@@ -32,10 +32,11 @@
 
 
 
-#include "SimdOverlapRecSD.hpp"
+#include "SimdOverlapRecSLD.hpp"
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <ranges>
 #include <string>
 
@@ -45,28 +46,31 @@
 #include "SimdAlign.hpp"
 #include "SimdDimensions.hpp"
 #include "SimdPrimitives.hpp"
-#include "SimdStorage.hpp"
 
 namespace simdovl {  // simdovl namespace
 
 auto
-compute_sd_overlap(double               *values,
-                   const size_t          nvalues,
-                   const CBasisFunction &bra,
-                   const CBasisFunction &ket,
-                   const CSimdMatrix    &coordinates,
-                   const double          threshold) -> void
+compute_sld_overlap(double               *values,
+                    const size_t          nvalues,
+                    const CBasisFunction &bra,
+                    const CBasisFunction &ket,
+                    const CSimdMatrix    &coordinates,
+                    const double          threshold) -> void
 {
-    if ((bra.get_angular_momentum() != 0) || (ket.get_angular_momentum() != 2))
+    const auto lbra = bra.get_angular_momentum();
+
+    const auto lket = ket.get_angular_momentum();
+
+    if (!(((lbra == 0) && (lket == 2)) || ((lbra == 2) && (lket == 0))))
     {
         errors::assertMsgCritical(
-            false, std::string("SimdOverlapRecSD.compute_sd_overlap: Basis functions must be of angular momenta zero and two"));
+            false, std::string("SimdOverlapRecSLD.compute_sld_overlap: Basis functions must be of angular momenta zero and two"));
     }
 
     if (nvalues > coordinates.number_of_columns())
     {
         errors::assertMsgCritical(
-            false, std::string("SimdOverlapRecSD.compute_sd_overlap: Number of values exceeds number of atom pairs"));
+            false, std::string("SimdOverlapRecSLD.compute_sld_overlap: Number of values exceeds number of atom pairs"));
     }
 
     if (nvalues == 0) return;
@@ -80,33 +84,26 @@ compute_sd_overlap(double               *values,
     const auto dimensions = simdfunc::make_column_dimensions(
         bra, ket, nvalues, coordinates, screenfunc::two_center_overlap_primitive_bound, threshold / static_cast<double>(nprims));
 
-    // NOTE: the buffer holds the prefactor shared by the angular components in
-    // its first row and the integrals of the components in the rows which follow,
-    // as the harmonic factors out of the sum over the pairs of primitives and
-    // multiplies the accumulated prefactor once.
+    // NOTE: the buffer holds the contracted prefactor alone, as the harmonic
+    // factors out of the sum over the pairs of primitives and the integrals of the
+    // angular components are formed straight into the values.
 
-    auto buffer = simdfunc::make_primitive_buffer(dimensions, 6);
+    auto buffer = simdfunc::make_primitive_buffer(dimensions, 1);
 
     if (buffer.number_of_columns() == 0)
     {
-        simdfunc::store_components(values, nvalues, buffer, 1, 5);
+        std::fill(values, values + 5 * nvalues, 0.0);
 
         return;
     }
 
     const auto nmax = buffer.number_of_columns();
 
-    auto *prim = buffer.data(0);
-
-    auto *out_m2 = buffer.data(1);
-    auto *out_m1 = buffer.data(2);
-    auto *out_0 = buffer.data(3);
-    auto *out_p1 = buffer.data(4);
-    auto *out_p2 = buffer.data(5);
+    auto *pe_0 = buffer.data(0);
 
     // NOTE: the components of the vector between the atoms and its squared length
-    // are carried by the coordinates, so the harmonic below is formed from rows
-    // which are already in place.
+    // are carried by the coordinates, so the angular half below reads rows which
+    // are already in place.
 
     const auto *ab_x = coordinates.data(6);
     const auto *ab_y = coordinates.data(7);
@@ -115,6 +112,13 @@ compute_sd_overlap(double               *values,
     const auto *ab_2 = coordinates.data(9);
 
     constexpr auto fpi = mathconst::pi_value();
+
+    // NOTE: the harmonic sits on whichever side carries the angular momentum, and
+    // the Gaussian product center is displaced from it by (a / p) times the vector
+    // between the atoms when that is the ket side and by -(b / p) when it is the bra
+    // side. The order is therefore settled once here and not inside any loop.
+
+    const auto on_ket = (lbra == 0);
 
     // accumulate the prefactor of each pair of primitives
 
@@ -127,46 +131,71 @@ compute_sd_overlap(double               *values,
 
         const auto fovl = fpi / fexp;
 
-        // NOTE: the harmonic sits on the ket side, so the Gaussian product center is
-        // displaced from it by (a / p) times the vector between the atoms and the
-        // prefactor carries that ratio raised to the power two.
+        const auto fbase = pair.anorm * pair.bnorm * fovl * std::sqrt(fovl);
 
-        const auto fr = pair.aexp / fexp;
+        const auto fr = on_ket ? (pair.aexp / fexp) : (-pair.bexp / fexp);
 
-        const auto ffact = pair.anorm * pair.bnorm * fovl * std::sqrt(fovl) * fr * fr;
+        const auto ffact = fbase * fr * fr;
 
-#pragma omp simd aligned(prim, ab_2 : simd::cache_line_size())
+#pragma omp simd aligned(pe_0, ab_2 : simd::cache_line_size())
         for (size_t k = 0; k < ncols; k++)
         {
-            prim[k] += ffact * std::exp(-fmu * ab_2[k]);
+            pe_0[k] += ffact * std::exp(-fmu * ab_2[k]);
         }
     });
 
-    // NOTE: the integrals of the angular components are the accumulated prefactor
-    // times the components of the harmonic, formed in one pass over the rows of
-    // the buffer and of the coordinates, all of which start at a cache line
-    // boundary.
+    // NOTE: the rows of the values are not aligned, as they start at the offset of
+    // this combination of basis functions in the values block, so they are kept out
+    // of the aligned clauses below.
 
-#pragma omp simd aligned(out_m2, out_m1, out_0, out_p1, out_p2, prim, ab_x, ab_y, ab_z, ab_2 : simd::cache_line_size())
+    auto *pc_0 = values + 0 * nvalues;
+    auto *pc_1 = values + 1 * nvalues;
+    auto *pc_2 = values + 2 * nvalues;
+    auto *pc_3 = values + 3 * nvalues;
+    auto *pc_4 = values + 4 * nvalues;
+
+    // NOTE: the components are formed in 2 loops, as the vectorizer runs out
+    // of registers with all of them in one. Only the prefactor and the vector
+    // between the atoms are loaded by more than one loop.
+
+#pragma omp simd aligned(pe_0, ab_x, ab_y, ab_z : simd::cache_line_size())
     for (size_t k = 0; k < nmax; k++)
     {
         const auto x = ab_x[k];
         const auto y = ab_y[k];
         const auto z = ab_z[k];
-        const auto r_2 = ab_2[k];
 
-        out_m2[k] = prim[k] * (std::sqrt(3.0) * x * y);
+        const auto e_0 = pe_0[k];
 
-        out_m1[k] = prim[k] * (std::sqrt(3.0) * y * z);
+        pc_0[k] = e_0 * (std::sqrt(3.0) * x * y);
 
-        out_0[k] = prim[k] * (1.5 * z * z - 0.5 * r_2);
+        pc_1[k] = e_0 * (std::sqrt(3.0) * y * z);
 
-        out_p1[k] = prim[k] * (std::sqrt(3.0) * x * z);
+        pc_2[k] = e_0 * (-0.5 * x * x - 0.5 * y * y + z * z);
 
-        out_p2[k] = prim[k] * (std::sqrt(0.75) * x * x - std::sqrt(0.75) * y * y);
+        pc_3[k] = e_0 * (std::sqrt(3.0) * x * z);
     }
 
-    simdfunc::store_components(values, nvalues, buffer, 1, 5);
+#pragma omp simd aligned(pe_0, ab_x, ab_y : simd::cache_line_size())
+    for (size_t k = 0; k < nmax; k++)
+    {
+        const auto x = ab_x[k];
+        const auto y = ab_y[k];
+
+        const auto e_0 = pe_0[k];
+
+        pc_4[k] = e_0 * (std::sqrt(0.75) * x * x - std::sqrt(0.75) * y * y);
+    }
+
+    // NOTE: the atom pairs beyond the reach of every pair of primitives have no
+    // contribution and are set to zero.
+
+    for (size_t m = 0; m < 5; m++)
+    {
+        auto *pv = values + m * nvalues;
+
+        std::fill(pv + nmax, pv + nvalues, 0.0);
+    }
 }
 
 }  // namespace simdovl

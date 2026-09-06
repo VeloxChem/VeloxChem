@@ -32,8 +32,8 @@
 
 
 
-#ifndef SimdOverlapRecDS_hpp
-#define SimdOverlapRecDS_hpp
+#ifndef SimdOverlapRecSLD_hpp
+#define SimdOverlapRecSLD_hpp
 
 #include <cstddef>
 
@@ -42,8 +42,8 @@
 
 namespace simdovl {  // simdovl namespace
 
-/// @brief Computes the overlap integrals of a combination of basis functions of
-/// angular momenta two and zero on bra and ket sides.
+/// @brief Computes the overlap integrals of a combination of one basis function
+/// of zero angular momentum and one of angular momentum two, in either order.
 /// @param values The values of the combination of basis functions in the values
 /// block of the sparsity pattern.
 /// @param nvalues The number of values to compute, i.e. the number of atom pairs
@@ -54,18 +54,19 @@ namespace simdovl {  // simdovl namespace
 /// ascending interatomic distance, holding the vector between the atoms in rows
 /// six to eight and its squared length in row nine.
 /// @param threshold The screening threshold of the integrals.
-/// @note The harmonic does not depend on the pair of primitives, so it multiplies
-/// the accumulated prefactor once rather than every contribution.
-/// @note The 5 spherical components of the harmonic are written out as
-/// polynomials in the components of the vector between the atoms and in its
-/// squared length, which the coordinates carry, so no recursion is run here.
-auto compute_ds_overlap(double               *values,
-                        const size_t          nvalues,
-                        const CBasisFunction &bra,
-                        const CBasisFunction &ket,
-                        const CSimdMatrix    &coordinates,
-                        const double          threshold) -> void;
+/// @note The angular half is the same for both orders, as the harmonic is the same
+/// polynomial of the vector between the atoms either way. The orders differ only in
+/// the prefactor, which is selected once for the whole combination.
+/// @note One term survives the integration over the Gaussian product center, so the
+/// buffer holds a single accumulator and the integrals of the angular components are
+/// formed straight into the values.
+auto compute_sld_overlap(double               *values,
+                         const size_t          nvalues,
+                         const CBasisFunction &bra,
+                         const CBasisFunction &ket,
+                         const CSimdMatrix    &coordinates,
+                         const double          threshold) -> void;
 
 }  // namespace simdovl
 
-#endif /* SimdOverlapRecDS_hpp */
+#endif /* SimdOverlapRecSLD_hpp */

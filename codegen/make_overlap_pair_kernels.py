@@ -403,3 +403,161 @@ if __name__ == "__main__":
     for la in ls:
         for lb in ls:
             print("wrote", emit(la, lb), flush=True)
+
+
+def emit_single(l):
+    """Emits the kernel of one S type function and one function of angular momentum
+    l, covering both orders.
+
+    The angular half does not depend on the order: the harmonic is the same
+    polynomial of the vector between the atoms either way. Only the prefactor
+    differs, carrying (a / p) raised to the power l when the harmonic sits on the
+    ket side and -(b / p) raised to it when it sits on the bra side, so the order is
+    selected once per pair of primitives and not inside any loop.
+    """
+    tag = "SL" + LETTER[l]
+    fn = tag.lower()
+    ncomp = 2 * l + 1
+    ms = list(range(-l, l + 1))
+
+    per = {m: terms(0, l, 0, m) for m in ms}
+    for m in ms:
+        assert set(per[m]) == {0}, "a single S type function must leave one term"
+
+    hpp = LIC_HPP + f"#ifndef SimdOverlapRec{tag}_hpp\n#define SimdOverlapRec{tag}_hpp\n\n"
+    hpp += "#include <cstddef>\n\n"
+    hpp += '#include "BasisFunction.hpp"\n#include "SimdMatrix.hpp"\n\n'
+    hpp += "namespace simdovl {  // simdovl namespace\n\n"
+    hpp += ("/// @brief Computes the overlap integrals of a combination of one basis function\n"
+            f"/// of zero angular momentum and one of angular momentum {MOMENT[l]}, in either order.\n"
+            "/// @param values The values of the combination of basis functions in the values\n"
+            "/// block of the sparsity pattern.\n"
+            "/// @param nvalues The number of values to compute, i.e. the number of atom pairs\n"
+            "/// surviving the screening of the combination of basis functions.\n"
+            "/// @param bra The basis function on bra side.\n"
+            "/// @param ket The basis function on ket side.\n"
+            "/// @param coordinates The coordinates of the atom pairs, as ten rows ordered by\n"
+            "/// ascending interatomic distance, holding the vector between the atoms in rows\n"
+            "/// six to eight and its squared length in row nine.\n"
+            "/// @param threshold The screening threshold of the integrals.\n"
+            "/// @note The angular half is the same for both orders, as the harmonic is the same\n"
+            "/// polynomial of the vector between the atoms either way. The orders differ only in\n"
+            "/// the prefactor, which is selected once for the whole combination.\n"
+            "/// @note One term survives the integration over the Gaussian product center, so the\n"
+            "/// buffer holds a single accumulator and the integrals of the angular components are\n"
+            "/// formed straight into the values.\n")
+    hpp += (f"auto compute_{fn}_overlap(double               *values,\n"
+            "                         const size_t          nvalues,\n"
+            "                         const CBasisFunction &bra,\n"
+            "                         const CBasisFunction &ket,\n"
+            "                         const CSimdMatrix    &coordinates,\n"
+            "                         const double          threshold) -> void;\n\n")
+    hpp += "}  // namespace simdovl\n\n"
+    hpp += f"#endif /* SimdOverlapRec{tag}_hpp */\n"
+
+    computed = [(m, i) for i, m in enumerate(ms)]
+    groups, cur, load = [], [], 0
+    for m, idx in computed:
+        n = len(sp.Poly(per[m][0], RX, RY, RZ).terms())
+        if cur and (len(cur) >= CHUNK or load + n > BUDGET):
+            groups.append(cur)
+            cur, load = [], 0
+        cur.append((m, idx))
+        load += n
+    if cur:
+        groups.append(cur)
+
+    ptrs = "\n".join(f"    auto *pc_{i} = values + {i} * nvalues;" for _, i in computed)
+
+    loops = ""
+    for grp in groups:
+        used = set()
+        for m, _ in grp:
+            used |= per[m][0].free_symbols
+        vs = [(s, n) for s, n in ((RX, "x"), (RY, "y"), (RZ, "z")) if s in used]
+        aligned = ", ".join(["pe_0"] + ["ab_" + n for _, n in vs])
+        loops += f"#pragma omp simd aligned({aligned} : simd::cache_line_size())\n"
+        loops += "    for (size_t k = 0; k < nmax; k++)\n    {\n"
+        for _, n in vs:
+            loops += f"        const auto {n} = ab_{n}[k];\n"
+        loops += "\n        const auto e_0 = pe_0[k];\n\n"
+        for m, i in grp:
+            loops += f"        pc_{i}[k] = e_0 * ({expression(per[m][0])});\n\n"
+        loops = loops.rstrip("\n") + "\n    }\n\n"
+
+    cpp = LICENSE + f'#include "SimdOverlapRec{tag}.hpp"\n\n'
+    cpp += "#include <algorithm>\n#include <cmath>\n#include <cstddef>\n#include <ranges>\n#include <string>\n\n"
+    cpp += ('#include "ErrorHandler.hpp"\n#include "MathConst.hpp"\n#include "ScreeningFunc.hpp"\n'
+            '#include "SimdAlign.hpp"\n#include "SimdDimensions.hpp"\n#include "SimdPrimitives.hpp"\n\n')
+    cpp += "namespace simdovl {  // simdovl namespace\n\n"
+    cpp += (f"auto\ncompute_{fn}_overlap(double               *values,\n"
+            "                    const size_t          nvalues,\n"
+            "                    const CBasisFunction &bra,\n"
+            "                    const CBasisFunction &ket,\n"
+            "                    const CSimdMatrix    &coordinates,\n"
+            "                    const double          threshold) -> void\n{\n")
+    cpp += (f"    const auto lbra = bra.get_angular_momentum();\n\n"
+            f"    const auto lket = ket.get_angular_momentum();\n\n"
+            f"    if (!(((lbra == 0) && (lket == {l})) || ((lbra == {l}) && (lket == 0))))\n"
+            "    {\n        errors::assertMsgCritical(\n"
+            f'            false, std::string("SimdOverlapRec{tag}.compute_{fn}_overlap: Basis functions must be of angular momenta zero and {MOMENT[l]}"));\n'
+            "    }\n\n")
+    cpp += ("    if (nvalues > coordinates.number_of_columns())\n    {\n        errors::assertMsgCritical(\n"
+            f'            false, std::string("SimdOverlapRec{tag}.compute_{fn}_overlap: Number of values exceeds number of atom pairs"));\n'
+            "    }\n\n    if (nvalues == 0) return;\n\n")
+    cpp += "    const auto nprims = bra.exponents().size() * ket.exponents().size();\n\n"
+    cpp += ("    // NOTE: the pairs of primitives are screened with the threshold of the\n"
+            "    // integrals divided by their number, as their contributions accumulate into\n"
+            "    // a single value and the error of the sum is bounded by the number of terms.\n\n")
+    cpp += ("    const auto dimensions = simdfunc::make_column_dimensions(\n"
+            "        bra, ket, nvalues, coordinates, screenfunc::two_center_overlap_primitive_bound, "
+            "threshold / static_cast<double>(nprims));\n\n")
+    cpp += ("    // NOTE: the buffer holds the contracted prefactor alone, as the harmonic\n"
+            "    // factors out of the sum over the pairs of primitives and the integrals of the\n"
+            "    // angular components are formed straight into the values.\n\n")
+    cpp += "    auto buffer = simdfunc::make_primitive_buffer(dimensions, 1);\n\n"
+    cpp += ("    if (buffer.number_of_columns() == 0)\n    {\n"
+            f"        std::fill(values, values + {ncomp} * nvalues, 0.0);\n\n        return;\n    }}\n\n")
+    cpp += "    const auto nmax = buffer.number_of_columns();\n\n    auto *pe_0 = buffer.data(0);\n\n"
+    cpp += ("    // NOTE: the components of the vector between the atoms and its squared length\n"
+            "    // are carried by the coordinates, so the angular half below reads rows which\n"
+            "    // are already in place.\n\n")
+    cpp += ("    const auto *ab_x = coordinates.data(6);\n    const auto *ab_y = coordinates.data(7);\n"
+            "    const auto *ab_z = coordinates.data(8);\n\n    const auto *ab_2 = coordinates.data(9);\n\n")
+    cpp += "    constexpr auto fpi = mathconst::pi_value();\n\n"
+    cpp += ("    // NOTE: the harmonic sits on whichever side carries the angular momentum, and\n"
+            "    // the Gaussian product center is displaced from it by (a / p) times the vector\n"
+            "    // between the atoms when that is the ket side and by -(b / p) when it is the bra\n"
+            "    // side. The order is therefore settled once here and not inside any loop.\n\n")
+    cpp += "    const auto on_ket = (lbra == 0);\n\n"
+    cpp += "    // accumulate the prefactor of each pair of primitives\n\n"
+    cpp += ("    simdfunc::accumulate_primitives(bra, ket, dimensions, [&](const simdfunc::CPrimitivePair &pair) {\n"
+            "        const auto ncols = pair.ncols;\n\n"
+            "        const auto fexp = pair.aexp + pair.bexp;\n\n"
+            "        const auto fmu = pair.aexp * pair.bexp / fexp;\n\n"
+            "        const auto fovl = fpi / fexp;\n\n"
+            "        const auto fbase = pair.anorm * pair.bnorm * fovl * std::sqrt(fovl);\n\n"
+            "        const auto fr = on_ket ? (pair.aexp / fexp) : (-pair.bexp / fexp);\n\n"
+            "        const auto ffact = fbase" + " * fr" * l + ";\n\n"
+            "#pragma omp simd aligned(pe_0, ab_2 : simd::cache_line_size())\n"
+            "        for (size_t k = 0; k < ncols; k++)\n        {\n"
+            "            pe_0[k] += ffact * std::exp(-fmu * ab_2[k]);\n        }\n    });\n\n")
+    cpp += ("    // NOTE: the rows of the values are not aligned, as they start at the offset of\n"
+            "    // this combination of basis functions in the values block, so they are kept out\n"
+            "    // of the aligned clauses below.\n\n")
+    cpp += ptrs + "\n\n"
+    if len(groups) > 1:
+        cpp += (f"    // NOTE: the components are formed in {len(groups)} loops, as the vectorizer runs out\n"
+                "    // of registers with all of them in one. Only the prefactor and the vector\n"
+                "    // between the atoms are loaded by more than one loop.\n\n")
+    cpp += loops
+    cpp += ("    // NOTE: the atom pairs beyond the reach of every pair of primitives have no\n"
+            "    // contribution and are set to zero.\n\n")
+    cpp += (f"    for (size_t m = 0; m < {ncomp}; m++)\n    {{\n"
+            "        auto *pv = values + m * nvalues;\n\n"
+            "        std::fill(pv + nmax, pv + nvalues, 0.0);\n    }\n")
+    cpp += "}\n\n}  // namespace simdovl\n"
+
+    io.open(SRC + f"SimdOverlapRec{tag}.hpp", "w").write(hpp)
+    io.open(SRC + f"SimdOverlapRec{tag}.cpp", "w").write(cpp)
+    return tag

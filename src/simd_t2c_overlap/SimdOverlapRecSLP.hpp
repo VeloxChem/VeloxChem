@@ -31,8 +31,9 @@
 //  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
-#ifndef SimdOverlapRecPS_hpp
-#define SimdOverlapRecPS_hpp
+
+#ifndef SimdOverlapRecSLP_hpp
+#define SimdOverlapRecSLP_hpp
 
 #include <cstddef>
 
@@ -41,8 +42,8 @@
 
 namespace simdovl {  // simdovl namespace
 
-/// @brief Computes the overlap integrals of a combination of basis functions of
-/// angular momenta one and zero on bra and ket sides.
+/// @brief Computes the overlap integrals of a combination of one basis function
+/// of zero angular momentum and one of angular momentum one, in either order.
 /// @param values The values of the combination of basis functions in the values
 /// block of the sparsity pattern.
 /// @param nvalues The number of values to compute, i.e. the number of atom pairs
@@ -53,18 +54,19 @@ namespace simdovl {  // simdovl namespace
 /// ascending interatomic distance, holding the vector between the atoms in rows
 /// six to eight and its squared length in row nine.
 /// @param threshold The screening threshold of the integrals.
-/// @note The Gaussian product center lies at -(b / p) times the vector between the atoms from the atom on bra side, so the integrals carry the exponent of the ket side over the total exponent and a sign, the harmonic being homogeneous of degree one and odd.
-/// @note The solid harmonic of angular momentum one is the vector between the
-/// atoms itself, so it is read from the coordinates and not formed by a
-/// recursion. Its spherical components run m = -1, 0, 1 and are the y, z and x
-/// components of that vector in that order.
-auto compute_ps_overlap(double               *values,
-                        const size_t          nvalues,
-                        const CBasisFunction &bra,
-                        const CBasisFunction &ket,
-                        const CSimdMatrix    &coordinates,
-                        const double          threshold) -> void;
+/// @note The angular half is the same for both orders, as the harmonic is the same
+/// polynomial of the vector between the atoms either way. The orders differ only in
+/// the prefactor, which is selected once for the whole combination.
+/// @note One term survives the integration over the Gaussian product center, so the
+/// buffer holds a single accumulator and the integrals of the angular components are
+/// formed straight into the values.
+auto compute_slp_overlap(double               *values,
+                         const size_t          nvalues,
+                         const CBasisFunction &bra,
+                         const CBasisFunction &ket,
+                         const CSimdMatrix    &coordinates,
+                         const double          threshold) -> void;
 
 }  // namespace simdovl
 
-#endif /* SimdOverlapRecPS_hpp */
+#endif /* SimdOverlapRecSLP_hpp */
