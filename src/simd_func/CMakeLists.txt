@@ -3,19 +3,6 @@ target_sources(vlxobjs
     SimdBoysFunc.cpp
     SimdBoysTable.cpp
     SimdCoordinates.cpp
-    SimdHarmonics.cpp
-    SimdHarmonicsRecP.cpp
-    SimdHarmonicsRecD.cpp
-    SimdHarmonicsRecF.cpp
-    SimdHarmonicsRecG.cpp
-    SimdHarmonicsRecH.cpp
-    SimdHarmonicsRecI.cpp
-    SimdHarmonicsRecK.cpp
-    SimdHarmonicsRecL.cpp
-    SimdHarmonicsRecM.cpp
-    SimdHarmonicsRecN.cpp
-    SimdHarmonicsRecO.cpp
-    SimdHarmonicsRecQ.cpp
   )
 
 target_include_directories(vlxobjs
