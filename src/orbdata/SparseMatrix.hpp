@@ -52,6 +52,7 @@
 #include "MolecularBasis.hpp"
 #include "Molecule.hpp"
 #include "ScreeningFunc.hpp"
+#include "SparsityPattern.hpp"
 #include "OpenMPFunc.hpp"
 #include "TensorComponents.hpp"
 #include "ValuesState.hpp"
@@ -78,21 +79,6 @@
 class CSparseMatrix
 {
    public:
-    /// @brief The number of blocks per thread aimed at when the target number of
-    /// atom pairs of a block is chosen. The blocks are a few per thread, so that
-    /// dynamic scheduling has enough of them to even out the ones which differ in
-    /// cost, and no more, as a block carries a fixed cost and the blocks contend
-    /// for the memory. Measured on fourteen threads, where two per thread is
-    /// five percent better than four and four is twice as good as sixteen.
-    static constexpr size_t blocks_per_thread = 2;
-
-    /// @brief The smallest target number of atom pairs of a block chosen. A
-    /// block carries a fixed cost which does not shrink with the atom pairs it
-    /// holds, chiefly the bisection of the screening over the pairs of
-    /// primitives, so a molecule too small to fill the threads is divided into
-    /// fewer blocks rather than into blocks whose fixed cost outweighs their work.
-    static constexpr size_t min_block_size = 2048;
-
     /// @brief The number of elements of the dense matrix one thread sets to zero
     /// at a time when the matrix is reconstructed.
     static constexpr size_t _dense_chunk_size = 1 << 20;
@@ -107,6 +93,24 @@ class CSparseMatrix
         , _values{}
 
         , _type(mat_t::general)
+
+        , _values_state(valstat::empty)
+    {
+    }
+
+    /// @brief The constructor with a prepared sparsity pattern.
+    /// @param pattern The sparsity pattern of the blocks of the matrix.
+    /// @note This is the constructor the drivers use, as the pattern is formed once
+    /// by sparsity::make_pattern and may be shared with the consumers of the values.
+    explicit CSparseMatrix(const CSparsityPattern &pattern)
+
+        : _pair_blocks(pattern.pair_blocks())
+
+        , _diagonal_blocks(pattern.diagonal_blocks())
+
+        , _values(pattern.number_of_pair_blocks() + pattern.number_of_diagonal_blocks(), nullptr)
+
+        , _type(pattern.get_type())
 
         , _values_state(valstat::empty)
     {
@@ -152,24 +156,8 @@ class CSparseMatrix
                   const diagstor         storage,
                   const size_t           block_size = 0)
 
-        : _pair_blocks{}
-
-        , _diagonal_blocks{}
-
-        , _values{}
-
-        , _type(mat_type)
-
-        , _values_state(valstat::empty)
+        : CSparseMatrix(sparsity::make_pattern(molecule, basis, basis, screener, threshold, mat_type, storage, block_size))
     {
-        // NOTE: a symmetric or antisymmetric matrix needs the upper triangle of
-        // the atom basis pair groups only, while a general matrix needs their
-        // full direct product, which the two molecular bases factory delivers
-        // even when handed the same molecular basis twice.
-
-        auto groups = (mat_type == mat_t::general) ? basis.basis_pair_groups(basis) : basis.basis_pair_groups();
-
-        _add_blocks(molecule, groups, screener, threshold, storage, block_size);
     }
 
     /// @brief The constructor with molecule, molecular bases on bra and ket
@@ -194,22 +182,10 @@ class CSparseMatrix
                   const diagstor         storage,
                   const size_t           block_size = 0)
 
-        : _pair_blocks{}
-
-        , _diagonal_blocks{}
-
-        , _values{}
-
-        , _type(mat_type)
-
-        , _values_state(valstat::empty)
+        : CSparseMatrix(sparsity::make_pattern(molecule, bra_basis, ket_basis, screener, threshold, mat_type, storage, block_size))
     {
         errors::assertMsgCritical(mat_type == mat_t::general,
                                   std::string("SparseMatrix: Matrix with two molecular bases must be of general type"));
-
-        auto groups = bra_basis.basis_pair_groups(ket_basis);
-
-        _add_blocks(molecule, groups, screener, threshold, storage, block_size);
     }
 
     /// @brief The constructor with molecule, molecular basis, named integral
@@ -230,19 +206,8 @@ class CSparseMatrix
                   const diagstor         storage,
                   const size_t           block_size = 0)
 
-        : _pair_blocks{}
-
-        , _diagonal_blocks{}
-
-        , _values{}
-
-        , _type(mat_type)
-
-        , _values_state(valstat::empty)
+        : CSparseMatrix(sparsity::make_pattern(molecule, basis, basis, bound, threshold, mat_type, storage, block_size))
     {
-        auto groups = (mat_type == mat_t::general) ? basis.basis_pair_groups(basis) : basis.basis_pair_groups();
-
-        _add_named_blocks(molecule, groups, bound, threshold, storage, block_size);
     }
 
     /// @brief The constructor with molecule, molecular bases on bra and ket
@@ -265,22 +230,10 @@ class CSparseMatrix
                   const diagstor         storage,
                   const size_t           block_size = 0)
 
-        : _pair_blocks{}
-
-        , _diagonal_blocks{}
-
-        , _values{}
-
-        , _type(mat_type)
-
-        , _values_state(valstat::empty)
+        : CSparseMatrix(sparsity::make_pattern(molecule, bra_basis, ket_basis, bound, threshold, mat_type, storage, block_size))
     {
         errors::assertMsgCritical(mat_type == mat_t::general,
                                   std::string("SparseMatrix: Matrix with two molecular bases must be of general type"));
-
-        auto groups = bra_basis.basis_pair_groups(ket_basis);
-
-        _add_named_blocks(molecule, groups, bound, threshold, storage, block_size);
     }
 
     /// @brief The copy constructor.
@@ -915,40 +868,6 @@ class CSparseMatrix
         }
     }
 
-    /// @brief Adds the blocks screened with a named two-center integral bound.
-    /// @param molecule The molecule to compute interatomic distances from.
-    /// @param groups The atom basis pair groups to describe.
-    /// @param bound The integral bound to screen atom pairs with.
-    /// @param threshold The screening threshold.
-    /// @param storage The storage layout of the diagonal blocks.
-    /// @param block_size The target number of atom pairs of a block, or zero to
-    /// choose it from the number of the threads and the number of the atom pairs.
-    auto
-    _add_named_blocks(const CMolecule                  &molecule,
-                      std::vector<CAtomBasisPairGroup> &groups,
-                      const screener                    bound,
-                      const double                      threshold,
-                      const diagstor                    storage,
-                      const size_t                      block_size) -> void
-    {
-        if (bound == screener::overlap)
-        {
-            _add_blocks(molecule, groups, screenfunc::two_center_overlap_bound, threshold, storage, block_size);
-        }
-        else if (bound == screener::kinetic_energy)
-        {
-            _add_blocks(molecule, groups, screenfunc::two_center_kinetic_energy_bound, threshold, storage, block_size);
-        }
-        else if (bound == screener::nuclear_potential)
-        {
-            _add_blocks(molecule, groups, screenfunc::two_center_nuclear_potential_bound, threshold, storage, block_size);
-        }
-        else
-        {
-            errors::assertMsgCritical(false, std::string("SparseMatrix: Integral bound is not a two-center bound"));
-        }
-    }
-
     /// @brief Checks that the values blocks are allocated and that a block index
     /// is in range.
     /// @param index The index of block.
@@ -1022,80 +941,6 @@ class CSparseMatrix
 
             throw;
         }
-    }
-
-    /// @brief Adds the sparsity patterns of the non-empty blocks of the atom
-    /// basis pair groups.
-    /// @param molecule The molecule to compute interatomic distances from.
-    /// @param groups The atom basis pair groups to describe.
-    /// @param screener The integral bound.
-    /// @param threshold The screening threshold.
-    /// @param storage The storage layout of the diagonal blocks.
-    /// @param block_size The target number of atom pairs of a block, or zero to
-    /// choose it from the number of the threads and the number of the atom pairs.
-    template <typename B>
-    auto
-    _add_blocks(const CMolecule                  &molecule,
-                std::vector<CAtomBasisPairGroup> &groups,
-                const B                          &screener,
-                const double                      threshold,
-                const diagstor                    storage,
-                const size_t                      block_size) -> void
-    {
-        // NOTE: the atom basis pair groups are as many as the pairs of the
-        // unique atom bases, so their number is set by the variety of the
-        // elements of the molecule and not by its size, and the largest of them
-        // holds a third of the atom pairs. Dividing them into blocks of a target
-        // number of atom pairs makes the number of the blocks follow the size of
-        // the molecule instead, so the work of every stage below divides for any
-        // number of threads.
-
-        const auto nblock_pairs = (block_size == 0) ? CAtomBasisPairGroup::make_block_size(groups, blocks_per_thread, min_block_size) : block_size;
-
-        auto blocks = (nblock_pairs == 0) ? std::move(groups) : CAtomBasisPairGroup::divide(groups, nblock_pairs);
-
-        // NOTE: the atom pairs of all the blocks are ordered by interatomic
-        // distance before the sparsity patterns are described, as the patterns
-        // are read off the leading atom pairs which survive the screening. A
-        // block holds a subrange of the atom pairs of its group and is ordered
-        // within itself, which is all the bisection of the screening needs, as
-        // the screening keeps an atom pair or drops it on its own distance.
-
-        CAtomBasisPairGroup::sort_by_distance(blocks, molecule);
-
-        // NOTE: the patterns are held in a vector indexed by the block, so that
-        // they are described in any order and added in the order of the blocks.
-        // The layout of the values blocks therefore does not depend on the
-        // scheduling.
-
-        const auto nblocks = static_cast<int>(blocks.size());
-
-        std::vector<std::optional<CAtomBasisPairSparsity>> pair_blocks(blocks.size());
-
-        std::vector<std::optional<CAtomBasisDiagonalSparsity>> diagonal_blocks(blocks.size());
-
-#pragma omp parallel for schedule(dynamic)
-        for (int i = 0; i < nblocks; i++)
-        {
-            pair_blocks[i].emplace(blocks[i], screener, threshold);
-
-            diagonal_blocks[i].emplace(blocks[i], storage);
-        }
-
-        // NOTE: an empty pattern is left out, as it carries no values block of
-        // its own.
-
-        for (int i = 0; i < nblocks; i++)
-        {
-            if (pair_blocks[i]->number_of_pairs() > 0) _pair_blocks.push_back(std::move(*pair_blocks[i]));
-
-            if (diagonal_blocks[i]->number_of_atoms() > 0) _diagonal_blocks.push_back(std::move(*diagonal_blocks[i]));
-        }
-
-        // NOTE: one values block per sparsity pattern, sized here so that every
-        // construction path leaves the values blocks consistent with the blocks.
-
-        _values.assign(_pair_blocks.size() + _diagonal_blocks.size(), nullptr);
     }
 
     /// @brief The sparsity patterns of the off-diagonal blocks.
