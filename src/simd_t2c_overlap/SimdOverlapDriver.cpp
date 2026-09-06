@@ -31,21 +31,8 @@
 //  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
+
 #include "SimdOverlapDriver.hpp"
-
-#include <algorithm>
-#include <cstdint>
-#include <ranges>
-#include <string>
-#include <utility>
-#include <vector>
-
-#include "DenseIndexFunc.hpp"
-#include "ErrorHandler.hpp"
-#include "Matrix.hpp"
-#include "ScreeningFunc.hpp"
-#include "SimdCoordinates.hpp"
-#include "SimdOverlapFunc.hpp"
 
 auto
 CSimdOverlapDriver::compute(const CMolecule &molecule, const CMolecularBasis &basis) const -> CSparseMatrix
@@ -54,7 +41,7 @@ CSimdOverlapDriver::compute(const CMolecule &molecule, const CMolecularBasis &ba
     // diagonal atom pair blocks hold one value for each pair of basis functions
     // with the same angular momentum.
 
-    auto matrix = CSparseMatrix(molecule, basis, screener::overlap, _threshold, mat_t::symmetric, diagstor::scalar);
+    const auto pattern = make_pattern(molecule, basis, basis, mat_t::symmetric);
 
     // NOTE: the values blocks are not set to zero after they are allocated, as
     // every value of every block is written below. A combination of basis
@@ -62,11 +49,13 @@ CSimdOverlapDriver::compute(const CMolecule &molecule, const CMolecularBasis &ba
     // integrals of the atom pairs it reaches and zeros of the remaining ones, so
     // no value is left with the undefined content of the allocation.
 
+    auto matrix = CSparseMatrix(pattern);
+
     matrix.allocate();
 
-    _compute_pair_blocks(matrix, molecule, basis, basis);
+    auto distributor = CSimdT2CDistributor<CSparseMatrix>(&matrix);
 
-    _compute_diagonal_blocks(matrix, molecule, basis, basis);
+    compute(pattern, molecule, basis, basis, distributor);
 
     return matrix;
 }
@@ -75,176 +64,15 @@ auto
 CSimdOverlapDriver::compute(const CMolecule &molecule, const CMolecularBasis &bra_basis, const CMolecularBasis &ket_basis) const
     -> CSparseMatrix
 {
-    auto matrix = CSparseMatrix(molecule, bra_basis, ket_basis, screener::overlap, _threshold, mat_t::general, diagstor::scalar);
+    const auto pattern = make_pattern(molecule, bra_basis, ket_basis, mat_t::general);
 
-    // NOTE: the values blocks are not set to zero after they are allocated, as
-    // every value of every block is written below. A combination of basis
-    // functions reaching no atom pair holds no values, and a kernel writes the
-    // integrals of the atom pairs it reaches and zeros of the remaining ones, so
-    // no value is left with the undefined content of the allocation.
+    auto matrix = CSparseMatrix(pattern);
 
     matrix.allocate();
 
-    _compute_pair_blocks(matrix, molecule, bra_basis, ket_basis);
+    auto distributor = CSimdT2CDistributor<CSparseMatrix>(&matrix);
 
-    _compute_diagonal_blocks(matrix, molecule, bra_basis, ket_basis);
+    compute(pattern, molecule, bra_basis, ket_basis, distributor);
 
     return matrix;
-}
-
-auto
-CSimdOverlapDriver::_compute_pair_blocks(CSparseMatrix         &matrix,
-                                         const CMolecule       &molecule,
-                                         const CMolecularBasis &bra_basis,
-                                         const CMolecularBasis &ket_basis) const -> void
-{
-    // NOTE: the blocks are independent, as each of them forms its own coordinates
-    // and writes the values of its own combinations of basis functions, which no
-    // other block addresses. Dynamic scheduling is used as
-    // the blocks hold a comparable number of atom pairs but differ in the number
-    // of the combinations of basis functions and in the cost of their kernels.
-
-    const auto nblocks = static_cast<int>(matrix.number_of_pair_blocks());
-
-    // NOTE: the blocks are visited from the most costly to the least, so that a
-    // costly block is taken while there is still work to fill the other threads
-    // with. The threads draw two or three blocks each, so a costly block drawn
-    // last is finished alone and sets the time of the whole loop.
-
-    // NOTE: the cost of a block is the number of its atom pairs times the cost of
-    // its combinations of basis functions, each weighted by the sum of the
-    // angular momenta it carries, as the recursions of the integrals grow with
-    // that sum. The weight is an estimate and orders the blocks, it is not used
-    // for anything else.
-
-    std::vector<size_t> order(static_cast<size_t>(nblocks));
-
-    std::vector<double> costs(static_cast<size_t>(nblocks), 0.0);
-
-    for (int iblk = 0; iblk < nblocks; iblk++)
-    {
-        const auto &block = matrix.pair_block(static_cast<size_t>(iblk));
-
-        const auto a_indices = denseidx::index_functions(bra_basis.basis_set(block.bra_index()));
-
-        const auto b_indices = denseidx::index_functions(ket_basis.basis_set(block.ket_index()));
-
-        double weight = 0.0;
-
-        for (const auto &[la, ia] : a_indices)
-        {
-            for (const auto &[lb, jb] : b_indices)
-            {
-                const auto lsum = static_cast<double>(la + lb + 1);
-
-                weight += lsum * lsum;
-            }
-        }
-
-        order[static_cast<size_t>(iblk)] = static_cast<size_t>(iblk);
-
-        costs[static_cast<size_t>(iblk)] = static_cast<double>(block.number_of_pairs()) * weight;
-    }
-
-    std::ranges::sort(order, [&](const size_t a, const size_t b) { return costs[a] > costs[b]; });
-
-#pragma omp parallel for schedule(dynamic) if (nblocks > 1)
-    for (int iblk = 0; iblk < nblocks; iblk++)
-    {
-        const auto jblk = order[static_cast<size_t>(iblk)];
-
-        const auto &block = matrix.pair_block(jblk);
-
-        if (block.number_of_pairs() == 0) continue;
-
-        // NOTE: the coordinates of the atom pairs are created once for the whole
-        // block, as all combinations of basis functions of the block share them.
-
-        const auto coordinates = simdfunc::make_coordinates(block, molecule);
-
-        const auto &a_basis = bra_basis.basis_set(block.bra_index());
-
-        const auto &b_basis = ket_basis.basis_set(block.ket_index());
-
-        const auto a_indices = denseidx::index_functions(a_basis);
-
-        const auto b_indices = denseidx::index_functions(b_basis);
-
-        // NOTE: the atom bases of an off-diagonal block sit on different atoms,
-        // so all combinations of basis functions are computed and none of them
-        // shares its storage with the reverse order.
-
-        // NOTE: the combinations of basis functions are independent, as each of
-        // them writes its own values and reads the coordinates of the block
-        // without changing them.
-
-        for (size_t i = 0; i < a_indices.size(); i++)
-        {
-            for (size_t j = 0; j < b_indices.size(); j++)
-            {
-                const auto [la, ia] = a_indices[i];
-
-                const auto [lb, jb] = b_indices[j];
-
-                const auto nvalues = block.number_of_pairs(la, ia, lb, jb);
-
-                if (nvalues == 0) continue;
-
-                simdovl::compute_overlap(matrix.pair_values(jblk, la, ia, lb, jb),
-                                         nvalues,
-                                         a_basis.functions()[i],
-                                         b_basis.functions()[j],
-                                         coordinates,
-                                         _threshold);
-            }
-        }
-
-    }
-}
-
-auto
-CSimdOverlapDriver::_compute_diagonal_blocks(CSparseMatrix         &matrix,
-                                             const CMolecule       &molecule,
-                                             const CMolecularBasis &bra_basis,
-                                             const CMolecularBasis &ket_basis) const -> void
-{
-    // NOTE: the overlap of two basis functions on the same atom does not depend
-    // on the position of the atom, so a single value is stored for each pair of
-    // basis functions with the same angular momentum and the molecule is not
-    // needed here.
-
-    for (size_t iblk = 0; iblk < matrix.number_of_diagonal_blocks(); iblk++)
-    {
-        const auto &block = matrix.diagonal_block(iblk);
-
-        const auto &a_basis = bra_basis.basis_set(block.bra_index());
-
-        const auto &b_basis = ket_basis.basis_set(block.ket_index());
-
-        const auto a_indices = denseidx::index_functions(a_basis);
-
-        const auto b_indices = denseidx::index_functions(b_basis);
-
-        auto *values = matrix.diagonal_values(iblk);
-
-        for (size_t i = 0; i < a_indices.size(); i++)
-        {
-            for (size_t j = 0; j < b_indices.size(); j++)
-            {
-                // NOTE: only the stored combinations are computed, as the values
-                // of the reverse order share their storage.
-
-                if (block.is_triangular() && (i > j)) continue;
-
-                const auto [la, ia] = a_indices[i];
-
-                const auto [lb, jb] = b_indices[j];
-
-                if (block.number_of_elements(la, ia, lb, jb) == 0) continue;
-
-                values[block.element_offset(la, ia, lb, jb)] =
-                    simdovl::one_center_overlap(a_basis.functions()[i], b_basis.functions()[j]);
-            }
-        }
-    }
 }

@@ -50,19 +50,25 @@ export_simdintegrals(py::module &m) -> void
 
     PyClass<CSimdOverlapDriver>(m, "SimdOverlapDriver")
         .def(py::init<>())
-        .def(py::init<const double>(), "Creates an overlap driver with given screening threshold.", py::arg("threshold"))
+        .def(py::init<const double, const size_t>(),
+             "Creates an overlap driver with given screening threshold and target block size.",
+             py::arg("threshold"),
+             py::arg("block_size") = 0)
         .def("compute",
-             py::overload_cast<const CMolecule &, const CMolecularBasis &>(&CSimdOverlapDriver::compute, py::const_),
+             static_cast<CSparseMatrix (CSimdOverlapDriver::*)(const CMolecule &, const CMolecularBasis &) const>(
+                 &CSimdOverlapDriver::compute),
              "Computes sparse overlap matrix for given molecule and basis.",
              py::arg("molecule"),
              py::arg("basis"))
         .def("compute",
-             py::overload_cast<const CMolecule &, const CMolecularBasis &, const CMolecularBasis &>(&CSimdOverlapDriver::compute, py::const_),
+             static_cast<CSparseMatrix (CSimdOverlapDriver::*)(const CMolecule &, const CMolecularBasis &, const CMolecularBasis &) const>(
+                 &CSimdOverlapDriver::compute),
              "Computes sparse overlap matrix for given molecule and pair of bases.",
              py::arg("molecule"),
              py::arg("bra_basis"),
              py::arg("ket_basis"))
-        .def("get_threshold", &CSimdOverlapDriver::get_threshold, "Gets screening threshold of the integrals.");
+        .def("get_threshold", &CSimdOverlapDriver::get_threshold, "Gets screening threshold of the integrals.")
+        .def("get_block_size", &CSimdOverlapDriver::get_block_size, "Gets target number of atom pairs of a block.");
 }
 
 }  // namespace vlx_simdintegrals
