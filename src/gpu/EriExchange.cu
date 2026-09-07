@@ -120983,4 +120983,6 @@ computeExchangeFockDDDD25_RS_FP32(double*         mat_K,
 }
 
 
+#include "ExchangeMPWinners.cu.inc"
+
 }  // namespace gpu

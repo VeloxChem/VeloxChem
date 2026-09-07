@@ -10963,6 +10963,8 @@ computeExchangeFockDDDD25_RS_FP32(double*         mat_K,
                        const uint32_t* displ_cuts);
 
 
+#include "ExchangeMPWinners.hpp.inc"
+
 }  // namespace gpu
 
 #endif
