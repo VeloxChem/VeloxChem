@@ -100,6 +100,9 @@ class CSimdOverlapDriver
     /// @param distributor The distributor to hand the integrals to.
     /// @note This is the form which does not name a container of the values. The
     /// overloads which return a sparse matrix are written in terms of it.
+    /// @note The pattern carries the threshold its atom pairs were screened with and
+    /// the integrals are screened with that one, so the threshold of the driver is
+    /// the one a pattern is formed with and not the one a pattern is computed with.
     template <class D>
     auto
     compute(const CSparsityPattern &pattern,
@@ -115,6 +118,8 @@ class CSimdOverlapDriver
         const auto a_indices = denseidx::index_functions(bra_basis);
 
         const auto b_indices = denseidx::index_functions(ket_basis);
+
+        sparsity::check_pattern(pattern, a_indices, b_indices);
 
         _compute_pair_blocks(pattern, molecule, bra_basis, ket_basis, a_indices, b_indices, distributor);
 
@@ -312,7 +317,13 @@ CSimdOverlapDriver::_compute_pair_blocks(const CSparsityPattern              &pa
 
                 auto *values = distributor.target(block, jblk, la, ia, lb, jb, nvalues, ncomps);
 
-                simdovl::compute_overlap(values, nvalues, a_basis.functions()[i], b_basis.functions()[j], coordinates, _threshold);
+                // NOTE: the pairs of primitives are screened with the threshold the
+                // atom pairs of the pattern were screened with, so that the two
+                // screenings of a computation cannot disagree when the pattern comes
+                // from the caller rather than from this driver.
+
+                simdovl::compute_overlap(
+                    values, nvalues, a_basis.functions()[i], b_basis.functions()[j], coordinates, pattern.get_threshold());
 
                 distributor.commit(block, jblk, la, ia, lb, jb, nvalues, ncomps);
             }

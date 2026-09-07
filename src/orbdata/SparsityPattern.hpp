@@ -44,6 +44,7 @@
 #include "AtomBasisDiagonalSparsity.hpp"
 #include "AtomBasisPairGroup.hpp"
 #include "AtomBasisPairSparsity.hpp"
+#include "DenseIndexFunc.hpp"
 #include "ErrorHandler.hpp"
 #include "Matrix.hpp"
 #include "Molecule.hpp"
@@ -69,6 +70,8 @@ class CSparsityPattern
         , _diagonal_blocks{}
 
         , _type(mat_t::general)
+
+        , _threshold(0.0)
     {
     }
 
@@ -76,15 +79,19 @@ class CSparsityPattern
     /// @param pair_blocks The sparsity patterns of the off-diagonal blocks.
     /// @param diagonal_blocks The sparsity patterns of the diagonal blocks.
     /// @param mat_type The type of quantity the pattern describes.
+    /// @param threshold The screening threshold the blocks were described under.
     CSparsityPattern(std::vector<CAtomBasisPairSparsity>     pair_blocks,
                      std::vector<CAtomBasisDiagonalSparsity> diagonal_blocks,
-                     const mat_t                             mat_type)
+                     const mat_t                             mat_type,
+                     const double                            threshold)
 
         : _pair_blocks(std::move(pair_blocks))
 
         , _diagonal_blocks(std::move(diagonal_blocks))
 
         , _type(mat_type)
+
+        , _threshold(threshold)
     {
     }
 
@@ -152,6 +159,19 @@ class CSparsityPattern
         return _type;
     }
 
+    /// @brief Gets screening threshold the blocks were described under.
+    /// @return The screening threshold.
+    /// @note This is the threshold which dropped the atom pairs of the blocks, so
+    /// it is the threshold a driver screens the pairs of primitives with. Taking it
+    /// from the pattern rather than from the driver keeps the two screenings of a
+    /// computation from disagreeing when a pattern is shared or is formed by another
+    /// driver.
+    auto
+    get_threshold() const -> double
+    {
+        return _threshold;
+    }
+
    private:
     /// @brief The sparsity patterns of the off-diagonal blocks.
     std::vector<CAtomBasisPairSparsity> _pair_blocks;
@@ -161,6 +181,9 @@ class CSparsityPattern
 
     /// @brief The type of the quantity the pattern describes.
     mat_t _type;
+
+    /// @brief The screening threshold the blocks were described under.
+    double _threshold;
 };
 
 namespace sparsity {  // sparsity namespace
@@ -179,6 +202,46 @@ inline constexpr size_t blocks_per_thread = 2;
 /// small to fill the threads is divided into fewer blocks rather than into blocks
 /// whose fixed cost outweighs their work.
 inline constexpr size_t min_block_size = 2048;
+
+/// @brief Checks that a sparsity pattern describes a pair of molecular bases.
+/// @param pattern The sparsity pattern to check.
+/// @param a_indices The index of the basis functions of the basis on bra side.
+/// @param b_indices The index of the basis functions of the basis on ket side.
+/// @note A pattern carries neither the molecule nor the bases it was formed from,
+/// so a driver handed a pattern of other bases would address an atom basis which is
+/// not there, or write the values of a number of combinations of basis functions
+/// which is not the number the pattern reserved. Both are caught here, before
+/// anything is computed. A pattern of another molecule is caught by the coordinates,
+/// which assert that every atom of a block is an atom of the molecule.
+inline auto
+check_pattern(const CSparsityPattern              &pattern,
+              const denseidx::TBasisFunctionIndex &a_indices,
+              const denseidx::TBasisFunctionIndex &b_indices) -> void
+{
+    const auto check_block = [&](const auto &block) {
+        const auto ibra = static_cast<size_t>(block.bra_index());
+
+        const auto iket = static_cast<size_t>(block.ket_index());
+
+        errors::assertMsgCritical((block.bra_index() >= 0) && (ibra < a_indices.size()) && (block.ket_index() >= 0) &&
+                                      (iket < b_indices.size()),
+                                  std::string("SparsityPattern.check_pattern: Block addresses an atom basis which is not in the basis"));
+
+        errors::assertMsgCritical((block.number_of_bra_basis_functions() == a_indices[ibra].size()) &&
+                                      (block.number_of_ket_basis_functions() == b_indices[iket].size()),
+                                  std::string("SparsityPattern.check_pattern: Block was described for other molecular bases"));
+    };
+
+    for (const auto &block : pattern.pair_blocks())
+    {
+        check_block(block);
+    }
+
+    for (const auto &block : pattern.diagonal_blocks())
+    {
+        check_block(block);
+    }
+}
 
 /// @brief Divides the atom basis pair groups into the blocks the integrals are
 /// computed in, ordered by interatomic distance.
@@ -265,7 +328,7 @@ describe(const std::vector<CAtomBasisPairGroup> &blocks,
         if (diagonal_blocks[i]->number_of_atoms() > 0) diagonals.push_back(std::move(*diagonal_blocks[i]));
     }
 
-    return CSparsityPattern(std::move(pairs), std::move(diagonals), mat_type);
+    return CSparsityPattern(std::move(pairs), std::move(diagonals), mat_type, threshold);
 }
 
 /// @brief Creates the sparsity pattern of a two-center quantity.
