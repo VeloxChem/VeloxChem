@@ -398,7 +398,7 @@ computeExchangeFockSSSS_FP32(double*         mat_K,
                         const float*    s_prim_info_f,
                         const uint32_t* s_prim_aoinds,
                         const uint32_t  s_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_ss,
                         const uint32_t* pair_displs_K_ss,
@@ -542,7 +542,7 @@ computeExchangeFockSSSS_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -971,7 +971,7 @@ computeExchangeFockSSSP_FP32(double*         mat_K,
                         const float*    p_prim_info_f,
                         const uint32_t* p_prim_aoinds,
                         const uint32_t  p_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_ss,
                         const uint32_t* D_inds_K_sp,
@@ -1134,7 +1134,7 @@ computeExchangeFockSSSP_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -1625,7 +1625,7 @@ computeExchangeFockSSSD_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_ss,
                         const uint32_t* D_inds_K_sd,
@@ -1819,7 +1819,7 @@ computeExchangeFockSSSD_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -2248,7 +2248,7 @@ computeExchangeFockSPSS_FP32(double*         mat_K,
                         const float*    p_prim_info_f,
                         const uint32_t* p_prim_aoinds,
                         const uint32_t  p_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_sp,
                         const uint32_t* D_inds_K_ss,
@@ -2411,7 +2411,7 @@ computeExchangeFockSPSS_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -2879,7 +2879,7 @@ computeExchangeFockSPSP_FP32(double*         mat_K,
                         const float*    p_prim_info_f,
                         const uint32_t* p_prim_aoinds,
                         const uint32_t  p_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_sp,
                         const uint32_t* pair_displs_K_sp,
@@ -3062,7 +3062,7 @@ computeExchangeFockSPSP_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -3628,7 +3628,7 @@ computeExchangeFockSPSD_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_sp,
                         const uint32_t* D_inds_K_sd,
@@ -3855,7 +3855,7 @@ computeExchangeFockSPSD_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -4346,7 +4346,7 @@ computeExchangeFockSDSS_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_sd,
                         const uint32_t* D_inds_K_ss,
@@ -4540,7 +4540,7 @@ computeExchangeFockSDSS_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -5106,7 +5106,7 @@ computeExchangeFockSDSP_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_sd,
                         const uint32_t* D_inds_K_sp,
@@ -5333,7 +5333,7 @@ computeExchangeFockSDSP_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -6003,7 +6003,7 @@ computeExchangeFockSDSD_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_sd,
                         const uint32_t* pair_displs_K_sd,
@@ -6287,7 +6287,7 @@ computeExchangeFockSDSD_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -6716,7 +6716,7 @@ computeExchangeFockSSPS_FP32(double*         mat_K,
                         const float*    p_prim_info_f,
                         const uint32_t* p_prim_aoinds,
                         const uint32_t  p_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_ss,
                         const uint32_t* D_inds_K_ps,
@@ -6879,7 +6879,7 @@ computeExchangeFockSSPS_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -7356,7 +7356,7 @@ computeExchangeFockSSPP_FP32(double*         mat_K,
                         const float*    p_prim_info_f,
                         const uint32_t* p_prim_aoinds,
                         const uint32_t  p_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_ss,
                         const uint32_t* D_inds_K_pp,
@@ -7543,7 +7543,7 @@ computeExchangeFockSSPP_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -8085,7 +8085,7 @@ computeExchangeFockSSPD_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_ss,
                         const uint32_t* D_inds_K_pd,
@@ -8300,7 +8300,7 @@ computeExchangeFockSSPD_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -8777,7 +8777,7 @@ computeExchangeFockSPPS_FP32(double*         mat_K,
                         const float*    p_prim_info_f,
                         const uint32_t* p_prim_aoinds,
                         const uint32_t  p_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_sp,
                         const uint32_t* D_inds_K_ps,
@@ -8964,7 +8964,7 @@ computeExchangeFockSPPS_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -9507,7 +9507,7 @@ computeExchangeFockSPPP_FP32(double*         mat_K,
                         const float*    p_prim_info_f,
                         const uint32_t* p_prim_aoinds,
                         const uint32_t  p_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_sp,
                         const uint32_t* D_inds_K_pp,
@@ -9727,7 +9727,7 @@ computeExchangeFockSPPP_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -10367,7 +10367,7 @@ computeExchangeFockSPPD_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_sp,
                         const uint32_t* D_inds_K_pd,
@@ -10631,7 +10631,7 @@ computeExchangeFockSPPD_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -11197,7 +11197,7 @@ computeExchangeFockSDPS_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_sd,
                         const uint32_t* D_inds_K_ps,
@@ -11424,7 +11424,7 @@ computeExchangeFockSDPS_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -12112,7 +12112,7 @@ computeExchangeFockSDPP_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_sd,
                         const uint32_t* D_inds_K_pp,
@@ -12400,7 +12400,7 @@ computeExchangeFockSDPP_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -13242,7 +13242,7 @@ computeExchangeFockSDPD_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_sd,
                         const uint32_t* D_inds_K_pd,
@@ -13607,7 +13607,7 @@ computeExchangeFockSDPD_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -14102,7 +14102,7 @@ computeExchangeFockSSDS_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_ss,
                         const uint32_t* D_inds_K_ds,
@@ -14298,7 +14298,7 @@ computeExchangeFockSSDS_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -14840,7 +14840,7 @@ computeExchangeFockSSDP_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_ss,
                         const uint32_t* D_inds_K_dp,
@@ -15055,7 +15055,7 @@ computeExchangeFockSSDP_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -15646,7 +15646,7 @@ computeExchangeFockSSDD_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_ss,
                         const uint32_t* D_inds_K_dd,
@@ -15890,7 +15890,7 @@ computeExchangeFockSSDD_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -16452,7 +16452,7 @@ computeExchangeFockSPDS_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_sp,
                         const uint32_t* D_inds_K_ds,
@@ -16677,7 +16677,7 @@ computeExchangeFockSPDS_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -17317,7 +17317,7 @@ computeExchangeFockSPDP_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_sp,
                         const uint32_t* D_inds_K_dp,
@@ -17581,7 +17581,7 @@ computeExchangeFockSPDP_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -18327,7 +18327,7 @@ computeExchangeFockSPDD_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_sp,
                         const uint32_t* D_inds_K_dd,
@@ -18644,7 +18644,7 @@ computeExchangeFockSPDD_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -19319,7 +19319,7 @@ computeExchangeFockSDDS_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_sd,
                         const uint32_t* D_inds_K_ds,
@@ -19605,7 +19605,7 @@ computeExchangeFockSDDS_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -20447,7 +20447,7 @@ computeExchangeFockSDDP_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_sd,
                         const uint32_t* D_inds_K_dp,
@@ -20812,7 +20812,7 @@ computeExchangeFockSDDP_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -21847,7 +21847,7 @@ computeExchangeFockSDDD_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_sd,
                         const uint32_t* D_inds_K_dd,
@@ -22313,7 +22313,7 @@ computeExchangeFockSDDD_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -22781,7 +22781,7 @@ computeExchangeFockPSPS_FP32(double*         mat_K,
                         const float*    p_prim_info_f,
                         const uint32_t* p_prim_aoinds,
                         const uint32_t  p_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_ps,
                         const uint32_t* pair_displs_K_ps,
@@ -22964,7 +22964,7 @@ computeExchangeFockPSPS_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -23507,7 +23507,7 @@ computeExchangeFockPSPP_FP32(double*         mat_K,
                         const float*    p_prim_info_f,
                         const uint32_t* p_prim_aoinds,
                         const uint32_t  p_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_ps,
                         const uint32_t* D_inds_K_pp,
@@ -23727,7 +23727,7 @@ computeExchangeFockPSPP_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -24367,7 +24367,7 @@ computeExchangeFockPSPD_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_ps,
                         const uint32_t* D_inds_K_pd,
@@ -24631,7 +24631,7 @@ computeExchangeFockPSPD_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -25178,7 +25178,7 @@ computeExchangeFockPPPS_FP32(double*         mat_K,
                         const float*    p_prim_info_f,
                         const uint32_t* p_prim_aoinds,
                         const uint32_t  p_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_pp,
                         const uint32_t* D_inds_K_ps,
@@ -25400,7 +25400,7 @@ computeExchangeFockPPPS_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -26051,7 +26051,7 @@ computeExchangeFockPPPP_FP32(double*         mat_K,
                         const float*    p_prim_info_f,
                         const uint32_t* p_prim_aoinds,
                         const uint32_t  p_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_pp,
                         const uint32_t* pair_displs_K_pp,
@@ -26330,7 +26330,7 @@ computeExchangeFockPPPP_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -27167,7 +27167,7 @@ computeExchangeFockPPPD_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_pp,
                         const uint32_t* D_inds_K_pd,
@@ -27534,7 +27534,7 @@ computeExchangeFockPPPD_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -28186,7 +28186,7 @@ computeExchangeFockPDPS_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_pd,
                         const uint32_t* D_inds_K_ps,
@@ -28456,7 +28456,7 @@ computeExchangeFockPDPS_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -29285,7 +29285,7 @@ computeExchangeFockPDPP_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_pd,
                         const uint32_t* D_inds_K_pp,
@@ -29648,7 +29648,7 @@ computeExchangeFockPDPP_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -30706,7 +30706,7 @@ computeExchangeFockPDPD_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_pd,
                         const uint32_t* pair_displs_K_pd,
@@ -31184,7 +31184,7 @@ computeExchangeFockPDPD_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -31750,7 +31750,7 @@ computeExchangeFockPSDS_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_ps,
                         const uint32_t* D_inds_K_ds,
@@ -31977,7 +31977,7 @@ computeExchangeFockPSDS_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -32617,7 +32617,7 @@ computeExchangeFockPSDP_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_ps,
                         const uint32_t* D_inds_K_dp,
@@ -32881,7 +32881,7 @@ computeExchangeFockPSDP_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -33627,7 +33627,7 @@ computeExchangeFockPSDD_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_ps,
                         const uint32_t* D_inds_K_dd,
@@ -33944,7 +33944,7 @@ computeExchangeFockPSDD_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -34632,7 +34632,7 @@ computeExchangeFockPPDS_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_pp,
                         const uint32_t* D_inds_K_ds,
@@ -34920,7 +34920,7 @@ computeExchangeFockPPDS_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -35757,7 +35757,7 @@ computeExchangeFockPPDP_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_pp,
                         const uint32_t* D_inds_K_dp,
@@ -36124,7 +36124,7 @@ computeExchangeFockPPDP_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -37163,7 +37163,7 @@ computeExchangeFockPPDD_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_pp,
                         const uint32_t* D_inds_K_dd,
@@ -37631,7 +37631,7 @@ computeExchangeFockPPDD_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -38465,7 +38465,7 @@ computeExchangeFockPDDS_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_pd,
                         const uint32_t* D_inds_K_ds,
@@ -38826,7 +38826,7 @@ computeExchangeFockPDDS_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -39893,7 +39893,7 @@ computeExchangeFockPDDP_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_pd,
                         const uint32_t* D_inds_K_dp,
@@ -40375,7 +40375,7 @@ computeExchangeFockPDDP_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -40982,7 +40982,7 @@ computeExchangeFockPDDD0_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_pd,
                         const uint32_t* D_inds_K_dd,
@@ -41234,7 +41234,7 @@ computeExchangeFockPDDD0_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -41863,7 +41863,7 @@ computeExchangeFockPDDD1_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_pd,
                         const uint32_t* D_inds_K_dd,
@@ -42126,7 +42126,7 @@ computeExchangeFockPDDD1_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -42809,7 +42809,7 @@ computeExchangeFockPDDD2_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_pd,
                         const uint32_t* D_inds_K_dd,
@@ -43099,7 +43099,7 @@ computeExchangeFockPDDD2_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -43646,7 +43646,7 @@ computeExchangeFockPDDD3_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_pd,
                         const uint32_t* D_inds_K_dd,
@@ -43868,7 +43868,7 @@ computeExchangeFockPDDD3_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -44437,7 +44437,7 @@ computeExchangeFockPDDD4_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_pd,
                         const uint32_t* D_inds_K_dd,
@@ -44670,7 +44670,7 @@ computeExchangeFockPDDD4_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -45167,7 +45167,7 @@ computeExchangeFockPDDD5_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_pd,
                         const uint32_t* D_inds_K_dd,
@@ -45364,7 +45364,7 @@ computeExchangeFockPDDD5_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -45829,7 +45829,7 @@ computeExchangeFockPDDD6_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_pd,
                         const uint32_t* D_inds_K_dd,
@@ -46010,7 +46010,7 @@ computeExchangeFockPDDD6_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -46617,7 +46617,7 @@ computeExchangeFockPDDD7_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_pd,
                         const uint32_t* D_inds_K_dd,
@@ -46869,7 +46869,7 @@ computeExchangeFockPDDD7_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -47551,7 +47551,7 @@ computeExchangeFockDSDS_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_ds,
                         const uint32_t* pair_displs_K_ds,
@@ -47841,7 +47841,7 @@ computeExchangeFockDSDS_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -48683,7 +48683,7 @@ computeExchangeFockDSDP_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_ds,
                         const uint32_t* D_inds_K_dp,
@@ -49048,7 +49048,7 @@ computeExchangeFockDSDP_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -50095,7 +50095,7 @@ computeExchangeFockDSDD_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_ds,
                         const uint32_t* D_inds_K_dd,
@@ -50567,7 +50567,7 @@ computeExchangeFockDSDD_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -51405,7 +51405,7 @@ computeExchangeFockDPDS_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dp,
                         const uint32_t* D_inds_K_ds,
@@ -51768,7 +51768,7 @@ computeExchangeFockDPDS_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -52830,7 +52830,7 @@ computeExchangeFockDPDP_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dp,
                         const uint32_t* pair_displs_K_dp,
@@ -53310,7 +53310,7 @@ computeExchangeFockDPDP_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -54353,7 +54353,7 @@ computeExchangeFockDDDS_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dd,
                         const uint32_t* D_inds_K_ds,
@@ -54823,7 +54823,7 @@ computeExchangeFockDDDS_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -55430,7 +55430,7 @@ computeExchangeFockDPDD0_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dp,
                         const uint32_t* D_inds_K_dd,
@@ -55682,7 +55682,7 @@ computeExchangeFockDPDD0_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -56311,7 +56311,7 @@ computeExchangeFockDPDD1_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dp,
                         const uint32_t* D_inds_K_dd,
@@ -56574,7 +56574,7 @@ computeExchangeFockDPDD1_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -57123,7 +57123,7 @@ computeExchangeFockDPDD2_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dp,
                         const uint32_t* D_inds_K_dd,
@@ -57346,7 +57346,7 @@ computeExchangeFockDPDD2_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -58025,7 +58025,7 @@ computeExchangeFockDPDD3_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dp,
                         const uint32_t* D_inds_K_dd,
@@ -58313,7 +58313,7 @@ computeExchangeFockDPDD3_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -58902,7 +58902,7 @@ computeExchangeFockDPDD4_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dp,
                         const uint32_t* D_inds_K_dd,
@@ -59145,7 +59145,7 @@ computeExchangeFockDPDD4_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -59634,7 +59634,7 @@ computeExchangeFockDPDD5_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dp,
                         const uint32_t* D_inds_K_dd,
@@ -59827,7 +59827,7 @@ computeExchangeFockDPDD5_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -60434,7 +60434,7 @@ computeExchangeFockDPDD6_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dp,
                         const uint32_t* D_inds_K_dd,
@@ -60686,7 +60686,7 @@ computeExchangeFockDPDD6_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -61245,7 +61245,7 @@ computeExchangeFockDDDP0_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dd,
                         const uint32_t* D_inds_K_dp,
@@ -61473,7 +61473,7 @@ computeExchangeFockDDDP0_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -62090,7 +62090,7 @@ computeExchangeFockDDDP1_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dd,
                         const uint32_t* D_inds_K_dp,
@@ -62347,7 +62347,7 @@ computeExchangeFockDDDP1_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -62956,7 +62956,7 @@ computeExchangeFockDDDP2_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dd,
                         const uint32_t* D_inds_K_dp,
@@ -63209,7 +63209,7 @@ computeExchangeFockDDDP2_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -63864,7 +63864,7 @@ computeExchangeFockDDDP3_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dd,
                         const uint32_t* D_inds_K_dp,
@@ -64140,7 +64140,7 @@ computeExchangeFockDDDP3_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -64685,7 +64685,7 @@ computeExchangeFockDDDP4_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dd,
                         const uint32_t* D_inds_K_dp,
@@ -64906,7 +64906,7 @@ computeExchangeFockDDDP4_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -65479,7 +65479,7 @@ computeExchangeFockDDDP5_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dd,
                         const uint32_t* D_inds_K_dp,
@@ -65714,7 +65714,7 @@ computeExchangeFockDDDP5_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -66309,7 +66309,7 @@ computeExchangeFockDDDP6_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dd,
                         const uint32_t* D_inds_K_dp,
@@ -66555,7 +66555,7 @@ computeExchangeFockDDDP6_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -67132,7 +67132,7 @@ computeExchangeFockDDDD0_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dd,
                         const uint32_t* pair_displs_K_dd,
@@ -67374,7 +67374,7 @@ computeExchangeFockDDDD0_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -67927,7 +67927,7 @@ computeExchangeFockDDDD1_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dd,
                         const uint32_t* pair_displs_K_dd,
@@ -68157,7 +68157,7 @@ computeExchangeFockDDDD1_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -68752,7 +68752,7 @@ computeExchangeFockDDDD2_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dd,
                         const uint32_t* pair_displs_K_dd,
@@ -69003,7 +69003,7 @@ computeExchangeFockDDDD2_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -69574,7 +69574,7 @@ computeExchangeFockDDDD3_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dd,
                         const uint32_t* pair_displs_K_dd,
@@ -69813,7 +69813,7 @@ computeExchangeFockDDDD3_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -70334,7 +70334,7 @@ computeExchangeFockDDDD4_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dd,
                         const uint32_t* pair_displs_K_dd,
@@ -70548,7 +70548,7 @@ computeExchangeFockDDDD4_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -71065,7 +71065,7 @@ computeExchangeFockDDDD5_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dd,
                         const uint32_t* pair_displs_K_dd,
@@ -71277,7 +71277,7 @@ computeExchangeFockDDDD5_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -71786,7 +71786,7 @@ computeExchangeFockDDDD6_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dd,
                         const uint32_t* pair_displs_K_dd,
@@ -71994,7 +71994,7 @@ computeExchangeFockDDDD6_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -72475,7 +72475,7 @@ computeExchangeFockDDDD7_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dd,
                         const uint32_t* pair_displs_K_dd,
@@ -72669,7 +72669,7 @@ computeExchangeFockDDDD7_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -73178,7 +73178,7 @@ computeExchangeFockDDDD8_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dd,
                         const uint32_t* pair_displs_K_dd,
@@ -73386,7 +73386,7 @@ computeExchangeFockDDDD8_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -73859,7 +73859,7 @@ computeExchangeFockDDDD9_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dd,
                         const uint32_t* pair_displs_K_dd,
@@ -74049,7 +74049,7 @@ computeExchangeFockDDDD9_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -74596,7 +74596,7 @@ computeExchangeFockDDDD10_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dd,
                         const uint32_t* pair_displs_K_dd,
@@ -74823,7 +74823,7 @@ computeExchangeFockDDDD10_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -75342,7 +75342,7 @@ computeExchangeFockDDDD11_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dd,
                         const uint32_t* pair_displs_K_dd,
@@ -75555,7 +75555,7 @@ computeExchangeFockDDDD11_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -76014,7 +76014,7 @@ computeExchangeFockDDDD12_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dd,
                         const uint32_t* pair_displs_K_dd,
@@ -76197,7 +76197,7 @@ computeExchangeFockDDDD12_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -76688,7 +76688,7 @@ computeExchangeFockDDDD13_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dd,
                         const uint32_t* pair_displs_K_dd,
@@ -76887,7 +76887,7 @@ computeExchangeFockDDDD13_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -77374,7 +77374,7 @@ computeExchangeFockDDDD14_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dd,
                         const uint32_t* pair_displs_K_dd,
@@ -77571,7 +77571,7 @@ computeExchangeFockDDDD14_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -78068,7 +78068,7 @@ computeExchangeFockDDDD15_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dd,
                         const uint32_t* pair_displs_K_dd,
@@ -78270,7 +78270,7 @@ computeExchangeFockDDDD15_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -78783,7 +78783,7 @@ computeExchangeFockDDDD16_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dd,
                         const uint32_t* pair_displs_K_dd,
@@ -78993,7 +78993,7 @@ computeExchangeFockDDDD16_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -79490,7 +79490,7 @@ computeExchangeFockDDDD17_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dd,
                         const uint32_t* pair_displs_K_dd,
@@ -79692,7 +79692,7 @@ computeExchangeFockDDDD17_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -80287,7 +80287,7 @@ computeExchangeFockDDDD18_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dd,
                         const uint32_t* pair_displs_K_dd,
@@ -80538,7 +80538,7 @@ computeExchangeFockDDDD18_FP32(double*         mat_K,
 
                     );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -81241,7 +81241,7 @@ computeExchangeFockSDDD0_RS_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_sd,
                         const uint32_t* D_inds_K_dd,
@@ -81542,7 +81542,7 @@ computeExchangeFockSDDD0_RS_FP32(double*         mat_K,
 
                 );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -82251,7 +82251,7 @@ computeExchangeFockSDDD1_RS_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_sd,
                         const uint32_t* D_inds_K_dd,
@@ -82556,7 +82556,7 @@ computeExchangeFockSDDD1_RS_FP32(double*         mat_K,
 
                 );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -83261,7 +83261,7 @@ computeExchangeFockPPDD0_RS_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_pp,
                         const uint32_t* D_inds_K_dd,
@@ -83564,7 +83564,7 @@ computeExchangeFockPPDD0_RS_FP32(double*         mat_K,
 
                 );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -84273,7 +84273,7 @@ computeExchangeFockPPDD1_RS_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_pp,
                         const uint32_t* D_inds_K_dd,
@@ -84578,7 +84578,7 @@ computeExchangeFockPPDD1_RS_FP32(double*         mat_K,
 
                 );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -85233,7 +85233,7 @@ computeExchangeFockPDDD0_RS_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_pd,
                         const uint32_t* D_inds_K_dd,
@@ -85511,7 +85511,7 @@ computeExchangeFockPDDD0_RS_FP32(double*         mat_K,
 
                 );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -86222,7 +86222,7 @@ computeExchangeFockPDDD1_RS_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_pd,
                         const uint32_t* D_inds_K_dd,
@@ -86528,7 +86528,7 @@ computeExchangeFockPDDD1_RS_FP32(double*         mat_K,
 
                 );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -87131,7 +87131,7 @@ computeExchangeFockPDDD2_RS_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_pd,
                         const uint32_t* D_inds_K_dd,
@@ -87383,7 +87383,7 @@ computeExchangeFockPDDD2_RS_FP32(double*         mat_K,
 
                 );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -87968,7 +87968,7 @@ computeExchangeFockPDDD3_RS_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_pd,
                         const uint32_t* D_inds_K_dd,
@@ -88211,7 +88211,7 @@ computeExchangeFockPDDD3_RS_FP32(double*         mat_K,
 
                 );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -88866,7 +88866,7 @@ computeExchangeFockPDDD4_RS_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_pd,
                         const uint32_t* D_inds_K_dd,
@@ -89144,7 +89144,7 @@ computeExchangeFockPDDD4_RS_FP32(double*         mat_K,
 
                 );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -89849,7 +89849,7 @@ computeExchangeFockDSDD0_RS_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_ds,
                         const uint32_t* D_inds_K_dd,
@@ -90152,7 +90152,7 @@ computeExchangeFockDSDD0_RS_FP32(double*         mat_K,
 
                 );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -90869,7 +90869,7 @@ computeExchangeFockDSDD1_RS_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_ds,
                         const uint32_t* D_inds_K_dd,
@@ -91178,7 +91178,7 @@ computeExchangeFockDSDD1_RS_FP32(double*         mat_K,
 
                 );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -91833,7 +91833,7 @@ computeExchangeFockDPDD0_RS_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dp,
                         const uint32_t* D_inds_K_dd,
@@ -92111,7 +92111,7 @@ computeExchangeFockDPDD0_RS_FP32(double*         mat_K,
 
                 );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -92822,7 +92822,7 @@ computeExchangeFockDPDD1_RS_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dp,
                         const uint32_t* D_inds_K_dd,
@@ -93128,7 +93128,7 @@ computeExchangeFockDPDD1_RS_FP32(double*         mat_K,
 
                 );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -93731,7 +93731,7 @@ computeExchangeFockDPDD2_RS_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dp,
                         const uint32_t* D_inds_K_dd,
@@ -93983,7 +93983,7 @@ computeExchangeFockDPDD2_RS_FP32(double*         mat_K,
 
                 );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -94568,7 +94568,7 @@ computeExchangeFockDPDD3_RS_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dp,
                         const uint32_t* D_inds_K_dd,
@@ -94811,7 +94811,7 @@ computeExchangeFockDPDD3_RS_FP32(double*         mat_K,
 
                 );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -95466,7 +95466,7 @@ computeExchangeFockDPDD4_RS_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dp,
                         const uint32_t* D_inds_K_dd,
@@ -95744,7 +95744,7 @@ computeExchangeFockDPDD4_RS_FP32(double*         mat_K,
 
                 );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -96449,7 +96449,7 @@ computeExchangeFockDDDS0_RS_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dd,
                         const uint32_t* D_inds_K_ds,
@@ -96752,7 +96752,7 @@ computeExchangeFockDDDS0_RS_FP32(double*         mat_K,
 
                 );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -97465,7 +97465,7 @@ computeExchangeFockDDDS1_RS_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dd,
                         const uint32_t* D_inds_K_ds,
@@ -97772,7 +97772,7 @@ computeExchangeFockDDDS1_RS_FP32(double*         mat_K,
 
                 );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -98427,7 +98427,7 @@ computeExchangeFockDDDP0_RS_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dd,
                         const uint32_t* D_inds_K_dp,
@@ -98705,7 +98705,7 @@ computeExchangeFockDDDP0_RS_FP32(double*         mat_K,
 
                 );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -99282,7 +99282,7 @@ computeExchangeFockDDDP1_RS_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dd,
                         const uint32_t* D_inds_K_dp,
@@ -99521,7 +99521,7 @@ computeExchangeFockDDDP1_RS_FP32(double*         mat_K,
 
                 );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -100096,7 +100096,7 @@ computeExchangeFockDDDP2_RS_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dd,
                         const uint32_t* D_inds_K_dp,
@@ -100334,7 +100334,7 @@ computeExchangeFockDDDP2_RS_FP32(double*         mat_K,
 
                 );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -100937,7 +100937,7 @@ computeExchangeFockDDDP3_RS_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dd,
                         const uint32_t* D_inds_K_dp,
@@ -101189,7 +101189,7 @@ computeExchangeFockDDDP3_RS_FP32(double*         mat_K,
 
                 );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -101786,7 +101786,7 @@ computeExchangeFockDDDP4_RS_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dd,
                         const uint32_t* D_inds_K_dp,
@@ -102035,7 +102035,7 @@ computeExchangeFockDDDP4_RS_FP32(double*         mat_K,
 
                 );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -102682,7 +102682,7 @@ computeExchangeFockDDDP5_RS_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dd,
                         const uint32_t* D_inds_K_dp,
@@ -102956,7 +102956,7 @@ computeExchangeFockDDDP5_RS_FP32(double*         mat_K,
 
                 );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -103703,7 +103703,7 @@ computeExchangeFockDDDD0_RS_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dd,
                         const uint32_t* pair_displs_K_dd,
@@ -104032,7 +104032,7 @@ computeExchangeFockDDDD0_RS_FP32(double*         mat_K,
 
                 );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -104519,7 +104519,7 @@ computeExchangeFockDDDD1_RS_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dd,
                         const uint32_t* pair_displs_K_dd,
@@ -104718,7 +104718,7 @@ computeExchangeFockDDDD1_RS_FP32(double*         mat_K,
 
                 );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -105189,7 +105189,7 @@ computeExchangeFockDDDD2_RS_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dd,
                         const uint32_t* pair_displs_K_dd,
@@ -105380,7 +105380,7 @@ computeExchangeFockDDDD2_RS_FP32(double*         mat_K,
 
                 );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -105919,7 +105919,7 @@ computeExchangeFockDDDD3_RS_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dd,
                         const uint32_t* pair_displs_K_dd,
@@ -106144,7 +106144,7 @@ computeExchangeFockDDDD3_RS_FP32(double*         mat_K,
 
                 );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -106647,7 +106647,7 @@ computeExchangeFockDDDD4_RS_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dd,
                         const uint32_t* pair_displs_K_dd,
@@ -106854,7 +106854,7 @@ computeExchangeFockDDDD4_RS_FP32(double*         mat_K,
 
                 );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -107339,7 +107339,7 @@ computeExchangeFockDDDD5_RS_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dd,
                         const uint32_t* pair_displs_K_dd,
@@ -107537,7 +107537,7 @@ computeExchangeFockDDDD5_RS_FP32(double*         mat_K,
 
                 );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -107990,7 +107990,7 @@ computeExchangeFockDDDD6_RS_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dd,
                         const uint32_t* pair_displs_K_dd,
@@ -108172,7 +108172,7 @@ computeExchangeFockDDDD6_RS_FP32(double*         mat_K,
 
                 );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -108633,7 +108633,7 @@ computeExchangeFockDDDD7_RS_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dd,
                         const uint32_t* pair_displs_K_dd,
@@ -108819,7 +108819,7 @@ computeExchangeFockDDDD7_RS_FP32(double*         mat_K,
 
                 );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -109268,7 +109268,7 @@ computeExchangeFockDDDD8_RS_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dd,
                         const uint32_t* pair_displs_K_dd,
@@ -109448,7 +109448,7 @@ computeExchangeFockDDDD8_RS_FP32(double*         mat_K,
 
                 );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -109929,7 +109929,7 @@ computeExchangeFockDDDD9_RS_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dd,
                         const uint32_t* pair_displs_K_dd,
@@ -110125,7 +110125,7 @@ computeExchangeFockDDDD9_RS_FP32(double*         mat_K,
 
                 );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -110586,7 +110586,7 @@ computeExchangeFockDDDD10_RS_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dd,
                         const uint32_t* pair_displs_K_dd,
@@ -110772,7 +110772,7 @@ computeExchangeFockDDDD10_RS_FP32(double*         mat_K,
 
                 );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -111253,7 +111253,7 @@ computeExchangeFockDDDD11_RS_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dd,
                         const uint32_t* pair_displs_K_dd,
@@ -111449,7 +111449,7 @@ computeExchangeFockDDDD11_RS_FP32(double*         mat_K,
 
                 );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -111958,7 +111958,7 @@ computeExchangeFockDDDD12_RS_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dd,
                         const uint32_t* pair_displs_K_dd,
@@ -112168,7 +112168,7 @@ computeExchangeFockDDDD12_RS_FP32(double*         mat_K,
 
                 );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -112631,7 +112631,7 @@ computeExchangeFockDDDD13_RS_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dd,
                         const uint32_t* pair_displs_K_dd,
@@ -112818,7 +112818,7 @@ computeExchangeFockDDDD13_RS_FP32(double*         mat_K,
 
                 );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -113281,7 +113281,7 @@ computeExchangeFockDDDD14_RS_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dd,
                         const uint32_t* pair_displs_K_dd,
@@ -113468,7 +113468,7 @@ computeExchangeFockDDDD14_RS_FP32(double*         mat_K,
 
                 );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -113931,7 +113931,7 @@ computeExchangeFockDDDD15_RS_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dd,
                         const uint32_t* pair_displs_K_dd,
@@ -114118,7 +114118,7 @@ computeExchangeFockDDDD15_RS_FP32(double*         mat_K,
 
                 );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -114581,7 +114581,7 @@ computeExchangeFockDDDD16_RS_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dd,
                         const uint32_t* pair_displs_K_dd,
@@ -114768,7 +114768,7 @@ computeExchangeFockDDDD16_RS_FP32(double*         mat_K,
 
                 );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -115227,7 +115227,7 @@ computeExchangeFockDDDD17_RS_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dd,
                         const uint32_t* pair_displs_K_dd,
@@ -115412,7 +115412,7 @@ computeExchangeFockDDDD17_RS_FP32(double*         mat_K,
 
                 );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -115863,7 +115863,7 @@ computeExchangeFockDDDD18_RS_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dd,
                         const uint32_t* pair_displs_K_dd,
@@ -116044,7 +116044,7 @@ computeExchangeFockDDDD18_RS_FP32(double*         mat_K,
 
                 );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -116571,7 +116571,7 @@ computeExchangeFockDDDD19_RS_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dd,
                         const uint32_t* pair_displs_K_dd,
@@ -116790,7 +116790,7 @@ computeExchangeFockDDDD19_RS_FP32(double*         mat_K,
 
                 );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -117257,7 +117257,7 @@ computeExchangeFockDDDD20_RS_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dd,
                         const uint32_t* pair_displs_K_dd,
@@ -117446,7 +117446,7 @@ computeExchangeFockDDDD20_RS_FP32(double*         mat_K,
 
                 );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -117891,7 +117891,7 @@ computeExchangeFockDDDD21_RS_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dd,
                         const uint32_t* pair_displs_K_dd,
@@ -118069,7 +118069,7 @@ computeExchangeFockDDDD21_RS_FP32(double*         mat_K,
 
                 );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -118534,7 +118534,7 @@ computeExchangeFockDDDD22_RS_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dd,
                         const uint32_t* pair_displs_K_dd,
@@ -118722,7 +118722,7 @@ computeExchangeFockDDDD22_RS_FP32(double*         mat_K,
 
                 );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -119187,7 +119187,7 @@ computeExchangeFockDDDD23_RS_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dd,
                         const uint32_t* pair_displs_K_dd,
@@ -119375,7 +119375,7 @@ computeExchangeFockDDDD23_RS_FP32(double*         mat_K,
 
                 );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -119904,7 +119904,7 @@ computeExchangeFockDDDD24_RS_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dd,
                         const uint32_t* pair_displs_K_dd,
@@ -120124,7 +120124,7 @@ computeExchangeFockDDDD24_RS_FP32(double*         mat_K,
 
                 );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
@@ -120711,7 +120711,7 @@ computeExchangeFockDDDD25_RS_FP32(double*         mat_K,
                         const float*    d_prim_info_f,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
-                        const double*   mat_D_full_AO,
+                        const float*    mat_D_full_AO_f,
                         const uint32_t  naos,
                         const uint32_t* D_inds_K_dd,
                         const uint32_t* pair_displs_K_dd,
@@ -120960,7 +120960,7 @@ computeExchangeFockDDDD25_RS_FP32(double*         mat_K,
 
                 );
 
-            ERIs[threadIdx.y][threadIdx.x] += (double)eri_ijkl_f * mat_D_full_AO[j_cgto * naos + l_cgto];
+            ERIs[threadIdx.y][threadIdx.x] += static_cast<double>(eri_ijkl_f * mat_D_full_AO_f[j_cgto * naos + l_cgto]);
         }
     }
 
