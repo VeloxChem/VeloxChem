@@ -2,54 +2,19 @@ target_sources(vlxobjs
   PRIVATE
     SimdOverlapDriver.cpp
     SimdOverlapFunc.cpp
-    SimdOverlapRecDD.cpp
-    SimdOverlapRecDF.cpp
-    SimdOverlapRecDG.cpp
-    SimdOverlapRecDH.cpp
-    SimdOverlapRecDI.cpp
-    SimdOverlapRecDP.cpp
-    SimdOverlapRecDS.cpp
-    SimdOverlapRecFD.cpp
-    SimdOverlapRecFF.cpp
-    SimdOverlapRecFG.cpp
-    SimdOverlapRecFH.cpp
-    SimdOverlapRecFI.cpp
-    SimdOverlapRecFP.cpp
-    SimdOverlapRecFS.cpp
-    SimdOverlapRecGD.cpp
-    SimdOverlapRecGF.cpp
-    SimdOverlapRecGG.cpp
-    SimdOverlapRecGH.cpp
-    SimdOverlapRecGI.cpp
-    SimdOverlapRecGP.cpp
-    SimdOverlapRecGS.cpp
-    SimdOverlapRecHD.cpp
-    SimdOverlapRecHF.cpp
-    SimdOverlapRecHG.cpp
-    SimdOverlapRecHH.cpp
-    SimdOverlapRecHI.cpp
-    SimdOverlapRecHP.cpp
-    SimdOverlapRecHS.cpp
-    SimdOverlapRecID.cpp
-    SimdOverlapRecIF.cpp
-    SimdOverlapRecIG.cpp
-    SimdOverlapRecIH.cpp
-    SimdOverlapRecII.cpp
-    SimdOverlapRecIP.cpp
-    SimdOverlapRecIS.cpp
-    SimdOverlapRecPD.cpp
-    SimdOverlapRecPF.cpp
-    SimdOverlapRecPG.cpp
-    SimdOverlapRecPH.cpp
-    SimdOverlapRecPI.cpp
-    SimdOverlapRecPP.cpp
-    SimdOverlapRecPS.cpp
-    SimdOverlapRecSD.cpp
-    SimdOverlapRecSF.cpp
-    SimdOverlapRecSG.cpp
-    SimdOverlapRecSH.cpp
-    SimdOverlapRecSI.cpp
-    SimdOverlapRecSP.cpp
+    SimdOverlapPrimRecSLD.cpp
+    SimdOverlapPrimRecSLF.cpp
+    SimdOverlapPrimRecSLG.cpp
+    SimdOverlapPrimRecSLH.cpp
+    SimdOverlapPrimRecSLI.cpp
+    SimdOverlapPrimRecSLP.cpp
+    SimdOverlapPrimRecSS.cpp
+    SimdOverlapRecSLD.cpp
+    SimdOverlapRecSLF.cpp
+    SimdOverlapRecSLG.cpp
+    SimdOverlapRecSLH.cpp
+    SimdOverlapRecSLI.cpp
+    SimdOverlapRecSLP.cpp
     SimdOverlapRecSS.cpp
   )
 
