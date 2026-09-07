@@ -622,9 +622,12 @@ class MetalForceFieldManager:
         taken out of the fine topology. That decomposition is untouched by
         how a metal is gripped, which is the whole reason for splitting the
         comparison in two. Each of them is a coarse node carrying its
-        Weisfeiler-Lehman key, its formula and its heavy atom subgraph, so
-        the two levels are one object rather than a graph and a list that
-        have to agree.
+        Weisfeiler-Lehman key, its formula, its heavy atom subgraph and the
+        family key of that subgraph, so the two levels are one object rather
+        than a graph and a list that have to agree. The family key is hashed
+        here, once per residue, rather than by each of the readers that
+        compares one -- the isomorphism search asks for it per candidate
+        node pair, which made it the most repeated hash in the module.
 
         The active site is not modified; a new dictionary is returned.
 
@@ -634,7 +637,8 @@ class MetalForceFieldManager:
             Its bonds, as index pairs.
 
         :return:
-            The active site with fine_topology and coarse_topology added.
+            The active site with fine_topology, coarse_topology and
+            composition added.
         """
 
         labels = active_site['molecule'].get_labels()
@@ -653,11 +657,13 @@ class MetalForceFieldManager:
         for index, component in enumerate(nx.connected_components(sidechains)):
             nodes = sorted(component)
             node = ('residue', index)
+            heavy = self._heavy_subgraph(labels, fine, nodes)
             coarse.add_node(node,
                             kind='residue',
                             key=self._fragment_key(fine, nodes),
                             formula=self._formula(labels, nodes),
-                            heavy=self._heavy_subgraph(labels, fine, nodes))
+                            heavy=heavy,
+                            family=self._family_key(heavy))
 
             for metal in metal_indices:
                 if any(fine.has_edge(metal, atom) for atom in nodes):
@@ -667,6 +673,7 @@ class MetalForceFieldManager:
             **active_site,
             'fine_topology': fine,
             'coarse_topology': coarse,
+            'composition': sorted(labels),
         }
 
     @staticmethod
@@ -806,23 +813,6 @@ class MetalForceFieldManager:
 
         return spec
 
-    @staticmethod
-    def _matrix_edges(connectivity_matrix):
-        """
-        Returns the bonds of a connectivity matrix as index pairs.
-
-        The core derives them the same way in connectivity_bonds, so there
-        is one definition of what an edge of the matrix is.
-
-        :param connectivity_matrix:
-            The connectivity of an active site.
-
-        :return:
-            The bonds.
-        """
-
-        return core.connectivity_bonds(connectivity_matrix)
-
     def compare_active_site(self,
                             active_site=None,
                             mm_opt=True,
@@ -889,9 +879,7 @@ class MetalForceFieldManager:
             'MetalSiteForceFieldBuilder first.')
 
         builder = self._active_site_builder
-        described = self._describe(
-            builder.active_site,
-            self._matrix_edges(builder.active_site['connectivity_matrix']))
+        described = self._described_site(builder)
 
         if mm_opt:
             molecule = self._mm_relax({'active_site': described})
@@ -902,7 +890,6 @@ class MetalForceFieldManager:
 
         coordinates = molecule.get_coordinates_in_angstrom()
         heavy_only = not include_hydrogens
-        composition = sorted(described['molecule'].get_labels())
 
         findings = {}
 
@@ -916,7 +903,7 @@ class MetalForceFieldManager:
                 'regions': {},
             }
 
-            if sorted(template['molecule'].get_labels()) != composition:
+            if template['composition'] != described['composition']:
                 # not the same atoms, so there is nothing to map onto
                 entry['status'] = 'composition'
                 findings[name] = entry
@@ -1335,7 +1322,7 @@ class MetalForceFieldManager:
 
         return self._describe(
             active_site,
-            self._matrix_edges(active_site['connectivity_matrix']))
+            core.connectivity_bonds(active_site['connectivity_matrix']))
 
     @staticmethod
     def _family_key(heavy):
@@ -1370,9 +1357,8 @@ class MetalForceFieldManager:
 
         coarse = described['coarse_topology']
 
-        return Counter(
-            self._family_key(coarse.nodes[node]['heavy'])
-            for node in self._residue_nodes(coarse))
+        return Counter(coarse.nodes[node]['family']
+                       for node in self._residue_nodes(coarse))
 
     def _family_name(self, described, key):
         """
@@ -1390,7 +1376,7 @@ class MetalForceFieldManager:
         coarse = described['coarse_topology']
 
         for node in self._residue_nodes(coarse):
-            if self._family_key(coarse.nodes[node]['heavy']) == key:
+            if coarse.nodes[node]['family'] == key:
                 return coarse.nodes[node]['formula']
 
         return key[:6]
@@ -1410,9 +1396,8 @@ class MetalForceFieldManager:
 
         coarse = described['coarse_topology']
 
-        return Counter(
-            self._family_key(coarse.nodes[image]['heavy'])
-            for image in coarse.neighbors(('metal', metal)))
+        return Counter(coarse.nodes[image]['family']
+                       for image in coarse.neighbors(('metal', metal)))
 
     @staticmethod
     def _sidechain_heavy_atoms(residue):
@@ -1563,7 +1548,7 @@ class MetalForceFieldManager:
             best = {
                 'resid': str(residue.id),
                 'chain': str(residue.chain.id),
-                'label': f'{residue.name}{residue.id}',
+                'label': core.residue_label(residue),
                 'res_index': residue.index,
                 'distance': distance,
                 # which atom of it would do the coordinating, since a
@@ -1727,14 +1712,24 @@ class MetalForceFieldManager:
                         for index in described['metal_indices'])):
             return None
 
+        # each side's counter depends on that side's metal alone, so the
+        # double loop below reads them rather than rebuilding them per pair
+        template_families = {
+            index: self._metal_families(template, index)
+            for index in template['metal_indices']
+        }
+        query_families = {
+            index: self._metal_families(described, index)
+            for index in described['metal_indices']
+        }
+
         ranked = []
 
         for first in template['metal_indices']:
             for second in described['metal_indices']:
                 if template_labels[first] != query_labels[second]:
                     continue
-                shared = self._metal_families(template, first) & (
-                    self._metal_families(described, second))
+                shared = template_families[first] & query_families[second]
                 ranked.append((-sum(shared.values()), first, second))
 
         pairs = []
@@ -1973,7 +1968,7 @@ class MetalForceFieldManager:
         for node in coarse.neighbors(('metal', metal)):
             heavy = coarse.nodes[node]['heavy']
 
-            if self._family_key(heavy) != family_key:
+            if coarse.nodes[node]['family'] != family_key:
                 continue
 
             bonded = [atom for atom in heavy.nodes if fine.has_edge(metal, atom)]
@@ -1987,7 +1982,7 @@ class MetalForceFieldManager:
                 'chain': str(residue.chain.id),
                 'atom': atoms[described['atom_map'][atom]].name,
                 'metal': res_index,
-                'label': (f'{residue.name}{residue.id} '
+                'label': (f'{core.residue_label(residue)} '
                           f'{atoms[described["atom_map"][atom]].name}'),
             } for atom in sorted(bonded)]))
 
@@ -2016,10 +2011,9 @@ class MetalForceFieldManager:
         """
 
         coarse = template['coarse_topology']
-        keep = Counter(
-            self._family_key(coarse.nodes[node]['heavy'])
-            for node in self._residue_nodes(coarse)
-            if coarse.degree(node) == 0)
+        keep = Counter(coarse.nodes[node]['family']
+                       for node in self._residue_nodes(coarse)
+                       if coarse.degree(node) == 0)
 
         topology = builder.enzyme_topology
         positions = np.asarray(builder.enzyme_positions)
@@ -2053,7 +2047,7 @@ class MetalForceFieldManager:
             dropped.append({
                 'resid': str(residue.id),
                 'chain': str(residue.chain.id),
-                'label': f'{residue.name}{residue.id}',
+                'label': core.residue_label(residue),
             })
 
         for entry in dropped:
@@ -2224,7 +2218,7 @@ class MetalForceFieldManager:
             variant = self._target_variant(residue, current, delta, wanted)
 
             if variant is None:
-                return (f'{residue.name}{residue.id} would have to be '
+                return (f'{core.residue_label(residue)} would have to be '
                         'protonated the way '
                         f'{template["name"]} has it, and there is no variant '
                         'of it that is')
@@ -2235,7 +2229,7 @@ class MetalForceFieldManager:
             changes.append({
                 'resid': str(residue.id),
                 'chain': str(residue.chain.id),
-                'label': f'{residue.name}{residue.id}',
+                'label': core.residue_label(residue),
                 'variant': variant,
             })
 
@@ -2414,7 +2408,7 @@ class MetalForceFieldManager:
         }
         current = {
             frozenset((first, second))
-            for first, second in self._matrix_edges(
+            for first, second in core.connectivity_bonds(
                 described['connectivity_matrix']) if metals & {first, second}
         }
 
@@ -2454,7 +2448,7 @@ class MetalForceFieldManager:
             'chain': str(atom.residue.chain.id),
             'atom': atom.name,
             'metal': self._metal_res_index(builder, described, metal),
-            'label': f'{atom.residue.name}{atom.residue.id} {atom.name}',
+            'label': f'{core.residue_label(atom.residue)} {atom.name}',
         }
 
     def _selection_criteria(self):
@@ -2670,20 +2664,20 @@ class MetalForceFieldManager:
             One mapping of coarse nodes per way the two sites line up.
         """
 
-        # taken off the class rather than off self: GraphMatcher keeps the
-        # callable alive inside reference cycles of its own, and an instance
-        # caught in one is collected whenever the cycle collector gets to it
-        # rather than when it is finished with. For a manager that means its
-        # output stream -- and with it whatever sys.stdout was when it was
-        # made -- is closed in the middle of somebody else's work.
-        family_key = MetalForceFieldManager._family_key
-
+        # node_match must not capture self: GraphMatcher keeps the callable
+        # alive inside reference cycles of its own, and an instance caught
+        # in one is collected whenever the cycle collector gets to it rather
+        # than when it is finished with. For a manager that means its output
+        # stream -- and with it whatever sys.stdout was when it was made --
+        # is closed in the middle of somebody else's work. Reading the
+        # family key _describe already stored keeps it out of the closure
+        # altogether, and off the hot path of the search.
         def node_match(a, b):
             if a['kind'] != b['kind']:
                 return False
             if match_protonation or a['kind'] == 'metal':
                 return a['key'] == b['key']
-            return family_key(a['heavy']) == family_key(b['heavy'])
+            return a['family'] == b['family']
 
         matcher = GraphMatcher(template['coarse_topology'],
                                query['coarse_topology'],
@@ -2785,11 +2779,15 @@ class MetalForceFieldManager:
         reference = template['molecule'].get_coordinates_in_angstrom()
         best = None
 
+        # every mapping in maps is keyed on the same template indices, so
+        # the order and the slice it takes are loop invariants
+        order = sorted(maps[0]) if maps else []
+        reference_block = reference[order]
+
         for atom_map in maps:
-            order = sorted(atom_map)
             moved = coordinates[[atom_map[index] for index in order]]
 
-            rmsd, rot, trans = svd_superimpose(moved, reference[order])
+            rmsd, rot, trans = svd_superimpose(moved, reference_block)
 
             if best is None or rmsd < best[0]:
                 best = (rmsd, atom_map, rot, trans)
@@ -2833,16 +2831,17 @@ class MetalForceFieldManager:
 
         atom_map = dict(heavy_map)
 
+        template_labels = template['molecule'].get_labels()
+        query_labels = query['molecule'].get_labels()
+
         def hydrogens(labels, graph, node):
             return [
                 other for other in graph.neighbors(node) if labels[other] == 'H'
             ]
 
         for node, image in heavy_map.items():
-            first = hydrogens(template['molecule'].get_labels(),
-                              template['fine_topology'], node)
-            second = hydrogens(query['molecule'].get_labels(),
-                               query['fine_topology'], image)
+            first = hydrogens(template_labels, template['fine_topology'], node)
+            second = hydrogens(query_labels, query['fine_topology'], image)
 
             groups = [(first, second)]
 
@@ -2994,7 +2993,9 @@ class MetalForceFieldManager:
                                 heavy_only)
 
         return {
-            'atoms': len(self._rmsd_indices(template, region, heavy_only)),
+            # _rmsd_indices is the region less the hydrogens when they are
+            # being left out, which is exactly the two lists already in hand
+            'atoms': len(heavy) if heavy_only else len(indices),
             'rmsd': rmsd,
             'rmsd_heavy': heavy_rmsd,
             'ic_rmsd': ic_rmsd,
@@ -3223,7 +3224,7 @@ class MetalForceFieldManager:
                 matrix[second, first] = 1
                 changes['added'].append((first, second))
 
-        for first, second in self._matrix_edges(matrix):
+        for first, second in core.connectivity_bonds(matrix):
             if not ({first, second} & metals):
                 continue
             if frozenset((first, second)) in wanted:
@@ -3240,7 +3241,7 @@ class MetalForceFieldManager:
             'connectivity_matrix': matrix,
         }
 
-        return self._describe(active_site, self._matrix_edges(matrix)), changes
+        return self._describe(active_site, core.connectivity_bonds(matrix)), changes
 
     def _print_forced_bonds(self, template, active_site, changes):
         """
@@ -3421,25 +3422,6 @@ class MetalForceFieldManager:
 
         return params
 
-    @staticmethod
-    def _param(label, value, label_width=26, value_width=20):
-        """
-        Formats one parameter line with fixed label and value widths.
-
-        print_header centers what it is given, so every line has to be the
-        same width to come out left aligned against the others.
-
-        :param label:
-            The label.
-        :param value:
-            The value.
-
-        :return:
-            The formatted line.
-        """
-
-        return f'{label:<{label_width}} : {str(value):>{value_width}}'
-
     def _print_template(self, template):
         """
         Prints what one template holds.
@@ -3456,16 +3438,16 @@ class MetalForceFieldManager:
         self.ostream.print_header(f'Template {template["name"]}')
         self.ostream.print_header((9 + len(template['name'])) * '-')
         self.ostream.print_header(
-            self._param('geometry', template['geometry_kind']))
+            core._param('geometry', template['geometry_kind']))
         self.ostream.print_header(
-            self._param('atoms', template['molecule'].number_of_atoms()))
-        self.ostream.print_header(self._param('metal centers', metals))
+            core._param('atoms', template['molecule'].number_of_atoms()))
+        self.ostream.print_header(core._param('metal centers', metals))
         self.ostream.print_header(
-            self._param('capping hydrogens', len(template['cap_indices'])))
-        self.ostream.print_header(self._param('metal bonds', len(bonds)))
-        self.ostream.print_header(self._param('metal angles', len(angles)))
+            core._param('capping hydrogens', len(template['cap_indices'])))
+        self.ostream.print_header(core._param('metal bonds', len(bonds)))
+        self.ostream.print_header(core._param('metal angles', len(angles)))
         self.ostream.print_header(
-            self._param('total charge',
+            core._param('total charge',
                         f'{float(np.sum(template["charges"])):+.3f}'))
         self.ostream.print_blank()
         self.ostream.print_info(f'Loaded from {template["folder"]}')
@@ -3514,19 +3496,19 @@ class MetalForceFieldManager:
         self.ostream.print_header('Comparison against every template')
         self.ostream.print_header(33 * '-')
         self.ostream.print_header(
-            self._param('source',
+            core._param('source',
                         Path(results['source']).name))
         self.ostream.print_header(
-            self._param('active site atoms',
+            core._param('active site atoms',
                         active_site['molecule'].number_of_atoms()))
-        self.ostream.print_header(self._param('metal centers', metals))
-        self.ostream.print_header(self._param('geometry', results['geometry']))
+        self.ostream.print_header(core._param('metal centers', metals))
+        self.ostream.print_header(core._param('geometry', results['geometry']))
         self.ostream.print_header(
-            self._param(
+            core._param(
                 'measured over',
                 'all atoms' if results['include_hydrogens'] else 'heavy atoms'))
         self.ostream.print_header(
-            self._param('templates', len(results['templates'])))
+            core._param('templates', len(results['templates'])))
         self.ostream.print_blank()
         self.ostream.print_info(
             f'Residues: {", ".join(active_site["residues"])}')
@@ -3743,7 +3725,7 @@ class MetalForceFieldManager:
             limits = '; '.join(f'{name} {shown} {self.IC_TYPES[name]}'
                                for name, shown in measures.items())
             self.ostream.print_header(
-                self._param(region, limits, value_width=44))
+                core._param(region, limits, value_width=44))
 
         self.ostream.print_blank()
 

@@ -1,3 +1,5 @@
+import numpy as np
+
 from veloxchem.atomtypeidentifier import AtomTypeIdentifier
 from veloxchem.molecule import Molecule
 
@@ -2183,3 +2185,175 @@ class TestAtomTypeIdentifier:
         self.run_atomtypeidentifier(xyz_string, expected_atomtypes,
                                     expected_equal_charges_list,
                                     expected_equiv_atoms)
+
+    # A metal bond is an edge like any other to the perception, so a
+    # carboxylate oxygen that grips a metal is typed as an ether one and its
+    # carbon can lose the carbonyl type with it. metal_blind_typing looks
+    # past those bonds, which is what a coordinating amino acid is meant to
+    # behave like. The geometry below is propanoate -- glutamate without the
+    # backbone -- with a zinc 2 A off one carboxylate oxygen.
+
+    zn_propanoate_xyz = """11
+        propanoate with a zinc on one carboxylate oxygen
+        C     -0.357691     1.539992     1.111205
+        C      0.849241     0.862678     1.749537
+        C      0.659738    -0.620319     1.792751
+        O      0.021197    -1.208404     2.877216
+        O      1.038159    -1.335826     0.828221
+        H     -1.276549     1.323644     1.697362
+        H     -0.494483     1.181694     0.068342
+        H     -0.199553     2.638887     1.091346
+        H      1.763051     1.107979     1.166142
+        H      0.984329     1.247575     2.783043
+        Zn    -0.216118    -2.817765     4.040676
+    """
+
+    # the covalent bonds of the propanoate, without the zinc contact
+    propanoate_bonds = [(0, 1), (0, 5), (0, 6), (0, 7), (1, 2), (1, 8), (1, 9),
+                        (2, 3), (2, 4)]
+
+    # the zinc contact, on the oxygen the perception then mistypes
+    zinc_bond = (3, 10)
+
+    @staticmethod
+    def connectivity(bonds):
+        """
+        A connectivity matrix over the eleven atoms holding the given bonds.
+
+        :param bonds:
+            The bonds, as pairs of 0-based atom indices.
+
+        :return:
+            The connectivity matrix.
+        """
+
+        connectivity_matrix = np.zeros((11, 11), dtype='int32')
+        for i, j in bonds:
+            connectivity_matrix[i][j] = 1
+            connectivity_matrix[j][i] = 1
+
+        return connectivity_matrix
+
+    @staticmethod
+    def zn_propanoate():
+        """
+        The molecule and the connectivity the zinc contact is in.
+
+        :return:
+            The molecule and its connectivity matrix.
+        """
+
+        molecule = Molecule.read_xyz_string(
+            TestAtomTypeIdentifier.zn_propanoate_xyz)
+        molecule.set_charge(1)
+
+        bonds = (TestAtomTypeIdentifier.propanoate_bonds +
+                 [TestAtomTypeIdentifier.zinc_bond])
+
+        return molecule, TestAtomTypeIdentifier.connectivity(bonds)
+
+    @staticmethod
+    def equivalence_partition(equivalent_atoms):
+        """
+        Which atoms an equivalence labelling puts together.
+
+        The labels themselves are seeded from the atom types, so they follow
+        a retyping; which atoms share one is what has to be compared across
+        it.
+
+        :param equivalent_atoms:
+            The equivalence labels, one per atom.
+
+        :return:
+            The atom indices, grouped and sorted.
+        """
+
+        groups = {}
+        for index, label in enumerate(equivalent_atoms):
+            groups.setdefault(label, []).append(index)
+
+        return sorted(sorted(group) for group in groups.values())
+
+    @staticmethod
+    def typed(connectivity_matrix, molecule, **settings):
+        """
+        Runs the perception under the given settings.
+
+        :param connectivity_matrix:
+            The connectivity to perceive from.
+        :param molecule:
+            The molecule.
+        :param settings:
+            Settings to assign on the identifier.
+
+        :return:
+            The identifier, with the types on it.
+        """
+
+        atomtypeidentifier = AtomTypeIdentifier()
+        atomtypeidentifier.ostream.mute()
+        for key, value in settings.items():
+            setattr(atomtypeidentifier, key, value)
+        atomtypeidentifier.generate_gaff_atomtypes(molecule,
+                                                   connectivity_matrix)
+
+        return atomtypeidentifier
+
+    def test_metal_blind_typing(self):
+
+        molecule, connectivity_matrix = self.zn_propanoate()
+
+        # the same eleven atoms with no zinc contact at all, which is what
+        # the blind perception is expected to reproduce
+        free = self.typed(self.connectivity(self.propanoate_bonds), molecule)
+        bonded = self.typed(connectivity_matrix, molecule)
+        blind = self.typed(connectivity_matrix,
+                           molecule,
+                           metal_blind_typing=True)
+
+        # the zinc costs the oxygen it holds its carbonyl type
+        assert bonded.gaff_atom_types[3] == 'os'
+        assert bonded.gaff_atom_types[4] == 'o'
+
+        # and looking past the bond gives back what the free molecule has
+        assert blind.gaff_atom_types == free.gaff_atom_types
+        assert blind.gaff_atom_types == [
+            'c3', 'c3', 'c', 'o', 'o', 'hc', 'hc', 'hc', 'hc', 'hc',
+            'Zn_unknown'
+        ]
+
+    def test_metal_blind_typing_keeps_the_bond_and_the_equivalences(self):
+
+        molecule, connectivity_matrix = self.zn_propanoate()
+
+        bonded = self.typed(connectivity_matrix, molecule)
+        bonded.identify_equivalences()
+        blind = self.typed(connectivity_matrix,
+                           molecule,
+                           metal_blind_typing=True)
+        blind.identify_equivalences()
+
+        # only the perception looks past the bond: what the identifier hands
+        # back is the connectivity it was given, since the topology built
+        # from it still has to make the bond
+        assert (blind.connectivity_matrix == connectivity_matrix).all()
+
+        # the metal breaks the symmetry of the two carboxylate oxygens, and
+        # has to keep breaking it: the equivalences read the real bonding
+        assert (self.equivalence_partition(blind.equivalent_atoms) ==
+                self.equivalence_partition(bonded.equivalent_atoms))
+        assert blind.equivalent_atoms[3] != blind.equivalent_atoms[4]
+
+    def test_typing_ignored_bonds_names_one_edge(self):
+
+        molecule, connectivity_matrix = self.zn_propanoate()
+
+        blind = self.typed(connectivity_matrix,
+                           molecule,
+                           metal_blind_typing=True)
+        # the only metal bond there is, named by hand rather than by element
+        named = self.typed(connectivity_matrix,
+                           molecule,
+                           typing_ignored_bonds=[self.zinc_bond])
+
+        assert named.gaff_atom_types == blind.gaff_atom_types

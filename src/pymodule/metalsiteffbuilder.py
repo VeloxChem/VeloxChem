@@ -175,6 +175,11 @@ class MetalSiteForceFieldBuilder:
         - calculate_partial_hessian: The flag for restricting the Hessian to
           the atom pairs the metal terms are fitted from. False computes the
           whole thing, which costs far more and changes no parameter.
+        - partial_hessian_cutoff: The distance in Angstrom within which a donor
+          atom is covered by the partial Hessian whether or not it is bonded to
+          a metal, so that a contact the geometry put out of perception range
+          can still be made a bond afterwards without paying for the Hessian
+          again. None restricts it to the bonding as perceived.
         - constrain_capping_hydrogens: The flag for constraining the capping
           hydrogens in addition to the beta carbons.
         - average_metal_terms: The flag for averaging the fitted metal terms
@@ -250,8 +255,8 @@ class MetalSiteForceFieldBuilder:
         # coordination detection
         # the primary cutoff is generous on purpose: a stretched bridging
         # contact in an unrelaxed structure is still a bond
-        self.metal_bond_cutoff = 3.0
-        self.report_cutoff = 3.5
+        self.metal_bond_cutoff = core.METAL_BOND_CUTOFF
+        self.report_cutoff = core.REPORT_CUTOFF
         self.metal_elements = tuple(core.METAL_ELEMENTS)
         self.metal_formal_charges = dict(core.METAL_FORMAL_CHARGES)
 
@@ -260,7 +265,7 @@ class MetalSiteForceFieldBuilder:
         self.bidentate_asymmetry = core.BIDENTATE_ASYMMETRY
 
         # truncation and protonation
-        self.cap_bond_length = 1.09
+        self.cap_bond_length = core.CAP_BOND_LENGTH
         self.protonation_overrides = None
         # the repair renumbers atoms and is what lets a protein force field
         # match its templates; a run that only wants the metal site can skip
@@ -285,6 +290,11 @@ class MetalSiteForceFieldBuilder:
         # off for a Hessian that is worth something on its own -- a frequency
         # analysis, or a fit of terms the metals do not reach.
         self.calculate_partial_hessian = True
+        # What is computed is more forgiving than what is fitted: a donor this
+        # close to a metal gets its Hessian blocks whether or not the geometry
+        # left it inside metal_bond_cutoff, so that add_metal_bond afterwards
+        # lands on real data rather than on zeros no fit can use.
+        self.partial_hessian_cutoff = core.PARTIAL_HESSIAN_CUTOFF
         # the beta carbon is where the backbone actually holds the sidechain;
         # the capping hydrogen only stands in for the alpha carbon
         self.constrain_capping_hydrogens = False
@@ -313,7 +323,7 @@ class MetalSiteForceFieldBuilder:
         # residue's shortest metal bond, it is dropped rather than kept as a
         # bond with no stiffness.
         self.prune_weak_bridge_bonds = True
-        self.weak_bridge_tolerance = 0.25
+        self.weak_bridge_tolerance = core.WEAK_BRIDGE_TOLERANCE
 
         # A coordinating histidine's ring nitrogen, and a bidentate
         # carboxylate's two oxygens, both have their donor lone pair(s) in
@@ -826,10 +836,10 @@ class MetalSiteForceFieldBuilder:
             # has index i for id i+1, so an index written here would also
             # match its neighbour by id
             overrides = dict(self.protonation_overrides or {})
-            overrides[f'{residue.name}{residue.id}'] = variant
+            overrides[core.residue_label(residue)] = variant
 
             self.ostream.print_info(
-                f'{residue.name}{residue.id} will be protonated as {variant}.')
+                f'{core.residue_label(residue)} will be protonated as {variant}.')
             self.ostream.flush()
 
             return overrides
@@ -869,7 +879,7 @@ class MetalSiteForceFieldBuilder:
             core.check_truncatable(residue)
 
             request = self._request
-            label = f'{residue.name}{residue.id}'
+            label = core.residue_label(residue)
 
             already = residue.index in core.active_site_residues(
                 self.binding_modes)
@@ -933,7 +943,7 @@ class MetalSiteForceFieldBuilder:
 
             request = self._request
             modes = self.binding_modes
-            label = f'{residue.name}{residue.id}'
+            label = core.residue_label(residue)
             members = core.active_site_residues(modes)
 
             assert_msg_critical(
@@ -1109,7 +1119,9 @@ class MetalSiteForceFieldBuilder:
         Restricted to the atom pairs the metal terms are fitted from unless
         calculate_partial_hessian is switched off, since Seminario reads one
         block per metal bond and two per metal angle and the fit throws the
-        rest away.
+        rest away. Those pairs are taken with partial_hessian_cutoff's
+        forgiveness, so a contact just outside the perceived coordination is
+        covered as well and can be bonded afterwards without recomputing.
 
         Collective: every rank runs it, and the drivers parallelize inside.
 
@@ -1120,16 +1132,20 @@ class MetalSiteForceFieldBuilder:
         self._require('calculate_hessian', Stage.ACTIVE_SITE)
         active_site = self._active_site
 
-        atom_pairs, atoms = core.extract_pairs(
-            active_site['connectivity_matrix'],
-            active_site['metal_indices'],
-            bond_count=2)
+        atom_pairs, atoms = core.hessian_pairs(
+            active_site,
+            bond_count=2,
+            partial_hessian_cutoff=self.partial_hessian_cutoff)
         n_atoms = active_site['molecule'].number_of_atoms()
 
         if self.calculate_partial_hessian:
-            self.ostream.print_info(
-                f'Hessian restricted to {len(atom_pairs)} atom pairs over '
-                f'{len(atoms)} of {n_atoms} atoms.')
+            restriction = (f'Hessian restricted to {len(atom_pairs)} atom '
+                           f'pairs over {len(atoms)} of {n_atoms} atoms')
+            if self.partial_hessian_cutoff is not None:
+                restriction += (', covering every donor atom within '
+                                f'{self.partial_hessian_cutoff:.2f} A of a '
+                                'metal whether it is bonded to one or not')
+            self.ostream.print_info(restriction + '.')
         else:
             self.ostream.print_info(
                 f'Computing the full Hessian over all {n_atoms} atoms; the '
@@ -1343,10 +1359,6 @@ class MetalSiteForceFieldBuilder:
         """
 
         self._require('create_enzyme_system', Stage.FITTED)
-        assert_msg_critical(
-            self._forcefield is not None,
-            'MetalSiteForceFieldBuilder.create_enzyme_system: there is no '
-            'force field yet. Call build_forcefield first.')
 
         self._enzyme_system = self._on_master(self._create_enzyme_system)
         self._enter(Stage.ENZYME)
@@ -2059,6 +2071,10 @@ class MetalSiteForceFieldBuilder:
             param(
                 'Hessian', 'computed, partial'
                 if self.calculate_partial_hessian else 'computed, full'))
+        if (self.calculate_partial_hessian and
+                self.partial_hessian_cutoff is not None):
+            self.ostream.print_header(
+                param('Hessian cutoff', f'{self.partial_hessian_cutoff:.2f} A'))
         self.ostream.print_header(
             param('partial charges', 'RESP' if self.do_resp else 'D4'))
         self.ostream.print_header(

@@ -39,6 +39,7 @@ the same functions directly.
 """
 
 from mpi4py import MPI
+from contextlib import contextmanager
 from pathlib import Path
 from copy import deepcopy
 import numpy as np
@@ -101,6 +102,47 @@ DONOR_ELEMENTS = ('N', 'O', 'S', 'Se')
 # Angstrom, before the pair stops counting as a chelating bidentate and
 # becomes a monodentate contact of the near oxygen alone.
 BIDENTATE_ASYMMETRY = 0.75
+
+# Distance, in Angstrom, within which a donor atom is taken to be bonded to
+# a metal center. It is generous on purpose: the scan reads an unrelaxed
+# structure, where a stretched bridging contact is still a bond.
+METAL_BOND_CUTOFF = 3.0
+
+# Distance, in Angstrom, out to which a contact is reported without being
+# made a bond, so that a near miss is visible in the coordination table.
+REPORT_CUTOFF = 3.5
+
+# Distance, in Angstrom, within which a donor atom is given Hessian blocks
+# with a metal center whether or not it is bonded to one. The perception is
+# a distance cutoff read on a single geometry, and the contact that falls
+# just outside it is exactly the one a user adds by hand afterwards. Filling
+# a block that was never computed costs the whole Hessian again, so what the
+# partial Hessian covers is deliberately more forgiving than the bonding it
+# is fitted to. It widens what is computed, never what is fitted.
+PARTIAL_HESSIAN_CUTOFF = 3.5
+
+# Length, in Angstrom, of the C-H bond of the hydrogen that caps a
+# sidechain where the CA-CB bond was cut.
+CAP_BOND_LENGTH = 1.09
+
+# How much further out than its residue's shortest metal bond, in Angstrom,
+# the weak arm of a bridging residue has to sit before the fit drops it.
+WEAK_BRIDGE_TOLERANCE = 0.25
+
+# Where _seed_metal_terms took a term's equilibrium from, written into the
+# comment of every term it touches so that the force field says it without
+# being asked again. _seeded_equilibria reads them back for the crude-pass
+# table, so the two sides cannot drift on the wording.
+SEEDED_FROM_REQUEST = 'asked for with the bond'
+SEEDED_FROM_TABLE = 'given equilibrium'
+SEEDED_FROM_GEOMETRY = 'measured on the input geometry'
+
+# What the crude-pass table calls each of them.
+SEEDED_EQUILIBRIUM_LABELS = {
+    SEEDED_FROM_REQUEST: 'requested',
+    SEEDED_FROM_TABLE: 'given',
+    SEEDED_FROM_GEOMETRY: 'measured',
+}
 
 # Residues whose sidechain can bridge two metal centers. A carboxylate has
 # two donor oxygens and a thiolate sulfur has several lone pairs, so both
@@ -266,6 +308,80 @@ def _folder_file(name, folder=None):
     path = Path(folder) / name
 
     return path if path.is_file() else None
+
+
+def residue_label(residue):
+    """
+    Returns the ASP130-style label a residue is named by.
+
+    This label is load-bearing rather than cosmetic: it is what a user
+    request is matched against, what update_protonation_state writes as a
+    protonation_overrides key, and what active_site['residues'] holds. It
+    is built in one place so that all of those agree on it.
+
+    :param residue:
+        The topology residue.
+
+    :return:
+        The label.
+    """
+
+    return f'{residue.name}{residue.id}'
+
+
+@contextmanager
+def _muted(drivers, mute_scf=True):
+    """
+    Mutes the output streams of the given drivers for the duration of a run.
+
+    OutputStream.mute is reference counted, so a mute that is not balanced
+    by its unmute swallows every later warning of that stream outright.
+    Doing it here means the balance holds even when the driver raises.
+
+    :param drivers:
+        The drivers whose streams to mute.
+    :param mute_scf:
+        Whether to mute at all. When False this does nothing, so a caller
+        need not branch on it.
+    """
+
+    if not mute_scf:
+        yield
+        return
+
+    for driver in drivers:
+        driver.ostream.mute()
+
+    try:
+        yield
+    finally:
+        for driver in drivers:
+            driver.ostream.unmute()
+
+
+def _site_index_map(active_site):
+    """
+    Maps a topology atom index back to the active site index that holds it.
+
+    A capping hydrogen is mapped to the CA it replaces rather than to an
+    atom of its own, so its entry is left out: the site holds no alpha
+    carbon, and reading a cap's position back as that CA's is the one way
+    this inversion goes wrong.
+
+    :param active_site:
+        The active site.
+
+    :return:
+        The dictionary from topology atom index to active site index.
+    """
+
+    caps = set(active_site['cap_indices'])
+
+    return {
+        top_index: site_index
+        for site_index, top_index in active_site['atom_map'].items()
+        if site_index not in caps
+    }
 
 
 def broadcast_forcefield(forcefield, comm=None, ostream=None):
@@ -486,8 +602,8 @@ def suggest_binding_modes(topology,
                           metal_formal_charges=None,
                           ostream=None,
                           bidentate_asymmetry=BIDENTATE_ASYMMETRY,
-                          metal_bond_cutoff=3.0,
-                          report_cutoff=3.5,
+                          metal_bond_cutoff=METAL_BOND_CUTOFF,
+                          report_cutoff=REPORT_CUTOFF,
                           request=None):
     """
     Derives the coordination topology of the metal centers from geometry.
@@ -613,8 +729,8 @@ def _collect_ligands(atoms,
                      notes,
                      forced=None,
                      bidentate_asymmetry=BIDENTATE_ASYMMETRY,
-                     metal_bond_cutoff=3.0,
-                     report_cutoff=3.5,
+                     metal_bond_cutoff=METAL_BOND_CUTOFF,
+                     report_cutoff=REPORT_CUTOFF,
                      ostream=None):
     """
     Builds the classified ligand contact list of a set of candidate atoms.
@@ -660,7 +776,7 @@ def _collect_ligands(atoms,
         if closest > report_cutoff:
             continue
 
-        label = f'{atom.residue.name}{atom.residue.id}'
+        label = residue_label(atom.residue)
 
         if atom.name in BACKBONE_ATOM_NAMES:
             notes.append(
@@ -754,7 +870,7 @@ def _resolve_residues(topology, coordinating_residues, ostream=None):
         wanted = str(request).strip()
         matched = [
             residue for residue in residues
-            if wanted in (str(residue.id), f'{residue.name}{residue.id}')
+            if wanted in (str(residue.id), residue_label(residue))
         ]
 
         assert_msg_critical(
@@ -764,7 +880,7 @@ def _resolve_residues(topology, coordinating_residues, ostream=None):
         for residue in matched:
             forced.add(residue.index)
 
-        found = ', '.join(f'{residue.name}{residue.id} '
+        found = ', '.join(f'{residue_label(residue)} '
                           f'(chain {residue.chain.id})' for residue in matched)
         ostream.print_info(
             f'Including {found} in the coordination sphere by request.')
@@ -780,8 +896,8 @@ def _force_ligands(atoms,
                    contacts,
                    notes,
                    forced,
-                   metal_bond_cutoff=3.0,
-                   report_cutoff=3.5,
+                   metal_bond_cutoff=METAL_BOND_CUTOFF,
+                   report_cutoff=REPORT_CUTOFF,
                    ostream=None):
     """
     Makes the residues asked for ligands of their nearest metal.
@@ -839,7 +955,7 @@ def _force_ligands(atoms,
                     best = (distance, atom, metal)
 
         distance, atom, metal = best
-        label = f'{atom.residue.name}{atom.residue.id}'
+        label = residue_label(atom.residue)
 
         notes.append(
             f'{label} {atom.name} is {distance:.2f} A from a metal, '
@@ -1271,7 +1387,7 @@ def _apply_manual_bonds(ligands, records, metals, atoms, position_of, notes):
 
         if contact is None:
             contact = {
-                'residue': f'{atom.residue.name}{atom.residue.id}',
+                'residue': residue_label(atom.residue),
                 'res_name': atom.residue.name,
                 'res_index': atom.residue.index,
                 'chain': atom.residue.chain.id,
@@ -1302,8 +1418,8 @@ def add_metal_bond(request,
                    atom=None,
                    chain=None,
                    bidentate_asymmetry=BIDENTATE_ASYMMETRY,
-                   metal_bond_cutoff=3.0,
-                   report_cutoff=3.5,
+                   metal_bond_cutoff=METAL_BOND_CUTOFF,
+                   report_cutoff=REPORT_CUTOFF,
                    equilibrium=None,
                    ostream=None):
     """
@@ -1368,7 +1484,7 @@ def add_metal_bond(request,
     ligand_atom = _resolve_ligand_atom(residue, atom, metal_entry, positions,
                                        binding_modes['ligands'])
 
-    label = f'{residue.name}{residue.id}'
+    label = residue_label(residue)
     metal_label = f'{metal_entry["element"]} (index {metal_entry["index"]})'
 
     assert_msg_critical(
@@ -1647,7 +1763,7 @@ def _resolve_residue(topology, resid, chain=None):
     wanted = str(resid).strip()
     matched = [
         residue for residue in topology.residues()
-        if wanted in (str(residue.id), f'{residue.name}{residue.id}') and
+        if wanted in (str(residue.id), residue_label(residue)) and
         (chain is None or str(residue.chain.id) == str(chain))
     ]
 
@@ -1657,7 +1773,7 @@ def _resolve_residue(topology, resid, chain=None):
         len(matched) > 0, f'residue {resid}'
         f'{in_chain} is not a residue of this structure')
 
-    found = ', '.join(f'{residue.name}{residue.id} '
+    found = ', '.join(f'{residue_label(residue)} '
                       f'(chain {residue.chain.id})' for residue in matched)
 
     assert_msg_critical(
@@ -1769,7 +1885,7 @@ def _resolve_ligand_atom(residue, atom, metal_entry, positions, ligands):
 
     atoms = list(residue.atoms())
     donors = _sidechain_donors(residue)
-    label = f'{residue.name}{residue.id}'
+    label = residue_label(residue)
     names = [donor.name for donor in donors]
 
     if atom is not None:
@@ -1867,7 +1983,7 @@ def _histidine_variant(residue, positions, metal_positions):
     }
 
     if len(ring_nitrogens) < 2:
-        return 'HID', (f'{residue.name}{residue.id} does not have both ring '
+        return 'HID', (f'{residue_label(residue)} does not have both ring '
                        'nitrogens; defaulting to HID, please check')
 
     distances = {
@@ -1882,7 +1998,7 @@ def _histidine_variant(residue, positions, metal_positions):
     note = None
     nearest = min(sidechain, key=closest_metal_distance)
     if nearest.name not in ('ND1', 'NE2'):
-        note = (f'{residue.name}{residue.id} has {nearest.name} closer to a '
+        note = (f'{residue_label(residue)} has {nearest.name} closer to a '
                 f'metal ({closest_metal_distance(nearest):.2f} A) than either '
                 f'ring nitrogen (ND1 {distances["ND1"]:.2f} A, NE2 '
                 f'{distances["NE2"]:.2f} A); the tautomer was still chosen '
@@ -1937,7 +2053,7 @@ def check_variant(residue, variant):
         The variant name.
     """
 
-    label = f'{residue.name}{residue.id}'
+    label = residue_label(residue)
     legal = known_variants(residue.name)
 
     assert_msg_critical(
@@ -2030,7 +2146,7 @@ def suggest_variants(topology,
     for key, variant in overrides.items():
         by_id = [
             residue for residue in residues if str(residue.id) == str(key) or
-            f'{residue.name}{residue.id}' == str(key)
+            residue_label(residue) == str(key)
         ]
         matched = by_id or [
             residue for residue in residues if residue.index == key
@@ -2040,7 +2156,7 @@ def suggest_variants(topology,
             len(matched) > 0, 'suggest_variants: override '
             f'residue {key} not found')
 
-        named = ', '.join(f'{residue.name}{residue.id} '
+        named = ', '.join(f'{residue_label(residue)} '
                           f'(chain {residue.chain.id})' for residue in matched)
 
         assert_msg_critical(
@@ -2145,7 +2261,7 @@ def check_truncatable(residue):
 
     assert_msg_critical(
         reason is None, 'check_truncatable: '
-        f'{residue.name}{residue.id} {reason}, and the truncation of this '
+        f'{residue_label(residue)} {reason}, and the truncation of this '
         'module cuts every sidechain at CA-CB. It cannot be part of the '
         'active site')
 
@@ -2177,7 +2293,7 @@ def active_site_residues(binding_modes):
 def extract_active_site(topology,
                         positions,
                         binding_modes,
-                        cap_bond_length=1.09,
+                        cap_bond_length=CAP_BOND_LENGTH,
                         ostream=None):
     """
     Builds the truncated QM active site.
@@ -2278,7 +2394,7 @@ def extract_active_site(topology,
                         break
                 assert_msg_critical(
                     cb_atom is not None, 'extract_active_site: '
-                    f'residue {residue.name}{residue.id} has no CB to '
+                    f'residue {residue_label(residue)} has no CB to '
                     'cut at')
                 direction = positions[atom.index] - positions[cb_atom.index]
                 direction /= np.linalg.norm(direction)
@@ -2314,7 +2430,7 @@ def extract_active_site(topology,
             variant = residue.name
             ostream.print_warning(
                 'No protonation variant recorded for '
-                f'{residue.name}{residue.id}; using the residue name for '
+                f'{residue_label(residue)}; using the residue name for '
                 'the charge count')
         assert_msg_critical(
             variant in VARIANT_CHARGES, 'extract_active_site: no charge '
@@ -2507,12 +2623,7 @@ def apply_metal_bonds(active_site, binding_modes):
         itself when nothing changed.
     """
 
-    caps = set(active_site['cap_indices'])
-    site_of = {
-        top_index: site_index
-        for site_index, top_index in active_site['atom_map'].items()
-        if site_index not in caps
-    }
+    site_of = _site_index_map(active_site)
     metals = set(active_site['metal_indices'])
 
     matrix = np.array(active_site['connectivity_matrix'], copy=True)
@@ -2623,8 +2734,8 @@ def derive_site_coordination(topology,
                              active_site,
                              binding_modes,
                              bidentate_asymmetry=BIDENTATE_ASYMMETRY,
-                             metal_bond_cutoff=3.0,
-                             report_cutoff=3.5,
+                             metal_bond_cutoff=METAL_BOND_CUTOFF,
+                             report_cutoff=REPORT_CUTOFF,
                              ostream=None):
     """
     Works out the coordination of an extracted active site from its own
@@ -2667,16 +2778,7 @@ def derive_site_coordination(topology,
         f'has {len(coordinates)} atoms while the active site has '
         f'{len(atom_map)}')
 
-    # a capping hydrogen is mapped to the CA it replaces, so its position
-    # must not be read back as that CA's
-    cap_atoms = {
-        atom_map[site_index] for site_index in active_site['cap_indices']
-    }
-    site_of = {
-        top_index: site_index
-        for site_index, top_index in atom_map.items()
-        if top_index not in cap_atoms
-    }
+    site_of = _site_index_map(active_site)
 
     atoms = list(topology.atoms())
     candidates = [atoms[top_index] for top_index in sorted(site_of)]
@@ -2716,8 +2818,8 @@ def update_binding_modes(topology,
                          active_site,
                          binding_modes,
                          bidentate_asymmetry=BIDENTATE_ASYMMETRY,
-                         metal_bond_cutoff=3.0,
-                         report_cutoff=3.5,
+                         metal_bond_cutoff=METAL_BOND_CUTOFF,
+                         report_cutoff=REPORT_CUTOFF,
                          ostream=None):
     """
     Re-detects the coordination sphere on a new active site geometry.
@@ -2759,16 +2861,7 @@ def update_binding_modes(topology,
     else:
         coordinates = np.asarray(geometry, dtype=float)
 
-    atom_map = active_site['atom_map']
-
-    cap_atoms = {
-        atom_map[site_index] for site_index in active_site['cap_indices']
-    }
-    site_of = {
-        top_index: site_index
-        for site_index, top_index in atom_map.items()
-        if top_index not in cap_atoms
-    }
+    site_of = _site_index_map(active_site)
 
     records = binding_modes.get('manual_bonds', [])
 
@@ -2906,11 +2999,7 @@ def _metal_contact_label(ligand, binding_modes):
         for index, distance in zip(ligand['metals'], ligand['distances']))
 
 
-def extract_pairs(connectivity_matrix,
-                  source_atoms,
-                  bond_count=2,
-                  initial_bond_range=None,
-                  coordinates=None):
+def extract_pairs(connectivity_matrix, source_atoms, bond_count=2):
     """
     Finds the atom pairs needed for a pair-restricted Hessian.
 
@@ -2927,12 +3016,6 @@ def extract_pairs(connectivity_matrix,
         The indices to walk out from, typically the metal centers.
     :param bond_count:
         The number of bonds to walk.
-    :param initial_bond_range:
-        The distance in Angstrom within which the first shell is taken.
-        Lets the function run on a topology in which the metal has no bonds
-        yet. Requires coordinates.
-    :param coordinates:
-        The coordinates in Angstrom, only needed with initial_bond_range.
 
     :return:
         The tuple of the sorted pair list and the sorted atom list.
@@ -2941,28 +3024,17 @@ def extract_pairs(connectivity_matrix,
     connectivity_matrix = np.asarray(connectivity_matrix)
     source_atoms = list(source_atoms)
 
-    assert_msg_critical(
-        initial_bond_range is None or coordinates is not None,
-        'extract_pairs: initial_bond_range '
-        'requires coordinates')
-
-    def neighbors(index, depth):
-        if depth == 0 and initial_bond_range is not None:
-            coords = np.asarray(coordinates)
-            distances = np.linalg.norm(coords - coords[index], axis=1)
-            found = set(np.where(distances <= initial_bond_range)[0].tolist())
-            found.discard(index)
-            return found
+    def neighbors(index):
         return set(np.where(connectivity_matrix[index])[0].tolist())
 
     visited = set(source_atoms)
     pairs = set()
     frontier = list(source_atoms)
 
-    for depth in range(bond_count):
+    for _ in range(bond_count):
         next_frontier = []
         for index in frontier:
-            for neighbor in neighbors(index, depth):
+            for neighbor in neighbors(index):
                 pairs.add((min(index, neighbor), max(index, neighbor)))
                 if neighbor not in visited:
                     visited.add(neighbor)
@@ -3216,7 +3288,6 @@ def _get_scf_driver(molecule,
             scf_drv = ScfRestrictedDriver(comm, ostream)
         if xcfun is not None:
             scf_drv.xcfun = xcfun
-        scf_drv = scf_drv
 
     basis = MolecularBasis.read(molecule, basis_set_label)
 
@@ -3262,13 +3333,8 @@ def _run_scf(scf_drv, molecule, basis, mute_scf=True):
         Whether to mute the driver while it runs.
     """
 
-    if mute_scf:
-        scf_drv.ostream.mute()
-
-    scf_drv.compute(molecule, basis)
-
-    if mute_scf:
-        scf_drv.ostream.unmute()
+    with _muted([scf_drv], mute_scf):
+        scf_drv.compute(molecule, basis)
 
 
 def optimize_active_site(active_site,
@@ -3326,21 +3392,74 @@ def optimize_active_site(active_site,
     opt_drv = OptimizationDriver(grad_drv)
     opt_drv.constraints = constraints
 
-    if mute_scf:
-        grad_drv.ostream.mute()
-        opt_drv.ostream.mute()
-
-    opt_results = opt_drv.compute(molecule, basis)
-
-    if mute_scf:
-        grad_drv.ostream.unmute()
-        opt_drv.ostream.unmute()
+    with _muted([grad_drv, opt_drv], mute_scf):
+        opt_results = opt_drv.compute(molecule, basis)
 
     optimized = Molecule.read_xyz_string(opt_results['final_geometry'])
     optimized.set_charge(molecule.get_charge())
     optimized.set_multiplicity(molecule.get_multiplicity())
 
     return optimized, opt_results
+
+
+def hessian_pairs(active_site,
+                  bond_count=2,
+                  partial_hessian_cutoff=PARTIAL_HESSIAN_CUTOFF):
+    """
+    Finds the atom pairs a partial Hessian has to hold blocks for.
+
+    The pairs extract_pairs walks out of the connectivity cover exactly the
+    metal terms the fit makes on the geometry as it stands. That is one
+    geometry's worth of perception, and a coordination the QM optimization
+    opened up past metal_bond_cutoff is precisely what add_metal_bond is
+    reached for afterwards -- at which point the Hessian holds an all-zero
+    block for the new bond and Seminario gives it no force constant, with
+    the whole Hessian to pay for again to repair it. The walk therefore
+    starts from a connectivity that additionally treats every donor atom
+    within partial_hessian_cutoff of a metal as bonded to it, so a bond
+    added later is already covered.
+
+    Only what is computed is widened. Nothing reads this connectivity back:
+    the active site keeps the bonding it was perceived with, and the fit
+    keeps fitting that.
+
+    :param active_site:
+        The active site whose Hessian is being computed. Not modified.
+    :param bond_count:
+        The number of bonds to walk, as extract_pairs takes it.
+    :param partial_hessian_cutoff:
+        The distance in Angstrom within which an unbonded donor atom is
+        covered along with the metal anyway. None walks the connectivity as
+        it stands.
+
+    :return:
+        The tuple of the sorted pair list and the sorted atom list.
+    """
+
+    matrix = np.array(active_site['connectivity_matrix'], dtype=bool)
+    metals = list(active_site['metal_indices'])
+
+    if partial_hessian_cutoff is not None:
+        molecule = active_site['molecule']
+        coordinates = molecule.get_coordinates_in_angstrom()
+        labels = molecule.get_labels()
+
+        donors = [
+            index for index, label in enumerate(labels)
+            if label in DONOR_ELEMENTS
+        ]
+
+        for metal in metals:
+            for donor in donors:
+                if matrix[metal, donor]:
+                    continue
+                distance = np.linalg.norm(coordinates[donor] -
+                                          coordinates[metal])
+                if distance <= partial_hessian_cutoff:
+                    matrix[metal, donor] = True
+                    matrix[donor, metal] = True
+
+    return extract_pairs(matrix, metals, bond_count=bond_count)
 
 
 def compute_hessian(active_site,
@@ -3360,13 +3479,13 @@ def compute_hessian(active_site,
     are added by the Hessian driver itself, so only the off-diagonal pairs
     need to be given.
 
-    compute() passes the pairs of extract_pairs unless
+    compute() passes the pairs of hessian_pairs unless
     calculate_partial_hessian is off, in which case it asks for the whole
     Hessian instead.
 
     :param atom_pairs:
         The list of zero-based (i, j) tuples, typically from
-        extract_pairs. None computes the full Hessian.
+        hessian_pairs. None computes the full Hessian.
 
     :return:
         The Hessian as a (3N, 3N) numpy array in Hartree per Bohr squared.
@@ -3405,13 +3524,8 @@ def compute_hessian(active_site,
     else:
         hessian_drv.atom_pairs = [tuple(pair) for pair in atom_pairs]
 
-    if mute_scf:
-        hessian_drv.ostream.mute()
-
-    hessian_drv.compute(molecule, basis)
-
-    if mute_scf:
-        hessian_drv.ostream.unmute()
+    with _muted([hessian_drv], mute_scf):
+        hessian_drv.compute(molecule, basis)
 
     hessian = np.copy(hessian_drv.hessian)
 
@@ -3437,18 +3551,13 @@ def compute_resp_charges(active_site, mute_scf=True, comm=None, ostream=None):
 
     resp_drv = RespChargesDriver(comm, ostream)
 
-    if mute_scf:
-        resp_drv.ostream.mute()
-
     # Neither a basis nor SCF results are passed: the driver then defaults
     # to Hartree-Fock with 6-31G*, which is what RESP charges are meant to
     # be fitted to, and runs its own SCF. Handing it the active site's own
     # functional and basis would silently fit the charges at a level the
     # RESP parameters were never derived for.
-    charges = resp_drv.compute(molecule)
-
-    if mute_scf:
-        resp_drv.ostream.unmute()
+    with _muted([resp_drv], mute_scf):
+        charges = resp_drv.compute(molecule)
 
     charges = comm.bcast(charges, root=mpi_master())
     charges = np.array(charges)
@@ -3544,12 +3653,7 @@ def _manual_bond_records_by_key(active_site, topology, binding_modes):
         return {}
 
     atoms = list(topology.atoms())
-    caps = set(active_site['cap_indices'])
-    site_of = {
-        top_index: site_index
-        for site_index, top_index in active_site['atom_map'].items()
-        if site_index not in caps
-    }
+    site_of = _site_index_map(active_site)
 
     by_key = {}
     for top_index in site_of:
@@ -3686,6 +3790,13 @@ def _add_metal_planarity_impropers(
     def neighbors(index):
         return set(np.where(matrix[index])[0].tolist()) - {index}
 
+    # the impropers indexed by the atom set they cover, so that install
+    # does not walk the whole table once per restraint it places
+    by_atoms = {}
+    for existing in forcefield.impropers:
+        if len(existing) == 4:
+            by_atoms.setdefault(frozenset(existing), []).append(existing)
+
     def install(key):
         # a term already covering the same four atoms in some other order
         # -- GAFF's own generic sp2-planarity guess can produce exactly
@@ -3693,9 +3804,9 @@ def _add_metal_planarity_impropers(
         # layered under a second one, so the restraint this atom set gets
         # is the one force_constant names, not the sum of two
         target = frozenset(key)
-        for existing in [k for k in forcefield.impropers if len(k) == 4]:
-            if frozenset(existing) == target:
-                del forcefield.impropers[existing]
+        for existing in by_atoms.get(target, []):
+            del forcefield.impropers[existing]
+        by_atoms[target] = [key]
         forcefield.impropers[key] = {
             'type': 'Fourier',
             'barrier': force_constant,
@@ -3760,7 +3871,7 @@ def build_forcefield(
         metal_bond_equilibria=None,
         protected_bonds=None,
         bond_equilibria=None,
-        weak_bridge_tolerance=0.25,
+        weak_bridge_tolerance=WEAK_BRIDGE_TOLERANCE,
         add_metal_planarity_impropers=True,
         metal_planarity_force_constant=DEFAULT_METAL_PLANARITY_FORCE_CONSTANT):
     """
@@ -3833,11 +3944,7 @@ def build_forcefield(
     # made -- only the typing looks past them.
     forcefield.metal_blind_typing = metal_blind_typing
 
-    # the generator shares the output stream of the builder, so muting it
-    # has to be balanced before anything of our own is printed
-    
     forcefield.create_topology(molecule, resp=False)
-    
 
     # The charges have to be applied after create_topology: setting
     # topology_update_flag, which is what makes the custom connectivity
@@ -3887,12 +3994,11 @@ def build_forcefield(
             hessian.shape == (3 * n_atoms, 3 * n_atoms),
             'build_forcefield: Hessian shape '
             f'{hessian.shape} does not match {(3 * n_atoms, 3 * n_atoms)}')
-        
+
         forcefield.reparameterize(hessian,
                                   reparameterize_keys=bonds + angles,
                                   average_metal_terms=average_metal_terms,
                                   method=metal_hessian_fitting_method)
-        
 
         if prune_weak_bridge_bonds:
             bonds, angles = _prune_weak_bridges(
@@ -4044,18 +4150,18 @@ def _seed_metal_terms(
     for key in bonds:
         elements = tuple(labels[index] for index in key)
         equilibrium = bond_equilibria.get(tuple(sorted(key)))
-        comment = 'asked for with the bond'
+        comment = SEEDED_FROM_REQUEST
 
         if equilibrium is None:
             equilibrium = _lookup_equilibrium(metal_bond_equilibria, elements)
-            comment = 'given equilibrium'
+            comment = SEEDED_FROM_TABLE
 
         if equilibrium is None:
             # the getters index atoms from one, and the force field keeps
             # its bond lengths in nanometers
             equilibrium = 0.1 * molecule.get_distance_in_angstroms(
                 [index + 1 for index in key])
-            comment = 'measured on the input geometry'
+            comment = SEEDED_FROM_GEOMETRY
         forcefield.bonds[key]['equilibrium'] = equilibrium
         forcefield.bonds[key]['force_constant'] = (
             default_metal_bond_force_constant)
@@ -4067,9 +4173,9 @@ def _seed_metal_terms(
         if equilibrium is None:
             equilibrium = molecule.get_angle_in_degrees(
                 [index + 1 for index in key])
-            comment = 'measured on the input geometry'
+            comment = SEEDED_FROM_GEOMETRY
         else:
-            comment = 'given equilibrium'
+            comment = SEEDED_FROM_TABLE
         forcefield.angles[key]['equilibrium'] = equilibrium
         forcefield.angles[key]['force_constant'] = (
             default_metal_angle_force_constant)
@@ -4082,7 +4188,7 @@ def _prune_weak_bridges(forcefield,
                         active_site,
                         bonds,
                         angles,
-                        weak_bridge_tolerance=0.25,
+                        weak_bridge_tolerance=WEAK_BRIDGE_TOLERANCE,
                         protected=None,
                         ostream=None):
     """
@@ -4322,12 +4428,13 @@ def _check_force_constants(forcefield,
     is not the same:
 
     - **the Hessian does not cover the term.** compute_hessian is
-      restricted to the pairs extract_pairs walks out of the connectivity,
+      restricted to the pairs hessian_pairs walks out of the connectivity,
       and everything else is left at zero. A bond that was not there when
-      those pairs were taken has nothing to project, which is what a
-      Hessian reused from a folder or supplied by hand runs into when the
-      coordination has moved on since. Only recomputing it on this
-      coordination fixes that.
+      those pairs were taken, and further out than
+      partial_hessian_cutoff was forgiving of, has nothing to project,
+      which is what a Hessian reused from a folder or supplied by hand
+      runs into when the coordination has moved on since. Only recomputing
+      it on this coordination fixes that.
     - **the projection was negative and Seminario clamped it**, which
       means the geometry is not stationary along that coordinate. On an
       unrelaxed structure this typically wipes out the long, strained
@@ -4694,11 +4801,11 @@ def redistribute_backbone_charges(system,
     # indices, so the elements are checked before anything is modified.
     atoms = list(topology.atoms())
     labels = active_site['molecule'].get_labels()
+    site_of = _site_index_map(active_site)
     mismatched = [
         index for index in covered
         if index >= len(atoms) or atoms[index].element is None or
-        atoms[index].element.symbol != labels[next(
-            c for c, t in atom_map.items() if t == index and c not in caps)]
+        atoms[index].element.symbol != labels[site_of[index]]
     ]
 
     assert_msg_critical(
@@ -4721,7 +4828,6 @@ def redistribute_backbone_charges(system,
         return nonbonded.getParticleParameters(index)[0].value_in_unit(
             mmunit.elementary_charge)
 
-    atoms = list(topology.atoms())
     residue_indices = {atoms[index].residue.index for index in covered}
     region = [
         atom for residue in topology.residues()
@@ -5051,7 +5157,10 @@ def _hessian_covers_site(hessian, active_site):
     Says whether a Hessian holds data for every metal term of a site.
 
     The blocks the metal terms read are the pairs extract_pairs walks out
-    of the connectivity, which is exactly what compute_hessian fills.
+    of the connectivity as it stands. Deliberately not hessian_pairs: what
+    the terms need is what has to be there, while the donors
+    partial_hessian_cutoff was forgiving of are a surplus a file computed
+    under another setting is not worth rejecting over.
 
     :param hessian:
         The Hessian.
@@ -5504,7 +5613,7 @@ def _print_partial_charges(topology,
         if len(indices) == 1 and indices[0] in metals:
             name = f'{labels[indices[0]]} (metal)'
         else:
-            name = f'{residue.name}{residue.id}'
+            name = residue_label(residue)
         valstr = '{:>16} {:>7} | {:>12.4f}'.format(name, len(indices), total)
         ostream.print_header(valstr)
 
@@ -5547,15 +5656,15 @@ def _seeded_equilibria(table, keys):
         The keys of the metal terms.
 
     :return:
-        'given', 'measured', or 'mixed'.
+        'requested', 'given', 'measured', or 'mixed'.
     """
 
-    given = {table[key].get('comment') == 'given equilibrium' for key in keys}
+    sources = {table[key].get('comment') for key in keys}
 
-    if len(given) != 1:
+    if len(sources) != 1:
         return 'mixed'
 
-    return 'given' if given.pop() else 'measured'
+    return SEEDED_EQUILIBRIUM_LABELS.get(sources.pop(), 'mixed')
 
 
 def _print_mm_optimization(active_site,
