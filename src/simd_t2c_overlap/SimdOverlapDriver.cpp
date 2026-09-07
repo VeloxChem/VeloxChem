@@ -35,14 +35,11 @@
 #include "SimdOverlapDriver.hpp"
 
 auto
-CSimdOverlapDriver::compute(const CMolecule &molecule, const CMolecularBasis &basis) const -> CSparseMatrix
+CSimdOverlapDriver::compute_matrix(const CSparsityPattern &pattern,
+                                   const CMolecule        &molecule,
+                                   const CMolecularBasis  &bra_basis,
+                                   const CMolecularBasis  &ket_basis) const -> CSparseMatrix
 {
-    // NOTE: the overlap operator is spherically symmetric about an atom, so the
-    // diagonal atom pair blocks hold one value for each pair of basis functions
-    // with the same angular momentum.
-
-    const auto pattern = make_pattern(molecule, basis, basis, mat_t::symmetric);
-
     // NOTE: the values blocks are not set to zero after they are allocated, as
     // every value of every block is written below. A combination of basis
     // functions reaching no atom pair holds no values, and a kernel writes the
@@ -55,24 +52,20 @@ CSimdOverlapDriver::compute(const CMolecule &molecule, const CMolecularBasis &ba
 
     auto distributor = CSimdT2CDistributor<CSparseMatrix>(&matrix);
 
-    compute(pattern, molecule, basis, basis, distributor);
+    compute(pattern, molecule, bra_basis, ket_basis, distributor);
 
     return matrix;
 }
 
 auto
-CSimdOverlapDriver::compute(const CMolecule &molecule, const CMolecularBasis &bra_basis, const CMolecularBasis &ket_basis) const
+CSimdOverlapDriver::compute_matrix(const CMolecule &molecule, const CMolecularBasis &basis) const -> CSparseMatrix
+{
+    return compute_matrix(make_pattern(molecule, basis, basis, mat_t::symmetric), molecule, basis, basis);
+}
+
+auto
+CSimdOverlapDriver::compute_matrix(const CMolecule &molecule, const CMolecularBasis &bra_basis, const CMolecularBasis &ket_basis) const
     -> CSparseMatrix
 {
-    const auto pattern = make_pattern(molecule, bra_basis, ket_basis, mat_t::general);
-
-    auto matrix = CSparseMatrix(pattern);
-
-    matrix.allocate();
-
-    auto distributor = CSimdT2CDistributor<CSparseMatrix>(&matrix);
-
-    compute(pattern, molecule, bra_basis, ket_basis, distributor);
-
-    return matrix;
+    return compute_matrix(make_pattern(molecule, bra_basis, ket_basis, mat_t::general), molecule, bra_basis, ket_basis);
 }

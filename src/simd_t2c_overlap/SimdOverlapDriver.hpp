@@ -121,18 +121,33 @@ class CSimdOverlapDriver
         _compute_diagonal_blocks(pattern, bra_basis, ket_basis, a_indices, b_indices, distributor);
     }
 
+    /// @brief Computes the overlap matrix of a sparsity pattern.
+    /// @param pattern The sparsity pattern to compute the integrals of.
+    /// @param molecule The molecule to compute the overlap matrix of.
+    /// @param bra_basis The molecular basis on bra side.
+    /// @param ket_basis The molecular basis on ket side.
+    /// @return The sparse overlap matrix of the pattern.
+    /// @note This is the form which takes a pattern the caller already holds, so
+    /// that a pattern is formed once and the matrices of several operators of the
+    /// same basis and threshold are computed in it. The overloads below form the
+    /// pattern themselves and are written in terms of it.
+    auto compute_matrix(const CSparsityPattern &pattern,
+                        const CMolecule        &molecule,
+                        const CMolecularBasis  &bra_basis,
+                        const CMolecularBasis  &ket_basis) const -> CSparseMatrix;
+
     /// @brief Computes the overlap matrix of a molecular basis.
     /// @param molecule The molecule to compute the overlap matrix of.
     /// @param basis The molecular basis on bra and ket sides.
     /// @return The symmetric sparse overlap matrix.
-    auto compute(const CMolecule &molecule, const CMolecularBasis &basis) const -> CSparseMatrix;
+    auto compute_matrix(const CMolecule &molecule, const CMolecularBasis &basis) const -> CSparseMatrix;
 
     /// @brief Computes the overlap matrix of a pair of molecular bases.
     /// @param molecule The molecule to compute the overlap matrix of.
     /// @param bra_basis The molecular basis on bra side.
     /// @param ket_basis The molecular basis on ket side.
     /// @return The general sparse overlap matrix.
-    auto compute(const CMolecule &molecule, const CMolecularBasis &bra_basis, const CMolecularBasis &ket_basis) const
+    auto compute_matrix(const CMolecule &molecule, const CMolecularBasis &bra_basis, const CMolecularBasis &ket_basis) const
         -> CSparseMatrix;
 
     /// @brief Gets screening threshold of the integrals.

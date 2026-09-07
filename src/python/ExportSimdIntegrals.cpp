@@ -55,14 +55,13 @@ export_simdintegrals(py::module &m) -> void
              py::arg("threshold"),
              py::arg("block_size") = 0)
         .def("compute",
-             static_cast<CSparseMatrix (CSimdOverlapDriver::*)(const CMolecule &, const CMolecularBasis &) const>(
-                 &CSimdOverlapDriver::compute),
+             py::overload_cast<const CMolecule &, const CMolecularBasis &>(&CSimdOverlapDriver::compute_matrix, py::const_),
              "Computes sparse overlap matrix for given molecule and basis.",
              py::arg("molecule"),
              py::arg("basis"))
         .def("compute",
-             static_cast<CSparseMatrix (CSimdOverlapDriver::*)(const CMolecule &, const CMolecularBasis &, const CMolecularBasis &) const>(
-                 &CSimdOverlapDriver::compute),
+             py::overload_cast<const CMolecule &, const CMolecularBasis &, const CMolecularBasis &>(
+                 &CSimdOverlapDriver::compute_matrix, py::const_),
              "Computes sparse overlap matrix for given molecule and pair of bases.",
              py::arg("molecule"),
              py::arg("bra_basis"),
