@@ -124,7 +124,7 @@ class CMolecularBasis
 
     /// @brief Gets vector of unique atom bases.
     /// @return The vector of atom bases.
-    auto basis_sets() const -> std::vector<CAtomBasis>;
+    auto basis_sets() const -> const std::vector<CAtomBasis> &;
 
     /// @brief Gets unique atom basis with specific index.
     /// @param index The index of unique atom basis.

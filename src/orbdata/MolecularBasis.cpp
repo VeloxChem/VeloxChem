@@ -210,7 +210,7 @@ CMolecularBasis::basis_pair_groups(const CMolecularBasis &other) const -> std::v
 }
 
 auto
-CMolecularBasis::basis_sets() const -> std::vector<CAtomBasis>
+CMolecularBasis::basis_sets() const -> const std::vector<CAtomBasis> &
 {
     return _basis_sets;
 }
