@@ -44,6 +44,7 @@ class TestHessianAtomPair:
 
         hess_drv = ScfHessianDriver(scf_drv)
         hess_drv.atom_pairs = atom_pairs
+        hess_drv.update_settings({}, cphf_dict={'conv_thresh': 1.0e-6})
         hess_drv.compute(mol, basis)
 
         pair_hess = hess_drv.hessian
@@ -93,6 +94,7 @@ class TestHessianAtomPair:
             hess_drv = ScfHessianDriver(scf_drv)
             hess_drv.ostream.mute()
             hess_drv.atom_pairs = atom_pairs_input
+            hess_drv.update_settings({}, cphf_dict={'conv_thresh': 1.0e-6})
             hess_drv.compute(mol, basis)
 
             return scf_drv, hess_drv.hessian

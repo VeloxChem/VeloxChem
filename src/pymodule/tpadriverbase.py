@@ -45,7 +45,8 @@ from .linearsolver import LinearSolver
 from .nonlinearsolver import NonlinearSolver
 from .distributedarray import DistributedArray
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
-                           ri_sanity_check, dft_sanity_check)
+                           ri_sanity_check, dft_sanity_check,
+                           nonlinear_response_environment_sanity_check)
 from .errorhandler import assert_msg_critical
 from .resultsio import write_results_to_hdf5
 from .spectrumplot import plot_tpa_spectrum
@@ -144,6 +145,9 @@ class TpaDriverBase(NonlinearSolver):
 
         # check SCF results
         scf_results_sanity_check(self, scf_results)
+
+        # reject unsupported environment settings inherited from SCF
+        nonlinear_response_environment_sanity_check(self)
 
         # update checkpoint_file after scf_results_sanity_check
         if self.filename is not None and self.checkpoint_file is None:

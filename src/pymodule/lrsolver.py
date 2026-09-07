@@ -39,8 +39,8 @@ from .distributedarray import DistributedArray
 from .lrsolverbase import LinearResponseSolverBase
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            ri_sanity_check, dft_sanity_check, pe_sanity_check,
-                           solvation_model_sanity_check)
-from .errorhandler import assert_msg_critical
+                           solvation_model_sanity_check, gostshyp_sanity_check,
+                           environment_compatibility_sanity_check)
 from .mathutils import safe_solve
 from .checkpoint import check_rsp_hdf5
 from .resultsio import (clear_group_in_hdf5, write_rsp_full_solution_to_hdf5,
@@ -122,14 +122,14 @@ class LinearResponseSolver(LinearResponseSolverBase):
         # check pe setup
         pe_sanity_check(self, molecule=molecule)
 
-        # check solvation setup
+        # check solvation model setup
         solvation_model_sanity_check(self)
 
-        # check solvation model setup
-        if self.rank == mpi_master():
-            assert_msg_critical(
-                'solvation_model' not in scf_results,
-                type(self).__name__ + ': Solvation model not implemented')
+        # check GOSTSHYP setup
+        gostshyp_sanity_check(self)
+
+        # check pairwise compatibility of the environment settings
+        environment_compatibility_sanity_check(self)
 
         # check print level (verbosity of output)
         self.print_level = max(1, min(self.print_level, 3))
@@ -171,6 +171,9 @@ class LinearResponseSolver(LinearResponseSolverBase):
 
         # CPCM information
         self._init_cpcm(molecule, basis)
+
+        # GOSTSHYP information
+        self._init_gostshyp(molecule, basis, scf_results)
 
         # right-hand side (gradient)
         if self.rank == mpi_master():
@@ -456,6 +459,8 @@ class LinearResponseSolver(LinearResponseSolverBase):
                 profiler.print_memory_tracing(self.ostream)
 
                 self._print_iteration(relative_residual_norm, xvs)
+
+                self._print_gostshyp_neg_amp_info()
 
             profiler.stop_timer('ReducedSpace')
 

@@ -42,7 +42,9 @@ from .distributedarray import DistributedArray
 from .subcommunicators import SubCommunicators
 from .linearsolver import LinearSolver
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
-                           ri_sanity_check, dft_sanity_check, pe_sanity_check)
+                           ri_sanity_check, dft_sanity_check, pe_sanity_check,
+                           gostshyp_sanity_check, solvation_model_sanity_check,
+                           environment_compatibility_sanity_check)
 from .errorhandler import assert_msg_critical
 from .mathutils import safe_solve
 from .inputparser import parse_input
@@ -160,6 +162,23 @@ class CphfSolver(LinearSolver):
 
         # check pe setup
         pe_sanity_check(self, molecule=molecule)
+
+        # check solvation model setup
+        solvation_model_sanity_check(self)
+
+        assert_msg_critical(
+            not self._cpcm,
+            f'{type(self).__name__}.compute_solution_vectors: CPCM is not supported')
+
+        # check GOSTSHYP setup
+        gostshyp_sanity_check(self)
+
+        # check pairwise compatibility of the environment settings
+        environment_compatibility_sanity_check(self)
+
+        assert_msg_critical(
+            not self._gostshyp,
+            f'{type(self).__name__}.compute_solution_vectors: GOSTSHYP is not supported')
 
         if self.rank == mpi_master():
             if self._dft:
@@ -388,6 +407,9 @@ class CphfSolver(LinearSolver):
         # check pe setup
         pe_sanity_check(self, molecule=molecule)
 
+        # check pairwise compatibility of the environment settings
+        environment_compatibility_sanity_check(self)
+
         # ERI information
         eri_dict = self._init_eri(molecule, basis)
 
@@ -397,8 +419,11 @@ class CphfSolver(LinearSolver):
         # PE information
         pe_dict = self._init_pe(molecule, basis)
 
-        # CPCM_information
+        # CPCM information
         self._init_cpcm(molecule, basis)
+
+        # GOSTSHYP information
+        self._init_gostshyp(molecule, basis, scf_results)
 
         cphf_rhs_dict = self.compute_rhs(molecule, basis, scf_results, eri_dict,
                                          dft_dict, pe_dict, *args)
@@ -534,6 +559,8 @@ class CphfSolver(LinearSolver):
                 profiler.print_memory_tracing(self.ostream)
 
                 self.print_iteration(relative_residual_norm, molecule)
+
+                self._print_gostshyp_neg_amp_info()
 
             profiler.stop_timer('ReducedSpace')
 
@@ -1401,11 +1428,11 @@ class CphfSolver(LinearSolver):
                 int(dist_trials.data.ndim > 0 and dist_trials.shape(0) > 0),
                 op=MPI.SUM) > 0
             if has_global_rows:
-                dist_trials = self._remove_linear_dependence_half_size(
+                dist_trials = self._remove_linear_dependence_full_size(
                     dist_trials, self.lindep_thresh)
-                dist_trials = (
-                    self._orthogonalize_gram_schmidt_half_size(dist_trials))
-                dist_trials = self._normalize_half_size(dist_trials)
+                dist_trials = self._orthogonalize_gram_schmidt_full_size(
+                    dist_trials)
+                dist_trials = self._normalize_full_size(dist_trials)
 
         if self.rank == mpi_master():
             assert_msg_critical(dist_trials.data.size > 0,
@@ -1421,12 +1448,14 @@ class CphfSolver(LinearSolver):
             Relative residual norms.
         """
 
+        self._is_converged = False
+
         if self.rank == mpi_master():
             max_residual = max(relative_residual_norm)
             if max_residual < self.conv_thresh:
                 self._is_converged = True
 
-        self._is_converged = self.comm.bcast(self.is_converged,
+        self._is_converged = self.comm.bcast(self._is_converged,
                                              root=mpi_master())
 
     def compute_rhs(self, molecule, basis, scf_results, eri_dict, dft_dict,

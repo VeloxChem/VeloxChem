@@ -57,7 +57,9 @@ from .oneeints import (compute_electric_dipole_integrals,
                        compute_linear_momentum_integrals,
                        compute_angular_momentum_integrals)
 from .sanitychecks import (dft_sanity_check, ri_sanity_check, pe_sanity_check,
-                           solvation_model_sanity_check)
+                           solvation_model_sanity_check,
+                           gostshyp_sanity_check,
+                           environment_compatibility_sanity_check)
 from .errorhandler import assert_msg_critical
 from .inputparser import (parse_input, print_keywords, print_attributes,
                           get_random_string_parallel, unparse_input,
@@ -68,6 +70,7 @@ from .checkpoint import write_rsp_hdf5
 from .batchsize import get_batch_size
 from .batchsize import get_number_of_batches
 from .cpcmdriver import CpcmDriver
+from .gostshypdriver import GostshypDriver
 
 
 class LinearSolver:
@@ -149,9 +152,6 @@ class LinearSolver:
         # static electric field
         self.electric_field = None
 
-        # point charges
-        self.point_charges = None
-
         # solvation model
         self.solvation_model = None
         self.non_equilibrium_solv = True
@@ -165,6 +165,20 @@ class LinearSolver:
         self.cpcm_cg_thresh = 1.0e-8
         self.cpcm_x = 0
         self.cpcm_custom_vdw_radii = None
+
+        # gostshyp setup
+        self._gostshyp = False
+        self._gostshyp_drv = None
+        self.pressure = 0.0
+        self.pressure_units = 'MPa'
+        self.gostshyp_num_lebedev_points = 110
+        self.gostshyp_tssf = 1.2
+        self.gostshyp_discretization = 'swig'
+        self.gostshyp_switching_thresh = 1.0e-8
+        self.gostshyp_r_ext = 0.25
+        self.gostshyp_tco_tol = 1.0e-14
+        self._gostshyp_tess_info = None
+        self._gostshyp_gs_density = None
 
         # solver setup
         self.conv_thresh = 1.0e-4
@@ -270,6 +284,16 @@ class LinearSolver:
                 'cpcm_x': ('float', 'parameter for scaling function (C-PCM)'),
                 'cpcm_custom_vdw_radii':
                     ('seq_fixed_str', 'custom vdw radii for C-PCM'),
+                'pressure': ('float', 'applied hydrostatic pressure'),
+                'pressure_units': ('str', 'units of the applied pressure'),
+                'gostshyp_num_lebedev_points': ('int', 'number of grid points per sphere'),
+                'gostshyp_tssf': ('float', 'tessellation sphere scaling factor'),
+                'gostshyp_discretization': ('str', 'surface discretization method'),
+                'gostshyp_switching_thresh': ('float', 'switching function threshold'),
+                'gostshyp_r_ext':
+                    ('float', 'extension radius for outer cavity correction in angstrom'),
+                'gostshyp_tco_tol':
+                    ('float', 'three-center overlap integral screening threshold')
             },
         }
 
@@ -369,7 +393,11 @@ class LinearSolver:
 
         pe_sanity_check(self, method_dict)
 
+        # check solvation model setup
         solvation_model_sanity_check(self)
+
+        # check GOSTSHYP setup
+        gostshyp_sanity_check(self)
 
         assert_msg_critical(not self._smd,
                             'Cannot use SMD in response calculation')
@@ -382,10 +410,9 @@ class LinearSolver:
                 not self._pe,
                 'LinearSolver: \'electric field\' input is incompatible ' +
                 'with polarizable embedding')
-            # disable restart of calculation with static electric field since
-            # checkpoint file does not contain information about the electric
-            # field
-            self.restart = False
+
+        # check pairwise compatibility of the environment settings
+        environment_compatibility_sanity_check(self)
 
     def _get_response_keywords(self):
         """
@@ -691,6 +718,72 @@ class LinearSolver:
                     + f'generated in {tm.time() - cpcm_grid_t0:.2f} sec.')
                 self.ostream.print_blank()
                 self.ostream.flush()
+
+    def _init_gostshyp(self, molecule, basis, scf_results):
+        """
+        Initializes GOSTSHYP.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param scf_results:
+            The dictionary of tensors from converged SCF wavefunction.
+        """
+
+        if self._gostshyp:
+            self._gostshyp_drv = GostshypDriver(self.comm, self.ostream)
+            self._gostshyp_drv.print_gostshyp_references()
+            self._gostshyp_drv.init(molecule, basis, self.pressure,
+                                    self.pressure_units,
+                                    self.gostshyp_tco_tol)
+
+            self._gostshyp_tess_info = {
+                'num_lebedev_points': self.gostshyp_num_lebedev_points,
+                'tssf': self.gostshyp_tssf,
+                'discretization': self.gostshyp_discretization,
+                'switching_thresh': self.gostshyp_switching_thresh,
+                'r_ext': self.gostshyp_r_ext,
+            }
+
+            if self.rank == mpi_master():
+                # Note: make gs_density a tuple
+                if scf_results['scf_type'] == 'restricted':
+                    gs_density = (scf_results['D_alpha'].copy(),)
+                else:
+                    gs_density = (scf_results['D_alpha'].copy(),
+                                  scf_results['D_beta'].copy())
+            else:
+                gs_density = None
+            # TODO: bcast D_alpha and D_beta separately
+            self._gostshyp_gs_density = self.comm.bcast(
+                gs_density, root=mpi_master())
+
+        else:
+            self._gostshyp_tess_info = None
+            self._gostshyp_gs_density = None
+
+    def _print_gostshyp_neg_amp_info(self):
+        """
+        Prints information about grid points with negative amplitudes
+        excluded in the GOSTSHYP calculation, provided that any grid
+        points were excluded.
+
+        The number of excluded grid points is read from the GOSTSHYP
+        driver; it is determined from the ground state density the first
+        time the GOSTSHYP contribution to the response Fock matrix is
+        computed. The count is reduced to the master rank only, and the
+        information is checked and printed on the master rank only.
+        """
+
+        if (self.rank == mpi_master() and self._gostshyp
+                and self._gostshyp_drv is not None
+                and self._gostshyp_drv.num_neg_amp > 0):
+            valstr = '*** GOSTSHYP information: A total number of '
+            valstr += ('{} grid points with negative amplitudes were '
+                       'excluded ***'.format(self._gostshyp_drv.num_neg_amp))
+            self.ostream.print_header(valstr)
+            self.ostream.print_blank()
 
     def _read_checkpoint(self, rsp_vector_labels):
         """
@@ -1013,6 +1106,11 @@ class LinearSolver:
                        pe_dict,
                        profiler=None,
                        method_type='restricted'):
+
+        # TODO: support GOSTSHYP with communicator-local drivers in subcomms.
+        assert_msg_critical(
+            not (self.use_subcomms and self._gostshyp),
+            'LinearSolver: Cannot use subcomms with GOSTSHYP')
 
         if self.use_subcomms and self.ri_coulomb:
             self.use_subcomms = False
@@ -1958,6 +2056,8 @@ class LinearSolver:
 
         molgrid = dft_dict['molgrid']
         gs_density = dft_dict['gs_density']
+        gs_dm_gost = self._gostshyp_gs_density
+        tessellation_settings = self._gostshyp_tess_info
 
         if comm_rank == mpi_master():
             num_densities = len(dens)
@@ -2085,6 +2185,26 @@ class LinearSolver:
             if profiler is not None:
                 profiler.add_timing_info('FockCPCM', tm.time() - t0)
 
+        if self._gostshyp:
+
+            t0 = tm.time()
+            gs_dm = gs_dm_gost[0]
+
+            for idx in range(num_densities):
+
+                dm = dens[idx]
+
+                # Note: only closed shell density for now
+                fock_gost = self._gostshyp_drv.gostshyp_rsp_contrib(gs_dm * 2.0,
+                                                                    dm * 2.0,
+                                                                    tessellation_settings)
+
+                if comm_rank == mpi_master():
+                    fock_arrays[idx] += fock_gost
+
+            if profiler is not None:
+                profiler.add_timing_info('FockGOST', tm.time() - t0)
+
         for idx in range(len(fock_arrays)):
             fock_arrays[idx] = comm.reduce(fock_arrays[idx], root=mpi_master())
 
@@ -2139,6 +2259,8 @@ class LinearSolver:
 
         molgrid = dft_dict['molgrid']
         gs_density = dft_dict['gs_density']
+        gs_dm_gost = self._gostshyp_gs_density
+        tessellation_settings = self._gostshyp_tess_info
 
         if comm_rank == mpi_master():
             num_densities = len(dens_a)
@@ -2306,6 +2428,31 @@ class LinearSolver:
 
             if profiler is not None:
                 profiler.add_timing_info('FockCPCM', tm.time() - t0)
+
+        # TODO: validate GOSTSHYP implementation for unrestricted case
+        assert_msg_critical(
+            not self._gostshyp,
+            'LinearSolver: GOSTSHYP is not supported for unrestricted case yet')
+
+        if self._gostshyp:
+
+            t0 = tm.time()
+
+            gs_dm_a = gs_dm_gost[0]
+            gs_dm_b = gs_dm_gost[1]
+
+            for idx in range(num_densities):
+
+                fock_gost = self._gostshyp_drv.gostshyp_rsp_contrib(gs_dm_a + gs_dm_b,
+                                                                    dens_a[idx] + dens_b[idx],
+                                                                    tessellation_settings)
+
+                if comm_rank == mpi_master():
+                    fock_arrays[idx * 2 + 0] += fock_gost
+                    fock_arrays[idx * 2 + 1] += fock_gost
+
+            if profiler is not None:
+                profiler.add_timing_info('FockGOST', tm.time() - t0)
 
         for idx in range(num_densities):
             fock_arrays[idx * 2 + 0] = comm.reduce(fock_arrays[idx * 2 + 0],
@@ -2952,6 +3099,27 @@ class LinearSolver:
                 cur_str = 'C-PCM Optical Dielectric Const. : '
                 cur_str += f'{self.cpcm_optical_epsilon}'
                 self.ostream.print_header(cur_str.ljust(str_width))
+
+        if self._gostshyp:
+            cur_str = 'Pressure Model                  : '
+            cur_str += 'GOSTSHYP'
+            self.ostream.print_header(cur_str.ljust(str_width))
+            cur_str = 'Input Pressure                  : '
+            cur_str += f'{self.pressure} '
+            cur_str += self.pressure_units
+            self.ostream.print_header(cur_str.ljust(str_width))
+            cur_str = 'vDW Cavity Switching Function   : '
+            cur_str += self.gostshyp_discretization.upper()
+            self.ostream.print_header(cur_str.ljust(str_width))
+            cur_str = 'vdW Sphere Scaling Factor       : '
+            cur_str += f'{self.gostshyp_tssf}'
+            self.ostream.print_header(cur_str.ljust(str_width))
+            cur_str = 'Grid Points per vdW Sphere      : '
+            cur_str += f'{self.gostshyp_num_lebedev_points}'
+            self.ostream.print_header(cur_str.ljust(str_width))
+            cur_str = 'Extension radius for OCC        : '
+            cur_str += f'{self.gostshyp_r_ext}'
+            self.ostream.print_header(cur_str.ljust(str_width))
 
         self.ostream.print_blank()
         self.ostream.flush()
@@ -3614,6 +3782,32 @@ class LinearSolver:
 
         return basis.matmul_AB_no_gather(Tmask)
 
+    def _remove_linear_dependence_full_size(self, basis, threshold):
+        """
+        Removes linear dependence in a set of full-size vectors.
+
+        :param basis:
+            The set of vectors.
+        :param threshold:
+            The threshold for removing linear dependence.
+
+        :return:
+            The new set of vectors.
+        """
+
+        Sb = basis.matmul_AtB(basis)
+
+        if self.rank == mpi_master():
+            l, T = np.linalg.eigh(Sb)
+            b_norm = np.sqrt(Sb.diagonal())
+            mask = l > b_norm * threshold
+            Tmask = T[:, mask].copy()
+        else:
+            Tmask = None
+        Tmask = self.comm.bcast(Tmask, root=mpi_master())
+
+        return basis.matmul_AB_no_gather(Tmask)
+
     @staticmethod
     def orthogonalize_gram_schmidt(tvecs):
         """
@@ -3673,6 +3867,35 @@ class LinearSolver:
         return tvecs
 
     @staticmethod
+    def _orthogonalize_gram_schmidt_full_size(tvecs):
+        """
+        Applies modified Gram Schmidt orthogonalization to full-size trial
+        vectors.
+
+        :param tvecs:
+            The trial vectors.
+
+        :return:
+            The orthogonalized trial vectors.
+        """
+
+        if tvecs.shape(1) > 0:
+
+            n2 = tvecs.dot(0, tvecs, 0)
+            tvecs.data[:, 0] *= 1.0 / np.sqrt(n2)
+
+            for i in range(1, tvecs.shape(1)):
+                for j in range(i):
+                    dot_ij = tvecs.dot(i, tvecs, j)
+                    dot_jj = tvecs.dot(j, tvecs, j)
+                    tvecs.data[:, i] -= (dot_ij / dot_jj) * tvecs.data[:, j]
+
+                n2 = tvecs.dot(i, tvecs, i)
+                tvecs.data[:, i] *= 1.0 / np.sqrt(n2)
+
+        return tvecs
+
+    @staticmethod
     def normalize(vecs):
         """
         Normalizes vectors by dividing by vector norm.
@@ -3708,6 +3931,24 @@ class LinearSolver:
         invsqrt2 = 1.0 / np.sqrt(2.0)
 
         invnorm = invsqrt2 / vecs.norm(axis=0)
+
+        vecs.data *= invnorm
+
+        return vecs
+
+    @staticmethod
+    def _normalize_full_size(vecs):
+        """
+        Normalizes full-size vectors by dividing by vector norm.
+
+        :param vecs:
+            The vectors.
+
+        :return:
+            The normalized vectors.
+        """
+
+        invnorm = 1.0 / vecs.norm(axis=0)
 
         vecs.data *= invnorm
 

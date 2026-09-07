@@ -130,12 +130,17 @@ class OptimizationEngine(geometric.engine.Engine):
         Implements calc_new method for the engine.
 
         :param coords:
-            The coordinates.
+            The coordinates.  Not used on worker ranks in a master-driven
+            run: the geometry is received via the broadcast inside this
+            method.
         :param dirname:
-            The relative path.
+            The relative path.  Not used on worker ranks in a master-driven
+            run.
 
         :return:
-            A dictionary containing energy and gradient.
+            A dictionary containing energy and gradient.  On worker ranks in a
+            master-driven run this method may instead return the 'stop'
+            control string; see run_worker().
         """
 
         start_time = tm.time()
@@ -151,6 +156,14 @@ class OptimizationEngine(geometric.engine.Engine):
         else:
             new_mol = Molecule()
         new_mol = self.comm.bcast(new_mol, root=mpi_master())
+
+        # Worker-side control channel.  When only the master rank drives
+        # geomeTRIC (see OptimizationDriver.compute), the master broadcasts
+        # the 'stop' string through this geometry broadcast once the
+        # optimization has finished.  This branch never fires on the master
+        # rank, where new_mol is always a Molecule.
+        if isinstance(new_mol, str):
+            return new_mol  # 'stop'
 
         title_txt = f'Optimization Step {self.opt_current_step}'
         self.grad_drv.ostream.print_header(title_txt)
@@ -198,6 +211,21 @@ class OptimizationEngine(geometric.engine.Engine):
             'energy': energy,
             'gradient': gradient.flatten(),
         }
+
+    def run_worker(self):
+        """
+        Runs on non-master ranks while the master rank drives geomeTRIC.
+
+        Each call blocks inside calc_new until the master broadcasts the next
+        geometry (or the 'stop' control string), so every collective
+        single-point evaluation requested by the master is mirrored on all
+        ranks.  Returns when the master signals 'stop'.
+        """
+
+        while True:
+            msg = self.calc_new(None, None)
+            if msg == 'stop':
+                return
 
     def copy_scratch(self, src, dest):
         """

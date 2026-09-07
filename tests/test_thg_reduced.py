@@ -67,4 +67,4 @@ class Testhgreduced:
     @pytest.mark.timeconsuming
     def test_thg_red_mgga(self):
 
-        self.run_thg_red('tpssh')
+        self.run_thg_red('m06-2x')

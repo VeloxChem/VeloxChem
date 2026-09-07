@@ -32,6 +32,7 @@
 
 from pathlib import Path
 import json
+import numpy as np
 
 from .veloxchemlib import bohr_in_angstroms
 from .veloxchemlib import parse_xc_func
@@ -69,9 +70,76 @@ def molecule_sanity_check(mol, method_type=None, caller_name=None):
     assert_msg_critical(mol.check_proximity(0.1), 'Molecule: Atoms too close')
 
 
+def _warn_if_environment_overwritten(obj, key, scf_value):
+    """
+    Warns if an environment setting explicitly specified in response
+    settings differs from the value used in SCF and will be overwritten
+    by it.
+
+    :param obj:
+        The object (response driver) that is being updated.
+    :param key:
+        The environment setting name.
+    :param scf_value:
+        The value from the SCF results.
+    """
+
+    rsp_value = getattr(obj, key, None)
+
+    if rsp_value is None:
+        return
+
+    if isinstance(rsp_value, np.ndarray) or isinstance(scf_value, np.ndarray):
+        differs = not np.array_equal(rsp_value, scf_value)
+    elif (isinstance(rsp_value, (list, tuple)) and
+            isinstance(scf_value, (list, tuple))):
+        differs = (list(rsp_value) != list(scf_value))
+    else:
+        differs = (rsp_value != scf_value)
+
+    if differs:
+        warn_msg = f"The '{key}' in response settings differs from the "
+        warn_msg += 'value used in SCF and will be overwritten: '
+        warn_msg += str(scf_value)
+        obj.ostream.print_warning(warn_msg)
+        obj.ostream.flush()
+
+
+def _warn_if_environment_absent_from_scf(obj, scf_results):
+    """
+    Warns about environments active in a calculation but absent from its SCF
+    reference.
+
+    :param obj:
+        The driver being updated.
+    :param scf_results:
+        The dictionary containing SCF results.
+    """
+
+    environments_absent_from_scf = []
+
+    for key in ('potfile', 'solvation_model'):
+        if (getattr(obj, key, None) is not None and
+                scf_results.get(key, None) is None):
+            environments_absent_from_scf.append(key)
+
+    if (getattr(obj, 'pressure', 0.0) not in (None, 0.0) and
+            scf_results.get('pressure', 0.0) in (None, 0.0)):
+        environments_absent_from_scf.append('pressure')
+
+    if environments_absent_from_scf:
+        warn_msg = ('Environment settings active in the current calculation '
+                    'but absent from the SCF reference: ')
+        warn_msg += ', '.join(environments_absent_from_scf)
+        warn_msg += ('. The SCF reference orbitals and density are not '
+                     'relaxed for these settings.')
+        obj.ostream.print_warning(warn_msg)
+        obj.ostream.flush()
+
+
 def scf_results_sanity_check(obj, scf_results):
     """
-    Checks SCF results for ERI, DFT and PE information.
+    Checks SCF results and inherits method and environment settings.
 
     :param obj:
         The object (response driver) that is being updated.
@@ -102,20 +170,26 @@ def scf_results_sanity_check(obj, scf_results):
                 updated_scf_info['restart'] = scf_results['restart']
 
         if scf_results.get('xcfun', None) is not None:
-            # do not overwrite xcfun if it is already specified
+            # do not overwrite xcfun if it is already specified: a different
+            # functional in response will not be rejected
             if obj.xcfun is None:
                 updated_scf_info['xcfun'] = scf_results['xcfun']
                 if 'grid_level' in scf_results:
                     updated_scf_info['grid_level'] = scf_results['grid_level']
 
         if scf_results.get('potfile', None) is not None:
-            # do not overwrite potfile if it is already specified
-            if obj.potfile is None:
-                updated_scf_info['potfile'] = scf_results['potfile']
+            # the environment is inherited from SCF; a different potfile in
+            # response settings is overwritten with a warning
+            _warn_if_environment_overwritten(obj, 'potfile',
+                                             scf_results['potfile'])
+            updated_scf_info['potfile'] = scf_results['potfile']
 
         if scf_results.get('solvation_model', None) is not None:
-            # do not overwrite solvation_model if it is already specified
-            if hasattr(obj, 'solvation_model') and obj.solvation_model is None:
+            # the environment is inherited from SCF; a different solvation
+            # model in response settings is overwritten with a warning
+            if hasattr(obj, 'solvation_model'):
+                _warn_if_environment_overwritten(
+                    obj, 'solvation_model', scf_results['solvation_model'])
                 for key in [
                         'solvation_model',
                         'cpcm_epsilon',
@@ -126,6 +200,37 @@ def scf_results_sanity_check(obj, scf_results):
                 ]:
                     updated_scf_info[key] = scf_results[key]
 
+        if scf_results.get('pressure', None) is not None:
+            # the environment (including GOSTSHYP pressure) is inherited
+            # from SCF; response cannot override it
+            if hasattr(obj, 'pressure'):
+                # warn only for explicitly set pressures: 0.0 is the default
+                if obj.pressure != 0.0:
+                    _warn_if_environment_overwritten(obj, 'pressure',
+                                                     scf_results['pressure'])
+                    _warn_if_environment_overwritten(obj, 'pressure_units',
+                                                     scf_results['pressure_units'])
+                for key in [
+                        'pressure',
+                        'pressure_units',
+                        'gostshyp_num_lebedev_points',
+                        'gostshyp_tssf',
+                        'gostshyp_discretization',
+                        'gostshyp_switching_thresh',
+                        'gostshyp_r_ext',
+                        'gostshyp_tco_tol',
+                ]:
+                    if key in scf_results:
+                        updated_scf_info[key] = scf_results[key]
+
+        if scf_results.get('electric_field', None) is not None:
+            # the environment is inherited from SCF; a different electric
+            # field in response settings is overwritten with a warning
+            if hasattr(obj, 'electric_field'):
+                _warn_if_environment_overwritten(obj, 'electric_field',
+                                                 scf_results['electric_field'])
+                updated_scf_info['electric_field'] = scf_results['electric_field']
+
     updated_scf_info = obj.comm.bcast(updated_scf_info, root=mpi_master())
 
     for key, val in updated_scf_info.items():
@@ -134,6 +239,8 @@ def scf_results_sanity_check(obj, scf_results):
     # double check xcfun in SCF and response
 
     if obj.rank == mpi_master():
+        _warn_if_environment_absent_from_scf(obj, scf_results)
+
         scf_xcfun_label = scf_results.get('xcfun', 'HF').upper()
         if obj.xcfun is None:
             rsp_xcfun_label = 'HF'
@@ -147,6 +254,49 @@ def scf_results_sanity_check(obj, scf_results):
             warn_msg += ' Please double check.'
             obj.ostream.print_warning(warn_msg)
             obj.ostream.flush()
+
+
+def nonlinear_response_environment_sanity_check(obj):
+    """
+    Checks environment settings in nonlinear response drivers.
+
+    Solvation, pressure and polarizable embedding are not supported in
+    nonlinear response calculations. The settings are rejected here whether
+    they were set explicitly or inherited from the SCF results, so that an
+    unsupported environment is never silently ignored.
+
+    :param obj:
+        The nonlinear response driver.
+    """
+
+    if obj.potfile is not None:
+        errmsg = "NonlinearSolver: The 'potfile' keyword is not supported "
+        errmsg += 'in nonlinear response calculation.'
+        if obj.rank == mpi_master():
+            assert_msg_critical(False, errmsg)
+
+    if obj.solvation_model is not None:
+        errmsg = "NonlinearSolver: The 'solvation_model' keyword is not "
+        errmsg += 'supported in nonlinear response calculation.'
+        if obj.rank == mpi_master():
+            assert_msg_critical(False, errmsg)
+
+    if obj.pressure != 0.0:
+        errmsg = "NonlinearSolver: The 'pressure' keyword is not supported "
+        errmsg += 'in nonlinear response calculation.'
+        if obj.rank == mpi_master():
+            assert_msg_critical(False, errmsg)
+
+    if obj.electric_field is not None:
+        # the electric field is supported: it is a static one-electron term
+        # that enters the calculation through the SCF; only validate it
+        assert_msg_critical(
+            len(obj.electric_field) == 3,
+            "NonlinearSolver: Expecting 3 values in 'electric field' "
+            'input')
+
+    # point charges are also supported: they enter the calculation through
+    # the SCF as a static one-electron term, with no driver attribute
 
 
 def rsp_results_solvation_sanity_check(obj, rsp_results):
@@ -636,6 +786,66 @@ def embedding_sanity_check(options):
         )
 
 
+def gostshyp_sanity_check(obj, basis=None):
+    """
+    Checks the GOSTSHYP settings and updates relevant attributes.
+
+    :param basis:
+        The basis set.
+    """
+
+    if obj.pressure is None:
+        obj.pressure = 0.0
+
+    obj._gostshyp = (obj.pressure != 0.0)
+
+    if obj._gostshyp:
+        assert_msg_critical(obj.pressure > 0.0,
+                            'GOSTSHYP: Unphysical negative pressures invalid')
+
+        assert_msg_critical(
+            np.isfinite(obj.gostshyp_tssf) and obj.gostshyp_tssf > 0.0,
+            'GOSTSHYP: Tessellation sphere scaling factor must be finite and '
+            'positive')
+
+        assert_msg_critical(
+            obj.solvation_model is None,
+            type(obj).__name__ +
+            ': GOSTSHYP is incompatible with the solvation model')
+
+        valid_discretizations = ('fixed', 'swig', 'iswig')
+        assert_msg_critical(
+            isinstance(obj.gostshyp_discretization, str) and
+            obj.gostshyp_discretization.lower() in valid_discretizations,
+            "GOSTSHYP: Invalid discretization. Valid options are 'fixed', "
+            "'swig', and 'iswig'")
+
+        assert_msg_critical(
+            obj.gostshyp_tco_tol > 0.0,
+            'GOSTSHYP: Three-center overlap integral screening threshold '
+            'must be positive')
+
+        from .tessellation import validate_num_lebedev_points
+        obj.gostshyp_num_lebedev_points = validate_num_lebedev_points(
+            obj.gostshyp_num_lebedev_points,
+            obj.gostshyp_discretization,
+            obj.ostream)
+
+        if basis is not None:
+
+            # check max angular momentum of basis
+            max_am = basis.max_angular_momentum()
+            gost_max_am = 3
+
+            # TODO: consider moving this check to gostshyp 1e integral drivers
+            if max_am > gost_max_am:
+                labels = {0: 's', 1: 'p', 2: 'd', 3: 'f', 4: 'g', 5: 'h'}
+                assert_msg_critical(
+                    False,
+                    f"GOSTSHYP supports basis functions up to f-type; this basis "
+                    f"contains {labels.get(max_am, f'l={max_am}')}-type functions.")
+
+
 def solvation_model_sanity_check(obj):
     """
     Checks solvation model and updates relevant attributes.
@@ -649,10 +859,16 @@ def solvation_model_sanity_check(obj):
             'polarizable embedding')
 
         assert_msg_critical(
-            obj.point_charges is None,
+            getattr(obj, 'point_charges', None) is None,
             type(obj).__name__ +
             ': The \'solvation_model\' option is incompatible with ' +
             'point charges')
+
+        assert_msg_critical(
+            obj.pressure == 0.0,
+            type(obj).__name__ +
+            ': The \'solvation_model\' option is incompatible with ' +
+            'GOSTSHYP (hydrostatic pressure)')
 
         assert_msg_critical(
             obj.solvation_model.lower() in ['cpcm', 'c-pcm', 'c_pcm', 'smd'],
@@ -665,6 +881,79 @@ def solvation_model_sanity_check(obj):
     else:
         obj._cpcm = False
         obj._smd = False
+
+
+def environment_compatibility_sanity_check(obj):
+    """
+    Checks the pairwise compatibility of the environment settings.
+
+    The environment settings are: ``potfile`` (polarizable embedding),
+    ``solvation_model`` (C-PCM / SMD), ``pressure`` (GOSTSHYP),
+    ``electric_field`` and ``point_charges``. Each setting can be used
+    individually. The supported combinations are ``electric_field``
+    together with ``point_charges`` and ``electric_field`` together
+    with ``pressure`` (GOSTSHYP): the electric field is a static
+    one-electron term with no mutual response loop, and the GOSTSHYP
+    pressure potential is converged within the SCF iterations rather
+    than in a separate self-consistent loop. All other combinations
+    are rejected, because the density-coupled response loops of the
+    other environments (induced dipoles, surface charges) are not
+    supported in combination.
+
+    The helper is intended to be reusable: it only relies on the driver
+    attributes that declare the five settings (all queried with
+    ``getattr``), so it can be called from any driver that carries them,
+    e.g. after the environment sanity checks in ``ScfDriver``.
+
+    :param obj:
+        The driver.
+    """
+
+    has_pe = (bool(getattr(obj, '_pe', False)) or
+              bool(getattr(obj, 'potfile', None)))
+    has_cpcm = getattr(obj, 'solvation_model', None) is not None
+    pressure = getattr(obj, 'pressure', 0.0)
+    has_gostshyp = (bool(getattr(obj, '_gostshyp', False)) or
+                    (pressure is not None and pressure != 0.0))
+    has_field = getattr(obj, 'electric_field', None) is not None
+    has_pc = getattr(obj, 'point_charges', None) is not None
+
+    if has_field:
+        assert_msg_critical(
+            len(obj.electric_field) == 3,
+            f"{type(obj).__name__}: Expecting 3 values in "
+            "'electric field' input")
+
+    names = []
+    if has_pe:
+        names.append("'potfile' (polarizable embedding)")
+    if has_cpcm:
+        names.append("'solvation_model'")
+    if has_gostshyp:
+        names.append("'pressure' (GOSTSHYP)")
+    if has_field:
+        names.append("'electric_field'")
+    if has_pc:
+        names.append("'point_charges'")
+
+    if len(names) <= 1:
+        return
+
+    if has_field and len(names) == 2 and (has_pc or has_gostshyp):
+        # supported combinations: 'electric_field' with 'point_charges'
+        # (two static one-electron terms) and 'electric_field' with
+        # 'pressure' (GOSTSHYP): the field is a static one-electron term
+        # added to the density-dependent GOSTSHYP potential within the
+        # SCF iterations, with no mutual response loop
+        return
+
+    err_msg = f"{type(obj).__name__}: Incompatible environment settings: "
+    err_msg += ', '.join(names) + '. '
+    err_msg += "Environment settings can only be used individually; the "
+    err_msg += "supported combinations are 'electric_field' with "
+    err_msg += "'point_charges' and 'electric_field' with 'pressure' "
+    err_msg += "(GOSTSHYP)."
+    assert_msg_critical(False, err_msg)
 
 
 def write_pe_jsonfile(molecule, potfile):

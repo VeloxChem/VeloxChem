@@ -41,9 +41,11 @@ from .distributedarray import DistributedArray
 from .dftutils import get_default_grid_level
 from .inputparser import parse_input
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
-                           dft_sanity_check, pe_sanity_check,
+                           ri_sanity_check, dft_sanity_check, pe_sanity_check,
                            solvation_model_sanity_check,
-                           rsp_results_solvation_sanity_check)
+                           rsp_results_solvation_sanity_check,
+                           gostshyp_sanity_check,
+                           environment_compatibility_sanity_check)
 
 
 class TddftOrbitalResponse(CphfSolver):
@@ -160,15 +162,25 @@ class TddftOrbitalResponse(CphfSolver):
         # check SCF results
         scf_results_sanity_check(self, scf_tensors)
 
+        # check RI setup
+        ri_sanity_check(self)
+
         # check dft setup
-        dft_sanity_check(self, 'compute_rhs')
+        dft_sanity_check(self, 'compute')
 
         # check pe setup
         pe_sanity_check(self, molecule=molecule)
 
-        # check solvation setup
+        # check solvation model setup
         solvation_model_sanity_check(self)
+
         rsp_results_solvation_sanity_check(self, rsp_results)
+
+        # check GOSTSHYP setup
+        gostshyp_sanity_check(self)
+
+        # check pairwise compatibility of the environment settings
+        environment_compatibility_sanity_check(self)
 
         # TODO: replace with a sanity check?
         if self.rank == mpi_master():
@@ -189,8 +201,11 @@ class TddftOrbitalResponse(CphfSolver):
         # PE information
         pe_dict = self._init_pe(molecule, basis, silent=True)
 
-        # CPCM_information
+        # CPCM information
         self._init_cpcm(molecule, basis)
+
+        # GOSTSHYP information
+        self._init_gostshyp(molecule, basis, scf_tensors)
 
         profiler = Profiler({
             'timing': self.timing,
@@ -473,6 +488,30 @@ class TddftOrbitalResponse(CphfSolver):
             a numpy array containing the Lagrange multipliers in AO basis.
         """
 
+        # check molecule
+        molecule_sanity_check(molecule)
+
+        # check SCF results
+        scf_results_sanity_check(self, scf_tensors)
+
+        # check RI setup
+        ri_sanity_check(self)
+
+        # check dft setup
+        dft_sanity_check(self, 'compute')
+
+        # check pe setup
+        pe_sanity_check(self, molecule=molecule)
+
+        # check solvation model setup
+        solvation_model_sanity_check(self)
+
+        # check GOSTSHYP setup
+        gostshyp_sanity_check(self)
+
+        # check pairwise compatibility of the environment settings
+        environment_compatibility_sanity_check(self)
+
         profiler = Profiler({
             'timing': self.timing,
             'profiling': self.profiling,
@@ -499,8 +538,11 @@ class TddftOrbitalResponse(CphfSolver):
         # PE information
         pe_dict = self._init_pe(molecule, basis, silent=True)
 
-        # CPCM_information
+        # CPCM information
         self._init_cpcm(molecule, basis)
+
+        # GOSTSHYP information
+        self._init_gostshyp(molecule, basis, scf_tensors)
 
         profiler.stop_timer('Prep')
 

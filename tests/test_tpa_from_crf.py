@@ -128,4 +128,4 @@ class TestTpaFromCrf:
 
     def test_tpa_from_crf_mgga(self):
 
-        self.run_tpa_from_crf('tpssh')
+        self.run_tpa_from_crf('m06-2x')
