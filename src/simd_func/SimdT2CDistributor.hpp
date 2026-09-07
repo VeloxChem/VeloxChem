@@ -51,6 +51,10 @@
 /// own and does its work in commit, where the atom pairs of the block give the
 /// mapping from the columns of the destination to the atoms.
 ///
+/// The diagonal blocks are served by the same pair of calls, so that such a
+/// consumer is notified of the integrals of the atom pairs of an atom with itself
+/// as it is of the integrals of the other atom pairs.
+///
 /// The primary template does nothing; a consumer is served by a specialization.
 ///
 /// @note Thread safety is a property of the specialization and is stated by each
@@ -121,7 +125,14 @@ class CSimdT2CDistributor
     /// of a diagonal block, which is a single value.
     /// @param block The sparsity pattern of the diagonal block.
     /// @param iblock The index of the diagonal block.
+    /// @param bra_angular_momentum The angular momentum of basis function on bra side.
+    /// @param bra_index The index of basis function on bra side.
+    /// @param ket_angular_momentum The angular momentum of basis function on ket side.
+    /// @param ket_index The index of basis function on ket side.
     /// @return The pointer to the value.
+    /// @note The overlap of two basis functions on the same atom does not depend on
+    /// the position of the atom, so the atoms of the block carry the value rather
+    /// than a value being stored for each of them.
     auto
     diagonal_target(const CAtomBasisDiagonalSparsity &block,
                     const size_t                      iblock,
@@ -133,6 +144,18 @@ class CSimdT2CDistributor
         return nullptr;
     }
 
+    /// @brief Takes the integral written into the destination above.
+    /// @note The arguments are those of the matching call to diagonal_target.
+    auto
+    diagonal_commit(const CAtomBasisDiagonalSparsity &block,
+                    const size_t                      iblock,
+                    const int                         bra_angular_momentum,
+                    const size_t                      bra_index,
+                    const int                         ket_angular_momentum,
+                    const size_t                      ket_index) -> void
+    {
+    }
+
    protected:
     /// @brief The storage the distributor distributes into.
     T *_storage;
@@ -140,7 +163,7 @@ class CSimdT2CDistributor
 
 /// @brief The specialization which distributes into a sparse matrix.
 /// @note The layout a kernel writes is the layout of the values of the matrix, so
-/// the kernel writes into the matrix directly and commit has nothing to do.
+/// the kernel writes into the matrix directly and neither commit has anything to do.
 /// @note This specialization needs no synchronization of its own: the blocks are
 /// disjoint in the values of the matrix, and so are the combinations of basis
 /// functions within a block.
@@ -198,6 +221,16 @@ class CSimdT2CDistributor<CSparseMatrix>
                     const size_t                      ket_index) -> double *
     {
         return _storage->diagonal_values(iblock, bra_angular_momentum, bra_index, ket_angular_momentum, ket_index);
+    }
+
+    auto
+    diagonal_commit(const CAtomBasisDiagonalSparsity &block,
+                    const size_t                      iblock,
+                    const int                         bra_angular_momentum,
+                    const size_t                      bra_index,
+                    const int                         ket_angular_momentum,
+                    const size_t                      ket_index) -> void
+    {
     }
 
    private:

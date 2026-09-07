@@ -360,8 +360,11 @@ CSimdOverlapDriver::_compute_diagonal_blocks(const CSparsityPattern             
 
                 if (block.number_of_elements(la, ia, lb, jb) == 0) continue;
 
-                *distributor.diagonal_target(block, iblk, la, ia, lb, jb) =
-                    simdovl::one_center_overlap(a_basis.functions()[i], b_basis.functions()[j]);
+                auto *values = distributor.diagonal_target(block, iblk, la, ia, lb, jb);
+
+                *values = simdovl::one_center_overlap(a_basis.functions()[i], b_basis.functions()[j]);
+
+                distributor.diagonal_commit(block, iblk, la, ia, lb, jb);
             }
         }
     }
