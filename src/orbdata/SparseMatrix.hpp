@@ -693,6 +693,14 @@ class CSparseMatrix
 
         const auto ket_nmoms = ket_strides.size();
 
+        // NOTE: the basis functions of an atom basis are indexed once here rather
+        // than once per block, as the index depends on the atom basis alone and the
+        // blocks of one pair of atom bases are many.
+
+        const auto bra_indices = denseidx::index_functions(bra_basis);
+
+        const auto ket_indices = denseidx::index_functions(ket_basis);
+
         // NOTE: an element of the dense matrix belongs to a single atom pair, and
         // an atom pair belongs to a single block, so the blocks write to disjoint
         // elements and need no synchronization. Dynamic scheduling is used as the
@@ -711,9 +719,9 @@ class CSparseMatrix
 
             const auto &ket_atoms = block.ket_atoms();
 
-            const auto a_indices = denseidx::index_functions(bra_basis.basis_set(block.bra_index()));
+            const auto &a_indices = bra_indices[static_cast<size_t>(block.bra_index())];
 
-            const auto b_indices = denseidx::index_functions(ket_basis.basis_set(block.ket_index()));
+            const auto &b_indices = ket_indices[static_cast<size_t>(block.ket_index())];
 
             for (size_t i = 0; i < a_indices.size(); i++)
             {
@@ -804,6 +812,10 @@ class CSparseMatrix
 
         const auto ket_nmoms = ket_strides.size();
 
+        const auto bra_indices = denseidx::index_functions(bra_basis);
+
+        const auto ket_indices = denseidx::index_functions(ket_basis);
+
         // NOTE: the diagonal blocks carry atoms of their own and write to
         // disjoint elements, as the off-diagonal blocks above do.
 
@@ -821,9 +833,9 @@ class CSparseMatrix
 
             const auto &atoms = block.atoms();
 
-            const auto a_indices = denseidx::index_functions(bra_basis.basis_set(block.bra_index()));
+            const auto &a_indices = bra_indices[static_cast<size_t>(block.bra_index())];
 
-            const auto b_indices = denseidx::index_functions(ket_basis.basis_set(block.ket_index()));
+            const auto &b_indices = ket_indices[static_cast<size_t>(block.ket_index())];
 
             for (size_t i = 0; i < a_indices.size(); i++)
             {

@@ -44,6 +44,10 @@
 
 namespace denseidx {  // denseidx namespace
 
+/// @brief The angular momentum and the index within it of each basis function of
+/// every unique atom basis of a molecular basis.
+using TBasisFunctionIndex = std::vector<std::vector<std::pair<int, size_t>>>;
+
 /// @brief Gets the angular momentum and the index within it of each basis
 /// function of an atom basis.
 /// @param basis The atom basis to index the basis functions of.
@@ -64,6 +68,27 @@ index_functions(const CAtomBasis &basis) -> std::vector<std::pair<int, size_t>>
         indices.push_back({lval, counts[lval]});
 
         counts[lval]++;
+    }
+
+    return indices;
+}
+
+/// @brief Gets the angular momentum and the index within it of each basis
+/// function of every unique atom basis of a molecular basis.
+/// @param basis The molecular basis to index the atom bases of.
+/// @return The vector of indices, one entry per unique atom basis, in the order
+/// the atom bases are addressed by the index of an atom basis pair block.
+/// @note The index of an atom basis depends on the atom basis alone, so it is
+/// created once for a molecular basis rather than once for each block or each
+/// atom which carries that atom basis.
+inline auto
+index_functions(const CMolecularBasis &basis) -> TBasisFunctionIndex
+{
+    TBasisFunctionIndex indices;
+
+    for (const auto &atom_basis : basis.basis_sets())
+    {
+        indices.push_back(index_functions(atom_basis));
     }
 
     return indices;

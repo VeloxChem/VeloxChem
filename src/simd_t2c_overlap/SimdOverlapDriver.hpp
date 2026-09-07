@@ -108,9 +108,17 @@ class CSimdOverlapDriver
             const CMolecularBasis  &ket_basis,
             D                      &distributor) const -> void
     {
-        _compute_pair_blocks(pattern, molecule, bra_basis, ket_basis, distributor);
+        // NOTE: the basis functions of an atom basis are indexed once here rather
+        // than once per block, as the index depends on the atom basis alone and the
+        // blocks of one pair of atom bases are many.
 
-        _compute_diagonal_blocks(pattern, bra_basis, ket_basis, distributor);
+        const auto a_indices = denseidx::index_functions(bra_basis);
+
+        const auto b_indices = denseidx::index_functions(ket_basis);
+
+        _compute_pair_blocks(pattern, molecule, bra_basis, ket_basis, a_indices, b_indices, distributor);
+
+        _compute_diagonal_blocks(pattern, bra_basis, ket_basis, a_indices, b_indices, distributor);
     }
 
     /// @brief Computes the overlap matrix of a molecular basis.
@@ -141,43 +149,34 @@ class CSimdOverlapDriver
     /// @param molecule The molecule to compute the integrals of.
     /// @param bra_basis The molecular basis on bra side.
     /// @param ket_basis The molecular basis on ket side.
+    /// @param a_indices The index of the basis functions of the basis on bra side.
+    /// @param b_indices The index of the basis functions of the basis on ket side.
     /// @param distributor The distributor to hand the integrals to.
     template <class D>
-    auto _compute_pair_blocks(const CSparsityPattern &pattern,
-                              const CMolecule        &molecule,
-                              const CMolecularBasis  &bra_basis,
-                              const CMolecularBasis  &ket_basis,
-                              D                      &distributor) const -> void;
+    auto _compute_pair_blocks(const CSparsityPattern              &pattern,
+                              const CMolecule                     &molecule,
+                              const CMolecularBasis               &bra_basis,
+                              const CMolecularBasis               &ket_basis,
+                              const denseidx::TBasisFunctionIndex &a_indices,
+                              const denseidx::TBasisFunctionIndex &b_indices,
+                              D                                   &distributor) const -> void;
 
     /// @brief Computes the integrals of the diagonal blocks.
     /// @param pattern The sparsity pattern to compute the integrals of.
     /// @param bra_basis The molecular basis on bra side.
     /// @param ket_basis The molecular basis on ket side.
+    /// @param a_indices The index of the basis functions of the basis on bra side.
+    /// @param b_indices The index of the basis functions of the basis on ket side.
     /// @param distributor The distributor to hand the integrals to.
     /// @note The overlap of two basis functions on the same atom does not depend on
     /// the position of the atom, so the molecule is not needed here.
     template <class D>
-    auto _compute_diagonal_blocks(const CSparsityPattern &pattern,
-                                  const CMolecularBasis  &bra_basis,
-                                  const CMolecularBasis  &ket_basis,
-                                  D                      &distributor) const -> void;
-
-    /// @brief Indexes the basis functions of every unique atom basis of a molecular
-    /// basis by their angular momentum and their order within it.
-    /// @param basis The molecular basis to index the atom bases of.
-    /// @return The vector of indices, one entry per unique atom basis.
-    static auto
-    _index_functions(const CMolecularBasis &basis) -> std::vector<std::vector<std::pair<int, size_t>>>
-    {
-        std::vector<std::vector<std::pair<int, size_t>>> indices;
-
-        for (const auto &atom_basis : basis.basis_sets())
-        {
-            indices.push_back(denseidx::index_functions(atom_basis));
-        }
-
-        return indices;
-    }
+    auto _compute_diagonal_blocks(const CSparsityPattern              &pattern,
+                                  const CMolecularBasis               &bra_basis,
+                                  const CMolecularBasis               &ket_basis,
+                                  const denseidx::TBasisFunctionIndex &a_indices,
+                                  const denseidx::TBasisFunctionIndex &b_indices,
+                                  D                                   &distributor) const -> void;
 
     /// @brief The screening threshold of the integrals.
     double _threshold;
@@ -189,11 +188,13 @@ class CSimdOverlapDriver
 
 template <class D>
 auto
-CSimdOverlapDriver::_compute_pair_blocks(const CSparsityPattern &pattern,
-                                         const CMolecule        &molecule,
-                                         const CMolecularBasis  &bra_basis,
-                                         const CMolecularBasis  &ket_basis,
-                                         D                      &distributor) const -> void
+CSimdOverlapDriver::_compute_pair_blocks(const CSparsityPattern              &pattern,
+                                         const CMolecule                     &molecule,
+                                         const CMolecularBasis               &bra_basis,
+                                         const CMolecularBasis               &ket_basis,
+                                         const denseidx::TBasisFunctionIndex &a_indices,
+                                         const denseidx::TBasisFunctionIndex &b_indices,
+                                         D                                   &distributor) const -> void
 {
     // NOTE: the blocks are independent, as each of them forms its own coordinates
     // and hands the distributor the values of its own combinations of basis
@@ -202,14 +203,6 @@ CSimdOverlapDriver::_compute_pair_blocks(const CSparsityPattern &pattern,
     // combinations of basis functions and in the cost of their kernels.
 
     const auto nblocks = static_cast<int>(pattern.number_of_pair_blocks());
-
-    // NOTE: the basis functions of an atom basis are indexed once per atom basis
-    // rather than once per block, as the index depends on the atom basis alone and
-    // the blocks of one pair of atom bases are many.
-
-    const auto a_indices = _index_functions(bra_basis);
-
-    const auto b_indices = _index_functions(ket_basis);
 
     // NOTE: the blocks are visited from the most costly to the least, so that a
     // costly block is taken while there is still work to fill the other threads
@@ -314,18 +307,16 @@ CSimdOverlapDriver::_compute_pair_blocks(const CSparsityPattern &pattern,
 
 template <class D>
 auto
-CSimdOverlapDriver::_compute_diagonal_blocks(const CSparsityPattern &pattern,
-                                             const CMolecularBasis  &bra_basis,
-                                             const CMolecularBasis  &ket_basis,
-                                             D                      &distributor) const -> void
+CSimdOverlapDriver::_compute_diagonal_blocks(const CSparsityPattern              &pattern,
+                                             const CMolecularBasis               &bra_basis,
+                                             const CMolecularBasis               &ket_basis,
+                                             const denseidx::TBasisFunctionIndex &a_indices,
+                                             const denseidx::TBasisFunctionIndex &b_indices,
+                                             D                                   &distributor) const -> void
 {
     // NOTE: the overlap operator is spherically symmetric about an atom, so a single
     // value is stored for each pair of basis functions with the same angular
     // momentum and the position of the atom does not enter.
-
-    const auto a_indices = _index_functions(bra_basis);
-
-    const auto b_indices = _index_functions(ket_basis);
 
     for (size_t iblk = 0; iblk < pattern.number_of_diagonal_blocks(); iblk++)
     {
