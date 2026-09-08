@@ -144,6 +144,34 @@ compute_prim_hs_electron_repulsion_14(CSimdMatrix &buffer, const size_t target, 
                                       const size_t ncols, const double alpha, const double beta,
                                       const double p) -> void;
 
+/// @brief Takes one step of the recurrence for one pair of primitives.
+auto
+compute_prim_hs_electron_repulsion_15(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t fs0, const size_t fs1, const size_t gs,
+                                      const size_t ncols, const double alpha, const double beta,
+                                      const double p) -> void;
+
+/// @brief Takes one step of the recurrence for one pair of primitives.
+auto
+compute_prim_hs_electron_repulsion_16(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t fs0, const size_t fs1, const size_t gs,
+                                      const size_t ncols, const double alpha, const double beta,
+                                      const double p) -> void;
+
+/// @brief Takes one step of the recurrence for one pair of primitives.
+auto
+compute_prim_hs_electron_repulsion_17(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t fs0, const size_t fs1, const size_t gs,
+                                      const size_t ncols, const double alpha, const double beta,
+                                      const double p) -> void;
+
+/// @brief Takes one step of the recurrence for one pair of primitives.
+auto
+compute_prim_hs_electron_repulsion_18(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t fs0, const size_t fs1, const size_t gs,
+                                      const size_t ncols, const double alpha, const double beta,
+                                      const double p) -> void;
+
 }  // namespace simdt2ceri
 
 #endif /* SimdElectronRepulsionVrrRecHS_hpp */

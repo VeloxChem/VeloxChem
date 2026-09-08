@@ -612,6 +612,69 @@ compute_prim_ph_electron_repulsion_1(CSimdMatrix &buffer, const size_t target, c
 
 auto
 compute_prim_ph_electron_repulsion_2(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                     const size_t sg, const size_t sh, const size_t ncols,
+                                     const double p) -> void
+{
+    // NOTE: the factors are fixed by the pair of primitives, so they are formed
+    // once rather than for every atom pair the pair reaches.
+
+    const auto f_0 = 2.5 / p;
+
+    auto *t_0 = buffer.data(target + 0);
+    auto *t_1 = buffer.data(target + 1);
+    auto *t_2 = buffer.data(target + 2);
+    auto *t_3 = buffer.data(target + 3);
+    auto *t_4 = buffer.data(target + 4);
+    auto *t_5 = buffer.data(target + 5);
+    auto *t_6 = buffer.data(target + 6);
+    auto *t_7 = buffer.data(target + 7);
+    auto *t_8 = buffer.data(target + 8);
+
+    const auto *pa_x = buffer.data(pa + 0);
+    const auto *pa_y = buffer.data(pa + 1);
+    const auto *pa_z = buffer.data(pa + 2);
+
+    const auto *sg_0 = buffer.data(sg + 0);
+    const auto *sg_5 = buffer.data(sg + 5);
+    const auto *sg_8 = buffer.data(sg + 8);
+
+    const auto *sh_0 = buffer.data(sh + 0);
+    const auto *sh_8 = buffer.data(sh + 8);
+    const auto *sh_12 = buffer.data(sh + 12);
+
+#pragma omp simd aligned(t_0, t_1, t_2, t_3, t_4, t_5, t_6, t_7, pa_x, pa_y, pa_z, sg_0, sg_5, \
+                         sh_0, sh_8, sh_12 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_0[k] = f_0 * sg_0[k]
+                 + pa_x[k] * sh_0[k];
+
+        t_1[k] = pa_x[k] * sh_8[k];
+
+        t_2[k] = pa_x[k] * sh_12[k];
+
+        t_3[k] = pa_y[k] * sh_0[k];
+
+        t_4[k] = f_0 * sg_5[k]
+                 + pa_y[k] * sh_8[k];
+
+        t_5[k] = pa_y[k] * sh_12[k];
+
+        t_6[k] = pa_z[k] * sh_0[k];
+
+        t_7[k] = pa_z[k] * sh_8[k];
+    }
+
+#pragma omp simd aligned(t_8, pa_z, sg_8, sh_12 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_8[k] = f_0 * sg_8[k]
+                 + pa_z[k] * sh_12[k];
+    }
+}
+
+auto
+compute_prim_ph_electron_repulsion_3(CSimdMatrix &buffer, const size_t target, const size_t pa,
                                      const size_t pb, const size_t sg, const size_t sh,
                                      const size_t pg, const size_t ncols,
                                      const double p) -> void
@@ -787,7 +850,7 @@ compute_prim_ph_electron_repulsion_2(CSimdMatrix &buffer, const size_t target, c
 }
 
 auto
-compute_prim_ph_electron_repulsion_3(CSimdMatrix &buffer, const size_t target, const size_t pa,
+compute_prim_ph_electron_repulsion_4(CSimdMatrix &buffer, const size_t target, const size_t pa,
                                      const size_t pb, const size_t sg, const size_t sh,
                                      const size_t pg, const size_t ncols,
                                      const double p) -> void
@@ -1004,7 +1067,7 @@ compute_prim_ph_electron_repulsion_3(CSimdMatrix &buffer, const size_t target, c
 }
 
 auto
-compute_prim_ph_electron_repulsion_4(CSimdMatrix &buffer, const size_t target, const size_t pa,
+compute_prim_ph_electron_repulsion_5(CSimdMatrix &buffer, const size_t target, const size_t pa,
                                      const size_t pb, const size_t sg, const size_t sh,
                                      const size_t pg, const size_t ncols,
                                      const double p) -> void
@@ -1169,9 +1232,278 @@ compute_prim_ph_electron_repulsion_4(CSimdMatrix &buffer, const size_t target, c
 }
 
 auto
-compute_prim_ph_electron_repulsion_5(CSimdMatrix &buffer, const size_t target, const size_t pa,
+compute_prim_ph_electron_repulsion_6(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                     const size_t pb, const size_t sg, const size_t sh,
+                                     const size_t pg, const size_t ncols,
+                                     const double p) -> void
+{
+    // NOTE: the factors are fixed by the pair of primitives, so they are formed
+    // once rather than for every atom pair the pair reaches.
+
+    const auto f_0 = 2.5 / p;
+    const auto f_1 = 1.0 / p;
+    const auto f_2 = 1.5 / p;
+
+    auto *t_0 = buffer.data(target + 0);
+    auto *t_1 = buffer.data(target + 1);
+    auto *t_2 = buffer.data(target + 2);
+    auto *t_3 = buffer.data(target + 3);
+    auto *t_4 = buffer.data(target + 4);
+    auto *t_5 = buffer.data(target + 5);
+    auto *t_6 = buffer.data(target + 6);
+    auto *t_7 = buffer.data(target + 7);
+    auto *t_8 = buffer.data(target + 8);
+    auto *t_9 = buffer.data(target + 9);
+    auto *t_10 = buffer.data(target + 10);
+    auto *t_11 = buffer.data(target + 11);
+    auto *t_12 = buffer.data(target + 12);
+    auto *t_13 = buffer.data(target + 13);
+    auto *t_14 = buffer.data(target + 14);
+    auto *t_15 = buffer.data(target + 15);
+    auto *t_16 = buffer.data(target + 16);
+    auto *t_17 = buffer.data(target + 17);
+    auto *t_18 = buffer.data(target + 18);
+    auto *t_19 = buffer.data(target + 19);
+
+    const auto *pa_x = buffer.data(pa + 0);
+    const auto *pa_y = buffer.data(pa + 1);
+    const auto *pa_z = buffer.data(pa + 2);
+
+    const auto *pb_x = buffer.data(pb + 0);
+    const auto *pb_y = buffer.data(pb + 1);
+
+    const auto *sg_0 = buffer.data(sg + 0);
+    const auto *sg_1 = buffer.data(sg + 1);
+    const auto *sg_2 = buffer.data(sg + 2);
+    const auto *sg_3 = buffer.data(sg + 3);
+    const auto *sg_4 = buffer.data(sg + 4);
+    const auto *sg_7 = buffer.data(sg + 7);
+    const auto *sg_8 = buffer.data(sg + 8);
+    const auto *sg_9 = buffer.data(sg + 9);
+    const auto *sg_10 = buffer.data(sg + 10);
+    const auto *sg_11 = buffer.data(sg + 11);
+
+    const auto *sh_0 = buffer.data(sh + 0);
+    const auto *sh_3 = buffer.data(sh + 3);
+    const auto *sh_4 = buffer.data(sh + 4);
+    const auto *sh_5 = buffer.data(sh + 5);
+    const auto *sh_6 = buffer.data(sh + 6);
+    const auto *sh_10 = buffer.data(sh + 10);
+    const auto *sh_12 = buffer.data(sh + 12);
+    const auto *sh_13 = buffer.data(sh + 13);
+    const auto *sh_15 = buffer.data(sh + 15);
+
+    const auto *pg_1 = buffer.data(pg + 1);
+    const auto *pg_2 = buffer.data(pg + 2);
+
+#pragma omp simd aligned(t_0, t_1, t_2, t_3, t_4, t_5, pa_x, pa_y, sg_0, sg_1, sg_3, sh_0, \
+                         sh_3, sh_5, sh_10, sh_15 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_0[k] = f_0 * sg_0[k]
+                 + pa_x[k] * sh_0[k];
+
+        t_1[k] = pa_x[k] * sh_10[k];
+
+        t_2[k] = pa_x[k] * sh_15[k];
+
+        t_3[k] = pa_y[k] * sh_0[k];
+
+        t_4[k] = f_1 * sg_1[k]
+                 + pa_y[k] * sh_3[k];
+
+        t_5[k] = f_2 * sg_3[k]
+                 + pa_y[k] * sh_5[k];
+    }
+
+#pragma omp simd aligned(t_6, t_7, t_8, t_9, t_10, pa_y, pb_x, sg_7, sg_9, sg_10, sh_10, \
+                         sh_12, sh_13, sh_15, pg_1 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_6[k] = pb_x[k] * pg_1[k];
+
+        t_7[k] = f_0 * sg_7[k]
+                 + pa_y[k] * sh_10[k];
+
+        t_8[k] = f_2 * sg_9[k]
+                 + pa_y[k] * sh_12[k];
+
+        t_9[k] = f_1 * sg_10[k]
+                 + pa_y[k] * sh_13[k];
+
+        t_10[k] = pa_y[k] * sh_15[k];
+    }
+
+#pragma omp simd aligned(t_11, t_12, t_13, t_14, t_15, pa_z, pb_x, sg_2, sg_4, sh_0, sh_4, \
+                         sh_6, sh_10, pg_2 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_11[k] = pa_z[k] * sh_0[k];
+
+        t_12[k] = f_1 * sg_2[k]
+                  + pa_z[k] * sh_4[k];
+
+        t_13[k] = f_2 * sg_4[k]
+                  + pa_z[k] * sh_6[k];
+
+        t_14[k] = pb_x[k] * pg_2[k];
+
+        t_15[k] = pa_z[k] * sh_10[k];
+    }
+
+#pragma omp simd aligned(t_16, t_17, t_18, t_19, pa_z, pb_y, sg_8, sg_9, sg_11, sh_12, sh_13, \
+                         sh_15, pg_2 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_16[k] = f_1 * sg_8[k]
+                  + pa_z[k] * sh_12[k];
+
+        t_17[k] = f_2 * sg_9[k]
+                  + pa_z[k] * sh_13[k];
+
+        t_18[k] = pb_y[k] * pg_2[k];
+
+        t_19[k] = f_0 * sg_11[k]
+                  + pa_z[k] * sh_15[k];
+    }
+}
+
+auto
+compute_prim_ph_electron_repulsion_7(CSimdMatrix &buffer, const size_t target, const size_t pa,
                                      const size_t sg, const size_t sh, const size_t ncols,
                                      const double p) -> void
+{
+    // NOTE: the factors are fixed by the pair of primitives, so they are formed
+    // once rather than for every atom pair the pair reaches.
+
+    const auto f_0 = 2.5 / p;
+
+    auto *t_0 = buffer.data(target + 0);
+    auto *t_1 = buffer.data(target + 1);
+    auto *t_2 = buffer.data(target + 2);
+    auto *t_3 = buffer.data(target + 3);
+    auto *t_4 = buffer.data(target + 4);
+    auto *t_5 = buffer.data(target + 5);
+
+    const auto *pa_x = buffer.data(pa + 0);
+    const auto *pa_y = buffer.data(pa + 1);
+    const auto *pa_z = buffer.data(pa + 2);
+
+    const auto *sg_0 = buffer.data(sg + 0);
+    const auto *sg_5 = buffer.data(sg + 5);
+    const auto *sg_8 = buffer.data(sg + 8);
+
+    const auto *sh_0 = buffer.data(sh + 0);
+    const auto *sh_8 = buffer.data(sh + 8);
+    const auto *sh_12 = buffer.data(sh + 12);
+
+#pragma omp simd aligned(t_0, t_1, t_2, t_3, t_4, t_5, pa_x, pa_y, pa_z, sg_0, sg_5, sg_8, \
+                         sh_0, sh_8, sh_12 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_0[k] = f_0 * sg_0[k]
+                 + pa_x[k] * sh_0[k];
+
+        t_1[k] = f_0 * sg_5[k]
+                 + pa_y[k] * sh_8[k];
+
+        t_2[k] = pa_y[k] * sh_12[k];
+
+        t_3[k] = pa_z[k] * sh_0[k];
+
+        t_4[k] = pa_z[k] * sh_8[k];
+
+        t_5[k] = f_0 * sg_8[k]
+                 + pa_z[k] * sh_12[k];
+    }
+}
+
+auto
+compute_prim_ph_electron_repulsion_8(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                     const size_t sg, const size_t sh, const size_t ncols,
+                                     const double p) -> void
+{
+    // NOTE: the factors are fixed by the pair of primitives, so they are formed
+    // once rather than for every atom pair the pair reaches.
+
+    const auto f_0 = 2.5 / p;
+
+    auto *t_0 = buffer.data(target + 0);
+    auto *t_1 = buffer.data(target + 1);
+    auto *t_2 = buffer.data(target + 2);
+
+    const auto *pa_x = buffer.data(pa + 0);
+    const auto *pa_y = buffer.data(pa + 1);
+    const auto *pa_z = buffer.data(pa + 2);
+
+    const auto *sg_0 = buffer.data(sg + 0);
+    const auto *sg_5 = buffer.data(sg + 5);
+    const auto *sg_8 = buffer.data(sg + 8);
+
+    const auto *sh_0 = buffer.data(sh + 0);
+    const auto *sh_8 = buffer.data(sh + 8);
+    const auto *sh_12 = buffer.data(sh + 12);
+
+#pragma omp simd aligned(t_0, t_1, t_2, pa_x, pa_y, pa_z, sg_0, sg_5, sg_8, sh_0, sh_8, \
+                         sh_12 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_0[k] = f_0 * sg_0[k]
+                 + pa_x[k] * sh_0[k];
+
+        t_1[k] = f_0 * sg_5[k]
+                 + pa_y[k] * sh_8[k];
+
+        t_2[k] = f_0 * sg_8[k]
+                 + pa_z[k] * sh_12[k];
+    }
+}
+
+auto
+compute_prim_ph_electron_repulsion_9(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                     const size_t sg, const size_t sh, const size_t ncols,
+                                     const double p) -> void
+{
+    // NOTE: the factors are fixed by the pair of primitives, so they are formed
+    // once rather than for every atom pair the pair reaches.
+
+    const auto f_0 = 2.5 / p;
+
+    auto *t_0 = buffer.data(target + 0);
+    auto *t_1 = buffer.data(target + 1);
+    auto *t_2 = buffer.data(target + 2);
+
+    const auto *pa_x = buffer.data(pa + 0);
+    const auto *pa_y = buffer.data(pa + 1);
+    const auto *pa_z = buffer.data(pa + 2);
+
+    const auto *sg_0 = buffer.data(sg + 0);
+    const auto *sg_5 = buffer.data(sg + 5);
+    const auto *sg_8 = buffer.data(sg + 8);
+
+    const auto *sh_0 = buffer.data(sh + 0);
+    const auto *sh_10 = buffer.data(sh + 10);
+    const auto *sh_15 = buffer.data(sh + 15);
+
+#pragma omp simd aligned(t_0, t_1, t_2, pa_x, pa_y, pa_z, sg_0, sg_5, sg_8, sh_0, sh_10, \
+                         sh_15 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_0[k] = f_0 * sg_0[k]
+                 + pa_x[k] * sh_0[k];
+
+        t_1[k] = f_0 * sg_5[k]
+                 + pa_y[k] * sh_10[k];
+
+        t_2[k] = f_0 * sg_8[k]
+                 + pa_z[k] * sh_15[k];
+    }
+}
+
+auto
+compute_prim_ph_electron_repulsion_10(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t sg, const size_t sh, const size_t ncols,
+                                      const double p) -> void
 {
     // NOTE: the factors are fixed by the pair of primitives, so they are formed
     // once rather than for every atom pair the pair reaches.
@@ -1253,10 +1585,10 @@ compute_prim_ph_electron_repulsion_5(CSimdMatrix &buffer, const size_t target, c
 }
 
 auto
-compute_prim_ph_electron_repulsion_6(CSimdMatrix &buffer, const size_t target, const size_t pa,
-                                     const size_t pb, const size_t sg, const size_t sh,
-                                     const size_t pg, const size_t ncols,
-                                     const double p) -> void
+compute_prim_ph_electron_repulsion_11(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t pb, const size_t sg, const size_t sh,
+                                      const size_t pg, const size_t ncols,
+                                      const double p) -> void
 {
     // NOTE: the factors are fixed by the pair of primitives, so they are formed
     // once rather than for every atom pair the pair reaches.
@@ -1443,9 +1775,9 @@ compute_prim_ph_electron_repulsion_6(CSimdMatrix &buffer, const size_t target, c
 }
 
 auto
-compute_prim_ph_electron_repulsion_7(CSimdMatrix &buffer, const size_t target, const size_t pa,
-                                     const size_t sg, const size_t sh, const size_t ncols,
-                                     const double p) -> void
+compute_prim_ph_electron_repulsion_12(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t sg, const size_t sh, const size_t ncols,
+                                      const double p) -> void
 {
     // NOTE: the factors are fixed by the pair of primitives, so they are formed
     // once rather than for every atom pair the pair reaches.
@@ -1527,9 +1859,370 @@ compute_prim_ph_electron_repulsion_7(CSimdMatrix &buffer, const size_t target, c
 }
 
 auto
-compute_prim_ph_electron_repulsion_8(CSimdMatrix &buffer, const size_t target, const size_t pa,
-                                     const size_t sg, const size_t sh, const size_t ncols,
-                                     const double p) -> void
+compute_prim_ph_electron_repulsion_13(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t pb, const size_t sg, const size_t sh,
+                                      const size_t pg, const size_t ncols,
+                                      const double p) -> void
+{
+    // NOTE: the factors are fixed by the pair of primitives, so they are formed
+    // once rather than for every atom pair the pair reaches.
+
+    const auto f_0 = 2.5 / p;
+    const auto f_1 = 1.0 / p;
+    const auto f_2 = 1.5 / p;
+
+    auto *t_0 = buffer.data(target + 0);
+    auto *t_1 = buffer.data(target + 1);
+    auto *t_2 = buffer.data(target + 2);
+    auto *t_3 = buffer.data(target + 3);
+    auto *t_4 = buffer.data(target + 4);
+    auto *t_5 = buffer.data(target + 5);
+    auto *t_6 = buffer.data(target + 6);
+    auto *t_7 = buffer.data(target + 7);
+    auto *t_8 = buffer.data(target + 8);
+    auto *t_9 = buffer.data(target + 9);
+    auto *t_10 = buffer.data(target + 10);
+    auto *t_11 = buffer.data(target + 11);
+    auto *t_12 = buffer.data(target + 12);
+    auto *t_13 = buffer.data(target + 13);
+    auto *t_14 = buffer.data(target + 14);
+    auto *t_15 = buffer.data(target + 15);
+
+    const auto *pa_x = buffer.data(pa + 0);
+    const auto *pa_y = buffer.data(pa + 1);
+    const auto *pa_z = buffer.data(pa + 2);
+
+    const auto *pb_x = buffer.data(pb + 0);
+    const auto *pb_y = buffer.data(pb + 1);
+
+    const auto *sg_0 = buffer.data(sg + 0);
+    const auto *sg_1 = buffer.data(sg + 1);
+    const auto *sg_2 = buffer.data(sg + 2);
+    const auto *sg_3 = buffer.data(sg + 3);
+    const auto *sg_4 = buffer.data(sg + 4);
+    const auto *sg_7 = buffer.data(sg + 7);
+    const auto *sg_8 = buffer.data(sg + 8);
+    const auto *sg_9 = buffer.data(sg + 9);
+    const auto *sg_11 = buffer.data(sg + 11);
+
+    const auto *sh_0 = buffer.data(sh + 0);
+    const auto *sh_3 = buffer.data(sh + 3);
+    const auto *sh_4 = buffer.data(sh + 4);
+    const auto *sh_5 = buffer.data(sh + 5);
+    const auto *sh_7 = buffer.data(sh + 7);
+    const auto *sh_11 = buffer.data(sh + 11);
+    const auto *sh_13 = buffer.data(sh + 13);
+    const auto *sh_14 = buffer.data(sh + 14);
+    const auto *sh_16 = buffer.data(sh + 16);
+
+    const auto *pg_1 = buffer.data(pg + 1);
+    const auto *pg_2 = buffer.data(pg + 2);
+    const auto *pg_5 = buffer.data(pg + 5);
+
+#pragma omp simd aligned(t_0, t_1, t_2, t_3, pa_x, pa_y, pb_x, sg_0, sg_1, sg_3, sh_0, sh_3, \
+                         sh_5, pg_1 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_0[k] = f_0 * sg_0[k]
+                 + pa_x[k] * sh_0[k];
+
+        t_1[k] = f_1 * sg_1[k]
+                 + pa_y[k] * sh_3[k];
+
+        t_2[k] = f_2 * sg_3[k]
+                 + pa_y[k] * sh_5[k];
+
+        t_3[k] = pb_x[k] * pg_1[k];
+    }
+
+#pragma omp simd aligned(t_4, t_5, t_6, t_7, t_8, pa_y, pa_z, pb_y, sg_2, sg_7, sh_0, sh_4, \
+                         sh_11, sh_16, pg_2 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_4[k] = f_0 * sg_7[k]
+                 + pa_y[k] * sh_11[k];
+
+        t_5[k] = pa_y[k] * sh_16[k];
+
+        t_6[k] = pa_z[k] * sh_0[k];
+
+        t_7[k] = f_1 * sg_2[k]
+                 + pa_z[k] * sh_4[k];
+
+        t_8[k] = pb_y[k] * pg_2[k];
+    }
+
+#pragma omp simd aligned(t_9, t_10, t_11, t_12, t_13, pa_z, pb_x, sg_4, sg_8, sg_9, sh_7, \
+                         sh_11, sh_13, sh_14, pg_5 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_9[k] = f_2 * sg_4[k]
+                 + pa_z[k] * sh_7[k];
+
+        t_10[k] = pb_x[k] * pg_5[k];
+
+        t_11[k] = pa_z[k] * sh_11[k];
+
+        t_12[k] = f_1 * sg_8[k]
+                  + pa_z[k] * sh_13[k];
+
+        t_13[k] = f_2 * sg_9[k]
+                  + pa_z[k] * sh_14[k];
+    }
+
+#pragma omp simd aligned(t_14, t_15, pa_z, pb_y, sg_11, sh_16, pg_5 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_14[k] = pb_y[k] * pg_5[k];
+
+        t_15[k] = f_0 * sg_11[k]
+                  + pa_z[k] * sh_16[k];
+    }
+}
+
+auto
+compute_prim_ph_electron_repulsion_14(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t pb, const size_t sg, const size_t sh,
+                                      const size_t pg, const size_t ncols,
+                                      const double p) -> void
+{
+    // NOTE: the factors are fixed by the pair of primitives, so they are formed
+    // once rather than for every atom pair the pair reaches.
+
+    const auto f_0 = 2.5 / p;
+    const auto f_1 = 1.0 / p;
+    const auto f_2 = 1.5 / p;
+
+    auto *t_0 = buffer.data(target + 0);
+    auto *t_1 = buffer.data(target + 1);
+    auto *t_2 = buffer.data(target + 2);
+    auto *t_3 = buffer.data(target + 3);
+    auto *t_4 = buffer.data(target + 4);
+    auto *t_5 = buffer.data(target + 5);
+    auto *t_6 = buffer.data(target + 6);
+    auto *t_7 = buffer.data(target + 7);
+    auto *t_8 = buffer.data(target + 8);
+    auto *t_9 = buffer.data(target + 9);
+    auto *t_10 = buffer.data(target + 10);
+    auto *t_11 = buffer.data(target + 11);
+    auto *t_12 = buffer.data(target + 12);
+    auto *t_13 = buffer.data(target + 13);
+    auto *t_14 = buffer.data(target + 14);
+
+    const auto *pa_x = buffer.data(pa + 0);
+    const auto *pa_y = buffer.data(pa + 1);
+    const auto *pa_z = buffer.data(pa + 2);
+
+    const auto *pb_x = buffer.data(pb + 0);
+    const auto *pb_y = buffer.data(pb + 1);
+
+    const auto *sg_0 = buffer.data(sg + 0);
+    const auto *sg_1 = buffer.data(sg + 1);
+    const auto *sg_2 = buffer.data(sg + 2);
+    const auto *sg_3 = buffer.data(sg + 3);
+    const auto *sg_4 = buffer.data(sg + 4);
+    const auto *sg_7 = buffer.data(sg + 7);
+    const auto *sg_8 = buffer.data(sg + 8);
+    const auto *sg_9 = buffer.data(sg + 9);
+    const auto *sg_11 = buffer.data(sg + 11);
+
+    const auto *sh_0 = buffer.data(sh + 0);
+    const auto *sh_3 = buffer.data(sh + 3);
+    const auto *sh_4 = buffer.data(sh + 4);
+    const auto *sh_5 = buffer.data(sh + 5);
+    const auto *sh_6 = buffer.data(sh + 6);
+    const auto *sh_10 = buffer.data(sh + 10);
+    const auto *sh_12 = buffer.data(sh + 12);
+    const auto *sh_13 = buffer.data(sh + 13);
+    const auto *sh_15 = buffer.data(sh + 15);
+
+    const auto *pg_1 = buffer.data(pg + 1);
+    const auto *pg_2 = buffer.data(pg + 2);
+
+#pragma omp simd aligned(t_0, t_1, t_2, t_3, pa_x, pa_y, pb_x, sg_0, sg_1, sg_3, sh_0, sh_3, \
+                         sh_5, pg_1 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_0[k] = f_0 * sg_0[k]
+                 + pa_x[k] * sh_0[k];
+
+        t_1[k] = f_1 * sg_1[k]
+                 + pa_y[k] * sh_3[k];
+
+        t_2[k] = f_2 * sg_3[k]
+                 + pa_y[k] * sh_5[k];
+
+        t_3[k] = pb_x[k] * pg_1[k];
+    }
+
+#pragma omp simd aligned(t_4, t_5, t_6, t_7, t_8, pa_y, pa_z, sg_2, sg_4, sg_7, sh_0, sh_4, \
+                         sh_6, sh_10, sh_15 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_4[k] = f_0 * sg_7[k]
+                 + pa_y[k] * sh_10[k];
+
+        t_5[k] = pa_y[k] * sh_15[k];
+
+        t_6[k] = pa_z[k] * sh_0[k];
+
+        t_7[k] = f_1 * sg_2[k]
+                 + pa_z[k] * sh_4[k];
+
+        t_8[k] = f_2 * sg_4[k]
+                 + pa_z[k] * sh_6[k];
+    }
+
+#pragma omp simd aligned(t_9, t_10, t_11, t_12, t_13, pa_z, pb_x, pb_y, sg_8, sg_9, sh_10, \
+                         sh_12, sh_13, pg_2 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_9[k] = pb_x[k] * pg_2[k];
+
+        t_10[k] = pa_z[k] * sh_10[k];
+
+        t_11[k] = f_1 * sg_8[k]
+                  + pa_z[k] * sh_12[k];
+
+        t_12[k] = f_2 * sg_9[k]
+                  + pa_z[k] * sh_13[k];
+
+        t_13[k] = pb_y[k] * pg_2[k];
+    }
+
+#pragma omp simd aligned(t_14, pa_z, sg_11, sh_15 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_14[k] = f_0 * sg_11[k]
+                  + pa_z[k] * sh_15[k];
+    }
+}
+
+auto
+compute_prim_ph_electron_repulsion_15(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t sg, const size_t sh, const size_t ncols,
+                                      const double p) -> void
+{
+    // NOTE: the factors are fixed by the pair of primitives, so they are formed
+    // once rather than for every atom pair the pair reaches.
+
+    const auto f_0 = 2.5 / p;
+
+    auto *t_0 = buffer.data(target + 0);
+    auto *t_1 = buffer.data(target + 1);
+    auto *t_2 = buffer.data(target + 2);
+
+    const auto *pa_x = buffer.data(pa + 0);
+    const auto *pa_y = buffer.data(pa + 1);
+    const auto *pa_z = buffer.data(pa + 2);
+
+    const auto *sg_0 = buffer.data(sg + 0);
+    const auto *sg_5 = buffer.data(sg + 5);
+    const auto *sg_8 = buffer.data(sg + 8);
+
+    const auto *sh_0 = buffer.data(sh + 0);
+    const auto *sh_11 = buffer.data(sh + 11);
+    const auto *sh_16 = buffer.data(sh + 16);
+
+#pragma omp simd aligned(t_0, t_1, t_2, pa_x, pa_y, pa_z, sg_0, sg_5, sg_8, sh_0, sh_11, \
+                         sh_16 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_0[k] = f_0 * sg_0[k]
+                 + pa_x[k] * sh_0[k];
+
+        t_1[k] = f_0 * sg_5[k]
+                 + pa_y[k] * sh_11[k];
+
+        t_2[k] = f_0 * sg_8[k]
+                 + pa_z[k] * sh_16[k];
+    }
+}
+
+auto
+compute_prim_ph_electron_repulsion_16(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t pb, const size_t sg, const size_t sh,
+                                      const size_t pg, const size_t ncols,
+                                      const double p) -> void
+{
+    // NOTE: the factors are fixed by the pair of primitives, so they are formed
+    // once rather than for every atom pair the pair reaches.
+
+    const auto f_0 = 2.5 / p;
+    const auto f_1 = 1.0 / p;
+    const auto f_2 = 1.5 / p;
+
+    auto *t_0 = buffer.data(target + 0);
+    auto *t_1 = buffer.data(target + 1);
+    auto *t_2 = buffer.data(target + 2);
+    auto *t_3 = buffer.data(target + 3);
+    auto *t_4 = buffer.data(target + 4);
+    auto *t_5 = buffer.data(target + 5);
+    auto *t_6 = buffer.data(target + 6);
+    auto *t_7 = buffer.data(target + 7);
+
+    const auto *pa_x = buffer.data(pa + 0);
+    const auto *pa_y = buffer.data(pa + 1);
+    const auto *pa_z = buffer.data(pa + 2);
+
+    const auto *pb_y = buffer.data(pb + 1);
+
+    const auto *sg_0 = buffer.data(sg + 0);
+    const auto *sg_1 = buffer.data(sg + 1);
+    const auto *sg_3 = buffer.data(sg + 3);
+    const auto *sg_6 = buffer.data(sg + 6);
+    const auto *sg_7 = buffer.data(sg + 7);
+    const auto *sg_8 = buffer.data(sg + 8);
+    const auto *sg_10 = buffer.data(sg + 10);
+
+    const auto *sh_0 = buffer.data(sh + 0);
+    const auto *sh_4 = buffer.data(sh + 4);
+    const auto *sh_6 = buffer.data(sh + 6);
+    const auto *sh_10 = buffer.data(sh + 10);
+    const auto *sh_12 = buffer.data(sh + 12);
+    const auto *sh_13 = buffer.data(sh + 13);
+    const auto *sh_15 = buffer.data(sh + 15);
+
+    const auto *pg_2 = buffer.data(pg + 2);
+
+#pragma omp simd aligned(t_0, t_1, t_2, t_3, pa_x, pa_y, pa_z, sg_0, sg_1, sg_3, sg_6, sh_0, \
+                         sh_4, sh_6, sh_10 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_0[k] = f_0 * sg_0[k]
+                 + pa_x[k] * sh_0[k];
+
+        t_1[k] = f_0 * sg_6[k]
+                 + pa_y[k] * sh_10[k];
+
+        t_2[k] = f_1 * sg_1[k]
+                 + pa_z[k] * sh_4[k];
+
+        t_3[k] = f_2 * sg_3[k]
+                 + pa_z[k] * sh_6[k];
+    }
+
+#pragma omp simd aligned(t_4, t_5, t_6, t_7, pa_z, pb_y, sg_7, sg_8, sg_10, sh_12, sh_13, \
+                         sh_15, pg_2 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_4[k] = f_1 * sg_7[k]
+                 + pa_z[k] * sh_12[k];
+
+        t_5[k] = f_2 * sg_8[k]
+                 + pa_z[k] * sh_13[k];
+
+        t_6[k] = pb_y[k] * pg_2[k];
+
+        t_7[k] = f_0 * sg_10[k]
+                 + pa_z[k] * sh_15[k];
+    }
+}
+
+auto
+compute_prim_ph_electron_repulsion_17(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t sg, const size_t sh, const size_t ncols,
+                                      const double p) -> void
 {
     // NOTE: the factors are fixed by the pair of primitives, so they are formed
     // once rather than for every atom pair the pair reaches.
@@ -1564,6 +2257,206 @@ compute_prim_ph_electron_repulsion_8(CSimdMatrix &buffer, const size_t target, c
 
         t_2[k] = f_0 * sg_2[k]
                  + pa_z[k] * sh_2[k];
+    }
+}
+
+auto
+compute_prim_ph_electron_repulsion_18(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t pb, const size_t sg, const size_t sh,
+                                      const size_t pg, const size_t ncols,
+                                      const double p) -> void
+{
+    // NOTE: the factors are fixed by the pair of primitives, so they are formed
+    // once rather than for every atom pair the pair reaches.
+
+    const auto f_0 = 2.5 / p;
+    const auto f_1 = 1.0 / p;
+    const auto f_2 = 1.5 / p;
+
+    auto *t_0 = buffer.data(target + 0);
+    auto *t_1 = buffer.data(target + 1);
+    auto *t_2 = buffer.data(target + 2);
+    auto *t_3 = buffer.data(target + 3);
+    auto *t_4 = buffer.data(target + 4);
+    auto *t_5 = buffer.data(target + 5);
+    auto *t_6 = buffer.data(target + 6);
+    auto *t_7 = buffer.data(target + 7);
+    auto *t_8 = buffer.data(target + 8);
+    auto *t_9 = buffer.data(target + 9);
+    auto *t_10 = buffer.data(target + 10);
+    auto *t_11 = buffer.data(target + 11);
+    auto *t_12 = buffer.data(target + 12);
+    auto *t_13 = buffer.data(target + 13);
+    auto *t_14 = buffer.data(target + 14);
+
+    const auto *pa_x = buffer.data(pa + 0);
+    const auto *pa_y = buffer.data(pa + 1);
+    const auto *pa_z = buffer.data(pa + 2);
+
+    const auto *pb_x = buffer.data(pb + 0);
+    const auto *pb_y = buffer.data(pb + 1);
+
+    const auto *sg_0 = buffer.data(sg + 0);
+    const auto *sg_1 = buffer.data(sg + 1);
+    const auto *sg_2 = buffer.data(sg + 2);
+    const auto *sg_3 = buffer.data(sg + 3);
+    const auto *sg_4 = buffer.data(sg + 4);
+    const auto *sg_7 = buffer.data(sg + 7);
+    const auto *sg_8 = buffer.data(sg + 8);
+    const auto *sg_9 = buffer.data(sg + 9);
+    const auto *sg_11 = buffer.data(sg + 11);
+
+    const auto *sh_0 = buffer.data(sh + 0);
+    const auto *sh_3 = buffer.data(sh + 3);
+    const auto *sh_4 = buffer.data(sh + 4);
+    const auto *sh_5 = buffer.data(sh + 5);
+    const auto *sh_6 = buffer.data(sh + 6);
+    const auto *sh_7 = buffer.data(sh + 7);
+    const auto *sh_9 = buffer.data(sh + 9);
+    const auto *sh_10 = buffer.data(sh + 10);
+    const auto *sh_11 = buffer.data(sh + 11);
+
+    const auto *pg_1 = buffer.data(pg + 1);
+    const auto *pg_2 = buffer.data(pg + 2);
+
+#pragma omp simd aligned(t_0, t_1, t_2, t_3, pa_x, pa_y, pb_x, sg_0, sg_1, sg_3, sh_0, sh_3, \
+                         sh_5, pg_1 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_0[k] = f_0 * sg_0[k]
+                 + pa_x[k] * sh_0[k];
+
+        t_1[k] = f_1 * sg_1[k]
+                 + pa_y[k] * sh_3[k];
+
+        t_2[k] = f_2 * sg_3[k]
+                 + pa_y[k] * sh_5[k];
+
+        t_3[k] = pb_x[k] * pg_1[k];
+    }
+
+#pragma omp simd aligned(t_4, t_5, t_6, t_7, t_8, pa_y, pa_z, sg_2, sg_4, sg_7, sh_0, sh_4, \
+                         sh_6, sh_7, sh_11 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_4[k] = f_0 * sg_7[k]
+                 + pa_y[k] * sh_7[k];
+
+        t_5[k] = pa_y[k] * sh_11[k];
+
+        t_6[k] = pa_z[k] * sh_0[k];
+
+        t_7[k] = f_1 * sg_2[k]
+                 + pa_z[k] * sh_4[k];
+
+        t_8[k] = f_2 * sg_4[k]
+                 + pa_z[k] * sh_6[k];
+    }
+
+#pragma omp simd aligned(t_9, t_10, t_11, t_12, t_13, pa_z, pb_x, pb_y, sg_8, sg_9, sh_7, \
+                         sh_9, sh_10, pg_2 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_9[k] = pb_x[k] * pg_2[k];
+
+        t_10[k] = pa_z[k] * sh_7[k];
+
+        t_11[k] = f_1 * sg_8[k]
+                  + pa_z[k] * sh_9[k];
+
+        t_12[k] = f_2 * sg_9[k]
+                  + pa_z[k] * sh_10[k];
+
+        t_13[k] = pb_y[k] * pg_2[k];
+    }
+
+#pragma omp simd aligned(t_14, pa_z, sg_11, sh_11 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_14[k] = f_0 * sg_11[k]
+                  + pa_z[k] * sh_11[k];
+    }
+}
+
+auto
+compute_prim_ph_electron_repulsion_19(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t sg, const size_t sh, const size_t ncols,
+                                      const double p) -> void
+{
+    // NOTE: the factors are fixed by the pair of primitives, so they are formed
+    // once rather than for every atom pair the pair reaches.
+
+    const auto f_0 = 2.5 / p;
+
+    auto *t_0 = buffer.data(target + 0);
+    auto *t_1 = buffer.data(target + 1);
+    auto *t_2 = buffer.data(target + 2);
+
+    const auto *pa_x = buffer.data(pa + 0);
+    const auto *pa_y = buffer.data(pa + 1);
+    const auto *pa_z = buffer.data(pa + 2);
+
+    const auto *sg_0 = buffer.data(sg + 0);
+    const auto *sg_5 = buffer.data(sg + 5);
+    const auto *sg_8 = buffer.data(sg + 8);
+
+    const auto *sh_0 = buffer.data(sh + 0);
+    const auto *sh_7 = buffer.data(sh + 7);
+    const auto *sh_11 = buffer.data(sh + 11);
+
+#pragma omp simd aligned(t_0, t_1, t_2, pa_x, pa_y, pa_z, sg_0, sg_5, sg_8, sh_0, sh_7, \
+                         sh_11 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_0[k] = f_0 * sg_0[k]
+                 + pa_x[k] * sh_0[k];
+
+        t_1[k] = f_0 * sg_5[k]
+                 + pa_y[k] * sh_7[k];
+
+        t_2[k] = f_0 * sg_8[k]
+                 + pa_z[k] * sh_11[k];
+    }
+}
+
+auto
+compute_prim_ph_electron_repulsion_20(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t sg, const size_t sh, const size_t ncols,
+                                      const double p) -> void
+{
+    // NOTE: the factors are fixed by the pair of primitives, so they are formed
+    // once rather than for every atom pair the pair reaches.
+
+    const auto f_0 = 2.5 / p;
+
+    auto *t_0 = buffer.data(target + 0);
+    auto *t_1 = buffer.data(target + 1);
+    auto *t_2 = buffer.data(target + 2);
+
+    const auto *pa_x = buffer.data(pa + 0);
+    const auto *pa_y = buffer.data(pa + 1);
+    const auto *pa_z = buffer.data(pa + 2);
+
+    const auto *sg_0 = buffer.data(sg + 0);
+    const auto *sg_5 = buffer.data(sg + 5);
+    const auto *sg_8 = buffer.data(sg + 8);
+
+    const auto *sh_0 = buffer.data(sh + 0);
+    const auto *sh_9 = buffer.data(sh + 9);
+    const auto *sh_14 = buffer.data(sh + 14);
+
+#pragma omp simd aligned(t_0, t_1, t_2, pa_x, pa_y, pa_z, sg_0, sg_5, sg_8, sh_0, sh_9, \
+                         sh_14 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_0[k] = f_0 * sg_0[k]
+                 + pa_x[k] * sh_0[k];
+
+        t_1[k] = f_0 * sg_5[k]
+                 + pa_y[k] * sh_9[k];
+
+        t_2[k] = f_0 * sg_8[k]
+                 + pa_z[k] * sh_14[k];
     }
 }
 

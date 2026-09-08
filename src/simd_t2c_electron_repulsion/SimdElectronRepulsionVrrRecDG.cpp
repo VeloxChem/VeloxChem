@@ -4135,6 +4135,233 @@ compute_prim_dg_electron_repulsion_17(CSimdMatrix &buffer, const size_t target, 
     const auto f_0 = 1.0 / p;
     const auto f_1 = 1.5 / beta;
     const auto f_2 = 1.5 * alpha / (beta * p);
+    const auto f_3 = 0.5 / beta;
+    const auto f_4 = 0.5 * alpha / (beta * p);
+
+    auto *t_0 = buffer.data(target + 0);
+    auto *t_1 = buffer.data(target + 1);
+    auto *t_2 = buffer.data(target + 2);
+    auto *t_3 = buffer.data(target + 3);
+    auto *t_4 = buffer.data(target + 4);
+    auto *t_5 = buffer.data(target + 5);
+    auto *t_6 = buffer.data(target + 6);
+    auto *t_7 = buffer.data(target + 7);
+    auto *t_8 = buffer.data(target + 8);
+    auto *t_9 = buffer.data(target + 9);
+    auto *t_10 = buffer.data(target + 10);
+    auto *t_11 = buffer.data(target + 11);
+    auto *t_12 = buffer.data(target + 12);
+    auto *t_13 = buffer.data(target + 13);
+    auto *t_14 = buffer.data(target + 14);
+    auto *t_15 = buffer.data(target + 15);
+    auto *t_16 = buffer.data(target + 16);
+    auto *t_17 = buffer.data(target + 17);
+    auto *t_18 = buffer.data(target + 18);
+    auto *t_19 = buffer.data(target + 19);
+    auto *t_20 = buffer.data(target + 20);
+    auto *t_21 = buffer.data(target + 21);
+    auto *t_22 = buffer.data(target + 22);
+    auto *t_23 = buffer.data(target + 23);
+    auto *t_24 = buffer.data(target + 24);
+    auto *t_25 = buffer.data(target + 25);
+    auto *t_26 = buffer.data(target + 26);
+    auto *t_27 = buffer.data(target + 27);
+    auto *t_28 = buffer.data(target + 28);
+    auto *t_29 = buffer.data(target + 29);
+
+    const auto *pb_x = buffer.data(pb + 0);
+    const auto *pb_y = buffer.data(pb + 1);
+    const auto *pb_z = buffer.data(pb + 2);
+
+    const auto *pf_0 = buffer.data(pf + 0);
+    const auto *pf_1 = buffer.data(pf + 1);
+    const auto *pf_2 = buffer.data(pf + 2);
+
+    const auto *dd0_0 = buffer.data(dd0 + 0);
+    const auto *dd0_1 = buffer.data(dd0 + 1);
+    const auto *dd0_2 = buffer.data(dd0 + 2);
+    const auto *dd0_3 = buffer.data(dd0 + 3);
+    const auto *dd0_4 = buffer.data(dd0 + 4);
+    const auto *dd0_5 = buffer.data(dd0 + 5);
+    const auto *dd0_6 = buffer.data(dd0 + 6);
+    const auto *dd0_7 = buffer.data(dd0 + 7);
+    const auto *dd0_8 = buffer.data(dd0 + 8);
+
+    const auto *dd1_0 = buffer.data(dd1 + 0);
+    const auto *dd1_1 = buffer.data(dd1 + 1);
+    const auto *dd1_2 = buffer.data(dd1 + 2);
+    const auto *dd1_3 = buffer.data(dd1 + 3);
+    const auto *dd1_4 = buffer.data(dd1 + 4);
+    const auto *dd1_5 = buffer.data(dd1 + 5);
+    const auto *dd1_6 = buffer.data(dd1 + 6);
+    const auto *dd1_7 = buffer.data(dd1 + 7);
+    const auto *dd1_8 = buffer.data(dd1 + 8);
+
+    const auto *df_0 = buffer.data(df + 0);
+    const auto *df_1 = buffer.data(df + 1);
+    const auto *df_2 = buffer.data(df + 2);
+    const auto *df_3 = buffer.data(df + 3);
+    const auto *df_4 = buffer.data(df + 4);
+    const auto *df_5 = buffer.data(df + 5);
+    const auto *df_6 = buffer.data(df + 6);
+    const auto *df_7 = buffer.data(df + 7);
+    const auto *df_8 = buffer.data(df + 8);
+    const auto *df_9 = buffer.data(df + 9);
+    const auto *df_10 = buffer.data(df + 10);
+    const auto *df_11 = buffer.data(df + 11);
+    const auto *df_12 = buffer.data(df + 12);
+    const auto *df_13 = buffer.data(df + 13);
+    const auto *df_14 = buffer.data(df + 14);
+    const auto *df_15 = buffer.data(df + 15);
+    const auto *df_16 = buffer.data(df + 16);
+    const auto *df_17 = buffer.data(df + 17);
+
+#pragma omp simd aligned(t_0, t_1, t_2, t_3, t_4, pb_x, pb_y, pb_z, pf_0, dd0_0, dd1_0, df_0, \
+                         df_1, df_2 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_0[k] = f_0 * pf_0[k]
+                 + f_1 * dd0_0[k]
+                 - f_2 * dd1_0[k]
+                 + pb_x[k] * df_0[k];
+
+        t_1[k] = pb_y[k] * df_0[k];
+
+        t_2[k] = pb_z[k] * df_0[k];
+
+        t_3[k] = f_3 * dd0_0[k]
+                 - f_4 * dd1_0[k]
+                 + pb_y[k] * df_1[k];
+
+        t_4[k] = f_3 * dd0_0[k]
+                 - f_4 * dd1_0[k]
+                 + pb_z[k] * df_2[k];
+    }
+
+#pragma omp simd aligned(t_5, t_6, t_7, t_8, t_9, pb_y, pb_z, dd0_1, dd0_2, dd1_1, dd1_2, \
+                         df_3, df_4, df_5 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_5[k] = f_1 * dd0_1[k]
+                 - f_2 * dd1_1[k]
+                 + pb_y[k] * df_3[k];
+
+        t_6[k] = pb_z[k] * df_3[k];
+
+        t_7[k] = f_3 * dd0_2[k]
+                 - f_4 * dd1_2[k]
+                 + pb_y[k] * df_4[k];
+
+        t_8[k] = pb_y[k] * df_5[k];
+
+        t_9[k] = f_1 * dd0_2[k]
+                 - f_2 * dd1_2[k]
+                 + pb_z[k] * df_5[k];
+    }
+
+#pragma omp simd aligned(t_10, t_11, t_12, t_13, pb_x, pb_z, dd0_3, dd0_4, dd0_5, dd1_3, \
+                         dd1_4, dd1_5, df_6, df_7, df_8 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_10[k] = f_1 * dd0_3[k]
+                  - f_2 * dd1_3[k]
+                  + pb_x[k] * df_6[k];
+
+        t_11[k] = pb_z[k] * df_6[k];
+
+        t_12[k] = f_3 * dd0_4[k]
+                  - f_4 * dd1_4[k]
+                  + pb_x[k] * df_7[k];
+
+        t_13[k] = f_3 * dd0_5[k]
+                  - f_4 * dd1_5[k]
+                  + pb_x[k] * df_8[k];
+    }
+
+#pragma omp simd aligned(t_14, t_15, t_16, t_17, t_18, pb_x, pb_y, pb_z, pf_1, dd0_4, dd1_4, \
+                         df_9, df_10, df_11 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_14[k] = pb_x[k] * df_9[k];
+
+        t_15[k] = pb_x[k] * df_11[k];
+
+        t_16[k] = f_0 * pf_1[k]
+                  + f_1 * dd0_4[k]
+                  - f_2 * dd1_4[k]
+                  + pb_y[k] * df_9[k];
+
+        t_17[k] = pb_z[k] * df_9[k];
+
+        t_18[k] = f_3 * dd0_4[k]
+                  - f_4 * dd1_4[k]
+                  + pb_z[k] * df_10[k];
+    }
+
+#pragma omp simd aligned(t_19, t_20, t_21, t_22, pb_x, pb_y, pb_z, dd0_5, dd0_6, dd0_7, dd1_5, \
+                         dd1_6, dd1_7, df_11, df_12, df_13 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_19[k] = f_1 * dd0_5[k]
+                  - f_2 * dd1_5[k]
+                  + pb_z[k] * df_11[k];
+
+        t_20[k] = f_1 * dd0_6[k]
+                  - f_2 * dd1_6[k]
+                  + pb_x[k] * df_12[k];
+
+        t_21[k] = pb_y[k] * df_12[k];
+
+        t_22[k] = f_3 * dd0_7[k]
+                  - f_4 * dd1_7[k]
+                  + pb_x[k] * df_13[k];
+    }
+
+#pragma omp simd aligned(t_23, t_24, t_25, t_26, t_27, t_28, pb_x, pb_y, dd0_7, dd0_8, dd1_7, \
+                         dd1_8, df_14, df_15, df_16, df_17 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_23[k] = f_3 * dd0_8[k]
+                  - f_4 * dd1_8[k]
+                  + pb_x[k] * df_14[k];
+
+        t_24[k] = pb_x[k] * df_15[k];
+
+        t_25[k] = pb_x[k] * df_17[k];
+
+        t_26[k] = f_1 * dd0_7[k]
+                  - f_2 * dd1_7[k]
+                  + pb_y[k] * df_15[k];
+
+        t_27[k] = f_3 * dd0_8[k]
+                  - f_4 * dd1_8[k]
+                  + pb_y[k] * df_16[k];
+
+        t_28[k] = pb_y[k] * df_17[k];
+    }
+
+#pragma omp simd aligned(t_29, pb_z, pf_2, dd0_8, dd1_8, df_17 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_29[k] = f_0 * pf_2[k]
+                  + f_1 * dd0_8[k]
+                  - f_2 * dd1_8[k]
+                  + pb_z[k] * df_17[k];
+    }
+}
+
+auto
+compute_prim_dg_electron_repulsion_18(CSimdMatrix &buffer, const size_t target, const size_t pb,
+                                      const size_t pf, const size_t dd0, const size_t dd1,
+                                      const size_t df, const size_t ncols, const double alpha,
+                                      const double beta, const double p) -> void
+{
+    // NOTE: the factors are fixed by the pair of primitives, so they are formed
+    // once rather than for every atom pair the pair reaches.
+
+    const auto f_0 = 1.0 / p;
+    const auto f_1 = 1.5 / beta;
+    const auto f_2 = 1.5 * alpha / (beta * p);
 
     auto *t_0 = buffer.data(target + 0);
     auto *t_1 = buffer.data(target + 1);
@@ -4186,7 +4413,7 @@ compute_prim_dg_electron_repulsion_17(CSimdMatrix &buffer, const size_t target, 
 }
 
 auto
-compute_prim_dg_electron_repulsion_18(CSimdMatrix &buffer, const size_t target, const size_t pb,
+compute_prim_dg_electron_repulsion_19(CSimdMatrix &buffer, const size_t target, const size_t pb,
                                       const size_t pf, const size_t dd0, const size_t dd1,
                                       const size_t df, const size_t ncols, const double alpha,
                                       const double beta, const double p) -> void
@@ -4248,7 +4475,7 @@ compute_prim_dg_electron_repulsion_18(CSimdMatrix &buffer, const size_t target, 
 }
 
 auto
-compute_prim_dg_electron_repulsion_19(CSimdMatrix &buffer, const size_t target, const size_t pb,
+compute_prim_dg_electron_repulsion_20(CSimdMatrix &buffer, const size_t target, const size_t pb,
                                       const size_t pf, const size_t dd0, const size_t dd1,
                                       const size_t df, const size_t ncols, const double alpha,
                                       const double beta, const double p) -> void
@@ -4310,7 +4537,7 @@ compute_prim_dg_electron_repulsion_19(CSimdMatrix &buffer, const size_t target, 
 }
 
 auto
-compute_prim_dg_electron_repulsion_20(CSimdMatrix &buffer, const size_t target, const size_t pb,
+compute_prim_dg_electron_repulsion_21(CSimdMatrix &buffer, const size_t target, const size_t pb,
                                       const size_t pf, const size_t dd0, const size_t dd1,
                                       const size_t df, const size_t ncols, const double alpha,
                                       const double beta, const double p) -> void
@@ -4492,7 +4719,7 @@ compute_prim_dg_electron_repulsion_20(CSimdMatrix &buffer, const size_t target, 
 }
 
 auto
-compute_prim_dg_electron_repulsion_21(CSimdMatrix &buffer, const size_t target, const size_t pb,
+compute_prim_dg_electron_repulsion_22(CSimdMatrix &buffer, const size_t target, const size_t pb,
                                       const size_t pf, const size_t dd0, const size_t dd1,
                                       const size_t df, const size_t ncols, const double alpha,
                                       const double beta, const double p) -> void
@@ -4554,7 +4781,7 @@ compute_prim_dg_electron_repulsion_21(CSimdMatrix &buffer, const size_t target, 
 }
 
 auto
-compute_prim_dg_electron_repulsion_22(CSimdMatrix &buffer, const size_t target, const size_t pb,
+compute_prim_dg_electron_repulsion_23(CSimdMatrix &buffer, const size_t target, const size_t pb,
                                       const size_t pf, const size_t dd0, const size_t dd1,
                                       const size_t df, const size_t ncols, const double alpha,
                                       const double beta, const double p) -> void
@@ -4616,7 +4843,7 @@ compute_prim_dg_electron_repulsion_22(CSimdMatrix &buffer, const size_t target, 
 }
 
 auto
-compute_prim_dg_electron_repulsion_23(CSimdMatrix &buffer, const size_t target, const size_t pa,
+compute_prim_dg_electron_repulsion_24(CSimdMatrix &buffer, const size_t target, const size_t pa,
                                       const size_t pb, const size_t pf, const size_t pg,
                                       const size_t dd0, const size_t dd1, const size_t df,
                                       const size_t ncols, const double alpha, const double beta,
@@ -4852,7 +5079,7 @@ compute_prim_dg_electron_repulsion_23(CSimdMatrix &buffer, const size_t target, 
 }
 
 auto
-compute_prim_dg_electron_repulsion_24(CSimdMatrix &buffer, const size_t target, const size_t pb,
+compute_prim_dg_electron_repulsion_25(CSimdMatrix &buffer, const size_t target, const size_t pb,
                                       const size_t pf, const size_t dd0, const size_t dd1,
                                       const size_t df, const size_t ncols, const double alpha,
                                       const double beta, const double p) -> void
@@ -4914,7 +5141,7 @@ compute_prim_dg_electron_repulsion_24(CSimdMatrix &buffer, const size_t target, 
 }
 
 auto
-compute_prim_dg_electron_repulsion_25(CSimdMatrix &buffer, const size_t target, const size_t pb,
+compute_prim_dg_electron_repulsion_26(CSimdMatrix &buffer, const size_t target, const size_t pb,
                                       const size_t pf, const size_t dd0, const size_t dd1,
                                       const size_t df, const size_t ncols, const double alpha,
                                       const double beta, const double p) -> void
@@ -4976,7 +5203,7 @@ compute_prim_dg_electron_repulsion_25(CSimdMatrix &buffer, const size_t target, 
 }
 
 auto
-compute_prim_dg_electron_repulsion_26(CSimdMatrix &buffer, const size_t target, const size_t pb,
+compute_prim_dg_electron_repulsion_27(CSimdMatrix &buffer, const size_t target, const size_t pb,
                                       const size_t pf, const size_t dd0, const size_t dd1,
                                       const size_t df, const size_t ncols, const double alpha,
                                       const double beta, const double p) -> void
@@ -5038,7 +5265,7 @@ compute_prim_dg_electron_repulsion_26(CSimdMatrix &buffer, const size_t target, 
 }
 
 auto
-compute_prim_dg_electron_repulsion_27(CSimdMatrix &buffer, const size_t target, const size_t pb,
+compute_prim_dg_electron_repulsion_28(CSimdMatrix &buffer, const size_t target, const size_t pb,
                                       const size_t pf, const size_t dd0, const size_t dd1,
                                       const size_t df, const size_t ncols, const double alpha,
                                       const double beta, const double p) -> void
@@ -5121,7 +5348,7 @@ compute_prim_dg_electron_repulsion_27(CSimdMatrix &buffer, const size_t target, 
 }
 
 auto
-compute_prim_dg_electron_repulsion_28(CSimdMatrix &buffer, const size_t target, const size_t pb,
+compute_prim_dg_electron_repulsion_29(CSimdMatrix &buffer, const size_t target, const size_t pb,
                                       const size_t pf, const size_t dd0, const size_t dd1,
                                       const size_t df, const size_t ncols, const double alpha,
                                       const double beta, const double p) -> void
@@ -5204,7 +5431,7 @@ compute_prim_dg_electron_repulsion_28(CSimdMatrix &buffer, const size_t target, 
 }
 
 auto
-compute_prim_dg_electron_repulsion_29(CSimdMatrix &buffer, const size_t target, const size_t pb,
+compute_prim_dg_electron_repulsion_30(CSimdMatrix &buffer, const size_t target, const size_t pb,
                                       const size_t pf, const size_t dd0, const size_t dd1,
                                       const size_t df, const size_t ncols, const double alpha,
                                       const double beta, const double p) -> void
@@ -5287,7 +5514,7 @@ compute_prim_dg_electron_repulsion_29(CSimdMatrix &buffer, const size_t target, 
 }
 
 auto
-compute_prim_dg_electron_repulsion_30(CSimdMatrix &buffer, const size_t target, const size_t pb,
+compute_prim_dg_electron_repulsion_31(CSimdMatrix &buffer, const size_t target, const size_t pb,
                                       const size_t pf, const size_t dd0, const size_t dd1,
                                       const size_t df, const size_t ncols, const double alpha,
                                       const double beta, const double p) -> void
@@ -5379,7 +5606,7 @@ compute_prim_dg_electron_repulsion_30(CSimdMatrix &buffer, const size_t target, 
 }
 
 auto
-compute_prim_dg_electron_repulsion_31(CSimdMatrix &buffer, const size_t target, const size_t pb,
+compute_prim_dg_electron_repulsion_32(CSimdMatrix &buffer, const size_t target, const size_t pb,
                                       const size_t pf, const size_t dd0, const size_t dd1,
                                       const size_t df, const size_t ncols, const double alpha,
                                       const double beta, const double p) -> void
@@ -5471,7 +5698,7 @@ compute_prim_dg_electron_repulsion_31(CSimdMatrix &buffer, const size_t target, 
 }
 
 auto
-compute_prim_dg_electron_repulsion_32(CSimdMatrix &buffer, const size_t target, const size_t pb,
+compute_prim_dg_electron_repulsion_33(CSimdMatrix &buffer, const size_t target, const size_t pb,
                                       const size_t pf, const size_t dd0, const size_t dd1,
                                       const size_t df, const size_t ncols, const double alpha,
                                       const double beta, const double p) -> void
@@ -5621,7 +5848,7 @@ compute_prim_dg_electron_repulsion_32(CSimdMatrix &buffer, const size_t target, 
 }
 
 auto
-compute_prim_dg_electron_repulsion_33(CSimdMatrix &buffer, const size_t target, const size_t pb,
+compute_prim_dg_electron_repulsion_34(CSimdMatrix &buffer, const size_t target, const size_t pb,
                                       const size_t pf, const size_t dd0, const size_t dd1,
                                       const size_t df, const size_t ncols, const double alpha,
                                       const double beta, const double p) -> void

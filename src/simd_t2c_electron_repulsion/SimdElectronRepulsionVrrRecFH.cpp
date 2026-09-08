@@ -2108,7 +2108,728 @@ compute_prim_fh_electron_repulsion_1(CSimdMatrix &buffer, const size_t target, c
 }
 
 auto
-compute_prim_fh_electron_repulsion_2(CSimdMatrix &buffer, const size_t target, const size_t pa,
+compute_prim_fh_electron_repulsion_2(CSimdMatrix &buffer, const size_t target, const size_t pb,
+                                     const size_t dg, const size_t ff0, const size_t ff1,
+                                     const size_t fg, const size_t ncols, const double alpha,
+                                     const double beta, const double p) -> void
+{
+    // NOTE: the factors are fixed by the pair of primitives, so they are formed
+    // once rather than for every atom pair the pair reaches.
+
+    const auto f_0 = 1.5 / p;
+    const auto f_1 = 2.0 / beta;
+    const auto f_2 = 2.0 * alpha / (beta * p);
+    const auto f_3 = 0.5 / beta;
+    const auto f_4 = 0.5 * alpha / (beta * p);
+    const auto f_5 = 1.0 / beta;
+    const auto f_6 = alpha / (beta * p);
+
+    auto *t_0 = buffer.data(target + 0);
+    auto *t_1 = buffer.data(target + 1);
+    auto *t_2 = buffer.data(target + 2);
+    auto *t_3 = buffer.data(target + 3);
+    auto *t_4 = buffer.data(target + 4);
+    auto *t_5 = buffer.data(target + 5);
+    auto *t_6 = buffer.data(target + 6);
+    auto *t_7 = buffer.data(target + 7);
+    auto *t_8 = buffer.data(target + 8);
+    auto *t_9 = buffer.data(target + 9);
+    auto *t_10 = buffer.data(target + 10);
+    auto *t_11 = buffer.data(target + 11);
+    auto *t_12 = buffer.data(target + 12);
+    auto *t_13 = buffer.data(target + 13);
+    auto *t_14 = buffer.data(target + 14);
+    auto *t_15 = buffer.data(target + 15);
+    auto *t_16 = buffer.data(target + 16);
+    auto *t_17 = buffer.data(target + 17);
+    auto *t_18 = buffer.data(target + 18);
+    auto *t_19 = buffer.data(target + 19);
+    auto *t_20 = buffer.data(target + 20);
+    auto *t_21 = buffer.data(target + 21);
+    auto *t_22 = buffer.data(target + 22);
+    auto *t_23 = buffer.data(target + 23);
+    auto *t_24 = buffer.data(target + 24);
+    auto *t_25 = buffer.data(target + 25);
+    auto *t_26 = buffer.data(target + 26);
+    auto *t_27 = buffer.data(target + 27);
+    auto *t_28 = buffer.data(target + 28);
+    auto *t_29 = buffer.data(target + 29);
+    auto *t_30 = buffer.data(target + 30);
+    auto *t_31 = buffer.data(target + 31);
+    auto *t_32 = buffer.data(target + 32);
+    auto *t_33 = buffer.data(target + 33);
+    auto *t_34 = buffer.data(target + 34);
+    auto *t_35 = buffer.data(target + 35);
+    auto *t_36 = buffer.data(target + 36);
+    auto *t_37 = buffer.data(target + 37);
+    auto *t_38 = buffer.data(target + 38);
+
+    const auto *pb_x = buffer.data(pb + 0);
+    const auto *pb_y = buffer.data(pb + 1);
+    const auto *pb_z = buffer.data(pb + 2);
+
+    const auto *dg_0 = buffer.data(dg + 0);
+    const auto *dg_14 = buffer.data(dg + 14);
+    const auto *dg_26 = buffer.data(dg + 26);
+
+    const auto *ff0_0 = buffer.data(ff0 + 0);
+    const auto *ff0_1 = buffer.data(ff0 + 1);
+    const auto *ff0_2 = buffer.data(ff0 + 2);
+    const auto *ff0_3 = buffer.data(ff0 + 3);
+    const auto *ff0_4 = buffer.data(ff0 + 4);
+    const auto *ff0_5 = buffer.data(ff0 + 5);
+    const auto *ff0_6 = buffer.data(ff0 + 6);
+    const auto *ff0_7 = buffer.data(ff0 + 7);
+    const auto *ff0_8 = buffer.data(ff0 + 8);
+    const auto *ff0_9 = buffer.data(ff0 + 9);
+    const auto *ff0_10 = buffer.data(ff0 + 10);
+    const auto *ff0_11 = buffer.data(ff0 + 11);
+    const auto *ff0_12 = buffer.data(ff0 + 12);
+    const auto *ff0_13 = buffer.data(ff0 + 13);
+    const auto *ff0_14 = buffer.data(ff0 + 14);
+    const auto *ff0_15 = buffer.data(ff0 + 15);
+    const auto *ff0_16 = buffer.data(ff0 + 16);
+    const auto *ff0_17 = buffer.data(ff0 + 17);
+
+    const auto *ff1_0 = buffer.data(ff1 + 0);
+    const auto *ff1_1 = buffer.data(ff1 + 1);
+    const auto *ff1_2 = buffer.data(ff1 + 2);
+    const auto *ff1_3 = buffer.data(ff1 + 3);
+    const auto *ff1_4 = buffer.data(ff1 + 4);
+    const auto *ff1_5 = buffer.data(ff1 + 5);
+    const auto *ff1_6 = buffer.data(ff1 + 6);
+    const auto *ff1_7 = buffer.data(ff1 + 7);
+    const auto *ff1_8 = buffer.data(ff1 + 8);
+    const auto *ff1_9 = buffer.data(ff1 + 9);
+    const auto *ff1_10 = buffer.data(ff1 + 10);
+    const auto *ff1_11 = buffer.data(ff1 + 11);
+    const auto *ff1_12 = buffer.data(ff1 + 12);
+    const auto *ff1_13 = buffer.data(ff1 + 13);
+    const auto *ff1_14 = buffer.data(ff1 + 14);
+    const auto *ff1_15 = buffer.data(ff1 + 15);
+    const auto *ff1_16 = buffer.data(ff1 + 16);
+    const auto *ff1_17 = buffer.data(ff1 + 17);
+
+    const auto *fg_0 = buffer.data(fg + 0);
+    const auto *fg_1 = buffer.data(fg + 1);
+    const auto *fg_2 = buffer.data(fg + 2);
+    const auto *fg_3 = buffer.data(fg + 3);
+    const auto *fg_4 = buffer.data(fg + 4);
+    const auto *fg_5 = buffer.data(fg + 5);
+    const auto *fg_6 = buffer.data(fg + 6);
+    const auto *fg_7 = buffer.data(fg + 7);
+    const auto *fg_8 = buffer.data(fg + 8);
+    const auto *fg_9 = buffer.data(fg + 9);
+    const auto *fg_10 = buffer.data(fg + 10);
+    const auto *fg_11 = buffer.data(fg + 11);
+    const auto *fg_12 = buffer.data(fg + 12);
+    const auto *fg_13 = buffer.data(fg + 13);
+    const auto *fg_14 = buffer.data(fg + 14);
+    const auto *fg_15 = buffer.data(fg + 15);
+    const auto *fg_16 = buffer.data(fg + 16);
+    const auto *fg_17 = buffer.data(fg + 17);
+    const auto *fg_18 = buffer.data(fg + 18);
+    const auto *fg_19 = buffer.data(fg + 19);
+    const auto *fg_20 = buffer.data(fg + 20);
+    const auto *fg_21 = buffer.data(fg + 21);
+    const auto *fg_22 = buffer.data(fg + 22);
+    const auto *fg_23 = buffer.data(fg + 23);
+    const auto *fg_24 = buffer.data(fg + 24);
+    const auto *fg_25 = buffer.data(fg + 25);
+    const auto *fg_26 = buffer.data(fg + 26);
+
+#pragma omp simd aligned(t_0, t_1, t_2, t_3, t_4, pb_x, pb_y, pb_z, dg_0, ff0_0, ff1_0, fg_0, \
+                         fg_1, fg_2 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_0[k] = f_0 * dg_0[k]
+                 + f_1 * ff0_0[k]
+                 - f_2 * ff1_0[k]
+                 + pb_x[k] * fg_0[k];
+
+        t_1[k] = pb_y[k] * fg_0[k];
+
+        t_2[k] = pb_z[k] * fg_0[k];
+
+        t_3[k] = f_3 * ff0_0[k]
+                 - f_4 * ff1_0[k]
+                 + pb_y[k] * fg_1[k];
+
+        t_4[k] = f_3 * ff0_0[k]
+                 - f_4 * ff1_0[k]
+                 + pb_z[k] * fg_2[k];
+    }
+
+#pragma omp simd aligned(t_5, t_6, t_7, t_8, pb_y, pb_z, ff0_1, ff0_2, ff0_3, ff1_1, ff1_2, \
+                         ff1_3, fg_3, fg_4, fg_5 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_5[k] = f_5 * ff0_1[k]
+                 - f_6 * ff1_1[k]
+                 + pb_y[k] * fg_3[k];
+
+        t_6[k] = pb_y[k] * fg_4[k];
+
+        t_7[k] = f_5 * ff0_2[k]
+                 - f_6 * ff1_2[k]
+                 + pb_z[k] * fg_4[k];
+
+        t_8[k] = f_1 * ff0_3[k]
+                 - f_2 * ff1_3[k]
+                 + pb_y[k] * fg_5[k];
+    }
+
+#pragma omp simd aligned(t_9, t_10, t_11, t_12, pb_y, pb_z, ff0_4, ff0_5, ff1_4, ff1_5, fg_6, \
+                         fg_7, fg_8 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_9[k] = f_5 * ff0_4[k]
+                 - f_6 * ff1_4[k]
+                 + pb_y[k] * fg_6[k];
+
+        t_10[k] = f_3 * ff0_5[k]
+                  - f_4 * ff1_5[k]
+                  + pb_y[k] * fg_7[k];
+
+        t_11[k] = pb_y[k] * fg_8[k];
+
+        t_12[k] = f_1 * ff0_5[k]
+                  - f_2 * ff1_5[k]
+                  + pb_z[k] * fg_8[k];
+    }
+
+#pragma omp simd aligned(t_13, t_14, t_15, pb_x, ff0_6, ff0_7, ff0_8, ff1_6, ff1_7, ff1_8, \
+                         fg_9, fg_10, fg_11 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_13[k] = f_1 * ff0_6[k]
+                  - f_2 * ff1_6[k]
+                  + pb_x[k] * fg_9[k];
+
+        t_14[k] = f_5 * ff0_7[k]
+                  - f_6 * ff1_7[k]
+                  + pb_x[k] * fg_10[k];
+
+        t_15[k] = f_5 * ff0_8[k]
+                  - f_6 * ff1_8[k]
+                  + pb_x[k] * fg_11[k];
+    }
+
+#pragma omp simd aligned(t_16, t_17, t_18, t_19, t_20, pb_x, ff0_9, ff0_11, ff1_9, ff1_11, \
+                         fg_12, fg_13, fg_14, fg_16, fg_17 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_16[k] = f_3 * ff0_9[k]
+                  - f_4 * ff1_9[k]
+                  + pb_x[k] * fg_12[k];
+
+        t_17[k] = f_3 * ff0_11[k]
+                  - f_4 * ff1_11[k]
+                  + pb_x[k] * fg_13[k];
+
+        t_18[k] = pb_x[k] * fg_14[k];
+
+        t_19[k] = pb_x[k] * fg_16[k];
+
+        t_20[k] = pb_x[k] * fg_17[k];
+    }
+
+#pragma omp simd aligned(t_21, t_22, t_23, t_24, pb_y, pb_z, dg_14, ff0_9, ff0_10, ff1_9, \
+                         ff1_10, fg_14, fg_15, fg_16 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_21[k] = f_0 * dg_14[k]
+                  + f_1 * ff0_9[k]
+                  - f_2 * ff1_9[k]
+                  + pb_y[k] * fg_14[k];
+
+        t_22[k] = pb_z[k] * fg_14[k];
+
+        t_23[k] = f_3 * ff0_9[k]
+                  - f_4 * ff1_9[k]
+                  + pb_z[k] * fg_15[k];
+
+        t_24[k] = f_5 * ff0_10[k]
+                  - f_6 * ff1_10[k]
+                  + pb_z[k] * fg_16[k];
+    }
+
+#pragma omp simd aligned(t_25, t_26, t_27, pb_x, pb_z, ff0_11, ff0_12, ff0_13, ff1_11, ff1_12, \
+                         ff1_13, fg_17, fg_18, fg_19 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_25[k] = f_1 * ff0_11[k]
+                  - f_2 * ff1_11[k]
+                  + pb_z[k] * fg_17[k];
+
+        t_26[k] = f_1 * ff0_12[k]
+                  - f_2 * ff1_12[k]
+                  + pb_x[k] * fg_18[k];
+
+        t_27[k] = f_5 * ff0_13[k]
+                  - f_6 * ff1_13[k]
+                  + pb_x[k] * fg_19[k];
+    }
+
+#pragma omp simd aligned(t_28, t_29, t_30, t_31, pb_x, ff0_14, ff0_15, ff0_17, ff1_14, ff1_15, \
+                         ff1_17, fg_20, fg_21, fg_22, fg_23 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_28[k] = f_5 * ff0_14[k]
+                  - f_6 * ff1_14[k]
+                  + pb_x[k] * fg_20[k];
+
+        t_29[k] = f_3 * ff0_15[k]
+                  - f_4 * ff1_15[k]
+                  + pb_x[k] * fg_21[k];
+
+        t_30[k] = f_3 * ff0_17[k]
+                  - f_4 * ff1_17[k]
+                  + pb_x[k] * fg_22[k];
+
+        t_31[k] = pb_x[k] * fg_23[k];
+    }
+
+#pragma omp simd aligned(t_32, t_33, t_34, t_35, pb_x, pb_y, ff0_15, ff0_16, ff1_15, ff1_16, \
+                         fg_23, fg_24, fg_26 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_32[k] = pb_x[k] * fg_24[k];
+
+        t_33[k] = pb_x[k] * fg_26[k];
+
+        t_34[k] = f_1 * ff0_15[k]
+                  - f_2 * ff1_15[k]
+                  + pb_y[k] * fg_23[k];
+
+        t_35[k] = f_5 * ff0_16[k]
+                  - f_6 * ff1_16[k]
+                  + pb_y[k] * fg_24[k];
+    }
+
+#pragma omp simd aligned(t_36, t_37, t_38, pb_y, pb_z, dg_26, ff0_17, ff1_17, fg_25, \
+                         fg_26 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_36[k] = f_3 * ff0_17[k]
+                  - f_4 * ff1_17[k]
+                  + pb_y[k] * fg_25[k];
+
+        t_37[k] = pb_y[k] * fg_26[k];
+
+        t_38[k] = f_0 * dg_26[k]
+                  + f_1 * ff0_17[k]
+                  - f_2 * ff1_17[k]
+                  + pb_z[k] * fg_26[k];
+    }
+}
+
+auto
+compute_prim_fh_electron_repulsion_3(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                     const size_t pb, const size_t dg, const size_t dh,
+                                     const size_t ff0, const size_t ff1, const size_t fg,
+                                     const size_t ncols, const double alpha, const double beta,
+                                     const double p) -> void
+{
+    // NOTE: the factors are fixed by the pair of primitives, so they are formed
+    // once rather than for every atom pair the pair reaches.
+
+    const auto f_0 = 1.5 / p;
+    const auto f_1 = 2.0 / beta;
+    const auto f_2 = 2.0 * alpha / (beta * p);
+    const auto f_3 = 0.5 / beta;
+    const auto f_4 = 0.5 * alpha / (beta * p);
+    const auto f_5 = 1.0 / beta;
+    const auto f_6 = alpha / (beta * p);
+    const auto f_7 = 2.5 / p;
+
+    auto *t_0 = buffer.data(target + 0);
+    auto *t_1 = buffer.data(target + 1);
+    auto *t_2 = buffer.data(target + 2);
+    auto *t_3 = buffer.data(target + 3);
+    auto *t_4 = buffer.data(target + 4);
+    auto *t_5 = buffer.data(target + 5);
+    auto *t_6 = buffer.data(target + 6);
+    auto *t_7 = buffer.data(target + 7);
+    auto *t_8 = buffer.data(target + 8);
+    auto *t_9 = buffer.data(target + 9);
+    auto *t_10 = buffer.data(target + 10);
+    auto *t_11 = buffer.data(target + 11);
+    auto *t_12 = buffer.data(target + 12);
+    auto *t_13 = buffer.data(target + 13);
+    auto *t_14 = buffer.data(target + 14);
+    auto *t_15 = buffer.data(target + 15);
+    auto *t_16 = buffer.data(target + 16);
+    auto *t_17 = buffer.data(target + 17);
+    auto *t_18 = buffer.data(target + 18);
+    auto *t_19 = buffer.data(target + 19);
+    auto *t_20 = buffer.data(target + 20);
+    auto *t_21 = buffer.data(target + 21);
+    auto *t_22 = buffer.data(target + 22);
+    auto *t_23 = buffer.data(target + 23);
+    auto *t_24 = buffer.data(target + 24);
+    auto *t_25 = buffer.data(target + 25);
+    auto *t_26 = buffer.data(target + 26);
+    auto *t_27 = buffer.data(target + 27);
+    auto *t_28 = buffer.data(target + 28);
+    auto *t_29 = buffer.data(target + 29);
+    auto *t_30 = buffer.data(target + 30);
+    auto *t_31 = buffer.data(target + 31);
+    auto *t_32 = buffer.data(target + 32);
+    auto *t_33 = buffer.data(target + 33);
+    auto *t_34 = buffer.data(target + 34);
+    auto *t_35 = buffer.data(target + 35);
+    auto *t_36 = buffer.data(target + 36);
+    auto *t_37 = buffer.data(target + 37);
+    auto *t_38 = buffer.data(target + 38);
+    auto *t_39 = buffer.data(target + 39);
+    auto *t_40 = buffer.data(target + 40);
+    auto *t_41 = buffer.data(target + 41);
+    auto *t_42 = buffer.data(target + 42);
+    auto *t_43 = buffer.data(target + 43);
+    auto *t_44 = buffer.data(target + 44);
+    auto *t_45 = buffer.data(target + 45);
+    auto *t_46 = buffer.data(target + 46);
+    auto *t_47 = buffer.data(target + 47);
+    auto *t_48 = buffer.data(target + 48);
+    auto *t_49 = buffer.data(target + 49);
+    auto *t_50 = buffer.data(target + 50);
+    auto *t_51 = buffer.data(target + 51);
+    auto *t_52 = buffer.data(target + 52);
+    auto *t_53 = buffer.data(target + 53);
+
+    const auto *pa_x = buffer.data(pa + 0);
+    const auto *pa_y = buffer.data(pa + 1);
+    const auto *pa_z = buffer.data(pa + 2);
+
+    const auto *pb_x = buffer.data(pb + 0);
+    const auto *pb_y = buffer.data(pb + 1);
+    const auto *pb_z = buffer.data(pb + 2);
+
+    const auto *dg_0 = buffer.data(dg + 0);
+    const auto *dg_5 = buffer.data(dg + 5);
+    const auto *dg_8 = buffer.data(dg + 8);
+    const auto *dg_9 = buffer.data(dg + 9);
+    const auto *dg_14 = buffer.data(dg + 14);
+    const auto *dg_17 = buffer.data(dg + 17);
+    const auto *dg_18 = buffer.data(dg + 18);
+    const auto *dg_23 = buffer.data(dg + 23);
+    const auto *dg_26 = buffer.data(dg + 26);
+
+    const auto *dh_0 = buffer.data(dh + 0);
+    const auto *dh_8 = buffer.data(dh + 8);
+    const auto *dh_12 = buffer.data(dh + 12);
+    const auto *dh_14 = buffer.data(dh + 14);
+    const auto *dh_22 = buffer.data(dh + 22);
+    const auto *dh_26 = buffer.data(dh + 26);
+    const auto *dh_29 = buffer.data(dh + 29);
+    const auto *dh_37 = buffer.data(dh + 37);
+    const auto *dh_41 = buffer.data(dh + 41);
+
+    const auto *ff0_0 = buffer.data(ff0 + 0);
+    const auto *ff0_1 = buffer.data(ff0 + 1);
+    const auto *ff0_2 = buffer.data(ff0 + 2);
+    const auto *ff0_3 = buffer.data(ff0 + 3);
+    const auto *ff0_4 = buffer.data(ff0 + 4);
+    const auto *ff0_5 = buffer.data(ff0 + 5);
+    const auto *ff0_6 = buffer.data(ff0 + 6);
+    const auto *ff0_7 = buffer.data(ff0 + 7);
+    const auto *ff0_8 = buffer.data(ff0 + 8);
+    const auto *ff0_9 = buffer.data(ff0 + 9);
+    const auto *ff0_10 = buffer.data(ff0 + 10);
+    const auto *ff0_11 = buffer.data(ff0 + 11);
+    const auto *ff0_12 = buffer.data(ff0 + 12);
+    const auto *ff0_13 = buffer.data(ff0 + 13);
+    const auto *ff0_14 = buffer.data(ff0 + 14);
+    const auto *ff0_15 = buffer.data(ff0 + 15);
+    const auto *ff0_16 = buffer.data(ff0 + 16);
+    const auto *ff0_17 = buffer.data(ff0 + 17);
+
+    const auto *ff1_0 = buffer.data(ff1 + 0);
+    const auto *ff1_1 = buffer.data(ff1 + 1);
+    const auto *ff1_2 = buffer.data(ff1 + 2);
+    const auto *ff1_3 = buffer.data(ff1 + 3);
+    const auto *ff1_4 = buffer.data(ff1 + 4);
+    const auto *ff1_5 = buffer.data(ff1 + 5);
+    const auto *ff1_6 = buffer.data(ff1 + 6);
+    const auto *ff1_7 = buffer.data(ff1 + 7);
+    const auto *ff1_8 = buffer.data(ff1 + 8);
+    const auto *ff1_9 = buffer.data(ff1 + 9);
+    const auto *ff1_10 = buffer.data(ff1 + 10);
+    const auto *ff1_11 = buffer.data(ff1 + 11);
+    const auto *ff1_12 = buffer.data(ff1 + 12);
+    const auto *ff1_13 = buffer.data(ff1 + 13);
+    const auto *ff1_14 = buffer.data(ff1 + 14);
+    const auto *ff1_15 = buffer.data(ff1 + 15);
+    const auto *ff1_16 = buffer.data(ff1 + 16);
+    const auto *ff1_17 = buffer.data(ff1 + 17);
+
+    const auto *fg_0 = buffer.data(fg + 0);
+    const auto *fg_1 = buffer.data(fg + 1);
+    const auto *fg_2 = buffer.data(fg + 2);
+    const auto *fg_3 = buffer.data(fg + 3);
+    const auto *fg_4 = buffer.data(fg + 4);
+    const auto *fg_5 = buffer.data(fg + 5);
+    const auto *fg_6 = buffer.data(fg + 6);
+    const auto *fg_7 = buffer.data(fg + 7);
+    const auto *fg_8 = buffer.data(fg + 8);
+    const auto *fg_9 = buffer.data(fg + 9);
+    const auto *fg_10 = buffer.data(fg + 10);
+    const auto *fg_11 = buffer.data(fg + 11);
+    const auto *fg_12 = buffer.data(fg + 12);
+    const auto *fg_13 = buffer.data(fg + 13);
+    const auto *fg_14 = buffer.data(fg + 14);
+    const auto *fg_15 = buffer.data(fg + 15);
+    const auto *fg_16 = buffer.data(fg + 16);
+    const auto *fg_17 = buffer.data(fg + 17);
+    const auto *fg_18 = buffer.data(fg + 18);
+    const auto *fg_19 = buffer.data(fg + 19);
+    const auto *fg_20 = buffer.data(fg + 20);
+    const auto *fg_21 = buffer.data(fg + 21);
+    const auto *fg_22 = buffer.data(fg + 22);
+    const auto *fg_23 = buffer.data(fg + 23);
+    const auto *fg_24 = buffer.data(fg + 24);
+    const auto *fg_25 = buffer.data(fg + 25);
+    const auto *fg_26 = buffer.data(fg + 26);
+
+#pragma omp simd aligned(t_0, t_1, t_2, t_3, t_4, pb_x, pb_y, pb_z, dg_0, ff0_0, ff1_0, fg_0, \
+                         fg_1, fg_2 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_0[k] = f_0 * dg_0[k]
+                 + f_1 * ff0_0[k]
+                 - f_2 * ff1_0[k]
+                 + pb_x[k] * fg_0[k];
+
+        t_1[k] = pb_y[k] * fg_0[k];
+
+        t_2[k] = pb_z[k] * fg_0[k];
+
+        t_3[k] = f_3 * ff0_0[k]
+                 - f_4 * ff1_0[k]
+                 + pb_y[k] * fg_1[k];
+
+        t_4[k] = f_3 * ff0_0[k]
+                 - f_4 * ff1_0[k]
+                 + pb_z[k] * fg_2[k];
+    }
+
+#pragma omp simd aligned(t_5, t_6, t_7, t_8, pb_y, pb_z, ff0_1, ff0_2, ff0_3, ff1_1, ff1_2, \
+                         ff1_3, fg_3, fg_4, fg_5 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_5[k] = f_5 * ff0_1[k]
+                 - f_6 * ff1_1[k]
+                 + pb_y[k] * fg_3[k];
+
+        t_6[k] = pb_y[k] * fg_4[k];
+
+        t_7[k] = f_5 * ff0_2[k]
+                 - f_6 * ff1_2[k]
+                 + pb_z[k] * fg_4[k];
+
+        t_8[k] = f_1 * ff0_3[k]
+                 - f_2 * ff1_3[k]
+                 + pb_y[k] * fg_5[k];
+    }
+
+#pragma omp simd aligned(t_9, t_10, t_11, t_12, t_13, pa_y, pb_y, pb_z, dh_0, ff0_4, ff0_5, \
+                         ff1_4, ff1_5, fg_6, fg_7, fg_8 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_9[k] = f_5 * ff0_4[k]
+                 - f_6 * ff1_4[k]
+                 + pb_y[k] * fg_6[k];
+
+        t_10[k] = f_3 * ff0_5[k]
+                  - f_4 * ff1_5[k]
+                  + pb_y[k] * fg_7[k];
+
+        t_11[k] = pb_y[k] * fg_8[k];
+
+        t_12[k] = f_1 * ff0_5[k]
+                  - f_2 * ff1_5[k]
+                  + pb_z[k] * fg_8[k];
+
+        t_13[k] = pa_y[k] * dh_0[k];
+    }
+
+#pragma omp simd aligned(t_14, t_15, t_16, t_17, t_18, t_19, pa_x, pa_y, pa_z, dg_5, dg_8, \
+                         dg_9, dh_0, dh_8, dh_12, dh_14 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_14[k] = f_7 * dg_5[k]
+                  + pa_y[k] * dh_8[k];
+
+        t_15[k] = pa_y[k] * dh_12[k];
+
+        t_16[k] = pa_z[k] * dh_0[k];
+
+        t_17[k] = pa_z[k] * dh_8[k];
+
+        t_18[k] = f_7 * dg_8[k]
+                  + pa_z[k] * dh_12[k];
+
+        t_19[k] = f_7 * dg_9[k]
+                  + pa_x[k] * dh_14[k];
+    }
+
+#pragma omp simd aligned(t_20, t_21, t_22, t_23, pa_x, pb_x, dg_18, dh_22, dh_29, dh_41, \
+                         ff0_6, ff1_6, fg_9 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_20[k] = pa_x[k] * dh_22[k];
+
+        t_21[k] = f_7 * dg_18[k]
+                  + pa_x[k] * dh_29[k];
+
+        t_22[k] = pa_x[k] * dh_41[k];
+
+        t_23[k] = f_1 * ff0_6[k]
+                  - f_2 * ff1_6[k]
+                  + pb_x[k] * fg_9[k];
+    }
+
+#pragma omp simd aligned(t_24, t_25, t_26, pb_x, ff0_7, ff0_8, ff0_9, ff1_7, ff1_8, ff1_9, \
+                         fg_10, fg_11, fg_12 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_24[k] = f_5 * ff0_7[k]
+                  - f_6 * ff1_7[k]
+                  + pb_x[k] * fg_10[k];
+
+        t_25[k] = f_5 * ff0_8[k]
+                  - f_6 * ff1_8[k]
+                  + pb_x[k] * fg_11[k];
+
+        t_26[k] = f_3 * ff0_9[k]
+                  - f_4 * ff1_9[k]
+                  + pb_x[k] * fg_12[k];
+    }
+
+#pragma omp simd aligned(t_27, t_28, t_29, t_30, t_31, pb_x, pb_y, dg_14, ff0_9, ff0_11, \
+                         ff1_9, ff1_11, fg_13, fg_14, fg_16, fg_17 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_27[k] = f_3 * ff0_11[k]
+                  - f_4 * ff1_11[k]
+                  + pb_x[k] * fg_13[k];
+
+        t_28[k] = pb_x[k] * fg_14[k];
+
+        t_29[k] = pb_x[k] * fg_16[k];
+
+        t_30[k] = pb_x[k] * fg_17[k];
+
+        t_31[k] = f_0 * dg_14[k]
+                  + f_1 * ff0_9[k]
+                  - f_2 * ff1_9[k]
+                  + pb_y[k] * fg_14[k];
+    }
+
+#pragma omp simd aligned(t_32, t_33, t_34, t_35, pb_z, ff0_9, ff0_10, ff0_11, ff1_9, ff1_10, \
+                         ff1_11, fg_14, fg_15, fg_16, fg_17 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_32[k] = pb_z[k] * fg_14[k];
+
+        t_33[k] = f_3 * ff0_9[k]
+                  - f_4 * ff1_9[k]
+                  + pb_z[k] * fg_15[k];
+
+        t_34[k] = f_5 * ff0_10[k]
+                  - f_6 * ff1_10[k]
+                  + pb_z[k] * fg_16[k];
+
+        t_35[k] = f_1 * ff0_11[k]
+                  - f_2 * ff1_11[k]
+                  + pb_z[k] * fg_17[k];
+    }
+
+#pragma omp simd aligned(t_36, t_37, t_38, t_39, t_40, pa_y, pa_z, dg_17, dg_23, dh_14, dh_22, \
+                         dh_26, dh_37, dh_41 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_36[k] = pa_z[k] * dh_14[k];
+
+        t_37[k] = pa_z[k] * dh_22[k];
+
+        t_38[k] = f_7 * dg_17[k]
+                  + pa_z[k] * dh_26[k];
+
+        t_39[k] = f_7 * dg_23[k]
+                  + pa_y[k] * dh_37[k];
+
+        t_40[k] = pa_y[k] * dh_41[k];
+    }
+
+#pragma omp simd aligned(t_41, t_42, t_43, pb_x, ff0_12, ff0_13, ff0_14, ff1_12, ff1_13, \
+                         ff1_14, fg_18, fg_19, fg_20 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_41[k] = f_1 * ff0_12[k]
+                  - f_2 * ff1_12[k]
+                  + pb_x[k] * fg_18[k];
+
+        t_42[k] = f_5 * ff0_13[k]
+                  - f_6 * ff1_13[k]
+                  + pb_x[k] * fg_19[k];
+
+        t_43[k] = f_5 * ff0_14[k]
+                  - f_6 * ff1_14[k]
+                  + pb_x[k] * fg_20[k];
+    }
+
+#pragma omp simd aligned(t_44, t_45, t_46, t_47, t_48, pb_x, ff0_15, ff0_17, ff1_15, ff1_17, \
+                         fg_21, fg_22, fg_23, fg_24, fg_26 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_44[k] = f_3 * ff0_15[k]
+                  - f_4 * ff1_15[k]
+                  + pb_x[k] * fg_21[k];
+
+        t_45[k] = f_3 * ff0_17[k]
+                  - f_4 * ff1_17[k]
+                  + pb_x[k] * fg_22[k];
+
+        t_46[k] = pb_x[k] * fg_23[k];
+
+        t_47[k] = pb_x[k] * fg_24[k];
+
+        t_48[k] = pb_x[k] * fg_26[k];
+    }
+
+#pragma omp simd aligned(t_49, t_50, t_51, t_52, pb_y, ff0_15, ff0_16, ff0_17, ff1_15, ff1_16, \
+                         ff1_17, fg_23, fg_24, fg_25, fg_26 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_49[k] = f_1 * ff0_15[k]
+                  - f_2 * ff1_15[k]
+                  + pb_y[k] * fg_23[k];
+
+        t_50[k] = f_5 * ff0_16[k]
+                  - f_6 * ff1_16[k]
+                  + pb_y[k] * fg_24[k];
+
+        t_51[k] = f_3 * ff0_17[k]
+                  - f_4 * ff1_17[k]
+                  + pb_y[k] * fg_25[k];
+
+        t_52[k] = pb_y[k] * fg_26[k];
+    }
+
+#pragma omp simd aligned(t_53, pb_z, dg_26, ff0_17, ff1_17, fg_26 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_53[k] = f_0 * dg_26[k]
+                  + f_1 * ff0_17[k]
+                  - f_2 * ff1_17[k]
+                  + pb_z[k] * fg_26[k];
+    }
+}
+
+auto
+compute_prim_fh_electron_repulsion_4(CSimdMatrix &buffer, const size_t target, const size_t pa,
                                      const size_t pb, const size_t dg, const size_t dh,
                                      const size_t ff0, const size_t ff1, const size_t fg,
                                      const size_t ncols, const double alpha, const double beta,
@@ -2698,7 +3419,7 @@ compute_prim_fh_electron_repulsion_2(CSimdMatrix &buffer, const size_t target, c
 }
 
 auto
-compute_prim_fh_electron_repulsion_3(CSimdMatrix &buffer, const size_t target, const size_t pa,
+compute_prim_fh_electron_repulsion_5(CSimdMatrix &buffer, const size_t target, const size_t pa,
                                      const size_t pb, const size_t dg, const size_t dh,
                                      const size_t ff0, const size_t ff1, const size_t fg,
                                      const size_t ncols, const double alpha, const double beta,
@@ -3517,7 +4238,7 @@ compute_prim_fh_electron_repulsion_3(CSimdMatrix &buffer, const size_t target, c
 }
 
 auto
-compute_prim_fh_electron_repulsion_4(CSimdMatrix &buffer, const size_t target, const size_t pa,
+compute_prim_fh_electron_repulsion_6(CSimdMatrix &buffer, const size_t target, const size_t pa,
                                      const size_t pb, const size_t dg, const size_t dh,
                                      const size_t ff0, const size_t ff1, const size_t fg,
                                      const size_t ncols, const double alpha, const double beta,
@@ -4097,11 +4818,2906 @@ compute_prim_fh_electron_repulsion_4(CSimdMatrix &buffer, const size_t target, c
 }
 
 auto
-compute_prim_fh_electron_repulsion_5(CSimdMatrix &buffer, const size_t target, const size_t pa,
+compute_prim_fh_electron_repulsion_7(CSimdMatrix &buffer, const size_t target, const size_t pa,
                                      const size_t pb, const size_t dg, const size_t dh,
                                      const size_t ff0, const size_t ff1, const size_t fg,
                                      const size_t ncols, const double alpha, const double beta,
                                      const double p) -> void
+{
+    // NOTE: the factors are fixed by the pair of primitives, so they are formed
+    // once rather than for every atom pair the pair reaches.
+
+    const auto f_0 = 1.5 / p;
+    const auto f_1 = 2.0 / beta;
+    const auto f_2 = 2.0 * alpha / (beta * p);
+    const auto f_3 = 0.5 / beta;
+    const auto f_4 = 0.5 * alpha / (beta * p);
+    const auto f_5 = 1.0 / beta;
+    const auto f_6 = alpha / (beta * p);
+
+    auto *t_0 = buffer.data(target + 0);
+    auto *t_1 = buffer.data(target + 1);
+    auto *t_2 = buffer.data(target + 2);
+    auto *t_3 = buffer.data(target + 3);
+    auto *t_4 = buffer.data(target + 4);
+    auto *t_5 = buffer.data(target + 5);
+    auto *t_6 = buffer.data(target + 6);
+    auto *t_7 = buffer.data(target + 7);
+    auto *t_8 = buffer.data(target + 8);
+    auto *t_9 = buffer.data(target + 9);
+    auto *t_10 = buffer.data(target + 10);
+    auto *t_11 = buffer.data(target + 11);
+    auto *t_12 = buffer.data(target + 12);
+    auto *t_13 = buffer.data(target + 13);
+    auto *t_14 = buffer.data(target + 14);
+    auto *t_15 = buffer.data(target + 15);
+    auto *t_16 = buffer.data(target + 16);
+    auto *t_17 = buffer.data(target + 17);
+    auto *t_18 = buffer.data(target + 18);
+    auto *t_19 = buffer.data(target + 19);
+    auto *t_20 = buffer.data(target + 20);
+    auto *t_21 = buffer.data(target + 21);
+    auto *t_22 = buffer.data(target + 22);
+    auto *t_23 = buffer.data(target + 23);
+    auto *t_24 = buffer.data(target + 24);
+    auto *t_25 = buffer.data(target + 25);
+    auto *t_26 = buffer.data(target + 26);
+    auto *t_27 = buffer.data(target + 27);
+    auto *t_28 = buffer.data(target + 28);
+    auto *t_29 = buffer.data(target + 29);
+    auto *t_30 = buffer.data(target + 30);
+    auto *t_31 = buffer.data(target + 31);
+    auto *t_32 = buffer.data(target + 32);
+    auto *t_33 = buffer.data(target + 33);
+    auto *t_34 = buffer.data(target + 34);
+    auto *t_35 = buffer.data(target + 35);
+    auto *t_36 = buffer.data(target + 36);
+    auto *t_37 = buffer.data(target + 37);
+    auto *t_38 = buffer.data(target + 38);
+    auto *t_39 = buffer.data(target + 39);
+    auto *t_40 = buffer.data(target + 40);
+    auto *t_41 = buffer.data(target + 41);
+    auto *t_42 = buffer.data(target + 42);
+    auto *t_43 = buffer.data(target + 43);
+    auto *t_44 = buffer.data(target + 44);
+
+    const auto *pa_x = buffer.data(pa + 0);
+    const auto *pa_y = buffer.data(pa + 1);
+    const auto *pa_z = buffer.data(pa + 2);
+
+    const auto *pb_x = buffer.data(pb + 0);
+    const auto *pb_y = buffer.data(pb + 1);
+    const auto *pb_z = buffer.data(pb + 2);
+
+    const auto *dg_0 = buffer.data(dg + 0);
+    const auto *dg_14 = buffer.data(dg + 14);
+    const auto *dg_26 = buffer.data(dg + 26);
+
+    const auto *dh_0 = buffer.data(dh + 0);
+    const auto *dh_26 = buffer.data(dh + 26);
+    const auto *dh_47 = buffer.data(dh + 47);
+
+    const auto *ff0_0 = buffer.data(ff0 + 0);
+    const auto *ff0_1 = buffer.data(ff0 + 1);
+    const auto *ff0_2 = buffer.data(ff0 + 2);
+    const auto *ff0_3 = buffer.data(ff0 + 3);
+    const auto *ff0_4 = buffer.data(ff0 + 4);
+    const auto *ff0_5 = buffer.data(ff0 + 5);
+    const auto *ff0_10 = buffer.data(ff0 + 10);
+    const auto *ff0_11 = buffer.data(ff0 + 11);
+    const auto *ff0_12 = buffer.data(ff0 + 12);
+    const auto *ff0_13 = buffer.data(ff0 + 13);
+    const auto *ff0_14 = buffer.data(ff0 + 14);
+    const auto *ff0_15 = buffer.data(ff0 + 15);
+    const auto *ff0_18 = buffer.data(ff0 + 18);
+    const auto *ff0_19 = buffer.data(ff0 + 19);
+    const auto *ff0_20 = buffer.data(ff0 + 20);
+    const auto *ff0_21 = buffer.data(ff0 + 21);
+    const auto *ff0_22 = buffer.data(ff0 + 22);
+    const auto *ff0_23 = buffer.data(ff0 + 23);
+
+    const auto *ff1_0 = buffer.data(ff1 + 0);
+    const auto *ff1_1 = buffer.data(ff1 + 1);
+    const auto *ff1_2 = buffer.data(ff1 + 2);
+    const auto *ff1_3 = buffer.data(ff1 + 3);
+    const auto *ff1_4 = buffer.data(ff1 + 4);
+    const auto *ff1_5 = buffer.data(ff1 + 5);
+    const auto *ff1_12 = buffer.data(ff1 + 12);
+    const auto *ff1_13 = buffer.data(ff1 + 13);
+    const auto *ff1_14 = buffer.data(ff1 + 14);
+    const auto *ff1_15 = buffer.data(ff1 + 15);
+    const auto *ff1_16 = buffer.data(ff1 + 16);
+    const auto *ff1_17 = buffer.data(ff1 + 17);
+    const auto *ff1_21 = buffer.data(ff1 + 21);
+    const auto *ff1_22 = buffer.data(ff1 + 22);
+    const auto *ff1_23 = buffer.data(ff1 + 23);
+    const auto *ff1_24 = buffer.data(ff1 + 24);
+    const auto *ff1_25 = buffer.data(ff1 + 25);
+    const auto *ff1_26 = buffer.data(ff1 + 26);
+
+    const auto *fg_0 = buffer.data(fg + 0);
+    const auto *fg_1 = buffer.data(fg + 1);
+    const auto *fg_2 = buffer.data(fg + 2);
+    const auto *fg_3 = buffer.data(fg + 3);
+    const auto *fg_4 = buffer.data(fg + 4);
+    const auto *fg_5 = buffer.data(fg + 5);
+    const auto *fg_6 = buffer.data(fg + 6);
+    const auto *fg_7 = buffer.data(fg + 7);
+    const auto *fg_8 = buffer.data(fg + 8);
+    const auto *fg_17 = buffer.data(fg + 17);
+    const auto *fg_18 = buffer.data(fg + 18);
+    const auto *fg_19 = buffer.data(fg + 19);
+    const auto *fg_20 = buffer.data(fg + 20);
+    const auto *fg_21 = buffer.data(fg + 21);
+    const auto *fg_22 = buffer.data(fg + 22);
+    const auto *fg_23 = buffer.data(fg + 23);
+    const auto *fg_24 = buffer.data(fg + 24);
+    const auto *fg_25 = buffer.data(fg + 25);
+    const auto *fg_30 = buffer.data(fg + 30);
+    const auto *fg_31 = buffer.data(fg + 31);
+    const auto *fg_32 = buffer.data(fg + 32);
+    const auto *fg_33 = buffer.data(fg + 33);
+    const auto *fg_34 = buffer.data(fg + 34);
+    const auto *fg_35 = buffer.data(fg + 35);
+    const auto *fg_36 = buffer.data(fg + 36);
+    const auto *fg_37 = buffer.data(fg + 37);
+    const auto *fg_38 = buffer.data(fg + 38);
+
+#pragma omp simd aligned(t_0, t_1, t_2, t_3, t_4, pb_x, pb_y, pb_z, dg_0, ff0_0, ff1_0, fg_0, \
+                         fg_1, fg_2 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_0[k] = f_0 * dg_0[k]
+                 + f_1 * ff0_0[k]
+                 - f_2 * ff1_0[k]
+                 + pb_x[k] * fg_0[k];
+
+        t_1[k] = pb_y[k] * fg_0[k];
+
+        t_2[k] = pb_z[k] * fg_0[k];
+
+        t_3[k] = f_3 * ff0_0[k]
+                 - f_4 * ff1_0[k]
+                 + pb_y[k] * fg_1[k];
+
+        t_4[k] = f_3 * ff0_0[k]
+                 - f_4 * ff1_0[k]
+                 + pb_z[k] * fg_2[k];
+    }
+
+#pragma omp simd aligned(t_5, t_6, t_7, t_8, pb_y, pb_z, ff0_1, ff0_2, ff0_3, ff1_1, ff1_2, \
+                         ff1_3, fg_3, fg_4, fg_5 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_5[k] = f_5 * ff0_1[k]
+                 - f_6 * ff1_1[k]
+                 + pb_y[k] * fg_3[k];
+
+        t_6[k] = pb_y[k] * fg_4[k];
+
+        t_7[k] = f_5 * ff0_2[k]
+                 - f_6 * ff1_2[k]
+                 + pb_z[k] * fg_4[k];
+
+        t_8[k] = f_1 * ff0_3[k]
+                 - f_2 * ff1_3[k]
+                 + pb_y[k] * fg_5[k];
+    }
+
+#pragma omp simd aligned(t_9, t_10, t_11, t_12, t_13, pa_y, pb_y, pb_z, dh_0, ff0_4, ff0_5, \
+                         ff1_4, ff1_5, fg_6, fg_7, fg_8 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_9[k] = f_5 * ff0_4[k]
+                 - f_6 * ff1_4[k]
+                 + pb_y[k] * fg_6[k];
+
+        t_10[k] = f_3 * ff0_5[k]
+                  - f_4 * ff1_5[k]
+                  + pb_y[k] * fg_7[k];
+
+        t_11[k] = pb_y[k] * fg_8[k];
+
+        t_12[k] = f_1 * ff0_5[k]
+                  - f_2 * ff1_5[k]
+                  + pb_z[k] * fg_8[k];
+
+        t_13[k] = pa_y[k] * dh_0[k];
+    }
+
+#pragma omp simd aligned(t_14, t_15, t_16, t_17, pa_x, pa_z, pb_x, dh_0, dh_26, dh_47, ff0_10, \
+                         ff1_12, fg_17 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_14[k] = pa_z[k] * dh_0[k];
+
+        t_15[k] = pa_x[k] * dh_26[k];
+
+        t_16[k] = pa_x[k] * dh_47[k];
+
+        t_17[k] = f_1 * ff0_10[k]
+                  - f_2 * ff1_12[k]
+                  + pb_x[k] * fg_17[k];
+    }
+
+#pragma omp simd aligned(t_18, t_19, t_20, pb_x, ff0_11, ff0_12, ff0_13, ff1_13, ff1_14, \
+                         ff1_15, fg_18, fg_19, fg_20 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_18[k] = f_5 * ff0_11[k]
+                  - f_6 * ff1_13[k]
+                  + pb_x[k] * fg_18[k];
+
+        t_19[k] = f_5 * ff0_12[k]
+                  - f_6 * ff1_14[k]
+                  + pb_x[k] * fg_19[k];
+
+        t_20[k] = f_3 * ff0_13[k]
+                  - f_4 * ff1_15[k]
+                  + pb_x[k] * fg_20[k];
+    }
+
+#pragma omp simd aligned(t_21, t_22, t_23, t_24, t_25, pb_x, pb_y, dg_14, ff0_13, ff0_15, \
+                         ff1_15, ff1_17, fg_21, fg_22, fg_24, fg_25 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_21[k] = f_3 * ff0_15[k]
+                  - f_4 * ff1_17[k]
+                  + pb_x[k] * fg_21[k];
+
+        t_22[k] = pb_x[k] * fg_22[k];
+
+        t_23[k] = pb_x[k] * fg_24[k];
+
+        t_24[k] = pb_x[k] * fg_25[k];
+
+        t_25[k] = f_0 * dg_14[k]
+                  + f_1 * ff0_13[k]
+                  - f_2 * ff1_15[k]
+                  + pb_y[k] * fg_22[k];
+    }
+
+#pragma omp simd aligned(t_26, t_27, t_28, t_29, pb_z, ff0_13, ff0_14, ff0_15, ff1_15, ff1_16, \
+                         ff1_17, fg_22, fg_23, fg_24, fg_25 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_26[k] = pb_z[k] * fg_22[k];
+
+        t_27[k] = f_3 * ff0_13[k]
+                  - f_4 * ff1_15[k]
+                  + pb_z[k] * fg_23[k];
+
+        t_28[k] = f_5 * ff0_14[k]
+                  - f_6 * ff1_16[k]
+                  + pb_z[k] * fg_24[k];
+
+        t_29[k] = f_1 * ff0_15[k]
+                  - f_2 * ff1_17[k]
+                  + pb_z[k] * fg_25[k];
+    }
+
+#pragma omp simd aligned(t_30, t_31, t_32, t_33, pa_y, pa_z, pb_x, dh_26, dh_47, ff0_18, \
+                         ff0_19, ff1_21, ff1_22, fg_30, fg_31 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_30[k] = pa_z[k] * dh_26[k];
+
+        t_31[k] = pa_y[k] * dh_47[k];
+
+        t_32[k] = f_1 * ff0_18[k]
+                  - f_2 * ff1_21[k]
+                  + pb_x[k] * fg_30[k];
+
+        t_33[k] = f_5 * ff0_19[k]
+                  - f_6 * ff1_22[k]
+                  + pb_x[k] * fg_31[k];
+    }
+
+#pragma omp simd aligned(t_34, t_35, t_36, t_37, pb_x, ff0_20, ff0_21, ff0_23, ff1_23, ff1_24, \
+                         ff1_26, fg_32, fg_33, fg_34, fg_35 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_34[k] = f_5 * ff0_20[k]
+                  - f_6 * ff1_23[k]
+                  + pb_x[k] * fg_32[k];
+
+        t_35[k] = f_3 * ff0_21[k]
+                  - f_4 * ff1_24[k]
+                  + pb_x[k] * fg_33[k];
+
+        t_36[k] = f_3 * ff0_23[k]
+                  - f_4 * ff1_26[k]
+                  + pb_x[k] * fg_34[k];
+
+        t_37[k] = pb_x[k] * fg_35[k];
+    }
+
+#pragma omp simd aligned(t_38, t_39, t_40, t_41, pb_x, pb_y, ff0_21, ff0_22, ff1_24, ff1_25, \
+                         fg_35, fg_36, fg_38 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_38[k] = pb_x[k] * fg_36[k];
+
+        t_39[k] = pb_x[k] * fg_38[k];
+
+        t_40[k] = f_1 * ff0_21[k]
+                  - f_2 * ff1_24[k]
+                  + pb_y[k] * fg_35[k];
+
+        t_41[k] = f_5 * ff0_22[k]
+                  - f_6 * ff1_25[k]
+                  + pb_y[k] * fg_36[k];
+    }
+
+#pragma omp simd aligned(t_42, t_43, t_44, pb_y, pb_z, dg_26, ff0_23, ff1_26, fg_37, \
+                         fg_38 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_42[k] = f_3 * ff0_23[k]
+                  - f_4 * ff1_26[k]
+                  + pb_y[k] * fg_37[k];
+
+        t_43[k] = pb_y[k] * fg_38[k];
+
+        t_44[k] = f_0 * dg_26[k]
+                  + f_1 * ff0_23[k]
+                  - f_2 * ff1_26[k]
+                  + pb_z[k] * fg_38[k];
+    }
+}
+
+auto
+compute_prim_fh_electron_repulsion_8(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                     const size_t pb, const size_t dg, const size_t dh,
+                                     const size_t ff0, const size_t ff1, const size_t fg,
+                                     const size_t ncols, const double alpha, const double beta,
+                                     const double p) -> void
+{
+    // NOTE: the factors are fixed by the pair of primitives, so they are formed
+    // once rather than for every atom pair the pair reaches.
+
+    const auto f_0 = 1.5 / p;
+    const auto f_1 = 2.0 / beta;
+    const auto f_2 = 2.0 * alpha / (beta * p);
+    const auto f_3 = 0.5 / beta;
+    const auto f_4 = 0.5 * alpha / (beta * p);
+    const auto f_5 = 1.0 / beta;
+    const auto f_6 = alpha / (beta * p);
+    const auto f_7 = 2.5 / p;
+    const auto f_8 = 1.0 / p;
+    const auto f_9 = 0.5 / p;
+
+    auto *t_0 = buffer.data(target + 0);
+    auto *t_1 = buffer.data(target + 1);
+    auto *t_2 = buffer.data(target + 2);
+    auto *t_3 = buffer.data(target + 3);
+    auto *t_4 = buffer.data(target + 4);
+    auto *t_5 = buffer.data(target + 5);
+    auto *t_6 = buffer.data(target + 6);
+    auto *t_7 = buffer.data(target + 7);
+    auto *t_8 = buffer.data(target + 8);
+    auto *t_9 = buffer.data(target + 9);
+    auto *t_10 = buffer.data(target + 10);
+    auto *t_11 = buffer.data(target + 11);
+    auto *t_12 = buffer.data(target + 12);
+    auto *t_13 = buffer.data(target + 13);
+    auto *t_14 = buffer.data(target + 14);
+    auto *t_15 = buffer.data(target + 15);
+    auto *t_16 = buffer.data(target + 16);
+    auto *t_17 = buffer.data(target + 17);
+    auto *t_18 = buffer.data(target + 18);
+    auto *t_19 = buffer.data(target + 19);
+    auto *t_20 = buffer.data(target + 20);
+    auto *t_21 = buffer.data(target + 21);
+    auto *t_22 = buffer.data(target + 22);
+    auto *t_23 = buffer.data(target + 23);
+    auto *t_24 = buffer.data(target + 24);
+    auto *t_25 = buffer.data(target + 25);
+    auto *t_26 = buffer.data(target + 26);
+    auto *t_27 = buffer.data(target + 27);
+    auto *t_28 = buffer.data(target + 28);
+    auto *t_29 = buffer.data(target + 29);
+    auto *t_30 = buffer.data(target + 30);
+    auto *t_31 = buffer.data(target + 31);
+    auto *t_32 = buffer.data(target + 32);
+    auto *t_33 = buffer.data(target + 33);
+    auto *t_34 = buffer.data(target + 34);
+    auto *t_35 = buffer.data(target + 35);
+    auto *t_36 = buffer.data(target + 36);
+    auto *t_37 = buffer.data(target + 37);
+    auto *t_38 = buffer.data(target + 38);
+    auto *t_39 = buffer.data(target + 39);
+    auto *t_40 = buffer.data(target + 40);
+    auto *t_41 = buffer.data(target + 41);
+    auto *t_42 = buffer.data(target + 42);
+    auto *t_43 = buffer.data(target + 43);
+    auto *t_44 = buffer.data(target + 44);
+    auto *t_45 = buffer.data(target + 45);
+    auto *t_46 = buffer.data(target + 46);
+    auto *t_47 = buffer.data(target + 47);
+    auto *t_48 = buffer.data(target + 48);
+    auto *t_49 = buffer.data(target + 49);
+    auto *t_50 = buffer.data(target + 50);
+    auto *t_51 = buffer.data(target + 51);
+    auto *t_52 = buffer.data(target + 52);
+    auto *t_53 = buffer.data(target + 53);
+    auto *t_54 = buffer.data(target + 54);
+    auto *t_55 = buffer.data(target + 55);
+    auto *t_56 = buffer.data(target + 56);
+    auto *t_57 = buffer.data(target + 57);
+    auto *t_58 = buffer.data(target + 58);
+    auto *t_59 = buffer.data(target + 59);
+    auto *t_60 = buffer.data(target + 60);
+    auto *t_61 = buffer.data(target + 61);
+    auto *t_62 = buffer.data(target + 62);
+    auto *t_63 = buffer.data(target + 63);
+    auto *t_64 = buffer.data(target + 64);
+    auto *t_65 = buffer.data(target + 65);
+    auto *t_66 = buffer.data(target + 66);
+    auto *t_67 = buffer.data(target + 67);
+    auto *t_68 = buffer.data(target + 68);
+    auto *t_69 = buffer.data(target + 69);
+    auto *t_70 = buffer.data(target + 70);
+    auto *t_71 = buffer.data(target + 71);
+    auto *t_72 = buffer.data(target + 72);
+    auto *t_73 = buffer.data(target + 73);
+    auto *t_74 = buffer.data(target + 74);
+    auto *t_75 = buffer.data(target + 75);
+    auto *t_76 = buffer.data(target + 76);
+    auto *t_77 = buffer.data(target + 77);
+    auto *t_78 = buffer.data(target + 78);
+
+    const auto *pa_x = buffer.data(pa + 0);
+    const auto *pa_y = buffer.data(pa + 1);
+    const auto *pa_z = buffer.data(pa + 2);
+
+    const auto *pb_x = buffer.data(pb + 0);
+    const auto *pb_y = buffer.data(pb + 1);
+    const auto *pb_z = buffer.data(pb + 2);
+
+    const auto *dg_0 = buffer.data(dg + 0);
+    const auto *dg_2 = buffer.data(dg + 2);
+    const auto *dg_4 = buffer.data(dg + 4);
+    const auto *dg_5 = buffer.data(dg + 5);
+    const auto *dg_6 = buffer.data(dg + 6);
+    const auto *dg_7 = buffer.data(dg + 7);
+    const auto *dg_9 = buffer.data(dg + 9);
+    const auto *dg_10 = buffer.data(dg + 10);
+    const auto *dg_11 = buffer.data(dg + 11);
+    const auto *dg_12 = buffer.data(dg + 12);
+    const auto *dg_13 = buffer.data(dg + 13);
+    const auto *dg_14 = buffer.data(dg + 14);
+    const auto *dg_16 = buffer.data(dg + 16);
+    const auto *dg_17 = buffer.data(dg + 17);
+    const auto *dg_18 = buffer.data(dg + 18);
+    const auto *dg_19 = buffer.data(dg + 19);
+    const auto *dg_20 = buffer.data(dg + 20);
+    const auto *dg_21 = buffer.data(dg + 21);
+    const auto *dg_22 = buffer.data(dg + 22);
+    const auto *dg_23 = buffer.data(dg + 23);
+    const auto *dg_25 = buffer.data(dg + 25);
+    const auto *dg_26 = buffer.data(dg + 26);
+    const auto *dg_27 = buffer.data(dg + 27);
+    const auto *dg_28 = buffer.data(dg + 28);
+    const auto *dg_29 = buffer.data(dg + 29);
+
+    const auto *dh_0 = buffer.data(dh + 0);
+    const auto *dh_4 = buffer.data(dh + 4);
+    const auto *dh_7 = buffer.data(dh + 7);
+    const auto *dh_8 = buffer.data(dh + 8);
+    const auto *dh_10 = buffer.data(dh + 10);
+    const auto *dh_11 = buffer.data(dh + 11);
+    const auto *dh_13 = buffer.data(dh + 13);
+    const auto *dh_15 = buffer.data(dh + 15);
+    const auto *dh_17 = buffer.data(dh + 17);
+    const auto *dh_18 = buffer.data(dh + 18);
+    const auto *dh_19 = buffer.data(dh + 19);
+    const auto *dh_20 = buffer.data(dh + 20);
+    const auto *dh_24 = buffer.data(dh + 24);
+    const auto *dh_26 = buffer.data(dh + 26);
+    const auto *dh_27 = buffer.data(dh + 27);
+    const auto *dh_28 = buffer.data(dh + 28);
+    const auto *dh_31 = buffer.data(dh + 31);
+    const auto *dh_33 = buffer.data(dh + 33);
+    const auto *dh_34 = buffer.data(dh + 34);
+    const auto *dh_35 = buffer.data(dh + 35);
+    const auto *dh_36 = buffer.data(dh + 36);
+    const auto *dh_40 = buffer.data(dh + 40);
+    const auto *dh_41 = buffer.data(dh + 41);
+    const auto *dh_42 = buffer.data(dh + 42);
+    const auto *dh_44 = buffer.data(dh + 44);
+
+    const auto *ff0_0 = buffer.data(ff0 + 0);
+    const auto *ff0_1 = buffer.data(ff0 + 1);
+    const auto *ff0_2 = buffer.data(ff0 + 2);
+    const auto *ff0_3 = buffer.data(ff0 + 3);
+    const auto *ff0_4 = buffer.data(ff0 + 4);
+    const auto *ff0_5 = buffer.data(ff0 + 5);
+    const auto *ff0_12 = buffer.data(ff0 + 12);
+    const auto *ff0_13 = buffer.data(ff0 + 13);
+    const auto *ff0_14 = buffer.data(ff0 + 14);
+    const auto *ff0_15 = buffer.data(ff0 + 15);
+    const auto *ff0_16 = buffer.data(ff0 + 16);
+    const auto *ff0_17 = buffer.data(ff0 + 17);
+    const auto *ff0_21 = buffer.data(ff0 + 21);
+    const auto *ff0_22 = buffer.data(ff0 + 22);
+    const auto *ff0_23 = buffer.data(ff0 + 23);
+    const auto *ff0_24 = buffer.data(ff0 + 24);
+    const auto *ff0_25 = buffer.data(ff0 + 25);
+    const auto *ff0_26 = buffer.data(ff0 + 26);
+
+    const auto *ff1_0 = buffer.data(ff1 + 0);
+    const auto *ff1_1 = buffer.data(ff1 + 1);
+    const auto *ff1_2 = buffer.data(ff1 + 2);
+    const auto *ff1_3 = buffer.data(ff1 + 3);
+    const auto *ff1_4 = buffer.data(ff1 + 4);
+    const auto *ff1_5 = buffer.data(ff1 + 5);
+    const auto *ff1_12 = buffer.data(ff1 + 12);
+    const auto *ff1_13 = buffer.data(ff1 + 13);
+    const auto *ff1_14 = buffer.data(ff1 + 14);
+    const auto *ff1_15 = buffer.data(ff1 + 15);
+    const auto *ff1_16 = buffer.data(ff1 + 16);
+    const auto *ff1_17 = buffer.data(ff1 + 17);
+    const auto *ff1_21 = buffer.data(ff1 + 21);
+    const auto *ff1_22 = buffer.data(ff1 + 22);
+    const auto *ff1_23 = buffer.data(ff1 + 23);
+    const auto *ff1_24 = buffer.data(ff1 + 24);
+    const auto *ff1_25 = buffer.data(ff1 + 25);
+    const auto *ff1_26 = buffer.data(ff1 + 26);
+
+    const auto *fg_0 = buffer.data(fg + 0);
+    const auto *fg_1 = buffer.data(fg + 1);
+    const auto *fg_2 = buffer.data(fg + 2);
+    const auto *fg_3 = buffer.data(fg + 3);
+    const auto *fg_4 = buffer.data(fg + 4);
+    const auto *fg_5 = buffer.data(fg + 5);
+    const auto *fg_6 = buffer.data(fg + 6);
+    const auto *fg_7 = buffer.data(fg + 7);
+    const auto *fg_8 = buffer.data(fg + 8);
+    const auto *fg_11 = buffer.data(fg + 11);
+    const auto *fg_14 = buffer.data(fg + 14);
+    const auto *fg_17 = buffer.data(fg + 17);
+    const auto *fg_18 = buffer.data(fg + 18);
+    const auto *fg_19 = buffer.data(fg + 19);
+    const auto *fg_20 = buffer.data(fg + 20);
+    const auto *fg_21 = buffer.data(fg + 21);
+    const auto *fg_22 = buffer.data(fg + 22);
+    const auto *fg_23 = buffer.data(fg + 23);
+    const auto *fg_24 = buffer.data(fg + 24);
+    const auto *fg_25 = buffer.data(fg + 25);
+    const auto *fg_26 = buffer.data(fg + 26);
+    const auto *fg_28 = buffer.data(fg + 28);
+    const auto *fg_29 = buffer.data(fg + 29);
+    const auto *fg_32 = buffer.data(fg + 32);
+    const auto *fg_33 = buffer.data(fg + 33);
+    const auto *fg_34 = buffer.data(fg + 34);
+    const auto *fg_35 = buffer.data(fg + 35);
+    const auto *fg_36 = buffer.data(fg + 36);
+    const auto *fg_37 = buffer.data(fg + 37);
+    const auto *fg_38 = buffer.data(fg + 38);
+    const auto *fg_39 = buffer.data(fg + 39);
+    const auto *fg_40 = buffer.data(fg + 40);
+    const auto *fg_41 = buffer.data(fg + 41);
+
+#pragma omp simd aligned(t_0, t_1, t_2, t_3, t_4, pb_x, pb_y, pb_z, dg_0, ff0_0, ff1_0, fg_0, \
+                         fg_1, fg_2 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_0[k] = f_0 * dg_0[k]
+                 + f_1 * ff0_0[k]
+                 - f_2 * ff1_0[k]
+                 + pb_x[k] * fg_0[k];
+
+        t_1[k] = pb_y[k] * fg_0[k];
+
+        t_2[k] = pb_z[k] * fg_0[k];
+
+        t_3[k] = f_3 * ff0_0[k]
+                 - f_4 * ff1_0[k]
+                 + pb_y[k] * fg_1[k];
+
+        t_4[k] = f_3 * ff0_0[k]
+                 - f_4 * ff1_0[k]
+                 + pb_z[k] * fg_2[k];
+    }
+
+#pragma omp simd aligned(t_5, t_6, t_7, t_8, t_9, pb_y, pb_z, ff0_1, ff0_2, ff0_3, ff1_1, \
+                         ff1_2, ff1_3, fg_3, fg_4, fg_5 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_5[k] = f_5 * ff0_1[k]
+                 - f_6 * ff1_1[k]
+                 + pb_y[k] * fg_3[k];
+
+        t_6[k] = pb_y[k] * fg_4[k];
+
+        t_7[k] = f_5 * ff0_2[k]
+                 - f_6 * ff1_2[k]
+                 + pb_z[k] * fg_4[k];
+
+        t_8[k] = f_1 * ff0_3[k]
+                 - f_2 * ff1_3[k]
+                 + pb_y[k] * fg_5[k];
+
+        t_9[k] = pb_z[k] * fg_5[k];
+    }
+
+#pragma omp simd aligned(t_10, t_11, t_12, t_13, t_14, pa_y, pb_y, pb_z, dh_0, ff0_4, ff0_5, \
+                         ff1_4, ff1_5, fg_6, fg_7, fg_8 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_10[k] = f_5 * ff0_4[k]
+                  - f_6 * ff1_4[k]
+                  + pb_y[k] * fg_6[k];
+
+        t_11[k] = f_3 * ff0_5[k]
+                  - f_4 * ff1_5[k]
+                  + pb_y[k] * fg_7[k];
+
+        t_12[k] = pb_y[k] * fg_8[k];
+
+        t_13[k] = f_1 * ff0_5[k]
+                  - f_2 * ff1_5[k]
+                  + pb_z[k] * fg_8[k];
+
+        t_14[k] = pa_y[k] * dh_0[k];
+    }
+
+#pragma omp simd aligned(t_15, t_16, t_17, t_18, t_19, t_20, pa_y, pa_z, dg_2, dg_4, dg_5, \
+                         dh_0, dh_4, dh_7, dh_8, dh_13 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_15[k] = f_7 * dg_5[k]
+                  + pa_y[k] * dh_8[k];
+
+        t_16[k] = pa_y[k] * dh_13[k];
+
+        t_17[k] = pa_z[k] * dh_0[k];
+
+        t_18[k] = f_8 * dg_2[k]
+                  + pa_z[k] * dh_4[k];
+
+        t_19[k] = f_0 * dg_4[k]
+                  + pa_z[k] * dh_7[k];
+
+        t_20[k] = pa_z[k] * dh_8[k];
+    }
+
+#pragma omp simd aligned(t_21, t_22, t_23, t_24, pa_z, pb_y, dg_6, dg_7, dg_9, dh_10, dh_11, \
+                         dh_13, fg_11 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_21[k] = f_8 * dg_6[k]
+                  + pa_z[k] * dh_10[k];
+
+        t_22[k] = f_0 * dg_7[k]
+                  + pa_z[k] * dh_11[k];
+
+        t_23[k] = pb_y[k] * fg_11[k];
+
+        t_24[k] = f_7 * dg_9[k]
+                  + pa_z[k] * dh_13[k];
+    }
+
+#pragma omp simd aligned(t_25, t_26, t_27, t_28, t_29, pa_x, pb_x, dg_10, dg_12, dg_14, dg_16, \
+                         dh_15, dh_17, dh_19, dh_24, fg_14 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_25[k] = f_7 * dg_10[k]
+                  + pa_x[k] * dh_15[k];
+
+        t_26[k] = f_0 * dg_12[k]
+                  + pa_x[k] * dh_17[k];
+
+        t_27[k] = f_8 * dg_14[k]
+                  + pa_x[k] * dh_19[k];
+
+        t_28[k] = f_9 * dg_16[k]
+                  + pb_x[k] * fg_14[k];
+
+        t_29[k] = pa_x[k] * dh_24[k];
+    }
+
+#pragma omp simd aligned(t_30, t_31, t_32, t_33, t_34, pa_x, pb_x, dg_20, dg_23, dg_25, dg_29, \
+                         dh_31, dh_34, dh_36, dh_44, fg_17 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_30[k] = f_7 * dg_20[k]
+                  + pa_x[k] * dh_31[k];
+
+        t_31[k] = f_0 * dg_23[k]
+                  + pa_x[k] * dh_34[k];
+
+        t_32[k] = f_8 * dg_25[k]
+                  + pa_x[k] * dh_36[k];
+
+        t_33[k] = f_9 * dg_29[k]
+                  + pb_x[k] * fg_17[k];
+
+        t_34[k] = pa_x[k] * dh_44[k];
+    }
+
+#pragma omp simd aligned(t_35, t_36, t_37, t_38, pb_x, pb_z, ff0_12, ff0_13, ff0_14, ff1_12, \
+                         ff1_13, ff1_14, fg_18, fg_19, fg_20 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_35[k] = f_1 * ff0_12[k]
+                  - f_2 * ff1_12[k]
+                  + pb_x[k] * fg_18[k];
+
+        t_36[k] = pb_z[k] * fg_18[k];
+
+        t_37[k] = f_5 * ff0_13[k]
+                  - f_6 * ff1_13[k]
+                  + pb_x[k] * fg_19[k];
+
+        t_38[k] = f_5 * ff0_14[k]
+                  - f_6 * ff1_14[k]
+                  + pb_x[k] * fg_20[k];
+    }
+
+#pragma omp simd aligned(t_39, t_40, t_41, t_42, t_43, pb_x, ff0_15, ff0_17, ff1_15, ff1_17, \
+                         fg_21, fg_22, fg_23, fg_25, fg_26 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_39[k] = f_3 * ff0_15[k]
+                  - f_4 * ff1_15[k]
+                  + pb_x[k] * fg_21[k];
+
+        t_40[k] = f_3 * ff0_17[k]
+                  - f_4 * ff1_17[k]
+                  + pb_x[k] * fg_22[k];
+
+        t_41[k] = pb_x[k] * fg_23[k];
+
+        t_42[k] = pb_x[k] * fg_25[k];
+
+        t_43[k] = pb_x[k] * fg_26[k];
+    }
+
+#pragma omp simd aligned(t_44, t_45, t_46, t_47, pb_y, pb_z, dg_16, ff0_15, ff0_16, ff1_15, \
+                         ff1_16, fg_23, fg_24, fg_25 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_44[k] = f_0 * dg_16[k]
+                  + f_1 * ff0_15[k]
+                  - f_2 * ff1_15[k]
+                  + pb_y[k] * fg_23[k];
+
+        t_45[k] = pb_z[k] * fg_23[k];
+
+        t_46[k] = f_3 * ff0_15[k]
+                  - f_4 * ff1_15[k]
+                  + pb_z[k] * fg_24[k];
+
+        t_47[k] = f_5 * ff0_16[k]
+                  - f_6 * ff1_16[k]
+                  + pb_z[k] * fg_25[k];
+    }
+
+#pragma omp simd aligned(t_48, t_49, t_50, t_51, pa_z, pb_z, dg_11, dg_13, dh_15, dh_18, \
+                         dh_20, ff0_17, ff1_17, fg_26 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_48[k] = f_1 * ff0_17[k]
+                  - f_2 * ff1_17[k]
+                  + pb_z[k] * fg_26[k];
+
+        t_49[k] = pa_z[k] * dh_15[k];
+
+        t_50[k] = f_8 * dg_11[k]
+                  + pa_z[k] * dh_18[k];
+
+        t_51[k] = f_0 * dg_13[k]
+                  + pa_z[k] * dh_20[k];
+    }
+
+#pragma omp simd aligned(t_52, t_53, t_54, t_55, t_56, pa_z, pb_x, dg_17, dg_18, dg_19, dh_24, \
+                         dh_26, dh_27, dh_28, fg_28 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_52[k] = pb_x[k] * fg_28[k];
+
+        t_53[k] = pa_z[k] * dh_24[k];
+
+        t_54[k] = f_8 * dg_17[k]
+                  + pa_z[k] * dh_26[k];
+
+        t_55[k] = f_0 * dg_18[k]
+                  + pa_z[k] * dh_27[k];
+
+        t_56[k] = f_7 * dg_19[k]
+                  + pa_z[k] * dh_28[k];
+    }
+
+#pragma omp simd aligned(t_57, t_58, t_59, t_60, t_61, pa_y, pb_x, dg_21, dg_22, dg_26, dg_27, \
+                         dh_33, dh_35, dh_40, dh_41, fg_29 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_57[k] = f_8 * dg_21[k]
+                  + pa_y[k] * dh_33[k];
+
+        t_58[k] = f_0 * dg_22[k]
+                  + pa_y[k] * dh_35[k];
+
+        t_59[k] = pb_x[k] * fg_29[k];
+
+        t_60[k] = f_7 * dg_26[k]
+                  + pa_y[k] * dh_40[k];
+
+        t_61[k] = f_0 * dg_27[k]
+                  + pa_y[k] * dh_41[k];
+    }
+
+#pragma omp simd aligned(t_62, t_63, t_64, t_65, t_66, pa_y, pb_x, pb_y, dg_28, dg_29, dh_42, \
+                         dh_44, ff0_21, ff1_21, fg_32, fg_33 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_62[k] = f_8 * dg_28[k]
+                  + pa_y[k] * dh_42[k];
+
+        t_63[k] = f_9 * dg_29[k]
+                  + pb_y[k] * fg_32[k];
+
+        t_64[k] = pa_y[k] * dh_44[k];
+
+        t_65[k] = f_1 * ff0_21[k]
+                  - f_2 * ff1_21[k]
+                  + pb_x[k] * fg_33[k];
+
+        t_66[k] = pb_y[k] * fg_33[k];
+    }
+
+#pragma omp simd aligned(t_67, t_68, t_69, pb_x, ff0_22, ff0_23, ff0_24, ff1_22, ff1_23, \
+                         ff1_24, fg_34, fg_35, fg_36 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_67[k] = f_5 * ff0_22[k]
+                  - f_6 * ff1_22[k]
+                  + pb_x[k] * fg_34[k];
+
+        t_68[k] = f_5 * ff0_23[k]
+                  - f_6 * ff1_23[k]
+                  + pb_x[k] * fg_35[k];
+
+        t_69[k] = f_3 * ff0_24[k]
+                  - f_4 * ff1_24[k]
+                  + pb_x[k] * fg_36[k];
+    }
+
+#pragma omp simd aligned(t_70, t_71, t_72, t_73, t_74, pb_x, pb_y, ff0_24, ff0_26, ff1_24, \
+                         ff1_26, fg_37, fg_38, fg_39, fg_41 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_70[k] = f_3 * ff0_26[k]
+                  - f_4 * ff1_26[k]
+                  + pb_x[k] * fg_37[k];
+
+        t_71[k] = pb_x[k] * fg_38[k];
+
+        t_72[k] = pb_x[k] * fg_39[k];
+
+        t_73[k] = pb_x[k] * fg_41[k];
+
+        t_74[k] = f_1 * ff0_24[k]
+                  - f_2 * ff1_24[k]
+                  + pb_y[k] * fg_38[k];
+    }
+
+#pragma omp simd aligned(t_75, t_76, t_77, t_78, pb_y, pb_z, dg_29, ff0_25, ff0_26, ff1_25, \
+                         ff1_26, fg_39, fg_40, fg_41 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_75[k] = f_5 * ff0_25[k]
+                  - f_6 * ff1_25[k]
+                  + pb_y[k] * fg_39[k];
+
+        t_76[k] = f_3 * ff0_26[k]
+                  - f_4 * ff1_26[k]
+                  + pb_y[k] * fg_40[k];
+
+        t_77[k] = pb_y[k] * fg_41[k];
+
+        t_78[k] = f_0 * dg_29[k]
+                  + f_1 * ff0_26[k]
+                  - f_2 * ff1_26[k]
+                  + pb_z[k] * fg_41[k];
+    }
+}
+
+auto
+compute_prim_fh_electron_repulsion_9(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                     const size_t pb, const size_t dg, const size_t dh,
+                                     const size_t ff0, const size_t ff1, const size_t fg,
+                                     const size_t ncols, const double alpha, const double beta,
+                                     const double p) -> void
+{
+    // NOTE: the factors are fixed by the pair of primitives, so they are formed
+    // once rather than for every atom pair the pair reaches.
+
+    const auto f_0 = 1.5 / p;
+    const auto f_1 = 2.0 / beta;
+    const auto f_2 = 2.0 * alpha / (beta * p);
+    const auto f_3 = 0.5 / beta;
+    const auto f_4 = 0.5 * alpha / (beta * p);
+    const auto f_5 = 1.0 / beta;
+    const auto f_6 = alpha / (beta * p);
+    const auto f_7 = 2.5 / p;
+
+    auto *t_0 = buffer.data(target + 0);
+    auto *t_1 = buffer.data(target + 1);
+    auto *t_2 = buffer.data(target + 2);
+    auto *t_3 = buffer.data(target + 3);
+    auto *t_4 = buffer.data(target + 4);
+    auto *t_5 = buffer.data(target + 5);
+    auto *t_6 = buffer.data(target + 6);
+    auto *t_7 = buffer.data(target + 7);
+    auto *t_8 = buffer.data(target + 8);
+    auto *t_9 = buffer.data(target + 9);
+    auto *t_10 = buffer.data(target + 10);
+    auto *t_11 = buffer.data(target + 11);
+    auto *t_12 = buffer.data(target + 12);
+    auto *t_13 = buffer.data(target + 13);
+    auto *t_14 = buffer.data(target + 14);
+    auto *t_15 = buffer.data(target + 15);
+    auto *t_16 = buffer.data(target + 16);
+    auto *t_17 = buffer.data(target + 17);
+    auto *t_18 = buffer.data(target + 18);
+    auto *t_19 = buffer.data(target + 19);
+    auto *t_20 = buffer.data(target + 20);
+    auto *t_21 = buffer.data(target + 21);
+    auto *t_22 = buffer.data(target + 22);
+    auto *t_23 = buffer.data(target + 23);
+    auto *t_24 = buffer.data(target + 24);
+    auto *t_25 = buffer.data(target + 25);
+    auto *t_26 = buffer.data(target + 26);
+    auto *t_27 = buffer.data(target + 27);
+    auto *t_28 = buffer.data(target + 28);
+    auto *t_29 = buffer.data(target + 29);
+    auto *t_30 = buffer.data(target + 30);
+    auto *t_31 = buffer.data(target + 31);
+    auto *t_32 = buffer.data(target + 32);
+    auto *t_33 = buffer.data(target + 33);
+    auto *t_34 = buffer.data(target + 34);
+    auto *t_35 = buffer.data(target + 35);
+    auto *t_36 = buffer.data(target + 36);
+    auto *t_37 = buffer.data(target + 37);
+    auto *t_38 = buffer.data(target + 38);
+    auto *t_39 = buffer.data(target + 39);
+    auto *t_40 = buffer.data(target + 40);
+    auto *t_41 = buffer.data(target + 41);
+    auto *t_42 = buffer.data(target + 42);
+    auto *t_43 = buffer.data(target + 43);
+    auto *t_44 = buffer.data(target + 44);
+    auto *t_45 = buffer.data(target + 45);
+    auto *t_46 = buffer.data(target + 46);
+    auto *t_47 = buffer.data(target + 47);
+    auto *t_48 = buffer.data(target + 48);
+    auto *t_49 = buffer.data(target + 49);
+    auto *t_50 = buffer.data(target + 50);
+
+    const auto *pa_x = buffer.data(pa + 0);
+    const auto *pa_y = buffer.data(pa + 1);
+    const auto *pa_z = buffer.data(pa + 2);
+
+    const auto *pb_x = buffer.data(pb + 0);
+    const auto *pb_y = buffer.data(pb + 1);
+    const auto *pb_z = buffer.data(pb + 2);
+
+    const auto *dg_0 = buffer.data(dg + 0);
+    const auto *dg_5 = buffer.data(dg + 5);
+    const auto *dg_8 = buffer.data(dg + 8);
+    const auto *dg_9 = buffer.data(dg + 9);
+    const auto *dg_14 = buffer.data(dg + 14);
+    const auto *dg_17 = buffer.data(dg + 17);
+    const auto *dg_18 = buffer.data(dg + 18);
+    const auto *dg_23 = buffer.data(dg + 23);
+    const auto *dg_26 = buffer.data(dg + 26);
+
+    const auto *dh_0 = buffer.data(dh + 0);
+    const auto *dh_8 = buffer.data(dh + 8);
+    const auto *dh_12 = buffer.data(dh + 12);
+    const auto *dh_13 = buffer.data(dh + 13);
+    const auto *dh_21 = buffer.data(dh + 21);
+    const auto *dh_25 = buffer.data(dh + 25);
+    const auto *dh_26 = buffer.data(dh + 26);
+    const auto *dh_34 = buffer.data(dh + 34);
+    const auto *dh_38 = buffer.data(dh + 38);
+
+    const auto *ff0_0 = buffer.data(ff0 + 0);
+    const auto *ff0_1 = buffer.data(ff0 + 1);
+    const auto *ff0_2 = buffer.data(ff0 + 2);
+    const auto *ff0_3 = buffer.data(ff0 + 3);
+    const auto *ff0_4 = buffer.data(ff0 + 4);
+    const auto *ff0_5 = buffer.data(ff0 + 5);
+    const auto *ff0_12 = buffer.data(ff0 + 12);
+    const auto *ff0_13 = buffer.data(ff0 + 13);
+    const auto *ff0_14 = buffer.data(ff0 + 14);
+    const auto *ff0_15 = buffer.data(ff0 + 15);
+    const auto *ff0_16 = buffer.data(ff0 + 16);
+    const auto *ff0_17 = buffer.data(ff0 + 17);
+    const auto *ff0_21 = buffer.data(ff0 + 21);
+    const auto *ff0_22 = buffer.data(ff0 + 22);
+    const auto *ff0_23 = buffer.data(ff0 + 23);
+    const auto *ff0_24 = buffer.data(ff0 + 24);
+    const auto *ff0_25 = buffer.data(ff0 + 25);
+    const auto *ff0_26 = buffer.data(ff0 + 26);
+
+    const auto *ff1_0 = buffer.data(ff1 + 0);
+    const auto *ff1_1 = buffer.data(ff1 + 1);
+    const auto *ff1_2 = buffer.data(ff1 + 2);
+    const auto *ff1_3 = buffer.data(ff1 + 3);
+    const auto *ff1_4 = buffer.data(ff1 + 4);
+    const auto *ff1_5 = buffer.data(ff1 + 5);
+    const auto *ff1_12 = buffer.data(ff1 + 12);
+    const auto *ff1_13 = buffer.data(ff1 + 13);
+    const auto *ff1_14 = buffer.data(ff1 + 14);
+    const auto *ff1_15 = buffer.data(ff1 + 15);
+    const auto *ff1_16 = buffer.data(ff1 + 16);
+    const auto *ff1_17 = buffer.data(ff1 + 17);
+    const auto *ff1_21 = buffer.data(ff1 + 21);
+    const auto *ff1_22 = buffer.data(ff1 + 22);
+    const auto *ff1_23 = buffer.data(ff1 + 23);
+    const auto *ff1_24 = buffer.data(ff1 + 24);
+    const auto *ff1_25 = buffer.data(ff1 + 25);
+    const auto *ff1_26 = buffer.data(ff1 + 26);
+
+    const auto *fg_0 = buffer.data(fg + 0);
+    const auto *fg_1 = buffer.data(fg + 1);
+    const auto *fg_2 = buffer.data(fg + 2);
+    const auto *fg_3 = buffer.data(fg + 3);
+    const auto *fg_4 = buffer.data(fg + 4);
+    const auto *fg_5 = buffer.data(fg + 5);
+    const auto *fg_6 = buffer.data(fg + 6);
+    const auto *fg_7 = buffer.data(fg + 7);
+    const auto *fg_8 = buffer.data(fg + 8);
+    const auto *fg_13 = buffer.data(fg + 13);
+    const auto *fg_14 = buffer.data(fg + 14);
+    const auto *fg_15 = buffer.data(fg + 15);
+    const auto *fg_16 = buffer.data(fg + 16);
+    const auto *fg_17 = buffer.data(fg + 17);
+    const auto *fg_18 = buffer.data(fg + 18);
+    const auto *fg_19 = buffer.data(fg + 19);
+    const auto *fg_20 = buffer.data(fg + 20);
+    const auto *fg_21 = buffer.data(fg + 21);
+    const auto *fg_24 = buffer.data(fg + 24);
+    const auto *fg_25 = buffer.data(fg + 25);
+    const auto *fg_26 = buffer.data(fg + 26);
+    const auto *fg_27 = buffer.data(fg + 27);
+    const auto *fg_28 = buffer.data(fg + 28);
+    const auto *fg_29 = buffer.data(fg + 29);
+    const auto *fg_30 = buffer.data(fg + 30);
+    const auto *fg_31 = buffer.data(fg + 31);
+    const auto *fg_32 = buffer.data(fg + 32);
+
+#pragma omp simd aligned(t_0, t_1, t_2, t_3, t_4, pb_x, pb_y, pb_z, dg_0, ff0_0, ff1_0, fg_0, \
+                         fg_1, fg_2 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_0[k] = f_0 * dg_0[k]
+                 + f_1 * ff0_0[k]
+                 - f_2 * ff1_0[k]
+                 + pb_x[k] * fg_0[k];
+
+        t_1[k] = pb_y[k] * fg_0[k];
+
+        t_2[k] = pb_z[k] * fg_0[k];
+
+        t_3[k] = f_3 * ff0_0[k]
+                 - f_4 * ff1_0[k]
+                 + pb_y[k] * fg_1[k];
+
+        t_4[k] = f_3 * ff0_0[k]
+                 - f_4 * ff1_0[k]
+                 + pb_z[k] * fg_2[k];
+    }
+
+#pragma omp simd aligned(t_5, t_6, t_7, t_8, pb_y, pb_z, ff0_1, ff0_2, ff0_3, ff1_1, ff1_2, \
+                         ff1_3, fg_3, fg_4, fg_5 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_5[k] = f_5 * ff0_1[k]
+                 - f_6 * ff1_1[k]
+                 + pb_y[k] * fg_3[k];
+
+        t_6[k] = pb_y[k] * fg_4[k];
+
+        t_7[k] = f_5 * ff0_2[k]
+                 - f_6 * ff1_2[k]
+                 + pb_z[k] * fg_4[k];
+
+        t_8[k] = f_1 * ff0_3[k]
+                 - f_2 * ff1_3[k]
+                 + pb_y[k] * fg_5[k];
+    }
+
+#pragma omp simd aligned(t_9, t_10, t_11, t_12, t_13, pa_y, pb_y, pb_z, dh_0, ff0_4, ff0_5, \
+                         ff1_4, ff1_5, fg_6, fg_7, fg_8 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_9[k] = f_5 * ff0_4[k]
+                 - f_6 * ff1_4[k]
+                 + pb_y[k] * fg_6[k];
+
+        t_10[k] = f_3 * ff0_5[k]
+                  - f_4 * ff1_5[k]
+                  + pb_y[k] * fg_7[k];
+
+        t_11[k] = pb_y[k] * fg_8[k];
+
+        t_12[k] = f_1 * ff0_5[k]
+                  - f_2 * ff1_5[k]
+                  + pb_z[k] * fg_8[k];
+
+        t_13[k] = pa_y[k] * dh_0[k];
+    }
+
+#pragma omp simd aligned(t_14, t_15, t_16, t_17, t_18, pa_x, pa_y, pa_z, dg_5, dg_8, dg_9, \
+                         dh_0, dh_8, dh_12, dh_13, dh_21 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_14[k] = f_7 * dg_5[k]
+                  + pa_y[k] * dh_8[k];
+
+        t_15[k] = pa_z[k] * dh_0[k];
+
+        t_16[k] = f_7 * dg_8[k]
+                  + pa_z[k] * dh_12[k];
+
+        t_17[k] = f_7 * dg_9[k]
+                  + pa_x[k] * dh_13[k];
+
+        t_18[k] = pa_x[k] * dh_21[k];
+    }
+
+#pragma omp simd aligned(t_19, t_20, t_21, t_22, pa_x, pb_x, dg_18, dh_26, dh_38, ff0_12, \
+                         ff0_13, ff1_12, ff1_13, fg_13, fg_14 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_19[k] = f_7 * dg_18[k]
+                  + pa_x[k] * dh_26[k];
+
+        t_20[k] = pa_x[k] * dh_38[k];
+
+        t_21[k] = f_1 * ff0_12[k]
+                  - f_2 * ff1_12[k]
+                  + pb_x[k] * fg_13[k];
+
+        t_22[k] = f_5 * ff0_13[k]
+                  - f_6 * ff1_13[k]
+                  + pb_x[k] * fg_14[k];
+    }
+
+#pragma omp simd aligned(t_23, t_24, t_25, t_26, pb_x, ff0_14, ff0_15, ff0_17, ff1_14, ff1_15, \
+                         ff1_17, fg_15, fg_16, fg_17, fg_18 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_23[k] = f_5 * ff0_14[k]
+                  - f_6 * ff1_14[k]
+                  + pb_x[k] * fg_15[k];
+
+        t_24[k] = f_3 * ff0_15[k]
+                  - f_4 * ff1_15[k]
+                  + pb_x[k] * fg_16[k];
+
+        t_25[k] = f_3 * ff0_17[k]
+                  - f_4 * ff1_17[k]
+                  + pb_x[k] * fg_17[k];
+
+        t_26[k] = pb_x[k] * fg_18[k];
+    }
+
+#pragma omp simd aligned(t_27, t_28, t_29, t_30, t_31, pb_x, pb_y, pb_z, dg_14, ff0_15, \
+                         ff1_15, fg_18, fg_19, fg_20, fg_21 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_27[k] = pb_x[k] * fg_20[k];
+
+        t_28[k] = pb_x[k] * fg_21[k];
+
+        t_29[k] = f_0 * dg_14[k]
+                  + f_1 * ff0_15[k]
+                  - f_2 * ff1_15[k]
+                  + pb_y[k] * fg_18[k];
+
+        t_30[k] = pb_z[k] * fg_18[k];
+
+        t_31[k] = f_3 * ff0_15[k]
+                  - f_4 * ff1_15[k]
+                  + pb_z[k] * fg_19[k];
+    }
+
+#pragma omp simd aligned(t_32, t_33, t_34, t_35, pa_z, pb_z, dg_17, dh_21, dh_25, ff0_16, \
+                         ff0_17, ff1_16, ff1_17, fg_20, fg_21 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_32[k] = f_5 * ff0_16[k]
+                  - f_6 * ff1_16[k]
+                  + pb_z[k] * fg_20[k];
+
+        t_33[k] = f_1 * ff0_17[k]
+                  - f_2 * ff1_17[k]
+                  + pb_z[k] * fg_21[k];
+
+        t_34[k] = pa_z[k] * dh_21[k];
+
+        t_35[k] = f_7 * dg_17[k]
+                  + pa_z[k] * dh_25[k];
+    }
+
+#pragma omp simd aligned(t_36, t_37, t_38, t_39, pa_y, pb_x, dg_23, dh_34, dh_38, ff0_21, \
+                         ff0_22, ff1_21, ff1_22, fg_24, fg_25 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_36[k] = f_7 * dg_23[k]
+                  + pa_y[k] * dh_34[k];
+
+        t_37[k] = pa_y[k] * dh_38[k];
+
+        t_38[k] = f_1 * ff0_21[k]
+                  - f_2 * ff1_21[k]
+                  + pb_x[k] * fg_24[k];
+
+        t_39[k] = f_5 * ff0_22[k]
+                  - f_6 * ff1_22[k]
+                  + pb_x[k] * fg_25[k];
+    }
+
+#pragma omp simd aligned(t_40, t_41, t_42, t_43, pb_x, ff0_23, ff0_24, ff0_26, ff1_23, ff1_24, \
+                         ff1_26, fg_26, fg_27, fg_28, fg_29 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_40[k] = f_5 * ff0_23[k]
+                  - f_6 * ff1_23[k]
+                  + pb_x[k] * fg_26[k];
+
+        t_41[k] = f_3 * ff0_24[k]
+                  - f_4 * ff1_24[k]
+                  + pb_x[k] * fg_27[k];
+
+        t_42[k] = f_3 * ff0_26[k]
+                  - f_4 * ff1_26[k]
+                  + pb_x[k] * fg_28[k];
+
+        t_43[k] = pb_x[k] * fg_29[k];
+    }
+
+#pragma omp simd aligned(t_44, t_45, t_46, t_47, pb_x, pb_y, ff0_24, ff0_25, ff1_24, ff1_25, \
+                         fg_29, fg_30, fg_32 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_44[k] = pb_x[k] * fg_30[k];
+
+        t_45[k] = pb_x[k] * fg_32[k];
+
+        t_46[k] = f_1 * ff0_24[k]
+                  - f_2 * ff1_24[k]
+                  + pb_y[k] * fg_29[k];
+
+        t_47[k] = f_5 * ff0_25[k]
+                  - f_6 * ff1_25[k]
+                  + pb_y[k] * fg_30[k];
+    }
+
+#pragma omp simd aligned(t_48, t_49, t_50, pb_y, pb_z, dg_26, ff0_26, ff1_26, fg_31, \
+                         fg_32 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_48[k] = f_3 * ff0_26[k]
+                  - f_4 * ff1_26[k]
+                  + pb_y[k] * fg_31[k];
+
+        t_49[k] = pb_y[k] * fg_32[k];
+
+        t_50[k] = f_0 * dg_26[k]
+                  + f_1 * ff0_26[k]
+                  - f_2 * ff1_26[k]
+                  + pb_z[k] * fg_32[k];
+    }
+}
+
+auto
+compute_prim_fh_electron_repulsion_10(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t pb, const size_t dg, const size_t dh,
+                                      const size_t ff0, const size_t ff1, const size_t fg,
+                                      const size_t ncols, const double alpha, const double beta,
+                                      const double p) -> void
+{
+    // NOTE: the factors are fixed by the pair of primitives, so they are formed
+    // once rather than for every atom pair the pair reaches.
+
+    const auto f_0 = 1.5 / p;
+    const auto f_1 = 2.0 / beta;
+    const auto f_2 = 2.0 * alpha / (beta * p);
+    const auto f_3 = 0.5 / beta;
+    const auto f_4 = 0.5 * alpha / (beta * p);
+    const auto f_5 = 1.0 / beta;
+    const auto f_6 = alpha / (beta * p);
+    const auto f_7 = 1.0 / p;
+    const auto f_8 = 0.5 / p;
+
+    auto *t_0 = buffer.data(target + 0);
+    auto *t_1 = buffer.data(target + 1);
+    auto *t_2 = buffer.data(target + 2);
+    auto *t_3 = buffer.data(target + 3);
+    auto *t_4 = buffer.data(target + 4);
+    auto *t_5 = buffer.data(target + 5);
+    auto *t_6 = buffer.data(target + 6);
+    auto *t_7 = buffer.data(target + 7);
+    auto *t_8 = buffer.data(target + 8);
+    auto *t_9 = buffer.data(target + 9);
+    auto *t_10 = buffer.data(target + 10);
+    auto *t_11 = buffer.data(target + 11);
+    auto *t_12 = buffer.data(target + 12);
+    auto *t_13 = buffer.data(target + 13);
+    auto *t_14 = buffer.data(target + 14);
+    auto *t_15 = buffer.data(target + 15);
+    auto *t_16 = buffer.data(target + 16);
+    auto *t_17 = buffer.data(target + 17);
+    auto *t_18 = buffer.data(target + 18);
+    auto *t_19 = buffer.data(target + 19);
+    auto *t_20 = buffer.data(target + 20);
+    auto *t_21 = buffer.data(target + 21);
+    auto *t_22 = buffer.data(target + 22);
+    auto *t_23 = buffer.data(target + 23);
+    auto *t_24 = buffer.data(target + 24);
+    auto *t_25 = buffer.data(target + 25);
+    auto *t_26 = buffer.data(target + 26);
+    auto *t_27 = buffer.data(target + 27);
+    auto *t_28 = buffer.data(target + 28);
+    auto *t_29 = buffer.data(target + 29);
+    auto *t_30 = buffer.data(target + 30);
+    auto *t_31 = buffer.data(target + 31);
+    auto *t_32 = buffer.data(target + 32);
+    auto *t_33 = buffer.data(target + 33);
+    auto *t_34 = buffer.data(target + 34);
+    auto *t_35 = buffer.data(target + 35);
+    auto *t_36 = buffer.data(target + 36);
+    auto *t_37 = buffer.data(target + 37);
+    auto *t_38 = buffer.data(target + 38);
+    auto *t_39 = buffer.data(target + 39);
+    auto *t_40 = buffer.data(target + 40);
+    auto *t_41 = buffer.data(target + 41);
+    auto *t_42 = buffer.data(target + 42);
+    auto *t_43 = buffer.data(target + 43);
+    auto *t_44 = buffer.data(target + 44);
+    auto *t_45 = buffer.data(target + 45);
+    auto *t_46 = buffer.data(target + 46);
+    auto *t_47 = buffer.data(target + 47);
+    auto *t_48 = buffer.data(target + 48);
+    auto *t_49 = buffer.data(target + 49);
+    auto *t_50 = buffer.data(target + 50);
+
+    const auto *pa_x = buffer.data(pa + 0);
+    const auto *pa_y = buffer.data(pa + 1);
+
+    const auto *pb_x = buffer.data(pb + 0);
+    const auto *pb_y = buffer.data(pb + 1);
+    const auto *pb_z = buffer.data(pb + 2);
+
+    const auto *dg_0 = buffer.data(dg + 0);
+    const auto *dg_10 = buffer.data(dg + 10);
+    const auto *dg_12 = buffer.data(dg + 12);
+    const auto *dg_14 = buffer.data(dg + 14);
+    const auto *dg_20 = buffer.data(dg + 20);
+    const auto *dg_22 = buffer.data(dg + 22);
+    const auto *dg_24 = buffer.data(dg + 24);
+    const auto *dg_25 = buffer.data(dg + 25);
+    const auto *dg_26 = buffer.data(dg + 26);
+
+    const auto *dh_14 = buffer.data(dh + 14);
+    const auto *dh_16 = buffer.data(dh + 16);
+    const auto *dh_21 = buffer.data(dh + 21);
+    const auto *dh_28 = buffer.data(dh + 28);
+    const auto *dh_30 = buffer.data(dh + 30);
+    const auto *dh_35 = buffer.data(dh + 35);
+    const auto *dh_36 = buffer.data(dh + 36);
+    const auto *dh_38 = buffer.data(dh + 38);
+
+    const auto *ff0_0 = buffer.data(ff0 + 0);
+    const auto *ff0_1 = buffer.data(ff0 + 1);
+    const auto *ff0_2 = buffer.data(ff0 + 2);
+    const auto *ff0_3 = buffer.data(ff0 + 3);
+    const auto *ff0_4 = buffer.data(ff0 + 4);
+    const auto *ff0_5 = buffer.data(ff0 + 5);
+    const auto *ff0_10 = buffer.data(ff0 + 10);
+    const auto *ff0_11 = buffer.data(ff0 + 11);
+    const auto *ff0_12 = buffer.data(ff0 + 12);
+    const auto *ff0_13 = buffer.data(ff0 + 13);
+    const auto *ff0_14 = buffer.data(ff0 + 14);
+    const auto *ff0_15 = buffer.data(ff0 + 15);
+    const auto *ff0_18 = buffer.data(ff0 + 18);
+    const auto *ff0_19 = buffer.data(ff0 + 19);
+    const auto *ff0_20 = buffer.data(ff0 + 20);
+    const auto *ff0_21 = buffer.data(ff0 + 21);
+    const auto *ff0_22 = buffer.data(ff0 + 22);
+    const auto *ff0_23 = buffer.data(ff0 + 23);
+
+    const auto *ff1_0 = buffer.data(ff1 + 0);
+    const auto *ff1_1 = buffer.data(ff1 + 1);
+    const auto *ff1_2 = buffer.data(ff1 + 2);
+    const auto *ff1_3 = buffer.data(ff1 + 3);
+    const auto *ff1_4 = buffer.data(ff1 + 4);
+    const auto *ff1_5 = buffer.data(ff1 + 5);
+    const auto *ff1_12 = buffer.data(ff1 + 12);
+    const auto *ff1_13 = buffer.data(ff1 + 13);
+    const auto *ff1_14 = buffer.data(ff1 + 14);
+    const auto *ff1_15 = buffer.data(ff1 + 15);
+    const auto *ff1_16 = buffer.data(ff1 + 16);
+    const auto *ff1_17 = buffer.data(ff1 + 17);
+    const auto *ff1_21 = buffer.data(ff1 + 21);
+    const auto *ff1_22 = buffer.data(ff1 + 22);
+    const auto *ff1_23 = buffer.data(ff1 + 23);
+    const auto *ff1_24 = buffer.data(ff1 + 24);
+    const auto *ff1_25 = buffer.data(ff1 + 25);
+    const auto *ff1_26 = buffer.data(ff1 + 26);
+
+    const auto *fg_0 = buffer.data(fg + 0);
+    const auto *fg_1 = buffer.data(fg + 1);
+    const auto *fg_2 = buffer.data(fg + 2);
+    const auto *fg_3 = buffer.data(fg + 3);
+    const auto *fg_4 = buffer.data(fg + 4);
+    const auto *fg_5 = buffer.data(fg + 5);
+    const auto *fg_6 = buffer.data(fg + 6);
+    const auto *fg_7 = buffer.data(fg + 7);
+    const auto *fg_8 = buffer.data(fg + 8);
+    const auto *fg_13 = buffer.data(fg + 13);
+    const auto *fg_16 = buffer.data(fg + 16);
+    const auto *fg_17 = buffer.data(fg + 17);
+    const auto *fg_18 = buffer.data(fg + 18);
+    const auto *fg_19 = buffer.data(fg + 19);
+    const auto *fg_20 = buffer.data(fg + 20);
+    const auto *fg_21 = buffer.data(fg + 21);
+    const auto *fg_22 = buffer.data(fg + 22);
+    const auto *fg_23 = buffer.data(fg + 23);
+    const auto *fg_24 = buffer.data(fg + 24);
+    const auto *fg_25 = buffer.data(fg + 25);
+    const auto *fg_29 = buffer.data(fg + 29);
+    const auto *fg_30 = buffer.data(fg + 30);
+    const auto *fg_31 = buffer.data(fg + 31);
+    const auto *fg_32 = buffer.data(fg + 32);
+    const auto *fg_33 = buffer.data(fg + 33);
+    const auto *fg_34 = buffer.data(fg + 34);
+    const auto *fg_35 = buffer.data(fg + 35);
+    const auto *fg_36 = buffer.data(fg + 36);
+    const auto *fg_37 = buffer.data(fg + 37);
+    const auto *fg_38 = buffer.data(fg + 38);
+
+#pragma omp simd aligned(t_0, t_1, t_2, t_3, t_4, pb_x, pb_y, pb_z, dg_0, ff0_0, ff1_0, fg_0, \
+                         fg_1, fg_2 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_0[k] = f_0 * dg_0[k]
+                 + f_1 * ff0_0[k]
+                 - f_2 * ff1_0[k]
+                 + pb_x[k] * fg_0[k];
+
+        t_1[k] = pb_y[k] * fg_0[k];
+
+        t_2[k] = pb_z[k] * fg_0[k];
+
+        t_3[k] = f_3 * ff0_0[k]
+                 - f_4 * ff1_0[k]
+                 + pb_y[k] * fg_1[k];
+
+        t_4[k] = f_3 * ff0_0[k]
+                 - f_4 * ff1_0[k]
+                 + pb_z[k] * fg_2[k];
+    }
+
+#pragma omp simd aligned(t_5, t_6, t_7, t_8, pb_y, pb_z, ff0_1, ff0_2, ff0_3, ff1_1, ff1_2, \
+                         ff1_3, fg_3, fg_4, fg_5 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_5[k] = f_5 * ff0_1[k]
+                 - f_6 * ff1_1[k]
+                 + pb_y[k] * fg_3[k];
+
+        t_6[k] = pb_y[k] * fg_4[k];
+
+        t_7[k] = f_5 * ff0_2[k]
+                 - f_6 * ff1_2[k]
+                 + pb_z[k] * fg_4[k];
+
+        t_8[k] = f_1 * ff0_3[k]
+                 - f_2 * ff1_3[k]
+                 + pb_y[k] * fg_5[k];
+    }
+
+#pragma omp simd aligned(t_9, t_10, t_11, t_12, pb_y, pb_z, ff0_4, ff0_5, ff1_4, ff1_5, fg_6, \
+                         fg_7, fg_8 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_9[k] = f_5 * ff0_4[k]
+                 - f_6 * ff1_4[k]
+                 + pb_y[k] * fg_6[k];
+
+        t_10[k] = f_3 * ff0_5[k]
+                  - f_4 * ff1_5[k]
+                  + pb_y[k] * fg_7[k];
+
+        t_11[k] = pb_y[k] * fg_8[k];
+
+        t_12[k] = f_1 * ff0_5[k]
+                  - f_2 * ff1_5[k]
+                  + pb_z[k] * fg_8[k];
+    }
+
+#pragma omp simd aligned(t_13, t_14, t_15, t_16, t_17, pa_x, pb_x, dg_10, dg_12, dg_14, dg_20, \
+                         dh_14, dh_16, dh_21, dh_28, fg_13 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_13[k] = f_0 * dg_10[k]
+                  + pa_x[k] * dh_14[k];
+
+        t_14[k] = f_7 * dg_12[k]
+                  + pa_x[k] * dh_16[k];
+
+        t_15[k] = f_8 * dg_14[k]
+                  + pb_x[k] * fg_13[k];
+
+        t_16[k] = pa_x[k] * dh_21[k];
+
+        t_17[k] = f_0 * dg_20[k]
+                  + pa_x[k] * dh_28[k];
+    }
+
+#pragma omp simd aligned(t_18, t_19, t_20, t_21, pa_x, pb_x, dg_22, dg_26, dh_30, dh_38, \
+                         ff0_10, ff1_12, fg_16, fg_17 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_18[k] = f_7 * dg_22[k]
+                  + pa_x[k] * dh_30[k];
+
+        t_19[k] = f_8 * dg_26[k]
+                  + pb_x[k] * fg_16[k];
+
+        t_20[k] = pa_x[k] * dh_38[k];
+
+        t_21[k] = f_1 * ff0_10[k]
+                  - f_2 * ff1_12[k]
+                  + pb_x[k] * fg_17[k];
+    }
+
+#pragma omp simd aligned(t_22, t_23, t_24, pb_x, ff0_11, ff0_12, ff0_13, ff1_13, ff1_14, \
+                         ff1_15, fg_18, fg_19, fg_20 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_22[k] = f_5 * ff0_11[k]
+                  - f_6 * ff1_13[k]
+                  + pb_x[k] * fg_18[k];
+
+        t_23[k] = f_5 * ff0_12[k]
+                  - f_6 * ff1_14[k]
+                  + pb_x[k] * fg_19[k];
+
+        t_24[k] = f_3 * ff0_13[k]
+                  - f_4 * ff1_15[k]
+                  + pb_x[k] * fg_20[k];
+    }
+
+#pragma omp simd aligned(t_25, t_26, t_27, t_28, t_29, pb_x, pb_y, dg_14, ff0_13, ff0_15, \
+                         ff1_15, ff1_17, fg_21, fg_22, fg_24, fg_25 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_25[k] = f_3 * ff0_15[k]
+                  - f_4 * ff1_17[k]
+                  + pb_x[k] * fg_21[k];
+
+        t_26[k] = pb_x[k] * fg_22[k];
+
+        t_27[k] = pb_x[k] * fg_24[k];
+
+        t_28[k] = pb_x[k] * fg_25[k];
+
+        t_29[k] = f_0 * dg_14[k]
+                  + f_1 * ff0_13[k]
+                  - f_2 * ff1_15[k]
+                  + pb_y[k] * fg_22[k];
+    }
+
+#pragma omp simd aligned(t_30, t_31, t_32, t_33, pb_z, ff0_13, ff0_14, ff0_15, ff1_15, ff1_16, \
+                         ff1_17, fg_22, fg_23, fg_24, fg_25 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_30[k] = pb_z[k] * fg_22[k];
+
+        t_31[k] = f_3 * ff0_13[k]
+                  - f_4 * ff1_15[k]
+                  + pb_z[k] * fg_23[k];
+
+        t_32[k] = f_5 * ff0_14[k]
+                  - f_6 * ff1_16[k]
+                  + pb_z[k] * fg_24[k];
+
+        t_33[k] = f_1 * ff0_15[k]
+                  - f_2 * ff1_17[k]
+                  + pb_z[k] * fg_25[k];
+    }
+
+#pragma omp simd aligned(t_34, t_35, t_36, t_37, pa_y, pb_y, dg_24, dg_25, dg_26, dh_35, \
+                         dh_36, dh_38, fg_29 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_34[k] = f_0 * dg_24[k]
+                  + pa_y[k] * dh_35[k];
+
+        t_35[k] = f_7 * dg_25[k]
+                  + pa_y[k] * dh_36[k];
+
+        t_36[k] = f_8 * dg_26[k]
+                  + pb_y[k] * fg_29[k];
+
+        t_37[k] = pa_y[k] * dh_38[k];
+    }
+
+#pragma omp simd aligned(t_38, t_39, t_40, pb_x, ff0_18, ff0_19, ff0_20, ff1_21, ff1_22, \
+                         ff1_23, fg_30, fg_31, fg_32 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_38[k] = f_1 * ff0_18[k]
+                  - f_2 * ff1_21[k]
+                  + pb_x[k] * fg_30[k];
+
+        t_39[k] = f_5 * ff0_19[k]
+                  - f_6 * ff1_22[k]
+                  + pb_x[k] * fg_31[k];
+
+        t_40[k] = f_5 * ff0_20[k]
+                  - f_6 * ff1_23[k]
+                  + pb_x[k] * fg_32[k];
+    }
+
+#pragma omp simd aligned(t_41, t_42, t_43, t_44, t_45, pb_x, ff0_21, ff0_23, ff1_24, ff1_26, \
+                         fg_33, fg_34, fg_35, fg_36, fg_38 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_41[k] = f_3 * ff0_21[k]
+                  - f_4 * ff1_24[k]
+                  + pb_x[k] * fg_33[k];
+
+        t_42[k] = f_3 * ff0_23[k]
+                  - f_4 * ff1_26[k]
+                  + pb_x[k] * fg_34[k];
+
+        t_43[k] = pb_x[k] * fg_35[k];
+
+        t_44[k] = pb_x[k] * fg_36[k];
+
+        t_45[k] = pb_x[k] * fg_38[k];
+    }
+
+#pragma omp simd aligned(t_46, t_47, t_48, t_49, pb_y, ff0_21, ff0_22, ff0_23, ff1_24, ff1_25, \
+                         ff1_26, fg_35, fg_36, fg_37, fg_38 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_46[k] = f_1 * ff0_21[k]
+                  - f_2 * ff1_24[k]
+                  + pb_y[k] * fg_35[k];
+
+        t_47[k] = f_5 * ff0_22[k]
+                  - f_6 * ff1_25[k]
+                  + pb_y[k] * fg_36[k];
+
+        t_48[k] = f_3 * ff0_23[k]
+                  - f_4 * ff1_26[k]
+                  + pb_y[k] * fg_37[k];
+
+        t_49[k] = pb_y[k] * fg_38[k];
+    }
+
+#pragma omp simd aligned(t_50, pb_z, dg_26, ff0_23, ff1_26, fg_38 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_50[k] = f_0 * dg_26[k]
+                  + f_1 * ff0_23[k]
+                  - f_2 * ff1_26[k]
+                  + pb_z[k] * fg_38[k];
+    }
+}
+
+auto
+compute_prim_fh_electron_repulsion_11(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t pb, const size_t dg, const size_t dh,
+                                      const size_t ff0, const size_t ff1, const size_t fg,
+                                      const size_t ncols, const double alpha, const double beta,
+                                      const double p) -> void
+{
+    // NOTE: the factors are fixed by the pair of primitives, so they are formed
+    // once rather than for every atom pair the pair reaches.
+
+    const auto f_0 = 1.5 / p;
+    const auto f_1 = 2.0 / beta;
+    const auto f_2 = 2.0 * alpha / (beta * p);
+    const auto f_3 = 0.5 / beta;
+    const auto f_4 = 0.5 * alpha / (beta * p);
+    const auto f_5 = 1.0 / beta;
+    const auto f_6 = alpha / (beta * p);
+    const auto f_7 = 1.0 / p;
+    const auto f_8 = 0.5 / p;
+
+    auto *t_0 = buffer.data(target + 0);
+    auto *t_1 = buffer.data(target + 1);
+    auto *t_2 = buffer.data(target + 2);
+    auto *t_3 = buffer.data(target + 3);
+    auto *t_4 = buffer.data(target + 4);
+    auto *t_5 = buffer.data(target + 5);
+    auto *t_6 = buffer.data(target + 6);
+    auto *t_7 = buffer.data(target + 7);
+    auto *t_8 = buffer.data(target + 8);
+    auto *t_9 = buffer.data(target + 9);
+    auto *t_10 = buffer.data(target + 10);
+    auto *t_11 = buffer.data(target + 11);
+    auto *t_12 = buffer.data(target + 12);
+    auto *t_13 = buffer.data(target + 13);
+    auto *t_14 = buffer.data(target + 14);
+    auto *t_15 = buffer.data(target + 15);
+    auto *t_16 = buffer.data(target + 16);
+    auto *t_17 = buffer.data(target + 17);
+    auto *t_18 = buffer.data(target + 18);
+    auto *t_19 = buffer.data(target + 19);
+    auto *t_20 = buffer.data(target + 20);
+    auto *t_21 = buffer.data(target + 21);
+    auto *t_22 = buffer.data(target + 22);
+    auto *t_23 = buffer.data(target + 23);
+    auto *t_24 = buffer.data(target + 24);
+    auto *t_25 = buffer.data(target + 25);
+    auto *t_26 = buffer.data(target + 26);
+    auto *t_27 = buffer.data(target + 27);
+    auto *t_28 = buffer.data(target + 28);
+    auto *t_29 = buffer.data(target + 29);
+    auto *t_30 = buffer.data(target + 30);
+    auto *t_31 = buffer.data(target + 31);
+    auto *t_32 = buffer.data(target + 32);
+    auto *t_33 = buffer.data(target + 33);
+    auto *t_34 = buffer.data(target + 34);
+    auto *t_35 = buffer.data(target + 35);
+    auto *t_36 = buffer.data(target + 36);
+    auto *t_37 = buffer.data(target + 37);
+    auto *t_38 = buffer.data(target + 38);
+    auto *t_39 = buffer.data(target + 39);
+    auto *t_40 = buffer.data(target + 40);
+    auto *t_41 = buffer.data(target + 41);
+    auto *t_42 = buffer.data(target + 42);
+    auto *t_43 = buffer.data(target + 43);
+    auto *t_44 = buffer.data(target + 44);
+    auto *t_45 = buffer.data(target + 45);
+    auto *t_46 = buffer.data(target + 46);
+    auto *t_47 = buffer.data(target + 47);
+    auto *t_48 = buffer.data(target + 48);
+    auto *t_49 = buffer.data(target + 49);
+    auto *t_50 = buffer.data(target + 50);
+    auto *t_51 = buffer.data(target + 51);
+    auto *t_52 = buffer.data(target + 52);
+    auto *t_53 = buffer.data(target + 53);
+
+    const auto *pa_x = buffer.data(pa + 0);
+    const auto *pa_y = buffer.data(pa + 1);
+    const auto *pa_z = buffer.data(pa + 2);
+
+    const auto *pb_x = buffer.data(pb + 0);
+    const auto *pb_y = buffer.data(pb + 1);
+    const auto *pb_z = buffer.data(pb + 2);
+
+    const auto *dg_0 = buffer.data(dg + 0);
+    const auto *dg_10 = buffer.data(dg + 10);
+    const auto *dg_12 = buffer.data(dg + 12);
+    const auto *dg_14 = buffer.data(dg + 14);
+    const auto *dg_20 = buffer.data(dg + 20);
+    const auto *dg_22 = buffer.data(dg + 22);
+    const auto *dg_24 = buffer.data(dg + 24);
+    const auto *dg_25 = buffer.data(dg + 25);
+    const auto *dg_26 = buffer.data(dg + 26);
+
+    const auto *dh_0 = buffer.data(dh + 0);
+    const auto *dh_16 = buffer.data(dh + 16);
+    const auto *dh_18 = buffer.data(dh + 18);
+    const auto *dh_23 = buffer.data(dh + 23);
+    const auto *dh_31 = buffer.data(dh + 31);
+    const auto *dh_33 = buffer.data(dh + 33);
+    const auto *dh_38 = buffer.data(dh + 38);
+    const auto *dh_39 = buffer.data(dh + 39);
+    const auto *dh_41 = buffer.data(dh + 41);
+
+    const auto *ff0_0 = buffer.data(ff0 + 0);
+    const auto *ff0_1 = buffer.data(ff0 + 1);
+    const auto *ff0_2 = buffer.data(ff0 + 2);
+    const auto *ff0_3 = buffer.data(ff0 + 3);
+    const auto *ff0_4 = buffer.data(ff0 + 4);
+    const auto *ff0_5 = buffer.data(ff0 + 5);
+    const auto *ff0_12 = buffer.data(ff0 + 12);
+    const auto *ff0_13 = buffer.data(ff0 + 13);
+    const auto *ff0_14 = buffer.data(ff0 + 14);
+    const auto *ff0_15 = buffer.data(ff0 + 15);
+    const auto *ff0_16 = buffer.data(ff0 + 16);
+    const auto *ff0_17 = buffer.data(ff0 + 17);
+    const auto *ff0_21 = buffer.data(ff0 + 21);
+    const auto *ff0_22 = buffer.data(ff0 + 22);
+    const auto *ff0_23 = buffer.data(ff0 + 23);
+    const auto *ff0_24 = buffer.data(ff0 + 24);
+    const auto *ff0_25 = buffer.data(ff0 + 25);
+    const auto *ff0_26 = buffer.data(ff0 + 26);
+
+    const auto *ff1_0 = buffer.data(ff1 + 0);
+    const auto *ff1_1 = buffer.data(ff1 + 1);
+    const auto *ff1_2 = buffer.data(ff1 + 2);
+    const auto *ff1_3 = buffer.data(ff1 + 3);
+    const auto *ff1_4 = buffer.data(ff1 + 4);
+    const auto *ff1_5 = buffer.data(ff1 + 5);
+    const auto *ff1_12 = buffer.data(ff1 + 12);
+    const auto *ff1_13 = buffer.data(ff1 + 13);
+    const auto *ff1_14 = buffer.data(ff1 + 14);
+    const auto *ff1_15 = buffer.data(ff1 + 15);
+    const auto *ff1_16 = buffer.data(ff1 + 16);
+    const auto *ff1_17 = buffer.data(ff1 + 17);
+    const auto *ff1_21 = buffer.data(ff1 + 21);
+    const auto *ff1_22 = buffer.data(ff1 + 22);
+    const auto *ff1_23 = buffer.data(ff1 + 23);
+    const auto *ff1_24 = buffer.data(ff1 + 24);
+    const auto *ff1_25 = buffer.data(ff1 + 25);
+    const auto *ff1_26 = buffer.data(ff1 + 26);
+
+    const auto *fg_0 = buffer.data(fg + 0);
+    const auto *fg_1 = buffer.data(fg + 1);
+    const auto *fg_2 = buffer.data(fg + 2);
+    const auto *fg_3 = buffer.data(fg + 3);
+    const auto *fg_4 = buffer.data(fg + 4);
+    const auto *fg_5 = buffer.data(fg + 5);
+    const auto *fg_6 = buffer.data(fg + 6);
+    const auto *fg_7 = buffer.data(fg + 7);
+    const auto *fg_8 = buffer.data(fg + 8);
+    const auto *fg_13 = buffer.data(fg + 13);
+    const auto *fg_16 = buffer.data(fg + 16);
+    const auto *fg_17 = buffer.data(fg + 17);
+    const auto *fg_18 = buffer.data(fg + 18);
+    const auto *fg_19 = buffer.data(fg + 19);
+    const auto *fg_20 = buffer.data(fg + 20);
+    const auto *fg_21 = buffer.data(fg + 21);
+    const auto *fg_22 = buffer.data(fg + 22);
+    const auto *fg_23 = buffer.data(fg + 23);
+    const auto *fg_24 = buffer.data(fg + 24);
+    const auto *fg_25 = buffer.data(fg + 25);
+    const auto *fg_29 = buffer.data(fg + 29);
+    const auto *fg_30 = buffer.data(fg + 30);
+    const auto *fg_31 = buffer.data(fg + 31);
+    const auto *fg_32 = buffer.data(fg + 32);
+    const auto *fg_33 = buffer.data(fg + 33);
+    const auto *fg_34 = buffer.data(fg + 34);
+    const auto *fg_35 = buffer.data(fg + 35);
+    const auto *fg_36 = buffer.data(fg + 36);
+    const auto *fg_37 = buffer.data(fg + 37);
+    const auto *fg_38 = buffer.data(fg + 38);
+
+#pragma omp simd aligned(t_0, t_1, t_2, t_3, t_4, pb_x, pb_y, pb_z, dg_0, ff0_0, ff1_0, fg_0, \
+                         fg_1, fg_2 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_0[k] = f_0 * dg_0[k]
+                 + f_1 * ff0_0[k]
+                 - f_2 * ff1_0[k]
+                 + pb_x[k] * fg_0[k];
+
+        t_1[k] = pb_y[k] * fg_0[k];
+
+        t_2[k] = pb_z[k] * fg_0[k];
+
+        t_3[k] = f_3 * ff0_0[k]
+                 - f_4 * ff1_0[k]
+                 + pb_y[k] * fg_1[k];
+
+        t_4[k] = f_3 * ff0_0[k]
+                 - f_4 * ff1_0[k]
+                 + pb_z[k] * fg_2[k];
+    }
+
+#pragma omp simd aligned(t_5, t_6, t_7, t_8, pb_y, pb_z, ff0_1, ff0_2, ff0_3, ff1_1, ff1_2, \
+                         ff1_3, fg_3, fg_4, fg_5 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_5[k] = f_5 * ff0_1[k]
+                 - f_6 * ff1_1[k]
+                 + pb_y[k] * fg_3[k];
+
+        t_6[k] = pb_y[k] * fg_4[k];
+
+        t_7[k] = f_5 * ff0_2[k]
+                 - f_6 * ff1_2[k]
+                 + pb_z[k] * fg_4[k];
+
+        t_8[k] = f_1 * ff0_3[k]
+                 - f_2 * ff1_3[k]
+                 + pb_y[k] * fg_5[k];
+    }
+
+#pragma omp simd aligned(t_9, t_10, t_11, t_12, t_13, pa_y, pb_y, pb_z, dh_0, ff0_4, ff0_5, \
+                         ff1_4, ff1_5, fg_6, fg_7, fg_8 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_9[k] = f_5 * ff0_4[k]
+                 - f_6 * ff1_4[k]
+                 + pb_y[k] * fg_6[k];
+
+        t_10[k] = f_3 * ff0_5[k]
+                  - f_4 * ff1_5[k]
+                  + pb_y[k] * fg_7[k];
+
+        t_11[k] = pb_y[k] * fg_8[k];
+
+        t_12[k] = f_1 * ff0_5[k]
+                  - f_2 * ff1_5[k]
+                  + pb_z[k] * fg_8[k];
+
+        t_13[k] = pa_y[k] * dh_0[k];
+    }
+
+#pragma omp simd aligned(t_14, t_15, t_16, t_17, t_18, pa_x, pa_z, pb_x, dg_10, dg_12, dg_14, \
+                         dh_0, dh_16, dh_18, dh_23, fg_13 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_14[k] = pa_z[k] * dh_0[k];
+
+        t_15[k] = f_0 * dg_10[k]
+                  + pa_x[k] * dh_16[k];
+
+        t_16[k] = f_7 * dg_12[k]
+                  + pa_x[k] * dh_18[k];
+
+        t_17[k] = f_8 * dg_14[k]
+                  + pb_x[k] * fg_13[k];
+
+        t_18[k] = pa_x[k] * dh_23[k];
+    }
+
+#pragma omp simd aligned(t_19, t_20, t_21, t_22, pa_x, pb_x, dg_20, dg_22, dg_26, dh_31, \
+                         dh_33, dh_41, fg_16 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_19[k] = f_0 * dg_20[k]
+                  + pa_x[k] * dh_31[k];
+
+        t_20[k] = f_7 * dg_22[k]
+                  + pa_x[k] * dh_33[k];
+
+        t_21[k] = f_8 * dg_26[k]
+                  + pb_x[k] * fg_16[k];
+
+        t_22[k] = pa_x[k] * dh_41[k];
+    }
+
+#pragma omp simd aligned(t_23, t_24, t_25, pb_x, ff0_12, ff0_13, ff0_14, ff1_12, ff1_13, \
+                         ff1_14, fg_17, fg_18, fg_19 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_23[k] = f_1 * ff0_12[k]
+                  - f_2 * ff1_12[k]
+                  + pb_x[k] * fg_17[k];
+
+        t_24[k] = f_5 * ff0_13[k]
+                  - f_6 * ff1_13[k]
+                  + pb_x[k] * fg_18[k];
+
+        t_25[k] = f_5 * ff0_14[k]
+                  - f_6 * ff1_14[k]
+                  + pb_x[k] * fg_19[k];
+    }
+
+#pragma omp simd aligned(t_26, t_27, t_28, t_29, t_30, pb_x, ff0_15, ff0_17, ff1_15, ff1_17, \
+                         fg_20, fg_21, fg_22, fg_24, fg_25 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_26[k] = f_3 * ff0_15[k]
+                  - f_4 * ff1_15[k]
+                  + pb_x[k] * fg_20[k];
+
+        t_27[k] = f_3 * ff0_17[k]
+                  - f_4 * ff1_17[k]
+                  + pb_x[k] * fg_21[k];
+
+        t_28[k] = pb_x[k] * fg_22[k];
+
+        t_29[k] = pb_x[k] * fg_24[k];
+
+        t_30[k] = pb_x[k] * fg_25[k];
+    }
+
+#pragma omp simd aligned(t_31, t_32, t_33, t_34, pb_y, pb_z, dg_14, ff0_15, ff0_16, ff1_15, \
+                         ff1_16, fg_22, fg_23, fg_24 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_31[k] = f_0 * dg_14[k]
+                  + f_1 * ff0_15[k]
+                  - f_2 * ff1_15[k]
+                  + pb_y[k] * fg_22[k];
+
+        t_32[k] = pb_z[k] * fg_22[k];
+
+        t_33[k] = f_3 * ff0_15[k]
+                  - f_4 * ff1_15[k]
+                  + pb_z[k] * fg_23[k];
+
+        t_34[k] = f_5 * ff0_16[k]
+                  - f_6 * ff1_16[k]
+                  + pb_z[k] * fg_24[k];
+    }
+
+#pragma omp simd aligned(t_35, t_36, t_37, t_38, pa_y, pa_z, pb_z, dg_24, dg_25, dh_23, dh_38, \
+                         dh_39, ff0_17, ff1_17, fg_25 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_35[k] = f_1 * ff0_17[k]
+                  - f_2 * ff1_17[k]
+                  + pb_z[k] * fg_25[k];
+
+        t_36[k] = pa_z[k] * dh_23[k];
+
+        t_37[k] = f_0 * dg_24[k]
+                  + pa_y[k] * dh_38[k];
+
+        t_38[k] = f_7 * dg_25[k]
+                  + pa_y[k] * dh_39[k];
+    }
+
+#pragma omp simd aligned(t_39, t_40, t_41, t_42, pa_y, pb_x, pb_y, dg_26, dh_41, ff0_21, \
+                         ff0_22, ff1_21, ff1_22, fg_29, fg_30, fg_31 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_39[k] = f_8 * dg_26[k]
+                  + pb_y[k] * fg_29[k];
+
+        t_40[k] = pa_y[k] * dh_41[k];
+
+        t_41[k] = f_1 * ff0_21[k]
+                  - f_2 * ff1_21[k]
+                  + pb_x[k] * fg_30[k];
+
+        t_42[k] = f_5 * ff0_22[k]
+                  - f_6 * ff1_22[k]
+                  + pb_x[k] * fg_31[k];
+    }
+
+#pragma omp simd aligned(t_43, t_44, t_45, t_46, pb_x, ff0_23, ff0_24, ff0_26, ff1_23, ff1_24, \
+                         ff1_26, fg_32, fg_33, fg_34, fg_35 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_43[k] = f_5 * ff0_23[k]
+                  - f_6 * ff1_23[k]
+                  + pb_x[k] * fg_32[k];
+
+        t_44[k] = f_3 * ff0_24[k]
+                  - f_4 * ff1_24[k]
+                  + pb_x[k] * fg_33[k];
+
+        t_45[k] = f_3 * ff0_26[k]
+                  - f_4 * ff1_26[k]
+                  + pb_x[k] * fg_34[k];
+
+        t_46[k] = pb_x[k] * fg_35[k];
+    }
+
+#pragma omp simd aligned(t_47, t_48, t_49, t_50, pb_x, pb_y, ff0_24, ff0_25, ff1_24, ff1_25, \
+                         fg_35, fg_36, fg_38 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_47[k] = pb_x[k] * fg_36[k];
+
+        t_48[k] = pb_x[k] * fg_38[k];
+
+        t_49[k] = f_1 * ff0_24[k]
+                  - f_2 * ff1_24[k]
+                  + pb_y[k] * fg_35[k];
+
+        t_50[k] = f_5 * ff0_25[k]
+                  - f_6 * ff1_25[k]
+                  + pb_y[k] * fg_36[k];
+    }
+
+#pragma omp simd aligned(t_51, t_52, t_53, pb_y, pb_z, dg_26, ff0_26, ff1_26, fg_37, \
+                         fg_38 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_51[k] = f_3 * ff0_26[k]
+                  - f_4 * ff1_26[k]
+                  + pb_y[k] * fg_37[k];
+
+        t_52[k] = pb_y[k] * fg_38[k];
+
+        t_53[k] = f_0 * dg_26[k]
+                  + f_1 * ff0_26[k]
+                  - f_2 * ff1_26[k]
+                  + pb_z[k] * fg_38[k];
+    }
+}
+
+auto
+compute_prim_fh_electron_repulsion_12(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t pb, const size_t dg, const size_t dh,
+                                      const size_t ff0, const size_t ff1, const size_t fg,
+                                      const size_t ncols, const double alpha, const double beta,
+                                      const double p) -> void
+{
+    // NOTE: the factors are fixed by the pair of primitives, so they are formed
+    // once rather than for every atom pair the pair reaches.
+
+    const auto f_0 = 1.5 / p;
+    const auto f_1 = 2.0 / beta;
+    const auto f_2 = 2.0 * alpha / (beta * p);
+    const auto f_3 = 0.5 / beta;
+    const auto f_4 = 0.5 * alpha / (beta * p);
+    const auto f_5 = 1.0 / beta;
+    const auto f_6 = alpha / (beta * p);
+    const auto f_7 = 2.5 / p;
+    const auto f_8 = 1.0 / p;
+    const auto f_9 = 0.5 / p;
+
+    auto *t_0 = buffer.data(target + 0);
+    auto *t_1 = buffer.data(target + 1);
+    auto *t_2 = buffer.data(target + 2);
+    auto *t_3 = buffer.data(target + 3);
+    auto *t_4 = buffer.data(target + 4);
+    auto *t_5 = buffer.data(target + 5);
+    auto *t_6 = buffer.data(target + 6);
+    auto *t_7 = buffer.data(target + 7);
+    auto *t_8 = buffer.data(target + 8);
+    auto *t_9 = buffer.data(target + 9);
+    auto *t_10 = buffer.data(target + 10);
+    auto *t_11 = buffer.data(target + 11);
+    auto *t_12 = buffer.data(target + 12);
+    auto *t_13 = buffer.data(target + 13);
+    auto *t_14 = buffer.data(target + 14);
+    auto *t_15 = buffer.data(target + 15);
+    auto *t_16 = buffer.data(target + 16);
+    auto *t_17 = buffer.data(target + 17);
+    auto *t_18 = buffer.data(target + 18);
+    auto *t_19 = buffer.data(target + 19);
+    auto *t_20 = buffer.data(target + 20);
+    auto *t_21 = buffer.data(target + 21);
+    auto *t_22 = buffer.data(target + 22);
+    auto *t_23 = buffer.data(target + 23);
+    auto *t_24 = buffer.data(target + 24);
+    auto *t_25 = buffer.data(target + 25);
+    auto *t_26 = buffer.data(target + 26);
+    auto *t_27 = buffer.data(target + 27);
+    auto *t_28 = buffer.data(target + 28);
+    auto *t_29 = buffer.data(target + 29);
+    auto *t_30 = buffer.data(target + 30);
+    auto *t_31 = buffer.data(target + 31);
+    auto *t_32 = buffer.data(target + 32);
+    auto *t_33 = buffer.data(target + 33);
+    auto *t_34 = buffer.data(target + 34);
+    auto *t_35 = buffer.data(target + 35);
+    auto *t_36 = buffer.data(target + 36);
+    auto *t_37 = buffer.data(target + 37);
+    auto *t_38 = buffer.data(target + 38);
+    auto *t_39 = buffer.data(target + 39);
+    auto *t_40 = buffer.data(target + 40);
+    auto *t_41 = buffer.data(target + 41);
+    auto *t_42 = buffer.data(target + 42);
+    auto *t_43 = buffer.data(target + 43);
+    auto *t_44 = buffer.data(target + 44);
+    auto *t_45 = buffer.data(target + 45);
+    auto *t_46 = buffer.data(target + 46);
+    auto *t_47 = buffer.data(target + 47);
+    auto *t_48 = buffer.data(target + 48);
+    auto *t_49 = buffer.data(target + 49);
+    auto *t_50 = buffer.data(target + 50);
+    auto *t_51 = buffer.data(target + 51);
+    auto *t_52 = buffer.data(target + 52);
+    auto *t_53 = buffer.data(target + 53);
+    auto *t_54 = buffer.data(target + 54);
+    auto *t_55 = buffer.data(target + 55);
+    auto *t_56 = buffer.data(target + 56);
+
+    const auto *pa_x = buffer.data(pa + 0);
+    const auto *pa_y = buffer.data(pa + 1);
+    const auto *pa_z = buffer.data(pa + 2);
+
+    const auto *pb_x = buffer.data(pb + 0);
+    const auto *pb_y = buffer.data(pb + 1);
+    const auto *pb_z = buffer.data(pb + 2);
+
+    const auto *dg_0 = buffer.data(dg + 0);
+    const auto *dg_8 = buffer.data(dg + 8);
+    const auto *dg_10 = buffer.data(dg + 10);
+    const auto *dg_12 = buffer.data(dg + 12);
+    const auto *dg_14 = buffer.data(dg + 14);
+    const auto *dg_17 = buffer.data(dg + 17);
+    const auto *dg_20 = buffer.data(dg + 20);
+    const auto *dg_22 = buffer.data(dg + 22);
+    const auto *dg_23 = buffer.data(dg + 23);
+    const auto *dg_24 = buffer.data(dg + 24);
+    const auto *dg_25 = buffer.data(dg + 25);
+    const auto *dg_26 = buffer.data(dg + 26);
+
+    const auto *dh_0 = buffer.data(dh + 0);
+    const auto *dh_12 = buffer.data(dh + 12);
+    const auto *dh_14 = buffer.data(dh + 14);
+    const auto *dh_16 = buffer.data(dh + 16);
+    const auto *dh_21 = buffer.data(dh + 21);
+    const auto *dh_25 = buffer.data(dh + 25);
+    const auto *dh_28 = buffer.data(dh + 28);
+    const auto *dh_30 = buffer.data(dh + 30);
+    const auto *dh_34 = buffer.data(dh + 34);
+    const auto *dh_35 = buffer.data(dh + 35);
+    const auto *dh_36 = buffer.data(dh + 36);
+    const auto *dh_38 = buffer.data(dh + 38);
+
+    const auto *ff0_0 = buffer.data(ff0 + 0);
+    const auto *ff0_1 = buffer.data(ff0 + 1);
+    const auto *ff0_2 = buffer.data(ff0 + 2);
+    const auto *ff0_3 = buffer.data(ff0 + 3);
+    const auto *ff0_4 = buffer.data(ff0 + 4);
+    const auto *ff0_5 = buffer.data(ff0 + 5);
+    const auto *ff0_12 = buffer.data(ff0 + 12);
+    const auto *ff0_13 = buffer.data(ff0 + 13);
+    const auto *ff0_14 = buffer.data(ff0 + 14);
+    const auto *ff0_15 = buffer.data(ff0 + 15);
+    const auto *ff0_16 = buffer.data(ff0 + 16);
+    const auto *ff0_17 = buffer.data(ff0 + 17);
+    const auto *ff0_21 = buffer.data(ff0 + 21);
+    const auto *ff0_22 = buffer.data(ff0 + 22);
+    const auto *ff0_23 = buffer.data(ff0 + 23);
+    const auto *ff0_24 = buffer.data(ff0 + 24);
+    const auto *ff0_25 = buffer.data(ff0 + 25);
+    const auto *ff0_26 = buffer.data(ff0 + 26);
+
+    const auto *ff1_0 = buffer.data(ff1 + 0);
+    const auto *ff1_1 = buffer.data(ff1 + 1);
+    const auto *ff1_2 = buffer.data(ff1 + 2);
+    const auto *ff1_3 = buffer.data(ff1 + 3);
+    const auto *ff1_4 = buffer.data(ff1 + 4);
+    const auto *ff1_5 = buffer.data(ff1 + 5);
+    const auto *ff1_12 = buffer.data(ff1 + 12);
+    const auto *ff1_13 = buffer.data(ff1 + 13);
+    const auto *ff1_14 = buffer.data(ff1 + 14);
+    const auto *ff1_15 = buffer.data(ff1 + 15);
+    const auto *ff1_16 = buffer.data(ff1 + 16);
+    const auto *ff1_17 = buffer.data(ff1 + 17);
+    const auto *ff1_21 = buffer.data(ff1 + 21);
+    const auto *ff1_22 = buffer.data(ff1 + 22);
+    const auto *ff1_23 = buffer.data(ff1 + 23);
+    const auto *ff1_24 = buffer.data(ff1 + 24);
+    const auto *ff1_25 = buffer.data(ff1 + 25);
+    const auto *ff1_26 = buffer.data(ff1 + 26);
+
+    const auto *fg_0 = buffer.data(fg + 0);
+    const auto *fg_1 = buffer.data(fg + 1);
+    const auto *fg_2 = buffer.data(fg + 2);
+    const auto *fg_3 = buffer.data(fg + 3);
+    const auto *fg_4 = buffer.data(fg + 4);
+    const auto *fg_5 = buffer.data(fg + 5);
+    const auto *fg_6 = buffer.data(fg + 6);
+    const auto *fg_7 = buffer.data(fg + 7);
+    const auto *fg_8 = buffer.data(fg + 8);
+    const auto *fg_13 = buffer.data(fg + 13);
+    const auto *fg_16 = buffer.data(fg + 16);
+    const auto *fg_17 = buffer.data(fg + 17);
+    const auto *fg_18 = buffer.data(fg + 18);
+    const auto *fg_19 = buffer.data(fg + 19);
+    const auto *fg_20 = buffer.data(fg + 20);
+    const auto *fg_21 = buffer.data(fg + 21);
+    const auto *fg_22 = buffer.data(fg + 22);
+    const auto *fg_23 = buffer.data(fg + 23);
+    const auto *fg_24 = buffer.data(fg + 24);
+    const auto *fg_25 = buffer.data(fg + 25);
+    const auto *fg_29 = buffer.data(fg + 29);
+    const auto *fg_30 = buffer.data(fg + 30);
+    const auto *fg_31 = buffer.data(fg + 31);
+    const auto *fg_32 = buffer.data(fg + 32);
+    const auto *fg_33 = buffer.data(fg + 33);
+    const auto *fg_34 = buffer.data(fg + 34);
+    const auto *fg_35 = buffer.data(fg + 35);
+    const auto *fg_36 = buffer.data(fg + 36);
+    const auto *fg_37 = buffer.data(fg + 37);
+    const auto *fg_38 = buffer.data(fg + 38);
+
+#pragma omp simd aligned(t_0, t_1, t_2, t_3, t_4, pb_x, pb_y, pb_z, dg_0, ff0_0, ff1_0, fg_0, \
+                         fg_1, fg_2 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_0[k] = f_0 * dg_0[k]
+                 + f_1 * ff0_0[k]
+                 - f_2 * ff1_0[k]
+                 + pb_x[k] * fg_0[k];
+
+        t_1[k] = pb_y[k] * fg_0[k];
+
+        t_2[k] = pb_z[k] * fg_0[k];
+
+        t_3[k] = f_3 * ff0_0[k]
+                 - f_4 * ff1_0[k]
+                 + pb_y[k] * fg_1[k];
+
+        t_4[k] = f_3 * ff0_0[k]
+                 - f_4 * ff1_0[k]
+                 + pb_z[k] * fg_2[k];
+    }
+
+#pragma omp simd aligned(t_5, t_6, t_7, t_8, pb_y, pb_z, ff0_1, ff0_2, ff0_3, ff1_1, ff1_2, \
+                         ff1_3, fg_3, fg_4, fg_5 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_5[k] = f_5 * ff0_1[k]
+                 - f_6 * ff1_1[k]
+                 + pb_y[k] * fg_3[k];
+
+        t_6[k] = pb_y[k] * fg_4[k];
+
+        t_7[k] = f_5 * ff0_2[k]
+                 - f_6 * ff1_2[k]
+                 + pb_z[k] * fg_4[k];
+
+        t_8[k] = f_1 * ff0_3[k]
+                 - f_2 * ff1_3[k]
+                 + pb_y[k] * fg_5[k];
+    }
+
+#pragma omp simd aligned(t_9, t_10, t_11, t_12, t_13, pa_y, pb_y, pb_z, dh_0, ff0_4, ff0_5, \
+                         ff1_4, ff1_5, fg_6, fg_7, fg_8 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_9[k] = f_5 * ff0_4[k]
+                 - f_6 * ff1_4[k]
+                 + pb_y[k] * fg_6[k];
+
+        t_10[k] = f_3 * ff0_5[k]
+                  - f_4 * ff1_5[k]
+                  + pb_y[k] * fg_7[k];
+
+        t_11[k] = pb_y[k] * fg_8[k];
+
+        t_12[k] = f_1 * ff0_5[k]
+                  - f_2 * ff1_5[k]
+                  + pb_z[k] * fg_8[k];
+
+        t_13[k] = pa_y[k] * dh_0[k];
+    }
+
+#pragma omp simd aligned(t_14, t_15, t_16, t_17, pa_x, pa_z, dg_8, dg_10, dg_12, dh_0, dh_12, \
+                         dh_14, dh_16 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_14[k] = pa_z[k] * dh_0[k];
+
+        t_15[k] = f_7 * dg_8[k]
+                  + pa_z[k] * dh_12[k];
+
+        t_16[k] = f_0 * dg_10[k]
+                  + pa_x[k] * dh_14[k];
+
+        t_17[k] = f_8 * dg_12[k]
+                  + pa_x[k] * dh_16[k];
+    }
+
+#pragma omp simd aligned(t_18, t_19, t_20, t_21, t_22, pa_x, pb_x, dg_14, dg_20, dg_22, dg_26, \
+                         dh_21, dh_28, dh_30, fg_13, fg_16 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_18[k] = f_9 * dg_14[k]
+                  + pb_x[k] * fg_13[k];
+
+        t_19[k] = pa_x[k] * dh_21[k];
+
+        t_20[k] = f_0 * dg_20[k]
+                  + pa_x[k] * dh_28[k];
+
+        t_21[k] = f_8 * dg_22[k]
+                  + pa_x[k] * dh_30[k];
+
+        t_22[k] = f_9 * dg_26[k]
+                  + pb_x[k] * fg_16[k];
+    }
+
+#pragma omp simd aligned(t_23, t_24, t_25, t_26, pa_x, pb_x, dh_38, ff0_12, ff0_13, ff0_14, \
+                         ff1_12, ff1_13, ff1_14, fg_17, fg_18, fg_19 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_23[k] = pa_x[k] * dh_38[k];
+
+        t_24[k] = f_1 * ff0_12[k]
+                  - f_2 * ff1_12[k]
+                  + pb_x[k] * fg_17[k];
+
+        t_25[k] = f_5 * ff0_13[k]
+                  - f_6 * ff1_13[k]
+                  + pb_x[k] * fg_18[k];
+
+        t_26[k] = f_5 * ff0_14[k]
+                  - f_6 * ff1_14[k]
+                  + pb_x[k] * fg_19[k];
+    }
+
+#pragma omp simd aligned(t_27, t_28, t_29, t_30, t_31, pb_x, ff0_15, ff0_17, ff1_15, ff1_17, \
+                         fg_20, fg_21, fg_22, fg_24, fg_25 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_27[k] = f_3 * ff0_15[k]
+                  - f_4 * ff1_15[k]
+                  + pb_x[k] * fg_20[k];
+
+        t_28[k] = f_3 * ff0_17[k]
+                  - f_4 * ff1_17[k]
+                  + pb_x[k] * fg_21[k];
+
+        t_29[k] = pb_x[k] * fg_22[k];
+
+        t_30[k] = pb_x[k] * fg_24[k];
+
+        t_31[k] = pb_x[k] * fg_25[k];
+    }
+
+#pragma omp simd aligned(t_32, t_33, t_34, t_35, pb_y, pb_z, dg_14, ff0_15, ff0_16, ff1_15, \
+                         ff1_16, fg_22, fg_23, fg_24 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_32[k] = f_0 * dg_14[k]
+                  + f_1 * ff0_15[k]
+                  - f_2 * ff1_15[k]
+                  + pb_y[k] * fg_22[k];
+
+        t_33[k] = pb_z[k] * fg_22[k];
+
+        t_34[k] = f_3 * ff0_15[k]
+                  - f_4 * ff1_15[k]
+                  + pb_z[k] * fg_23[k];
+
+        t_35[k] = f_5 * ff0_16[k]
+                  - f_6 * ff1_16[k]
+                  + pb_z[k] * fg_24[k];
+    }
+
+#pragma omp simd aligned(t_36, t_37, t_38, t_39, pa_y, pa_z, pb_z, dg_17, dg_23, dh_21, dh_25, \
+                         dh_34, ff0_17, ff1_17, fg_25 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_36[k] = f_1 * ff0_17[k]
+                  - f_2 * ff1_17[k]
+                  + pb_z[k] * fg_25[k];
+
+        t_37[k] = pa_z[k] * dh_21[k];
+
+        t_38[k] = f_7 * dg_17[k]
+                  + pa_z[k] * dh_25[k];
+
+        t_39[k] = f_7 * dg_23[k]
+                  + pa_y[k] * dh_34[k];
+    }
+
+#pragma omp simd aligned(t_40, t_41, t_42, t_43, pa_y, pb_y, dg_24, dg_25, dg_26, dh_35, \
+                         dh_36, dh_38, fg_29 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_40[k] = f_0 * dg_24[k]
+                  + pa_y[k] * dh_35[k];
+
+        t_41[k] = f_8 * dg_25[k]
+                  + pa_y[k] * dh_36[k];
+
+        t_42[k] = f_9 * dg_26[k]
+                  + pb_y[k] * fg_29[k];
+
+        t_43[k] = pa_y[k] * dh_38[k];
+    }
+
+#pragma omp simd aligned(t_44, t_45, t_46, pb_x, ff0_21, ff0_22, ff0_23, ff1_21, ff1_22, \
+                         ff1_23, fg_30, fg_31, fg_32 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_44[k] = f_1 * ff0_21[k]
+                  - f_2 * ff1_21[k]
+                  + pb_x[k] * fg_30[k];
+
+        t_45[k] = f_5 * ff0_22[k]
+                  - f_6 * ff1_22[k]
+                  + pb_x[k] * fg_31[k];
+
+        t_46[k] = f_5 * ff0_23[k]
+                  - f_6 * ff1_23[k]
+                  + pb_x[k] * fg_32[k];
+    }
+
+#pragma omp simd aligned(t_47, t_48, t_49, t_50, t_51, pb_x, ff0_24, ff0_26, ff1_24, ff1_26, \
+                         fg_33, fg_34, fg_35, fg_36, fg_38 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_47[k] = f_3 * ff0_24[k]
+                  - f_4 * ff1_24[k]
+                  + pb_x[k] * fg_33[k];
+
+        t_48[k] = f_3 * ff0_26[k]
+                  - f_4 * ff1_26[k]
+                  + pb_x[k] * fg_34[k];
+
+        t_49[k] = pb_x[k] * fg_35[k];
+
+        t_50[k] = pb_x[k] * fg_36[k];
+
+        t_51[k] = pb_x[k] * fg_38[k];
+    }
+
+#pragma omp simd aligned(t_52, t_53, t_54, t_55, pb_y, ff0_24, ff0_25, ff0_26, ff1_24, ff1_25, \
+                         ff1_26, fg_35, fg_36, fg_37, fg_38 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_52[k] = f_1 * ff0_24[k]
+                  - f_2 * ff1_24[k]
+                  + pb_y[k] * fg_35[k];
+
+        t_53[k] = f_5 * ff0_25[k]
+                  - f_6 * ff1_25[k]
+                  + pb_y[k] * fg_36[k];
+
+        t_54[k] = f_3 * ff0_26[k]
+                  - f_4 * ff1_26[k]
+                  + pb_y[k] * fg_37[k];
+
+        t_55[k] = pb_y[k] * fg_38[k];
+    }
+
+#pragma omp simd aligned(t_56, pb_z, dg_26, ff0_26, ff1_26, fg_38 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_56[k] = f_0 * dg_26[k]
+                  + f_1 * ff0_26[k]
+                  - f_2 * ff1_26[k]
+                  + pb_z[k] * fg_38[k];
+    }
+}
+
+auto
+compute_prim_fh_electron_repulsion_13(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t pb, const size_t dg, const size_t dh,
+                                      const size_t ff0, const size_t ff1, const size_t fg,
+                                      const size_t ncols, const double alpha, const double beta,
+                                      const double p) -> void
+{
+    // NOTE: the factors are fixed by the pair of primitives, so they are formed
+    // once rather than for every atom pair the pair reaches.
+
+    const auto f_0 = 1.5 / p;
+    const auto f_1 = 2.0 / beta;
+    const auto f_2 = 2.0 * alpha / (beta * p);
+    const auto f_3 = 0.5 / beta;
+    const auto f_4 = 0.5 * alpha / (beta * p);
+    const auto f_5 = 1.0 / beta;
+    const auto f_6 = alpha / (beta * p);
+
+    auto *t_0 = buffer.data(target + 0);
+    auto *t_1 = buffer.data(target + 1);
+    auto *t_2 = buffer.data(target + 2);
+    auto *t_3 = buffer.data(target + 3);
+    auto *t_4 = buffer.data(target + 4);
+    auto *t_5 = buffer.data(target + 5);
+    auto *t_6 = buffer.data(target + 6);
+    auto *t_7 = buffer.data(target + 7);
+    auto *t_8 = buffer.data(target + 8);
+    auto *t_9 = buffer.data(target + 9);
+    auto *t_10 = buffer.data(target + 10);
+    auto *t_11 = buffer.data(target + 11);
+    auto *t_12 = buffer.data(target + 12);
+    auto *t_13 = buffer.data(target + 13);
+    auto *t_14 = buffer.data(target + 14);
+    auto *t_15 = buffer.data(target + 15);
+    auto *t_16 = buffer.data(target + 16);
+    auto *t_17 = buffer.data(target + 17);
+    auto *t_18 = buffer.data(target + 18);
+    auto *t_19 = buffer.data(target + 19);
+    auto *t_20 = buffer.data(target + 20);
+    auto *t_21 = buffer.data(target + 21);
+    auto *t_22 = buffer.data(target + 22);
+    auto *t_23 = buffer.data(target + 23);
+    auto *t_24 = buffer.data(target + 24);
+    auto *t_25 = buffer.data(target + 25);
+    auto *t_26 = buffer.data(target + 26);
+    auto *t_27 = buffer.data(target + 27);
+    auto *t_28 = buffer.data(target + 28);
+    auto *t_29 = buffer.data(target + 29);
+    auto *t_30 = buffer.data(target + 30);
+    auto *t_31 = buffer.data(target + 31);
+    auto *t_32 = buffer.data(target + 32);
+    auto *t_33 = buffer.data(target + 33);
+    auto *t_34 = buffer.data(target + 34);
+    auto *t_35 = buffer.data(target + 35);
+    auto *t_36 = buffer.data(target + 36);
+    auto *t_37 = buffer.data(target + 37);
+    auto *t_38 = buffer.data(target + 38);
+    auto *t_39 = buffer.data(target + 39);
+    auto *t_40 = buffer.data(target + 40);
+    auto *t_41 = buffer.data(target + 41);
+    auto *t_42 = buffer.data(target + 42);
+    auto *t_43 = buffer.data(target + 43);
+    auto *t_44 = buffer.data(target + 44);
+
+    const auto *pa_x = buffer.data(pa + 0);
+    const auto *pa_y = buffer.data(pa + 1);
+    const auto *pa_z = buffer.data(pa + 2);
+
+    const auto *pb_x = buffer.data(pb + 0);
+    const auto *pb_y = buffer.data(pb + 1);
+    const auto *pb_z = buffer.data(pb + 2);
+
+    const auto *dg_0 = buffer.data(dg + 0);
+    const auto *dg_14 = buffer.data(dg + 14);
+    const auto *dg_26 = buffer.data(dg + 26);
+
+    const auto *dh_0 = buffer.data(dh + 0);
+    const auto *dh_21 = buffer.data(dh + 21);
+    const auto *dh_38 = buffer.data(dh + 38);
+
+    const auto *ff0_0 = buffer.data(ff0 + 0);
+    const auto *ff0_1 = buffer.data(ff0 + 1);
+    const auto *ff0_2 = buffer.data(ff0 + 2);
+    const auto *ff0_3 = buffer.data(ff0 + 3);
+    const auto *ff0_4 = buffer.data(ff0 + 4);
+    const auto *ff0_5 = buffer.data(ff0 + 5);
+    const auto *ff0_12 = buffer.data(ff0 + 12);
+    const auto *ff0_13 = buffer.data(ff0 + 13);
+    const auto *ff0_14 = buffer.data(ff0 + 14);
+    const auto *ff0_15 = buffer.data(ff0 + 15);
+    const auto *ff0_16 = buffer.data(ff0 + 16);
+    const auto *ff0_17 = buffer.data(ff0 + 17);
+    const auto *ff0_21 = buffer.data(ff0 + 21);
+    const auto *ff0_22 = buffer.data(ff0 + 22);
+    const auto *ff0_23 = buffer.data(ff0 + 23);
+    const auto *ff0_24 = buffer.data(ff0 + 24);
+    const auto *ff0_25 = buffer.data(ff0 + 25);
+    const auto *ff0_26 = buffer.data(ff0 + 26);
+
+    const auto *ff1_0 = buffer.data(ff1 + 0);
+    const auto *ff1_1 = buffer.data(ff1 + 1);
+    const auto *ff1_2 = buffer.data(ff1 + 2);
+    const auto *ff1_3 = buffer.data(ff1 + 3);
+    const auto *ff1_4 = buffer.data(ff1 + 4);
+    const auto *ff1_5 = buffer.data(ff1 + 5);
+    const auto *ff1_12 = buffer.data(ff1 + 12);
+    const auto *ff1_13 = buffer.data(ff1 + 13);
+    const auto *ff1_14 = buffer.data(ff1 + 14);
+    const auto *ff1_15 = buffer.data(ff1 + 15);
+    const auto *ff1_16 = buffer.data(ff1 + 16);
+    const auto *ff1_17 = buffer.data(ff1 + 17);
+    const auto *ff1_21 = buffer.data(ff1 + 21);
+    const auto *ff1_22 = buffer.data(ff1 + 22);
+    const auto *ff1_23 = buffer.data(ff1 + 23);
+    const auto *ff1_24 = buffer.data(ff1 + 24);
+    const auto *ff1_25 = buffer.data(ff1 + 25);
+    const auto *ff1_26 = buffer.data(ff1 + 26);
+
+    const auto *fg_0 = buffer.data(fg + 0);
+    const auto *fg_1 = buffer.data(fg + 1);
+    const auto *fg_2 = buffer.data(fg + 2);
+    const auto *fg_3 = buffer.data(fg + 3);
+    const auto *fg_4 = buffer.data(fg + 4);
+    const auto *fg_5 = buffer.data(fg + 5);
+    const auto *fg_6 = buffer.data(fg + 6);
+    const auto *fg_7 = buffer.data(fg + 7);
+    const auto *fg_8 = buffer.data(fg + 8);
+    const auto *fg_13 = buffer.data(fg + 13);
+    const auto *fg_14 = buffer.data(fg + 14);
+    const auto *fg_15 = buffer.data(fg + 15);
+    const auto *fg_16 = buffer.data(fg + 16);
+    const auto *fg_17 = buffer.data(fg + 17);
+    const auto *fg_18 = buffer.data(fg + 18);
+    const auto *fg_19 = buffer.data(fg + 19);
+    const auto *fg_20 = buffer.data(fg + 20);
+    const auto *fg_21 = buffer.data(fg + 21);
+    const auto *fg_24 = buffer.data(fg + 24);
+    const auto *fg_25 = buffer.data(fg + 25);
+    const auto *fg_26 = buffer.data(fg + 26);
+    const auto *fg_27 = buffer.data(fg + 27);
+    const auto *fg_28 = buffer.data(fg + 28);
+    const auto *fg_29 = buffer.data(fg + 29);
+    const auto *fg_30 = buffer.data(fg + 30);
+    const auto *fg_31 = buffer.data(fg + 31);
+    const auto *fg_32 = buffer.data(fg + 32);
+
+#pragma omp simd aligned(t_0, t_1, t_2, t_3, t_4, pb_x, pb_y, pb_z, dg_0, ff0_0, ff1_0, fg_0, \
+                         fg_1, fg_2 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_0[k] = f_0 * dg_0[k]
+                 + f_1 * ff0_0[k]
+                 - f_2 * ff1_0[k]
+                 + pb_x[k] * fg_0[k];
+
+        t_1[k] = pb_y[k] * fg_0[k];
+
+        t_2[k] = pb_z[k] * fg_0[k];
+
+        t_3[k] = f_3 * ff0_0[k]
+                 - f_4 * ff1_0[k]
+                 + pb_y[k] * fg_1[k];
+
+        t_4[k] = f_3 * ff0_0[k]
+                 - f_4 * ff1_0[k]
+                 + pb_z[k] * fg_2[k];
+    }
+
+#pragma omp simd aligned(t_5, t_6, t_7, t_8, pb_y, pb_z, ff0_1, ff0_2, ff0_3, ff1_1, ff1_2, \
+                         ff1_3, fg_3, fg_4, fg_5 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_5[k] = f_5 * ff0_1[k]
+                 - f_6 * ff1_1[k]
+                 + pb_y[k] * fg_3[k];
+
+        t_6[k] = pb_y[k] * fg_4[k];
+
+        t_7[k] = f_5 * ff0_2[k]
+                 - f_6 * ff1_2[k]
+                 + pb_z[k] * fg_4[k];
+
+        t_8[k] = f_1 * ff0_3[k]
+                 - f_2 * ff1_3[k]
+                 + pb_y[k] * fg_5[k];
+    }
+
+#pragma omp simd aligned(t_9, t_10, t_11, t_12, t_13, pa_y, pb_y, pb_z, dh_0, ff0_4, ff0_5, \
+                         ff1_4, ff1_5, fg_6, fg_7, fg_8 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_9[k] = f_5 * ff0_4[k]
+                 - f_6 * ff1_4[k]
+                 + pb_y[k] * fg_6[k];
+
+        t_10[k] = f_3 * ff0_5[k]
+                  - f_4 * ff1_5[k]
+                  + pb_y[k] * fg_7[k];
+
+        t_11[k] = pb_y[k] * fg_8[k];
+
+        t_12[k] = f_1 * ff0_5[k]
+                  - f_2 * ff1_5[k]
+                  + pb_z[k] * fg_8[k];
+
+        t_13[k] = pa_y[k] * dh_0[k];
+    }
+
+#pragma omp simd aligned(t_14, t_15, t_16, t_17, pa_x, pa_z, pb_x, dh_0, dh_21, dh_38, ff0_12, \
+                         ff1_12, fg_13 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_14[k] = pa_z[k] * dh_0[k];
+
+        t_15[k] = pa_x[k] * dh_21[k];
+
+        t_16[k] = pa_x[k] * dh_38[k];
+
+        t_17[k] = f_1 * ff0_12[k]
+                  - f_2 * ff1_12[k]
+                  + pb_x[k] * fg_13[k];
+    }
+
+#pragma omp simd aligned(t_18, t_19, t_20, pb_x, ff0_13, ff0_14, ff0_15, ff1_13, ff1_14, \
+                         ff1_15, fg_14, fg_15, fg_16 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_18[k] = f_5 * ff0_13[k]
+                  - f_6 * ff1_13[k]
+                  + pb_x[k] * fg_14[k];
+
+        t_19[k] = f_5 * ff0_14[k]
+                  - f_6 * ff1_14[k]
+                  + pb_x[k] * fg_15[k];
+
+        t_20[k] = f_3 * ff0_15[k]
+                  - f_4 * ff1_15[k]
+                  + pb_x[k] * fg_16[k];
+    }
+
+#pragma omp simd aligned(t_21, t_22, t_23, t_24, t_25, pb_x, pb_y, dg_14, ff0_15, ff0_17, \
+                         ff1_15, ff1_17, fg_17, fg_18, fg_20, fg_21 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_21[k] = f_3 * ff0_17[k]
+                  - f_4 * ff1_17[k]
+                  + pb_x[k] * fg_17[k];
+
+        t_22[k] = pb_x[k] * fg_18[k];
+
+        t_23[k] = pb_x[k] * fg_20[k];
+
+        t_24[k] = pb_x[k] * fg_21[k];
+
+        t_25[k] = f_0 * dg_14[k]
+                  + f_1 * ff0_15[k]
+                  - f_2 * ff1_15[k]
+                  + pb_y[k] * fg_18[k];
+    }
+
+#pragma omp simd aligned(t_26, t_27, t_28, t_29, pb_z, ff0_15, ff0_16, ff0_17, ff1_15, ff1_16, \
+                         ff1_17, fg_18, fg_19, fg_20, fg_21 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_26[k] = pb_z[k] * fg_18[k];
+
+        t_27[k] = f_3 * ff0_15[k]
+                  - f_4 * ff1_15[k]
+                  + pb_z[k] * fg_19[k];
+
+        t_28[k] = f_5 * ff0_16[k]
+                  - f_6 * ff1_16[k]
+                  + pb_z[k] * fg_20[k];
+
+        t_29[k] = f_1 * ff0_17[k]
+                  - f_2 * ff1_17[k]
+                  + pb_z[k] * fg_21[k];
+    }
+
+#pragma omp simd aligned(t_30, t_31, t_32, t_33, pa_y, pa_z, pb_x, dh_21, dh_38, ff0_21, \
+                         ff0_22, ff1_21, ff1_22, fg_24, fg_25 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_30[k] = pa_z[k] * dh_21[k];
+
+        t_31[k] = pa_y[k] * dh_38[k];
+
+        t_32[k] = f_1 * ff0_21[k]
+                  - f_2 * ff1_21[k]
+                  + pb_x[k] * fg_24[k];
+
+        t_33[k] = f_5 * ff0_22[k]
+                  - f_6 * ff1_22[k]
+                  + pb_x[k] * fg_25[k];
+    }
+
+#pragma omp simd aligned(t_34, t_35, t_36, t_37, pb_x, ff0_23, ff0_24, ff0_26, ff1_23, ff1_24, \
+                         ff1_26, fg_26, fg_27, fg_28, fg_29 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_34[k] = f_5 * ff0_23[k]
+                  - f_6 * ff1_23[k]
+                  + pb_x[k] * fg_26[k];
+
+        t_35[k] = f_3 * ff0_24[k]
+                  - f_4 * ff1_24[k]
+                  + pb_x[k] * fg_27[k];
+
+        t_36[k] = f_3 * ff0_26[k]
+                  - f_4 * ff1_26[k]
+                  + pb_x[k] * fg_28[k];
+
+        t_37[k] = pb_x[k] * fg_29[k];
+    }
+
+#pragma omp simd aligned(t_38, t_39, t_40, t_41, pb_x, pb_y, ff0_24, ff0_25, ff1_24, ff1_25, \
+                         fg_29, fg_30, fg_32 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_38[k] = pb_x[k] * fg_30[k];
+
+        t_39[k] = pb_x[k] * fg_32[k];
+
+        t_40[k] = f_1 * ff0_24[k]
+                  - f_2 * ff1_24[k]
+                  + pb_y[k] * fg_29[k];
+
+        t_41[k] = f_5 * ff0_25[k]
+                  - f_6 * ff1_25[k]
+                  + pb_y[k] * fg_30[k];
+    }
+
+#pragma omp simd aligned(t_42, t_43, t_44, pb_y, pb_z, dg_26, ff0_26, ff1_26, fg_31, \
+                         fg_32 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_42[k] = f_3 * ff0_26[k]
+                  - f_4 * ff1_26[k]
+                  + pb_y[k] * fg_31[k];
+
+        t_43[k] = pb_y[k] * fg_32[k];
+
+        t_44[k] = f_0 * dg_26[k]
+                  + f_1 * ff0_26[k]
+                  - f_2 * ff1_26[k]
+                  + pb_z[k] * fg_32[k];
+    }
+}
+
+auto
+compute_prim_fh_electron_repulsion_14(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t pb, const size_t dg, const size_t dh,
+                                      const size_t ff0, const size_t ff1, const size_t fg,
+                                      const size_t ncols, const double alpha, const double beta,
+                                      const double p) -> void
 {
     // NOTE: the factors are fixed by the pair of primitives, so they are formed
     // once rather than for every atom pair the pair reaches.
@@ -4191,11 +7807,11 @@ compute_prim_fh_electron_repulsion_5(CSimdMatrix &buffer, const size_t target, c
 }
 
 auto
-compute_prim_fh_electron_repulsion_6(CSimdMatrix &buffer, const size_t target, const size_t pa,
-                                     const size_t pb, const size_t dg, const size_t dh,
-                                     const size_t ff0, const size_t ff1, const size_t fg,
-                                     const size_t ncols, const double alpha, const double beta,
-                                     const double p) -> void
+compute_prim_fh_electron_repulsion_15(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t pb, const size_t dg, const size_t dh,
+                                      const size_t ff0, const size_t ff1, const size_t fg,
+                                      const size_t ncols, const double alpha, const double beta,
+                                      const double p) -> void
 {
     // NOTE: the factors are fixed by the pair of primitives, so they are formed
     // once rather than for every atom pair the pair reaches.
@@ -4285,11 +7901,11 @@ compute_prim_fh_electron_repulsion_6(CSimdMatrix &buffer, const size_t target, c
 }
 
 auto
-compute_prim_fh_electron_repulsion_7(CSimdMatrix &buffer, const size_t target, const size_t pa,
-                                     const size_t pb, const size_t dg, const size_t dh,
-                                     const size_t ff0, const size_t ff1, const size_t fg,
-                                     const size_t ncols, const double alpha, const double beta,
-                                     const double p) -> void
+compute_prim_fh_electron_repulsion_16(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t pb, const size_t dg, const size_t dh,
+                                      const size_t ff0, const size_t ff1, const size_t fg,
+                                      const size_t ncols, const double alpha, const double beta,
+                                      const double p) -> void
 {
     // NOTE: the factors are fixed by the pair of primitives, so they are formed
     // once rather than for every atom pair the pair reaches.
@@ -4588,11 +8204,11 @@ compute_prim_fh_electron_repulsion_7(CSimdMatrix &buffer, const size_t target, c
 }
 
 auto
-compute_prim_fh_electron_repulsion_8(CSimdMatrix &buffer, const size_t target, const size_t pa,
-                                     const size_t pb, const size_t dg, const size_t dh,
-                                     const size_t ff0, const size_t ff1, const size_t fg,
-                                     const size_t ncols, const double alpha, const double beta,
-                                     const double p) -> void
+compute_prim_fh_electron_repulsion_17(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t pb, const size_t dg, const size_t dh,
+                                      const size_t ff0, const size_t ff1, const size_t fg,
+                                      const size_t ncols, const double alpha, const double beta,
+                                      const double p) -> void
 {
     // NOTE: the factors are fixed by the pair of primitives, so they are formed
     // once rather than for every atom pair the pair reaches.
@@ -4682,11 +8298,11 @@ compute_prim_fh_electron_repulsion_8(CSimdMatrix &buffer, const size_t target, c
 }
 
 auto
-compute_prim_fh_electron_repulsion_9(CSimdMatrix &buffer, const size_t target, const size_t pa,
-                                     const size_t pb, const size_t dg, const size_t dh,
-                                     const size_t ff0, const size_t ff1, const size_t fg,
-                                     const size_t ncols, const double alpha, const double beta,
-                                     const double p) -> void
+compute_prim_fh_electron_repulsion_18(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t pb, const size_t dg, const size_t dh,
+                                      const size_t ff0, const size_t ff1, const size_t fg,
+                                      const size_t ncols, const double alpha, const double beta,
+                                      const double p) -> void
 {
     // NOTE: the factors are fixed by the pair of primitives, so they are formed
     // once rather than for every atom pair the pair reaches.
@@ -5273,7 +8889,7 @@ compute_prim_fh_electron_repulsion_9(CSimdMatrix &buffer, const size_t target, c
 }
 
 auto
-compute_prim_fh_electron_repulsion_10(CSimdMatrix &buffer, const size_t target, const size_t pa,
+compute_prim_fh_electron_repulsion_19(CSimdMatrix &buffer, const size_t target, const size_t pa,
                                       const size_t pb, const size_t dg, const size_t dh,
                                       const size_t ff0, const size_t ff1, const size_t fg,
                                       const size_t ncols, const double alpha, const double beta,
@@ -5622,7 +9238,2729 @@ compute_prim_fh_electron_repulsion_10(CSimdMatrix &buffer, const size_t target, 
 }
 
 auto
-compute_prim_fh_electron_repulsion_11(CSimdMatrix &buffer, const size_t target, const size_t pa,
+compute_prim_fh_electron_repulsion_20(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t pb, const size_t dg, const size_t dh,
+                                      const size_t ff0, const size_t ff1, const size_t fg,
+                                      const size_t ncols, const double alpha, const double beta,
+                                      const double p) -> void
+{
+    // NOTE: the factors are fixed by the pair of primitives, so they are formed
+    // once rather than for every atom pair the pair reaches.
+
+    const auto f_0 = 1.5 / p;
+    const auto f_1 = 2.0 / beta;
+    const auto f_2 = 2.0 * alpha / (beta * p);
+
+    auto *t_0 = buffer.data(target + 0);
+    auto *t_1 = buffer.data(target + 1);
+    auto *t_2 = buffer.data(target + 2);
+    auto *t_3 = buffer.data(target + 3);
+    auto *t_4 = buffer.data(target + 4);
+    auto *t_5 = buffer.data(target + 5);
+    auto *t_6 = buffer.data(target + 6);
+    auto *t_7 = buffer.data(target + 7);
+    auto *t_8 = buffer.data(target + 8);
+
+    const auto *pa_x = buffer.data(pa + 0);
+    const auto *pa_y = buffer.data(pa + 1);
+    const auto *pa_z = buffer.data(pa + 2);
+
+    const auto *pb_x = buffer.data(pb + 0);
+    const auto *pb_y = buffer.data(pb + 1);
+    const auto *pb_z = buffer.data(pb + 2);
+
+    const auto *dg_0 = buffer.data(dg + 0);
+    const auto *dg_1 = buffer.data(dg + 1);
+    const auto *dg_2 = buffer.data(dg + 2);
+
+    const auto *dh_0 = buffer.data(dh + 0);
+    const auto *dh_1 = buffer.data(dh + 1);
+    const auto *dh_2 = buffer.data(dh + 2);
+
+    const auto *ff0_0 = buffer.data(ff0 + 0);
+    const auto *ff0_5 = buffer.data(ff0 + 5);
+    const auto *ff0_8 = buffer.data(ff0 + 8);
+
+    const auto *ff1_0 = buffer.data(ff1 + 0);
+    const auto *ff1_15 = buffer.data(ff1 + 15);
+    const auto *ff1_26 = buffer.data(ff1 + 26);
+
+    const auto *fg_0 = buffer.data(fg + 0);
+    const auto *fg_22 = buffer.data(fg + 22);
+    const auto *fg_38 = buffer.data(fg + 38);
+
+#pragma omp simd aligned(t_0, t_1, t_2, t_3, t_4, pa_x, pa_y, pa_z, pb_x, dg_0, dh_0, dh_1, \
+                         dh_2, ff0_0, ff1_0, fg_0 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_0[k] = f_0 * dg_0[k]
+                 + f_1 * ff0_0[k]
+                 - f_2 * ff1_0[k]
+                 + pb_x[k] * fg_0[k];
+
+        t_1[k] = pa_y[k] * dh_0[k];
+
+        t_2[k] = pa_z[k] * dh_0[k];
+
+        t_3[k] = pa_x[k] * dh_1[k];
+
+        t_4[k] = pa_x[k] * dh_2[k];
+    }
+
+#pragma omp simd aligned(t_5, t_6, t_7, pa_y, pa_z, pb_y, dg_1, dh_1, dh_2, ff0_5, ff1_15, \
+                         fg_22 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_5[k] = f_0 * dg_1[k]
+                 + f_1 * ff0_5[k]
+                 - f_2 * ff1_15[k]
+                 + pb_y[k] * fg_22[k];
+
+        t_6[k] = pa_z[k] * dh_1[k];
+
+        t_7[k] = pa_y[k] * dh_2[k];
+    }
+
+#pragma omp simd aligned(t_8, pb_z, dg_2, ff0_8, ff1_26, fg_38 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_8[k] = f_0 * dg_2[k]
+                 + f_1 * ff0_8[k]
+                 - f_2 * ff1_26[k]
+                 + pb_z[k] * fg_38[k];
+    }
+}
+
+auto
+compute_prim_fh_electron_repulsion_21(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t pb, const size_t dg, const size_t dh,
+                                      const size_t ff0, const size_t ff1, const size_t fg,
+                                      const size_t ncols, const double alpha, const double beta,
+                                      const double p) -> void
+{
+    // NOTE: the factors are fixed by the pair of primitives, so they are formed
+    // once rather than for every atom pair the pair reaches.
+
+    const auto f_0 = 1.5 / p;
+    const auto f_1 = 2.0 / beta;
+    const auto f_2 = 2.0 * alpha / (beta * p);
+    const auto f_3 = 0.5 / beta;
+    const auto f_4 = 0.5 * alpha / (beta * p);
+    const auto f_5 = 1.0 / beta;
+    const auto f_6 = alpha / (beta * p);
+    const auto f_7 = 2.5 / p;
+    const auto f_8 = 1.0 / p;
+    const auto f_9 = 0.5 / p;
+
+    auto *t_0 = buffer.data(target + 0);
+    auto *t_1 = buffer.data(target + 1);
+    auto *t_2 = buffer.data(target + 2);
+    auto *t_3 = buffer.data(target + 3);
+    auto *t_4 = buffer.data(target + 4);
+    auto *t_5 = buffer.data(target + 5);
+    auto *t_6 = buffer.data(target + 6);
+    auto *t_7 = buffer.data(target + 7);
+    auto *t_8 = buffer.data(target + 8);
+    auto *t_9 = buffer.data(target + 9);
+    auto *t_10 = buffer.data(target + 10);
+    auto *t_11 = buffer.data(target + 11);
+    auto *t_12 = buffer.data(target + 12);
+    auto *t_13 = buffer.data(target + 13);
+    auto *t_14 = buffer.data(target + 14);
+    auto *t_15 = buffer.data(target + 15);
+    auto *t_16 = buffer.data(target + 16);
+    auto *t_17 = buffer.data(target + 17);
+    auto *t_18 = buffer.data(target + 18);
+    auto *t_19 = buffer.data(target + 19);
+    auto *t_20 = buffer.data(target + 20);
+    auto *t_21 = buffer.data(target + 21);
+    auto *t_22 = buffer.data(target + 22);
+    auto *t_23 = buffer.data(target + 23);
+    auto *t_24 = buffer.data(target + 24);
+    auto *t_25 = buffer.data(target + 25);
+    auto *t_26 = buffer.data(target + 26);
+    auto *t_27 = buffer.data(target + 27);
+    auto *t_28 = buffer.data(target + 28);
+    auto *t_29 = buffer.data(target + 29);
+    auto *t_30 = buffer.data(target + 30);
+    auto *t_31 = buffer.data(target + 31);
+    auto *t_32 = buffer.data(target + 32);
+    auto *t_33 = buffer.data(target + 33);
+    auto *t_34 = buffer.data(target + 34);
+    auto *t_35 = buffer.data(target + 35);
+    auto *t_36 = buffer.data(target + 36);
+    auto *t_37 = buffer.data(target + 37);
+    auto *t_38 = buffer.data(target + 38);
+    auto *t_39 = buffer.data(target + 39);
+    auto *t_40 = buffer.data(target + 40);
+    auto *t_41 = buffer.data(target + 41);
+    auto *t_42 = buffer.data(target + 42);
+    auto *t_43 = buffer.data(target + 43);
+    auto *t_44 = buffer.data(target + 44);
+    auto *t_45 = buffer.data(target + 45);
+    auto *t_46 = buffer.data(target + 46);
+    auto *t_47 = buffer.data(target + 47);
+    auto *t_48 = buffer.data(target + 48);
+    auto *t_49 = buffer.data(target + 49);
+    auto *t_50 = buffer.data(target + 50);
+    auto *t_51 = buffer.data(target + 51);
+    auto *t_52 = buffer.data(target + 52);
+    auto *t_53 = buffer.data(target + 53);
+    auto *t_54 = buffer.data(target + 54);
+    auto *t_55 = buffer.data(target + 55);
+    auto *t_56 = buffer.data(target + 56);
+    auto *t_57 = buffer.data(target + 57);
+    auto *t_58 = buffer.data(target + 58);
+    auto *t_59 = buffer.data(target + 59);
+    auto *t_60 = buffer.data(target + 60);
+    auto *t_61 = buffer.data(target + 61);
+    auto *t_62 = buffer.data(target + 62);
+    auto *t_63 = buffer.data(target + 63);
+    auto *t_64 = buffer.data(target + 64);
+    auto *t_65 = buffer.data(target + 65);
+    auto *t_66 = buffer.data(target + 66);
+    auto *t_67 = buffer.data(target + 67);
+    auto *t_68 = buffer.data(target + 68);
+    auto *t_69 = buffer.data(target + 69);
+    auto *t_70 = buffer.data(target + 70);
+    auto *t_71 = buffer.data(target + 71);
+    auto *t_72 = buffer.data(target + 72);
+    auto *t_73 = buffer.data(target + 73);
+    auto *t_74 = buffer.data(target + 74);
+    auto *t_75 = buffer.data(target + 75);
+    auto *t_76 = buffer.data(target + 76);
+    auto *t_77 = buffer.data(target + 77);
+
+    const auto *pa_x = buffer.data(pa + 0);
+    const auto *pa_y = buffer.data(pa + 1);
+    const auto *pa_z = buffer.data(pa + 2);
+
+    const auto *pb_x = buffer.data(pb + 0);
+    const auto *pb_y = buffer.data(pb + 1);
+    const auto *pb_z = buffer.data(pb + 2);
+
+    const auto *dg_0 = buffer.data(dg + 0);
+    const auto *dg_5 = buffer.data(dg + 5);
+    const auto *dg_6 = buffer.data(dg + 6);
+    const auto *dg_7 = buffer.data(dg + 7);
+    const auto *dg_9 = buffer.data(dg + 9);
+    const auto *dg_10 = buffer.data(dg + 10);
+    const auto *dg_11 = buffer.data(dg + 11);
+    const auto *dg_12 = buffer.data(dg + 12);
+    const auto *dg_13 = buffer.data(dg + 13);
+    const auto *dg_14 = buffer.data(dg + 14);
+    const auto *dg_16 = buffer.data(dg + 16);
+    const auto *dg_19 = buffer.data(dg + 19);
+    const auto *dg_20 = buffer.data(dg + 20);
+    const auto *dg_21 = buffer.data(dg + 21);
+    const auto *dg_22 = buffer.data(dg + 22);
+    const auto *dg_23 = buffer.data(dg + 23);
+    const auto *dg_25 = buffer.data(dg + 25);
+    const auto *dg_26 = buffer.data(dg + 26);
+    const auto *dg_27 = buffer.data(dg + 27);
+    const auto *dg_28 = buffer.data(dg + 28);
+    const auto *dg_29 = buffer.data(dg + 29);
+
+    const auto *dh_0 = buffer.data(dh + 0);
+    const auto *dh_7 = buffer.data(dh + 7);
+    const auto *dh_9 = buffer.data(dh + 9);
+    const auto *dh_10 = buffer.data(dh + 10);
+    const auto *dh_11 = buffer.data(dh + 11);
+    const auto *dh_13 = buffer.data(dh + 13);
+    const auto *dh_15 = buffer.data(dh + 15);
+    const auto *dh_16 = buffer.data(dh + 16);
+    const auto *dh_17 = buffer.data(dh + 17);
+    const auto *dh_18 = buffer.data(dh + 18);
+    const auto *dh_20 = buffer.data(dh + 20);
+    const auto *dh_24 = buffer.data(dh + 24);
+    const auto *dh_27 = buffer.data(dh + 27);
+    const auto *dh_29 = buffer.data(dh + 29);
+    const auto *dh_30 = buffer.data(dh + 30);
+    const auto *dh_31 = buffer.data(dh + 31);
+    const auto *dh_32 = buffer.data(dh + 32);
+    const auto *dh_34 = buffer.data(dh + 34);
+    const auto *dh_35 = buffer.data(dh + 35);
+    const auto *dh_36 = buffer.data(dh + 36);
+    const auto *dh_38 = buffer.data(dh + 38);
+
+    const auto *ff0_0 = buffer.data(ff0 + 0);
+    const auto *ff0_1 = buffer.data(ff0 + 1);
+    const auto *ff0_2 = buffer.data(ff0 + 2);
+    const auto *ff0_3 = buffer.data(ff0 + 3);
+    const auto *ff0_4 = buffer.data(ff0 + 4);
+    const auto *ff0_5 = buffer.data(ff0 + 5);
+    const auto *ff0_12 = buffer.data(ff0 + 12);
+    const auto *ff0_13 = buffer.data(ff0 + 13);
+    const auto *ff0_14 = buffer.data(ff0 + 14);
+    const auto *ff0_15 = buffer.data(ff0 + 15);
+    const auto *ff0_16 = buffer.data(ff0 + 16);
+    const auto *ff0_17 = buffer.data(ff0 + 17);
+    const auto *ff0_21 = buffer.data(ff0 + 21);
+    const auto *ff0_22 = buffer.data(ff0 + 22);
+    const auto *ff0_23 = buffer.data(ff0 + 23);
+    const auto *ff0_24 = buffer.data(ff0 + 24);
+    const auto *ff0_25 = buffer.data(ff0 + 25);
+    const auto *ff0_26 = buffer.data(ff0 + 26);
+
+    const auto *ff1_0 = buffer.data(ff1 + 0);
+    const auto *ff1_1 = buffer.data(ff1 + 1);
+    const auto *ff1_2 = buffer.data(ff1 + 2);
+    const auto *ff1_3 = buffer.data(ff1 + 3);
+    const auto *ff1_4 = buffer.data(ff1 + 4);
+    const auto *ff1_5 = buffer.data(ff1 + 5);
+    const auto *ff1_12 = buffer.data(ff1 + 12);
+    const auto *ff1_13 = buffer.data(ff1 + 13);
+    const auto *ff1_14 = buffer.data(ff1 + 14);
+    const auto *ff1_15 = buffer.data(ff1 + 15);
+    const auto *ff1_16 = buffer.data(ff1 + 16);
+    const auto *ff1_17 = buffer.data(ff1 + 17);
+    const auto *ff1_21 = buffer.data(ff1 + 21);
+    const auto *ff1_22 = buffer.data(ff1 + 22);
+    const auto *ff1_23 = buffer.data(ff1 + 23);
+    const auto *ff1_24 = buffer.data(ff1 + 24);
+    const auto *ff1_25 = buffer.data(ff1 + 25);
+    const auto *ff1_26 = buffer.data(ff1 + 26);
+
+    const auto *fg_0 = buffer.data(fg + 0);
+    const auto *fg_1 = buffer.data(fg + 1);
+    const auto *fg_2 = buffer.data(fg + 2);
+    const auto *fg_3 = buffer.data(fg + 3);
+    const auto *fg_4 = buffer.data(fg + 4);
+    const auto *fg_5 = buffer.data(fg + 5);
+    const auto *fg_7 = buffer.data(fg + 7);
+    const auto *fg_8 = buffer.data(fg + 8);
+    const auto *fg_9 = buffer.data(fg + 9);
+    const auto *fg_12 = buffer.data(fg + 12);
+    const auto *fg_15 = buffer.data(fg + 15);
+    const auto *fg_18 = buffer.data(fg + 18);
+    const auto *fg_19 = buffer.data(fg + 19);
+    const auto *fg_21 = buffer.data(fg + 21);
+    const auto *fg_22 = buffer.data(fg + 22);
+    const auto *fg_23 = buffer.data(fg + 23);
+    const auto *fg_24 = buffer.data(fg + 24);
+    const auto *fg_25 = buffer.data(fg + 25);
+    const auto *fg_26 = buffer.data(fg + 26);
+    const auto *fg_27 = buffer.data(fg + 27);
+    const auto *fg_28 = buffer.data(fg + 28);
+    const auto *fg_30 = buffer.data(fg + 30);
+    const auto *fg_31 = buffer.data(fg + 31);
+    const auto *fg_34 = buffer.data(fg + 34);
+    const auto *fg_35 = buffer.data(fg + 35);
+    const auto *fg_37 = buffer.data(fg + 37);
+    const auto *fg_38 = buffer.data(fg + 38);
+    const auto *fg_39 = buffer.data(fg + 39);
+    const auto *fg_40 = buffer.data(fg + 40);
+    const auto *fg_41 = buffer.data(fg + 41);
+    const auto *fg_42 = buffer.data(fg + 42);
+    const auto *fg_43 = buffer.data(fg + 43);
+    const auto *fg_44 = buffer.data(fg + 44);
+
+#pragma omp simd aligned(t_0, t_1, t_2, t_3, t_4, pb_x, pb_y, pb_z, dg_0, ff0_0, ff1_0, fg_0, \
+                         fg_1, fg_2 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_0[k] = f_0 * dg_0[k]
+                 + f_1 * ff0_0[k]
+                 - f_2 * ff1_0[k]
+                 + pb_x[k] * fg_0[k];
+
+        t_1[k] = pb_y[k] * fg_0[k];
+
+        t_2[k] = pb_z[k] * fg_0[k];
+
+        t_3[k] = f_3 * ff0_0[k]
+                 - f_4 * ff1_0[k]
+                 + pb_y[k] * fg_1[k];
+
+        t_4[k] = f_3 * ff0_0[k]
+                 - f_4 * ff1_0[k]
+                 + pb_z[k] * fg_2[k];
+    }
+
+#pragma omp simd aligned(t_5, t_6, t_7, t_8, t_9, pb_y, pb_z, ff0_1, ff0_2, ff0_3, ff1_1, \
+                         ff1_2, ff1_3, fg_3, fg_4, fg_5 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_5[k] = f_5 * ff0_1[k]
+                 - f_6 * ff1_1[k]
+                 + pb_y[k] * fg_3[k];
+
+        t_6[k] = pb_z[k] * fg_3[k];
+
+        t_7[k] = pb_y[k] * fg_4[k];
+
+        t_8[k] = f_5 * ff0_2[k]
+                 - f_6 * ff1_2[k]
+                 + pb_z[k] * fg_4[k];
+
+        t_9[k] = f_1 * ff0_3[k]
+                 - f_2 * ff1_3[k]
+                 + pb_y[k] * fg_5[k];
+    }
+
+#pragma omp simd aligned(t_10, t_11, t_12, t_13, t_14, pb_y, pb_z, ff0_4, ff0_5, ff1_4, ff1_5, \
+                         fg_5, fg_7, fg_8, fg_9 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_10[k] = pb_z[k] * fg_5[k];
+
+        t_11[k] = f_5 * ff0_4[k]
+                  - f_6 * ff1_4[k]
+                  + pb_y[k] * fg_7[k];
+
+        t_12[k] = f_3 * ff0_5[k]
+                  - f_4 * ff1_5[k]
+                  + pb_y[k] * fg_8[k];
+
+        t_13[k] = pb_y[k] * fg_9[k];
+
+        t_14[k] = f_1 * ff0_5[k]
+                  - f_2 * ff1_5[k]
+                  + pb_z[k] * fg_9[k];
+    }
+
+#pragma omp simd aligned(t_15, t_16, t_17, t_18, t_19, t_20, pa_y, pa_z, dg_5, dg_6, dh_0, \
+                         dh_7, dh_9, dh_11 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_15[k] = pa_y[k] * dh_0[k];
+
+        t_16[k] = f_7 * dg_5[k]
+                  + pa_y[k] * dh_7[k];
+
+        t_17[k] = pa_y[k] * dh_11[k];
+
+        t_18[k] = pa_z[k] * dh_0[k];
+
+        t_19[k] = pa_z[k] * dh_7[k];
+
+        t_20[k] = f_8 * dg_6[k]
+                  + pa_z[k] * dh_9[k];
+    }
+
+#pragma omp simd aligned(t_21, t_22, t_23, t_24, pa_x, pa_z, pb_y, dg_7, dg_9, dg_10, dh_10, \
+                         dh_11, dh_13, fg_12 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_21[k] = f_0 * dg_7[k]
+                  + pa_z[k] * dh_10[k];
+
+        t_22[k] = pb_y[k] * fg_12[k];
+
+        t_23[k] = f_7 * dg_9[k]
+                  + pa_z[k] * dh_11[k];
+
+        t_24[k] = f_7 * dg_10[k]
+                  + pa_x[k] * dh_13[k];
+    }
+
+#pragma omp simd aligned(t_25, t_26, t_27, t_28, t_29, pa_x, pb_x, dg_12, dg_14, dg_16, dg_20, \
+                         dh_15, dh_17, dh_20, dh_27, fg_15 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_25[k] = f_0 * dg_12[k]
+                  + pa_x[k] * dh_15[k];
+
+        t_26[k] = f_8 * dg_14[k]
+                  + pa_x[k] * dh_17[k];
+
+        t_27[k] = f_9 * dg_16[k]
+                  + pb_x[k] * fg_15[k];
+
+        t_28[k] = pa_x[k] * dh_20[k];
+
+        t_29[k] = f_7 * dg_20[k]
+                  + pa_x[k] * dh_27[k];
+    }
+
+#pragma omp simd aligned(t_30, t_31, t_32, t_33, pa_x, pb_x, dg_23, dg_25, dg_29, dh_30, \
+                         dh_32, dh_38, fg_18 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_30[k] = f_0 * dg_23[k]
+                  + pa_x[k] * dh_30[k];
+
+        t_31[k] = f_8 * dg_25[k]
+                  + pa_x[k] * dh_32[k];
+
+        t_32[k] = f_9 * dg_29[k]
+                  + pb_x[k] * fg_18[k];
+
+        t_33[k] = pa_x[k] * dh_38[k];
+    }
+
+#pragma omp simd aligned(t_34, t_35, t_36, t_37, pb_x, pb_z, ff0_12, ff0_13, ff0_14, ff1_12, \
+                         ff1_13, ff1_14, fg_19, fg_21, fg_22 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_34[k] = f_1 * ff0_12[k]
+                  - f_2 * ff1_12[k]
+                  + pb_x[k] * fg_19[k];
+
+        t_35[k] = pb_z[k] * fg_19[k];
+
+        t_36[k] = f_5 * ff0_13[k]
+                  - f_6 * ff1_13[k]
+                  + pb_x[k] * fg_21[k];
+
+        t_37[k] = f_5 * ff0_14[k]
+                  - f_6 * ff1_14[k]
+                  + pb_x[k] * fg_22[k];
+    }
+
+#pragma omp simd aligned(t_38, t_39, t_40, t_41, t_42, pb_x, pb_z, ff0_15, ff0_17, ff1_15, \
+                         ff1_17, fg_21, fg_23, fg_24, fg_25, fg_27 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_38[k] = f_3 * ff0_15[k]
+                  - f_4 * ff1_15[k]
+                  + pb_x[k] * fg_23[k];
+
+        t_39[k] = pb_z[k] * fg_21[k];
+
+        t_40[k] = f_3 * ff0_17[k]
+                  - f_4 * ff1_17[k]
+                  + pb_x[k] * fg_24[k];
+
+        t_41[k] = pb_x[k] * fg_25[k];
+
+        t_42[k] = pb_x[k] * fg_27[k];
+    }
+
+#pragma omp simd aligned(t_43, t_44, t_45, t_46, pb_x, pb_y, pb_z, dg_16, ff0_15, ff1_15, \
+                         fg_25, fg_26, fg_28 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_43[k] = pb_x[k] * fg_28[k];
+
+        t_44[k] = f_0 * dg_16[k]
+                  + f_1 * ff0_15[k]
+                  - f_2 * ff1_15[k]
+                  + pb_y[k] * fg_25[k];
+
+        t_45[k] = pb_z[k] * fg_25[k];
+
+        t_46[k] = f_3 * ff0_15[k]
+                  - f_4 * ff1_15[k]
+                  + pb_z[k] * fg_26[k];
+    }
+
+#pragma omp simd aligned(t_47, t_48, t_49, t_50, pa_z, pb_z, dg_11, dh_13, dh_16, ff0_16, \
+                         ff0_17, ff1_16, ff1_17, fg_27, fg_28 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_47[k] = f_5 * ff0_16[k]
+                  - f_6 * ff1_16[k]
+                  + pb_z[k] * fg_27[k];
+
+        t_48[k] = f_1 * ff0_17[k]
+                  - f_2 * ff1_17[k]
+                  + pb_z[k] * fg_28[k];
+
+        t_49[k] = pa_z[k] * dh_13[k];
+
+        t_50[k] = f_8 * dg_11[k]
+                  + pa_z[k] * dh_16[k];
+    }
+
+#pragma omp simd aligned(t_51, t_52, t_53, t_54, t_55, pa_y, pa_z, pb_x, dg_13, dg_19, dg_21, \
+                         dh_18, dh_20, dh_24, dh_29, fg_30 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_51[k] = f_0 * dg_13[k]
+                  + pa_z[k] * dh_18[k];
+
+        t_52[k] = pb_x[k] * fg_30[k];
+
+        t_53[k] = pa_z[k] * dh_20[k];
+
+        t_54[k] = f_7 * dg_19[k]
+                  + pa_z[k] * dh_24[k];
+
+        t_55[k] = f_8 * dg_21[k]
+                  + pa_y[k] * dh_29[k];
+    }
+
+#pragma omp simd aligned(t_56, t_57, t_58, t_59, t_60, pa_y, pb_x, dg_22, dg_26, dg_27, dg_28, \
+                         dh_31, dh_34, dh_35, dh_36, fg_31 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_56[k] = f_0 * dg_22[k]
+                  + pa_y[k] * dh_31[k];
+
+        t_57[k] = pb_x[k] * fg_31[k];
+
+        t_58[k] = f_7 * dg_26[k]
+                  + pa_y[k] * dh_34[k];
+
+        t_59[k] = f_0 * dg_27[k]
+                  + pa_y[k] * dh_35[k];
+
+        t_60[k] = f_8 * dg_28[k]
+                  + pa_y[k] * dh_36[k];
+    }
+
+#pragma omp simd aligned(t_61, t_62, t_63, t_64, pa_y, pb_x, pb_y, dg_29, dh_38, ff0_21, \
+                         ff1_21, fg_34, fg_35 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_61[k] = f_9 * dg_29[k]
+                  + pb_y[k] * fg_34[k];
+
+        t_62[k] = pa_y[k] * dh_38[k];
+
+        t_63[k] = f_1 * ff0_21[k]
+                  - f_2 * ff1_21[k]
+                  + pb_x[k] * fg_35[k];
+
+        t_64[k] = pb_y[k] * fg_35[k];
+    }
+
+#pragma omp simd aligned(t_65, t_66, t_67, t_68, pb_x, pb_y, ff0_22, ff0_23, ff0_24, ff1_22, \
+                         ff1_23, ff1_24, fg_37, fg_38, fg_39 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_65[k] = f_5 * ff0_22[k]
+                  - f_6 * ff1_22[k]
+                  + pb_x[k] * fg_37[k];
+
+        t_66[k] = f_5 * ff0_23[k]
+                  - f_6 * ff1_23[k]
+                  + pb_x[k] * fg_38[k];
+
+        t_67[k] = f_3 * ff0_24[k]
+                  - f_4 * ff1_24[k]
+                  + pb_x[k] * fg_39[k];
+
+        t_68[k] = pb_y[k] * fg_38[k];
+    }
+
+#pragma omp simd aligned(t_69, t_70, t_71, t_72, t_73, pb_x, pb_y, ff0_24, ff0_26, ff1_24, \
+                         ff1_26, fg_40, fg_41, fg_42, fg_44 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_69[k] = f_3 * ff0_26[k]
+                  - f_4 * ff1_26[k]
+                  + pb_x[k] * fg_40[k];
+
+        t_70[k] = pb_x[k] * fg_41[k];
+
+        t_71[k] = pb_x[k] * fg_42[k];
+
+        t_72[k] = pb_x[k] * fg_44[k];
+
+        t_73[k] = f_1 * ff0_24[k]
+                  - f_2 * ff1_24[k]
+                  + pb_y[k] * fg_41[k];
+    }
+
+#pragma omp simd aligned(t_74, t_75, t_76, t_77, pb_y, pb_z, dg_29, ff0_25, ff0_26, ff1_25, \
+                         ff1_26, fg_42, fg_43, fg_44 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_74[k] = f_5 * ff0_25[k]
+                  - f_6 * ff1_25[k]
+                  + pb_y[k] * fg_42[k];
+
+        t_75[k] = f_3 * ff0_26[k]
+                  - f_4 * ff1_26[k]
+                  + pb_y[k] * fg_43[k];
+
+        t_76[k] = pb_y[k] * fg_44[k];
+
+        t_77[k] = f_0 * dg_29[k]
+                  + f_1 * ff0_26[k]
+                  - f_2 * ff1_26[k]
+                  + pb_z[k] * fg_44[k];
+    }
+}
+
+auto
+compute_prim_fh_electron_repulsion_22(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t pb, const size_t dg, const size_t dh,
+                                      const size_t ff0, const size_t ff1, const size_t fg,
+                                      const size_t ncols, const double alpha, const double beta,
+                                      const double p) -> void
+{
+    // NOTE: the factors are fixed by the pair of primitives, so they are formed
+    // once rather than for every atom pair the pair reaches.
+
+    const auto f_0 = 1.5 / p;
+    const auto f_1 = 2.0 / beta;
+    const auto f_2 = 2.0 * alpha / (beta * p);
+    const auto f_3 = 0.5 / beta;
+    const auto f_4 = 0.5 * alpha / (beta * p);
+    const auto f_5 = 1.0 / beta;
+    const auto f_6 = alpha / (beta * p);
+    const auto f_7 = 2.5 / p;
+    const auto f_8 = 1.0 / p;
+    const auto f_9 = 0.5 / p;
+
+    auto *t_0 = buffer.data(target + 0);
+    auto *t_1 = buffer.data(target + 1);
+    auto *t_2 = buffer.data(target + 2);
+    auto *t_3 = buffer.data(target + 3);
+    auto *t_4 = buffer.data(target + 4);
+    auto *t_5 = buffer.data(target + 5);
+    auto *t_6 = buffer.data(target + 6);
+    auto *t_7 = buffer.data(target + 7);
+    auto *t_8 = buffer.data(target + 8);
+    auto *t_9 = buffer.data(target + 9);
+    auto *t_10 = buffer.data(target + 10);
+    auto *t_11 = buffer.data(target + 11);
+    auto *t_12 = buffer.data(target + 12);
+    auto *t_13 = buffer.data(target + 13);
+    auto *t_14 = buffer.data(target + 14);
+    auto *t_15 = buffer.data(target + 15);
+    auto *t_16 = buffer.data(target + 16);
+    auto *t_17 = buffer.data(target + 17);
+    auto *t_18 = buffer.data(target + 18);
+    auto *t_19 = buffer.data(target + 19);
+    auto *t_20 = buffer.data(target + 20);
+    auto *t_21 = buffer.data(target + 21);
+    auto *t_22 = buffer.data(target + 22);
+    auto *t_23 = buffer.data(target + 23);
+    auto *t_24 = buffer.data(target + 24);
+    auto *t_25 = buffer.data(target + 25);
+    auto *t_26 = buffer.data(target + 26);
+    auto *t_27 = buffer.data(target + 27);
+    auto *t_28 = buffer.data(target + 28);
+    auto *t_29 = buffer.data(target + 29);
+    auto *t_30 = buffer.data(target + 30);
+    auto *t_31 = buffer.data(target + 31);
+    auto *t_32 = buffer.data(target + 32);
+    auto *t_33 = buffer.data(target + 33);
+    auto *t_34 = buffer.data(target + 34);
+    auto *t_35 = buffer.data(target + 35);
+    auto *t_36 = buffer.data(target + 36);
+    auto *t_37 = buffer.data(target + 37);
+    auto *t_38 = buffer.data(target + 38);
+    auto *t_39 = buffer.data(target + 39);
+    auto *t_40 = buffer.data(target + 40);
+    auto *t_41 = buffer.data(target + 41);
+    auto *t_42 = buffer.data(target + 42);
+    auto *t_43 = buffer.data(target + 43);
+    auto *t_44 = buffer.data(target + 44);
+    auto *t_45 = buffer.data(target + 45);
+    auto *t_46 = buffer.data(target + 46);
+    auto *t_47 = buffer.data(target + 47);
+    auto *t_48 = buffer.data(target + 48);
+    auto *t_49 = buffer.data(target + 49);
+    auto *t_50 = buffer.data(target + 50);
+    auto *t_51 = buffer.data(target + 51);
+    auto *t_52 = buffer.data(target + 52);
+    auto *t_53 = buffer.data(target + 53);
+    auto *t_54 = buffer.data(target + 54);
+    auto *t_55 = buffer.data(target + 55);
+    auto *t_56 = buffer.data(target + 56);
+    auto *t_57 = buffer.data(target + 57);
+    auto *t_58 = buffer.data(target + 58);
+    auto *t_59 = buffer.data(target + 59);
+    auto *t_60 = buffer.data(target + 60);
+    auto *t_61 = buffer.data(target + 61);
+    auto *t_62 = buffer.data(target + 62);
+
+    const auto *pa_x = buffer.data(pa + 0);
+    const auto *pa_y = buffer.data(pa + 1);
+    const auto *pa_z = buffer.data(pa + 2);
+
+    const auto *pb_x = buffer.data(pb + 0);
+    const auto *pb_y = buffer.data(pb + 1);
+    const auto *pb_z = buffer.data(pb + 2);
+
+    const auto *dg_0 = buffer.data(dg + 0);
+    const auto *dg_5 = buffer.data(dg + 5);
+    const auto *dg_8 = buffer.data(dg + 8);
+    const auto *dg_9 = buffer.data(dg + 9);
+    const auto *dg_10 = buffer.data(dg + 10);
+    const auto *dg_12 = buffer.data(dg + 12);
+    const auto *dg_14 = buffer.data(dg + 14);
+    const auto *dg_17 = buffer.data(dg + 17);
+    const auto *dg_18 = buffer.data(dg + 18);
+    const auto *dg_20 = buffer.data(dg + 20);
+    const auto *dg_22 = buffer.data(dg + 22);
+    const auto *dg_23 = buffer.data(dg + 23);
+    const auto *dg_24 = buffer.data(dg + 24);
+    const auto *dg_25 = buffer.data(dg + 25);
+    const auto *dg_26 = buffer.data(dg + 26);
+
+    const auto *dh_0 = buffer.data(dh + 0);
+    const auto *dh_7 = buffer.data(dh + 7);
+    const auto *dh_11 = buffer.data(dh + 11);
+    const auto *dh_12 = buffer.data(dh + 12);
+    const auto *dh_13 = buffer.data(dh + 13);
+    const auto *dh_15 = buffer.data(dh + 15);
+    const auto *dh_19 = buffer.data(dh + 19);
+    const auto *dh_23 = buffer.data(dh + 23);
+    const auto *dh_24 = buffer.data(dh + 24);
+    const auto *dh_26 = buffer.data(dh + 26);
+    const auto *dh_28 = buffer.data(dh + 28);
+    const auto *dh_31 = buffer.data(dh + 31);
+    const auto *dh_32 = buffer.data(dh + 32);
+    const auto *dh_33 = buffer.data(dh + 33);
+    const auto *dh_35 = buffer.data(dh + 35);
+
+    const auto *ff0_0 = buffer.data(ff0 + 0);
+    const auto *ff0_1 = buffer.data(ff0 + 1);
+    const auto *ff0_2 = buffer.data(ff0 + 2);
+    const auto *ff0_3 = buffer.data(ff0 + 3);
+    const auto *ff0_4 = buffer.data(ff0 + 4);
+    const auto *ff0_5 = buffer.data(ff0 + 5);
+    const auto *ff0_12 = buffer.data(ff0 + 12);
+    const auto *ff0_13 = buffer.data(ff0 + 13);
+    const auto *ff0_14 = buffer.data(ff0 + 14);
+    const auto *ff0_15 = buffer.data(ff0 + 15);
+    const auto *ff0_16 = buffer.data(ff0 + 16);
+    const auto *ff0_17 = buffer.data(ff0 + 17);
+    const auto *ff0_21 = buffer.data(ff0 + 21);
+    const auto *ff0_22 = buffer.data(ff0 + 22);
+    const auto *ff0_23 = buffer.data(ff0 + 23);
+    const auto *ff0_24 = buffer.data(ff0 + 24);
+    const auto *ff0_25 = buffer.data(ff0 + 25);
+    const auto *ff0_26 = buffer.data(ff0 + 26);
+
+    const auto *ff1_0 = buffer.data(ff1 + 0);
+    const auto *ff1_1 = buffer.data(ff1 + 1);
+    const auto *ff1_2 = buffer.data(ff1 + 2);
+    const auto *ff1_3 = buffer.data(ff1 + 3);
+    const auto *ff1_4 = buffer.data(ff1 + 4);
+    const auto *ff1_5 = buffer.data(ff1 + 5);
+    const auto *ff1_12 = buffer.data(ff1 + 12);
+    const auto *ff1_13 = buffer.data(ff1 + 13);
+    const auto *ff1_14 = buffer.data(ff1 + 14);
+    const auto *ff1_15 = buffer.data(ff1 + 15);
+    const auto *ff1_16 = buffer.data(ff1 + 16);
+    const auto *ff1_17 = buffer.data(ff1 + 17);
+    const auto *ff1_21 = buffer.data(ff1 + 21);
+    const auto *ff1_22 = buffer.data(ff1 + 22);
+    const auto *ff1_23 = buffer.data(ff1 + 23);
+    const auto *ff1_24 = buffer.data(ff1 + 24);
+    const auto *ff1_25 = buffer.data(ff1 + 25);
+    const auto *ff1_26 = buffer.data(ff1 + 26);
+
+    const auto *fg_0 = buffer.data(fg + 0);
+    const auto *fg_1 = buffer.data(fg + 1);
+    const auto *fg_2 = buffer.data(fg + 2);
+    const auto *fg_3 = buffer.data(fg + 3);
+    const auto *fg_4 = buffer.data(fg + 4);
+    const auto *fg_5 = buffer.data(fg + 5);
+    const auto *fg_6 = buffer.data(fg + 6);
+    const auto *fg_7 = buffer.data(fg + 7);
+    const auto *fg_8 = buffer.data(fg + 8);
+    const auto *fg_13 = buffer.data(fg + 13);
+    const auto *fg_16 = buffer.data(fg + 16);
+    const auto *fg_17 = buffer.data(fg + 17);
+    const auto *fg_18 = buffer.data(fg + 18);
+    const auto *fg_19 = buffer.data(fg + 19);
+    const auto *fg_20 = buffer.data(fg + 20);
+    const auto *fg_21 = buffer.data(fg + 21);
+    const auto *fg_22 = buffer.data(fg + 22);
+    const auto *fg_23 = buffer.data(fg + 23);
+    const auto *fg_24 = buffer.data(fg + 24);
+    const auto *fg_25 = buffer.data(fg + 25);
+    const auto *fg_29 = buffer.data(fg + 29);
+    const auto *fg_30 = buffer.data(fg + 30);
+    const auto *fg_31 = buffer.data(fg + 31);
+    const auto *fg_32 = buffer.data(fg + 32);
+    const auto *fg_33 = buffer.data(fg + 33);
+    const auto *fg_34 = buffer.data(fg + 34);
+    const auto *fg_35 = buffer.data(fg + 35);
+    const auto *fg_36 = buffer.data(fg + 36);
+    const auto *fg_37 = buffer.data(fg + 37);
+    const auto *fg_38 = buffer.data(fg + 38);
+
+#pragma omp simd aligned(t_0, t_1, t_2, t_3, t_4, pb_x, pb_y, pb_z, dg_0, ff0_0, ff1_0, fg_0, \
+                         fg_1, fg_2 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_0[k] = f_0 * dg_0[k]
+                 + f_1 * ff0_0[k]
+                 - f_2 * ff1_0[k]
+                 + pb_x[k] * fg_0[k];
+
+        t_1[k] = pb_y[k] * fg_0[k];
+
+        t_2[k] = pb_z[k] * fg_0[k];
+
+        t_3[k] = f_3 * ff0_0[k]
+                 - f_4 * ff1_0[k]
+                 + pb_y[k] * fg_1[k];
+
+        t_4[k] = f_3 * ff0_0[k]
+                 - f_4 * ff1_0[k]
+                 + pb_z[k] * fg_2[k];
+    }
+
+#pragma omp simd aligned(t_5, t_6, t_7, t_8, t_9, pb_y, pb_z, ff0_1, ff0_2, ff0_3, ff1_1, \
+                         ff1_2, ff1_3, fg_3, fg_4, fg_5 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_5[k] = f_5 * ff0_1[k]
+                 - f_6 * ff1_1[k]
+                 + pb_y[k] * fg_3[k];
+
+        t_6[k] = pb_y[k] * fg_4[k];
+
+        t_7[k] = f_5 * ff0_2[k]
+                 - f_6 * ff1_2[k]
+                 + pb_z[k] * fg_4[k];
+
+        t_8[k] = f_1 * ff0_3[k]
+                 - f_2 * ff1_3[k]
+                 + pb_y[k] * fg_5[k];
+
+        t_9[k] = pb_z[k] * fg_5[k];
+    }
+
+#pragma omp simd aligned(t_10, t_11, t_12, t_13, t_14, pa_y, pb_y, pb_z, dh_0, ff0_4, ff0_5, \
+                         ff1_4, ff1_5, fg_6, fg_7, fg_8 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_10[k] = f_5 * ff0_4[k]
+                  - f_6 * ff1_4[k]
+                  + pb_y[k] * fg_6[k];
+
+        t_11[k] = f_3 * ff0_5[k]
+                  - f_4 * ff1_5[k]
+                  + pb_y[k] * fg_7[k];
+
+        t_12[k] = pb_y[k] * fg_8[k];
+
+        t_13[k] = f_1 * ff0_5[k]
+                  - f_2 * ff1_5[k]
+                  + pb_z[k] * fg_8[k];
+
+        t_14[k] = pa_y[k] * dh_0[k];
+    }
+
+#pragma omp simd aligned(t_15, t_16, t_17, t_18, pa_x, pa_y, pa_z, dg_5, dg_8, dg_9, dh_0, \
+                         dh_7, dh_11, dh_12 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_15[k] = f_7 * dg_5[k]
+                  + pa_y[k] * dh_7[k];
+
+        t_16[k] = pa_z[k] * dh_0[k];
+
+        t_17[k] = f_7 * dg_8[k]
+                  + pa_z[k] * dh_11[k];
+
+        t_18[k] = f_7 * dg_9[k]
+                  + pa_x[k] * dh_12[k];
+    }
+
+#pragma omp simd aligned(t_19, t_20, t_21, t_22, t_23, pa_x, pb_x, dg_10, dg_12, dg_14, dg_18, \
+                         dh_13, dh_15, dh_19, dh_24, fg_13 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_19[k] = f_0 * dg_10[k]
+                  + pa_x[k] * dh_13[k];
+
+        t_20[k] = f_8 * dg_12[k]
+                  + pa_x[k] * dh_15[k];
+
+        t_21[k] = f_9 * dg_14[k]
+                  + pb_x[k] * fg_13[k];
+
+        t_22[k] = pa_x[k] * dh_19[k];
+
+        t_23[k] = f_7 * dg_18[k]
+                  + pa_x[k] * dh_24[k];
+    }
+
+#pragma omp simd aligned(t_24, t_25, t_26, t_27, pa_x, pb_x, dg_20, dg_22, dg_26, dh_26, \
+                         dh_28, dh_35, fg_16 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_24[k] = f_0 * dg_20[k]
+                  + pa_x[k] * dh_26[k];
+
+        t_25[k] = f_8 * dg_22[k]
+                  + pa_x[k] * dh_28[k];
+
+        t_26[k] = f_9 * dg_26[k]
+                  + pb_x[k] * fg_16[k];
+
+        t_27[k] = pa_x[k] * dh_35[k];
+    }
+
+#pragma omp simd aligned(t_28, t_29, t_30, t_31, pb_x, pb_z, ff0_12, ff0_13, ff0_14, ff1_12, \
+                         ff1_13, ff1_14, fg_17, fg_18, fg_19 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_28[k] = f_1 * ff0_12[k]
+                  - f_2 * ff1_12[k]
+                  + pb_x[k] * fg_17[k];
+
+        t_29[k] = pb_z[k] * fg_17[k];
+
+        t_30[k] = f_5 * ff0_13[k]
+                  - f_6 * ff1_13[k]
+                  + pb_x[k] * fg_18[k];
+
+        t_31[k] = f_5 * ff0_14[k]
+                  - f_6 * ff1_14[k]
+                  + pb_x[k] * fg_19[k];
+    }
+
+#pragma omp simd aligned(t_32, t_33, t_34, t_35, t_36, pb_x, ff0_15, ff0_17, ff1_15, ff1_17, \
+                         fg_20, fg_21, fg_22, fg_24, fg_25 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_32[k] = f_3 * ff0_15[k]
+                  - f_4 * ff1_15[k]
+                  + pb_x[k] * fg_20[k];
+
+        t_33[k] = f_3 * ff0_17[k]
+                  - f_4 * ff1_17[k]
+                  + pb_x[k] * fg_21[k];
+
+        t_34[k] = pb_x[k] * fg_22[k];
+
+        t_35[k] = pb_x[k] * fg_24[k];
+
+        t_36[k] = pb_x[k] * fg_25[k];
+    }
+
+#pragma omp simd aligned(t_37, t_38, t_39, t_40, pb_y, pb_z, dg_14, ff0_15, ff0_16, ff1_15, \
+                         ff1_16, fg_22, fg_23, fg_24 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_37[k] = f_0 * dg_14[k]
+                  + f_1 * ff0_15[k]
+                  - f_2 * ff1_15[k]
+                  + pb_y[k] * fg_22[k];
+
+        t_38[k] = pb_z[k] * fg_22[k];
+
+        t_39[k] = f_3 * ff0_15[k]
+                  - f_4 * ff1_15[k]
+                  + pb_z[k] * fg_23[k];
+
+        t_40[k] = f_5 * ff0_16[k]
+                  - f_6 * ff1_16[k]
+                  + pb_z[k] * fg_24[k];
+    }
+
+#pragma omp simd aligned(t_41, t_42, t_43, t_44, pa_y, pa_z, pb_z, dg_17, dg_23, dh_19, dh_23, \
+                         dh_31, ff0_17, ff1_17, fg_25 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_41[k] = f_1 * ff0_17[k]
+                  - f_2 * ff1_17[k]
+                  + pb_z[k] * fg_25[k];
+
+        t_42[k] = pa_z[k] * dh_19[k];
+
+        t_43[k] = f_7 * dg_17[k]
+                  + pa_z[k] * dh_23[k];
+
+        t_44[k] = f_7 * dg_23[k]
+                  + pa_y[k] * dh_31[k];
+    }
+
+#pragma omp simd aligned(t_45, t_46, t_47, t_48, pa_y, pb_y, dg_24, dg_25, dg_26, dh_32, \
+                         dh_33, dh_35, fg_29 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_45[k] = f_0 * dg_24[k]
+                  + pa_y[k] * dh_32[k];
+
+        t_46[k] = f_8 * dg_25[k]
+                  + pa_y[k] * dh_33[k];
+
+        t_47[k] = f_9 * dg_26[k]
+                  + pb_y[k] * fg_29[k];
+
+        t_48[k] = pa_y[k] * dh_35[k];
+    }
+
+#pragma omp simd aligned(t_49, t_50, t_51, t_52, pb_x, pb_y, ff0_21, ff0_22, ff0_23, ff1_21, \
+                         ff1_22, ff1_23, fg_30, fg_31, fg_32 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_49[k] = f_1 * ff0_21[k]
+                  - f_2 * ff1_21[k]
+                  + pb_x[k] * fg_30[k];
+
+        t_50[k] = pb_y[k] * fg_30[k];
+
+        t_51[k] = f_5 * ff0_22[k]
+                  - f_6 * ff1_22[k]
+                  + pb_x[k] * fg_31[k];
+
+        t_52[k] = f_5 * ff0_23[k]
+                  - f_6 * ff1_23[k]
+                  + pb_x[k] * fg_32[k];
+    }
+
+#pragma omp simd aligned(t_53, t_54, t_55, t_56, t_57, pb_x, ff0_24, ff0_26, ff1_24, ff1_26, \
+                         fg_33, fg_34, fg_35, fg_36, fg_38 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_53[k] = f_3 * ff0_24[k]
+                  - f_4 * ff1_24[k]
+                  + pb_x[k] * fg_33[k];
+
+        t_54[k] = f_3 * ff0_26[k]
+                  - f_4 * ff1_26[k]
+                  + pb_x[k] * fg_34[k];
+
+        t_55[k] = pb_x[k] * fg_35[k];
+
+        t_56[k] = pb_x[k] * fg_36[k];
+
+        t_57[k] = pb_x[k] * fg_38[k];
+    }
+
+#pragma omp simd aligned(t_58, t_59, t_60, t_61, pb_y, ff0_24, ff0_25, ff0_26, ff1_24, ff1_25, \
+                         ff1_26, fg_35, fg_36, fg_37, fg_38 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_58[k] = f_1 * ff0_24[k]
+                  - f_2 * ff1_24[k]
+                  + pb_y[k] * fg_35[k];
+
+        t_59[k] = f_5 * ff0_25[k]
+                  - f_6 * ff1_25[k]
+                  + pb_y[k] * fg_36[k];
+
+        t_60[k] = f_3 * ff0_26[k]
+                  - f_4 * ff1_26[k]
+                  + pb_y[k] * fg_37[k];
+
+        t_61[k] = pb_y[k] * fg_38[k];
+    }
+
+#pragma omp simd aligned(t_62, pb_z, dg_26, ff0_26, ff1_26, fg_38 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_62[k] = f_0 * dg_26[k]
+                  + f_1 * ff0_26[k]
+                  - f_2 * ff1_26[k]
+                  + pb_z[k] * fg_38[k];
+    }
+}
+
+auto
+compute_prim_fh_electron_repulsion_23(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t pb, const size_t dg, const size_t dh,
+                                      const size_t ff0, const size_t ff1, const size_t fg,
+                                      const size_t ncols, const double alpha, const double beta,
+                                      const double p) -> void
+{
+    // NOTE: the factors are fixed by the pair of primitives, so they are formed
+    // once rather than for every atom pair the pair reaches.
+
+    const auto f_0 = 1.5 / p;
+    const auto f_1 = 2.0 / beta;
+    const auto f_2 = 2.0 * alpha / (beta * p);
+    const auto f_3 = 0.5 / beta;
+    const auto f_4 = 0.5 * alpha / (beta * p);
+    const auto f_5 = 1.0 / beta;
+    const auto f_6 = alpha / (beta * p);
+
+    auto *t_0 = buffer.data(target + 0);
+    auto *t_1 = buffer.data(target + 1);
+    auto *t_2 = buffer.data(target + 2);
+    auto *t_3 = buffer.data(target + 3);
+    auto *t_4 = buffer.data(target + 4);
+    auto *t_5 = buffer.data(target + 5);
+    auto *t_6 = buffer.data(target + 6);
+    auto *t_7 = buffer.data(target + 7);
+    auto *t_8 = buffer.data(target + 8);
+    auto *t_9 = buffer.data(target + 9);
+    auto *t_10 = buffer.data(target + 10);
+    auto *t_11 = buffer.data(target + 11);
+    auto *t_12 = buffer.data(target + 12);
+    auto *t_13 = buffer.data(target + 13);
+    auto *t_14 = buffer.data(target + 14);
+    auto *t_15 = buffer.data(target + 15);
+    auto *t_16 = buffer.data(target + 16);
+    auto *t_17 = buffer.data(target + 17);
+    auto *t_18 = buffer.data(target + 18);
+    auto *t_19 = buffer.data(target + 19);
+    auto *t_20 = buffer.data(target + 20);
+    auto *t_21 = buffer.data(target + 21);
+    auto *t_22 = buffer.data(target + 22);
+    auto *t_23 = buffer.data(target + 23);
+    auto *t_24 = buffer.data(target + 24);
+    auto *t_25 = buffer.data(target + 25);
+    auto *t_26 = buffer.data(target + 26);
+    auto *t_27 = buffer.data(target + 27);
+    auto *t_28 = buffer.data(target + 28);
+    auto *t_29 = buffer.data(target + 29);
+    auto *t_30 = buffer.data(target + 30);
+    auto *t_31 = buffer.data(target + 31);
+    auto *t_32 = buffer.data(target + 32);
+    auto *t_33 = buffer.data(target + 33);
+    auto *t_34 = buffer.data(target + 34);
+    auto *t_35 = buffer.data(target + 35);
+    auto *t_36 = buffer.data(target + 36);
+    auto *t_37 = buffer.data(target + 37);
+    auto *t_38 = buffer.data(target + 38);
+    auto *t_39 = buffer.data(target + 39);
+    auto *t_40 = buffer.data(target + 40);
+    auto *t_41 = buffer.data(target + 41);
+    auto *t_42 = buffer.data(target + 42);
+    auto *t_43 = buffer.data(target + 43);
+    auto *t_44 = buffer.data(target + 44);
+
+    const auto *pa_x = buffer.data(pa + 0);
+    const auto *pa_y = buffer.data(pa + 1);
+    const auto *pa_z = buffer.data(pa + 2);
+
+    const auto *pb_x = buffer.data(pb + 0);
+    const auto *pb_y = buffer.data(pb + 1);
+    const auto *pb_z = buffer.data(pb + 2);
+
+    const auto *dg_0 = buffer.data(dg + 0);
+    const auto *dg_14 = buffer.data(dg + 14);
+    const auto *dg_26 = buffer.data(dg + 26);
+
+    const auto *dh_0 = buffer.data(dh + 0);
+    const auto *dh_1 = buffer.data(dh + 1);
+    const auto *dh_2 = buffer.data(dh + 2);
+
+    const auto *ff0_0 = buffer.data(ff0 + 0);
+    const auto *ff0_1 = buffer.data(ff0 + 1);
+    const auto *ff0_2 = buffer.data(ff0 + 2);
+    const auto *ff0_3 = buffer.data(ff0 + 3);
+    const auto *ff0_4 = buffer.data(ff0 + 4);
+    const auto *ff0_5 = buffer.data(ff0 + 5);
+    const auto *ff0_12 = buffer.data(ff0 + 12);
+    const auto *ff0_13 = buffer.data(ff0 + 13);
+    const auto *ff0_14 = buffer.data(ff0 + 14);
+    const auto *ff0_15 = buffer.data(ff0 + 15);
+    const auto *ff0_16 = buffer.data(ff0 + 16);
+    const auto *ff0_17 = buffer.data(ff0 + 17);
+    const auto *ff0_21 = buffer.data(ff0 + 21);
+    const auto *ff0_22 = buffer.data(ff0 + 22);
+    const auto *ff0_23 = buffer.data(ff0 + 23);
+    const auto *ff0_24 = buffer.data(ff0 + 24);
+    const auto *ff0_25 = buffer.data(ff0 + 25);
+    const auto *ff0_26 = buffer.data(ff0 + 26);
+
+    const auto *ff1_0 = buffer.data(ff1 + 0);
+    const auto *ff1_1 = buffer.data(ff1 + 1);
+    const auto *ff1_2 = buffer.data(ff1 + 2);
+    const auto *ff1_3 = buffer.data(ff1 + 3);
+    const auto *ff1_4 = buffer.data(ff1 + 4);
+    const auto *ff1_5 = buffer.data(ff1 + 5);
+    const auto *ff1_12 = buffer.data(ff1 + 12);
+    const auto *ff1_13 = buffer.data(ff1 + 13);
+    const auto *ff1_14 = buffer.data(ff1 + 14);
+    const auto *ff1_15 = buffer.data(ff1 + 15);
+    const auto *ff1_16 = buffer.data(ff1 + 16);
+    const auto *ff1_17 = buffer.data(ff1 + 17);
+    const auto *ff1_21 = buffer.data(ff1 + 21);
+    const auto *ff1_22 = buffer.data(ff1 + 22);
+    const auto *ff1_23 = buffer.data(ff1 + 23);
+    const auto *ff1_24 = buffer.data(ff1 + 24);
+    const auto *ff1_25 = buffer.data(ff1 + 25);
+    const auto *ff1_26 = buffer.data(ff1 + 26);
+
+    const auto *fg_0 = buffer.data(fg + 0);
+    const auto *fg_1 = buffer.data(fg + 1);
+    const auto *fg_2 = buffer.data(fg + 2);
+    const auto *fg_3 = buffer.data(fg + 3);
+    const auto *fg_4 = buffer.data(fg + 4);
+    const auto *fg_5 = buffer.data(fg + 5);
+    const auto *fg_6 = buffer.data(fg + 6);
+    const auto *fg_7 = buffer.data(fg + 7);
+    const auto *fg_8 = buffer.data(fg + 8);
+    const auto *fg_13 = buffer.data(fg + 13);
+    const auto *fg_14 = buffer.data(fg + 14);
+    const auto *fg_15 = buffer.data(fg + 15);
+    const auto *fg_16 = buffer.data(fg + 16);
+    const auto *fg_17 = buffer.data(fg + 17);
+    const auto *fg_18 = buffer.data(fg + 18);
+    const auto *fg_19 = buffer.data(fg + 19);
+    const auto *fg_20 = buffer.data(fg + 20);
+    const auto *fg_21 = buffer.data(fg + 21);
+    const auto *fg_24 = buffer.data(fg + 24);
+    const auto *fg_25 = buffer.data(fg + 25);
+    const auto *fg_26 = buffer.data(fg + 26);
+    const auto *fg_27 = buffer.data(fg + 27);
+    const auto *fg_28 = buffer.data(fg + 28);
+    const auto *fg_29 = buffer.data(fg + 29);
+    const auto *fg_30 = buffer.data(fg + 30);
+    const auto *fg_31 = buffer.data(fg + 31);
+    const auto *fg_32 = buffer.data(fg + 32);
+
+#pragma omp simd aligned(t_0, t_1, t_2, t_3, t_4, pb_x, pb_y, pb_z, dg_0, ff0_0, ff1_0, fg_0, \
+                         fg_1, fg_2 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_0[k] = f_0 * dg_0[k]
+                 + f_1 * ff0_0[k]
+                 - f_2 * ff1_0[k]
+                 + pb_x[k] * fg_0[k];
+
+        t_1[k] = pb_y[k] * fg_0[k];
+
+        t_2[k] = pb_z[k] * fg_0[k];
+
+        t_3[k] = f_3 * ff0_0[k]
+                 - f_4 * ff1_0[k]
+                 + pb_y[k] * fg_1[k];
+
+        t_4[k] = f_3 * ff0_0[k]
+                 - f_4 * ff1_0[k]
+                 + pb_z[k] * fg_2[k];
+    }
+
+#pragma omp simd aligned(t_5, t_6, t_7, t_8, pb_y, pb_z, ff0_1, ff0_2, ff0_3, ff1_1, ff1_2, \
+                         ff1_3, fg_3, fg_4, fg_5 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_5[k] = f_5 * ff0_1[k]
+                 - f_6 * ff1_1[k]
+                 + pb_y[k] * fg_3[k];
+
+        t_6[k] = pb_y[k] * fg_4[k];
+
+        t_7[k] = f_5 * ff0_2[k]
+                 - f_6 * ff1_2[k]
+                 + pb_z[k] * fg_4[k];
+
+        t_8[k] = f_1 * ff0_3[k]
+                 - f_2 * ff1_3[k]
+                 + pb_y[k] * fg_5[k];
+    }
+
+#pragma omp simd aligned(t_9, t_10, t_11, t_12, t_13, pa_y, pb_y, pb_z, dh_0, ff0_4, ff0_5, \
+                         ff1_4, ff1_5, fg_6, fg_7, fg_8 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_9[k] = f_5 * ff0_4[k]
+                 - f_6 * ff1_4[k]
+                 + pb_y[k] * fg_6[k];
+
+        t_10[k] = f_3 * ff0_5[k]
+                  - f_4 * ff1_5[k]
+                  + pb_y[k] * fg_7[k];
+
+        t_11[k] = pb_y[k] * fg_8[k];
+
+        t_12[k] = f_1 * ff0_5[k]
+                  - f_2 * ff1_5[k]
+                  + pb_z[k] * fg_8[k];
+
+        t_13[k] = pa_y[k] * dh_0[k];
+    }
+
+#pragma omp simd aligned(t_14, t_15, t_16, t_17, pa_x, pa_z, pb_x, dh_0, dh_1, dh_2, ff0_12, \
+                         ff1_12, fg_13 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_14[k] = pa_z[k] * dh_0[k];
+
+        t_15[k] = pa_x[k] * dh_1[k];
+
+        t_16[k] = pa_x[k] * dh_2[k];
+
+        t_17[k] = f_1 * ff0_12[k]
+                  - f_2 * ff1_12[k]
+                  + pb_x[k] * fg_13[k];
+    }
+
+#pragma omp simd aligned(t_18, t_19, t_20, pb_x, ff0_13, ff0_14, ff0_15, ff1_13, ff1_14, \
+                         ff1_15, fg_14, fg_15, fg_16 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_18[k] = f_5 * ff0_13[k]
+                  - f_6 * ff1_13[k]
+                  + pb_x[k] * fg_14[k];
+
+        t_19[k] = f_5 * ff0_14[k]
+                  - f_6 * ff1_14[k]
+                  + pb_x[k] * fg_15[k];
+
+        t_20[k] = f_3 * ff0_15[k]
+                  - f_4 * ff1_15[k]
+                  + pb_x[k] * fg_16[k];
+    }
+
+#pragma omp simd aligned(t_21, t_22, t_23, t_24, t_25, pb_x, pb_y, dg_14, ff0_15, ff0_17, \
+                         ff1_15, ff1_17, fg_17, fg_18, fg_20, fg_21 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_21[k] = f_3 * ff0_17[k]
+                  - f_4 * ff1_17[k]
+                  + pb_x[k] * fg_17[k];
+
+        t_22[k] = pb_x[k] * fg_18[k];
+
+        t_23[k] = pb_x[k] * fg_20[k];
+
+        t_24[k] = pb_x[k] * fg_21[k];
+
+        t_25[k] = f_0 * dg_14[k]
+                  + f_1 * ff0_15[k]
+                  - f_2 * ff1_15[k]
+                  + pb_y[k] * fg_18[k];
+    }
+
+#pragma omp simd aligned(t_26, t_27, t_28, t_29, pb_z, ff0_15, ff0_16, ff0_17, ff1_15, ff1_16, \
+                         ff1_17, fg_18, fg_19, fg_20, fg_21 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_26[k] = pb_z[k] * fg_18[k];
+
+        t_27[k] = f_3 * ff0_15[k]
+                  - f_4 * ff1_15[k]
+                  + pb_z[k] * fg_19[k];
+
+        t_28[k] = f_5 * ff0_16[k]
+                  - f_6 * ff1_16[k]
+                  + pb_z[k] * fg_20[k];
+
+        t_29[k] = f_1 * ff0_17[k]
+                  - f_2 * ff1_17[k]
+                  + pb_z[k] * fg_21[k];
+    }
+
+#pragma omp simd aligned(t_30, t_31, t_32, t_33, pa_y, pa_z, pb_x, dh_1, dh_2, ff0_21, ff0_22, \
+                         ff1_21, ff1_22, fg_24, fg_25 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_30[k] = pa_z[k] * dh_1[k];
+
+        t_31[k] = pa_y[k] * dh_2[k];
+
+        t_32[k] = f_1 * ff0_21[k]
+                  - f_2 * ff1_21[k]
+                  + pb_x[k] * fg_24[k];
+
+        t_33[k] = f_5 * ff0_22[k]
+                  - f_6 * ff1_22[k]
+                  + pb_x[k] * fg_25[k];
+    }
+
+#pragma omp simd aligned(t_34, t_35, t_36, t_37, pb_x, ff0_23, ff0_24, ff0_26, ff1_23, ff1_24, \
+                         ff1_26, fg_26, fg_27, fg_28, fg_29 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_34[k] = f_5 * ff0_23[k]
+                  - f_6 * ff1_23[k]
+                  + pb_x[k] * fg_26[k];
+
+        t_35[k] = f_3 * ff0_24[k]
+                  - f_4 * ff1_24[k]
+                  + pb_x[k] * fg_27[k];
+
+        t_36[k] = f_3 * ff0_26[k]
+                  - f_4 * ff1_26[k]
+                  + pb_x[k] * fg_28[k];
+
+        t_37[k] = pb_x[k] * fg_29[k];
+    }
+
+#pragma omp simd aligned(t_38, t_39, t_40, t_41, pb_x, pb_y, ff0_24, ff0_25, ff1_24, ff1_25, \
+                         fg_29, fg_30, fg_32 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_38[k] = pb_x[k] * fg_30[k];
+
+        t_39[k] = pb_x[k] * fg_32[k];
+
+        t_40[k] = f_1 * ff0_24[k]
+                  - f_2 * ff1_24[k]
+                  + pb_y[k] * fg_29[k];
+
+        t_41[k] = f_5 * ff0_25[k]
+                  - f_6 * ff1_25[k]
+                  + pb_y[k] * fg_30[k];
+    }
+
+#pragma omp simd aligned(t_42, t_43, t_44, pb_y, pb_z, dg_26, ff0_26, ff1_26, fg_31, \
+                         fg_32 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_42[k] = f_3 * ff0_26[k]
+                  - f_4 * ff1_26[k]
+                  + pb_y[k] * fg_31[k];
+
+        t_43[k] = pb_y[k] * fg_32[k];
+
+        t_44[k] = f_0 * dg_26[k]
+                  + f_1 * ff0_26[k]
+                  - f_2 * ff1_26[k]
+                  + pb_z[k] * fg_32[k];
+    }
+}
+
+auto
+compute_prim_fh_electron_repulsion_24(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t pb, const size_t dg, const size_t dh,
+                                      const size_t ff0, const size_t ff1, const size_t fg,
+                                      const size_t ncols, const double alpha, const double beta,
+                                      const double p) -> void
+{
+    // NOTE: the factors are fixed by the pair of primitives, so they are formed
+    // once rather than for every atom pair the pair reaches.
+
+    const auto f_0 = 1.5 / p;
+    const auto f_1 = 2.0 / beta;
+    const auto f_2 = 2.0 * alpha / (beta * p);
+    const auto f_3 = 0.5 / beta;
+    const auto f_4 = 0.5 * alpha / (beta * p);
+    const auto f_5 = 1.0 / beta;
+    const auto f_6 = alpha / (beta * p);
+    const auto f_7 = 1.0 / p;
+    const auto f_8 = 0.5 / p;
+
+    auto *t_0 = buffer.data(target + 0);
+    auto *t_1 = buffer.data(target + 1);
+    auto *t_2 = buffer.data(target + 2);
+    auto *t_3 = buffer.data(target + 3);
+    auto *t_4 = buffer.data(target + 4);
+    auto *t_5 = buffer.data(target + 5);
+    auto *t_6 = buffer.data(target + 6);
+    auto *t_7 = buffer.data(target + 7);
+    auto *t_8 = buffer.data(target + 8);
+    auto *t_9 = buffer.data(target + 9);
+    auto *t_10 = buffer.data(target + 10);
+    auto *t_11 = buffer.data(target + 11);
+    auto *t_12 = buffer.data(target + 12);
+    auto *t_13 = buffer.data(target + 13);
+    auto *t_14 = buffer.data(target + 14);
+    auto *t_15 = buffer.data(target + 15);
+    auto *t_16 = buffer.data(target + 16);
+    auto *t_17 = buffer.data(target + 17);
+    auto *t_18 = buffer.data(target + 18);
+    auto *t_19 = buffer.data(target + 19);
+    auto *t_20 = buffer.data(target + 20);
+    auto *t_21 = buffer.data(target + 21);
+    auto *t_22 = buffer.data(target + 22);
+    auto *t_23 = buffer.data(target + 23);
+    auto *t_24 = buffer.data(target + 24);
+    auto *t_25 = buffer.data(target + 25);
+    auto *t_26 = buffer.data(target + 26);
+    auto *t_27 = buffer.data(target + 27);
+    auto *t_28 = buffer.data(target + 28);
+    auto *t_29 = buffer.data(target + 29);
+    auto *t_30 = buffer.data(target + 30);
+    auto *t_31 = buffer.data(target + 31);
+    auto *t_32 = buffer.data(target + 32);
+    auto *t_33 = buffer.data(target + 33);
+    auto *t_34 = buffer.data(target + 34);
+    auto *t_35 = buffer.data(target + 35);
+    auto *t_36 = buffer.data(target + 36);
+    auto *t_37 = buffer.data(target + 37);
+    auto *t_38 = buffer.data(target + 38);
+    auto *t_39 = buffer.data(target + 39);
+    auto *t_40 = buffer.data(target + 40);
+    auto *t_41 = buffer.data(target + 41);
+    auto *t_42 = buffer.data(target + 42);
+    auto *t_43 = buffer.data(target + 43);
+    auto *t_44 = buffer.data(target + 44);
+    auto *t_45 = buffer.data(target + 45);
+    auto *t_46 = buffer.data(target + 46);
+    auto *t_47 = buffer.data(target + 47);
+    auto *t_48 = buffer.data(target + 48);
+    auto *t_49 = buffer.data(target + 49);
+    auto *t_50 = buffer.data(target + 50);
+    auto *t_51 = buffer.data(target + 51);
+    auto *t_52 = buffer.data(target + 52);
+    auto *t_53 = buffer.data(target + 53);
+
+    const auto *pa_x = buffer.data(pa + 0);
+    const auto *pa_y = buffer.data(pa + 1);
+    const auto *pa_z = buffer.data(pa + 2);
+
+    const auto *pb_x = buffer.data(pb + 0);
+    const auto *pb_y = buffer.data(pb + 1);
+    const auto *pb_z = buffer.data(pb + 2);
+
+    const auto *dg_0 = buffer.data(dg + 0);
+    const auto *dg_10 = buffer.data(dg + 10);
+    const auto *dg_12 = buffer.data(dg + 12);
+    const auto *dg_14 = buffer.data(dg + 14);
+    const auto *dg_20 = buffer.data(dg + 20);
+    const auto *dg_22 = buffer.data(dg + 22);
+    const auto *dg_24 = buffer.data(dg + 24);
+    const auto *dg_25 = buffer.data(dg + 25);
+    const auto *dg_26 = buffer.data(dg + 26);
+
+    const auto *dh_0 = buffer.data(dh + 0);
+    const auto *dh_15 = buffer.data(dh + 15);
+    const auto *dh_17 = buffer.data(dh + 17);
+    const auto *dh_21 = buffer.data(dh + 21);
+    const auto *dh_29 = buffer.data(dh + 29);
+    const auto *dh_31 = buffer.data(dh + 31);
+    const auto *dh_35 = buffer.data(dh + 35);
+    const auto *dh_36 = buffer.data(dh + 36);
+    const auto *dh_38 = buffer.data(dh + 38);
+
+    const auto *ff0_0 = buffer.data(ff0 + 0);
+    const auto *ff0_1 = buffer.data(ff0 + 1);
+    const auto *ff0_2 = buffer.data(ff0 + 2);
+    const auto *ff0_3 = buffer.data(ff0 + 3);
+    const auto *ff0_4 = buffer.data(ff0 + 4);
+    const auto *ff0_5 = buffer.data(ff0 + 5);
+    const auto *ff0_12 = buffer.data(ff0 + 12);
+    const auto *ff0_13 = buffer.data(ff0 + 13);
+    const auto *ff0_14 = buffer.data(ff0 + 14);
+    const auto *ff0_15 = buffer.data(ff0 + 15);
+    const auto *ff0_16 = buffer.data(ff0 + 16);
+    const auto *ff0_17 = buffer.data(ff0 + 17);
+    const auto *ff0_21 = buffer.data(ff0 + 21);
+    const auto *ff0_22 = buffer.data(ff0 + 22);
+    const auto *ff0_23 = buffer.data(ff0 + 23);
+    const auto *ff0_24 = buffer.data(ff0 + 24);
+    const auto *ff0_25 = buffer.data(ff0 + 25);
+    const auto *ff0_26 = buffer.data(ff0 + 26);
+
+    const auto *ff1_0 = buffer.data(ff1 + 0);
+    const auto *ff1_1 = buffer.data(ff1 + 1);
+    const auto *ff1_2 = buffer.data(ff1 + 2);
+    const auto *ff1_3 = buffer.data(ff1 + 3);
+    const auto *ff1_4 = buffer.data(ff1 + 4);
+    const auto *ff1_5 = buffer.data(ff1 + 5);
+    const auto *ff1_12 = buffer.data(ff1 + 12);
+    const auto *ff1_13 = buffer.data(ff1 + 13);
+    const auto *ff1_14 = buffer.data(ff1 + 14);
+    const auto *ff1_15 = buffer.data(ff1 + 15);
+    const auto *ff1_16 = buffer.data(ff1 + 16);
+    const auto *ff1_17 = buffer.data(ff1 + 17);
+    const auto *ff1_21 = buffer.data(ff1 + 21);
+    const auto *ff1_22 = buffer.data(ff1 + 22);
+    const auto *ff1_23 = buffer.data(ff1 + 23);
+    const auto *ff1_24 = buffer.data(ff1 + 24);
+    const auto *ff1_25 = buffer.data(ff1 + 25);
+    const auto *ff1_26 = buffer.data(ff1 + 26);
+
+    const auto *fg_0 = buffer.data(fg + 0);
+    const auto *fg_1 = buffer.data(fg + 1);
+    const auto *fg_2 = buffer.data(fg + 2);
+    const auto *fg_3 = buffer.data(fg + 3);
+    const auto *fg_4 = buffer.data(fg + 4);
+    const auto *fg_5 = buffer.data(fg + 5);
+    const auto *fg_6 = buffer.data(fg + 6);
+    const auto *fg_7 = buffer.data(fg + 7);
+    const auto *fg_8 = buffer.data(fg + 8);
+    const auto *fg_13 = buffer.data(fg + 13);
+    const auto *fg_16 = buffer.data(fg + 16);
+    const auto *fg_17 = buffer.data(fg + 17);
+    const auto *fg_18 = buffer.data(fg + 18);
+    const auto *fg_19 = buffer.data(fg + 19);
+    const auto *fg_20 = buffer.data(fg + 20);
+    const auto *fg_21 = buffer.data(fg + 21);
+    const auto *fg_22 = buffer.data(fg + 22);
+    const auto *fg_23 = buffer.data(fg + 23);
+    const auto *fg_24 = buffer.data(fg + 24);
+    const auto *fg_25 = buffer.data(fg + 25);
+    const auto *fg_29 = buffer.data(fg + 29);
+    const auto *fg_30 = buffer.data(fg + 30);
+    const auto *fg_31 = buffer.data(fg + 31);
+    const auto *fg_32 = buffer.data(fg + 32);
+    const auto *fg_33 = buffer.data(fg + 33);
+    const auto *fg_34 = buffer.data(fg + 34);
+    const auto *fg_35 = buffer.data(fg + 35);
+    const auto *fg_36 = buffer.data(fg + 36);
+    const auto *fg_37 = buffer.data(fg + 37);
+    const auto *fg_38 = buffer.data(fg + 38);
+
+#pragma omp simd aligned(t_0, t_1, t_2, t_3, t_4, pb_x, pb_y, pb_z, dg_0, ff0_0, ff1_0, fg_0, \
+                         fg_1, fg_2 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_0[k] = f_0 * dg_0[k]
+                 + f_1 * ff0_0[k]
+                 - f_2 * ff1_0[k]
+                 + pb_x[k] * fg_0[k];
+
+        t_1[k] = pb_y[k] * fg_0[k];
+
+        t_2[k] = pb_z[k] * fg_0[k];
+
+        t_3[k] = f_3 * ff0_0[k]
+                 - f_4 * ff1_0[k]
+                 + pb_y[k] * fg_1[k];
+
+        t_4[k] = f_3 * ff0_0[k]
+                 - f_4 * ff1_0[k]
+                 + pb_z[k] * fg_2[k];
+    }
+
+#pragma omp simd aligned(t_5, t_6, t_7, t_8, pb_y, pb_z, ff0_1, ff0_2, ff0_3, ff1_1, ff1_2, \
+                         ff1_3, fg_3, fg_4, fg_5 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_5[k] = f_5 * ff0_1[k]
+                 - f_6 * ff1_1[k]
+                 + pb_y[k] * fg_3[k];
+
+        t_6[k] = pb_y[k] * fg_4[k];
+
+        t_7[k] = f_5 * ff0_2[k]
+                 - f_6 * ff1_2[k]
+                 + pb_z[k] * fg_4[k];
+
+        t_8[k] = f_1 * ff0_3[k]
+                 - f_2 * ff1_3[k]
+                 + pb_y[k] * fg_5[k];
+    }
+
+#pragma omp simd aligned(t_9, t_10, t_11, t_12, t_13, pa_y, pb_y, pb_z, dh_0, ff0_4, ff0_5, \
+                         ff1_4, ff1_5, fg_6, fg_7, fg_8 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_9[k] = f_5 * ff0_4[k]
+                 - f_6 * ff1_4[k]
+                 + pb_y[k] * fg_6[k];
+
+        t_10[k] = f_3 * ff0_5[k]
+                  - f_4 * ff1_5[k]
+                  + pb_y[k] * fg_7[k];
+
+        t_11[k] = pb_y[k] * fg_8[k];
+
+        t_12[k] = f_1 * ff0_5[k]
+                  - f_2 * ff1_5[k]
+                  + pb_z[k] * fg_8[k];
+
+        t_13[k] = pa_y[k] * dh_0[k];
+    }
+
+#pragma omp simd aligned(t_14, t_15, t_16, t_17, t_18, pa_x, pa_z, pb_x, dg_10, dg_12, dg_14, \
+                         dh_0, dh_15, dh_17, dh_21, fg_13 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_14[k] = pa_z[k] * dh_0[k];
+
+        t_15[k] = f_0 * dg_10[k]
+                  + pa_x[k] * dh_15[k];
+
+        t_16[k] = f_7 * dg_12[k]
+                  + pa_x[k] * dh_17[k];
+
+        t_17[k] = f_8 * dg_14[k]
+                  + pb_x[k] * fg_13[k];
+
+        t_18[k] = pa_x[k] * dh_21[k];
+    }
+
+#pragma omp simd aligned(t_19, t_20, t_21, t_22, pa_x, pb_x, dg_20, dg_22, dg_26, dh_29, \
+                         dh_31, dh_38, fg_16 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_19[k] = f_0 * dg_20[k]
+                  + pa_x[k] * dh_29[k];
+
+        t_20[k] = f_7 * dg_22[k]
+                  + pa_x[k] * dh_31[k];
+
+        t_21[k] = f_8 * dg_26[k]
+                  + pb_x[k] * fg_16[k];
+
+        t_22[k] = pa_x[k] * dh_38[k];
+    }
+
+#pragma omp simd aligned(t_23, t_24, t_25, pb_x, ff0_12, ff0_13, ff0_14, ff1_12, ff1_13, \
+                         ff1_14, fg_17, fg_18, fg_19 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_23[k] = f_1 * ff0_12[k]
+                  - f_2 * ff1_12[k]
+                  + pb_x[k] * fg_17[k];
+
+        t_24[k] = f_5 * ff0_13[k]
+                  - f_6 * ff1_13[k]
+                  + pb_x[k] * fg_18[k];
+
+        t_25[k] = f_5 * ff0_14[k]
+                  - f_6 * ff1_14[k]
+                  + pb_x[k] * fg_19[k];
+    }
+
+#pragma omp simd aligned(t_26, t_27, t_28, t_29, t_30, pb_x, ff0_15, ff0_17, ff1_15, ff1_17, \
+                         fg_20, fg_21, fg_22, fg_24, fg_25 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_26[k] = f_3 * ff0_15[k]
+                  - f_4 * ff1_15[k]
+                  + pb_x[k] * fg_20[k];
+
+        t_27[k] = f_3 * ff0_17[k]
+                  - f_4 * ff1_17[k]
+                  + pb_x[k] * fg_21[k];
+
+        t_28[k] = pb_x[k] * fg_22[k];
+
+        t_29[k] = pb_x[k] * fg_24[k];
+
+        t_30[k] = pb_x[k] * fg_25[k];
+    }
+
+#pragma omp simd aligned(t_31, t_32, t_33, t_34, pb_y, pb_z, dg_14, ff0_15, ff0_16, ff1_15, \
+                         ff1_16, fg_22, fg_23, fg_24 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_31[k] = f_0 * dg_14[k]
+                  + f_1 * ff0_15[k]
+                  - f_2 * ff1_15[k]
+                  + pb_y[k] * fg_22[k];
+
+        t_32[k] = pb_z[k] * fg_22[k];
+
+        t_33[k] = f_3 * ff0_15[k]
+                  - f_4 * ff1_15[k]
+                  + pb_z[k] * fg_23[k];
+
+        t_34[k] = f_5 * ff0_16[k]
+                  - f_6 * ff1_16[k]
+                  + pb_z[k] * fg_24[k];
+    }
+
+#pragma omp simd aligned(t_35, t_36, t_37, t_38, pa_y, pa_z, pb_z, dg_24, dg_25, dh_21, dh_35, \
+                         dh_36, ff0_17, ff1_17, fg_25 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_35[k] = f_1 * ff0_17[k]
+                  - f_2 * ff1_17[k]
+                  + pb_z[k] * fg_25[k];
+
+        t_36[k] = pa_z[k] * dh_21[k];
+
+        t_37[k] = f_0 * dg_24[k]
+                  + pa_y[k] * dh_35[k];
+
+        t_38[k] = f_7 * dg_25[k]
+                  + pa_y[k] * dh_36[k];
+    }
+
+#pragma omp simd aligned(t_39, t_40, t_41, t_42, pa_y, pb_x, pb_y, dg_26, dh_38, ff0_21, \
+                         ff0_22, ff1_21, ff1_22, fg_29, fg_30, fg_31 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_39[k] = f_8 * dg_26[k]
+                  + pb_y[k] * fg_29[k];
+
+        t_40[k] = pa_y[k] * dh_38[k];
+
+        t_41[k] = f_1 * ff0_21[k]
+                  - f_2 * ff1_21[k]
+                  + pb_x[k] * fg_30[k];
+
+        t_42[k] = f_5 * ff0_22[k]
+                  - f_6 * ff1_22[k]
+                  + pb_x[k] * fg_31[k];
+    }
+
+#pragma omp simd aligned(t_43, t_44, t_45, t_46, pb_x, ff0_23, ff0_24, ff0_26, ff1_23, ff1_24, \
+                         ff1_26, fg_32, fg_33, fg_34, fg_35 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_43[k] = f_5 * ff0_23[k]
+                  - f_6 * ff1_23[k]
+                  + pb_x[k] * fg_32[k];
+
+        t_44[k] = f_3 * ff0_24[k]
+                  - f_4 * ff1_24[k]
+                  + pb_x[k] * fg_33[k];
+
+        t_45[k] = f_3 * ff0_26[k]
+                  - f_4 * ff1_26[k]
+                  + pb_x[k] * fg_34[k];
+
+        t_46[k] = pb_x[k] * fg_35[k];
+    }
+
+#pragma omp simd aligned(t_47, t_48, t_49, t_50, pb_x, pb_y, ff0_24, ff0_25, ff1_24, ff1_25, \
+                         fg_35, fg_36, fg_38 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_47[k] = pb_x[k] * fg_36[k];
+
+        t_48[k] = pb_x[k] * fg_38[k];
+
+        t_49[k] = f_1 * ff0_24[k]
+                  - f_2 * ff1_24[k]
+                  + pb_y[k] * fg_35[k];
+
+        t_50[k] = f_5 * ff0_25[k]
+                  - f_6 * ff1_25[k]
+                  + pb_y[k] * fg_36[k];
+    }
+
+#pragma omp simd aligned(t_51, t_52, t_53, pb_y, pb_z, dg_26, ff0_26, ff1_26, fg_37, \
+                         fg_38 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_51[k] = f_3 * ff0_26[k]
+                  - f_4 * ff1_26[k]
+                  + pb_y[k] * fg_37[k];
+
+        t_52[k] = pb_y[k] * fg_38[k];
+
+        t_53[k] = f_0 * dg_26[k]
+                  + f_1 * ff0_26[k]
+                  - f_2 * ff1_26[k]
+                  + pb_z[k] * fg_38[k];
+    }
+}
+
+auto
+compute_prim_fh_electron_repulsion_25(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t pb, const size_t dg, const size_t dh,
+                                      const size_t ff0, const size_t ff1, const size_t fg,
+                                      const size_t ncols, const double alpha, const double beta,
+                                      const double p) -> void
+{
+    // NOTE: the factors are fixed by the pair of primitives, so they are formed
+    // once rather than for every atom pair the pair reaches.
+
+    const auto f_0 = 1.5 / p;
+    const auto f_1 = 2.0 / beta;
+    const auto f_2 = 2.0 * alpha / (beta * p);
+    const auto f_3 = 0.5 / beta;
+    const auto f_4 = 0.5 * alpha / (beta * p);
+    const auto f_5 = 1.0 / beta;
+    const auto f_6 = alpha / (beta * p);
+    const auto f_7 = 2.5 / p;
+    const auto f_8 = 1.0 / p;
+    const auto f_9 = 0.5 / p;
+
+    auto *t_0 = buffer.data(target + 0);
+    auto *t_1 = buffer.data(target + 1);
+    auto *t_2 = buffer.data(target + 2);
+    auto *t_3 = buffer.data(target + 3);
+    auto *t_4 = buffer.data(target + 4);
+    auto *t_5 = buffer.data(target + 5);
+    auto *t_6 = buffer.data(target + 6);
+    auto *t_7 = buffer.data(target + 7);
+    auto *t_8 = buffer.data(target + 8);
+    auto *t_9 = buffer.data(target + 9);
+    auto *t_10 = buffer.data(target + 10);
+    auto *t_11 = buffer.data(target + 11);
+    auto *t_12 = buffer.data(target + 12);
+    auto *t_13 = buffer.data(target + 13);
+    auto *t_14 = buffer.data(target + 14);
+    auto *t_15 = buffer.data(target + 15);
+    auto *t_16 = buffer.data(target + 16);
+    auto *t_17 = buffer.data(target + 17);
+    auto *t_18 = buffer.data(target + 18);
+    auto *t_19 = buffer.data(target + 19);
+    auto *t_20 = buffer.data(target + 20);
+    auto *t_21 = buffer.data(target + 21);
+    auto *t_22 = buffer.data(target + 22);
+    auto *t_23 = buffer.data(target + 23);
+    auto *t_24 = buffer.data(target + 24);
+    auto *t_25 = buffer.data(target + 25);
+    auto *t_26 = buffer.data(target + 26);
+    auto *t_27 = buffer.data(target + 27);
+    auto *t_28 = buffer.data(target + 28);
+    auto *t_29 = buffer.data(target + 29);
+    auto *t_30 = buffer.data(target + 30);
+    auto *t_31 = buffer.data(target + 31);
+    auto *t_32 = buffer.data(target + 32);
+    auto *t_33 = buffer.data(target + 33);
+    auto *t_34 = buffer.data(target + 34);
+    auto *t_35 = buffer.data(target + 35);
+    auto *t_36 = buffer.data(target + 36);
+    auto *t_37 = buffer.data(target + 37);
+    auto *t_38 = buffer.data(target + 38);
+    auto *t_39 = buffer.data(target + 39);
+    auto *t_40 = buffer.data(target + 40);
+    auto *t_41 = buffer.data(target + 41);
+    auto *t_42 = buffer.data(target + 42);
+    auto *t_43 = buffer.data(target + 43);
+    auto *t_44 = buffer.data(target + 44);
+    auto *t_45 = buffer.data(target + 45);
+    auto *t_46 = buffer.data(target + 46);
+    auto *t_47 = buffer.data(target + 47);
+    auto *t_48 = buffer.data(target + 48);
+    auto *t_49 = buffer.data(target + 49);
+    auto *t_50 = buffer.data(target + 50);
+    auto *t_51 = buffer.data(target + 51);
+    auto *t_52 = buffer.data(target + 52);
+    auto *t_53 = buffer.data(target + 53);
+    auto *t_54 = buffer.data(target + 54);
+    auto *t_55 = buffer.data(target + 55);
+    auto *t_56 = buffer.data(target + 56);
+    auto *t_57 = buffer.data(target + 57);
+    auto *t_58 = buffer.data(target + 58);
+    auto *t_59 = buffer.data(target + 59);
+
+    const auto *pa_x = buffer.data(pa + 0);
+    const auto *pa_y = buffer.data(pa + 1);
+    const auto *pa_z = buffer.data(pa + 2);
+
+    const auto *pb_x = buffer.data(pb + 0);
+    const auto *pb_y = buffer.data(pb + 1);
+    const auto *pb_z = buffer.data(pb + 2);
+
+    const auto *dg_0 = buffer.data(dg + 0);
+    const auto *dg_8 = buffer.data(dg + 8);
+    const auto *dg_10 = buffer.data(dg + 10);
+    const auto *dg_12 = buffer.data(dg + 12);
+    const auto *dg_14 = buffer.data(dg + 14);
+    const auto *dg_17 = buffer.data(dg + 17);
+    const auto *dg_20 = buffer.data(dg + 20);
+    const auto *dg_22 = buffer.data(dg + 22);
+    const auto *dg_23 = buffer.data(dg + 23);
+    const auto *dg_24 = buffer.data(dg + 24);
+    const auto *dg_25 = buffer.data(dg + 25);
+    const auto *dg_26 = buffer.data(dg + 26);
+
+    const auto *dh_0 = buffer.data(dh + 0);
+    const auto *dh_11 = buffer.data(dh + 11);
+    const auto *dh_13 = buffer.data(dh + 13);
+    const auto *dh_15 = buffer.data(dh + 15);
+    const auto *dh_19 = buffer.data(dh + 19);
+    const auto *dh_23 = buffer.data(dh + 23);
+    const auto *dh_26 = buffer.data(dh + 26);
+    const auto *dh_28 = buffer.data(dh + 28);
+    const auto *dh_31 = buffer.data(dh + 31);
+    const auto *dh_32 = buffer.data(dh + 32);
+    const auto *dh_33 = buffer.data(dh + 33);
+    const auto *dh_35 = buffer.data(dh + 35);
+
+    const auto *ff0_0 = buffer.data(ff0 + 0);
+    const auto *ff0_1 = buffer.data(ff0 + 1);
+    const auto *ff0_2 = buffer.data(ff0 + 2);
+    const auto *ff0_3 = buffer.data(ff0 + 3);
+    const auto *ff0_4 = buffer.data(ff0 + 4);
+    const auto *ff0_5 = buffer.data(ff0 + 5);
+    const auto *ff0_12 = buffer.data(ff0 + 12);
+    const auto *ff0_13 = buffer.data(ff0 + 13);
+    const auto *ff0_14 = buffer.data(ff0 + 14);
+    const auto *ff0_15 = buffer.data(ff0 + 15);
+    const auto *ff0_16 = buffer.data(ff0 + 16);
+    const auto *ff0_17 = buffer.data(ff0 + 17);
+    const auto *ff0_21 = buffer.data(ff0 + 21);
+    const auto *ff0_22 = buffer.data(ff0 + 22);
+    const auto *ff0_23 = buffer.data(ff0 + 23);
+    const auto *ff0_24 = buffer.data(ff0 + 24);
+    const auto *ff0_25 = buffer.data(ff0 + 25);
+    const auto *ff0_26 = buffer.data(ff0 + 26);
+
+    const auto *ff1_0 = buffer.data(ff1 + 0);
+    const auto *ff1_1 = buffer.data(ff1 + 1);
+    const auto *ff1_2 = buffer.data(ff1 + 2);
+    const auto *ff1_3 = buffer.data(ff1 + 3);
+    const auto *ff1_4 = buffer.data(ff1 + 4);
+    const auto *ff1_5 = buffer.data(ff1 + 5);
+    const auto *ff1_12 = buffer.data(ff1 + 12);
+    const auto *ff1_13 = buffer.data(ff1 + 13);
+    const auto *ff1_14 = buffer.data(ff1 + 14);
+    const auto *ff1_15 = buffer.data(ff1 + 15);
+    const auto *ff1_16 = buffer.data(ff1 + 16);
+    const auto *ff1_17 = buffer.data(ff1 + 17);
+    const auto *ff1_21 = buffer.data(ff1 + 21);
+    const auto *ff1_22 = buffer.data(ff1 + 22);
+    const auto *ff1_23 = buffer.data(ff1 + 23);
+    const auto *ff1_24 = buffer.data(ff1 + 24);
+    const auto *ff1_25 = buffer.data(ff1 + 25);
+    const auto *ff1_26 = buffer.data(ff1 + 26);
+
+    const auto *fg_0 = buffer.data(fg + 0);
+    const auto *fg_1 = buffer.data(fg + 1);
+    const auto *fg_2 = buffer.data(fg + 2);
+    const auto *fg_3 = buffer.data(fg + 3);
+    const auto *fg_4 = buffer.data(fg + 4);
+    const auto *fg_5 = buffer.data(fg + 5);
+    const auto *fg_6 = buffer.data(fg + 6);
+    const auto *fg_7 = buffer.data(fg + 7);
+    const auto *fg_8 = buffer.data(fg + 8);
+    const auto *fg_13 = buffer.data(fg + 13);
+    const auto *fg_16 = buffer.data(fg + 16);
+    const auto *fg_17 = buffer.data(fg + 17);
+    const auto *fg_18 = buffer.data(fg + 18);
+    const auto *fg_19 = buffer.data(fg + 19);
+    const auto *fg_20 = buffer.data(fg + 20);
+    const auto *fg_21 = buffer.data(fg + 21);
+    const auto *fg_22 = buffer.data(fg + 22);
+    const auto *fg_23 = buffer.data(fg + 23);
+    const auto *fg_24 = buffer.data(fg + 24);
+    const auto *fg_25 = buffer.data(fg + 25);
+    const auto *fg_29 = buffer.data(fg + 29);
+    const auto *fg_30 = buffer.data(fg + 30);
+    const auto *fg_31 = buffer.data(fg + 31);
+    const auto *fg_32 = buffer.data(fg + 32);
+    const auto *fg_33 = buffer.data(fg + 33);
+    const auto *fg_34 = buffer.data(fg + 34);
+    const auto *fg_35 = buffer.data(fg + 35);
+    const auto *fg_36 = buffer.data(fg + 36);
+    const auto *fg_37 = buffer.data(fg + 37);
+    const auto *fg_38 = buffer.data(fg + 38);
+
+#pragma omp simd aligned(t_0, t_1, t_2, t_3, t_4, pb_x, pb_y, pb_z, dg_0, ff0_0, ff1_0, fg_0, \
+                         fg_1, fg_2 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_0[k] = f_0 * dg_0[k]
+                 + f_1 * ff0_0[k]
+                 - f_2 * ff1_0[k]
+                 + pb_x[k] * fg_0[k];
+
+        t_1[k] = pb_y[k] * fg_0[k];
+
+        t_2[k] = pb_z[k] * fg_0[k];
+
+        t_3[k] = f_3 * ff0_0[k]
+                 - f_4 * ff1_0[k]
+                 + pb_y[k] * fg_1[k];
+
+        t_4[k] = f_3 * ff0_0[k]
+                 - f_4 * ff1_0[k]
+                 + pb_z[k] * fg_2[k];
+    }
+
+#pragma omp simd aligned(t_5, t_6, t_7, t_8, t_9, pb_y, pb_z, ff0_1, ff0_2, ff0_3, ff1_1, \
+                         ff1_2, ff1_3, fg_3, fg_4, fg_5 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_5[k] = f_5 * ff0_1[k]
+                 - f_6 * ff1_1[k]
+                 + pb_y[k] * fg_3[k];
+
+        t_6[k] = pb_y[k] * fg_4[k];
+
+        t_7[k] = f_5 * ff0_2[k]
+                 - f_6 * ff1_2[k]
+                 + pb_z[k] * fg_4[k];
+
+        t_8[k] = f_1 * ff0_3[k]
+                 - f_2 * ff1_3[k]
+                 + pb_y[k] * fg_5[k];
+
+        t_9[k] = pb_z[k] * fg_5[k];
+    }
+
+#pragma omp simd aligned(t_10, t_11, t_12, t_13, t_14, pa_y, pb_y, pb_z, dh_0, ff0_4, ff0_5, \
+                         ff1_4, ff1_5, fg_6, fg_7, fg_8 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_10[k] = f_5 * ff0_4[k]
+                  - f_6 * ff1_4[k]
+                  + pb_y[k] * fg_6[k];
+
+        t_11[k] = f_3 * ff0_5[k]
+                  - f_4 * ff1_5[k]
+                  + pb_y[k] * fg_7[k];
+
+        t_12[k] = pb_y[k] * fg_8[k];
+
+        t_13[k] = f_1 * ff0_5[k]
+                  - f_2 * ff1_5[k]
+                  + pb_z[k] * fg_8[k];
+
+        t_14[k] = pa_y[k] * dh_0[k];
+    }
+
+#pragma omp simd aligned(t_15, t_16, t_17, t_18, pa_x, pa_z, dg_8, dg_10, dg_12, dh_0, dh_11, \
+                         dh_13, dh_15 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_15[k] = pa_z[k] * dh_0[k];
+
+        t_16[k] = f_7 * dg_8[k]
+                  + pa_z[k] * dh_11[k];
+
+        t_17[k] = f_0 * dg_10[k]
+                  + pa_x[k] * dh_13[k];
+
+        t_18[k] = f_8 * dg_12[k]
+                  + pa_x[k] * dh_15[k];
+    }
+
+#pragma omp simd aligned(t_19, t_20, t_21, t_22, t_23, pa_x, pb_x, dg_14, dg_20, dg_22, dg_26, \
+                         dh_19, dh_26, dh_28, fg_13, fg_16 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_19[k] = f_9 * dg_14[k]
+                  + pb_x[k] * fg_13[k];
+
+        t_20[k] = pa_x[k] * dh_19[k];
+
+        t_21[k] = f_0 * dg_20[k]
+                  + pa_x[k] * dh_26[k];
+
+        t_22[k] = f_8 * dg_22[k]
+                  + pa_x[k] * dh_28[k];
+
+        t_23[k] = f_9 * dg_26[k]
+                  + pb_x[k] * fg_16[k];
+    }
+
+#pragma omp simd aligned(t_24, t_25, t_26, t_27, pa_x, pb_x, pb_z, dh_35, ff0_12, ff0_13, \
+                         ff1_12, ff1_13, fg_17, fg_18 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_24[k] = pa_x[k] * dh_35[k];
+
+        t_25[k] = f_1 * ff0_12[k]
+                  - f_2 * ff1_12[k]
+                  + pb_x[k] * fg_17[k];
+
+        t_26[k] = pb_z[k] * fg_17[k];
+
+        t_27[k] = f_5 * ff0_13[k]
+                  - f_6 * ff1_13[k]
+                  + pb_x[k] * fg_18[k];
+    }
+
+#pragma omp simd aligned(t_28, t_29, t_30, t_31, pb_x, ff0_14, ff0_15, ff0_17, ff1_14, ff1_15, \
+                         ff1_17, fg_19, fg_20, fg_21, fg_22 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_28[k] = f_5 * ff0_14[k]
+                  - f_6 * ff1_14[k]
+                  + pb_x[k] * fg_19[k];
+
+        t_29[k] = f_3 * ff0_15[k]
+                  - f_4 * ff1_15[k]
+                  + pb_x[k] * fg_20[k];
+
+        t_30[k] = f_3 * ff0_17[k]
+                  - f_4 * ff1_17[k]
+                  + pb_x[k] * fg_21[k];
+
+        t_31[k] = pb_x[k] * fg_22[k];
+    }
+
+#pragma omp simd aligned(t_32, t_33, t_34, t_35, t_36, pb_x, pb_y, pb_z, dg_14, ff0_15, \
+                         ff1_15, fg_22, fg_23, fg_24, fg_25 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_32[k] = pb_x[k] * fg_24[k];
+
+        t_33[k] = pb_x[k] * fg_25[k];
+
+        t_34[k] = f_0 * dg_14[k]
+                  + f_1 * ff0_15[k]
+                  - f_2 * ff1_15[k]
+                  + pb_y[k] * fg_22[k];
+
+        t_35[k] = pb_z[k] * fg_22[k];
+
+        t_36[k] = f_3 * ff0_15[k]
+                  - f_4 * ff1_15[k]
+                  + pb_z[k] * fg_23[k];
+    }
+
+#pragma omp simd aligned(t_37, t_38, t_39, t_40, pa_z, pb_z, dg_17, dh_19, dh_23, ff0_16, \
+                         ff0_17, ff1_16, ff1_17, fg_24, fg_25 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_37[k] = f_5 * ff0_16[k]
+                  - f_6 * ff1_16[k]
+                  + pb_z[k] * fg_24[k];
+
+        t_38[k] = f_1 * ff0_17[k]
+                  - f_2 * ff1_17[k]
+                  + pb_z[k] * fg_25[k];
+
+        t_39[k] = pa_z[k] * dh_19[k];
+
+        t_40[k] = f_7 * dg_17[k]
+                  + pa_z[k] * dh_23[k];
+    }
+
+#pragma omp simd aligned(t_41, t_42, t_43, t_44, t_45, pa_y, pb_y, dg_23, dg_24, dg_25, dg_26, \
+                         dh_31, dh_32, dh_33, dh_35, fg_29 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_41[k] = f_7 * dg_23[k]
+                  + pa_y[k] * dh_31[k];
+
+        t_42[k] = f_0 * dg_24[k]
+                  + pa_y[k] * dh_32[k];
+
+        t_43[k] = f_8 * dg_25[k]
+                  + pa_y[k] * dh_33[k];
+
+        t_44[k] = f_9 * dg_26[k]
+                  + pb_y[k] * fg_29[k];
+
+        t_45[k] = pa_y[k] * dh_35[k];
+    }
+
+#pragma omp simd aligned(t_46, t_47, t_48, t_49, pb_x, pb_y, ff0_21, ff0_22, ff0_23, ff1_21, \
+                         ff1_22, ff1_23, fg_30, fg_31, fg_32 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_46[k] = f_1 * ff0_21[k]
+                  - f_2 * ff1_21[k]
+                  + pb_x[k] * fg_30[k];
+
+        t_47[k] = pb_y[k] * fg_30[k];
+
+        t_48[k] = f_5 * ff0_22[k]
+                  - f_6 * ff1_22[k]
+                  + pb_x[k] * fg_31[k];
+
+        t_49[k] = f_5 * ff0_23[k]
+                  - f_6 * ff1_23[k]
+                  + pb_x[k] * fg_32[k];
+    }
+
+#pragma omp simd aligned(t_50, t_51, t_52, t_53, t_54, pb_x, ff0_24, ff0_26, ff1_24, ff1_26, \
+                         fg_33, fg_34, fg_35, fg_36, fg_38 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_50[k] = f_3 * ff0_24[k]
+                  - f_4 * ff1_24[k]
+                  + pb_x[k] * fg_33[k];
+
+        t_51[k] = f_3 * ff0_26[k]
+                  - f_4 * ff1_26[k]
+                  + pb_x[k] * fg_34[k];
+
+        t_52[k] = pb_x[k] * fg_35[k];
+
+        t_53[k] = pb_x[k] * fg_36[k];
+
+        t_54[k] = pb_x[k] * fg_38[k];
+    }
+
+#pragma omp simd aligned(t_55, t_56, t_57, t_58, pb_y, ff0_24, ff0_25, ff0_26, ff1_24, ff1_25, \
+                         ff1_26, fg_35, fg_36, fg_37, fg_38 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_55[k] = f_1 * ff0_24[k]
+                  - f_2 * ff1_24[k]
+                  + pb_y[k] * fg_35[k];
+
+        t_56[k] = f_5 * ff0_25[k]
+                  - f_6 * ff1_25[k]
+                  + pb_y[k] * fg_36[k];
+
+        t_57[k] = f_3 * ff0_26[k]
+                  - f_4 * ff1_26[k]
+                  + pb_y[k] * fg_37[k];
+
+        t_58[k] = pb_y[k] * fg_38[k];
+    }
+
+#pragma omp simd aligned(t_59, pb_z, dg_26, ff0_26, ff1_26, fg_38 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_59[k] = f_0 * dg_26[k]
+                  + f_1 * ff0_26[k]
+                  - f_2 * ff1_26[k]
+                  + pb_z[k] * fg_38[k];
+    }
+}
+
+auto
+compute_prim_fh_electron_repulsion_26(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t pb, const size_t dg, const size_t dh,
+                                      const size_t ff0, const size_t ff1, const size_t fg,
+                                      const size_t ncols, const double alpha, const double beta,
+                                      const double p) -> void
+{
+    // NOTE: the factors are fixed by the pair of primitives, so they are formed
+    // once rather than for every atom pair the pair reaches.
+
+    const auto f_0 = 1.5 / p;
+    const auto f_1 = 2.0 / beta;
+    const auto f_2 = 2.0 * alpha / (beta * p);
+    const auto f_3 = 0.5 / beta;
+    const auto f_4 = 0.5 * alpha / (beta * p);
+    const auto f_5 = 1.0 / beta;
+    const auto f_6 = alpha / (beta * p);
+    const auto f_7 = 1.0 / p;
+    const auto f_8 = 0.5 / p;
+
+    auto *t_0 = buffer.data(target + 0);
+    auto *t_1 = buffer.data(target + 1);
+    auto *t_2 = buffer.data(target + 2);
+    auto *t_3 = buffer.data(target + 3);
+    auto *t_4 = buffer.data(target + 4);
+    auto *t_5 = buffer.data(target + 5);
+    auto *t_6 = buffer.data(target + 6);
+    auto *t_7 = buffer.data(target + 7);
+    auto *t_8 = buffer.data(target + 8);
+    auto *t_9 = buffer.data(target + 9);
+    auto *t_10 = buffer.data(target + 10);
+    auto *t_11 = buffer.data(target + 11);
+    auto *t_12 = buffer.data(target + 12);
+    auto *t_13 = buffer.data(target + 13);
+    auto *t_14 = buffer.data(target + 14);
+    auto *t_15 = buffer.data(target + 15);
+    auto *t_16 = buffer.data(target + 16);
+    auto *t_17 = buffer.data(target + 17);
+    auto *t_18 = buffer.data(target + 18);
+    auto *t_19 = buffer.data(target + 19);
+    auto *t_20 = buffer.data(target + 20);
+    auto *t_21 = buffer.data(target + 21);
+    auto *t_22 = buffer.data(target + 22);
+    auto *t_23 = buffer.data(target + 23);
+    auto *t_24 = buffer.data(target + 24);
+    auto *t_25 = buffer.data(target + 25);
+    auto *t_26 = buffer.data(target + 26);
+    auto *t_27 = buffer.data(target + 27);
+    auto *t_28 = buffer.data(target + 28);
+    auto *t_29 = buffer.data(target + 29);
+    auto *t_30 = buffer.data(target + 30);
+    auto *t_31 = buffer.data(target + 31);
+    auto *t_32 = buffer.data(target + 32);
+    auto *t_33 = buffer.data(target + 33);
+    auto *t_34 = buffer.data(target + 34);
+    auto *t_35 = buffer.data(target + 35);
+    auto *t_36 = buffer.data(target + 36);
+    auto *t_37 = buffer.data(target + 37);
+    auto *t_38 = buffer.data(target + 38);
+    auto *t_39 = buffer.data(target + 39);
+    auto *t_40 = buffer.data(target + 40);
+    auto *t_41 = buffer.data(target + 41);
+    auto *t_42 = buffer.data(target + 42);
+    auto *t_43 = buffer.data(target + 43);
+    auto *t_44 = buffer.data(target + 44);
+    auto *t_45 = buffer.data(target + 45);
+    auto *t_46 = buffer.data(target + 46);
+    auto *t_47 = buffer.data(target + 47);
+    auto *t_48 = buffer.data(target + 48);
+    auto *t_49 = buffer.data(target + 49);
+    auto *t_50 = buffer.data(target + 50);
+    auto *t_51 = buffer.data(target + 51);
+    auto *t_52 = buffer.data(target + 52);
+    auto *t_53 = buffer.data(target + 53);
+
+    const auto *pa_x = buffer.data(pa + 0);
+    const auto *pa_y = buffer.data(pa + 1);
+    const auto *pa_z = buffer.data(pa + 2);
+
+    const auto *pb_x = buffer.data(pb + 0);
+    const auto *pb_y = buffer.data(pb + 1);
+    const auto *pb_z = buffer.data(pb + 2);
+
+    const auto *dg_0 = buffer.data(dg + 0);
+    const auto *dg_10 = buffer.data(dg + 10);
+    const auto *dg_12 = buffer.data(dg + 12);
+    const auto *dg_14 = buffer.data(dg + 14);
+    const auto *dg_20 = buffer.data(dg + 20);
+    const auto *dg_22 = buffer.data(dg + 22);
+    const auto *dg_24 = buffer.data(dg + 24);
+    const auto *dg_25 = buffer.data(dg + 25);
+    const auto *dg_26 = buffer.data(dg + 26);
+
+    const auto *dh_0 = buffer.data(dh + 0);
+    const auto *dh_13 = buffer.data(dh + 13);
+    const auto *dh_15 = buffer.data(dh + 15);
+    const auto *dh_19 = buffer.data(dh + 19);
+    const auto *dh_26 = buffer.data(dh + 26);
+    const auto *dh_28 = buffer.data(dh + 28);
+    const auto *dh_32 = buffer.data(dh + 32);
+    const auto *dh_33 = buffer.data(dh + 33);
+    const auto *dh_35 = buffer.data(dh + 35);
+
+    const auto *ff0_0 = buffer.data(ff0 + 0);
+    const auto *ff0_1 = buffer.data(ff0 + 1);
+    const auto *ff0_2 = buffer.data(ff0 + 2);
+    const auto *ff0_3 = buffer.data(ff0 + 3);
+    const auto *ff0_4 = buffer.data(ff0 + 4);
+    const auto *ff0_5 = buffer.data(ff0 + 5);
+    const auto *ff0_12 = buffer.data(ff0 + 12);
+    const auto *ff0_13 = buffer.data(ff0 + 13);
+    const auto *ff0_14 = buffer.data(ff0 + 14);
+    const auto *ff0_15 = buffer.data(ff0 + 15);
+    const auto *ff0_16 = buffer.data(ff0 + 16);
+    const auto *ff0_17 = buffer.data(ff0 + 17);
+    const auto *ff0_21 = buffer.data(ff0 + 21);
+    const auto *ff0_22 = buffer.data(ff0 + 22);
+    const auto *ff0_23 = buffer.data(ff0 + 23);
+    const auto *ff0_24 = buffer.data(ff0 + 24);
+    const auto *ff0_25 = buffer.data(ff0 + 25);
+    const auto *ff0_26 = buffer.data(ff0 + 26);
+
+    const auto *ff1_0 = buffer.data(ff1 + 0);
+    const auto *ff1_1 = buffer.data(ff1 + 1);
+    const auto *ff1_2 = buffer.data(ff1 + 2);
+    const auto *ff1_3 = buffer.data(ff1 + 3);
+    const auto *ff1_4 = buffer.data(ff1 + 4);
+    const auto *ff1_5 = buffer.data(ff1 + 5);
+    const auto *ff1_12 = buffer.data(ff1 + 12);
+    const auto *ff1_13 = buffer.data(ff1 + 13);
+    const auto *ff1_14 = buffer.data(ff1 + 14);
+    const auto *ff1_15 = buffer.data(ff1 + 15);
+    const auto *ff1_16 = buffer.data(ff1 + 16);
+    const auto *ff1_17 = buffer.data(ff1 + 17);
+    const auto *ff1_21 = buffer.data(ff1 + 21);
+    const auto *ff1_22 = buffer.data(ff1 + 22);
+    const auto *ff1_23 = buffer.data(ff1 + 23);
+    const auto *ff1_24 = buffer.data(ff1 + 24);
+    const auto *ff1_25 = buffer.data(ff1 + 25);
+    const auto *ff1_26 = buffer.data(ff1 + 26);
+
+    const auto *fg_0 = buffer.data(fg + 0);
+    const auto *fg_1 = buffer.data(fg + 1);
+    const auto *fg_2 = buffer.data(fg + 2);
+    const auto *fg_3 = buffer.data(fg + 3);
+    const auto *fg_4 = buffer.data(fg + 4);
+    const auto *fg_5 = buffer.data(fg + 5);
+    const auto *fg_6 = buffer.data(fg + 6);
+    const auto *fg_7 = buffer.data(fg + 7);
+    const auto *fg_8 = buffer.data(fg + 8);
+    const auto *fg_13 = buffer.data(fg + 13);
+    const auto *fg_16 = buffer.data(fg + 16);
+    const auto *fg_17 = buffer.data(fg + 17);
+    const auto *fg_18 = buffer.data(fg + 18);
+    const auto *fg_19 = buffer.data(fg + 19);
+    const auto *fg_20 = buffer.data(fg + 20);
+    const auto *fg_21 = buffer.data(fg + 21);
+    const auto *fg_22 = buffer.data(fg + 22);
+    const auto *fg_23 = buffer.data(fg + 23);
+    const auto *fg_24 = buffer.data(fg + 24);
+    const auto *fg_25 = buffer.data(fg + 25);
+    const auto *fg_29 = buffer.data(fg + 29);
+    const auto *fg_30 = buffer.data(fg + 30);
+    const auto *fg_31 = buffer.data(fg + 31);
+    const auto *fg_32 = buffer.data(fg + 32);
+    const auto *fg_33 = buffer.data(fg + 33);
+    const auto *fg_34 = buffer.data(fg + 34);
+    const auto *fg_35 = buffer.data(fg + 35);
+    const auto *fg_36 = buffer.data(fg + 36);
+    const auto *fg_37 = buffer.data(fg + 37);
+    const auto *fg_38 = buffer.data(fg + 38);
+
+#pragma omp simd aligned(t_0, t_1, t_2, t_3, t_4, pb_x, pb_y, pb_z, dg_0, ff0_0, ff1_0, fg_0, \
+                         fg_1, fg_2 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_0[k] = f_0 * dg_0[k]
+                 + f_1 * ff0_0[k]
+                 - f_2 * ff1_0[k]
+                 + pb_x[k] * fg_0[k];
+
+        t_1[k] = pb_y[k] * fg_0[k];
+
+        t_2[k] = pb_z[k] * fg_0[k];
+
+        t_3[k] = f_3 * ff0_0[k]
+                 - f_4 * ff1_0[k]
+                 + pb_y[k] * fg_1[k];
+
+        t_4[k] = f_3 * ff0_0[k]
+                 - f_4 * ff1_0[k]
+                 + pb_z[k] * fg_2[k];
+    }
+
+#pragma omp simd aligned(t_5, t_6, t_7, t_8, pb_y, pb_z, ff0_1, ff0_2, ff0_3, ff1_1, ff1_2, \
+                         ff1_3, fg_3, fg_4, fg_5 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_5[k] = f_5 * ff0_1[k]
+                 - f_6 * ff1_1[k]
+                 + pb_y[k] * fg_3[k];
+
+        t_6[k] = pb_y[k] * fg_4[k];
+
+        t_7[k] = f_5 * ff0_2[k]
+                 - f_6 * ff1_2[k]
+                 + pb_z[k] * fg_4[k];
+
+        t_8[k] = f_1 * ff0_3[k]
+                 - f_2 * ff1_3[k]
+                 + pb_y[k] * fg_5[k];
+    }
+
+#pragma omp simd aligned(t_9, t_10, t_11, t_12, t_13, pa_y, pb_y, pb_z, dh_0, ff0_4, ff0_5, \
+                         ff1_4, ff1_5, fg_6, fg_7, fg_8 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_9[k] = f_5 * ff0_4[k]
+                 - f_6 * ff1_4[k]
+                 + pb_y[k] * fg_6[k];
+
+        t_10[k] = f_3 * ff0_5[k]
+                  - f_4 * ff1_5[k]
+                  + pb_y[k] * fg_7[k];
+
+        t_11[k] = pb_y[k] * fg_8[k];
+
+        t_12[k] = f_1 * ff0_5[k]
+                  - f_2 * ff1_5[k]
+                  + pb_z[k] * fg_8[k];
+
+        t_13[k] = pa_y[k] * dh_0[k];
+    }
+
+#pragma omp simd aligned(t_14, t_15, t_16, t_17, t_18, pa_x, pa_z, pb_x, dg_10, dg_12, dg_14, \
+                         dh_0, dh_13, dh_15, dh_19, fg_13 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_14[k] = pa_z[k] * dh_0[k];
+
+        t_15[k] = f_0 * dg_10[k]
+                  + pa_x[k] * dh_13[k];
+
+        t_16[k] = f_7 * dg_12[k]
+                  + pa_x[k] * dh_15[k];
+
+        t_17[k] = f_8 * dg_14[k]
+                  + pb_x[k] * fg_13[k];
+
+        t_18[k] = pa_x[k] * dh_19[k];
+    }
+
+#pragma omp simd aligned(t_19, t_20, t_21, t_22, pa_x, pb_x, dg_20, dg_22, dg_26, dh_26, \
+                         dh_28, dh_35, fg_16 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_19[k] = f_0 * dg_20[k]
+                  + pa_x[k] * dh_26[k];
+
+        t_20[k] = f_7 * dg_22[k]
+                  + pa_x[k] * dh_28[k];
+
+        t_21[k] = f_8 * dg_26[k]
+                  + pb_x[k] * fg_16[k];
+
+        t_22[k] = pa_x[k] * dh_35[k];
+    }
+
+#pragma omp simd aligned(t_23, t_24, t_25, pb_x, ff0_12, ff0_13, ff0_14, ff1_12, ff1_13, \
+                         ff1_14, fg_17, fg_18, fg_19 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_23[k] = f_1 * ff0_12[k]
+                  - f_2 * ff1_12[k]
+                  + pb_x[k] * fg_17[k];
+
+        t_24[k] = f_5 * ff0_13[k]
+                  - f_6 * ff1_13[k]
+                  + pb_x[k] * fg_18[k];
+
+        t_25[k] = f_5 * ff0_14[k]
+                  - f_6 * ff1_14[k]
+                  + pb_x[k] * fg_19[k];
+    }
+
+#pragma omp simd aligned(t_26, t_27, t_28, t_29, t_30, pb_x, ff0_15, ff0_17, ff1_15, ff1_17, \
+                         fg_20, fg_21, fg_22, fg_24, fg_25 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_26[k] = f_3 * ff0_15[k]
+                  - f_4 * ff1_15[k]
+                  + pb_x[k] * fg_20[k];
+
+        t_27[k] = f_3 * ff0_17[k]
+                  - f_4 * ff1_17[k]
+                  + pb_x[k] * fg_21[k];
+
+        t_28[k] = pb_x[k] * fg_22[k];
+
+        t_29[k] = pb_x[k] * fg_24[k];
+
+        t_30[k] = pb_x[k] * fg_25[k];
+    }
+
+#pragma omp simd aligned(t_31, t_32, t_33, t_34, pb_y, pb_z, dg_14, ff0_15, ff0_16, ff1_15, \
+                         ff1_16, fg_22, fg_23, fg_24 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_31[k] = f_0 * dg_14[k]
+                  + f_1 * ff0_15[k]
+                  - f_2 * ff1_15[k]
+                  + pb_y[k] * fg_22[k];
+
+        t_32[k] = pb_z[k] * fg_22[k];
+
+        t_33[k] = f_3 * ff0_15[k]
+                  - f_4 * ff1_15[k]
+                  + pb_z[k] * fg_23[k];
+
+        t_34[k] = f_5 * ff0_16[k]
+                  - f_6 * ff1_16[k]
+                  + pb_z[k] * fg_24[k];
+    }
+
+#pragma omp simd aligned(t_35, t_36, t_37, t_38, pa_y, pa_z, pb_z, dg_24, dg_25, dh_19, dh_32, \
+                         dh_33, ff0_17, ff1_17, fg_25 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_35[k] = f_1 * ff0_17[k]
+                  - f_2 * ff1_17[k]
+                  + pb_z[k] * fg_25[k];
+
+        t_36[k] = pa_z[k] * dh_19[k];
+
+        t_37[k] = f_0 * dg_24[k]
+                  + pa_y[k] * dh_32[k];
+
+        t_38[k] = f_7 * dg_25[k]
+                  + pa_y[k] * dh_33[k];
+    }
+
+#pragma omp simd aligned(t_39, t_40, t_41, t_42, pa_y, pb_x, pb_y, dg_26, dh_35, ff0_21, \
+                         ff0_22, ff1_21, ff1_22, fg_29, fg_30, fg_31 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_39[k] = f_8 * dg_26[k]
+                  + pb_y[k] * fg_29[k];
+
+        t_40[k] = pa_y[k] * dh_35[k];
+
+        t_41[k] = f_1 * ff0_21[k]
+                  - f_2 * ff1_21[k]
+                  + pb_x[k] * fg_30[k];
+
+        t_42[k] = f_5 * ff0_22[k]
+                  - f_6 * ff1_22[k]
+                  + pb_x[k] * fg_31[k];
+    }
+
+#pragma omp simd aligned(t_43, t_44, t_45, t_46, pb_x, ff0_23, ff0_24, ff0_26, ff1_23, ff1_24, \
+                         ff1_26, fg_32, fg_33, fg_34, fg_35 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_43[k] = f_5 * ff0_23[k]
+                  - f_6 * ff1_23[k]
+                  + pb_x[k] * fg_32[k];
+
+        t_44[k] = f_3 * ff0_24[k]
+                  - f_4 * ff1_24[k]
+                  + pb_x[k] * fg_33[k];
+
+        t_45[k] = f_3 * ff0_26[k]
+                  - f_4 * ff1_26[k]
+                  + pb_x[k] * fg_34[k];
+
+        t_46[k] = pb_x[k] * fg_35[k];
+    }
+
+#pragma omp simd aligned(t_47, t_48, t_49, t_50, pb_x, pb_y, ff0_24, ff0_25, ff1_24, ff1_25, \
+                         fg_35, fg_36, fg_38 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_47[k] = pb_x[k] * fg_36[k];
+
+        t_48[k] = pb_x[k] * fg_38[k];
+
+        t_49[k] = f_1 * ff0_24[k]
+                  - f_2 * ff1_24[k]
+                  + pb_y[k] * fg_35[k];
+
+        t_50[k] = f_5 * ff0_25[k]
+                  - f_6 * ff1_25[k]
+                  + pb_y[k] * fg_36[k];
+    }
+
+#pragma omp simd aligned(t_51, t_52, t_53, pb_y, pb_z, dg_26, ff0_26, ff1_26, fg_37, \
+                         fg_38 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_51[k] = f_3 * ff0_26[k]
+                  - f_4 * ff1_26[k]
+                  + pb_y[k] * fg_37[k];
+
+        t_52[k] = pb_y[k] * fg_38[k];
+
+        t_53[k] = f_0 * dg_26[k]
+                  + f_1 * ff0_26[k]
+                  - f_2 * ff1_26[k]
+                  + pb_z[k] * fg_38[k];
+    }
+}
+
+auto
+compute_prim_fh_electron_repulsion_27(CSimdMatrix &buffer, const size_t target, const size_t pa,
                                       const size_t pb, const size_t dg, const size_t dh,
                                       const size_t ff0, const size_t ff1, const size_t fg,
                                       const size_t ncols, const double alpha, const double beta,
@@ -5716,7 +12054,7 @@ compute_prim_fh_electron_repulsion_11(CSimdMatrix &buffer, const size_t target, 
 }
 
 auto
-compute_prim_fh_electron_repulsion_12(CSimdMatrix &buffer, const size_t target, const size_t pa,
+compute_prim_fh_electron_repulsion_28(CSimdMatrix &buffer, const size_t target, const size_t pa,
                                       const size_t pb, const size_t dg, const size_t dh,
                                       const size_t ff0, const size_t ff1, const size_t fg,
                                       const size_t ncols, const double alpha, const double beta,
@@ -5810,7 +12148,7 @@ compute_prim_fh_electron_repulsion_12(CSimdMatrix &buffer, const size_t target, 
 }
 
 auto
-compute_prim_fh_electron_repulsion_13(CSimdMatrix &buffer, const size_t target, const size_t pa,
+compute_prim_fh_electron_repulsion_29(CSimdMatrix &buffer, const size_t target, const size_t pa,
                                       const size_t pb, const size_t dg, const size_t dh,
                                       const size_t ff0, const size_t ff1, const size_t fg,
                                       const size_t ncols, const double alpha, const double beta,
@@ -5904,7 +12242,7 @@ compute_prim_fh_electron_repulsion_13(CSimdMatrix &buffer, const size_t target, 
 }
 
 auto
-compute_prim_fh_electron_repulsion_14(CSimdMatrix &buffer, const size_t target, const size_t pa,
+compute_prim_fh_electron_repulsion_30(CSimdMatrix &buffer, const size_t target, const size_t pa,
                                       const size_t pb, const size_t dg, const size_t dh,
                                       const size_t ff0, const size_t ff1, const size_t fg,
                                       const size_t ncols, const double alpha, const double beta,
@@ -6061,7 +12399,7 @@ compute_prim_fh_electron_repulsion_14(CSimdMatrix &buffer, const size_t target, 
 }
 
 auto
-compute_prim_fh_electron_repulsion_15(CSimdMatrix &buffer, const size_t target, const size_t pa,
+compute_prim_fh_electron_repulsion_31(CSimdMatrix &buffer, const size_t target, const size_t pa,
                                       const size_t pb, const size_t dg, const size_t dh,
                                       const size_t ff0, const size_t ff1, const size_t fg,
                                       const size_t ncols, const double alpha, const double beta,
@@ -6218,7 +12556,7 @@ compute_prim_fh_electron_repulsion_15(CSimdMatrix &buffer, const size_t target, 
 }
 
 auto
-compute_prim_fh_electron_repulsion_16(CSimdMatrix &buffer, const size_t target, const size_t pa,
+compute_prim_fh_electron_repulsion_32(CSimdMatrix &buffer, const size_t target, const size_t pa,
                                       const size_t pb, const size_t dg, const size_t dh,
                                       const size_t ff0, const size_t ff1, const size_t fg,
                                       const size_t ncols, const double alpha, const double beta,
@@ -6588,7 +12926,7 @@ compute_prim_fh_electron_repulsion_16(CSimdMatrix &buffer, const size_t target, 
 }
 
 auto
-compute_prim_fh_electron_repulsion_17(CSimdMatrix &buffer, const size_t target, const size_t pa,
+compute_prim_fh_electron_repulsion_33(CSimdMatrix &buffer, const size_t target, const size_t pa,
                                       const size_t pb, const size_t dg, const size_t dh,
                                       const size_t ff0, const size_t ff1, const size_t fg,
                                       const size_t ncols, const double alpha, const double beta,
@@ -6678,6 +13016,4952 @@ compute_prim_fh_electron_repulsion_17(CSimdMatrix &buffer, const size_t target, 
                  + f_1 * ff0_26[k]
                  - f_2 * ff1_26[k]
                  + pb_z[k] * fg_8[k];
+    }
+}
+
+auto
+compute_prim_fh_electron_repulsion_34(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t pb, const size_t dg, const size_t dh,
+                                      const size_t ff0, const size_t ff1, const size_t fg,
+                                      const size_t ncols, const double alpha, const double beta,
+                                      const double p) -> void
+{
+    // NOTE: the factors are fixed by the pair of primitives, so they are formed
+    // once rather than for every atom pair the pair reaches.
+
+    const auto f_0 = 1.5 / p;
+    const auto f_1 = 2.0 / beta;
+    const auto f_2 = 2.0 * alpha / (beta * p);
+
+    auto *t_0 = buffer.data(target + 0);
+    auto *t_1 = buffer.data(target + 1);
+    auto *t_2 = buffer.data(target + 2);
+    auto *t_3 = buffer.data(target + 3);
+    auto *t_4 = buffer.data(target + 4);
+    auto *t_5 = buffer.data(target + 5);
+    auto *t_6 = buffer.data(target + 6);
+    auto *t_7 = buffer.data(target + 7);
+    auto *t_8 = buffer.data(target + 8);
+
+    const auto *pa_x = buffer.data(pa + 0);
+    const auto *pa_y = buffer.data(pa + 1);
+    const auto *pa_z = buffer.data(pa + 2);
+
+    const auto *pb_x = buffer.data(pb + 0);
+    const auto *pb_y = buffer.data(pb + 1);
+    const auto *pb_z = buffer.data(pb + 2);
+
+    const auto *dg_0 = buffer.data(dg + 0);
+    const auto *dg_3 = buffer.data(dg + 3);
+    const auto *dg_8 = buffer.data(dg + 8);
+
+    const auto *dh_0 = buffer.data(dh + 0);
+    const auto *dh_4 = buffer.data(dh + 4);
+    const auto *dh_11 = buffer.data(dh + 11);
+
+    const auto *ff0_0 = buffer.data(ff0 + 0);
+    const auto *ff0_5 = buffer.data(ff0 + 5);
+    const auto *ff0_8 = buffer.data(ff0 + 8);
+
+    const auto *ff1_0 = buffer.data(ff1 + 0);
+    const auto *ff1_7 = buffer.data(ff1 + 7);
+    const auto *ff1_11 = buffer.data(ff1 + 11);
+
+    const auto *fg_0 = buffer.data(fg + 0);
+    const auto *fg_9 = buffer.data(fg + 9);
+    const auto *fg_14 = buffer.data(fg + 14);
+
+#pragma omp simd aligned(t_0, t_1, t_2, t_3, t_4, pa_x, pa_y, pa_z, pb_x, dg_0, dh_0, dh_4, \
+                         dh_11, ff0_0, ff1_0, fg_0 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_0[k] = f_0 * dg_0[k]
+                 + f_1 * ff0_0[k]
+                 - f_2 * ff1_0[k]
+                 + pb_x[k] * fg_0[k];
+
+        t_1[k] = pa_y[k] * dh_0[k];
+
+        t_2[k] = pa_z[k] * dh_0[k];
+
+        t_3[k] = pa_x[k] * dh_4[k];
+
+        t_4[k] = pa_x[k] * dh_11[k];
+    }
+
+#pragma omp simd aligned(t_5, t_6, t_7, pa_y, pa_z, pb_y, dg_3, dh_4, dh_11, ff0_5, ff1_7, \
+                         fg_9 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_5[k] = f_0 * dg_3[k]
+                 + f_1 * ff0_5[k]
+                 - f_2 * ff1_7[k]
+                 + pb_y[k] * fg_9[k];
+
+        t_6[k] = pa_z[k] * dh_4[k];
+
+        t_7[k] = pa_y[k] * dh_11[k];
+    }
+
+#pragma omp simd aligned(t_8, pb_z, dg_8, ff0_8, ff1_11, fg_14 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_8[k] = f_0 * dg_8[k]
+                 + f_1 * ff0_8[k]
+                 - f_2 * ff1_11[k]
+                 + pb_z[k] * fg_14[k];
+    }
+}
+
+auto
+compute_prim_fh_electron_repulsion_35(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t pb, const size_t dg, const size_t dh,
+                                      const size_t ff0, const size_t ff1, const size_t fg,
+                                      const size_t ncols, const double alpha, const double beta,
+                                      const double p) -> void
+{
+    // NOTE: the factors are fixed by the pair of primitives, so they are formed
+    // once rather than for every atom pair the pair reaches.
+
+    const auto f_0 = 1.5 / p;
+    const auto f_1 = 2.0 / beta;
+    const auto f_2 = 2.0 * alpha / (beta * p);
+    const auto f_3 = 1.0 / p;
+    const auto f_4 = 0.5 / p;
+
+    auto *t_0 = buffer.data(target + 0);
+    auto *t_1 = buffer.data(target + 1);
+    auto *t_2 = buffer.data(target + 2);
+    auto *t_3 = buffer.data(target + 3);
+    auto *t_4 = buffer.data(target + 4);
+    auto *t_5 = buffer.data(target + 5);
+    auto *t_6 = buffer.data(target + 6);
+    auto *t_7 = buffer.data(target + 7);
+    auto *t_8 = buffer.data(target + 8);
+    auto *t_9 = buffer.data(target + 9);
+    auto *t_10 = buffer.data(target + 10);
+    auto *t_11 = buffer.data(target + 11);
+    auto *t_12 = buffer.data(target + 12);
+    auto *t_13 = buffer.data(target + 13);
+    auto *t_14 = buffer.data(target + 14);
+    auto *t_15 = buffer.data(target + 15);
+    auto *t_16 = buffer.data(target + 16);
+    auto *t_17 = buffer.data(target + 17);
+
+    const auto *pa_x = buffer.data(pa + 0);
+    const auto *pa_y = buffer.data(pa + 1);
+    const auto *pa_z = buffer.data(pa + 2);
+
+    const auto *pb_x = buffer.data(pb + 0);
+    const auto *pb_y = buffer.data(pb + 1);
+    const auto *pb_z = buffer.data(pb + 2);
+
+    const auto *dg_0 = buffer.data(dg + 0);
+    const auto *dg_1 = buffer.data(dg + 1);
+    const auto *dg_2 = buffer.data(dg + 2);
+    const auto *dg_3 = buffer.data(dg + 3);
+    const auto *dg_4 = buffer.data(dg + 4);
+    const auto *dg_5 = buffer.data(dg + 5);
+    const auto *dg_6 = buffer.data(dg + 6);
+    const auto *dg_7 = buffer.data(dg + 7);
+    const auto *dg_8 = buffer.data(dg + 8);
+
+    const auto *dh_0 = buffer.data(dh + 0);
+    const auto *dh_1 = buffer.data(dh + 1);
+    const auto *dh_2 = buffer.data(dh + 2);
+    const auto *dh_4 = buffer.data(dh + 4);
+    const auto *dh_5 = buffer.data(dh + 5);
+    const auto *dh_6 = buffer.data(dh + 6);
+    const auto *dh_8 = buffer.data(dh + 8);
+    const auto *dh_9 = buffer.data(dh + 9);
+    const auto *dh_11 = buffer.data(dh + 11);
+
+    const auto *ff0_0 = buffer.data(ff0 + 0);
+    const auto *ff0_7 = buffer.data(ff0 + 7);
+    const auto *ff0_11 = buffer.data(ff0 + 11);
+
+    const auto *ff1_0 = buffer.data(ff1 + 0);
+    const auto *ff1_15 = buffer.data(ff1 + 15);
+    const auto *ff1_26 = buffer.data(ff1 + 26);
+
+    const auto *fg_0 = buffer.data(fg + 0);
+    const auto *fg_14 = buffer.data(fg + 14);
+    const auto *fg_17 = buffer.data(fg + 17);
+    const auto *fg_24 = buffer.data(fg + 24);
+    const auto *fg_31 = buffer.data(fg + 31);
+    const auto *fg_41 = buffer.data(fg + 41);
+
+#pragma omp simd aligned(t_0, t_1, t_2, t_3, pa_x, pa_y, pa_z, pb_x, dg_0, dg_1, dh_0, dh_1, \
+                         ff0_0, ff1_0, fg_0 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_0[k] = f_0 * dg_0[k]
+                 + f_1 * ff0_0[k]
+                 - f_2 * ff1_0[k]
+                 + pb_x[k] * fg_0[k];
+
+        t_1[k] = pa_y[k] * dh_0[k];
+
+        t_2[k] = pa_z[k] * dh_0[k];
+
+        t_3[k] = f_0 * dg_1[k]
+                 + pa_x[k] * dh_1[k];
+    }
+
+#pragma omp simd aligned(t_4, t_5, t_6, t_7, t_8, pa_x, pb_x, dg_2, dg_3, dg_4, dg_5, dh_2, \
+                         dh_4, dh_5, dh_6, fg_14 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_4[k] = f_3 * dg_2[k]
+                 + pa_x[k] * dh_2[k];
+
+        t_5[k] = f_4 * dg_3[k]
+                 + pb_x[k] * fg_14[k];
+
+        t_6[k] = pa_x[k] * dh_4[k];
+
+        t_7[k] = f_0 * dg_4[k]
+                 + pa_x[k] * dh_5[k];
+
+        t_8[k] = f_3 * dg_5[k]
+                 + pa_x[k] * dh_6[k];
+    }
+
+#pragma omp simd aligned(t_9, t_10, t_11, t_12, pa_x, pa_z, pb_x, pb_y, dg_3, dg_8, dh_4, \
+                         dh_11, ff0_7, ff1_15, fg_17, fg_24 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_9[k] = f_4 * dg_8[k]
+                 + pb_x[k] * fg_17[k];
+
+        t_10[k] = pa_x[k] * dh_11[k];
+
+        t_11[k] = f_0 * dg_3[k]
+                  + f_1 * ff0_7[k]
+                  - f_2 * ff1_15[k]
+                  + pb_y[k] * fg_24[k];
+
+        t_12[k] = pa_z[k] * dh_4[k];
+    }
+
+#pragma omp simd aligned(t_13, t_14, t_15, t_16, pa_y, pb_y, dg_6, dg_7, dg_8, dh_8, dh_9, \
+                         dh_11, fg_31 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_13[k] = f_0 * dg_6[k]
+                  + pa_y[k] * dh_8[k];
+
+        t_14[k] = f_3 * dg_7[k]
+                  + pa_y[k] * dh_9[k];
+
+        t_15[k] = f_4 * dg_8[k]
+                  + pb_y[k] * fg_31[k];
+
+        t_16[k] = pa_y[k] * dh_11[k];
+    }
+
+#pragma omp simd aligned(t_17, pb_z, dg_8, ff0_11, ff1_26, fg_41 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_17[k] = f_0 * dg_8[k]
+                  + f_1 * ff0_11[k]
+                  - f_2 * ff1_26[k]
+                  + pb_z[k] * fg_41[k];
+    }
+}
+
+auto
+compute_prim_fh_electron_repulsion_36(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t pb, const size_t dg, const size_t dh,
+                                      const size_t ff0, const size_t ff1, const size_t fg,
+                                      const size_t ncols, const double alpha, const double beta,
+                                      const double p) -> void
+{
+    // NOTE: the factors are fixed by the pair of primitives, so they are formed
+    // once rather than for every atom pair the pair reaches.
+
+    const auto f_0 = 1.5 / p;
+    const auto f_1 = 2.0 / beta;
+    const auto f_2 = 2.0 * alpha / (beta * p);
+    const auto f_3 = 0.5 / beta;
+    const auto f_4 = 0.5 * alpha / (beta * p);
+    const auto f_5 = 1.0 / beta;
+    const auto f_6 = alpha / (beta * p);
+    const auto f_7 = 2.5 / p;
+    const auto f_8 = 1.0 / p;
+    const auto f_9 = 0.5 / p;
+
+    auto *t_0 = buffer.data(target + 0);
+    auto *t_1 = buffer.data(target + 1);
+    auto *t_2 = buffer.data(target + 2);
+    auto *t_3 = buffer.data(target + 3);
+    auto *t_4 = buffer.data(target + 4);
+    auto *t_5 = buffer.data(target + 5);
+    auto *t_6 = buffer.data(target + 6);
+    auto *t_7 = buffer.data(target + 7);
+    auto *t_8 = buffer.data(target + 8);
+    auto *t_9 = buffer.data(target + 9);
+    auto *t_10 = buffer.data(target + 10);
+    auto *t_11 = buffer.data(target + 11);
+    auto *t_12 = buffer.data(target + 12);
+    auto *t_13 = buffer.data(target + 13);
+    auto *t_14 = buffer.data(target + 14);
+    auto *t_15 = buffer.data(target + 15);
+    auto *t_16 = buffer.data(target + 16);
+    auto *t_17 = buffer.data(target + 17);
+    auto *t_18 = buffer.data(target + 18);
+    auto *t_19 = buffer.data(target + 19);
+    auto *t_20 = buffer.data(target + 20);
+    auto *t_21 = buffer.data(target + 21);
+    auto *t_22 = buffer.data(target + 22);
+    auto *t_23 = buffer.data(target + 23);
+    auto *t_24 = buffer.data(target + 24);
+    auto *t_25 = buffer.data(target + 25);
+    auto *t_26 = buffer.data(target + 26);
+    auto *t_27 = buffer.data(target + 27);
+    auto *t_28 = buffer.data(target + 28);
+    auto *t_29 = buffer.data(target + 29);
+    auto *t_30 = buffer.data(target + 30);
+    auto *t_31 = buffer.data(target + 31);
+    auto *t_32 = buffer.data(target + 32);
+    auto *t_33 = buffer.data(target + 33);
+    auto *t_34 = buffer.data(target + 34);
+    auto *t_35 = buffer.data(target + 35);
+    auto *t_36 = buffer.data(target + 36);
+    auto *t_37 = buffer.data(target + 37);
+    auto *t_38 = buffer.data(target + 38);
+    auto *t_39 = buffer.data(target + 39);
+    auto *t_40 = buffer.data(target + 40);
+    auto *t_41 = buffer.data(target + 41);
+    auto *t_42 = buffer.data(target + 42);
+    auto *t_43 = buffer.data(target + 43);
+    auto *t_44 = buffer.data(target + 44);
+    auto *t_45 = buffer.data(target + 45);
+    auto *t_46 = buffer.data(target + 46);
+    auto *t_47 = buffer.data(target + 47);
+    auto *t_48 = buffer.data(target + 48);
+    auto *t_49 = buffer.data(target + 49);
+    auto *t_50 = buffer.data(target + 50);
+    auto *t_51 = buffer.data(target + 51);
+    auto *t_52 = buffer.data(target + 52);
+    auto *t_53 = buffer.data(target + 53);
+    auto *t_54 = buffer.data(target + 54);
+    auto *t_55 = buffer.data(target + 55);
+    auto *t_56 = buffer.data(target + 56);
+
+    const auto *pa_x = buffer.data(pa + 0);
+    const auto *pa_y = buffer.data(pa + 1);
+    const auto *pa_z = buffer.data(pa + 2);
+
+    const auto *pb_x = buffer.data(pb + 0);
+    const auto *pb_y = buffer.data(pb + 1);
+    const auto *pb_z = buffer.data(pb + 2);
+
+    const auto *dg_0 = buffer.data(dg + 0);
+    const auto *dg_1 = buffer.data(dg + 1);
+    const auto *dg_2 = buffer.data(dg + 2);
+    const auto *dg_3 = buffer.data(dg + 3);
+    const auto *dg_4 = buffer.data(dg + 4);
+    const auto *dg_5 = buffer.data(dg + 5);
+    const auto *dg_6 = buffer.data(dg + 6);
+    const auto *dg_7 = buffer.data(dg + 7);
+    const auto *dg_8 = buffer.data(dg + 8);
+    const auto *dg_9 = buffer.data(dg + 9);
+    const auto *dg_10 = buffer.data(dg + 10);
+    const auto *dg_11 = buffer.data(dg + 11);
+    const auto *dg_12 = buffer.data(dg + 12);
+    const auto *dg_13 = buffer.data(dg + 13);
+    const auto *dg_14 = buffer.data(dg + 14);
+
+    const auto *dh_0 = buffer.data(dh + 0);
+    const auto *dh_1 = buffer.data(dh + 1);
+    const auto *dh_2 = buffer.data(dh + 2);
+    const auto *dh_3 = buffer.data(dh + 3);
+    const auto *dh_4 = buffer.data(dh + 4);
+    const auto *dh_5 = buffer.data(dh + 5);
+    const auto *dh_7 = buffer.data(dh + 7);
+    const auto *dh_8 = buffer.data(dh + 8);
+    const auto *dh_9 = buffer.data(dh + 9);
+    const auto *dh_10 = buffer.data(dh + 10);
+    const auto *dh_11 = buffer.data(dh + 11);
+    const auto *dh_13 = buffer.data(dh + 13);
+    const auto *dh_14 = buffer.data(dh + 14);
+    const auto *dh_15 = buffer.data(dh + 15);
+    const auto *dh_17 = buffer.data(dh + 17);
+
+    const auto *ff0_0 = buffer.data(ff0 + 0);
+    const auto *ff0_1 = buffer.data(ff0 + 1);
+    const auto *ff0_2 = buffer.data(ff0 + 2);
+    const auto *ff0_3 = buffer.data(ff0 + 3);
+    const auto *ff0_4 = buffer.data(ff0 + 4);
+    const auto *ff0_5 = buffer.data(ff0 + 5);
+    const auto *ff0_12 = buffer.data(ff0 + 12);
+    const auto *ff0_13 = buffer.data(ff0 + 13);
+    const auto *ff0_14 = buffer.data(ff0 + 14);
+    const auto *ff0_15 = buffer.data(ff0 + 15);
+    const auto *ff0_16 = buffer.data(ff0 + 16);
+    const auto *ff0_17 = buffer.data(ff0 + 17);
+    const auto *ff0_21 = buffer.data(ff0 + 21);
+    const auto *ff0_22 = buffer.data(ff0 + 22);
+    const auto *ff0_23 = buffer.data(ff0 + 23);
+    const auto *ff0_24 = buffer.data(ff0 + 24);
+    const auto *ff0_25 = buffer.data(ff0 + 25);
+    const auto *ff0_26 = buffer.data(ff0 + 26);
+
+    const auto *ff1_0 = buffer.data(ff1 + 0);
+    const auto *ff1_1 = buffer.data(ff1 + 1);
+    const auto *ff1_2 = buffer.data(ff1 + 2);
+    const auto *ff1_3 = buffer.data(ff1 + 3);
+    const auto *ff1_4 = buffer.data(ff1 + 4);
+    const auto *ff1_5 = buffer.data(ff1 + 5);
+    const auto *ff1_12 = buffer.data(ff1 + 12);
+    const auto *ff1_13 = buffer.data(ff1 + 13);
+    const auto *ff1_14 = buffer.data(ff1 + 14);
+    const auto *ff1_15 = buffer.data(ff1 + 15);
+    const auto *ff1_16 = buffer.data(ff1 + 16);
+    const auto *ff1_17 = buffer.data(ff1 + 17);
+    const auto *ff1_21 = buffer.data(ff1 + 21);
+    const auto *ff1_22 = buffer.data(ff1 + 22);
+    const auto *ff1_23 = buffer.data(ff1 + 23);
+    const auto *ff1_24 = buffer.data(ff1 + 24);
+    const auto *ff1_25 = buffer.data(ff1 + 25);
+    const auto *ff1_26 = buffer.data(ff1 + 26);
+
+    const auto *fg_0 = buffer.data(fg + 0);
+    const auto *fg_1 = buffer.data(fg + 1);
+    const auto *fg_2 = buffer.data(fg + 2);
+    const auto *fg_3 = buffer.data(fg + 3);
+    const auto *fg_4 = buffer.data(fg + 4);
+    const auto *fg_5 = buffer.data(fg + 5);
+    const auto *fg_6 = buffer.data(fg + 6);
+    const auto *fg_7 = buffer.data(fg + 7);
+    const auto *fg_8 = buffer.data(fg + 8);
+    const auto *fg_13 = buffer.data(fg + 13);
+    const auto *fg_16 = buffer.data(fg + 16);
+    const auto *fg_17 = buffer.data(fg + 17);
+    const auto *fg_18 = buffer.data(fg + 18);
+    const auto *fg_19 = buffer.data(fg + 19);
+    const auto *fg_20 = buffer.data(fg + 20);
+    const auto *fg_21 = buffer.data(fg + 21);
+    const auto *fg_22 = buffer.data(fg + 22);
+    const auto *fg_23 = buffer.data(fg + 23);
+    const auto *fg_24 = buffer.data(fg + 24);
+    const auto *fg_25 = buffer.data(fg + 25);
+    const auto *fg_29 = buffer.data(fg + 29);
+    const auto *fg_30 = buffer.data(fg + 30);
+    const auto *fg_31 = buffer.data(fg + 31);
+    const auto *fg_32 = buffer.data(fg + 32);
+    const auto *fg_33 = buffer.data(fg + 33);
+    const auto *fg_34 = buffer.data(fg + 34);
+    const auto *fg_35 = buffer.data(fg + 35);
+    const auto *fg_36 = buffer.data(fg + 36);
+    const auto *fg_37 = buffer.data(fg + 37);
+    const auto *fg_38 = buffer.data(fg + 38);
+
+#pragma omp simd aligned(t_0, t_1, t_2, t_3, t_4, pb_x, pb_y, pb_z, dg_0, ff0_0, ff1_0, fg_0, \
+                         fg_1, fg_2 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_0[k] = f_0 * dg_0[k]
+                 + f_1 * ff0_0[k]
+                 - f_2 * ff1_0[k]
+                 + pb_x[k] * fg_0[k];
+
+        t_1[k] = pb_y[k] * fg_0[k];
+
+        t_2[k] = pb_z[k] * fg_0[k];
+
+        t_3[k] = f_3 * ff0_0[k]
+                 - f_4 * ff1_0[k]
+                 + pb_y[k] * fg_1[k];
+
+        t_4[k] = f_3 * ff0_0[k]
+                 - f_4 * ff1_0[k]
+                 + pb_z[k] * fg_2[k];
+    }
+
+#pragma omp simd aligned(t_5, t_6, t_7, t_8, pb_y, pb_z, ff0_1, ff0_2, ff0_3, ff1_1, ff1_2, \
+                         ff1_3, fg_3, fg_4, fg_5 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_5[k] = f_5 * ff0_1[k]
+                 - f_6 * ff1_1[k]
+                 + pb_y[k] * fg_3[k];
+
+        t_6[k] = f_5 * ff0_2[k]
+                 - f_6 * ff1_2[k]
+                 + pb_z[k] * fg_4[k];
+
+        t_7[k] = f_1 * ff0_3[k]
+                 - f_2 * ff1_3[k]
+                 + pb_y[k] * fg_5[k];
+
+        t_8[k] = pb_z[k] * fg_5[k];
+    }
+
+#pragma omp simd aligned(t_9, t_10, t_11, t_12, pa_y, pb_y, pb_z, dh_0, ff0_4, ff0_5, ff1_4, \
+                         ff1_5, fg_6, fg_7, fg_8 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_9[k] = f_5 * ff0_4[k]
+                 - f_6 * ff1_4[k]
+                 + pb_y[k] * fg_6[k];
+
+        t_10[k] = f_3 * ff0_5[k]
+                  - f_4 * ff1_5[k]
+                  + pb_y[k] * fg_7[k];
+
+        t_11[k] = f_1 * ff0_5[k]
+                  - f_2 * ff1_5[k]
+                  + pb_z[k] * fg_8[k];
+
+        t_12[k] = pa_y[k] * dh_0[k];
+    }
+
+#pragma omp simd aligned(t_13, t_14, t_15, t_16, pa_x, pa_y, pa_z, dg_1, dg_2, dg_3, dh_0, \
+                         dh_1, dh_2, dh_3 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_13[k] = f_7 * dg_1[k]
+                  + pa_y[k] * dh_1[k];
+
+        t_14[k] = pa_z[k] * dh_0[k];
+
+        t_15[k] = f_7 * dg_2[k]
+                  + pa_z[k] * dh_2[k];
+
+        t_16[k] = f_7 * dg_3[k]
+                  + pa_x[k] * dh_3[k];
+    }
+
+#pragma omp simd aligned(t_17, t_18, t_19, t_20, t_21, pa_x, pb_x, dg_4, dg_5, dg_6, dg_8, \
+                         dh_4, dh_5, dh_7, dh_9, fg_13 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_17[k] = f_0 * dg_4[k]
+                  + pa_x[k] * dh_4[k];
+
+        t_18[k] = f_8 * dg_5[k]
+                  + pa_x[k] * dh_5[k];
+
+        t_19[k] = f_9 * dg_6[k]
+                  + pb_x[k] * fg_13[k];
+
+        t_20[k] = pa_x[k] * dh_7[k];
+
+        t_21[k] = f_7 * dg_8[k]
+                  + pa_x[k] * dh_9[k];
+    }
+
+#pragma omp simd aligned(t_22, t_23, t_24, t_25, pa_x, pb_x, dg_9, dg_10, dg_14, dh_10, dh_11, \
+                         dh_17, fg_16 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_22[k] = f_0 * dg_9[k]
+                  + pa_x[k] * dh_10[k];
+
+        t_23[k] = f_8 * dg_10[k]
+                  + pa_x[k] * dh_11[k];
+
+        t_24[k] = f_9 * dg_14[k]
+                  + pb_x[k] * fg_16[k];
+
+        t_25[k] = pa_x[k] * dh_17[k];
+    }
+
+#pragma omp simd aligned(t_26, t_27, t_28, t_29, pb_x, pb_z, ff0_12, ff0_13, ff0_14, ff1_12, \
+                         ff1_13, ff1_14, fg_17, fg_18, fg_19 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_26[k] = f_1 * ff0_12[k]
+                  - f_2 * ff1_12[k]
+                  + pb_x[k] * fg_17[k];
+
+        t_27[k] = pb_z[k] * fg_17[k];
+
+        t_28[k] = f_5 * ff0_13[k]
+                  - f_6 * ff1_13[k]
+                  + pb_x[k] * fg_18[k];
+
+        t_29[k] = f_5 * ff0_14[k]
+                  - f_6 * ff1_14[k]
+                  + pb_x[k] * fg_19[k];
+    }
+
+#pragma omp simd aligned(t_30, t_31, t_32, t_33, t_34, pb_x, pb_y, pb_z, dg_6, ff0_15, ff0_17, \
+                         ff1_15, ff1_17, fg_20, fg_21, fg_22 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_30[k] = f_3 * ff0_15[k]
+                  - f_4 * ff1_15[k]
+                  + pb_x[k] * fg_20[k];
+
+        t_31[k] = f_3 * ff0_17[k]
+                  - f_4 * ff1_17[k]
+                  + pb_x[k] * fg_21[k];
+
+        t_32[k] = pb_x[k] * fg_22[k];
+
+        t_33[k] = f_0 * dg_6[k]
+                  + f_1 * ff0_15[k]
+                  - f_2 * ff1_15[k]
+                  + pb_y[k] * fg_22[k];
+
+        t_34[k] = pb_z[k] * fg_22[k];
+    }
+
+#pragma omp simd aligned(t_35, t_36, t_37, t_38, pa_z, pb_z, dh_7, ff0_15, ff0_16, ff0_17, \
+                         ff1_15, ff1_16, ff1_17, fg_23, fg_24, fg_25 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_35[k] = f_3 * ff0_15[k]
+                  - f_4 * ff1_15[k]
+                  + pb_z[k] * fg_23[k];
+
+        t_36[k] = f_5 * ff0_16[k]
+                  - f_6 * ff1_16[k]
+                  + pb_z[k] * fg_24[k];
+
+        t_37[k] = f_1 * ff0_17[k]
+                  - f_2 * ff1_17[k]
+                  + pb_z[k] * fg_25[k];
+
+        t_38[k] = pa_z[k] * dh_7[k];
+    }
+
+#pragma omp simd aligned(t_39, t_40, t_41, t_42, pa_y, pa_z, dg_7, dg_11, dg_12, dg_13, dh_8, \
+                         dh_13, dh_14, dh_15 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_39[k] = f_7 * dg_7[k]
+                  + pa_z[k] * dh_8[k];
+
+        t_40[k] = f_7 * dg_11[k]
+                  + pa_y[k] * dh_13[k];
+
+        t_41[k] = f_0 * dg_12[k]
+                  + pa_y[k] * dh_14[k];
+
+        t_42[k] = f_8 * dg_13[k]
+                  + pa_y[k] * dh_15[k];
+    }
+
+#pragma omp simd aligned(t_43, t_44, t_45, t_46, pa_y, pb_x, pb_y, dg_14, dh_17, ff0_21, \
+                         ff1_21, fg_29, fg_30 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_43[k] = f_9 * dg_14[k]
+                  + pb_y[k] * fg_29[k];
+
+        t_44[k] = pa_y[k] * dh_17[k];
+
+        t_45[k] = f_1 * ff0_21[k]
+                  - f_2 * ff1_21[k]
+                  + pb_x[k] * fg_30[k];
+
+        t_46[k] = pb_y[k] * fg_30[k];
+    }
+
+#pragma omp simd aligned(t_47, t_48, t_49, pb_x, ff0_22, ff0_23, ff0_24, ff1_22, ff1_23, \
+                         ff1_24, fg_31, fg_32, fg_33 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_47[k] = f_5 * ff0_22[k]
+                  - f_6 * ff1_22[k]
+                  + pb_x[k] * fg_31[k];
+
+        t_48[k] = f_5 * ff0_23[k]
+                  - f_6 * ff1_23[k]
+                  + pb_x[k] * fg_32[k];
+
+        t_49[k] = f_3 * ff0_24[k]
+                  - f_4 * ff1_24[k]
+                  + pb_x[k] * fg_33[k];
+    }
+
+#pragma omp simd aligned(t_50, t_51, t_52, t_53, pb_x, pb_y, ff0_24, ff0_25, ff0_26, ff1_24, \
+                         ff1_25, ff1_26, fg_34, fg_35, fg_36, fg_38 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_50[k] = f_3 * ff0_26[k]
+                  - f_4 * ff1_26[k]
+                  + pb_x[k] * fg_34[k];
+
+        t_51[k] = pb_x[k] * fg_38[k];
+
+        t_52[k] = f_1 * ff0_24[k]
+                  - f_2 * ff1_24[k]
+                  + pb_y[k] * fg_35[k];
+
+        t_53[k] = f_5 * ff0_25[k]
+                  - f_6 * ff1_25[k]
+                  + pb_y[k] * fg_36[k];
+    }
+
+#pragma omp simd aligned(t_54, t_55, t_56, pb_y, pb_z, dg_14, ff0_26, ff1_26, fg_37, \
+                         fg_38 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_54[k] = f_3 * ff0_26[k]
+                  - f_4 * ff1_26[k]
+                  + pb_y[k] * fg_37[k];
+
+        t_55[k] = pb_y[k] * fg_38[k];
+
+        t_56[k] = f_0 * dg_14[k]
+                  + f_1 * ff0_26[k]
+                  - f_2 * ff1_26[k]
+                  + pb_z[k] * fg_38[k];
+    }
+}
+
+auto
+compute_prim_fh_electron_repulsion_37(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t pb, const size_t dg, const size_t dh,
+                                      const size_t ff0, const size_t ff1, const size_t fg,
+                                      const size_t ncols, const double alpha, const double beta,
+                                      const double p) -> void
+{
+    // NOTE: the factors are fixed by the pair of primitives, so they are formed
+    // once rather than for every atom pair the pair reaches.
+
+    const auto f_0 = 1.5 / p;
+    const auto f_1 = 2.0 / beta;
+    const auto f_2 = 2.0 * alpha / (beta * p);
+    const auto f_3 = 0.5 / beta;
+    const auto f_4 = 0.5 * alpha / (beta * p);
+    const auto f_5 = 1.0 / beta;
+    const auto f_6 = alpha / (beta * p);
+    const auto f_7 = 1.0 / p;
+    const auto f_8 = 0.5 / p;
+
+    auto *t_0 = buffer.data(target + 0);
+    auto *t_1 = buffer.data(target + 1);
+    auto *t_2 = buffer.data(target + 2);
+    auto *t_3 = buffer.data(target + 3);
+    auto *t_4 = buffer.data(target + 4);
+    auto *t_5 = buffer.data(target + 5);
+    auto *t_6 = buffer.data(target + 6);
+    auto *t_7 = buffer.data(target + 7);
+    auto *t_8 = buffer.data(target + 8);
+    auto *t_9 = buffer.data(target + 9);
+    auto *t_10 = buffer.data(target + 10);
+    auto *t_11 = buffer.data(target + 11);
+    auto *t_12 = buffer.data(target + 12);
+    auto *t_13 = buffer.data(target + 13);
+    auto *t_14 = buffer.data(target + 14);
+    auto *t_15 = buffer.data(target + 15);
+    auto *t_16 = buffer.data(target + 16);
+    auto *t_17 = buffer.data(target + 17);
+    auto *t_18 = buffer.data(target + 18);
+    auto *t_19 = buffer.data(target + 19);
+    auto *t_20 = buffer.data(target + 20);
+    auto *t_21 = buffer.data(target + 21);
+    auto *t_22 = buffer.data(target + 22);
+    auto *t_23 = buffer.data(target + 23);
+    auto *t_24 = buffer.data(target + 24);
+    auto *t_25 = buffer.data(target + 25);
+    auto *t_26 = buffer.data(target + 26);
+    auto *t_27 = buffer.data(target + 27);
+    auto *t_28 = buffer.data(target + 28);
+    auto *t_29 = buffer.data(target + 29);
+    auto *t_30 = buffer.data(target + 30);
+    auto *t_31 = buffer.data(target + 31);
+    auto *t_32 = buffer.data(target + 32);
+    auto *t_33 = buffer.data(target + 33);
+    auto *t_34 = buffer.data(target + 34);
+    auto *t_35 = buffer.data(target + 35);
+    auto *t_36 = buffer.data(target + 36);
+    auto *t_37 = buffer.data(target + 37);
+    auto *t_38 = buffer.data(target + 38);
+    auto *t_39 = buffer.data(target + 39);
+    auto *t_40 = buffer.data(target + 40);
+    auto *t_41 = buffer.data(target + 41);
+    auto *t_42 = buffer.data(target + 42);
+    auto *t_43 = buffer.data(target + 43);
+    auto *t_44 = buffer.data(target + 44);
+    auto *t_45 = buffer.data(target + 45);
+    auto *t_46 = buffer.data(target + 46);
+    auto *t_47 = buffer.data(target + 47);
+    auto *t_48 = buffer.data(target + 48);
+    auto *t_49 = buffer.data(target + 49);
+    auto *t_50 = buffer.data(target + 50);
+
+    const auto *pa_x = buffer.data(pa + 0);
+    const auto *pa_y = buffer.data(pa + 1);
+    const auto *pa_z = buffer.data(pa + 2);
+
+    const auto *pb_x = buffer.data(pb + 0);
+    const auto *pb_y = buffer.data(pb + 1);
+    const auto *pb_z = buffer.data(pb + 2);
+
+    const auto *dg_0 = buffer.data(dg + 0);
+    const auto *dg_4 = buffer.data(dg + 4);
+    const auto *dg_5 = buffer.data(dg + 5);
+    const auto *dg_6 = buffer.data(dg + 6);
+    const auto *dg_9 = buffer.data(dg + 9);
+    const auto *dg_10 = buffer.data(dg + 10);
+    const auto *dg_12 = buffer.data(dg + 12);
+    const auto *dg_13 = buffer.data(dg + 13);
+    const auto *dg_14 = buffer.data(dg + 14);
+
+    const auto *dh_0 = buffer.data(dh + 0);
+    const auto *dh_1 = buffer.data(dh + 1);
+    const auto *dh_2 = buffer.data(dh + 2);
+    const auto *dh_4 = buffer.data(dh + 4);
+    const auto *dh_5 = buffer.data(dh + 5);
+    const auto *dh_6 = buffer.data(dh + 6);
+    const auto *dh_8 = buffer.data(dh + 8);
+    const auto *dh_9 = buffer.data(dh + 9);
+    const auto *dh_11 = buffer.data(dh + 11);
+
+    const auto *ff0_0 = buffer.data(ff0 + 0);
+    const auto *ff0_1 = buffer.data(ff0 + 1);
+    const auto *ff0_2 = buffer.data(ff0 + 2);
+    const auto *ff0_3 = buffer.data(ff0 + 3);
+    const auto *ff0_4 = buffer.data(ff0 + 4);
+    const auto *ff0_5 = buffer.data(ff0 + 5);
+    const auto *ff0_12 = buffer.data(ff0 + 12);
+    const auto *ff0_13 = buffer.data(ff0 + 13);
+    const auto *ff0_14 = buffer.data(ff0 + 14);
+    const auto *ff0_15 = buffer.data(ff0 + 15);
+    const auto *ff0_16 = buffer.data(ff0 + 16);
+    const auto *ff0_17 = buffer.data(ff0 + 17);
+    const auto *ff0_21 = buffer.data(ff0 + 21);
+    const auto *ff0_22 = buffer.data(ff0 + 22);
+    const auto *ff0_23 = buffer.data(ff0 + 23);
+    const auto *ff0_24 = buffer.data(ff0 + 24);
+    const auto *ff0_25 = buffer.data(ff0 + 25);
+    const auto *ff0_26 = buffer.data(ff0 + 26);
+
+    const auto *ff1_0 = buffer.data(ff1 + 0);
+    const auto *ff1_1 = buffer.data(ff1 + 1);
+    const auto *ff1_2 = buffer.data(ff1 + 2);
+    const auto *ff1_3 = buffer.data(ff1 + 3);
+    const auto *ff1_4 = buffer.data(ff1 + 4);
+    const auto *ff1_5 = buffer.data(ff1 + 5);
+    const auto *ff1_12 = buffer.data(ff1 + 12);
+    const auto *ff1_13 = buffer.data(ff1 + 13);
+    const auto *ff1_14 = buffer.data(ff1 + 14);
+    const auto *ff1_15 = buffer.data(ff1 + 15);
+    const auto *ff1_16 = buffer.data(ff1 + 16);
+    const auto *ff1_17 = buffer.data(ff1 + 17);
+    const auto *ff1_21 = buffer.data(ff1 + 21);
+    const auto *ff1_22 = buffer.data(ff1 + 22);
+    const auto *ff1_23 = buffer.data(ff1 + 23);
+    const auto *ff1_24 = buffer.data(ff1 + 24);
+    const auto *ff1_25 = buffer.data(ff1 + 25);
+    const auto *ff1_26 = buffer.data(ff1 + 26);
+
+    const auto *fg_0 = buffer.data(fg + 0);
+    const auto *fg_1 = buffer.data(fg + 1);
+    const auto *fg_2 = buffer.data(fg + 2);
+    const auto *fg_3 = buffer.data(fg + 3);
+    const auto *fg_4 = buffer.data(fg + 4);
+    const auto *fg_5 = buffer.data(fg + 5);
+    const auto *fg_6 = buffer.data(fg + 6);
+    const auto *fg_7 = buffer.data(fg + 7);
+    const auto *fg_8 = buffer.data(fg + 8);
+    const auto *fg_13 = buffer.data(fg + 13);
+    const auto *fg_16 = buffer.data(fg + 16);
+    const auto *fg_17 = buffer.data(fg + 17);
+    const auto *fg_18 = buffer.data(fg + 18);
+    const auto *fg_19 = buffer.data(fg + 19);
+    const auto *fg_20 = buffer.data(fg + 20);
+    const auto *fg_21 = buffer.data(fg + 21);
+    const auto *fg_22 = buffer.data(fg + 22);
+    const auto *fg_23 = buffer.data(fg + 23);
+    const auto *fg_24 = buffer.data(fg + 24);
+    const auto *fg_25 = buffer.data(fg + 25);
+    const auto *fg_29 = buffer.data(fg + 29);
+    const auto *fg_30 = buffer.data(fg + 30);
+    const auto *fg_31 = buffer.data(fg + 31);
+    const auto *fg_32 = buffer.data(fg + 32);
+    const auto *fg_33 = buffer.data(fg + 33);
+    const auto *fg_34 = buffer.data(fg + 34);
+    const auto *fg_35 = buffer.data(fg + 35);
+    const auto *fg_36 = buffer.data(fg + 36);
+    const auto *fg_37 = buffer.data(fg + 37);
+    const auto *fg_38 = buffer.data(fg + 38);
+
+#pragma omp simd aligned(t_0, t_1, t_2, t_3, t_4, pb_x, pb_y, pb_z, dg_0, ff0_0, ff1_0, fg_0, \
+                         fg_1, fg_2 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_0[k] = f_0 * dg_0[k]
+                 + f_1 * ff0_0[k]
+                 - f_2 * ff1_0[k]
+                 + pb_x[k] * fg_0[k];
+
+        t_1[k] = pb_y[k] * fg_0[k];
+
+        t_2[k] = pb_z[k] * fg_0[k];
+
+        t_3[k] = f_3 * ff0_0[k]
+                 - f_4 * ff1_0[k]
+                 + pb_y[k] * fg_1[k];
+
+        t_4[k] = f_3 * ff0_0[k]
+                 - f_4 * ff1_0[k]
+                 + pb_z[k] * fg_2[k];
+    }
+
+#pragma omp simd aligned(t_5, t_6, t_7, pb_y, pb_z, ff0_1, ff0_2, ff0_3, ff1_1, ff1_2, ff1_3, \
+                         fg_3, fg_4, fg_5 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_5[k] = f_5 * ff0_1[k]
+                 - f_6 * ff1_1[k]
+                 + pb_y[k] * fg_3[k];
+
+        t_6[k] = f_5 * ff0_2[k]
+                 - f_6 * ff1_2[k]
+                 + pb_z[k] * fg_4[k];
+
+        t_7[k] = f_1 * ff0_3[k]
+                 - f_2 * ff1_3[k]
+                 + pb_y[k] * fg_5[k];
+    }
+
+#pragma omp simd aligned(t_8, t_9, t_10, t_11, t_12, pa_y, pb_y, pb_z, dh_0, ff0_4, ff0_5, \
+                         ff1_4, ff1_5, fg_6, fg_7, fg_8 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_8[k] = f_5 * ff0_4[k]
+                 - f_6 * ff1_4[k]
+                 + pb_y[k] * fg_6[k];
+
+        t_9[k] = f_3 * ff0_5[k]
+                 - f_4 * ff1_5[k]
+                 + pb_y[k] * fg_7[k];
+
+        t_10[k] = pb_y[k] * fg_8[k];
+
+        t_11[k] = f_1 * ff0_5[k]
+                  - f_2 * ff1_5[k]
+                  + pb_z[k] * fg_8[k];
+
+        t_12[k] = pa_y[k] * dh_0[k];
+    }
+
+#pragma omp simd aligned(t_13, t_14, t_15, t_16, t_17, pa_x, pa_z, pb_x, dg_4, dg_5, dg_6, \
+                         dh_0, dh_1, dh_2, dh_4, fg_13 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_13[k] = pa_z[k] * dh_0[k];
+
+        t_14[k] = f_0 * dg_4[k]
+                  + pa_x[k] * dh_1[k];
+
+        t_15[k] = f_7 * dg_5[k]
+                  + pa_x[k] * dh_2[k];
+
+        t_16[k] = f_8 * dg_6[k]
+                  + pb_x[k] * fg_13[k];
+
+        t_17[k] = pa_x[k] * dh_4[k];
+    }
+
+#pragma omp simd aligned(t_18, t_19, t_20, t_21, pa_x, pb_x, dg_9, dg_10, dg_14, dh_5, dh_6, \
+                         dh_11, fg_16 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_18[k] = f_0 * dg_9[k]
+                  + pa_x[k] * dh_5[k];
+
+        t_19[k] = f_7 * dg_10[k]
+                  + pa_x[k] * dh_6[k];
+
+        t_20[k] = f_8 * dg_14[k]
+                  + pb_x[k] * fg_16[k];
+
+        t_21[k] = pa_x[k] * dh_11[k];
+    }
+
+#pragma omp simd aligned(t_22, t_23, t_24, pb_x, ff0_12, ff0_13, ff0_14, ff1_12, ff1_13, \
+                         ff1_14, fg_17, fg_18, fg_19 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_22[k] = f_1 * ff0_12[k]
+                  - f_2 * ff1_12[k]
+                  + pb_x[k] * fg_17[k];
+
+        t_23[k] = f_5 * ff0_13[k]
+                  - f_6 * ff1_13[k]
+                  + pb_x[k] * fg_18[k];
+
+        t_24[k] = f_5 * ff0_14[k]
+                  - f_6 * ff1_14[k]
+                  + pb_x[k] * fg_19[k];
+    }
+
+#pragma omp simd aligned(t_25, t_26, t_27, t_28, t_29, pb_x, pb_y, dg_6, ff0_15, ff0_17, \
+                         ff1_15, ff1_17, fg_20, fg_21, fg_22, fg_25 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_25[k] = f_3 * ff0_15[k]
+                  - f_4 * ff1_15[k]
+                  + pb_x[k] * fg_20[k];
+
+        t_26[k] = f_3 * ff0_17[k]
+                  - f_4 * ff1_17[k]
+                  + pb_x[k] * fg_21[k];
+
+        t_27[k] = pb_x[k] * fg_22[k];
+
+        t_28[k] = pb_x[k] * fg_25[k];
+
+        t_29[k] = f_0 * dg_6[k]
+                  + f_1 * ff0_15[k]
+                  - f_2 * ff1_15[k]
+                  + pb_y[k] * fg_22[k];
+    }
+
+#pragma omp simd aligned(t_30, t_31, t_32, t_33, pb_z, ff0_15, ff0_16, ff0_17, ff1_15, ff1_16, \
+                         ff1_17, fg_22, fg_23, fg_24, fg_25 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_30[k] = pb_z[k] * fg_22[k];
+
+        t_31[k] = f_3 * ff0_15[k]
+                  - f_4 * ff1_15[k]
+                  + pb_z[k] * fg_23[k];
+
+        t_32[k] = f_5 * ff0_16[k]
+                  - f_6 * ff1_16[k]
+                  + pb_z[k] * fg_24[k];
+
+        t_33[k] = f_1 * ff0_17[k]
+                  - f_2 * ff1_17[k]
+                  + pb_z[k] * fg_25[k];
+    }
+
+#pragma omp simd aligned(t_34, t_35, t_36, t_37, t_38, pa_y, pa_z, pb_y, dg_12, dg_13, dg_14, \
+                         dh_4, dh_8, dh_9, dh_11, fg_29 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_34[k] = pa_z[k] * dh_4[k];
+
+        t_35[k] = f_0 * dg_12[k]
+                  + pa_y[k] * dh_8[k];
+
+        t_36[k] = f_7 * dg_13[k]
+                  + pa_y[k] * dh_9[k];
+
+        t_37[k] = f_8 * dg_14[k]
+                  + pb_y[k] * fg_29[k];
+
+        t_38[k] = pa_y[k] * dh_11[k];
+    }
+
+#pragma omp simd aligned(t_39, t_40, t_41, pb_x, ff0_21, ff0_22, ff0_23, ff1_21, ff1_22, \
+                         ff1_23, fg_30, fg_31, fg_32 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_39[k] = f_1 * ff0_21[k]
+                  - f_2 * ff1_21[k]
+                  + pb_x[k] * fg_30[k];
+
+        t_40[k] = f_5 * ff0_22[k]
+                  - f_6 * ff1_22[k]
+                  + pb_x[k] * fg_31[k];
+
+        t_41[k] = f_5 * ff0_23[k]
+                  - f_6 * ff1_23[k]
+                  + pb_x[k] * fg_32[k];
+    }
+
+#pragma omp simd aligned(t_42, t_43, t_44, t_45, t_46, pb_x, pb_y, ff0_24, ff0_26, ff1_24, \
+                         ff1_26, fg_33, fg_34, fg_35, fg_38 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_42[k] = f_3 * ff0_24[k]
+                  - f_4 * ff1_24[k]
+                  + pb_x[k] * fg_33[k];
+
+        t_43[k] = f_3 * ff0_26[k]
+                  - f_4 * ff1_26[k]
+                  + pb_x[k] * fg_34[k];
+
+        t_44[k] = pb_x[k] * fg_35[k];
+
+        t_45[k] = pb_x[k] * fg_38[k];
+
+        t_46[k] = f_1 * ff0_24[k]
+                  - f_2 * ff1_24[k]
+                  + pb_y[k] * fg_35[k];
+    }
+
+#pragma omp simd aligned(t_47, t_48, t_49, t_50, pb_y, pb_z, dg_14, ff0_25, ff0_26, ff1_25, \
+                         ff1_26, fg_36, fg_37, fg_38 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_47[k] = f_5 * ff0_25[k]
+                  - f_6 * ff1_25[k]
+                  + pb_y[k] * fg_36[k];
+
+        t_48[k] = f_3 * ff0_26[k]
+                  - f_4 * ff1_26[k]
+                  + pb_y[k] * fg_37[k];
+
+        t_49[k] = pb_y[k] * fg_38[k];
+
+        t_50[k] = f_0 * dg_14[k]
+                  + f_1 * ff0_26[k]
+                  - f_2 * ff1_26[k]
+                  + pb_z[k] * fg_38[k];
+    }
+}
+
+auto
+compute_prim_fh_electron_repulsion_38(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t pb, const size_t dg, const size_t dh,
+                                      const size_t ff0, const size_t ff1, const size_t fg,
+                                      const size_t ncols, const double alpha, const double beta,
+                                      const double p) -> void
+{
+    // NOTE: the factors are fixed by the pair of primitives, so they are formed
+    // once rather than for every atom pair the pair reaches.
+
+    const auto f_0 = 1.5 / p;
+    const auto f_1 = 2.0 / beta;
+    const auto f_2 = 2.0 * alpha / (beta * p);
+    const auto f_3 = 1.0 / p;
+    const auto f_4 = 0.5 / p;
+
+    auto *t_0 = buffer.data(target + 0);
+    auto *t_1 = buffer.data(target + 1);
+    auto *t_2 = buffer.data(target + 2);
+    auto *t_3 = buffer.data(target + 3);
+    auto *t_4 = buffer.data(target + 4);
+    auto *t_5 = buffer.data(target + 5);
+    auto *t_6 = buffer.data(target + 6);
+    auto *t_7 = buffer.data(target + 7);
+    auto *t_8 = buffer.data(target + 8);
+    auto *t_9 = buffer.data(target + 9);
+    auto *t_10 = buffer.data(target + 10);
+    auto *t_11 = buffer.data(target + 11);
+    auto *t_12 = buffer.data(target + 12);
+    auto *t_13 = buffer.data(target + 13);
+    auto *t_14 = buffer.data(target + 14);
+    auto *t_15 = buffer.data(target + 15);
+    auto *t_16 = buffer.data(target + 16);
+    auto *t_17 = buffer.data(target + 17);
+
+    const auto *pa_x = buffer.data(pa + 0);
+    const auto *pa_y = buffer.data(pa + 1);
+    const auto *pa_z = buffer.data(pa + 2);
+
+    const auto *pb_x = buffer.data(pb + 0);
+    const auto *pb_y = buffer.data(pb + 1);
+    const auto *pb_z = buffer.data(pb + 2);
+
+    const auto *dg_0 = buffer.data(dg + 0);
+    const auto *dg_1 = buffer.data(dg + 1);
+    const auto *dg_2 = buffer.data(dg + 2);
+    const auto *dg_3 = buffer.data(dg + 3);
+    const auto *dg_4 = buffer.data(dg + 4);
+    const auto *dg_5 = buffer.data(dg + 5);
+    const auto *dg_6 = buffer.data(dg + 6);
+    const auto *dg_7 = buffer.data(dg + 7);
+    const auto *dg_8 = buffer.data(dg + 8);
+
+    const auto *dh_0 = buffer.data(dh + 0);
+    const auto *dh_1 = buffer.data(dh + 1);
+    const auto *dh_2 = buffer.data(dh + 2);
+    const auto *dh_4 = buffer.data(dh + 4);
+    const auto *dh_5 = buffer.data(dh + 5);
+    const auto *dh_6 = buffer.data(dh + 6);
+    const auto *dh_8 = buffer.data(dh + 8);
+    const auto *dh_9 = buffer.data(dh + 9);
+    const auto *dh_11 = buffer.data(dh + 11);
+
+    const auto *ff0_0 = buffer.data(ff0 + 0);
+    const auto *ff0_7 = buffer.data(ff0 + 7);
+    const auto *ff0_11 = buffer.data(ff0 + 11);
+
+    const auto *ff1_0 = buffer.data(ff1 + 0);
+    const auto *ff1_7 = buffer.data(ff1 + 7);
+    const auto *ff1_11 = buffer.data(ff1 + 11);
+
+    const auto *fg_0 = buffer.data(fg + 0);
+    const auto *fg_5 = buffer.data(fg + 5);
+    const auto *fg_8 = buffer.data(fg + 8);
+    const auto *fg_9 = buffer.data(fg + 9);
+    const auto *fg_13 = buffer.data(fg + 13);
+    const auto *fg_14 = buffer.data(fg + 14);
+
+#pragma omp simd aligned(t_0, t_1, t_2, t_3, pa_x, pa_y, pa_z, pb_x, dg_0, dg_1, dh_0, dh_1, \
+                         ff0_0, ff1_0, fg_0 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_0[k] = f_0 * dg_0[k]
+                 + f_1 * ff0_0[k]
+                 - f_2 * ff1_0[k]
+                 + pb_x[k] * fg_0[k];
+
+        t_1[k] = pa_y[k] * dh_0[k];
+
+        t_2[k] = pa_z[k] * dh_0[k];
+
+        t_3[k] = f_0 * dg_1[k]
+                 + pa_x[k] * dh_1[k];
+    }
+
+#pragma omp simd aligned(t_4, t_5, t_6, t_7, t_8, pa_x, pb_x, dg_2, dg_3, dg_4, dg_5, dh_2, \
+                         dh_4, dh_5, dh_6, fg_5 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_4[k] = f_3 * dg_2[k]
+                 + pa_x[k] * dh_2[k];
+
+        t_5[k] = f_4 * dg_3[k]
+                 + pb_x[k] * fg_5[k];
+
+        t_6[k] = pa_x[k] * dh_4[k];
+
+        t_7[k] = f_0 * dg_4[k]
+                 + pa_x[k] * dh_5[k];
+
+        t_8[k] = f_3 * dg_5[k]
+                 + pa_x[k] * dh_6[k];
+    }
+
+#pragma omp simd aligned(t_9, t_10, t_11, t_12, pa_x, pa_z, pb_x, pb_y, dg_3, dg_8, dh_4, \
+                         dh_11, ff0_7, ff1_7, fg_8, fg_9 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_9[k] = f_4 * dg_8[k]
+                 + pb_x[k] * fg_8[k];
+
+        t_10[k] = pa_x[k] * dh_11[k];
+
+        t_11[k] = f_0 * dg_3[k]
+                  + f_1 * ff0_7[k]
+                  - f_2 * ff1_7[k]
+                  + pb_y[k] * fg_9[k];
+
+        t_12[k] = pa_z[k] * dh_4[k];
+    }
+
+#pragma omp simd aligned(t_13, t_14, t_15, t_16, pa_y, pb_y, dg_6, dg_7, dg_8, dh_8, dh_9, \
+                         dh_11, fg_13 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_13[k] = f_0 * dg_6[k]
+                  + pa_y[k] * dh_8[k];
+
+        t_14[k] = f_3 * dg_7[k]
+                  + pa_y[k] * dh_9[k];
+
+        t_15[k] = f_4 * dg_8[k]
+                  + pb_y[k] * fg_13[k];
+
+        t_16[k] = pa_y[k] * dh_11[k];
+    }
+
+#pragma omp simd aligned(t_17, pb_z, dg_8, ff0_11, ff1_11, fg_14 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_17[k] = f_0 * dg_8[k]
+                  + f_1 * ff0_11[k]
+                  - f_2 * ff1_11[k]
+                  + pb_z[k] * fg_14[k];
+    }
+}
+
+auto
+compute_prim_fh_electron_repulsion_39(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t pb, const size_t dg, const size_t dh,
+                                      const size_t ff0, const size_t ff1, const size_t fg,
+                                      const size_t ncols, const double alpha, const double beta,
+                                      const double p) -> void
+{
+    // NOTE: the factors are fixed by the pair of primitives, so they are formed
+    // once rather than for every atom pair the pair reaches.
+
+    const auto f_0 = 1.5 / p;
+    const auto f_1 = 2.0 / beta;
+    const auto f_2 = 2.0 * alpha / (beta * p);
+    const auto f_3 = 1.0 / p;
+    const auto f_4 = 0.5 / p;
+
+    auto *t_0 = buffer.data(target + 0);
+    auto *t_1 = buffer.data(target + 1);
+    auto *t_2 = buffer.data(target + 2);
+    auto *t_3 = buffer.data(target + 3);
+    auto *t_4 = buffer.data(target + 4);
+    auto *t_5 = buffer.data(target + 5);
+    auto *t_6 = buffer.data(target + 6);
+    auto *t_7 = buffer.data(target + 7);
+    auto *t_8 = buffer.data(target + 8);
+    auto *t_9 = buffer.data(target + 9);
+    auto *t_10 = buffer.data(target + 10);
+    auto *t_11 = buffer.data(target + 11);
+    auto *t_12 = buffer.data(target + 12);
+    auto *t_13 = buffer.data(target + 13);
+    auto *t_14 = buffer.data(target + 14);
+    auto *t_15 = buffer.data(target + 15);
+    auto *t_16 = buffer.data(target + 16);
+    auto *t_17 = buffer.data(target + 17);
+
+    const auto *pa_x = buffer.data(pa + 0);
+    const auto *pa_y = buffer.data(pa + 1);
+    const auto *pa_z = buffer.data(pa + 2);
+
+    const auto *pb_x = buffer.data(pb + 0);
+    const auto *pb_y = buffer.data(pb + 1);
+    const auto *pb_z = buffer.data(pb + 2);
+
+    const auto *dg_0 = buffer.data(dg + 0);
+    const auto *dg_1 = buffer.data(dg + 1);
+    const auto *dg_2 = buffer.data(dg + 2);
+    const auto *dg_3 = buffer.data(dg + 3);
+    const auto *dg_4 = buffer.data(dg + 4);
+    const auto *dg_5 = buffer.data(dg + 5);
+    const auto *dg_6 = buffer.data(dg + 6);
+    const auto *dg_7 = buffer.data(dg + 7);
+    const auto *dg_8 = buffer.data(dg + 8);
+
+    const auto *dh_0 = buffer.data(dh + 0);
+    const auto *dh_1 = buffer.data(dh + 1);
+    const auto *dh_2 = buffer.data(dh + 2);
+    const auto *dh_4 = buffer.data(dh + 4);
+    const auto *dh_5 = buffer.data(dh + 5);
+    const auto *dh_6 = buffer.data(dh + 6);
+    const auto *dh_8 = buffer.data(dh + 8);
+    const auto *dh_9 = buffer.data(dh + 9);
+    const auto *dh_11 = buffer.data(dh + 11);
+
+    const auto *ff0_0 = buffer.data(ff0 + 0);
+    const auto *ff0_7 = buffer.data(ff0 + 7);
+    const auto *ff0_11 = buffer.data(ff0 + 11);
+
+    const auto *ff1_0 = buffer.data(ff1 + 0);
+    const auto *ff1_15 = buffer.data(ff1 + 15);
+    const auto *ff1_26 = buffer.data(ff1 + 26);
+
+    const auto *fg_0 = buffer.data(fg + 0);
+    const auto *fg_13 = buffer.data(fg + 13);
+    const auto *fg_16 = buffer.data(fg + 16);
+    const auto *fg_22 = buffer.data(fg + 22);
+    const auto *fg_29 = buffer.data(fg + 29);
+    const auto *fg_38 = buffer.data(fg + 38);
+
+#pragma omp simd aligned(t_0, t_1, t_2, t_3, pa_x, pa_y, pa_z, pb_x, dg_0, dg_1, dh_0, dh_1, \
+                         ff0_0, ff1_0, fg_0 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_0[k] = f_0 * dg_0[k]
+                 + f_1 * ff0_0[k]
+                 - f_2 * ff1_0[k]
+                 + pb_x[k] * fg_0[k];
+
+        t_1[k] = pa_y[k] * dh_0[k];
+
+        t_2[k] = pa_z[k] * dh_0[k];
+
+        t_3[k] = f_0 * dg_1[k]
+                 + pa_x[k] * dh_1[k];
+    }
+
+#pragma omp simd aligned(t_4, t_5, t_6, t_7, t_8, pa_x, pb_x, dg_2, dg_3, dg_4, dg_5, dh_2, \
+                         dh_4, dh_5, dh_6, fg_13 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_4[k] = f_3 * dg_2[k]
+                 + pa_x[k] * dh_2[k];
+
+        t_5[k] = f_4 * dg_3[k]
+                 + pb_x[k] * fg_13[k];
+
+        t_6[k] = pa_x[k] * dh_4[k];
+
+        t_7[k] = f_0 * dg_4[k]
+                 + pa_x[k] * dh_5[k];
+
+        t_8[k] = f_3 * dg_5[k]
+                 + pa_x[k] * dh_6[k];
+    }
+
+#pragma omp simd aligned(t_9, t_10, t_11, t_12, pa_x, pa_z, pb_x, pb_y, dg_3, dg_8, dh_4, \
+                         dh_11, ff0_7, ff1_15, fg_16, fg_22 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_9[k] = f_4 * dg_8[k]
+                 + pb_x[k] * fg_16[k];
+
+        t_10[k] = pa_x[k] * dh_11[k];
+
+        t_11[k] = f_0 * dg_3[k]
+                  + f_1 * ff0_7[k]
+                  - f_2 * ff1_15[k]
+                  + pb_y[k] * fg_22[k];
+
+        t_12[k] = pa_z[k] * dh_4[k];
+    }
+
+#pragma omp simd aligned(t_13, t_14, t_15, t_16, pa_y, pb_y, dg_6, dg_7, dg_8, dh_8, dh_9, \
+                         dh_11, fg_29 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_13[k] = f_0 * dg_6[k]
+                  + pa_y[k] * dh_8[k];
+
+        t_14[k] = f_3 * dg_7[k]
+                  + pa_y[k] * dh_9[k];
+
+        t_15[k] = f_4 * dg_8[k]
+                  + pb_y[k] * fg_29[k];
+
+        t_16[k] = pa_y[k] * dh_11[k];
+    }
+
+#pragma omp simd aligned(t_17, pb_z, dg_8, ff0_11, ff1_26, fg_38 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_17[k] = f_0 * dg_8[k]
+                  + f_1 * ff0_11[k]
+                  - f_2 * ff1_26[k]
+                  + pb_z[k] * fg_38[k];
+    }
+}
+
+auto
+compute_prim_fh_electron_repulsion_40(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t pb, const size_t dg, const size_t dh,
+                                      const size_t ff0, const size_t ff1, const size_t fg,
+                                      const size_t ncols, const double alpha, const double beta,
+                                      const double p) -> void
+{
+    // NOTE: the factors are fixed by the pair of primitives, so they are formed
+    // once rather than for every atom pair the pair reaches.
+
+    const auto f_0 = 1.5 / p;
+    const auto f_1 = 2.0 / beta;
+    const auto f_2 = 2.0 * alpha / (beta * p);
+    const auto f_3 = 0.5 / beta;
+    const auto f_4 = 0.5 * alpha / (beta * p);
+    const auto f_5 = 1.0 / beta;
+    const auto f_6 = alpha / (beta * p);
+    const auto f_7 = 1.0 / p;
+    const auto f_8 = 0.5 / p;
+
+    auto *t_0 = buffer.data(target + 0);
+    auto *t_1 = buffer.data(target + 1);
+    auto *t_2 = buffer.data(target + 2);
+    auto *t_3 = buffer.data(target + 3);
+    auto *t_4 = buffer.data(target + 4);
+    auto *t_5 = buffer.data(target + 5);
+    auto *t_6 = buffer.data(target + 6);
+    auto *t_7 = buffer.data(target + 7);
+    auto *t_8 = buffer.data(target + 8);
+    auto *t_9 = buffer.data(target + 9);
+    auto *t_10 = buffer.data(target + 10);
+    auto *t_11 = buffer.data(target + 11);
+    auto *t_12 = buffer.data(target + 12);
+    auto *t_13 = buffer.data(target + 13);
+    auto *t_14 = buffer.data(target + 14);
+    auto *t_15 = buffer.data(target + 15);
+    auto *t_16 = buffer.data(target + 16);
+    auto *t_17 = buffer.data(target + 17);
+    auto *t_18 = buffer.data(target + 18);
+    auto *t_19 = buffer.data(target + 19);
+    auto *t_20 = buffer.data(target + 20);
+    auto *t_21 = buffer.data(target + 21);
+    auto *t_22 = buffer.data(target + 22);
+    auto *t_23 = buffer.data(target + 23);
+    auto *t_24 = buffer.data(target + 24);
+    auto *t_25 = buffer.data(target + 25);
+    auto *t_26 = buffer.data(target + 26);
+    auto *t_27 = buffer.data(target + 27);
+    auto *t_28 = buffer.data(target + 28);
+    auto *t_29 = buffer.data(target + 29);
+    auto *t_30 = buffer.data(target + 30);
+    auto *t_31 = buffer.data(target + 31);
+    auto *t_32 = buffer.data(target + 32);
+    auto *t_33 = buffer.data(target + 33);
+    auto *t_34 = buffer.data(target + 34);
+    auto *t_35 = buffer.data(target + 35);
+    auto *t_36 = buffer.data(target + 36);
+    auto *t_37 = buffer.data(target + 37);
+    auto *t_38 = buffer.data(target + 38);
+    auto *t_39 = buffer.data(target + 39);
+    auto *t_40 = buffer.data(target + 40);
+    auto *t_41 = buffer.data(target + 41);
+    auto *t_42 = buffer.data(target + 42);
+    auto *t_43 = buffer.data(target + 43);
+    auto *t_44 = buffer.data(target + 44);
+    auto *t_45 = buffer.data(target + 45);
+    auto *t_46 = buffer.data(target + 46);
+    auto *t_47 = buffer.data(target + 47);
+    auto *t_48 = buffer.data(target + 48);
+    auto *t_49 = buffer.data(target + 49);
+    auto *t_50 = buffer.data(target + 50);
+    auto *t_51 = buffer.data(target + 51);
+    auto *t_52 = buffer.data(target + 52);
+    auto *t_53 = buffer.data(target + 53);
+
+    const auto *pa_x = buffer.data(pa + 0);
+    const auto *pa_y = buffer.data(pa + 1);
+    const auto *pa_z = buffer.data(pa + 2);
+
+    const auto *pb_x = buffer.data(pb + 0);
+    const auto *pb_y = buffer.data(pb + 1);
+    const auto *pb_z = buffer.data(pb + 2);
+
+    const auto *dg_0 = buffer.data(dg + 0);
+    const auto *dg_4 = buffer.data(dg + 4);
+    const auto *dg_5 = buffer.data(dg + 5);
+    const auto *dg_6 = buffer.data(dg + 6);
+    const auto *dg_9 = buffer.data(dg + 9);
+    const auto *dg_10 = buffer.data(dg + 10);
+    const auto *dg_12 = buffer.data(dg + 12);
+    const auto *dg_13 = buffer.data(dg + 13);
+    const auto *dg_14 = buffer.data(dg + 14);
+
+    const auto *dh_0 = buffer.data(dh + 0);
+    const auto *dh_4 = buffer.data(dh + 4);
+    const auto *dh_5 = buffer.data(dh + 5);
+    const auto *dh_7 = buffer.data(dh + 7);
+    const auto *dh_10 = buffer.data(dh + 10);
+    const auto *dh_11 = buffer.data(dh + 11);
+    const auto *dh_14 = buffer.data(dh + 14);
+    const auto *dh_15 = buffer.data(dh + 15);
+    const auto *dh_17 = buffer.data(dh + 17);
+
+    const auto *ff0_0 = buffer.data(ff0 + 0);
+    const auto *ff0_1 = buffer.data(ff0 + 1);
+    const auto *ff0_2 = buffer.data(ff0 + 2);
+    const auto *ff0_3 = buffer.data(ff0 + 3);
+    const auto *ff0_4 = buffer.data(ff0 + 4);
+    const auto *ff0_5 = buffer.data(ff0 + 5);
+    const auto *ff0_12 = buffer.data(ff0 + 12);
+    const auto *ff0_13 = buffer.data(ff0 + 13);
+    const auto *ff0_14 = buffer.data(ff0 + 14);
+    const auto *ff0_15 = buffer.data(ff0 + 15);
+    const auto *ff0_16 = buffer.data(ff0 + 16);
+    const auto *ff0_17 = buffer.data(ff0 + 17);
+    const auto *ff0_21 = buffer.data(ff0 + 21);
+    const auto *ff0_22 = buffer.data(ff0 + 22);
+    const auto *ff0_23 = buffer.data(ff0 + 23);
+    const auto *ff0_24 = buffer.data(ff0 + 24);
+    const auto *ff0_25 = buffer.data(ff0 + 25);
+    const auto *ff0_26 = buffer.data(ff0 + 26);
+
+    const auto *ff1_0 = buffer.data(ff1 + 0);
+    const auto *ff1_1 = buffer.data(ff1 + 1);
+    const auto *ff1_2 = buffer.data(ff1 + 2);
+    const auto *ff1_3 = buffer.data(ff1 + 3);
+    const auto *ff1_4 = buffer.data(ff1 + 4);
+    const auto *ff1_5 = buffer.data(ff1 + 5);
+    const auto *ff1_12 = buffer.data(ff1 + 12);
+    const auto *ff1_13 = buffer.data(ff1 + 13);
+    const auto *ff1_14 = buffer.data(ff1 + 14);
+    const auto *ff1_15 = buffer.data(ff1 + 15);
+    const auto *ff1_16 = buffer.data(ff1 + 16);
+    const auto *ff1_17 = buffer.data(ff1 + 17);
+    const auto *ff1_21 = buffer.data(ff1 + 21);
+    const auto *ff1_22 = buffer.data(ff1 + 22);
+    const auto *ff1_23 = buffer.data(ff1 + 23);
+    const auto *ff1_24 = buffer.data(ff1 + 24);
+    const auto *ff1_25 = buffer.data(ff1 + 25);
+    const auto *ff1_26 = buffer.data(ff1 + 26);
+
+    const auto *fg_0 = buffer.data(fg + 0);
+    const auto *fg_1 = buffer.data(fg + 1);
+    const auto *fg_2 = buffer.data(fg + 2);
+    const auto *fg_3 = buffer.data(fg + 3);
+    const auto *fg_4 = buffer.data(fg + 4);
+    const auto *fg_5 = buffer.data(fg + 5);
+    const auto *fg_6 = buffer.data(fg + 6);
+    const auto *fg_7 = buffer.data(fg + 7);
+    const auto *fg_8 = buffer.data(fg + 8);
+    const auto *fg_13 = buffer.data(fg + 13);
+    const auto *fg_16 = buffer.data(fg + 16);
+    const auto *fg_17 = buffer.data(fg + 17);
+    const auto *fg_18 = buffer.data(fg + 18);
+    const auto *fg_19 = buffer.data(fg + 19);
+    const auto *fg_20 = buffer.data(fg + 20);
+    const auto *fg_21 = buffer.data(fg + 21);
+    const auto *fg_22 = buffer.data(fg + 22);
+    const auto *fg_23 = buffer.data(fg + 23);
+    const auto *fg_24 = buffer.data(fg + 24);
+    const auto *fg_25 = buffer.data(fg + 25);
+    const auto *fg_29 = buffer.data(fg + 29);
+    const auto *fg_30 = buffer.data(fg + 30);
+    const auto *fg_31 = buffer.data(fg + 31);
+    const auto *fg_32 = buffer.data(fg + 32);
+    const auto *fg_33 = buffer.data(fg + 33);
+    const auto *fg_34 = buffer.data(fg + 34);
+    const auto *fg_35 = buffer.data(fg + 35);
+    const auto *fg_36 = buffer.data(fg + 36);
+    const auto *fg_37 = buffer.data(fg + 37);
+    const auto *fg_38 = buffer.data(fg + 38);
+
+#pragma omp simd aligned(t_0, t_1, t_2, t_3, t_4, pb_x, pb_y, pb_z, dg_0, ff0_0, ff1_0, fg_0, \
+                         fg_1, fg_2 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_0[k] = f_0 * dg_0[k]
+                 + f_1 * ff0_0[k]
+                 - f_2 * ff1_0[k]
+                 + pb_x[k] * fg_0[k];
+
+        t_1[k] = pb_y[k] * fg_0[k];
+
+        t_2[k] = pb_z[k] * fg_0[k];
+
+        t_3[k] = f_3 * ff0_0[k]
+                 - f_4 * ff1_0[k]
+                 + pb_y[k] * fg_1[k];
+
+        t_4[k] = f_3 * ff0_0[k]
+                 - f_4 * ff1_0[k]
+                 + pb_z[k] * fg_2[k];
+    }
+
+#pragma omp simd aligned(t_5, t_6, t_7, t_8, pb_y, pb_z, ff0_1, ff0_2, ff0_3, ff1_1, ff1_2, \
+                         ff1_3, fg_3, fg_4, fg_5 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_5[k] = f_5 * ff0_1[k]
+                 - f_6 * ff1_1[k]
+                 + pb_y[k] * fg_3[k];
+
+        t_6[k] = f_5 * ff0_2[k]
+                 - f_6 * ff1_2[k]
+                 + pb_z[k] * fg_4[k];
+
+        t_7[k] = f_1 * ff0_3[k]
+                 - f_2 * ff1_3[k]
+                 + pb_y[k] * fg_5[k];
+
+        t_8[k] = pb_z[k] * fg_5[k];
+    }
+
+#pragma omp simd aligned(t_9, t_10, t_11, t_12, t_13, pa_y, pb_y, pb_z, dh_0, ff0_4, ff0_5, \
+                         ff1_4, ff1_5, fg_6, fg_7, fg_8 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_9[k] = f_5 * ff0_4[k]
+                 - f_6 * ff1_4[k]
+                 + pb_y[k] * fg_6[k];
+
+        t_10[k] = f_3 * ff0_5[k]
+                  - f_4 * ff1_5[k]
+                  + pb_y[k] * fg_7[k];
+
+        t_11[k] = pb_y[k] * fg_8[k];
+
+        t_12[k] = f_1 * ff0_5[k]
+                  - f_2 * ff1_5[k]
+                  + pb_z[k] * fg_8[k];
+
+        t_13[k] = pa_y[k] * dh_0[k];
+    }
+
+#pragma omp simd aligned(t_14, t_15, t_16, t_17, t_18, pa_x, pa_z, pb_x, dg_4, dg_5, dg_6, \
+                         dh_0, dh_4, dh_5, dh_7, fg_13 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_14[k] = pa_z[k] * dh_0[k];
+
+        t_15[k] = f_0 * dg_4[k]
+                  + pa_x[k] * dh_4[k];
+
+        t_16[k] = f_7 * dg_5[k]
+                  + pa_x[k] * dh_5[k];
+
+        t_17[k] = f_8 * dg_6[k]
+                  + pb_x[k] * fg_13[k];
+
+        t_18[k] = pa_x[k] * dh_7[k];
+    }
+
+#pragma omp simd aligned(t_19, t_20, t_21, t_22, pa_x, pb_x, dg_9, dg_10, dg_14, dh_10, dh_11, \
+                         dh_17, fg_16 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_19[k] = f_0 * dg_9[k]
+                  + pa_x[k] * dh_10[k];
+
+        t_20[k] = f_7 * dg_10[k]
+                  + pa_x[k] * dh_11[k];
+
+        t_21[k] = f_8 * dg_14[k]
+                  + pb_x[k] * fg_16[k];
+
+        t_22[k] = pa_x[k] * dh_17[k];
+    }
+
+#pragma omp simd aligned(t_23, t_24, t_25, t_26, pb_x, pb_z, ff0_12, ff0_13, ff0_14, ff1_12, \
+                         ff1_13, ff1_14, fg_17, fg_18, fg_19 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_23[k] = f_1 * ff0_12[k]
+                  - f_2 * ff1_12[k]
+                  + pb_x[k] * fg_17[k];
+
+        t_24[k] = pb_z[k] * fg_17[k];
+
+        t_25[k] = f_5 * ff0_13[k]
+                  - f_6 * ff1_13[k]
+                  + pb_x[k] * fg_18[k];
+
+        t_26[k] = f_5 * ff0_14[k]
+                  - f_6 * ff1_14[k]
+                  + pb_x[k] * fg_19[k];
+    }
+
+#pragma omp simd aligned(t_27, t_28, t_29, t_30, t_31, pb_x, pb_y, dg_6, ff0_15, ff0_17, \
+                         ff1_15, ff1_17, fg_20, fg_21, fg_22, fg_25 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_27[k] = f_3 * ff0_15[k]
+                  - f_4 * ff1_15[k]
+                  + pb_x[k] * fg_20[k];
+
+        t_28[k] = f_3 * ff0_17[k]
+                  - f_4 * ff1_17[k]
+                  + pb_x[k] * fg_21[k];
+
+        t_29[k] = pb_x[k] * fg_22[k];
+
+        t_30[k] = pb_x[k] * fg_25[k];
+
+        t_31[k] = f_0 * dg_6[k]
+                  + f_1 * ff0_15[k]
+                  - f_2 * ff1_15[k]
+                  + pb_y[k] * fg_22[k];
+    }
+
+#pragma omp simd aligned(t_32, t_33, t_34, t_35, pb_z, ff0_15, ff0_16, ff0_17, ff1_15, ff1_16, \
+                         ff1_17, fg_22, fg_23, fg_24, fg_25 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_32[k] = pb_z[k] * fg_22[k];
+
+        t_33[k] = f_3 * ff0_15[k]
+                  - f_4 * ff1_15[k]
+                  + pb_z[k] * fg_23[k];
+
+        t_34[k] = f_5 * ff0_16[k]
+                  - f_6 * ff1_16[k]
+                  + pb_z[k] * fg_24[k];
+
+        t_35[k] = f_1 * ff0_17[k]
+                  - f_2 * ff1_17[k]
+                  + pb_z[k] * fg_25[k];
+    }
+
+#pragma omp simd aligned(t_36, t_37, t_38, t_39, t_40, pa_y, pa_z, pb_y, dg_12, dg_13, dg_14, \
+                         dh_7, dh_14, dh_15, dh_17, fg_29 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_36[k] = pa_z[k] * dh_7[k];
+
+        t_37[k] = f_0 * dg_12[k]
+                  + pa_y[k] * dh_14[k];
+
+        t_38[k] = f_7 * dg_13[k]
+                  + pa_y[k] * dh_15[k];
+
+        t_39[k] = f_8 * dg_14[k]
+                  + pb_y[k] * fg_29[k];
+
+        t_40[k] = pa_y[k] * dh_17[k];
+    }
+
+#pragma omp simd aligned(t_41, t_42, t_43, t_44, pb_x, pb_y, ff0_21, ff0_22, ff0_23, ff1_21, \
+                         ff1_22, ff1_23, fg_30, fg_31, fg_32 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_41[k] = f_1 * ff0_21[k]
+                  - f_2 * ff1_21[k]
+                  + pb_x[k] * fg_30[k];
+
+        t_42[k] = pb_y[k] * fg_30[k];
+
+        t_43[k] = f_5 * ff0_22[k]
+                  - f_6 * ff1_22[k]
+                  + pb_x[k] * fg_31[k];
+
+        t_44[k] = f_5 * ff0_23[k]
+                  - f_6 * ff1_23[k]
+                  + pb_x[k] * fg_32[k];
+    }
+
+#pragma omp simd aligned(t_45, t_46, t_47, t_48, t_49, pb_x, pb_y, ff0_24, ff0_26, ff1_24, \
+                         ff1_26, fg_33, fg_34, fg_35, fg_38 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_45[k] = f_3 * ff0_24[k]
+                  - f_4 * ff1_24[k]
+                  + pb_x[k] * fg_33[k];
+
+        t_46[k] = f_3 * ff0_26[k]
+                  - f_4 * ff1_26[k]
+                  + pb_x[k] * fg_34[k];
+
+        t_47[k] = pb_x[k] * fg_35[k];
+
+        t_48[k] = pb_x[k] * fg_38[k];
+
+        t_49[k] = f_1 * ff0_24[k]
+                  - f_2 * ff1_24[k]
+                  + pb_y[k] * fg_35[k];
+    }
+
+#pragma omp simd aligned(t_50, t_51, t_52, t_53, pb_y, pb_z, dg_14, ff0_25, ff0_26, ff1_25, \
+                         ff1_26, fg_36, fg_37, fg_38 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_50[k] = f_5 * ff0_25[k]
+                  - f_6 * ff1_25[k]
+                  + pb_y[k] * fg_36[k];
+
+        t_51[k] = f_3 * ff0_26[k]
+                  - f_4 * ff1_26[k]
+                  + pb_y[k] * fg_37[k];
+
+        t_52[k] = pb_y[k] * fg_38[k];
+
+        t_53[k] = f_0 * dg_14[k]
+                  + f_1 * ff0_26[k]
+                  - f_2 * ff1_26[k]
+                  + pb_z[k] * fg_38[k];
+    }
+}
+
+auto
+compute_prim_fh_electron_repulsion_41(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t pb, const size_t dg, const size_t dh,
+                                      const size_t ff0, const size_t ff1, const size_t fg,
+                                      const size_t ncols, const double alpha, const double beta,
+                                      const double p) -> void
+{
+    // NOTE: the factors are fixed by the pair of primitives, so they are formed
+    // once rather than for every atom pair the pair reaches.
+
+    const auto f_0 = 1.5 / p;
+    const auto f_1 = 2.0 / beta;
+    const auto f_2 = 2.0 * alpha / (beta * p);
+    const auto f_3 = 0.5 / beta;
+    const auto f_4 = 0.5 * alpha / (beta * p);
+    const auto f_5 = 1.0 / beta;
+    const auto f_6 = alpha / (beta * p);
+    const auto f_7 = 1.0 / p;
+    const auto f_8 = 0.5 / p;
+
+    auto *t_0 = buffer.data(target + 0);
+    auto *t_1 = buffer.data(target + 1);
+    auto *t_2 = buffer.data(target + 2);
+    auto *t_3 = buffer.data(target + 3);
+    auto *t_4 = buffer.data(target + 4);
+    auto *t_5 = buffer.data(target + 5);
+    auto *t_6 = buffer.data(target + 6);
+    auto *t_7 = buffer.data(target + 7);
+    auto *t_8 = buffer.data(target + 8);
+    auto *t_9 = buffer.data(target + 9);
+    auto *t_10 = buffer.data(target + 10);
+    auto *t_11 = buffer.data(target + 11);
+    auto *t_12 = buffer.data(target + 12);
+    auto *t_13 = buffer.data(target + 13);
+    auto *t_14 = buffer.data(target + 14);
+    auto *t_15 = buffer.data(target + 15);
+    auto *t_16 = buffer.data(target + 16);
+    auto *t_17 = buffer.data(target + 17);
+    auto *t_18 = buffer.data(target + 18);
+    auto *t_19 = buffer.data(target + 19);
+    auto *t_20 = buffer.data(target + 20);
+    auto *t_21 = buffer.data(target + 21);
+    auto *t_22 = buffer.data(target + 22);
+    auto *t_23 = buffer.data(target + 23);
+    auto *t_24 = buffer.data(target + 24);
+    auto *t_25 = buffer.data(target + 25);
+    auto *t_26 = buffer.data(target + 26);
+    auto *t_27 = buffer.data(target + 27);
+    auto *t_28 = buffer.data(target + 28);
+    auto *t_29 = buffer.data(target + 29);
+    auto *t_30 = buffer.data(target + 30);
+    auto *t_31 = buffer.data(target + 31);
+    auto *t_32 = buffer.data(target + 32);
+    auto *t_33 = buffer.data(target + 33);
+    auto *t_34 = buffer.data(target + 34);
+    auto *t_35 = buffer.data(target + 35);
+    auto *t_36 = buffer.data(target + 36);
+    auto *t_37 = buffer.data(target + 37);
+    auto *t_38 = buffer.data(target + 38);
+    auto *t_39 = buffer.data(target + 39);
+    auto *t_40 = buffer.data(target + 40);
+    auto *t_41 = buffer.data(target + 41);
+    auto *t_42 = buffer.data(target + 42);
+    auto *t_43 = buffer.data(target + 43);
+    auto *t_44 = buffer.data(target + 44);
+    auto *t_45 = buffer.data(target + 45);
+    auto *t_46 = buffer.data(target + 46);
+    auto *t_47 = buffer.data(target + 47);
+    auto *t_48 = buffer.data(target + 48);
+    auto *t_49 = buffer.data(target + 49);
+    auto *t_50 = buffer.data(target + 50);
+
+    const auto *pa_x = buffer.data(pa + 0);
+    const auto *pa_y = buffer.data(pa + 1);
+    const auto *pa_z = buffer.data(pa + 2);
+
+    const auto *pb_x = buffer.data(pb + 0);
+    const auto *pb_y = buffer.data(pb + 1);
+    const auto *pb_z = buffer.data(pb + 2);
+
+    const auto *dg_0 = buffer.data(dg + 0);
+    const auto *dg_4 = buffer.data(dg + 4);
+    const auto *dg_5 = buffer.data(dg + 5);
+    const auto *dg_6 = buffer.data(dg + 6);
+    const auto *dg_9 = buffer.data(dg + 9);
+    const auto *dg_10 = buffer.data(dg + 10);
+    const auto *dg_12 = buffer.data(dg + 12);
+    const auto *dg_13 = buffer.data(dg + 13);
+    const auto *dg_14 = buffer.data(dg + 14);
+
+    const auto *dh_0 = buffer.data(dh + 0);
+    const auto *dh_4 = buffer.data(dh + 4);
+    const auto *dh_5 = buffer.data(dh + 5);
+    const auto *dh_7 = buffer.data(dh + 7);
+    const auto *dh_10 = buffer.data(dh + 10);
+    const auto *dh_11 = buffer.data(dh + 11);
+    const auto *dh_14 = buffer.data(dh + 14);
+    const auto *dh_15 = buffer.data(dh + 15);
+    const auto *dh_17 = buffer.data(dh + 17);
+
+    const auto *ff0_0 = buffer.data(ff0 + 0);
+    const auto *ff0_1 = buffer.data(ff0 + 1);
+    const auto *ff0_2 = buffer.data(ff0 + 2);
+    const auto *ff0_3 = buffer.data(ff0 + 3);
+    const auto *ff0_4 = buffer.data(ff0 + 4);
+    const auto *ff0_5 = buffer.data(ff0 + 5);
+    const auto *ff0_12 = buffer.data(ff0 + 12);
+    const auto *ff0_13 = buffer.data(ff0 + 13);
+    const auto *ff0_14 = buffer.data(ff0 + 14);
+    const auto *ff0_15 = buffer.data(ff0 + 15);
+    const auto *ff0_16 = buffer.data(ff0 + 16);
+    const auto *ff0_17 = buffer.data(ff0 + 17);
+    const auto *ff0_21 = buffer.data(ff0 + 21);
+    const auto *ff0_22 = buffer.data(ff0 + 22);
+    const auto *ff0_23 = buffer.data(ff0 + 23);
+    const auto *ff0_24 = buffer.data(ff0 + 24);
+    const auto *ff0_25 = buffer.data(ff0 + 25);
+    const auto *ff0_26 = buffer.data(ff0 + 26);
+
+    const auto *ff1_0 = buffer.data(ff1 + 0);
+    const auto *ff1_1 = buffer.data(ff1 + 1);
+    const auto *ff1_2 = buffer.data(ff1 + 2);
+    const auto *ff1_3 = buffer.data(ff1 + 3);
+    const auto *ff1_4 = buffer.data(ff1 + 4);
+    const auto *ff1_5 = buffer.data(ff1 + 5);
+    const auto *ff1_12 = buffer.data(ff1 + 12);
+    const auto *ff1_13 = buffer.data(ff1 + 13);
+    const auto *ff1_14 = buffer.data(ff1 + 14);
+    const auto *ff1_15 = buffer.data(ff1 + 15);
+    const auto *ff1_16 = buffer.data(ff1 + 16);
+    const auto *ff1_17 = buffer.data(ff1 + 17);
+    const auto *ff1_21 = buffer.data(ff1 + 21);
+    const auto *ff1_22 = buffer.data(ff1 + 22);
+    const auto *ff1_23 = buffer.data(ff1 + 23);
+    const auto *ff1_24 = buffer.data(ff1 + 24);
+    const auto *ff1_25 = buffer.data(ff1 + 25);
+    const auto *ff1_26 = buffer.data(ff1 + 26);
+
+    const auto *fg_0 = buffer.data(fg + 0);
+    const auto *fg_1 = buffer.data(fg + 1);
+    const auto *fg_2 = buffer.data(fg + 2);
+    const auto *fg_3 = buffer.data(fg + 3);
+    const auto *fg_4 = buffer.data(fg + 4);
+    const auto *fg_5 = buffer.data(fg + 5);
+    const auto *fg_6 = buffer.data(fg + 6);
+    const auto *fg_7 = buffer.data(fg + 7);
+    const auto *fg_8 = buffer.data(fg + 8);
+    const auto *fg_13 = buffer.data(fg + 13);
+    const auto *fg_16 = buffer.data(fg + 16);
+    const auto *fg_17 = buffer.data(fg + 17);
+    const auto *fg_18 = buffer.data(fg + 18);
+    const auto *fg_19 = buffer.data(fg + 19);
+    const auto *fg_20 = buffer.data(fg + 20);
+    const auto *fg_21 = buffer.data(fg + 21);
+    const auto *fg_22 = buffer.data(fg + 22);
+    const auto *fg_23 = buffer.data(fg + 23);
+    const auto *fg_24 = buffer.data(fg + 24);
+    const auto *fg_25 = buffer.data(fg + 25);
+    const auto *fg_29 = buffer.data(fg + 29);
+    const auto *fg_30 = buffer.data(fg + 30);
+    const auto *fg_31 = buffer.data(fg + 31);
+    const auto *fg_32 = buffer.data(fg + 32);
+    const auto *fg_33 = buffer.data(fg + 33);
+    const auto *fg_34 = buffer.data(fg + 34);
+    const auto *fg_35 = buffer.data(fg + 35);
+    const auto *fg_36 = buffer.data(fg + 36);
+    const auto *fg_37 = buffer.data(fg + 37);
+    const auto *fg_38 = buffer.data(fg + 38);
+
+#pragma omp simd aligned(t_0, t_1, t_2, t_3, t_4, pb_x, pb_y, pb_z, dg_0, ff0_0, ff1_0, fg_0, \
+                         fg_1, fg_2 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_0[k] = f_0 * dg_0[k]
+                 + f_1 * ff0_0[k]
+                 - f_2 * ff1_0[k]
+                 + pb_x[k] * fg_0[k];
+
+        t_1[k] = pb_y[k] * fg_0[k];
+
+        t_2[k] = pb_z[k] * fg_0[k];
+
+        t_3[k] = f_3 * ff0_0[k]
+                 - f_4 * ff1_0[k]
+                 + pb_y[k] * fg_1[k];
+
+        t_4[k] = f_3 * ff0_0[k]
+                 - f_4 * ff1_0[k]
+                 + pb_z[k] * fg_2[k];
+    }
+
+#pragma omp simd aligned(t_5, t_6, t_7, pb_y, pb_z, ff0_1, ff0_2, ff0_3, ff1_1, ff1_2, ff1_3, \
+                         fg_3, fg_4, fg_5 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_5[k] = f_5 * ff0_1[k]
+                 - f_6 * ff1_1[k]
+                 + pb_y[k] * fg_3[k];
+
+        t_6[k] = f_5 * ff0_2[k]
+                 - f_6 * ff1_2[k]
+                 + pb_z[k] * fg_4[k];
+
+        t_7[k] = f_1 * ff0_3[k]
+                 - f_2 * ff1_3[k]
+                 + pb_y[k] * fg_5[k];
+    }
+
+#pragma omp simd aligned(t_8, t_9, t_10, t_11, t_12, pa_y, pb_y, pb_z, dh_0, ff0_4, ff0_5, \
+                         ff1_4, ff1_5, fg_6, fg_7, fg_8 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_8[k] = f_5 * ff0_4[k]
+                 - f_6 * ff1_4[k]
+                 + pb_y[k] * fg_6[k];
+
+        t_9[k] = f_3 * ff0_5[k]
+                 - f_4 * ff1_5[k]
+                 + pb_y[k] * fg_7[k];
+
+        t_10[k] = pb_y[k] * fg_8[k];
+
+        t_11[k] = f_1 * ff0_5[k]
+                  - f_2 * ff1_5[k]
+                  + pb_z[k] * fg_8[k];
+
+        t_12[k] = pa_y[k] * dh_0[k];
+    }
+
+#pragma omp simd aligned(t_13, t_14, t_15, t_16, t_17, pa_x, pa_z, pb_x, dg_4, dg_5, dg_6, \
+                         dh_0, dh_4, dh_5, dh_7, fg_13 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_13[k] = pa_z[k] * dh_0[k];
+
+        t_14[k] = f_0 * dg_4[k]
+                  + pa_x[k] * dh_4[k];
+
+        t_15[k] = f_7 * dg_5[k]
+                  + pa_x[k] * dh_5[k];
+
+        t_16[k] = f_8 * dg_6[k]
+                  + pb_x[k] * fg_13[k];
+
+        t_17[k] = pa_x[k] * dh_7[k];
+    }
+
+#pragma omp simd aligned(t_18, t_19, t_20, t_21, pa_x, pb_x, dg_9, dg_10, dg_14, dh_10, dh_11, \
+                         dh_17, fg_16 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_18[k] = f_0 * dg_9[k]
+                  + pa_x[k] * dh_10[k];
+
+        t_19[k] = f_7 * dg_10[k]
+                  + pa_x[k] * dh_11[k];
+
+        t_20[k] = f_8 * dg_14[k]
+                  + pb_x[k] * fg_16[k];
+
+        t_21[k] = pa_x[k] * dh_17[k];
+    }
+
+#pragma omp simd aligned(t_22, t_23, t_24, pb_x, ff0_12, ff0_13, ff0_14, ff1_12, ff1_13, \
+                         ff1_14, fg_17, fg_18, fg_19 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_22[k] = f_1 * ff0_12[k]
+                  - f_2 * ff1_12[k]
+                  + pb_x[k] * fg_17[k];
+
+        t_23[k] = f_5 * ff0_13[k]
+                  - f_6 * ff1_13[k]
+                  + pb_x[k] * fg_18[k];
+
+        t_24[k] = f_5 * ff0_14[k]
+                  - f_6 * ff1_14[k]
+                  + pb_x[k] * fg_19[k];
+    }
+
+#pragma omp simd aligned(t_25, t_26, t_27, t_28, t_29, pb_x, pb_y, dg_6, ff0_15, ff0_17, \
+                         ff1_15, ff1_17, fg_20, fg_21, fg_22, fg_25 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_25[k] = f_3 * ff0_15[k]
+                  - f_4 * ff1_15[k]
+                  + pb_x[k] * fg_20[k];
+
+        t_26[k] = f_3 * ff0_17[k]
+                  - f_4 * ff1_17[k]
+                  + pb_x[k] * fg_21[k];
+
+        t_27[k] = pb_x[k] * fg_22[k];
+
+        t_28[k] = pb_x[k] * fg_25[k];
+
+        t_29[k] = f_0 * dg_6[k]
+                  + f_1 * ff0_15[k]
+                  - f_2 * ff1_15[k]
+                  + pb_y[k] * fg_22[k];
+    }
+
+#pragma omp simd aligned(t_30, t_31, t_32, t_33, pb_z, ff0_15, ff0_16, ff0_17, ff1_15, ff1_16, \
+                         ff1_17, fg_22, fg_23, fg_24, fg_25 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_30[k] = pb_z[k] * fg_22[k];
+
+        t_31[k] = f_3 * ff0_15[k]
+                  - f_4 * ff1_15[k]
+                  + pb_z[k] * fg_23[k];
+
+        t_32[k] = f_5 * ff0_16[k]
+                  - f_6 * ff1_16[k]
+                  + pb_z[k] * fg_24[k];
+
+        t_33[k] = f_1 * ff0_17[k]
+                  - f_2 * ff1_17[k]
+                  + pb_z[k] * fg_25[k];
+    }
+
+#pragma omp simd aligned(t_34, t_35, t_36, t_37, t_38, pa_y, pa_z, pb_y, dg_12, dg_13, dg_14, \
+                         dh_7, dh_14, dh_15, dh_17, fg_29 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_34[k] = pa_z[k] * dh_7[k];
+
+        t_35[k] = f_0 * dg_12[k]
+                  + pa_y[k] * dh_14[k];
+
+        t_36[k] = f_7 * dg_13[k]
+                  + pa_y[k] * dh_15[k];
+
+        t_37[k] = f_8 * dg_14[k]
+                  + pb_y[k] * fg_29[k];
+
+        t_38[k] = pa_y[k] * dh_17[k];
+    }
+
+#pragma omp simd aligned(t_39, t_40, t_41, pb_x, ff0_21, ff0_22, ff0_23, ff1_21, ff1_22, \
+                         ff1_23, fg_30, fg_31, fg_32 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_39[k] = f_1 * ff0_21[k]
+                  - f_2 * ff1_21[k]
+                  + pb_x[k] * fg_30[k];
+
+        t_40[k] = f_5 * ff0_22[k]
+                  - f_6 * ff1_22[k]
+                  + pb_x[k] * fg_31[k];
+
+        t_41[k] = f_5 * ff0_23[k]
+                  - f_6 * ff1_23[k]
+                  + pb_x[k] * fg_32[k];
+    }
+
+#pragma omp simd aligned(t_42, t_43, t_44, t_45, t_46, pb_x, pb_y, ff0_24, ff0_26, ff1_24, \
+                         ff1_26, fg_33, fg_34, fg_35, fg_38 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_42[k] = f_3 * ff0_24[k]
+                  - f_4 * ff1_24[k]
+                  + pb_x[k] * fg_33[k];
+
+        t_43[k] = f_3 * ff0_26[k]
+                  - f_4 * ff1_26[k]
+                  + pb_x[k] * fg_34[k];
+
+        t_44[k] = pb_x[k] * fg_35[k];
+
+        t_45[k] = pb_x[k] * fg_38[k];
+
+        t_46[k] = f_1 * ff0_24[k]
+                  - f_2 * ff1_24[k]
+                  + pb_y[k] * fg_35[k];
+    }
+
+#pragma omp simd aligned(t_47, t_48, t_49, t_50, pb_y, pb_z, dg_14, ff0_25, ff0_26, ff1_25, \
+                         ff1_26, fg_36, fg_37, fg_38 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_47[k] = f_5 * ff0_25[k]
+                  - f_6 * ff1_25[k]
+                  + pb_y[k] * fg_36[k];
+
+        t_48[k] = f_3 * ff0_26[k]
+                  - f_4 * ff1_26[k]
+                  + pb_y[k] * fg_37[k];
+
+        t_49[k] = pb_y[k] * fg_38[k];
+
+        t_50[k] = f_0 * dg_14[k]
+                  + f_1 * ff0_26[k]
+                  - f_2 * ff1_26[k]
+                  + pb_z[k] * fg_38[k];
+    }
+}
+
+auto
+compute_prim_fh_electron_repulsion_42(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t pb, const size_t dg, const size_t dh,
+                                      const size_t ff0, const size_t ff1, const size_t fg,
+                                      const size_t ncols, const double alpha, const double beta,
+                                      const double p) -> void
+{
+    // NOTE: the factors are fixed by the pair of primitives, so they are formed
+    // once rather than for every atom pair the pair reaches.
+
+    const auto f_0 = 1.5 / p;
+    const auto f_1 = 2.0 / beta;
+    const auto f_2 = 2.0 * alpha / (beta * p);
+
+    auto *t_0 = buffer.data(target + 0);
+    auto *t_1 = buffer.data(target + 1);
+    auto *t_2 = buffer.data(target + 2);
+    auto *t_3 = buffer.data(target + 3);
+    auto *t_4 = buffer.data(target + 4);
+    auto *t_5 = buffer.data(target + 5);
+    auto *t_6 = buffer.data(target + 6);
+    auto *t_7 = buffer.data(target + 7);
+    auto *t_8 = buffer.data(target + 8);
+
+    const auto *pa_x = buffer.data(pa + 0);
+    const auto *pa_y = buffer.data(pa + 1);
+    const auto *pa_z = buffer.data(pa + 2);
+
+    const auto *pb_x = buffer.data(pb + 0);
+    const auto *pb_y = buffer.data(pb + 1);
+    const auto *pb_z = buffer.data(pb + 2);
+
+    const auto *dg_0 = buffer.data(dg + 0);
+    const auto *dg_1 = buffer.data(dg + 1);
+    const auto *dg_2 = buffer.data(dg + 2);
+
+    const auto *dh_0 = buffer.data(dh + 0);
+    const auto *dh_1 = buffer.data(dh + 1);
+    const auto *dh_2 = buffer.data(dh + 2);
+
+    const auto *ff0_0 = buffer.data(ff0 + 0);
+    const auto *ff0_5 = buffer.data(ff0 + 5);
+    const auto *ff0_8 = buffer.data(ff0 + 8);
+
+    const auto *ff1_0 = buffer.data(ff1 + 0);
+    const auto *ff1_8 = buffer.data(ff1 + 8);
+    const auto *ff1_14 = buffer.data(ff1 + 14);
+
+    const auto *fg_0 = buffer.data(fg + 0);
+    const auto *fg_10 = buffer.data(fg + 10);
+    const auto *fg_17 = buffer.data(fg + 17);
+
+#pragma omp simd aligned(t_0, t_1, t_2, t_3, t_4, pa_x, pa_y, pa_z, pb_x, dg_0, dh_0, dh_1, \
+                         dh_2, ff0_0, ff1_0, fg_0 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_0[k] = f_0 * dg_0[k]
+                 + f_1 * ff0_0[k]
+                 - f_2 * ff1_0[k]
+                 + pb_x[k] * fg_0[k];
+
+        t_1[k] = pa_y[k] * dh_0[k];
+
+        t_2[k] = pa_z[k] * dh_0[k];
+
+        t_3[k] = pa_x[k] * dh_1[k];
+
+        t_4[k] = pa_x[k] * dh_2[k];
+    }
+
+#pragma omp simd aligned(t_5, t_6, t_7, pa_y, pa_z, pb_y, dg_1, dh_1, dh_2, ff0_5, ff1_8, \
+                         fg_10 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_5[k] = f_0 * dg_1[k]
+                 + f_1 * ff0_5[k]
+                 - f_2 * ff1_8[k]
+                 + pb_y[k] * fg_10[k];
+
+        t_6[k] = pa_z[k] * dh_1[k];
+
+        t_7[k] = pa_y[k] * dh_2[k];
+    }
+
+#pragma omp simd aligned(t_8, pb_z, dg_2, ff0_8, ff1_14, fg_17 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_8[k] = f_0 * dg_2[k]
+                 + f_1 * ff0_8[k]
+                 - f_2 * ff1_14[k]
+                 + pb_z[k] * fg_17[k];
+    }
+}
+
+auto
+compute_prim_fh_electron_repulsion_43(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t pb, const size_t dg, const size_t dh,
+                                      const size_t ff0, const size_t ff1, const size_t fg,
+                                      const size_t ncols, const double alpha, const double beta,
+                                      const double p) -> void
+{
+    // NOTE: the factors are fixed by the pair of primitives, so they are formed
+    // once rather than for every atom pair the pair reaches.
+
+    const auto f_0 = 1.5 / p;
+    const auto f_1 = 2.0 / beta;
+    const auto f_2 = 2.0 * alpha / (beta * p);
+
+    auto *t_0 = buffer.data(target + 0);
+    auto *t_1 = buffer.data(target + 1);
+    auto *t_2 = buffer.data(target + 2);
+    auto *t_3 = buffer.data(target + 3);
+    auto *t_4 = buffer.data(target + 4);
+    auto *t_5 = buffer.data(target + 5);
+    auto *t_6 = buffer.data(target + 6);
+    auto *t_7 = buffer.data(target + 7);
+    auto *t_8 = buffer.data(target + 8);
+
+    const auto *pa_x = buffer.data(pa + 0);
+    const auto *pa_y = buffer.data(pa + 1);
+    const auto *pa_z = buffer.data(pa + 2);
+
+    const auto *pb_x = buffer.data(pb + 0);
+    const auto *pb_y = buffer.data(pb + 1);
+    const auto *pb_z = buffer.data(pb + 2);
+
+    const auto *dg_0 = buffer.data(dg + 0);
+    const auto *dg_2 = buffer.data(dg + 2);
+    const auto *dg_5 = buffer.data(dg + 5);
+
+    const auto *dh_0 = buffer.data(dh + 0);
+    const auto *dh_1 = buffer.data(dh + 1);
+    const auto *dh_2 = buffer.data(dh + 2);
+
+    const auto *ff0_0 = buffer.data(ff0 + 0);
+    const auto *ff0_8 = buffer.data(ff0 + 8);
+    const auto *ff0_14 = buffer.data(ff0 + 14);
+
+    const auto *ff1_0 = buffer.data(ff1 + 0);
+    const auto *ff1_8 = buffer.data(ff1 + 8);
+    const auto *ff1_14 = buffer.data(ff1 + 14);
+
+    const auto *fg_0 = buffer.data(fg + 0);
+    const auto *fg_10 = buffer.data(fg + 10);
+    const auto *fg_17 = buffer.data(fg + 17);
+
+#pragma omp simd aligned(t_0, t_1, t_2, t_3, t_4, pa_x, pa_y, pa_z, pb_x, dg_0, dh_0, dh_1, \
+                         dh_2, ff0_0, ff1_0, fg_0 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_0[k] = f_0 * dg_0[k]
+                 + f_1 * ff0_0[k]
+                 - f_2 * ff1_0[k]
+                 + pb_x[k] * fg_0[k];
+
+        t_1[k] = pa_y[k] * dh_0[k];
+
+        t_2[k] = pa_z[k] * dh_0[k];
+
+        t_3[k] = pa_x[k] * dh_1[k];
+
+        t_4[k] = pa_x[k] * dh_2[k];
+    }
+
+#pragma omp simd aligned(t_5, t_6, t_7, pa_y, pa_z, pb_y, dg_2, dh_1, dh_2, ff0_8, ff1_8, \
+                         fg_10 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_5[k] = f_0 * dg_2[k]
+                 + f_1 * ff0_8[k]
+                 - f_2 * ff1_8[k]
+                 + pb_y[k] * fg_10[k];
+
+        t_6[k] = pa_z[k] * dh_1[k];
+
+        t_7[k] = pa_y[k] * dh_2[k];
+    }
+
+#pragma omp simd aligned(t_8, pb_z, dg_5, ff0_14, ff1_14, fg_17 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_8[k] = f_0 * dg_5[k]
+                 + f_1 * ff0_14[k]
+                 - f_2 * ff1_14[k]
+                 + pb_z[k] * fg_17[k];
+    }
+}
+
+auto
+compute_prim_fh_electron_repulsion_44(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t pb, const size_t dg, const size_t dh,
+                                      const size_t ff0, const size_t ff1, const size_t fg,
+                                      const size_t ncols, const double alpha, const double beta,
+                                      const double p) -> void
+{
+    // NOTE: the factors are fixed by the pair of primitives, so they are formed
+    // once rather than for every atom pair the pair reaches.
+
+    const auto f_0 = 1.5 / p;
+    const auto f_1 = 2.0 / beta;
+    const auto f_2 = 2.0 * alpha / (beta * p);
+
+    auto *t_0 = buffer.data(target + 0);
+    auto *t_1 = buffer.data(target + 1);
+    auto *t_2 = buffer.data(target + 2);
+    auto *t_3 = buffer.data(target + 3);
+    auto *t_4 = buffer.data(target + 4);
+    auto *t_5 = buffer.data(target + 5);
+    auto *t_6 = buffer.data(target + 6);
+    auto *t_7 = buffer.data(target + 7);
+    auto *t_8 = buffer.data(target + 8);
+
+    const auto *pa_x = buffer.data(pa + 0);
+    const auto *pa_y = buffer.data(pa + 1);
+    const auto *pa_z = buffer.data(pa + 2);
+
+    const auto *pb_x = buffer.data(pb + 0);
+    const auto *pb_y = buffer.data(pb + 1);
+    const auto *pb_z = buffer.data(pb + 2);
+
+    const auto *dg_0 = buffer.data(dg + 0);
+    const auto *dg_2 = buffer.data(dg + 2);
+    const auto *dg_5 = buffer.data(dg + 5);
+
+    const auto *dh_0 = buffer.data(dh + 0);
+    const auto *dh_1 = buffer.data(dh + 1);
+    const auto *dh_2 = buffer.data(dh + 2);
+
+    const auto *ff0_0 = buffer.data(ff0 + 0);
+    const auto *ff0_8 = buffer.data(ff0 + 8);
+    const auto *ff0_14 = buffer.data(ff0 + 14);
+
+    const auto *ff1_0 = buffer.data(ff1 + 0);
+    const auto *ff1_11 = buffer.data(ff1 + 11);
+    const auto *ff1_20 = buffer.data(ff1 + 20);
+
+    const auto *fg_0 = buffer.data(fg + 0);
+    const auto *fg_10 = buffer.data(fg + 10);
+    const auto *fg_17 = buffer.data(fg + 17);
+
+#pragma omp simd aligned(t_0, t_1, t_2, t_3, t_4, pa_x, pa_y, pa_z, pb_x, dg_0, dh_0, dh_1, \
+                         dh_2, ff0_0, ff1_0, fg_0 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_0[k] = f_0 * dg_0[k]
+                 + f_1 * ff0_0[k]
+                 - f_2 * ff1_0[k]
+                 + pb_x[k] * fg_0[k];
+
+        t_1[k] = pa_y[k] * dh_0[k];
+
+        t_2[k] = pa_z[k] * dh_0[k];
+
+        t_3[k] = pa_x[k] * dh_1[k];
+
+        t_4[k] = pa_x[k] * dh_2[k];
+    }
+
+#pragma omp simd aligned(t_5, t_6, t_7, pa_y, pa_z, pb_y, dg_2, dh_1, dh_2, ff0_8, ff1_11, \
+                         fg_10 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_5[k] = f_0 * dg_2[k]
+                 + f_1 * ff0_8[k]
+                 - f_2 * ff1_11[k]
+                 + pb_y[k] * fg_10[k];
+
+        t_6[k] = pa_z[k] * dh_1[k];
+
+        t_7[k] = pa_y[k] * dh_2[k];
+    }
+
+#pragma omp simd aligned(t_8, pb_z, dg_5, ff0_14, ff1_20, fg_17 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_8[k] = f_0 * dg_5[k]
+                 + f_1 * ff0_14[k]
+                 - f_2 * ff1_20[k]
+                 + pb_z[k] * fg_17[k];
+    }
+}
+
+auto
+compute_prim_fh_electron_repulsion_45(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t pb, const size_t dg, const size_t dh,
+                                      const size_t ff0, const size_t ff1, const size_t fg,
+                                      const size_t ncols, const double alpha, const double beta,
+                                      const double p) -> void
+{
+    // NOTE: the factors are fixed by the pair of primitives, so they are formed
+    // once rather than for every atom pair the pair reaches.
+
+    const auto f_0 = 1.5 / p;
+    const auto f_1 = 2.0 / beta;
+    const auto f_2 = 2.0 * alpha / (beta * p);
+
+    auto *t_0 = buffer.data(target + 0);
+    auto *t_1 = buffer.data(target + 1);
+    auto *t_2 = buffer.data(target + 2);
+    auto *t_3 = buffer.data(target + 3);
+    auto *t_4 = buffer.data(target + 4);
+    auto *t_5 = buffer.data(target + 5);
+    auto *t_6 = buffer.data(target + 6);
+    auto *t_7 = buffer.data(target + 7);
+    auto *t_8 = buffer.data(target + 8);
+
+    const auto *pa_x = buffer.data(pa + 0);
+    const auto *pa_y = buffer.data(pa + 1);
+    const auto *pa_z = buffer.data(pa + 2);
+
+    const auto *pb_x = buffer.data(pb + 0);
+    const auto *pb_y = buffer.data(pb + 1);
+    const auto *pb_z = buffer.data(pb + 2);
+
+    const auto *dg_0 = buffer.data(dg + 0);
+    const auto *dg_2 = buffer.data(dg + 2);
+    const auto *dg_5 = buffer.data(dg + 5);
+
+    const auto *dh_0 = buffer.data(dh + 0);
+    const auto *dh_1 = buffer.data(dh + 1);
+    const auto *dh_2 = buffer.data(dh + 2);
+
+    const auto *ff0_0 = buffer.data(ff0 + 0);
+    const auto *ff0_11 = buffer.data(ff0 + 11);
+    const auto *ff0_20 = buffer.data(ff0 + 20);
+
+    const auto *ff1_0 = buffer.data(ff1 + 0);
+    const auto *ff1_8 = buffer.data(ff1 + 8);
+    const auto *ff1_14 = buffer.data(ff1 + 14);
+
+    const auto *fg_0 = buffer.data(fg + 0);
+    const auto *fg_5 = buffer.data(fg + 5);
+    const auto *fg_8 = buffer.data(fg + 8);
+
+#pragma omp simd aligned(t_0, t_1, t_2, t_3, t_4, pa_x, pa_y, pa_z, pb_x, dg_0, dh_0, dh_1, \
+                         dh_2, ff0_0, ff1_0, fg_0 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_0[k] = f_0 * dg_0[k]
+                 + f_1 * ff0_0[k]
+                 - f_2 * ff1_0[k]
+                 + pb_x[k] * fg_0[k];
+
+        t_1[k] = pa_y[k] * dh_0[k];
+
+        t_2[k] = pa_z[k] * dh_0[k];
+
+        t_3[k] = pa_x[k] * dh_1[k];
+
+        t_4[k] = pa_x[k] * dh_2[k];
+    }
+
+#pragma omp simd aligned(t_5, t_6, t_7, pa_y, pa_z, pb_y, dg_2, dh_1, dh_2, ff0_11, ff1_8, \
+                         fg_5 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_5[k] = f_0 * dg_2[k]
+                 + f_1 * ff0_11[k]
+                 - f_2 * ff1_8[k]
+                 + pb_y[k] * fg_5[k];
+
+        t_6[k] = pa_z[k] * dh_1[k];
+
+        t_7[k] = pa_y[k] * dh_2[k];
+    }
+
+#pragma omp simd aligned(t_8, pb_z, dg_5, ff0_20, ff1_14, fg_8 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_8[k] = f_0 * dg_5[k]
+                 + f_1 * ff0_20[k]
+                 - f_2 * ff1_14[k]
+                 + pb_z[k] * fg_8[k];
+    }
+}
+
+auto
+compute_prim_fh_electron_repulsion_46(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t pb, const size_t dg, const size_t dh,
+                                      const size_t ff0, const size_t ff1, const size_t fg,
+                                      const size_t ncols, const double alpha, const double beta,
+                                      const double p) -> void
+{
+    // NOTE: the factors are fixed by the pair of primitives, so they are formed
+    // once rather than for every atom pair the pair reaches.
+
+    const auto f_0 = 1.5 / p;
+    const auto f_1 = 2.0 / beta;
+    const auto f_2 = 2.0 * alpha / (beta * p);
+
+    auto *t_0 = buffer.data(target + 0);
+    auto *t_1 = buffer.data(target + 1);
+    auto *t_2 = buffer.data(target + 2);
+    auto *t_3 = buffer.data(target + 3);
+    auto *t_4 = buffer.data(target + 4);
+    auto *t_5 = buffer.data(target + 5);
+    auto *t_6 = buffer.data(target + 6);
+    auto *t_7 = buffer.data(target + 7);
+    auto *t_8 = buffer.data(target + 8);
+
+    const auto *pa_x = buffer.data(pa + 0);
+    const auto *pa_y = buffer.data(pa + 1);
+    const auto *pa_z = buffer.data(pa + 2);
+
+    const auto *pb_x = buffer.data(pb + 0);
+    const auto *pb_y = buffer.data(pb + 1);
+    const auto *pb_z = buffer.data(pb + 2);
+
+    const auto *dg_0 = buffer.data(dg + 0);
+    const auto *dg_1 = buffer.data(dg + 1);
+    const auto *dg_2 = buffer.data(dg + 2);
+
+    const auto *dh_0 = buffer.data(dh + 0);
+    const auto *dh_1 = buffer.data(dh + 1);
+    const auto *dh_2 = buffer.data(dh + 2);
+
+    const auto *ff0_0 = buffer.data(ff0 + 0);
+    const auto *ff0_5 = buffer.data(ff0 + 5);
+    const auto *ff0_8 = buffer.data(ff0 + 8);
+
+    const auto *ff1_0 = buffer.data(ff1 + 0);
+    const auto *ff1_8 = buffer.data(ff1 + 8);
+    const auto *ff1_14 = buffer.data(ff1 + 14);
+
+    const auto *fg_0 = buffer.data(fg + 0);
+    const auto *fg_11 = buffer.data(fg + 11);
+    const auto *fg_20 = buffer.data(fg + 20);
+
+#pragma omp simd aligned(t_0, t_1, t_2, t_3, t_4, pa_x, pa_y, pa_z, pb_x, dg_0, dh_0, dh_1, \
+                         dh_2, ff0_0, ff1_0, fg_0 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_0[k] = f_0 * dg_0[k]
+                 + f_1 * ff0_0[k]
+                 - f_2 * ff1_0[k]
+                 + pb_x[k] * fg_0[k];
+
+        t_1[k] = pa_y[k] * dh_0[k];
+
+        t_2[k] = pa_z[k] * dh_0[k];
+
+        t_3[k] = pa_x[k] * dh_1[k];
+
+        t_4[k] = pa_x[k] * dh_2[k];
+    }
+
+#pragma omp simd aligned(t_5, t_6, t_7, pa_y, pa_z, pb_y, dg_1, dh_1, dh_2, ff0_5, ff1_8, \
+                         fg_11 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_5[k] = f_0 * dg_1[k]
+                 + f_1 * ff0_5[k]
+                 - f_2 * ff1_8[k]
+                 + pb_y[k] * fg_11[k];
+
+        t_6[k] = pa_z[k] * dh_1[k];
+
+        t_7[k] = pa_y[k] * dh_2[k];
+    }
+
+#pragma omp simd aligned(t_8, pb_z, dg_2, ff0_8, ff1_14, fg_20 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_8[k] = f_0 * dg_2[k]
+                 + f_1 * ff0_8[k]
+                 - f_2 * ff1_14[k]
+                 + pb_z[k] * fg_20[k];
+    }
+}
+
+auto
+compute_prim_fh_electron_repulsion_47(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t pb, const size_t dg, const size_t dh,
+                                      const size_t ff0, const size_t ff1, const size_t fg,
+                                      const size_t ncols, const double alpha, const double beta,
+                                      const double p) -> void
+{
+    // NOTE: the factors are fixed by the pair of primitives, so they are formed
+    // once rather than for every atom pair the pair reaches.
+
+    const auto f_0 = 1.5 / p;
+    const auto f_1 = 2.0 / beta;
+    const auto f_2 = 2.0 * alpha / (beta * p);
+    const auto f_3 = 1.0 / p;
+    const auto f_4 = 0.5 / p;
+    const auto f_5 = 1.0 / beta;
+    const auto f_6 = alpha / (beta * p);
+    const auto f_7 = 0.5 / beta;
+    const auto f_8 = 0.5 * alpha / (beta * p);
+
+    auto *t_0 = buffer.data(target + 0);
+    auto *t_1 = buffer.data(target + 1);
+    auto *t_2 = buffer.data(target + 2);
+    auto *t_3 = buffer.data(target + 3);
+    auto *t_4 = buffer.data(target + 4);
+    auto *t_5 = buffer.data(target + 5);
+    auto *t_6 = buffer.data(target + 6);
+    auto *t_7 = buffer.data(target + 7);
+    auto *t_8 = buffer.data(target + 8);
+    auto *t_9 = buffer.data(target + 9);
+    auto *t_10 = buffer.data(target + 10);
+    auto *t_11 = buffer.data(target + 11);
+    auto *t_12 = buffer.data(target + 12);
+    auto *t_13 = buffer.data(target + 13);
+    auto *t_14 = buffer.data(target + 14);
+    auto *t_15 = buffer.data(target + 15);
+    auto *t_16 = buffer.data(target + 16);
+    auto *t_17 = buffer.data(target + 17);
+    auto *t_18 = buffer.data(target + 18);
+    auto *t_19 = buffer.data(target + 19);
+    auto *t_20 = buffer.data(target + 20);
+    auto *t_21 = buffer.data(target + 21);
+    auto *t_22 = buffer.data(target + 22);
+    auto *t_23 = buffer.data(target + 23);
+
+    const auto *pa_x = buffer.data(pa + 0);
+    const auto *pa_y = buffer.data(pa + 1);
+    const auto *pa_z = buffer.data(pa + 2);
+
+    const auto *pb_x = buffer.data(pb + 0);
+    const auto *pb_y = buffer.data(pb + 1);
+    const auto *pb_z = buffer.data(pb + 2);
+
+    const auto *dg_0 = buffer.data(dg + 0);
+    const auto *dg_1 = buffer.data(dg + 1);
+    const auto *dg_2 = buffer.data(dg + 2);
+    const auto *dg_3 = buffer.data(dg + 3);
+    const auto *dg_4 = buffer.data(dg + 4);
+    const auto *dg_5 = buffer.data(dg + 5);
+    const auto *dg_6 = buffer.data(dg + 6);
+    const auto *dg_7 = buffer.data(dg + 7);
+    const auto *dg_8 = buffer.data(dg + 8);
+
+    const auto *dh_0 = buffer.data(dh + 0);
+    const auto *dh_1 = buffer.data(dh + 1);
+    const auto *dh_2 = buffer.data(dh + 2);
+    const auto *dh_3 = buffer.data(dh + 3);
+    const auto *dh_4 = buffer.data(dh + 4);
+    const auto *dh_5 = buffer.data(dh + 5);
+    const auto *dh_6 = buffer.data(dh + 6);
+    const auto *dh_7 = buffer.data(dh + 7);
+    const auto *dh_8 = buffer.data(dh + 8);
+
+    const auto *ff0_0 = buffer.data(ff0 + 0);
+    const auto *ff0_7 = buffer.data(ff0 + 7);
+    const auto *ff0_8 = buffer.data(ff0 + 8);
+    const auto *ff0_12 = buffer.data(ff0 + 12);
+    const auto *ff0_13 = buffer.data(ff0 + 13);
+    const auto *ff0_14 = buffer.data(ff0 + 14);
+
+    const auto *ff1_0 = buffer.data(ff1 + 0);
+    const auto *ff1_7 = buffer.data(ff1 + 7);
+    const auto *ff1_8 = buffer.data(ff1 + 8);
+    const auto *ff1_12 = buffer.data(ff1 + 12);
+    const auto *ff1_13 = buffer.data(ff1 + 13);
+    const auto *ff1_14 = buffer.data(ff1 + 14);
+
+    const auto *fg_0 = buffer.data(fg + 0);
+    const auto *fg_5 = buffer.data(fg + 5);
+    const auto *fg_8 = buffer.data(fg + 8);
+    const auto *fg_9 = buffer.data(fg + 9);
+    const auto *fg_10 = buffer.data(fg + 10);
+    const auto *fg_11 = buffer.data(fg + 11);
+    const auto *fg_15 = buffer.data(fg + 15);
+    const auto *fg_16 = buffer.data(fg + 16);
+    const auto *fg_17 = buffer.data(fg + 17);
+    const auto *fg_18 = buffer.data(fg + 18);
+    const auto *fg_19 = buffer.data(fg + 19);
+    const auto *fg_20 = buffer.data(fg + 20);
+
+#pragma omp simd aligned(t_0, t_1, t_2, t_3, pa_x, pa_y, pa_z, pb_x, dg_0, dg_1, dh_0, dh_1, \
+                         ff0_0, ff1_0, fg_0 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_0[k] = f_0 * dg_0[k]
+                 + f_1 * ff0_0[k]
+                 - f_2 * ff1_0[k]
+                 + pb_x[k] * fg_0[k];
+
+        t_1[k] = pa_y[k] * dh_0[k];
+
+        t_2[k] = pa_z[k] * dh_0[k];
+
+        t_3[k] = f_0 * dg_1[k]
+                 + pa_x[k] * dh_1[k];
+    }
+
+#pragma omp simd aligned(t_4, t_5, t_6, t_7, t_8, pa_x, pb_x, dg_2, dg_3, dg_4, dg_5, dh_2, \
+                         dh_3, dh_4, dh_5, fg_5 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_4[k] = f_3 * dg_2[k]
+                 + pa_x[k] * dh_2[k];
+
+        t_5[k] = f_4 * dg_3[k]
+                 + pb_x[k] * fg_5[k];
+
+        t_6[k] = pa_x[k] * dh_3[k];
+
+        t_7[k] = f_0 * dg_4[k]
+                 + pa_x[k] * dh_4[k];
+
+        t_8[k] = f_3 * dg_5[k]
+                 + pa_x[k] * dh_5[k];
+    }
+
+#pragma omp simd aligned(t_9, t_10, t_11, t_12, pa_x, pb_x, dg_8, dh_8, ff0_7, ff0_8, ff1_7, \
+                         ff1_8, fg_8, fg_9, fg_10 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_9[k] = f_4 * dg_8[k]
+                 + pb_x[k] * fg_8[k];
+
+        t_10[k] = pa_x[k] * dh_8[k];
+
+        t_11[k] = f_5 * ff0_7[k]
+                  - f_6 * ff1_7[k]
+                  + pb_x[k] * fg_9[k];
+
+        t_12[k] = f_7 * ff0_8[k]
+                  - f_8 * ff1_8[k]
+                  + pb_x[k] * fg_10[k];
+    }
+
+#pragma omp simd aligned(t_13, t_14, t_15, t_16, pa_y, pa_z, pb_y, dg_3, dg_6, dg_7, dh_3, \
+                         dh_6, dh_7, ff0_8, ff1_8, fg_11 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_13[k] = f_0 * dg_3[k]
+                  + f_1 * ff0_8[k]
+                  - f_2 * ff1_8[k]
+                  + pb_y[k] * fg_11[k];
+
+        t_14[k] = pa_z[k] * dh_3[k];
+
+        t_15[k] = f_0 * dg_6[k]
+                  + pa_y[k] * dh_6[k];
+
+        t_16[k] = f_3 * dg_7[k]
+                  + pa_y[k] * dh_7[k];
+    }
+
+#pragma omp simd aligned(t_17, t_18, t_19, t_20, pa_y, pb_x, pb_y, dg_8, dh_8, ff0_12, ff0_14, \
+                         ff1_12, ff1_14, fg_15, fg_16, fg_17 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_17[k] = f_4 * dg_8[k]
+                  + pb_y[k] * fg_15[k];
+
+        t_18[k] = pa_y[k] * dh_8[k];
+
+        t_19[k] = f_5 * ff0_12[k]
+                  - f_6 * ff1_12[k]
+                  + pb_x[k] * fg_16[k];
+
+        t_20[k] = f_7 * ff0_14[k]
+                  - f_8 * ff1_14[k]
+                  + pb_x[k] * fg_17[k];
+    }
+
+#pragma omp simd aligned(t_21, t_22, t_23, pb_y, pb_z, dg_8, ff0_13, ff0_14, ff1_13, ff1_14, \
+                         fg_18, fg_19, fg_20 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_21[k] = f_5 * ff0_13[k]
+                  - f_6 * ff1_13[k]
+                  + pb_y[k] * fg_18[k];
+
+        t_22[k] = f_7 * ff0_14[k]
+                  - f_8 * ff1_14[k]
+                  + pb_y[k] * fg_19[k];
+
+        t_23[k] = f_0 * dg_8[k]
+                  + f_1 * ff0_14[k]
+                  - f_2 * ff1_14[k]
+                  + pb_z[k] * fg_20[k];
+    }
+}
+
+auto
+compute_prim_fh_electron_repulsion_48(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t pb, const size_t dg, const size_t dh,
+                                      const size_t ff0, const size_t ff1, const size_t fg,
+                                      const size_t ncols, const double alpha, const double beta,
+                                      const double p) -> void
+{
+    // NOTE: the factors are fixed by the pair of primitives, so they are formed
+    // once rather than for every atom pair the pair reaches.
+
+    const auto f_0 = 1.5 / p;
+    const auto f_1 = 2.0 / beta;
+    const auto f_2 = 2.0 * alpha / (beta * p);
+    const auto f_3 = 1.0 / p;
+    const auto f_4 = 0.5 / p;
+    const auto f_5 = 1.0 / beta;
+    const auto f_6 = alpha / (beta * p);
+    const auto f_7 = 0.5 / beta;
+    const auto f_8 = 0.5 * alpha / (beta * p);
+
+    auto *t_0 = buffer.data(target + 0);
+    auto *t_1 = buffer.data(target + 1);
+    auto *t_2 = buffer.data(target + 2);
+    auto *t_3 = buffer.data(target + 3);
+    auto *t_4 = buffer.data(target + 4);
+    auto *t_5 = buffer.data(target + 5);
+    auto *t_6 = buffer.data(target + 6);
+    auto *t_7 = buffer.data(target + 7);
+    auto *t_8 = buffer.data(target + 8);
+    auto *t_9 = buffer.data(target + 9);
+    auto *t_10 = buffer.data(target + 10);
+    auto *t_11 = buffer.data(target + 11);
+    auto *t_12 = buffer.data(target + 12);
+    auto *t_13 = buffer.data(target + 13);
+    auto *t_14 = buffer.data(target + 14);
+    auto *t_15 = buffer.data(target + 15);
+    auto *t_16 = buffer.data(target + 16);
+    auto *t_17 = buffer.data(target + 17);
+    auto *t_18 = buffer.data(target + 18);
+    auto *t_19 = buffer.data(target + 19);
+    auto *t_20 = buffer.data(target + 20);
+    auto *t_21 = buffer.data(target + 21);
+    auto *t_22 = buffer.data(target + 22);
+    auto *t_23 = buffer.data(target + 23);
+
+    const auto *pa_x = buffer.data(pa + 0);
+    const auto *pa_y = buffer.data(pa + 1);
+    const auto *pa_z = buffer.data(pa + 2);
+
+    const auto *pb_x = buffer.data(pb + 0);
+    const auto *pb_y = buffer.data(pb + 1);
+    const auto *pb_z = buffer.data(pb + 2);
+
+    const auto *dg_0 = buffer.data(dg + 0);
+    const auto *dg_1 = buffer.data(dg + 1);
+    const auto *dg_2 = buffer.data(dg + 2);
+    const auto *dg_3 = buffer.data(dg + 3);
+    const auto *dg_4 = buffer.data(dg + 4);
+    const auto *dg_5 = buffer.data(dg + 5);
+    const auto *dg_6 = buffer.data(dg + 6);
+    const auto *dg_7 = buffer.data(dg + 7);
+    const auto *dg_8 = buffer.data(dg + 8);
+
+    const auto *dh_0 = buffer.data(dh + 0);
+    const auto *dh_1 = buffer.data(dh + 1);
+    const auto *dh_2 = buffer.data(dh + 2);
+    const auto *dh_3 = buffer.data(dh + 3);
+    const auto *dh_4 = buffer.data(dh + 4);
+    const auto *dh_5 = buffer.data(dh + 5);
+    const auto *dh_6 = buffer.data(dh + 6);
+    const auto *dh_7 = buffer.data(dh + 7);
+    const auto *dh_8 = buffer.data(dh + 8);
+
+    const auto *ff0_0 = buffer.data(ff0 + 0);
+    const auto *ff0_7 = buffer.data(ff0 + 7);
+    const auto *ff0_8 = buffer.data(ff0 + 8);
+    const auto *ff0_12 = buffer.data(ff0 + 12);
+    const auto *ff0_13 = buffer.data(ff0 + 13);
+    const auto *ff0_14 = buffer.data(ff0 + 14);
+
+    const auto *ff1_0 = buffer.data(ff1 + 0);
+    const auto *ff1_10 = buffer.data(ff1 + 10);
+    const auto *ff1_11 = buffer.data(ff1 + 11);
+    const auto *ff1_17 = buffer.data(ff1 + 17);
+    const auto *ff1_19 = buffer.data(ff1 + 19);
+    const auto *ff1_20 = buffer.data(ff1 + 20);
+
+    const auto *fg_0 = buffer.data(fg + 0);
+    const auto *fg_7 = buffer.data(fg + 7);
+    const auto *fg_10 = buffer.data(fg + 10);
+    const auto *fg_12 = buffer.data(fg + 12);
+    const auto *fg_13 = buffer.data(fg + 13);
+    const auto *fg_14 = buffer.data(fg + 14);
+    const auto *fg_19 = buffer.data(fg + 19);
+    const auto *fg_21 = buffer.data(fg + 21);
+    const auto *fg_22 = buffer.data(fg + 22);
+    const auto *fg_24 = buffer.data(fg + 24);
+    const auto *fg_25 = buffer.data(fg + 25);
+    const auto *fg_26 = buffer.data(fg + 26);
+
+#pragma omp simd aligned(t_0, t_1, t_2, t_3, pa_x, pa_y, pa_z, pb_x, dg_0, dg_1, dh_0, dh_1, \
+                         ff0_0, ff1_0, fg_0 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_0[k] = f_0 * dg_0[k]
+                 + f_1 * ff0_0[k]
+                 - f_2 * ff1_0[k]
+                 + pb_x[k] * fg_0[k];
+
+        t_1[k] = pa_y[k] * dh_0[k];
+
+        t_2[k] = pa_z[k] * dh_0[k];
+
+        t_3[k] = f_0 * dg_1[k]
+                 + pa_x[k] * dh_1[k];
+    }
+
+#pragma omp simd aligned(t_4, t_5, t_6, t_7, t_8, pa_x, pb_x, dg_2, dg_3, dg_4, dg_5, dh_2, \
+                         dh_3, dh_4, dh_5, fg_7 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_4[k] = f_3 * dg_2[k]
+                 + pa_x[k] * dh_2[k];
+
+        t_5[k] = f_4 * dg_3[k]
+                 + pb_x[k] * fg_7[k];
+
+        t_6[k] = pa_x[k] * dh_3[k];
+
+        t_7[k] = f_0 * dg_4[k]
+                 + pa_x[k] * dh_4[k];
+
+        t_8[k] = f_3 * dg_5[k]
+                 + pa_x[k] * dh_5[k];
+    }
+
+#pragma omp simd aligned(t_9, t_10, t_11, t_12, pa_x, pb_x, dg_8, dh_8, ff0_7, ff0_8, ff1_10, \
+                         ff1_11, fg_10, fg_12, fg_13 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_9[k] = f_4 * dg_8[k]
+                 + pb_x[k] * fg_10[k];
+
+        t_10[k] = pa_x[k] * dh_8[k];
+
+        t_11[k] = f_5 * ff0_7[k]
+                  - f_6 * ff1_10[k]
+                  + pb_x[k] * fg_12[k];
+
+        t_12[k] = f_7 * ff0_8[k]
+                  - f_8 * ff1_11[k]
+                  + pb_x[k] * fg_13[k];
+    }
+
+#pragma omp simd aligned(t_13, t_14, t_15, t_16, pa_y, pa_z, pb_y, dg_3, dg_6, dg_7, dh_3, \
+                         dh_6, dh_7, ff0_8, ff1_11, fg_14 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_13[k] = f_0 * dg_3[k]
+                  + f_1 * ff0_8[k]
+                  - f_2 * ff1_11[k]
+                  + pb_y[k] * fg_14[k];
+
+        t_14[k] = pa_z[k] * dh_3[k];
+
+        t_15[k] = f_0 * dg_6[k]
+                  + pa_y[k] * dh_6[k];
+
+        t_16[k] = f_3 * dg_7[k]
+                  + pa_y[k] * dh_7[k];
+    }
+
+#pragma omp simd aligned(t_17, t_18, t_19, t_20, pa_y, pb_x, pb_y, dg_8, dh_8, ff0_12, ff0_14, \
+                         ff1_17, ff1_20, fg_19, fg_21, fg_22 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_17[k] = f_4 * dg_8[k]
+                  + pb_y[k] * fg_19[k];
+
+        t_18[k] = pa_y[k] * dh_8[k];
+
+        t_19[k] = f_5 * ff0_12[k]
+                  - f_6 * ff1_17[k]
+                  + pb_x[k] * fg_21[k];
+
+        t_20[k] = f_7 * ff0_14[k]
+                  - f_8 * ff1_20[k]
+                  + pb_x[k] * fg_22[k];
+    }
+
+#pragma omp simd aligned(t_21, t_22, t_23, pb_y, pb_z, dg_8, ff0_13, ff0_14, ff1_19, ff1_20, \
+                         fg_24, fg_25, fg_26 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_21[k] = f_5 * ff0_13[k]
+                  - f_6 * ff1_19[k]
+                  + pb_y[k] * fg_24[k];
+
+        t_22[k] = f_7 * ff0_14[k]
+                  - f_8 * ff1_20[k]
+                  + pb_y[k] * fg_25[k];
+
+        t_23[k] = f_0 * dg_8[k]
+                  + f_1 * ff0_14[k]
+                  - f_2 * ff1_20[k]
+                  + pb_z[k] * fg_26[k];
+    }
+}
+
+auto
+compute_prim_fh_electron_repulsion_49(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t pb, const size_t dg, const size_t dh,
+                                      const size_t ff0, const size_t ff1, const size_t fg,
+                                      const size_t ncols, const double alpha, const double beta,
+                                      const double p) -> void
+{
+    // NOTE: the factors are fixed by the pair of primitives, so they are formed
+    // once rather than for every atom pair the pair reaches.
+
+    const auto f_0 = 1.5 / p;
+    const auto f_1 = 2.0 / beta;
+    const auto f_2 = 2.0 * alpha / (beta * p);
+    const auto f_3 = 1.0 / p;
+    const auto f_4 = 0.5 / p;
+    const auto f_5 = 1.0 / beta;
+    const auto f_6 = alpha / (beta * p);
+    const auto f_7 = 0.5 / beta;
+    const auto f_8 = 0.5 * alpha / (beta * p);
+
+    auto *t_0 = buffer.data(target + 0);
+    auto *t_1 = buffer.data(target + 1);
+    auto *t_2 = buffer.data(target + 2);
+    auto *t_3 = buffer.data(target + 3);
+    auto *t_4 = buffer.data(target + 4);
+    auto *t_5 = buffer.data(target + 5);
+    auto *t_6 = buffer.data(target + 6);
+    auto *t_7 = buffer.data(target + 7);
+    auto *t_8 = buffer.data(target + 8);
+    auto *t_9 = buffer.data(target + 9);
+    auto *t_10 = buffer.data(target + 10);
+    auto *t_11 = buffer.data(target + 11);
+    auto *t_12 = buffer.data(target + 12);
+    auto *t_13 = buffer.data(target + 13);
+    auto *t_14 = buffer.data(target + 14);
+    auto *t_15 = buffer.data(target + 15);
+    auto *t_16 = buffer.data(target + 16);
+    auto *t_17 = buffer.data(target + 17);
+    auto *t_18 = buffer.data(target + 18);
+    auto *t_19 = buffer.data(target + 19);
+    auto *t_20 = buffer.data(target + 20);
+    auto *t_21 = buffer.data(target + 21);
+    auto *t_22 = buffer.data(target + 22);
+    auto *t_23 = buffer.data(target + 23);
+
+    const auto *pa_x = buffer.data(pa + 0);
+    const auto *pa_y = buffer.data(pa + 1);
+    const auto *pa_z = buffer.data(pa + 2);
+
+    const auto *pb_x = buffer.data(pb + 0);
+    const auto *pb_y = buffer.data(pb + 1);
+    const auto *pb_z = buffer.data(pb + 2);
+
+    const auto *dg_0 = buffer.data(dg + 0);
+    const auto *dg_1 = buffer.data(dg + 1);
+    const auto *dg_2 = buffer.data(dg + 2);
+    const auto *dg_3 = buffer.data(dg + 3);
+    const auto *dg_4 = buffer.data(dg + 4);
+    const auto *dg_5 = buffer.data(dg + 5);
+    const auto *dg_6 = buffer.data(dg + 6);
+    const auto *dg_7 = buffer.data(dg + 7);
+    const auto *dg_8 = buffer.data(dg + 8);
+
+    const auto *dh_0 = buffer.data(dh + 0);
+    const auto *dh_1 = buffer.data(dh + 1);
+    const auto *dh_2 = buffer.data(dh + 2);
+    const auto *dh_3 = buffer.data(dh + 3);
+    const auto *dh_4 = buffer.data(dh + 4);
+    const auto *dh_5 = buffer.data(dh + 5);
+    const auto *dh_6 = buffer.data(dh + 6);
+    const auto *dh_7 = buffer.data(dh + 7);
+    const auto *dh_8 = buffer.data(dh + 8);
+
+    const auto *ff0_0 = buffer.data(ff0 + 0);
+    const auto *ff0_10 = buffer.data(ff0 + 10);
+    const auto *ff0_11 = buffer.data(ff0 + 11);
+    const auto *ff0_17 = buffer.data(ff0 + 17);
+    const auto *ff0_19 = buffer.data(ff0 + 19);
+    const auto *ff0_20 = buffer.data(ff0 + 20);
+
+    const auto *ff1_0 = buffer.data(ff1 + 0);
+    const auto *ff1_10 = buffer.data(ff1 + 10);
+    const auto *ff1_11 = buffer.data(ff1 + 11);
+    const auto *ff1_17 = buffer.data(ff1 + 17);
+    const auto *ff1_19 = buffer.data(ff1 + 19);
+    const auto *ff1_20 = buffer.data(ff1 + 20);
+
+    const auto *fg_0 = buffer.data(fg + 0);
+    const auto *fg_5 = buffer.data(fg + 5);
+    const auto *fg_8 = buffer.data(fg + 8);
+    const auto *fg_9 = buffer.data(fg + 9);
+    const auto *fg_10 = buffer.data(fg + 10);
+    const auto *fg_11 = buffer.data(fg + 11);
+    const auto *fg_15 = buffer.data(fg + 15);
+    const auto *fg_16 = buffer.data(fg + 16);
+    const auto *fg_17 = buffer.data(fg + 17);
+    const auto *fg_18 = buffer.data(fg + 18);
+    const auto *fg_19 = buffer.data(fg + 19);
+    const auto *fg_20 = buffer.data(fg + 20);
+
+#pragma omp simd aligned(t_0, t_1, t_2, t_3, pa_x, pa_y, pa_z, pb_x, dg_0, dg_1, dh_0, dh_1, \
+                         ff0_0, ff1_0, fg_0 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_0[k] = f_0 * dg_0[k]
+                 + f_1 * ff0_0[k]
+                 - f_2 * ff1_0[k]
+                 + pb_x[k] * fg_0[k];
+
+        t_1[k] = pa_y[k] * dh_0[k];
+
+        t_2[k] = pa_z[k] * dh_0[k];
+
+        t_3[k] = f_0 * dg_1[k]
+                 + pa_x[k] * dh_1[k];
+    }
+
+#pragma omp simd aligned(t_4, t_5, t_6, t_7, t_8, pa_x, pb_x, dg_2, dg_3, dg_4, dg_5, dh_2, \
+                         dh_3, dh_4, dh_5, fg_5 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_4[k] = f_3 * dg_2[k]
+                 + pa_x[k] * dh_2[k];
+
+        t_5[k] = f_4 * dg_3[k]
+                 + pb_x[k] * fg_5[k];
+
+        t_6[k] = pa_x[k] * dh_3[k];
+
+        t_7[k] = f_0 * dg_4[k]
+                 + pa_x[k] * dh_4[k];
+
+        t_8[k] = f_3 * dg_5[k]
+                 + pa_x[k] * dh_5[k];
+    }
+
+#pragma omp simd aligned(t_9, t_10, t_11, t_12, pa_x, pb_x, dg_8, dh_8, ff0_10, ff0_11, \
+                         ff1_10, ff1_11, fg_8, fg_9, fg_10 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_9[k] = f_4 * dg_8[k]
+                 + pb_x[k] * fg_8[k];
+
+        t_10[k] = pa_x[k] * dh_8[k];
+
+        t_11[k] = f_5 * ff0_10[k]
+                  - f_6 * ff1_10[k]
+                  + pb_x[k] * fg_9[k];
+
+        t_12[k] = f_7 * ff0_11[k]
+                  - f_8 * ff1_11[k]
+                  + pb_x[k] * fg_10[k];
+    }
+
+#pragma omp simd aligned(t_13, t_14, t_15, t_16, pa_y, pa_z, pb_y, dg_3, dg_6, dg_7, dh_3, \
+                         dh_6, dh_7, ff0_11, ff1_11, fg_11 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_13[k] = f_0 * dg_3[k]
+                  + f_1 * ff0_11[k]
+                  - f_2 * ff1_11[k]
+                  + pb_y[k] * fg_11[k];
+
+        t_14[k] = pa_z[k] * dh_3[k];
+
+        t_15[k] = f_0 * dg_6[k]
+                  + pa_y[k] * dh_6[k];
+
+        t_16[k] = f_3 * dg_7[k]
+                  + pa_y[k] * dh_7[k];
+    }
+
+#pragma omp simd aligned(t_17, t_18, t_19, t_20, pa_y, pb_x, pb_y, dg_8, dh_8, ff0_17, ff0_20, \
+                         ff1_17, ff1_20, fg_15, fg_16, fg_17 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_17[k] = f_4 * dg_8[k]
+                  + pb_y[k] * fg_15[k];
+
+        t_18[k] = pa_y[k] * dh_8[k];
+
+        t_19[k] = f_5 * ff0_17[k]
+                  - f_6 * ff1_17[k]
+                  + pb_x[k] * fg_16[k];
+
+        t_20[k] = f_7 * ff0_20[k]
+                  - f_8 * ff1_20[k]
+                  + pb_x[k] * fg_17[k];
+    }
+
+#pragma omp simd aligned(t_21, t_22, t_23, pb_y, pb_z, dg_8, ff0_19, ff0_20, ff1_19, ff1_20, \
+                         fg_18, fg_19, fg_20 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_21[k] = f_5 * ff0_19[k]
+                  - f_6 * ff1_19[k]
+                  + pb_y[k] * fg_18[k];
+
+        t_22[k] = f_7 * ff0_20[k]
+                  - f_8 * ff1_20[k]
+                  + pb_y[k] * fg_19[k];
+
+        t_23[k] = f_0 * dg_8[k]
+                  + f_1 * ff0_20[k]
+                  - f_2 * ff1_20[k]
+                  + pb_z[k] * fg_20[k];
+    }
+}
+
+auto
+compute_prim_fh_electron_repulsion_50(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t pb, const size_t dg, const size_t dh,
+                                      const size_t ff0, const size_t ff1, const size_t fg,
+                                      const size_t ncols, const double alpha, const double beta,
+                                      const double p) -> void
+{
+    // NOTE: the factors are fixed by the pair of primitives, so they are formed
+    // once rather than for every atom pair the pair reaches.
+
+    const auto f_0 = 1.5 / p;
+    const auto f_1 = 2.0 / beta;
+    const auto f_2 = 2.0 * alpha / (beta * p);
+
+    auto *t_0 = buffer.data(target + 0);
+    auto *t_1 = buffer.data(target + 1);
+    auto *t_2 = buffer.data(target + 2);
+    auto *t_3 = buffer.data(target + 3);
+    auto *t_4 = buffer.data(target + 4);
+    auto *t_5 = buffer.data(target + 5);
+    auto *t_6 = buffer.data(target + 6);
+    auto *t_7 = buffer.data(target + 7);
+    auto *t_8 = buffer.data(target + 8);
+
+    const auto *pa_x = buffer.data(pa + 0);
+    const auto *pa_y = buffer.data(pa + 1);
+    const auto *pa_z = buffer.data(pa + 2);
+
+    const auto *pb_x = buffer.data(pb + 0);
+    const auto *pb_y = buffer.data(pb + 1);
+    const auto *pb_z = buffer.data(pb + 2);
+
+    const auto *dg_0 = buffer.data(dg + 0);
+    const auto *dg_3 = buffer.data(dg + 3);
+    const auto *dg_8 = buffer.data(dg + 8);
+
+    const auto *dh_0 = buffer.data(dh + 0);
+    const auto *dh_1 = buffer.data(dh + 1);
+    const auto *dh_2 = buffer.data(dh + 2);
+
+    const auto *ff0_0 = buffer.data(ff0 + 0);
+    const auto *ff0_11 = buffer.data(ff0 + 11);
+    const auto *ff0_20 = buffer.data(ff0 + 20);
+
+    const auto *ff1_0 = buffer.data(ff1 + 0);
+    const auto *ff1_8 = buffer.data(ff1 + 8);
+    const auto *ff1_14 = buffer.data(ff1 + 14);
+
+    const auto *fg_0 = buffer.data(fg + 0);
+    const auto *fg_5 = buffer.data(fg + 5);
+    const auto *fg_8 = buffer.data(fg + 8);
+
+#pragma omp simd aligned(t_0, t_1, t_2, t_3, t_4, pa_x, pa_y, pa_z, pb_x, dg_0, dh_0, dh_1, \
+                         dh_2, ff0_0, ff1_0, fg_0 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_0[k] = f_0 * dg_0[k]
+                 + f_1 * ff0_0[k]
+                 - f_2 * ff1_0[k]
+                 + pb_x[k] * fg_0[k];
+
+        t_1[k] = pa_y[k] * dh_0[k];
+
+        t_2[k] = pa_z[k] * dh_0[k];
+
+        t_3[k] = pa_x[k] * dh_1[k];
+
+        t_4[k] = pa_x[k] * dh_2[k];
+    }
+
+#pragma omp simd aligned(t_5, t_6, t_7, pa_y, pa_z, pb_y, dg_3, dh_1, dh_2, ff0_11, ff1_8, \
+                         fg_5 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_5[k] = f_0 * dg_3[k]
+                 + f_1 * ff0_11[k]
+                 - f_2 * ff1_8[k]
+                 + pb_y[k] * fg_5[k];
+
+        t_6[k] = pa_z[k] * dh_1[k];
+
+        t_7[k] = pa_y[k] * dh_2[k];
+    }
+
+#pragma omp simd aligned(t_8, pb_z, dg_8, ff0_20, ff1_14, fg_8 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_8[k] = f_0 * dg_8[k]
+                 + f_1 * ff0_20[k]
+                 - f_2 * ff1_14[k]
+                 + pb_z[k] * fg_8[k];
+    }
+}
+
+auto
+compute_prim_fh_electron_repulsion_51(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t pb, const size_t dg, const size_t dh,
+                                      const size_t ff0, const size_t ff1, const size_t fg,
+                                      const size_t ncols, const double alpha, const double beta,
+                                      const double p) -> void
+{
+    // NOTE: the factors are fixed by the pair of primitives, so they are formed
+    // once rather than for every atom pair the pair reaches.
+
+    const auto f_0 = 1.5 / p;
+    const auto f_1 = 2.0 / beta;
+    const auto f_2 = 2.0 * alpha / (beta * p);
+    const auto f_3 = 1.0 / p;
+    const auto f_4 = 0.5 / p;
+    const auto f_5 = 1.0 / beta;
+    const auto f_6 = alpha / (beta * p);
+    const auto f_7 = 0.5 / beta;
+    const auto f_8 = 0.5 * alpha / (beta * p);
+
+    auto *t_0 = buffer.data(target + 0);
+    auto *t_1 = buffer.data(target + 1);
+    auto *t_2 = buffer.data(target + 2);
+    auto *t_3 = buffer.data(target + 3);
+    auto *t_4 = buffer.data(target + 4);
+    auto *t_5 = buffer.data(target + 5);
+    auto *t_6 = buffer.data(target + 6);
+    auto *t_7 = buffer.data(target + 7);
+    auto *t_8 = buffer.data(target + 8);
+    auto *t_9 = buffer.data(target + 9);
+    auto *t_10 = buffer.data(target + 10);
+    auto *t_11 = buffer.data(target + 11);
+    auto *t_12 = buffer.data(target + 12);
+    auto *t_13 = buffer.data(target + 13);
+    auto *t_14 = buffer.data(target + 14);
+    auto *t_15 = buffer.data(target + 15);
+    auto *t_16 = buffer.data(target + 16);
+    auto *t_17 = buffer.data(target + 17);
+    auto *t_18 = buffer.data(target + 18);
+    auto *t_19 = buffer.data(target + 19);
+    auto *t_20 = buffer.data(target + 20);
+    auto *t_21 = buffer.data(target + 21);
+    auto *t_22 = buffer.data(target + 22);
+    auto *t_23 = buffer.data(target + 23);
+    auto *t_24 = buffer.data(target + 24);
+    auto *t_25 = buffer.data(target + 25);
+    auto *t_26 = buffer.data(target + 26);
+
+    const auto *pa_x = buffer.data(pa + 0);
+    const auto *pa_y = buffer.data(pa + 1);
+    const auto *pa_z = buffer.data(pa + 2);
+
+    const auto *pb_x = buffer.data(pb + 0);
+    const auto *pb_y = buffer.data(pb + 1);
+    const auto *pb_z = buffer.data(pb + 2);
+
+    const auto *dg_0 = buffer.data(dg + 0);
+    const auto *dg_1 = buffer.data(dg + 1);
+    const auto *dg_2 = buffer.data(dg + 2);
+    const auto *dg_3 = buffer.data(dg + 3);
+    const auto *dg_4 = buffer.data(dg + 4);
+    const auto *dg_5 = buffer.data(dg + 5);
+    const auto *dg_6 = buffer.data(dg + 6);
+    const auto *dg_7 = buffer.data(dg + 7);
+    const auto *dg_8 = buffer.data(dg + 8);
+
+    const auto *dh_0 = buffer.data(dh + 0);
+    const auto *dh_1 = buffer.data(dh + 1);
+    const auto *dh_2 = buffer.data(dh + 2);
+    const auto *dh_4 = buffer.data(dh + 4);
+    const auto *dh_5 = buffer.data(dh + 5);
+    const auto *dh_6 = buffer.data(dh + 6);
+    const auto *dh_8 = buffer.data(dh + 8);
+    const auto *dh_9 = buffer.data(dh + 9);
+    const auto *dh_11 = buffer.data(dh + 11);
+
+    const auto *ff0_0 = buffer.data(ff0 + 0);
+    const auto *ff0_7 = buffer.data(ff0 + 7);
+    const auto *ff0_8 = buffer.data(ff0 + 8);
+    const auto *ff0_12 = buffer.data(ff0 + 12);
+    const auto *ff0_13 = buffer.data(ff0 + 13);
+    const auto *ff0_14 = buffer.data(ff0 + 14);
+
+    const auto *ff1_0 = buffer.data(ff1 + 0);
+    const auto *ff1_7 = buffer.data(ff1 + 7);
+    const auto *ff1_8 = buffer.data(ff1 + 8);
+    const auto *ff1_12 = buffer.data(ff1 + 12);
+    const auto *ff1_13 = buffer.data(ff1 + 13);
+    const auto *ff1_14 = buffer.data(ff1 + 14);
+
+    const auto *fg_0 = buffer.data(fg + 0);
+    const auto *fg_5 = buffer.data(fg + 5);
+    const auto *fg_8 = buffer.data(fg + 8);
+    const auto *fg_9 = buffer.data(fg + 9);
+    const auto *fg_10 = buffer.data(fg + 10);
+    const auto *fg_11 = buffer.data(fg + 11);
+    const auto *fg_15 = buffer.data(fg + 15);
+    const auto *fg_16 = buffer.data(fg + 16);
+    const auto *fg_17 = buffer.data(fg + 17);
+    const auto *fg_18 = buffer.data(fg + 18);
+    const auto *fg_19 = buffer.data(fg + 19);
+    const auto *fg_20 = buffer.data(fg + 20);
+
+#pragma omp simd aligned(t_0, t_1, t_2, t_3, pa_x, pa_y, pa_z, pb_x, dg_0, dg_1, dh_0, dh_1, \
+                         ff0_0, ff1_0, fg_0 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_0[k] = f_0 * dg_0[k]
+                 + f_1 * ff0_0[k]
+                 - f_2 * ff1_0[k]
+                 + pb_x[k] * fg_0[k];
+
+        t_1[k] = pa_y[k] * dh_0[k];
+
+        t_2[k] = pa_z[k] * dh_0[k];
+
+        t_3[k] = f_0 * dg_1[k]
+                 + pa_x[k] * dh_1[k];
+    }
+
+#pragma omp simd aligned(t_4, t_5, t_6, t_7, t_8, pa_x, pb_x, dg_2, dg_3, dg_4, dg_5, dh_2, \
+                         dh_4, dh_5, dh_6, fg_5 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_4[k] = f_3 * dg_2[k]
+                 + pa_x[k] * dh_2[k];
+
+        t_5[k] = f_4 * dg_3[k]
+                 + pb_x[k] * fg_5[k];
+
+        t_6[k] = pa_x[k] * dh_4[k];
+
+        t_7[k] = f_0 * dg_4[k]
+                 + pa_x[k] * dh_5[k];
+
+        t_8[k] = f_3 * dg_5[k]
+                 + pa_x[k] * dh_6[k];
+    }
+
+#pragma omp simd aligned(t_9, t_10, t_11, t_12, pa_x, pb_x, dg_8, dh_11, ff0_7, ff0_8, ff1_7, \
+                         ff1_8, fg_8, fg_9, fg_10 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_9[k] = f_4 * dg_8[k]
+                 + pb_x[k] * fg_8[k];
+
+        t_10[k] = pa_x[k] * dh_11[k];
+
+        t_11[k] = f_5 * ff0_7[k]
+                  - f_6 * ff1_7[k]
+                  + pb_x[k] * fg_9[k];
+
+        t_12[k] = f_7 * ff0_8[k]
+                  - f_8 * ff1_8[k]
+                  + pb_x[k] * fg_10[k];
+    }
+
+#pragma omp simd aligned(t_13, t_14, t_15, t_16, pa_y, pa_z, pb_x, pb_y, dg_3, dg_6, dh_4, \
+                         dh_8, ff0_8, ff1_8, fg_11 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_13[k] = pb_x[k] * fg_11[k];
+
+        t_14[k] = f_0 * dg_3[k]
+                  + f_1 * ff0_8[k]
+                  - f_2 * ff1_8[k]
+                  + pb_y[k] * fg_11[k];
+
+        t_15[k] = pa_z[k] * dh_4[k];
+
+        t_16[k] = f_0 * dg_6[k]
+                  + pa_y[k] * dh_8[k];
+    }
+
+#pragma omp simd aligned(t_17, t_18, t_19, t_20, pa_y, pb_x, pb_y, dg_7, dg_8, dh_9, dh_11, \
+                         ff0_12, ff1_12, fg_15, fg_16 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_17[k] = f_3 * dg_7[k]
+                  + pa_y[k] * dh_9[k];
+
+        t_18[k] = f_4 * dg_8[k]
+                  + pb_y[k] * fg_15[k];
+
+        t_19[k] = pa_y[k] * dh_11[k];
+
+        t_20[k] = f_5 * ff0_12[k]
+                  - f_6 * ff1_12[k]
+                  + pb_x[k] * fg_16[k];
+    }
+
+#pragma omp simd aligned(t_21, t_22, t_23, t_24, t_25, pb_x, pb_y, ff0_13, ff0_14, ff1_13, \
+                         ff1_14, fg_17, fg_18, fg_19, fg_20 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_21[k] = f_7 * ff0_14[k]
+                  - f_8 * ff1_14[k]
+                  + pb_x[k] * fg_17[k];
+
+        t_22[k] = pb_x[k] * fg_20[k];
+
+        t_23[k] = f_5 * ff0_13[k]
+                  - f_6 * ff1_13[k]
+                  + pb_y[k] * fg_18[k];
+
+        t_24[k] = f_7 * ff0_14[k]
+                  - f_8 * ff1_14[k]
+                  + pb_y[k] * fg_19[k];
+
+        t_25[k] = pb_y[k] * fg_20[k];
+    }
+
+#pragma omp simd aligned(t_26, pb_z, dg_8, ff0_14, ff1_14, fg_20 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_26[k] = f_0 * dg_8[k]
+                  + f_1 * ff0_14[k]
+                  - f_2 * ff1_14[k]
+                  + pb_z[k] * fg_20[k];
+    }
+}
+
+auto
+compute_prim_fh_electron_repulsion_52(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t pb, const size_t dg, const size_t dh,
+                                      const size_t ff0, const size_t ff1, const size_t fg,
+                                      const size_t ncols, const double alpha, const double beta,
+                                      const double p) -> void
+{
+    // NOTE: the factors are fixed by the pair of primitives, so they are formed
+    // once rather than for every atom pair the pair reaches.
+
+    const auto f_0 = 1.5 / p;
+    const auto f_1 = 2.0 / beta;
+    const auto f_2 = 2.0 * alpha / (beta * p);
+    const auto f_3 = 1.0 / p;
+    const auto f_4 = 0.5 / p;
+    const auto f_5 = 1.0 / beta;
+    const auto f_6 = alpha / (beta * p);
+    const auto f_7 = 0.5 / beta;
+    const auto f_8 = 0.5 * alpha / (beta * p);
+
+    auto *t_0 = buffer.data(target + 0);
+    auto *t_1 = buffer.data(target + 1);
+    auto *t_2 = buffer.data(target + 2);
+    auto *t_3 = buffer.data(target + 3);
+    auto *t_4 = buffer.data(target + 4);
+    auto *t_5 = buffer.data(target + 5);
+    auto *t_6 = buffer.data(target + 6);
+    auto *t_7 = buffer.data(target + 7);
+    auto *t_8 = buffer.data(target + 8);
+    auto *t_9 = buffer.data(target + 9);
+    auto *t_10 = buffer.data(target + 10);
+    auto *t_11 = buffer.data(target + 11);
+    auto *t_12 = buffer.data(target + 12);
+    auto *t_13 = buffer.data(target + 13);
+    auto *t_14 = buffer.data(target + 14);
+    auto *t_15 = buffer.data(target + 15);
+    auto *t_16 = buffer.data(target + 16);
+    auto *t_17 = buffer.data(target + 17);
+    auto *t_18 = buffer.data(target + 18);
+    auto *t_19 = buffer.data(target + 19);
+    auto *t_20 = buffer.data(target + 20);
+    auto *t_21 = buffer.data(target + 21);
+    auto *t_22 = buffer.data(target + 22);
+    auto *t_23 = buffer.data(target + 23);
+    auto *t_24 = buffer.data(target + 24);
+    auto *t_25 = buffer.data(target + 25);
+    auto *t_26 = buffer.data(target + 26);
+
+    const auto *pa_x = buffer.data(pa + 0);
+    const auto *pa_y = buffer.data(pa + 1);
+    const auto *pa_z = buffer.data(pa + 2);
+
+    const auto *pb_x = buffer.data(pb + 0);
+    const auto *pb_y = buffer.data(pb + 1);
+    const auto *pb_z = buffer.data(pb + 2);
+
+    const auto *dg_0 = buffer.data(dg + 0);
+    const auto *dg_1 = buffer.data(dg + 1);
+    const auto *dg_2 = buffer.data(dg + 2);
+    const auto *dg_3 = buffer.data(dg + 3);
+    const auto *dg_4 = buffer.data(dg + 4);
+    const auto *dg_5 = buffer.data(dg + 5);
+    const auto *dg_6 = buffer.data(dg + 6);
+    const auto *dg_7 = buffer.data(dg + 7);
+    const auto *dg_8 = buffer.data(dg + 8);
+
+    const auto *dh_0 = buffer.data(dh + 0);
+    const auto *dh_1 = buffer.data(dh + 1);
+    const auto *dh_2 = buffer.data(dh + 2);
+    const auto *dh_4 = buffer.data(dh + 4);
+    const auto *dh_5 = buffer.data(dh + 5);
+    const auto *dh_6 = buffer.data(dh + 6);
+    const auto *dh_8 = buffer.data(dh + 8);
+    const auto *dh_9 = buffer.data(dh + 9);
+    const auto *dh_11 = buffer.data(dh + 11);
+
+    const auto *ff0_0 = buffer.data(ff0 + 0);
+    const auto *ff0_7 = buffer.data(ff0 + 7);
+    const auto *ff0_8 = buffer.data(ff0 + 8);
+    const auto *ff0_12 = buffer.data(ff0 + 12);
+    const auto *ff0_13 = buffer.data(ff0 + 13);
+    const auto *ff0_14 = buffer.data(ff0 + 14);
+
+    const auto *ff1_0 = buffer.data(ff1 + 0);
+    const auto *ff1_10 = buffer.data(ff1 + 10);
+    const auto *ff1_11 = buffer.data(ff1 + 11);
+    const auto *ff1_17 = buffer.data(ff1 + 17);
+    const auto *ff1_19 = buffer.data(ff1 + 19);
+    const auto *ff1_20 = buffer.data(ff1 + 20);
+
+    const auto *fg_0 = buffer.data(fg + 0);
+    const auto *fg_7 = buffer.data(fg + 7);
+    const auto *fg_10 = buffer.data(fg + 10);
+    const auto *fg_12 = buffer.data(fg + 12);
+    const auto *fg_13 = buffer.data(fg + 13);
+    const auto *fg_14 = buffer.data(fg + 14);
+    const auto *fg_19 = buffer.data(fg + 19);
+    const auto *fg_21 = buffer.data(fg + 21);
+    const auto *fg_22 = buffer.data(fg + 22);
+    const auto *fg_24 = buffer.data(fg + 24);
+    const auto *fg_25 = buffer.data(fg + 25);
+    const auto *fg_26 = buffer.data(fg + 26);
+
+#pragma omp simd aligned(t_0, t_1, t_2, t_3, pa_x, pa_y, pa_z, pb_x, dg_0, dg_1, dh_0, dh_1, \
+                         ff0_0, ff1_0, fg_0 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_0[k] = f_0 * dg_0[k]
+                 + f_1 * ff0_0[k]
+                 - f_2 * ff1_0[k]
+                 + pb_x[k] * fg_0[k];
+
+        t_1[k] = pa_y[k] * dh_0[k];
+
+        t_2[k] = pa_z[k] * dh_0[k];
+
+        t_3[k] = f_0 * dg_1[k]
+                 + pa_x[k] * dh_1[k];
+    }
+
+#pragma omp simd aligned(t_4, t_5, t_6, t_7, t_8, pa_x, pb_x, dg_2, dg_3, dg_4, dg_5, dh_2, \
+                         dh_4, dh_5, dh_6, fg_7 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_4[k] = f_3 * dg_2[k]
+                 + pa_x[k] * dh_2[k];
+
+        t_5[k] = f_4 * dg_3[k]
+                 + pb_x[k] * fg_7[k];
+
+        t_6[k] = pa_x[k] * dh_4[k];
+
+        t_7[k] = f_0 * dg_4[k]
+                 + pa_x[k] * dh_5[k];
+
+        t_8[k] = f_3 * dg_5[k]
+                 + pa_x[k] * dh_6[k];
+    }
+
+#pragma omp simd aligned(t_9, t_10, t_11, t_12, pa_x, pb_x, dg_8, dh_11, ff0_7, ff0_8, ff1_10, \
+                         ff1_11, fg_10, fg_12, fg_13 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_9[k] = f_4 * dg_8[k]
+                 + pb_x[k] * fg_10[k];
+
+        t_10[k] = pa_x[k] * dh_11[k];
+
+        t_11[k] = f_5 * ff0_7[k]
+                  - f_6 * ff1_10[k]
+                  + pb_x[k] * fg_12[k];
+
+        t_12[k] = f_7 * ff0_8[k]
+                  - f_8 * ff1_11[k]
+                  + pb_x[k] * fg_13[k];
+    }
+
+#pragma omp simd aligned(t_13, t_14, t_15, t_16, pa_y, pa_z, pb_x, pb_y, dg_3, dg_6, dh_4, \
+                         dh_8, ff0_8, ff1_11, fg_14 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_13[k] = pb_x[k] * fg_14[k];
+
+        t_14[k] = f_0 * dg_3[k]
+                  + f_1 * ff0_8[k]
+                  - f_2 * ff1_11[k]
+                  + pb_y[k] * fg_14[k];
+
+        t_15[k] = pa_z[k] * dh_4[k];
+
+        t_16[k] = f_0 * dg_6[k]
+                  + pa_y[k] * dh_8[k];
+    }
+
+#pragma omp simd aligned(t_17, t_18, t_19, t_20, pa_y, pb_x, pb_y, dg_7, dg_8, dh_9, dh_11, \
+                         ff0_12, ff1_17, fg_19, fg_21 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_17[k] = f_3 * dg_7[k]
+                  + pa_y[k] * dh_9[k];
+
+        t_18[k] = f_4 * dg_8[k]
+                  + pb_y[k] * fg_19[k];
+
+        t_19[k] = pa_y[k] * dh_11[k];
+
+        t_20[k] = f_5 * ff0_12[k]
+                  - f_6 * ff1_17[k]
+                  + pb_x[k] * fg_21[k];
+    }
+
+#pragma omp simd aligned(t_21, t_22, t_23, t_24, t_25, pb_x, pb_y, ff0_13, ff0_14, ff1_19, \
+                         ff1_20, fg_22, fg_24, fg_25, fg_26 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_21[k] = f_7 * ff0_14[k]
+                  - f_8 * ff1_20[k]
+                  + pb_x[k] * fg_22[k];
+
+        t_22[k] = pb_x[k] * fg_26[k];
+
+        t_23[k] = f_5 * ff0_13[k]
+                  - f_6 * ff1_19[k]
+                  + pb_y[k] * fg_24[k];
+
+        t_24[k] = f_7 * ff0_14[k]
+                  - f_8 * ff1_20[k]
+                  + pb_y[k] * fg_25[k];
+
+        t_25[k] = pb_y[k] * fg_26[k];
+    }
+
+#pragma omp simd aligned(t_26, pb_z, dg_8, ff0_14, ff1_20, fg_26 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_26[k] = f_0 * dg_8[k]
+                  + f_1 * ff0_14[k]
+                  - f_2 * ff1_20[k]
+                  + pb_z[k] * fg_26[k];
+    }
+}
+
+auto
+compute_prim_fh_electron_repulsion_53(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t pb, const size_t dg, const size_t dh,
+                                      const size_t ff0, const size_t ff1, const size_t fg,
+                                      const size_t ncols, const double alpha, const double beta,
+                                      const double p) -> void
+{
+    // NOTE: the factors are fixed by the pair of primitives, so they are formed
+    // once rather than for every atom pair the pair reaches.
+
+    const auto f_0 = 1.5 / p;
+    const auto f_1 = 2.0 / beta;
+    const auto f_2 = 2.0 * alpha / (beta * p);
+    const auto f_3 = 1.0 / p;
+    const auto f_4 = 0.5 / p;
+    const auto f_5 = 1.0 / beta;
+    const auto f_6 = alpha / (beta * p);
+    const auto f_7 = 0.5 / beta;
+    const auto f_8 = 0.5 * alpha / (beta * p);
+
+    auto *t_0 = buffer.data(target + 0);
+    auto *t_1 = buffer.data(target + 1);
+    auto *t_2 = buffer.data(target + 2);
+    auto *t_3 = buffer.data(target + 3);
+    auto *t_4 = buffer.data(target + 4);
+    auto *t_5 = buffer.data(target + 5);
+    auto *t_6 = buffer.data(target + 6);
+    auto *t_7 = buffer.data(target + 7);
+    auto *t_8 = buffer.data(target + 8);
+    auto *t_9 = buffer.data(target + 9);
+    auto *t_10 = buffer.data(target + 10);
+    auto *t_11 = buffer.data(target + 11);
+    auto *t_12 = buffer.data(target + 12);
+    auto *t_13 = buffer.data(target + 13);
+    auto *t_14 = buffer.data(target + 14);
+    auto *t_15 = buffer.data(target + 15);
+    auto *t_16 = buffer.data(target + 16);
+    auto *t_17 = buffer.data(target + 17);
+    auto *t_18 = buffer.data(target + 18);
+    auto *t_19 = buffer.data(target + 19);
+    auto *t_20 = buffer.data(target + 20);
+    auto *t_21 = buffer.data(target + 21);
+    auto *t_22 = buffer.data(target + 22);
+    auto *t_23 = buffer.data(target + 23);
+    auto *t_24 = buffer.data(target + 24);
+    auto *t_25 = buffer.data(target + 25);
+    auto *t_26 = buffer.data(target + 26);
+    auto *t_27 = buffer.data(target + 27);
+    auto *t_28 = buffer.data(target + 28);
+    auto *t_29 = buffer.data(target + 29);
+    auto *t_30 = buffer.data(target + 30);
+    auto *t_31 = buffer.data(target + 31);
+    auto *t_32 = buffer.data(target + 32);
+
+    const auto *pa_x = buffer.data(pa + 0);
+    const auto *pa_y = buffer.data(pa + 1);
+    const auto *pa_z = buffer.data(pa + 2);
+
+    const auto *pb_x = buffer.data(pb + 0);
+    const auto *pb_y = buffer.data(pb + 1);
+    const auto *pb_z = buffer.data(pb + 2);
+
+    const auto *dg_0 = buffer.data(dg + 0);
+    const auto *dg_1 = buffer.data(dg + 1);
+    const auto *dg_2 = buffer.data(dg + 2);
+    const auto *dg_3 = buffer.data(dg + 3);
+    const auto *dg_4 = buffer.data(dg + 4);
+    const auto *dg_5 = buffer.data(dg + 5);
+    const auto *dg_6 = buffer.data(dg + 6);
+    const auto *dg_7 = buffer.data(dg + 7);
+    const auto *dg_8 = buffer.data(dg + 8);
+
+    const auto *dh_0 = buffer.data(dh + 0);
+    const auto *dh_1 = buffer.data(dh + 1);
+    const auto *dh_2 = buffer.data(dh + 2);
+    const auto *dh_4 = buffer.data(dh + 4);
+    const auto *dh_5 = buffer.data(dh + 5);
+    const auto *dh_6 = buffer.data(dh + 6);
+    const auto *dh_8 = buffer.data(dh + 8);
+    const auto *dh_9 = buffer.data(dh + 9);
+    const auto *dh_11 = buffer.data(dh + 11);
+
+    const auto *ff0_0 = buffer.data(ff0 + 0);
+    const auto *ff0_1 = buffer.data(ff0 + 1);
+    const auto *ff0_2 = buffer.data(ff0 + 2);
+    const auto *ff0_9 = buffer.data(ff0 + 9);
+    const auto *ff0_10 = buffer.data(ff0 + 10);
+    const auto *ff0_11 = buffer.data(ff0 + 11);
+    const auto *ff0_12 = buffer.data(ff0 + 12);
+    const auto *ff0_16 = buffer.data(ff0 + 16);
+    const auto *ff0_17 = buffer.data(ff0 + 17);
+    const auto *ff0_18 = buffer.data(ff0 + 18);
+    const auto *ff0_19 = buffer.data(ff0 + 19);
+    const auto *ff0_20 = buffer.data(ff0 + 20);
+
+    const auto *ff1_0 = buffer.data(ff1 + 0);
+    const auto *ff1_1 = buffer.data(ff1 + 1);
+    const auto *ff1_2 = buffer.data(ff1 + 2);
+    const auto *ff1_9 = buffer.data(ff1 + 9);
+    const auto *ff1_10 = buffer.data(ff1 + 10);
+    const auto *ff1_11 = buffer.data(ff1 + 11);
+    const auto *ff1_12 = buffer.data(ff1 + 12);
+    const auto *ff1_16 = buffer.data(ff1 + 16);
+    const auto *ff1_17 = buffer.data(ff1 + 17);
+    const auto *ff1_18 = buffer.data(ff1 + 18);
+    const auto *ff1_19 = buffer.data(ff1 + 19);
+    const auto *ff1_20 = buffer.data(ff1 + 20);
+
+    const auto *fg_0 = buffer.data(fg + 0);
+    const auto *fg_1 = buffer.data(fg + 1);
+    const auto *fg_2 = buffer.data(fg + 2);
+    const auto *fg_7 = buffer.data(fg + 7);
+    const auto *fg_10 = buffer.data(fg + 10);
+    const auto *fg_11 = buffer.data(fg + 11);
+    const auto *fg_12 = buffer.data(fg + 12);
+    const auto *fg_13 = buffer.data(fg + 13);
+    const auto *fg_14 = buffer.data(fg + 14);
+    const auto *fg_15 = buffer.data(fg + 15);
+    const auto *fg_19 = buffer.data(fg + 19);
+    const auto *fg_20 = buffer.data(fg + 20);
+    const auto *fg_21 = buffer.data(fg + 21);
+    const auto *fg_22 = buffer.data(fg + 22);
+    const auto *fg_23 = buffer.data(fg + 23);
+    const auto *fg_24 = buffer.data(fg + 24);
+    const auto *fg_25 = buffer.data(fg + 25);
+    const auto *fg_26 = buffer.data(fg + 26);
+
+#pragma omp simd aligned(t_0, t_1, t_2, pb_x, pb_y, pb_z, dg_0, ff0_0, ff0_1, ff0_2, ff1_0, \
+                         ff1_1, ff1_2, fg_0, fg_1, fg_2 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_0[k] = f_0 * dg_0[k]
+                 + f_1 * ff0_0[k]
+                 - f_2 * ff1_0[k]
+                 + pb_x[k] * fg_0[k];
+
+        t_1[k] = f_1 * ff0_1[k]
+                 - f_2 * ff1_1[k]
+                 + pb_y[k] * fg_1[k];
+
+        t_2[k] = f_1 * ff0_2[k]
+                 - f_2 * ff1_2[k]
+                 + pb_z[k] * fg_2[k];
+    }
+
+#pragma omp simd aligned(t_3, t_4, t_5, t_6, t_7, pa_x, pa_y, pa_z, pb_x, dg_1, dg_2, dg_3, \
+                         dh_0, dh_1, dh_2, fg_7 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_3[k] = pa_y[k] * dh_0[k];
+
+        t_4[k] = pa_z[k] * dh_0[k];
+
+        t_5[k] = f_0 * dg_1[k]
+                 + pa_x[k] * dh_1[k];
+
+        t_6[k] = f_3 * dg_2[k]
+                 + pa_x[k] * dh_2[k];
+
+        t_7[k] = f_4 * dg_3[k]
+                 + pb_x[k] * fg_7[k];
+    }
+
+#pragma omp simd aligned(t_8, t_9, t_10, t_11, t_12, pa_x, pb_x, dg_4, dg_5, dg_8, dh_4, dh_5, \
+                         dh_6, dh_11, fg_10 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_8[k] = pa_x[k] * dh_4[k];
+
+        t_9[k] = f_0 * dg_4[k]
+                 + pa_x[k] * dh_5[k];
+
+        t_10[k] = f_3 * dg_5[k]
+                  + pa_x[k] * dh_6[k];
+
+        t_11[k] = f_4 * dg_8[k]
+                  + pb_x[k] * fg_10[k];
+
+        t_12[k] = pa_x[k] * dh_11[k];
+    }
+
+#pragma omp simd aligned(t_13, t_14, t_15, t_16, pb_x, ff0_9, ff0_10, ff0_11, ff1_9, ff1_10, \
+                         ff1_11, fg_11, fg_12, fg_13, fg_14 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_13[k] = f_1 * ff0_9[k]
+                  - f_2 * ff1_9[k]
+                  + pb_x[k] * fg_11[k];
+
+        t_14[k] = f_5 * ff0_10[k]
+                  - f_6 * ff1_10[k]
+                  + pb_x[k] * fg_12[k];
+
+        t_15[k] = f_7 * ff0_11[k]
+                  - f_8 * ff1_11[k]
+                  + pb_x[k] * fg_13[k];
+
+        t_16[k] = pb_x[k] * fg_14[k];
+    }
+
+#pragma omp simd aligned(t_17, t_18, t_19, pa_z, pb_y, pb_z, dg_3, dh_4, ff0_11, ff0_12, \
+                         ff1_11, ff1_12, fg_14, fg_15 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_17[k] = f_0 * dg_3[k]
+                  + f_1 * ff0_11[k]
+                  - f_2 * ff1_11[k]
+                  + pb_y[k] * fg_14[k];
+
+        t_18[k] = f_1 * ff0_12[k]
+                  - f_2 * ff1_12[k]
+                  + pb_z[k] * fg_15[k];
+
+        t_19[k] = pa_z[k] * dh_4[k];
+    }
+
+#pragma omp simd aligned(t_20, t_21, t_22, t_23, pa_y, pb_y, dg_6, dg_7, dg_8, dh_8, dh_9, \
+                         dh_11, fg_19 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_20[k] = f_0 * dg_6[k]
+                  + pa_y[k] * dh_8[k];
+
+        t_21[k] = f_3 * dg_7[k]
+                  + pa_y[k] * dh_9[k];
+
+        t_22[k] = f_4 * dg_8[k]
+                  + pb_y[k] * fg_19[k];
+
+        t_23[k] = pa_y[k] * dh_11[k];
+    }
+
+#pragma omp simd aligned(t_24, t_25, t_26, t_27, pb_x, ff0_16, ff0_17, ff0_20, ff1_16, ff1_17, \
+                         ff1_20, fg_20, fg_21, fg_22, fg_26 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_24[k] = f_1 * ff0_16[k]
+                  - f_2 * ff1_16[k]
+                  + pb_x[k] * fg_20[k];
+
+        t_25[k] = f_5 * ff0_17[k]
+                  - f_6 * ff1_17[k]
+                  + pb_x[k] * fg_21[k];
+
+        t_26[k] = f_7 * ff0_20[k]
+                  - f_8 * ff1_20[k]
+                  + pb_x[k] * fg_22[k];
+
+        t_27[k] = pb_x[k] * fg_26[k];
+    }
+
+#pragma omp simd aligned(t_28, t_29, t_30, t_31, pb_y, ff0_18, ff0_19, ff0_20, ff1_18, ff1_19, \
+                         ff1_20, fg_23, fg_24, fg_25, fg_26 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_28[k] = f_1 * ff0_18[k]
+                  - f_2 * ff1_18[k]
+                  + pb_y[k] * fg_23[k];
+
+        t_29[k] = f_5 * ff0_19[k]
+                  - f_6 * ff1_19[k]
+                  + pb_y[k] * fg_24[k];
+
+        t_30[k] = f_7 * ff0_20[k]
+                  - f_8 * ff1_20[k]
+                  + pb_y[k] * fg_25[k];
+
+        t_31[k] = pb_y[k] * fg_26[k];
+    }
+
+#pragma omp simd aligned(t_32, pb_z, dg_8, ff0_20, ff1_20, fg_26 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_32[k] = f_0 * dg_8[k]
+                  + f_1 * ff0_20[k]
+                  - f_2 * ff1_20[k]
+                  + pb_z[k] * fg_26[k];
+    }
+}
+
+auto
+compute_prim_fh_electron_repulsion_54(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t pb, const size_t dg, const size_t dh,
+                                      const size_t ff0, const size_t ff1, const size_t fg,
+                                      const size_t ncols, const double alpha, const double beta,
+                                      const double p) -> void
+{
+    // NOTE: the factors are fixed by the pair of primitives, so they are formed
+    // once rather than for every atom pair the pair reaches.
+
+    const auto f_0 = 1.5 / p;
+    const auto f_1 = 2.0 / beta;
+    const auto f_2 = 2.0 * alpha / (beta * p);
+    const auto f_3 = 1.0 / p;
+    const auto f_4 = 0.5 / p;
+    const auto f_5 = 1.0 / beta;
+    const auto f_6 = alpha / (beta * p);
+    const auto f_7 = 0.5 / beta;
+    const auto f_8 = 0.5 * alpha / (beta * p);
+
+    auto *t_0 = buffer.data(target + 0);
+    auto *t_1 = buffer.data(target + 1);
+    auto *t_2 = buffer.data(target + 2);
+    auto *t_3 = buffer.data(target + 3);
+    auto *t_4 = buffer.data(target + 4);
+    auto *t_5 = buffer.data(target + 5);
+    auto *t_6 = buffer.data(target + 6);
+    auto *t_7 = buffer.data(target + 7);
+    auto *t_8 = buffer.data(target + 8);
+    auto *t_9 = buffer.data(target + 9);
+    auto *t_10 = buffer.data(target + 10);
+    auto *t_11 = buffer.data(target + 11);
+    auto *t_12 = buffer.data(target + 12);
+    auto *t_13 = buffer.data(target + 13);
+    auto *t_14 = buffer.data(target + 14);
+    auto *t_15 = buffer.data(target + 15);
+    auto *t_16 = buffer.data(target + 16);
+    auto *t_17 = buffer.data(target + 17);
+    auto *t_18 = buffer.data(target + 18);
+    auto *t_19 = buffer.data(target + 19);
+    auto *t_20 = buffer.data(target + 20);
+    auto *t_21 = buffer.data(target + 21);
+    auto *t_22 = buffer.data(target + 22);
+    auto *t_23 = buffer.data(target + 23);
+    auto *t_24 = buffer.data(target + 24);
+    auto *t_25 = buffer.data(target + 25);
+    auto *t_26 = buffer.data(target + 26);
+
+    const auto *pa_x = buffer.data(pa + 0);
+    const auto *pa_y = buffer.data(pa + 1);
+    const auto *pa_z = buffer.data(pa + 2);
+
+    const auto *pb_x = buffer.data(pb + 0);
+    const auto *pb_y = buffer.data(pb + 1);
+    const auto *pb_z = buffer.data(pb + 2);
+
+    const auto *dg_0 = buffer.data(dg + 0);
+    const auto *dg_1 = buffer.data(dg + 1);
+    const auto *dg_2 = buffer.data(dg + 2);
+    const auto *dg_3 = buffer.data(dg + 3);
+    const auto *dg_4 = buffer.data(dg + 4);
+    const auto *dg_5 = buffer.data(dg + 5);
+    const auto *dg_6 = buffer.data(dg + 6);
+    const auto *dg_7 = buffer.data(dg + 7);
+    const auto *dg_8 = buffer.data(dg + 8);
+
+    const auto *dh_0 = buffer.data(dh + 0);
+    const auto *dh_1 = buffer.data(dh + 1);
+    const auto *dh_2 = buffer.data(dh + 2);
+    const auto *dh_4 = buffer.data(dh + 4);
+    const auto *dh_5 = buffer.data(dh + 5);
+    const auto *dh_6 = buffer.data(dh + 6);
+    const auto *dh_8 = buffer.data(dh + 8);
+    const auto *dh_9 = buffer.data(dh + 9);
+    const auto *dh_11 = buffer.data(dh + 11);
+
+    const auto *ff0_0 = buffer.data(ff0 + 0);
+    const auto *ff0_10 = buffer.data(ff0 + 10);
+    const auto *ff0_11 = buffer.data(ff0 + 11);
+    const auto *ff0_17 = buffer.data(ff0 + 17);
+    const auto *ff0_19 = buffer.data(ff0 + 19);
+    const auto *ff0_20 = buffer.data(ff0 + 20);
+
+    const auto *ff1_0 = buffer.data(ff1 + 0);
+    const auto *ff1_10 = buffer.data(ff1 + 10);
+    const auto *ff1_11 = buffer.data(ff1 + 11);
+    const auto *ff1_17 = buffer.data(ff1 + 17);
+    const auto *ff1_19 = buffer.data(ff1 + 19);
+    const auto *ff1_20 = buffer.data(ff1 + 20);
+
+    const auto *fg_0 = buffer.data(fg + 0);
+    const auto *fg_5 = buffer.data(fg + 5);
+    const auto *fg_8 = buffer.data(fg + 8);
+    const auto *fg_9 = buffer.data(fg + 9);
+    const auto *fg_10 = buffer.data(fg + 10);
+    const auto *fg_11 = buffer.data(fg + 11);
+    const auto *fg_15 = buffer.data(fg + 15);
+    const auto *fg_16 = buffer.data(fg + 16);
+    const auto *fg_17 = buffer.data(fg + 17);
+    const auto *fg_18 = buffer.data(fg + 18);
+    const auto *fg_19 = buffer.data(fg + 19);
+    const auto *fg_20 = buffer.data(fg + 20);
+
+#pragma omp simd aligned(t_0, t_1, t_2, t_3, pa_x, pa_y, pa_z, pb_x, dg_0, dg_1, dh_0, dh_1, \
+                         ff0_0, ff1_0, fg_0 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_0[k] = f_0 * dg_0[k]
+                 + f_1 * ff0_0[k]
+                 - f_2 * ff1_0[k]
+                 + pb_x[k] * fg_0[k];
+
+        t_1[k] = pa_y[k] * dh_0[k];
+
+        t_2[k] = pa_z[k] * dh_0[k];
+
+        t_3[k] = f_0 * dg_1[k]
+                 + pa_x[k] * dh_1[k];
+    }
+
+#pragma omp simd aligned(t_4, t_5, t_6, t_7, t_8, pa_x, pb_x, dg_2, dg_3, dg_4, dg_5, dh_2, \
+                         dh_4, dh_5, dh_6, fg_5 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_4[k] = f_3 * dg_2[k]
+                 + pa_x[k] * dh_2[k];
+
+        t_5[k] = f_4 * dg_3[k]
+                 + pb_x[k] * fg_5[k];
+
+        t_6[k] = pa_x[k] * dh_4[k];
+
+        t_7[k] = f_0 * dg_4[k]
+                 + pa_x[k] * dh_5[k];
+
+        t_8[k] = f_3 * dg_5[k]
+                 + pa_x[k] * dh_6[k];
+    }
+
+#pragma omp simd aligned(t_9, t_10, t_11, t_12, pa_x, pb_x, dg_8, dh_11, ff0_10, ff0_11, \
+                         ff1_10, ff1_11, fg_8, fg_9, fg_10 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_9[k] = f_4 * dg_8[k]
+                 + pb_x[k] * fg_8[k];
+
+        t_10[k] = pa_x[k] * dh_11[k];
+
+        t_11[k] = f_5 * ff0_10[k]
+                  - f_6 * ff1_10[k]
+                  + pb_x[k] * fg_9[k];
+
+        t_12[k] = f_7 * ff0_11[k]
+                  - f_8 * ff1_11[k]
+                  + pb_x[k] * fg_10[k];
+    }
+
+#pragma omp simd aligned(t_13, t_14, t_15, t_16, pa_y, pa_z, pb_x, pb_y, dg_3, dg_6, dh_4, \
+                         dh_8, ff0_11, ff1_11, fg_11 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_13[k] = pb_x[k] * fg_11[k];
+
+        t_14[k] = f_0 * dg_3[k]
+                  + f_1 * ff0_11[k]
+                  - f_2 * ff1_11[k]
+                  + pb_y[k] * fg_11[k];
+
+        t_15[k] = pa_z[k] * dh_4[k];
+
+        t_16[k] = f_0 * dg_6[k]
+                  + pa_y[k] * dh_8[k];
+    }
+
+#pragma omp simd aligned(t_17, t_18, t_19, t_20, pa_y, pb_x, pb_y, dg_7, dg_8, dh_9, dh_11, \
+                         ff0_17, ff1_17, fg_15, fg_16 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_17[k] = f_3 * dg_7[k]
+                  + pa_y[k] * dh_9[k];
+
+        t_18[k] = f_4 * dg_8[k]
+                  + pb_y[k] * fg_15[k];
+
+        t_19[k] = pa_y[k] * dh_11[k];
+
+        t_20[k] = f_5 * ff0_17[k]
+                  - f_6 * ff1_17[k]
+                  + pb_x[k] * fg_16[k];
+    }
+
+#pragma omp simd aligned(t_21, t_22, t_23, t_24, t_25, pb_x, pb_y, ff0_19, ff0_20, ff1_19, \
+                         ff1_20, fg_17, fg_18, fg_19, fg_20 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_21[k] = f_7 * ff0_20[k]
+                  - f_8 * ff1_20[k]
+                  + pb_x[k] * fg_17[k];
+
+        t_22[k] = pb_x[k] * fg_20[k];
+
+        t_23[k] = f_5 * ff0_19[k]
+                  - f_6 * ff1_19[k]
+                  + pb_y[k] * fg_18[k];
+
+        t_24[k] = f_7 * ff0_20[k]
+                  - f_8 * ff1_20[k]
+                  + pb_y[k] * fg_19[k];
+
+        t_25[k] = pb_y[k] * fg_20[k];
+    }
+
+#pragma omp simd aligned(t_26, pb_z, dg_8, ff0_20, ff1_20, fg_20 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_26[k] = f_0 * dg_8[k]
+                  + f_1 * ff0_20[k]
+                  - f_2 * ff1_20[k]
+                  + pb_z[k] * fg_20[k];
+    }
+}
+
+auto
+compute_prim_fh_electron_repulsion_55(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t pb, const size_t dg, const size_t dh,
+                                      const size_t ff0, const size_t ff1, const size_t fg,
+                                      const size_t ncols, const double alpha, const double beta,
+                                      const double p) -> void
+{
+    // NOTE: the factors are fixed by the pair of primitives, so they are formed
+    // once rather than for every atom pair the pair reaches.
+
+    const auto f_0 = 1.5 / p;
+    const auto f_1 = 2.0 / beta;
+    const auto f_2 = 2.0 * alpha / (beta * p);
+
+    auto *t_0 = buffer.data(target + 0);
+    auto *t_1 = buffer.data(target + 1);
+    auto *t_2 = buffer.data(target + 2);
+    auto *t_3 = buffer.data(target + 3);
+    auto *t_4 = buffer.data(target + 4);
+    auto *t_5 = buffer.data(target + 5);
+    auto *t_6 = buffer.data(target + 6);
+    auto *t_7 = buffer.data(target + 7);
+    auto *t_8 = buffer.data(target + 8);
+
+    const auto *pa_x = buffer.data(pa + 0);
+    const auto *pa_y = buffer.data(pa + 1);
+    const auto *pa_z = buffer.data(pa + 2);
+
+    const auto *pb_x = buffer.data(pb + 0);
+    const auto *pb_y = buffer.data(pb + 1);
+    const auto *pb_z = buffer.data(pb + 2);
+
+    const auto *dg_0 = buffer.data(dg + 0);
+    const auto *dg_2 = buffer.data(dg + 2);
+    const auto *dg_5 = buffer.data(dg + 5);
+
+    const auto *dh_0 = buffer.data(dh + 0);
+    const auto *dh_1 = buffer.data(dh + 1);
+    const auto *dh_2 = buffer.data(dh + 2);
+
+    const auto *ff0_0 = buffer.data(ff0 + 0);
+    const auto *ff0_7 = buffer.data(ff0 + 7);
+    const auto *ff0_11 = buffer.data(ff0 + 11);
+
+    const auto *ff1_0 = buffer.data(ff1 + 0);
+    const auto *ff1_8 = buffer.data(ff1 + 8);
+    const auto *ff1_14 = buffer.data(ff1 + 14);
+
+    const auto *fg_0 = buffer.data(fg + 0);
+    const auto *fg_10 = buffer.data(fg + 10);
+    const auto *fg_17 = buffer.data(fg + 17);
+
+#pragma omp simd aligned(t_0, t_1, t_2, t_3, t_4, pa_x, pa_y, pa_z, pb_x, dg_0, dh_0, dh_1, \
+                         dh_2, ff0_0, ff1_0, fg_0 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_0[k] = f_0 * dg_0[k]
+                 + f_1 * ff0_0[k]
+                 - f_2 * ff1_0[k]
+                 + pb_x[k] * fg_0[k];
+
+        t_1[k] = pa_y[k] * dh_0[k];
+
+        t_2[k] = pa_z[k] * dh_0[k];
+
+        t_3[k] = pa_x[k] * dh_1[k];
+
+        t_4[k] = pa_x[k] * dh_2[k];
+    }
+
+#pragma omp simd aligned(t_5, t_6, t_7, pa_y, pa_z, pb_y, dg_2, dh_1, dh_2, ff0_7, ff1_8, \
+                         fg_10 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_5[k] = f_0 * dg_2[k]
+                 + f_1 * ff0_7[k]
+                 - f_2 * ff1_8[k]
+                 + pb_y[k] * fg_10[k];
+
+        t_6[k] = pa_z[k] * dh_1[k];
+
+        t_7[k] = pa_y[k] * dh_2[k];
+    }
+
+#pragma omp simd aligned(t_8, pb_z, dg_5, ff0_11, ff1_14, fg_17 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_8[k] = f_0 * dg_5[k]
+                 + f_1 * ff0_11[k]
+                 - f_2 * ff1_14[k]
+                 + pb_z[k] * fg_17[k];
+    }
+}
+
+auto
+compute_prim_fh_electron_repulsion_56(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t pb, const size_t dg, const size_t dh,
+                                      const size_t ff0, const size_t ff1, const size_t fg,
+                                      const size_t ncols, const double alpha, const double beta,
+                                      const double p) -> void
+{
+    // NOTE: the factors are fixed by the pair of primitives, so they are formed
+    // once rather than for every atom pair the pair reaches.
+
+    const auto f_0 = 1.5 / p;
+    const auto f_1 = 2.0 / beta;
+    const auto f_2 = 2.0 * alpha / (beta * p);
+
+    auto *t_0 = buffer.data(target + 0);
+    auto *t_1 = buffer.data(target + 1);
+    auto *t_2 = buffer.data(target + 2);
+    auto *t_3 = buffer.data(target + 3);
+    auto *t_4 = buffer.data(target + 4);
+    auto *t_5 = buffer.data(target + 5);
+    auto *t_6 = buffer.data(target + 6);
+    auto *t_7 = buffer.data(target + 7);
+    auto *t_8 = buffer.data(target + 8);
+
+    const auto *pa_x = buffer.data(pa + 0);
+    const auto *pa_y = buffer.data(pa + 1);
+    const auto *pa_z = buffer.data(pa + 2);
+
+    const auto *pb_x = buffer.data(pb + 0);
+    const auto *pb_y = buffer.data(pb + 1);
+    const auto *pb_z = buffer.data(pb + 2);
+
+    const auto *dg_0 = buffer.data(dg + 0);
+    const auto *dg_2 = buffer.data(dg + 2);
+    const auto *dg_5 = buffer.data(dg + 5);
+
+    const auto *dh_0 = buffer.data(dh + 0);
+    const auto *dh_1 = buffer.data(dh + 1);
+    const auto *dh_2 = buffer.data(dh + 2);
+
+    const auto *ff0_0 = buffer.data(ff0 + 0);
+    const auto *ff0_8 = buffer.data(ff0 + 8);
+    const auto *ff0_14 = buffer.data(ff0 + 14);
+
+    const auto *ff1_0 = buffer.data(ff1 + 0);
+    const auto *ff1_8 = buffer.data(ff1 + 8);
+    const auto *ff1_14 = buffer.data(ff1 + 14);
+
+    const auto *fg_0 = buffer.data(fg + 0);
+    const auto *fg_5 = buffer.data(fg + 5);
+    const auto *fg_8 = buffer.data(fg + 8);
+
+#pragma omp simd aligned(t_0, t_1, t_2, t_3, t_4, pa_x, pa_y, pa_z, pb_x, dg_0, dh_0, dh_1, \
+                         dh_2, ff0_0, ff1_0, fg_0 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_0[k] = f_0 * dg_0[k]
+                 + f_1 * ff0_0[k]
+                 - f_2 * ff1_0[k]
+                 + pb_x[k] * fg_0[k];
+
+        t_1[k] = pa_y[k] * dh_0[k];
+
+        t_2[k] = pa_z[k] * dh_0[k];
+
+        t_3[k] = pa_x[k] * dh_1[k];
+
+        t_4[k] = pa_x[k] * dh_2[k];
+    }
+
+#pragma omp simd aligned(t_5, t_6, t_7, pa_y, pa_z, pb_y, dg_2, dh_1, dh_2, ff0_8, ff1_8, \
+                         fg_5 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_5[k] = f_0 * dg_2[k]
+                 + f_1 * ff0_8[k]
+                 - f_2 * ff1_8[k]
+                 + pb_y[k] * fg_5[k];
+
+        t_6[k] = pa_z[k] * dh_1[k];
+
+        t_7[k] = pa_y[k] * dh_2[k];
+    }
+
+#pragma omp simd aligned(t_8, pb_z, dg_5, ff0_14, ff1_14, fg_8 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_8[k] = f_0 * dg_5[k]
+                 + f_1 * ff0_14[k]
+                 - f_2 * ff1_14[k]
+                 + pb_z[k] * fg_8[k];
+    }
+}
+
+auto
+compute_prim_fh_electron_repulsion_57(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t pb, const size_t dg, const size_t dh,
+                                      const size_t ff0, const size_t ff1, const size_t fg,
+                                      const size_t ncols, const double alpha, const double beta,
+                                      const double p) -> void
+{
+    // NOTE: the factors are fixed by the pair of primitives, so they are formed
+    // once rather than for every atom pair the pair reaches.
+
+    const auto f_0 = 1.5 / p;
+    const auto f_1 = 2.0 / beta;
+    const auto f_2 = 2.0 * alpha / (beta * p);
+    const auto f_3 = 1.0 / p;
+    const auto f_4 = 0.5 / p;
+
+    auto *t_0 = buffer.data(target + 0);
+    auto *t_1 = buffer.data(target + 1);
+    auto *t_2 = buffer.data(target + 2);
+    auto *t_3 = buffer.data(target + 3);
+    auto *t_4 = buffer.data(target + 4);
+    auto *t_5 = buffer.data(target + 5);
+    auto *t_6 = buffer.data(target + 6);
+    auto *t_7 = buffer.data(target + 7);
+    auto *t_8 = buffer.data(target + 8);
+    auto *t_9 = buffer.data(target + 9);
+    auto *t_10 = buffer.data(target + 10);
+    auto *t_11 = buffer.data(target + 11);
+    auto *t_12 = buffer.data(target + 12);
+    auto *t_13 = buffer.data(target + 13);
+    auto *t_14 = buffer.data(target + 14);
+    auto *t_15 = buffer.data(target + 15);
+    auto *t_16 = buffer.data(target + 16);
+    auto *t_17 = buffer.data(target + 17);
+
+    const auto *pa_x = buffer.data(pa + 0);
+    const auto *pa_y = buffer.data(pa + 1);
+    const auto *pa_z = buffer.data(pa + 2);
+
+    const auto *pb_x = buffer.data(pb + 0);
+    const auto *pb_y = buffer.data(pb + 1);
+    const auto *pb_z = buffer.data(pb + 2);
+
+    const auto *dg_0 = buffer.data(dg + 0);
+    const auto *dg_1 = buffer.data(dg + 1);
+    const auto *dg_2 = buffer.data(dg + 2);
+    const auto *dg_3 = buffer.data(dg + 3);
+    const auto *dg_4 = buffer.data(dg + 4);
+    const auto *dg_5 = buffer.data(dg + 5);
+    const auto *dg_6 = buffer.data(dg + 6);
+    const auto *dg_7 = buffer.data(dg + 7);
+    const auto *dg_8 = buffer.data(dg + 8);
+
+    const auto *dh_0 = buffer.data(dh + 0);
+    const auto *dh_1 = buffer.data(dh + 1);
+    const auto *dh_2 = buffer.data(dh + 2);
+    const auto *dh_3 = buffer.data(dh + 3);
+    const auto *dh_4 = buffer.data(dh + 4);
+    const auto *dh_5 = buffer.data(dh + 5);
+    const auto *dh_6 = buffer.data(dh + 6);
+    const auto *dh_7 = buffer.data(dh + 7);
+    const auto *dh_8 = buffer.data(dh + 8);
+
+    const auto *ff0_0 = buffer.data(ff0 + 0);
+    const auto *ff0_7 = buffer.data(ff0 + 7);
+    const auto *ff0_11 = buffer.data(ff0 + 11);
+
+    const auto *ff1_0 = buffer.data(ff1 + 0);
+    const auto *ff1_8 = buffer.data(ff1 + 8);
+    const auto *ff1_14 = buffer.data(ff1 + 14);
+
+    const auto *fg_0 = buffer.data(fg + 0);
+    const auto *fg_5 = buffer.data(fg + 5);
+    const auto *fg_8 = buffer.data(fg + 8);
+    const auto *fg_11 = buffer.data(fg + 11);
+    const auto *fg_15 = buffer.data(fg + 15);
+    const auto *fg_20 = buffer.data(fg + 20);
+
+#pragma omp simd aligned(t_0, t_1, t_2, t_3, pa_x, pa_y, pa_z, pb_x, dg_0, dg_1, dh_0, dh_1, \
+                         ff0_0, ff1_0, fg_0 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_0[k] = f_0 * dg_0[k]
+                 + f_1 * ff0_0[k]
+                 - f_2 * ff1_0[k]
+                 + pb_x[k] * fg_0[k];
+
+        t_1[k] = pa_y[k] * dh_0[k];
+
+        t_2[k] = pa_z[k] * dh_0[k];
+
+        t_3[k] = f_0 * dg_1[k]
+                 + pa_x[k] * dh_1[k];
+    }
+
+#pragma omp simd aligned(t_4, t_5, t_6, t_7, t_8, pa_x, pb_x, dg_2, dg_3, dg_4, dg_5, dh_2, \
+                         dh_3, dh_4, dh_5, fg_5 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_4[k] = f_3 * dg_2[k]
+                 + pa_x[k] * dh_2[k];
+
+        t_5[k] = f_4 * dg_3[k]
+                 + pb_x[k] * fg_5[k];
+
+        t_6[k] = pa_x[k] * dh_3[k];
+
+        t_7[k] = f_0 * dg_4[k]
+                 + pa_x[k] * dh_4[k];
+
+        t_8[k] = f_3 * dg_5[k]
+                 + pa_x[k] * dh_5[k];
+    }
+
+#pragma omp simd aligned(t_9, t_10, t_11, t_12, pa_x, pa_z, pb_x, pb_y, dg_3, dg_8, dh_3, \
+                         dh_8, ff0_7, ff1_8, fg_8, fg_11 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_9[k] = f_4 * dg_8[k]
+                 + pb_x[k] * fg_8[k];
+
+        t_10[k] = pa_x[k] * dh_8[k];
+
+        t_11[k] = f_0 * dg_3[k]
+                  + f_1 * ff0_7[k]
+                  - f_2 * ff1_8[k]
+                  + pb_y[k] * fg_11[k];
+
+        t_12[k] = pa_z[k] * dh_3[k];
+    }
+
+#pragma omp simd aligned(t_13, t_14, t_15, t_16, pa_y, pb_y, dg_6, dg_7, dg_8, dh_6, dh_7, \
+                         dh_8, fg_15 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_13[k] = f_0 * dg_6[k]
+                  + pa_y[k] * dh_6[k];
+
+        t_14[k] = f_3 * dg_7[k]
+                  + pa_y[k] * dh_7[k];
+
+        t_15[k] = f_4 * dg_8[k]
+                  + pb_y[k] * fg_15[k];
+
+        t_16[k] = pa_y[k] * dh_8[k];
+    }
+
+#pragma omp simd aligned(t_17, pb_z, dg_8, ff0_11, ff1_14, fg_20 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_17[k] = f_0 * dg_8[k]
+                  + f_1 * ff0_11[k]
+                  - f_2 * ff1_14[k]
+                  + pb_z[k] * fg_20[k];
+    }
+}
+
+auto
+compute_prim_fh_electron_repulsion_58(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t pb, const size_t dg, const size_t dh,
+                                      const size_t ff0, const size_t ff1, const size_t fg,
+                                      const size_t ncols, const double alpha, const double beta,
+                                      const double p) -> void
+{
+    // NOTE: the factors are fixed by the pair of primitives, so they are formed
+    // once rather than for every atom pair the pair reaches.
+
+    const auto f_0 = 1.5 / p;
+    const auto f_1 = 2.0 / beta;
+    const auto f_2 = 2.0 * alpha / (beta * p);
+
+    auto *t_0 = buffer.data(target + 0);
+    auto *t_1 = buffer.data(target + 1);
+    auto *t_2 = buffer.data(target + 2);
+    auto *t_3 = buffer.data(target + 3);
+    auto *t_4 = buffer.data(target + 4);
+    auto *t_5 = buffer.data(target + 5);
+    auto *t_6 = buffer.data(target + 6);
+    auto *t_7 = buffer.data(target + 7);
+    auto *t_8 = buffer.data(target + 8);
+
+    const auto *pa_x = buffer.data(pa + 0);
+    const auto *pa_y = buffer.data(pa + 1);
+    const auto *pa_z = buffer.data(pa + 2);
+
+    const auto *pb_x = buffer.data(pb + 0);
+    const auto *pb_y = buffer.data(pb + 1);
+    const auto *pb_z = buffer.data(pb + 2);
+
+    const auto *dg_0 = buffer.data(dg + 0);
+    const auto *dg_3 = buffer.data(dg + 3);
+    const auto *dg_8 = buffer.data(dg + 8);
+
+    const auto *dh_0 = buffer.data(dh + 0);
+    const auto *dh_1 = buffer.data(dh + 1);
+    const auto *dh_2 = buffer.data(dh + 2);
+
+    const auto *ff0_0 = buffer.data(ff0 + 0);
+    const auto *ff0_8 = buffer.data(ff0 + 8);
+    const auto *ff0_14 = buffer.data(ff0 + 14);
+
+    const auto *ff1_0 = buffer.data(ff1 + 0);
+    const auto *ff1_8 = buffer.data(ff1 + 8);
+    const auto *ff1_14 = buffer.data(ff1 + 14);
+
+    const auto *fg_0 = buffer.data(fg + 0);
+    const auto *fg_5 = buffer.data(fg + 5);
+    const auto *fg_8 = buffer.data(fg + 8);
+
+#pragma omp simd aligned(t_0, t_1, t_2, t_3, t_4, pa_x, pa_y, pa_z, pb_x, dg_0, dh_0, dh_1, \
+                         dh_2, ff0_0, ff1_0, fg_0 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_0[k] = f_0 * dg_0[k]
+                 + f_1 * ff0_0[k]
+                 - f_2 * ff1_0[k]
+                 + pb_x[k] * fg_0[k];
+
+        t_1[k] = pa_y[k] * dh_0[k];
+
+        t_2[k] = pa_z[k] * dh_0[k];
+
+        t_3[k] = pa_x[k] * dh_1[k];
+
+        t_4[k] = pa_x[k] * dh_2[k];
+    }
+
+#pragma omp simd aligned(t_5, t_6, t_7, pa_y, pa_z, pb_y, dg_3, dh_1, dh_2, ff0_8, ff1_8, \
+                         fg_5 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_5[k] = f_0 * dg_3[k]
+                 + f_1 * ff0_8[k]
+                 - f_2 * ff1_8[k]
+                 + pb_y[k] * fg_5[k];
+
+        t_6[k] = pa_z[k] * dh_1[k];
+
+        t_7[k] = pa_y[k] * dh_2[k];
+    }
+
+#pragma omp simd aligned(t_8, pb_z, dg_8, ff0_14, ff1_14, fg_8 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_8[k] = f_0 * dg_8[k]
+                 + f_1 * ff0_14[k]
+                 - f_2 * ff1_14[k]
+                 + pb_z[k] * fg_8[k];
+    }
+}
+
+auto
+compute_prim_fh_electron_repulsion_59(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t pb, const size_t dg, const size_t dh,
+                                      const size_t ff0, const size_t ff1, const size_t fg,
+                                      const size_t ncols, const double alpha, const double beta,
+                                      const double p) -> void
+{
+    // NOTE: the factors are fixed by the pair of primitives, so they are formed
+    // once rather than for every atom pair the pair reaches.
+
+    const auto f_0 = 1.5 / p;
+    const auto f_1 = 2.0 / beta;
+    const auto f_2 = 2.0 * alpha / (beta * p);
+    const auto f_3 = 1.0 / p;
+    const auto f_4 = 0.5 / p;
+
+    auto *t_0 = buffer.data(target + 0);
+    auto *t_1 = buffer.data(target + 1);
+    auto *t_2 = buffer.data(target + 2);
+    auto *t_3 = buffer.data(target + 3);
+    auto *t_4 = buffer.data(target + 4);
+    auto *t_5 = buffer.data(target + 5);
+    auto *t_6 = buffer.data(target + 6);
+    auto *t_7 = buffer.data(target + 7);
+    auto *t_8 = buffer.data(target + 8);
+    auto *t_9 = buffer.data(target + 9);
+    auto *t_10 = buffer.data(target + 10);
+    auto *t_11 = buffer.data(target + 11);
+    auto *t_12 = buffer.data(target + 12);
+    auto *t_13 = buffer.data(target + 13);
+    auto *t_14 = buffer.data(target + 14);
+    auto *t_15 = buffer.data(target + 15);
+    auto *t_16 = buffer.data(target + 16);
+    auto *t_17 = buffer.data(target + 17);
+
+    const auto *pa_x = buffer.data(pa + 0);
+    const auto *pa_y = buffer.data(pa + 1);
+    const auto *pa_z = buffer.data(pa + 2);
+
+    const auto *pb_x = buffer.data(pb + 0);
+    const auto *pb_y = buffer.data(pb + 1);
+    const auto *pb_z = buffer.data(pb + 2);
+
+    const auto *dg_0 = buffer.data(dg + 0);
+    const auto *dg_1 = buffer.data(dg + 1);
+    const auto *dg_2 = buffer.data(dg + 2);
+    const auto *dg_3 = buffer.data(dg + 3);
+    const auto *dg_4 = buffer.data(dg + 4);
+    const auto *dg_5 = buffer.data(dg + 5);
+    const auto *dg_6 = buffer.data(dg + 6);
+    const auto *dg_7 = buffer.data(dg + 7);
+    const auto *dg_8 = buffer.data(dg + 8);
+
+    const auto *dh_0 = buffer.data(dh + 0);
+    const auto *dh_1 = buffer.data(dh + 1);
+    const auto *dh_2 = buffer.data(dh + 2);
+    const auto *dh_4 = buffer.data(dh + 4);
+    const auto *dh_5 = buffer.data(dh + 5);
+    const auto *dh_6 = buffer.data(dh + 6);
+    const auto *dh_8 = buffer.data(dh + 8);
+    const auto *dh_9 = buffer.data(dh + 9);
+    const auto *dh_11 = buffer.data(dh + 11);
+
+    const auto *ff0_0 = buffer.data(ff0 + 0);
+    const auto *ff0_7 = buffer.data(ff0 + 7);
+    const auto *ff0_11 = buffer.data(ff0 + 11);
+
+    const auto *ff1_0 = buffer.data(ff1 + 0);
+    const auto *ff1_8 = buffer.data(ff1 + 8);
+    const auto *ff1_14 = buffer.data(ff1 + 14);
+
+    const auto *fg_0 = buffer.data(fg + 0);
+    const auto *fg_5 = buffer.data(fg + 5);
+    const auto *fg_8 = buffer.data(fg + 8);
+    const auto *fg_11 = buffer.data(fg + 11);
+    const auto *fg_15 = buffer.data(fg + 15);
+    const auto *fg_20 = buffer.data(fg + 20);
+
+#pragma omp simd aligned(t_0, t_1, t_2, t_3, pa_x, pa_y, pa_z, pb_x, dg_0, dg_1, dh_0, dh_1, \
+                         ff0_0, ff1_0, fg_0 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_0[k] = f_0 * dg_0[k]
+                 + f_1 * ff0_0[k]
+                 - f_2 * ff1_0[k]
+                 + pb_x[k] * fg_0[k];
+
+        t_1[k] = pa_y[k] * dh_0[k];
+
+        t_2[k] = pa_z[k] * dh_0[k];
+
+        t_3[k] = f_0 * dg_1[k]
+                 + pa_x[k] * dh_1[k];
+    }
+
+#pragma omp simd aligned(t_4, t_5, t_6, t_7, t_8, pa_x, pb_x, dg_2, dg_3, dg_4, dg_5, dh_2, \
+                         dh_4, dh_5, dh_6, fg_5 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_4[k] = f_3 * dg_2[k]
+                 + pa_x[k] * dh_2[k];
+
+        t_5[k] = f_4 * dg_3[k]
+                 + pb_x[k] * fg_5[k];
+
+        t_6[k] = pa_x[k] * dh_4[k];
+
+        t_7[k] = f_0 * dg_4[k]
+                 + pa_x[k] * dh_5[k];
+
+        t_8[k] = f_3 * dg_5[k]
+                 + pa_x[k] * dh_6[k];
+    }
+
+#pragma omp simd aligned(t_9, t_10, t_11, t_12, pa_x, pa_z, pb_x, pb_y, dg_3, dg_8, dh_4, \
+                         dh_11, ff0_7, ff1_8, fg_8, fg_11 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_9[k] = f_4 * dg_8[k]
+                 + pb_x[k] * fg_8[k];
+
+        t_10[k] = pa_x[k] * dh_11[k];
+
+        t_11[k] = f_0 * dg_3[k]
+                  + f_1 * ff0_7[k]
+                  - f_2 * ff1_8[k]
+                  + pb_y[k] * fg_11[k];
+
+        t_12[k] = pa_z[k] * dh_4[k];
+    }
+
+#pragma omp simd aligned(t_13, t_14, t_15, t_16, pa_y, pb_y, dg_6, dg_7, dg_8, dh_8, dh_9, \
+                         dh_11, fg_15 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_13[k] = f_0 * dg_6[k]
+                  + pa_y[k] * dh_8[k];
+
+        t_14[k] = f_3 * dg_7[k]
+                  + pa_y[k] * dh_9[k];
+
+        t_15[k] = f_4 * dg_8[k]
+                  + pb_y[k] * fg_15[k];
+
+        t_16[k] = pa_y[k] * dh_11[k];
+    }
+
+#pragma omp simd aligned(t_17, pb_z, dg_8, ff0_11, ff1_14, fg_20 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_17[k] = f_0 * dg_8[k]
+                  + f_1 * ff0_11[k]
+                  - f_2 * ff1_14[k]
+                  + pb_z[k] * fg_20[k];
     }
 }
 

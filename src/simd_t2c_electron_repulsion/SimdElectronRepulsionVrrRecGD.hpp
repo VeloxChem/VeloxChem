@@ -318,6 +318,96 @@ compute_prim_gd_electron_repulsion_30(CSimdMatrix &buffer, const size_t target, 
                                       const double alpha, const double beta,
                                       const double p) -> void;
 
+/// @brief Takes one step of the recurrence for one pair of primitives.
+auto
+compute_prim_gd_electron_repulsion_31(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t pb, const size_t dd0, const size_t dd1,
+                                      const size_t fp, const size_t fd, const size_t gs0,
+                                      const size_t gs1, const size_t gp, const size_t ncols,
+                                      const double alpha, const double beta,
+                                      const double p) -> void;
+
+/// @brief Takes one step of the recurrence for one pair of primitives.
+auto
+compute_prim_gd_electron_repulsion_32(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t pb, const size_t dd0, const size_t dd1,
+                                      const size_t fp, const size_t fd, const size_t gs0,
+                                      const size_t gs1, const size_t gp, const size_t ncols,
+                                      const double alpha, const double beta,
+                                      const double p) -> void;
+
+/// @brief Takes one step of the recurrence for one pair of primitives.
+auto
+compute_prim_gd_electron_repulsion_33(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t pb, const size_t dd0, const size_t dd1,
+                                      const size_t fp, const size_t fd, const size_t gs0,
+                                      const size_t gs1, const size_t gp, const size_t ncols,
+                                      const double alpha, const double beta,
+                                      const double p) -> void;
+
+/// @brief Takes one step of the recurrence for one pair of primitives.
+auto
+compute_prim_gd_electron_repulsion_34(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t pb, const size_t dd0, const size_t dd1,
+                                      const size_t fp, const size_t fd, const size_t gs0,
+                                      const size_t gs1, const size_t gp, const size_t ncols,
+                                      const double alpha, const double beta,
+                                      const double p) -> void;
+
+/// @brief Takes one step of the recurrence for one pair of primitives.
+auto
+compute_prim_gd_electron_repulsion_35(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t pb, const size_t dd0, const size_t dd1,
+                                      const size_t fp, const size_t fd, const size_t gs0,
+                                      const size_t gs1, const size_t gp, const size_t ncols,
+                                      const double alpha, const double beta,
+                                      const double p) -> void;
+
+/// @brief Takes one step of the recurrence for one pair of primitives.
+auto
+compute_prim_gd_electron_repulsion_36(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t pb, const size_t dd0, const size_t dd1,
+                                      const size_t fp, const size_t fd, const size_t gs0,
+                                      const size_t gs1, const size_t gp, const size_t ncols,
+                                      const double alpha, const double beta,
+                                      const double p) -> void;
+
+/// @brief Takes one step of the recurrence for one pair of primitives.
+auto
+compute_prim_gd_electron_repulsion_37(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t pb, const size_t dd0, const size_t dd1,
+                                      const size_t fp, const size_t fd, const size_t gs0,
+                                      const size_t gs1, const size_t gp, const size_t ncols,
+                                      const double alpha, const double beta,
+                                      const double p) -> void;
+
+/// @brief Takes one step of the recurrence for one pair of primitives.
+auto
+compute_prim_gd_electron_repulsion_38(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t pb, const size_t dd0, const size_t dd1,
+                                      const size_t fp, const size_t fd, const size_t gs0,
+                                      const size_t gs1, const size_t gp, const size_t ncols,
+                                      const double alpha, const double beta,
+                                      const double p) -> void;
+
+/// @brief Takes one step of the recurrence for one pair of primitives.
+auto
+compute_prim_gd_electron_repulsion_39(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t pb, const size_t dd0, const size_t dd1,
+                                      const size_t fp, const size_t fd, const size_t gs0,
+                                      const size_t gs1, const size_t gp, const size_t ncols,
+                                      const double alpha, const double beta,
+                                      const double p) -> void;
+
+/// @brief Takes one step of the recurrence for one pair of primitives.
+auto
+compute_prim_gd_electron_repulsion_40(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t pb, const size_t dd0, const size_t dd1,
+                                      const size_t fp, const size_t fd, const size_t gs0,
+                                      const size_t gs1, const size_t gp, const size_t ncols,
+                                      const double alpha, const double beta,
+                                      const double p) -> void;
+
 }  // namespace simdt2ceri
 
 #endif /* SimdElectronRepulsionVrrRecGD_hpp */

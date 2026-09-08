@@ -149,7 +149,7 @@ compute_ph_electron_repulsion(double               *values,
 
             compute_prim_pg_electron_repulsion_1(buffer, 91, 0, 3, 46, 82, 61, ncols, p);
 
-            compute_prim_sh_electron_repulsion_1(buffer, 118, 3, 40, 46, 82, ncols, alpha, beta, p);
+            compute_prim_sh_electron_repulsion_2(buffer, 118, 3, 40, 46, 82, ncols, alpha, beta, p);
 
             compute_prim_ph_electron_repulsion_0(buffer, 127, 0, 3, 70, 118, 91, ncols, p);
 

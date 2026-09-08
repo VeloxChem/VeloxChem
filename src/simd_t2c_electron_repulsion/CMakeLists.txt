@@ -5,12 +5,16 @@ target_sources(vlxobjs
     SimdElectronRepulsionCtrVrrGS.cpp
     SimdElectronRepulsionCtrVrrHS.cpp
     SimdElectronRepulsionCtrVrrIS.cpp
+    SimdElectronRepulsionCtrVrrKS.cpp
+    SimdElectronRepulsionCtrVrrLS.cpp
     SimdElectronRepulsionCtrVrrPS.cpp
     SimdElectronRepulsionCtrVrrSD.cpp
     SimdElectronRepulsionCtrVrrSF.cpp
     SimdElectronRepulsionCtrVrrSG.cpp
     SimdElectronRepulsionCtrVrrSH.cpp
     SimdElectronRepulsionCtrVrrSI.cpp
+    SimdElectronRepulsionCtrVrrSK.cpp
+    SimdElectronRepulsionCtrVrrSL.cpp
     SimdElectronRepulsionCtrVrrSP.cpp
     SimdElectronRepulsionCtrVrrSS.cpp
     SimdElectronRepulsionRecDD.cpp
@@ -18,6 +22,8 @@ target_sources(vlxobjs
     SimdElectronRepulsionRecDG.cpp
     SimdElectronRepulsionRecDH.cpp
     SimdElectronRepulsionRecDI.cpp
+    SimdElectronRepulsionRecDK.cpp
+    SimdElectronRepulsionRecDL.cpp
     SimdElectronRepulsionRecDP.cpp
     SimdElectronRepulsionRecDS.cpp
     SimdElectronRepulsionRecFD.cpp
@@ -25,6 +31,8 @@ target_sources(vlxobjs
     SimdElectronRepulsionRecFG.cpp
     SimdElectronRepulsionRecFH.cpp
     SimdElectronRepulsionRecFI.cpp
+    SimdElectronRepulsionRecFK.cpp
+    SimdElectronRepulsionRecFL.cpp
     SimdElectronRepulsionRecFP.cpp
     SimdElectronRepulsionRecFS.cpp
     SimdElectronRepulsionRecGD.cpp
@@ -32,6 +40,8 @@ target_sources(vlxobjs
     SimdElectronRepulsionRecGG.cpp
     SimdElectronRepulsionRecGH.cpp
     SimdElectronRepulsionRecGI.cpp
+    SimdElectronRepulsionRecGK.cpp
+    SimdElectronRepulsionRecGL.cpp
     SimdElectronRepulsionRecGP.cpp
     SimdElectronRepulsionRecGS.cpp
     SimdElectronRepulsionRecHD.cpp
@@ -39,6 +49,8 @@ target_sources(vlxobjs
     SimdElectronRepulsionRecHG.cpp
     SimdElectronRepulsionRecHH.cpp
     SimdElectronRepulsionRecHI.cpp
+    SimdElectronRepulsionRecHK.cpp
+    SimdElectronRepulsionRecHL.cpp
     SimdElectronRepulsionRecHP.cpp
     SimdElectronRepulsionRecHS.cpp
     SimdElectronRepulsionRecID.cpp
@@ -46,13 +58,35 @@ target_sources(vlxobjs
     SimdElectronRepulsionRecIG.cpp
     SimdElectronRepulsionRecIH.cpp
     SimdElectronRepulsionRecII.cpp
+    SimdElectronRepulsionRecIK.cpp
+    SimdElectronRepulsionRecIL.cpp
     SimdElectronRepulsionRecIP.cpp
     SimdElectronRepulsionRecIS.cpp
+    SimdElectronRepulsionRecKD.cpp
+    SimdElectronRepulsionRecKF.cpp
+    SimdElectronRepulsionRecKG.cpp
+    SimdElectronRepulsionRecKH.cpp
+    SimdElectronRepulsionRecKI.cpp
+    SimdElectronRepulsionRecKK.cpp
+    SimdElectronRepulsionRecKL.cpp
+    SimdElectronRepulsionRecKP.cpp
+    SimdElectronRepulsionRecKS.cpp
+    SimdElectronRepulsionRecLD.cpp
+    SimdElectronRepulsionRecLF.cpp
+    SimdElectronRepulsionRecLG.cpp
+    SimdElectronRepulsionRecLH.cpp
+    SimdElectronRepulsionRecLI.cpp
+    SimdElectronRepulsionRecLK.cpp
+    SimdElectronRepulsionRecLL.cpp
+    SimdElectronRepulsionRecLP.cpp
+    SimdElectronRepulsionRecLS.cpp
     SimdElectronRepulsionRecPD.cpp
     SimdElectronRepulsionRecPF.cpp
     SimdElectronRepulsionRecPG.cpp
     SimdElectronRepulsionRecPH.cpp
     SimdElectronRepulsionRecPI.cpp
+    SimdElectronRepulsionRecPK.cpp
+    SimdElectronRepulsionRecPL.cpp
     SimdElectronRepulsionRecPP.cpp
     SimdElectronRepulsionRecPS.cpp
     SimdElectronRepulsionRecSD.cpp
@@ -60,6 +94,8 @@ target_sources(vlxobjs
     SimdElectronRepulsionRecSG.cpp
     SimdElectronRepulsionRecSH.cpp
     SimdElectronRepulsionRecSI.cpp
+    SimdElectronRepulsionRecSK.cpp
+    SimdElectronRepulsionRecSL.cpp
     SimdElectronRepulsionRecSP.cpp
     SimdElectronRepulsionRecSS.cpp
     SimdElectronRepulsionVrrRecDD.cpp
@@ -67,6 +103,8 @@ target_sources(vlxobjs
     SimdElectronRepulsionVrrRecDG.cpp
     SimdElectronRepulsionVrrRecDH.cpp
     SimdElectronRepulsionVrrRecDI.cpp
+    SimdElectronRepulsionVrrRecDK.cpp
+    SimdElectronRepulsionVrrRecDL.cpp
     SimdElectronRepulsionVrrRecDP.cpp
     SimdElectronRepulsionVrrRecDS.cpp
     SimdElectronRepulsionVrrRecFD.cpp
@@ -74,6 +112,8 @@ target_sources(vlxobjs
     SimdElectronRepulsionVrrRecFG.cpp
     SimdElectronRepulsionVrrRecFH.cpp
     SimdElectronRepulsionVrrRecFI.cpp
+    SimdElectronRepulsionVrrRecFK.cpp
+    SimdElectronRepulsionVrrRecFL.cpp
     SimdElectronRepulsionVrrRecFP.cpp
     SimdElectronRepulsionVrrRecFS.cpp
     SimdElectronRepulsionVrrRecGD.cpp
@@ -81,6 +121,8 @@ target_sources(vlxobjs
     SimdElectronRepulsionVrrRecGG.cpp
     SimdElectronRepulsionVrrRecGH.cpp
     SimdElectronRepulsionVrrRecGI.cpp
+    SimdElectronRepulsionVrrRecGK.cpp
+    SimdElectronRepulsionVrrRecGL.cpp
     SimdElectronRepulsionVrrRecGP.cpp
     SimdElectronRepulsionVrrRecGS.cpp
     SimdElectronRepulsionVrrRecHD.cpp
@@ -88,6 +130,8 @@ target_sources(vlxobjs
     SimdElectronRepulsionVrrRecHG.cpp
     SimdElectronRepulsionVrrRecHH.cpp
     SimdElectronRepulsionVrrRecHI.cpp
+    SimdElectronRepulsionVrrRecHK.cpp
+    SimdElectronRepulsionVrrRecHL.cpp
     SimdElectronRepulsionVrrRecHP.cpp
     SimdElectronRepulsionVrrRecHS.cpp
     SimdElectronRepulsionVrrRecID.cpp
@@ -95,13 +139,35 @@ target_sources(vlxobjs
     SimdElectronRepulsionVrrRecIG.cpp
     SimdElectronRepulsionVrrRecIH.cpp
     SimdElectronRepulsionVrrRecII.cpp
+    SimdElectronRepulsionVrrRecIK.cpp
+    SimdElectronRepulsionVrrRecIL.cpp
     SimdElectronRepulsionVrrRecIP.cpp
     SimdElectronRepulsionVrrRecIS.cpp
+    SimdElectronRepulsionVrrRecKD.cpp
+    SimdElectronRepulsionVrrRecKF.cpp
+    SimdElectronRepulsionVrrRecKG.cpp
+    SimdElectronRepulsionVrrRecKH.cpp
+    SimdElectronRepulsionVrrRecKI.cpp
+    SimdElectronRepulsionVrrRecKK.cpp
+    SimdElectronRepulsionVrrRecKL.cpp
+    SimdElectronRepulsionVrrRecKP.cpp
+    SimdElectronRepulsionVrrRecKS.cpp
+    SimdElectronRepulsionVrrRecLD.cpp
+    SimdElectronRepulsionVrrRecLF.cpp
+    SimdElectronRepulsionVrrRecLG.cpp
+    SimdElectronRepulsionVrrRecLH.cpp
+    SimdElectronRepulsionVrrRecLI.cpp
+    SimdElectronRepulsionVrrRecLK.cpp
+    SimdElectronRepulsionVrrRecLL.cpp
+    SimdElectronRepulsionVrrRecLP.cpp
+    SimdElectronRepulsionVrrRecLS.cpp
     SimdElectronRepulsionVrrRecPD.cpp
     SimdElectronRepulsionVrrRecPF.cpp
     SimdElectronRepulsionVrrRecPG.cpp
     SimdElectronRepulsionVrrRecPH.cpp
     SimdElectronRepulsionVrrRecPI.cpp
+    SimdElectronRepulsionVrrRecPK.cpp
+    SimdElectronRepulsionVrrRecPL.cpp
     SimdElectronRepulsionVrrRecPP.cpp
     SimdElectronRepulsionVrrRecPS.cpp
     SimdElectronRepulsionVrrRecSD.cpp
@@ -109,6 +175,8 @@ target_sources(vlxobjs
     SimdElectronRepulsionVrrRecSG.cpp
     SimdElectronRepulsionVrrRecSH.cpp
     SimdElectronRepulsionVrrRecSI.cpp
+    SimdElectronRepulsionVrrRecSK.cpp
+    SimdElectronRepulsionVrrRecSL.cpp
     SimdElectronRepulsionVrrRecSP.cpp
     SimdTwoCenterElectronRepulsionDriver.cpp
     SimdTwoCenterElectronRepulsionFunc.cpp

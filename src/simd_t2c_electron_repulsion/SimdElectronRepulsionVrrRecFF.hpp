@@ -342,6 +342,62 @@ compute_prim_ff_electron_repulsion_37(CSimdMatrix &buffer, const size_t target, 
                                       const size_t ncols, const double alpha, const double beta,
                                       const double p) -> void;
 
+/// @brief Takes one step of the recurrence for one pair of primitives.
+auto
+compute_prim_ff_electron_repulsion_38(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t pb, const size_t dd, const size_t df,
+                                      const size_t fp0, const size_t fp1, const size_t fd,
+                                      const size_t ncols, const double alpha, const double beta,
+                                      const double p) -> void;
+
+/// @brief Takes one step of the recurrence for one pair of primitives.
+auto
+compute_prim_ff_electron_repulsion_39(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t pb, const size_t dd, const size_t df,
+                                      const size_t fp0, const size_t fp1, const size_t fd,
+                                      const size_t ncols, const double alpha, const double beta,
+                                      const double p) -> void;
+
+/// @brief Takes one step of the recurrence for one pair of primitives.
+auto
+compute_prim_ff_electron_repulsion_40(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t pb, const size_t dd, const size_t df,
+                                      const size_t fp0, const size_t fp1, const size_t fd,
+                                      const size_t ncols, const double alpha, const double beta,
+                                      const double p) -> void;
+
+/// @brief Takes one step of the recurrence for one pair of primitives.
+auto
+compute_prim_ff_electron_repulsion_41(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t pb, const size_t dd, const size_t df,
+                                      const size_t fp0, const size_t fp1, const size_t fd,
+                                      const size_t ncols, const double alpha, const double beta,
+                                      const double p) -> void;
+
+/// @brief Takes one step of the recurrence for one pair of primitives.
+auto
+compute_prim_ff_electron_repulsion_42(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t pb, const size_t dd, const size_t df,
+                                      const size_t fp0, const size_t fp1, const size_t fd,
+                                      const size_t ncols, const double alpha, const double beta,
+                                      const double p) -> void;
+
+/// @brief Takes one step of the recurrence for one pair of primitives.
+auto
+compute_prim_ff_electron_repulsion_43(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t pb, const size_t dd, const size_t df,
+                                      const size_t fp0, const size_t fp1, const size_t fd,
+                                      const size_t ncols, const double alpha, const double beta,
+                                      const double p) -> void;
+
+/// @brief Takes one step of the recurrence for one pair of primitives.
+auto
+compute_prim_ff_electron_repulsion_44(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t pb, const size_t dd, const size_t df,
+                                      const size_t fp0, const size_t fp1, const size_t fd,
+                                      const size_t ncols, const double alpha, const double beta,
+                                      const double p) -> void;
+
 }  // namespace simdt2ceri
 
 #endif /* SimdElectronRepulsionVrrRecFF_hpp */

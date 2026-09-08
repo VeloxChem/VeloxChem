@@ -220,9 +220,9 @@ compute_dh_electron_repulsion(double               *values,
 
             compute_prim_dg_electron_repulsion_1(buffer, 329, 0, 3, 188, 311, 137, 146, 242, ncols, alpha, beta, p);
 
-            compute_prim_sh_electron_repulsion_4(buffer, 386, 3, 164, 173, 278, ncols, alpha, beta, p);
+            compute_prim_sh_electron_repulsion_5(buffer, 386, 3, 164, 173, 278, ncols, alpha, beta, p);
 
-            compute_prim_ph_electron_repulsion_2(buffer, 395, 0, 3, 266, 386, 311, ncols, p);
+            compute_prim_ph_electron_repulsion_3(buffer, 395, 0, 3, 266, 386, 311, ncols, p);
 
             compute_prim_dh_electron_repulsion_0(buffer, 419, 0, 3, 287, 395, 206, 224, 329, ncols, alpha, beta, p);
 

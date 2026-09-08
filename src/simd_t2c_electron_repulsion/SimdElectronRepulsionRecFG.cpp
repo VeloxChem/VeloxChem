@@ -230,7 +230,7 @@ compute_fg_electron_repulsion(double               *values,
 
             compute_prim_sg_electron_repulsion_2(buffer, 410, 3, 149, 152, 257, ncols, alpha, beta, p);
 
-            compute_prim_pg_electron_repulsion_8(buffer, 416, 0, 251, 410, ncols, p);
+            compute_prim_pg_electron_repulsion_10(buffer, 416, 0, 251, 410, ncols, p);
 
             compute_prim_dg_electron_repulsion_4(buffer, 422, 0, 3, 263, 416, 173, 182, 317, ncols, alpha, beta, p);
 

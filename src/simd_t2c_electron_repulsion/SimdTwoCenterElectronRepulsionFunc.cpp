@@ -45,6 +45,8 @@
 #include "SimdElectronRepulsionRecDG.hpp"
 #include "SimdElectronRepulsionRecDH.hpp"
 #include "SimdElectronRepulsionRecDI.hpp"
+#include "SimdElectronRepulsionRecDK.hpp"
+#include "SimdElectronRepulsionRecDL.hpp"
 #include "SimdElectronRepulsionRecDP.hpp"
 #include "SimdElectronRepulsionRecDS.hpp"
 #include "SimdElectronRepulsionRecFD.hpp"
@@ -52,6 +54,8 @@
 #include "SimdElectronRepulsionRecFG.hpp"
 #include "SimdElectronRepulsionRecFH.hpp"
 #include "SimdElectronRepulsionRecFI.hpp"
+#include "SimdElectronRepulsionRecFK.hpp"
+#include "SimdElectronRepulsionRecFL.hpp"
 #include "SimdElectronRepulsionRecFP.hpp"
 #include "SimdElectronRepulsionRecFS.hpp"
 #include "SimdElectronRepulsionRecGD.hpp"
@@ -59,6 +63,8 @@
 #include "SimdElectronRepulsionRecGG.hpp"
 #include "SimdElectronRepulsionRecGH.hpp"
 #include "SimdElectronRepulsionRecGI.hpp"
+#include "SimdElectronRepulsionRecGK.hpp"
+#include "SimdElectronRepulsionRecGL.hpp"
 #include "SimdElectronRepulsionRecGP.hpp"
 #include "SimdElectronRepulsionRecGS.hpp"
 #include "SimdElectronRepulsionRecHD.hpp"
@@ -66,6 +72,8 @@
 #include "SimdElectronRepulsionRecHG.hpp"
 #include "SimdElectronRepulsionRecHH.hpp"
 #include "SimdElectronRepulsionRecHI.hpp"
+#include "SimdElectronRepulsionRecHK.hpp"
+#include "SimdElectronRepulsionRecHL.hpp"
 #include "SimdElectronRepulsionRecHP.hpp"
 #include "SimdElectronRepulsionRecHS.hpp"
 #include "SimdElectronRepulsionRecID.hpp"
@@ -73,13 +81,35 @@
 #include "SimdElectronRepulsionRecIG.hpp"
 #include "SimdElectronRepulsionRecIH.hpp"
 #include "SimdElectronRepulsionRecII.hpp"
+#include "SimdElectronRepulsionRecIK.hpp"
+#include "SimdElectronRepulsionRecIL.hpp"
 #include "SimdElectronRepulsionRecIP.hpp"
 #include "SimdElectronRepulsionRecIS.hpp"
+#include "SimdElectronRepulsionRecKD.hpp"
+#include "SimdElectronRepulsionRecKF.hpp"
+#include "SimdElectronRepulsionRecKG.hpp"
+#include "SimdElectronRepulsionRecKH.hpp"
+#include "SimdElectronRepulsionRecKI.hpp"
+#include "SimdElectronRepulsionRecKK.hpp"
+#include "SimdElectronRepulsionRecKL.hpp"
+#include "SimdElectronRepulsionRecKP.hpp"
+#include "SimdElectronRepulsionRecKS.hpp"
+#include "SimdElectronRepulsionRecLD.hpp"
+#include "SimdElectronRepulsionRecLF.hpp"
+#include "SimdElectronRepulsionRecLG.hpp"
+#include "SimdElectronRepulsionRecLH.hpp"
+#include "SimdElectronRepulsionRecLI.hpp"
+#include "SimdElectronRepulsionRecLK.hpp"
+#include "SimdElectronRepulsionRecLL.hpp"
+#include "SimdElectronRepulsionRecLP.hpp"
+#include "SimdElectronRepulsionRecLS.hpp"
 #include "SimdElectronRepulsionRecPD.hpp"
 #include "SimdElectronRepulsionRecPF.hpp"
 #include "SimdElectronRepulsionRecPG.hpp"
 #include "SimdElectronRepulsionRecPH.hpp"
 #include "SimdElectronRepulsionRecPI.hpp"
+#include "SimdElectronRepulsionRecPK.hpp"
+#include "SimdElectronRepulsionRecPL.hpp"
 #include "SimdElectronRepulsionRecPP.hpp"
 #include "SimdElectronRepulsionRecPS.hpp"
 #include "SimdElectronRepulsionRecSD.hpp"
@@ -87,6 +117,8 @@
 #include "SimdElectronRepulsionRecSG.hpp"
 #include "SimdElectronRepulsionRecSH.hpp"
 #include "SimdElectronRepulsionRecSI.hpp"
+#include "SimdElectronRepulsionRecSK.hpp"
+#include "SimdElectronRepulsionRecSL.hpp"
 #include "SimdElectronRepulsionRecSP.hpp"
 #include "SimdElectronRepulsionRecSS.hpp"
 
@@ -170,7 +202,7 @@ compute_electron_repulsion(double               *values,
     // single index, so the compiler forms one jump table rather than a chain of
     // comparisons which the combinations of high angular momentum reach last.
 
-    switch (lbra * 7 + lket)
+    switch (lbra * 9 + lket)
     {
         case  0:
             compute_ss_electron_repulsion(values, nvalues, bra, ket, coordinates);
@@ -201,178 +233,306 @@ compute_electron_repulsion(double               *values,
             return;
 
         case  7:
-            compute_ps_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_sk_electron_repulsion(values, nvalues, bra, ket, coordinates);
             return;
 
         case  8:
-            compute_pp_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_sl_electron_repulsion(values, nvalues, bra, ket, coordinates);
             return;
 
         case  9:
-            compute_pd_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_ps_electron_repulsion(values, nvalues, bra, ket, coordinates);
             return;
 
         case 10:
-            compute_pf_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_pp_electron_repulsion(values, nvalues, bra, ket, coordinates);
             return;
 
         case 11:
-            compute_pg_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_pd_electron_repulsion(values, nvalues, bra, ket, coordinates);
             return;
 
         case 12:
-            compute_ph_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_pf_electron_repulsion(values, nvalues, bra, ket, coordinates);
             return;
 
         case 13:
-            compute_pi_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_pg_electron_repulsion(values, nvalues, bra, ket, coordinates);
             return;
 
         case 14:
-            compute_ds_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_ph_electron_repulsion(values, nvalues, bra, ket, coordinates);
             return;
 
         case 15:
-            compute_dp_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_pi_electron_repulsion(values, nvalues, bra, ket, coordinates);
             return;
 
         case 16:
-            compute_dd_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_pk_electron_repulsion(values, nvalues, bra, ket, coordinates);
             return;
 
         case 17:
-            compute_df_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_pl_electron_repulsion(values, nvalues, bra, ket, coordinates);
             return;
 
         case 18:
-            compute_dg_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_ds_electron_repulsion(values, nvalues, bra, ket, coordinates);
             return;
 
         case 19:
-            compute_dh_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_dp_electron_repulsion(values, nvalues, bra, ket, coordinates);
             return;
 
         case 20:
-            compute_di_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_dd_electron_repulsion(values, nvalues, bra, ket, coordinates);
             return;
 
         case 21:
-            compute_fs_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_df_electron_repulsion(values, nvalues, bra, ket, coordinates);
             return;
 
         case 22:
-            compute_fp_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_dg_electron_repulsion(values, nvalues, bra, ket, coordinates);
             return;
 
         case 23:
-            compute_fd_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_dh_electron_repulsion(values, nvalues, bra, ket, coordinates);
             return;
 
         case 24:
-            compute_ff_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_di_electron_repulsion(values, nvalues, bra, ket, coordinates);
             return;
 
         case 25:
-            compute_fg_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_dk_electron_repulsion(values, nvalues, bra, ket, coordinates);
             return;
 
         case 26:
-            compute_fh_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_dl_electron_repulsion(values, nvalues, bra, ket, coordinates);
             return;
 
         case 27:
-            compute_fi_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_fs_electron_repulsion(values, nvalues, bra, ket, coordinates);
             return;
 
         case 28:
-            compute_gs_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_fp_electron_repulsion(values, nvalues, bra, ket, coordinates);
             return;
 
         case 29:
-            compute_gp_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_fd_electron_repulsion(values, nvalues, bra, ket, coordinates);
             return;
 
         case 30:
-            compute_gd_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_ff_electron_repulsion(values, nvalues, bra, ket, coordinates);
             return;
 
         case 31:
-            compute_gf_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_fg_electron_repulsion(values, nvalues, bra, ket, coordinates);
             return;
 
         case 32:
-            compute_gg_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_fh_electron_repulsion(values, nvalues, bra, ket, coordinates);
             return;
 
         case 33:
-            compute_gh_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_fi_electron_repulsion(values, nvalues, bra, ket, coordinates);
             return;
 
         case 34:
-            compute_gi_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_fk_electron_repulsion(values, nvalues, bra, ket, coordinates);
             return;
 
         case 35:
-            compute_hs_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_fl_electron_repulsion(values, nvalues, bra, ket, coordinates);
             return;
 
         case 36:
-            compute_hp_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_gs_electron_repulsion(values, nvalues, bra, ket, coordinates);
             return;
 
         case 37:
-            compute_hd_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_gp_electron_repulsion(values, nvalues, bra, ket, coordinates);
             return;
 
         case 38:
-            compute_hf_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_gd_electron_repulsion(values, nvalues, bra, ket, coordinates);
             return;
 
         case 39:
-            compute_hg_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_gf_electron_repulsion(values, nvalues, bra, ket, coordinates);
             return;
 
         case 40:
-            compute_hh_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_gg_electron_repulsion(values, nvalues, bra, ket, coordinates);
             return;
 
         case 41:
-            compute_hi_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_gh_electron_repulsion(values, nvalues, bra, ket, coordinates);
             return;
 
         case 42:
-            compute_is_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_gi_electron_repulsion(values, nvalues, bra, ket, coordinates);
             return;
 
         case 43:
-            compute_ip_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_gk_electron_repulsion(values, nvalues, bra, ket, coordinates);
             return;
 
         case 44:
-            compute_id_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_gl_electron_repulsion(values, nvalues, bra, ket, coordinates);
             return;
 
         case 45:
-            compute_if_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_hs_electron_repulsion(values, nvalues, bra, ket, coordinates);
             return;
 
         case 46:
-            compute_ig_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_hp_electron_repulsion(values, nvalues, bra, ket, coordinates);
             return;
 
         case 47:
-            compute_ih_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_hd_electron_repulsion(values, nvalues, bra, ket, coordinates);
             return;
 
         case 48:
+            compute_hf_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            return;
+
+        case 49:
+            compute_hg_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            return;
+
+        case 50:
+            compute_hh_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            return;
+
+        case 51:
+            compute_hi_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            return;
+
+        case 52:
+            compute_hk_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            return;
+
+        case 53:
+            compute_hl_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            return;
+
+        case 54:
+            compute_is_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            return;
+
+        case 55:
+            compute_ip_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            return;
+
+        case 56:
+            compute_id_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            return;
+
+        case 57:
+            compute_if_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            return;
+
+        case 58:
+            compute_ig_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            return;
+
+        case 59:
+            compute_ih_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            return;
+
+        case 60:
             compute_ii_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            return;
+
+        case 61:
+            compute_ik_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            return;
+
+        case 62:
+            compute_il_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            return;
+
+        case 63:
+            compute_ks_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            return;
+
+        case 64:
+            compute_kp_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            return;
+
+        case 65:
+            compute_kd_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            return;
+
+        case 66:
+            compute_kf_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            return;
+
+        case 67:
+            compute_kg_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            return;
+
+        case 68:
+            compute_kh_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            return;
+
+        case 69:
+            compute_ki_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            return;
+
+        case 70:
+            compute_kk_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            return;
+
+        case 71:
+            compute_kl_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            return;
+
+        case 72:
+            compute_ls_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            return;
+
+        case 73:
+            compute_lp_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            return;
+
+        case 74:
+            compute_ld_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            return;
+
+        case 75:
+            compute_lf_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            return;
+
+        case 76:
+            compute_lg_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            return;
+
+        case 77:
+            compute_lh_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            return;
+
+        case 78:
+            compute_li_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            return;
+
+        case 79:
+            compute_lk_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            return;
+
+        case 80:
+            compute_ll_electron_repulsion(values, nvalues, bra, ket, coordinates);
             return;
 
         default:
             break;
     }
 
-    // NOTE: the kernels are generated up to angular momentum six, so a combination
+    // NOTE: the kernels are generated up to angular momentum eight, so a combination
     // above it stops rather than leaving the values of the matrix unwritten, which
     // is what a caller would otherwise read as integrals.
 

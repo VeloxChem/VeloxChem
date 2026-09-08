@@ -78,7 +78,7 @@ auto one_center_electron_repulsion(const CBasisFunction &bra, const CBasisFuncti
 /// so neither an atom pair nor a pair of primitives falls below a threshold at any
 /// distance a molecule reaches, and every combination of basis functions is computed
 /// over every atom pair of every block.
-/// @note The kernels are generated up to angular momentum six, so a combination
+/// @note The kernels are generated up to angular momentum eight, so a combination
 /// above it stops with an error rather than returning values it did not compute. The
 /// integral of two basis functions on the same atom is unaffected and is computed by
 /// one_center_electron_repulsion above.

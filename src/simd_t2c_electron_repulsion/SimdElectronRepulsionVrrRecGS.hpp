@@ -109,6 +109,13 @@ compute_prim_gs_electron_repulsion_9(CSimdMatrix &buffer, const size_t target, c
                                      const size_t ncols, const double alpha, const double beta,
                                      const double p) -> void;
 
+/// @brief Takes one step of the recurrence for one pair of primitives.
+auto
+compute_prim_gs_electron_repulsion_10(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                      const size_t ds0, const size_t ds1, const size_t fs,
+                                      const size_t ncols, const double alpha, const double beta,
+                                      const double p) -> void;
+
 }  // namespace simdt2ceri
 
 #endif /* SimdElectronRepulsionVrrRecGS_hpp */
