@@ -93,7 +93,9 @@ class MetalForceFieldManager:
     Where a comparison comes back a mismatch, shoehorn(name) makes those
     edits itself: it walks the site onto a named template's residues,
     coordination and protonation, so that comparing it again succeeds. It
-    edits nothing else and builds nothing.
+    edits nothing else and builds nothing. A later unnamed
+    build_ff_from_template then builds from that template rather than from
+    whatever the criteria rank first, and built_from names the one it used.
 
     Settings are kept on the object, apart from the templates and the active
     site itself.
@@ -247,12 +249,15 @@ class MetalForceFieldManager:
         # compare_active_site
         self._active_site_builder = None
         self._comparison = None
-        # the template the tracked site was last walked onto, which
-        # build_ff_from_template falls back to when the criteria pick
-        # nothing. Cleared whenever a different site is handed in, since a
+        # the template the tracked site was last walked onto, which an
+        # unnamed build_ff_from_template builds from whatever the criteria
+        # come to. Cleared whenever a different site is handed in, since a
         # shoehorning is a statement about one site and not about the
         # manager.
         self._shoehorned = None
+        # the template the last force field was built from, which is not
+        # always the one the criteria rank first -- see built_from
+        self._built_from = None
 
         # matching
         self.metal_shell_bonds = 2
@@ -282,6 +287,19 @@ class MetalForceFieldManager:
         """
 
         return self._active_site_builder
+
+    @property
+    def built_from(self):
+        """
+        The name of the template the last force field was built from, or None
+        before build_ff_from_template has been called on the tracked site.
+
+        Worth asking rather than assuming: an unnamed call is not always
+        answered by the template the criteria rank first, since a shoehorning
+        overrides them -- see _prefer_the_shoehorned_template.
+        """
+
+        return self._built_from
 
     def load_template_from_folder(self, folder, name=None, fallback=None):
         """
@@ -1100,8 +1118,9 @@ class MetalForceFieldManager:
                 'has no active site yet. Call build_active_site on it '
                 'first.')
             self._active_site_builder = active_site
-            # the shoehorning belonged to the site being replaced
+            # both belonged to the site being replaced
             self._shoehorned = None
+            self._built_from = None
 
         have_builder = self._active_site_builder is not None
         assert_msg_critical(
@@ -1312,35 +1331,54 @@ class MetalForceFieldManager:
             'match, or build this site with MetalSiteForceFieldBuilder.')
         self.ostream.flush()
 
-    def _fall_back_to_shoehorned(self, decision):
+    def _prefer_the_shoehorned_template(self, decision):
         """
-        Takes the template the site was shoehorned into when the criteria
-        took nothing.
+        Takes the template the site was shoehorned into, over whatever the
+        criteria came to.
 
         A shoehorning is the same statement naming a template is -- this
         site is to be built the way that one is -- so an unnamed call after
-        one is not really unnamed. It is also the case the criteria are
-        least able to judge: they measure a geometry whose coordination
-        sphere is still open, and what would close it is the very force
-        field being asked for, so the site cannot look like the template
-        until after the transfer it is being refused.
+        one is not really unnamed, and what the criteria make of the field
+        does not get to overrule it. Both ways they can differ are wrong on
+        their own terms.
+
+        With nothing within them, the criteria are the least able to judge:
+        they measure a geometry whose coordination sphere is still open, and
+        what would close it is the very force field being asked for, so the
+        site cannot look like the template until after the transfer it is
+        being refused.
+
+        With something within them, the something is rarely alone. A
+        shoehorned site passes against the template it was walked onto and
+        against every sibling of that template's family too, and the ranking
+        then separates them on an active-site bond rms that differs in
+        thousandths of an Angstrom -- so the site gets walked onto one
+        template and built from another, which is a geometry from one and
+        parameters from the other and a description of neither. That is not
+        a tie to be broken better: the shoehorning already said which one it
+        is.
 
         What is not waived is the mapping. Every atom of the site has to
         land somewhere in the template or there is nothing to transfer onto
         it, and _build_ff_from_template fails outright on the first key it
-        cannot map, so a template that maps incompletely is left refused.
+        cannot map, so a template that maps incompletely is left refused and
+        the criteria keep the decision.
 
         :param decision:
-            The decision _select_template came to, with no name in it.
+            The decision _select_template came to.
 
         :return:
             A decision naming the shoehorned template, or the one given when
-            there is no shoehorning to fall back on.
+            there is no shoehorning to take, when it is already what the
+            criteria took, or when it does not map the site completely.
         """
 
         name = self._shoehorned
 
         if name is None or name not in self._comparison['templates']:
+            return decision
+
+        if name == decision['name']:
             return decision
 
         entry = self._comparison['templates'][name]
@@ -1353,22 +1391,37 @@ class MetalForceFieldManager:
             self.ostream.flush()
             return decision
 
+        verdict = decision['verdicts'][name] or 'within the criteria'
+        ranked = decision['name']
+
         decision = dict(decision)
         decision['name'] = name
         decision['entry'] = entry
         decision['forced'] = True
         decision['score'] = decision['scores'][name]
 
-        self.ostream.print_warning(
-            f'No template is within the {decision["criteria_name"]} '
-            f'criteria, but the site was shoehorned into {name}, which is '
-            'the same statement as naming it. Building from it anyway: '
-            f'{decision["verdicts"][name]}.')
-        self.ostream.print_info(
-            'The criteria measure a geometry whose coordination sphere the '
-            'transferred parameters have not closed yet. Relax the site on '
-            'the force field this returns (mm_optimize_active_site) and '
-            'compare again to see whether it then matches on its own.')
+        if ranked is None:
+            self.ostream.print_warning(
+                f'No template is within the {decision["criteria_name"]} '
+                f'criteria, but the site was shoehorned into {name}, which '
+                'is the same statement as naming it. Building from it '
+                f'anyway: {verdict}.')
+            self.ostream.print_info(
+                'The criteria measure a geometry whose coordination sphere '
+                'the transferred parameters have not closed yet. Relax the '
+                'site on the force field this returns '
+                '(mm_optimize_active_site) and compare again to see whether '
+                'it then matches on its own.')
+        else:
+            self.ostream.print_warning(
+                f'The criteria ranked {ranked} first, but the site was '
+                f'shoehorned into {name}, which is the same statement as '
+                f'naming it. Building from {name} instead: {verdict}.')
+            self.ostream.print_info(
+                f'The site was walked onto {name}, so its parameters are the '
+                f'ones that describe it. Name {ranked} in the call to build '
+                'from that one instead.')
+
         self.ostream.flush()
 
         return decision
@@ -1390,16 +1443,19 @@ class MetalForceFieldManager:
         measured not to fit would silently mis-parameterize the site.
 
         The one exception is a site shoehorn walked onto a template: with no
-        name given and nothing within the criteria, that template is taken,
-        with a warning saying so and naming the verdict. Walking a site onto
-        a template is already the statement that naming one makes, and the
-        criteria cannot answer this case on their own -- what they measure is
-        a geometry whose coordination sphere is still open, since the
-        parameters that would close it are the ones being asked for. The
-        mapping is still required to be complete: with an atom landing
-        nowhere there is nothing to transfer, and that stays a hard error.
-        Relaxing on the transferred force field and comparing once more is
-        what turns this into an ordinary match.
+        name given, that template is taken whatever the criteria came to --
+        nothing within them, or another template within them and ranked
+        ahead of it -- with a warning saying so and naming the verdict.
+        Walking a site onto a template is already the statement that naming
+        one makes, and the criteria cannot answer this case on their own:
+        what they measure is a geometry whose coordination sphere is still
+        open, since the parameters that would close it are the ones being
+        asked for, and once it is open enough to pass at all it passes
+        against the whole family the template belongs to. The mapping is
+        still required to be complete: with an atom landing nowhere there is
+        nothing to transfer, and that stays a hard error. Relaxing on the
+        transferred force field and comparing once more is what turns this
+        into an ordinary match.
 
         The coordination comes from the template too. Denticity is a distance
         cutoff on an unrelaxed structure rather than chemistry, so a site that
@@ -1423,8 +1479,8 @@ class MetalForceFieldManager:
 
         decision = self._select_template(template)
 
-        if decision['name'] is None and template is None:
-            decision = self._fall_back_to_shoehorned(decision)
+        if template is None:
+            decision = self._prefer_the_shoehorned_template(decision)
 
         matched = decision['name'] is not None
         assert_msg_critical(
@@ -1443,6 +1499,7 @@ class MetalForceFieldManager:
 
         name = decision['name']
         entry = decision['entry']
+        self._built_from = name
         template_obj = self.templates[name]
         active_site = self._comparison['active_site']
 

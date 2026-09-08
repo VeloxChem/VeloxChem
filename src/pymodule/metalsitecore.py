@@ -3148,6 +3148,71 @@ def freeze_constraints(active_site,
     return f'freeze xyz {selection}'
 
 
+def _add_untemplated_impropers(system, forcefield):
+    """
+    Puts the impropers a residue template cannot express onto a system.
+
+    OpenMM builds impropers out of a residue template by walking every atom
+    with three or more bonds and taking combinations of what it is bonded
+    to, then matching the template's first class against that central atom.
+    An improper naming four atoms of any other shape is therefore written
+    into the XML and then never matched -- no error, no term.
+
+    The one a bidentate carboxylate gets is exactly that shape: its central
+    carbon is bonded to its two oxygens and to the beta carbon, not to the
+    metal the improper is meant to hold it planar with. Left to the
+    template it is silently absent from the relaxation the site is meant to
+    be doing it under, so it is added here by index, where nothing has to be
+    bonded to anything.
+
+    Which ones those are is read off forcefield.bonds, which is where the
+    residue template's own bonds come from, so this asks the same question
+    of the same graph OpenMM does rather than guessing at its answer.
+
+    :param system:
+        The OpenMM system built from the force field's own XML.
+    :param forcefield:
+        The force field generator the system was built from.
+
+    :return:
+        The improper keys that were added.
+    """
+
+    torsion_force = None
+    for force in system.getForces():
+        if isinstance(force, mm.PeriodicTorsionForce):
+            torsion_force = force
+
+    bonded = {}
+    for first, second in forcefield.bonds:
+        bonded.setdefault(first, set()).add(second)
+        bonded.setdefault(second, set()).add(first)
+
+    added = []
+
+    for key in forcefield.impropers:
+        central = key[0]
+        if set(key[1:]) <= bonded.get(central, set()):
+            continue
+
+        assert_msg_critical(
+            torsion_force is not None,
+            '_add_untemplated_impropers: the force field carries an improper '
+            'no residue template can express, but the system it built has no '
+            'periodic torsion force to add it to')
+
+        params = forcefield.impropers[key]
+        # the central atom goes third, which is where OpenMM puts it when it
+        # does build an improper itself
+        torsion_force.addTorsion(key[1], key[2], central, key[3],
+                                 params['periodicity'],
+                                 params['phase'] * mmunit.degree,
+                                 params['barrier'] * mmunit.kilojoule_per_mole)
+        added.append(key)
+
+    return added
+
+
 def minimize_active_site(active_site,
                          forcefield,
                          frozen_indices=None,
@@ -3192,6 +3257,10 @@ def minimize_active_site(active_site,
         openmm_ff = mmapp.ForceField(f'{stem}.xml')
         system = openmm_ff.createSystem(pdb.topology,
                                         nonbondedMethod=mmapp.NoCutoff)
+
+        # the atoms are written and read back in force field order, so a
+        # force field index is a particle index here
+        _add_untemplated_impropers(system, forcefield)
 
         # a zero mass makes OpenMM hold the particle fixed
         for index in frozen_indices:
@@ -3656,6 +3725,30 @@ def get_metal_keys(forcefield, active_site):
     angles = [key for key in forcefield.angles if metals & set(key)]
 
     return bonds, angles
+
+
+def get_metal_impropers(forcefield, active_site):
+    """
+    Returns the improper keys that involve a metal center.
+
+    Kept apart from get_metal_keys, whose two return values five callers
+    unpack, and filtered to the metal the same way they are: every other
+    improper of the site belongs to a residue the protein force field
+    parameterizes itself, so transferring those would put a second copy of
+    a term beside the one already there.
+
+    :param forcefield:
+        The force field generator.
+    :param active_site:
+        The active site, for the indices of the metal centers.
+
+    :return:
+        The improper key list.
+    """
+
+    metals = set(active_site['metal_indices'])
+
+    return [key for key in forcefield.impropers if metals & set(key)]
 
 
 def _manual_bond_records_by_key(active_site, topology, binding_modes):
@@ -4958,11 +5051,19 @@ def create_enzyme_system(topology,
     enzyme.
 
     The protein force field already covers everything except the metal, so
-    only the metal bonds and angles are transferred. The active site was built
-    from the topology, so the atom map of the active site gives the
-    correspondence directly and no graph matching is needed. Capping
-    hydrogens are skipped, since they stand in for CA atoms that the
-    protein force field parameterizes itself.
+    only the metal bonds, angles and impropers are transferred -- every
+    other term of the site belongs to a residue it parameterizes itself.
+    The active site was built from the topology, so the atom map of the
+    active site gives the correspondence directly and no graph matching is
+    needed. Capping hydrogens are skipped, since they stand in for CA atoms
+    that the protein force field parameterizes itself.
+
+    The impropers are added to the periodic torsion force by index, which is
+    what a metal improper needs: OpenMM builds an improper out of a residue
+    template only for a central atom and three atoms bonded to it, so the
+    one a bidentate carboxylate gets -- the carboxylate carbon against its
+    two oxygens and the metal, which the carbon is not bonded to -- never
+    reaches a system built that way. Added here it does.
 
     :param topology:
         The protonated OpenMM topology of the whole enzyme.
@@ -5004,19 +5105,28 @@ def create_enzyme_system(topology,
     atom_map = active_site['atom_map']
     caps = set(active_site['cap_indices'])
     bonds, angles = get_metal_keys(forcefield, active_site)
+    impropers = get_metal_impropers(forcefield, active_site)
 
     bond_force = None
     angle_force = None
+    torsion_force = None
     for force in system.getForces():
         if isinstance(force, mm.HarmonicBondForce):
             bond_force = force
         elif isinstance(force, mm.HarmonicAngleForce):
             angle_force = force
+        elif isinstance(force, mm.PeriodicTorsionForce):
+            torsion_force = force
 
     assert_msg_critical(
         bond_force is not None and angle_force is not None,
         'create_enzyme_system: the protein '
         'system has no harmonic bond or angle force to extend')
+
+    assert_msg_critical(
+        torsion_force is not None or not impropers,
+        'create_enzyme_system: the force field carries metal impropers but '
+        'the protein system has no periodic torsion force to extend')
 
     added = []
 
@@ -5040,10 +5150,30 @@ def create_enzyme_system(topology,
             mmunit.kilojoule_per_mole / mmunit.radian**2)
         added.append(('angle', key))
 
+    for key in impropers:
+        if caps & set(key):
+            continue
+        params = forcefield.impropers[key]
+        # an improper key is the central atom and its three substituents,
+        # and OpenMM writes that as the torsion (first, second, central,
+        # third) -- the order the same improper comes out in when the
+        # generator's own XML is loaded through mmapp.ForceField, which is
+        # what the active site is relaxed on. Adding it in the key's own
+        # order instead would measure a different dihedral of the same four
+        # atoms.
+        torsion_force.addTorsion(
+            atom_map[key[1]], atom_map[key[2]], atom_map[key[0]],
+            atom_map[key[3]], params['periodicity'],
+            params['phase'] * mmunit.degree,
+            params['barrier'] * mmunit.kilojoule_per_mole)
+        added.append(('improper', key))
+
+    counts = {kind: sum(1 for term in added if term[0] == kind)
+              for kind in ('bond', 'angle', 'improper')}
     ostream.print_info(
-        f'Added {sum(1 for term in added if term[0] == "bond")} metal '
-        f'bond(s) and {sum(1 for term in added if term[0] == "angle")} '
-        'metal angle(s) to the enzyme system.')
+        f'Added {counts["bond"]} metal bond(s), {counts["angle"]} metal '
+        f'angle(s) and {counts["improper"]} metal improper(s) to the enzyme '
+        'system.')
     ostream.flush()
 
     return system, added
