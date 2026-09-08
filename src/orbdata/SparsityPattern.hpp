@@ -192,16 +192,22 @@ namespace sparsity {  // sparsity namespace
 /// pairs of a block is chosen. The blocks are a few per thread, so that dynamic
 /// scheduling has enough of them to even out the ones which differ in cost, and no
 /// more, as a block carries a fixed cost and the blocks contend for the memory.
-/// Measured on fourteen threads, where two per thread is five percent better than
-/// four and four is twice as good as sixteen.
-inline constexpr size_t blocks_per_thread = 2;
+/// @note Fitted on fourteen threads over ninety molecule and basis cases of the
+/// overlap driver, where four per thread is the best of one to sixty four. A
+/// molecule of the size of ubiquitin is otherwise divided into fewer blocks than
+/// dynamic scheduling can balance.
+inline constexpr size_t blocks_per_thread = 4;
 
 /// @brief The smallest target number of atom pairs of a block chosen. A block
 /// carries a fixed cost which does not shrink with the atom pairs it holds, chiefly
 /// the bisection of the screening over the pairs of primitives, so a molecule too
 /// small to fill the threads is divided into fewer blocks rather than into blocks
 /// whose fixed cost outweighs their work.
-inline constexpr size_t min_block_size = 2048;
+/// @note Fitted with the number of blocks per thread above. A floor high enough to
+/// leave a molecule of a few dozen atoms in a single block costs it every thread it
+/// has: c60 holds 1770 atom pairs, and a floor of 2048 made its overlap serial and
+/// up to 4.6 times slower than the blocks it is divided into here.
+inline constexpr size_t min_block_size = 256;
 
 /// @brief Checks that a sparsity pattern describes a pair of molecular bases.
 /// @param pattern The sparsity pattern to check.
