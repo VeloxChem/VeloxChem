@@ -123,10 +123,6 @@ compute_dg_overlap(double               *values,
 
             const auto fovl = a_norms[i] * b_norms[j] * fpi * std::sqrt(fpi);
 
-            const auto alpha = a_exps[i];
-
-            const auto beta = b_exps[j];
-
             const auto fb = a_exps[i] / p;
 
             simdfunc::compute_pb(buffer, coordinates, 0, ncols, fb);

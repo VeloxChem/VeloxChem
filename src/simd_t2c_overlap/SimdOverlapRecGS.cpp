@@ -117,10 +117,6 @@ compute_gs_overlap(double               *values,
 
             const auto fovl = a_norms[i] * b_norms[j] * fpi * std::sqrt(fpi);
 
-            const auto alpha = a_exps[i];
-
-            const auto beta = b_exps[j];
-
             const auto fa = -b_exps[j] / p;
 
             simdfunc::compute_pa(buffer, coordinates, 0, ncols, fa);
