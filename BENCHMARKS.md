@@ -22,7 +22,8 @@ kernels describes the hand written kernels, which were replaced by a generated s
 and was measured under the block size constants which preceded the fit recorded
 there. They are kept as the record of what was measured at the time and do not
 describe the drivers as they stand. The sections named `The generated overlap
-kernels` and `The generated kinetic energy kernels` do.
+kernels`, `The generated kinetic energy kernels` and `The generated two-center
+Coulomb kernels` do.
 
 ## Machine
 
@@ -2756,3 +2757,99 @@ combinations involving h or i agree with it to between 2e-10 and 6e-8 relative,
 against a control of 5e-10 on the (s|s) combination, which is itself exact against
 the reference. That is the accuracy of the finite difference and not of the
 kernels.
+
+## The generated two-center Coulomb kernels
+
+The two-center Coulomb driver takes one molecular basis and returns a
+`CPackedMatrix`, the lower triangle of a symmetric matrix held in full. There is
+no sparsity pattern and no threshold: the operator decays as the inverse of the
+interatomic distance, so no atom pair of any molecule falls below a threshold and
+the matrix is dense however large the molecule is. Only the geometry half of
+`sparsity::make_blocks` is formed, to divide the atom pairs for the threads.
+
+Measured on an otherwise idle machine at `OMP_NUM_THREADS=14`, best of two to five
+runs. **ref** is `TwoCenterElectronRepulsionDriver`. `max |d|` is the largest
+absolute difference over the whole matrix.
+
+The bases are the def2 universal fitting sets, which is what this operator is
+used with. Both reach angular momentum four.
+
+| molecule | basis | nao | ref ms | simd ms | x ref | max abs diff |
+| --- | --- | --- | --- | --- | --- | --- |
+| tagrisso | jfit | 2176 | 2.59 | 3.32 | 0.8 | 3.48e-13 |
+| tagrisso | jkfit | 3387 | 5.17 | 5.82 | 0.9 | 5.12e-13 |
+| c60 | jfit | 2940 | 4.00 | 4.13 | 1.0 | 1.28e-13 |
+| c60 | jkfit | 4500 | 6.68 | 7.79 | 0.9 | 5.51e-13 |
+| taxol | jfit | 3528 | 4.59 | 5.46 | 0.8 | 4.12e-13 |
+| taxol | jkfit | 5489 | 12.31 | 9.66 | 1.3 | 5.97e-13 |
+| paracetamol_cluster | jfit | 10208 | 40.50 | 34.11 | 1.2 | 4.05e-13 |
+| paracetamol_cluster | jkfit | 15888 | 78.19 | 74.08 | 1.1 | 4.97e-13 |
+| crambin | jfit | 19500 | 128.64 | 123.19 | 1.0 | 3.55e-13 |
+| crambin | jkfit | 30751 | 591.28 | 283.95 | 2.1 | -- |
+| ubiquitin | jfit | 36419 | 627.88 | 492.91 | 1.3 | -- |
+| ubiquitin | jkfit | 56971 | -- | 1076.53 | -- | -- |
+
+Two cases carry a caveat. crambin in jkfit and ubiquitin in jfit gave the
+reference one or two runs only, as each allocates seven to ten gigabytes of dense
+matrix, so those two ratios are the softest here. ubiquitin in jkfit has no
+reference at all: twenty four gigabytes dense against twelve packed.
+
+### What these numbers say
+
+This is a different picture from the overlap and the kinetic energy, and the
+reason is structural. Those two win by not computing the atom pairs the reference
+computes. Here both compute every pair, so the comparison is arithmetic against
+arithmetic and the ratio sits near one. Five of the ten measured cases are at or
+below the reference, and only the two largest pull ahead, crambin in jkfit at 2.1
+and ubiquitin in jfit at 1.3.
+
+The agreement is 1e-13 to 6e-13 absolute against integrals of order one hundred,
+which is about 1e-15 relative and is where a scheme built on the Boys function
+should sit.
+
+### The block size is not what limits this driver
+
+A sweep of the `block_size` argument over the twelve cases. `auto` is the
+heuristic's own choice, which is 256 for every molecule.
+
+| molecule | basis | auto | 32 | 64 | 128 | 256 | 512 | 1024 | 2048 | 4096 | 8192 | 16384 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| tagrisso | jfit | 3.51 | 3.29 | 2.84 | 2.62 | 3.24 | 5.14 | 5.00 | 4.86 | 5.16 | 5.11 | 5.11 |
+| tagrisso | jkfit | 5.72 | 5.26 | 4.75 | 4.56 | 5.67 | 9.28 | 9.24 | 9.12 | 9.10 | 9.16 | 9.39 |
+| c60 | jfit | 4.04 | 4.52 | 3.88 | 3.68 | 4.08 | 6.23 | 10.96 | 20.19 | 20.09 | 20.03 | 20.04 |
+| c60 | jkfit | 7.75 | 8.11 | 7.22 | 7.17 | 7.69 | 12.13 | 21.24 | 40.28 | 40.25 | 39.73 | 39.82 |
+| taxol | jfit | 5.58 | 6.75 | 5.39 | 4.89 | 5.32 | 7.05 | 12.27 | 12.15 | 12.11 | 12.15 | 12.13 |
+| taxol | jkfit | 9.96 | 11.79 | 9.76 | 9.30 | 10.12 | 13.79 | 24.24 | 24.15 | 23.99 | 24.20 | 23.88 |
+| paracetamol_cluster | jfit | 33.70 | 54.84 | 42.05 | 37.35 | 34.60 | 35.73 | 41.71 | 61.17 | 107.11 | 117.57 | 121.07 |
+| paracetamol_cluster | jkfit | 72.77 | 101.87 | 81.51 | 75.46 | 70.92 | 77.93 | 93.90 | 152.59 | 227.37 | 266.92 | 249.09 |
+| crambin | jfit | 122.01 | 199.34 | 153.65 | 135.05 | 121.25 | 119.26 | 130.10 | 145.52 | 161.60 | 189.31 | 240.59 |
+| crambin | jkfit | 258.27 | 356.48 | 287.42 | 272.12 | 253.90 | 261.99 | 289.60 | 331.52 | 379.80 | 442.55 | 579.93 |
+| ubiquitin | jfit | 512.76 | 767.66 | 597.25 | 528.02 | 488.24 | 481.71 | 526.43 | 575.96 | 609.02 | 730.12 | 816.56 |
+| ubiquitin | jkfit | 1071.08 | 1361.77 | 1139.90 | 1091.31 | 1068.72 | 1116.13 | 1285.46 | 1341.58 | 1494.20 | 1775.46 | 1954.27 |
+
+Fitting the ceiling against this, with the geometric mean of each case's slowdown
+against the best any ceiling reaches for it:
+
+| max_block_size | geometric mean | worst case | total ms | sizes it picks |
+| --- | --- | --- | --- | --- |
+| 128 | 1.038 | 1.13 | 2171.5 | 128 |
+| 256 (current) | 1.069 | 1.24 | 2073.7 | 256 |
+| 512 | 1.084 | 1.24 | 2128.9 | 256, 512 |
+| 64 | 1.116 | 1.29 | 2335.6 | 64 |
+| 32 | 1.355 | 1.67 | 2881.7 | 32 |
+
+Every ceiling from 64 to 512 lands within four to eight per cent of the best any
+of them reaches, where the wrong floor cost the overlap driver a factor of four.
+A ceiling of 128 wins the mean and 256 wins the total time, and they disagree
+because the effect splits by molecule: 128 buys 7 to 24 per cent on the three
+small molecules and costs 6 to 10 per cent on the three large ones, which carry
+the time. The value stays at 256 for that reason. Ceilings above 512 were not
+fitted, as the curves are already rising there.
+
+One thing the fit turned up which is not about performance. `max_block_size` is
+256 and `sparsity::min_block_size` is 256 as well, so the clamp returns 256 for
+every molecule and the term which follows the size of the molecule never applies.
+The driver divides tagrisso and ubiquitin into blocks of the same size. The
+measurement says that costs it little, but it is a coincidence of two constants
+fitted for different drivers rather than a choice, and refitting the floor for the
+overlap moves this driver with it.
