@@ -85,4 +85,85 @@ compute_prim_ds_overlap_0(CSimdMatrix &buffer, const size_t target, const size_t
     }
 }
 
+auto
+compute_prim_ds_overlap_1(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                          const size_t ss, const size_t ps, const size_t ncols,
+                          const double p) -> void
+{
+    // NOTE: the factors are fixed by the pair of primitives, so they are formed
+    // once rather than for every atom pair the pair reaches.
+
+    const auto f_0 = 0.5 / p;
+
+    auto *t_0 = buffer.data(target + 0);
+    auto *t_1 = buffer.data(target + 1);
+    auto *t_2 = buffer.data(target + 2);
+    auto *t_3 = buffer.data(target + 3);
+
+    const auto *pa_x = buffer.data(pa + 0);
+    const auto *pa_y = buffer.data(pa + 1);
+    const auto *pa_z = buffer.data(pa + 2);
+
+    const auto *ss_0 = buffer.data(ss + 0);
+
+    const auto *ps_0 = buffer.data(ps + 0);
+    const auto *ps_1 = buffer.data(ps + 1);
+    const auto *ps_2 = buffer.data(ps + 2);
+
+#pragma omp simd aligned(t_0, t_1, t_2, t_3, pa_x, pa_y, pa_z, ss_0, ps_0, ps_1, \
+                         ps_2 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_0[k] = f_0 * ss_0[k]
+                 + pa_x[k] * ps_0[k];
+
+        t_1[k] = f_0 * ss_0[k]
+                 + pa_y[k] * ps_1[k];
+
+        t_2[k] = pa_y[k] * ps_2[k];
+
+        t_3[k] = f_0 * ss_0[k]
+                 + pa_z[k] * ps_2[k];
+    }
+}
+
+auto
+compute_prim_ds_overlap_2(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                          const size_t ss, const size_t ps, const size_t ncols,
+                          const double p) -> void
+{
+    // NOTE: the factors are fixed by the pair of primitives, so they are formed
+    // once rather than for every atom pair the pair reaches.
+
+    const auto f_0 = 0.5 / p;
+
+    auto *t_0 = buffer.data(target + 0);
+    auto *t_1 = buffer.data(target + 1);
+    auto *t_2 = buffer.data(target + 2);
+
+    const auto *pa_x = buffer.data(pa + 0);
+    const auto *pa_y = buffer.data(pa + 1);
+    const auto *pa_z = buffer.data(pa + 2);
+
+    const auto *ss_0 = buffer.data(ss + 0);
+
+    const auto *ps_0 = buffer.data(ps + 0);
+    const auto *ps_1 = buffer.data(ps + 1);
+    const auto *ps_2 = buffer.data(ps + 2);
+
+#pragma omp simd aligned(t_0, t_1, t_2, pa_x, pa_y, pa_z, ss_0, ps_0, ps_1, \
+                         ps_2 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_0[k] = f_0 * ss_0[k]
+                 + pa_x[k] * ps_0[k];
+
+        t_1[k] = f_0 * ss_0[k]
+                 + pa_y[k] * ps_1[k];
+
+        t_2[k] = f_0 * ss_0[k]
+                 + pa_z[k] * ps_2[k];
+    }
+}
+
 }  // namespace simdovl

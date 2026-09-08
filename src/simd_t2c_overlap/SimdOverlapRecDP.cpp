@@ -118,6 +118,10 @@ compute_dp_overlap(double               *values,
 
             const auto fovl = a_norms[i] * b_norms[j] * fpi * std::sqrt(fpi);
 
+            const auto alpha = a_exps[i];
+
+            const auto beta = b_exps[j];
+
             const auto fa = -b_exps[j] / p;
 
             simdfunc::compute_pa(buffer, coordinates, 0, ncols, fa);
@@ -134,7 +138,7 @@ compute_dp_overlap(double               *values,
         }
     }
 
-    compute_hrr_dp(values, nvalues, buffer, coordinates, 23, 29, nmax);
+    compute_hrr_dp_sph(values, nvalues, buffer, coordinates, 23, 29, nmax);
 
     for (size_t m = 0; m < 15; m++)
     {

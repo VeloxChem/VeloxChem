@@ -38,9 +38,9 @@
 namespace simdovl {  // simdovl namespace
 
 auto
-compute_hrr_pp(double *values, const size_t nvalues, CSimdMatrix &buffer,
-               const CSimdMatrix &coordinates, const size_t sp, const size_t sd,
-               const size_t nmax) -> void
+compute_hrr_pp_sph(double *values, const size_t nvalues, CSimdMatrix &buffer,
+                   const CSimdMatrix &coordinates, const size_t sp, const size_t sd,
+                   const size_t nmax) -> void
 {
     // NOTE: the rows of the values are not aligned, starting at this combination's
     // offset in the values block, so they are kept out of the clause below.
@@ -108,9 +108,9 @@ compute_hrr_pp(double *values, const size_t nvalues, CSimdMatrix &buffer,
 }
 
 auto
-compute_hrr_pp_tri(double *values, const size_t nvalues, CSimdMatrix &buffer,
-                   const CSimdMatrix &coordinates, const size_t sp, const size_t sd,
-                   const size_t nmax) -> void
+compute_hrr_pp_sph_tri(double *values, const size_t nvalues, CSimdMatrix &buffer,
+                       const CSimdMatrix &coordinates, const size_t sp, const size_t sd,
+                       const size_t nmax) -> void
 {
     // NOTE: the rows of the values are not aligned, starting at this combination's
     // offset in the values block, so they are kept out of the clause below.

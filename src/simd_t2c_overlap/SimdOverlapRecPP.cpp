@@ -117,6 +117,10 @@ compute_pp_overlap(double               *values,
 
             const auto fovl = a_norms[i] * b_norms[j] * fpi * std::sqrt(fpi);
 
+            const auto alpha = a_exps[i];
+
+            const auto beta = b_exps[j];
+
             const auto fb = a_exps[i] / p;
 
             simdfunc::compute_pb(buffer, coordinates, 0, ncols, fb);
@@ -125,13 +129,13 @@ compute_pp_overlap(double               *values,
 
             compute_prim_sp_overlap_0(buffer, 4, 0, 3, ncols);
 
-            compute_prim_sd_overlap_0(buffer, 7, 0, 3, 4, ncols, p);
+            compute_prim_sd_overlap_2(buffer, 7, 0, 3, 4, ncols, p);
 
             simdfunc::contract_primitives(buffer, 13, 4, 9, ncols);
         }
     }
 
-    compute_hrr_pp_tri(values, nvalues, buffer, coordinates, 13, 16, nmax);
+    compute_hrr_pp_sph_tri(values, nvalues, buffer, coordinates, 13, 16, nmax);
 
     for (size_t m = 0; m < 9; m++)
     {

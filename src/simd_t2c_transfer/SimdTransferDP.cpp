@@ -39,9 +39,9 @@
 namespace simdovl {  // simdovl namespace
 
 auto
-compute_hrr_dp(double *values, const size_t nvalues, CSimdMatrix &buffer,
-               const CSimdMatrix &coordinates, const size_t ds, const size_t fs,
-               const size_t nmax) -> void
+compute_hrr_dp_sph(double *values, const size_t nvalues, CSimdMatrix &buffer,
+                   const CSimdMatrix &coordinates, const size_t ds, const size_t fs,
+                   const size_t nmax) -> void
 {
     // NOTE: the factors are fixed by the pair of primitives, so they are formed
     // once rather than for every atom pair the pair reaches.
