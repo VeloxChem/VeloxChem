@@ -91,6 +91,9 @@ class Stage(IntEnum):
 # other. What invalidates them is a different active site, and _adopt -- the
 # one place a site is taken on -- is what drops them.
 STAGE_FIELDS = {
+    # the site itself is replaced rather than cleared, by _adopt, so entering
+    # this stage has nothing to drop. The row is kept so the table reads as
+    # the whole of the ordering rather than the part of it that owns state.
     Stage.ACTIVE_SITE: (),
     Stage.FITTED: ('_forcefield', ),
     Stage.ENZYME: ('_enzyme_system', ),
@@ -177,6 +180,9 @@ class MetalSiteForceFieldBuilder:
         - mute_scf: The flag for muting the output of the QM drivers.
         - do_qm_optimization: The flag for optimizing the active site before the
           Hessian is computed.
+        - do_hessian: The flag for computing the Hessian. Off fits the metal
+          terms on default force constants instead, so a run can reach
+          Stage.FITTED with the hessian property still None.
         - do_resp: The flag for computing RESP charges. D4 charges are used
           when it is off.
         - calculate_partial_hessian: The flag for restricting the Hessian to
@@ -518,7 +524,7 @@ class MetalSiteForceFieldBuilder:
 
         return self._protonated_positions
 
-    def show_active_site(self, active_site=None, **kwargs):
+    def show_active_site(self, **kwargs):
         """
         Draws the active site as it now stands.
 
@@ -537,8 +543,6 @@ class MetalSiteForceFieldBuilder:
             Whatever Molecule.show returns.
         """
 
-        if active_site is not None:
-            return core.show_active_site(active_site, **kwargs)
         self._require('show_active_site', Stage.ACTIVE_SITE)
 
         return core.show_active_site(self._active_site, **kwargs)
@@ -798,11 +802,14 @@ class MetalSiteForceFieldBuilder:
                   'given' if self.scf_drv is not None else 'default'))
         self.ostream.print_header(
             param('QM optimization', self.do_qm_optimization))
-        self.ostream.print_header(
-            param(
-                'Hessian', 'computed, partial'
-                if self.calculate_partial_hessian else 'computed, full'))
-        if (self.calculate_partial_hessian and
+        if not self.do_hessian:
+            hessian_line = 'skipped'
+        elif self.calculate_partial_hessian:
+            hessian_line = 'computed, partial'
+        else:
+            hessian_line = 'computed, full'
+        self.ostream.print_header(param('Hessian', hessian_line))
+        if (self.do_hessian and self.calculate_partial_hessian and
                 self.partial_hessian_cutoff is not None):
             self.ostream.print_header(
                 param('Hessian cutoff', f'{self.partial_hessian_cutoff:.2f} A'))
@@ -1547,8 +1554,8 @@ class MetalSiteForceFieldBuilder:
             hessian = self.calculate_hessian()
         else:
             self.ostream.print_info(
-                'Skipping the Hessian calculation; Using default force constants for the metal terms.'
-            )
+                'Skipping the Hessian calculation; using default force '
+                'constants for the metal terms.')
             self.ostream.flush()
 
         charges = self._on_master(lambda: core._resolve_partial_charges(
