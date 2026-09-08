@@ -453,14 +453,6 @@ class MetalForceFieldManager:
         return Molecule.show_grid(molecules, **kwargs)
 
     # ------------------------------------------------------------------
-    # description
-    #
-    # A described site is the query and the template in one vocabulary:
-    # a coarse residue graph, a heavy atom map and a formula per node.
-    # Both the comparison and the shoehorning read it.
-    # ------------------------------------------------------------------
-
-    # ------------------------------------------------------------------
     # comparison
     # ------------------------------------------------------------------
 
@@ -628,6 +620,8 @@ class MetalForceFieldManager:
         self._comparison = results
         self._print_comparison(results)
 
+        # the table this decision would print is printed by the one caller
+        # that acts on it, build_ff_from_template
         return self._select_template(None)['name'] is not None
 
     def _print_comparison(self, results):
@@ -643,10 +637,10 @@ class MetalForceFieldManager:
 
         # a spec is printed for the structure, and for any template that
         # coordinates a different set of residues than it does
-        specs = {None: self._nodes_of(results['active_site'])}
+        specs = {None: self._spec_of(results['active_site'])}
         for name, entry in results['templates'].items():
             if entry['status'] == 'spec':
-                specs[name] = self._nodes_of(self.templates[name])
+                specs[name] = self._spec_of(self.templates[name])
 
         scores = {
             name: self._selection_score(entry)
@@ -659,10 +653,10 @@ class MetalForceFieldManager:
                                   scores,
                                   ostream=self.ostream)
 
-    def _nodes_of(self, described):
+    def _spec_of(self, described):
         """
-        Returns a described site paired with its residue nodes, which is what
-        printing.print_spec is drawn from.
+        Returns a described site paired with the residues that bridge it,
+        which is what printing.print_spec is drawn from.
 
         :param described:
             A described active site or a template.
@@ -672,7 +666,7 @@ class MetalForceFieldManager:
         """
 
         return (described,
-                matching.residue_nodes(described['coarse_topology']))
+                matching.bridging_nodes(described['coarse_topology']))
 
     # ------------------------------------------------------------------
     # selection
@@ -760,7 +754,24 @@ class MetalForceFieldManager:
                 decision['entry'] = comparison['templates'][name]
                 decision['score'] = decision['scores'][name]
 
-        printing.print_selection(comparison,
+        return decision
+
+    def _print_decision(self, decision):
+        """
+        Prints how every template stood against the criteria, and which one
+        was taken.
+
+        Separate from _select_template because a decision is made twice --
+        once to answer compare_active_site's boolean and once to act on in
+        build_ff_from_template -- and printing the whole field twice for one
+        comparison only invited the reader to look for what had changed
+        between them. Nothing had.
+
+        :param decision:
+            The decision, as _select_template makes it.
+        """
+
+        printing.print_selection(self._comparison,
                                  decision,
                                  self.RMSD_REGIONS,
                                  self.IC_TYPES,
@@ -769,8 +780,6 @@ class MetalForceFieldManager:
 
         if decision['name'] is None:
             self._print_no_selection(decision)
-
-        return decision
 
     def _print_no_selection(self, decision):
         """
@@ -949,6 +958,8 @@ class MetalForceFieldManager:
 
         if template is None:
             decision = self._prefer_the_shoehorned_template(decision)
+
+        self._print_decision(decision)
 
         matched = decision['name'] is not None
         assert_msg_critical(
@@ -1283,14 +1294,6 @@ class MetalForceFieldManager:
             forcefield,
             ostream=self.ostream,
             **builder.relax_settings())
-
-    # ------------------------------------------------------------------
-    # matching
-    # ------------------------------------------------------------------
-
-    # ------------------------------------------------------------------
-    # measurement
-    # ------------------------------------------------------------------
 
     # ------------------------------------------------------------------
     # transfer

@@ -314,7 +314,7 @@ def print_shoehorn_summary(template_name, modes, variants, ostream=None):
 # ----------------------------------------------------------------------
 
 
-def print_spec(title, described, residue_nodes, ostream=None):
+def print_spec(title, described, bridging, ostream=None):
     """
     Prints what a site is made of: which residues it holds and which of them
     coordinate which metal.
@@ -326,8 +326,10 @@ def print_spec(title, described, residue_nodes, ostream=None):
         What the block is describing.
     :param described:
         A described active site or a template.
-    :param residue_nodes:
-        Its residue nodes, metals left out.
+    :param bridging:
+        Its residue nodes that coordinate more than one metal center, from
+        matching.bridging_nodes -- the same answer the spec two sites are
+        compared by is built from.
     :param ostream:
         The output stream, or None to print nothing.
     """
@@ -350,7 +352,6 @@ def print_spec(title, described, residue_nodes, ostream=None):
         ostream.print_info(
             f'  {labels[metal]}{metal}: {named(coarse.neighbors(node))}')
 
-    bridging = [node for node in residue_nodes if coarse.degree(node) > 1]
     if bridging:
         ostream.print_info(f'  bridging: {named(bridging)}')
 

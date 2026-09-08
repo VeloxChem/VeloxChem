@@ -387,12 +387,16 @@ def _metal_pairings(builder, template, described):
 
     pairings = []
 
+    # bound once for the whole search: nothing here edits the site, and
+    # every permutation would otherwise re-derive the same coordination
+    modes = builder.binding_modes
+
     for order in permutations(query_metals):
         if any(template_labels[first] != query_labels[second]
                for first, second in zip(template_metals, order)):
             continue
         pairings.append({
-            first: _metal_res_index(builder, described, second)
+            first: _metal_res_index(modes, described, second)
             for first, second in zip(template_metals, order)
         })
 
@@ -865,12 +869,18 @@ def _drop_unassigned(builder, template, donors, ostream=None):
         ostream.flush()
 
 
-def _metal_res_index(builder, described, metal):
+def _metal_res_index(modes, described, metal):
     """
     The residue index of one of the site's metal centers.
 
-    :param builder:
-        The builder holding the site.
+    Takes the coordination rather than the builder, so a caller looking up
+    several metals binds it once. binding_modes hands back a new object per
+    access, so reading it per lookup rebuilds it per lookup -- which is only
+    safe to avoid where no edit happens in between, and every caller here
+    is inside a loop that makes none.
+
+    :param modes:
+        The binding modes, bound once by the caller.
     :param described:
         The described active site.
     :param metal:
@@ -881,14 +891,15 @@ def _metal_res_index(builder, described, metal):
     """
 
     index = described['atom_map'][metal]
+    res_index = {entry['index']: entry['res_index']
+                 for entry in modes['metals']}
 
-    for entry in builder.binding_modes['metals']:
-        if entry['index'] == index:
-            return entry['res_index']
-
+    known = index in res_index
     assert_msg_critical(
-        False, 'MetalForceFieldManager: the active site holds a metal '
+        known, 'MetalForceFieldManager: the active site holds a metal '
         f'center at atom {index} that its binding modes do not')
+
+    return res_index[index]
 
 
 def _metal_entry(builder, res_index):
@@ -908,13 +919,15 @@ def _metal_entry(builder, res_index):
         The metal entry of the binding modes.
     """
 
-    for entry in builder.binding_modes['metals']:
-        if entry['res_index'] == res_index:
-            return entry
+    entries = {entry['res_index']: entry
+               for entry in builder.binding_modes['metals']}
 
+    known = res_index in entries
     assert_msg_critical(
-        False, 'MetalForceFieldManager: the structure no longer holds a '
+        known, 'MetalForceFieldManager: the structure no longer holds a '
         f'metal center in residue {res_index}')
+
+    return entries[res_index]
 
 
 def _best_heavy_mapping(template, described, match_h_count=True, max_mappings=matching.DEFAULT_MAX_MAPPINGS, ostream=None):
@@ -1297,21 +1310,31 @@ def _denticity_changes(builder, template, described, heavy_map, max_mappings=mat
 
     changes = {'added': [], 'removed': []}
 
+    # Bound once for the recording loop. Safe only because this loop
+    # applies no edit -- the edits are made by the caller, on what is
+    # returned -- and both would otherwise be rebuilt per bond: the atom
+    # list walks the whole protein, and binding_modes derives a new object
+    # per access by design.
+    atoms = list(builder.protonated_topology.atoms())
+    modes = builder.binding_modes
+
     for kind, pairs in (('added', wanted - current), ('removed',
                                                       current - wanted)):
         for pair in sorted(pairs, key=sorted):
             changes[kind].append(
-                _bond_record(builder, described, pair))
+                _bond_record(atoms, modes, described, pair))
 
     return changes
 
 
-def _bond_record(builder, described, pair):
+def _bond_record(atoms, modes, described, pair):
     """
     Names one metal-ligand bond the way an edit method takes it.
 
-    :param builder:
-        The builder holding the site.
+    :param atoms:
+        The atoms of the protonated topology, bound once by the caller.
+    :param modes:
+        The binding modes, bound once by the caller.
     :param described:
         The described active site.
     :param pair:
@@ -1324,13 +1347,12 @@ def _bond_record(builder, described, pair):
     metals = set(described['metal_indices'])
     metal, donor = sorted(pair, key=lambda index: index not in metals)
 
-    atoms = list(builder.protonated_topology.atoms())
     atom = atoms[described['atom_map'][donor]]
 
     return {
         'resid': str(atom.residue.id),
         'chain': str(atom.residue.chain.id),
         'atom': atom.name,
-        'metal': _metal_res_index(builder, described, metal),
+        'metal': _metal_res_index(modes, described, metal),
         'label': f'{core.residue_label(atom.residue)} {atom.name}',
     }

@@ -313,14 +313,29 @@ def site_spec(described):
         spec[f'{labels[metal]}{metal}'] = sorted(
             coarse.nodes[image]['key'] for image in coarse.neighbors(node))
 
-    residues = residue_nodes(coarse)
-
     spec['residues'] = sorted(coarse.nodes[node]['key']
-                              for node in residues)
-    spec['bridging'] = sorted(coarse.nodes[node]['key'] for node in residues
-                              if coarse.degree(node) > 1)
+                              for node in residue_nodes(coarse))
+    spec['bridging'] = sorted(coarse.nodes[node]['key']
+                              for node in bridging_nodes(coarse))
 
     return spec
+
+
+def bridging_nodes(coarse):
+    """
+    Returns the residue nodes that coordinate more than one metal center.
+
+    One definition, because the spec a site is compared by and the spec it
+    is reported by have to agree on which residues bridge.
+
+    :param coarse:
+        The coarse topology.
+
+    :return:
+        The nodes, in the order they were found.
+    """
+
+    return [node for node in residue_nodes(coarse) if coarse.degree(node) > 1]
 
 
 def family_key(heavy):
