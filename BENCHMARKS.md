@@ -17,10 +17,12 @@ kernel profile, the sweeps of the blocks and the block floor, the Instruments
 findings and the dense reconstruction, keep the numbers of the run which produced
 them and were not repeated; they say so where it matters.
 
-Every overlap table before the last section describes the hand written kernels,
-which were replaced by a generated set. They are kept as the record of what was
-measured at the time and do not describe the driver as it stands. The last section
-does.
+Every overlap and kinetic energy table before the two sections on the generated
+kernels describes the hand written kernels, which were replaced by a generated set,
+and was measured under the block size constants which preceded the fit recorded
+there. They are kept as the record of what was measured at the time and do not
+describe the drivers as they stand. The sections named `The generated overlap
+kernels` and `The generated kinetic energy kernels` do.
 
 ## Machine
 
@@ -2451,3 +2453,306 @@ level, both against the trend of every neighbouring row. At 127 to 194 thousand
 basis functions those allocate ten gigabytes or more per matrix and are bound by
 the memory rather than the arithmetic, and the best of three runs is not enough to
 separate them.
+
+## The generated kinetic energy kernels
+
+The kinetic energy driver was added on the same shape as the overlap driver, with
+the pair of molecular bases dropped: the operator is symmetric in the two sides,
+so it takes one basis and describes a symmetric quantity. Its kernels are
+generated to l = 6 in both orders, building both sides with vertical recurrences
+and reaching the spherical components through a transform rather than a transfer,
+and they consume the overlap intermediates on the way.
+
+Measured on an otherwise idle machine at `OMP_NUM_THREADS=14`, best of two to five
+runs, with the block size constants fitted on the overlap, `blocks_per_thread = 4`
+and `min_block_size = 256`. **ref** is `KineticEnergyDriver`, which computes every
+atom pair and carries no threshold, so it is timed once per molecule and basis and
+the same number serves both threshold rows.
+
+**The bases stop at g.** `KineticEnergyFunc.hpp` in the reference dispatches only
+up to angular momentum four and returns zeros above it, silently, although the
+`PrimRec` kernels for h and i are present in `t2c_kinetic_energy`. Every basis
+below therefore reaches g at most, asserted per case, so the reference is
+computing rather than returning zeros. The correlation consistent sets at quintuple
+and sextuple zeta are left out for that reason and not because the driver cannot
+do them.
+
+`max |d|` is the largest absolute difference over the whole matrix, filled where
+both the sparse and the dense matrix fit under eight thousand basis functions.
+`dense too big` marks the cases where the reference cannot be run at all.
+
+### tagrisso
+
+| basis | threshold | lmax | nao | ref ms | simd ms | x ref | max abs diff |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| def2-svp | 1e-14 | 2 | 683 | 1.70 | 0.79 | 2.2 | 8.94e-15 |
+| def2-svp | 1e-12 | 2 | 683 | 1.70 | 0.80 | 2.1 | 8.94e-15 |
+| def2-svpd | 1e-14 | 2 | 1010 | 1.89 | 0.87 | 2.2 | 8.94e-15 |
+| def2-svpd | 1e-12 | 2 | 1010 | 1.89 | 1.01 | 1.9 | 8.94e-15 |
+| def2-tzvp | 1e-14 | 3 | 1345 | 1.74 | 1.30 | 1.3 | 9.10e-15 |
+| def2-tzvp | 1e-12 | 3 | 1345 | 1.74 | 1.23 | 1.4 | 9.10e-15 |
+| def2-tzvpp | 1e-14 | 3 | 1609 | 1.78 | 1.16 | 1.5 | 9.10e-15 |
+| def2-tzvpp | 1e-12 | 3 | 1609 | 1.78 | 1.14 | 1.6 | 9.10e-15 |
+| def2-tzvpd | 1e-14 | 3 | 1672 | 1.43 | 1.37 | 1.0 | 9.10e-15 |
+| def2-tzvpd | 1e-12 | 3 | 1672 | 1.43 | 1.40 | 1.0 | 9.10e-15 |
+| def2-tzvppd | 1e-14 | 3 | 1936 | 2.07 | 1.48 | 1.4 | 9.10e-15 |
+| def2-tzvppd | 1e-12 | 3 | 1936 | 2.07 | 1.71 | 1.2 | 9.10e-15 |
+| def2-qzvp | 1e-14 | 4 | 3099 | 4.06 | 2.51 | 1.6 | 9.16e-15 |
+| def2-qzvp | 1e-12 | 4 | 3099 | 4.06 | 2.51 | 1.6 | 9.16e-15 |
+| def2-qzvpp | 1e-14 | 4 | 3099 | 3.82 | 2.58 | 1.5 | 9.16e-15 |
+| def2-qzvpp | 1e-12 | 4 | 3099 | 3.82 | 2.50 | 1.5 | 9.16e-15 |
+| def2-qzvpd | 1e-14 | 4 | 3426 | 4.29 | 3.12 | 1.4 | 9.16e-15 |
+| def2-qzvpd | 1e-12 | 4 | 3426 | 4.29 | 3.04 | 1.4 | 9.16e-15 |
+| def2-qzvppd | 1e-14 | 4 | 3426 | 4.30 | 3.08 | 1.4 | 9.16e-15 |
+| def2-qzvppd | 1e-12 | 4 | 3426 | 4.30 | 3.06 | 1.4 | 9.16e-15 |
+| cc-pvdz | 1e-14 | 2 | 683 | 1.03 | 0.72 | 1.4 | 8.23e-15 |
+| cc-pvdz | 1e-12 | 2 | 683 | 1.03 | 0.75 | 1.4 | 8.23e-15 |
+| cc-pvtz | 1e-14 | 3 | 1572 | 1.58 | 1.17 | 1.4 | 9.15e-15 |
+| cc-pvtz | 1e-12 | 3 | 1572 | 1.58 | 1.11 | 1.4 | 9.15e-15 |
+| cc-pvqz | 1e-14 | 4 | 3025 | 4.02 | 2.49 | 1.6 | 9.15e-15 |
+| cc-pvqz | 1e-12 | 4 | 3025 | 4.02 | 2.38 | 1.7 | 9.15e-15 |
+| aug-cc-pvdz | 1e-14 | 2 | 1148 | 1.20 | 1.00 | 1.2 | 8.23e-15 |
+| aug-cc-pvdz | 1e-12 | 2 | 1148 | 1.20 | 0.98 | 1.2 | 8.23e-15 |
+| aug-cc-pvtz | 1e-14 | 3 | 2461 | 2.50 | 2.15 | 1.2 | 9.15e-15 |
+| aug-cc-pvtz | 1e-12 | 3 | 2461 | 2.50 | 2.10 | 1.2 | 9.15e-15 |
+| aug-cc-pvqz | 1e-14 | 4 | 4478 | 8.56 | 5.48 | 1.6 | 9.15e-15 |
+| aug-cc-pvqz | 1e-12 | 4 | 4478 | 8.56 | 5.19 | 1.6 | 9.15e-15 |
+
+### c60
+
+| basis | threshold | lmax | nao | ref ms | simd ms | x ref | max abs diff |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| def2-svp | 1e-14 | 2 | 840 | 1.12 | 0.61 | 1.8 | 1.95e-15 |
+| def2-svp | 1e-12 | 2 | 840 | 1.12 | 0.75 | 1.5 | 1.95e-15 |
+| def2-svpd | 1e-14 | 2 | 1200 | 1.63 | 1.04 | 1.6 | 1.95e-15 |
+| def2-svpd | 1e-12 | 2 | 1200 | 1.63 | 0.81 | 2.0 | 1.95e-15 |
+| def2-tzvp | 1e-14 | 3 | 1860 | 2.13 | 1.34 | 1.6 | 8.67e-15 |
+| def2-tzvp | 1e-12 | 3 | 1860 | 2.13 | 1.30 | 1.6 | 8.67e-15 |
+| def2-tzvpp | 1e-14 | 3 | 1860 | 2.11 | 1.28 | 1.6 | 8.67e-15 |
+| def2-tzvpp | 1e-12 | 3 | 1860 | 2.11 | 1.28 | 1.6 | 8.67e-15 |
+| def2-tzvpd | 1e-14 | 3 | 2220 | 1.96 | 1.71 | 1.1 | 8.67e-15 |
+| def2-tzvpd | 1e-12 | 3 | 2220 | 1.96 | 1.65 | 1.2 | 8.67e-15 |
+| def2-tzvppd | 1e-14 | 3 | 2220 | 1.87 | 1.68 | 1.1 | 8.67e-15 |
+| def2-tzvppd | 1e-12 | 3 | 2220 | 1.87 | 1.63 | 1.1 | 8.67e-15 |
+| def2-qzvp | 1e-14 | 4 | 3420 | 4.94 | 3.56 | 1.4 | 9.17e-15 |
+| def2-qzvp | 1e-12 | 4 | 3420 | 4.94 | 3.22 | 1.5 | 9.17e-15 |
+| def2-qzvpp | 1e-14 | 4 | 3420 | 6.10 | 3.31 | 1.8 | 9.17e-15 |
+| def2-qzvpp | 1e-12 | 4 | 3420 | 6.10 | 3.47 | 1.8 | 9.17e-15 |
+| def2-qzvpd | 1e-14 | 4 | 3780 | 6.42 | 4.33 | 1.5 | 9.17e-15 |
+| def2-qzvpd | 1e-12 | 4 | 3780 | 6.42 | 4.16 | 1.5 | 9.17e-15 |
+| def2-qzvppd | 1e-14 | 4 | 3780 | 6.83 | 3.95 | 1.7 | 9.17e-15 |
+| def2-qzvppd | 1e-12 | 4 | 3780 | 6.83 | 4.18 | 1.6 | 9.17e-15 |
+| cc-pvdz | 1e-14 | 2 | 840 | 1.54 | 0.74 | 2.1 | 1.78e-15 |
+| cc-pvdz | 1e-12 | 2 | 840 | 1.54 | 0.70 | 2.2 | 1.78e-15 |
+| cc-pvtz | 1e-14 | 3 | 1800 | 2.08 | 1.41 | 1.5 | 9.16e-15 |
+| cc-pvtz | 1e-12 | 3 | 1800 | 2.08 | 1.33 | 1.6 | 9.16e-15 |
+| cc-pvqz | 1e-14 | 4 | 3300 | 5.31 | 3.23 | 1.6 | 9.15e-15 |
+| cc-pvqz | 1e-12 | 4 | 3300 | 5.31 | 3.13 | 1.7 | 9.15e-15 |
+| aug-cc-pvdz | 1e-14 | 2 | 1380 | 1.51 | 1.11 | 1.4 | 1.78e-15 |
+| aug-cc-pvdz | 1e-12 | 2 | 1380 | 1.51 | 1.07 | 1.4 | 1.78e-15 |
+| aug-cc-pvtz | 1e-14 | 3 | 2760 | 3.30 | 2.63 | 1.3 | 9.16e-15 |
+| aug-cc-pvtz | 1e-12 | 3 | 2760 | 3.30 | 2.55 | 1.3 | 9.16e-15 |
+| aug-cc-pvqz | 1e-14 | 4 | 4800 | 11.56 | 7.30 | 1.6 | 9.15e-15 |
+| aug-cc-pvqz | 1e-12 | 4 | 4800 | 11.56 | 6.90 | 1.7 | 9.15e-15 |
+
+### taxol
+
+| basis | threshold | lmax | nao | ref ms | simd ms | x ref | max abs diff |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| def2-svp | 1e-14 | 2 | 1099 | 1.12 | 0.83 | 1.4 | 9.13e-15 |
+| def2-svp | 1e-12 | 2 | 1099 | 1.12 | 0.83 | 1.4 | 9.13e-15 |
+| def2-svpd | 1e-14 | 2 | 1657 | 1.95 | 1.13 | 1.7 | 9.13e-15 |
+| def2-svpd | 1e-12 | 2 | 1657 | 1.95 | 1.43 | 1.4 | 9.13e-15 |
+| def2-tzvp | 1e-14 | 3 | 2185 | 2.29 | 1.39 | 1.7 | 9.14e-15 |
+| def2-tzvp | 1e-12 | 3 | 2185 | 2.29 | 1.36 | 1.7 | 9.14e-15 |
+| def2-tzvpp | 1e-14 | 3 | 2577 | 2.97 | 1.58 | 1.9 | 9.14e-15 |
+| def2-tzvpp | 1e-12 | 3 | 2577 | 2.97 | 1.52 | 1.9 | 9.14e-15 |
+| def2-tzvpd | 1e-14 | 3 | 2743 | 3.01 | 1.92 | 1.6 | 9.14e-15 |
+| def2-tzvpd | 1e-12 | 3 | 2743 | 3.01 | 1.86 | 1.6 | 9.14e-15 |
+| def2-tzvppd | 1e-14 | 3 | 3135 | 3.14 | 2.16 | 1.5 | 9.14e-15 |
+| def2-tzvppd | 1e-12 | 3 | 3135 | 3.14 | 2.14 | 1.5 | 9.14e-15 |
+| def2-qzvp | 1e-14 | 4 | 4947 | 9.64 | 3.82 | 2.5 | 9.12e-15 |
+| def2-qzvp | 1e-12 | 4 | 4947 | 9.64 | 3.61 | 2.7 | 9.12e-15 |
+| def2-qzvpp | 1e-14 | 4 | 4947 | 9.64 | 3.73 | 2.6 | 9.12e-15 |
+| def2-qzvpp | 1e-12 | 4 | 4947 | 9.64 | 3.67 | 2.6 | 9.12e-15 |
+| def2-qzvpd | 1e-14 | 4 | 5505 | 10.06 | 5.00 | 2.0 | 9.12e-15 |
+| def2-qzvpd | 1e-12 | 4 | 5505 | 10.06 | 4.81 | 2.1 | 9.12e-15 |
+| def2-qzvppd | 1e-14 | 4 | 5505 | 11.87 | 4.81 | 2.5 | 9.12e-15 |
+| def2-qzvppd | 1e-12 | 4 | 5505 | 11.87 | 4.66 | 2.5 | 9.12e-15 |
+| cc-pvdz | 1e-14 | 2 | 1099 | 2.49 | 0.90 | 2.8 | 8.96e-15 |
+| cc-pvdz | 1e-12 | 2 | 1099 | 2.49 | 0.92 | 2.7 | 8.96e-15 |
+| cc-pvtz | 1e-14 | 3 | 2516 | 2.96 | 1.61 | 1.8 | 9.04e-15 |
+| cc-pvtz | 1e-12 | 3 | 2516 | 2.96 | 1.54 | 1.9 | 9.04e-15 |
+| cc-pvqz | 1e-14 | 4 | 4825 | 8.79 | 3.63 | 2.4 | 9.17e-15 |
+| cc-pvqz | 1e-12 | 4 | 4825 | 8.79 | 3.47 | 2.5 | 9.17e-15 |
+| aug-cc-pvdz | 1e-14 | 2 | 1844 | 1.80 | 1.35 | 1.3 | 8.96e-15 |
+| aug-cc-pvdz | 1e-12 | 2 | 1844 | 1.80 | 1.36 | 1.3 | 8.96e-15 |
+| aug-cc-pvtz | 1e-14 | 3 | 3933 | 5.20 | 3.21 | 1.6 | 9.04e-15 |
+| aug-cc-pvtz | 1e-12 | 3 | 3933 | 5.20 | 3.14 | 1.7 | 9.04e-15 |
+| aug-cc-pvqz | 1e-14 | 4 | 7134 | 17.44 | 8.36 | 2.1 | 9.17e-15 |
+| aug-cc-pvqz | 1e-12 | 4 | 7134 | 17.44 | 8.14 | 2.1 | 9.17e-15 |
+
+### paracetamol_cluster
+
+| basis | threshold | lmax | nao | ref ms | simd ms | x ref | max abs diff |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| def2-svp | 1e-14 | 2 | 3184 | 3.96 | 1.76 | 2.3 | 9.13e-15 |
+| def2-svp | 1e-12 | 2 | 3184 | 3.96 | 1.68 | 2.4 | 9.13e-15 |
+| def2-svpd | 1e-14 | 2 | 4768 | 7.23 | 3.11 | 2.3 | 9.13e-15 |
+| def2-svpd | 1e-12 | 2 | 4768 | 7.23 | 2.98 | 2.4 | 9.13e-15 |
+| def2-tzvp | 1e-14 | 3 | 6320 | 13.55 | 3.64 | 3.7 | 9.15e-15 |
+| def2-tzvp | 1e-12 | 3 | 6320 | 13.55 | 3.43 | 4.0 | 9.15e-15 |
+| def2-tzvpp | 1e-14 | 3 | 7472 | 17.79 | 4.34 | 4.1 | 9.15e-15 |
+| def2-tzvpp | 1e-12 | 3 | 7472 | 17.79 | 3.96 | 4.5 | 9.15e-15 |
+| def2-tzvpd | 1e-14 | 3 | 7904 | 20.96 | 6.32 | 3.3 | 9.15e-15 |
+| def2-tzvpd | 1e-12 | 3 | 7904 | 20.96 | 5.91 | 3.5 | 9.15e-15 |
+| def2-tzvppd | 1e-14 | 3 | 9056 | 24.72 | 6.85 | 3.6 | -- |
+| def2-tzvppd | 1e-12 | 3 | 9056 | 24.72 | 6.50 | 3.8 | -- |
+| def2-qzvp | 1e-14 | 4 | 14352 | 69.56 | 11.15 | 6.2 | -- |
+| def2-qzvp | 1e-12 | 4 | 14352 | 69.56 | 10.30 | 6.8 | -- |
+| def2-qzvpp | 1e-14 | 4 | 14352 | 69.00 | 11.08 | 6.2 | -- |
+| def2-qzvpp | 1e-12 | 4 | 14352 | 69.00 | 10.24 | 6.7 | -- |
+| def2-qzvpd | 1e-14 | 4 | 15936 | 86.02 | 17.47 | 4.9 | -- |
+| def2-qzvpd | 1e-12 | 4 | 15936 | 86.02 | 15.75 | 5.5 | -- |
+| def2-qzvppd | 1e-14 | 4 | 15936 | 85.74 | 17.31 | 5.0 | -- |
+| def2-qzvppd | 1e-12 | 4 | 15936 | 85.74 | 15.48 | 5.5 | -- |
+| cc-pvdz | 1e-14 | 2 | 3184 | 6.43 | 1.92 | 3.3 | 9.11e-15 |
+| cc-pvdz | 1e-12 | 2 | 3184 | 6.43 | 1.84 | 3.5 | 9.11e-15 |
+| cc-pvtz | 1e-14 | 3 | 7296 | 19.01 | 4.21 | 4.5 | 9.15e-15 |
+| cc-pvtz | 1e-12 | 3 | 7296 | 19.01 | 3.91 | 4.9 | 9.15e-15 |
+| cc-pvqz | 1e-14 | 4 | 14000 | 67.72 | 10.39 | 6.5 | -- |
+| cc-pvqz | 1e-12 | 4 | 14000 | 67.72 | 9.38 | 7.2 | -- |
+| aug-cc-pvdz | 1e-14 | 2 | 5344 | 11.53 | 4.11 | 2.8 | 9.11e-15 |
+| aug-cc-pvdz | 1e-12 | 2 | 5344 | 11.53 | 3.92 | 2.9 | 9.11e-15 |
+| aug-cc-pvtz | 1e-14 | 3 | 11408 | 41.96 | 11.27 | 3.7 | -- |
+| aug-cc-pvtz | 1e-12 | 3 | 11408 | 41.96 | 10.52 | 4.0 | -- |
+| aug-cc-pvqz | 1e-14 | 4 | 20704 | 157.24 | 34.51 | 4.6 | -- |
+| aug-cc-pvqz | 1e-12 | 4 | 20704 | 157.24 | 31.00 | 5.1 | -- |
+
+### crambin
+
+| basis | threshold | lmax | nao | ref ms | simd ms | x ref | max abs diff |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| def2-svp | 1e-14 | 2 | 6177 | 14.91 | 2.53 | 5.9 | 9.17e-15 |
+| def2-svp | 1e-12 | 2 | 6177 | 14.91 | 2.43 | 6.1 | 9.17e-15 |
+| def2-svpd | 1e-14 | 2 | 9294 | 27.24 | 5.35 | 5.1 | -- |
+| def2-svpd | 1e-12 | 2 | 9294 | 27.24 | 5.14 | 5.3 | -- |
+| def2-tzvp | 1e-14 | 3 | 12063 | 50.94 | 6.25 | 8.2 | -- |
+| def2-tzvp | 1e-12 | 3 | 12063 | 50.94 | 5.54 | 9.2 | -- |
+| def2-tzvpp | 1e-14 | 3 | 14613 | 69.78 | 6.79 | 10.3 | -- |
+| def2-tzvpp | 1e-12 | 3 | 14613 | 69.78 | 6.24 | 11.2 | -- |
+| def2-tzvpd | 1e-14 | 3 | 15180 | 74.67 | 12.62 | 5.9 | -- |
+| def2-tzvpd | 1e-12 | 3 | 15180 | 74.67 | 11.44 | 6.5 | -- |
+| def2-tzvppd | 1e-14 | 3 | 17730 | 92.74 | 14.33 | 6.5 | -- |
+| def2-tzvppd | 1e-12 | 3 | 17730 | 92.74 | 12.29 | 7.5 | -- |
+| def2-qzvp | 1e-14 | 4 | 28167 | 274.07 | 20.77 | 13.2 | -- |
+| def2-qzvp | 1e-12 | 4 | 28167 | 274.07 | 19.15 | 14.3 | -- |
+| def2-qzvpp | 1e-14 | 4 | 28167 | 276.43 | 21.59 | 12.8 | -- |
+| def2-qzvpp | 1e-12 | 4 | 28167 | 276.43 | 18.72 | 14.8 | -- |
+| def2-qzvpd | 1e-14 | 4 | 31284 | -- | 39.92 | -- | -- |
+| def2-qzvpd | 1e-12 | 4 | 31284 | -- | 34.03 | -- | -- |
+| def2-qzvppd | 1e-14 | 4 | 31284 | -- | 38.93 | -- | -- |
+| def2-qzvppd | 1e-12 | 4 | 31284 | -- | 34.41 | -- | -- |
+| cc-pvdz | 1e-14 | 2 | 6177 | 23.11 | 3.04 | 7.6 | 1.42e-14 |
+| cc-pvdz | 1e-12 | 2 | 6177 | 23.11 | 2.83 | 8.2 | 1.42e-14 |
+| cc-pvtz | 1e-14 | 3 | 14244 | 81.09 | 6.70 | 12.1 | -- |
+| cc-pvtz | 1e-12 | 3 | 14244 | 81.09 | 6.10 | 13.3 | -- |
+| cc-pvqz | 1e-14 | 4 | 27459 | 269.24 | 19.45 | 13.8 | -- |
+| cc-pvqz | 1e-12 | 4 | 27459 | 269.24 | 17.20 | 15.7 | -- |
+| aug-cc-pvdz | 1e-14 | 2 | 10380 | 43.94 | 8.48 | 5.2 | -- |
+| aug-cc-pvdz | 1e-12 | 2 | 10380 | 43.94 | 7.72 | 5.7 | -- |
+| aug-cc-pvtz | 1e-14 | 3 | 22311 | 156.07 | 25.99 | 6.0 | -- |
+| aug-cc-pvtz | 1e-12 | 3 | 22311 | 156.07 | 23.19 | 6.7 | -- |
+| aug-cc-pvqz | 1e-14 | 4 | 40674 | -- | 98.76 | -- | -- |
+| aug-cc-pvqz | 1e-12 | 4 | 40674 | -- | 86.79 | -- | -- |
+
+### ubiquitin
+
+| basis | threshold | lmax | nao | ref ms | simd ms | x ref | max abs diff |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| def2-svp | 1e-14 | 2 | 11577 | 55.21 | 4.40 | 12.5 | -- |
+| def2-svp | 1e-12 | 2 | 11577 | 55.21 | 4.04 | 13.7 | -- |
+| def2-svpd | 1e-14 | 2 | 17433 | 94.84 | 12.14 | 7.8 | -- |
+| def2-svpd | 1e-12 | 2 | 17433 | 94.84 | 10.03 | 9.5 | -- |
+| def2-tzvp | 1e-14 | 3 | 22442 | 176.50 | 11.13 | 15.9 | -- |
+| def2-tzvp | 1e-12 | 3 | 22442 | 176.50 | 9.93 | 17.8 | -- |
+| def2-tzvpp | 1e-14 | 3 | 27479 | 259.35 | 13.56 | 19.1 | -- |
+| def2-tzvpp | 1e-12 | 3 | 27479 | 259.35 | 11.47 | 22.6 | -- |
+| def2-tzvpd | 1e-14 | 3 | 28298 | 274.51 | 31.25 | 8.8 | -- |
+| def2-tzvpd | 1e-12 | 3 | 28298 | 274.51 | 26.43 | 10.4 | -- |
+| def2-tzvppd | 1e-14 | 3 | 33335 | -- | 36.56 | -- | -- |
+| def2-tzvppd | 1e-12 | 3 | 33335 | -- | 30.75 | -- | -- |
+| def2-qzvp | 1e-14 | 4 | 53197 | -- | 50.25 | -- | -- |
+| def2-qzvp | 1e-12 | 4 | 53197 | -- | 40.43 | -- | -- |
+| def2-qzvpp | 1e-14 | 4 | 53197 | -- | 48.06 | -- | -- |
+| def2-qzvpp | 1e-12 | 4 | 53197 | -- | 40.90 | -- | -- |
+| def2-qzvpd | 1e-14 | 4 | 59053 | -- | 112.50 | -- | -- |
+| def2-qzvpd | 1e-12 | 4 | 59053 | -- | 97.71 | -- | -- |
+| def2-qzvppd | 1e-14 | 4 | 59053 | -- | 110.37 | -- | -- |
+| def2-qzvppd | 1e-12 | 4 | 59053 | -- | 94.84 | -- | -- |
+| cc-pvdz | 1e-14 | 2 | 11577 | 77.27 | 5.12 | 15.1 | -- |
+| cc-pvdz | 1e-12 | 2 | 11577 | 77.27 | 4.79 | 16.1 | -- |
+| cc-pvtz | 1e-14 | 3 | 26870 | 266.12 | 13.03 | 20.4 | -- |
+| cc-pvtz | 1e-12 | 3 | 26870 | 266.12 | 11.00 | 24.2 | -- |
+| cc-pvqz | 1e-14 | 4 | 51984 | -- | 42.57 | -- | -- |
+| cc-pvqz | 1e-12 | 4 | 51984 | -- | 36.29 | -- | -- |
+| aug-cc-pvdz | 1e-14 | 2 | 19511 | 150.63 | 19.88 | 7.6 | -- |
+| aug-cc-pvdz | 1e-12 | 2 | 19511 | 150.63 | 17.46 | 8.6 | -- |
+| aug-cc-pvtz | 1e-14 | 3 | 42163 | -- | 82.23 | -- | -- |
+| aug-cc-pvtz | 1e-12 | 3 | 42163 | -- | 69.78 | -- | -- |
+| aug-cc-pvqz | 1e-14 | 4 | 77098 | -- | 321.00 | -- | -- |
+| aug-cc-pvqz | 1e-12 | 4 | 77098 | -- | 271.11 | -- | -- |
+
+### The advantage against the reference
+
+| molecule | rows | x ref |
+| --- | --- | --- |
+| tagrisso | 32 | 1.5 (1.0 to 2.2) |
+| c60 | 32 | 1.5 (1.1 to 2.2) |
+| taxol | 32 | 1.9 (1.3 to 2.8) |
+| paracetamol_cluster | 32 | 4.1 (2.3 to 7.2) |
+| crambin | 26 | 8.5 (5.1 to 15.7) |
+| ubiquitin | 16 | 13.4 (7.6 to 24.2) |
+| **all** | **170** | **3.0** (1.0 to 24.2) |
+
+### What these numbers say
+
+The advantage tracks the size of the molecule, as it does for the overlap, and no
+case is slower than the reference. The smallest ratio is 1.0 and it belongs to
+tagrisso in def2-tzvpd, which is a 1.4 millisecond run.
+
+It is consistently a smaller win than the overlap on the same case: ubiquitin in
+cc-pVTZ is 24.2 here against 29.5 for the overlap, crambin in def2-qzvp 14.3
+against 18.2. The kinetic kernels carry the overlap intermediates as well as their
+own recurrence, so there is more arithmetic behind each surviving atom pair, while
+the reference's work grows in much the same way for both operators.
+
+Loosening the threshold from 1.0e-14 to 1.0e-12 is worth 5 to 20 per cent, the
+same as for the overlap.
+
+The c60 rows are worth reading against the overlap section. Under the block size
+constants which preceded this measurement c60 was a single block and the overlap
+lost to the reference on thirty six of its forty rows. Here it wins on all
+thirty two, between 1.1 and 2.2 times, which is the refitted floor rather than
+anything about the kinetic kernels.
+
+### What the kernels are checked against
+
+The same center integrals go through a closed form rather than a kernel:
+(2 l + 3) a b / (a + b) times the overlap of the two primitives, which follows
+from applying the operator to a solid harmonic Gaussian. It reproduces the
+reference exactly for l = 0 to 4, to 1.8e-15.
+
+The combinations above g cannot be checked against the reference at all. They were
+checked instead against the operator identity
+
+    T = (2 l_b + 3) b S + 2 b^2 dS/db
+
+which holds because the operator on a solid harmonic Gaussian is
+`(2l + 3) b - 2 b^2 r^2` times the function itself, and `r^2 exp(-b r^2)` is the
+derivative of the exponential in the exponent. The derivative was taken by central
+difference on the overlap driver, which does reach l = 6. The thirteen
+combinations involving h or i agree with it to between 2e-10 and 6e-8 relative,
+against a control of 5e-10 on the (s|s) combination, which is itself exact against
+the reference. That is the accuracy of the finite difference and not of the
+kernels.
