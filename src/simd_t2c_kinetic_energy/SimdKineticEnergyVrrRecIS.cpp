@@ -81,6 +81,9 @@ compute_prim_is_kinetic_energy_0(CSimdMatrix &buffer, const size_t target, const
     auto *t_22 = buffer.data(target + 22);
     auto *t_23 = buffer.data(target + 23);
     auto *t_24 = buffer.data(target + 24);
+    auto *t_25 = buffer.data(target + 25);
+    auto *t_26 = buffer.data(target + 26);
+    auto *t_27 = buffer.data(target + 27);
 
     const auto *pa_x = buffer.data(pa + 0);
     const auto *pa_y = buffer.data(pa + 1);
@@ -88,37 +91,39 @@ compute_prim_is_kinetic_energy_0(CSimdMatrix &buffer, const size_t target, const
 
     const auto *gs_s_0 = buffer.data(gs_s + 0);
     const auto *gs_s_3 = buffer.data(gs_s + 3);
-    const auto *gs_s_4 = buffer.data(gs_s + 4);
     const auto *gs_s_5 = buffer.data(gs_s + 5);
     const auto *gs_s_6 = buffer.data(gs_s + 6);
-    const auto *gs_s_7 = buffer.data(gs_s + 7);
     const auto *gs_s_9 = buffer.data(gs_s + 9);
     const auto *gs_s_10 = buffer.data(gs_s + 10);
-    const auto *gs_s_11 = buffer.data(gs_s + 11);
+    const auto *gs_s_12 = buffer.data(gs_s + 12);
+    const auto *gs_s_13 = buffer.data(gs_s + 13);
+    const auto *gs_s_14 = buffer.data(gs_s + 14);
 
     const auto *gs_0 = buffer.data(gs + 0);
     const auto *gs_3 = buffer.data(gs + 3);
-    const auto *gs_4 = buffer.data(gs + 4);
     const auto *gs_5 = buffer.data(gs + 5);
     const auto *gs_6 = buffer.data(gs + 6);
-    const auto *gs_7 = buffer.data(gs + 7);
     const auto *gs_9 = buffer.data(gs + 9);
     const auto *gs_10 = buffer.data(gs + 10);
-    const auto *gs_11 = buffer.data(gs + 11);
+    const auto *gs_12 = buffer.data(gs + 12);
+    const auto *gs_13 = buffer.data(gs + 13);
+    const auto *gs_14 = buffer.data(gs + 14);
 
     const auto *hs_0 = buffer.data(hs + 0);
+    const auto *hs_2 = buffer.data(hs + 2);
     const auto *hs_3 = buffer.data(hs + 3);
-    const auto *hs_4 = buffer.data(hs + 4);
     const auto *hs_5 = buffer.data(hs + 5);
-    const auto *hs_8 = buffer.data(hs + 8);
+    const auto *hs_6 = buffer.data(hs + 6);
     const auto *hs_9 = buffer.data(hs + 9);
     const auto *hs_10 = buffer.data(hs + 10);
-    const auto *hs_11 = buffer.data(hs + 11);
     const auto *hs_12 = buffer.data(hs + 12);
     const auto *hs_14 = buffer.data(hs + 14);
     const auto *hs_15 = buffer.data(hs + 15);
     const auto *hs_16 = buffer.data(hs + 16);
     const auto *hs_17 = buffer.data(hs + 17);
+    const auto *hs_18 = buffer.data(hs + 18);
+    const auto *hs_19 = buffer.data(hs + 19);
+    const auto *hs_20 = buffer.data(hs + 20);
 
     const auto *is_s_0 = buffer.data(is_s + 0);
     const auto *is_s_1 = buffer.data(is_s + 1);
@@ -145,6 +150,9 @@ compute_prim_is_kinetic_energy_0(CSimdMatrix &buffer, const size_t target, const
     const auto *is_s_22 = buffer.data(is_s + 22);
     const auto *is_s_23 = buffer.data(is_s + 23);
     const auto *is_s_24 = buffer.data(is_s + 24);
+    const auto *is_s_25 = buffer.data(is_s + 25);
+    const auto *is_s_26 = buffer.data(is_s + 26);
+    const auto *is_s_27 = buffer.data(is_s + 27);
 
 #pragma omp simd aligned(t_0, t_1, t_2, pa_x, pa_y, pa_z, gs_s_0, gs_0, hs_0, is_s_0, is_s_1, \
                          is_s_2 : simd::cache_line_size())
@@ -162,8 +170,8 @@ compute_prim_is_kinetic_energy_0(CSimdMatrix &buffer, const size_t target, const
                  + f_2 * is_s_2[k];
     }
 
-#pragma omp simd aligned(t_3, t_4, t_5, pa_x, gs_s_3, gs_s_4, gs_s_5, gs_3, gs_4, gs_5, hs_3, \
-                         hs_4, hs_5, is_s_3, is_s_4, is_s_5 : simd::cache_line_size())
+#pragma omp simd aligned(t_3, t_4, t_5, pa_x, pa_y, gs_s_3, gs_s_5, gs_3, gs_5, hs_2, hs_3, \
+                         hs_5, is_s_3, is_s_4, is_s_5 : simd::cache_line_size())
     for (size_t k = 0; k < ncols; k++)
     {
         t_3[k] = -f_3 * gs_s_3[k]
@@ -171,747 +179,136 @@ compute_prim_is_kinetic_energy_0(CSimdMatrix &buffer, const size_t target, const
                  + pa_x[k] * hs_3[k]
                  + f_2 * is_s_3[k];
 
-        t_4[k] = -f_3 * gs_s_4[k]
-                 + f_4 * gs_4[k]
-                 + pa_x[k] * hs_4[k]
+        t_4[k] = pa_y[k] * hs_2[k]
                  + f_2 * is_s_4[k];
 
-        t_5[k] = -f_5 * gs_s_5[k]
-                 + f_6 * gs_5[k]
+        t_5[k] = -f_3 * gs_s_5[k]
+                 + f_4 * gs_5[k]
                  + pa_x[k] * hs_5[k]
                  + f_2 * is_s_5[k];
     }
 
-#pragma omp simd aligned(t_6, t_7, t_8, pa_x, pa_y, pa_z, gs_s_6, gs_6, hs_3, hs_4, hs_8, \
+#pragma omp simd aligned(t_6, t_7, t_8, pa_x, pa_y, pa_z, gs_s_6, gs_6, hs_3, hs_5, hs_6, \
                          is_s_6, is_s_7, is_s_8 : simd::cache_line_size())
     for (size_t k = 0; k < ncols; k++)
     {
-        t_6[k] = pa_z[k] * hs_3[k]
+        t_6[k] = -f_5 * gs_s_6[k]
+                 + f_6 * gs_6[k]
+                 + pa_x[k] * hs_6[k]
                  + f_2 * is_s_6[k];
 
-        t_7[k] = pa_y[k] * hs_4[k]
+        t_7[k] = pa_z[k] * hs_3[k]
                  + f_2 * is_s_7[k];
 
-        t_8[k] = -f_5 * gs_s_6[k]
-                 + f_6 * gs_6[k]
-                 + pa_x[k] * hs_8[k]
+        t_8[k] = pa_y[k] * hs_5[k]
                  + f_2 * is_s_8[k];
     }
 
-#pragma omp simd aligned(t_9, t_10, t_11, pa_x, pa_z, gs_s_7, gs_s_9, gs_7, gs_9, hs_5, hs_9, \
-                         hs_10, is_s_9, is_s_10, is_s_11 : simd::cache_line_size())
+#pragma omp simd aligned(t_9, t_10, t_11, pa_x, pa_z, gs_s_9, gs_s_10, gs_9, gs_10, hs_6, \
+                         hs_9, hs_10, is_s_9, is_s_10, is_s_11 : simd::cache_line_size())
     for (size_t k = 0; k < ncols; k++)
     {
-        t_9[k] = -f_7 * gs_s_7[k]
-                 + f_8 * gs_7[k]
+        t_9[k] = -f_5 * gs_s_9[k]
+                 + f_6 * gs_9[k]
                  + pa_x[k] * hs_9[k]
                  + f_2 * is_s_9[k];
 
-        t_10[k] = pa_z[k] * hs_5[k]
+        t_10[k] = -f_7 * gs_s_10[k]
+                  + f_8 * gs_10[k]
+                  + pa_x[k] * hs_10[k]
                   + f_2 * is_s_10[k];
 
-        t_11[k] = -f_7 * gs_s_9[k]
-                  + f_8 * gs_9[k]
-                  + pa_x[k] * hs_10[k]
+        t_11[k] = pa_z[k] * hs_6[k]
                   + f_2 * is_s_11[k];
     }
 
-#pragma omp simd aligned(t_12, t_13, t_14, t_15, pa_x, pa_y, gs_s_11, gs_11, hs_8, hs_11, \
-                         hs_12, hs_14, is_s_12, is_s_13, is_s_14, \
-                         is_s_15 : simd::cache_line_size())
+#pragma omp simd aligned(t_12, t_13, t_14, pa_x, pa_y, gs_s_12, gs_s_14, gs_12, gs_14, hs_9, \
+                         hs_12, hs_14, is_s_12, is_s_13, is_s_14 : simd::cache_line_size())
     for (size_t k = 0; k < ncols; k++)
     {
-        t_12[k] = pa_y[k] * hs_8[k]
+        t_12[k] = -f_7 * gs_s_12[k]
+                  + f_8 * gs_12[k]
+                  + pa_x[k] * hs_12[k]
                   + f_2 * is_s_12[k];
 
-        t_13[k] = -f_7 * gs_s_11[k]
-                  + f_8 * gs_11[k]
-                  + pa_x[k] * hs_11[k]
+        t_13[k] = pa_y[k] * hs_9[k]
                   + f_2 * is_s_13[k];
 
-        t_14[k] = pa_x[k] * hs_12[k]
+        t_14[k] = -f_7 * gs_s_14[k]
+                  + f_8 * gs_14[k]
+                  + pa_x[k] * hs_14[k]
                   + f_2 * is_s_14[k];
-
-        t_15[k] = pa_x[k] * hs_14[k]
-                  + f_2 * is_s_15[k];
     }
 
-#pragma omp simd aligned(t_16, t_17, t_18, t_19, pa_x, pa_y, pa_z, gs_s_7, gs_7, hs_12, hs_15, \
-                         hs_17, is_s_16, is_s_17, is_s_18, is_s_19 : simd::cache_line_size())
+#pragma omp simd aligned(t_15, t_16, t_17, t_18, t_19, pa_x, hs_15, hs_16, hs_17, hs_18, \
+                         hs_19, is_s_15, is_s_16, is_s_17, is_s_18, \
+                         is_s_19 : simd::cache_line_size())
     for (size_t k = 0; k < ncols; k++)
     {
-        t_16[k] = pa_x[k] * hs_15[k]
+        t_15[k] = pa_x[k] * hs_15[k]
+                  + f_2 * is_s_15[k];
+
+        t_16[k] = pa_x[k] * hs_16[k]
                   + f_2 * is_s_16[k];
 
         t_17[k] = pa_x[k] * hs_17[k]
                   + f_2 * is_s_17[k];
 
-        t_18[k] = -f_0 * gs_s_7[k]
-                  + f_1 * gs_7[k]
-                  + pa_y[k] * hs_12[k]
+        t_18[k] = pa_x[k] * hs_18[k]
                   + f_2 * is_s_18[k];
 
-        t_19[k] = pa_z[k] * hs_12[k]
+        t_19[k] = pa_x[k] * hs_19[k]
                   + f_2 * is_s_19[k];
     }
 
-#pragma omp simd aligned(t_20, t_21, t_22, pa_y, gs_s_9, gs_s_10, gs_s_11, gs_9, gs_10, gs_11, \
-                         hs_14, hs_15, hs_16, is_s_20, is_s_21, \
-                         is_s_22 : simd::cache_line_size())
+#pragma omp simd aligned(t_20, t_21, t_22, pa_x, pa_y, pa_z, gs_s_10, gs_10, hs_15, hs_20, \
+                         is_s_20, is_s_21, is_s_22 : simd::cache_line_size())
     for (size_t k = 0; k < ncols; k++)
     {
-        t_20[k] = -f_3 * gs_s_9[k]
-                  + f_4 * gs_9[k]
-                  + pa_y[k] * hs_14[k]
+        t_20[k] = pa_x[k] * hs_20[k]
                   + f_2 * is_s_20[k];
 
-        t_21[k] = -f_5 * gs_s_10[k]
-                  + f_6 * gs_10[k]
+        t_21[k] = -f_0 * gs_s_10[k]
+                  + f_1 * gs_10[k]
                   + pa_y[k] * hs_15[k]
                   + f_2 * is_s_21[k];
 
-        t_22[k] = -f_7 * gs_s_11[k]
-                  + f_8 * gs_11[k]
-                  + pa_y[k] * hs_16[k]
+        t_22[k] = pa_z[k] * hs_15[k]
                   + f_2 * is_s_22[k];
     }
 
-#pragma omp simd aligned(t_23, t_24, pa_y, pa_z, gs_s_11, gs_11, hs_17, is_s_23, \
-                         is_s_24 : simd::cache_line_size())
+#pragma omp simd aligned(t_23, t_24, t_25, pa_y, gs_s_12, gs_s_13, gs_s_14, gs_12, gs_13, \
+                         gs_14, hs_17, hs_18, hs_19, is_s_23, is_s_24, \
+                         is_s_25 : simd::cache_line_size())
     for (size_t k = 0; k < ncols; k++)
     {
-        t_23[k] = pa_y[k] * hs_17[k]
+        t_23[k] = -f_3 * gs_s_12[k]
+                  + f_4 * gs_12[k]
+                  + pa_y[k] * hs_17[k]
                   + f_2 * is_s_23[k];
 
-        t_24[k] = -f_0 * gs_s_11[k]
-                  + f_1 * gs_11[k]
-                  + pa_z[k] * hs_17[k]
+        t_24[k] = -f_5 * gs_s_13[k]
+                  + f_6 * gs_13[k]
+                  + pa_y[k] * hs_18[k]
                   + f_2 * is_s_24[k];
-    }
-}
 
-auto
-compute_prim_is_kinetic_energy_1(CSimdMatrix &buffer, const size_t target, const size_t pa,
-                                 const size_t gs_s, const size_t gs, const size_t hs,
-                                 const size_t is_s, const size_t ncols, const double alpha,
-                                 const double beta, const double p) -> void
-{
-    // NOTE: the factors are fixed by the pair of primitives, so they are formed
-    // once rather than for every atom pair the pair reaches.
-
-    const auto f_0 = 5.0 * beta / p;
-    const auto f_1 = 2.5 / p;
-    const auto f_2 = 2.0 * alpha * beta / p;
-    const auto f_3 = 3.0 * beta / p;
-    const auto f_4 = 1.5 / p;
-    const auto f_5 = 2.0 * beta / p;
-    const auto f_6 = 1.0 / p;
-    const auto f_7 = beta / p;
-    const auto f_8 = 0.5 / p;
-
-    auto *t_0 = buffer.data(target + 0);
-    auto *t_1 = buffer.data(target + 1);
-    auto *t_2 = buffer.data(target + 2);
-    auto *t_3 = buffer.data(target + 3);
-    auto *t_4 = buffer.data(target + 4);
-    auto *t_5 = buffer.data(target + 5);
-    auto *t_6 = buffer.data(target + 6);
-    auto *t_7 = buffer.data(target + 7);
-    auto *t_8 = buffer.data(target + 8);
-    auto *t_9 = buffer.data(target + 9);
-    auto *t_10 = buffer.data(target + 10);
-    auto *t_11 = buffer.data(target + 11);
-    auto *t_12 = buffer.data(target + 12);
-    auto *t_13 = buffer.data(target + 13);
-    auto *t_14 = buffer.data(target + 14);
-    auto *t_15 = buffer.data(target + 15);
-    auto *t_16 = buffer.data(target + 16);
-    auto *t_17 = buffer.data(target + 17);
-    auto *t_18 = buffer.data(target + 18);
-    auto *t_19 = buffer.data(target + 19);
-    auto *t_20 = buffer.data(target + 20);
-    auto *t_21 = buffer.data(target + 21);
-    auto *t_22 = buffer.data(target + 22);
-
-    const auto *pa_x = buffer.data(pa + 0);
-    const auto *pa_y = buffer.data(pa + 1);
-    const auto *pa_z = buffer.data(pa + 2);
-
-    const auto *gs_s_0 = buffer.data(gs_s + 0);
-    const auto *gs_s_3 = buffer.data(gs_s + 3);
-    const auto *gs_s_4 = buffer.data(gs_s + 4);
-    const auto *gs_s_5 = buffer.data(gs_s + 5);
-    const auto *gs_s_6 = buffer.data(gs_s + 6);
-    const auto *gs_s_7 = buffer.data(gs_s + 7);
-    const auto *gs_s_9 = buffer.data(gs_s + 9);
-    const auto *gs_s_10 = buffer.data(gs_s + 10);
-    const auto *gs_s_11 = buffer.data(gs_s + 11);
-
-    const auto *gs_0 = buffer.data(gs + 0);
-    const auto *gs_3 = buffer.data(gs + 3);
-    const auto *gs_4 = buffer.data(gs + 4);
-    const auto *gs_5 = buffer.data(gs + 5);
-    const auto *gs_6 = buffer.data(gs + 6);
-    const auto *gs_7 = buffer.data(gs + 7);
-    const auto *gs_9 = buffer.data(gs + 9);
-    const auto *gs_10 = buffer.data(gs + 10);
-    const auto *gs_11 = buffer.data(gs + 11);
-
-    const auto *hs_0 = buffer.data(hs + 0);
-    const auto *hs_3 = buffer.data(hs + 3);
-    const auto *hs_4 = buffer.data(hs + 4);
-    const auto *hs_5 = buffer.data(hs + 5);
-    const auto *hs_8 = buffer.data(hs + 8);
-    const auto *hs_9 = buffer.data(hs + 9);
-    const auto *hs_10 = buffer.data(hs + 10);
-    const auto *hs_11 = buffer.data(hs + 11);
-    const auto *hs_12 = buffer.data(hs + 12);
-    const auto *hs_14 = buffer.data(hs + 14);
-    const auto *hs_15 = buffer.data(hs + 15);
-    const auto *hs_16 = buffer.data(hs + 16);
-    const auto *hs_17 = buffer.data(hs + 17);
-
-    const auto *is_s_0 = buffer.data(is_s + 0);
-    const auto *is_s_1 = buffer.data(is_s + 1);
-    const auto *is_s_2 = buffer.data(is_s + 2);
-    const auto *is_s_3 = buffer.data(is_s + 3);
-    const auto *is_s_4 = buffer.data(is_s + 4);
-    const auto *is_s_5 = buffer.data(is_s + 5);
-    const auto *is_s_6 = buffer.data(is_s + 6);
-    const auto *is_s_7 = buffer.data(is_s + 7);
-    const auto *is_s_8 = buffer.data(is_s + 8);
-    const auto *is_s_9 = buffer.data(is_s + 9);
-    const auto *is_s_10 = buffer.data(is_s + 10);
-    const auto *is_s_11 = buffer.data(is_s + 11);
-    const auto *is_s_12 = buffer.data(is_s + 12);
-    const auto *is_s_13 = buffer.data(is_s + 13);
-    const auto *is_s_14 = buffer.data(is_s + 14);
-    const auto *is_s_15 = buffer.data(is_s + 15);
-    const auto *is_s_16 = buffer.data(is_s + 16);
-    const auto *is_s_17 = buffer.data(is_s + 17);
-    const auto *is_s_18 = buffer.data(is_s + 18);
-    const auto *is_s_19 = buffer.data(is_s + 19);
-    const auto *is_s_20 = buffer.data(is_s + 20);
-    const auto *is_s_21 = buffer.data(is_s + 21);
-    const auto *is_s_22 = buffer.data(is_s + 22);
-
-#pragma omp simd aligned(t_0, t_1, t_2, pa_x, pa_y, pa_z, gs_s_0, gs_0, hs_0, is_s_0, is_s_1, \
-                         is_s_2 : simd::cache_line_size())
-    for (size_t k = 0; k < ncols; k++)
-    {
-        t_0[k] = -f_0 * gs_s_0[k]
-                 + f_1 * gs_0[k]
-                 + pa_x[k] * hs_0[k]
-                 + f_2 * is_s_0[k];
-
-        t_1[k] = pa_y[k] * hs_0[k]
-                 + f_2 * is_s_1[k];
-
-        t_2[k] = pa_z[k] * hs_0[k]
-                 + f_2 * is_s_2[k];
+        t_25[k] = -f_7 * gs_s_14[k]
+                  + f_8 * gs_14[k]
+                  + pa_y[k] * hs_19[k]
+                  + f_2 * is_s_25[k];
     }
 
-#pragma omp simd aligned(t_3, t_4, t_5, pa_x, gs_s_3, gs_s_4, gs_s_5, gs_3, gs_4, gs_5, hs_3, \
-                         hs_4, hs_5, is_s_3, is_s_4, is_s_5 : simd::cache_line_size())
+#pragma omp simd aligned(t_26, t_27, pa_y, pa_z, gs_s_14, gs_14, hs_20, is_s_26, \
+                         is_s_27 : simd::cache_line_size())
     for (size_t k = 0; k < ncols; k++)
     {
-        t_3[k] = -f_3 * gs_s_3[k]
-                 + f_4 * gs_3[k]
-                 + pa_x[k] * hs_3[k]
-                 + f_2 * is_s_3[k];
-
-        t_4[k] = -f_3 * gs_s_4[k]
-                 + f_4 * gs_4[k]
-                 + pa_x[k] * hs_4[k]
-                 + f_2 * is_s_4[k];
-
-        t_5[k] = -f_5 * gs_s_5[k]
-                 + f_6 * gs_5[k]
-                 + pa_x[k] * hs_5[k]
-                 + f_2 * is_s_5[k];
-    }
-
-#pragma omp simd aligned(t_6, t_7, t_8, pa_x, pa_y, pa_z, gs_s_6, gs_6, hs_3, hs_4, hs_8, \
-                         is_s_6, is_s_7, is_s_8 : simd::cache_line_size())
-    for (size_t k = 0; k < ncols; k++)
-    {
-        t_6[k] = pa_z[k] * hs_3[k]
-                 + f_2 * is_s_6[k];
-
-        t_7[k] = pa_y[k] * hs_4[k]
-                 + f_2 * is_s_7[k];
-
-        t_8[k] = -f_5 * gs_s_6[k]
-                 + f_6 * gs_6[k]
-                 + pa_x[k] * hs_8[k]
-                 + f_2 * is_s_8[k];
-    }
-
-#pragma omp simd aligned(t_9, t_10, t_11, pa_x, pa_z, gs_s_7, gs_s_9, gs_7, gs_9, hs_5, hs_9, \
-                         hs_10, is_s_9, is_s_10, is_s_11 : simd::cache_line_size())
-    for (size_t k = 0; k < ncols; k++)
-    {
-        t_9[k] = -f_7 * gs_s_7[k]
-                 + f_8 * gs_7[k]
-                 + pa_x[k] * hs_9[k]
-                 + f_2 * is_s_9[k];
-
-        t_10[k] = pa_z[k] * hs_5[k]
-                  + f_2 * is_s_10[k];
-
-        t_11[k] = -f_7 * gs_s_9[k]
-                  + f_8 * gs_9[k]
-                  + pa_x[k] * hs_10[k]
-                  + f_2 * is_s_11[k];
-    }
-
-#pragma omp simd aligned(t_12, t_13, t_14, t_15, pa_x, pa_y, gs_s_11, gs_11, hs_8, hs_11, \
-                         hs_12, hs_17, is_s_12, is_s_13, is_s_14, \
-                         is_s_15 : simd::cache_line_size())
-    for (size_t k = 0; k < ncols; k++)
-    {
-        t_12[k] = pa_y[k] * hs_8[k]
-                  + f_2 * is_s_12[k];
-
-        t_13[k] = -f_7 * gs_s_11[k]
-                  + f_8 * gs_11[k]
-                  + pa_x[k] * hs_11[k]
-                  + f_2 * is_s_13[k];
-
-        t_14[k] = pa_x[k] * hs_12[k]
-                  + f_2 * is_s_14[k];
-
-        t_15[k] = pa_x[k] * hs_17[k]
-                  + f_2 * is_s_15[k];
-    }
-
-#pragma omp simd aligned(t_16, t_17, t_18, pa_y, pa_z, gs_s_7, gs_s_9, gs_7, gs_9, hs_12, \
-                         hs_14, is_s_16, is_s_17, is_s_18 : simd::cache_line_size())
-    for (size_t k = 0; k < ncols; k++)
-    {
-        t_16[k] = -f_0 * gs_s_7[k]
-                  + f_1 * gs_7[k]
-                  + pa_y[k] * hs_12[k]
-                  + f_2 * is_s_16[k];
-
-        t_17[k] = pa_z[k] * hs_12[k]
-                  + f_2 * is_s_17[k];
-
-        t_18[k] = -f_3 * gs_s_9[k]
-                  + f_4 * gs_9[k]
-                  + pa_y[k] * hs_14[k]
-                  + f_2 * is_s_18[k];
-    }
-
-#pragma omp simd aligned(t_19, t_20, t_21, pa_y, gs_s_10, gs_s_11, gs_10, gs_11, hs_15, hs_16, \
-                         hs_17, is_s_19, is_s_20, is_s_21 : simd::cache_line_size())
-    for (size_t k = 0; k < ncols; k++)
-    {
-        t_19[k] = -f_5 * gs_s_10[k]
-                  + f_6 * gs_10[k]
-                  + pa_y[k] * hs_15[k]
-                  + f_2 * is_s_19[k];
-
-        t_20[k] = -f_7 * gs_s_11[k]
-                  + f_8 * gs_11[k]
-                  + pa_y[k] * hs_16[k]
-                  + f_2 * is_s_20[k];
-
-        t_21[k] = pa_y[k] * hs_17[k]
-                  + f_2 * is_s_21[k];
-    }
-
-#pragma omp simd aligned(t_22, pa_z, gs_s_11, gs_11, hs_17, is_s_22 : simd::cache_line_size())
-    for (size_t k = 0; k < ncols; k++)
-    {
-        t_22[k] = -f_0 * gs_s_11[k]
-                  + f_1 * gs_11[k]
-                  + pa_z[k] * hs_17[k]
-                  + f_2 * is_s_22[k];
-    }
-}
-
-auto
-compute_prim_is_kinetic_energy_2(CSimdMatrix &buffer, const size_t target, const size_t pa,
-                                 const size_t gs_s, const size_t gs, const size_t hs,
-                                 const size_t is_s, const size_t ncols, const double alpha,
-                                 const double beta, const double p) -> void
-{
-    // NOTE: the factors are fixed by the pair of primitives, so they are formed
-    // once rather than for every atom pair the pair reaches.
-
-    const auto f_0 = 5.0 * beta / p;
-    const auto f_1 = 2.5 / p;
-    const auto f_2 = 2.0 * alpha * beta / p;
-    const auto f_3 = 3.0 * beta / p;
-    const auto f_4 = 1.5 / p;
-    const auto f_5 = 2.0 * beta / p;
-    const auto f_6 = 1.0 / p;
-    const auto f_7 = beta / p;
-    const auto f_8 = 0.5 / p;
-
-    auto *t_0 = buffer.data(target + 0);
-    auto *t_1 = buffer.data(target + 1);
-    auto *t_2 = buffer.data(target + 2);
-    auto *t_3 = buffer.data(target + 3);
-    auto *t_4 = buffer.data(target + 4);
-    auto *t_5 = buffer.data(target + 5);
-    auto *t_6 = buffer.data(target + 6);
-    auto *t_7 = buffer.data(target + 7);
-    auto *t_8 = buffer.data(target + 8);
-    auto *t_9 = buffer.data(target + 9);
-    auto *t_10 = buffer.data(target + 10);
-    auto *t_11 = buffer.data(target + 11);
-    auto *t_12 = buffer.data(target + 12);
-    auto *t_13 = buffer.data(target + 13);
-    auto *t_14 = buffer.data(target + 14);
-    auto *t_15 = buffer.data(target + 15);
-    auto *t_16 = buffer.data(target + 16);
-    auto *t_17 = buffer.data(target + 17);
-
-    const auto *pa_x = buffer.data(pa + 0);
-    const auto *pa_y = buffer.data(pa + 1);
-    const auto *pa_z = buffer.data(pa + 2);
-
-    const auto *gs_s_0 = buffer.data(gs_s + 0);
-    const auto *gs_s_3 = buffer.data(gs_s + 3);
-    const auto *gs_s_4 = buffer.data(gs_s + 4);
-    const auto *gs_s_5 = buffer.data(gs_s + 5);
-    const auto *gs_s_6 = buffer.data(gs_s + 6);
-    const auto *gs_s_7 = buffer.data(gs_s + 7);
-    const auto *gs_s_9 = buffer.data(gs_s + 9);
-    const auto *gs_s_10 = buffer.data(gs_s + 10);
-    const auto *gs_s_11 = buffer.data(gs_s + 11);
-
-    const auto *gs_0 = buffer.data(gs + 0);
-    const auto *gs_3 = buffer.data(gs + 3);
-    const auto *gs_4 = buffer.data(gs + 4);
-    const auto *gs_5 = buffer.data(gs + 5);
-    const auto *gs_6 = buffer.data(gs + 6);
-    const auto *gs_7 = buffer.data(gs + 7);
-    const auto *gs_9 = buffer.data(gs + 9);
-    const auto *gs_10 = buffer.data(gs + 10);
-    const auto *gs_11 = buffer.data(gs + 11);
-
-    const auto *hs_0 = buffer.data(hs + 0);
-    const auto *hs_3 = buffer.data(hs + 3);
-    const auto *hs_4 = buffer.data(hs + 4);
-    const auto *hs_5 = buffer.data(hs + 5);
-    const auto *hs_7 = buffer.data(hs + 7);
-    const auto *hs_8 = buffer.data(hs + 8);
-    const auto *hs_9 = buffer.data(hs + 9);
-    const auto *hs_10 = buffer.data(hs + 10);
-    const auto *hs_11 = buffer.data(hs + 11);
-    const auto *hs_13 = buffer.data(hs + 13);
-    const auto *hs_14 = buffer.data(hs + 14);
-    const auto *hs_15 = buffer.data(hs + 15);
-    const auto *hs_16 = buffer.data(hs + 16);
-
-    const auto *is_s_0 = buffer.data(is_s + 0);
-    const auto *is_s_1 = buffer.data(is_s + 1);
-    const auto *is_s_2 = buffer.data(is_s + 2);
-    const auto *is_s_3 = buffer.data(is_s + 3);
-    const auto *is_s_4 = buffer.data(is_s + 4);
-    const auto *is_s_5 = buffer.data(is_s + 5);
-    const auto *is_s_6 = buffer.data(is_s + 6);
-    const auto *is_s_7 = buffer.data(is_s + 7);
-    const auto *is_s_8 = buffer.data(is_s + 8);
-    const auto *is_s_9 = buffer.data(is_s + 9);
-    const auto *is_s_10 = buffer.data(is_s + 10);
-    const auto *is_s_11 = buffer.data(is_s + 11);
-    const auto *is_s_12 = buffer.data(is_s + 12);
-    const auto *is_s_13 = buffer.data(is_s + 13);
-    const auto *is_s_14 = buffer.data(is_s + 14);
-    const auto *is_s_15 = buffer.data(is_s + 15);
-    const auto *is_s_16 = buffer.data(is_s + 16);
-    const auto *is_s_18 = buffer.data(is_s + 18);
-
-#pragma omp simd aligned(t_0, t_1, t_2, pa_x, pa_y, pa_z, gs_s_0, gs_0, hs_0, is_s_0, is_s_1, \
-                         is_s_2 : simd::cache_line_size())
-    for (size_t k = 0; k < ncols; k++)
-    {
-        t_0[k] = -f_0 * gs_s_0[k]
-                 + f_1 * gs_0[k]
-                 + pa_x[k] * hs_0[k]
-                 + f_2 * is_s_0[k];
-
-        t_1[k] = pa_y[k] * hs_0[k]
-                 + f_2 * is_s_1[k];
-
-        t_2[k] = pa_z[k] * hs_0[k]
-                 + f_2 * is_s_2[k];
-    }
-
-#pragma omp simd aligned(t_3, t_4, t_5, pa_x, gs_s_3, gs_s_4, gs_s_5, gs_3, gs_4, gs_5, hs_3, \
-                         hs_4, hs_5, is_s_3, is_s_4, is_s_5 : simd::cache_line_size())
-    for (size_t k = 0; k < ncols; k++)
-    {
-        t_3[k] = -f_3 * gs_s_3[k]
-                 + f_4 * gs_3[k]
-                 + pa_x[k] * hs_3[k]
-                 + f_2 * is_s_3[k];
-
-        t_4[k] = -f_3 * gs_s_4[k]
-                 + f_4 * gs_4[k]
-                 + pa_x[k] * hs_4[k]
-                 + f_2 * is_s_4[k];
-
-        t_5[k] = -f_5 * gs_s_5[k]
-                 + f_6 * gs_5[k]
-                 + pa_x[k] * hs_5[k]
-                 + f_2 * is_s_5[k];
-    }
-
-#pragma omp simd aligned(t_6, t_7, t_8, pa_x, pa_z, gs_s_6, gs_s_7, gs_6, gs_7, hs_3, hs_7, \
-                         hs_8, is_s_6, is_s_7, is_s_8 : simd::cache_line_size())
-    for (size_t k = 0; k < ncols; k++)
-    {
-        t_6[k] = pa_z[k] * hs_3[k]
-                 + f_2 * is_s_6[k];
-
-        t_7[k] = -f_5 * gs_s_6[k]
-                 + f_6 * gs_6[k]
-                 + pa_x[k] * hs_7[k]
-                 + f_2 * is_s_7[k];
-
-        t_8[k] = -f_7 * gs_s_7[k]
-                 + f_8 * gs_7[k]
-                 + pa_x[k] * hs_8[k]
-                 + f_2 * is_s_8[k];
-    }
-
-#pragma omp simd aligned(t_9, t_10, t_11, pa_x, pa_z, gs_s_9, gs_s_11, gs_9, gs_11, hs_5, \
-                         hs_9, hs_10, is_s_9, is_s_10, is_s_11 : simd::cache_line_size())
-    for (size_t k = 0; k < ncols; k++)
-    {
-        t_9[k] = pa_z[k] * hs_5[k]
-                 + f_2 * is_s_9[k];
-
-        t_10[k] = -f_7 * gs_s_9[k]
-                  + f_8 * gs_9[k]
-                  + pa_x[k] * hs_9[k]
-                  + f_2 * is_s_10[k];
-
-        t_11[k] = -f_7 * gs_s_11[k]
-                  + f_8 * gs_11[k]
-                  + pa_x[k] * hs_10[k]
-                  + f_2 * is_s_11[k];
-    }
-
-#pragma omp simd aligned(t_12, t_13, t_14, pa_y, pa_z, gs_s_7, gs_s_9, gs_7, gs_9, hs_11, \
-                         hs_13, is_s_12, is_s_13, is_s_14 : simd::cache_line_size())
-    for (size_t k = 0; k < ncols; k++)
-    {
-        t_12[k] = -f_0 * gs_s_7[k]
-                  + f_1 * gs_7[k]
-                  + pa_y[k] * hs_11[k]
-                  + f_2 * is_s_12[k];
-
-        t_13[k] = pa_z[k] * hs_11[k]
-                  + f_2 * is_s_13[k];
-
-        t_14[k] = -f_3 * gs_s_9[k]
-                  + f_4 * gs_9[k]
-                  + pa_y[k] * hs_13[k]
-                  + f_2 * is_s_14[k];
-    }
-
-#pragma omp simd aligned(t_15, t_16, t_17, pa_y, pa_z, gs_s_10, gs_s_11, gs_10, gs_11, hs_14, \
-                         hs_15, hs_16, is_s_15, is_s_16, is_s_18 : simd::cache_line_size())
-    for (size_t k = 0; k < ncols; k++)
-    {
-        t_15[k] = -f_5 * gs_s_10[k]
-                  + f_6 * gs_10[k]
-                  + pa_y[k] * hs_14[k]
-                  + f_2 * is_s_15[k];
-
-        t_16[k] = -f_7 * gs_s_11[k]
-                  + f_8 * gs_11[k]
-                  + pa_y[k] * hs_15[k]
-                  + f_2 * is_s_16[k];
-
-        t_17[k] = -f_0 * gs_s_11[k]
-                  + f_1 * gs_11[k]
-                  + pa_z[k] * hs_16[k]
-                  + f_2 * is_s_18[k];
-    }
-}
-
-auto
-compute_prim_is_kinetic_energy_3(CSimdMatrix &buffer, const size_t target, const size_t pa,
-                                 const size_t gs_s, const size_t gs, const size_t hs,
-                                 const size_t is_s, const size_t ncols, const double alpha,
-                                 const double beta, const double p) -> void
-{
-    // NOTE: the factors are fixed by the pair of primitives, so they are formed
-    // once rather than for every atom pair the pair reaches.
-
-    const auto f_0 = 5.0 * beta / p;
-    const auto f_1 = 2.5 / p;
-    const auto f_2 = 2.0 * alpha * beta / p;
-    const auto f_3 = 3.0 * beta / p;
-    const auto f_4 = 1.5 / p;
-    const auto f_5 = 2.0 * beta / p;
-    const auto f_6 = 1.0 / p;
-    const auto f_7 = beta / p;
-    const auto f_8 = 0.5 / p;
-
-    auto *t_0 = buffer.data(target + 0);
-    auto *t_1 = buffer.data(target + 1);
-    auto *t_2 = buffer.data(target + 2);
-    auto *t_3 = buffer.data(target + 3);
-    auto *t_4 = buffer.data(target + 4);
-    auto *t_5 = buffer.data(target + 5);
-    auto *t_6 = buffer.data(target + 6);
-    auto *t_7 = buffer.data(target + 7);
-    auto *t_8 = buffer.data(target + 8);
-    auto *t_9 = buffer.data(target + 9);
-    auto *t_10 = buffer.data(target + 10);
-    auto *t_11 = buffer.data(target + 11);
-    auto *t_12 = buffer.data(target + 12);
-    auto *t_13 = buffer.data(target + 13);
-
-    const auto *pa_x = buffer.data(pa + 0);
-    const auto *pa_y = buffer.data(pa + 1);
-    const auto *pa_z = buffer.data(pa + 2);
-
-    const auto *gs_s_0 = buffer.data(gs_s + 0);
-    const auto *gs_s_2 = buffer.data(gs_s + 2);
-    const auto *gs_s_3 = buffer.data(gs_s + 3);
-    const auto *gs_s_4 = buffer.data(gs_s + 4);
-    const auto *gs_s_5 = buffer.data(gs_s + 5);
-    const auto *gs_s_6 = buffer.data(gs_s + 6);
-    const auto *gs_s_8 = buffer.data(gs_s + 8);
-    const auto *gs_s_9 = buffer.data(gs_s + 9);
-    const auto *gs_s_10 = buffer.data(gs_s + 10);
-
-    const auto *gs_0 = buffer.data(gs + 0);
-    const auto *gs_2 = buffer.data(gs + 2);
-    const auto *gs_3 = buffer.data(gs + 3);
-    const auto *gs_4 = buffer.data(gs + 4);
-    const auto *gs_5 = buffer.data(gs + 5);
-    const auto *gs_6 = buffer.data(gs + 6);
-    const auto *gs_8 = buffer.data(gs + 8);
-    const auto *gs_9 = buffer.data(gs + 9);
-    const auto *gs_10 = buffer.data(gs + 10);
-
-    const auto *hs_0 = buffer.data(hs + 0);
-    const auto *hs_2 = buffer.data(hs + 2);
-    const auto *hs_3 = buffer.data(hs + 3);
-    const auto *hs_4 = buffer.data(hs + 4);
-    const auto *hs_5 = buffer.data(hs + 5);
-    const auto *hs_6 = buffer.data(hs + 6);
-    const auto *hs_7 = buffer.data(hs + 7);
-    const auto *hs_8 = buffer.data(hs + 8);
-    const auto *hs_10 = buffer.data(hs + 10);
-    const auto *hs_11 = buffer.data(hs + 11);
-    const auto *hs_12 = buffer.data(hs + 12);
-    const auto *hs_13 = buffer.data(hs + 13);
-
-    const auto *is_s_0 = buffer.data(is_s + 0);
-    const auto *is_s_1 = buffer.data(is_s + 1);
-    const auto *is_s_2 = buffer.data(is_s + 2);
-    const auto *is_s_3 = buffer.data(is_s + 3);
-    const auto *is_s_4 = buffer.data(is_s + 4);
-    const auto *is_s_5 = buffer.data(is_s + 5);
-    const auto *is_s_6 = buffer.data(is_s + 6);
-    const auto *is_s_7 = buffer.data(is_s + 7);
-    const auto *is_s_8 = buffer.data(is_s + 8);
-    const auto *is_s_9 = buffer.data(is_s + 9);
-    const auto *is_s_10 = buffer.data(is_s + 10);
-    const auto *is_s_11 = buffer.data(is_s + 11);
-    const auto *is_s_12 = buffer.data(is_s + 12);
-    const auto *is_s_14 = buffer.data(is_s + 14);
-
-#pragma omp simd aligned(t_0, t_1, t_2, pa_x, pa_z, gs_s_0, gs_s_2, gs_0, gs_2, hs_0, hs_2, \
-                         is_s_0, is_s_1, is_s_2 : simd::cache_line_size())
-    for (size_t k = 0; k < ncols; k++)
-    {
-        t_0[k] = -f_0 * gs_s_0[k]
-                 + f_1 * gs_0[k]
-                 + pa_x[k] * hs_0[k]
-                 + f_2 * is_s_0[k];
-
-        t_1[k] = pa_z[k] * hs_0[k]
-                 + f_2 * is_s_1[k];
-
-        t_2[k] = -f_3 * gs_s_2[k]
-                 + f_4 * gs_2[k]
-                 + pa_x[k] * hs_2[k]
-                 + f_2 * is_s_2[k];
-    }
-
-#pragma omp simd aligned(t_3, t_4, t_5, pa_x, gs_s_3, gs_s_4, gs_s_5, gs_3, gs_4, gs_5, hs_3, \
-                         hs_4, hs_5, is_s_3, is_s_4, is_s_5 : simd::cache_line_size())
-    for (size_t k = 0; k < ncols; k++)
-    {
-        t_3[k] = -f_3 * gs_s_3[k]
-                 + f_4 * gs_3[k]
-                 + pa_x[k] * hs_3[k]
-                 + f_2 * is_s_3[k];
-
-        t_4[k] = -f_5 * gs_s_4[k]
-                 + f_6 * gs_4[k]
-                 + pa_x[k] * hs_4[k]
-                 + f_2 * is_s_4[k];
-
-        t_5[k] = -f_5 * gs_s_5[k]
-                 + f_6 * gs_5[k]
-                 + pa_x[k] * hs_5[k]
-                 + f_2 * is_s_5[k];
-    }
-
-#pragma omp simd aligned(t_6, t_7, t_8, pa_x, pa_y, gs_s_6, gs_s_10, gs_6, gs_10, hs_6, hs_7, \
-                         hs_8, is_s_6, is_s_7, is_s_8 : simd::cache_line_size())
-    for (size_t k = 0; k < ncols; k++)
-    {
-        t_6[k] = -f_7 * gs_s_6[k]
-                 + f_8 * gs_6[k]
-                 + pa_x[k] * hs_6[k]
-                 + f_2 * is_s_6[k];
-
-        t_7[k] = -f_7 * gs_s_10[k]
-                 + f_8 * gs_10[k]
-                 + pa_x[k] * hs_7[k]
-                 + f_2 * is_s_7[k];
-
-        t_8[k] = -f_0 * gs_s_6[k]
-                 + f_1 * gs_6[k]
-                 + pa_y[k] * hs_8[k]
-                 + f_2 * is_s_8[k];
-    }
-
-#pragma omp simd aligned(t_9, t_10, t_11, pa_y, pa_z, gs_s_8, gs_s_9, gs_8, gs_9, hs_8, hs_10, \
-                         hs_11, is_s_9, is_s_10, is_s_11 : simd::cache_line_size())
-    for (size_t k = 0; k < ncols; k++)
-    {
-        t_9[k] = pa_z[k] * hs_8[k]
-                 + f_2 * is_s_9[k];
-
-        t_10[k] = -f_3 * gs_s_8[k]
-                  + f_4 * gs_8[k]
-                  + pa_y[k] * hs_10[k]
-                  + f_2 * is_s_10[k];
-
-        t_11[k] = -f_5 * gs_s_9[k]
-                  + f_6 * gs_9[k]
-                  + pa_y[k] * hs_11[k]
-                  + f_2 * is_s_11[k];
-    }
-
-#pragma omp simd aligned(t_12, t_13, pa_y, pa_z, gs_s_10, gs_10, hs_12, hs_13, is_s_12, \
-                         is_s_14 : simd::cache_line_size())
-    for (size_t k = 0; k < ncols; k++)
-    {
-        t_12[k] = -f_7 * gs_s_10[k]
-                  + f_8 * gs_10[k]
-                  + pa_y[k] * hs_12[k]
-                  + f_2 * is_s_12[k];
-
-        t_13[k] = -f_0 * gs_s_10[k]
-                  + f_1 * gs_10[k]
-                  + pa_z[k] * hs_13[k]
-                  + f_2 * is_s_14[k];
+        t_26[k] = pa_y[k] * hs_20[k]
+                  + f_2 * is_s_26[k];
+
+        t_27[k] = -f_0 * gs_s_14[k]
+                  + f_1 * gs_14[k]
+                  + pa_z[k] * hs_20[k]
+                  + f_2 * is_s_27[k];
     }
 }
 

@@ -48,33 +48,6 @@ compute_prim_hh_kinetic_energy_0(CSimdMatrix &buffer, const size_t target, const
                                  const size_t ncols, const double alpha, const double beta,
                                  const double p) -> void;
 
-/// @brief Takes one step of the recurrence for one pair of primitives.
-auto
-compute_prim_hh_kinetic_energy_1(CSimdMatrix &buffer, const size_t target, const size_t pa,
-                                 const size_t pb, const size_t fh_s, const size_t fh,
-                                 const size_t gg, const size_t gh, const size_t hf_s,
-                                 const size_t hh_s, const size_t hf, const size_t hg,
-                                 const size_t ncols, const double alpha, const double beta,
-                                 const double p) -> void;
-
-/// @brief Takes one step of the recurrence for one pair of primitives.
-auto
-compute_prim_hh_kinetic_energy_2(CSimdMatrix &buffer, const size_t target, const size_t pa,
-                                 const size_t pb, const size_t fh_s, const size_t fh,
-                                 const size_t gg, const size_t gh, const size_t hf_s,
-                                 const size_t hh_s, const size_t hf, const size_t hg,
-                                 const size_t ncols, const double alpha, const double beta,
-                                 const double p) -> void;
-
-/// @brief Takes one step of the recurrence for one pair of primitives.
-auto
-compute_prim_hh_kinetic_energy_3(CSimdMatrix &buffer, const size_t target, const size_t pa,
-                                 const size_t pb, const size_t fh_s, const size_t fh,
-                                 const size_t gg, const size_t gh, const size_t hf_s,
-                                 const size_t hh_s, const size_t hf, const size_t hg,
-                                 const size_t ncols, const double alpha, const double beta,
-                                 const double p) -> void;
-
 }  // namespace simdkin
 
 #endif /* SimdKineticEnergyVrrRecHH_hpp */

@@ -46,20 +46,6 @@ compute_prim_ds_kinetic_energy_0(CSimdMatrix &buffer, const size_t target, const
                                  const size_t ds_s, const size_t ncols, const double alpha,
                                  const double beta, const double p) -> void;
 
-/// @brief Takes one step of the recurrence for one pair of primitives.
-auto
-compute_prim_ds_kinetic_energy_1(CSimdMatrix &buffer, const size_t target, const size_t pa,
-                                 const size_t ss_s, const size_t ss, const size_t ps,
-                                 const size_t ds_s, const size_t ncols, const double alpha,
-                                 const double beta, const double p) -> void;
-
-/// @brief Takes one step of the recurrence for one pair of primitives.
-auto
-compute_prim_ds_kinetic_energy_2(CSimdMatrix &buffer, const size_t target, const size_t pa,
-                                 const size_t ss_s, const size_t ss, const size_t ps,
-                                 const size_t ds_s, const size_t ncols, const double alpha,
-                                 const double beta, const double p) -> void;
-
 }  // namespace simdkin
 
 #endif /* SimdKineticEnergyVrrRecDS_hpp */

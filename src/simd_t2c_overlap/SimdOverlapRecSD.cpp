@@ -43,19 +43,20 @@
 #include "SimdDimensions.hpp"
 #include "SimdPrimitives.hpp"
 
-#include "SimdOverlapCtrVrrSD.hpp"
+#include "SimdOverlapVrrRecSD.hpp"
 #include "SimdOverlapVrrRecSP.hpp"
 #include "SimdOverlapVrrRecSS.hpp"
+#include "SimdTransformD.hpp"
 
 namespace simdovl {  // simdovl namespace
 
 auto
 compute_sd_overlap(double               *values,
-                        const size_t          nvalues,
-                        const CBasisFunction &bra,
-                        const CBasisFunction &ket,
-                        const CSimdMatrix    &coordinates,
-                        const double          threshold) -> void
+                   const size_t          nvalues,
+                   const CBasisFunction &bra,
+                   const CBasisFunction &ket,
+                   const CSimdMatrix    &coordinates,
+                   const double          threshold) -> void
 {
     if (nvalues > coordinates.number_of_columns())
     {
@@ -64,12 +65,6 @@ compute_sd_overlap(double               *values,
     }
 
     if (nvalues == 0) return;
-
-    // NOTE: the values are zeroed before anything writes them, the composed
-    // step accumulating into them as the sum over primitives runs. The atom
-    // pairs no pair of primitives reaches keep the zeros set here.
-
-    std::fill(values, values + 5 * nvalues, 0.0);
 
     const auto &a_exps = bra.exponents();
 
@@ -92,9 +87,16 @@ compute_sd_overlap(double               *values,
     const auto dimensions = simdfunc::make_column_dimensions(
         bra, ket, nvalues, coordinates, screenfunc::two_center_overlap_primitive_bound, threshold / static_cast<double>(nprims));
 
-    auto buffer = simdfunc::make_primitive_buffer(dimensions, 7);
+    auto buffer = simdfunc::make_primitive_buffer(dimensions, 19);
 
-    if (buffer.number_of_columns() == 0) return;
+    if (buffer.number_of_columns() == 0)
+    {
+        std::fill(values, values + 5 * nvalues, 0.0);
+
+        return;
+    }
+
+    const auto nmax = buffer.number_of_columns();
 
     errors::assertMsgCritical(dimensions.size() == nprim_a * nprim_b,
                               std::string("Dimensions do not match the pairs of primitives"));
@@ -123,8 +125,19 @@ compute_sd_overlap(double               *values,
 
             compute_prim_sp_overlap_0(buffer, 4, 0, 3, ncols);
 
-            compute_ctr_sd_overlap_0(values, nvalues, buffer, 0, 4, ncols);
+            compute_prim_sd_overlap_0(buffer, 7, 0, 3, 4, ncols, p);
+
+            simdfunc::contract_primitives(buffer, 13, 7, 6, ncols);
         }
+    }
+
+    simdtrf::transform_d_outer(values, nvalues, buffer, 13, 1, nmax);
+
+    for (size_t m = 0; m < 5; m++)
+    {
+        auto *pv = values + m * nvalues;
+
+        std::fill(pv + nmax, pv + nvalues, 0.0);
     }
 }
 

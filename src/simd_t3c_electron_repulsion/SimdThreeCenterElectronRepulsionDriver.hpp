@@ -241,7 +241,8 @@ CSimdThreeCenterElectronRepulsionDriver::compute(const CTripleSparsityPattern &p
                                                            b_basis.functions()[j],
                                                            c_basis.functions()[k],
                                                            coordinates,
-                                                           c_coordinates);
+                                                           c_coordinates,
+                                                           pattern.get_threshold());
 
                     distributor.commit(
                         block, static_cast<size_t>(iblk), la, ia, lb, jb, lc, kc, npairs, natoms, ncomps);

@@ -47,16 +47,17 @@
 #include "SimdElectronRepulsionVrrRecDS.hpp"
 #include "SimdElectronRepulsionVrrRecPP.hpp"
 #include "SimdElectronRepulsionVrrRecPS.hpp"
-#include "SimdTransformDP.hpp"
+#include "SimdTransformD.hpp"
+#include "SimdTransformP.hpp"
 
 namespace simdt2ceri {  // simdt2ceri namespace
 
 auto
 compute_dp_electron_repulsion(double               *values,
-                                   const size_t          nvalues,
-                                   const CBasisFunction &bra,
-                                   const CBasisFunction &ket,
-                                   const CSimdMatrix    &coordinates) -> void
+                              const size_t          nvalues,
+                              const CBasisFunction &bra,
+                              const CBasisFunction &ket,
+                              const CSimdMatrix    &coordinates) -> void
 {
     if (nvalues > coordinates.number_of_columns())
     {
@@ -78,7 +79,7 @@ compute_dp_electron_repulsion(double               *values,
 
     const auto nprim_b = b_exps.size();
 
-    auto buffer = CSimdMatrix(61, nvalues);
+    auto buffer = CSimdMatrix(85, nvalues);
 
     buffer.zero();
 
@@ -117,17 +118,20 @@ compute_dp_electron_repulsion(double               *values,
 
             compute_prim_ps_electron_repulsion_0(buffer, 13, 0, 9, ncols);
 
-            compute_prim_ds_electron_repulsion_0(buffer, 16, 0, 7, 8, 13, ncols, alpha, beta, p);
+            compute_prim_ds_electron_repulsion_0(buffer, 16, 0, 7, 8, 13, ncols, alpha, beta,
+                                                 p);
 
-            compute_prim_pp_electron_repulsion_2(buffer, 22, 3, 8, 13, ncols, p);
+            compute_prim_pp_electron_repulsion_0(buffer, 22, 3, 8, 13, ncols, p);
 
-            compute_prim_dp_electron_repulsion_0(buffer, 25, 0, 3, 10, 22, 16, ncols, p);
+            compute_prim_dp_electron_repulsion_0(buffer, 31, 0, 3, 10, 22, 16, ncols, p);
 
-            simdfunc::contract_primitives(buffer, 43, 25, 18, ncols);
+            simdfunc::contract_primitives(buffer, 49, 31, 18, ncols);
         }
     }
 
-    simdtrf::transform_dp(values, nvalues, buffer, 43, nmax);
+    simdtrf::transform_p_inner(buffer, 67, 49, 6, nmax);
+
+    simdtrf::transform_d_outer(values, nvalues, buffer, 67, 3, nmax);
 }
 
 }  // namespace simdt2ceri

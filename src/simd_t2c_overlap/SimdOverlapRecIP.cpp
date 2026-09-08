@@ -52,16 +52,18 @@
 #include "SimdOverlapVrrRecPS.hpp"
 #include "SimdOverlapVrrRecSS.hpp"
 #include "SimdTransferIP.hpp"
+#include "SimdTransformI.hpp"
+#include "SimdTransformP.hpp"
 
 namespace simdovl {  // simdovl namespace
 
 auto
 compute_ip_overlap(double               *values,
-                        const size_t          nvalues,
-                        const CBasisFunction &bra,
-                        const CBasisFunction &ket,
-                        const CSimdMatrix    &coordinates,
-                        const double          threshold) -> void
+                   const size_t          nvalues,
+                   const CBasisFunction &bra,
+                   const CBasisFunction &ket,
+                   const CSimdMatrix    &coordinates,
+                   const double          threshold) -> void
 {
     if (nvalues > coordinates.number_of_columns())
     {
@@ -92,7 +94,7 @@ compute_ip_overlap(double               *values,
     const auto dimensions = simdfunc::make_column_dimensions(
         bra, ket, nvalues, coordinates, screenfunc::two_center_overlap_primitive_bound, threshold / static_cast<double>(nprims));
 
-    auto buffer = simdfunc::make_primitive_buffer(dimensions, 168);
+    auto buffer = simdfunc::make_primitive_buffer(dimensions, 355);
 
     if (buffer.number_of_columns() == 0)
     {
@@ -130,23 +132,27 @@ compute_ip_overlap(double               *values,
 
             compute_prim_ps_overlap_0(buffer, 4, 0, 3, ncols);
 
-            compute_prim_ds_overlap_2(buffer, 7, 0, 3, 4, ncols, p);
+            compute_prim_ds_overlap_0(buffer, 7, 0, 3, 4, ncols, p);
 
-            compute_prim_fs_overlap_3(buffer, 10, 0, 4, 7, ncols, p);
+            compute_prim_fs_overlap_0(buffer, 13, 0, 4, 7, ncols, p);
 
-            compute_prim_gs_overlap_3(buffer, 16, 0, 7, 10, ncols, p);
+            compute_prim_gs_overlap_0(buffer, 23, 0, 7, 13, ncols, p);
 
-            compute_prim_hs_overlap_3(buffer, 25, 0, 10, 16, ncols, p);
+            compute_prim_hs_overlap_0(buffer, 38, 0, 13, 23, ncols, p);
 
-            compute_prim_is_overlap_2(buffer, 40, 0, 16, 25, ncols, p);
+            compute_prim_is_overlap_0(buffer, 59, 0, 23, 38, ncols, p);
 
-            compute_prim_ks_overlap_1(buffer, 68, 0, 25, 40, ncols, p);
+            compute_prim_ks_overlap_0(buffer, 87, 0, 38, 59, ncols, p);
 
-            simdfunc::contract_primitives(buffer, 104, 40, 64, ncols);
+            simdfunc::contract_primitives(buffer, 123, 59, 64, ncols);
         }
     }
 
-    simdtrf::compute_hrr_ip_sph(values, nvalues, buffer, coordinates, 104, 132, nmax);
+    simdtrf::compute_hrr_ip(buffer, coordinates, 187, 123, 151, nmax);
+
+    simdtrf::transform_p_inner(buffer, 271, 187, 28, nmax);
+
+    simdtrf::transform_i_outer(values, nvalues, buffer, 271, 3, nmax);
 
     for (size_t m = 0; m < 39; m++)
     {

@@ -1,17 +1,5 @@
 target_sources(vlxobjs
   PRIVATE
-    SimdOverlapCtrVrrDS.cpp
-    SimdOverlapCtrVrrFS.cpp
-    SimdOverlapCtrVrrGS.cpp
-    SimdOverlapCtrVrrHS.cpp
-    SimdOverlapCtrVrrIS.cpp
-    SimdOverlapCtrVrrPS.cpp
-    SimdOverlapCtrVrrSD.cpp
-    SimdOverlapCtrVrrSF.cpp
-    SimdOverlapCtrVrrSG.cpp
-    SimdOverlapCtrVrrSH.cpp
-    SimdOverlapCtrVrrSI.cpp
-    SimdOverlapCtrVrrSP.cpp
     SimdOverlapCtrVrrSS.cpp
     SimdOverlapDriver.cpp
     SimdOverlapFunc.cpp

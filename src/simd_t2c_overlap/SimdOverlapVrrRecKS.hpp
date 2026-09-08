@@ -45,12 +45,6 @@ compute_prim_ks_overlap_0(CSimdMatrix &buffer, const size_t target, const size_t
                           const size_t hs, const size_t is, const size_t ncols,
                           const double p) -> void;
 
-/// @brief Takes one step of the recurrence for one pair of primitives.
-auto
-compute_prim_ks_overlap_1(CSimdMatrix &buffer, const size_t target, const size_t pa,
-                          const size_t hs, const size_t is, const size_t ncols,
-                          const double p) -> void;
-
 }  // namespace simdovl
 
 #endif /* SimdOverlapVrrRecKS_hpp */

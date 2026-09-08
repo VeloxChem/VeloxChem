@@ -45,13 +45,6 @@ auto
 compute_hrr_ip(CSimdMatrix &buffer, const CSimdMatrix &coordinates, const size_t target,
                const size_t is, const size_t ks, const size_t nmax) -> void;
 
-/// @brief Transfers a quantum between the two sides of a shell pair and
-/// transforms the result, once the sum over primitives has been taken.
-auto
-compute_hrr_ip_sph(double *values, const size_t nvalues, CSimdMatrix &buffer,
-                   const CSimdMatrix &coordinates, const size_t is, const size_t ks,
-                   const size_t nmax) -> void;
-
 }  // namespace simdtrf
 
 #endif /* SimdTransferIP_hpp */

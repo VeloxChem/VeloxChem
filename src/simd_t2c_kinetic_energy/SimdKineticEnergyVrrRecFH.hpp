@@ -48,69 +48,6 @@ compute_prim_fh_kinetic_energy_0(CSimdMatrix &buffer, const size_t target, const
                                  const size_t ncols, const double alpha, const double beta,
                                  const double p) -> void;
 
-/// @brief Takes one step of the recurrence for one pair of primitives.
-auto
-compute_prim_fh_kinetic_energy_1(CSimdMatrix &buffer, const size_t target, const size_t pa,
-                                 const size_t pb, const size_t ph_s, const size_t ph,
-                                 const size_t dg, const size_t dh, const size_t ff_s,
-                                 const size_t fh_s, const size_t ff, const size_t fg,
-                                 const size_t ncols, const double alpha, const double beta,
-                                 const double p) -> void;
-
-/// @brief Takes one step of the recurrence for one pair of primitives.
-auto
-compute_prim_fh_kinetic_energy_2(CSimdMatrix &buffer, const size_t target, const size_t pa,
-                                 const size_t pb, const size_t ph_s, const size_t ph,
-                                 const size_t dg, const size_t dh, const size_t ff_s,
-                                 const size_t fh_s, const size_t ff, const size_t fg,
-                                 const size_t ncols, const double alpha, const double beta,
-                                 const double p) -> void;
-
-/// @brief Takes one step of the recurrence for one pair of primitives.
-auto
-compute_prim_fh_kinetic_energy_3(CSimdMatrix &buffer, const size_t target, const size_t pa,
-                                 const size_t pb, const size_t ph_s, const size_t ph,
-                                 const size_t dg, const size_t dh, const size_t ff_s,
-                                 const size_t fh_s, const size_t ff, const size_t fg,
-                                 const size_t ncols, const double alpha, const double beta,
-                                 const double p) -> void;
-
-/// @brief Takes one step of the recurrence for one pair of primitives.
-auto
-compute_prim_fh_kinetic_energy_4(CSimdMatrix &buffer, const size_t target, const size_t pa,
-                                 const size_t pb, const size_t ph_s, const size_t ph,
-                                 const size_t dg, const size_t dh, const size_t ff_s,
-                                 const size_t fh_s, const size_t ff, const size_t fg,
-                                 const size_t ncols, const double alpha, const double beta,
-                                 const double p) -> void;
-
-/// @brief Takes one step of the recurrence for one pair of primitives.
-auto
-compute_prim_fh_kinetic_energy_5(CSimdMatrix &buffer, const size_t target, const size_t pa,
-                                 const size_t pb, const size_t ph_s, const size_t ph,
-                                 const size_t dg, const size_t dh, const size_t ff_s,
-                                 const size_t fh_s, const size_t ff, const size_t fg,
-                                 const size_t ncols, const double alpha, const double beta,
-                                 const double p) -> void;
-
-/// @brief Takes one step of the recurrence for one pair of primitives.
-auto
-compute_prim_fh_kinetic_energy_6(CSimdMatrix &buffer, const size_t target, const size_t pa,
-                                 const size_t pb, const size_t ph_s, const size_t ph,
-                                 const size_t dg, const size_t dh, const size_t ff_s,
-                                 const size_t fh_s, const size_t ff, const size_t fg,
-                                 const size_t ncols, const double alpha, const double beta,
-                                 const double p) -> void;
-
-/// @brief Takes one step of the recurrence for one pair of primitives.
-auto
-compute_prim_fh_kinetic_energy_7(CSimdMatrix &buffer, const size_t target, const size_t pa,
-                                 const size_t pb, const size_t ph_s, const size_t ph,
-                                 const size_t dg, const size_t dh, const size_t ff_s,
-                                 const size_t fh_s, const size_t ff, const size_t fg,
-                                 const size_t ncols, const double alpha, const double beta,
-                                 const double p) -> void;
-
 }  // namespace simdkin
 
 #endif /* SimdKineticEnergyVrrRecFH_hpp */

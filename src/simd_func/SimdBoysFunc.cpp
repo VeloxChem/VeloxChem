@@ -275,4 +275,53 @@ compute_boys_function(CSimdMatrix                        &buffer,
     _scale_values(buffer, target, orders.size(), ncols, fj);
 }
 
+auto
+compute_full_t3c_boys_function(CSimdMatrix       &buffer,
+                               const CSimdMatrix &coordinates,
+                               const size_t       target,
+                               const size_t       pc,
+                               const size_t       order,
+                               const size_t       ncols,
+                               const double       fj,
+                               const double       mu,
+                               const double       fq) -> void
+{
+    // NOTE: the argument is the squared displacement of the Gaussian product center
+    // from the atom on the ket side, scaled by the exponent of the pair of that
+    // center with the primitive on the ket side.
+
+    {
+        auto *args = buffer.data(target);
+
+        const auto *pc_x = buffer.data(pc + 0);
+        const auto *pc_y = buffer.data(pc + 1);
+        const auto *pc_z = buffer.data(pc + 2);
+
+#pragma omp simd aligned(args, pc_x, pc_y, pc_z : simd::cache_line_size())
+        for (size_t k = 0; k < ncols; k++)
+        {
+            args[k] = fq * (pc_x[k] * pc_x[k] + pc_y[k] * pc_y[k] + pc_z[k] * pc_z[k]);
+        }
+    }
+
+    compute_boys_values(buffer, target, order, ncols);
+
+    // NOTE: the scaling varies with the atom pair, as the pair of primitives on the
+    // bra side contributes the exponential of its own squared distance, so it is
+    // formed once here and applied to every order.
+
+    const auto *ab_2 = coordinates.data(9);
+
+    for (size_t j = 0; j <= order; j++)
+    {
+        auto *row = buffer.data(target + 1 + j);
+
+#pragma omp simd aligned(row, ab_2 : simd::cache_line_size())
+        for (size_t k = 0; k < ncols; k++)
+        {
+            row[k] *= fj * std::exp(-mu * ab_2[k]);
+        }
+    }
+}
+
 }  // namespace simdfunc

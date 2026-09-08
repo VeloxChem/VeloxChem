@@ -62,15 +62,15 @@ namespace simdt3ceri {  // simdt3ceri namespace
 /// @note The atoms on c side are a separate and shorter dimension than the atom
 /// pairs, so the values of one triple of angular components hold the atom pairs
 /// contiguously and repeat them for every atom on c side.
-/// @note There is no screening threshold here. The threshold enters when the blocks
-/// are described, through the bound on the charge distribution of the atom pair on a
-/// and b sides; the atom on c side does not screen, as the Coulomb operator decays
-/// as the inverse of the distance to it.
-/// @note This is the stub of the skeleton. It fills every element with a value which
-/// encodes that element's position, so that the loops of the driver and the offsets
-/// of the tensor are checked before the kernels exist. It is not the integral, and
-/// its body is not the shape of a kernel: it stops at a block of a thousand atom
-/// pairs or a thousand atoms on c side, which is where the encoding would collide.
+/// @param threshold The screening threshold of the integrals.
+/// @note The threshold screens the triples of primitives here, as the blocks were
+/// screened with it on the atom pairs. The atom on c side does not screen, as the
+/// Coulomb operator decays as the inverse of the distance to it, so the surviving
+/// triples are the same for every atom on that side and are counted once.
+/// @note Only the combination of three basis functions of zero angular momentum is
+/// implemented; the remaining kernels are generated elsewhere and are not in the tree
+/// yet, so they stop with an error rather than returning values they did not
+/// compute.
 auto compute_electron_repulsion(double               *values,
                                 const size_t          npairs,
                                 const size_t          natoms,
@@ -78,7 +78,8 @@ auto compute_electron_repulsion(double               *values,
                                 const CBasisFunction &b_function,
                                 const CBasisFunction &c_function,
                                 const CSimdMatrix    &coordinates,
-                                const CSimdMatrix    &c_coordinates) -> void;
+                                const CSimdMatrix    &c_coordinates,
+                                const double          threshold) -> void;
 
 }  // namespace simdt3ceri
 

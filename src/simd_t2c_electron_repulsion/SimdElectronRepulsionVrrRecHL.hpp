@@ -48,69 +48,6 @@ compute_prim_hl_electron_repulsion_0(CSimdMatrix &buffer, const size_t target, c
                                      const double alpha, const double beta,
                                      const double p) -> void;
 
-/// @brief Takes one step of the recurrence for one pair of primitives.
-auto
-compute_prim_hl_electron_repulsion_1(CSimdMatrix &buffer, const size_t target, const size_t pa,
-                                     const size_t pb, const size_t fl0, const size_t fl1,
-                                     const size_t gk, const size_t gl, const size_t hi0,
-                                     const size_t hi1, const size_t hk, const size_t ncols,
-                                     const double alpha, const double beta,
-                                     const double p) -> void;
-
-/// @brief Takes one step of the recurrence for one pair of primitives.
-auto
-compute_prim_hl_electron_repulsion_2(CSimdMatrix &buffer, const size_t target, const size_t pa,
-                                     const size_t pb, const size_t fl0, const size_t fl1,
-                                     const size_t gk, const size_t gl, const size_t hi0,
-                                     const size_t hi1, const size_t hk, const size_t ncols,
-                                     const double alpha, const double beta,
-                                     const double p) -> void;
-
-/// @brief Takes one step of the recurrence for one pair of primitives.
-auto
-compute_prim_hl_electron_repulsion_3(CSimdMatrix &buffer, const size_t target, const size_t pa,
-                                     const size_t pb, const size_t fl0, const size_t fl1,
-                                     const size_t gk, const size_t gl, const size_t hi0,
-                                     const size_t hi1, const size_t hk, const size_t ncols,
-                                     const double alpha, const double beta,
-                                     const double p) -> void;
-
-/// @brief Takes one step of the recurrence for one pair of primitives.
-auto
-compute_prim_hl_electron_repulsion_4(CSimdMatrix &buffer, const size_t target, const size_t pa,
-                                     const size_t pb, const size_t fl0, const size_t fl1,
-                                     const size_t gk, const size_t gl, const size_t hi0,
-                                     const size_t hi1, const size_t hk, const size_t ncols,
-                                     const double alpha, const double beta,
-                                     const double p) -> void;
-
-/// @brief Takes one step of the recurrence for one pair of primitives.
-auto
-compute_prim_hl_electron_repulsion_5(CSimdMatrix &buffer, const size_t target, const size_t pa,
-                                     const size_t pb, const size_t fl0, const size_t fl1,
-                                     const size_t gk, const size_t gl, const size_t hi0,
-                                     const size_t hi1, const size_t hk, const size_t ncols,
-                                     const double alpha, const double beta,
-                                     const double p) -> void;
-
-/// @brief Takes one step of the recurrence for one pair of primitives.
-auto
-compute_prim_hl_electron_repulsion_6(CSimdMatrix &buffer, const size_t target, const size_t pa,
-                                     const size_t pb, const size_t fl0, const size_t fl1,
-                                     const size_t gk, const size_t gl, const size_t hi0,
-                                     const size_t hi1, const size_t hk, const size_t ncols,
-                                     const double alpha, const double beta,
-                                     const double p) -> void;
-
-/// @brief Takes one step of the recurrence for one pair of primitives.
-auto
-compute_prim_hl_electron_repulsion_7(CSimdMatrix &buffer, const size_t target, const size_t pa,
-                                     const size_t pb, const size_t fl0, const size_t fl1,
-                                     const size_t gk, const size_t gl, const size_t hi0,
-                                     const size_t hi1, const size_t hk, const size_t ncols,
-                                     const double alpha, const double beta,
-                                     const double p) -> void;
-
 }  // namespace simdt2ceri
 
 #endif /* SimdElectronRepulsionVrrRecHL_hpp */

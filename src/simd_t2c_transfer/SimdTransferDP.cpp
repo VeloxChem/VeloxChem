@@ -33,40 +33,32 @@
 
 #include "SimdTransferDP.hpp"
 
-#include <cmath>
 #include "SimdAlign.hpp"
 
 namespace simdtrf {  // simdtrf namespace
 
 auto
-compute_hrr_dp_sph(double *values, const size_t nvalues, CSimdMatrix &buffer,
-                   const CSimdMatrix &coordinates, const size_t ds, const size_t fs,
-                   const size_t nmax) -> void
+compute_hrr_dp(CSimdMatrix &buffer, const CSimdMatrix &coordinates, const size_t target,
+               const size_t ds, const size_t fs, const size_t nmax) -> void
 {
-    // NOTE: the factors are the shells' own, so they are formed once rather
-    // than for every atom pair the shell pair reaches.
-
-    const auto f_0 = std::sqrt(3.0);
-    const auto f_1 = 0.5 * std::sqrt(3.0);
-
-    // NOTE: the rows of the values are not aligned, starting at this combination's
-    // offset in the values block, so they are kept out of the clause below.
-
-    auto *g_0 = values + 0 * nvalues;
-    auto *g_1 = values + 1 * nvalues;
-    auto *g_2 = values + 2 * nvalues;
-    auto *g_3 = values + 3 * nvalues;
-    auto *g_4 = values + 4 * nvalues;
-    auto *g_5 = values + 5 * nvalues;
-    auto *g_6 = values + 6 * nvalues;
-    auto *g_7 = values + 7 * nvalues;
-    auto *g_8 = values + 8 * nvalues;
-    auto *g_9 = values + 9 * nvalues;
-    auto *g_10 = values + 10 * nvalues;
-    auto *g_11 = values + 11 * nvalues;
-    auto *g_12 = values + 12 * nvalues;
-    auto *g_13 = values + 13 * nvalues;
-    auto *g_14 = values + 14 * nvalues;
+    auto *t_0 = buffer.data(target + 0);
+    auto *t_1 = buffer.data(target + 1);
+    auto *t_2 = buffer.data(target + 2);
+    auto *t_3 = buffer.data(target + 3);
+    auto *t_4 = buffer.data(target + 4);
+    auto *t_5 = buffer.data(target + 5);
+    auto *t_6 = buffer.data(target + 6);
+    auto *t_7 = buffer.data(target + 7);
+    auto *t_8 = buffer.data(target + 8);
+    auto *t_9 = buffer.data(target + 9);
+    auto *t_10 = buffer.data(target + 10);
+    auto *t_11 = buffer.data(target + 11);
+    auto *t_12 = buffer.data(target + 12);
+    auto *t_13 = buffer.data(target + 13);
+    auto *t_14 = buffer.data(target + 14);
+    auto *t_15 = buffer.data(target + 15);
+    auto *t_16 = buffer.data(target + 16);
+    auto *t_17 = buffer.data(target + 17);
 
     const auto *ab_x = coordinates.data(6);
     const auto *ab_y = coordinates.data(7);
@@ -90,87 +82,77 @@ compute_hrr_dp_sph(double *values, const size_t nvalues, CSimdMatrix &buffer,
     const auto *fs_8 = buffer.data(fs + 8);
     const auto *fs_9 = buffer.data(fs + 9);
 
-#pragma omp simd aligned(ab_x, ab_y, ab_z, ds_1, ds_4, fs_1, fs_3, fs_4, fs_7, \
-                         fs_8 : simd::cache_line_size())
+#pragma omp simd aligned(t_0, t_1, t_2, t_3, t_4, t_5, ab_x, ab_y, ab_z, ds_0, ds_1, fs_0, \
+                         fs_1, fs_2, fs_3, fs_4 : simd::cache_line_size())
     for (size_t k = 0; k < nmax; k++)
     {
-        g_0[k] = f_0 * ab_y[k] * ds_1[k]
-                 + f_0 * fs_3[k];
+        t_0[k] = ab_x[k] * ds_0[k]
+                 + fs_0[k];
 
-        g_1[k] = f_0 * ab_z[k] * ds_1[k]
-                 + f_0 * fs_4[k];
+        t_1[k] = ab_y[k] * ds_0[k]
+                 + fs_1[k];
 
-        g_2[k] = f_0 * ab_x[k] * ds_1[k]
-                 + f_0 * fs_1[k];
+        t_2[k] = ab_z[k] * ds_0[k]
+                 + fs_2[k];
 
-        g_3[k] = f_0 * ab_y[k] * ds_4[k]
-                 + f_0 * fs_7[k];
+        t_3[k] = ab_x[k] * ds_1[k]
+                 + fs_1[k];
 
-        g_4[k] = f_0 * ab_z[k] * ds_4[k]
-                 + f_0 * fs_8[k];
+        t_4[k] = ab_y[k] * ds_1[k]
+                 + fs_3[k];
 
-        g_5[k] = f_0 * ab_x[k] * ds_4[k]
-                 + f_0 * fs_4[k];
+        t_5[k] = ab_z[k] * ds_1[k]
+                 + fs_4[k];
     }
 
-#pragma omp simd aligned(ab_y, ab_z, ds_0, ds_3, ds_5, fs_1, fs_2, fs_6, fs_7, fs_8, \
-                         fs_9 : simd::cache_line_size())
+#pragma omp simd aligned(t_6, t_7, t_8, t_9, t_10, ab_x, ab_y, ab_z, ds_2, ds_3, fs_2, fs_3, \
+                         fs_4, fs_5, fs_6 : simd::cache_line_size())
     for (size_t k = 0; k < nmax; k++)
     {
-        g_6[k] = -0.5 * ab_y[k] * ds_0[k]
-                 - 0.5 * ab_y[k] * ds_3[k]
-                 + ab_y[k] * ds_5[k]
-                 - 0.5 * fs_1[k]
-                 - 0.5 * fs_6[k]
-                 + fs_8[k];
+        t_6[k] = ab_x[k] * ds_2[k]
+                 + fs_2[k];
 
-        g_7[k] = -0.5 * ab_z[k] * ds_0[k]
-                 - 0.5 * ab_z[k] * ds_3[k]
-                 + ab_z[k] * ds_5[k]
-                 - 0.5 * fs_2[k]
-                 - 0.5 * fs_7[k]
-                 + fs_9[k];
-    }
+        t_7[k] = ab_y[k] * ds_2[k]
+                 + fs_4[k];
 
-#pragma omp simd aligned(ab_x, ab_y, ab_z, ds_0, ds_2, ds_3, ds_5, fs_0, fs_2, fs_3, fs_4, \
-                         fs_5 : simd::cache_line_size())
-    for (size_t k = 0; k < nmax; k++)
-    {
-        g_8[k] = -0.5 * ab_x[k] * ds_0[k]
-                 - 0.5 * ab_x[k] * ds_3[k]
-                 + ab_x[k] * ds_5[k]
-                 - 0.5 * fs_0[k]
-                 - 0.5 * fs_3[k]
+        t_8[k] = ab_z[k] * ds_2[k]
                  + fs_5[k];
 
-        g_9[k] = f_0 * ab_y[k] * ds_2[k]
-                 + f_0 * fs_4[k];
+        t_9[k] = ab_x[k] * ds_3[k]
+                 + fs_3[k];
 
-        g_10[k] = f_0 * ab_z[k] * ds_2[k]
-                  + f_0 * fs_5[k];
-
-        g_11[k] = f_0 * ab_x[k] * ds_2[k]
-                  + f_0 * fs_2[k];
+        t_10[k] = ab_y[k] * ds_3[k]
+                  + fs_6[k];
     }
 
-#pragma omp simd aligned(ab_x, ab_y, ab_z, ds_0, ds_3, fs_0, fs_1, fs_2, fs_3, fs_6, \
-                         fs_7 : simd::cache_line_size())
+#pragma omp simd aligned(t_11, t_12, t_13, t_14, t_15, t_16, ab_x, ab_y, ab_z, ds_3, ds_4, \
+                         ds_5, fs_4, fs_5, fs_7, fs_8 : simd::cache_line_size())
     for (size_t k = 0; k < nmax; k++)
     {
-        g_12[k] = f_1 * ab_y[k] * ds_0[k]
-                  - f_1 * ab_y[k] * ds_3[k]
-                  + f_1 * fs_1[k]
-                  - f_1 * fs_6[k];
+        t_11[k] = ab_z[k] * ds_3[k]
+                  + fs_7[k];
 
-        g_13[k] = f_1 * ab_z[k] * ds_0[k]
-                  - f_1 * ab_z[k] * ds_3[k]
-                  + f_1 * fs_2[k]
-                  - f_1 * fs_7[k];
+        t_12[k] = ab_x[k] * ds_4[k]
+                  + fs_4[k];
 
-        g_14[k] = f_1 * ab_x[k] * ds_0[k]
-                  - f_1 * ab_x[k] * ds_3[k]
-                  + f_1 * fs_0[k]
-                  - f_1 * fs_3[k];
+        t_13[k] = ab_y[k] * ds_4[k]
+                  + fs_7[k];
+
+        t_14[k] = ab_z[k] * ds_4[k]
+                  + fs_8[k];
+
+        t_15[k] = ab_x[k] * ds_5[k]
+                  + fs_5[k];
+
+        t_16[k] = ab_y[k] * ds_5[k]
+                  + fs_8[k];
+    }
+
+#pragma omp simd aligned(t_17, ab_z, ds_5, fs_9 : simd::cache_line_size())
+    for (size_t k = 0; k < nmax; k++)
+    {
+        t_17[k] = ab_z[k] * ds_5[k]
+                  + fs_9[k];
     }
 }
 

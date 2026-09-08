@@ -43,9 +43,9 @@
 #include "SimdDimensions.hpp"
 #include "SimdPrimitives.hpp"
 
-#include "SimdKineticEnergyCtrVrrGS.hpp"
 #include "SimdKineticEnergyVrrRecDS.hpp"
 #include "SimdKineticEnergyVrrRecFS.hpp"
+#include "SimdKineticEnergyVrrRecGS.hpp"
 #include "SimdKineticEnergyVrrRecPS.hpp"
 #include "SimdKineticEnergyVrrRecSS.hpp"
 #include "SimdOverlapVrrRecDS.hpp"
@@ -53,16 +53,17 @@
 #include "SimdOverlapVrrRecGS.hpp"
 #include "SimdOverlapVrrRecPS.hpp"
 #include "SimdOverlapVrrRecSS.hpp"
+#include "SimdTransformG.hpp"
 
 namespace simdkin {  // simdkin namespace
 
 auto
 compute_gs_kinetic_energy(double               *values,
-                               const size_t          nvalues,
-                               const CBasisFunction &bra,
-                               const CBasisFunction &ket,
-                               const CSimdMatrix    &coordinates,
-                               const double          threshold) -> void
+                          const size_t          nvalues,
+                          const CBasisFunction &bra,
+                          const CBasisFunction &ket,
+                          const CSimdMatrix    &coordinates,
+                          const double          threshold) -> void
 {
     if (nvalues > coordinates.number_of_columns())
     {
@@ -71,12 +72,6 @@ compute_gs_kinetic_energy(double               *values,
     }
 
     if (nvalues == 0) return;
-
-    // NOTE: the values are zeroed before anything writes them, the composed
-    // step accumulating into them as the sum over primitives runs. The atom
-    // pairs no pair of primitives reaches keep the zeros set here.
-
-    std::fill(values, values + 9 * nvalues, 0.0);
 
     const auto &a_exps = bra.exponents();
 
@@ -99,9 +94,16 @@ compute_gs_kinetic_energy(double               *values,
     const auto dimensions = simdfunc::make_column_dimensions(
         bra, ket, nvalues, coordinates, screenfunc::two_center_kinetic_energy_primitive_bound, threshold / static_cast<double>(nprims));
 
-    auto buffer = simdfunc::make_primitive_buffer(dimensions, 48);
+    auto buffer = simdfunc::make_primitive_buffer(dimensions, 88);
 
-    if (buffer.number_of_columns() == 0) return;
+    if (buffer.number_of_columns() == 0)
+    {
+        std::fill(values, values + 9 * nvalues, 0.0);
+
+        return;
+    }
+
+    const auto nmax = buffer.number_of_columns();
 
     errors::assertMsgCritical(dimensions.size() == nprim_a * nprim_b,
                               std::string("Dimensions do not match the pairs of primitives"));
@@ -138,18 +140,31 @@ compute_gs_kinetic_energy(double               *values,
 
             compute_prim_ps_kinetic_energy_0(buffer, 8, 0, 4, 5, ncols, alpha, beta, p);
 
-            simdovl::compute_prim_ds_overlap_2(buffer, 11, 0, 3, 5, ncols, p);
+            simdovl::compute_prim_ds_overlap_0(buffer, 11, 0, 3, 5, ncols, p);
 
-            compute_prim_ds_kinetic_energy_1(buffer, 14, 0, 3, 4, 8, 11, ncols, alpha, beta, p);
+            compute_prim_ds_kinetic_energy_0(buffer, 17, 0, 3, 4, 8, 11, ncols, alpha, beta, p);
 
-            simdovl::compute_prim_fs_overlap_2(buffer, 17, 0, 5, 11, ncols, p);
+            simdovl::compute_prim_fs_overlap_0(buffer, 23, 0, 5, 11, ncols, p);
 
-            compute_prim_fs_kinetic_energy_3(buffer, 25, 0, 5, 8, 14, 17, ncols, alpha, beta, p);
+            compute_prim_fs_kinetic_energy_0(buffer, 33, 0, 5, 8, 17, 23, ncols, alpha, beta,
+                                             p);
 
-            simdovl::compute_prim_gs_overlap_1(buffer, 33, 0, 11, 17, ncols, p);
+            simdovl::compute_prim_gs_overlap_0(buffer, 43, 0, 11, 23, ncols, p);
 
-            compute_ctr_gs_kinetic_energy_0(values, nvalues, buffer, 0, 11, 14, 25, 33, ncols, alpha, beta, p);
+            compute_prim_gs_kinetic_energy_0(buffer, 58, 0, 11, 17, 33, 43, ncols, alpha, beta,
+                                             p);
+
+            simdfunc::contract_primitives(buffer, 73, 58, 15, ncols);
         }
+    }
+
+    simdtrf::transform_g_outer(values, nvalues, buffer, 73, 1, nmax);
+
+    for (size_t m = 0; m < 9; m++)
+    {
+        auto *pv = values + m * nvalues;
+
+        std::fill(pv + nmax, pv + nvalues, 0.0);
     }
 }
 

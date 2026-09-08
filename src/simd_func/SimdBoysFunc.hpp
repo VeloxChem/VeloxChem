@@ -119,6 +119,36 @@ auto compute_boys_function(CSimdMatrix                        &buffer,
                            const double                        fj,
                            const double                        mu) -> void;
 
+/// @brief Computes the values of Boys function of every order up to the requested
+/// one for one triple of primitives of a three-center electron repulsion integral.
+/// @param buffer The buffer of the combination of basis functions, holding the
+/// displacement of the Gaussian product center from the atom on the ket side in the
+/// three rows at pc.
+/// @param coordinates The coordinates of the atom pairs, whose row nine holds the
+/// squared distance of the atom pair.
+/// @param target The row of the buffer to write the argument to, with the values
+/// following it.
+/// @param pc The first of the three rows holding that displacement, as
+/// simdfunc::compute_pc wrote them.
+/// @param order The highest order of Boys function to compute.
+/// @param ncols The number of atom pairs the triple of primitives reaches.
+/// @param fj The prefactor of the integral, which every value is scaled by.
+/// @param mu The factor the squared distance of the atom pair is scaled by, whose
+/// exponential every value is scaled by as well.
+/// @param fq The factor the squared displacement is scaled by to give the argument.
+/// @note The scaling is not one number here, as it is for the two-center form. The
+/// pair of primitives contributes exp(-mu R_AB^2), which varies with the atom pair,
+/// so the values are scaled column by column and not by fj alone.
+auto compute_full_t3c_boys_function(CSimdMatrix       &buffer,
+                                    const CSimdMatrix &coordinates,
+                                    const size_t       target,
+                                    const size_t       pc,
+                                    const size_t       order,
+                                    const size_t       ncols,
+                                    const double       fj,
+                                    const double       mu,
+                                    const double       fq) -> void;
+
 }  // namespace simdfunc
 
 #endif /* SimdBoysFunc_hpp */

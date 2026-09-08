@@ -52,16 +52,18 @@
 #include "SimdTransferFD.hpp"
 #include "SimdTransferFP.hpp"
 #include "SimdTransferGP.hpp"
+#include "SimdTransformD.hpp"
+#include "SimdTransformF.hpp"
 
 namespace simdovl {  // simdovl namespace
 
 auto
 compute_fd_overlap(double               *values,
-                        const size_t          nvalues,
-                        const CBasisFunction &bra,
-                        const CBasisFunction &ket,
-                        const CSimdMatrix    &coordinates,
-                        const double          threshold) -> void
+                   const size_t          nvalues,
+                   const CBasisFunction &bra,
+                   const CBasisFunction &ket,
+                   const CSimdMatrix    &coordinates,
+                   const double          threshold) -> void
 {
     if (nvalues > coordinates.number_of_columns())
     {
@@ -92,7 +94,7 @@ compute_fd_overlap(double               *values,
     const auto dimensions = simdfunc::make_column_dimensions(
         bra, ket, nvalues, coordinates, screenfunc::two_center_overlap_primitive_bound, threshold / static_cast<double>(nprims));
 
-    auto buffer = simdfunc::make_primitive_buffer(dimensions, 178);
+    auto buffer = simdfunc::make_primitive_buffer(dimensions, 290);
 
     if (buffer.number_of_columns() == 0)
     {
@@ -130,23 +132,27 @@ compute_fd_overlap(double               *values,
 
             compute_prim_ps_overlap_0(buffer, 4, 0, 3, ncols);
 
-            compute_prim_ds_overlap_1(buffer, 7, 0, 3, 4, ncols, p);
+            compute_prim_ds_overlap_0(buffer, 7, 0, 3, 4, ncols, p);
 
-            compute_prim_fs_overlap_1(buffer, 11, 0, 4, 7, ncols, p);
+            compute_prim_fs_overlap_0(buffer, 13, 0, 4, 7, ncols, p);
 
-            compute_prim_gs_overlap_0(buffer, 21, 0, 7, 11, ncols, p);
+            compute_prim_gs_overlap_0(buffer, 23, 0, 7, 13, ncols, p);
 
-            compute_prim_hs_overlap_0(buffer, 36, 0, 11, 21, ncols, p);
+            compute_prim_hs_overlap_0(buffer, 38, 0, 13, 23, ncols, p);
 
-            simdfunc::contract_primitives(buffer, 57, 11, 46, ncols);
+            simdfunc::contract_primitives(buffer, 59, 13, 46, ncols);
         }
     }
 
-    simdtrf::compute_hrr_fp(buffer, coordinates, 103, 57, 67, nmax);
+    simdtrf::compute_hrr_fp(buffer, coordinates, 105, 59, 69, nmax);
 
-    simdtrf::compute_hrr_gp(buffer, coordinates, 133, 67, 82, nmax);
+    simdtrf::compute_hrr_gp(buffer, coordinates, 135, 69, 84, nmax);
 
-    simdtrf::compute_hrr_fd_sph(values, nvalues, buffer, coordinates, 103, 133, nmax);
+    simdtrf::compute_hrr_fd(buffer, coordinates, 180, 105, 135, nmax);
+
+    simdtrf::transform_d_inner(buffer, 240, 180, 10, nmax);
+
+    simdtrf::transform_f_outer(values, nvalues, buffer, 240, 5, nmax);
 
     for (size_t m = 0; m < 35; m++)
     {

@@ -49,17 +49,17 @@
 #include "SimdOverlapVrrRecPP.hpp"
 #include "SimdOverlapVrrRecPS.hpp"
 #include "SimdOverlapVrrRecSS.hpp"
-#include "SimdTransformPP.hpp"
+#include "SimdTransformP.hpp"
 
 namespace simdkin {  // simdkin namespace
 
 auto
 compute_pp_kinetic_energy(double               *values,
-                               const size_t          nvalues,
-                               const CBasisFunction &bra,
-                               const CBasisFunction &ket,
-                               const CSimdMatrix    &coordinates,
-                               const double          threshold) -> void
+                          const size_t          nvalues,
+                          const CBasisFunction &bra,
+                          const CBasisFunction &ket,
+                          const CSimdMatrix    &coordinates,
+                          const double          threshold) -> void
 {
     if (nvalues > coordinates.number_of_columns())
     {
@@ -90,7 +90,7 @@ compute_pp_kinetic_energy(double               *values,
     const auto dimensions = simdfunc::make_column_dimensions(
         bra, ket, nvalues, coordinates, screenfunc::two_center_kinetic_energy_primitive_bound, threshold / static_cast<double>(nprims));
 
-    auto buffer = simdfunc::make_primitive_buffer(dimensions, 41);
+    auto buffer = simdfunc::make_primitive_buffer(dimensions, 50);
 
     if (buffer.number_of_columns() == 0)
     {
@@ -148,7 +148,9 @@ compute_pp_kinetic_energy(double               *values,
         }
     }
 
-    simdtrf::transform_pp_tri(values, nvalues, buffer, 32, nmax);
+    simdtrf::transform_p_inner(buffer, 41, 32, 3, nmax);
+
+    simdtrf::transform_p_outer_tri(values, nvalues, buffer, 41, nmax);
 
     for (size_t m = 0; m < 9; m++)
     {

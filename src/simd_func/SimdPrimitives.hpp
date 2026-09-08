@@ -186,6 +186,60 @@ compute_pb(CSimdMatrix &buffer, const CSimdMatrix &coordinates, const size_t tar
     }
 }
 
+/// @brief Computes the displacement of the Gaussian product center of a pair of
+/// primitives from one atom on the ket side of a three-center quantity.
+/// @param buffer The buffer of the combination of basis functions.
+/// @param coordinates The coordinates of the atom pairs, whose rows zero to two hold
+/// the atom on bra side and whose rows six to eight hold the vector between the atoms.
+/// @param c_coordinates The coordinates of the atoms on the ket side, as three rows.
+/// @param target The first of the three rows of the buffer to write.
+/// @param iatom The atom on the ket side, as its column of c_coordinates.
+/// @param ncols The number of atom pairs the pair of primitives reaches.
+/// @param fc The displacement of the product center from the atom on bra side in
+/// units of the vector between the atoms, which is b / (a + b).
+/// @note The Gaussian product center P of the pair sits at A - b / (a + b) times the
+/// vector from A to B, so its displacement from the atom C on the ket side is
+/// (A - C) - fc times that vector. The atom on the ket side is one point and the atom
+/// pairs are many, so its coordinates are read once and the loop runs over the pairs.
+/// @note The rows of the buffer and of the coordinates start at a cache line
+/// boundary, so the loop is vectorized with aligned loads and stores. The coordinates
+/// of the atom on the ket side are scalars and are not part of the clause.
+inline auto
+compute_pc(CSimdMatrix       &buffer,
+           const CSimdMatrix &coordinates,
+           const CSimdMatrix &c_coordinates,
+           const size_t       target,
+           const size_t       iatom,
+           const size_t       ncols,
+           const double       fc) -> void
+{
+    auto *pc_x = buffer.data(target + 0);
+    auto *pc_y = buffer.data(target + 1);
+    auto *pc_z = buffer.data(target + 2);
+
+    const auto *a_x = coordinates.data(0);
+    const auto *a_y = coordinates.data(1);
+    const auto *a_z = coordinates.data(2);
+
+    const auto *ab_x = coordinates.data(6);
+    const auto *ab_y = coordinates.data(7);
+    const auto *ab_z = coordinates.data(8);
+
+    const auto c_x = c_coordinates.data(0)[iatom];
+    const auto c_y = c_coordinates.data(1)[iatom];
+    const auto c_z = c_coordinates.data(2)[iatom];
+
+#pragma omp simd aligned(pc_x, pc_y, pc_z, a_x, a_y, a_z, ab_x, ab_y, ab_z : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        pc_x[k] = (a_x[k] - c_x) - fc * ab_x[k];
+
+        pc_y[k] = (a_y[k] - c_y) - fc * ab_y[k];
+
+        pc_z[k] = (a_z[k] - c_z) - fc * ab_z[k];
+    }
+}
+
 }  // namespace simdfunc
 
 #endif /* SimdPrimitives_hpp */

@@ -58,16 +58,18 @@
 #include "SimdTransferPH.hpp"
 #include "SimdTransferPI.hpp"
 #include "SimdTransferPK.hpp"
+#include "SimdTransformF.hpp"
+#include "SimdTransformH.hpp"
 
 namespace simdovl {  // simdovl namespace
 
 auto
 compute_fh_overlap(double               *values,
-                        const size_t          nvalues,
-                        const CBasisFunction &bra,
-                        const CBasisFunction &ket,
-                        const CSimdMatrix    &coordinates,
-                        const double          threshold) -> void
+                   const size_t          nvalues,
+                   const CBasisFunction &bra,
+                   const CBasisFunction &ket,
+                   const CSimdMatrix    &coordinates,
+                   const double          threshold) -> void
 {
     if (nvalues > coordinates.number_of_columns())
     {
@@ -98,7 +100,7 @@ compute_fh_overlap(double               *values,
     const auto dimensions = simdfunc::make_column_dimensions(
         bra, ket, nvalues, coordinates, screenfunc::two_center_overlap_primitive_bound, threshold / static_cast<double>(nprims));
 
-    auto buffer = simdfunc::make_primitive_buffer(dimensions, 836);
+    auto buffer = simdfunc::make_primitive_buffer(dimensions, 1167);
 
     if (buffer.number_of_columns() == 0)
     {
@@ -136,35 +138,39 @@ compute_fh_overlap(double               *values,
 
             compute_prim_sp_overlap_0(buffer, 4, 0, 3, ncols);
 
-            compute_prim_sd_overlap_1(buffer, 7, 0, 3, 4, ncols, p);
+            compute_prim_sd_overlap_0(buffer, 7, 0, 3, 4, ncols, p);
 
-            compute_prim_sf_overlap_1(buffer, 10, 0, 4, 7, ncols, p);
+            compute_prim_sf_overlap_0(buffer, 13, 0, 4, 7, ncols, p);
 
-            compute_prim_sg_overlap_0(buffer, 16, 0, 7, 10, ncols, p);
+            compute_prim_sg_overlap_0(buffer, 23, 0, 7, 13, ncols, p);
 
-            compute_prim_sh_overlap_2(buffer, 27, 0, 10, 16, ncols, p);
+            compute_prim_sh_overlap_0(buffer, 38, 0, 13, 23, ncols, p);
 
-            compute_prim_si_overlap_0(buffer, 48, 0, 16, 27, ncols, p);
+            compute_prim_si_overlap_0(buffer, 59, 0, 23, 38, ncols, p);
 
-            compute_prim_sk_overlap_1(buffer, 76, 0, 27, 48, ncols, p);
+            compute_prim_sk_overlap_0(buffer, 87, 0, 38, 59, ncols, p);
 
-            compute_prim_sl_overlap_0(buffer, 112, 0, 48, 76, ncols, p);
+            compute_prim_sl_overlap_0(buffer, 123, 0, 59, 87, ncols, p);
 
-            simdfunc::contract_primitives(buffer, 157, 27, 130, ncols);
+            simdfunc::contract_primitives(buffer, 168, 38, 130, ncols);
         }
     }
 
-    simdtrf::compute_hrr_ph(buffer, coordinates, 287, 157, 178, nmax);
+    simdtrf::compute_hrr_ph(buffer, coordinates, 298, 168, 189, nmax);
 
-    simdtrf::compute_hrr_pi(buffer, coordinates, 350, 178, 206, nmax);
+    simdtrf::compute_hrr_pi(buffer, coordinates, 361, 189, 217, nmax);
 
-    simdtrf::compute_hrr_pk(buffer, coordinates, 434, 206, 242, nmax);
+    simdtrf::compute_hrr_pk(buffer, coordinates, 445, 217, 253, nmax);
 
-    simdtrf::compute_hrr_dh(buffer, coordinates, 542, 287, 350, nmax);
+    simdtrf::compute_hrr_dh(buffer, coordinates, 553, 298, 361, nmax);
 
-    simdtrf::compute_hrr_di(buffer, coordinates, 668, 350, 434, nmax);
+    simdtrf::compute_hrr_di(buffer, coordinates, 679, 361, 445, nmax);
 
-    simdtrf::compute_hrr_fh_sph(values, nvalues, buffer, coordinates, 542, 668, nmax);
+    simdtrf::compute_hrr_fh(buffer, coordinates, 847, 553, 679, nmax);
+
+    simdtrf::transform_h_inner(buffer, 1057, 847, 10, nmax);
+
+    simdtrf::transform_f_outer(values, nvalues, buffer, 1057, 11, nmax);
 
     for (size_t m = 0; m < 77; m++)
     {

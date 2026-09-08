@@ -46,27 +46,6 @@ compute_prim_id_overlap_0(CSimdMatrix &buffer, const size_t target, const size_t
                           const size_t is, const size_t ip, const size_t ncols,
                           const double p) -> void;
 
-/// @brief Takes one step of the recurrence for one pair of primitives.
-auto
-compute_prim_id_overlap_1(CSimdMatrix &buffer, const size_t target, const size_t pa,
-                          const size_t pb, const size_t gd, const size_t hp, const size_t hd,
-                          const size_t is, const size_t ip, const size_t ncols,
-                          const double p) -> void;
-
-/// @brief Takes one step of the recurrence for one pair of primitives.
-auto
-compute_prim_id_overlap_2(CSimdMatrix &buffer, const size_t target, const size_t pa,
-                          const size_t pb, const size_t gd, const size_t hp, const size_t hd,
-                          const size_t is, const size_t ip, const size_t ncols,
-                          const double p) -> void;
-
-/// @brief Takes one step of the recurrence for one pair of primitives.
-auto
-compute_prim_id_overlap_3(CSimdMatrix &buffer, const size_t target, const size_t pa,
-                          const size_t pb, const size_t gd, const size_t hp, const size_t hd,
-                          const size_t is, const size_t ip, const size_t ncols,
-                          const double p) -> void;
-
 }  // namespace simdovl
 
 #endif /* SimdOverlapVrrRecID_hpp */

@@ -1,17 +1,5 @@
 target_sources(vlxobjs
   PRIVATE
-    SimdKineticEnergyCtrVrrDS.cpp
-    SimdKineticEnergyCtrVrrFS.cpp
-    SimdKineticEnergyCtrVrrGS.cpp
-    SimdKineticEnergyCtrVrrHS.cpp
-    SimdKineticEnergyCtrVrrIS.cpp
-    SimdKineticEnergyCtrVrrPS.cpp
-    SimdKineticEnergyCtrVrrSD.cpp
-    SimdKineticEnergyCtrVrrSF.cpp
-    SimdKineticEnergyCtrVrrSG.cpp
-    SimdKineticEnergyCtrVrrSH.cpp
-    SimdKineticEnergyCtrVrrSI.cpp
-    SimdKineticEnergyCtrVrrSP.cpp
     SimdKineticEnergyCtrVrrSS.cpp
     SimdKineticEnergyDriver.cpp
     SimdKineticEnergyFunc.cpp

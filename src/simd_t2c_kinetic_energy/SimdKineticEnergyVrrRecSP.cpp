@@ -76,36 +76,4 @@ compute_prim_sp_kinetic_energy_0(CSimdMatrix &buffer, const size_t target, const
     }
 }
 
-auto
-compute_prim_sp_kinetic_energy_1(CSimdMatrix &buffer, const size_t target, const size_t pb,
-                                 const size_t sp_s, const size_t ss, const size_t ncols,
-                                 const double alpha, const double beta, const double p) -> void
-{
-    // NOTE: the factors are fixed by the pair of primitives, so they are formed
-    // once rather than for every atom pair the pair reaches.
-
-    const auto f_0 = 2.0 * alpha * beta / p;
-
-    auto *t_0 = buffer.data(target + 0);
-    auto *t_1 = buffer.data(target + 1);
-
-    const auto *pb_y = buffer.data(pb + 1);
-    const auto *pb_z = buffer.data(pb + 2);
-
-    const auto *sp_s_0 = buffer.data(sp_s + 0);
-    const auto *sp_s_1 = buffer.data(sp_s + 1);
-
-    const auto *ss_0 = buffer.data(ss + 0);
-
-#pragma omp simd aligned(t_0, t_1, pb_y, pb_z, sp_s_0, sp_s_1, ss_0 : simd::cache_line_size())
-    for (size_t k = 0; k < ncols; k++)
-    {
-        t_0[k] = f_0 * sp_s_0[k]
-                 + pb_y[k] * ss_0[k];
-
-        t_1[k] = f_0 * sp_s_1[k]
-                 + pb_z[k] * ss_0[k];
-    }
-}
-
 }  // namespace simdkin

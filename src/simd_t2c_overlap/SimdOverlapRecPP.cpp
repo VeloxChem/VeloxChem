@@ -47,16 +47,17 @@
 #include "SimdOverlapVrrRecSP.hpp"
 #include "SimdOverlapVrrRecSS.hpp"
 #include "SimdTransferPP.hpp"
+#include "SimdTransformP.hpp"
 
 namespace simdovl {  // simdovl namespace
 
 auto
 compute_pp_overlap(double               *values,
-                        const size_t          nvalues,
-                        const CBasisFunction &bra,
-                        const CBasisFunction &ket,
-                        const CSimdMatrix    &coordinates,
-                        const double          threshold) -> void
+                   const size_t          nvalues,
+                   const CBasisFunction &bra,
+                   const CBasisFunction &ket,
+                   const CSimdMatrix    &coordinates,
+                   const double          threshold) -> void
 {
     if (nvalues > coordinates.number_of_columns())
     {
@@ -87,7 +88,7 @@ compute_pp_overlap(double               *values,
     const auto dimensions = simdfunc::make_column_dimensions(
         bra, ket, nvalues, coordinates, screenfunc::two_center_overlap_primitive_bound, threshold / static_cast<double>(nprims));
 
-    auto buffer = simdfunc::make_primitive_buffer(dimensions, 22);
+    auto buffer = simdfunc::make_primitive_buffer(dimensions, 40);
 
     if (buffer.number_of_columns() == 0)
     {
@@ -125,13 +126,17 @@ compute_pp_overlap(double               *values,
 
             compute_prim_sp_overlap_0(buffer, 4, 0, 3, ncols);
 
-            compute_prim_sd_overlap_2(buffer, 7, 0, 3, 4, ncols, p);
+            compute_prim_sd_overlap_0(buffer, 7, 0, 3, 4, ncols, p);
 
             simdfunc::contract_primitives(buffer, 13, 4, 9, ncols);
         }
     }
 
-    simdtrf::compute_hrr_pp_sph_tri(values, nvalues, buffer, coordinates, 13, 16, nmax);
+    simdtrf::compute_hrr_pp(buffer, coordinates, 22, 13, 16, nmax);
+
+    simdtrf::transform_p_inner(buffer, 31, 22, 3, nmax);
+
+    simdtrf::transform_p_outer_tri(values, nvalues, buffer, 31, nmax);
 
     for (size_t m = 0; m < 9; m++)
     {

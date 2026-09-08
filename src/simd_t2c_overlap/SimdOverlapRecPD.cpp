@@ -48,16 +48,18 @@
 #include "SimdOverlapVrrRecSP.hpp"
 #include "SimdOverlapVrrRecSS.hpp"
 #include "SimdTransferPD.hpp"
+#include "SimdTransformD.hpp"
+#include "SimdTransformP.hpp"
 
 namespace simdovl {  // simdovl namespace
 
 auto
 compute_pd_overlap(double               *values,
-                        const size_t          nvalues,
-                        const CBasisFunction &bra,
-                        const CBasisFunction &ket,
-                        const CSimdMatrix    &coordinates,
-                        const double          threshold) -> void
+                   const size_t          nvalues,
+                   const CBasisFunction &bra,
+                   const CBasisFunction &ket,
+                   const CSimdMatrix    &coordinates,
+                   const double          threshold) -> void
 {
     if (nvalues > coordinates.number_of_columns())
     {
@@ -88,7 +90,7 @@ compute_pd_overlap(double               *values,
     const auto dimensions = simdfunc::make_column_dimensions(
         bra, ket, nvalues, coordinates, screenfunc::two_center_overlap_primitive_bound, threshold / static_cast<double>(nprims));
 
-    auto buffer = simdfunc::make_primitive_buffer(dimensions, 39);
+    auto buffer = simdfunc::make_primitive_buffer(dimensions, 72);
 
     if (buffer.number_of_columns() == 0)
     {
@@ -126,15 +128,19 @@ compute_pd_overlap(double               *values,
 
             compute_prim_sp_overlap_0(buffer, 4, 0, 3, ncols);
 
-            compute_prim_sd_overlap_2(buffer, 7, 0, 3, 4, ncols, p);
+            compute_prim_sd_overlap_0(buffer, 7, 0, 3, 4, ncols, p);
 
-            compute_prim_sf_overlap_2(buffer, 13, 0, 4, 7, ncols, p);
+            compute_prim_sf_overlap_0(buffer, 13, 0, 4, 7, ncols, p);
 
             simdfunc::contract_primitives(buffer, 23, 7, 16, ncols);
         }
     }
 
-    simdtrf::compute_hrr_pd_sph(values, nvalues, buffer, coordinates, 23, 29, nmax);
+    simdtrf::compute_hrr_pd(buffer, coordinates, 39, 23, 29, nmax);
+
+    simdtrf::transform_d_inner(buffer, 57, 39, 3, nmax);
+
+    simdtrf::transform_p_outer(values, nvalues, buffer, 57, 5, nmax);
 
     for (size_t m = 0; m < 15; m++)
     {

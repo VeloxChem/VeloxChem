@@ -45,16 +45,16 @@
 
 #include "SimdElectronRepulsionVrrRecPP.hpp"
 #include "SimdElectronRepulsionVrrRecPS.hpp"
-#include "SimdTransformPP.hpp"
+#include "SimdTransformP.hpp"
 
 namespace simdt2ceri {  // simdt2ceri namespace
 
 auto
 compute_pp_electron_repulsion(double               *values,
-                                   const size_t          nvalues,
-                                   const CBasisFunction &bra,
-                                   const CBasisFunction &ket,
-                                   const CSimdMatrix    &coordinates) -> void
+                              const size_t          nvalues,
+                              const CBasisFunction &bra,
+                              const CBasisFunction &ket,
+                              const CSimdMatrix    &coordinates) -> void
 {
     if (nvalues > coordinates.number_of_columns())
     {
@@ -76,7 +76,7 @@ compute_pp_electron_repulsion(double               *values,
 
     const auto nprim_b = b_exps.size();
 
-    auto buffer = CSimdMatrix(30, nvalues);
+    auto buffer = CSimdMatrix(39, nvalues);
 
     buffer.zero();
 
@@ -115,7 +115,9 @@ compute_pp_electron_repulsion(double               *values,
         }
     }
 
-    simdtrf::transform_pp_tri(values, nvalues, buffer, 21, nmax);
+    simdtrf::transform_p_inner(buffer, 30, 21, 3, nmax);
+
+    simdtrf::transform_p_outer_tri(values, nvalues, buffer, 30, nmax);
 }
 
 }  // namespace simdt2ceri

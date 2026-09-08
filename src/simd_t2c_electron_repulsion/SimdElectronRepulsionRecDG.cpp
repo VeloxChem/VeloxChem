@@ -57,16 +57,17 @@
 #include "SimdElectronRepulsionVrrRecSF.hpp"
 #include "SimdElectronRepulsionVrrRecSG.hpp"
 #include "SimdElectronRepulsionVrrRecSP.hpp"
-#include "SimdTransformDG.hpp"
+#include "SimdTransformD.hpp"
+#include "SimdTransformG.hpp"
 
 namespace simdt2ceri {  // simdt2ceri namespace
 
 auto
 compute_dg_electron_repulsion(double               *values,
-                                   const size_t          nvalues,
-                                   const CBasisFunction &bra,
-                                   const CBasisFunction &ket,
-                                   const CSimdMatrix    &coordinates) -> void
+                              const size_t          nvalues,
+                              const CBasisFunction &bra,
+                              const CBasisFunction &ket,
+                              const CSimdMatrix    &coordinates) -> void
 {
     if (nvalues > coordinates.number_of_columns())
     {
@@ -88,7 +89,7 @@ compute_dg_electron_repulsion(double               *values,
 
     const auto nprim_b = b_exps.size();
 
-    auto buffer = CSimdMatrix(434, nvalues);
+    auto buffer = CSimdMatrix(775, nvalues);
 
     buffer.zero();
 
@@ -133,73 +134,95 @@ compute_dg_electron_repulsion(double               *values,
 
             compute_prim_ps_electron_repulsion_0(buffer, 26, 0, 13, ncols);
 
-            compute_prim_ds_electron_repulsion_1(buffer, 29, 0, 7, 8, 14, ncols, alpha, beta, p);
+            compute_prim_ds_electron_repulsion_0(buffer, 29, 0, 7, 8, 14, ncols, alpha, beta,
+                                                 p);
 
-            compute_prim_ds_electron_repulsion_1(buffer, 32, 0, 8, 9, 17, ncols, alpha, beta, p);
+            compute_prim_ds_electron_repulsion_0(buffer, 35, 0, 8, 9, 17, ncols, alpha, beta,
+                                                 p);
 
-            compute_prim_ds_electron_repulsion_1(buffer, 35, 0, 9, 10, 20, ncols, alpha, beta, p);
+            compute_prim_ds_electron_repulsion_0(buffer, 41, 0, 9, 10, 20, ncols, alpha, beta,
+                                                 p);
 
-            compute_prim_ds_electron_repulsion_1(buffer, 38, 0, 10, 11, 23, ncols, alpha, beta, p);
+            compute_prim_ds_electron_repulsion_0(buffer, 47, 0, 10, 11, 23, ncols, alpha, beta,
+                                                 p);
 
-            compute_prim_ds_electron_repulsion_1(buffer, 41, 0, 11, 12, 26, ncols, alpha, beta, p);
+            compute_prim_ds_electron_repulsion_0(buffer, 53, 0, 11, 12, 26, ncols, alpha, beta,
+                                                 p);
 
-            compute_prim_sp_electron_repulsion_0(buffer, 44, 3, 10, ncols);
+            compute_prim_sp_electron_repulsion_0(buffer, 59, 3, 10, ncols);
 
-            compute_prim_sp_electron_repulsion_0(buffer, 47, 3, 11, ncols);
+            compute_prim_sp_electron_repulsion_0(buffer, 62, 3, 11, ncols);
 
-            compute_prim_sp_electron_repulsion_0(buffer, 50, 3, 12, ncols);
+            compute_prim_sp_electron_repulsion_0(buffer, 65, 3, 12, ncols);
 
-            compute_prim_sp_electron_repulsion_0(buffer, 53, 3, 13, ncols);
+            compute_prim_sp_electron_repulsion_0(buffer, 68, 3, 13, ncols);
 
-            compute_prim_pp_electron_repulsion_2(buffer, 56, 3, 9, 17, ncols, p);
+            compute_prim_pp_electron_repulsion_0(buffer, 71, 3, 9, 17, ncols, p);
 
-            compute_prim_pp_electron_repulsion_2(buffer, 59, 3, 10, 20, ncols, p);
+            compute_prim_pp_electron_repulsion_0(buffer, 80, 3, 10, 20, ncols, p);
 
-            compute_prim_pp_electron_repulsion_2(buffer, 62, 3, 11, 23, ncols, p);
+            compute_prim_pp_electron_repulsion_0(buffer, 89, 3, 11, 23, ncols, p);
 
-            compute_prim_dp_electron_repulsion_2(buffer, 65, 3, 17, 35, ncols, p);
+            compute_prim_pp_electron_repulsion_0(buffer, 98, 3, 12, 26, ncols, p);
 
-            compute_prim_dp_electron_repulsion_2(buffer, 74, 3, 20, 38, ncols, p);
+            compute_prim_dp_electron_repulsion_0(buffer, 107, 0, 3, 17, 80, 41, ncols, p);
 
-            compute_prim_dp_electron_repulsion_2(buffer, 83, 3, 23, 41, ncols, p);
+            compute_prim_dp_electron_repulsion_0(buffer, 125, 0, 3, 20, 89, 47, ncols, p);
 
-            compute_prim_sd_electron_repulsion_1(buffer, 92, 3, 9, 10, 47, ncols, alpha, beta, p);
+            compute_prim_dp_electron_repulsion_0(buffer, 143, 0, 3, 23, 98, 53, ncols, p);
 
-            compute_prim_sd_electron_repulsion_1(buffer, 95, 3, 10, 11, 50, ncols, alpha, beta, p);
+            compute_prim_sd_electron_repulsion_0(buffer, 161, 3, 9, 10, 62, ncols, alpha, beta,
+                                                 p);
 
-            compute_prim_sd_electron_repulsion_1(buffer, 98, 3, 11, 12, 53, ncols, alpha, beta, p);
+            compute_prim_sd_electron_repulsion_0(buffer, 167, 3, 10, 11, 65, ncols, alpha, beta,
+                                                 p);
 
-            compute_prim_pd_electron_repulsion_2(buffer, 101, 0, 47, 95, ncols, p);
+            compute_prim_sd_electron_repulsion_0(buffer, 173, 3, 11, 12, 68, ncols, alpha, beta,
+                                                 p);
 
-            compute_prim_pd_electron_repulsion_3(buffer, 110, 0, 50, 98, ncols, p);
+            compute_prim_pd_electron_repulsion_0(buffer, 179, 0, 3, 59, 161, 80, ncols, p);
 
-            compute_prim_dd_electron_repulsion_2(buffer, 116, 3, 56, 29, 32, 65, ncols, alpha, beta, p);
+            compute_prim_pd_electron_repulsion_0(buffer, 197, 0, 3, 62, 167, 89, ncols, p);
 
-            compute_prim_dd_electron_repulsion_2(buffer, 125, 3, 59, 32, 35, 74, ncols, alpha, beta, p);
+            compute_prim_pd_electron_repulsion_0(buffer, 215, 0, 3, 65, 173, 98, ncols, p);
 
-            compute_prim_dd_electron_repulsion_3(buffer, 134, 0, 3, 62, 110, 35, 38, 83, ncols, alpha, beta, p);
+            compute_prim_dd_electron_repulsion_0(buffer, 233, 0, 3, 71, 179, 29, 35, 107, ncols,
+                                                 alpha, beta, p);
 
-            compute_prim_sf_electron_repulsion_3(buffer, 149, 3, 44, 47, 95, ncols, alpha, beta, p);
+            compute_prim_dd_electron_repulsion_0(buffer, 269, 0, 3, 80, 197, 35, 41, 125, ncols,
+                                                 alpha, beta, p);
 
-            compute_prim_sf_electron_repulsion_1(buffer, 158, 3, 47, 50, 98, ncols, alpha, beta, p);
+            compute_prim_dd_electron_repulsion_0(buffer, 305, 0, 3, 89, 215, 41, 47, 143, ncols,
+                                                 alpha, beta, p);
 
-            compute_prim_pf_electron_repulsion_4(buffer, 164, 0, 3, 92, 149, 101, ncols, p);
+            compute_prim_sf_electron_repulsion_0(buffer, 341, 3, 59, 62, 167, ncols, alpha, beta,
+                                                 p);
 
-            compute_prim_pf_electron_repulsion_5(buffer, 179, 0, 3, 95, 158, 110, ncols, p);
+            compute_prim_sf_electron_repulsion_0(buffer, 351, 3, 62, 65, 173, ncols, alpha, beta,
+                                                 p);
 
-            compute_prim_df_electron_repulsion_1(buffer, 191, 0, 3, 101, 179, 65, 74, 134, ncols, alpha, beta, p);
+            compute_prim_pf_electron_repulsion_0(buffer, 361, 0, 3, 161, 341, 197, ncols, p);
 
-            compute_prim_sg_electron_repulsion_2(buffer, 230, 3, 92, 95, 158, ncols, alpha, beta, p);
+            compute_prim_pf_electron_repulsion_0(buffer, 391, 0, 3, 167, 351, 215, ncols, p);
 
-            compute_prim_pg_electron_repulsion_3(buffer, 236, 0, 3, 149, 230, 179, ncols, p);
+            compute_prim_df_electron_repulsion_0(buffer, 421, 0, 3, 197, 391, 107, 125, 305,
+                                                 ncols, alpha, beta, p);
 
-            compute_prim_dg_electron_repulsion_0(buffer, 254, 0, 3, 164, 236, 116, 125, 191, ncols, alpha, beta, p);
+            compute_prim_sg_electron_repulsion_0(buffer, 481, 3, 161, 167, 351, ncols, alpha,
+                                                 beta, p);
 
-            simdfunc::contract_primitives(buffer, 344, 254, 90, ncols);
+            compute_prim_pg_electron_repulsion_0(buffer, 496, 0, 3, 341, 481, 391, ncols, p);
+
+            compute_prim_dg_electron_repulsion_0(buffer, 541, 0, 3, 361, 496, 233, 269, 421,
+                                                 ncols, alpha, beta, p);
+
+            simdfunc::contract_primitives(buffer, 631, 541, 90, ncols);
         }
     }
 
-    simdtrf::transform_dg(values, nvalues, buffer, 344, nmax);
+    simdtrf::transform_g_inner(buffer, 721, 631, 6, nmax);
+
+    simdtrf::transform_d_outer(values, nvalues, buffer, 721, 9, nmax);
 }
 
 }  // namespace simdt2ceri

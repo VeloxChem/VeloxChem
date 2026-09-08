@@ -48,16 +48,18 @@
 #include "SimdOverlapVrrRecPS.hpp"
 #include "SimdOverlapVrrRecSS.hpp"
 #include "SimdTransferDP.hpp"
+#include "SimdTransformD.hpp"
+#include "SimdTransformP.hpp"
 
 namespace simdovl {  // simdovl namespace
 
 auto
 compute_dp_overlap(double               *values,
-                        const size_t          nvalues,
-                        const CBasisFunction &bra,
-                        const CBasisFunction &ket,
-                        const CSimdMatrix    &coordinates,
-                        const double          threshold) -> void
+                   const size_t          nvalues,
+                   const CBasisFunction &bra,
+                   const CBasisFunction &ket,
+                   const CSimdMatrix    &coordinates,
+                   const double          threshold) -> void
 {
     if (nvalues > coordinates.number_of_columns())
     {
@@ -88,7 +90,7 @@ compute_dp_overlap(double               *values,
     const auto dimensions = simdfunc::make_column_dimensions(
         bra, ket, nvalues, coordinates, screenfunc::two_center_overlap_primitive_bound, threshold / static_cast<double>(nprims));
 
-    auto buffer = simdfunc::make_primitive_buffer(dimensions, 39);
+    auto buffer = simdfunc::make_primitive_buffer(dimensions, 75);
 
     if (buffer.number_of_columns() == 0)
     {
@@ -134,7 +136,11 @@ compute_dp_overlap(double               *values,
         }
     }
 
-    simdtrf::compute_hrr_dp_sph(values, nvalues, buffer, coordinates, 23, 29, nmax);
+    simdtrf::compute_hrr_dp(buffer, coordinates, 39, 23, 29, nmax);
+
+    simdtrf::transform_p_inner(buffer, 57, 39, 6, nmax);
+
+    simdtrf::transform_d_outer(values, nvalues, buffer, 57, 3, nmax);
 
     for (size_t m = 0; m < 15; m++)
     {

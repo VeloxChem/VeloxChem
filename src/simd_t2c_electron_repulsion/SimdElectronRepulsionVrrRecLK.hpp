@@ -48,15 +48,6 @@ compute_prim_lk_electron_repulsion_0(CSimdMatrix &buffer, const size_t target, c
                                      const double alpha, const double beta,
                                      const double p) -> void;
 
-/// @brief Takes one step of the recurrence for one pair of primitives.
-auto
-compute_prim_lk_electron_repulsion_1(CSimdMatrix &buffer, const size_t target, const size_t pa,
-                                     const size_t pb, const size_t ik0, const size_t ik1,
-                                     const size_t ki, const size_t kk, const size_t lh0,
-                                     const size_t lh1, const size_t li, const size_t ncols,
-                                     const double alpha, const double beta,
-                                     const double p) -> void;
-
 }  // namespace simdt2ceri
 
 #endif /* SimdElectronRepulsionVrrRecLK_hpp */

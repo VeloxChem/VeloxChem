@@ -34,11 +34,10 @@
 
 #include "SimdThreeCenterElectronRepulsionFunc.hpp"
 
-#include <array>
 #include <string>
 
 #include "ErrorHandler.hpp"
-#include "TensorComponents.hpp"
+#include "SimdThreeCenterElectronRepulsionRecSSS.hpp"
 
 namespace simdt3ceri {  // simdt3ceri namespace
 
@@ -50,51 +49,29 @@ compute_electron_repulsion(double               *values,
                            const CBasisFunction &b_function,
                            const CBasisFunction &c_function,
                            const CSimdMatrix    &coordinates,
-                           const CSimdMatrix    &c_coordinates) -> void
+                           const CSimdMatrix    &c_coordinates,
+                           const double          threshold) -> void
 {
-    // NOTE: the kernels of the atom pairs are generated elsewhere and are not in the
-    // tree yet. Rather than stopping, this fills every element the block hands it
-    // with a value which encodes that element's position, so that the loops of the
-    // driver and the offsets of the tensor can be checked before the kernels exist.
-    // A caller which reads these as integrals gets numbers which are obviously not
-    // integrals.
+    const auto la = a_function.get_angular_momentum();
 
-    // NOTE: this walks the values as one range and decomposes the index only because
-    // the encoding has to name a position. It is not the shape of a kernel: a kernel
-    // loops over the pairs of primitives, builds a buffer, contracts it and writes
-    // the values once through a transform. Nothing here anticipates that, and the
-    // only contract it keeps is to fill the elements it was handed.
+    const auto lb = b_function.get_angular_momentum();
 
-    const auto ncomps_a =
-        static_cast<size_t>(tensor::number_of_spherical_components(std::array<int, 1>{a_function.get_angular_momentum()}));
+    const auto lc = c_function.get_angular_momentum();
 
-    const auto ncomps_b =
-        static_cast<size_t>(tensor::number_of_spherical_components(std::array<int, 1>{b_function.get_angular_momentum()}));
+    if ((la == 0) && (lb == 0) && (lc == 0))
+    {
+        compute_sss_three_center_electron_repulsion(
+            values, npairs, natoms, a_function, b_function, c_function, coordinates, c_coordinates, threshold);
 
-    const auto ncomps_c =
-        static_cast<size_t>(tensor::number_of_spherical_components(std::array<int, 1>{c_function.get_angular_momentum()}));
+        return;
+    }
 
-    // NOTE: the three indices are packed into one number by decimal place, so a
-    // block wider than a thousand atom pairs or carrying more than a thousand atoms
-    // on c side would let them collide and the check would stop distinguishing
-    // positions. It stops here rather than reporting agreement it did not establish.
+    // NOTE: the remaining kernels are generated elsewhere and are not in the tree
+    // yet. The combination stops rather than leaving the values of the tensor
+    // unwritten, which is what a caller would otherwise read as integrals.
 
     errors::assertMsgCritical(
-        (npairs < 1000) && (natoms < 1000),
-        std::string("SimdThreeCenterElectronRepulsionFunc.compute_electron_repulsion: The stub cannot encode a block this large"));
-
-    const auto nvalues = ncomps_a * ncomps_b * ncomps_c * natoms * npairs;
-
-    for (size_t n = 0; n < nvalues; n++)
-    {
-        const auto k = n % npairs;
-
-        const auto ic = (n / npairs) % natoms;
-
-        const auto icomp = n / (npairs * natoms);
-
-        values[n] = static_cast<double>(icomp) * 1.0e6 + static_cast<double>(ic) * 1.0e3 + static_cast<double>(k);
-    }
+        false, std::string("SimdThreeCenterElectronRepulsionFunc.compute_electron_repulsion: Integrals are not implemented"));
 }
 
 }  // namespace simdt3ceri

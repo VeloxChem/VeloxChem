@@ -42,13 +42,6 @@ namespace simdtrf {  // simdtrf namespace
 /// @brief Transfers a quantum between the two sides of a shell pair and
 /// transforms the result, once the sum over primitives has been taken.
 auto
-compute_hrr_fg_sph(double *values, const size_t nvalues, CSimdMatrix &buffer,
-                   const CSimdMatrix &coordinates, const size_t dg, const size_t dh,
-                   const size_t nmax) -> void;
-
-/// @brief Transfers a quantum between the two sides of a shell pair and
-/// transforms the result, once the sum over primitives has been taken.
-auto
 compute_hrr_fg(CSimdMatrix &buffer, const CSimdMatrix &coordinates, const size_t target,
                const size_t dg, const size_t dh, const size_t nmax) -> void;
 

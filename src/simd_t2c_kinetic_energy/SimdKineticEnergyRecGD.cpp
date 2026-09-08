@@ -73,17 +73,18 @@
 #include "SimdOverlapVrrRecSD.hpp"
 #include "SimdOverlapVrrRecSP.hpp"
 #include "SimdOverlapVrrRecSS.hpp"
-#include "SimdTransformGD.hpp"
+#include "SimdTransformD.hpp"
+#include "SimdTransformG.hpp"
 
 namespace simdkin {  // simdkin namespace
 
 auto
 compute_gd_kinetic_energy(double               *values,
-                               const size_t          nvalues,
-                               const CBasisFunction &bra,
-                               const CBasisFunction &ket,
-                               const CSimdMatrix    &coordinates,
-                               const double          threshold) -> void
+                          const size_t          nvalues,
+                          const CBasisFunction &bra,
+                          const CBasisFunction &ket,
+                          const CSimdMatrix    &coordinates,
+                          const double          threshold) -> void
 {
     if (nvalues > coordinates.number_of_columns())
     {
@@ -114,7 +115,7 @@ compute_gd_kinetic_energy(double               *values,
     const auto dimensions = simdfunc::make_column_dimensions(
         bra, ket, nvalues, coordinates, screenfunc::two_center_kinetic_energy_primitive_bound, threshold / static_cast<double>(nprims));
 
-    auto buffer = simdfunc::make_primitive_buffer(dimensions, 538);
+    auto buffer = simdfunc::make_primitive_buffer(dimensions, 871);
 
     if (buffer.number_of_columns() == 0)
     {
@@ -158,69 +159,84 @@ compute_gd_kinetic_energy(double               *values,
 
             simdovl::compute_prim_ss_overlap(buffer, coordinates, 6, ncols, fovl, mu);
 
-            simdovl::compute_prim_sp_overlap_1(buffer, 7, 3, 6, ncols);
+            simdovl::compute_prim_sp_overlap_0(buffer, 7, 3, 6, ncols);
 
-            simdovl::compute_prim_sd_overlap_3(buffer, 9, 3, 6, 7, ncols, p);
+            simdovl::compute_prim_sd_overlap_0(buffer, 10, 3, 6, 7, ncols, p);
 
-            compute_prim_ss_kinetic_energy_0(buffer, coordinates, 11, 6, ncols, mu);
+            compute_prim_ss_kinetic_energy_0(buffer, coordinates, 16, 6, ncols, mu);
 
-            compute_prim_sp_kinetic_energy_1(buffer, 12, 3, 7, 11, ncols, alpha, beta, p);
+            compute_prim_sp_kinetic_energy_0(buffer, 17, 3, 7, 16, ncols, alpha, beta, p);
 
-            compute_prim_sd_kinetic_energy_2(buffer, 14, 3, 6, 9, 11, 12, ncols, alpha, beta, p);
+            compute_prim_sd_kinetic_energy_0(buffer, 20, 3, 6, 10, 16, 17, ncols, alpha, beta,
+                                             p);
 
-            simdovl::compute_prim_ps_overlap_0(buffer, 16, 0, 6, ncols);
+            simdovl::compute_prim_ps_overlap_0(buffer, 26, 0, 6, ncols);
 
-            simdovl::compute_prim_pp_overlap_2(buffer, 19, 3, 6, 16, ncols, p);
+            simdovl::compute_prim_pp_overlap_0(buffer, 29, 3, 6, 26, ncols, p);
 
-            simdovl::compute_prim_pd_overlap_10(buffer, 22, 0, 7, 9, ncols, p);
+            simdovl::compute_prim_pd_overlap_0(buffer, 38, 0, 3, 7, 10, 29, ncols, p);
 
-            compute_prim_ps_kinetic_energy_0(buffer, 24, 0, 11, 16, ncols, alpha, beta, p);
+            compute_prim_ps_kinetic_energy_0(buffer, 56, 0, 16, 26, ncols, alpha, beta, p);
 
-            compute_prim_pp_kinetic_energy_2(buffer, 27, 3, 11, 19, 24, ncols, alpha, beta, p);
+            compute_prim_pp_kinetic_energy_0(buffer, 59, 3, 16, 29, 56, ncols, alpha, beta, p);
 
-            compute_prim_pd_kinetic_energy_8(buffer, 30, 0, 12, 14, 22, ncols, alpha, beta, p);
+            compute_prim_pd_kinetic_energy_0(buffer, 68, 0, 3, 17, 20, 38, 59, ncols, alpha,
+                                             beta, p);
 
-            simdovl::compute_prim_ds_overlap_2(buffer, 32, 0, 6, 16, ncols, p);
+            simdovl::compute_prim_ds_overlap_0(buffer, 86, 0, 6, 26, ncols, p);
 
-            simdovl::compute_prim_dp_overlap_6(buffer, 35, 0, 3, 16, 19, 32, ncols, p);
+            simdovl::compute_prim_dp_overlap_0(buffer, 92, 0, 3, 26, 29, 86, ncols, p);
 
-            simdovl::compute_prim_dd_overlap_8(buffer, 44, 0, 3, 19, 22, 32, 35, ncols, p);
+            simdovl::compute_prim_dd_overlap_0(buffer, 110, 0, 3, 29, 38, 86, 92, ncols, p);
 
-            compute_prim_ds_kinetic_energy_1(buffer, 53, 0, 6, 11, 24, 32, ncols, alpha, beta, p);
+            compute_prim_ds_kinetic_energy_0(buffer, 146, 0, 6, 16, 56, 86, ncols, alpha, beta,
+                                             p);
 
-            compute_prim_dp_kinetic_energy_6(buffer, 56, 0, 3, 24, 27, 35, 53, ncols, alpha, beta, p);
+            compute_prim_dp_kinetic_energy_0(buffer, 152, 0, 3, 56, 59, 92, 146, ncols, alpha,
+                                             beta, p);
 
-            compute_prim_dd_kinetic_energy_8(buffer, 65, 0, 3, 27, 30, 32, 44, 53, 56, ncols, alpha, beta, p);
+            compute_prim_dd_kinetic_energy_0(buffer, 170, 0, 3, 59, 68, 86, 110, 146, 152, ncols,
+                                             alpha, beta, p);
 
-            simdovl::compute_prim_fs_overlap_4(buffer, 74, 0, 16, 32, ncols, p);
+            simdovl::compute_prim_fs_overlap_0(buffer, 206, 0, 26, 86, ncols, p);
 
-            simdovl::compute_prim_fp_overlap_5(buffer, 83, 0, 3, 32, 35, 74, ncols, p);
+            simdovl::compute_prim_fp_overlap_0(buffer, 216, 0, 3, 86, 92, 206, ncols, p);
 
-            simdovl::compute_prim_fd_overlap_4(buffer, 99, 0, 3, 22, 35, 44, 74, 83, ncols, p);
+            simdovl::compute_prim_fd_overlap_0(buffer, 246, 0, 3, 38, 92, 110, 206, 216, ncols,
+                                               p);
 
-            compute_prim_fs_kinetic_energy_0(buffer, 126, 0, 16, 24, 53, 74, ncols, alpha, beta, p);
+            compute_prim_fs_kinetic_energy_0(buffer, 306, 0, 26, 56, 146, 206, ncols, alpha,
+                                             beta, p);
 
-            compute_prim_fp_kinetic_energy_5(buffer, 135, 0, 3, 53, 56, 83, 126, ncols, alpha, beta, p);
+            compute_prim_fp_kinetic_energy_0(buffer, 316, 0, 3, 146, 152, 216, 306, ncols, alpha,
+                                             beta, p);
 
-            compute_prim_fd_kinetic_energy_4(buffer, 151, 0, 3, 22, 30, 56, 65, 74, 99, 126, 135, ncols, alpha, beta, p);
+            compute_prim_fd_kinetic_energy_0(buffer, 346, 0, 3, 38, 68, 152, 170, 206, 246, 306,
+                                             316, ncols, alpha, beta, p);
 
-            simdovl::compute_prim_gs_overlap_4(buffer, 178, 0, 32, 74, ncols, p);
+            simdovl::compute_prim_gs_overlap_0(buffer, 406, 0, 86, 206, ncols, p);
 
-            simdovl::compute_prim_gp_overlap_1(buffer, 190, 0, 3, 74, 83, 178, ncols, p);
+            simdovl::compute_prim_gp_overlap_0(buffer, 421, 0, 3, 206, 216, 406, ncols, p);
 
-            simdovl::compute_prim_gd_overlap_0(buffer, 223, 0, 3, 44, 83, 99, 178, 190, ncols, p);
+            simdovl::compute_prim_gd_overlap_0(buffer, 466, 0, 3, 110, 216, 246, 406, 421, ncols,
+                                               p);
 
-            compute_prim_gs_kinetic_energy_0(buffer, 313, 0, 32, 53, 126, 178, ncols, alpha, beta, p);
+            compute_prim_gs_kinetic_energy_0(buffer, 556, 0, 86, 146, 306, 406, ncols, alpha,
+                                             beta, p);
 
-            compute_prim_gp_kinetic_energy_1(buffer, 325, 0, 3, 126, 135, 190, 313, ncols, alpha, beta, p);
+            compute_prim_gp_kinetic_energy_0(buffer, 571, 0, 3, 306, 316, 421, 556, ncols, alpha,
+                                             beta, p);
 
-            compute_prim_gd_kinetic_energy_0(buffer, 358, 0, 3, 44, 65, 135, 151, 178, 223, 313, 325, ncols, alpha, beta, p);
+            compute_prim_gd_kinetic_energy_0(buffer, 616, 0, 3, 110, 170, 316, 346, 406, 466,
+                                             556, 571, ncols, alpha, beta, p);
 
-            simdfunc::contract_primitives(buffer, 448, 358, 90, ncols);
+            simdfunc::contract_primitives(buffer, 706, 616, 90, ncols);
         }
     }
 
-    simdtrf::transform_gd(values, nvalues, buffer, 448, nmax);
+    simdtrf::transform_d_inner(buffer, 796, 706, 15, nmax);
+
+    simdtrf::transform_g_outer(values, nvalues, buffer, 796, 5, nmax);
 
     for (size_t m = 0; m < 45; m++)
     {

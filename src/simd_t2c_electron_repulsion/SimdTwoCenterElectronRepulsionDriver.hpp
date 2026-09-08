@@ -85,25 +85,28 @@ class CSimdTwoCenterElectronRepulsionDriver
 
     /// @brief The largest target number of atom pairs of a block chosen when the
     /// size is not given.
-    /// @note Fitted on fourteen threads over the six benchmark molecules in the def2
-    /// universal jfit and jkfit sets, against the generated kernels. The block size
-    /// is not what limits this driver: every ceiling from 64 to 512 lands within four
-    /// to eight per cent of the best any of them reaches, where the wrong floor cost
-    /// the overlap driver a factor of four. A ceiling of 128 wins the mean over the
-    /// twelve cases and 256 wins their total time, because 128 buys 7 to 24 per cent
-    /// on the three small molecules and costs 6 to 10 per cent on the three large
-    /// ones, which carry the time. The value stays at 256 for that reason. Ceilings
-    /// above 512 were not fitted: the curves are already rising there, the
-    /// paracetamol cluster in jfit going from 35.7 ms at 512 to 41.7 at 1024 and
-    /// ubiquitin from 481.7 to 526.4.
-    /// @note The ceiling meets the floor. sparsity::min_block_size is 256 as well, so
-    /// min(max(npairs / (blocks_per_thread * nthreads), 256), 256) is 256 for every
+    /// @note Fitted on fourteen threads over the benchmark molecules in the def2
+    /// universal jfit and the correlation consistent rifit sets, against the kernels
+    /// in the tree. A ceiling of 128 is the best of 64 to 1024 on the mean, on the
+    /// worst case and on the total time, taking the worst case from 1.21 to 1.09. It
+    /// helps the small and middle sized molecules, tagrisso in jfit going from 3.91
+    /// ms to 3.24 and c60 in cc-pVQZ-rifit from 38.5 to 31.9, and costs the largest
+    /// ones little. A ceiling of 64 measures the same, as the floor below never lets
+    /// the size fall under 128 for any molecule here.
+    /// @note The ceiling meets the floor. sparsity::min_block_size is 256, so
+    /// min(max(npairs / (blocks_per_thread * nthreads), 256), 128) is 128 for every
     /// molecule and the term which follows the size of the molecule never applies.
-    /// The driver therefore divides tagrisso and ubiquitin into blocks of the same
-    /// size, which the measurement says costs it little but which is a coincidence of
-    /// the two constants rather than a choice. Refitting the floor moves this driver
+    /// The driver divides tagrisso and ubiquitin into blocks of the same size, which
+    /// the measurement says costs it little but which is a consequence of the two
+    /// constants meeting rather than a choice. Refitting the floor moves this driver
     /// with it.
-    static constexpr size_t max_block_size = 256;
+    /// @note What no choice of this constant reaches is that the best block size
+    /// follows the basis as much as the molecule, and the formula sees only the count
+    /// of atom pairs. On the screened path ubiquitin wants 16384 atom pairs a block
+    /// in def2-svp and 2048 in cc-pV5Z, an eightfold difference on one molecule,
+    /// because the cost of a pair differs by that much. Closing that would mean
+    /// telling the block size something about the basis.
+    static constexpr size_t max_block_size = 128;
 
    private:
     /// @brief Computes the integrals of the atom pairs of the blocks and adds them

@@ -48,42 +48,6 @@ compute_prim_il_electron_repulsion_0(CSimdMatrix &buffer, const size_t target, c
                                      const double alpha, const double beta,
                                      const double p) -> void;
 
-/// @brief Takes one step of the recurrence for one pair of primitives.
-auto
-compute_prim_il_electron_repulsion_1(CSimdMatrix &buffer, const size_t target, const size_t pa,
-                                     const size_t pb, const size_t gl0, const size_t gl1,
-                                     const size_t hk, const size_t hl, const size_t ii0,
-                                     const size_t ii1, const size_t ik, const size_t ncols,
-                                     const double alpha, const double beta,
-                                     const double p) -> void;
-
-/// @brief Takes one step of the recurrence for one pair of primitives.
-auto
-compute_prim_il_electron_repulsion_2(CSimdMatrix &buffer, const size_t target, const size_t pa,
-                                     const size_t pb, const size_t gl0, const size_t gl1,
-                                     const size_t hk, const size_t hl, const size_t ii0,
-                                     const size_t ii1, const size_t ik, const size_t ncols,
-                                     const double alpha, const double beta,
-                                     const double p) -> void;
-
-/// @brief Takes one step of the recurrence for one pair of primitives.
-auto
-compute_prim_il_electron_repulsion_3(CSimdMatrix &buffer, const size_t target, const size_t pa,
-                                     const size_t pb, const size_t gl0, const size_t gl1,
-                                     const size_t hk, const size_t hl, const size_t ii0,
-                                     const size_t ii1, const size_t ik, const size_t ncols,
-                                     const double alpha, const double beta,
-                                     const double p) -> void;
-
-/// @brief Takes one step of the recurrence for one pair of primitives.
-auto
-compute_prim_il_electron_repulsion_4(CSimdMatrix &buffer, const size_t target, const size_t pa,
-                                     const size_t pb, const size_t gl0, const size_t gl1,
-                                     const size_t hk, const size_t hl, const size_t ii0,
-                                     const size_t ii1, const size_t ik, const size_t ncols,
-                                     const double alpha, const double beta,
-                                     const double p) -> void;
-
 }  // namespace simdt2ceri
 
 #endif /* SimdElectronRepulsionVrrRecIL_hpp */

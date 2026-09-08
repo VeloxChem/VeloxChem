@@ -43,24 +43,25 @@
 #include "SimdDimensions.hpp"
 #include "SimdPrimitives.hpp"
 
-#include "SimdKineticEnergyCtrVrrSF.hpp"
 #include "SimdKineticEnergyVrrRecSD.hpp"
+#include "SimdKineticEnergyVrrRecSF.hpp"
 #include "SimdKineticEnergyVrrRecSP.hpp"
 #include "SimdKineticEnergyVrrRecSS.hpp"
 #include "SimdOverlapVrrRecSD.hpp"
 #include "SimdOverlapVrrRecSF.hpp"
 #include "SimdOverlapVrrRecSP.hpp"
 #include "SimdOverlapVrrRecSS.hpp"
+#include "SimdTransformF.hpp"
 
 namespace simdkin {  // simdkin namespace
 
 auto
 compute_sf_kinetic_energy(double               *values,
-                               const size_t          nvalues,
-                               const CBasisFunction &bra,
-                               const CBasisFunction &ket,
-                               const CSimdMatrix    &coordinates,
-                               const double          threshold) -> void
+                          const size_t          nvalues,
+                          const CBasisFunction &bra,
+                          const CBasisFunction &ket,
+                          const CSimdMatrix    &coordinates,
+                          const double          threshold) -> void
 {
     if (nvalues > coordinates.number_of_columns())
     {
@@ -69,12 +70,6 @@ compute_sf_kinetic_energy(double               *values,
     }
 
     if (nvalues == 0) return;
-
-    // NOTE: the values are zeroed before anything writes them, the composed
-    // step accumulating into them as the sum over primitives runs. The atom
-    // pairs no pair of primitives reaches keep the zeros set here.
-
-    std::fill(values, values + 7 * nvalues, 0.0);
 
     const auto &a_exps = bra.exponents();
 
@@ -97,9 +92,16 @@ compute_sf_kinetic_energy(double               *values,
     const auto dimensions = simdfunc::make_column_dimensions(
         bra, ket, nvalues, coordinates, screenfunc::two_center_kinetic_energy_primitive_bound, threshold / static_cast<double>(nprims));
 
-    auto buffer = simdfunc::make_primitive_buffer(dimensions, 29);
+    auto buffer = simdfunc::make_primitive_buffer(dimensions, 53);
 
-    if (buffer.number_of_columns() == 0) return;
+    if (buffer.number_of_columns() == 0)
+    {
+        std::fill(values, values + 7 * nvalues, 0.0);
+
+        return;
+    }
+
+    const auto nmax = buffer.number_of_columns();
 
     errors::assertMsgCritical(dimensions.size() == nprim_a * nprim_b,
                               std::string("Dimensions do not match the pairs of primitives"));
@@ -134,16 +136,29 @@ compute_sf_kinetic_energy(double               *values,
 
             simdovl::compute_prim_sd_overlap_0(buffer, 7, 0, 3, 4, ncols, p);
 
-            simdovl::compute_prim_sf_overlap_3(buffer, 11, 0, 4, 7, ncols, p);
+            simdovl::compute_prim_sf_overlap_0(buffer, 13, 0, 4, 7, ncols, p);
 
-            compute_prim_ss_kinetic_energy_0(buffer, coordinates, 21, 3, ncols, mu);
+            compute_prim_ss_kinetic_energy_0(buffer, coordinates, 23, 3, ncols, mu);
 
-            compute_prim_sp_kinetic_energy_0(buffer, 22, 0, 4, 21, ncols, alpha, beta, p);
+            compute_prim_sp_kinetic_energy_0(buffer, 24, 0, 4, 23, ncols, alpha, beta, p);
 
-            compute_prim_sd_kinetic_energy_0(buffer, 25, 0, 3, 7, 21, 22, ncols, alpha, beta, p);
+            compute_prim_sd_kinetic_energy_0(buffer, 27, 0, 3, 7, 23, 24, ncols, alpha, beta,
+                                             p);
 
-            compute_ctr_sf_kinetic_energy_0(values, nvalues, buffer, 0, 4, 11, 22, 25, ncols, alpha, beta, p);
+            compute_prim_sf_kinetic_energy_0(buffer, 33, 0, 4, 13, 24, 27, ncols, alpha, beta,
+                                             p);
+
+            simdfunc::contract_primitives(buffer, 43, 33, 10, ncols);
         }
+    }
+
+    simdtrf::transform_f_outer(values, nvalues, buffer, 43, 1, nmax);
+
+    for (size_t m = 0; m < 7; m++)
+    {
+        auto *pv = values + m * nvalues;
+
+        std::fill(pv + nmax, pv + nvalues, 0.0);
     }
 }
 

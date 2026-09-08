@@ -46,62 +46,6 @@ compute_prim_gg_overlap_0(CSimdMatrix &buffer, const size_t target, const size_t
                           const size_t gd, const size_t gf, const size_t ncols,
                           const double p) -> void;
 
-/// @brief Takes one step of the recurrence for one pair of primitives.
-auto
-compute_prim_gg_overlap_1(CSimdMatrix &buffer, const size_t target, const size_t pa,
-                          const size_t pb, const size_t dg, const size_t ff, const size_t fg,
-                          const size_t gd, const size_t gf, const size_t ncols,
-                          const double p) -> void;
-
-/// @brief Takes one step of the recurrence for one pair of primitives.
-auto
-compute_prim_gg_overlap_2(CSimdMatrix &buffer, const size_t target, const size_t pa,
-                          const size_t pb, const size_t dg, const size_t ff, const size_t fg,
-                          const size_t gd, const size_t gf, const size_t ncols,
-                          const double p) -> void;
-
-/// @brief Takes one step of the recurrence for one pair of primitives.
-auto
-compute_prim_gg_overlap_3(CSimdMatrix &buffer, const size_t target, const size_t pa,
-                          const size_t pb, const size_t dg, const size_t ff, const size_t fg,
-                          const size_t gd, const size_t gf, const size_t ncols,
-                          const double p) -> void;
-
-/// @brief Takes one step of the recurrence for one pair of primitives.
-auto
-compute_prim_gg_overlap_4(CSimdMatrix &buffer, const size_t target, const size_t pa,
-                          const size_t pb, const size_t dg, const size_t ff, const size_t fg,
-                          const size_t gd, const size_t gf, const size_t ncols,
-                          const double p) -> void;
-
-/// @brief Takes one step of the recurrence for one pair of primitives.
-auto
-compute_prim_gg_overlap_5(CSimdMatrix &buffer, const size_t target, const size_t pa,
-                          const size_t pb, const size_t dg, const size_t ff, const size_t fg,
-                          const size_t gd, const size_t gf, const size_t ncols,
-                          const double p) -> void;
-
-/// @brief Takes one step of the recurrence for one pair of primitives.
-auto
-compute_prim_gg_overlap_6(CSimdMatrix &buffer, const size_t target, const size_t pa,
-                          const size_t pb, const size_t dg, const size_t ff, const size_t fg,
-                          const size_t gd, const size_t gf, const size_t ncols,
-                          const double p) -> void;
-
-/// @brief Takes one step of the recurrence for one pair of primitives.
-auto
-compute_prim_gg_overlap_7(CSimdMatrix &buffer, const size_t target, const size_t pa,
-                          const size_t pb, const size_t dg, const size_t ff, const size_t fg,
-                          const size_t gd, const size_t gf, const size_t ncols,
-                          const double p) -> void;
-
-/// @brief Takes one step of the recurrence for one pair of primitives.
-auto
-compute_prim_gg_overlap_8(CSimdMatrix &buffer, const size_t target, const size_t pa,
-                          const size_t pb, const size_t dg, const size_t ff, const size_t fg,
-                          const size_t gd, const size_t gf, const size_t ncols,
-                          const double p) -> void;
-
 }  // namespace simdovl
 
 #endif /* SimdOverlapVrrRecGG_hpp */
