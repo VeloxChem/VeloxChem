@@ -31,25 +31,69 @@
 //  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
+
 #ifndef SimdBoysFunc_hpp
 #define SimdBoysFunc_hpp
 
-#include "SimdVariableMatrix.hpp"
+#include <cstddef>
+#include <initializer_list>
+
+#include "SimdMatrix.hpp"
 
 namespace simdfunc {  // simdfunc namespace
 
-/// @brief Computes Boys function values for the arguments of a matrix.
-/// @param matrix The matrix with the arguments of Boys function in block zero
-/// and the values of Boys function of order zero to N in blocks one to N + 1,
-/// where N is the order of Boys function.
-/// @note The order of Boys function follows from the number of blocks, which is
-/// the order plus two. The arguments in block zero are not modified.
-/// @note The values are computed from the Taylor expansion on a grid of
-/// arguments below 35.05 and from the asymptotic expansion above it, with the
-/// remaining orders following from the downward and upward recursions
-/// respectively. The relative accuracy is better than 1.0e-14 for every order up
-/// to the highest supported one and for every argument.
-auto compute_boys_function(CSimdVariableMatrix &matrix) -> void;
+/// @brief Computes the values of Boys function of every order up to the requested
+/// one, for one pair of primitives.
+/// @param buffer The buffer of the combination of basis functions.
+/// @param coordinates The coordinates of the atom pairs, whose row nine holds the
+/// squared distance of the atom pair.
+/// @param target The row of the buffer to write the argument to. The values follow
+/// it, so the routine writes order + 2 rows in all.
+/// @param order The highest order of Boys function to compute.
+/// @param ncols The number of atom pairs the pair of primitives reaches.
+/// @param fj The factor every value is scaled by.
+/// @param mu The factor the squared distance is scaled by to give the argument.
+/// @note The row at target holds the argument, mu times the squared distance, and
+/// the rows from target + 1 to target + order + 1 hold the values of order zero to
+/// order, each scaled by fj. The argument is kept rather than recomputed, as the
+/// recursions below read it once per order.
+/// @note The values are computed from the Taylor expansion on a grid of arguments
+/// below the end of the grid and from the asymptotic expansion above it, with the
+/// remaining orders following from the downward and the upward recursion
+/// respectively. The relative accuracy is better than 1.0e-14 for every order up to
+/// the highest supported one and for every argument.
+auto compute_full_boys_function(CSimdMatrix       &buffer,
+                                const CSimdMatrix &coordinates,
+                                const size_t       target,
+                                const size_t       order,
+                                const size_t       ncols,
+                                const double       fj,
+                                const double       mu) -> void;
+
+/// @brief Computes the values of Boys function of the requested orders alone, for
+/// one pair of primitives.
+/// @param buffer The buffer of the combination of basis functions.
+/// @param coordinates The coordinates of the atom pairs, whose row nine holds the
+/// squared distance of the atom pair.
+/// @param target The row of the buffer to write the argument to. The values follow
+/// it, one row per requested order and in the order they are requested, so the
+/// routine writes one row more than there are orders.
+/// @param orders The orders of Boys function to compute.
+/// @param ncols The number of atom pairs the pair of primitives reaches.
+/// @param fj The factor every value is scaled by.
+/// @param mu The factor the squared distance is scaled by to give the argument.
+/// @note A recursion carries the values from the order the expansion gives to the
+/// order which is wanted, so the orders below the highest requested one are computed
+/// whether they are asked for or not. What this form saves is the rows of the
+/// buffer, not the arithmetic: a kernel which needs two orders out of twelve holds
+/// three rows rather than fourteen.
+auto compute_boys_function(CSimdMatrix                        &buffer,
+                           const CSimdMatrix                  &coordinates,
+                           const size_t                        target,
+                           const std::initializer_list<size_t> orders,
+                           const size_t                        ncols,
+                           const double                        fj,
+                           const double                        mu) -> void;
 
 }  // namespace simdfunc
 
