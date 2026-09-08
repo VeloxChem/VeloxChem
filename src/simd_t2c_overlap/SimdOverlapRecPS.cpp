@@ -95,8 +95,6 @@ compute_ps_overlap(double               *values,
 
     if (buffer.number_of_columns() == 0) return;
 
-    const auto nmax = buffer.number_of_columns();
-
     errors::assertMsgCritical(dimensions.size() == nprim_a * nprim_b,
                               std::string("Dimensions do not match the pairs of primitives"));
 

@@ -43,7 +43,7 @@ namespace simdovl {  // simdovl namespace
 /// to the integrals, for one pair of primitives.
 auto
 compute_ctr_ds_overlap_0(double *values, const size_t nvalues, CSimdMatrix &buffer,
-                         const size_t pa, const size_t ps, const size_t nmax) -> void;
+                         const size_t pa, const size_t ps, const size_t ncols) -> void;
 
 }  // namespace simdovl
 

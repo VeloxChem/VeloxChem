@@ -39,7 +39,7 @@ namespace simdovl {  // simdovl namespace
 
 auto
 compute_ctr_sp_overlap_0(double *values, const size_t nvalues, CSimdMatrix &buffer,
-                         const size_t pb, const size_t ss, const size_t nmax) -> void
+                         const size_t pb, const size_t ss, const size_t ncols) -> void
 {
     // NOTE: the rows of the values are not aligned, starting at this combination's
     // offset in the values block, so they are kept out of the clause below.
@@ -55,7 +55,7 @@ compute_ctr_sp_overlap_0(double *values, const size_t nvalues, CSimdMatrix &buff
     const auto *ss_0 = buffer.data(ss + 0);
 
 #pragma omp simd aligned(pb_x, pb_y, pb_z, ss_0 : simd::cache_line_size())
-    for (size_t k = 0; k < nmax; k++)
+    for (size_t k = 0; k < ncols; k++)
     {
         g_0[k] += pb_y[k] * ss_0[k];
 

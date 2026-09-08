@@ -40,7 +40,7 @@ namespace simdovl {  // simdovl namespace
 
 auto
 compute_ctr_ds_overlap_0(double *values, const size_t nvalues, CSimdMatrix &buffer,
-                         const size_t pa, const size_t ps, const size_t nmax) -> void
+                         const size_t pa, const size_t ps, const size_t ncols) -> void
 {
     // NOTE: the factors are fixed by the pair of primitives, so they are formed
     // once rather than for every atom pair the pair reaches.
@@ -66,7 +66,7 @@ compute_ctr_ds_overlap_0(double *values, const size_t nvalues, CSimdMatrix &buff
     const auto *ps_2 = buffer.data(ps + 2);
 
 #pragma omp simd aligned(pa_x, pa_y, pa_z, ps_0, ps_1, ps_2 : simd::cache_line_size())
-    for (size_t k = 0; k < nmax; k++)
+    for (size_t k = 0; k < ncols; k++)
     {
         g_0[k] += f_0 * pa_x[k] * ps_1[k];
 
