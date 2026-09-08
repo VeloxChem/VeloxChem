@@ -3444,6 +3444,11 @@ class ScfDriver:
         if use_scf_modifier:
             return
 
+        # User-supplied start orbitals have zero placeholder energies until
+        # the first MO diagonalization. Reject first-cycle convergence.
+        if self._use_start_orbitals and self._num_iter == 1:
+            return
+
         if self._num_iter > 0:
 
             e_grad = self._iter_data['gradient_norm']
