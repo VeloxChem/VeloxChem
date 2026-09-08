@@ -509,9 +509,32 @@ class MetalSiteForceFieldBuilder:
         return self._enzyme_system
 
     @property
+    def protonated_topology(self):
+        """
+        The whole protein as build_active_site protonated it, which the
+        cluster was cut out of.
+
+        There from Stage.ACTIVE_SITE onwards, long before there is an enzyme
+        system, which is what tells it apart from enzyme_topology: a caller
+        reading the residues of a site it is editing wants this one.
+        """
+
+        return self._protonated_topology
+
+    @property
+    def protonated_positions(self):
+        """
+        The positions of that topology, in Angstrom.
+        """
+
+        return self._protonated_positions
+
+    @property
     def enzyme_topology(self):
         """
-        The protonated topology the enzyme system was built for.
+        The protonated topology the enzyme system was built for. The same
+        object as protonated_topology; read that one unless the enzyme
+        system is what is being asked about.
         """
 
         return self._protonated_topology
@@ -1349,11 +1372,8 @@ class MetalSiteForceFieldBuilder:
         relaxed = core.mm_optimize_active_site(
             active_site,
             forcefield,
-            constrain_metals=self.mm_constrain_metals,
-            constrain_capping_hydrogens=self.constrain_capping_hydrogens,
-            max_iterations=self.mm_max_iterations,
-            bond_change_warning=self.mm_bond_change_warning,
-            ostream=self.ostream)
+            ostream=self.ostream,
+            **self.relax_settings())
 
         self._save_intermediate(core.MM_GEOMETRY_FILE,
                                 lambda path: relaxed.write_xyz_file(str(path)))
@@ -2225,6 +2245,27 @@ class MetalSiteForceFieldBuilder:
             'xcfun': self.xcfun,
             'basis_set_label': self.basis_set_label,
             'mute_scf': self.mute_scf,
+        }
+
+    def relax_settings(self):
+        """
+        The settings the crude relaxation reads, as keyword arguments.
+
+        Public for the same reason as detection_settings and fit_settings.
+        Without it these four were hand-copied into the manager's comparison
+        relaxation, so a new mm_ setting would have reached a run and not the
+        comparison -- and the comparison would then have measured a geometry
+        relaxed under different rules than the run it was measuring against.
+
+        :return:
+            The keyword arguments.
+        """
+
+        return {
+            'constrain_metals': self.mm_constrain_metals,
+            'constrain_capping_hydrogens': self.constrain_capping_hydrogens,
+            'max_iterations': self.mm_max_iterations,
+            'bond_change_warning': self.mm_bond_change_warning,
         }
 
     def fit_settings(self):

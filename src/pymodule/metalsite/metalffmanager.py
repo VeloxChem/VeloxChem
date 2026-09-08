@@ -1759,7 +1759,7 @@ class MetalForceFieldManager:
 
         # bound once: binding_modes derives a new object per access
         modes = builder.binding_modes
-        residues = list(builder.enzyme_topology.residues())
+        residues = list(builder.protonated_topology.residues())
         site = set(core.active_site_residues(modes))
 
         variants = [(core.residue_label(residues[res_index]), variant)
@@ -1928,7 +1928,7 @@ class MetalForceFieldManager:
             distances to every metal center by that center's residue index.
         """
 
-        topology = builder.enzyme_topology
+        topology = builder.protonated_topology
         positions = np.asarray(builder.enzyme_positions)
         modes = builder.binding_modes
 
@@ -2487,7 +2487,7 @@ class MetalForceFieldManager:
             The candidate of each assigned residue.
         """
 
-        residues = list(builder.enzyme_topology.residues())
+        residues = list(builder.protonated_topology.residues())
         dropped = []
 
         for res_index in sorted(
@@ -2683,7 +2683,7 @@ class MetalForceFieldManager:
             way as a string.
         """
 
-        topology = builder.enzyme_topology
+        topology = builder.protonated_topology
         atoms = list(topology.atoms())
         residues = list(topology.residues())
         variants = builder.binding_modes['variants']
@@ -2941,7 +2941,7 @@ class MetalForceFieldManager:
         metals = set(described['metal_indices'])
         metal, donor = sorted(pair, key=lambda index: index not in metals)
 
-        atoms = list(builder.enzyme_topology.atoms())
+        atoms = list(builder.protonated_topology.atoms())
         atom = atoms[described['atom_map'][donor]]
 
         return {
@@ -3139,11 +3139,8 @@ class MetalForceFieldManager:
         return core.mm_optimize_active_site(
             active_site,
             forcefield,
-            constrain_metals=builder.mm_constrain_metals,
-            constrain_capping_hydrogens=builder.constrain_capping_hydrogens,
-            max_iterations=builder.mm_max_iterations,
-            bond_change_warning=builder.mm_bond_change_warning,
-            ostream=self.ostream)
+            ostream=self.ostream,
+            **builder.relax_settings())
 
     # ------------------------------------------------------------------
     # matching
