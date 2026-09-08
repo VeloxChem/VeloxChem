@@ -52,6 +52,7 @@
 #include "MolecularBasis.hpp"
 #include "Molecule.hpp"
 #include "ScreeningFunc.hpp"
+#include "TripleSparsityPattern.hpp"
 #include "ValuesState.hpp"
 
 /// @brief Class CSparseTensor stores the sparsity pattern of a three-dimensional
@@ -72,30 +73,6 @@
 class CSparseTensor
 {
    public:
-    /// @brief The number of blocks per thread aimed at when the target number of
-    /// atom pairs of a block is chosen. It only ever raises the size above the
-    /// floor below, which is what decides every molecule measured here.
-    static constexpr size_t blocks_per_thread = 2;
-
-    /// @brief The smallest target number of atom pairs of a block chosen. A block
-    /// carries a fixed cost which does not shrink with the atom pairs it holds,
-    /// chiefly the bisection of the screening, so dividing too finely multiplies
-    /// that cost rather than dividing it.
-    /// @note This is far above the two thousand and forty eight of the sparse
-    /// matrix, and there is no ceiling to go with it, which is the opposite of
-    /// the two-center Coulomb driver. A block there is cheap to start and wants
-    /// to be small; a block here carries the bisection and wants to be large.
-    /// Measured on fourteen threads over def2-svp with the jkfit auxiliary basis,
-    /// as the number of atom pairs of a block: crambin in sixty three batches
-    /// takes 93 ms at 8192, 78 at 32768 and 89 undivided, and ubiquitin in one
-    /// hundred and twenty six batches takes 426 ms at 8192, 279 at 32768 and 434
-    /// undivided. Both ends cost, the small one by the fixed cost of a block and
-    /// the large one by leaving too few blocks for the threads.
-    /// @note The size computed from the threads is 7348 atom pairs for crambin
-    /// and 27038 for ubiquitin, both below this, so the floor is what binds and
-    /// blocks_per_thread decides nothing for them.
-    static constexpr size_t min_block_size = 32768;
-
     /// @brief The default constructor.
     CSparseTensor()
 
@@ -124,6 +101,23 @@ class CSparseTensor
     {
     }
 
+    /// @brief The constructor with a prepared sparsity pattern.
+    /// @param pattern The sparsity pattern of the blocks of the tensor.
+    /// @note This is the constructor the drivers use, as the pattern is formed once
+    /// by sparsity::make_triple_pattern and may be shared with the consumers of the
+    /// values.
+    explicit CSparseTensor(const CTripleSparsityPattern &pattern)
+
+        : _blocks(pattern.blocks())
+
+        , _values(pattern.number_of_blocks(), nullptr)
+
+        , _type(pattern.get_type())
+
+        , _values_state(valstat::empty)
+    {
+    }
+
     /// @brief The constructor with molecule, molecular basis on a and b sides,
     /// molecular basis on c side, integral screener and screening threshold. All
     /// atoms on c side are described.
@@ -142,68 +136,12 @@ class CSparseTensor
                   const double           threshold,
                   const mat_t            mat_type)
 
-        : _blocks{}
-
-        , _values{}
-
-        , _type(mat_type)
-
-        , _values_state(valstat::empty)
+        : CSparseTensor(sparsity::make_triple_pattern(molecule, basis, aux_basis, screener, threshold, mat_type))
     {
-        // NOTE: a symmetric or antisymmetric tensor needs the upper triangle of
-        // the atom basis pair groups only, while a general tensor needs their
-        // full direct product.
-
-        auto groups = (mat_type == mat_t::general) ? basis.basis_pair_groups(basis) : basis.basis_pair_groups();
-
-        _add_blocks(molecule, groups, aux_basis.basis_groups(), screener, threshold);
     }
 
-    /// @brief The constructor with molecule, molecular bases on a and b sides,
-    /// molecular basis on c side, integral screener and screening threshold. All
-    /// atoms on c side are described.
-    /// @param molecule The molecule to compute interatomic distances from.
-    /// @param bra_basis The molecular basis on a side.
-    /// @param ket_basis The molecular basis on b side.
-    /// @param aux_basis The molecular basis on c side.
-    /// @param screener The integral bound.
-    /// @param threshold The screening threshold.
-    /// @param mat_type The type of tensor, which must be general.
-    template <typename B>
-    CSparseTensor(const CMolecule       &molecule,
-                  const CMolecularBasis &bra_basis,
-                  const CMolecularBasis &ket_basis,
-                  const CMolecularBasis &aux_basis,
-                  const B               &screener,
-                  const double           threshold,
-                  const mat_t            mat_type)
-
-        : _blocks{}
-
-        , _values{}
-
-        , _type(mat_type)
-
-        , _values_state(valstat::empty)
-    {
-        errors::assertMsgCritical(mat_type == mat_t::general,
-                                  std::string("SparseTensor: Tensor with two molecular bases must be of general type"));
-
-        auto groups = bra_basis.basis_pair_groups(ket_basis);
-
-        _add_blocks(molecule, groups, aux_basis.basis_groups(), screener, threshold);
-    }
-
-    /// @brief The constructor with molecule, molecular basis on a and b sides,
-    /// molecular basis on c side, integral screener, screening threshold and the
-    /// atoms on c side to describe. The tensor holds the part of the whole which
-    /// those atoms carry.
-    /// @param molecule The molecule to compute interatomic distances from.
-    /// @param basis The molecular basis on a and b sides.
-    /// @param aux_basis The molecular basis on c side.
-    /// @param screener The integral bound.
-    /// @param threshold The screening threshold.
-    /// @param mat_type The type of tensor.
+    /// @brief The constructor with the atoms on c side to describe. The tensor holds
+    /// the part of the whole which those atoms carry.
     /// @param aux_atoms The atoms on c side to describe, as their indices in the
     /// molecule and without repetition.
     template <typename B>
@@ -215,32 +153,11 @@ class CSparseTensor
                   const mat_t             mat_type,
                   const std::vector<int> &aux_atoms)
 
-        : _blocks{}
-
-        , _values{}
-
-        , _type(mat_type)
-
-        , _values_state(valstat::empty)
+        : CSparseTensor(sparsity::make_triple_pattern(molecule, basis, aux_basis, screener, threshold, mat_type, aux_atoms))
     {
-        auto groups = (mat_type == mat_t::general) ? basis.basis_pair_groups(basis) : basis.basis_pair_groups();
-
-        const auto aux_groups = _select_aux_groups(molecule, aux_basis, aux_atoms);
-
-        _add_blocks(molecule, groups, aux_groups, screener, threshold);
     }
 
-    /// @brief The constructor with molecule, molecular bases, named integral
-    /// bound, screening threshold and the atoms on c side to describe. The tensor
-    /// holds the part of the whole which those atoms carry.
-    /// @param molecule The molecule to compute interatomic distances from.
-    /// @param basis The molecular basis on a and b sides.
-    /// @param aux_basis The molecular basis on c side.
-    /// @param bound The integral bound to screen atom pairs with.
-    /// @param threshold The screening threshold.
-    /// @param mat_type The type of tensor.
-    /// @param aux_atoms The atoms on c side to describe, as their indices in the
-    /// molecule and without repetition.
+    /// @brief The constructor with a named integral bound and the atoms on c side.
     CSparseTensor(const CMolecule        &molecule,
                   const CMolecularBasis  &basis,
                   const CMolecularBasis  &aux_basis,
@@ -249,22 +166,16 @@ class CSparseTensor
                   const mat_t             mat_type,
                   const std::vector<int> &aux_atoms)
 
-        : _blocks{}
-
-        , _values{}
-
-        , _type(mat_type)
-
-        , _values_state(valstat::empty)
+        : CSparseTensor(molecule,
+                        basis,
+                        aux_basis,
+                        screenfunc::three_center_electron_repulsion_bound,
+                        threshold,
+                        mat_type,
+                        aux_atoms)
     {
         errors::assertMsgCritical(bound == screener::electron_repulsion,
                                   std::string("SparseTensor: Integral bound is not a three-center bound"));
-
-        auto groups = (mat_type == mat_t::general) ? basis.basis_pair_groups(basis) : basis.basis_pair_groups();
-
-        const auto aux_groups = _select_aux_groups(molecule, aux_basis, aux_atoms);
-
-        _add_blocks(molecule, groups, aux_groups, screenfunc::three_center_electron_repulsion_bound, threshold);
     }
 
     /// @brief The copy constructor.
@@ -620,119 +531,6 @@ class CSparseTensor
 
             throw;
         }
-    }
-
-    /// @brief Selects the atom basis groups on c side which the given atoms
-    /// belong to, keeping only those atoms.
-    /// @param molecule The molecule the atoms are indexed in.
-    /// @param aux_basis The molecular basis on c side.
-    /// @param aux_atoms The atoms on c side to describe, as their indices in the
-    /// molecule and without repetition.
-    /// @return The atom basis groups holding the given atoms.
-    /// @note The atoms of a group are taken in the order of the given atoms and
-    /// not in the order of the group, so the values of a block follow the order
-    /// the caller asked for. A group holding none of them is left out, as it
-    /// carries no block.
-    /// @note The atoms are not checked for repetition, which the caller answers
-    /// for. A repeated atom would be described twice and its integrals computed
-    /// twice, which is wasteful rather than wrong.
-    static auto
-    _select_aux_groups(const CMolecule        &molecule,
-                       const CMolecularBasis  &aux_basis,
-                       const std::vector<int> &aux_atoms) -> std::vector<CAtomBasisGroup>
-    {
-        errors::assertMsgCritical(!aux_atoms.empty(), std::string("SparseTensor: The atoms on c side must not be empty"));
-
-        const auto natoms = molecule.number_of_atoms();
-
-        std::ranges::for_each(aux_atoms, [&](const auto atom) {
-            errors::assertMsgCritical((atom >= 0) && (atom < natoms),
-                                      std::string("SparseTensor: Index of atom on c side is out of range"));
-        });
-
-        std::vector<CAtomBasisGroup> groups;
-
-        std::ranges::for_each(aux_basis.basis_groups(), [&](const auto &group) {
-            const std::unordered_set<int> atoms(group.atoms().begin(), group.atoms().end());
-
-            std::vector<int> selected;
-
-            selected.reserve(aux_atoms.size());
-
-            std::ranges::copy_if(aux_atoms, std::back_inserter(selected), [&](const auto atom) { return atoms.contains(atom); });
-
-            if (!selected.empty()) groups.push_back(CAtomBasisGroup(group.basis(), selected, group.index()));
-        });
-
-        return groups;
-    }
-
-    /// @brief Adds the sparsity patterns of the non-empty blocks of the atom
-    /// basis pair groups and atom basis groups.
-    /// @param molecule The molecule to compute interatomic distances from.
-    /// @param groups The atom basis pair groups on a and b sides.
-    /// @param aux_groups The atom basis groups on c side.
-    /// @param screener The integral bound.
-    /// @param threshold The screening threshold.
-    template <typename B>
-    auto
-    _add_blocks(const CMolecule                     &molecule,
-                std::vector<CAtomBasisPairGroup>    &groups,
-                const std::vector<CAtomBasisGroup>  &aux_groups,
-                const B                             &screener,
-                const double                         threshold) -> void
-    {
-        // NOTE: the atom basis pair groups are as many as the pairs of the unique
-        // atom bases, so their number is set by the variety of the elements of
-        // the molecule and not by its size. Dividing them into blocks of a target
-        // number of atom pairs makes the number of the blocks follow the size of
-        // the molecule instead, so the work below divides for any number of
-        // threads. Batching the c side does not do this, as the cost of a block
-        // follows the atom pairs on the a and b sides.
-
-        const auto nblock_pairs = CAtomBasisPairGroup::make_block_size(groups, blocks_per_thread, min_block_size);
-
-        auto blocks = (nblock_pairs == 0) ? std::move(groups) : CAtomBasisPairGroup::divide(groups, nblock_pairs);
-
-        // NOTE: the atom pairs of all the blocks are ordered by interatomic
-        // distance before the sparsity patterns are described, as the patterns
-        // are read off the leading atom pairs which survive the screening. A
-        // block holds a subrange of the atom pairs of its group and is ordered
-        // within itself, which is all the bisection of the screening needs, as
-        // the screening keeps an atom pair or drops it on its own distance.
-
-        CAtomBasisPairGroup::sort_by_distance(blocks, molecule);
-
-        // NOTE: the patterns are held in a vector indexed by the block and the
-        // atom basis group on c side, so that they are described in any order and
-        // added in the order of that index. The layout of the values blocks
-        // therefore does not depend on the scheduling.
-
-        const auto naux = aux_groups.size();
-
-        const auto npatterns = static_cast<int>(blocks.size() * naux);
-
-        std::vector<std::optional<CAtomBasisTripleSparsity>> patterns(blocks.size() * naux);
-
-#pragma omp parallel for schedule(dynamic)
-        for (int i = 0; i < npatterns; i++)
-        {
-            const auto index = static_cast<size_t>(i);
-
-            patterns[index].emplace(blocks[index / naux], aux_groups[index % naux], screener, threshold);
-        }
-
-        // NOTE: an empty pattern is left out, as it carries no values block of
-        // its own.
-
-        for (int i = 0; i < npatterns; i++)
-        {
-            auto &pattern = patterns[static_cast<size_t>(i)];
-
-            if (pattern->number_of_pairs() > 0) _blocks.push_back(std::move(*pattern));
-        }
-
-        _values.assign(_blocks.size(), nullptr);
     }
 
     /// @brief The sparsity patterns of the blocks.

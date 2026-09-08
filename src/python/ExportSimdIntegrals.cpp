@@ -35,12 +35,15 @@
 #include "ExportSimdIntegrals.hpp"
 
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 
 #include "MolecularBasis.hpp"
 #include "Molecule.hpp"
 #include "PackedMatrix.hpp"
+#include "SparseTensor.hpp"
 #include "SimdKineticEnergyDriver.hpp"
 #include "SimdOverlapDriver.hpp"
+#include "SimdThreeCenterElectronRepulsionDriver.hpp"
 #include "SimdTwoCenterElectronRepulsionDriver.hpp"
 #include "SparseMatrix.hpp"
 
@@ -103,6 +106,30 @@ export_simdintegrals(py::module &m) -> void
         .def("get_block_size",
              &CSimdTwoCenterElectronRepulsionDriver::get_block_size,
              "Gets target number of atom pairs of a block.");
+
+    // CSimdThreeCenterElectronRepulsionDriver class
+
+    PyClass<CSimdThreeCenterElectronRepulsionDriver>(m, "SimdThreeCenterElectronRepulsionDriver")
+        .def(py::init<>())
+        .def("compute",
+             static_cast<CSparseTensor (CSimdThreeCenterElectronRepulsionDriver::*)(
+                 const CMolecule &, const CMolecularBasis &, const CMolecularBasis &, const double) const>(
+                 &CSimdThreeCenterElectronRepulsionDriver::compute),
+             "Computes sparse tensor of three-center electron repulsion integrals.",
+             py::arg("molecule"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("threshold"))
+        .def("compute",
+             static_cast<CSparseTensor (CSimdThreeCenterElectronRepulsionDriver::*)(
+                 const CMolecule &, const CMolecularBasis &, const CMolecularBasis &, const double,
+                 const std::vector<int> &) const>(&CSimdThreeCenterElectronRepulsionDriver::compute),
+             "Computes sparse tensor of three-center electron repulsion integrals for given atoms on c side.",
+             py::arg("molecule"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("threshold"),
+             py::arg("atoms"));
 }
 
 }  // namespace vlx_simdintegrals
