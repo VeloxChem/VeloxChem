@@ -1887,8 +1887,16 @@ class ScfDriver:
 
             iter_start_time = tm.time()
 
+            use_density_factor = use_pfon or use_density_damping
+
             fock_mat, vxc_mat, e_emb, V_emb, e_pr, V_pr = self._comp_2e_fock_single_comm(
-                den_mat, molecule, ao_basis, screener, e_grad, profiler)
+                den_mat,
+                molecule,
+                ao_basis,
+                screener,
+                e_grad,
+                profiler,
+                use_density_factor=use_density_factor)
 
             self._e_gostshyp = e_pr
 
@@ -2631,7 +2639,12 @@ class ScfDriver:
         return (fock_type, exchange_scaling_factor, need_omega, erf_k_coef,
                 omega)
 
-    def _comp_restricted_2e_fock(self, den_mat, basis, screener, thresh_int):
+    def _comp_restricted_2e_fock(self,
+                                 den_mat,
+                                 basis,
+                                 screener,
+                                 thresh_int,
+                                 use_density_factor=False):
         """
         Computes the restricted 2e Fock matrix.
 
@@ -2643,6 +2656,8 @@ class ScfDriver:
             The screening container object.
         :param thresh_int:
             The integral threshold exponent.
+        :param use_density_factor:
+            Whether the exchange should be built from the density.
         :return:
             The restricted Fock matrix list or None on non-master ranks.
         """
@@ -2672,7 +2687,10 @@ class ScfDriver:
                                                               'j',
                                                               verbose=False)
             fock_mat_k = self._ri_drv.compute_screened_k_fock(
-                den_mat_for_fock, self.molecular_orbitals, verbose=False)
+                den_mat_for_fock,
+                self.molecular_orbitals,
+                verbose=False,
+                use_density_factor=use_density_factor)
             fock_mat_np = (fock_mat_j.to_numpy() * 2.0 -
                            fock_mat_k.to_numpy() * exchange_scaling_factor)
         else:
@@ -2705,7 +2723,12 @@ class ScfDriver:
 
         return None
 
-    def _comp_open_shell_2e_fock(self, den_mat, basis, screener, thresh_int):
+    def _comp_open_shell_2e_fock(self,
+                                 den_mat,
+                                 basis,
+                                 screener,
+                                 thresh_int,
+                                 use_density_factor=False):
         """
         Computes the unrestricted/restricted-open-shell 2e Fock matrices.
 
@@ -2717,6 +2740,8 @@ class ScfDriver:
             The screening container object.
         :param thresh_int:
             The integral threshold exponent.
+        :param use_density_factor:
+            Whether the exchange should be built from the density.
         :return:
             The open-shell Fock matrix list or None on non-master ranks.
         """
@@ -2774,7 +2799,8 @@ class ScfDriver:
                     den_mat_for_Ka,
                     self.molecular_orbitals,
                     verbose=False,
-                    spin='alpha')
+                    spin='alpha',
+                    use_density_factor=use_density_factor)
                 K_a_np = fock_mat.to_numpy() * exchange_scaling_factor
                 fock_mat = Matrix()
 
@@ -2782,7 +2808,8 @@ class ScfDriver:
                     den_mat_for_Kb,
                     self.molecular_orbitals,
                     verbose=False,
-                    spin='beta')
+                    spin='beta',
+                    use_density_factor=use_density_factor)
                 K_b_np = fock_mat.to_numpy() * exchange_scaling_factor
                 fock_mat = Matrix()
 
@@ -2843,7 +2870,8 @@ class ScfDriver:
                                   basis,
                                   screener,
                                   e_grad=None,
-                                  profiler=None):
+                                  profiler=None,
+                                  use_density_factor=False):
         """
         Computes Fock/Kohn-Sham matrix on single communicator.
 
@@ -2859,6 +2887,8 @@ class ScfDriver:
             The electronic gradient.
         :param profiler:
             The profiler.
+        :param use_density_factor:
+            Whether the exchange should be built from the density.
 
         :return:
             The Fock matrix, AO Kohn-Sham (Vxc) matrix, etc.
@@ -2874,12 +2904,12 @@ class ScfDriver:
         fock_mat = None
 
         if self.scf_type == 'restricted':
-            fock_mat = self._comp_restricted_2e_fock(den_mat, basis, screener,
-                                                     thresh_int)
+            fock_mat = self._comp_restricted_2e_fock(
+                den_mat, basis, screener, thresh_int, use_density_factor)
 
         else:
-            fock_mat = self._comp_open_shell_2e_fock(den_mat, basis, screener,
-                                                     thresh_int)
+            fock_mat = self._comp_open_shell_2e_fock(
+                den_mat, basis, screener, thresh_int, use_density_factor)
 
         if self.timing:
             profiler.add_timing_info('FockERI', tm.time() - eri_t0)
