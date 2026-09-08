@@ -85,13 +85,24 @@ class CSimdTwoCenterElectronRepulsionDriver
 
     /// @brief The largest target number of atom pairs of a block chosen when the
     /// size is not given.
-    /// @note Inherited from the driver which preceded the generated kernels, where
-    /// it was measured on fourteen threads over the def2 universal fitting sets: the
-    /// time was flat below about three hundred atom pairs a block and rose steeply
-    /// above it, crambin in jkfit taking 271 ms at 7348 and 158 at 153. Those
-    /// numbers describe kernels which no longer exist and the block constants which
-    /// preceded the fit in BENCHMARKS.md, so the ceiling is carried over rather than
-    /// confirmed, and wants measuring again once the kernels are here.
+    /// @note Fitted on fourteen threads over the six benchmark molecules in the def2
+    /// universal jfit and jkfit sets, against the generated kernels. The block size
+    /// is not what limits this driver: every ceiling from 64 to 512 lands within four
+    /// to eight per cent of the best any of them reaches, where the wrong floor cost
+    /// the overlap driver a factor of four. A ceiling of 128 wins the mean over the
+    /// twelve cases and 256 wins their total time, because 128 buys 7 to 24 per cent
+    /// on the three small molecules and costs 6 to 10 per cent on the three large
+    /// ones, which carry the time. The value stays at 256 for that reason. Ceilings
+    /// above 512 were not fitted: the curves are already rising there, the
+    /// paracetamol cluster in jfit going from 35.7 ms at 512 to 41.7 at 1024 and
+    /// ubiquitin from 481.7 to 526.4.
+    /// @note The ceiling meets the floor. sparsity::min_block_size is 256 as well, so
+    /// min(max(npairs / (blocks_per_thread * nthreads), 256), 256) is 256 for every
+    /// molecule and the term which follows the size of the molecule never applies.
+    /// The driver therefore divides tagrisso and ubiquitin into blocks of the same
+    /// size, which the measurement says costs it little but which is a coincidence of
+    /// the two constants rather than a choice. Refitting the floor moves this driver
+    /// with it.
     static constexpr size_t max_block_size = 256;
 
    private:
