@@ -1149,6 +1149,94 @@ class MetalSiteForceFieldBuilder:
         self._reapply()
 
     # ------------------------------------------------------------------
+    # applying an edit
+    # ------------------------------------------------------------------
+
+    def _edit_coordination(self, edit):
+        """
+        Applies one coordination edit and brings the builder up to date.
+
+        An edit is a decision, so it goes into the request, which is the
+        same thing at either stage: there is only one numbering now, and the
+        request survives every derivation. What differs between the stages
+        is only what is done about it afterwards -- the site is extracted
+        again before the fit, and the metal terms are fitted again after it.
+
+        :param edit:
+            A callable taking the request and the coordination it is being
+            made against, and returning the edited request.
+        """
+
+        self._request = self._on_master(
+            lambda: edit(self._request, self.binding_modes))
+
+        self._reapply()
+
+    def _reapply(self):
+        """
+        Brings everything downstream of an edit up to date, whichever way
+        this builder's stage says that is done. The one place that branch is
+        written, and every edit method's last act.
+        """
+
+        if self._stage < Stage.FITTED:
+            self._rebuild_active_site()
+        else:
+            self._refit_forcefield()
+
+    def _rebuild_active_site(self):
+        """
+        Protonates and truncates again from the binding modes as they stand.
+
+        The same work build_active_site does without a path, and run the same
+        way it was run then, so that an edit does not silently change whether
+        the crude pass happens. The run header is not printed again: this is
+        not a new run.
+        """
+
+        state = self._on_master(
+            lambda: self._build_active_site(None, self._mm_opt, None))
+
+        self._adopt(state)
+
+        # the site they were computed for has just been replaced; a file in
+        # the folder that still fits this one is picked back up by
+        # build_forcefield, which validates it before it uses it
+        self._enter(Stage.ACTIVE_SITE)
+
+    def _refit_forcefield(self):
+        """
+        Fits the metal terms again after the coordination was edited.
+
+        Nothing expensive runs. The geometry, the Hessian and the charges all
+        still describe this cluster, and only which atoms the metals are
+        bonded to has changed, so the force field is built again from them
+        with the new connectivity. Rebuilding it rather than patching it is
+        what keeps the angles, torsions and impropers that cross an edited
+        bond right: the generator derives every one of them from the
+        connectivity matrix.
+
+        A term the Hessian holds nothing for is fitted to zero and reported by
+        _check_force_constants, which is what a bond added by hand looks like
+        when the Hessian was computed for a coordination without it. The bond
+        is kept: the warning says to recompute the Hessian, not that the edit
+        was refused.
+        """
+
+        self.ostream.print_info(
+            'Fitting the metal terms again on the edited coordination. '
+            'Nothing is recomputed; a term the Hessian does not cover is '
+            'reported below.')
+        self.ostream.flush()
+
+        self._active_site = self._on_master(lambda: core.apply_metal_bonds(
+            self._active_site,
+            self._site_coordination(self._active_site['molecule'])))
+
+        # entering FITTED drops the enzyme system built from the old terms
+        self._fit_and_broadcast(self._hessian, self._partial_charges)
+
+    # ------------------------------------------------------------------
     # steps
     #
     # The pipeline's stages, usable on their own. Each drops the fit above
@@ -2013,98 +2101,6 @@ class MetalSiteForceFieldBuilder:
         modes['notes'] = notes
 
         return modes
-
-    # ------------------------------------------------------------------
-    # applying an edit
-    # ------------------------------------------------------------------
-
-    def _edit_coordination(self, edit):
-        """
-        Applies one coordination edit and brings the builder up to date.
-
-        An edit is a decision, so it goes into the request, which is the
-        same thing at either stage: there is only one numbering now, and the
-        request survives every derivation. What differs between the stages
-        is only what is done about it afterwards -- the site is extracted
-        again before the fit, and the metal terms are fitted again after it.
-
-        :param edit:
-            A callable taking the request and the coordination it is being
-            made against, and returning the edited request.
-        """
-
-        self._request = self._on_master(
-            lambda: edit(self._request, self.binding_modes))
-
-        self._reapply()
-
-    def _reapply(self):
-        """
-        Brings everything downstream of an edit up to date.
-
-        An edit is not a request to be remembered for later: the builder that
-        made it describes the edited site immediately, at whichever stage it
-        is in. Before the force field exists that means extracting the site
-        again from the corrected binding modes; afterwards it means fitting
-        the metal terms again on what is already there.
-        """
-
-        if self._stage < Stage.FITTED:
-            self._rebuild_active_site()
-        else:
-            self._refit_forcefield()
-
-    def _rebuild_active_site(self):
-        """
-        Protonates and truncates again from the binding modes as they stand.
-
-        The same work build_active_site does without a path, and run the same
-        way it was run then, so that an edit does not silently change whether
-        the crude pass happens. The run header is not printed again: this is
-        not a new run.
-        """
-
-        state = self._on_master(
-            lambda: self._build_active_site(None, self._mm_opt, None))
-
-        self._adopt(state)
-
-        # the site they were computed for has just been replaced; a file in
-        # the folder that still fits this one is picked back up by
-        # build_forcefield, which validates it before it uses it
-        self._enter(Stage.ACTIVE_SITE)
-
-    def _refit_forcefield(self):
-        """
-        Fits the metal terms again after the coordination was edited.
-
-        Nothing expensive runs. The geometry, the Hessian and the charges all
-        still describe this cluster, and only which atoms the metals are
-        bonded to has changed, so the force field is built again from them
-        with the new connectivity. Rebuilding it rather than patching it is
-        what keeps the angles, torsions and impropers that cross an edited
-        bond right: the generator derives every one of them from the
-        connectivity matrix.
-
-        A term the Hessian holds nothing for is fitted to zero and reported by
-        _check_force_constants, which is what a bond added by hand looks like
-        when the Hessian was computed for a coordination without it. The bond
-        is kept: the warning says to recompute the Hessian, not that the edit
-        was refused.
-        """
-
-        self.ostream.print_info(
-            'Fitting the metal terms again on the edited coordination. '
-            'Nothing is recomputed; a term the Hessian does not cover is '
-            'reported below.')
-        self.ostream.flush()
-
-        self._active_site = self._on_master(lambda: core.apply_metal_bonds(
-            self._active_site,
-            self._site_coordination(self._active_site['molecule'])))
-
-        # entering FITTED drops the enzyme system built from the old terms
-        self._fit_and_broadcast(self._hessian, self._partial_charges)
 
     # ------------------------------------------------------------------
     # settings assembly
