@@ -46,23 +46,6 @@
 
 namespace simdfunc {  // simdfunc namespace
 
-/// @brief Writes the argument of Boys function, the scaled squared distance of the
-/// atom pair.
-static auto
-_make_arguments(CSimdMatrix &buffer, const CSimdMatrix &coordinates, const size_t target, const size_t ncols, const double mu)
-    -> void
-{
-    auto *args = buffer.data(target);
-
-    const auto *ab_2 = coordinates.data(9);
-
-#pragma omp simd aligned(args, ab_2 : simd::cache_line_size())
-    for (size_t k = 0; k < ncols; k++)
-    {
-        args[k] = mu * ab_2[k];
-    }
-}
-
 /// @brief Computes the values of Boys function of order zero to order for one
 /// argument, into the leading order + 1 entries of values.
 /// @note The highest order is taken from the Taylor expansion on the grid and the
@@ -131,21 +114,13 @@ _boys_ladder(double *values, const double fa, const int order, const double *tab
 }
 
 auto
-compute_full_boys_function(CSimdMatrix       &buffer,
-                           const CSimdMatrix &coordinates,
-                           const size_t       target,
-                           const size_t       order,
-                           const size_t       ncols,
-                           const double       fj,
-                           const double       mu) -> void
+compute_boys_values(CSimdMatrix &buffer, const size_t target, const size_t order, const size_t ncols) -> void
 {
     errors::assertMsgCritical(static_cast<int>(order) <= max_boys_order(),
-                              std::string("SimdBoysFunc.compute_full_boys_function: Order of Boys function is out of range"));
+                              std::string("SimdBoysFunc.compute_boys_values: Order of Boys function is out of range"));
 
     errors::assertMsgCritical(target + order + 1 < buffer.number_of_rows(),
-                              std::string("SimdBoysFunc.compute_full_boys_function: Buffer has too few rows"));
-
-    _make_arguments(buffer, coordinates, target, ncols, mu);
+                              std::string("SimdBoysFunc.compute_boys_values: Buffer has too few rows"));
 
     const auto iorder = static_cast<int>(order);
 
@@ -157,8 +132,9 @@ compute_full_boys_function(CSimdMatrix       &buffer,
 
     const auto *args = buffer.data(target);
 
-    // NOTE: every order is wanted here, so the values are formed straight into the
-    // rows of the buffer and the ladder is the rows themselves.
+    // NOTE: every order is wanted here, so the values go straight into the rows of
+    // the buffer through a scratch of one column, which the ladder needs as its
+    // orders are formed in sequence.
 
     std::vector<double *> rows(order + 1, nullptr);
 
@@ -175,31 +151,24 @@ compute_full_boys_function(CSimdMatrix       &buffer,
 
         for (size_t j = 0; j <= order; j++)
         {
-            rows[j][i] = fj * ladder[j];
+            rows[j][i] = ladder[j];
         }
     }
 }
 
 auto
-compute_boys_function(CSimdMatrix                        &buffer,
-                      const CSimdMatrix                  &coordinates,
-                      const size_t                        target,
-                      const std::initializer_list<size_t> orders,
-                      const size_t                        ncols,
-                      const double                        fj,
-                      const double                        mu) -> void
+compute_boys_values(CSimdMatrix &buffer, const size_t target, const std::initializer_list<size_t> orders, const size_t ncols)
+    -> void
 {
-    errors::assertMsgCritical(orders.size() > 0, std::string("SimdBoysFunc.compute_boys_function: No order was requested"));
+    errors::assertMsgCritical(orders.size() > 0, std::string("SimdBoysFunc.compute_boys_values: No order was requested"));
 
     const auto top = *std::ranges::max_element(orders);
 
     errors::assertMsgCritical(static_cast<int>(top) <= max_boys_order(),
-                              std::string("SimdBoysFunc.compute_boys_function: Order of Boys function is out of range"));
+                              std::string("SimdBoysFunc.compute_boys_values: Order of Boys function is out of range"));
 
     errors::assertMsgCritical(target + orders.size() < buffer.number_of_rows(),
-                              std::string("SimdBoysFunc.compute_boys_function: Buffer has too few rows"));
-
-    _make_arguments(buffer, coordinates, target, ncols, mu);
+                              std::string("SimdBoysFunc.compute_boys_values: Buffer has too few rows"));
 
     const auto itop = static_cast<int>(top);
 
@@ -234,11 +203,76 @@ compute_boys_function(CSimdMatrix                        &buffer,
 
         for (const auto j : orders)
         {
-            rows[irow][i] = fj * ladder[j];
+            rows[irow][i] = ladder[j];
 
             irow++;
         }
     }
+}
+
+/// @brief Writes the argument of Boys function of a two-center electron repulsion
+/// integral, the squared distance of the atom pair scaled by the exponents.
+static auto
+_make_arguments(CSimdMatrix &buffer, const CSimdMatrix &coordinates, const size_t target, const size_t ncols, const double mu)
+    -> void
+{
+    auto *args = buffer.data(target);
+
+    const auto *ab_2 = coordinates.data(9);
+
+#pragma omp simd aligned(args, ab_2 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        args[k] = mu * ab_2[k];
+    }
+}
+
+/// @brief Scales the rows of values by the prefactor of the integral.
+static auto
+_scale_values(CSimdMatrix &buffer, const size_t target, const size_t nrows, const size_t ncols, const double fj) -> void
+{
+    for (size_t j = 0; j < nrows; j++)
+    {
+        auto *row = buffer.data(target + 1 + j);
+
+#pragma omp simd aligned(row : simd::cache_line_size())
+        for (size_t k = 0; k < ncols; k++)
+        {
+            row[k] *= fj;
+        }
+    }
+}
+
+auto
+compute_full_boys_function(CSimdMatrix       &buffer,
+                           const CSimdMatrix &coordinates,
+                           const size_t       target,
+                           const size_t       order,
+                           const size_t       ncols,
+                           const double       fj,
+                           const double       mu) -> void
+{
+    _make_arguments(buffer, coordinates, target, ncols, mu);
+
+    compute_boys_values(buffer, target, order, ncols);
+
+    _scale_values(buffer, target, order + 1, ncols, fj);
+}
+
+auto
+compute_boys_function(CSimdMatrix                        &buffer,
+                      const CSimdMatrix                  &coordinates,
+                      const size_t                        target,
+                      const std::initializer_list<size_t> orders,
+                      const size_t                        ncols,
+                      const double                        fj,
+                      const double                        mu) -> void
+{
+    _make_arguments(buffer, coordinates, target, ncols, mu);
+
+    compute_boys_values(buffer, target, orders, ncols);
+
+    _scale_values(buffer, target, orders.size(), ncols, fj);
 }
 
 }  // namespace simdfunc

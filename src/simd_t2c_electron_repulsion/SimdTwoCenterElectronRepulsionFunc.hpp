@@ -40,7 +40,7 @@
 #include "BasisFunction.hpp"
 #include "SimdMatrix.hpp"
 
-namespace simderi {  // simderi namespace
+namespace simdt2ceri {  // simdt2ceri namespace
 
 /// @brief Computes the two-center electron repulsion integral of two basis
 /// functions centered on the same atom.
@@ -78,9 +78,9 @@ auto one_center_electron_repulsion(const CBasisFunction &bra, const CBasisFuncti
 /// so neither an atom pair nor a pair of primitives falls below a threshold at any
 /// distance a molecule reaches, and every combination of basis functions is computed
 /// over every atom pair of every block.
-/// @note The kernels of the atom pairs are not written yet, so every combination
-/// stops with an error rather than returning values it did not compute. The integral
-/// of two basis functions on the same atom is unaffected and is computed by
+/// @note The kernels are generated up to angular momentum six, so a combination
+/// above it stops with an error rather than returning values it did not compute. The
+/// integral of two basis functions on the same atom is unaffected and is computed by
 /// one_center_electron_repulsion above.
 auto compute_electron_repulsion(double               *values,
                                 const size_t          nvalues,
@@ -88,6 +88,6 @@ auto compute_electron_repulsion(double               *values,
                                 const CBasisFunction &ket,
                                 const CSimdMatrix    &coordinates) -> void;
 
-}  // namespace simderi
+}  // namespace simdt2ceri
 
 #endif /* SimdTwoCenterElectronRepulsionFunc_hpp */

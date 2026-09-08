@@ -40,6 +40,12 @@
 #include <string>
 #include <vector>
 
+// NOTE: the generated kernels reach the Boys function through this header, as
+// they include it for the other helpers of simdfunc and do not include the Boys
+// header of their own. The include belongs in the kernels which call it and can
+// go once they carry it.
+#include "SimdBoysFunc.hpp"
+
 #include "ErrorHandler.hpp"
 #include "SimdAlign.hpp"
 #include "SimdMatrix.hpp"

@@ -148,10 +148,15 @@ CSimdTwoCenterElectronRepulsionDriver::_compute_pair_blocks(CPackedMatrix       
                 // per pair of angular components, as the elements of the matrix a
                 // combination reaches are not contiguous.
 
-                auto scratch = CSimdMatrix(ncomps, npairs);
+                // NOTE: the scratch is contiguous and not a CSimdMatrix. A kernel
+                // addresses the row of a component as values + m * nvalues, while the
+                // rows of a CSimdMatrix are padded to a cache line, so every component
+                // past the first would land in the padding of the row before it.
 
-                simderi::compute_electron_repulsion(scratch.data(0), npairs, a_basis.functions()[i], b_basis.functions()[j],
-                                                    coordinates);
+                std::vector<double> scratch(ncomps * npairs, 0.0);
+
+                simdt2ceri::compute_electron_repulsion(scratch.data(), npairs, a_basis.functions()[i], b_basis.functions()[j],
+                                                       coordinates);
 
                 const auto a_ncomps = static_cast<size_t>(tensor::number_of_spherical_components(std::array<int, 1>{la}));
 
@@ -161,7 +166,7 @@ CSimdTwoCenterElectronRepulsionDriver::_compute_pair_blocks(CPackedMatrix       
                 {
                     for (size_t mb = 0; mb < b_ncomps; mb++)
                     {
-                        const auto *cell = scratch.data(ma * b_ncomps + mb);
+                        const auto *cell = scratch.data() + (ma * b_ncomps + mb) * npairs;
 
                         for (size_t k = 0; k < npairs; k++)
                         {
@@ -217,7 +222,7 @@ CSimdTwoCenterElectronRepulsionDriver::_compute_diagonal_blocks(CPackedMatrix &m
 
                 if (la != lb) continue;
 
-                const auto fval = simderi::one_center_electron_repulsion(atom_basis.functions()[i], atom_basis.functions()[j]);
+                const auto fval = simdt2ceri::one_center_electron_repulsion(atom_basis.functions()[i], atom_basis.functions()[j]);
 
                 const auto ncomps = static_cast<size_t>(tensor::number_of_spherical_components(std::array<int, 1>{la}));
 
