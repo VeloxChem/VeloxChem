@@ -108,9 +108,18 @@ BIDENTATE_ASYMMETRY = 0.75
 # structure, where a stretched bridging contact is still a bond.
 METAL_BOND_CUTOFF = 3.0
 
+# How much further than the bonding cutoff, in Angstrom, a contact is
+# reported without being made a bond, so that a near miss is visible in the
+# coordination table. It is a margin rather than a distance of its own
+# because the two are not independent: a scan that stops before the bonding
+# cutoff would drop contacts that are bonds, so raising metal_bond_cutoff
+# past a fixed report_cutoff used to have no effect at all.
+REPORT_CUTOFF_MARGIN = 0.5
+
 # Distance, in Angstrom, out to which a contact is reported without being
-# made a bond, so that a near miss is visible in the coordination table.
-REPORT_CUTOFF = 3.5
+# made a bond. Only the default pairing of the two; what a scan uses is
+# resolved from the bonding cutoff it is given, by _resolve_report_cutoff.
+REPORT_CUTOFF = METAL_BOND_CUTOFF + REPORT_CUTOFF_MARGIN
 
 # Distance, in Angstrom, within which a donor atom is given Hessian blocks
 # with a metal center whether or not it is bonded to one. The perception is
@@ -288,6 +297,32 @@ def _stream(ostream):
     """
 
     return OutputStream(None) if ostream is None else ostream
+
+
+def _resolve_report_cutoff(metal_bond_cutoff, report_cutoff=None):
+    """
+    Returns the distance a coordination scan looks out to.
+
+    The two cutoffs are not independent. The scan collects candidates out to
+    the reporting distance and decides bonding inside it, so a reporting
+    distance below the bonding one silently drops contacts that are bonds:
+    raising metal_bond_cutoff past a fixed report_cutoff used to have no
+    effect whatever. It is therefore a margin above the bonding cutoff, and
+    a distance given explicitly is never allowed underneath it.
+
+    :param metal_bond_cutoff:
+        The distance a donor atom is bonded to a metal within.
+    :param report_cutoff:
+        The distance to report out to, or None for the margin.
+
+    :return:
+        The distance to scan out to.
+    """
+
+    if report_cutoff is None:
+        return metal_bond_cutoff + REPORT_CUTOFF_MARGIN
+
+    return max(float(report_cutoff), float(metal_bond_cutoff))
 
 
 def _folder_file(name, folder=None):
@@ -756,6 +791,8 @@ def _collect_ligands(atoms,
     :return:
         The list of ligand contacts, each carrying its mode.
     """
+
+    report_cutoff = _resolve_report_cutoff(metal_bond_cutoff, report_cutoff)
 
     metal_indices = [metal['index'] for metal in metals]
     atoms = list(atoms)
@@ -3873,7 +3910,8 @@ def build_forcefield(
         bond_equilibria=None,
         weak_bridge_tolerance=WEAK_BRIDGE_TOLERANCE,
         add_metal_planarity_impropers=True,
-        metal_planarity_force_constant=DEFAULT_METAL_PLANARITY_FORCE_CONSTANT):
+        metal_planarity_force_constant=DEFAULT_METAL_PLANARITY_FORCE_CONSTANT,
+        mute_generator=True):
     """
     Builds the active site force field and fits the metal terms.
 
@@ -3915,6 +3953,13 @@ def build_forcefield(
         bonds and angles with: 'seminario' (default), 'improved-seminario'
         or 'phf'/'phf(k)'. Only used when a Hessian is given; the seeded
         pass ignores it.
+    :param mute_generator:
+        Whether the generator reports its own work. It names every
+        parameter it looks up and every bond and angle it re-measures,
+        which buries what this module has to say about the site -- and a
+        shoehorning, which rebuilds the site after every edit, prints it
+        all again each time. Off by default; set it False to see what GAFF
+        did.
 
     :return:
         The force field generator.
@@ -3930,7 +3975,13 @@ def build_forcefield(
     molecule = active_site['molecule']
     n_atoms = molecule.number_of_atoms()
 
-    forcefield = MMForceFieldGenerator(comm, ostream)
+    # The generator reports every parameter it looks up and every bond and
+    # angle it re-measures, which for a site of this size is hundreds of
+    # lines saying only that GAFF was used. It is given a stream of its own
+    # rather than the shared one being muted, since OutputStream.mute is
+    # reference counted and an unbalanced pair silences everything after it.
+    forcefield = MMForceFieldGenerator(
+        comm, OutputStream(None) if mute_generator else ostream)
     # copied, not aliased: np.asarray hands back the caller's own array, and
     # the weak bridge pruning edits the generator's matrix, so sharing it
     # would have this function quietly rewriting the active site it was

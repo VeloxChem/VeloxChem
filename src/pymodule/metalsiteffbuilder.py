@@ -144,8 +144,10 @@ class MetalSiteForceFieldBuilder:
     Instance variables
         - metal_bond_cutoff: The distance in Angstrom within which a donor atom
           is taken to be bonded to a metal center.
-        - report_cutoff: The distance in Angstrom out to which contacts are
-          reported for review.
+        - report_cutoff_margin: How much further in Angstrom than
+          metal_bond_cutoff a contact is still reported for review. The
+          reporting distance itself is read back off report_cutoff, which
+          follows the bonding cutoff rather than being set on its own.
         - metal_elements: The elements treated as metal centers.
         - metal_formal_charges: The formal charges assumed for the metal ions.
         - bidentate_asymmetry: How much closer one carboxylate oxygen has to be
@@ -191,6 +193,10 @@ class MetalSiteForceFieldBuilder:
         - metal_blind_typing: The flag for perceiving the GAFF atom types as
           if the metal bonds were not there, so that a coordinating residue
           is typed as the amino acid it is.
+        - mute_forcefield_generator: The flag for keeping the force field
+          generator's own commentary out of the output. On by default: it
+          names every parameter it looks up, which is hundreds of lines per
+          build and says nothing about the site. Set it False to see it.
         - prune_weak_bridge_bonds: The flag for dropping the long arm of a
           bridging residue when the fit gave it no force constant.
         - weak_bridge_tolerance: How much longer than the residue's shortest
@@ -256,7 +262,11 @@ class MetalSiteForceFieldBuilder:
         # the primary cutoff is generous on purpose: a stretched bridging
         # contact in an unrelaxed structure is still a bond
         self.metal_bond_cutoff = core.METAL_BOND_CUTOFF
-        self.report_cutoff = core.REPORT_CUTOFF
+        # how much further than that a contact is still reported; the
+        # reporting distance follows the bonding one rather than standing on
+        # its own, since a scan that stopped short of the bonding cutoff
+        # would drop contacts that are bonds
+        self.report_cutoff_margin = core.REPORT_CUTOFF_MARGIN
         self.metal_elements = tuple(core.METAL_ELEMENTS)
         self.metal_formal_charges = dict(core.METAL_FORMAL_CHARGES)
 
@@ -315,6 +325,13 @@ class MetalSiteForceFieldBuilder:
         # perception looks past the metal bonds by default. The bonds
         # themselves are untouched -- only the typing ignores them.
         self.metal_blind_typing = True
+
+        # MMForceFieldGenerator names every parameter it looks up and every
+        # bond and angle it re-measures, which is hundreds of lines per
+        # build and buries what this class has to say about the site. It is
+        # given a silent stream of its own rather than this one being muted,
+        # since OutputStream.mute is reference counted.
+        self.mute_forcefield_generator = True
 
         # A residue that bridges two metals, through one atom or through two,
         # can reach one of them far more weakly than the other. Where the fit
@@ -396,9 +413,31 @@ class MetalSiteForceFieldBuilder:
         self._protonated_positions = None
         self._active_site = None
         self._forcefield = None
+        # where the force field came from. A fit made here describes the
+        # geometry its Hessian was computed on; one adopted from a template
+        # describes the template, and a relaxation toward it therefore does
+        # not invalidate it. Provenance is not derivable from the force
+        # field, so it is recorded rather than worked out.
+        self._adopted_forcefield = False
         self._hessian = None
         self._partial_charges = None
         self._enzyme_system = None
+
+    @property
+    def report_cutoff(self):
+        """
+        The distance in Angstrom a coordination scan looks out to: the
+        bonding cutoff plus report_cutoff_margin.
+
+        Derived rather than set, because the two are not independent. The
+        scan collects candidates out to this distance and decides bonding
+        inside it, so a reporting distance below the bonding one drops
+        contacts that are bonds -- which is what made raising
+        metal_bond_cutoff past 3.5 A do nothing at all. Widen the margin to
+        see further without bonding further.
+        """
+
+        return self.metal_bond_cutoff + self.report_cutoff_margin
 
     # ------------------------------------------------------------------
     # results
@@ -1010,12 +1049,29 @@ class MetalSiteForceFieldBuilder:
 
     def mm_optimize_active_site(self):
         """
-        Relaxes the active site again on a crude force field of its own.
+        Relaxes the active site again, on the best force field there is.
 
         build_active_site does this once already unless it was told not to.
         This is the way to do it again, or to do it after the fact on a site
         that was extracted without it. The relaxed geometry replaces the one
         on the builder.
+
+        Which force field it runs on is whichever describes the site best.
+        Before a fit that is the crude seeded one, whose metal equilibria are
+        measured on the geometry in front of it -- so a contact the cutoffs
+        did not close is already at its minimum and the pass cannot move it.
+        Once there is a fit, its metal terms are per-bond equilibria and
+        per-bond force constants, which is strictly more than the seeding
+        knows, and they are what the relaxation uses instead. That is what
+        pulls a site walked onto a template by shoehorn into the coordination
+        the template was fitted for.
+
+        A fit made here describes the geometry its Hessian was computed on,
+        so producing a new one drops it. A fit adopted from a template
+        describes the template rather than this geometry, and relaxing
+        toward its parameters brings the two closer together, so that one is
+        kept -- an enzyme system built on it is not, since the positions it
+        was built from have moved.
 
         :return:
             The relaxed active site molecule.
@@ -1023,24 +1079,43 @@ class MetalSiteForceFieldBuilder:
 
         self._require('mm_optimize_active_site', Stage.ACTIVE_SITE)
 
+        # None before a fit, which is what makes _crude_relax build the
+        # seeded force field it is named for
+        forcefield = self._forcefield
+        adopted = self._adopted_forcefield
+
         molecule = self._on_master(lambda: self._crude_relax(
-            self._active_site, self._manual_equilibria()))
+            self._active_site,
+            self._manual_equilibria(),
+            forcefield=forcefield))
         self._active_site['molecule'] = molecule
 
-        # a force field fitted before this describes the geometry it replaced
-        self._enter(Stage.ACTIVE_SITE)
+        if adopted:
+            # the parameters are the template's, not this geometry's
+            self._enter(Stage.FITTED)
+        else:
+            # a force field fitted here describes the geometry it replaced
+            self._enter(Stage.ACTIVE_SITE)
 
         return molecule
 
-    def _crude_relax(self, active_site, bond_equilibria=None):
+    def _crude_relax(self, active_site, bond_equilibria=None, forcefield=None):
         """
-        Relaxes a site on a force field of its own, and writes the result.
+        Relaxes a site on a force field, and writes the result.
 
         The pre-QM pass, run once by build_active_site and again by
-        mm_optimize_active_site. The force field is built here rather than
-        taken, because this is the one caller that wants the seeded one: the
-        equilibria come off the geometry and the stiffness is a flat default,
-        which is all that is known before a Hessian exists.
+        mm_optimize_active_site. With no force field it builds the seeded
+        one it is named for: the equilibria come off the geometry and the
+        stiffness is a flat default, which is all that is known before a
+        Hessian exists. build_active_site is always that case -- there is
+        nothing else yet.
+
+        A force field is taken rather than built once one exists, because a
+        fitted metal term says more than a seeded one can: a per-bond
+        equilibrium and a per-bond force constant, against an equilibrium
+        measured on the very geometry the pass is trying to improve. The
+        pass is still crude in the same way either way -- it carries
+        electrostatics only if the force field does.
 
         Runs on one rank; the caller broadcasts.
 
@@ -1050,17 +1125,23 @@ class MetalSiteForceFieldBuilder:
             Distances in nanometers to pull individual metal bonds to, from
             manual_bond_equilibria. Passed in rather than read off the
             builder, because build_active_site relaxes the site it has just
-            extracted, before that site is the one the builder holds.
+            extracted, before that site is the one the builder holds. Read
+            only when the seeded force field is built here.
+        :param forcefield:
+            The force field to relax on. Defaults to building the seeded
+            one for this site.
 
         :return:
             The relaxed molecule.
         """
 
-        forcefield = core.build_forcefield(active_site,
-                                           comm=MPI.COMM_SELF,
-                                           ostream=self.ostream,
-                                           bond_equilibria=bond_equilibria,
-                                           **self.fit_settings())
+        if forcefield is None:
+            forcefield = core.build_forcefield(active_site,
+                                               comm=MPI.COMM_SELF,
+                                               ostream=self.ostream,
+                                               bond_equilibria=bond_equilibria,
+                                               **self.fit_settings())
+
         relaxed = core.mm_optimize_active_site(
             active_site,
             forcefield,
@@ -1333,6 +1414,7 @@ class MetalSiteForceFieldBuilder:
             self._active_site = active_site
 
         self._forcefield = forcefield
+        self._adopted_forcefield = True
         if forcefield.partial_charges is not None:
             self._partial_charges = np.asarray(forcefield.partial_charges)
 
@@ -1355,7 +1437,7 @@ class MetalSiteForceFieldBuilder:
         build_forcefield.
 
         :return:
-            The tuple of the OpenMM system and the topology it was built for.
+            The tuple of the OpenMM system, the topology and the positions it was built for.
         """
 
         self._require('create_enzyme_system', Stage.FITTED)
@@ -1529,6 +1611,9 @@ class MetalSiteForceFieldBuilder:
                 continue
             for name in names:
                 setattr(self, name, None)
+
+        if self._forcefield is None:
+            self._adopted_forcefield = False
 
         self._stage = stage
 
@@ -1878,6 +1963,7 @@ class MetalSiteForceFieldBuilder:
         self._forcefield = core.broadcast_forcefield(forcefield,
                                                      comm=self.comm,
                                                      ostream=self.ostream)
+        self._adopted_forcefield = False
 
         # The weak bridge pruning is the one step that can decide a metal
         # contact is not a bond after all, and it decides it on the force
@@ -1995,6 +2081,7 @@ class MetalSiteForceFieldBuilder:
 
         return {
             'metal_blind_typing': self.metal_blind_typing,
+            'mute_generator': self.mute_forcefield_generator,
             'average_metal_terms': self.average_metal_terms,
             'metal_hessian_fitting_method': self.metal_hessian_fitting_method,
             'prune_weak_bridge_bonds': self.prune_weak_bridge_bonds,

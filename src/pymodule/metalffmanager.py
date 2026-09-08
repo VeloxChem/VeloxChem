@@ -42,6 +42,11 @@ import sys
 from networkx.algorithms.isomorphism import GraphMatcher
 import networkx as nx
 
+try:
+    from scipy.optimize import linear_sum_assignment
+except ImportError:
+    pass
+
 from .veloxchemlib import mpi_master
 from .molecule import Molecule
 from .outputstream import OutputStream
@@ -242,6 +247,12 @@ class MetalForceFieldManager:
         # compare_active_site
         self._active_site_builder = None
         self._comparison = None
+        # the template the tracked site was last walked onto, which
+        # build_ff_from_template falls back to when the criteria pick
+        # nothing. Cleared whenever a different site is handed in, since a
+        # shoehorning is a statement about one site and not about the
+        # manager.
+        self._shoehorned = None
 
         # matching
         self.metal_shell_bonds = 2
@@ -281,6 +292,12 @@ class MetalForceFieldManager:
         geometry the fit was done on. Nothing else of the folder is needed, and
         the atom indices of the force field are not assumed to mean anything
         outside it: the mapping onto a new site is solved when a match is made.
+
+        A residue of the folder that coordinates none of the metals is
+        discarded here: it is a neighbour the truncation happened to keep,
+        nothing is transferred from it, and every structure matched against
+        the template would have to hold it too. The charge it takes with it
+        is put back onto the atoms that stay.
 
         The geometry a run writes to opt_active_site.xyz is whatever the active
         site ended up as, which is only a QM optimized geometry if the run
@@ -496,6 +513,10 @@ class MetalForceFieldManager:
         annotate_atoms wrote, which is how a cap is told apart from the
         hydrogens it is symmetric with.
 
+        What the folder holds is not taken as it stands: the residues that
+        coordinate no metal are discarded by _prune_unconnected_residues
+        before the template is handed back.
+
         :param name:
             The name of the template.
         :param forcefield:
@@ -576,7 +597,215 @@ class MetalForceFieldManager:
             'folder': str(folder),
         }
 
-        return self._describe(template, forcefield.bonds.keys())
+        described = self._describe(template, forcefield.bonds.keys())
+
+        return self._prune_unconnected_residues(described)
+
+    def _prune_unconnected_residues(self, template):
+        """
+        Discards the residues of a template that coordinate no metal.
+
+        A template exists for the coordination it was fitted for, and a
+        residue reaching none of the metals says nothing about that one: it
+        is a neighbour the truncation happened to keep. Nothing is ever
+        transferred from it -- the metal bonds and angles that are, are keyed
+        on the residues that stay -- while every structure compared against
+        the template has to hold a residue of its kind, in the right place,
+        or map onto nothing at all. Dropping it therefore widens what the
+        template matches and changes nothing it is used for.
+
+        The atoms of a discarded residue take their charge with them, which
+        leaves what is left off a whole number of electrons.
+        _compensate_charges puts that back.
+
+        :param template:
+            The described template.
+
+        :return:
+            The template with those residues dropped and described again, or
+            the object it was given when every residue coordinates a metal.
+        """
+
+        coarse = template['coarse_topology']
+        unconnected = [
+            node for node in self._residue_nodes(coarse)
+            if coarse.degree(node) == 0
+        ]
+
+        if not unconnected:
+            return template
+
+        discard = sorted(atom for node in unconnected
+                         for atom in coarse.nodes[node]['atoms'])
+
+        pruned, shift = self._drop_atoms(template, discard)
+        self._print_discarded_residues(template, unconnected, discard, shift)
+
+        return self._describe(pruned, pruned['forcefield'].bonds.keys())
+
+    def _drop_atoms(self, template, discard):
+        """
+        Removes atoms from a template and renumbers everything left.
+
+        A template is indexed by atom throughout -- the geometry, the
+        charges, the marked capping hydrogens and beta carbons, and every key
+        of the force field -- so all of them are rewritten together against
+        one map from the old index to the new. The force field generator is
+        rewritten in place: it is loaded for this template alone and is
+        shared with nothing.
+
+        :param template:
+            The described template.
+        :param discard:
+            The indices of the atoms to remove.
+
+        :return:
+            The tuple of a new template dictionary, without the topologies
+            _describe adds to one, and the charge every remaining atom was
+            shifted by.
+        """
+
+        molecule = template['molecule']
+        labels = molecule.get_labels()
+        dropped = set(discard)
+        keep = [index for index in range(len(labels)) if index not in dropped]
+        index_of = {old: new for new, old in enumerate(keep)}
+
+        def renumbered(indices):
+            return [index_of[index] for index in indices if index in index_of]
+
+        forcefield = template['forcefield']
+        forcefield.atoms = {
+            index_of[index]: atom
+            for index, atom in forcefield.atoms.items() if index in index_of
+        }
+
+        # a term of a discarded residue is internal to it, since a residue
+        # that coordinates no metal shares no bond with the rest of the site;
+        # the keys are filtered rather than assumed so anything else that
+        # crosses the cut goes with it
+        for name in ('bonds', 'angles', 'dihedrals', 'impropers'):
+            table = getattr(forcefield, name)
+            setattr(
+                forcefield, name, {
+                    tuple(index_of[index] for index in key): parameters
+                    for key, parameters in table.items()
+                    if all(index in index_of for index in key)
+                })
+
+        geometry = Molecule([labels[index] for index in keep],
+                            molecule.get_coordinates_in_angstrom()[keep],
+                            'angstrom')
+        geometry.set_charge(molecule.get_charge())
+        geometry.set_multiplicity(molecule.get_multiplicity())
+        forcefield.molecule = geometry
+
+        cap_indices = renumbered(template['cap_indices'])
+        charges, shift = self._compensate_charges(template['charges'][keep],
+                                                  cap_indices)
+
+        # one array means the charges: what the template reports is what the
+        # force field carries, here as everywhere else
+        for index, atom in forcefield.atoms.items():
+            atom['charge'] = float(charges[index])
+        forcefield.partial_charges = charges
+
+        pruned = {
+            key: value
+            for key, value in template.items()
+            if key not in ('fine_topology', 'coarse_topology', 'composition')
+        }
+        pruned.update({
+            'molecule': geometry,
+            'metal_indices': renumbered(template['metal_indices']),
+            'cap_indices': cap_indices,
+            'beta_carbon_indices':
+            renumbered(template['beta_carbon_indices']),
+            'charges': charges,
+        })
+
+        return pruned, shift
+
+    @staticmethod
+    def _compensate_charges(charges, cap_indices):
+        """
+        Puts the charge the discarded residues took with them back onto the
+        atoms that stay.
+
+        What is left of a template is a whole number of electrons, and the
+        atoms that went carried a share of the charge that is not one, so the
+        difference from the nearest integer is added in equal parts to every
+        remaining atom. The capping hydrogens are left out of it, for the
+        reason redistribute_cap_charges empties them in the first place: a
+        cap stands for a bond to a protein the site does not hold, and charge
+        put on one is taken off again by the next redistribution.
+
+        :param charges:
+            The charges of the atoms that stay.
+        :param cap_indices:
+            Which of those are capping hydrogens.
+
+        :return:
+            The tuple of the compensated charges and the shift each atom was
+            given.
+        """
+
+        charges = np.array(charges, dtype=float)
+        caps = set(cap_indices)
+        rest = [index for index in range(charges.size) if index not in caps]
+
+        carriers = len(rest) > 0
+        assert_msg_critical(
+            carriers, 'MetalForceFieldManager: discarding the residues that '
+            'coordinate no metal leaves nothing but capping hydrogens to '
+            'carry the charge')
+
+        total = float(np.sum(charges))
+        shift = (round(total) - total) / len(rest)
+        charges[rest] += shift
+
+        return charges, shift
+
+    def _print_discarded_residues(self, template, nodes, discard, shift):
+        """
+        Reports what loading a template threw away.
+
+        :param template:
+            The template as it stood before the atoms were dropped.
+        :param nodes:
+            The coarse nodes of the discarded residues.
+        :param discard:
+            The indices of the atoms that were dropped.
+        :param shift:
+            The charge every remaining atom was given to make up for them.
+        """
+
+        coarse = template['coarse_topology']
+        charges = template['charges']
+
+        named = ', '.join(
+            sorted(f'{coarse.nodes[node]["formula"]}/'
+                   f'{coarse.nodes[node]["key"][:6]}' for node in nodes))
+        carried = float(sum(charges[index] for index in discard))
+
+        self.ostream.print_info(
+            f'Template {template["name"]}: discarding {len(nodes)} residue(s) '
+            f'coordinating no metal ({named}), {len(discard)} atom(s) '
+            f'carrying {carried:+.3f} e.')
+        self.ostream.print_info(
+            f'Shifting every remaining atom but the capping hydrogens by '
+            f'{shift:+.4f} e to make the charge of the template whole again.')
+
+        stray = carried - round(carried)
+        if abs(stray) > 0.25:
+            self.ostream.print_warning(
+                f'Those residues carry {carried:+.3f} e, which is '
+                f'{stray:+.3f} e away from a whole number of electrons, so '
+                'what is left of the template was rounded onto the nearest '
+                'integer and that may not be the charge of the site it '
+                'describes.')
+
+        self.ostream.flush()
 
     @staticmethod
     def _graph(labels, edges, cap_indices):
@@ -622,9 +851,9 @@ class MetalForceFieldManager:
         taken out of the fine topology. That decomposition is untouched by
         how a metal is gripped, which is the whole reason for splitting the
         comparison in two. Each of them is a coarse node carrying its
-        Weisfeiler-Lehman key, its formula, its heavy atom subgraph and the
-        family key of that subgraph, so the two levels are one object rather
-        than a graph and a list that have to agree. The family key is hashed
+        Weisfeiler-Lehman key, its formula, its atoms, its heavy atom subgraph
+        and the family key of that subgraph, so the two levels are one object
+        rather than a graph and a list that have to agree. The family key is hashed
         here, once per residue, rather than by each of the readers that
         compares one -- the isomorphism search asks for it per candidate
         node pair, which made it the most repeated hash in the module.
@@ -662,6 +891,7 @@ class MetalForceFieldManager:
                             kind='residue',
                             key=self._fragment_key(fine, nodes),
                             formula=self._formula(labels, nodes),
+                            atoms=nodes,
                             heavy=heavy,
                             family=self._family_key(heavy))
 
@@ -870,6 +1100,8 @@ class MetalForceFieldManager:
                 'has no active site yet. Call build_active_site on it '
                 'first.')
             self._active_site_builder = active_site
+            # the shoehorning belonged to the site being replaced
+            self._shoehorned = None
 
         have_builder = self._active_site_builder is not None
         assert_msg_critical(
@@ -1080,6 +1312,67 @@ class MetalForceFieldManager:
             'match, or build this site with MetalSiteForceFieldBuilder.')
         self.ostream.flush()
 
+    def _fall_back_to_shoehorned(self, decision):
+        """
+        Takes the template the site was shoehorned into when the criteria
+        took nothing.
+
+        A shoehorning is the same statement naming a template is -- this
+        site is to be built the way that one is -- so an unnamed call after
+        one is not really unnamed. It is also the case the criteria are
+        least able to judge: they measure a geometry whose coordination
+        sphere is still open, and what would close it is the very force
+        field being asked for, so the site cannot look like the template
+        until after the transfer it is being refused.
+
+        What is not waived is the mapping. Every atom of the site has to
+        land somewhere in the template or there is nothing to transfer onto
+        it, and _build_ff_from_template fails outright on the first key it
+        cannot map, so a template that maps incompletely is left refused.
+
+        :param decision:
+            The decision _select_template came to, with no name in it.
+
+        :return:
+            A decision naming the shoehorned template, or the one given when
+            there is no shoehorning to fall back on.
+        """
+
+        name = self._shoehorned
+
+        if name is None or name not in self._comparison['templates']:
+            return decision
+
+        entry = self._comparison['templates'][name]
+
+        if not self._maps_every_atom(self._comparison, entry):
+            self.ostream.print_warning(
+                f'The site was shoehorned into {name}, but it does not map '
+                'onto every atom of the site, so nothing can be transferred '
+                'from it.')
+            self.ostream.flush()
+            return decision
+
+        decision = dict(decision)
+        decision['name'] = name
+        decision['entry'] = entry
+        decision['forced'] = True
+        decision['score'] = decision['scores'][name]
+
+        self.ostream.print_warning(
+            f'No template is within the {decision["criteria_name"]} '
+            f'criteria, but the site was shoehorned into {name}, which is '
+            'the same statement as naming it. Building from it anyway: '
+            f'{decision["verdicts"][name]}.')
+        self.ostream.print_info(
+            'The criteria measure a geometry whose coordination sphere the '
+            'transferred parameters have not closed yet. Relax the site on '
+            'the force field this returns (mm_optimize_active_site) and '
+            'compare again to see whether it then matches on its own.')
+        self.ostream.flush()
+
+        return decision
+
     def build_ff_from_template(self, template=None):
         """
         Builds a force field for the current active site out of the template
@@ -1095,6 +1388,18 @@ class MetalForceFieldManager:
         does not pass -- outside the criteria, or no match at all -- is a
         hard error naming why, since transferring parameters that were
         measured not to fit would silently mis-parameterize the site.
+
+        The one exception is a site shoehorn walked onto a template: with no
+        name given and nothing within the criteria, that template is taken,
+        with a warning saying so and naming the verdict. Walking a site onto
+        a template is already the statement that naming one makes, and the
+        criteria cannot answer this case on their own -- what they measure is
+        a geometry whose coordination sphere is still open, since the
+        parameters that would close it are the ones being asked for. The
+        mapping is still required to be complete: with an atom landing
+        nowhere there is nothing to transfer, and that stays a hard error.
+        Relaxing on the transferred force field and comparing once more is
+        what turns this into an ordinary match.
 
         The coordination comes from the template too. Denticity is a distance
         cutoff on an unrelaxed structure rather than chemistry, so a site that
@@ -1117,6 +1422,9 @@ class MetalForceFieldManager:
             'yet. Call compare_active_site first.')
 
         decision = self._select_template(template)
+
+        if decision['name'] is None and template is None:
+            decision = self._fall_back_to_shoehorned(decision)
 
         matched = decision['name'] is not None
         assert_msg_critical(
@@ -1196,8 +1504,15 @@ class MetalForceFieldManager:
 
         Every edit goes through the builder's own edit methods, so what comes
         out is a site the builder could have been walked to by hand. Nothing
-        is built here: the next calls are compare_active_site() with no
-        argument, and then build_ff_from_template.
+        is built here, but the site is measured again before returning: the
+        edits are the whole reason the last comparison no longer describes
+        it, and leaving that to the caller only invited
+        build_ff_from_template to be answered out of stale numbers. The next
+        call is build_ff_from_template.
+
+        Which template was walked onto is remembered, and an unnamed
+        build_ff_from_template falls back to it when the criteria pick
+        nothing -- see there for why that is not the same as ignoring them.
 
         A failure leaves the active site as it was found -- the record of the
         edits is put back and the site rebuilt from it -- and says what stood
@@ -1228,10 +1543,8 @@ class MetalForceFieldManager:
         builder = self._active_site_builder
         target = self.templates[template]
 
-        self.ostream.print_blank()
-        self.ostream.print_header(f'Shoehorning the site into {template}')
-        self.ostream.print_header((26 + len(template)) * '-')
-        self.ostream.flush()
+        # a run that fails leaves no record of one that succeeded
+        self._shoehorned = None
 
         # everything the builder is is a function of the record of the edits
         # made on it, which is what its own edit methods write and what
@@ -1239,25 +1552,54 @@ class MetalForceFieldManager:
         # therefore the whole of undoing a run that fails part way through.
         snapshot = deepcopy(builder._request)
 
+        self._print_shoehorn_header(builder, target, max_include_radius)
+
+        # Every edit rebuilds the site, and each rebuild reports the whole
+        # cluster and relaxes it again. Neither says anything about what to
+        # edit next -- the decisions are read off the protein, which the
+        # crude relaxation does not touch -- so the builder is quietened and
+        # its relaxation held back until there is a site worth relaxing. The
+        # stream is swapped rather than muted because mute is reference
+        # counted, and the manager's own stream may be this very object.
+        stream = builder.ostream
+        relaxing = builder._mm_opt
+
+        builder.ostream = OutputStream(None)
+        builder._mm_opt = False
+
         try:
             reason = self._shoehorn(builder, target, float(max_include_radius))
         except Exception:
+            builder._mm_opt = relaxing
             self._restore(builder, snapshot)
+            builder.ostream = stream
             raise
+
+        builder._mm_opt = relaxing
 
         if reason is not None:
             self._restore(builder, snapshot)
+            builder.ostream = stream
             self.ostream.print_warning(
                 f'Could not shoehorn the site into {template}: {reason}. The '
                 'active site is as it was.')
             self.ostream.flush()
             return False
 
-        self.ostream.print_info(
-            f'The site is now built the way {template} is built. Call '
-            'compare_active_site() to measure it, then '
-            'build_ff_from_template.')
-        self.ostream.flush()
+        if relaxing:
+            # what comes out is what a build_active_site would have left
+            builder.build_active_site()
+
+        builder.ostream = stream
+
+        self._print_shoehorn_summary(builder, target)
+
+        self._shoehorned = template
+
+        # the edits are exactly what makes the last comparison stale, so the
+        # site is measured again here rather than by a caller who has to
+        # remember to
+        self.compare_active_site()
 
         return True
 
@@ -1289,10 +1631,10 @@ class MetalForceFieldManager:
             What stood in the way, or None when nothing did.
         """
 
-        for stage in (self._shoehorn_residues, self._shoehorn_coordination):
-            reason = stage(builder, template, max_include_radius)
-            if reason is not None:
-                return reason
+        reason = self._shoehorn_composition(builder, template,
+                                            max_include_radius)
+        if reason is not None:
+            return reason
 
         # the protonation first: the mapping the denticity is forced through
         # cannot be solved while the hydrogens still differ
@@ -1343,61 +1685,6 @@ class MetalForceFieldManager:
         """
 
         return nx.weisfeiler_lehman_graph_hash(heavy, node_attr='elem')
-
-    def _family_counts(self, described):
-        """
-        How many residues of each kind a site is made of.
-
-        :param described:
-            A described active site or a template.
-
-        :return:
-            The counts, keyed by family key.
-        """
-
-        coarse = described['coarse_topology']
-
-        return Counter(coarse.nodes[node]['family']
-                       for node in self._residue_nodes(coarse))
-
-    def _family_name(self, described, key):
-        """
-        A readable name for one family key, for saying what is missing.
-
-        :param described:
-            The site the key was taken from.
-        :param key:
-            The family key.
-
-        :return:
-            The formula of a residue of that kind, or the key itself.
-        """
-
-        coarse = described['coarse_topology']
-
-        for node in self._residue_nodes(coarse):
-            if coarse.nodes[node]['family'] == key:
-                return coarse.nodes[node]['formula']
-
-        return key[:6]
-
-    def _metal_families(self, described, metal):
-        """
-        Which kinds of residue coordinate one metal center.
-
-        :param described:
-            A described active site or a template.
-        :param metal:
-            The index of the metal in that site.
-
-        :return:
-            The counts, keyed by family key.
-        """
-
-        coarse = described['coarse_topology']
-
-        return Counter(coarse.nodes[image]['family']
-                       for image in coarse.neighbors(('metal', metal)))
 
     @staticmethod
     def _sidechain_heavy_atoms(residue):
@@ -1454,38 +1741,23 @@ class MetalForceFieldManager:
 
         return self._family_key(graph)
 
-    def _find_residue(self,
-                      builder,
-                      family_key,
-                      max_radius,
-                      metal=None,
-                      include_members=False,
-                      exclude=()):
+    def _candidate_residues(self, builder, max_radius):
         """
-        Finds the residue of one kind that sits closest to a metal center.
+        Every residue a shoehorning is allowed to build the site out of.
 
-        The radius is not stepped outward: the closest candidate inside the
-        bound is the one a stepped search would stop at, and finding it costs
-        one scan of the structure either way.
+        The site's own residues and everything else within max_radius of a
+        metal center, each measured twice: how close its sidechain reaches a
+        center at all, and how close its nearest donor atom comes, which is
+        what a bond would be made through.
 
         :param builder:
             The builder holding the site.
-        :param family_key:
-            The kind of residue to look for.
         :param max_radius:
             How far out from a metal center, in Angstrom, to look.
-        :param metal:
-            The atom index of the one metal center to measure from, or None
-            for all of them.
-        :param include_members:
-            Whether a residue that is already part of the active site counts
-            as a candidate, which it does when what is missing is a bond
-            rather than the residue.
-        :param exclude:
-            Residue indices to pass over.
 
         :return:
-            What was found, or None when nothing of that kind is in reach.
+            The candidates, each naming its residue, its family and its
+            distances to every metal center by that center's residue index.
         """
 
         topology = builder.enzyme_topology
@@ -1493,123 +1765,311 @@ class MetalForceFieldManager:
         modes = builder.binding_modes
 
         members = set(core.active_site_residues(modes))
-        excluded = set(exclude)
-
-        if metal is None:
-            references = [
-                positions[entry['index']] for entry in modes['metals']
-            ]
-        else:
-            references = [positions[metal]]
-
-        bound = {
-            ligand['res_index']: set(ligand['metals'])
-            for ligand in modes['ligands']
+        metals = {
+            entry['res_index']: positions[entry['index']]
+            for entry in modes['metals']
         }
 
-        best = None
+        candidates = []
 
         for residue in topology.residues():
-            if residue.index in excluded:
-                continue
-            if residue.index in members and not include_members:
-                continue
             if residue.name in core.UNTRUNCATABLE_RESIDUES:
-                continue
-
-            reached = bound.get(residue.index, set()) - {metal}
-            if reached and residue.name not in core.BRIDGING_RESIDUES:
-                # only a carboxylate or a thiolate can reach two metals, and
-                # add_metal_bond refuses the rest outright
                 continue
 
             atoms = self._sidechain_heavy_atoms(residue)
             if not atoms:
                 continue
 
-            def reach(atom):
-                return min(
-                    float(np.linalg.norm(positions[atom.index] - reference))
-                    for reference in references)
+            reach = {}
+            donor = {}
 
-            distance = min(reach(atom) for atom in atoms)
+            for res_index, metal in metals.items():
+                measured = [
+                    (float(np.linalg.norm(positions[atom.index] - metal)),
+                     atom) for atom in atoms
+                ]
+                reach[res_index] = min(distance for distance, _ in measured)
+                donors = [(distance, atom) for distance, atom in measured
+                          if atom.element.symbol in core.DONOR_ELEMENTS]
+                if donors:
+                    distance, atom = min(donors, key=lambda found: found[0])
+                    donor[res_index] = (distance, atom.name)
 
-            if distance > max_radius:
+            if residue.index not in members and min(
+                    reach.values()) > max_radius:
                 continue
 
-            if best is not None and distance >= best['distance']:
-                continue
-
-            if self._residue_family_key(topology, residue) != family_key:
-                continue
-
-            donors = core._sidechain_donors(residue)
-
-            best = {
+            candidates.append({
+                'res_index': residue.index,
                 'resid': str(residue.id),
                 'chain': str(residue.chain.id),
-                'label': core.residue_label(residue),
-                'res_index': residue.index,
-                'distance': distance,
-                # which atom of it would do the coordinating, since a
-                # histidine has two nitrogens to choose between and
-                # add_metal_bond refuses to guess
-                'donor': None if not donors else min(donors, key=reach).name,
-            }
+                'name': residue.name,
+                'label': f'{residue.name}{residue.id}',
+                'key': self._residue_family_key(topology, residue),
+                'reach': reach,
+                'donor': donor,
+                'member': residue.index in members,
+            })
 
-        return best
+        return candidates
 
-    def _shoehorn_residues(self, builder, template, max_radius):
+    def _template_slots(self, template):
         """
-        Gives the site the residues the template is made of.
+        What a template asks the site to be made of: one slot per residue of
+        it, naming the kind of residue and the metal centers it is on.
 
-        Only additions: a residue the site holds and the template does not is
-        left alone here, since which metal it belongs to is not yet known and
-        dropping it is the coordination stage's decision.
+        :param template:
+            The template.
+
+        :return:
+            The slots, in the order the coarse topology holds them.
+        """
+
+        coarse = template['coarse_topology']
+        slots = []
+
+        for node in self._residue_nodes(coarse):
+            slots.append({
+                'key': self._family_key(coarse.nodes[node]['heavy']),
+                'formula': coarse.nodes[node]['formula'],
+                'metals': sorted(image[1] for image in coarse.neighbors(node)),
+            })
+
+        return slots
+
+    def _metal_pairings(self, builder, template, described):
+        """
+        Every way the metal centers of a site can stand for those of a
+        template.
+
+        There are only ever a handful, so they are all tried and the one
+        whose residues fit best is taken, rather than being guessed at from
+        what coordinates them. The element has to agree outright: a zinc site
+        is not a template for an iron one.
+
+        The site's centers are named by the index of their residue, which no
+        rebuild disturbs, unlike the atom indices every rebuild renumbers.
 
         :param builder:
             The builder holding the site.
         :param template:
             The template to match.
-        :param max_radius:
-            How far out from a metal center a residue may be picked up from.
+        :param described:
+            The described active site.
 
         :return:
-            What stood in the way, or None when nothing did.
+            One mapping of template metal index to site metal residue index
+            per pairing.
         """
 
-        wanted = self._family_counts(template)
-        included = []
+        template_labels = template['molecule'].get_labels()
+        query_labels = described['molecule'].get_labels()
 
-        for _ in range(sum(wanted.values()) + 1):
-            missing = wanted - self._family_counts(self._described_site(builder))
+        template_metals = list(template['metal_indices'])
+        query_metals = list(described['metal_indices'])
 
-            if not missing:
-                if included:
-                    self.ostream.print_info(
-                        'Included ' + ', '.join(included) +
-                        f', which {template["name"]} is made of.')
-                    self.ostream.flush()
+        if len(template_metals) != len(query_metals):
+            return []
+
+        pairings = []
+
+        for order in permutations(query_metals):
+            if any(template_labels[first] != query_labels[second]
+                   for first, second in zip(template_metals, order)):
+                continue
+            pairings.append({
+                first: self._metal_res_index(builder, described, second)
+                for first, second in zip(template_metals, order)
+            })
+
+        return pairings
+
+    @staticmethod
+    def _slot_cost(slot, candidate, pairing, max_radius):
+        """
+        What it costs to build one of a template's residues out of one of the
+        site's, as the total distance the bonds it asks for would span.
+
+        :param slot:
+            The template residue.
+        :param candidate:
+            The residue of the structure.
+        :param pairing:
+            Which site metal center stands for which of the template's.
+        :param max_radius:
+            The furthest a bond may be stretched to.
+
+        :return:
+            The cost, or infinity when this residue cannot fill this slot.
+        """
+
+        if candidate['key'] != slot['key']:
+            return math.inf
+
+        metals = [pairing[metal] for metal in slot['metals']]
+
+        if len(metals) > 1 and candidate['name'] not in core.BRIDGING_RESIDUES:
+            # an imidazole nitrogen has one lone pair in the ring plane, so a
+            # second metal on it is an artifact however the template reads
+            return math.inf
+
+        if not metals:
+            # a residue the template holds without coordinating anything;
+            # what matters is only that it is in the same neighbourhood
+            distance = min(candidate['reach'].values())
+            return distance if distance <= max_radius else math.inf
+
+        total = 0.0
+
+        for metal in metals:
+            found = candidate['donor'].get(metal)
+            if found is None or found[0] > max_radius:
+                return math.inf
+            total += found[0]
+
+        return total
+
+    def _assign_residues(self, slots, candidates, pairing, max_radius):
+        """
+        Solves which residue of the structure fills which residue of the
+        template, for one pairing of the metal centers.
+
+        The whole site is assigned at once rather than one metal center at a
+        time, which is what lets a residue move from one center to the other:
+        a histidine the cutoffs put on the near metal is exactly the one the
+        template wants on the far one, and no amount of filling one center's
+        deficit from the outside will produce that.
+
+        :param slots:
+            The template's residues.
+        :param candidates:
+            The residues of the structure.
+        :param pairing:
+            Which site metal center stands for which of the template's.
+        :param max_radius:
+            The furthest a bond may be stretched to.
+
+        :return:
+            The tuple of the total cost and the slot to candidate mapping, or
+            None when some residue of the template cannot be filled at all.
+        """
+
+        assert_msg_critical(
+            'scipy' in sys.modules,
+            'MetalForceFieldManager.shoehorn: scipy is required to solve '
+            'which residue of the structure fills which of the template')
+
+        if len(candidates) < len(slots):
+            return None
+
+        costs = np.array(
+            [[
+                self._slot_cost(slot, candidate, pairing, max_radius)
+                for candidate in candidates
+            ] for slot in slots])
+
+        finite = np.isfinite(costs)
+
+        if not finite.any(axis=1).all():
+            # a slot nothing at all can fill; no assignment exists
+            return None
+
+        # linear_sum_assignment cannot be given infinities, so they are made
+        # more expensive than any whole assignment of finite ones
+        blocked = costs[finite].sum() + 1.0
+        rows, columns = linear_sum_assignment(np.where(finite, costs, blocked))
+
+        assignment = {}
+        total = 0.0
+
+        for row, column in zip(rows, columns):
+            if not finite[row, column]:
                 return None
+            assignment[int(row)] = candidates[int(column)]
+            total += float(costs[row, column])
 
-            key = sorted(missing)[0]
-            found = self._find_residue(builder, key, max_radius)
+        if len(assignment) != len(slots):
+            return None
 
-            if found is None:
-                return (f'the site holds no {self._family_name(template, key)}'
-                        f' residue that {template["name"]} is made of, and '
-                        f'there is none within {max_radius:.1f} A of a metal '
-                        'center')
+        return total, assignment
 
-            builder.include_residue(found['resid'], chain=found['chain'])
-            included.append(f'{found["label"]} at {found["distance"]:.2f} A')
-
-        return ('the residues of the site could not be brought onto those of '
-                f'{template["name"]}')
-
-    def _shoehorn_coordination(self, builder, template, max_radius):
+    def _assignment_failure(self, template, slots, candidates, pairings,
+                            max_radius):
         """
-        Gives every metal center the residues the template coordinates.
+        Says which of a template's residues the structure cannot supply.
+
+        Reported off the pairing that got furthest, since that is the one the
+        site came closest to being built like.
+
+        :param template:
+            The template that could not be matched.
+        :param slots:
+            Its residues.
+        :param candidates:
+            The residues of the structure.
+        :param pairings:
+            The pairings of the metal centers that were tried.
+        :param max_radius:
+            The furthest a bond may be stretched to.
+
+        :return:
+            What stood in the way.
+        """
+
+        best = None
+
+        for pairing in pairings:
+            missing = []
+            for slot in slots:
+                if any(
+                        math.isfinite(
+                            self._slot_cost(slot, candidate, pairing,
+                                            max_radius))
+                        for candidate in candidates):
+                    continue
+                missing.append(slot)
+            if best is None or len(missing) < len(best):
+                best = missing
+
+        if best:
+            formulas = ', '.join(sorted(slot['formula'] for slot in best))
+            return (f'{template["name"]} is made of residues the structure '
+                    f'does not have within {max_radius:.1f} A of the right '
+                    f'metal center: {formulas}')
+
+        # every residue of the template can be filled by something, but not
+        # by enough different somethings at once: two of them are competing
+        # for the one residue the structure has in reach
+        counts = Counter(slot['key'] for slot in slots)
+        available = Counter(candidate['key'] for candidate in candidates)
+        short = [
+            slot['formula'] for slot in slots
+            if available[slot['key']] < counts[slot['key']]
+        ]
+
+        if short:
+            return (f'{template["name"]} is made of more '
+                    f'{", ".join(sorted(set(short)))} residues than the '
+                    f'structure has within {max_radius:.1f} A of its metal '
+                    'centers')
+
+        return (f'the residues of the structure cannot be shared out over '
+                f'those of {template["name"]}: two of them are wanted in '
+                'places only one residue can reach')
+
+    def _shoehorn_composition(self, builder, template, max_radius):
+        """
+        Makes the site hold the template's residues, coordinating the metal
+        centers the template coordinates.
+
+        Stages one and two of a shoehorning at once, because they are one
+        question: which residue of the structure is to be which residue of
+        the template. Answered as a single assignment over the whole site,
+        for every way the metal centers can be paired up, and the cheapest
+        answer is the one built -- so a residue is moved from one center to
+        another where that is what the template says, rather than a center's
+        deficit being filled from the outside while the residue that belongs
+        in it sits on its neighbour.
 
         :param builder:
             The builder holding the site.
@@ -1629,46 +2089,31 @@ class MetalForceFieldManager:
         if self._coarse_mappings(template, described, match_protonation=False):
             return None
 
-        pairs = self._match_metals(builder, template, described)
+        slots = self._template_slots(template)
+        candidates = self._candidate_residues(builder, max_radius)
+        pairings = self._metal_pairings(builder, template, described)
 
-        if pairs is None:
+        if not pairings:
             return (f'the metal centers of {template["name"]} are not the '
                     'metal centers of the site')
 
-        removals = []
+        best = None
 
-        for metal, res_index in pairs:
-            reason = self._reconcile_metal(builder, template, metal, res_index,
-                                           max_radius, removals)
-            if reason is not None:
-                return reason
+        for pairing in pairings:
+            found = self._assign_residues(slots, candidates, pairing,
+                                          max_radius)
+            if found is None:
+                continue
+            if best is None or found[0] < best[0]:
+                best = (found[0], pairing, found[1])
 
-        # nothing is let go of until every center has what the template puts
-        # on it: a residue surplus to one center can be the one another is
-        # still missing, and it is the bond that goes rather than the residue
-        # -- a bridge the template makes once is a grip, not a residue too
-        # many
-        for entry in removals:
-            metal = self._metal_entry(builder, entry['metal'])
-            builder.remove_metal_bond(entry['resid'],
-                                      metal=metal['index'],
-                                      atom=entry['atom'],
-                                      chain=entry['chain'])
+        if best is None:
+            return self._assignment_failure(template, slots, candidates,
+                                            pairings, max_radius)
 
-        if removals:
-            self.ostream.print_info(
-                'Unbound ' +
-                ', '.join(entry['label'] for entry in removals) +
-                f', which {template["name"]} does not coordinate.')
-            self.ostream.flush()
+        _, pairing, assignment = best
 
-        stranded = self._strip_stranded(builder, template)
-
-        if stranded:
-            self.ostream.print_info(
-                'Dropped ' + ', '.join(entry['label'] for entry in stranded) +
-                ', which coordinates nothing any more.')
-            self.ostream.flush()
+        self._apply_assignment(builder, template, slots, pairing, assignment)
 
         if not self._coarse_mappings(template,
                                      self._described_site(builder),
@@ -1678,74 +2123,218 @@ class MetalForceFieldManager:
 
         return None
 
-    def _match_metals(self, builder, template, described):
+    def _apply_assignment(self, builder, template, slots, pairing, assignment):
         """
-        Pairs the metal centers of a site with those of a template.
+        Edits the site into the assignment that was solved.
 
-        Ranked on how much of what coordinates the one also coordinates the
-        other, and taken best first so that no two centers are given the same
-        partner. The element has to agree outright: a zinc site is not a
-        template for an iron one.
-
-        The site's centers are named by the index of their residue, which no
-        rebuild disturbs, rather than by an atom index, which every rebuild
-        does.
+        The bonds the template does not make go first and the ones it makes
+        second, so that a residue moving from one metal center to another is
+        never bonded to both at once -- which for a histidine add_metal_bond
+        refuses outright. What is left holding nothing is dropped last, once
+        every center has what it is owed.
 
         :param builder:
             The builder holding the site.
         :param template:
-            The template to match.
-        :param described:
-            The described active site.
-
-        :return:
-            The pairs of template metal index and site metal residue index,
-            or None when they cannot be paired up.
+            The template being matched.
+        :param slots:
+            Its residues.
+        :param pairing:
+            Which site metal center stands for which of the template's.
+        :param assignment:
+            Which residue of the structure fills which slot.
         """
 
-        template_labels = template['molecule'].get_labels()
-        query_labels = described['molecule'].get_labels()
+        wanted = {}
+        donors = {}
 
-        if (Counter(template_labels[index]
-                    for index in template['metal_indices']) != Counter(
-                        query_labels[index]
-                        for index in described['metal_indices'])):
-            return None
+        for index, candidate in assignment.items():
+            res_index = candidate['res_index']
+            wanted.setdefault(res_index, set()).update(
+                pairing[metal] for metal in slots[index]['metals'])
+            donors[res_index] = candidate
 
-        # each side's counter depends on that side's metal alone, so the
-        # double loop below reads them rather than rebuilding them per pair
-        template_families = {
-            index: self._metal_families(template, index)
-            for index in template['metal_indices']
-        }
-        query_families = {
-            index: self._metal_families(described, index)
-            for index in described['metal_indices']
-        }
+        self._include_assigned(builder, template, donors)
+        self._remove_unwanted_bonds(builder, wanted)
+        self._add_wanted_bonds(builder, wanted, donors)
+        self._drop_unassigned(builder, template, donors)
 
-        ranked = []
+    def _include_assigned(self, builder, template, donors):
+        """
+        Puts every residue the assignment uses into the site before any bond
+        is made.
 
-        for first in template['metal_indices']:
-            for second in described['metal_indices']:
-                if template_labels[first] != query_labels[second]:
-                    continue
-                shared = template_families[first] & query_families[second]
-                ranked.append((-sum(shared.values()), first, second))
+        A residue remove_residue took out is remembered as excluded, and a
+        bond to a residue the site excludes is refused by the extraction
+        rather than quietly putting it back, so asking for it by name is
+        what clears the way. It is also how a residue the template holds
+        without coordinating anything gets in at all.
 
-        pairs = []
-        taken = set()
+        :param builder:
+            The builder holding the site.
+        :param template:
+            The template being matched.
+        :param donors:
+            The candidate of each assigned residue.
+        """
 
-        for _, first, second in sorted(ranked):
-            if first in {pair[0] for pair in pairs} or second in taken:
+        members = set(core.active_site_residues(builder.binding_modes))
+        included = []
+
+        for res_index, candidate in sorted(donors.items()):
+            if res_index in members:
                 continue
-            taken.add(second)
-            pairs.append((first, self._metal_res_index(builder, described,
-                                                       second)))
+            builder.include_residue(candidate['resid'],
+                                    chain=candidate['chain'])
+            included.append(candidate['label'])
 
-        if len(pairs) != len(template['metal_indices']):
-            return None
+        if included:
+            self.ostream.print_info(
+                'Included ' + ', '.join(included) +
+                f', which {template["name"]} is made of.')
+            self.ostream.flush()
 
-        return pairs
+    def _remove_unwanted_bonds(self, builder, wanted):
+        """
+        Takes out every metal bond the assignment does not ask for.
+
+        :param builder:
+            The builder holding the site.
+        :param wanted:
+            The metal centers each residue is to coordinate, by residue
+            index.
+        """
+
+        unwanted = []
+
+        modes = builder.binding_modes
+        metal_res = {
+            entry['index']: entry['res_index'] for entry in modes['metals']
+        }
+
+        for ligand in modes['ligands']:
+            for metal in ligand['metals']:
+                if metal_res[metal] in wanted.get(ligand['res_index'], set()):
+                    continue
+                unwanted.append({
+                    'resid': ligand['residue'][3:],
+                    'chain': str(ligand['chain']),
+                    'atom': ligand['atom'],
+                    'metal': metal_res[metal],
+                    'label': f'{ligand["residue"]} {ligand["atom"]}',
+                })
+
+        for entry in unwanted:
+            metal = self._metal_entry(builder, entry['metal'])
+            builder.remove_metal_bond(entry['resid'],
+                                      metal=metal['index'],
+                                      atom=entry['atom'],
+                                      chain=entry['chain'])
+
+        if unwanted:
+            self.ostream.print_info(
+                'Unbound ' + ', '.join(entry['label'] for entry in unwanted) +
+                ', which the template does not coordinate.')
+            self.ostream.flush()
+
+    def _add_wanted_bonds(self, builder, wanted, donors):
+        """
+        Makes every metal bond the assignment asks for and the site does not
+        already have.
+
+        :param builder:
+            The builder holding the site.
+        :param wanted:
+            The metal centers each residue is to coordinate, by residue
+            index.
+        :param donors:
+            The candidate of each of those residues, which names the atom the
+            bond is made through.
+        """
+
+        added = []
+
+        for res_index in sorted(wanted):
+            for metal_res_index in sorted(wanted[res_index]):
+                if self._bonded(builder, res_index, metal_res_index):
+                    continue
+
+                candidate = donors[res_index]
+                found = candidate['donor'].get(metal_res_index)
+
+                metal = self._metal_entry(builder, metal_res_index)
+                builder.add_metal_bond(candidate['resid'],
+                                       metal['index'],
+                                       atom=None if found is None else found[1],
+                                       chain=candidate['chain'])
+                added.append(f'{candidate["label"]} to '
+                             f'{metal["element"]} {metal["index"]}')
+
+        if added:
+            self.ostream.print_info('Bonded ' + ', '.join(added) +
+                                    ', which the template coordinates.')
+            self.ostream.flush()
+
+    @staticmethod
+    def _bonded(builder, res_index, metal_res_index):
+        """
+        Whether one residue coordinates one metal center as things stand.
+
+        :param builder:
+            The builder holding the site.
+        :param res_index:
+            The residue.
+        :param metal_res_index:
+            The residue of the metal center.
+
+        :return:
+            True when the two are bonded.
+        """
+
+        modes = builder.binding_modes
+        metal = [
+            entry['index'] for entry in modes['metals']
+            if entry['res_index'] == metal_res_index
+        ]
+
+        if not metal:
+            return False
+
+        return any(ligand['res_index'] == res_index and metal[0]
+                   in ligand['metals'] for ligand in modes['ligands'])
+
+    def _drop_unassigned(self, builder, template, donors):
+        """
+        Drops the residues the assignment had no use for.
+
+        Last of the edits, so that a residue on its way out is never the one
+        a metal center is still waiting for, and remove_residue's refusal to
+        orphan a center cannot be tripped by the order things are done in.
+
+        :param builder:
+            The builder holding the site.
+        :param template:
+            The template being matched.
+        :param donors:
+            The candidate of each assigned residue.
+        """
+
+        residues = list(builder.enzyme_topology.residues())
+        dropped = []
+
+        for res_index in sorted(
+                set(core.active_site_residues(builder.binding_modes)) -
+                set(donors)):
+            residue = residues[res_index]
+            builder.remove_residue(str(residue.id),
+                                   chain=str(residue.chain.id))
+            dropped.append(f'{residue.name}{residue.id}')
+
+        if dropped:
+            self.ostream.print_info(
+                'Dropped ' + ', '.join(dropped) +
+                f', which {template["name"]} is not made of.')
+            self.ostream.flush()
 
     @staticmethod
     def _metal_res_index(builder, described, metal):
@@ -1798,262 +2387,6 @@ class MetalForceFieldManager:
         assert_msg_critical(
             False, 'MetalForceFieldManager: the structure no longer holds a '
             f'metal center in residue {res_index}')
-
-    def _metal_site_index(self, described, index):
-        """
-        Where in the active site one metal center of the topology sits.
-
-        :param described:
-            The described active site.
-        :param index:
-            Its atom index in the topology.
-
-        :return:
-            Its index in the active site.
-        """
-
-        for site_index in described['metal_indices']:
-            if described['atom_map'][site_index] == index:
-                return site_index
-
-        assert_msg_critical(
-            False, 'MetalForceFieldManager: the active site does not hold the '
-            f'metal center at atom {index}')
-
-    def _reconcile_metal(self, builder, template, metal, res_index, max_radius,
-                         removals):
-        """
-        Gives one metal center the residues the template puts on its partner.
-
-        What is missing is bonded straight away, since the center it is going
-        onto is the one being dealt with. What is left over is only recorded:
-        it is dropped once every center has been through here.
-
-        :param builder:
-            The builder holding the site.
-        :param template:
-            The template to match.
-        :param metal:
-            The index of the template's metal center.
-        :param res_index:
-            The residue index of the site's metal center.
-        :param max_radius:
-            How far out from the center a residue may be picked up from.
-        :param removals:
-            The residues to drop afterwards, added to here.
-
-        :return:
-            What stood in the way, or None when nothing did.
-        """
-
-        wanted = self._metal_families(template, metal)
-
-        for _ in range(sum(wanted.values()) + 1):
-            described = self._described_site(builder)
-            entry = self._metal_entry(builder, res_index)
-            site_metal = self._metal_site_index(described, entry['index'])
-            have = self._metal_families(described, site_metal)
-            missing = wanted - have
-
-            if not missing:
-                for key, count in sorted((have - wanted).items()):
-                    removals.extend(
-                        self._surplus_bonds(builder, described, site_metal,
-                                            res_index, key, count))
-                return None
-
-            key = sorted(missing)[0]
-            found = self._find_residue(builder,
-                                       key,
-                                       max_radius,
-                                       metal=entry['index'],
-                                       include_members=True,
-                                       exclude=self._metal_residues(
-                                           builder, described, site_metal))
-
-            if found is None:
-                return (f'{entry["element"]} {entry["index"]} does not '
-                        f'coordinate the {self._family_name(template, key)} '
-                        f'residue {template["name"]} puts on it, and there is '
-                        f'none within {max_radius:.1f} A of it')
-
-            builder.add_metal_bond(found['resid'],
-                                   entry['index'],
-                                   atom=found['donor'],
-                                   chain=found['chain'])
-
-        return ('the coordination of the metal center in residue '
-                f'{res_index} could not be brought onto {template["name"]}')
-
-    def _residue_of(self, builder, described, node):
-        """
-        The residue of the topology one coarse node stands for.
-
-        :param builder:
-            The builder holding the site.
-        :param described:
-            The described active site.
-        :param node:
-            The coarse node.
-
-        :return:
-            The residue.
-        """
-
-        heavy = described['coarse_topology'].nodes[node]['heavy']
-        atoms = list(builder.enzyme_topology.atoms())
-        site_index = min(heavy.nodes)
-
-        return atoms[described['atom_map'][site_index]].residue
-
-    def _metal_residues(self, builder, described, metal):
-        """
-        The residues that already coordinate one metal center.
-
-        :param builder:
-            The builder holding the site.
-        :param described:
-            The described active site.
-        :param metal:
-            The index of the metal in that site.
-
-        :return:
-            Their indices in the topology.
-        """
-
-        coarse = described['coarse_topology']
-
-        return {
-            self._residue_of(builder, described, node).index
-            for node in coarse.neighbors(('metal', metal))
-        }
-
-    def _surplus_bonds(self, builder, described, metal, res_index, family_key,
-                       count):
-        """
-        Picks the bonds a metal center makes and the template does not.
-
-        Which of several residues of one kind to let go of is decided on the
-        distance: the one held furthest out is the one the cutoffs are least
-        sure of. It is the bond to this center that goes and not the residue
-        -- a residue that bridges here and grips there is one the template
-        still holds -- and everything it binds this center with goes at once,
-        since half a bidentate grip is not what was surplus.
-
-        :param builder:
-            The builder holding the site.
-        :param described:
-            The described active site.
-        :param metal:
-            The index of the metal in that site.
-        :param res_index:
-            The residue index of that metal, which is what names it once the
-            edits have renumbered the atoms.
-        :param family_key:
-            The kind of residue to let go of.
-        :param count:
-            How many of them.
-
-        :return:
-            What to hand to remove_metal_bond.
-        """
-
-        coarse = described['coarse_topology']
-        coordinates = described['molecule'].get_coordinates_in_angstrom()
-        fine = described['fine_topology']
-        atoms = list(builder.enzyme_topology.atoms())
-
-        found = []
-
-        for node in coarse.neighbors(('metal', metal)):
-            heavy = coarse.nodes[node]['heavy']
-
-            if coarse.nodes[node]['family'] != family_key:
-                continue
-
-            bonded = [atom for atom in heavy.nodes if fine.has_edge(metal, atom)]
-            distance = min(
-                float(np.linalg.norm(coordinates[atom] - coordinates[metal]))
-                for atom in bonded)
-
-            residue = self._residue_of(builder, described, node)
-            found.append((distance, [{
-                'resid': str(residue.id),
-                'chain': str(residue.chain.id),
-                'atom': atoms[described['atom_map'][atom]].name,
-                'metal': res_index,
-                'label': (f'{core.residue_label(residue)} '
-                          f'{atoms[described["atom_map"][atom]].name}'),
-            } for atom in sorted(bonded)]))
-
-        found.sort(key=lambda item: -item[0])
-
-        return [record for _, records in found[:count] for record in records]
-
-    def _strip_stranded(self, builder, template):
-        """
-        Drops the residues that are left coordinating nothing.
-
-        Taking the last bond off a residue takes the residue out of the site
-        with it, unless include_residue is what put it there, so this is
-        about the ones a shoehorning included and then found surplus. A
-        template can hold a residue that coordinates nothing itself -- a
-        second-shell one somebody included -- so that many of each kind are
-        kept, the closest ones first.
-
-        :param builder:
-            The builder holding the site.
-        :param template:
-            The template to match.
-
-        :return:
-            The residues that were dropped.
-        """
-
-        coarse = template['coarse_topology']
-        keep = Counter(coarse.nodes[node]['family']
-                       for node in self._residue_nodes(coarse)
-                       if coarse.degree(node) == 0)
-
-        topology = builder.enzyme_topology
-        positions = np.asarray(builder.enzyme_positions)
-        modes = builder.binding_modes
-        residues = list(topology.residues())
-
-        coordinating = {ligand['res_index'] for ligand in modes['ligands']}
-        metals = [positions[entry['index']] for entry in modes['metals']]
-
-        found = []
-
-        for res_index in core.active_site_residues(modes):
-            if res_index in coordinating:
-                continue
-
-            residue = residues[res_index]
-            atoms = self._sidechain_heavy_atoms(residue)
-            distance = min(
-                float(np.linalg.norm(positions[atom.index] - metal))
-                for atom in atoms for metal in metals)
-
-            found.append((distance, self._residue_family_key(
-                topology, residue), residue))
-
-        dropped = []
-
-        for distance, key, residue in sorted(found, key=lambda item: item[0]):
-            if keep[key] > 0:
-                keep[key] -= 1
-                continue
-            dropped.append({
-                'resid': str(residue.id),
-                'chain': str(residue.chain.id),
-                'label': core.residue_label(residue),
-            })
-
-        for entry in dropped:
-            builder.remove_residue(entry['resid'], chain=entry['chain'])
-
-        return dropped
 
     def _best_heavy_mapping(self, template, described, match_h_count=True):
         """
@@ -3421,6 +3754,87 @@ class MetalForceFieldManager:
         params['comment'] = f'{comment} (template {name})'.strip()
 
         return params
+
+    def _print_shoehorn_header(self, builder, template, max_include_radius):
+        """
+        Says what a shoehorning is starting from.
+
+        :param builder:
+            The builder holding the site.
+        :param template:
+            The template it is being edited onto.
+        :param max_include_radius:
+            How far out from a metal center a residue may be picked up from.
+        """
+
+        name = template['name']
+
+        self.ostream.print_blank()
+        self.ostream.print_header(f'Shoehorning the site into {name}')
+        self.ostream.print_header((26 + len(name)) * '-')
+        self.ostream.print_blank()
+        self.ostream.print_header(
+            core._param('template residues',
+                        len(self._residue_nodes(template['coarse_topology']))))
+        self.ostream.print_header(
+            core._param('site residues',
+                        len(builder.active_site['residues'])))
+        self.ostream.print_header(
+            core._param('search radius', f'{max_include_radius:.1f} A'))
+        self.ostream.print_blank()
+        self.ostream.print_info(
+            f'Site holds: {", ".join(builder.active_site["residues"])}')
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+    def _print_shoehorn_summary(self, builder, template):
+        """
+        Says what the site was made into.
+
+        The coordination is what a shoehorning is for, so it is printed the
+        way the builder prints it rather than left to be asked for: which
+        residue ended up on which metal center, how far out, and what it is
+        protonated as.
+
+        :param builder:
+            The builder holding the site.
+        :param template:
+            The template it was edited onto.
+        """
+
+        modes = builder.binding_modes
+        residues = list(builder.enzyme_topology.residues())
+
+        self.ostream.print_blank()
+        self.ostream.print_info(
+            f'The site is now built the way {template["name"]} is built.')
+        self.ostream.print_blank()
+
+        for metal in modes['metals']:
+            bonds = []
+            for ligand in modes['ligands']:
+                for index, distance in zip(ligand['metals'],
+                                           ligand['distances']):
+                    if index != metal['index']:
+                        continue
+                    bonds.append(f'{ligand["residue"]} {ligand["atom"]} '
+                                 f'{distance:.2f} A')
+            self.ostream.print_info(
+                f'  {metal["element"]} {metal["index"]}: ' +
+                (', '.join(sorted(bonds)) if bonds else 'nothing'))
+
+        protonation = ', '.join(
+            f'{residues[res_index].name}{residues[res_index].id} {variant}'
+            for res_index, variant in sorted(modes['variants'].items())
+            if res_index in set(core.active_site_residues(modes)))
+
+        self.ostream.print_info(f'  protonation: {protonation}')
+        self.ostream.print_blank()
+        self.ostream.print_info(
+            'Call compare_active_site() to measure it, then '
+            'build_ff_from_template.')
+        self.ostream.print_blank()
+        self.ostream.flush()
 
     def _print_template(self, template):
         """
