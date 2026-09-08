@@ -52,6 +52,7 @@ from ..molecule import Molecule
 from ..outputstream import OutputStream
 from .metalsiteffbuilder import MetalSiteForceFieldBuilder
 from . import core
+from . import printing
 from ..optimizationdriver import OptimizationDriver
 from ..superimpose import svd_superimpose
 from ..errorhandler import assert_msg_critical
@@ -377,8 +378,9 @@ class MetalForceFieldManager:
 
         self.templates[name] = template
 
-        self._print_template(template)
-        self._print_templates()
+        bonds, angles = self._metal_keys(template)
+        printing.print_template(template, bonds, angles, ostream=self.ostream)
+        printing.print_templates(self.templates, ostream=self.ostream)
 
     def load_templates_from_folders(self, folders):
         """
@@ -1235,6 +1237,50 @@ class MetalForceFieldManager:
 
         return self._select_template(None)['name'] is not None
 
+    def _print_comparison(self, results):
+        """
+        Gathers what the comparison tables are drawn from and prints them.
+
+        The scores and the residue nodes are worked out here rather than in
+        the printer, which computes nothing.
+
+        :param results:
+            The last comparison, from compare_active_site.
+        """
+
+        # a spec is printed for the structure, and for any template that
+        # coordinates a different set of residues than it does
+        specs = {None: self._nodes_of(results['active_site'])}
+        for name, entry in results['templates'].items():
+            if entry['status'] == 'spec':
+                specs[name] = self._nodes_of(self.templates[name])
+
+        scores = {
+            name: self._selection_score(entry)
+            for name, entry in results['templates'].items()
+        }
+
+        printing.print_comparison(results,
+                                  specs,
+                                  self.SELECTION_RANKED_ON,
+                                  scores,
+                                  ostream=self.ostream)
+
+    def _nodes_of(self, described):
+        """
+        Returns a described site paired with its residue nodes, which is what
+        printing.print_spec is drawn from.
+
+        :param described:
+            A described active site or a template.
+
+        :return:
+            The pair.
+        """
+
+        return (described,
+                self._residue_nodes(described['coarse_topology']))
+
     # ------------------------------------------------------------------
     # selection
     # ------------------------------------------------------------------
@@ -1321,7 +1367,12 @@ class MetalForceFieldManager:
                 decision['entry'] = comparison['templates'][name]
                 decision['score'] = decision['scores'][name]
 
-        self._print_selection(comparison, decision)
+        printing.print_selection(comparison,
+                                 decision,
+                                 self.RMSD_REGIONS,
+                                 self.IC_TYPES,
+                                 self.SELECTION_RANKED_ON,
+                                 ostream=self.ostream)
 
         if decision['name'] is None:
             self._print_no_selection(decision)
@@ -1640,7 +1691,12 @@ class MetalForceFieldManager:
         # therefore the whole of undoing a run that fails part way through.
         snapshot = deepcopy(builder._request)
 
-        self._print_shoehorn_header(builder, target, max_include_radius)
+        printing.print_shoehorn_header(
+            target['name'],
+            len(self._residue_nodes(target['coarse_topology'])),
+            builder.active_site['residues'],
+            max_include_radius,
+            ostream=self.ostream)
 
         # Every edit rebuilds the site, and each rebuild reports the whole
         # cluster and relaxes it again. Neither says anything about what to
@@ -1680,7 +1736,7 @@ class MetalForceFieldManager:
 
         builder.ostream = stream
 
-        self._print_shoehorn_summary(builder, target)
+        self._print_shoehorn_summary(builder, target['name'])
 
         self._shoehorned = template
 
@@ -1690,6 +1746,30 @@ class MetalForceFieldManager:
         self.compare_active_site()
 
         return True
+
+    def _print_shoehorn_summary(self, builder, name):
+        """
+        Names what the site was walked onto and prints what it became.
+
+        :param builder:
+            The builder holding the site.
+        :param name:
+            The name of the template it was edited onto.
+        """
+
+        # bound once: binding_modes derives a new object per access
+        modes = builder.binding_modes
+        residues = list(builder.enzyme_topology.residues())
+        site = set(core.active_site_residues(modes))
+
+        variants = [(core.residue_label(residues[res_index]), variant)
+                    for res_index, variant in sorted(modes['variants'].items())
+                    if res_index in site]
+
+        printing.print_shoehorn_summary(name,
+                                        modes,
+                                        variants,
+                                        ostream=self.ostream)
 
     def _restore(self, builder, request):
         """
@@ -3861,440 +3941,3 @@ class MetalForceFieldManager:
         params['comment'] = f'{comment} (template {name})'.strip()
 
         return params
-
-    # ------------------------------------------------------------------
-    # printing
-    # ------------------------------------------------------------------
-
-    def _print_shoehorn_header(self, builder, template, max_include_radius):
-        """
-        Says what a shoehorning is starting from.
-
-        :param builder:
-            The builder holding the site.
-        :param template:
-            The template it is being edited onto.
-        :param max_include_radius:
-            How far out from a metal center a residue may be picked up from.
-        """
-
-        name = template['name']
-
-        self.ostream.print_blank()
-        self.ostream.print_header(f'Shoehorning the site into {name}')
-        self.ostream.print_header((26 + len(name)) * '-')
-        self.ostream.print_blank()
-        self.ostream.print_header(
-            core._param('template residues',
-                        len(self._residue_nodes(template['coarse_topology']))))
-        self.ostream.print_header(
-            core._param('site residues',
-                        len(builder.active_site['residues'])))
-        self.ostream.print_header(
-            core._param('search radius', f'{max_include_radius:.1f} A'))
-        self.ostream.print_blank()
-        self.ostream.print_info(
-            f'Site holds: {", ".join(builder.active_site["residues"])}')
-        self.ostream.print_blank()
-        self.ostream.flush()
-
-    def _print_shoehorn_summary(self, builder, template):
-        """
-        Says what the site was made into.
-
-        The coordination is what a shoehorning is for, so it is printed the
-        way the builder prints it rather than left to be asked for: which
-        residue ended up on which metal center, how far out, and what it is
-        protonated as.
-
-        :param builder:
-            The builder holding the site.
-        :param template:
-            The template it was edited onto.
-        """
-
-        modes = builder.binding_modes
-        residues = list(builder.enzyme_topology.residues())
-
-        self.ostream.print_blank()
-        self.ostream.print_info(
-            f'The site is now built the way {template["name"]} is built.')
-        self.ostream.print_blank()
-
-        for metal in modes['metals']:
-            bonds = []
-            for ligand in modes['ligands']:
-                for index, distance in zip(ligand['metals'],
-                                           ligand['distances']):
-                    if index != metal['index']:
-                        continue
-                    bonds.append(f'{ligand["residue"]} {ligand["atom"]} '
-                                 f'{distance:.2f} A')
-            self.ostream.print_info(
-                f'  {metal["element"]} {metal["index"]}: ' +
-                (', '.join(sorted(bonds)) if bonds else 'nothing'))
-
-        protonation = ', '.join(
-            f'{residues[res_index].name}{residues[res_index].id} {variant}'
-            for res_index, variant in sorted(modes['variants'].items())
-            if res_index in set(core.active_site_residues(modes)))
-
-        self.ostream.print_info(f'  protonation: {protonation}')
-        self.ostream.print_blank()
-        self.ostream.print_info(
-            'Call compare_active_site() to measure it, then '
-            'build_ff_from_template.')
-        self.ostream.print_blank()
-        self.ostream.flush()
-
-    def _print_template(self, template):
-        """
-        Prints what one template holds.
-
-        :param template:
-            The template.
-        """
-
-        bonds, angles = self._metal_keys(template)
-        labels = template['molecule'].get_labels()
-        metals = ', '.join(labels[index] for index in template['metal_indices'])
-
-        self.ostream.print_blank()
-        self.ostream.print_header(f'Template {template["name"]}')
-        self.ostream.print_header((9 + len(template['name'])) * '-')
-        self.ostream.print_header(
-            core._param('geometry', template['geometry_kind']))
-        self.ostream.print_header(
-            core._param('atoms', template['molecule'].number_of_atoms()))
-        self.ostream.print_header(core._param('metal centers', metals))
-        self.ostream.print_header(
-            core._param('capping hydrogens', len(template['cap_indices'])))
-        self.ostream.print_header(core._param('metal bonds', len(bonds)))
-        self.ostream.print_header(core._param('metal angles', len(angles)))
-        self.ostream.print_header(
-            core._param('total charge',
-                        f'{float(np.sum(template["charges"])):+.3f}'))
-        self.ostream.print_blank()
-        self.ostream.print_info(f'Loaded from {template["folder"]}')
-        self.ostream.flush()
-
-    def _print_templates(self):
-        """
-        Prints every template that is loaded.
-        """
-
-        self.ostream.print_header(f'Loaded templates ({len(self.templates)})')
-        self.ostream.print_header(60 * '-')
-        valstr = '{:>24} | {:>7} | {:>7} | {:>13}'.format(
-            'name', 'atoms', 'metals', 'geometry')
-        self.ostream.print_header(valstr)
-        self.ostream.print_header(60 * '-')
-
-        for name, template in self.templates.items():
-            valstr = '{:>24} | {:>7} | {:>7} | {:>13}'.format(
-                name[:24], template['molecule'].number_of_atoms(),
-                len(template['metal_indices']), template['geometry_kind'])
-            self.ostream.print_header(valstr)
-
-        self.ostream.print_blank()
-        self.ostream.flush()
-
-    def _print_comparison(self, results):
-        """
-        Prints everything compare_active_site measured.
-
-        One table of numbers and one of verdicts per template that could be
-        measured, and a closing summary ranking the templates by the region
-        that is configured, so the closest one is visible without reading
-        every table.
-
-        :param results:
-            The last comparison, from compare_active_site.
-        """
-
-        active_site = results['active_site']
-        labels = active_site['molecule'].get_labels()
-        metals = ', '.join(labels[index]
-                           for index in active_site['metal_indices'])
-
-        self.ostream.print_blank()
-        self.ostream.print_header('Comparison against every template')
-        self.ostream.print_header(33 * '-')
-        self.ostream.print_header(
-            core._param('source',
-                        Path(results['source']).name))
-        self.ostream.print_header(
-            core._param('active site atoms',
-                        active_site['molecule'].number_of_atoms()))
-        self.ostream.print_header(core._param('metal centers', metals))
-        self.ostream.print_header(core._param('geometry', results['geometry']))
-        self.ostream.print_header(
-            core._param(
-                'measured over',
-                'all atoms' if results['include_hydrogens'] else 'heavy atoms'))
-        self.ostream.print_header(
-            core._param('templates', len(results['templates'])))
-        self.ostream.print_blank()
-        self.ostream.print_info(
-            f'Residues: {", ".join(active_site["residues"])}')
-
-        self._print_spec('the structure holds', results['active_site'])
-
-        for name, entry in results['templates'].items():
-            self._print_template_comparison(name, entry)
-
-        self._print_comparison_summary(results)
-
-    def _print_spec(self, title, described):
-        """
-        Prints what a site is made of: which residues it holds and which of
-        them coordinate which metal.
-
-        The residues are named by their formula, which is for reading; two
-        sites are compared on the keys behind them.
-
-        :param title:
-            What the block is describing.
-        :param described:
-            A described active site or a template.
-        """
-
-        labels = described['molecule'].get_labels()
-        coarse = described['coarse_topology']
-
-        def named(nodes):
-            return ', '.join(
-                sorted(f'{coarse.nodes[node]["formula"]}/'
-                       f'{coarse.nodes[node]["key"][:6]}' for node in nodes))
-
-        self.ostream.print_blank()
-        self.ostream.print_info(f'Site spec, {title}:')
-
-        for metal in described['metal_indices']:
-            node = ('metal', metal)
-            self.ostream.print_info(
-                f'  {labels[metal]}{metal}: {named(coarse.neighbors(node))}')
-
-        bridging = [
-            node for node in self._residue_nodes(coarse)
-            if coarse.degree(node) > 1
-        ]
-        if bridging:
-            self.ostream.print_info(f'  bridging: {named(bridging)}')
-
-        self.ostream.flush()
-
-    def _print_template_comparison(self, name, entry):
-        """
-        Prints the numbers and the verdicts of one template.
-
-        :param name:
-            The name of the template.
-        :param entry:
-            What compare_active_site measured for it.
-        """
-
-        self.ostream.print_blank()
-
-        if entry['status'] == 'composition':
-            self.ostream.print_info(
-                f'{name}: holds different atoms, so nothing was measured.')
-            self.ostream.flush()
-            return
-
-        if entry['status'] == 'spec':
-            self.ostream.print_info(
-                f'{name}: coordinates a different set of residues, so '
-                'nothing was measured.')
-            self._print_spec(f'{name} holds', self.templates[name])
-            self.ostream.flush()
-            return
-
-        bonds = entry['metal_bonds']
-        summary = (f'{bonds["shared"]} metal bond(s) shared, within '
-                   f'{bonds["deviation"]:.3f} A')
-        if bonds['template_only']:
-            summary += f', {bonds["template_only"]} only in the template'
-        if bonds['query_only']:
-            summary += f', {bonds["query_only"]} only in the structure'
-
-        self.ostream.print_info(
-            f'{name}: {entry["n_mappings"]} atom mapping(s) from '
-            f'{entry["n_coarse_mappings"]} coarse mapping(s), {summary}')
-        self.ostream.print_blank()
-
-        row = '{:>19} | {:>5} | {:>7} | {:>7} | {:>14} | {:>14} | {:>14}'
-        self.ostream.print_header(
-            row.format('region', 'atoms', 'RMSD', 'heavy', 'bonds rms/max',
-                       'angles rms/max', 'dihed rms/max'))
-        self.ostream.print_header(98 * '-')
-
-        for region, found in entry['regions'].items():
-            self.ostream.print_header(
-                row.format(region, found['atoms'], f'{found["rmsd"]:.3f}',
-                           f'{found["rmsd_heavy"]:.3f}',
-                           self._ic_cell(found['ic_rmsd'], 'bonds'),
-                           self._ic_cell(found['ic_rmsd'], 'angles'),
-                           self._ic_cell(found['ic_rmsd'], 'dihedrals')))
-
-        self.ostream.print_blank()
-        self.ostream.flush()
-
-    @staticmethod
-    def _ic_cell(ic_rmsd, name):
-        """
-        Formats one internal coordinate type for a table cell.
-
-        :param ic_rmsd:
-            The deviations, as get_ic_rmsd reports them.
-        :param name:
-            The type to format.
-
-        :return:
-            The cell.
-        """
-
-        if ic_rmsd is None:
-            return ''
-
-        found = ic_rmsd.get(name)
-
-        if found is None:
-            return ''
-
-        return f'{found["rms"]:.2f} / {found["max"]:.2f}'
-
-    def _print_comparison_summary(self, results):
-        """
-        Ranks the templates on what a selection is decided by.
-
-        :param results:
-            The last comparison, from compare_active_site.
-        """
-
-        region, ic_type, measure = self.SELECTION_RANKED_ON
-        heavy = not results['include_hydrogens']
-
-        def rmsd(entry):
-            found = entry['regions'].get(region)
-            if found is None:
-                return None
-            return found['rmsd_heavy'] if heavy else found['rmsd']
-
-        order = sorted(results['templates'].items(),
-                       key=lambda item: self._selection_score(item[1]))
-
-        self.ostream.print_blank()
-        title = f'Ranked on the {region} {ic_type} {measure}'
-        self.ostream.print_header(title)
-        self.ostream.print_header(len(title) * '-')
-
-        row = '{:>24} | {:>14} | {:>11} | {:>9} | {:>10}'
-        self.ostream.print_header(
-            row.format('template', 'status', f'{ic_type} {measure}', 'RMSD',
-                       'metal bond'))
-        self.ostream.print_header(78 * '-')
-
-        for name, entry in order:
-            found = rmsd(entry)
-            if found is None:
-                self.ostream.print_header(
-                    row.format(name[:24], entry['status'], '', '', ''))
-                continue
-            score = self._selection_score(entry)
-            self.ostream.print_header(
-                row.format(name[:24], entry['status'], f'{score:.3f}',
-                           f'{found:.3f}',
-                           f'{entry["metal_bonds"]["deviation"]:.3f}'))
-
-        self.ostream.print_blank()
-        self.ostream.flush()
-
-    def _print_selection(self, comparison, decision):
-        """
-        Prints how every template stands against the criteria, and which one
-        was taken.
-
-        The whole field is printed rather than the winner alone: whether the
-        others are near misses or a long way off is what says how much the
-        chosen one is worth.
-
-        :param comparison:
-            The last comparison, from compare_active_site.
-        :param decision:
-            The decision, as _select_template makes it.
-        """
-
-        regions = [
-            region for region in self.RMSD_REGIONS
-            if decision['criteria'].get(region)
-        ]
-
-        self.ostream.print_blank()
-        title = f'Choosing a template on the {decision["criteria_name"]} criteria'
-        self.ostream.print_header(title)
-        self.ostream.print_header(len(title) * '-')
-        self.ostream.print_blank()
-
-        for region in regions:
-            thresholds = decision['criteria'][region]
-            # only the measures the set actually holds, since either of
-            # them may be left out of one
-            measures = {
-                name:
-                ' / '.join(f'{measure} {limit:.2f}'
-                           for measure, limit in given.items()
-                           if limit is not None)
-                for name, given in thresholds.items() if given
-            }
-            limits = '; '.join(f'{name} {shown} {self.IC_TYPES[name]}'
-                               for name, shown in measures.items())
-            self.ostream.print_header(
-                core._param(region, limits, value_width=44))
-
-        self.ostream.print_blank()
-
-        # one column per region the criteria name, so a custom set of them
-        # prints as readably as the two that come with the class
-        row = ' | '.join(['{:>22}'] + ['{:>13}'] * len(regions) +
-                         ['{:>26}', '{:>5}'])
-        header = row.format('template', *[region[:13] for region in regions],
-                            'verdict', 'taken')
-        self.ostream.print_header(header)
-        self.ostream.print_header(len(header) * '-')
-
-        order = sorted(comparison['templates'],
-                       key=lambda name: (decision['verdicts'][name] is not None,
-                                         decision['scores'][name], name))
-
-        for name in order:
-            entry = comparison['templates'][name]
-            cells = []
-            for region in regions:
-                found = entry['regions'].get(region)
-                cells.append('' if found is
-                             None else self._ic_cell(found['ic_rmsd'], 'bonds'))
-
-            verdict = decision['verdicts'][name] or 'within the criteria'
-            self.ostream.print_header(
-                row.format(name[:22], *cells, verdict[:26],
-                           'yes' if name == decision['name'] else ''))
-
-        self.ostream.print_blank()
-
-        if decision['name'] is None:
-            self.ostream.print_info('No template was taken.')
-        elif decision['forced']:
-            self.ostream.print_info(
-                f'{decision["name"]} was named rather than chosen, so the '
-                'criteria were measured but did not decide.')
-        else:
-            ranked = ' '.join(self.SELECTION_RANKED_ON)
-            self.ostream.print_info(
-                f'{len(decision["candidates"])} of '
-                f'{len(comparison["templates"])} template(s) are within the '
-                f'criteria. Taking {decision["name"]}, whose {ranked} of '
-                f'{decision["score"]:.3f} is the lowest of them.')
-
-        self.ostream.print_blank()
-        self.ostream.flush()

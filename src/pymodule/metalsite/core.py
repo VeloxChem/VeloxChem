@@ -58,6 +58,9 @@ from ..scfgradientdriver import ScfGradientDriver
 from ..scfhessiandriver import ScfHessianDriver
 from ..optimizationdriver import OptimizationDriver
 from ..errorhandler import assert_msg_critical
+from .printing import stream as _stream
+from .printing import param as _param
+from .printing import print_param_list as _print_param_list
 
 try:
     import openmm as mm
@@ -279,24 +282,6 @@ DEFAULT_METAL_PLANARITY_FORCE_CONSTANT = 4.184
 # ----------------------------------------------------------------------
 # utilities
 # ----------------------------------------------------------------------
-
-
-def _stream(ostream):
-    """
-    Returns the stream to report through.
-
-    A core function reports only when it is given somewhere to report to, so a
-    caller that wants the numbers and not the commentary simply leaves the
-    argument out.
-
-    :param ostream:
-        The output stream, or None.
-
-    :return:
-        The given stream, or a silent one.
-    """
-
-    return OutputStream(None) if ostream is None else ostream
 
 
 def _resolve_report_cutoff(metal_bond_cutoff, report_cutoff=None):
@@ -5528,66 +5513,6 @@ def _check_forcefield(forcefield, active_site):
 # ----------------------------------------------------------------------
 # reporting
 # ----------------------------------------------------------------------
-
-
-def _param(label, value, label_width=26, value_width=20):
-    """
-    Formats one parameter line with fixed label and value widths.
-
-    print_header centers text, so all lines need the same total length to
-    appear left-aligned relative to each other.
-
-    :param label:
-        The parameter name.
-    :param value:
-        The parameter value.
-    :param label_width:
-        The width of the label field.
-    :param value_width:
-        The width of the value field.
-
-    :return:
-        The formatted line.
-    """
-
-    return f'{label:<{label_width}} : {str(value):>{value_width}}'
-
-
-def _print_param_list(label, items, value_width=20, ostream=None):
-    """
-    Prints a list of values as parameter lines of uniform width.
-
-    print_header centers each line, so a value that overflows the field
-    would make its line start further left than the others. Long lists are
-    therefore wrapped over several lines, with the label only on the
-    first.
-
-    :param label:
-        The parameter name.
-    :param items:
-        The values to list.
-    :param value_width:
-        The width of the value field.
-    """
-
-    ostream = _stream(ostream)
-
-    chunks = []
-    current = ''
-
-    for item in items:
-        candidate = item if not current else f'{current}, {item}'
-        if len(candidate) > value_width and current:
-            chunks.append(current + ',')
-            current = item
-        else:
-            current = candidate
-
-    if current:
-        chunks.append(current)
-
-    for i, chunk in enumerate(chunks):
-        ostream.print_header(_param(label if i == 0 else '', chunk))
 
 
 def _print_binding_modes(binding_modes, ostream=None):

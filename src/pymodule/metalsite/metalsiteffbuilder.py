@@ -42,6 +42,7 @@ from ..veloxchemlib import mpi_master
 from ..outputstream import OutputStream
 from ..errorhandler import assert_msg_critical
 from . import core
+from . import printing
 
 try:
     import openmm as mm
@@ -2186,7 +2187,7 @@ class MetalSiteForceFieldBuilder:
             The structure file being processed.
         """
 
-        param = core._param
+        param = printing.param
 
         self.ostream.print_blank()
         self.ostream.print_header('Metal Site Force Field Builder')
