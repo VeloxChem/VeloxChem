@@ -5457,7 +5457,7 @@ def _forcefield_elements(forcefield):
     return elements
 
 
-def _check_forcefield(forcefield, active_site):
+def _check_forcefield(forcefield, active_site, source=None):
     """
     Checks that a force field describes the extracted active site.
 
@@ -5469,21 +5469,26 @@ def _check_forcefield(forcefield, active_site):
         The force field generator.
     :param active_site:
         The active site, to validate against.
+    :param source:
+        Where the pair came from, for the message. A caller loading one of
+        many folders needs to be told which of them is the bad one; a caller
+        with only the site in hand leaves it out.
     """
 
-    labels = active_site['molecule'].get_labels()
+    labels = list(active_site['molecule'].get_labels())
     elements = _forcefield_elements(forcefield)
+    named = f' of {source}' if source is not None else ''
+    site = 'geometry' if source is not None else 'extracted active site'
 
     assert_msg_critical(
         len(elements) == len(labels),
-        f'_check_forcefield: the force field has {len(elements)} '
-        f'atoms but the extracted active site has {len(labels)}')
+        f'_check_forcefield: the force field{named} has {len(elements)} '
+        f'atoms but the {site} has {len(labels)}')
 
     assert_msg_critical(
         elements == labels,
-        '_check_forcefield: the elements of the force field do '
-        'not match the extracted active site, so it describes a different '
-        'structure')
+        f'_check_forcefield: the elements of the force field{named} do '
+        f'not match the {site}, so it describes a different structure')
 
 
 # ----------------------------------------------------------------------
