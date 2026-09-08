@@ -742,6 +742,89 @@ class MetalSiteForceFieldBuilder:
         }
 
     # ------------------------------------------------------------------
+    # reporting
+    # ------------------------------------------------------------------
+
+    def _functional_label(self):
+        """
+        Returns the functional actually in use.
+
+        The xcfun setting only applies when no SCF driver is provided, so an
+        assigned driver has to be asked for its own. Its xcfun stays a plain
+        string until it runs, and becomes a functional object afterwards.
+
+        :return:
+            The name of the functional.
+        """
+
+        if self.scf_drv is not None:
+            xcfun = self.scf_drv.xcfun
+        else:
+            xcfun = self.xcfun
+
+        if xcfun is None:
+            return 'Hartree-Fock'
+
+        if hasattr(xcfun, 'get_func_label'):
+            return xcfun.get_func_label()
+
+        return str(xcfun)
+
+    def _print_header(self, structure):
+        """
+        Prints the settings of the run.
+
+        :param structure:
+            The structure file being processed.
+        """
+
+        param = printing.param
+
+        self.ostream.print_blank()
+        self.ostream.print_header('Metal Site Force Field Builder')
+        self.ostream.print_header(32 * '=')
+        self.ostream.print_blank()
+
+        self.ostream.print_header(param('structure', Path(structure).name))
+        self.ostream.print_header(
+            param('primary cutoff', f'{self.metal_bond_cutoff:.2f} A'))
+        self.ostream.print_header(
+            param('secondary cutoff', f'{self.report_cutoff:.2f} A'))
+        self.ostream.print_header(param('basis set', self.basis_set_label))
+        self.ostream.print_header(
+            param('xc functional', self._functional_label()))
+        self.ostream.print_header(
+            param('SCF driver',
+                  'given' if self.scf_drv is not None else 'default'))
+        self.ostream.print_header(
+            param('QM optimization', self.do_qm_optimization))
+        self.ostream.print_header(
+            param(
+                'Hessian', 'computed, partial'
+                if self.calculate_partial_hessian else 'computed, full'))
+        if (self.calculate_partial_hessian and
+                self.partial_hessian_cutoff is not None):
+            self.ostream.print_header(
+                param('Hessian cutoff', f'{self.partial_hessian_cutoff:.2f} A'))
+        self.ostream.print_header(
+            param('partial charges', 'RESP' if self.do_resp else 'D4'))
+        self.ostream.print_header(
+            param(
+                'constrained atoms', 'beta carbons + caps'
+                if self.constrain_capping_hydrogens else 'beta carbons'))
+        self.ostream.print_header(
+            param(
+                'weak bridge pruning', f'> {self.weak_bridge_tolerance:.2f} A'
+                if self.prune_weak_bridge_bonds else 'off'))
+        self.ostream.print_header(
+            param('atom typing',
+                  'metal-blind' if self.metal_blind_typing else 'as bonded'))
+        self.ostream.print_header(param('MPI ranks', self.nodes))
+        self.ostream.print_header(param('output folder', self.output_folder))
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+    # ------------------------------------------------------------------
     # edits
     #
     # Every edit brings the builder up to date itself, so an edit is never
@@ -1796,6 +1879,75 @@ class MetalSiteForceFieldBuilder:
 
         return payload
 
+    def _fit_and_broadcast(self, hessian, charges):
+        """
+        Fits the metal terms on one rank and hands the force field to every
+        rank.
+
+        The fit itself is cheap and is kept off the collectives inside the
+        generator, so it runs on the master alone. MMForceFieldGenerator does
+        not pickle on its own -- it owns an output stream -- which is why the
+        crossing goes through core.broadcast_forcefield rather than a plain
+        bcast.
+
+        Shared by the first fit and by every refit after a bond edit, so the
+        two cannot come to write different artifacts or print different
+        tables.
+
+        :param hessian:
+            The Hessian to fit from.
+        :param charges:
+            The charges the force field carries.
+
+        :return:
+            The force field, on every rank.
+        """
+
+        forcefield = None
+
+        if self.rank == mpi_master():
+            forcefield = core.build_forcefield(
+                self._active_site,
+                hessian=hessian,
+                partial_charges=charges,
+                comm=MPI.COMM_SELF,
+                ostream=self.ostream,
+                protected_bonds=self._protected_bonds(),
+                **self.fit_settings())
+            core._print_metal_parameters(self._active_site,
+                                         forcefield,
+                                         ostream=self.ostream)
+            self._write_run_artifacts(forcefield, hessian, charges)
+
+        self._forcefield = core.broadcast_forcefield(forcefield,
+                                                     comm=self.comm,
+                                                     ostream=self.ostream)
+        self._adopted_forcefield = False
+
+        # The weak bridge pruning is the one step that can decide a metal
+        # contact is not a bond after all, and it decides it on the force
+        # field. Lifting that back onto the site is what stops the two
+        # disagreeing about what the cluster is bonded like -- see
+        # core.connectivity_from_forcefield. Done after the broadcast and on
+        # every rank rather than inside the master branch, so that every rank
+        # derives the same matrix from the same force field and no second
+        # broadcast is needed.
+        self._active_site = core.connectivity_from_forcefield(
+            self._active_site, self._forcefield)
+
+        # The fit folds the capping hydrogens' charge into the rest of the
+        # site, and from here on that is what "the charges" means: the same
+        # array reaches the force field, the enzyme system, the file and the
+        # partial_charges property, so no two of them can answer differently.
+        # Before a fit they are the raw result of the charge calculation,
+        # which is what there is to have.
+        if self._forcefield.partial_charges is not None:
+            self._partial_charges = np.asarray(self._forcefield.partial_charges)
+
+        self._enter(Stage.FITTED)
+
+        return self._forcefield
+
     # ------------------------------------------------------------------
     # state updates
     # ------------------------------------------------------------------
@@ -1965,75 +2117,6 @@ class MetalSiteForceFieldBuilder:
         # entering FITTED drops the enzyme system built from the old terms
         self._fit_and_broadcast(self._hessian, self._partial_charges)
 
-    def _fit_and_broadcast(self, hessian, charges):
-        """
-        Fits the metal terms on one rank and hands the force field to every
-        rank.
-
-        The fit itself is cheap and is kept off the collectives inside the
-        generator, so it runs on the master alone. MMForceFieldGenerator does
-        not pickle on its own -- it owns an output stream -- which is why the
-        crossing goes through core.broadcast_forcefield rather than a plain
-        bcast.
-
-        Shared by the first fit and by every refit after a bond edit, so the
-        two cannot come to write different artifacts or print different
-        tables.
-
-        :param hessian:
-            The Hessian to fit from.
-        :param charges:
-            The charges the force field carries.
-
-        :return:
-            The force field, on every rank.
-        """
-
-        forcefield = None
-
-        if self.rank == mpi_master():
-            forcefield = core.build_forcefield(
-                self._active_site,
-                hessian=hessian,
-                partial_charges=charges,
-                comm=MPI.COMM_SELF,
-                ostream=self.ostream,
-                protected_bonds=self._protected_bonds(),
-                **self.fit_settings())
-            core._print_metal_parameters(self._active_site,
-                                         forcefield,
-                                         ostream=self.ostream)
-            self._write_run_artifacts(forcefield, hessian, charges)
-
-        self._forcefield = core.broadcast_forcefield(forcefield,
-                                                     comm=self.comm,
-                                                     ostream=self.ostream)
-        self._adopted_forcefield = False
-
-        # The weak bridge pruning is the one step that can decide a metal
-        # contact is not a bond after all, and it decides it on the force
-        # field. Lifting that back onto the site is what stops the two
-        # disagreeing about what the cluster is bonded like -- see
-        # core.connectivity_from_forcefield. Done after the broadcast and on
-        # every rank rather than inside the master branch, so that every rank
-        # derives the same matrix from the same force field and no second
-        # broadcast is needed.
-        self._active_site = core.connectivity_from_forcefield(
-            self._active_site, self._forcefield)
-
-        # The fit folds the capping hydrogens' charge into the rest of the
-        # site, and from here on that is what "the charges" means: the same
-        # array reaches the force field, the enzyme system, the file and the
-        # partial_charges property, so no two of them can answer differently.
-        # Before a fit they are the raw result of the charge calculation,
-        # which is what there is to have.
-        if self._forcefield.partial_charges is not None:
-            self._partial_charges = np.asarray(self._forcefield.partial_charges)
-
-        self._enter(Stage.FITTED)
-
-        return self._forcefield
-
     # ------------------------------------------------------------------
     # settings assembly
     #
@@ -2149,86 +2232,3 @@ class MetalSiteForceFieldBuilder:
             'metal_bond_equilibria': self.metal_bond_equilibria,
             'metal_angle_equilibria': self.metal_angle_equilibria,
         }
-
-    # ------------------------------------------------------------------
-    # reporting
-    # ------------------------------------------------------------------
-
-    def _functional_label(self):
-        """
-        Returns the functional actually in use.
-
-        The xcfun setting only applies when no SCF driver is provided, so an
-        assigned driver has to be asked for its own. Its xcfun stays a plain
-        string until it runs, and becomes a functional object afterwards.
-
-        :return:
-            The name of the functional.
-        """
-
-        if self.scf_drv is not None:
-            xcfun = self.scf_drv.xcfun
-        else:
-            xcfun = self.xcfun
-
-        if xcfun is None:
-            return 'Hartree-Fock'
-
-        if hasattr(xcfun, 'get_func_label'):
-            return xcfun.get_func_label()
-
-        return str(xcfun)
-
-    def _print_header(self, structure):
-        """
-        Prints the settings of the run.
-
-        :param structure:
-            The structure file being processed.
-        """
-
-        param = printing.param
-
-        self.ostream.print_blank()
-        self.ostream.print_header('Metal Site Force Field Builder')
-        self.ostream.print_header(32 * '=')
-        self.ostream.print_blank()
-
-        self.ostream.print_header(param('structure', Path(structure).name))
-        self.ostream.print_header(
-            param('primary cutoff', f'{self.metal_bond_cutoff:.2f} A'))
-        self.ostream.print_header(
-            param('secondary cutoff', f'{self.report_cutoff:.2f} A'))
-        self.ostream.print_header(param('basis set', self.basis_set_label))
-        self.ostream.print_header(
-            param('xc functional', self._functional_label()))
-        self.ostream.print_header(
-            param('SCF driver',
-                  'given' if self.scf_drv is not None else 'default'))
-        self.ostream.print_header(
-            param('QM optimization', self.do_qm_optimization))
-        self.ostream.print_header(
-            param(
-                'Hessian', 'computed, partial'
-                if self.calculate_partial_hessian else 'computed, full'))
-        if (self.calculate_partial_hessian and
-                self.partial_hessian_cutoff is not None):
-            self.ostream.print_header(
-                param('Hessian cutoff', f'{self.partial_hessian_cutoff:.2f} A'))
-        self.ostream.print_header(
-            param('partial charges', 'RESP' if self.do_resp else 'D4'))
-        self.ostream.print_header(
-            param(
-                'constrained atoms', 'beta carbons + caps'
-                if self.constrain_capping_hydrogens else 'beta carbons'))
-        self.ostream.print_header(
-            param(
-                'weak bridge pruning', f'> {self.weak_bridge_tolerance:.2f} A'
-                if self.prune_weak_bridge_bonds else 'off'))
-        self.ostream.print_header(
-            param('atom typing',
-                  'metal-blind' if self.metal_blind_typing else 'as bonded'))
-        self.ostream.print_header(param('MPI ranks', self.nodes))
-        self.ostream.print_header(param('output folder', self.output_folder))
-        self.ostream.print_blank()
-        self.ostream.flush()
