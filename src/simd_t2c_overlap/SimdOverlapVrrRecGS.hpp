@@ -63,6 +63,42 @@ compute_prim_gs_overlap_3(CSimdMatrix &buffer, const size_t target, const size_t
                           const size_t ds, const size_t fs, const size_t ncols,
                           const double p) -> void;
 
+/// @brief Takes one step of the recurrence for one pair of primitives.
+auto
+compute_prim_gs_overlap_4(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                          const size_t ds, const size_t fs, const size_t ncols,
+                          const double p) -> void;
+
+/// @brief Takes one step of the recurrence for one pair of primitives.
+auto
+compute_prim_gs_overlap_5(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                          const size_t ds, const size_t fs, const size_t ncols,
+                          const double p) -> void;
+
+/// @brief Takes one step of the recurrence for one pair of primitives.
+auto
+compute_prim_gs_overlap_6(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                          const size_t ds, const size_t fs, const size_t ncols,
+                          const double p) -> void;
+
+/// @brief Takes one step of the recurrence for one pair of primitives.
+auto
+compute_prim_gs_overlap_7(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                          const size_t ds, const size_t fs, const size_t ncols,
+                          const double p) -> void;
+
+/// @brief Takes one step of the recurrence for one pair of primitives.
+auto
+compute_prim_gs_overlap_8(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                          const size_t ds, const size_t fs, const size_t ncols,
+                          const double p) -> void;
+
+/// @brief Takes one step of the recurrence for one pair of primitives.
+auto
+compute_prim_gs_overlap_9(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                          const size_t ds, const size_t fs, const size_t ncols,
+                          const double p) -> void;
+
 }  // namespace simdovl
 
 #endif /* SimdOverlapVrrRecGS_hpp */

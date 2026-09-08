@@ -148,11 +148,11 @@ compute_dh_overlap(double               *values,
         }
     }
 
-    compute_hrr_ph(buffer, coordinates, 197, 112, 133, nmax);
+    simdtrf::compute_hrr_ph(buffer, coordinates, 197, 112, 133, nmax);
 
-    compute_hrr_pi(buffer, coordinates, 260, 133, 161, nmax);
+    simdtrf::compute_hrr_pi(buffer, coordinates, 260, 133, 161, nmax);
 
-    compute_hrr_dh_sph(values, nvalues, buffer, coordinates, 197, 260, nmax);
+    simdtrf::compute_hrr_dh_sph(values, nvalues, buffer, coordinates, 197, 260, nmax);
 
     for (size_t m = 0; m < 55; m++)
     {

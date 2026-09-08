@@ -35,7 +35,7 @@
 
 #include "SimdAlign.hpp"
 
-namespace simdovl {  // simdovl namespace
+namespace simdtrf {  // simdtrf namespace
 
 auto
 compute_hrr_pp_sph(double *values, const size_t nvalues, CSimdMatrix &buffer,
@@ -171,4 +171,4 @@ compute_hrr_pp_sph_tri(double *values, const size_t nvalues, CSimdMatrix &buffer
     }
 }
 
-}  // namespace simdovl
+}  // namespace simdtrf

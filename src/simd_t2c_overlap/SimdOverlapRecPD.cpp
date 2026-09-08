@@ -134,7 +134,7 @@ compute_pd_overlap(double               *values,
         }
     }
 
-    compute_hrr_pd_sph(values, nvalues, buffer, coordinates, 23, 29, nmax);
+    simdtrf::compute_hrr_pd_sph(values, nvalues, buffer, coordinates, 23, 29, nmax);
 
     for (size_t m = 0; m < 15; m++)
     {

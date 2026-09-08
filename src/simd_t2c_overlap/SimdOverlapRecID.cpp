@@ -151,11 +151,11 @@ compute_id_overlap(double               *values,
         }
     }
 
-    compute_hrr_ip(buffer, coordinates, 258, 149, 177, nmax);
+    simdtrf::compute_hrr_ip(buffer, coordinates, 258, 149, 177, nmax);
 
-    compute_hrr_kp(buffer, coordinates, 342, 177, 213, nmax);
+    simdtrf::compute_hrr_kp(buffer, coordinates, 342, 177, 213, nmax);
 
-    compute_hrr_id_sph(values, nvalues, buffer, coordinates, 258, 342, nmax);
+    simdtrf::compute_hrr_id_sph(values, nvalues, buffer, coordinates, 258, 342, nmax);
 
     for (size_t m = 0; m < 65; m++)
     {

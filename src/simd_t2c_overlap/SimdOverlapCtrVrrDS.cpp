@@ -42,8 +42,8 @@ auto
 compute_ctr_ds_overlap_0(double *values, const size_t nvalues, CSimdMatrix &buffer,
                          const size_t pa, const size_t ps, const size_t ncols) -> void
 {
-    // NOTE: the factors are fixed by the pair of primitives, so they are formed
-    // once rather than for every atom pair the pair reaches.
+    // NOTE: the factors are the shells' own, so they are formed once rather
+    // than for every atom pair the shell pair reaches.
 
     const auto f_0 = std::sqrt(3.0);
     const auto f_1 = 0.5 * std::sqrt(3.0);

@@ -62,4 +62,25 @@ compute_prim_sp_overlap_0(CSimdMatrix &buffer, const size_t target, const size_t
     }
 }
 
+auto
+compute_prim_sp_overlap_1(CSimdMatrix &buffer, const size_t target, const size_t pb,
+                          const size_t ss, const size_t ncols) -> void
+{
+    auto *t_0 = buffer.data(target + 0);
+    auto *t_1 = buffer.data(target + 1);
+
+    const auto *pb_y = buffer.data(pb + 1);
+    const auto *pb_z = buffer.data(pb + 2);
+
+    const auto *ss_0 = buffer.data(ss + 0);
+
+#pragma omp simd aligned(t_0, t_1, pb_y, pb_z, ss_0 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_0[k] = pb_y[k] * ss_0[k];
+
+        t_1[k] = pb_z[k] * ss_0[k];
+    }
+}
+
 }  // namespace simdovl

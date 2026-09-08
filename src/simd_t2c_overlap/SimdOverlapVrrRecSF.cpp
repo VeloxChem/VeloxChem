@@ -281,4 +281,238 @@ compute_prim_sf_overlap_3(CSimdMatrix &buffer, const size_t target, const size_t
     }
 }
 
+auto
+compute_prim_sf_overlap_4(CSimdMatrix &buffer, const size_t target, const size_t pb,
+                          const size_t sp, const size_t sd, const size_t ncols,
+                          const double p) -> void
+{
+    // NOTE: the factors are fixed by the pair of primitives, so they are formed
+    // once rather than for every atom pair the pair reaches.
+
+    const auto f_0 = 1.0 / p;
+
+    auto *t_0 = buffer.data(target + 0);
+    auto *t_1 = buffer.data(target + 1);
+    auto *t_2 = buffer.data(target + 2);
+    auto *t_3 = buffer.data(target + 3);
+    auto *t_4 = buffer.data(target + 4);
+    auto *t_5 = buffer.data(target + 5);
+
+    const auto *pb_x = buffer.data(pb + 0);
+    const auto *pb_y = buffer.data(pb + 1);
+    const auto *pb_z = buffer.data(pb + 2);
+
+    const auto *sp_0 = buffer.data(sp + 0);
+    const auto *sp_1 = buffer.data(sp + 1);
+    const auto *sp_2 = buffer.data(sp + 2);
+
+    const auto *sd_0 = buffer.data(sd + 0);
+    const auto *sd_1 = buffer.data(sd + 1);
+    const auto *sd_2 = buffer.data(sd + 2);
+
+#pragma omp simd aligned(t_0, t_1, t_2, t_3, t_4, t_5, pb_x, pb_y, pb_z, sp_0, sp_1, sp_2, \
+                         sd_0, sd_1, sd_2 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_0[k] = f_0 * sp_0[k]
+                 + pb_x[k] * sd_0[k];
+
+        t_1[k] = pb_y[k] * sd_0[k];
+
+        t_2[k] = pb_z[k] * sd_0[k];
+
+        t_3[k] = f_0 * sp_1[k]
+                 + pb_y[k] * sd_1[k];
+
+        t_4[k] = pb_z[k] * sd_1[k];
+
+        t_5[k] = f_0 * sp_2[k]
+                 + pb_z[k] * sd_2[k];
+    }
+}
+
+auto
+compute_prim_sf_overlap_5(CSimdMatrix &buffer, const size_t target, const size_t pb,
+                          const size_t sp, const size_t sd, const size_t ncols,
+                          const double p) -> void
+{
+    // NOTE: the factors are fixed by the pair of primitives, so they are formed
+    // once rather than for every atom pair the pair reaches.
+
+    const auto f_0 = 1.0 / p;
+
+    auto *t_0 = buffer.data(target + 0);
+    auto *t_1 = buffer.data(target + 1);
+    auto *t_2 = buffer.data(target + 2);
+    auto *t_3 = buffer.data(target + 3);
+    auto *t_4 = buffer.data(target + 4);
+    auto *t_5 = buffer.data(target + 5);
+    auto *t_6 = buffer.data(target + 6);
+    auto *t_7 = buffer.data(target + 7);
+    auto *t_8 = buffer.data(target + 8);
+
+    const auto *pb_x = buffer.data(pb + 0);
+    const auto *pb_y = buffer.data(pb + 1);
+    const auto *pb_z = buffer.data(pb + 2);
+
+    const auto *sp_0 = buffer.data(sp + 0);
+    const auto *sp_1 = buffer.data(sp + 1);
+    const auto *sp_2 = buffer.data(sp + 2);
+
+    const auto *sd_0 = buffer.data(sd + 0);
+    const auto *sd_1 = buffer.data(sd + 1);
+    const auto *sd_2 = buffer.data(sd + 2);
+
+#pragma omp simd aligned(t_0, t_1, t_2, t_3, t_4, t_5, t_6, t_7, pb_x, pb_y, pb_z, sp_0, sp_1, \
+                         sd_0, sd_1, sd_2 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_0[k] = f_0 * sp_0[k]
+                 + pb_x[k] * sd_0[k];
+
+        t_1[k] = pb_y[k] * sd_0[k];
+
+        t_2[k] = pb_z[k] * sd_0[k];
+
+        t_3[k] = pb_x[k] * sd_1[k];
+
+        t_4[k] = pb_x[k] * sd_2[k];
+
+        t_5[k] = f_0 * sp_1[k]
+                 + pb_y[k] * sd_1[k];
+
+        t_6[k] = pb_z[k] * sd_1[k];
+
+        t_7[k] = pb_y[k] * sd_2[k];
+    }
+
+#pragma omp simd aligned(t_8, pb_z, sp_2, sd_2 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_8[k] = f_0 * sp_2[k]
+                 + pb_z[k] * sd_2[k];
+    }
+}
+
+auto
+compute_prim_sf_overlap_6(CSimdMatrix &buffer, const size_t target, const size_t pb,
+                          const size_t sp, const size_t sd, const size_t ncols,
+                          const double p) -> void
+{
+    // NOTE: the factors are fixed by the pair of primitives, so they are formed
+    // once rather than for every atom pair the pair reaches.
+
+    const auto f_0 = 1.0 / p;
+
+    auto *t_0 = buffer.data(target + 0);
+    auto *t_1 = buffer.data(target + 1);
+    auto *t_2 = buffer.data(target + 2);
+
+    const auto *pb_x = buffer.data(pb + 0);
+    const auto *pb_y = buffer.data(pb + 1);
+    const auto *pb_z = buffer.data(pb + 2);
+
+    const auto *sp_0 = buffer.data(sp + 0);
+    const auto *sp_1 = buffer.data(sp + 1);
+    const auto *sp_2 = buffer.data(sp + 2);
+
+    const auto *sd_0 = buffer.data(sd + 0);
+    const auto *sd_1 = buffer.data(sd + 1);
+    const auto *sd_2 = buffer.data(sd + 2);
+
+#pragma omp simd aligned(t_0, t_1, t_2, pb_x, pb_y, pb_z, sp_0, sp_1, sp_2, sd_0, sd_1, \
+                         sd_2 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_0[k] = f_0 * sp_0[k]
+                 + pb_x[k] * sd_0[k];
+
+        t_1[k] = f_0 * sp_1[k]
+                 + pb_y[k] * sd_1[k];
+
+        t_2[k] = f_0 * sp_2[k]
+                 + pb_z[k] * sd_2[k];
+    }
+}
+
+auto
+compute_prim_sf_overlap_7(CSimdMatrix &buffer, const size_t target, const size_t pb,
+                          const size_t sp, const size_t sd, const size_t ncols,
+                          const double p) -> void
+{
+    // NOTE: the factors are fixed by the pair of primitives, so they are formed
+    // once rather than for every atom pair the pair reaches.
+
+    const auto f_0 = 1.0 / p;
+
+    auto *t_0 = buffer.data(target + 0);
+    auto *t_1 = buffer.data(target + 1);
+
+    const auto *pb_y = buffer.data(pb + 1);
+    const auto *pb_z = buffer.data(pb + 2);
+
+    const auto *sp_1 = buffer.data(sp + 1);
+    const auto *sp_2 = buffer.data(sp + 2);
+
+    const auto *sd_1 = buffer.data(sd + 1);
+    const auto *sd_2 = buffer.data(sd + 2);
+
+#pragma omp simd aligned(t_0, t_1, pb_y, pb_z, sp_1, sp_2, sd_1, sd_2 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_0[k] = f_0 * sp_1[k]
+                 + pb_y[k] * sd_1[k];
+
+        t_1[k] = f_0 * sp_2[k]
+                 + pb_z[k] * sd_2[k];
+    }
+}
+
+auto
+compute_prim_sf_overlap_8(CSimdMatrix &buffer, const size_t target, const size_t pb,
+                          const size_t sp, const size_t sd, const size_t ncols,
+                          const double p) -> void
+{
+    // NOTE: the factors are fixed by the pair of primitives, so they are formed
+    // once rather than for every atom pair the pair reaches.
+
+    const auto f_0 = 1.0 / p;
+
+    auto *t_0 = buffer.data(target + 0);
+    auto *t_1 = buffer.data(target + 1);
+    auto *t_2 = buffer.data(target + 2);
+    auto *t_3 = buffer.data(target + 3);
+    auto *t_4 = buffer.data(target + 4);
+
+    const auto *pb_x = buffer.data(pb + 0);
+    const auto *pb_y = buffer.data(pb + 1);
+    const auto *pb_z = buffer.data(pb + 2);
+
+    const auto *sp_0 = buffer.data(sp + 0);
+    const auto *sp_1 = buffer.data(sp + 1);
+    const auto *sp_2 = buffer.data(sp + 2);
+
+    const auto *sd_0 = buffer.data(sd + 0);
+    const auto *sd_1 = buffer.data(sd + 1);
+    const auto *sd_2 = buffer.data(sd + 2);
+
+#pragma omp simd aligned(t_0, t_1, t_2, t_3, t_4, pb_x, pb_y, pb_z, sp_0, sp_1, sp_2, sd_0, \
+                         sd_1, sd_2 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_0[k] = f_0 * sp_0[k]
+                 + pb_x[k] * sd_0[k];
+
+        t_1[k] = f_0 * sp_1[k]
+                 + pb_y[k] * sd_1[k];
+
+        t_2[k] = pb_z[k] * sd_1[k];
+
+        t_3[k] = pb_y[k] * sd_2[k];
+
+        t_4[k] = f_0 * sp_2[k]
+                 + pb_z[k] * sd_2[k];
+    }
+}
+
 }  // namespace simdovl

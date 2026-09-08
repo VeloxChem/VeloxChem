@@ -37,7 +37,7 @@
 #include <cstddef>
 #include "SimdMatrix.hpp"
 
-namespace simdovl {  // simdovl namespace
+namespace simdtrf {  // simdtrf namespace
 
 /// @brief Transfers a quantum between the two sides of a shell pair and
 /// transforms the result, once the sum over primitives has been taken.
@@ -46,6 +46,6 @@ compute_hrr_dp_sph(double *values, const size_t nvalues, CSimdMatrix &buffer,
                    const CSimdMatrix &coordinates, const size_t ds, const size_t fs,
                    const size_t nmax) -> void;
 
-}  // namespace simdovl
+}  // namespace simdtrf
 
 #endif /* SimdTransferDP_hpp */

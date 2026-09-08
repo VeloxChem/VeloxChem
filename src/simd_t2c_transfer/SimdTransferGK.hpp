@@ -37,7 +37,7 @@
 #include <cstddef>
 #include "SimdMatrix.hpp"
 
-namespace simdovl {  // simdovl namespace
+namespace simdtrf {  // simdtrf namespace
 
 /// @brief Transfers a quantum between the two sides of a shell pair and
 /// transforms the result, once the sum over primitives has been taken.
@@ -45,6 +45,6 @@ auto
 compute_hrr_gk(CSimdMatrix &buffer, const CSimdMatrix &coordinates, const size_t target,
                const size_t fk, const size_t fl, const size_t nmax) -> void;
 
-}  // namespace simdovl
+}  // namespace simdtrf
 
 #endif /* SimdTransferGK_hpp */

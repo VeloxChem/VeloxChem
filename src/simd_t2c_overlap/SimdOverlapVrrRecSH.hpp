@@ -63,6 +63,66 @@ compute_prim_sh_overlap_3(CSimdMatrix &buffer, const size_t target, const size_t
                           const size_t sf, const size_t sg, const size_t ncols,
                           const double p) -> void;
 
+/// @brief Takes one step of the recurrence for one pair of primitives.
+auto
+compute_prim_sh_overlap_4(CSimdMatrix &buffer, const size_t target, const size_t pb,
+                          const size_t sf, const size_t sg, const size_t ncols,
+                          const double p) -> void;
+
+/// @brief Takes one step of the recurrence for one pair of primitives.
+auto
+compute_prim_sh_overlap_5(CSimdMatrix &buffer, const size_t target, const size_t pb,
+                          const size_t sf, const size_t sg, const size_t ncols,
+                          const double p) -> void;
+
+/// @brief Takes one step of the recurrence for one pair of primitives.
+auto
+compute_prim_sh_overlap_6(CSimdMatrix &buffer, const size_t target, const size_t pb,
+                          const size_t sf, const size_t sg, const size_t ncols,
+                          const double p) -> void;
+
+/// @brief Takes one step of the recurrence for one pair of primitives.
+auto
+compute_prim_sh_overlap_7(CSimdMatrix &buffer, const size_t target, const size_t pb,
+                          const size_t sf, const size_t sg, const size_t ncols,
+                          const double p) -> void;
+
+/// @brief Takes one step of the recurrence for one pair of primitives.
+auto
+compute_prim_sh_overlap_8(CSimdMatrix &buffer, const size_t target, const size_t pb,
+                          const size_t sf, const size_t sg, const size_t ncols,
+                          const double p) -> void;
+
+/// @brief Takes one step of the recurrence for one pair of primitives.
+auto
+compute_prim_sh_overlap_9(CSimdMatrix &buffer, const size_t target, const size_t pb,
+                          const size_t sf, const size_t sg, const size_t ncols,
+                          const double p) -> void;
+
+/// @brief Takes one step of the recurrence for one pair of primitives.
+auto
+compute_prim_sh_overlap_10(CSimdMatrix &buffer, const size_t target, const size_t pb,
+                           const size_t sf, const size_t sg, const size_t ncols,
+                           const double p) -> void;
+
+/// @brief Takes one step of the recurrence for one pair of primitives.
+auto
+compute_prim_sh_overlap_11(CSimdMatrix &buffer, const size_t target, const size_t pb,
+                           const size_t sf, const size_t sg, const size_t ncols,
+                           const double p) -> void;
+
+/// @brief Takes one step of the recurrence for one pair of primitives.
+auto
+compute_prim_sh_overlap_12(CSimdMatrix &buffer, const size_t target, const size_t pb,
+                           const size_t sf, const size_t sg, const size_t ncols,
+                           const double p) -> void;
+
+/// @brief Takes one step of the recurrence for one pair of primitives.
+auto
+compute_prim_sh_overlap_13(CSimdMatrix &buffer, const size_t target, const size_t pb,
+                           const size_t sf, const size_t sg, const size_t ncols,
+                           const double p) -> void;
+
 }  // namespace simdovl
 
 #endif /* SimdOverlapVrrRecSH_hpp */

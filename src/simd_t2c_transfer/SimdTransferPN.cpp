@@ -35,7 +35,7 @@
 
 #include "SimdAlign.hpp"
 
-namespace simdovl {  // simdovl namespace
+namespace simdtrf {  // simdtrf namespace
 
 auto
 compute_hrr_pn(CSimdMatrix &buffer, const CSimdMatrix &coordinates, const size_t target,
@@ -1185,4 +1185,4 @@ compute_hrr_pn(CSimdMatrix &buffer, const CSimdMatrix &coordinates, const size_t
     }
 }
 
-}  // namespace simdovl
+}  // namespace simdtrf

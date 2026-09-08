@@ -139,11 +139,11 @@ compute_dd_overlap(double               *values,
         }
     }
 
-    compute_hrr_pd(buffer, coordinates, 69, 38, 44, nmax);
+    simdtrf::compute_hrr_pd(buffer, coordinates, 69, 38, 44, nmax);
 
-    compute_hrr_pf(buffer, coordinates, 87, 44, 54, nmax);
+    simdtrf::compute_hrr_pf(buffer, coordinates, 87, 44, 54, nmax);
 
-    compute_hrr_dd_sph_tri(values, nvalues, buffer, coordinates, 69, 87, nmax);
+    simdtrf::compute_hrr_dd_sph_tri(values, nvalues, buffer, coordinates, 69, 87, nmax);
 
     for (size_t m = 0; m < 25; m++)
     {

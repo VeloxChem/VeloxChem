@@ -36,15 +36,15 @@
 #include <cmath>
 #include "SimdAlign.hpp"
 
-namespace simdovl {  // simdovl namespace
+namespace simdtrf {  // simdtrf namespace
 
 auto
 compute_hrr_ih_sph(double *values, const size_t nvalues, CSimdMatrix &buffer,
                    const CSimdMatrix &coordinates, const size_t ig, const size_t kg,
                    const size_t nmax) -> void
 {
-    // NOTE: the factors are fixed by the pair of primitives, so they are formed
-    // once rather than for every atom pair the pair reaches.
+    // NOTE: the factors are the shells' own, so they are formed once rather
+    // than for every atom pair the shell pair reaches.
 
     const auto f_0 = 2.4609375 * std::sqrt(33.0);
     const auto f_1 = 4.921875 * std::sqrt(33.0);
@@ -9478,4 +9478,4 @@ compute_hrr_ih_sph(double *values, const size_t nvalues, CSimdMatrix &buffer,
     }
 }
 
-}  // namespace simdovl
+}  // namespace simdtrf

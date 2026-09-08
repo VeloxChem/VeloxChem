@@ -64,16 +64,52 @@ target_sources(vlxobjs
     SimdOverlapRecSI.cpp
     SimdOverlapRecSP.cpp
     SimdOverlapRecSS.cpp
+    SimdOverlapVrrRecDD.cpp
+    SimdOverlapVrrRecDF.cpp
+    SimdOverlapVrrRecDG.cpp
+    SimdOverlapVrrRecDH.cpp
+    SimdOverlapVrrRecDI.cpp
+    SimdOverlapVrrRecDP.cpp
     SimdOverlapVrrRecDS.cpp
+    SimdOverlapVrrRecFD.cpp
+    SimdOverlapVrrRecFF.cpp
+    SimdOverlapVrrRecFG.cpp
+    SimdOverlapVrrRecFH.cpp
+    SimdOverlapVrrRecFI.cpp
+    SimdOverlapVrrRecFP.cpp
     SimdOverlapVrrRecFS.cpp
+    SimdOverlapVrrRecGD.cpp
+    SimdOverlapVrrRecGF.cpp
+    SimdOverlapVrrRecGG.cpp
+    SimdOverlapVrrRecGH.cpp
+    SimdOverlapVrrRecGI.cpp
+    SimdOverlapVrrRecGP.cpp
     SimdOverlapVrrRecGS.cpp
+    SimdOverlapVrrRecHD.cpp
+    SimdOverlapVrrRecHF.cpp
+    SimdOverlapVrrRecHG.cpp
+    SimdOverlapVrrRecHH.cpp
+    SimdOverlapVrrRecHI.cpp
+    SimdOverlapVrrRecHP.cpp
     SimdOverlapVrrRecHS.cpp
+    SimdOverlapVrrRecID.cpp
+    SimdOverlapVrrRecIF.cpp
+    SimdOverlapVrrRecIG.cpp
+    SimdOverlapVrrRecIH.cpp
+    SimdOverlapVrrRecII.cpp
+    SimdOverlapVrrRecIP.cpp
     SimdOverlapVrrRecIS.cpp
     SimdOverlapVrrRecKS.cpp
     SimdOverlapVrrRecLS.cpp
     SimdOverlapVrrRecMS.cpp
     SimdOverlapVrrRecNS.cpp
     SimdOverlapVrrRecOS.cpp
+    SimdOverlapVrrRecPD.cpp
+    SimdOverlapVrrRecPF.cpp
+    SimdOverlapVrrRecPG.cpp
+    SimdOverlapVrrRecPH.cpp
+    SimdOverlapVrrRecPI.cpp
+    SimdOverlapVrrRecPP.cpp
     SimdOverlapVrrRecPS.cpp
     SimdOverlapVrrRecSD.cpp
     SimdOverlapVrrRecSF.cpp

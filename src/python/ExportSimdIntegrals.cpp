@@ -38,6 +38,7 @@
 
 #include "MolecularBasis.hpp"
 #include "Molecule.hpp"
+#include "SimdKineticEnergyDriver.hpp"
 #include "SimdOverlapDriver.hpp"
 #include "SparseMatrix.hpp"
 
@@ -68,6 +69,22 @@ export_simdintegrals(py::module &m) -> void
              py::arg("ket_basis"))
         .def("get_threshold", &CSimdOverlapDriver::get_threshold, "Gets screening threshold of the integrals.")
         .def("get_block_size", &CSimdOverlapDriver::get_block_size, "Gets target number of atom pairs of a block.");
+
+    // CSimdKineticEnergyDriver class
+
+    PyClass<CSimdKineticEnergyDriver>(m, "SimdKineticEnergyDriver")
+        .def(py::init<>())
+        .def(py::init<const double, const size_t>(),
+             "Creates a kinetic energy driver with given screening threshold and target block size.",
+             py::arg("threshold"),
+             py::arg("block_size") = 0)
+        .def("compute",
+             py::overload_cast<const CMolecule &, const CMolecularBasis &>(&CSimdKineticEnergyDriver::compute_matrix, py::const_),
+             "Computes sparse kinetic energy matrix for given molecule and basis.",
+             py::arg("molecule"),
+             py::arg("basis"))
+        .def("get_threshold", &CSimdKineticEnergyDriver::get_threshold, "Gets screening threshold of the integrals.")
+        .def("get_block_size", &CSimdKineticEnergyDriver::get_block_size, "Gets target number of atom pairs of a block.");
 }
 
 }  // namespace vlx_simdintegrals
