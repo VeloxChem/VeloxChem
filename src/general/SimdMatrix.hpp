@@ -59,6 +59,10 @@ class CSimdMatrix
         , _columns(0)
 
         , _pitch(0)
+
+        , _capacity(0)
+
+        , _owned(true)
     {
     }
 
@@ -74,8 +78,37 @@ class CSimdMatrix
         , _columns(columns)
 
         , _pitch(simd::pitch_of(columns))
+
+        , _capacity(rows * simd::pitch_of(columns))
+
+        , _owned(true)
     {
         _allocate();
+    }
+
+    /// @brief The constructor with borrowed values.
+    /// @param values The values the matrix takes the shape over, which it does not
+    /// own and does not free.
+    /// @param capacity The number of values at values, which the shape of the matrix
+    /// may not exceed.
+    /// @note The matrix has no shape until it is reshaped. A driver which forms one
+    /// arena for a block of atom pairs and reshapes a view of it for every
+    /// combination of basis functions keeps the rows of a combination as close
+    /// together as an owned matrix would, while asking the allocator once.
+    CSimdMatrix(double *values, const size_t capacity)
+
+        : _data(values)
+
+        , _rows(0)
+
+        , _columns(0)
+
+        , _pitch(0)
+
+        , _capacity(capacity)
+
+        , _owned(false)
+    {
     }
 
     /// @brief The copy constructor.
@@ -89,6 +122,10 @@ class CSimdMatrix
         , _columns(other._columns)
 
         , _pitch(other._pitch)
+
+        , _capacity(other._rows * other._pitch)
+
+        , _owned(true)
     {
         _allocate();
 
@@ -106,6 +143,10 @@ class CSimdMatrix
         , _columns(other._columns)
 
         , _pitch(other._pitch)
+
+        , _capacity(other._capacity)
+
+        , _owned(other._owned)
     {
         other._data = nullptr;
 
@@ -114,6 +155,10 @@ class CSimdMatrix
         other._columns = 0;
 
         other._pitch = 0;
+
+        other._capacity = 0;
+
+        other._owned = true;
     }
 
     /// @brief The destructor.
@@ -137,6 +182,10 @@ class CSimdMatrix
             _columns = other._columns;
 
             _pitch = other._pitch;
+
+            _capacity = other._rows * other._pitch;
+
+            _owned = true;
 
             _allocate();
 
@@ -164,6 +213,10 @@ class CSimdMatrix
 
             _pitch = other._pitch;
 
+            _capacity = other._capacity;
+
+            _owned = other._owned;
+
             other._data = nullptr;
 
             other._rows = 0;
@@ -171,9 +224,45 @@ class CSimdMatrix
             other._columns = 0;
 
             other._pitch = 0;
+
+            other._capacity = 0;
+
+            other._owned = true;
         }
 
         return *this;
+    }
+
+    /// @brief Sets the shape of matrix over the values it borrows.
+    /// @param rows The number of rows in matrix.
+    /// @param columns The number of columns in matrix.
+    /// @note Only a matrix which borrows its values may be reshaped, as an owned one
+    /// would have to be reallocated. The values are left as they are.
+    auto
+    reshape(const size_t rows, const size_t columns) -> void
+    {
+        if (_owned) errors::assertMsgCritical(false, std::string("SimdMatrix.reshape: Matrix owns its values"));
+
+        const auto pitch = simd::pitch_of(columns);
+
+        if (rows * pitch > _capacity)
+        {
+            errors::assertMsgCritical(false, std::string("SimdMatrix.reshape: Shape exceeds capacity of borrowed values"));
+        }
+
+        _rows = rows;
+
+        _columns = columns;
+
+        _pitch = pitch;
+    }
+
+    /// @brief Gets number of values matrix may hold.
+    /// @return The number of values matrix owns or borrows.
+    auto
+    capacity() const -> size_t
+    {
+        return _capacity;
     }
 
     /// @brief Sets all values of matrix, padding included, to zero.
@@ -555,9 +644,9 @@ class CSimdMatrix
     auto
     _allocate() -> void
     {
-        if (const auto nelems = number_of_elements(); nelems > 0)
+        if (_capacity > 0)
         {
-            const auto nbytes = nelems * sizeof(double);
+            const auto nbytes = _capacity * sizeof(double);
 
             if (_reusing())
             {
@@ -579,7 +668,7 @@ class CSimdMatrix
     {
         if (_data != nullptr)
         {
-            if (!_reusing() || !_cache().give(_data, number_of_elements() * sizeof(double)))
+            if (_owned && (!_reusing() || !_cache().give(_data, _capacity * sizeof(double))))
             {
                 ::operator delete[](_data, std::align_val_t{simd::cache_line_size()});
             }
@@ -596,6 +685,13 @@ class CSimdMatrix
 
     /// @brief The number of columns in matrix.
     size_t _columns;
+
+    /// @brief The number of values matrix owns or borrows, which its shape may not
+    /// exceed.
+    size_t _capacity;
+
+    /// @brief Whether matrix owns the values it holds and frees them.
+    bool _owned;
 
     /// @brief The padded number of columns in a row of matrix.
     size_t _pitch;

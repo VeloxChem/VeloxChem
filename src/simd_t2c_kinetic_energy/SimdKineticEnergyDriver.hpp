@@ -46,6 +46,7 @@
 #include "Molecule.hpp"
 #include "ScreeningFunc.hpp"
 #include "SimdCoordinates.hpp"
+#include "SimdKineticEnergyBufferRows.hpp"
 #include "SimdKineticEnergyFunc.hpp"
 #include "SimdT2CDistributor.hpp"
 #include "SparseMatrix.hpp"
@@ -244,55 +245,95 @@ CSimdKineticEnergyDriver::_compute_pair_blocks(const CSparsityPattern           
 
     std::ranges::sort(order, [&](const size_t a, const size_t b) { return costs[a] > costs[b]; });
 
-#pragma omp parallel for schedule(dynamic) if (nblocks > 1)
+    // NOTE: the arena spans the largest combination of basis functions any block
+    // carries. See the overlap driver for why it is shaped this way.
+
+    auto arena_rows = size_t{0};
+
+    auto arena_cols = size_t{0};
+
     for (int iblk = 0; iblk < nblocks; iblk++)
     {
-        const auto jblk = order[static_cast<size_t>(iblk)];
+        const auto &block = pattern.pair_block(static_cast<size_t>(iblk));
 
-        const auto &block = pattern.pair_block(jblk);
+        arena_rows = std::max(arena_rows,
+                              simdkin::number_of_buffer_rows(basis.basis_set(block.bra_index()).max_angular_momentum(),
+                                                             basis.basis_set(block.ket_index()).max_angular_momentum()));
 
-        // NOTE: the coordinates of the atom pairs are created once for the whole
-        // block, as all combinations of basis functions of the block share them.
+        arena_cols = std::max(arena_cols, block.number_of_pairs());
+    }
 
-        const auto coordinates = simdfunc::make_coordinates(block, molecule);
+    // NOTE: the arena is formed once per thread and not once per block. Its
+    // largest shape serves every block, and holding it over the whole loop costs
+    // no more memory than a block at a time did, as every thread held one of them
+    // at once in any case. What it saves is the allocation and the page faults of
+    // a mapping this large, which the cache of blocks is too small to hold back.
 
-        const auto &a_basis = basis.basis_set(block.bra_index());
+#pragma omp parallel if (nblocks > 1)
+    {
+        auto arena = CSimdMatrix(arena_rows, arena_cols);
 
-        const auto &b_basis = basis.basis_set(block.ket_index());
+        // NOTE: the combinations work over a view of the arena and not over the
+        // arena itself, so that each takes the shape of the atom pairs it reaches.
+        // See the overlap driver for why.
 
-        const auto &a_index = indices[block.bra_index()];
+        auto buffer = CSimdMatrix(arena.data(), arena.capacity());
 
-        const auto &b_index = indices[block.ket_index()];
-
-        // NOTE: the atom bases of an off-diagonal block sit on different atoms, so
-        // all combinations of basis functions are computed and none of them shares
-        // the storage of its values with the reverse order.
-
-        for (size_t i = 0; i < a_index.size(); i++)
+#pragma omp for schedule(dynamic)
+        for (int iblk = 0; iblk < nblocks; iblk++)
         {
-            for (size_t j = 0; j < b_index.size(); j++)
+            const auto jblk = order[static_cast<size_t>(iblk)];
+
+            const auto &block = pattern.pair_block(jblk);
+
+            // NOTE: the coordinates of the atom pairs are created once for the whole
+            // block, as all combinations of basis functions of the block share them.
+
+            const auto coordinates = simdfunc::make_coordinates(block, molecule);
+
+            const auto &a_basis = basis.basis_set(block.bra_index());
+
+            const auto &b_basis = basis.basis_set(block.ket_index());
+
+            const auto &a_index = indices[block.bra_index()];
+
+            const auto &b_index = indices[block.ket_index()];
+
+            // NOTE: the atom bases of an off-diagonal block sit on different atoms, so
+            // all combinations of basis functions are computed and none of them shares
+            // the storage of its values with the reverse order.
+
+            for (size_t i = 0; i < a_index.size(); i++)
             {
-                const auto [la, ia] = a_index[i];
+                for (size_t j = 0; j < b_index.size(); j++)
+                {
+                    const auto [la, ia] = a_index[i];
 
-                const auto [lb, jb] = b_index[j];
+                    const auto [lb, jb] = b_index[j];
 
-                const auto nvalues = block.number_of_pairs(la, ia, lb, jb);
+                    const auto nvalues = block.number_of_pairs(la, ia, lb, jb);
 
-                if (nvalues == 0) continue;
+                    if (nvalues == 0) continue;
 
-                const auto ncomps = static_cast<size_t>(tensor::number_of_spherical_components(std::array<int, 2>{la, lb}));
+                    const auto ncomps = static_cast<size_t>(tensor::number_of_spherical_components(std::array<int, 2>{la, lb}));
 
-                auto *values = distributor.target(block, jblk, la, ia, lb, jb, nvalues, ncomps);
+                    auto *values = distributor.target(block, jblk, la, ia, lb, jb, nvalues, ncomps);
 
-                // NOTE: the pairs of primitives are screened with the threshold the
-                // atom pairs of the pattern were screened with, so that the two
-                // screenings of a computation cannot disagree when the pattern comes
-                // from the caller rather than from this driver.
+                    // NOTE: the pairs of primitives are screened with the threshold the
+                    // atom pairs of the pattern were screened with, so that the two
+                    // screenings of a computation cannot disagree when the pattern comes
+                    // from the caller rather than from this driver.
 
-                simdkin::compute_kinetic_energy(
-                    values, nvalues, a_basis.functions()[i], b_basis.functions()[j], coordinates, pattern.get_threshold());
+                    simdkin::compute_kinetic_energy(values,
+                                                    nvalues,
+                                                    a_basis.functions()[i],
+                                                    b_basis.functions()[j],
+                                                    coordinates,
+                                                    buffer,
+                                                    pattern.get_threshold());
 
-                distributor.commit(block, jblk, la, ia, lb, jb, nvalues, ncomps);
+                    distributor.commit(block, jblk, la, ia, lb, jb, nvalues, ncomps);
+                }
             }
         }
     }

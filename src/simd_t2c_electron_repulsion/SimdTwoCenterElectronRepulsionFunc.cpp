@@ -188,7 +188,8 @@ compute_electron_repulsion(double               *values,
                            const size_t          nvalues,
                            const CBasisFunction &bra,
                            const CBasisFunction &ket,
-                           const CSimdMatrix    &coordinates) -> void
+                           const CSimdMatrix    &coordinates,
+                           CSimdMatrix          &buffer) -> void
 {
     const auto lbra = bra.get_angular_momentum();
 
@@ -205,327 +206,327 @@ compute_electron_repulsion(double               *values,
     switch (lbra * 9 + lket)
     {
         case  0:
-            compute_ss_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_ss_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case  1:
-            compute_sp_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_sp_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case  2:
-            compute_sd_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_sd_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case  3:
-            compute_sf_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_sf_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case  4:
-            compute_sg_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_sg_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case  5:
-            compute_sh_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_sh_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case  6:
-            compute_si_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_si_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case  7:
-            compute_sk_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_sk_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case  8:
-            compute_sl_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_sl_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case  9:
-            compute_ps_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_ps_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case 10:
-            compute_pp_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_pp_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case 11:
-            compute_pd_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_pd_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case 12:
-            compute_pf_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_pf_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case 13:
-            compute_pg_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_pg_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case 14:
-            compute_ph_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_ph_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case 15:
-            compute_pi_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_pi_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case 16:
-            compute_pk_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_pk_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case 17:
-            compute_pl_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_pl_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case 18:
-            compute_ds_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_ds_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case 19:
-            compute_dp_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_dp_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case 20:
-            compute_dd_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_dd_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case 21:
-            compute_df_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_df_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case 22:
-            compute_dg_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_dg_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case 23:
-            compute_dh_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_dh_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case 24:
-            compute_di_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_di_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case 25:
-            compute_dk_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_dk_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case 26:
-            compute_dl_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_dl_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case 27:
-            compute_fs_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_fs_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case 28:
-            compute_fp_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_fp_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case 29:
-            compute_fd_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_fd_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case 30:
-            compute_ff_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_ff_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case 31:
-            compute_fg_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_fg_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case 32:
-            compute_fh_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_fh_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case 33:
-            compute_fi_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_fi_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case 34:
-            compute_fk_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_fk_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case 35:
-            compute_fl_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_fl_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case 36:
-            compute_gs_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_gs_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case 37:
-            compute_gp_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_gp_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case 38:
-            compute_gd_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_gd_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case 39:
-            compute_gf_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_gf_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case 40:
-            compute_gg_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_gg_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case 41:
-            compute_gh_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_gh_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case 42:
-            compute_gi_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_gi_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case 43:
-            compute_gk_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_gk_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case 44:
-            compute_gl_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_gl_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case 45:
-            compute_hs_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_hs_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case 46:
-            compute_hp_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_hp_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case 47:
-            compute_hd_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_hd_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case 48:
-            compute_hf_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_hf_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case 49:
-            compute_hg_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_hg_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case 50:
-            compute_hh_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_hh_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case 51:
-            compute_hi_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_hi_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case 52:
-            compute_hk_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_hk_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case 53:
-            compute_hl_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_hl_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case 54:
-            compute_is_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_is_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case 55:
-            compute_ip_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_ip_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case 56:
-            compute_id_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_id_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case 57:
-            compute_if_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_if_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case 58:
-            compute_ig_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_ig_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case 59:
-            compute_ih_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_ih_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case 60:
-            compute_ii_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_ii_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case 61:
-            compute_ik_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_ik_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case 62:
-            compute_il_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_il_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case 63:
-            compute_ks_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_ks_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case 64:
-            compute_kp_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_kp_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case 65:
-            compute_kd_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_kd_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case 66:
-            compute_kf_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_kf_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case 67:
-            compute_kg_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_kg_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case 68:
-            compute_kh_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_kh_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case 69:
-            compute_ki_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_ki_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case 70:
-            compute_kk_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_kk_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case 71:
-            compute_kl_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_kl_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case 72:
-            compute_ls_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_ls_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case 73:
-            compute_lp_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_lp_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case 74:
-            compute_ld_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_ld_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case 75:
-            compute_lf_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_lf_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case 76:
-            compute_lg_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_lg_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case 77:
-            compute_lh_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_lh_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case 78:
-            compute_li_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_li_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case 79:
-            compute_lk_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_lk_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         case 80:
-            compute_ll_electron_repulsion(values, nvalues, bra, ket, coordinates);
+            compute_ll_electron_repulsion(values, nvalues, bra, ket, coordinates, buffer);
             return;
 
         default:

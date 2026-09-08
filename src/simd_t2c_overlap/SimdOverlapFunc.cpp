@@ -95,6 +95,7 @@ compute_overlap(double               *values,
                 const CBasisFunction &bra,
                 const CBasisFunction &ket,
                 const CSimdMatrix    &coordinates,
+                CSimdMatrix          &buffer,
                 const double          threshold) -> void
 {
     const auto lbra = bra.get_angular_momentum();
@@ -112,199 +113,199 @@ compute_overlap(double               *values,
     switch (lbra * 7 + lket)
     {
         case  0:
-            compute_ss_overlap(values, nvalues, bra, ket, coordinates, threshold);
+            compute_ss_overlap(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case  1:
-            compute_sp_overlap(values, nvalues, bra, ket, coordinates, threshold);
+            compute_sp_overlap(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case  2:
-            compute_sd_overlap(values, nvalues, bra, ket, coordinates, threshold);
+            compute_sd_overlap(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case  3:
-            compute_sf_overlap(values, nvalues, bra, ket, coordinates, threshold);
+            compute_sf_overlap(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case  4:
-            compute_sg_overlap(values, nvalues, bra, ket, coordinates, threshold);
+            compute_sg_overlap(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case  5:
-            compute_sh_overlap(values, nvalues, bra, ket, coordinates, threshold);
+            compute_sh_overlap(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case  6:
-            compute_si_overlap(values, nvalues, bra, ket, coordinates, threshold);
+            compute_si_overlap(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case  7:
-            compute_ps_overlap(values, nvalues, bra, ket, coordinates, threshold);
+            compute_ps_overlap(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case  8:
-            compute_pp_overlap(values, nvalues, bra, ket, coordinates, threshold);
+            compute_pp_overlap(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case  9:
-            compute_pd_overlap(values, nvalues, bra, ket, coordinates, threshold);
+            compute_pd_overlap(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 10:
-            compute_pf_overlap(values, nvalues, bra, ket, coordinates, threshold);
+            compute_pf_overlap(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 11:
-            compute_pg_overlap(values, nvalues, bra, ket, coordinates, threshold);
+            compute_pg_overlap(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 12:
-            compute_ph_overlap(values, nvalues, bra, ket, coordinates, threshold);
+            compute_ph_overlap(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 13:
-            compute_pi_overlap(values, nvalues, bra, ket, coordinates, threshold);
+            compute_pi_overlap(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 14:
-            compute_ds_overlap(values, nvalues, bra, ket, coordinates, threshold);
+            compute_ds_overlap(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 15:
-            compute_dp_overlap(values, nvalues, bra, ket, coordinates, threshold);
+            compute_dp_overlap(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 16:
-            compute_dd_overlap(values, nvalues, bra, ket, coordinates, threshold);
+            compute_dd_overlap(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 17:
-            compute_df_overlap(values, nvalues, bra, ket, coordinates, threshold);
+            compute_df_overlap(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 18:
-            compute_dg_overlap(values, nvalues, bra, ket, coordinates, threshold);
+            compute_dg_overlap(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 19:
-            compute_dh_overlap(values, nvalues, bra, ket, coordinates, threshold);
+            compute_dh_overlap(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 20:
-            compute_di_overlap(values, nvalues, bra, ket, coordinates, threshold);
+            compute_di_overlap(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 21:
-            compute_fs_overlap(values, nvalues, bra, ket, coordinates, threshold);
+            compute_fs_overlap(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 22:
-            compute_fp_overlap(values, nvalues, bra, ket, coordinates, threshold);
+            compute_fp_overlap(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 23:
-            compute_fd_overlap(values, nvalues, bra, ket, coordinates, threshold);
+            compute_fd_overlap(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 24:
-            compute_ff_overlap(values, nvalues, bra, ket, coordinates, threshold);
+            compute_ff_overlap(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 25:
-            compute_fg_overlap(values, nvalues, bra, ket, coordinates, threshold);
+            compute_fg_overlap(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 26:
-            compute_fh_overlap(values, nvalues, bra, ket, coordinates, threshold);
+            compute_fh_overlap(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 27:
-            compute_fi_overlap(values, nvalues, bra, ket, coordinates, threshold);
+            compute_fi_overlap(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 28:
-            compute_gs_overlap(values, nvalues, bra, ket, coordinates, threshold);
+            compute_gs_overlap(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 29:
-            compute_gp_overlap(values, nvalues, bra, ket, coordinates, threshold);
+            compute_gp_overlap(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 30:
-            compute_gd_overlap(values, nvalues, bra, ket, coordinates, threshold);
+            compute_gd_overlap(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 31:
-            compute_gf_overlap(values, nvalues, bra, ket, coordinates, threshold);
+            compute_gf_overlap(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 32:
-            compute_gg_overlap(values, nvalues, bra, ket, coordinates, threshold);
+            compute_gg_overlap(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 33:
-            compute_gh_overlap(values, nvalues, bra, ket, coordinates, threshold);
+            compute_gh_overlap(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 34:
-            compute_gi_overlap(values, nvalues, bra, ket, coordinates, threshold);
+            compute_gi_overlap(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 35:
-            compute_hs_overlap(values, nvalues, bra, ket, coordinates, threshold);
+            compute_hs_overlap(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 36:
-            compute_hp_overlap(values, nvalues, bra, ket, coordinates, threshold);
+            compute_hp_overlap(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 37:
-            compute_hd_overlap(values, nvalues, bra, ket, coordinates, threshold);
+            compute_hd_overlap(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 38:
-            compute_hf_overlap(values, nvalues, bra, ket, coordinates, threshold);
+            compute_hf_overlap(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 39:
-            compute_hg_overlap(values, nvalues, bra, ket, coordinates, threshold);
+            compute_hg_overlap(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 40:
-            compute_hh_overlap(values, nvalues, bra, ket, coordinates, threshold);
+            compute_hh_overlap(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 41:
-            compute_hi_overlap(values, nvalues, bra, ket, coordinates, threshold);
+            compute_hi_overlap(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 42:
-            compute_is_overlap(values, nvalues, bra, ket, coordinates, threshold);
+            compute_is_overlap(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 43:
-            compute_ip_overlap(values, nvalues, bra, ket, coordinates, threshold);
+            compute_ip_overlap(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 44:
-            compute_id_overlap(values, nvalues, bra, ket, coordinates, threshold);
+            compute_id_overlap(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 45:
-            compute_if_overlap(values, nvalues, bra, ket, coordinates, threshold);
+            compute_if_overlap(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 46:
-            compute_ig_overlap(values, nvalues, bra, ket, coordinates, threshold);
+            compute_ig_overlap(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 47:
-            compute_ih_overlap(values, nvalues, bra, ket, coordinates, threshold);
+            compute_ih_overlap(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 48:
-            compute_ii_overlap(values, nvalues, bra, ket, coordinates, threshold);
+            compute_ii_overlap(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         default:

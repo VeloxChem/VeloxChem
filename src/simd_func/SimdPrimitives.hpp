@@ -112,6 +112,60 @@ contract_primitives(CSimdMatrix &buffer, const size_t target, const size_t sourc
     }
 }
 
+/// @brief Prepares a buffer a caller holds for one combination of basis functions.
+/// @param buffer The view of the arena of the block, which is reshaped to this
+/// combination.
+/// @param nrows The number of rows this combination uses.
+/// @param ncols The number of atom pairs this combination reaches.
+/// @return The number of columns, which is ncols, so a caller reads it back in one
+/// statement.
+/// @note The arena belongs to the block and not to the combination, so nothing is
+/// allocated here. The shape is taken per combination all the same: a combination
+/// which reaches fewer atom pairs than the block holds wants its rows that much
+/// closer together, and a view stretched to the pairs of the block would scatter
+/// every row of it over a page of its own.
+/// @note Only the rows this combination uses are zeroed. A combination which
+/// accumulates with += into its contracted rows needs them to start at zero, which is
+/// what this gives it; the rows beyond it hold whatever the combination before left
+/// there and are none of its business.
+/// @note Those rows are zeroed in one stroke, padding and all, and not row by row
+/// over the columns alone. They are contiguous once the shape is taken, so this is a
+/// single fill rather than one per row which stops short of the end of a cache line
+/// and has the line read back to write its tail.
+inline auto
+prepare_buffer(CSimdMatrix &buffer, const size_t nrows, const size_t ncols) -> size_t
+{
+    buffer.reshape(nrows, ncols);
+
+    auto *values = buffer.data();
+
+    std::fill(values, values + nrows * buffer.pitch(), 0.0);
+
+    return ncols;
+}
+
+/// @brief Prepares a buffer a caller holds for one combination of basis functions,
+/// spanning the atom pairs the furthest reaching pair of primitives reaches.
+/// @param buffer The buffer of the block.
+/// @param nrows The number of rows this combination uses.
+/// @param dimensions The number of atom pairs each pair of primitives reaches.
+/// @return The number of columns to work over, zero when no pair of primitives
+/// reaches any atom pair.
+/// @note The columns are searched for rather than assumed, for the reason given for
+/// make_primitive_buffer: the last pair of primitives is not always the furthest
+/// reaching.
+inline auto
+prepare_buffer(CSimdMatrix &buffer, const size_t nrows, const std::vector<size_t> &dimensions) -> size_t
+{
+    if (dimensions.empty()) return 0;
+
+    const auto nmax = *std::ranges::max_element(dimensions);
+
+    if (nmax == 0) return 0;
+
+    return prepare_buffer(buffer, nrows, nmax);
+}
+
 /// @brief Computes the displacement of the Gaussian product center from the atom
 /// on bra side, for one pair of primitives.
 /// @param buffer The buffer of the pair of primitives.

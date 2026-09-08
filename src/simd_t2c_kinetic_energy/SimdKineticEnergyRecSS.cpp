@@ -53,6 +53,7 @@ compute_ss_kinetic_energy(double               *values,
                           const CBasisFunction &bra,
                           const CBasisFunction &ket,
                           const CSimdMatrix    &coordinates,
+                          CSimdMatrix          &buffer,
                           const double          threshold) -> void
 {
     if (nvalues > coordinates.number_of_columns())

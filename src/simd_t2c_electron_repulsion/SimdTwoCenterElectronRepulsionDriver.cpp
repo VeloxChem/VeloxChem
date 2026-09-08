@@ -41,6 +41,7 @@
 #include "DenseIndexFunc.hpp"
 #include "SimdCoordinates.hpp"
 #include "SimdMatrix.hpp"
+#include "SimdTwoCenterElectronRepulsionBufferRows.hpp"
 #include "SimdTwoCenterElectronRepulsionFunc.hpp"
 #include "SparsityPattern.hpp"
 #include "TensorComponents.hpp"
@@ -108,73 +109,108 @@ CSimdTwoCenterElectronRepulsionDriver::_compute_pair_blocks(CPackedMatrix       
     // number of atom pairs but differ in the number of the combinations of basis
     // functions and in the cost of their kernels.
 
-#pragma omp parallel for schedule(dynamic) if (nblocks > 1)
+    // NOTE: the arena spans the largest combination of basis functions any block
+    // carries. See the overlap driver for why it is shaped this way.
+
+    auto arena_rows = size_t{0};
+
+    auto arena_cols = size_t{0};
+
     for (int iblk = 0; iblk < nblocks; iblk++)
     {
         const auto &block = blocks[static_cast<size_t>(iblk)];
 
-        const auto npairs = block.number_of_pairs();
+        arena_rows = std::max(arena_rows,
+                              simdt2ceri::number_of_buffer_rows(basis.basis_set(block.bra_index()).max_angular_momentum(),
+                                                                basis.basis_set(block.ket_index()).max_angular_momentum()));
 
-        if (npairs == 0) continue;
+        arena_cols = std::max(arena_cols, block.number_of_pairs());
+    }
 
-        // NOTE: the coordinates of the atom pairs are created once for the whole
-        // block, as all combinations of basis functions of the block share them.
+    // NOTE: the arena is formed once per thread and not once per block. Its
+    // largest shape serves every block, and holding it over the whole loop costs
+    // no more memory than a block at a time did, as every thread held one of them
+    // at once in any case. What it saves is the allocation and the page faults of
+    // a mapping this large, which the cache of blocks is too small to hold back.
 
-        const auto coordinates = simdfunc::make_coordinates(block, molecule);
+#pragma omp parallel if (nblocks > 1)
+    {
+        auto arena = CSimdMatrix(arena_rows, arena_cols);
 
-        const auto &bra_atoms = block.bra_atoms();
+        // NOTE: the combinations work over a view of the arena and not over the
+        // arena itself, so that each takes the shape of the atom pairs it reaches.
+        // See the overlap driver for why.
 
-        const auto &ket_atoms = block.ket_atoms();
+        auto buffer = CSimdMatrix(arena.data(), arena.capacity());
 
-        const auto &a_index = indices[static_cast<size_t>(block.bra_index())];
-
-        const auto &b_index = indices[static_cast<size_t>(block.ket_index())];
-
-        const auto &a_basis = basis.basis_set(block.bra_index());
-
-        const auto &b_basis = basis.basis_set(block.ket_index());
-
-        for (size_t i = 0; i < a_index.size(); i++)
+#pragma omp for schedule(dynamic)
+        for (int iblk = 0; iblk < nblocks; iblk++)
         {
-            for (size_t j = 0; j < b_index.size(); j++)
+            const auto &block = blocks[static_cast<size_t>(iblk)];
+
+            const auto npairs = block.number_of_pairs();
+
+            if (npairs == 0) continue;
+
+            // NOTE: the coordinates of the atom pairs are created once for the whole
+            // block, as all combinations of basis functions of the block share them.
+
+            const auto coordinates = simdfunc::make_coordinates(block, molecule);
+
+            const auto &bra_atoms = block.bra_atoms();
+
+            const auto &ket_atoms = block.ket_atoms();
+
+            const auto &a_index = indices[static_cast<size_t>(block.bra_index())];
+
+            const auto &b_index = indices[static_cast<size_t>(block.ket_index())];
+
+            const auto &a_basis = basis.basis_set(block.bra_index());
+
+            const auto &b_basis = basis.basis_set(block.ket_index());
+
+            for (size_t i = 0; i < a_index.size(); i++)
             {
-                const auto [la, ia] = a_index[i];
-
-                const auto [lb, jb] = b_index[j];
-
-                const auto ncomps = static_cast<size_t>(tensor::number_of_spherical_components(std::array<int, 2>{la, lb}));
-
-                // NOTE: the values of a combination are held in a scratch of one row
-                // per pair of angular components, as the elements of the matrix a
-                // combination reaches are not contiguous.
-
-                // NOTE: the scratch is contiguous and not a CSimdMatrix. A kernel
-                // addresses the row of a component as values + m * nvalues, while the
-                // rows of a CSimdMatrix are padded to a cache line, so every component
-                // past the first would land in the padding of the row before it.
-
-                std::vector<double> scratch(ncomps * npairs, 0.0);
-
-                simdt2ceri::compute_electron_repulsion(scratch.data(), npairs, a_basis.functions()[i], b_basis.functions()[j],
-                                                       coordinates);
-
-                const auto a_ncomps = static_cast<size_t>(tensor::number_of_spherical_components(std::array<int, 1>{la}));
-
-                const auto b_ncomps = static_cast<size_t>(tensor::number_of_spherical_components(std::array<int, 1>{lb}));
-
-                for (size_t ma = 0; ma < a_ncomps; ma++)
+                for (size_t j = 0; j < b_index.size(); j++)
                 {
-                    for (size_t mb = 0; mb < b_ncomps; mb++)
+                    const auto [la, ia] = a_index[i];
+
+                    const auto [lb, jb] = b_index[j];
+
+                    const auto ncomps = static_cast<size_t>(tensor::number_of_spherical_components(std::array<int, 2>{la, lb}));
+
+                    // NOTE: the values of a combination are held in a scratch of one row
+                    // per pair of angular components, as the elements of the matrix a
+                    // combination reaches are not contiguous.
+
+                    // NOTE: the scratch is contiguous and not a CSimdMatrix. A kernel
+                    // addresses the row of a component as values + m * nvalues, while the
+                    // rows of a CSimdMatrix are padded to a cache line, so every component
+                    // past the first would land in the padding of the row before it.
+
+                    std::vector<double> scratch(ncomps * npairs, 0.0);
+
+                    simdt2ceri::compute_electron_repulsion(
+                        scratch.data(), npairs, a_basis.functions()[i], b_basis.functions()[j], coordinates, buffer);
+
+                    const auto a_ncomps = static_cast<size_t>(tensor::number_of_spherical_components(std::array<int, 1>{la}));
+
+                    const auto b_ncomps = static_cast<size_t>(tensor::number_of_spherical_components(std::array<int, 1>{lb}));
+
+                    for (size_t ma = 0; ma < a_ncomps; ma++)
                     {
-                        const auto *cell = scratch.data() + (ma * b_ncomps + mb) * npairs;
-
-                        for (size_t k = 0; k < npairs; k++)
+                        for (size_t mb = 0; mb < b_ncomps; mb++)
                         {
-                            const auto row = starts[static_cast<size_t>(bra_atoms[k]) * nmoms + la] + ia + ma * strides[la];
+                            const auto *cell = scratch.data() + (ma * b_ncomps + mb) * npairs;
 
-                            const auto col = starts[static_cast<size_t>(ket_atoms[k]) * nmoms + lb] + jb + mb * strides[lb];
+                            for (size_t k = 0; k < npairs; k++)
+                            {
+                                const auto row = starts[static_cast<size_t>(bra_atoms[k]) * nmoms + la] + ia + ma * strides[la];
 
-                            matrix.data()[matrix.index(row, col)] = cell[k];
+                                const auto col = starts[static_cast<size_t>(ket_atoms[k]) * nmoms + lb] + jb + mb * strides[lb];
+
+                                matrix.data()[matrix.index(row, col)] = cell[k];
+                            }
                         }
                     }
                 }

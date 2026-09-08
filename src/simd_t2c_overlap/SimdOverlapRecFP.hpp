@@ -46,6 +46,7 @@ auto compute_fp_overlap(double               *values,
                         const CBasisFunction &bra,
                         const CBasisFunction &ket,
                         const CSimdMatrix    &coordinates,
+                        CSimdMatrix          &buffer,
                         const double          threshold) -> void;
 
 }  // namespace simdovl

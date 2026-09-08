@@ -70,7 +70,8 @@ compute_hd_electron_repulsion(double               *values,
                               const size_t          nvalues,
                               const CBasisFunction &bra,
                               const CBasisFunction &ket,
-                              const CSimdMatrix    &coordinates) -> void
+                              const CSimdMatrix    &coordinates,
+                              CSimdMatrix          &buffer) -> void
 {
     if (nvalues > coordinates.number_of_columns())
     {
@@ -92,11 +93,7 @@ compute_hd_electron_repulsion(double               *values,
 
     const auto nprim_b = b_exps.size();
 
-    auto buffer = CSimdMatrix(1393, nvalues);
-
-    buffer.zero();
-
-    const auto nmax = nvalues;
+    const auto nmax = simdfunc::prepare_buffer(buffer, 1393, nvalues);
 
     for (size_t i = 0; i < nprim_a; i++)
     {

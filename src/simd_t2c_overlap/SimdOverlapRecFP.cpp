@@ -60,6 +60,7 @@ compute_fp_overlap(double               *values,
                    const CBasisFunction &bra,
                    const CBasisFunction &ket,
                    const CSimdMatrix    &coordinates,
+                   CSimdMatrix          &buffer,
                    const double          threshold) -> void
 {
     if (nvalues > coordinates.number_of_columns())
@@ -91,16 +92,14 @@ compute_fp_overlap(double               *values,
     const auto dimensions = simdfunc::make_column_dimensions(
         bra, ket, nvalues, coordinates, screenfunc::two_center_overlap_primitive_bound, threshold / static_cast<double>(nprims));
 
-    auto buffer = simdfunc::make_primitive_buffer(dimensions, 123);
+    const auto nmax = simdfunc::prepare_buffer(buffer, 123, dimensions);
 
-    if (buffer.number_of_columns() == 0)
+    if (nmax == 0)
     {
         std::fill(values, values + 21 * nvalues, 0.0);
 
         return;
     }
-
-    const auto nmax = buffer.number_of_columns();
 
     errors::assertMsgCritical(dimensions.size() == nprim_a * nprim_b,
                               std::string("Dimensions do not match the pairs of primitives"));

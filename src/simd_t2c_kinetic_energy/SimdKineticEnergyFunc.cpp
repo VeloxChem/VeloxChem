@@ -95,6 +95,7 @@ compute_kinetic_energy(double               *values,
                        const CBasisFunction &bra,
                        const CBasisFunction &ket,
                        const CSimdMatrix    &coordinates,
+                       CSimdMatrix          &buffer,
                        const double          threshold) -> void
 {
     const auto lbra = bra.get_angular_momentum();
@@ -112,199 +113,199 @@ compute_kinetic_energy(double               *values,
     switch (lbra * 7 + lket)
     {
         case  0:
-            compute_ss_kinetic_energy(values, nvalues, bra, ket, coordinates, threshold);
+            compute_ss_kinetic_energy(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case  1:
-            compute_sp_kinetic_energy(values, nvalues, bra, ket, coordinates, threshold);
+            compute_sp_kinetic_energy(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case  2:
-            compute_sd_kinetic_energy(values, nvalues, bra, ket, coordinates, threshold);
+            compute_sd_kinetic_energy(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case  3:
-            compute_sf_kinetic_energy(values, nvalues, bra, ket, coordinates, threshold);
+            compute_sf_kinetic_energy(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case  4:
-            compute_sg_kinetic_energy(values, nvalues, bra, ket, coordinates, threshold);
+            compute_sg_kinetic_energy(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case  5:
-            compute_sh_kinetic_energy(values, nvalues, bra, ket, coordinates, threshold);
+            compute_sh_kinetic_energy(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case  6:
-            compute_si_kinetic_energy(values, nvalues, bra, ket, coordinates, threshold);
+            compute_si_kinetic_energy(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case  7:
-            compute_ps_kinetic_energy(values, nvalues, bra, ket, coordinates, threshold);
+            compute_ps_kinetic_energy(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case  8:
-            compute_pp_kinetic_energy(values, nvalues, bra, ket, coordinates, threshold);
+            compute_pp_kinetic_energy(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case  9:
-            compute_pd_kinetic_energy(values, nvalues, bra, ket, coordinates, threshold);
+            compute_pd_kinetic_energy(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 10:
-            compute_pf_kinetic_energy(values, nvalues, bra, ket, coordinates, threshold);
+            compute_pf_kinetic_energy(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 11:
-            compute_pg_kinetic_energy(values, nvalues, bra, ket, coordinates, threshold);
+            compute_pg_kinetic_energy(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 12:
-            compute_ph_kinetic_energy(values, nvalues, bra, ket, coordinates, threshold);
+            compute_ph_kinetic_energy(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 13:
-            compute_pi_kinetic_energy(values, nvalues, bra, ket, coordinates, threshold);
+            compute_pi_kinetic_energy(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 14:
-            compute_ds_kinetic_energy(values, nvalues, bra, ket, coordinates, threshold);
+            compute_ds_kinetic_energy(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 15:
-            compute_dp_kinetic_energy(values, nvalues, bra, ket, coordinates, threshold);
+            compute_dp_kinetic_energy(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 16:
-            compute_dd_kinetic_energy(values, nvalues, bra, ket, coordinates, threshold);
+            compute_dd_kinetic_energy(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 17:
-            compute_df_kinetic_energy(values, nvalues, bra, ket, coordinates, threshold);
+            compute_df_kinetic_energy(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 18:
-            compute_dg_kinetic_energy(values, nvalues, bra, ket, coordinates, threshold);
+            compute_dg_kinetic_energy(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 19:
-            compute_dh_kinetic_energy(values, nvalues, bra, ket, coordinates, threshold);
+            compute_dh_kinetic_energy(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 20:
-            compute_di_kinetic_energy(values, nvalues, bra, ket, coordinates, threshold);
+            compute_di_kinetic_energy(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 21:
-            compute_fs_kinetic_energy(values, nvalues, bra, ket, coordinates, threshold);
+            compute_fs_kinetic_energy(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 22:
-            compute_fp_kinetic_energy(values, nvalues, bra, ket, coordinates, threshold);
+            compute_fp_kinetic_energy(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 23:
-            compute_fd_kinetic_energy(values, nvalues, bra, ket, coordinates, threshold);
+            compute_fd_kinetic_energy(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 24:
-            compute_ff_kinetic_energy(values, nvalues, bra, ket, coordinates, threshold);
+            compute_ff_kinetic_energy(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 25:
-            compute_fg_kinetic_energy(values, nvalues, bra, ket, coordinates, threshold);
+            compute_fg_kinetic_energy(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 26:
-            compute_fh_kinetic_energy(values, nvalues, bra, ket, coordinates, threshold);
+            compute_fh_kinetic_energy(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 27:
-            compute_fi_kinetic_energy(values, nvalues, bra, ket, coordinates, threshold);
+            compute_fi_kinetic_energy(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 28:
-            compute_gs_kinetic_energy(values, nvalues, bra, ket, coordinates, threshold);
+            compute_gs_kinetic_energy(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 29:
-            compute_gp_kinetic_energy(values, nvalues, bra, ket, coordinates, threshold);
+            compute_gp_kinetic_energy(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 30:
-            compute_gd_kinetic_energy(values, nvalues, bra, ket, coordinates, threshold);
+            compute_gd_kinetic_energy(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 31:
-            compute_gf_kinetic_energy(values, nvalues, bra, ket, coordinates, threshold);
+            compute_gf_kinetic_energy(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 32:
-            compute_gg_kinetic_energy(values, nvalues, bra, ket, coordinates, threshold);
+            compute_gg_kinetic_energy(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 33:
-            compute_gh_kinetic_energy(values, nvalues, bra, ket, coordinates, threshold);
+            compute_gh_kinetic_energy(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 34:
-            compute_gi_kinetic_energy(values, nvalues, bra, ket, coordinates, threshold);
+            compute_gi_kinetic_energy(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 35:
-            compute_hs_kinetic_energy(values, nvalues, bra, ket, coordinates, threshold);
+            compute_hs_kinetic_energy(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 36:
-            compute_hp_kinetic_energy(values, nvalues, bra, ket, coordinates, threshold);
+            compute_hp_kinetic_energy(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 37:
-            compute_hd_kinetic_energy(values, nvalues, bra, ket, coordinates, threshold);
+            compute_hd_kinetic_energy(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 38:
-            compute_hf_kinetic_energy(values, nvalues, bra, ket, coordinates, threshold);
+            compute_hf_kinetic_energy(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 39:
-            compute_hg_kinetic_energy(values, nvalues, bra, ket, coordinates, threshold);
+            compute_hg_kinetic_energy(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 40:
-            compute_hh_kinetic_energy(values, nvalues, bra, ket, coordinates, threshold);
+            compute_hh_kinetic_energy(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 41:
-            compute_hi_kinetic_energy(values, nvalues, bra, ket, coordinates, threshold);
+            compute_hi_kinetic_energy(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 42:
-            compute_is_kinetic_energy(values, nvalues, bra, ket, coordinates, threshold);
+            compute_is_kinetic_energy(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 43:
-            compute_ip_kinetic_energy(values, nvalues, bra, ket, coordinates, threshold);
+            compute_ip_kinetic_energy(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 44:
-            compute_id_kinetic_energy(values, nvalues, bra, ket, coordinates, threshold);
+            compute_id_kinetic_energy(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 45:
-            compute_if_kinetic_energy(values, nvalues, bra, ket, coordinates, threshold);
+            compute_if_kinetic_energy(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 46:
-            compute_ig_kinetic_energy(values, nvalues, bra, ket, coordinates, threshold);
+            compute_ig_kinetic_energy(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 47:
-            compute_ih_kinetic_energy(values, nvalues, bra, ket, coordinates, threshold);
+            compute_ih_kinetic_energy(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         case 48:
-            compute_ii_kinetic_energy(values, nvalues, bra, ket, coordinates, threshold);
+            compute_ii_kinetic_energy(values, nvalues, bra, ket, coordinates, buffer, threshold);
             return;
 
         default:

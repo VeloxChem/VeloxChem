@@ -86,7 +86,8 @@ auto compute_electron_repulsion(double               *values,
                                 const size_t          nvalues,
                                 const CBasisFunction &bra,
                                 const CBasisFunction &ket,
-                                const CSimdMatrix    &coordinates) -> void;
+                                const CSimdMatrix    &coordinates,
+                                CSimdMatrix          &buffer) -> void;
 
 }  // namespace simdt2ceri
 

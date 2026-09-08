@@ -151,6 +151,7 @@ compute_ii_kinetic_energy(double               *values,
                           const CBasisFunction &bra,
                           const CBasisFunction &ket,
                           const CSimdMatrix    &coordinates,
+                          CSimdMatrix          &buffer,
                           const double          threshold) -> void
 {
     if (nvalues > coordinates.number_of_columns())
@@ -182,16 +183,14 @@ compute_ii_kinetic_energy(double               *values,
     const auto dimensions = simdfunc::make_column_dimensions(
         bra, ket, nvalues, coordinates, screenfunc::two_center_kinetic_energy_primitive_bound, threshold / static_cast<double>(nprims));
 
-    auto buffer = simdfunc::make_primitive_buffer(dimensions, 15266);
+    const auto nmax = simdfunc::prepare_buffer(buffer, 15266, dimensions);
 
-    if (buffer.number_of_columns() == 0)
+    if (nmax == 0)
     {
         std::fill(values, values + 169 * nvalues, 0.0);
 
         return;
     }
-
-    const auto nmax = buffer.number_of_columns();
 
     errors::assertMsgCritical(dimensions.size() == nprim_a * nprim_b,
                               std::string("Dimensions do not match the pairs of primitives"));

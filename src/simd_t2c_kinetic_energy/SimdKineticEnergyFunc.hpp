@@ -117,6 +117,8 @@ one_center_kinetic_energy(const CBasisFunction &bra, const CBasisFunction &ket) 
 /// @param coordinates The coordinates of the atom pairs, as ten rows ordered by
 /// ascending interatomic distance, holding the vector between the atoms in rows six
 /// to eight and its squared length in row nine.
+/// @param buffer The buffer of the block, which spans every combination the block
+/// carries and is sized by simdfunc from the highest angular momenta it holds.
 /// @param threshold The screening threshold of the integrals.
 /// @note The values of the combination of basis functions are stored as one row of
 /// nvalues columns for each of the (2 l_bra + 1) (2 l_ket + 1) spherical components,
@@ -130,6 +132,7 @@ auto compute_kinetic_energy(double               *values,
                             const CBasisFunction &bra,
                             const CBasisFunction &ket,
                             const CSimdMatrix    &coordinates,
+                            CSimdMatrix          &buffer,
                             const double          threshold) -> void;
 
 }  // namespace simdkin
