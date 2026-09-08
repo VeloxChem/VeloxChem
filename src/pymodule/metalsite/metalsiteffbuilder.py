@@ -551,13 +551,10 @@ class MetalSiteForceFieldBuilder:
         """
         Draws the active site as it now stands.
 
-        The bonds and the atom labels are the site's own rather than
-        perceived from the geometry: a metal-ligand bond is a decision that
-        nothing perceives, and the labels are what add_metal_bond and
-        remove_metal_bond want to be told about an atom, so a coordination
+        The bonds and labels are the site's own rather than perceived from
+        the geometry: a metal-ligand bond is a decision nothing perceives, and
+        the labels are what add_metal_bond and remove_metal_bond take, so an
         edit can be read straight off the picture.
-
-        Every other keyword reaches Molecule.show untouched.
 
         :param kwargs:
             Further keyword arguments for Molecule.show.
@@ -663,9 +660,9 @@ class MetalSiteForceFieldBuilder:
         a crude force field of its own so that a later QM optimization does not
         spend its first cycles cleaning up the structure file.
 
-        The edit methods rebuild the site themselves, so calling this again
-        by hand is only needed to start from a different structure, to change
-        mm_opt, or to reopen editing after build_forcefield.
+        Calling this by hand is only needed to start from a different
+        structure, to change mm_opt, or to reopen editing after
+        build_forcefield.
 
         :param cif_path:
             The path to a .pdb, .cif or .pdbx file, or None to rebuild from
@@ -873,16 +870,13 @@ class MetalSiteForceFieldBuilder:
         Bonds a residue to a metal center that the distances did not connect.
 
         The cutoffs read an unrelaxed structure, so a contact the design
-        intends can sit just outside them. The edit is recorded in the binding
-        modes by residue index, atom name and metal residue index, none of
-        which the renumbering of the protonation touches, so that a rebuild
-        and a re-detection on a relaxed geometry both put the bond back.
+        intends can sit just outside them. The edit is recorded by residue
+        index, atom name and metal residue index, none of which the
+        renumbering of the protonation touches, so a rebuild and a
+        re-detection on a relaxed geometry both put the bond back.
 
-        The active site is brought up to date on its own: before
-        build_forcefield it is extracted again from the corrected
-        coordination, and afterwards the metal terms are fitted again on the
-        geometry, the Hessian and the charges that are already there. It is
-        the one edit that is still allowed once the force field exists.
+        With remove_metal_bond, the only edit still allowed once the force
+        field exists.
 
         :param resid:
             The residue, as an id ('130' or 130) or as a label ('ASP130').
@@ -895,13 +889,11 @@ class MetalSiteForceFieldBuilder:
         :param chain:
             The chain id, when the residue id occurs in more than one chain.
         :param equilibrium:
-            The distance in Angstrom the crude pass should pull this bond
-            to, rather than holding it where the structure has it. A bond is
-            often added by hand because the sidechain is turned the wrong
-            way round, and an equilibrium measured on that geometry only
-            pins the mistake in place; naming a distance swings a histidine
-            into place before any QM is paid for. The QM optimization and
-            the Hessian fit that follow are not bound by it.
+            The distance in Angstrom the crude pass should pull this bond to,
+            rather than holding it where the structure has it. A bond is often
+            added by hand because the sidechain is turned the wrong way round,
+            and an equilibrium measured on that geometry only pins the mistake
+            in place. Nothing after the crude pass is bound by it.
         """
 
         self._require('add_metal_bond', Stage.ACTIVE_SITE)
@@ -925,15 +917,13 @@ class MetalSiteForceFieldBuilder:
         """
         Takes a residue's bond to a metal center back out.
 
-        The counterpart of add_metal_bond, and recorded the same way, so that
-        a contact the cutoffs invented does not come back when the
-        coordination is detected again on a relaxed geometry. The active site
-        is brought up to date on its own, and this too is still allowed once
-        the force field exists.
+        The counterpart of add_metal_bond, recorded the same way, so that a
+        contact the cutoffs invented does not come back when the coordination
+        is detected again on a relaxed geometry.
 
-        Note that taking the last bond off a residue takes the residue out of
-        the active site with it, unless include_residue asked for it. Use
-        remove_residue to say so outright.
+        Taking the last bond off a residue takes the residue out of the site
+        with it, unless include_residue asked for it. Use remove_residue to
+        say so outright.
 
         :param resid:
             The residue, as an id ('130' or 130) or as a label ('ASP130').
@@ -972,16 +962,14 @@ class MetalSiteForceFieldBuilder:
         coordinating nitrogen -- and this is how one of them is overruled, or
         how a residue that coordinates nothing is told what it should be.
 
-        The request goes into protonation_overrides, so it is the same thing
-        as the setting and survives every later rebuild. Hydrogens are added
-        and removed by protonating the structure again from before any
-        hydrogens were placed, which is also why the whole active site is
-        rebuilt: nothing expensive has run at this point, and re-protonating
-        an already protonated topology is not something to reach for.
+        The request goes into protonation_overrides -- the setting itself,
+        not a store beside it -- so it survives every later rebuild.
+        Hydrogens are added and removed by protonating again from before any
+        were placed, which is why the whole site is rebuilt: re-protonating
+        an already protonated topology is the bug that guards against.
 
-        Only possible before build_forcefield, since the charges and the
-        parameters of the force field describe the protonation it was fitted
-        to.
+        Refused after build_forcefield: the charges and parameters of a force
+        field describe the protonation it was fitted to.
 
         :param resid:
             The residue, as an id ('130' or 130) or as a label ('ASP130').
@@ -1186,11 +1174,9 @@ class MetalSiteForceFieldBuilder:
         """
         Applies one coordination edit and brings the builder up to date.
 
-        An edit is a decision, so it goes into the request, which is the
-        same thing at either stage: there is only one numbering now, and the
-        request survives every derivation. What differs between the stages
-        is only what is done about it afterwards -- the site is extracted
-        again before the fit, and the metal terms are fitted again after it.
+        An edit is a decision, so it goes into the request and nowhere else.
+        There is only one numbering, and the request survives every
+        derivation, so the same edit means the same thing at either stage.
 
         :param edit:
             A callable taking the request and the coordination it is being
@@ -1279,26 +1265,16 @@ class MetalSiteForceFieldBuilder:
         Relaxes the active site again, on the best force field there is.
 
         build_active_site does this once already unless it was told not to.
-        This is the way to do it again, or to do it after the fact on a site
-        that was extracted without it. The relaxed geometry replaces the one
-        on the builder.
+        This is the way to do it again, or after the fact on a site that was
+        extracted without it. The relaxed geometry replaces the one on the
+        builder, and which force field it runs on is _crude_relax's decision.
 
-        Which force field it runs on is whichever describes the site best.
-        Before a fit that is the crude seeded one, whose metal equilibria are
-        measured on the geometry in front of it -- so a contact the cutoffs
-        did not close is already at its minimum and the pass cannot move it.
-        Once there is a fit, its metal terms are per-bond equilibria and
-        per-bond force constants, which is strictly more than the seeding
-        knows, and they are what the relaxation uses instead. That is what
-        pulls a site walked onto a template by shoehorn into the coordination
-        the template was fitted for.
-
-        A fit made here describes the geometry its Hessian was computed on,
-        so producing a new one drops it. A fit adopted from a template
-        describes the template rather than this geometry, and relaxing
-        toward its parameters brings the two closer together, so that one is
-        kept -- an enzyme system built on it is not, since the positions it
-        was built from have moved.
+        The one step that does not always drop the fit above it. A fit made
+        here describes the geometry its Hessian was computed on, so a new
+        geometry drops it; a fit adopted from a template describes the
+        template, and relaxing toward its parameters brings the two closer
+        together, so that one is kept. The enzyme system goes either way --
+        the positions it was built from have moved.
 
         :return:
             The relaxed active site molecule.
@@ -1331,18 +1307,16 @@ class MetalSiteForceFieldBuilder:
         Relaxes a site on a force field, and writes the result.
 
         The pre-QM pass, run once by build_active_site and again by
-        mm_optimize_active_site. With no force field it builds the seeded
-        one it is named for: the equilibria come off the geometry and the
-        stiffness is a flat default, which is all that is known before a
-        Hessian exists. build_active_site is always that case -- there is
-        nothing else yet.
+        mm_optimize_active_site. With no force field it builds the seeded one
+        it is named for: equilibria off the geometry, a flat default
+        stiffness, which is all that is known before a Hessian exists.
 
-        A force field is taken rather than built once one exists, because a
-        fitted metal term says more than a seeded one can: a per-bond
-        equilibrium and a per-bond force constant, against an equilibrium
-        measured on the very geometry the pass is trying to improve. The
-        pass is still crude in the same way either way -- it carries
-        electrostatics only if the force field does.
+        A force field is taken rather than built once one exists, and the
+        difference is not cosmetic: a seeded equilibrium is measured on the
+        very geometry the pass is trying to improve, so a contact the cutoffs
+        left open sits at its own minimum and cannot be moved. A fitted or
+        transferred force field carries per-bond equilibria and force
+        constants, and pulls the same contact in.
 
         Runs on one rank; the caller broadcasts.
 
@@ -1602,15 +1576,13 @@ class MetalSiteForceFieldBuilder:
         Adopts a force field that was fitted elsewhere as this site's force
         field, without running any QM.
 
-        This is how MetalForceFieldManager.build_ff_from_template hands over
-        a force field it transferred from a matching template -- its own
-        Seminario metal terms and RESP charges, already paid for by an
-        earlier run -- so that create_enzyme_system can be called on this
-        builder directly afterwards. It is the manager's one integration
-        point with the Stage machinery, in the same spirit as
-        detection_settings/fit_settings already being public because the
-        manager reads them: the coupling is intentional and visible here
-        rather than the manager reaching into _forcefield/_stage by hand.
+        How MetalForceFieldManager.build_ff_from_template hands over a force
+        field transferred from a matching template -- metal terms and charges
+        an earlier run already paid for -- so that create_enzyme_system can be
+        called here afterwards. The manager's one way into the Stage
+        machinery, public for the same reason detection_settings and
+        fit_settings are, and so that it never reaches into _forcefield or
+        _stage by hand.
 
         :param forcefield:
             The force field to adopt, already carrying the fitted metal

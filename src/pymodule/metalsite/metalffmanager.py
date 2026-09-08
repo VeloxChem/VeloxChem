@@ -397,10 +397,10 @@ class MetalForceFieldManager:
 
         core.show_active_site is not used here: it reads
         active_site['labels'] and active_site['connectivity_matrix'], and a
-        template dictionary (built by _build_template) has neither -- it
+        template dictionary (built by templates.build) has neither -- it
         carries forcefield.bonds instead, which is the same source every
-        other template computation (_describe, _metal_keys, ...) reads its
-        bonds from.
+        other template computation (matching.describe, matching.metal_keys)
+        reads its bonds from.
 
         :param name:
             The name of the template to show.
