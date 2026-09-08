@@ -44,6 +44,7 @@ Geometries are the usual benchmark set.
 | c60 | 60 |
 | tagrisso | 70 |
 | taxol | 110 |
+| Cu(PPh3)4 cation | 137 |
 | paracetamol cluster | 320 |
 | crambin | 642 |
 | ubiquitin | 1231 |
@@ -2853,3 +2854,117 @@ The driver divides tagrisso and ubiquitin into blocks of the same size. The
 measurement says that costs it little, but it is a coincidence of two constants
 fitted for different drivers rather than a choice, and refitting the floor for the
 overlap moves this driver with it.
+
+### The RI fitting sets of the correlation consistent bases
+
+The two-center Coulomb kernels were extended to angular momentum eight, which is
+what the fitting sets of a transition metal reach: cc-pVQZ-rifit reaches k on a
+copper complex and cc-pV5Z-rifit reaches l. Measured on the same build and the
+same terms as the fitting set table above, with the copper complex added to the
+molecules.
+
+Three kinds of case carry no reference and say so in the row rather than being
+left out. `ref past i` is where the combination reaches k or l: the reference
+dispatches only to angular momentum six and returns an all zero block above it,
+silently, so comparing against it would report a false agreement. `dense big` is
+where its dense return passes forty thousand basis functions. And copper is absent
+from the DZ and 6Z fitting sets, so those combinations do not exist at all.
+
+| molecule | basis | lmax | nao | packed GB | ref ms | simd ms | x ref | max abs diff |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| tagrisso | cc-pvdz | f | 2534 | 0.02 | 3.92 | 3.53 | 1.1 | 2.03e-13 |
+| tagrisso | cc-pvtz | g | 3987 | 0.06 | 5.30 | 6.26 | 0.8 | 2.98e-13 |
+| tagrisso | cc-pvqz | h | 6699 | 0.17 | 14.83 | 19.70 | 0.8 | 2.06e-13 |
+| tagrisso | cc-pv5z | i | 10144 | 0.38 | 43.81 | 62.21 | 0.7 | 4.83e-13 |
+| tagrisso | cc-pv6z | k | 15091 | 0.85 | ref past i | 186.32 | -- | -- |
+| tagrisso | aug-cc-pvdz | f | 3423 | 0.04 | 3.63 | 4.48 | 0.8 | 1.34e-12 |
+| tagrisso | aug-cc-pvtz | g | 5440 | 0.11 | 8.04 | 10.97 | 0.7 | 8.81e-13 |
+| tagrisso | aug-cc-pvqz | h | 8856 | 0.29 | 26.86 | 36.42 | 0.7 | 9.52e-13 |
+| tagrisso | aug-cc-pv5z | i | 13145 | 0.64 | 77.58 | 107.76 | 0.7 | 1.22e-12 |
+| tagrisso | aug-cc-pv6z | k | 19076 | 1.36 | ref past i | 349.33 | -- | -- |
+| c60 | cc-pvdz | f | 3360 | 0.04 | 2.74 | 3.46 | 0.8 | 2.10e-13 |
+| c60 | cc-pvtz | g | 4860 | 0.09 | 11.25 | 7.48 | 1.5 | 2.42e-13 |
+| c60 | cc-pvqz | h | 7920 | 0.23 | 23.35 | 24.11 | 1.0 | 2.86e-13 |
+| c60 | cc-pv5z | i | 11580 | 0.50 | 56.55 | 70.63 | 0.8 | 3.13e-13 |
+| c60 | cc-pv6z | k | 16980 | 1.07 | ref past i | 215.34 | -- | -- |
+| c60 | aug-cc-pvdz | f | 4320 | 0.07 | 4.60 | 5.55 | 0.8 | 9.38e-13 |
+| c60 | aug-cc-pvtz | g | 6360 | 0.15 | 11.81 | 13.07 | 0.9 | 9.95e-13 |
+| c60 | aug-cc-pvqz | h | 10080 | 0.38 | 34.70 | 43.79 | 0.8 | 6.25e-13 |
+| c60 | aug-cc-pv5z | i | 14520 | 0.79 | 105.05 | 124.75 | 0.8 | 1.19e-12 |
+| c60 | aug-cc-pv6z | k | 20820 | 1.61 | ref past i | 368.03 | -- | -- |
+| taxol | cc-pvdz | f | 4102 | 0.06 | 3.86 | 5.02 | 0.8 | 2.20e-13 |
+| taxol | cc-pvtz | g | 6411 | 0.15 | 10.01 | 11.41 | 0.9 | 2.20e-13 |
+| taxol | cc-pvqz | h | 10747 | 0.43 | 34.07 | 39.07 | 0.9 | 2.33e-13 |
+| taxol | cc-pv5z | i | 16232 | 0.98 | 102.70 | 120.43 | 0.9 | 6.25e-13 |
+| taxol | cc-pv6z | k | 24123 | 2.17 | ref past i | 362.50 | -- | -- |
+| taxol | aug-cc-pvdz | f | 5519 | 0.11 | 7.25 | 9.04 | 0.8 | 1.19e-12 |
+| taxol | aug-cc-pvtz | g | 8720 | 0.28 | 19.04 | 21.58 | 0.9 | 8.95e-13 |
+| taxol | aug-cc-pvqz | h | 14168 | 0.75 | 63.95 | 73.69 | 0.9 | 1.02e-12 |
+| taxol | aug-cc-pv5z | i | 20985 | 1.64 | 198.29 | 221.75 | 0.9 | -- |
+| taxol | aug-cc-pv6z | k | 30428 | 3.45 | ref past i | 670.20 | -- | -- |
+| Cu_PPh3_4_cation | cc-pvtz | i | 8364 | 0.26 | 19.39 | 19.01 | 1.0 | 1.92e-13 |
+| Cu_PPh3_4_cation | cc-pvqz | k | 13798 | 0.71 | ref past i | 63.85 | -- | -- |
+| Cu_PPh3_4_cation | cc-pv5z | l | 20756 | 1.60 | ref past i | 196.52 | -- | -- |
+| Cu_PPh3_4_cation | aug-cc-pvtz | i | 11273 | 0.47 | 37.13 | 34.44 | 1.1 | 8.81e-13 |
+| Cu_PPh3_4_cation | aug-cc-pvqz | k | 18098 | 1.22 | ref past i | 118.79 | -- | -- |
+| Cu_PPh3_4_cation | aug-cc-pv5z | l | 26721 | 2.66 | ref past i | 360.91 | -- | -- |
+| paracetamol_cluster | cc-pvdz | f | 11872 | 0.53 | 30.54 | 33.76 | 0.9 | 1.78e-13 |
+| paracetamol_cluster | cc-pvtz | g | 18576 | 1.29 | 84.12 | 89.27 | 0.9 | 2.49e-13 |
+| paracetamol_cluster | cc-pvqz | h | 31152 | 3.62 | 626.88 | 354.30 | 1.8 | -- |
+| paracetamol_cluster | cc-pv5z | i | 47072 | 8.25 | dense big | 1173.06 | -- | -- |
+| paracetamol_cluster | aug-cc-pvdz | f | 15984 | 0.95 | 57.35 | 61.19 | 0.9 | 7.67e-13 |
+| paracetamol_cluster | aug-cc-pvtz | g | 25280 | 2.38 | 165.01 | 177.60 | 0.9 | -- |
+| paracetamol_cluster | aug-cc-pvqz | h | 41088 | 6.29 | dense big | 692.77 | -- | -- |
+| paracetamol_cluster | aug-cc-pv5z | i | 60880 | 13.81 | dense big | 2128.54 | -- | -- |
+| crambin | cc-pvdz | f | 22842 | 1.94 | 124.29 | 123.96 | 1.0 | -- |
+| crambin | cc-pvtz | g | 36183 | 4.88 | 580.06 | 391.00 | 1.5 | -- |
+| crambin | cc-pvqz | h | 60645 | 13.70 | dense big | 1357.36 | -- | -- |
+| crambin | aug-cc-pvdz | f | 30909 | 3.56 | 690.78 | 229.29 | 3.0 | -- |
+| crambin | aug-cc-pvtz | g | 49398 | 9.09 | dense big | 767.90 | -- | -- |
+| ubiquitin | cc-pvdz | f | 42538 | 6.74 | dense big | 506.90 | -- | -- |
+| ubiquitin | aug-cc-pvdz | f | 57831 | 12.46 | dense big | 951.00 | -- | -- |
+
+### What these numbers say
+
+The driver is **slower than the reference on most of these**, typically 0.7 to 0.9
+times: 26 of the 34 cases which have a reference are below one. That is the same
+picture as the def2 fitting sets, where the ratio
+hovered at one, and it has the same cause. Nothing screens here, so both sides
+compute every atom pair and the comparison is kernel against kernel rather than
+work against work.
+
+The wins are concentrated where the matrix is large, crambin in aug-cc-pVDZ at 3.0,
+paracetamol in cc-pVQZ at 1.8 and crambin in cc-pVTZ at 1.5. Those are also the
+cases where the dense allocation of the reference starts to weigh, so part of that
+gain is the packed storage rather than the integrals.
+
+The agreement is 1.8e-13 to 1.3e-12 absolute against integrals of order one
+hundred, about 1e-14 relative, wherever both matrices fit at once.
+
+The copper complex is what these kernels were extended for and it runs: 63.9 ms at
+13798 functions reaching k, and 196.5 ms at 20756 reaching l. Neither has a
+reference to check against, so what stands behind them is the zero separation
+limit below.
+
+### What the kernels above angular momentum six are checked against
+
+The reference cannot reach k or l, so the thirty two combinations which involve
+them were checked against the value the two-center integral approaches as the two
+atoms meet. That limit is the closed formula in the exponents alone which
+`one_center_electron_repulsion` carries, and the kernels of the atom pairs do not
+use it, so it is an independent reference rather than a restatement.
+
+The largest difference between the diagonal of the (l|l) block and the closed form,
+at three interatomic distances, three primitives per function:
+
+| l | closed form | R = 0.01 | R = 0.001 | R = 0.0001 |
+| --- | --- | --- | --- | --- |
+| s | 24.8977682425 | 2.09e-04 | 2.09e-06 | 2.09e-08 |
+| i | 1.9194163469 | 3.16e-04 | 3.16e-06 | 3.16e-08 |
+| k | 1.6667778485 | 3.16e-04 | 3.16e-06 | 3.16e-08 |
+| l | 1.4733255801 | 3.15e-04 | 3.15e-06 | 3.15e-08 |
+
+Every order converges as the square of the distance with the same coefficient, and
+k and l behave exactly as the orders the reference does validate. The rows for s to
+i are checked both ways, which is what makes the method trustworthy here rather
+than merely self consistent.
