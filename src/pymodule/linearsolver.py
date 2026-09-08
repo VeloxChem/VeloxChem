@@ -164,6 +164,7 @@ class LinearSolver:
         self.cpcm_grid_per_sphere = (194, 110)
         self.cpcm_cg_thresh = 1.0e-8
         self.cpcm_x = 0
+        self.cpcm_radii_scaling = 1.2
         self.cpcm_custom_vdw_radii = None
 
         # gostshyp setup
@@ -281,6 +282,8 @@ class LinearSolver:
                     ('float', 'dielectric constant of solvent (C-PCM)'),
                 'cpcm_optical_epsilon':
                     ('float', 'optical dielectric constant of solvent (C-PCM)'),
+                'cpcm_radii_scaling':
+                    ('float', 'scaling factor for C-PCM vdW radii'),
                 'cpcm_x': ('float', 'parameter for scaling function (C-PCM)'),
                 'cpcm_custom_vdw_radii':
                     ('seq_fixed_str', 'custom vdw radii for C-PCM'),
@@ -705,6 +708,7 @@ class LinearSolver:
             self.cpcm_drv.grid_per_sphere = self.cpcm_grid_per_sphere
             self.cpcm_drv.epsilon = self.cpcm_epsilon
             self.cpcm_drv.optical_epsilon = self.cpcm_optical_epsilon
+            self.cpcm_drv.radii_scaling = self.cpcm_radii_scaling
             self.cpcm_drv.x = self.cpcm_x
             self.cpcm_drv.custom_vdw_radii = self.cpcm_custom_vdw_radii
 

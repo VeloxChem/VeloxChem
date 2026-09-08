@@ -2202,12 +2202,23 @@ class ScfDriver:
                     for key in [
                             'solvation_model',
                             'cpcm_epsilon',
+                            'cpcm_radii_scaling',
                             'cpcm_grid_per_sphere',
                             'cpcm_cg_thresh',
                             'cpcm_x',
                             'cpcm_custom_vdw_radii',
                     ]:
                         self._scf_results[key] = getattr(self, key)
+
+                    if self._smd:
+                        # SMD overrides the plain CPCM attributes.
+                        self._scf_results['cpcm_epsilon'] = (
+                            self.cpcm_drv.epsilon)
+                        self._scf_results['cpcm_radii_scaling'] = (
+                            self.cpcm_drv.radii_scaling)
+                        self._scf_results['cpcm_custom_vdw_radii'] = (
+                            self.cpcm_drv.custom_vdw_radii)
+                        self._scf_results['smd_solvent'] = self.smd_solvent
 
                 if self._gostshyp:
                     # gostshyp info
