@@ -38,8 +38,10 @@
 
 #include "MolecularBasis.hpp"
 #include "Molecule.hpp"
+#include "PackedMatrix.hpp"
 #include "SimdKineticEnergyDriver.hpp"
 #include "SimdOverlapDriver.hpp"
+#include "SimdTwoCenterElectronRepulsionDriver.hpp"
 #include "SparseMatrix.hpp"
 
 namespace vlx_simdintegrals {  // vlx_simdintegrals namespace
@@ -85,6 +87,22 @@ export_simdintegrals(py::module &m) -> void
              py::arg("basis"))
         .def("get_threshold", &CSimdKineticEnergyDriver::get_threshold, "Gets screening threshold of the integrals.")
         .def("get_block_size", &CSimdKineticEnergyDriver::get_block_size, "Gets target number of atom pairs of a block.");
+
+    // CSimdTwoCenterElectronRepulsionDriver class
+
+    PyClass<CSimdTwoCenterElectronRepulsionDriver>(m, "SimdTwoCenterElectronRepulsionDriver")
+        .def(py::init<>())
+        .def(py::init<const size_t>(),
+             "Creates a two-center electron repulsion driver with given target block size.",
+             py::arg("block_size"))
+        .def("compute",
+             &CSimdTwoCenterElectronRepulsionDriver::compute,
+             "Computes packed two-center electron repulsion matrix for given molecule and basis.",
+             py::arg("molecule"),
+             py::arg("basis"))
+        .def("get_block_size",
+             &CSimdTwoCenterElectronRepulsionDriver::get_block_size,
+             "Gets target number of atom pairs of a block.");
 }
 
 }  // namespace vlx_simdintegrals
