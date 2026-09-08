@@ -38,10 +38,10 @@ import numpy as np
 import time
 import sys
 
-from .veloxchemlib import mpi_master
-from .outputstream import OutputStream
-from .errorhandler import assert_msg_critical
-from . import metalsitecore as core
+from ..veloxchemlib import mpi_master
+from ..outputstream import OutputStream
+from ..errorhandler import assert_msg_critical
+from . import core
 
 try:
     import openmm as mm
@@ -128,7 +128,7 @@ class MetalSiteForceFieldBuilder:
     data for is fitted to zero and reported as such, and kept.
 
     The object holds the settings and the intermediates; the work itself is
-    done by the functions of metalsitecore, which keep no state and take
+    done by the functions of the core module, which keep no state and take
     everything they use. What a step produced is read back off a read-only
     property rather than juggled by the caller.
 
@@ -1506,7 +1506,7 @@ class MetalSiteForceFieldBuilder:
         it failed.
 
         :param name:
-            The file name, one of the file name constants of metalsitecore.
+            The file name, one of the file name constants of the core module.
         :param writer:
             A callable taking the path to write.
         """

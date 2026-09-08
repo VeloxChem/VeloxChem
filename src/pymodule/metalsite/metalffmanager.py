@@ -47,14 +47,14 @@ try:
 except ImportError:
     pass
 
-from .veloxchemlib import mpi_master
-from .molecule import Molecule
-from .outputstream import OutputStream
+from ..veloxchemlib import mpi_master
+from ..molecule import Molecule
+from ..outputstream import OutputStream
 from .metalsiteffbuilder import MetalSiteForceFieldBuilder
-from . import metalsitecore as core
-from .optimizationdriver import OptimizationDriver
-from .superimpose import svd_superimpose
-from .errorhandler import assert_msg_critical
+from . import core
+from ..optimizationdriver import OptimizationDriver
+from ..superimpose import svd_superimpose
+from ..errorhandler import assert_msg_critical
 
 
 class MetalForceFieldManager:
@@ -109,7 +109,7 @@ class MetalForceFieldManager:
         - templates: The loaded templates, keyed by name.
         - builder: A MetalSiteForceFieldBuilder held for its settings alone --
           never given an active site of its own. The steps themselves are the
-          functions of metalsitecore, which are called with the settings this
+          functions of the core module, which are called with the settings this
           carries, so set them on it. Distinct from active_site, which is the
           builder that holds the real, loaded site.
         - metal_shell_bonds: How many bonds out from a metal the metal_shell
@@ -1861,7 +1861,7 @@ class MetalForceFieldManager:
                 'resid': str(residue.id),
                 'chain': str(residue.chain.id),
                 'name': residue.name,
-                'label': f'{residue.name}{residue.id}',
+                'label': core.residue_label(residue),
                 'key': self._residue_family_key(topology, residue),
                 'reach': reach,
                 'donor': donor,
@@ -1887,7 +1887,7 @@ class MetalForceFieldManager:
 
         for node in self._residue_nodes(coarse):
             slots.append({
-                'key': self._family_key(coarse.nodes[node]['heavy']),
+                'key': coarse.nodes[node]['family'],
                 'formula': coarse.nodes[node]['formula'],
                 'metals': sorted(image[1] for image in coarse.neighbors(node)),
             })
@@ -2385,7 +2385,7 @@ class MetalForceFieldManager:
             residue = residues[res_index]
             builder.remove_residue(str(residue.id),
                                    chain=str(residue.chain.id))
-            dropped.append(f'{residue.name}{residue.id}')
+            dropped.append(core.residue_label(residue))
 
         if dropped:
             self.ostream.print_info(

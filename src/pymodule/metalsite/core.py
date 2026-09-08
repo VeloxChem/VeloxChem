@@ -46,18 +46,18 @@ import numpy as np
 import tempfile
 import sys
 
-from .veloxchemlib import mpi_master
-from .molecule import Molecule
-from .molecularbasis import MolecularBasis
-from .outputstream import OutputStream
-from .mmforcefieldgenerator import MMForceFieldGenerator
-from .respchargesdriver import RespChargesDriver
-from .scfrestdriver import ScfRestrictedDriver
-from .scfunrestdriver import ScfUnrestrictedDriver
-from .scfgradientdriver import ScfGradientDriver
-from .scfhessiandriver import ScfHessianDriver
-from .optimizationdriver import OptimizationDriver
-from .errorhandler import assert_msg_critical
+from ..veloxchemlib import mpi_master
+from ..molecule import Molecule
+from ..molecularbasis import MolecularBasis
+from ..outputstream import OutputStream
+from ..mmforcefieldgenerator import MMForceFieldGenerator
+from ..respchargesdriver import RespChargesDriver
+from ..scfrestdriver import ScfRestrictedDriver
+from ..scfunrestdriver import ScfUnrestrictedDriver
+from ..scfgradientdriver import ScfGradientDriver
+from ..scfhessiandriver import ScfHessianDriver
+from ..optimizationdriver import OptimizationDriver
+from ..errorhandler import assert_msg_critical
 
 try:
     import openmm as mm
