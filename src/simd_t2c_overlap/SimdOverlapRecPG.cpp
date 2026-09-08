@@ -93,7 +93,7 @@ compute_pg_overlap(double               *values,
     const auto dimensions = simdfunc::make_column_dimensions(
         bra, ket, nvalues, coordinates, screenfunc::two_center_overlap_primitive_bound, threshold / static_cast<double>(nprims));
 
-    const auto nmax = simdfunc::prepare_buffer(buffer, 167, dimensions);
+    const auto nmax = simdfunc::prepare_buffer(buffer, 167, 59, 36, dimensions);
 
     if (nmax == 0)
     {

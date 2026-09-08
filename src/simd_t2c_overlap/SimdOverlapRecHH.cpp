@@ -111,7 +111,7 @@ compute_hh_overlap(double               *values,
     const auto dimensions = simdfunc::make_column_dimensions(
         bra, ket, nvalues, coordinates, screenfunc::two_center_overlap_primitive_bound, threshold / static_cast<double>(nprims));
 
-    const auto nmax = simdfunc::prepare_buffer(buffer, 4132, dimensions);
+    const auto nmax = simdfunc::prepare_buffer(buffer, 4132, 289, 251, dimensions);
 
     if (nmax == 0)
     {

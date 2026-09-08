@@ -40,10 +40,10 @@
 #include <string>
 #include <vector>
 
-// NOTE: the generated kernels reach the Boys function through this header, as
-// they include it for the other helpers of simdfunc and do not include the Boys
-// header of their own. The include belongs in the kernels which call it and can
-// go once they carry it.
+// NOTE: the generated three-center kernels reach the Boys function through this
+// header, as they include it for the other helpers of simdfunc and do not include
+// the Boys header of their own. The two-center kernels carry it themselves now, and
+// this include can go once the three-center ones do as well.
 #include "SimdBoysFunc.hpp"
 
 #include "ErrorHandler.hpp"
@@ -116,6 +116,8 @@ contract_primitives(CSimdMatrix &buffer, const size_t target, const size_t sourc
 /// @param buffer The view of the arena of the block, which is reshaped to this
 /// combination.
 /// @param nrows The number of rows this combination uses.
+/// @param first The first row this combination accumulates into.
+/// @param count The number of rows this combination accumulates into.
 /// @param ncols The number of atom pairs this combination reaches.
 /// @return The number of columns, which is ncols, so a caller reads it back in one
 /// statement.
@@ -124,38 +126,47 @@ contract_primitives(CSimdMatrix &buffer, const size_t target, const size_t sourc
 /// which reaches fewer atom pairs than the block holds wants its rows that much
 /// closer together, and a view stretched to the pairs of the block would scatter
 /// every row of it over a page of its own.
-/// @note Only the rows this combination uses are zeroed. A combination which
-/// accumulates with += into its contracted rows needs them to start at zero, which is
-/// what this gives it; the rows beyond it hold whatever the combination before left
-/// there and are none of its business.
-/// @note Those rows are zeroed in one stroke, padding and all, and not row by row
-/// over the columns alone. They are contiguous once the shape is taken, so this is a
-/// single fill rather than one per row which stops short of the end of a cache line
-/// and has the line read back to write its tail.
+/// @note Only the rows the combination accumulates into are zeroed, which are the
+/// rows contract_primitives adds to and are a small part of the buffer: three per
+/// hundred of it for two-center electron repulsion and under nine for the other two
+/// operators. Every other row is written outright before it is read, so zeroing it
+/// would be work for nothing, and zeroing all of them was the largest single frame
+/// in the profile of all three drivers.
+/// @note Those rows are contiguous once the shape is taken, so this is a single fill
+/// rather than one per row which stops short of the end of a cache line and has the
+/// line read back to write its tail. The padding is zeroed along with them.
 inline auto
-prepare_buffer(CSimdMatrix &buffer, const size_t nrows, const size_t ncols) -> size_t
+prepare_buffer(CSimdMatrix &buffer, const size_t nrows, const size_t first, const size_t count, const size_t ncols) -> size_t
 {
     buffer.reshape(nrows, ncols);
 
-    auto *values = buffer.data();
+    if (count == 0) return ncols;
 
-    std::fill(values, values + nrows * buffer.pitch(), 0.0);
+    auto *values = buffer.data(first);
+
+    std::fill(values, values + count * buffer.pitch(), 0.0);
 
     return ncols;
 }
 
 /// @brief Prepares a buffer a caller holds for one combination of basis functions,
 /// spanning the atom pairs the furthest reaching pair of primitives reaches.
-/// @param buffer The buffer of the block.
+/// @param buffer The view of the arena of the block.
 /// @param nrows The number of rows this combination uses.
+/// @param first The first row this combination accumulates into.
+/// @param count The number of rows this combination accumulates into.
 /// @param dimensions The number of atom pairs each pair of primitives reaches.
 /// @return The number of columns to work over, zero when no pair of primitives
 /// reaches any atom pair.
-/// @note The columns are searched for rather than assumed, for the reason given for
-/// make_primitive_buffer: the last pair of primitives is not always the furthest
-/// reaching.
+/// @note The columns are searched for rather than assumed: the last pair of
+/// primitives is not always the furthest reaching, as the screened count of a pair
+/// does not decrease with its exponents alone.
 inline auto
-prepare_buffer(CSimdMatrix &buffer, const size_t nrows, const std::vector<size_t> &dimensions) -> size_t
+prepare_buffer(CSimdMatrix          &buffer,
+               const size_t          nrows,
+               const size_t          first,
+               const size_t          count,
+               const std::vector<size_t> &dimensions) -> size_t
 {
     if (dimensions.empty()) return 0;
 
@@ -163,7 +174,7 @@ prepare_buffer(CSimdMatrix &buffer, const size_t nrows, const std::vector<size_t
 
     if (nmax == 0) return 0;
 
-    return prepare_buffer(buffer, nrows, nmax);
+    return prepare_buffer(buffer, nrows, first, count, nmax);
 }
 
 /// @brief Computes the displacement of the Gaussian product center from the atom

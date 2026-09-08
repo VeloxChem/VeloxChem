@@ -42,6 +42,7 @@
 #include "ScreeningFunc.hpp"
 #include "SimdDimensions.hpp"
 #include "SimdPrimitives.hpp"
+#include "SimdBoysFunc.hpp"
 
 #include "SimdElectronRepulsionVrrRecDS.hpp"
 #include "SimdElectronRepulsionVrrRecFS.hpp"
@@ -83,7 +84,7 @@ compute_ls_electron_repulsion(double               *values,
 
     const auto nprim_b = b_exps.size();
 
-    const auto nmax = simdfunc::prepare_buffer(buffer, 474, nvalues);
+    const auto nmax = simdfunc::prepare_buffer(buffer, 474, 429, 45, nvalues);
 
     for (size_t i = 0; i < nprim_a; i++)
     {

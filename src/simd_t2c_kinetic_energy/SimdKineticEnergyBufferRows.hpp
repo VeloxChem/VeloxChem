@@ -31,7 +31,6 @@
 //  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
-
 #ifndef SimdKineticEnergyBufferRows_hpp
 #define SimdKineticEnergyBufferRows_hpp
 
@@ -59,13 +58,13 @@ inline auto
 number_of_buffer_rows(const int bra_angular_momentum, const int ket_angular_momentum) -> size_t
 {
     constexpr std::array<std::array<size_t, 7>, 7> rows{{
-              0,      14,      29,      53,      88,     136,     199,
-             14,      50,     119,     217,     358,     550,     801,
-             29,     116,     272,     508,     850,    1318,    1932,
-             53,     220,     516,     976,    1646,    2566,    3776,
-             88,     370,     871,    1661,    2816,    4406,    6501,
-            136,     574,    1357,    2603,    4430,    6950,   10275,
-            199,     840,    1994,    3842,    6558,   10310,   15266
+        {       0,      14,      29,      53,      88,     136,     199},
+        {      14,      50,     119,     217,     358,     550,     801},
+        {      29,     116,     272,     508,     850,    1318,    1932},
+        {      53,     220,     516,     976,    1646,    2566,    3776},
+        {      88,     370,     871,    1661,    2816,    4406,    6501},
+        {     136,     574,    1357,    2603,    4430,    6950,   10275},
+        {     199,     840,    1994,    3842,    6558,   10310,   15266}
     }};
 
     errors::assertMsgCritical((bra_angular_momentum >= 0) && (bra_angular_momentum < 7) &&

@@ -156,7 +156,7 @@ compute_gi_kinetic_energy(double               *values,
     const auto dimensions = simdfunc::make_column_dimensions(
         bra, ket, nvalues, coordinates, screenfunc::two_center_kinetic_energy_primitive_bound, threshold / static_cast<double>(nprims));
 
-    const auto nmax = simdfunc::prepare_buffer(buffer, 6501, dimensions);
+    const auto nmax = simdfunc::prepare_buffer(buffer, 6501, 5886, 420, dimensions);
 
     if (nmax == 0)
     {

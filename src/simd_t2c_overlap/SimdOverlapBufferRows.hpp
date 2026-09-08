@@ -31,7 +31,6 @@
 //  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
-
 #ifndef SimdOverlapBufferRows_hpp
 #define SimdOverlapBufferRows_hpp
 
@@ -59,13 +58,13 @@ inline auto
 number_of_buffer_rows(const int bra_angular_momentum, const int ket_angular_momentum) -> size_t
 {
     constexpr std::array<std::array<size_t, 7>, 7> rows{{
-              0,      10,      19,      33,      53,      80,     115,
-             10,      40,      72,     114,     167,     232,     310,
-             19,      75,     183,     282,     403,     547,     715,
-             33,     123,     290,     619,     871,    1167,    1508,
-             53,     185,     424,     886,    1717,    2278,    2920,
-             80,     262,     586,    1204,    2302,    4132,    5260,
-            115,     355,     777,    1574,    2977,    5295,    8928
+        {       0,      10,      19,      33,      53,      80,     115},
+        {      10,      40,      72,     114,     167,     232,     310},
+        {      19,      75,     183,     282,     403,     547,     715},
+        {      33,     123,     290,     619,     871,    1167,    1508},
+        {      53,     185,     424,     886,    1717,    2278,    2920},
+        {      80,     262,     586,    1204,    2302,    4132,    5260},
+        {     115,     355,     777,    1574,    2977,    5295,    8928}
     }};
 
     errors::assertMsgCritical((bra_angular_momentum >= 0) && (bra_angular_momentum < 7) &&

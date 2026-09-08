@@ -686,15 +686,15 @@ class CSimdMatrix
     /// @brief The number of columns in matrix.
     size_t _columns;
 
+    /// @brief The padded number of columns in a row of matrix.
+    size_t _pitch;
+
     /// @brief The number of values matrix owns or borrows, which its shape may not
     /// exceed.
     size_t _capacity;
 
     /// @brief Whether matrix owns the values it holds and frees them.
     bool _owned;
-
-    /// @brief The padded number of columns in a row of matrix.
-    size_t _pitch;
 };
 
 #endif /* SimdMatrix_hpp */
