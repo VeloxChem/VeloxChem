@@ -1410,9 +1410,10 @@ class MetalSiteForceFieldBuilder:
         geometry, the Hessian and the charges the precedence is the same: what
         is passed in here, else the file an earlier run left in output_folder,
         else computing it -- the constrained optimization when
-        do_qm_optimization is on, the Hessian always, and the charges as RESP
-        or D4. Each of the three is validated against the extracted active
-        site before it is used.
+        do_qm_optimization is on, the Hessian when do_hessian is on, and the
+        charges as RESP or D4. Each of the three is validated against the
+        extracted active site before it is used, and which of the three it
+        came from is announced by the resolver rather than guessed at here.
 
         :param hessian:
             A matrix, or the path to a text file readable by numpy.loadtxt, to
@@ -1437,10 +1438,6 @@ class MetalSiteForceFieldBuilder:
             ostream=self.ostream))
 
         if geometry is not None:
-            self.ostream.print_info(
-                'Using the geometry given to build_forcefield; skipping the '
-                'constrained optimization.')
-            self.ostream.flush()
             self._adopt_geometry(geometry)
         elif self.do_qm_optimization:
             self.optimize_geometry()
@@ -1457,10 +1454,6 @@ class MetalSiteForceFieldBuilder:
                                           ostream=self.ostream))
 
         if hessian is not None:
-            self.ostream.print_info(
-                'Using the Hessian given to build_forcefield; skipping the '
-                'QM Hessian.')
-            self.ostream.flush()
             self._hessian = hessian
         elif self.do_hessian:
             hessian = self.calculate_hessian()
@@ -1477,10 +1470,6 @@ class MetalSiteForceFieldBuilder:
             ostream=self.ostream))
 
         if charges is not None:
-            self.ostream.print_info(
-                'Using the charges given to build_forcefield; skipping the '
-                'charge calculation.')
-            self.ostream.flush()
             self._partial_charges = charges
         else:
             charges = self.calculate_partial_charges()

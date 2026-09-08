@@ -5169,7 +5169,7 @@ def create_enzyme_system(topology,
 # ----------------------------------------------------------------------
 
 
-def _resolve_source(supplied, filename, folder=None, ostream=None):
+def _resolve_source(supplied, filename, label, folder=None, ostream=None):
     """
     Applies the precedence the three resolvers share: what the caller
     handed in beats what an earlier run left in the working folder, and
@@ -5178,15 +5178,23 @@ def _resolve_source(supplied, filename, folder=None, ostream=None):
     Stated once here rather than three times, so the rule cannot come to
     mean different things for a geometry, a Hessian and a set of charges.
 
+    Where a value came from is announced here for the same reason. This is
+    the only place that knows the answer, and a caller that guessed said
+    'given to build_forcefield' about a file a resumed run had left in the
+    folder -- misattributing the single most useful fact when a reused
+    folder produces a wrong fit.
+
     :param supplied:
         What the caller passed, or None.
     :param filename:
         The name the step writes its result under, one of the file name
         constants.
+    :param label:
+        What the value is, for the announcement.
     :param folder:
         The working folder to fall back on.
     :param ostream:
-        The output stream. The reuse is announced on it.
+        The output stream. Where the value came from is announced on it.
 
     :return:
         The tuple of the source and the flag that is True when it came
@@ -5194,7 +5202,11 @@ def _resolve_source(supplied, filename, folder=None, ostream=None):
         when there is nothing to use.
     """
 
+    ostream = _stream(ostream)
+
     if supplied is not None:
+        ostream.print_info(f'Using the {label} supplied by the caller.')
+        ostream.flush()
         return supplied, False
 
     source = _folder_file(filename, folder=folder)
@@ -5202,7 +5214,6 @@ def _resolve_source(supplied, filename, folder=None, ostream=None):
     if source is None:
         return None, False
 
-    ostream = _stream(ostream)
     ostream.print_info(f'Reusing {filename} from {folder}.')
     ostream.flush()
 
@@ -5227,6 +5238,7 @@ def _resolve_optimized_geometry(active_site,
 
     source, _ = _resolve_source(optimized_geometry,
                                 GEOMETRY_FILE,
+                                'geometry',
                                 folder=folder,
                                 ostream=ostream)
 
@@ -5278,6 +5290,7 @@ def _resolve_hessian(active_site, folder=None, hessian=None, ostream=None):
 
     source, reused = _resolve_source(hessian,
                                      HESSIAN_FILE,
+                                     'Hessian',
                                      folder=folder,
                                      ostream=ostream)
 
@@ -5363,6 +5376,7 @@ def _resolve_partial_charges(active_site,
 
     source, _ = _resolve_source(partial_charges,
                                 CHARGES_FILE,
+                                'partial charges',
                                 folder=folder,
                                 ostream=ostream)
 
