@@ -58,9 +58,17 @@ namespace simdfunc {  // simdfunc namespace
 /// @param threshold The screening threshold.
 /// @return The vector of the number of surviving atom pairs of each pair of
 /// primitives, with the primitives on bra side as the slowest running index.
-/// @note The primitives of a basis function are kept sorted by descending
-/// exponent, so the tightest primitives come first and the returned numbers do
-/// not decrease along either index.
+/// @note The returned numbers are not monotonic along either index. The primitives
+/// of a basis function are kept sorted by descending exponent, but the bound of a
+/// pair of primitives carries their prefactor as well as their decay, so a tighter
+/// pair with a larger prefactor reaches further than a more diffuse pair with a
+/// smaller one. A consumer which needs the furthest reaching pair must take the
+/// largest of these numbers and not the last of them, as
+/// simdfunc::make_primitive_buffer does.
+/// @note The layout is the contract a caller which loops over the pairs of
+/// primitives itself has to match: the entry of the pair i on bra side and j on ket
+/// side is at i * nprim_ket + j, and a pair whose number is zero reaches no atom
+/// pair and is skipped rather than run with an empty loop.
 template <typename B>
 inline auto
 make_column_dimensions(const CBasisFunction &bra,
@@ -119,9 +127,14 @@ make_column_dimensions(const CBasisFunction &bra,
 /// primitives, with the primitives on a side as the slowest and on c side as the
 /// fastest running index.
 /// @note Only the distance between the atoms on a and b sides enters, as the
-/// dependence on the position of the atom on c side is neglected. The primitives
-/// of a basis function are kept sorted by descending exponent, so the returned
-/// numbers do not decrease along any of the three indices.
+/// dependence on the position of the atom on c side is neglected.
+/// @note The returned numbers are not monotonic along any of the three indices, for
+/// the reason given for the two-center form above: the bound of a triple of
+/// primitives carries their prefactor as well as their decay. A consumer must take
+/// the largest of these numbers and not the last of them.
+/// @note The layout is the contract a caller which loops over the triples of
+/// primitives itself has to match: the entry of the primitives i, j and k is at
+/// (i * nprim_b + j) * nprim_c + k, and a triple whose number is zero is skipped.
 template <typename B>
 inline auto
 make_column_dimensions(const CBasisFunction &a,
