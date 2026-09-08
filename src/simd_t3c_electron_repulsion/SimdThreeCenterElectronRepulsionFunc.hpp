@@ -66,10 +66,11 @@ namespace simdt3ceri {  // simdt3ceri namespace
 /// are described, through the bound on the charge distribution of the atom pair on a
 /// and b sides; the atom on c side does not screen, as the Coulomb operator decays
 /// as the inverse of the distance to it.
-/// @note This is the stub of the skeleton. It writes a value which encodes the
-/// position of every element it is responsible for, so that the layout of the values
-/// and the loops of the driver are checked before the kernels exist. It is not the
-/// integral.
+/// @note This is the stub of the skeleton. It fills every element with a value which
+/// encodes that element's position, so that the loops of the driver and the offsets
+/// of the tensor are checked before the kernels exist. It is not the integral, and
+/// its body is not the shape of a kernel: it stops at a block of a thousand atom
+/// pairs or a thousand atoms on c side, which is where the encoding would collide.
 auto compute_electron_repulsion(double               *values,
                                 const size_t          npairs,
                                 const size_t          natoms,

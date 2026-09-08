@@ -163,20 +163,22 @@ inline constexpr size_t triple_blocks_per_thread = 2;
 /// quantity. A block carries a fixed cost which does not shrink with the atom pairs
 /// it holds, chiefly the bisection of the screening, so dividing too finely
 /// multiplies that cost rather than dividing it.
-/// @note This is far above the two hundred and fifty six of the two-center path, and
-/// there is no ceiling to go with it, which is the opposite of the two-center Coulomb
-/// driver. A block there is cheap to start and wants to be small; a block here
-/// carries the bisection and wants to be large. The two pairs of constants are not
-/// the same quantity and are not to be unified. Measured on fourteen threads over
-/// def2-svp with the jkfit auxiliary basis, as the number of atom pairs of a block:
-/// crambin in sixty three batches takes 93 ms at 8192, 78 at 32768 and 89 undivided,
-/// and ubiquitin in one hundred and twenty six batches takes 426 ms at 8192, 279 at
-/// 32768 and 434 undivided. Both ends cost, the small one by the fixed cost of a
-/// block and the large one by leaving too few blocks for the threads.
-/// @note The size computed from the threads is 7348 atom pairs for crambin and 27038
-/// for ubiquitin, both below this, so the floor is what binds and
-/// triple_blocks_per_thread decides nothing for them.
-inline constexpr size_t triple_min_block_size = 32768;
+/// @note A floor high enough to leave a molecule in a single block costs it every
+/// thread it has. The blocks of a small molecule come from the combinations of the
+/// atom basis pair groups with the auxiliary atom basis groups, which is set by the
+/// variety of its elements and not by its size, so a molecule of one element has one
+/// block however many atoms it holds: c60 carries 1770 atom pairs and was left
+/// undivided by a floor of 32768.
+/// @note This floor is not fitted. The value which preceded it, 32768, was measured
+/// against the three-center kernels which have since been removed, on fourteen
+/// threads over def2-svp with the jkfit auxiliary basis, as the number of atom pairs
+/// of a block: crambin in sixty three batches took 93 ms at 8192, 78 at 32768 and 89
+/// undivided, and ubiquitin in one hundred and twenty six batches took 426 ms at
+/// 8192, 279 at 32768 and 434 undivided. Those numbers say the large molecules
+/// preferred a large block, and they describe code which no longer exists. The value
+/// here matches the two-center floor so that no molecule collapses to a single
+/// block, and it wants fitting again once the kernels are in the tree.
+inline constexpr size_t triple_min_block_size = 256;
 
 /// @brief Selects the atom basis groups on c side which carry the given atoms.
 /// @param molecule The molecule the atoms belong to.

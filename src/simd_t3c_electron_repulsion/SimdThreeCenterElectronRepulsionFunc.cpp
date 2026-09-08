@@ -35,7 +35,9 @@
 #include "SimdThreeCenterElectronRepulsionFunc.hpp"
 
 #include <array>
+#include <string>
 
+#include "ErrorHandler.hpp"
 #include "TensorComponents.hpp"
 
 namespace simdt3ceri {  // simdt3ceri namespace
@@ -51,10 +53,17 @@ compute_electron_repulsion(double               *values,
                            const CSimdMatrix    &c_coordinates) -> void
 {
     // NOTE: the kernels of the atom pairs are generated elsewhere and are not in the
-    // tree yet. Rather than stopping, this writes a value which encodes the position
-    // of every element it is responsible for, so that the layout of the values and
-    // the loops of the driver can be checked before the kernels exist. A caller which
-    // reads these as integrals gets numbers which are obviously not integrals.
+    // tree yet. Rather than stopping, this fills every element the block hands it
+    // with a value which encodes that element's position, so that the loops of the
+    // driver and the offsets of the tensor can be checked before the kernels exist.
+    // A caller which reads these as integrals gets numbers which are obviously not
+    // integrals.
+
+    // NOTE: this walks the values as one range and decomposes the index only because
+    // the encoding has to name a position. It is not the shape of a kernel: a kernel
+    // loops over the pairs of primitives, builds a buffer, contracts it and writes
+    // the values once through a transform. Nothing here anticipates that, and the
+    // only contract it keeps is to fill the elements it was handed.
 
     const auto ncomps_a =
         static_cast<size_t>(tensor::number_of_spherical_components(std::array<int, 1>{a_function.get_angular_momentum()}));
@@ -65,30 +74,26 @@ compute_electron_repulsion(double               *values,
     const auto ncomps_c =
         static_cast<size_t>(tensor::number_of_spherical_components(std::array<int, 1>{c_function.get_angular_momentum()}));
 
-    for (size_t ma = 0; ma < ncomps_a; ma++)
+    // NOTE: the three indices are packed into one number by decimal place, so a
+    // block wider than a thousand atom pairs or carrying more than a thousand atoms
+    // on c side would let them collide and the check would stop distinguishing
+    // positions. It stops here rather than reporting agreement it did not establish.
+
+    errors::assertMsgCritical(
+        (npairs < 1000) && (natoms < 1000),
+        std::string("SimdThreeCenterElectronRepulsionFunc.compute_electron_repulsion: The stub cannot encode a block this large"));
+
+    const auto nvalues = ncomps_a * ncomps_b * ncomps_c * natoms * npairs;
+
+    for (size_t n = 0; n < nvalues; n++)
     {
-        for (size_t mb = 0; mb < ncomps_b; mb++)
-        {
-            for (size_t mc = 0; mc < ncomps_c; mc++)
-            {
-                const auto icomp = (ma * ncomps_b + mb) * ncomps_c + mc;
+        const auto k = n % npairs;
 
-                for (size_t ic = 0; ic < natoms; ic++)
-                {
-                    auto *row = values + (icomp * natoms + ic) * npairs;
+        const auto ic = (n / npairs) % natoms;
 
-                    for (size_t k = 0; k < npairs; k++)
-                    {
-                        // NOTE: the components, the atom on c side and the atom pair
-                        // are packed into one number, so that a value read back names
-                        // the place it was written to.
+        const auto icomp = n / (npairs * natoms);
 
-                        row[k] = static_cast<double>(icomp) * 1.0e6 + static_cast<double>(ic) * 1.0e3 +
-                                 static_cast<double>(k);
-                    }
-                }
-            }
-        }
+        values[n] = static_cast<double>(icomp) * 1.0e6 + static_cast<double>(ic) * 1.0e3 + static_cast<double>(k);
     }
 }
 
