@@ -778,6 +778,9 @@ class ScfDriver:
             if self.restart and self.rank == mpi_master():
                 self._ref_mol_orbs = MolecularOrbitals.read_hdf5(
                     self.get_checkpoint_file())
+        else:
+            # Clear any MOs left by previous calculation, for RI-JK exchange build
+            self._molecular_orbitals = MolecularOrbitals()
 
         # nuclear repulsion energy
         self._nuc_energy = molecule.effective_nuclear_repulsion_energy(basis)
@@ -1727,6 +1730,8 @@ class ScfDriver:
 
         self._history = []
         self._scf_energy = 0.0
+        self._is_converged = False
+        self._num_iter = 0
 
         if not self._first_step:
             profiler.begin({
@@ -2262,13 +2267,12 @@ class ScfDriver:
         """
         Gracefully exits the program.
 
+        This method writes a checkpoint if needed and then exits the process.
+
         :param molecule:
             The molecule.
         :param basis:
             The basis set.
-
-        :return:
-            The return code.
         """
 
         self.ostream.print_blank()
@@ -2927,8 +2931,8 @@ class ScfDriver:
     def _comp_energy(self, fock_mat, vxc_mat, e_emb, e_pr, kin_mat, npot_mat, ecp_mat,
                      den_mat):
         """
-        Computes the sum of SCF energy components: electronic energy, kinetic
-        energy, and nuclear potential energy.
+        Computes the electronic energy from one- and two-electron contributions,
+        including XC, embedding, and pressure energy when active.
 
         :param fock_mat:
             The Fock/Kohn-Sham matrix (only 2e-part).
@@ -2986,9 +2990,9 @@ class ScfDriver:
     def _comp_full_fock(self, fock_mat, vxc_mat, V_emb, V_pr, kin_mat, npot_mat,
                         ecp_mat):
         """
-        Computes full Fock/Kohn-Sham matrix by adding to 2e-part of
-        Fock/Kohn-Sham matrix the kinetic energy and nuclear potential
-        matrices.
+        Computes the full Fock/Kohn-Sham matrix by adding one-electron,
+        exchange-correlation, embedding, and pressure contributions to the
+        2e-part of the Fock/Kohn-Sham matrix.
 
         :param fock_mat:
             The Fock/Kohn-Sham matrix (2e-part).
@@ -3548,6 +3552,9 @@ class ScfDriver:
 
         if self.ri_coulomb:
             cur_str = 'Resolution of the Identity      : RI-J'
+            self.ostream.print_header(cur_str.ljust(str_width))
+        elif self.ri_jk:
+            cur_str = 'Resolution of the Identity      : RI-JK'
             self.ostream.print_header(cur_str.ljust(str_width))
 
         if self._dft:
