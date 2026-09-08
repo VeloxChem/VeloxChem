@@ -51,6 +51,10 @@ except ImportError:
     pass
 
 
+# ----------------------------------------------------------------------
+# stage
+# ----------------------------------------------------------------------
+
 class Stage(IntEnum):
     """
     How far along the workflow a builder is, and therefore what it will do.
@@ -235,6 +239,10 @@ class MetalSiteForceFieldBuilder:
         - nodes: The number of MPI processes.
         - ostream: The output stream.
     """
+
+    # ------------------------------------------------------------------
+    # settings and state
+    # ------------------------------------------------------------------
 
     def __init__(self, comm=None, ostream=None):
         """
@@ -732,6 +740,15 @@ class MetalSiteForceFieldBuilder:
             'active_site': active_site,
         }
 
+    # ------------------------------------------------------------------
+    # edits
+    #
+    # Every edit brings the builder up to date itself, so an edit is never
+    # a request waiting for a rebuild that could be forgotten. Which way it
+    # does that is the stage: before the fit it rebuilds the site, after it
+    # it refits the terms. The individual methods do not restate this.
+    # ------------------------------------------------------------------
+
     def add_metal_bond(self,
                        resid,
                        metal,
@@ -1047,6 +1064,14 @@ class MetalSiteForceFieldBuilder:
         self._request = self._on_master(work)
         self._reapply()
 
+    # ------------------------------------------------------------------
+    # steps
+    #
+    # The pipeline's stages, usable on their own. Each drops the fit above
+    # it -- a geometry, a Hessian or a set of charges computed after a fit
+    # describes something that fit does not.
+    # ------------------------------------------------------------------
+
     def mm_optimize_active_site(self):
         """
         Relaxes the active site again, on the best force field there is.
@@ -1285,6 +1310,10 @@ class MetalSiteForceFieldBuilder:
         self._partial_charges = charges
 
         return charges
+
+    # ------------------------------------------------------------------
+    # the fit and the enzyme system
+    # ------------------------------------------------------------------
 
     def build_forcefield(self,
                          hessian=None,
@@ -1585,7 +1614,7 @@ class MetalSiteForceFieldBuilder:
                                     keepIds=True)
 
     # ------------------------------------------------------------------
-    # plumbing
+    # stage machinery
     # ------------------------------------------------------------------
 
     def _enter(self, stage):
@@ -1723,6 +1752,13 @@ class MetalSiteForceFieldBuilder:
             request=self._request if request is None else request,
             **self.detection_settings())
 
+    # ------------------------------------------------------------------
+    # MPI
+    #
+    # Cheap work runs on the master and is broadcast; the three expensive
+    # QM steps are collective. The shell owns that rule; the core does not.
+    # ------------------------------------------------------------------
+
     def _on_master(self, work):
         """
         Runs work on the master rank and hands the result to every rank.
@@ -1758,6 +1794,10 @@ class MetalSiteForceFieldBuilder:
             raise payload
 
         return payload
+
+    # ------------------------------------------------------------------
+    # state updates
+    # ------------------------------------------------------------------
 
     def _adopt_geometry(self, molecule):
         """
@@ -1831,6 +1871,10 @@ class MetalSiteForceFieldBuilder:
         modes['notes'] = notes
 
         return modes
+
+    # ------------------------------------------------------------------
+    # applying an edit
+    # ------------------------------------------------------------------
 
     def _edit_coordination(self, edit):
         """
@@ -1988,6 +2032,14 @@ class MetalSiteForceFieldBuilder:
         self._enter(Stage.FITTED)
 
         return self._forcefield
+
+    # ------------------------------------------------------------------
+    # settings assembly
+    #
+    # detection_settings and fit_settings are public because the manager
+    # reads them: splatting the same dictionary into both a run and a
+    # comparison is what stops the two drifting on what a cutoff means.
+    # ------------------------------------------------------------------
 
     def _manual_equilibria(self):
         """

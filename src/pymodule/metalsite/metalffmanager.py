@@ -137,6 +137,10 @@ class MetalForceFieldManager:
         - ostream: The output stream.
     """
 
+    # ------------------------------------------------------------------
+    # constants
+    # ------------------------------------------------------------------
+
     # The geometry a run leaves behind, in the order it is looked for. Which
     # of them a template is allowed to be built from is what the fallback
     # argument of load_template_from_folder decides.
@@ -300,6 +304,10 @@ class MetalForceFieldManager:
         """
 
         return self._built_from
+
+    # ------------------------------------------------------------------
+    # templates
+    # ------------------------------------------------------------------
 
     def load_template_from_folder(self, folder, name=None, fallback=None):
         """
@@ -825,6 +833,14 @@ class MetalForceFieldManager:
 
         self.ostream.flush()
 
+    # ------------------------------------------------------------------
+    # description
+    #
+    # A described site is the query and the template in one vocabulary:
+    # a coarse residue graph, a heavy atom map and a formula per node.
+    # Both the comparison and the shoehorning read it.
+    # ------------------------------------------------------------------
+
     @staticmethod
     def _graph(labels, edges, cap_indices):
         """
@@ -1061,6 +1077,10 @@ class MetalForceFieldManager:
 
         return spec
 
+    # ------------------------------------------------------------------
+    # comparison
+    # ------------------------------------------------------------------
+
     def compare_active_site(self,
                             active_site=None,
                             mm_opt=True,
@@ -1214,6 +1234,10 @@ class MetalForceFieldManager:
         self._print_comparison(results)
 
         return self._select_template(None)['name'] is not None
+
+    # ------------------------------------------------------------------
+    # selection
+    # ------------------------------------------------------------------
 
     def _select_template(self, template=None):
         """
@@ -1528,6 +1552,13 @@ class MetalForceFieldManager:
                                      ostream=self.ostream)
 
         return forcefield
+
+    # ------------------------------------------------------------------
+    # shoehorning
+    #
+    # Walks a site onto a template by editing it through the builder's
+    # own public edit methods, and restores the request on any failure.
+    # ------------------------------------------------------------------
 
     def shoehorn(self, template, max_include_radius=7.0):
         """
@@ -2841,6 +2872,13 @@ class MetalForceFieldManager:
             'label': f'{core.residue_label(atom.residue)} {atom.name}',
         }
 
+    # ------------------------------------------------------------------
+    # verdicts
+    #
+    # What the comparison is judged by, and the crude relaxation it is
+    # judged after.
+    # ------------------------------------------------------------------
+
     def _selection_criteria(self):
         """
         Resolves the criteria a template is held to, as selection_criteria
@@ -3026,6 +3064,10 @@ class MetalForceFieldManager:
             max_iterations=builder.mm_max_iterations,
             bond_change_warning=builder.mm_bond_change_warning,
             ostream=self.ostream)
+
+    # ------------------------------------------------------------------
+    # matching
+    # ------------------------------------------------------------------
 
     def _coarse_mappings(self, template, query, match_protonation=True):
         """
@@ -3264,6 +3306,10 @@ class MetalForceFieldManager:
                 atom_map.update(dict(zip(ours, best[1])))
 
         return atom_map
+
+    # ------------------------------------------------------------------
+    # measurement
+    # ------------------------------------------------------------------
 
     def _rmsd_indices(self, template, region, heavy_only=None):
         """
@@ -3556,6 +3602,10 @@ class MetalForceFieldManager:
         return core.get_metal_keys(template['forcefield'],
                                    {'metal_indices': template['metal_indices']})
 
+    # ------------------------------------------------------------------
+    # transfer
+    # ------------------------------------------------------------------
+
     def _template_connectivity(self, template, mapping, active_site):
         """
         Wires a site's metal center exactly as the template wires its own.
@@ -3811,6 +3861,10 @@ class MetalForceFieldManager:
         params['comment'] = f'{comment} (template {name})'.strip()
 
         return params
+
+    # ------------------------------------------------------------------
+    # printing
+    # ------------------------------------------------------------------
 
     def _print_shoehorn_header(self, builder, template, max_include_radius):
         """
