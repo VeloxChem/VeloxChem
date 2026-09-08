@@ -34,17 +34,9 @@
 
 #include "SimdOverlapFunc.hpp"
 
-#include <algorithm>
 #include <string>
 
 #include "ErrorHandler.hpp"
-#include "SimdOverlapRecSS.hpp"
-#include "SimdOverlapRecSLP.hpp"
-#include "SimdOverlapRecSLD.hpp"
-#include "SimdOverlapRecSLF.hpp"
-#include "SimdOverlapRecSLG.hpp"
-#include "SimdOverlapRecSLH.hpp"
-#include "SimdOverlapRecSLI.hpp"
 
 namespace simdovl {  // simdovl namespace
 
@@ -56,76 +48,11 @@ compute_overlap(double               *values,
                 const CSimdMatrix    &coordinates,
                 const double          threshold) -> void
 {
-    const auto lbra = bra.get_angular_momentum();
-
-    const auto lket = ket.get_angular_momentum();
-
-    if ((lbra == 0) && (lket == 0))
-    {
-        compute_ss_overlap(values, nvalues, bra, ket, coordinates, threshold);
-
-        return;
-    }
-
-    // NOTE: a combination of one basis function of zero angular momentum and one of
-    // higher angular momentum is computed by a single kernel in either order, as the
-    // harmonic is the same polynomial of the vector between the atoms either way and
-    // the orders differ only in the prefactor.
-
-    const auto lmin = std::min(lbra, lket);
-
-    const auto lmax = std::max(lbra, lket);
-
-    if (lmin == 0)
-    {
-        if (lmax == 1)
-        {
-            compute_slp_overlap(values, nvalues, bra, ket, coordinates, threshold);
-
-            return;
-        }
-
-        if (lmax == 2)
-        {
-            compute_sld_overlap(values, nvalues, bra, ket, coordinates, threshold);
-
-            return;
-        }
-
-        if (lmax == 3)
-        {
-            compute_slf_overlap(values, nvalues, bra, ket, coordinates, threshold);
-
-            return;
-        }
-
-        if (lmax == 4)
-        {
-            compute_slg_overlap(values, nvalues, bra, ket, coordinates, threshold);
-
-            return;
-        }
-
-        if (lmax == 5)
-        {
-            compute_slh_overlap(values, nvalues, bra, ket, coordinates, threshold);
-
-            return;
-        }
-
-        if (lmax == 6)
-        {
-            compute_sli_overlap(values, nvalues, bra, ket, coordinates, threshold);
-
-            return;
-        }
-
-    }
-
-    // NOTE: the kernels of the remaining combinations of basis functions are being
-    // rewritten, so they are not computed here. A combination stops rather than
-    // leaving the values of the sparsity pattern unwritten, which is what a caller
-    // would otherwise read as integrals.
+    // NOTE: the kernels of the off-diagonal atom pair blocks are generated
+    // elsewhere and are not in the tree, so no combination of basis functions is
+    // computed here. The combination stops rather than leaving the values of the
+    // sparsity pattern unwritten, which is what a caller would otherwise read as
+    // integrals.
 
     errors::assertMsgCritical(false, std::string("SimdOverlapFunc.compute_overlap: Overlap integrals are not implemented"));
 }

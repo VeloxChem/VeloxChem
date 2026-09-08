@@ -40,35 +40,10 @@
 #include <string>
 #include <vector>
 
-#include "BasisFunction.hpp"
 #include "ErrorHandler.hpp"
 #include "SimdMatrix.hpp"
 
 namespace simdfunc {  // simdfunc namespace
-
-/// @brief The data of one pair of primitives of the basis functions on bra and
-/// ket sides which reaches at least one atom pair.
-/// @note The exponents and the normalization factors are passed by value, as the
-/// accumulation of a pair of primitives reads each of them a handful of times and
-/// forms its prefactors from them before the loop over the atom pairs.
-struct CPrimitivePair
-{
-    /// @brief The exponent of the primitive on bra side.
-    double aexp;
-
-    /// @brief The exponent of the primitive on ket side.
-    double bexp;
-
-    /// @brief The normalization factor of the primitive on bra side.
-    double anorm;
-
-    /// @brief The normalization factor of the primitive on ket side.
-    double bnorm;
-
-    /// @brief The number of atom pairs the pair of primitives reaches, which is
-    /// the number of leading columns of the accumulation buffer it contributes to.
-    size_t ncols;
-};
 
 /// @brief Creates the buffer the pairs of primitives accumulate their
 /// contributions in.
@@ -99,50 +74,6 @@ make_primitive_buffer(const std::vector<size_t> &dimensions, const size_t nrows)
     matrix.zero();
 
     return matrix;
-}
-
-/// @brief Accumulates the contribution of every pair of primitives which reaches
-/// at least one atom pair.
-/// @param bra The basis function on bra side.
-/// @param ket The basis function on ket side.
-/// @param dimensions The number of atom pairs each pair of primitives reaches,
-/// with the primitives on bra side as the slowest running index.
-/// @param accumulate The accumulation of one pair of primitives, called as
-/// accumulate(pair) with the data of the pair of primitives.
-/// @note The pairs of primitives which reach no atom pair are skipped rather than
-/// passed on with a length of zero, so the accumulation is never called with an
-/// empty loop to run.
-template <typename F>
-inline auto
-accumulate_primitives(const CBasisFunction &bra, const CBasisFunction &ket, const std::vector<size_t> &dimensions,
-                      const F &accumulate) -> void
-{
-    const auto &a_exps = bra.exponents();
-
-    const auto &b_exps = ket.exponents();
-
-    const auto &a_norms = bra.normalization_factors();
-
-    const auto &b_norms = ket.normalization_factors();
-
-    const auto nprim_a = a_exps.size();
-
-    const auto nprim_b = b_exps.size();
-
-    errors::assertMsgCritical(dimensions.size() == nprim_a * nprim_b,
-                              std::string("SimdPrimitives.accumulate_primitives: Dimensions do not match the pairs of primitives"));
-
-    for (size_t i = 0; i < nprim_a; i++)
-    {
-        for (size_t j = 0; j < nprim_b; j++)
-        {
-            const auto ncols = dimensions[i * nprim_b + j];
-
-            if (ncols == 0) continue;
-
-            accumulate(CPrimitivePair{a_exps[i], b_exps[j], a_norms[i], b_norms[j], ncols});
-        }
-    }
 }
 
 }  // namespace simdfunc

@@ -2,20 +2,6 @@ target_sources(vlxobjs
   PRIVATE
     SimdOverlapDriver.cpp
     SimdOverlapFunc.cpp
-    SimdOverlapPrimRecSLD.cpp
-    SimdOverlapPrimRecSLF.cpp
-    SimdOverlapPrimRecSLG.cpp
-    SimdOverlapPrimRecSLH.cpp
-    SimdOverlapPrimRecSLI.cpp
-    SimdOverlapPrimRecSLP.cpp
-    SimdOverlapPrimRecSS.cpp
-    SimdOverlapRecSLD.cpp
-    SimdOverlapRecSLF.cpp
-    SimdOverlapRecSLG.cpp
-    SimdOverlapRecSLH.cpp
-    SimdOverlapRecSLI.cpp
-    SimdOverlapRecSLP.cpp
-    SimdOverlapRecSS.cpp
   )
 
 target_include_directories(vlxobjs
