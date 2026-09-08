@@ -934,7 +934,7 @@ class ScfDriver:
                         lines = fh.read().strip().splitlines()
                         try:
                             npoints = int(lines[0].strip())
-                        except (ValueError, TypeError):
+                        except (ValueError, TypeError, IndexError):
                             assert_msg_critical(
                                 False, 'potfile: Invalid number of points')
                         assert_msg_critical(

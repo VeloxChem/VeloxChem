@@ -102,6 +102,22 @@ class TestPointCharges:
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason='requires standard single-process assertions')
+    def test_empty_point_charge_file_raises(self, tmp_path):
+
+        mol, bas = self.get_molecule_and_basis()
+        potfile = tmp_path / 'empty_point_charges.pot'
+        potfile.write_text('')
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.point_charges = str(potfile)
+        scf_drv.ostream.mute()
+
+        with pytest.raises(VeloxChemError,
+                           match='potfile: Invalid number of points'):
+            scf_drv.compute(mol, bas)
+
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='requires standard single-process assertions')
     def test_invalid_qm_vdw_line_raises(self, tmp_path):
 
         mol, bas = self.get_molecule_and_basis()
