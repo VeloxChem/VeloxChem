@@ -404,44 +404,6 @@ def _site_index_map(active_site):
     }
 
 
-def broadcast_forcefield(forcefield, comm=None, ostream=None):
-    """
-    Hands a force field generator from the master rank to every other one.
-
-    A generator cannot be pickled: it owns an output stream, and a stream
-    around sys.stdout does not survive the crossing. The stream is
-    therefore set aside for the trip and put back on both sides, which
-    keeps everything the JSON on disk leaves out - the pairs, the
-    connectivity matrix and the atom type tables.
-
-    :param forcefield:
-        The force field on the master rank, ignored elsewhere.
-    :param comm:
-        The MPI communicator.
-    :param ostream:
-        The output stream to attach to the generator on arrival.
-
-    :return:
-        The force field, on every rank.
-    """
-
-    comm = MPI.COMM_WORLD if comm is None else comm
-
-    if comm.Get_size() == 1:
-        return forcefield
-
-    stream = None
-    if comm.Get_rank() == mpi_master():
-        stream = forcefield.ostream
-        forcefield.ostream = None
-
-    forcefield = comm.bcast(forcefield, root=mpi_master())
-
-    forcefield.ostream = stream if stream is not None else _stream(ostream)
-
-    return forcefield
-
-
 # ----------------------------------------------------------------------
 # loading
 # ----------------------------------------------------------------------

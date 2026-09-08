@@ -1956,6 +1956,42 @@ class MetalSiteForceFieldBuilder:
 
         return payload
 
+    def _broadcast_forcefield(self, forcefield):
+        """
+        Hands a force field generator from the master rank to every other one.
+
+        A generator cannot be pickled: it owns an output stream, and a stream
+        around sys.stdout does not survive the crossing. The stream is
+        therefore set aside for the trip and put back on both sides, which
+        keeps everything the JSON on disk leaves out - the pairs, the
+        connectivity matrix and the atom type tables.
+
+        The mirror of _on_master, and here for the same reason it is: the
+        shell owns the MPI rule, so the one rank-aware helper the core held
+        belongs on this side of the line. The core builds no driver for it and
+        nothing else called it.
+
+        :param forcefield:
+            The force field on the master rank, ignored elsewhere.
+
+        :return:
+            The force field, on every rank.
+        """
+
+        if self.nodes == 1:
+            return forcefield
+
+        stream = None
+        if self.rank == mpi_master():
+            stream = forcefield.ostream
+            forcefield.ostream = None
+
+        forcefield = self.comm.bcast(forcefield, root=mpi_master())
+
+        forcefield.ostream = stream if stream is not None else self.ostream
+
+        return forcefield
+
     def _fit_and_broadcast(self, hessian, charges):
         """
         Fits the metal terms on one rank and hands the force field to every
@@ -1964,7 +2000,7 @@ class MetalSiteForceFieldBuilder:
         The fit itself is cheap and is kept off the collectives inside the
         generator, so it runs on the master alone. MMForceFieldGenerator does
         not pickle on its own -- it owns an output stream -- which is why the
-        crossing goes through core.broadcast_forcefield rather than a plain
+        crossing goes through _broadcast_forcefield rather than a plain
         bcast.
 
         Shared by the first fit and by every refit after a bond edit, so the
@@ -1996,9 +2032,7 @@ class MetalSiteForceFieldBuilder:
                                          ostream=self.ostream)
             self._write_run_artifacts(forcefield, hessian, charges)
 
-        self._forcefield = core.broadcast_forcefield(forcefield,
-                                                     comm=self.comm,
-                                                     ostream=self.ostream)
+        self._forcefield = self._broadcast_forcefield(forcefield)
         self._adopted_forcefield = False
 
         # The weak bridge pruning is the one step that can decide a metal
