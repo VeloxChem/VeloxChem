@@ -37,6 +37,15 @@
 #include <string>
 
 #include "ErrorHandler.hpp"
+#include "SimdOverlapRecSS.hpp"
+#include "SimdOverlapRecSP.hpp"
+#include "SimdOverlapRecSD.hpp"
+#include "SimdOverlapRecPS.hpp"
+#include "SimdOverlapRecPP.hpp"
+#include "SimdOverlapRecPD.hpp"
+#include "SimdOverlapRecDS.hpp"
+#include "SimdOverlapRecDP.hpp"
+#include "SimdOverlapRecDD.hpp"
 
 namespace simdovl {  // simdovl namespace
 
@@ -48,11 +57,80 @@ compute_overlap(double               *values,
                 const CSimdMatrix    &coordinates,
                 const double          threshold) -> void
 {
-    // NOTE: the kernels of the off-diagonal atom pair blocks are generated
-    // elsewhere and are not in the tree, so no combination of basis functions is
-    // computed here. The combination stops rather than leaving the values of the
-    // sparsity pattern unwritten, which is what a caller would otherwise read as
-    // integrals.
+    const auto lbra = bra.get_angular_momentum();
+
+    const auto lket = ket.get_angular_momentum();
+
+    // NOTE: the two orders of a combination are separate kernels, as the recurrence
+    // builds the angular momentum on ket side and transfers it to bra side, so the
+    // work differs with the order even where the integrals do not.
+
+    if ((lbra == 0) && (lket == 0))
+    {
+        compute_ss_overlap(values, nvalues, bra, ket, coordinates, threshold);
+
+        return;
+    }
+
+    if ((lbra == 0) && (lket == 1))
+    {
+        compute_sp_overlap(values, nvalues, bra, ket, coordinates, threshold);
+
+        return;
+    }
+
+    if ((lbra == 0) && (lket == 2))
+    {
+        compute_sd_overlap(values, nvalues, bra, ket, coordinates, threshold);
+
+        return;
+    }
+
+    if ((lbra == 1) && (lket == 0))
+    {
+        compute_ps_overlap(values, nvalues, bra, ket, coordinates, threshold);
+
+        return;
+    }
+
+    if ((lbra == 1) && (lket == 1))
+    {
+        compute_pp_overlap(values, nvalues, bra, ket, coordinates, threshold);
+
+        return;
+    }
+
+    if ((lbra == 1) && (lket == 2))
+    {
+        compute_pd_overlap(values, nvalues, bra, ket, coordinates, threshold);
+
+        return;
+    }
+
+    if ((lbra == 2) && (lket == 0))
+    {
+        compute_ds_overlap(values, nvalues, bra, ket, coordinates, threshold);
+
+        return;
+    }
+
+    if ((lbra == 2) && (lket == 1))
+    {
+        compute_dp_overlap(values, nvalues, bra, ket, coordinates, threshold);
+
+        return;
+    }
+
+    if ((lbra == 2) && (lket == 2))
+    {
+        compute_dd_overlap(values, nvalues, bra, ket, coordinates, threshold);
+
+        return;
+    }
+
+    // NOTE: the kernels are generated up to angular momentum two, so a combination
+    // above it stops rather than leaving the values of the sparsity pattern
+    // unwritten, which is what a caller would otherwise read as integrals.
 
     errors::assertMsgCritical(false, std::string("SimdOverlapFunc.compute_overlap: Overlap integrals are not implemented"));
 }

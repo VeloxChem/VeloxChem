@@ -77,6 +77,35 @@ make_primitive_buffer(const std::vector<size_t> &dimensions, const size_t nrows)
     return matrix;
 }
 
+/// @brief Adds the contribution of one pair of primitives to the contracted rows
+/// of the buffer.
+/// @param buffer The buffer of the combination of basis functions.
+/// @param target The first of the contracted rows to add to.
+/// @param source The first of the rows of the pair of primitives to add.
+/// @param nrows The number of rows to add.
+/// @param ncols The number of atom pairs the pair of primitives reaches.
+/// @note The rows of a pair of primitives are written over for every pair, while
+/// the contracted rows accumulate across them, which is why make_primitive_buffer
+/// zeroes the buffer: the first pair adds to rows nothing has written.
+/// @note The rows of the buffer start at a cache line boundary, so the loop is
+/// vectorized with aligned loads and stores.
+inline auto
+contract_primitives(CSimdMatrix &buffer, const size_t target, const size_t source, const size_t nrows, const size_t ncols) -> void
+{
+    for (size_t r = 0; r < nrows; r++)
+    {
+        auto *dst = buffer.data(target + r);
+
+        const auto *src = buffer.data(source + r);
+
+#pragma omp simd aligned(dst, src : simd::cache_line_size())
+        for (size_t k = 0; k < ncols; k++)
+        {
+            dst[k] += src[k];
+        }
+    }
+}
+
 /// @brief Computes the displacement of the Gaussian product center from the atom
 /// on bra side, for one pair of primitives.
 /// @param buffer The buffer of the pair of primitives.
