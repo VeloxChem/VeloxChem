@@ -898,11 +898,9 @@ def _load_gibbs_from_h5(path: str) -> GibbsResult:
 def _save_to_h5(path: str, result: GibbsResult) -> None:
     """Persist a GibbsResult to HDF5 from MPI rank 0 only.
 
-    Deliberately NO MPI barrier here.  A barrier immediately after a rank-0
-    HDF5 write can hide the real failure point on multi-node runs: the other
-    ranks wait forever while rank 0 is still in filesystem/HDF5 finalisation.
-    State HDF5 writes are now queued and flushed after the expensive MPI
-    ET-state calculations have returned, so M can hand off cleanly to M+.
+    Non-rank-0 MPI processes return immediately, so all ranks may call this
+    helper safely but only rank 0 touches the HDF5 file. There is deliberately
+    no MPI barrier here.
     """
     if not _is_rank0():
         return
@@ -1622,6 +1620,7 @@ class RedoxCalculator:
         temperature: float = 298.15,
         ri_jk: bool = True,
         sp_dispersion: bool = True,
+
     ) -> None:
         self.output_folder = output_folder
         self.basis_opt = basis_opt
@@ -2692,13 +2691,25 @@ class RedoxCalculator:
 
         for i, si in enumerate(labels):
             if si in BOND_CUTOFF:
-                basic_atoms.append(i)
                 cutoff = BOND_CUTOFF[si]
 
+                bound_H = []
                 for j, sj in enumerate(labels):
                     if sj == "H":
                         if float(np.linalg.norm(coords[i] - coords[j])) < cutoff:
                             acidic_H.append(j)
+                            bound_H.append(j)
+
+                # Protonation-site rule:
+                # - O atoms that already have H attached are treated as acidic O-H
+                #   sites only, not as basic protonation sites. This avoids trying
+                #   to make carboxylic-acid/alcohol/phenol OH2+ starting structures.
+                # - N/S/P atoms are still allowed as basic sites even if they already
+                #   carry H, so N-H -> NH2+ remains possible.
+                if si == "O" and bound_H:
+                    continue
+
+                basic_atoms.append(i)
 
         acidic_H = sorted(set(acidic_H))
         basic_atoms = sorted(set(basic_atoms))
@@ -2952,6 +2963,8 @@ class RedoxCalculator:
         scf_opt.conv_thresh = 1e-5
         scf_opt.dispersion  = True
         scf_opt.grid_level  = 4
+        scf_opt.solvation_model = 'cpcm'
+        scf_opt.cpcm_epsilon = self.conformer_cpcm_epsilon
         # Do not assign a VeloxChem checkpoint/output file name to the
         # optimizer driver. On 2-node runs this can hang during finalization.
         # The final state HDF5 is written explicitly by _save_to_h5() on
@@ -3204,16 +3217,12 @@ class RedoxCalculator:
 
             h5_path = os.path.join(self.output_folder, f"{file_name_base}.h5")
 
-            # Do not write the state HDF5 before returning to the ET-state loop.
-            # The expected healthy output is:
-            #   M solvent/vacuum SP finishes -> [M+] Conformer combinations
-            # not:
-            #   M finishes -> ranks wait in HDF5/barrier before M+ starts.
-            if _is_rank0():
-                if not hasattr(self, "_pending_h5_writes"):
-                    self._pending_h5_writes = []
-                self._pending_h5_writes.append((h5_path, result))
-                log.info("  [%s] Queued HDF5 write: %s", label, h5_path)
+            # Save immediately after this state is complete.
+            # _save_to_h5() is rank-0-only, so all ranks may call it safely,
+            # but only MPI rank 0 touches the HDF5 file.
+            _status("  [%s] HDF5 write starting: %s", label, h5_path)
+            _save_to_h5(h5_path, result)
+            _status("  [%s] HDF5 write done: %s", label, h5_path)
 
             log.info("compute_gibbs done: %s  G = %.6f au", label, g_total)
             _status("  [%s] compute_gibbs returned; next ET state may start now", label)
@@ -3229,29 +3238,6 @@ class RedoxCalculator:
                 raise
             return None
 
-    def _flush_pending_h5_writes(self) -> None:
-        """Write queued state HDF5 files from rank 0, without MPI barriers."""
-        if not _is_rank0():
-            return
-
-        pending = getattr(self, "_pending_h5_writes", [])
-        if not pending:
-            return
-
-        log.info("Flushing %d queued state HDF5 file(s).", len(pending))
-        _print0(f"Flushing {len(pending)} queued state HDF5 file(s).")
-
-        still_pending = []
-        for h5_path, result in pending:
-            try:
-                log.info("HDF5 write start: %s", h5_path)
-                _save_to_h5(h5_path, result)
-                log.info("HDF5 write done: %s", h5_path)
-            except Exception as exc:
-                log.error("HDF5 write failed for %s: %s", h5_path, exc)
-                still_pending.append((h5_path, result))
-
-        self._pending_h5_writes = still_pending
 
     # ------------------------------------------------------------------
     # Full thermodynamic profile
@@ -3422,9 +3408,8 @@ class RedoxCalculator:
             if g_ox is not None:
                 profile.pKa_M_plus = self.pka(g_acid=g_ox, g_base=g_mdr)
 
-        # HDF5 writes are intentionally deferred until after ET/PCET state
-        # transitions, so the output can reach M+ and M- immediately after M.
-        self._flush_pending_h5_writes()
+        # HDF5 files are written immediately at the end of each successful
+        # compute_gibbs() call, so there is no deferred write queue to flush here.
 
         self._print_summary(profile, label=mol_label)
         return profile
