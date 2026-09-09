@@ -37,6 +37,8 @@
 
 #include <array>
 #include <cstddef>
+#include <map>
+#include <ranges>
 #include <vector>
 
 #include "AtomBasisTripleSparsity.hpp"
@@ -68,6 +70,26 @@
 /// computed one after another.
 class CSimdThreeCenterElectronRepulsionDriver
 {
+    /// @brief One combination of basis functions of one block, which is the unit of
+    /// work the threads draw on.
+    struct TTripleTask
+    {
+        /// @brief The index of the block among the blocks of the pattern.
+        size_t iblock;
+
+        /// @brief The index of the basis function on a side within its atom basis.
+        size_t i;
+
+        /// @brief The index of the basis function on b side within its atom basis.
+        size_t j;
+
+        /// @brief The index of the basis function on c side within its atom basis.
+        size_t k;
+
+        /// @brief The number of atom pairs the combination reaches.
+        size_t npairs;
+    };
+
    public:
     /// @brief The default constructor.
     CSimdThreeCenterElectronRepulsionDriver() = default;
@@ -176,29 +198,47 @@ CSimdThreeCenterElectronRepulsionDriver::compute(const CTripleSparsityPattern &p
 
     sparsity::check_triple_pattern(pattern, indices, aux_indices);
 
-    const auto nblocks = static_cast<int>(pattern.number_of_blocks());
+    const auto nblocks = static_cast<size_t>(pattern.number_of_blocks());
 
-    // NOTE: the blocks are independent, as each of them forms its own coordinates and
-    // hands the distributor the values of its own combinations of basis functions,
-    // which no other block addresses. Dynamic scheduling is used as the blocks differ
-    // in the number of the combinations and in the atoms they carry on c side.
+    if (nblocks == 0) return;
 
-#pragma omp parallel for schedule(dynamic) if (nblocks > 1)
-    for (int iblk = 0; iblk < nblocks; iblk++)
+    // NOTE: the unit of work is one combination of basis functions of one block and
+    // not one block. A block is what the sparsity and the storage are described in
+    // and it carries a fixed cost, so it cannot be made small enough to feed a large
+    // machine, while the combinations of a block are the product of the basis
+    // functions of its three atom bases and are many. Each of them writes its own
+    // values and reads the coordinates of its block without changing them, so they
+    // are independent of one another. See the overlap driver.
+
+    // NOTE: the blocks are drawn from the largest to the smallest, and within a block
+    // the combinations from the most costly to the least, so that a costly task is
+    // taken while there is still work to fill the other threads with. The cost of a
+    // block is estimated from its atom pairs and the atoms it carries on c side,
+    // which needs no walk over its combinations.
+
+    std::vector<size_t> border(nblocks);
+
+    std::ranges::copy(std::views::iota(size_t{0}, nblocks), border.begin());
+
+    std::ranges::sort(border, [&](const size_t a, const size_t b) {
+        return pattern.block(a).number_of_pairs() * pattern.block(a).number_of_c_atoms() >
+               pattern.block(b).number_of_pairs() * pattern.block(b).number_of_c_atoms();
+    });
+
+    // NOTE: the order of the combinations by cost belongs to the triple of atom bases
+    // and not to the block, as the components and the primitives of a combination are
+    // properties of its three basis functions. It is therefore formed once for every
+    // triple the blocks draw on, and not once per block.
+
+    std::map<std::array<int, 3>, std::vector<std::array<size_t, 3>>> orders;
+
+    for (size_t iblk = 0; iblk < nblocks; iblk++)
     {
-        const auto &block = pattern.block(static_cast<size_t>(iblk));
+        const auto &block = pattern.block(iblk);
 
-        const auto natoms = block.number_of_c_atoms();
+        const auto key = std::array<int, 3>{block.a_index(), block.b_index(), block.c_index()};
 
-        if ((block.number_of_pairs() == 0) || (natoms == 0)) continue;
-
-        // NOTE: the coordinates of the atom pairs and of the atoms on c side are
-        // created once for the whole block, as all combinations of basis functions of
-        // the block share them.
-
-        const auto coordinates = simdfunc::make_coordinates(block, molecule);
-
-        const auto c_coordinates = _make_c_coordinates(block, molecule);
+        if (orders.contains(key)) continue;
 
         const auto &a_basis = basis.basis_set(block.a_index());
 
@@ -212,6 +252,10 @@ CSimdThreeCenterElectronRepulsionDriver::compute(const CTripleSparsityPattern &p
 
         const auto &c_index = aux_indices[static_cast<size_t>(block.c_index())];
 
+        std::vector<std::array<size_t, 3>> combinations;
+
+        std::vector<double> weights;
+
         for (size_t i = 0; i < a_index.size(); i++)
         {
             for (size_t j = 0; j < b_index.size(); j++)
@@ -224,30 +268,131 @@ CSimdThreeCenterElectronRepulsionDriver::compute(const CTripleSparsityPattern &p
 
                     const auto [lc, kc] = c_index[k];
 
-                    const auto npairs = block.number_of_pairs(la, ia, lb, jb, lc, kc);
-
-                    if (npairs == 0) continue;
-
                     const auto ncomps =
-                        static_cast<size_t>(tensor::number_of_spherical_components(std::array<int, 3>{la, lb, lc}));
+                        static_cast<double>(tensor::number_of_spherical_components(std::array<int, 3>{la, lb, lc}));
 
-                    auto *values = distributor.target(
-                        block, static_cast<size_t>(iblk), la, ia, lb, jb, lc, kc, npairs, natoms, ncomps);
+                    const auto nprims = static_cast<double>(a_basis.functions()[i].exponents().size() *
+                                                            b_basis.functions()[j].exponents().size() *
+                                                            c_basis.functions()[k].exponents().size());
 
-                    simdt3ceri::compute_electron_repulsion(values,
-                                                           npairs,
-                                                           natoms,
-                                                           a_basis.functions()[i],
-                                                           b_basis.functions()[j],
-                                                           c_basis.functions()[k],
-                                                           coordinates,
-                                                           c_coordinates,
-                                                           pattern.get_threshold());
+                    combinations.push_back({i, j, k});
 
-                    distributor.commit(
-                        block, static_cast<size_t>(iblk), la, ia, lb, jb, lc, kc, npairs, natoms, ncomps);
+                    weights.push_back(ncomps * nprims);
                 }
             }
+        }
+
+        std::vector<size_t> perm(combinations.size());
+
+        std::ranges::copy(std::views::iota(size_t{0}, combinations.size()), perm.begin());
+
+        std::ranges::sort(perm, [&](const size_t a, const size_t b) { return weights[a] > weights[b]; });
+
+        std::vector<std::array<size_t, 3>> sorted;
+
+        sorted.reserve(perm.size());
+
+        for (const auto m : perm) sorted.push_back(combinations[m]);
+
+        orders.emplace(key, std::move(sorted));
+    }
+
+    // NOTE: a combination which reaches no atom pair is left out here rather than
+    // skipped in the loop, so that every task the threads draw carries work.
+
+    std::vector<TTripleTask> tasks;
+
+    for (const auto iblk : border)
+    {
+        const auto &block = pattern.block(iblk);
+
+        if ((block.number_of_pairs() == 0) || (block.number_of_c_atoms() == 0)) continue;
+
+        const auto &a_index = indices[static_cast<size_t>(block.a_index())];
+
+        const auto &b_index = indices[static_cast<size_t>(block.b_index())];
+
+        const auto &c_index = aux_indices[static_cast<size_t>(block.c_index())];
+
+        for (const auto [i, j, k] : orders.at({block.a_index(), block.b_index(), block.c_index()}))
+        {
+            const auto [la, ia] = a_index[i];
+
+            const auto [lb, jb] = b_index[j];
+
+            const auto [lc, kc] = c_index[k];
+
+            if (const auto npairs = block.number_of_pairs(la, ia, lb, jb, lc, kc); npairs > 0)
+            {
+                tasks.push_back({iblk, i, j, k, npairs});
+            }
+        }
+    }
+
+    const auto ntasks = static_cast<int>(tasks.size());
+
+    if (ntasks == 0) return;
+
+    // NOTE: the coordinates of a block are formed before the tasks are drawn and not
+    // inside a task, as the combinations of a block are computed by different threads
+    // and all of them read the same coordinates.
+
+    std::vector<CSimdMatrix> coordinates(nblocks);
+
+    std::vector<CSimdMatrix> c_coordinates(nblocks);
+
+    const auto nblk = static_cast<int>(nblocks);
+
+#pragma omp parallel if (ntasks > 1)
+    {
+#pragma omp for schedule(dynamic)
+        for (int iblk = 0; iblk < nblk; iblk++)
+        {
+            const auto &block = pattern.block(static_cast<size_t>(iblk));
+
+            if ((block.number_of_pairs() == 0) || (block.number_of_c_atoms() == 0)) continue;
+
+            coordinates[static_cast<size_t>(iblk)] = simdfunc::make_coordinates(block, molecule);
+
+            c_coordinates[static_cast<size_t>(iblk)] = _make_c_coordinates(block, molecule);
+        }
+
+#pragma omp for schedule(dynamic)
+        for (int itask = 0; itask < ntasks; itask++)
+        {
+            const auto &task = tasks[static_cast<size_t>(itask)];
+
+            const auto &block = pattern.block(task.iblock);
+
+            const auto natoms = block.number_of_c_atoms();
+
+            const auto &a_basis = basis.basis_set(block.a_index());
+
+            const auto &b_basis = basis.basis_set(block.b_index());
+
+            const auto &c_basis = aux_basis.basis_set(block.c_index());
+
+            const auto [la, ia] = indices[static_cast<size_t>(block.a_index())][task.i];
+
+            const auto [lb, jb] = indices[static_cast<size_t>(block.b_index())][task.j];
+
+            const auto [lc, kc] = aux_indices[static_cast<size_t>(block.c_index())][task.k];
+
+            const auto ncomps = static_cast<size_t>(tensor::number_of_spherical_components(std::array<int, 3>{la, lb, lc}));
+
+            auto *values = distributor.target(block, task.iblock, la, ia, lb, jb, lc, kc, task.npairs, natoms, ncomps);
+
+            simdt3ceri::compute_electron_repulsion(values,
+                                                   task.npairs,
+                                                   natoms,
+                                                   a_basis.functions()[task.i],
+                                                   b_basis.functions()[task.j],
+                                                   c_basis.functions()[task.k],
+                                                   coordinates[task.iblock],
+                                                   c_coordinates[task.iblock],
+                                                   pattern.get_threshold());
+
+            distributor.commit(block, task.iblock, la, ia, lb, jb, lc, kc, task.npairs, natoms, ncomps);
         }
     }
 }
