@@ -59,6 +59,20 @@
 /// for, unlike their overlap, so the driver takes one molecular basis alone.
 class CSimdTwoCenterElectronRepulsionDriver
 {
+    /// @brief One combination of basis functions of one block, which is the unit of
+    /// work the threads draw on.
+    struct TPairTask
+    {
+        /// @brief The index of the block among the blocks of atom pairs.
+        size_t iblock;
+
+        /// @brief The index of the basis function on bra side within its atom basis.
+        size_t i;
+
+        /// @brief The index of the basis function on ket side within its atom basis.
+        size_t j;
+    };
+
    public:
     /// @brief The constructor with target block size.
     /// @param block_size The target number of atom pairs of a block, or zero to
