@@ -49,6 +49,7 @@
 #include "SimdCoordinates.hpp"
 #include "SimdMatrix.hpp"
 #include "SimdT3CDistributor.hpp"
+#include "SimdThreeCenterElectronRepulsionBufferRows.hpp"
 #include "SimdThreeCenterElectronRepulsionFunc.hpp"
 #include "SparseTensor.hpp"
 #include "TripleSparsityPattern.hpp"
@@ -216,6 +217,27 @@ CSimdThreeCenterElectronRepulsionDriver::compute(const CTripleSparsityPattern &p
     // block is estimated from its atom pairs and the atoms it carries on c side,
     // which needs no walk over its combinations.
 
+    // NOTE: the arena spans the largest combination any block carries, which is the
+    // one of the highest angular momenta of its three atom bases, as the rows a
+    // combination needs do not decrease with any of them. It is formed once per
+    // thread and the combinations work over a view of it. See the overlap driver.
+
+    auto arena_rows = size_t{0};
+
+    auto arena_cols = size_t{0};
+
+    for (size_t iblk = 0; iblk < nblocks; iblk++)
+    {
+        const auto &block = pattern.block(iblk);
+
+        arena_rows = std::max(arena_rows,
+                              simdt3ceri::number_of_buffer_rows(basis.basis_set(block.a_index()).max_angular_momentum(),
+                                                                basis.basis_set(block.b_index()).max_angular_momentum(),
+                                                                aux_basis.basis_set(block.c_index()).max_angular_momentum()));
+
+        arena_cols = std::max(arena_cols, block.number_of_pairs());
+    }
+
     std::vector<size_t> border(nblocks);
 
     std::ranges::copy(std::views::iota(size_t{0}, nblocks), border.begin());
@@ -357,6 +379,10 @@ CSimdThreeCenterElectronRepulsionDriver::compute(const CTripleSparsityPattern &p
             c_coordinates[static_cast<size_t>(iblk)] = _make_c_coordinates(block, molecule);
         }
 
+        auto arena = CSimdMatrix(arena_rows, arena_cols);
+
+        auto buffer = CSimdMatrix(arena.data(), arena.capacity());
+
 #pragma omp for schedule(dynamic)
         for (int itask = 0; itask < ntasks; itask++)
         {
@@ -390,6 +416,7 @@ CSimdThreeCenterElectronRepulsionDriver::compute(const CTripleSparsityPattern &p
                                                    c_basis.functions()[task.k],
                                                    coordinates[task.iblock],
                                                    c_coordinates[task.iblock],
+                                                   buffer,
                                                    pattern.get_threshold());
 
             distributor.commit(block, task.iblock, la, ia, lb, jb, lc, kc, task.npairs, natoms, ncomps);

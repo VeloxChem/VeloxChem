@@ -159,26 +159,18 @@ namespace sparsity {  // sparsity namespace
 /// size above the floor below, which is what decides every molecule measured here.
 inline constexpr size_t triple_blocks_per_thread = 2;
 
-/// @brief The smallest target number of atom pairs of a block of a three-center
-/// quantity. A block carries a fixed cost which does not shrink with the atom pairs
-/// it holds, chiefly the bisection of the screening, so dividing too finely
-/// multiplies that cost rather than dividing it.
-/// @note A floor high enough to leave a molecule in a single block costs it every
-/// thread it has. The blocks of a small molecule come from the combinations of the
-/// atom basis pair groups with the auxiliary atom basis groups, which is set by the
-/// variety of its elements and not by its size, so a molecule of one element has one
-/// block however many atoms it holds: c60 carries 1770 atom pairs and was left
-/// undivided by a floor of 32768.
-/// @note This floor is not fitted. The value which preceded it, 32768, was measured
-/// against the three-center kernels which have since been removed, on fourteen
-/// threads over def2-svp with the jkfit auxiliary basis, as the number of atom pairs
-/// of a block: crambin in sixty three batches took 93 ms at 8192, 78 at 32768 and 89
-/// undivided, and ubiquitin in one hundred and twenty six batches took 426 ms at
-/// 8192, 279 at 32768 and 434 undivided. Those numbers say the large molecules
-/// preferred a large block, and they describe code which no longer exists. The value
-/// here matches the two-center floor so that no molecule collapses to a single
-/// block, and it wants fitting again once the kernels are in the tree.
-inline constexpr size_t triple_min_block_size = 256;
+/// @brief The target number of atom pairs of a block of a three-center quantity.
+/// @note A block holds the buffer of the largest combination its atom bases carry,
+/// which for an (ii|l) combination is above half a million rows. The buffer is the
+/// rows times the atom pairs of the block, and one is held by every thread, so the
+/// atom pairs of a block are what bounds it: at thirty two the arena is 142 MB per
+/// thread, at two hundred and fifty six it is over a gigabyte. The size does not
+/// follow the number of the threads, as the parallelism comes from the combinations
+/// of a block and not from the blocks.
+inline constexpr size_t triple_min_block_size = 32;
+
+/// @brief The largest number of atom pairs of a block of a three-center quantity.
+inline constexpr size_t triple_max_block_size = 32;
 
 /// @brief Selects the atom basis groups on c side which carry the given atoms.
 /// @param molecule The molecule the atoms belong to.
@@ -237,7 +229,7 @@ make_triple_blocks(const CMolecule &molecule, std::vector<CAtomBasisPairGroup> &
     // work below divides for any number of threads. Batching the c side does not do
     // this, as the cost of a block follows the atom pairs on the a and b sides.
 
-    const auto nblock_pairs = CAtomBasisPairGroup::make_block_size(groups, triple_blocks_per_thread, triple_min_block_size);
+    const auto nblock_pairs = CAtomBasisPairGroup::make_block_size(groups, triple_blocks_per_thread, triple_min_block_size, triple_max_block_size);
 
     auto blocks = (nblock_pairs == 0) ? std::move(groups) : CAtomBasisPairGroup::divide(groups, nblock_pairs);
 

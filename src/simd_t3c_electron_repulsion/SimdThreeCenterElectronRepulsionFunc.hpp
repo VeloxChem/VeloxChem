@@ -79,6 +79,7 @@ auto compute_electron_repulsion(double               *values,
                                 const CBasisFunction &c_function,
                                 const CSimdMatrix    &coordinates,
                                 const CSimdMatrix    &c_coordinates,
+                                CSimdMatrix          &buffer,
                                 const double          threshold) -> void;
 
 }  // namespace simdt3ceri

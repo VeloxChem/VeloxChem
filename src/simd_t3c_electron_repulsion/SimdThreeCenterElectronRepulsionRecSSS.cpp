@@ -42,6 +42,7 @@
 #include "ScreeningFunc.hpp"
 #include "SimdDimensions.hpp"
 #include "SimdPrimitives.hpp"
+#include "SimdBoysFunc.hpp"
 
 #include "SimdThreeCenterElectronRepulsionCtrVrrSSS.hpp"
 
@@ -56,6 +57,7 @@ compute_sss_three_center_electron_repulsion(double               *values,
                                             const CBasisFunction &c_function,
                                             const CSimdMatrix    &coordinates,
                                             const CSimdMatrix    &c_coordinates,
+                                            CSimdMatrix          &buffer,
                                             const double          threshold) -> void
 {
     if (npairs > coordinates.number_of_columns())
@@ -101,11 +103,9 @@ compute_sss_three_center_electron_repulsion(double               *values,
         screenfunc::three_center_electron_repulsion_primitive_bound,
         threshold / static_cast<double>(nprims));
 
-    auto buffer = simdfunc::make_primitive_buffer(dimensions, 5);
+    const auto nmax = simdfunc::prepare_buffer(buffer, 5, 0, 0, dimensions);
 
-    if (buffer.number_of_columns() == 0) return;
-
-    const auto nmax = buffer.number_of_columns();
+    if (nmax == 0) return;
 
     const auto pi = mathconst::pi_value();
 
