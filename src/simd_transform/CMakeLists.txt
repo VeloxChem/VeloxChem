@@ -1,0 +1,12 @@
+target_sources(vlxobjs
+  PRIVATE
+    SimdTransformD.cpp
+    SimdTransformF.cpp
+    SimdTransformG.cpp
+    SimdTransformH.cpp
+    SimdTransformI.cpp
+    SimdTransformK.cpp
+    SimdTransformL.cpp
+    SimdTransformP.cpp
+    SimdTransformS.cpp
+  )
