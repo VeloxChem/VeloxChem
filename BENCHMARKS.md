@@ -3653,3 +3653,693 @@ in `simdtrf::`, spread over some twenty horizontal transfer and spherical transf
 routines with no single one above 1.9 per cent. There is no hot spot left there,
 only volume.
 
+## The unit of work the threads draw on
+
+Three changes, in the order they were made and measured.
+
+The **unit of work is now one combination of basis functions of one block** and no
+longer one block. A block is what the sparsity and the storage are described in and it
+carries a fixed cost, so it cannot be made small enough to feed a large machine: an
+ordinary molecule holds tens of blocks whatever the number of the threads, as the
+target size of a block is bounded from below. c60 forms seven blocks at any core
+count, taxol twenty eight, the copper complex forty one. The combinations of a block
+are tens to hundreds, cost nothing to enumerate, and are independent of one another,
+so a flat loop over them feeds a machine the loop over blocks cannot. Their ceiling,
+the total work divided by the cost of the fattest task, is 67 to 142 for a small
+molecule in an ordinary basis and two to fourteen thousand for the fitting sets.
+
+A **loop of too few iterations is left to the encountering thread**. Opening a region
+costs a fork and a join whose price grows with the number of the threads while the work
+of a loop with a handful of iterations does not. The chunk loop of make_pair_groups
+runs a single chunk for c60 and cost 0.008 ms on one thread against 0.060 ms on
+sixteen, for the same work. The bound applies only to a loop whose iteration carries
+little work: gating the ordering and the screening of the blocks the same way was
+measured and made c60 half again slower, as seven blocks over seven threads beats seven
+blocks over one by far more than a fork costs.
+
+The **keys of a small group are ordered by comparison and not by radix**. This was the
+largest of the three by a wide margin.
+
+### Eight microseconds a block, and where they were
+
+Sweeping the target size of a block at a fixed number of threads shows the time of a
+driver to be linear in the number of the blocks, at about eight microseconds each:
+crambin gave 8.4 and taxol 8.2, measured independently. That constant caps the cores a
+driver can use at roughly its single thread time divided by forty times it -- ten cores
+for taxol, eighty for crambin -- and it is why the smallest useful block is bounded
+from below, which is in turn why an ordinary molecule cannot fill a large machine.
+
+Timing the three stages inside sort_by_distance found all of it in one place.
+
+| stage | taxol, 214 pairs a block | crambin, 3170 pairs a block |
+| --- | --- | --- |
+| _make_keys | 0.00034 ms | 0.00428 ms |
+| _order_keys, the radix | 0.0988 ms | 0.1252 ms |
+| _move_pairs | 0.00024 ms | 0.00322 ms |
+
+The radix cost two hundred and ninety times what forming the keys cost, and it barely
+moved with the data: fifteen times the atom pairs cost 1.27 times the time. It ran four
+passes over sixty five thousand counters whatever the number of the keys, so a block of
+two hundred atom pairs paid half a million counter operations for two hundred elements
+of data. Divided by the threads, that is the eight microseconds the sweep measured.
+
+The keys are now ordered by comparison below four thousand and ninety six atom pairs
+and by radix above. The two give the same order: the second half of a key is the index
+of the atom pair and increases with it, so ordering the keys as pairs is the stable
+radix on their first half. The bound earns its place at both ends. taxol runs 1.084 ms
+with the radix always and 0.819 ms with the bound anywhere between 1024 and 8192, while
+ubiquitin, whose blocks hold thirteen thousand atom pairs, runs 7.47 ms with the bound
+and 8.72 ms with the comparison always.
+
+The fixed cost of a block fell from 8.4 to 2.6 microseconds on crambin and from 8.2 to
+4.2 on taxol. crambin at a target size of eight atom pairs went from 214.7 ms to 71.8.
+
+### What was tried first and did not work
+
+Four rounds of work before this one measured as noise, and the reason is the same each
+time.
+
+Making the hot assertions lazy removed two heap allocations from every call of
+`_cell_index`, which a profile had put at 39.7 per cent of the overlap driver. It moved
+the single thread time from 3.32 ms to 3.23. **macOS `sample` over-reports allocator
+frames by more than an order of magnitude**, as it catches threads holding the malloc
+lock out of proportion, and the ranking it gave was wrong.
+
+Collapsing the parallel regions of make_pattern from three into one bought nothing. The
+cost is per thread wake-up, not per region, and a barrier inside one region wakes
+sleeping threads exactly as a fork does. Holding the threads awake proves it: at eight
+threads `KMP_BLOCKTIME=1` is worth 1.17 times, and past twelve, which is this machine's
+performance core count, it inverts violently.
+
+Reusing the sparsity pattern between calls was abandoned before it was written. Most
+two-center quantities are computed once per calculation, so there is nothing to reuse
+across, and removing work does not make the remaining work scale.
+
+Folding the cost of a block into the description of the block, which is inside a
+parallel region, cut the serial pass that recomputed it from 0.140 ms to 0.0047 and
+stopped it growing with the thread count. Correct, and worth about one per cent.
+
+What found the radix was none of these. It was sweeping the size of a block and
+watching the time move.
+
+
+### The overlap driver against the reference
+
+`OMP_NUM_THREADS=14`, best of two to five runs. **ref** is `OverlapDriver`, which
+computes every atom pair and carries no threshold, so one number serves both threshold
+rows. A dash in the ref column marks a case it cannot run: it returns a dense matrix,
+and ubiquitin in aug-cc-pV6Z would be three hundred gigabytes.
+
+The geometric mean over the 196 cases which have a reference is **3.89**, against 3.11
+before these changes, on the same grid.
+
+
+#### tagrisso
+
+| basis | threshold | nao | ref ms | simd ms | x ref |
+| --- | --- | --- | --- | --- | --- |
+| def2-svp | 1e-14 | 683 | 1.56 | 0.61 | 2.6 |
+| def2-svp | 1e-12 | 683 | 1.56 | 0.62 | 2.5 |
+| def2-svpd | 1e-14 | 1010 | 1.59 | 0.73 | 2.2 |
+| def2-svpd | 1e-12 | 1010 | 1.59 | 0.71 | 2.2 |
+| def2-tzvp | 1e-14 | 1345 | 1.09 | 0.72 | 1.5 |
+| def2-tzvp | 1e-12 | 1345 | 1.09 | 0.66 | 1.7 |
+| def2-tzvpp | 1e-14 | 1609 | 1.00 | 0.74 | 1.4 |
+| def2-tzvpp | 1e-12 | 1609 | 1.00 | 0.73 | 1.4 |
+| def2-tzvpd | 1e-14 | 1672 | 1.79 | 0.81 | 2.2 |
+| def2-tzvpd | 1e-12 | 1672 | 1.79 | 1.04 | 1.7 |
+| def2-tzvppd | 1e-14 | 1936 | 1.92 | 1.15 | 1.7 |
+| def2-tzvppd | 1e-12 | 1936 | 1.92 | 1.11 | 1.7 |
+| def2-qzvp | 1e-14 | 3099 | 3.18 | 1.24 | 2.6 |
+| def2-qzvp | 1e-12 | 3099 | 3.18 | 1.17 | 2.7 |
+| def2-qzvpp | 1e-14 | 3099 | 3.05 | 1.25 | 2.4 |
+| def2-qzvpp | 1e-12 | 3099 | 3.05 | 1.23 | 2.5 |
+| def2-qzvpd | 1e-14 | 3426 | 3.84 | 1.49 | 2.6 |
+| def2-qzvpd | 1e-12 | 3426 | 3.84 | 1.46 | 2.6 |
+| def2-qzvppd | 1e-14 | 3426 | 3.21 | 1.49 | 2.2 |
+| def2-qzvppd | 1e-12 | 3426 | 3.21 | 1.45 | 2.2 |
+| cc-pvdz | 1e-14 | 683 | 1.59 | 0.62 | 2.6 |
+| cc-pvdz | 1e-12 | 683 | 1.59 | 0.63 | 2.5 |
+| cc-pvtz | 1e-14 | 1572 | 1.71 | 0.92 | 1.9 |
+| cc-pvtz | 1e-12 | 1572 | 1.71 | 0.90 | 1.9 |
+| cc-pvqz | 1e-14 | 3025 | 3.05 | 1.17 | 2.6 |
+| cc-pvqz | 1e-12 | 3025 | 3.05 | 1.15 | 2.7 |
+| cc-pv5z | 1e-14 | 5182 | 8.76 | 2.55 | 3.4 |
+| cc-pv5z | 1e-12 | 5182 | 8.76 | 2.41 | 3.6 |
+| cc-pv6z | 1e-14 | 8183 | 23.78 | 6.26 | 3.8 |
+| cc-pv6z | 1e-12 | 8183 | 23.78 | 5.94 | 4.0 |
+| aug-cc-pvdz | 1e-14 | 1148 | 3.33 | 0.65 | 5.1 |
+| aug-cc-pvdz | 1e-12 | 1148 | 3.33 | 0.65 | 5.1 |
+| aug-cc-pvtz | 1e-14 | 2461 | 2.06 | 1.17 | 1.8 |
+| aug-cc-pvtz | 1e-12 | 2461 | 2.06 | 1.50 | 1.4 |
+| aug-cc-pvqz | 1e-14 | 4478 | 5.71 | 2.39 | 2.4 |
+| aug-cc-pvqz | 1e-12 | 4478 | 5.71 | 2.30 | 2.5 |
+| aug-cc-pv5z | 1e-14 | 7339 | 16.84 | 5.93 | 2.8 |
+| aug-cc-pv5z | 1e-12 | 7339 | 16.84 | 5.64 | 3.0 |
+| aug-cc-pv6z | 1e-14 | 11184 | 45.59 | 15.45 | 3.0 |
+| aug-cc-pv6z | 1e-12 | 11184 | 45.59 | 14.69 | 3.1 |
+
+#### c60
+
+| basis | threshold | nao | ref ms | simd ms | x ref |
+| --- | --- | --- | --- | --- | --- |
+| def2-svp | 1e-14 | 840 | 0.45 | 0.45 | 1.0 |
+| def2-svp | 1e-12 | 840 | 0.45 | 0.46 | 1.0 |
+| def2-svpd | 1e-14 | 1200 | 1.75 | 0.69 | 2.5 |
+| def2-svpd | 1e-12 | 1200 | 1.75 | 0.69 | 2.5 |
+| def2-tzvp | 1e-14 | 1860 | 1.18 | 0.80 | 1.5 |
+| def2-tzvp | 1e-12 | 1860 | 1.18 | 1.01 | 1.2 |
+| def2-tzvpp | 1e-14 | 1860 | 1.63 | 0.78 | 2.1 |
+| def2-tzvpp | 1e-12 | 1860 | 1.63 | 1.01 | 1.6 |
+| def2-tzvpd | 1e-14 | 2220 | 1.60 | 0.92 | 1.7 |
+| def2-tzvpd | 1e-12 | 2220 | 1.60 | 0.94 | 1.7 |
+| def2-tzvppd | 1e-14 | 2220 | 1.85 | 0.92 | 2.0 |
+| def2-tzvppd | 1e-12 | 2220 | 1.85 | 0.91 | 2.0 |
+| def2-qzvp | 1e-14 | 3420 | 3.43 | 1.64 | 2.1 |
+| def2-qzvp | 1e-12 | 3420 | 3.43 | 1.53 | 2.2 |
+| def2-qzvpp | 1e-14 | 3420 | 3.80 | 1.61 | 2.4 |
+| def2-qzvpp | 1e-12 | 3420 | 3.80 | 1.52 | 2.5 |
+| def2-qzvpd | 1e-14 | 3780 | 3.87 | 1.88 | 2.1 |
+| def2-qzvpd | 1e-12 | 3780 | 3.87 | 1.81 | 2.1 |
+| def2-qzvppd | 1e-14 | 3780 | 4.84 | 1.91 | 2.5 |
+| def2-qzvppd | 1e-12 | 3780 | 4.84 | 1.83 | 2.6 |
+| cc-pvdz | 1e-14 | 840 | 1.62 | 0.67 | 2.4 |
+| cc-pvdz | 1e-12 | 840 | 1.62 | 0.65 | 2.5 |
+| cc-pvtz | 1e-14 | 1800 | 1.52 | 0.81 | 1.9 |
+| cc-pvtz | 1e-12 | 1800 | 1.52 | 0.75 | 2.0 |
+| cc-pvqz | 1e-14 | 3300 | 3.60 | 1.57 | 2.3 |
+| cc-pvqz | 1e-12 | 3300 | 3.60 | 1.53 | 2.4 |
+| cc-pv5z | 1e-14 | 5460 | 9.41 | 3.81 | 2.5 |
+| cc-pv5z | 1e-12 | 5460 | 9.41 | 3.57 | 2.6 |
+| cc-pv6z | 1e-14 | 8400 | 26.02 | 10.04 | 2.6 |
+| cc-pv6z | 1e-12 | 8400 | 26.02 | 9.41 | 2.8 |
+| aug-cc-pvdz | 1e-14 | 1380 | 1.24 | 0.69 | 1.8 |
+| aug-cc-pvdz | 1e-12 | 1380 | 1.24 | 0.68 | 1.8 |
+| aug-cc-pvtz | 1e-14 | 2760 | 3.37 | 1.34 | 2.5 |
+| aug-cc-pvtz | 1e-12 | 2760 | 3.37 | 1.91 | 1.8 |
+| aug-cc-pvqz | 1e-14 | 4800 | 6.73 | 3.27 | 2.1 |
+| aug-cc-pvqz | 1e-12 | 4800 | 6.73 | 3.18 | 2.1 |
+| aug-cc-pv5z | 1e-14 | 7620 | 19.01 | 9.04 | 2.1 |
+| aug-cc-pv5z | 1e-12 | 7620 | 19.01 | 8.75 | 2.2 |
+| aug-cc-pv6z | 1e-14 | 11340 | 51.09 | 25.65 | 2.0 |
+| aug-cc-pv6z | 1e-12 | 11340 | 51.09 | 24.37 | 2.1 |
+
+#### taxol
+
+| basis | threshold | nao | ref ms | simd ms | x ref |
+| --- | --- | --- | --- | --- | --- |
+| def2-svp | 1e-14 | 1099 | 0.95 | 0.61 | 1.6 |
+| def2-svp | 1e-12 | 1099 | 0.95 | 0.59 | 1.6 |
+| def2-svpd | 1e-14 | 1657 | 1.86 | 0.99 | 1.9 |
+| def2-svpd | 1e-12 | 1657 | 1.86 | 0.96 | 1.9 |
+| def2-tzvp | 1e-14 | 2185 | 2.12 | 0.89 | 2.4 |
+| def2-tzvp | 1e-12 | 2185 | 2.12 | 1.04 | 2.0 |
+| def2-tzvpp | 1e-14 | 2577 | 2.53 | 0.97 | 2.6 |
+| def2-tzvpp | 1e-12 | 2577 | 2.53 | 1.27 | 2.0 |
+| def2-tzvpd | 1e-14 | 2743 | 2.67 | 1.66 | 1.6 |
+| def2-tzvpd | 1e-12 | 2743 | 2.67 | 1.59 | 1.7 |
+| def2-tzvppd | 1e-14 | 3135 | 2.50 | 1.30 | 1.9 |
+| def2-tzvppd | 1e-12 | 3135 | 2.50 | 1.78 | 1.4 |
+| def2-qzvp | 1e-14 | 4947 | 6.18 | 2.00 | 3.1 |
+| def2-qzvp | 1e-12 | 4947 | 6.18 | 1.93 | 3.2 |
+| def2-qzvpp | 1e-14 | 4947 | 6.36 | 1.97 | 3.2 |
+| def2-qzvpp | 1e-12 | 4947 | 6.36 | 1.92 | 3.3 |
+| def2-qzvpd | 1e-14 | 5505 | 8.34 | 2.60 | 3.2 |
+| def2-qzvpd | 1e-12 | 5505 | 8.34 | 2.49 | 3.3 |
+| def2-qzvppd | 1e-14 | 5505 | 12.27 | 2.78 | 4.4 |
+| def2-qzvppd | 1e-12 | 5505 | 12.27 | 2.58 | 4.8 |
+| cc-pvdz | 1e-14 | 1099 | 1.29 | 0.66 | 2.0 |
+| cc-pvdz | 1e-12 | 1099 | 1.29 | 0.65 | 2.0 |
+| cc-pvtz | 1e-14 | 2516 | 2.48 | 0.99 | 2.5 |
+| cc-pvtz | 1e-12 | 2516 | 2.48 | 1.28 | 1.9 |
+| cc-pvqz | 1e-14 | 4825 | 6.98 | 1.90 | 3.7 |
+| cc-pvqz | 1e-12 | 4825 | 6.98 | 1.82 | 3.8 |
+| cc-pv5z | 1e-14 | 8246 | 21.64 | 4.59 | 4.7 |
+| cc-pv5z | 1e-12 | 8246 | 21.64 | 4.27 | 5.1 |
+| cc-pv6z | 1e-14 | 12999 | 57.31 | 11.99 | 4.8 |
+| cc-pv6z | 1e-12 | 12999 | 57.31 | 11.31 | 5.1 |
+| aug-cc-pvdz | 1e-14 | 1844 | 1.47 | 0.93 | 1.6 |
+| aug-cc-pvdz | 1e-12 | 1844 | 1.47 | 0.90 | 1.6 |
+| aug-cc-pvtz | 1e-14 | 3933 | 3.98 | 1.84 | 2.2 |
+| aug-cc-pvtz | 1e-12 | 3933 | 3.98 | 1.78 | 2.2 |
+| aug-cc-pvqz | 1e-14 | 7134 | 12.72 | 4.45 | 2.9 |
+| aug-cc-pvqz | 1e-12 | 7134 | 12.72 | 4.18 | 3.0 |
+| aug-cc-pv5z | 1e-14 | 11667 | 41.72 | 11.84 | 3.5 |
+| aug-cc-pv5z | 1e-12 | 11667 | 41.72 | 11.11 | 3.8 |
+| aug-cc-pv6z | 1e-14 | 17752 | 109.99 | 31.93 | 3.4 |
+| aug-cc-pv6z | 1e-12 | 17752 | 109.99 | 30.16 | 3.6 |
+
+#### paracetamol_cluster
+
+| basis | threshold | nao | ref ms | simd ms | x ref |
+| --- | --- | --- | --- | --- | --- |
+| def2-svp | 1e-14 | 3184 | 3.30 | 1.13 | 2.9 |
+| def2-svp | 1e-12 | 3184 | 3.30 | 1.04 | 3.2 |
+| def2-svpd | 1e-14 | 4768 | 6.21 | 1.94 | 3.2 |
+| def2-svpd | 1e-12 | 4768 | 6.21 | 1.79 | 3.5 |
+| def2-tzvp | 1e-14 | 6320 | 10.77 | 2.09 | 5.2 |
+| def2-tzvp | 1e-12 | 6320 | 10.77 | 1.94 | 5.6 |
+| def2-tzvpp | 1e-14 | 7472 | 13.96 | 2.44 | 5.7 |
+| def2-tzvpp | 1e-12 | 7472 | 13.96 | 2.23 | 6.3 |
+| def2-tzvpd | 1e-14 | 7904 | 15.66 | 3.66 | 4.3 |
+| def2-tzvpd | 1e-12 | 7904 | 15.66 | 3.40 | 4.6 |
+| def2-tzvppd | 1e-14 | 9056 | 19.70 | 4.21 | 4.7 |
+| def2-tzvppd | 1e-12 | 9056 | 19.70 | 3.91 | 5.0 |
+| def2-qzvp | 1e-14 | 14352 | 51.03 | 6.19 | 8.2 |
+| def2-qzvp | 1e-12 | 14352 | 51.03 | 5.70 | 9.0 |
+| def2-qzvpp | 1e-14 | 14352 | 50.86 | 6.16 | 8.3 |
+| def2-qzvpp | 1e-12 | 14352 | 50.86 | 5.71 | 8.9 |
+| def2-qzvpd | 1e-14 | 15936 | 64.12 | 9.74 | 6.6 |
+| def2-qzvpd | 1e-12 | 15936 | 64.12 | 8.91 | 7.2 |
+| def2-qzvppd | 1e-14 | 15936 | 64.27 | 9.91 | 6.5 |
+| def2-qzvppd | 1e-12 | 15936 | 64.27 | 9.10 | 7.1 |
+| cc-pvdz | 1e-14 | 3184 | 5.41 | 1.26 | 4.3 |
+| cc-pvdz | 1e-12 | 3184 | 5.41 | 1.20 | 4.5 |
+| cc-pvtz | 1e-14 | 7296 | 14.87 | 2.42 | 6.1 |
+| cc-pvtz | 1e-12 | 7296 | 14.87 | 2.28 | 6.5 |
+| cc-pvqz | 1e-14 | 14000 | 51.09 | 5.64 | 9.1 |
+| cc-pvqz | 1e-12 | 14000 | 51.09 | 5.17 | 9.9 |
+| cc-pv5z | 1e-14 | 23936 | 164.73 | 15.58 | 10.6 |
+| cc-pv5z | 1e-12 | 23936 | 164.73 | 14.08 | 11.7 |
+| cc-pv6z | 1e-14 | 37744 | -- | 42.30 | -- |
+| cc-pv6z | 1e-12 | 37744 | -- | 38.70 | -- |
+| aug-cc-pvdz | 1e-14 | 5344 | 9.84 | 2.71 | 3.6 |
+| aug-cc-pvdz | 1e-12 | 5344 | 9.84 | 2.57 | 3.8 |
+| aug-cc-pvtz | 1e-14 | 11408 | 35.36 | 7.11 | 5.0 |
+| aug-cc-pvtz | 1e-12 | 11408 | 35.36 | 6.51 | 5.4 |
+| aug-cc-pvqz | 1e-14 | 20704 | 116.58 | 19.88 | 5.9 |
+| aug-cc-pvqz | 1e-12 | 20704 | 116.58 | 18.16 | 6.4 |
+| aug-cc-pv5z | 1e-14 | 33872 | -- | 54.78 | -- |
+| aug-cc-pv5z | 1e-12 | 33872 | -- | 50.41 | -- |
+| aug-cc-pv6z | 1e-14 | 51552 | -- | 159.66 | -- |
+| aug-cc-pv6z | 1e-12 | 51552 | -- | 136.13 | -- |
+
+#### crambin
+
+| basis | threshold | nao | ref ms | simd ms | x ref |
+| --- | --- | --- | --- | --- | --- |
+| def2-svp | 1e-14 | 6177 | 12.19 | 2.03 | 6.0 |
+| def2-svp | 1e-12 | 6177 | 12.19 | 1.92 | 6.3 |
+| def2-svpd | 1e-14 | 9294 | 23.20 | 3.99 | 5.8 |
+| def2-svpd | 1e-12 | 9294 | 23.20 | 3.63 | 6.4 |
+| def2-tzvp | 1e-14 | 12063 | 45.55 | 4.01 | 11.4 |
+| def2-tzvp | 1e-12 | 12063 | 45.55 | 3.65 | 12.5 |
+| def2-tzvpp | 1e-14 | 14613 | 56.24 | 4.69 | 12.0 |
+| def2-tzvpp | 1e-12 | 14613 | 56.24 | 4.25 | 13.2 |
+| def2-tzvpd | 1e-14 | 15180 | 61.28 | 7.98 | 7.7 |
+| def2-tzvpd | 1e-12 | 15180 | 61.28 | 7.30 | 8.4 |
+| def2-tzvppd | 1e-14 | 17730 | 79.75 | 9.40 | 8.5 |
+| def2-tzvppd | 1e-12 | 17730 | 79.75 | 8.47 | 9.4 |
+| def2-qzvp | 1e-14 | 28167 | 210.30 | 12.91 | 16.3 |
+| def2-qzvp | 1e-12 | 28167 | 210.30 | 11.39 | 18.5 |
+| def2-qzvpp | 1e-14 | 28167 | 204.83 | 12.86 | 15.9 |
+| def2-qzvpp | 1e-12 | 28167 | 204.83 | 11.35 | 18.0 |
+| def2-qzvpd | 1e-14 | 31284 | -- | 22.73 | -- |
+| def2-qzvpd | 1e-12 | 31284 | -- | 20.27 | -- |
+| def2-qzvppd | 1e-14 | 31284 | -- | 22.64 | -- |
+| def2-qzvppd | 1e-12 | 31284 | -- | 20.28 | -- |
+| cc-pvdz | 1e-14 | 6177 | 18.82 | 2.36 | 8.0 |
+| cc-pvdz | 1e-12 | 6177 | 18.82 | 2.21 | 8.5 |
+| cc-pvtz | 1e-14 | 14244 | 59.96 | 4.63 | 13.0 |
+| cc-pvtz | 1e-12 | 14244 | 59.96 | 4.22 | 14.2 |
+| cc-pvqz | 1e-14 | 27459 | 203.96 | 11.42 | 17.9 |
+| cc-pvqz | 1e-12 | 27459 | 203.96 | 10.23 | 19.9 |
+| cc-pv5z | 1e-14 | 47106 | -- | 33.35 | -- |
+| cc-pv5z | 1e-12 | 47106 | -- | 29.51 | -- |
+| cc-pv6z | 1e-14 | 74469 | -- | 95.06 | -- |
+| cc-pv6z | 1e-12 | 74469 | -- | 83.53 | -- |
+| aug-cc-pvdz | 1e-14 | 10380 | 37.52 | 6.11 | 6.1 |
+| aug-cc-pvdz | 1e-12 | 10380 | 37.52 | 5.63 | 6.7 |
+| aug-cc-pvtz | 1e-14 | 22311 | 134.73 | 17.08 | 7.9 |
+| aug-cc-pvtz | 1e-12 | 22311 | 134.73 | 15.74 | 8.6 |
+| aug-cc-pvqz | 1e-14 | 40674 | -- | 49.63 | -- |
+| aug-cc-pvqz | 1e-12 | 40674 | -- | 44.19 | -- |
+| aug-cc-pv5z | 1e-14 | 66753 | -- | 160.71 | -- |
+| aug-cc-pv5z | 1e-12 | 66753 | -- | 131.36 | -- |
+| aug-cc-pv6z | 1e-14 | 101832 | -- | 486.54 | -- |
+| aug-cc-pv6z | 1e-12 | 101832 | -- | 393.91 | -- |
+
+#### ubiquitin
+
+| basis | threshold | nao | ref ms | simd ms | x ref |
+| --- | --- | --- | --- | --- | --- |
+| def2-svp | 1e-14 | 11577 | 41.95 | 3.65 | 11.5 |
+| def2-svp | 1e-12 | 11577 | 41.95 | 3.45 | 12.2 |
+| def2-svpd | 1e-14 | 17433 | 78.24 | 8.28 | 9.4 |
+| def2-svpd | 1e-12 | 17433 | 78.24 | 7.39 | 10.6 |
+| def2-tzvp | 1e-14 | 22442 | 137.59 | 7.65 | 18.0 |
+| def2-tzvp | 1e-12 | 22442 | 137.59 | 6.72 | 20.5 |
+| def2-tzvpp | 1e-14 | 27479 | 183.59 | 8.94 | 20.5 |
+| def2-tzvpp | 1e-12 | 27479 | 183.59 | 8.06 | 22.8 |
+| def2-tzvpd | 1e-14 | 28298 | 201.79 | 17.68 | 11.4 |
+| def2-tzvpd | 1e-12 | 28298 | 201.79 | 15.42 | 13.1 |
+| def2-tzvppd | 1e-14 | 33335 | -- | 21.04 | -- |
+| def2-tzvppd | 1e-12 | 33335 | -- | 18.31 | -- |
+| def2-qzvp | 1e-14 | 53197 | -- | 26.03 | -- |
+| def2-qzvp | 1e-12 | 53197 | -- | 22.70 | -- |
+| def2-qzvpp | 1e-14 | 53197 | -- | 26.05 | -- |
+| def2-qzvpp | 1e-12 | 53197 | -- | 22.46 | -- |
+| def2-qzvpd | 1e-14 | 59053 | -- | 55.36 | -- |
+| def2-qzvpd | 1e-12 | 59053 | -- | 47.36 | -- |
+| def2-qzvppd | 1e-14 | 59053 | -- | 54.81 | -- |
+| def2-qzvppd | 1e-12 | 59053 | -- | 47.11 | -- |
+| cc-pvdz | 1e-14 | 11577 | 65.24 | 4.16 | 15.7 |
+| cc-pvdz | 1e-12 | 11577 | 65.24 | 3.88 | 16.8 |
+| cc-pvtz | 1e-14 | 26870 | 218.55 | 8.71 | 25.1 |
+| cc-pvtz | 1e-12 | 26870 | 218.55 | 7.60 | 28.8 |
+| cc-pvqz | 1e-14 | 51984 | -- | 22.62 | -- |
+| cc-pvqz | 1e-12 | 51984 | -- | 19.81 | -- |
+| cc-pv5z | 1e-14 | 89381 | -- | 73.71 | -- |
+| cc-pv5z | 1e-12 | 89381 | -- | 62.30 | -- |
+| cc-pv6z | 1e-14 | 141523 | -- | 245.58 | -- |
+| cc-pv6z | 1e-12 | 141523 | -- | 192.29 | -- |
+| aug-cc-pvdz | 1e-14 | 19511 | 143.70 | 14.10 | 10.2 |
+| aug-cc-pvdz | 1e-12 | 19511 | 143.70 | 12.60 | 11.4 |
+| aug-cc-pvtz | 1e-14 | 42163 | -- | 43.20 | -- |
+| aug-cc-pvtz | 1e-12 | 42163 | -- | 37.46 | -- |
+| aug-cc-pvqz | 1e-14 | 77098 | -- | 163.80 | -- |
+| aug-cc-pvqz | 1e-12 | 77098 | -- | 127.99 | -- |
+| aug-cc-pv5z | 1e-14 | 126778 | -- | 555.45 | -- |
+| aug-cc-pv5z | 1e-12 | 126778 | -- | 432.38 | -- |
+| aug-cc-pv6z | 1e-14 | 193665 | -- | 1784.11 | -- |
+| aug-cc-pv6z | 1e-12 | 193665 | -- | 1267.84 | -- |
+
+### The kinetic energy driver against the reference
+
+The bases are those whose highest angular momentum is g, where the reference dispatcher
+stops. The geometric mean over the 170 comparable cases is **3.94**, against 2.51
+before these changes, on the same grid.
+
+
+#### tagrisso
+
+| basis | threshold | nao | ref ms | simd ms | x ref |
+| --- | --- | --- | --- | --- | --- |
+| def2-svp | 1e-14 | 683 | 1.20 | 0.55 | 2.2 |
+| def2-svp | 1e-12 | 683 | 1.20 | 0.58 | 2.1 |
+| def2-svpd | 1e-14 | 1010 | 0.71 | 0.68 | 1.0 |
+| def2-svpd | 1e-12 | 1010 | 0.71 | 0.66 | 1.1 |
+| def2-tzvp | 1e-14 | 1345 | 2.66 | 0.77 | 3.5 |
+| def2-tzvp | 1e-12 | 1345 | 2.66 | 0.74 | 3.6 |
+| def2-tzvpp | 1e-14 | 1609 | 1.75 | 0.82 | 2.1 |
+| def2-tzvpp | 1e-12 | 1609 | 1.75 | 0.78 | 2.2 |
+| def2-tzvpd | 1e-14 | 1672 | 1.31 | 0.96 | 1.4 |
+| def2-tzvpd | 1e-12 | 1672 | 1.31 | 0.94 | 1.4 |
+| def2-tzvppd | 1e-14 | 1936 | 1.72 | 1.02 | 1.7 |
+| def2-tzvppd | 1e-12 | 1936 | 1.72 | 0.99 | 1.7 |
+| def2-qzvp | 1e-14 | 3099 | 5.02 | 1.64 | 3.1 |
+| def2-qzvp | 1e-12 | 3099 | 5.02 | 1.61 | 3.1 |
+| def2-qzvpp | 1e-14 | 3099 | 4.07 | 1.67 | 2.4 |
+| def2-qzvpp | 1e-12 | 3099 | 4.07 | 1.57 | 2.6 |
+| def2-qzvpd | 1e-14 | 3426 | 8.98 | 1.98 | 4.5 |
+| def2-qzvpd | 1e-12 | 3426 | 8.98 | 1.95 | 4.6 |
+| def2-qzvppd | 1e-14 | 3426 | 8.18 | 2.01 | 4.1 |
+| def2-qzvppd | 1e-12 | 3426 | 8.18 | 1.94 | 4.2 |
+| cc-pvdz | 1e-14 | 683 | 1.02 | 0.54 | 1.9 |
+| cc-pvdz | 1e-12 | 683 | 1.02 | 0.57 | 1.8 |
+| cc-pvtz | 1e-14 | 1572 | 1.77 | 0.80 | 2.2 |
+| cc-pvtz | 1e-12 | 1572 | 1.77 | 0.81 | 2.2 |
+| cc-pvqz | 1e-14 | 3025 | 6.81 | 1.56 | 4.4 |
+| cc-pvqz | 1e-12 | 3025 | 6.81 | 1.51 | 4.5 |
+| aug-cc-pvdz | 1e-14 | 1148 | 1.18 | 0.73 | 1.6 |
+| aug-cc-pvdz | 1e-12 | 1148 | 1.18 | 0.79 | 1.5 |
+| aug-cc-pvtz | 1e-14 | 2461 | 2.84 | 1.38 | 2.1 |
+| aug-cc-pvtz | 1e-12 | 2461 | 2.84 | 1.34 | 2.1 |
+| aug-cc-pvqz | 1e-14 | 4478 | 8.98 | 3.56 | 2.5 |
+| aug-cc-pvqz | 1e-12 | 4478 | 8.98 | 3.44 | 2.6 |
+
+#### c60
+
+| basis | threshold | nao | ref ms | simd ms | x ref |
+| --- | --- | --- | --- | --- | --- |
+| def2-svp | 1e-14 | 840 | 0.69 | 0.47 | 1.5 |
+| def2-svp | 1e-12 | 840 | 0.69 | 0.45 | 1.5 |
+| def2-svpd | 1e-14 | 1200 | 1.04 | 0.61 | 1.7 |
+| def2-svpd | 1e-12 | 1200 | 1.04 | 0.60 | 1.7 |
+| def2-tzvp | 1e-14 | 1860 | 2.06 | 0.95 | 2.2 |
+| def2-tzvp | 1e-12 | 1860 | 2.06 | 0.92 | 2.2 |
+| def2-tzvpp | 1e-14 | 1860 | 1.94 | 0.90 | 2.2 |
+| def2-tzvpp | 1e-12 | 1860 | 1.94 | 0.94 | 2.1 |
+| def2-tzvpd | 1e-14 | 2220 | 2.51 | 1.21 | 2.1 |
+| def2-tzvpd | 1e-12 | 2220 | 2.51 | 1.15 | 2.2 |
+| def2-tzvppd | 1e-14 | 2220 | 1.82 | 1.22 | 1.5 |
+| def2-tzvppd | 1e-12 | 2220 | 1.82 | 1.14 | 1.6 |
+| def2-qzvp | 1e-14 | 3420 | 6.77 | 2.48 | 2.7 |
+| def2-qzvp | 1e-12 | 3420 | 6.77 | 2.31 | 2.9 |
+| def2-qzvpp | 1e-14 | 3420 | 6.10 | 2.45 | 2.5 |
+| def2-qzvpp | 1e-12 | 3420 | 6.10 | 2.34 | 2.6 |
+| def2-qzvpd | 1e-14 | 3780 | 6.43 | 2.89 | 2.2 |
+| def2-qzvpd | 1e-12 | 3780 | 6.43 | 2.79 | 2.3 |
+| def2-qzvppd | 1e-14 | 3780 | 7.62 | 2.94 | 2.6 |
+| def2-qzvppd | 1e-12 | 3780 | 7.62 | 2.82 | 2.7 |
+| cc-pvdz | 1e-14 | 840 | 2.09 | 0.59 | 3.5 |
+| cc-pvdz | 1e-12 | 840 | 2.09 | 0.72 | 2.9 |
+| cc-pvtz | 1e-14 | 1800 | 2.57 | 1.01 | 2.5 |
+| cc-pvtz | 1e-12 | 1800 | 2.57 | 0.92 | 2.8 |
+| cc-pvqz | 1e-14 | 3300 | 7.44 | 2.36 | 3.2 |
+| cc-pvqz | 1e-12 | 3300 | 7.44 | 2.23 | 3.3 |
+| aug-cc-pvdz | 1e-14 | 1380 | 1.44 | 0.79 | 1.8 |
+| aug-cc-pvdz | 1e-12 | 1380 | 1.44 | 0.77 | 1.9 |
+| aug-cc-pvtz | 1e-14 | 2760 | 4.00 | 1.82 | 2.2 |
+| aug-cc-pvtz | 1e-12 | 2760 | 4.00 | 1.77 | 2.3 |
+| aug-cc-pvqz | 1e-14 | 4800 | 10.29 | 5.41 | 1.9 |
+| aug-cc-pvqz | 1e-12 | 4800 | 10.29 | 5.31 | 1.9 |
+
+#### taxol
+
+| basis | threshold | nao | ref ms | simd ms | x ref |
+| --- | --- | --- | --- | --- | --- |
+| def2-svp | 1e-14 | 1099 | 1.09 | 0.61 | 1.8 |
+| def2-svp | 1e-12 | 1099 | 1.09 | 0.62 | 1.8 |
+| def2-svpd | 1e-14 | 1657 | 1.12 | 1.11 | 1.0 |
+| def2-svpd | 1e-12 | 1657 | 1.12 | 1.07 | 1.0 |
+| def2-tzvp | 1e-14 | 2185 | 2.45 | 1.04 | 2.4 |
+| def2-tzvp | 1e-12 | 2185 | 2.45 | 1.00 | 2.5 |
+| def2-tzvpp | 1e-14 | 2577 | 3.04 | 1.13 | 2.7 |
+| def2-tzvpp | 1e-12 | 2577 | 3.04 | 1.11 | 2.7 |
+| def2-tzvpd | 1e-14 | 2743 | 2.94 | 1.40 | 2.1 |
+| def2-tzvpd | 1e-12 | 2743 | 2.94 | 1.42 | 2.1 |
+| def2-tzvppd | 1e-14 | 3135 | 3.31 | 1.59 | 2.1 |
+| def2-tzvppd | 1e-12 | 3135 | 3.31 | 1.57 | 2.1 |
+| def2-qzvp | 1e-14 | 4947 | 9.10 | 2.85 | 3.2 |
+| def2-qzvp | 1e-12 | 4947 | 9.10 | 2.66 | 3.4 |
+| def2-qzvpp | 1e-14 | 4947 | 8.77 | 2.89 | 3.0 |
+| def2-qzvpp | 1e-12 | 4947 | 8.77 | 2.67 | 3.3 |
+| def2-qzvpd | 1e-14 | 5505 | 10.00 | 3.72 | 2.7 |
+| def2-qzvpd | 1e-12 | 5505 | 10.00 | 3.57 | 2.8 |
+| def2-qzvppd | 1e-14 | 5505 | 11.66 | 3.76 | 3.1 |
+| def2-qzvppd | 1e-12 | 5505 | 11.66 | 3.53 | 3.3 |
+| cc-pvdz | 1e-14 | 1099 | 2.52 | 0.69 | 3.7 |
+| cc-pvdz | 1e-12 | 1099 | 2.52 | 0.69 | 3.7 |
+| cc-pvtz | 1e-14 | 2516 | 3.09 | 1.16 | 2.7 |
+| cc-pvtz | 1e-12 | 2516 | 3.09 | 1.13 | 2.7 |
+| cc-pvqz | 1e-14 | 4825 | 8.97 | 2.71 | 3.3 |
+| cc-pvqz | 1e-12 | 4825 | 8.97 | 2.50 | 3.6 |
+| aug-cc-pvdz | 1e-14 | 1844 | 1.83 | 1.03 | 1.8 |
+| aug-cc-pvdz | 1e-12 | 1844 | 1.83 | 1.01 | 1.8 |
+| aug-cc-pvtz | 1e-14 | 3933 | 6.03 | 2.40 | 2.5 |
+| aug-cc-pvtz | 1e-12 | 3933 | 6.03 | 2.32 | 2.6 |
+| aug-cc-pvqz | 1e-14 | 7134 | 18.22 | 6.93 | 2.6 |
+| aug-cc-pvqz | 1e-12 | 7134 | 18.22 | 6.67 | 2.7 |
+
+#### paracetamol_cluster
+
+| basis | threshold | nao | ref ms | simd ms | x ref |
+| --- | --- | --- | --- | --- | --- |
+| def2-svp | 1e-14 | 3184 | 4.07 | 1.25 | 3.3 |
+| def2-svp | 1e-12 | 3184 | 4.07 | 1.15 | 3.5 |
+| def2-svpd | 1e-14 | 4768 | 7.39 | 2.44 | 3.0 |
+| def2-svpd | 1e-12 | 4768 | 7.39 | 2.22 | 3.3 |
+| def2-tzvp | 1e-14 | 6320 | 13.47 | 2.77 | 4.9 |
+| def2-tzvp | 1e-12 | 6320 | 13.47 | 2.54 | 5.3 |
+| def2-tzvpp | 1e-14 | 7472 | 18.48 | 3.22 | 5.7 |
+| def2-tzvpp | 1e-12 | 7472 | 18.48 | 3.00 | 6.2 |
+| def2-tzvpd | 1e-14 | 7904 | 20.76 | 5.23 | 4.0 |
+| def2-tzvpd | 1e-12 | 7904 | 20.76 | 4.86 | 4.3 |
+| def2-tzvppd | 1e-14 | 9056 | 27.82 | 6.01 | 4.6 |
+| def2-tzvppd | 1e-12 | 9056 | 27.82 | 5.55 | 5.0 |
+| def2-qzvp | 1e-14 | 14352 | 69.87 | 9.86 | 7.1 |
+| def2-qzvp | 1e-12 | 14352 | 69.87 | 9.10 | 7.7 |
+| def2-qzvpp | 1e-14 | 14352 | 72.36 | 9.92 | 7.3 |
+| def2-qzvpp | 1e-12 | 14352 | 72.36 | 8.90 | 8.1 |
+| def2-qzvpd | 1e-14 | 15936 | 84.76 | 16.00 | 5.3 |
+| def2-qzvpd | 1e-12 | 15936 | 84.76 | 14.78 | 5.7 |
+| def2-qzvppd | 1e-14 | 15936 | 85.76 | 15.98 | 5.4 |
+| def2-qzvppd | 1e-12 | 15936 | 85.76 | 14.53 | 5.9 |
+| cc-pvdz | 1e-14 | 3184 | 7.52 | 1.47 | 5.1 |
+| cc-pvdz | 1e-12 | 3184 | 7.52 | 1.41 | 5.3 |
+| cc-pvtz | 1e-14 | 7296 | 19.20 | 3.22 | 6.0 |
+| cc-pvtz | 1e-12 | 7296 | 19.20 | 2.96 | 6.5 |
+| cc-pvqz | 1e-14 | 14000 | 71.48 | 9.01 | 7.9 |
+| cc-pvqz | 1e-12 | 14000 | 71.48 | 8.14 | 8.8 |
+| aug-cc-pvdz | 1e-14 | 5344 | 11.89 | 3.49 | 3.4 |
+| aug-cc-pvdz | 1e-12 | 5344 | 11.89 | 3.28 | 3.6 |
+| aug-cc-pvtz | 1e-14 | 11408 | 41.62 | 10.68 | 3.9 |
+| aug-cc-pvtz | 1e-12 | 11408 | 41.62 | 9.79 | 4.3 |
+| aug-cc-pvqz | 1e-14 | 20704 | 150.52 | 34.92 | 4.3 |
+| aug-cc-pvqz | 1e-12 | 20704 | 150.52 | 31.52 | 4.8 |
+
+#### crambin
+
+| basis | threshold | nao | ref ms | simd ms | x ref |
+| --- | --- | --- | --- | --- | --- |
+| def2-svp | 1e-14 | 6177 | 17.18 | 2.34 | 7.3 |
+| def2-svp | 1e-12 | 6177 | 17.18 | 2.14 | 8.0 |
+| def2-svpd | 1e-14 | 9294 | 28.03 | 5.32 | 5.3 |
+| def2-svpd | 1e-12 | 9294 | 28.03 | 4.83 | 5.8 |
+| def2-tzvp | 1e-14 | 12063 | 53.59 | 5.43 | 9.9 |
+| def2-tzvp | 1e-12 | 12063 | 53.59 | 4.97 | 10.8 |
+| def2-tzvpp | 1e-14 | 14613 | 71.48 | 6.54 | 10.9 |
+| def2-tzvpp | 1e-12 | 14613 | 71.48 | 5.90 | 12.1 |
+| def2-tzvpd | 1e-14 | 15180 | 75.51 | 12.18 | 6.2 |
+| def2-tzvpd | 1e-12 | 15180 | 75.51 | 10.74 | 7.0 |
+| def2-tzvppd | 1e-14 | 17730 | 93.71 | 14.36 | 6.5 |
+| def2-tzvppd | 1e-12 | 17730 | 93.71 | 12.59 | 7.4 |
+| def2-qzvp | 1e-14 | 28167 | 279.01 | 22.00 | 12.7 |
+| def2-qzvp | 1e-12 | 28167 | 279.01 | 19.44 | 14.4 |
+| def2-qzvpp | 1e-14 | 28167 | 274.63 | 21.85 | 12.6 |
+| def2-qzvpp | 1e-12 | 28167 | 274.63 | 19.14 | 14.3 |
+| def2-qzvpd | 1e-14 | 31284 | -- | 40.69 | -- |
+| def2-qzvpd | 1e-12 | 31284 | -- | 35.72 | -- |
+| def2-qzvppd | 1e-14 | 31284 | -- | 39.69 | -- |
+| def2-qzvppd | 1e-12 | 31284 | -- | 35.42 | -- |
+| cc-pvdz | 1e-14 | 6177 | 24.32 | 2.81 | 8.7 |
+| cc-pvdz | 1e-12 | 6177 | 24.32 | 2.58 | 9.4 |
+| cc-pvtz | 1e-14 | 14244 | 77.38 | 6.38 | 12.1 |
+| cc-pvtz | 1e-12 | 14244 | 77.38 | 5.78 | 13.4 |
+| cc-pvqz | 1e-14 | 27459 | 276.88 | 19.75 | 14.0 |
+| cc-pvqz | 1e-12 | 27459 | 276.88 | 17.30 | 16.0 |
+| aug-cc-pvdz | 1e-14 | 10380 | 46.86 | 8.18 | 5.7 |
+| aug-cc-pvdz | 1e-12 | 10380 | 46.86 | 7.60 | 6.2 |
+| aug-cc-pvtz | 1e-14 | 22311 | 157.03 | 27.15 | 5.8 |
+| aug-cc-pvtz | 1e-12 | 22311 | 157.03 | 24.43 | 6.4 |
+| aug-cc-pvqz | 1e-14 | 40674 | -- | 102.23 | -- |
+| aug-cc-pvqz | 1e-12 | 40674 | -- | 88.48 | -- |
+
+#### ubiquitin
+
+| basis | threshold | nao | ref ms | simd ms | x ref |
+| --- | --- | --- | --- | --- | --- |
+| def2-svp | 1e-14 | 11577 | 50.14 | 4.23 | 11.9 |
+| def2-svp | 1e-12 | 11577 | 50.14 | 3.87 | 13.0 |
+| def2-svpd | 1e-14 | 17433 | 109.38 | 11.52 | 9.5 |
+| def2-svpd | 1e-12 | 17433 | 109.38 | 9.99 | 10.9 |
+| def2-tzvp | 1e-14 | 22442 | 171.13 | 10.82 | 15.8 |
+| def2-tzvp | 1e-12 | 22442 | 171.13 | 9.23 | 18.5 |
+| def2-tzvpp | 1e-14 | 27479 | 230.49 | 13.22 | 17.4 |
+| def2-tzvpp | 1e-12 | 27479 | 230.49 | 11.31 | 20.4 |
+| def2-tzvpd | 1e-14 | 28298 | 255.80 | 29.35 | 8.7 |
+| def2-tzvpd | 1e-12 | 28298 | 255.80 | 25.19 | 10.2 |
+| def2-tzvppd | 1e-14 | 33335 | -- | 34.99 | -- |
+| def2-tzvppd | 1e-12 | 33335 | -- | 30.13 | -- |
+| def2-qzvp | 1e-14 | 53197 | -- | 50.19 | -- |
+| def2-qzvp | 1e-12 | 53197 | -- | 42.43 | -- |
+| def2-qzvpp | 1e-14 | 53197 | -- | 50.24 | -- |
+| def2-qzvpp | 1e-12 | 53197 | -- | 42.38 | -- |
+| def2-qzvpd | 1e-14 | 59053 | -- | 112.16 | -- |
+| def2-qzvpd | 1e-12 | 59053 | -- | 93.82 | -- |
+| def2-qzvppd | 1e-14 | 59053 | -- | 112.31 | -- |
+| def2-qzvppd | 1e-12 | 59053 | -- | 94.45 | -- |
+| cc-pvdz | 1e-14 | 11577 | 77.93 | 5.13 | 15.2 |
+| cc-pvdz | 1e-12 | 11577 | 77.93 | 4.59 | 17.0 |
+| cc-pvtz | 1e-14 | 26870 | 253.76 | 12.65 | 20.1 |
+| cc-pvtz | 1e-12 | 26870 | 253.76 | 10.85 | 23.4 |
+| cc-pvqz | 1e-14 | 51984 | -- | 43.52 | -- |
+| cc-pvqz | 1e-12 | 51984 | -- | 36.36 | -- |
+| aug-cc-pvdz | 1e-14 | 19511 | 160.83 | 19.37 | 8.3 |
+| aug-cc-pvdz | 1e-12 | 19511 | 160.83 | 17.14 | 9.4 |
+| aug-cc-pvtz | 1e-14 | 42163 | -- | 77.89 | -- |
+| aug-cc-pvtz | 1e-12 | 42163 | -- | 66.24 | -- |
+| aug-cc-pvqz | 1e-14 | 77098 | -- | 348.78 | -- |
+| aug-cc-pvqz | 1e-12 | 77098 | -- | 294.58 | -- |
+
+### The two-center Coulomb driver against the reference
+
+The bases are the fitting sets, which is what this operator is used with. A dash in the
+ref column marks a case the reference dispatcher cannot reach, which is everything
+above angular momentum six. This grid merges the def2 and the correlation consistent
+fitting sets, which the sections above keep apart, so its mean is not comparable with
+the 1.07 and 0.96 recorded for them separately. The largest crambin and ubiquitin cases
+above g were left out for runtime.
+
+The geometric mean over the 44 cases with a reference is **1.21**. This driver stays the
+weak one, and for a structural reason: nothing screens here, so both sides compute
+every atom pair and the comparison is kernel against kernel rather than work against
+work.
+
+| molecule | basis | lmax | nao | ref ms | simd ms | x ref |
+| --- | --- | --- | --- | --- | --- | --- |
+| tagrisso | jfit | 4 | 2176 | 4.93 | 2.25 | 2.2 |
+| tagrisso | jkfit | 4 | 3387 | 5.84 | 3.53 | 1.7 |
+| tagrisso | cc-pvdz-rifit | 3 | 2534 | 2.07 | 1.72 | 1.2 |
+| tagrisso | cc-pvtz-rifit | 4 | 3987 | 9.25 | 3.86 | 2.4 |
+| tagrisso | cc-pvqz-rifit | 5 | 6699 | 15.41 | 13.88 | 1.1 |
+| tagrisso | cc-pv5z-rifit | 6 | 10144 | 44.26 | 49.03 | 0.9 |
+| tagrisso | aug-cc-pvdz-rifit | 3 | 3423 | 2.91 | 2.71 | 1.1 |
+| tagrisso | aug-cc-pvtz-rifit | 4 | 5440 | 11.49 | 7.20 | 1.6 |
+| tagrisso | aug-cc-pvqz-rifit | 5 | 8856 | 28.75 | 26.51 | 1.1 |
+| c60 | jfit | 4 | 2940 | 7.59 | 3.32 | 2.3 |
+| c60 | jkfit | 4 | 4500 | 11.17 | 6.06 | 1.8 |
+| c60 | cc-pvdz-rifit | 3 | 3360 | 5.94 | 2.45 | 2.4 |
+| c60 | cc-pvtz-rifit | 4 | 4860 | 6.27 | 5.50 | 1.1 |
+| c60 | cc-pvqz-rifit | 5 | 7920 | 20.50 | 20.87 | 1.0 |
+| c60 | cc-pv5z-rifit | 6 | 11580 | 58.95 | 79.14 | 0.7 |
+| c60 | aug-cc-pvdz-rifit | 3 | 4320 | 4.42 | 3.86 | 1.1 |
+| c60 | aug-cc-pvtz-rifit | 4 | 6360 | 10.86 | 10.22 | 1.1 |
+| c60 | aug-cc-pvqz-rifit | 5 | 10080 | 35.33 | 39.67 | 0.9 |
+| taxol | jfit | 4 | 3528 | 5.41 | 4.45 | 1.2 |
+| taxol | jkfit | 4 | 5489 | 11.71 | 8.16 | 1.4 |
+| taxol | cc-pvdz-rifit | 3 | 4102 | 3.87 | 3.54 | 1.1 |
+| taxol | cc-pvtz-rifit | 4 | 6411 | 10.44 | 9.30 | 1.1 |
+| taxol | cc-pvqz-rifit | 5 | 10747 | 35.88 | 34.87 | 1.0 |
+| taxol | cc-pv5z-rifit | 6 | 16232 | 106.50 | 127.84 | 0.8 |
+| taxol | aug-cc-pvdz-rifit | 3 | 5519 | 7.08 | 6.13 | 1.2 |
+| taxol | aug-cc-pvtz-rifit | 4 | 8720 | 20.70 | 17.95 | 1.2 |
+| taxol | aug-cc-pvqz-rifit | 5 | 14168 | 66.53 | 67.64 | 1.0 |
+| Cu_PPh3_4_cation | jfit | 4 | 4483 | 9.24 | 6.93 | 1.3 |
+| Cu_PPh3_4_cation | jkfit | 6 | 7256 | 19.09 | 14.74 | 1.3 |
+| Cu_PPh3_4_cation | cc-pvtz-rifit | 6 | 8364 | 23.82 | 16.16 | 1.5 |
+| Cu_PPh3_4_cation | cc-pvqz-rifit | 7 | 13798 | -- | 59.47 | -- |
+| Cu_PPh3_4_cation | cc-pv5z-rifit | 8 | 20756 | -- | 218.97 | -- |
+| Cu_PPh3_4_cation | aug-cc-pvtz-rifit | 6 | 11273 | 38.34 | 31.12 | 1.2 |
+| Cu_PPh3_4_cation | aug-cc-pvqz-rifit | 7 | 18098 | -- | 116.00 | -- |
+| paracetamol_cluster | jfit | 4 | 10208 | 38.87 | 37.66 | 1.0 |
+| paracetamol_cluster | jkfit | 4 | 15888 | 82.02 | 71.45 | 1.1 |
+| paracetamol_cluster | cc-pvdz-rifit | 3 | 11872 | 37.81 | 29.85 | 1.3 |
+| paracetamol_cluster | cc-pvtz-rifit | 4 | 18576 | 88.97 | 83.13 | 1.1 |
+| paracetamol_cluster | cc-pvqz-rifit | 5 | 31152 | 300.30 | 321.38 | 0.9 |
+| paracetamol_cluster | cc-pv5z-rifit | 6 | 47072 | -- | 1355.72 | -- |
+| paracetamol_cluster | aug-cc-pvdz-rifit | 3 | 15984 | 59.33 | 54.14 | 1.1 |
+| paracetamol_cluster | aug-cc-pvtz-rifit | 4 | 25280 | 171.71 | 162.20 | 1.1 |
+| paracetamol_cluster | aug-cc-pvqz-rifit | 5 | 41088 | -- | 730.90 | -- |
+| crambin | jfit | 4 | 19500 | 136.51 | 135.97 | 1.0 |
+| crambin | jkfit | 4 | 30751 | 274.47 | 263.42 | 1.0 |
+| crambin | cc-pvdz-rifit | 3 | 22842 | 111.50 | 107.04 | 1.0 |
+| crambin | cc-pvtz-rifit | 4 | 36183 | 319.40 | 381.11 | 0.8 |
+| crambin | aug-cc-pvdz-rifit | 3 | 30909 | 219.37 | 196.04 | 1.1 |
+| crambin | aug-cc-pvtz-rifit | 4 | 49398 | -- | 774.96 | -- |
+| ubiquitin | jfit | 4 | 36419 | 1027.64 | 541.07 | 1.9 |
+| ubiquitin | jkfit | 4 | 56971 | -- | 1124.64 | -- |
+| ubiquitin | cc-pvdz-rifit | 3 | 42538 | -- | 471.45 | -- |
+| ubiquitin | cc-pvtz-rifit | 4 | 67673 | -- | 1384.70 | -- |
+| ubiquitin | aug-cc-pvdz-rifit | 3 | 57831 | -- | 891.39 | -- |
+
+### What these numbers say
+
+The overlap and the kinetic energy drivers moved from 3.11 and 2.51 to 3.89 and 3.94
+against the reference on the same grids, and the gain is largest where it was needed:
+tagrisso 1.65 to 2.41, c60 1.50 to 2.04, taxol 2.13 to 2.67. Those are the molecules
+whose blocks are few and small, which is exactly what the fixed cost of a block was
+punishing. The largest cases move four to six per cent, as their blocks exceed the
+bound and keep the radix.
+
+What has not been fixed is the floor. Fitting `T = S + P/N` from one and fourteen
+threads, the part which does not scale is still one to four milliseconds, and it is 44
+to 98 per cent of the wall time of a call: for everything under six hundred atoms in a
+double or triple zeta basis it is 85 per cent or more. That number does not shrink with
+cores, so on a large node it is what remains. sort_by_distance was 37 to 46 per cent of
+it and is now much smaller; what is left is a tail of small phases -- the coordinates,
+the pair groups, the task list, the diagonal blocks, the description -- of three
+hundredths to a tenth of a millisecond each, several of which get *worse* as threads are
+added.
+
