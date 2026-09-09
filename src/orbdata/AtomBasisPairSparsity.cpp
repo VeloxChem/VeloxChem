@@ -54,6 +54,8 @@ CAtomBasisPairSparsity::CAtomBasisPairSparsity(const CAtomBasisPairGroup &group)
     , _bra_offsets(group.bra_basis().basis_function_offsets())
 
     , _ket_offsets(group.ket_basis().basis_function_offsets())
+
+    , _weight(0.0)
 {
     // NOTE: all atom pairs of the group survive for every combination of basis
     // functions until screening is applied, which can only lower the counts.
@@ -61,6 +63,23 @@ CAtomBasisPairSparsity::CAtomBasisPairSparsity(const CAtomBasisPairGroup &group)
     _counts.assign(number_of_bra_basis_functions() * number_of_ket_basis_functions(), _bra_atoms.size());
 
     _value_offsets = _make_value_offsets(_counts, _bra_offsets, _ket_offsets);
+
+    // NOTE: nothing is screened out here, so the cost of the block is the number of
+    // atom pairs times what every combination of basis functions computes over them.
+
+    const auto &bra_functions = group.bra_basis().functions();
+
+    const auto &ket_functions = group.ket_basis().functions();
+
+    std::ranges::for_each(bra_functions, [&](const auto &bra_function) {
+        std::ranges::for_each(ket_functions, [&](const auto &ket_function) {
+            const auto ncomps = (2 * bra_function.get_angular_momentum() + 1) * (2 * ket_function.get_angular_momentum() + 1);
+
+            const auto nprims = bra_function.exponents().size() * ket_function.exponents().size();
+
+            _weight += static_cast<double>(_bra_atoms.size()) * static_cast<double>(ncomps) * static_cast<double>(nprims);
+        });
+    });
 }
 
 auto

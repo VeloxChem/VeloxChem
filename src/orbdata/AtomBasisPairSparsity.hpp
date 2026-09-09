@@ -94,6 +94,8 @@ class CAtomBasisPairSparsity
         , _ket_offsets(group.ket_basis().basis_function_offsets())
 
         , _value_offsets{}
+
+        , _weight(0.0)
     {
         // NOTE: bisection over the atom pairs requires them to be ordered by
         // ascending interatomic distance, as the integral bound decreases
@@ -109,10 +111,26 @@ class CAtomBasisPairSparsity
 
         _counts.reserve(bra_functions.size() * ket_functions.size());
 
+        // NOTE: the cost of the block is accumulated here and not in a pass of its
+        // own. A consumer which orders the blocks by cost needs the number of
+        // surviving atom pairs of every combination of basis functions, which is
+        // what this loop produces, and the angular components and the primitives of
+        // the combination, which the basis functions carry. Gathering it in a pass of
+        // its own means reading every count of every block again, and that pass is
+        // serial while this one is not.
+
         std::ranges::for_each(bra_functions, [&](const auto &bra_function) {
             std::ranges::for_each(ket_functions, [&](const auto &ket_function) {
-                _counts.push_back(screenfunc::number_of_leading(
-                    group.distances(), [&](const double r) { return bound(bra_function, ket_function, r) > threshold; }));
+                const auto count = screenfunc::number_of_leading(
+                    group.distances(), [&](const double r) { return bound(bra_function, ket_function, r) > threshold; });
+
+                _counts.push_back(count);
+
+                const auto ncomps = (2 * bra_function.get_angular_momentum() + 1) * (2 * ket_function.get_angular_momentum() + 1);
+
+                const auto nprims = bra_function.exponents().size() * ket_function.exponents().size();
+
+                _weight += static_cast<double>(count) * static_cast<double>(ncomps) * static_cast<double>(nprims);
             });
         });
 
@@ -165,6 +183,20 @@ class CAtomBasisPairSparsity
     ket_atoms() const -> const std::vector<int> &
     {
         return _ket_atoms;
+    }
+
+    /// @brief Gets the cost of the block, i.e. the number of atom pairs surviving
+    /// the screening summed over the combinations of basis functions and weighted by
+    /// the angular components and the primitives each combination computes.
+    /// @return The cost of the block.
+    /// @note This is the quantity a consumer orders the blocks by, so that the most
+    /// costly are handed to the threads first and the tail of the loop is short. It
+    /// is accumulated where the counts are formed, which is inside the parallel
+    /// region that describes the blocks.
+    auto
+    weight() const -> double
+    {
+        return _weight;
     }
 
     /// @brief Gets number of atom pairs in sparsity pattern, i.e. the atom pairs
@@ -297,6 +329,9 @@ class CAtomBasisPairSparsity
     /// combinations are ordered as the counts, i.e. with the basis functions on
     /// bra side as rows.
     std::vector<size_t> _value_offsets;
+
+    /// @brief The cost of the block, as weight() describes it.
+    double _weight;
 };
 
 #endif /* AtomBasisPairSparsity_hpp */

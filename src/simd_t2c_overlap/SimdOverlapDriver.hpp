@@ -240,52 +240,29 @@ CSimdOverlapDriver::_compute_pair_blocks(const CSparsityPattern              &pa
 
     std::vector<double> costs(static_cast<size_t>(nblocks), 0.0);
 
-    for (int iblk = 0; iblk < nblocks; iblk++)
-    {
-        const auto &block = pattern.pair_block(static_cast<size_t>(iblk));
-
-        const auto &a_basis = bra_basis.basis_set(block.bra_index());
-
-        const auto &b_basis = ket_basis.basis_set(block.ket_index());
-
-        double weight = 0.0;
-
-        for (size_t i = 0; i < a_indices[block.bra_index()].size(); i++)
-        {
-            for (size_t j = 0; j < b_indices[block.ket_index()].size(); j++)
-            {
-                const auto [la, ia] = a_indices[block.bra_index()][i];
-
-                const auto [lb, jb] = b_indices[block.ket_index()][j];
-
-                const auto ncomps = static_cast<double>(tensor::number_of_spherical_components(std::array<int, 2>{la, lb}));
-
-                const auto nprims = static_cast<double>(a_basis.functions()[i].exponents().size() *
-                                                        b_basis.functions()[j].exponents().size());
-
-                weight += static_cast<double>(block.number_of_pairs(la, ia, lb, jb)) * ncomps * nprims;
-            }
-        }
-
-        order[static_cast<size_t>(iblk)] = static_cast<size_t>(iblk);
-
-        costs[static_cast<size_t>(iblk)] = weight;
-    }
-
-    std::ranges::sort(order, [&](const size_t a, const size_t b) { return costs[a] > costs[b]; });
-
-    // NOTE: the arena spans the largest combination of basis functions any block
-    // carries, which is the one of the highest angular momenta of the two atom
-    // bases of the block, as the rows a combination needs do not decrease with
-    // either momentum.
-
     auto arena_rows = size_t{0};
 
     auto arena_cols = size_t{0};
 
+    // NOTE: the cost of a block is read off the block and not recomputed here. It is
+    // accumulated where the sparsity of the block is described, which is inside a
+    // parallel region, so this pass is a read of one number per block rather than a
+    // walk over every combination of basis functions of every block. That walk was
+    // serial and its cost grew with the number of threads, as the number of blocks
+    // does.
+
+    // NOTE: the shape of the arena is gathered in the same pass. It spans the largest
+    // combination any block carries, which is the one of the highest angular momenta
+    // of the two atom bases of the block, as the rows a combination needs do not
+    // decrease with either momentum.
+
     for (int iblk = 0; iblk < nblocks; iblk++)
     {
         const auto &block = pattern.pair_block(static_cast<size_t>(iblk));
+
+        order[static_cast<size_t>(iblk)] = static_cast<size_t>(iblk);
+
+        costs[static_cast<size_t>(iblk)] = block.weight();
 
         arena_rows = std::max(arena_rows,
                               simdovl::number_of_buffer_rows(bra_basis.basis_set(block.bra_index()).max_angular_momentum(),
@@ -293,6 +270,9 @@ CSimdOverlapDriver::_compute_pair_blocks(const CSparsityPattern              &pa
 
         arena_cols = std::max(arena_cols, block.number_of_pairs());
     }
+
+    std::ranges::sort(order, [&](const size_t a, const size_t b) { return costs[a] > costs[b]; });
+
 
     // NOTE: the arena is formed once per thread and not once per block. Its
     // largest shape serves every block, and holding it over the whole loop costs
