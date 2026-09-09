@@ -663,6 +663,12 @@ class ScfDriver:
         self._scf_results = None
         self._scf_energy = 0.0
         self._num_iter = 0
+        self._history = None
+        self._iter_data = None
+        self._density = None
+        if not self._use_start_orbitals:
+            self._molecular_orbitals = MolecularOrbitals()
+            self._ref_mol_orbs = None
 
         assert_msg_critical(
             isinstance(self.acc_type, str) and self.acc_type.upper() in [
@@ -717,6 +723,10 @@ class ScfDriver:
 
         # check pe setup
         pe_sanity_check(self, molecule=molecule)
+
+        # Ensure embedding-object PE also populates the canonical potfile.
+        if self._pe and self.potfile is None:
+            self.potfile = self.pe_options.get('potfile')
 
         # check solvation model setup
         solvation_model_sanity_check(self)
@@ -1690,6 +1700,10 @@ class ScfDriver:
                 if self._cpcm:
                     write_cpcm_charges(checkpoint_file, self.cpcm_drv.cpcm_q)
 
+                # Set potfile before unparse_input serializes checkpoint settings.
+                if self._pe and self.potfile is None:
+                    self.potfile = self.pe_options.get('potfile')
+
                 scf_keywords = {
                     key: val[0]
                     for key, val in self._input_keywords['scf'].items()
@@ -2187,7 +2201,7 @@ class ScfDriver:
 
                 if self._pe:
                     # pe info, energy and potential matrix
-                    self._scf_results['potfile'] = self.potfile
+                    self._scf_results['potfile'] = self._get_pe_potfile()
                     self._scf_results['E_emb'] = e_emb
                     self._scf_results['F_emb'] = V_emb
 
@@ -2367,6 +2381,16 @@ class ScfDriver:
         """
 
         return self._pe or self.point_charges is not None
+
+    def _get_pe_potfile(self):
+        """Returns the PE potfile, falling back to pe_options when unset."""
+
+        if self._pe:
+            if self.potfile is not None:
+                return self.potfile
+            return self.pe_options.get('potfile')
+
+        return self.potfile
 
     def _parse_point_charge_line(self, content, idx, expect_vdw):
         """

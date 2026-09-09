@@ -17,6 +17,7 @@ from veloxchem.dispersionmodel import DispersionModel
 from veloxchem.resultsio import read_molecule_and_basis
 from veloxchem.inputparser import unparse_input, read_unparsed_input_from_hdf5
 from veloxchem.errorhandler import VeloxChemError
+from veloxchem.sanitychecks import pe_sanity_check
 
 
 @pytest.mark.solvers
@@ -514,6 +515,42 @@ class TestScfDriverMiscellaneous:
 
         assert not scf_drv.is_converged
         assert scf_drv.scf_results is None
+        assert scf_drv.history is None
+        assert scf_drv._iter_data is None
+        assert scf_drv.density is None
+        assert scf_drv.molecular_orbitals.is_empty()
+        assert scf_drv._ref_mol_orbs is None
+
+    def test_pe_potfile_falls_back_to_pe_options(self, monkeypatch):
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ostream.mute()
+
+        # PE configured through an embedding object, as in test_embedding.py.
+        scf_drv.embedding = {
+            'settings': {
+                'embedding_method': 'PE'
+            },
+            'inputs': {
+                'json_file': 'tests/data/acrolein.json'
+            },
+        }
+
+        # pyframe is not required for this state-transition test.
+        monkeypatch.setattr('veloxchem.sanitychecks.embedding_sanity_check',
+                            lambda options: None)
+        pe_sanity_check(scf_drv)
+
+        assert scf_drv._pe
+        assert scf_drv.potfile is None
+        assert scf_drv.pe_options['potfile'] == 'tests/data/acrolein.json'
+        assert scf_drv._get_pe_potfile() == 'tests/data/acrolein.json'
+
+        # This mirrors the fallback performed in compute().
+        if scf_drv._pe and scf_drv.potfile is None:
+            scf_drv.potfile = scf_drv.pe_options.get('potfile')
+
+        assert scf_drv.potfile == 'tests/data/acrolein.json'
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason='skip pytest.raises for multiple MPI processes')
