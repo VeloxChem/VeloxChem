@@ -382,7 +382,11 @@ CAtomBasisPairGroup::make_pair_groups(const std::vector<CAtomBasisGroup> &groups
 
     const auto nchunks = static_cast<int>(chunks.size());
 
-#pragma omp parallel for schedule(dynamic)
+    // NOTE: the loop is run by one thread when it holds too few chunks to pay for a
+    // region of its own. An ordinary molecule forms one to three chunks, and the fork
+    // and the join then cost several times the work.
+
+#pragma omp parallel for schedule(dynamic) if (nchunks >= omp::min_parallel_iterations)
     for (int i = 0; i < nchunks; i++)
     {
         auto &group = pair_groups[chunks[i].group];
