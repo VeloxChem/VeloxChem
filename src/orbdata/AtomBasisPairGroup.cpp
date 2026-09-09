@@ -55,15 +55,42 @@ namespace {  // anonymous namespace
 /// in which they were created.
 using TAtomPairKey = std::pair<uint64_t, uint32_t>;
 
-/// @brief Orders the keys of a group by radix.
+/// @brief The number of atom pairs below which the keys are ordered by comparison
+/// rather than by radix.
+/// @note The radix costs four passes over its counters whatever the number of the
+/// keys, so a block below this size pays far more for the counters than for its own
+/// atom pairs. Measured on fourteen threads by sweeping this bound: taxol in
+/// def2-TZVP, whose blocks hold some two hundred atom pairs, runs 1.084 ms with the
+/// radix always and 0.819 ms with the bound anywhere from 1024 to 8192; ubiquitin,
+/// whose blocks hold some thirteen thousand, runs 7.47 ms with the bound and 8.72 ms
+/// with the comparison always. The plateau between is wide and this sits in it.
+static constexpr size_t _radix_min_pairs = 4096;
+
+/// @brief Orders the keys of a group, by comparison for a small group and by radix
+/// for a large one.
 /// @param keys The keys of the atom pairs of the group.
 /// @param work The scratch space of the counting passes, of the size of the keys.
 /// @note The sort is stable, as the counting passes preserve the order of equal
-/// keys, and gives the order the ordering of the keys as pairs gives.
+/// keys, and gives the order the ordering of the keys as pairs gives. The comparison
+/// sort orders the keys as pairs outright, so the two agree.
 static auto
 _order_keys(std::vector<TAtomPairKey> &keys, std::vector<TAtomPairKey> &work) -> void
 {
     const auto npairs = keys.size();
+
+    // NOTE: the radix below costs four passes over sixty five thousand counters
+    // whatever the number of the keys, so it is worth its fixed cost only for a
+    // large block. A comparison sort of the keys as pairs gives the same order as
+    // the stable radix on their first member, as the second member is the index of
+    // the atom pair and increases with it, so equal distances keep their order
+    // either way.
+
+    if (npairs < _radix_min_pairs)
+    {
+        std::ranges::sort(keys);
+
+        return;
+    }
 
     // NOTE: the sixty four bits of a pattern are consumed in four passes of
     // sixteen bits, so the counters of one pass fit in the cache.
