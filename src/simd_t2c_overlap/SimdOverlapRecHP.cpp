@@ -144,9 +144,9 @@ compute_hp_overlap(double               *values,
         }
     }
 
-    simdtrf::compute_hrr_hp(buffer, coordinates, 136, 87, 108, nmax);
+    simdtrf::compute_hrr_hp(buffer, coordinates, 136, 87, 108, 1, nmax);
 
-    simdtrf::transform_p_inner(buffer, 199, 136, 21, nmax);
+    simdtrf::transform_p_inner(buffer, 199, 136, 21, 1, nmax);
 
     simdtrf::transform_h_outer(values, nvalues, buffer, 199, 3, nmax);
 

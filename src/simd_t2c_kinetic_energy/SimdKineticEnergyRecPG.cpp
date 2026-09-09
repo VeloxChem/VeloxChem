@@ -197,7 +197,7 @@ compute_pg_kinetic_energy(double               *values,
         }
     }
 
-    simdtrf::transform_g_inner(buffer, 331, 286, 3, nmax);
+    simdtrf::transform_g_inner(buffer, 331, 286, 3, 1, nmax);
 
     simdtrf::transform_p_outer(values, nvalues, buffer, 331, 9, nmax);
 

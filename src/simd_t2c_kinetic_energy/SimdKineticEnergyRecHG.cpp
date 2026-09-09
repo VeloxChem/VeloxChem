@@ -346,7 +346,7 @@ compute_hg_kinetic_energy(double               *values,
         }
     }
 
-    simdtrf::transform_g_inner(buffer, 4241, 3926, 21, nmax);
+    simdtrf::transform_g_inner(buffer, 4241, 3926, 21, 1, nmax);
 
     simdtrf::transform_h_outer(values, nvalues, buffer, 4241, 9, nmax);
 

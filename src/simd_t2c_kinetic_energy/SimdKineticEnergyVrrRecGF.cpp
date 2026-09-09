@@ -37,13 +37,13 @@
 
 namespace simdkin {  // simdkin namespace
 
-auto
-compute_prim_gf_kinetic_energy_0(CSimdMatrix &buffer, const size_t target, const size_t pa,
-                                 const size_t pb, const size_t df_s, const size_t df,
-                                 const size_t fd, const size_t ff, const size_t gp_s,
-                                 const size_t gf_s, const size_t gp, const size_t gd,
-                                 const size_t ncols, const double alpha, const double beta,
-                                 const double p) -> void
+static auto
+compute_prim_gf_kinetic_energy_0_piece0(CSimdMatrix &buffer, const size_t target,
+                                        const size_t pa, const size_t pb, const size_t df_s,
+                                        const size_t df, const size_t fd, const size_t ff,
+                                        const size_t gp_s, const size_t gf_s, const size_t gp,
+                                        const size_t gd, const size_t ncols, const double alpha,
+                                        const double beta, const double p) -> void
 {
     // NOTE: the factors are fixed by the pair of primitives, so they are formed
     // once rather than for every atom pair the pair reaches.
@@ -172,42 +172,6 @@ compute_prim_gf_kinetic_energy_0(CSimdMatrix &buffer, const size_t target, const
     auto *t_111 = buffer.data(target + 111);
     auto *t_112 = buffer.data(target + 112);
     auto *t_113 = buffer.data(target + 113);
-    auto *t_114 = buffer.data(target + 114);
-    auto *t_115 = buffer.data(target + 115);
-    auto *t_116 = buffer.data(target + 116);
-    auto *t_117 = buffer.data(target + 117);
-    auto *t_118 = buffer.data(target + 118);
-    auto *t_119 = buffer.data(target + 119);
-    auto *t_120 = buffer.data(target + 120);
-    auto *t_121 = buffer.data(target + 121);
-    auto *t_122 = buffer.data(target + 122);
-    auto *t_123 = buffer.data(target + 123);
-    auto *t_124 = buffer.data(target + 124);
-    auto *t_125 = buffer.data(target + 125);
-    auto *t_126 = buffer.data(target + 126);
-    auto *t_127 = buffer.data(target + 127);
-    auto *t_128 = buffer.data(target + 128);
-    auto *t_129 = buffer.data(target + 129);
-    auto *t_130 = buffer.data(target + 130);
-    auto *t_131 = buffer.data(target + 131);
-    auto *t_132 = buffer.data(target + 132);
-    auto *t_133 = buffer.data(target + 133);
-    auto *t_134 = buffer.data(target + 134);
-    auto *t_135 = buffer.data(target + 135);
-    auto *t_136 = buffer.data(target + 136);
-    auto *t_137 = buffer.data(target + 137);
-    auto *t_138 = buffer.data(target + 138);
-    auto *t_139 = buffer.data(target + 139);
-    auto *t_140 = buffer.data(target + 140);
-    auto *t_141 = buffer.data(target + 141);
-    auto *t_142 = buffer.data(target + 142);
-    auto *t_143 = buffer.data(target + 143);
-    auto *t_144 = buffer.data(target + 144);
-    auto *t_145 = buffer.data(target + 145);
-    auto *t_146 = buffer.data(target + 146);
-    auto *t_147 = buffer.data(target + 147);
-    auto *t_148 = buffer.data(target + 148);
-    auto *t_149 = buffer.data(target + 149);
 
     const auto *pa_x = buffer.data(pa + 0);
     const auto *pa_y = buffer.data(pa + 1);
@@ -221,14 +185,12 @@ compute_prim_gf_kinetic_energy_0(CSimdMatrix &buffer, const size_t target, const
     const auto *df_s_16 = buffer.data(df_s + 16);
     const auto *df_s_29 = buffer.data(df_s + 29);
     const auto *df_s_36 = buffer.data(df_s + 36);
-    const auto *df_s_49 = buffer.data(df_s + 49);
     const auto *df_s_59 = buffer.data(df_s + 59);
 
     const auto *df_0 = buffer.data(df + 0);
     const auto *df_16 = buffer.data(df + 16);
     const auto *df_29 = buffer.data(df + 29);
     const auto *df_36 = buffer.data(df + 36);
-    const auto *df_49 = buffer.data(df + 49);
     const auto *df_59 = buffer.data(df + 59);
 
     const auto *fd_0 = buffer.data(fd + 0);
@@ -249,12 +211,10 @@ compute_prim_gf_kinetic_energy_0(CSimdMatrix &buffer, const size_t target, const
     const auto *fd_36 = buffer.data(fd + 36);
     const auto *fd_39 = buffer.data(fd + 39);
     const auto *fd_41 = buffer.data(fd + 41);
-    const auto *fd_45 = buffer.data(fd + 45);
     const auto *fd_46 = buffer.data(fd + 46);
     const auto *fd_47 = buffer.data(fd + 47);
     const auto *fd_51 = buffer.data(fd + 51);
     const auto *fd_52 = buffer.data(fd + 52);
-    const auto *fd_53 = buffer.data(fd + 53);
     const auto *fd_54 = buffer.data(fd + 54);
     const auto *fd_57 = buffer.data(fd + 57);
     const auto *fd_59 = buffer.data(fd + 59);
@@ -294,8 +254,6 @@ compute_prim_gf_kinetic_energy_0(CSimdMatrix &buffer, const size_t target, const
     const auto *ff_88 = buffer.data(ff + 88);
     const auto *ff_89 = buffer.data(ff + 89);
     const auto *ff_90 = buffer.data(ff + 90);
-    const auto *ff_91 = buffer.data(ff + 91);
-    const auto *ff_92 = buffer.data(ff + 92);
     const auto *ff_96 = buffer.data(ff + 96);
     const auto *ff_97 = buffer.data(ff + 97);
     const auto *ff_99 = buffer.data(ff + 99);
@@ -311,12 +269,6 @@ compute_prim_gf_kinetic_energy_0(CSimdMatrix &buffer, const size_t target, const
     const auto *gp_s_31 = buffer.data(gp_s + 31);
     const auto *gp_s_32 = buffer.data(gp_s + 32);
     const auto *gp_s_35 = buffer.data(gp_s + 35);
-    const auto *gp_s_36 = buffer.data(gp_s + 36);
-    const auto *gp_s_37 = buffer.data(gp_s + 37);
-    const auto *gp_s_38 = buffer.data(gp_s + 38);
-    const auto *gp_s_42 = buffer.data(gp_s + 42);
-    const auto *gp_s_43 = buffer.data(gp_s + 43);
-    const auto *gp_s_44 = buffer.data(gp_s + 44);
 
     const auto *gf_s_0 = buffer.data(gf_s + 0);
     const auto *gf_s_1 = buffer.data(gf_s + 1);
@@ -432,42 +384,6 @@ compute_prim_gf_kinetic_energy_0(CSimdMatrix &buffer, const size_t target, const
     const auto *gf_s_111 = buffer.data(gf_s + 111);
     const auto *gf_s_112 = buffer.data(gf_s + 112);
     const auto *gf_s_113 = buffer.data(gf_s + 113);
-    const auto *gf_s_114 = buffer.data(gf_s + 114);
-    const auto *gf_s_115 = buffer.data(gf_s + 115);
-    const auto *gf_s_116 = buffer.data(gf_s + 116);
-    const auto *gf_s_117 = buffer.data(gf_s + 117);
-    const auto *gf_s_118 = buffer.data(gf_s + 118);
-    const auto *gf_s_119 = buffer.data(gf_s + 119);
-    const auto *gf_s_120 = buffer.data(gf_s + 120);
-    const auto *gf_s_121 = buffer.data(gf_s + 121);
-    const auto *gf_s_122 = buffer.data(gf_s + 122);
-    const auto *gf_s_123 = buffer.data(gf_s + 123);
-    const auto *gf_s_124 = buffer.data(gf_s + 124);
-    const auto *gf_s_125 = buffer.data(gf_s + 125);
-    const auto *gf_s_126 = buffer.data(gf_s + 126);
-    const auto *gf_s_127 = buffer.data(gf_s + 127);
-    const auto *gf_s_128 = buffer.data(gf_s + 128);
-    const auto *gf_s_129 = buffer.data(gf_s + 129);
-    const auto *gf_s_130 = buffer.data(gf_s + 130);
-    const auto *gf_s_131 = buffer.data(gf_s + 131);
-    const auto *gf_s_132 = buffer.data(gf_s + 132);
-    const auto *gf_s_133 = buffer.data(gf_s + 133);
-    const auto *gf_s_134 = buffer.data(gf_s + 134);
-    const auto *gf_s_135 = buffer.data(gf_s + 135);
-    const auto *gf_s_136 = buffer.data(gf_s + 136);
-    const auto *gf_s_137 = buffer.data(gf_s + 137);
-    const auto *gf_s_138 = buffer.data(gf_s + 138);
-    const auto *gf_s_139 = buffer.data(gf_s + 139);
-    const auto *gf_s_140 = buffer.data(gf_s + 140);
-    const auto *gf_s_141 = buffer.data(gf_s + 141);
-    const auto *gf_s_142 = buffer.data(gf_s + 142);
-    const auto *gf_s_143 = buffer.data(gf_s + 143);
-    const auto *gf_s_144 = buffer.data(gf_s + 144);
-    const auto *gf_s_145 = buffer.data(gf_s + 145);
-    const auto *gf_s_146 = buffer.data(gf_s + 146);
-    const auto *gf_s_147 = buffer.data(gf_s + 147);
-    const auto *gf_s_148 = buffer.data(gf_s + 148);
-    const auto *gf_s_149 = buffer.data(gf_s + 149);
 
     const auto *gp_0 = buffer.data(gp + 0);
     const auto *gp_1 = buffer.data(gp + 1);
@@ -480,12 +396,6 @@ compute_prim_gf_kinetic_energy_0(CSimdMatrix &buffer, const size_t target, const
     const auto *gp_31 = buffer.data(gp + 31);
     const auto *gp_32 = buffer.data(gp + 32);
     const auto *gp_35 = buffer.data(gp + 35);
-    const auto *gp_36 = buffer.data(gp + 36);
-    const auto *gp_37 = buffer.data(gp + 37);
-    const auto *gp_38 = buffer.data(gp + 38);
-    const auto *gp_42 = buffer.data(gp + 42);
-    const auto *gp_43 = buffer.data(gp + 43);
-    const auto *gp_44 = buffer.data(gp + 44);
 
     const auto *gd_0 = buffer.data(gd + 0);
     const auto *gd_2 = buffer.data(gd + 2);
@@ -532,22 +442,6 @@ compute_prim_gf_kinetic_energy_0(CSimdMatrix &buffer, const size_t target, const
     const auto *gd_65 = buffer.data(gd + 65);
     const auto *gd_68 = buffer.data(gd + 68);
     const auto *gd_69 = buffer.data(gd + 69);
-    const auto *gd_70 = buffer.data(gd + 70);
-    const auto *gd_71 = buffer.data(gd + 71);
-    const auto *gd_72 = buffer.data(gd + 72);
-    const auto *gd_73 = buffer.data(gd + 73);
-    const auto *gd_74 = buffer.data(gd + 74);
-    const auto *gd_75 = buffer.data(gd + 75);
-    const auto *gd_76 = buffer.data(gd + 76);
-    const auto *gd_77 = buffer.data(gd + 77);
-    const auto *gd_81 = buffer.data(gd + 81);
-    const auto *gd_82 = buffer.data(gd + 82);
-    const auto *gd_83 = buffer.data(gd + 83);
-    const auto *gd_84 = buffer.data(gd + 84);
-    const auto *gd_86 = buffer.data(gd + 86);
-    const auto *gd_87 = buffer.data(gd + 87);
-    const auto *gd_88 = buffer.data(gd + 88);
-    const auto *gd_89 = buffer.data(gd + 89);
 
 #pragma omp simd aligned(t_0, t_1, t_2, pb_x, pb_y, pb_z, fd_0, gp_s_0, gf_s_0, gf_s_1, \
                          gf_s_2, gp_0, gd_0 : simd::cache_line_size())
@@ -1136,6 +1030,168 @@ compute_prim_gf_kinetic_energy_0(CSimdMatrix &buffer, const size_t target, const
         t_113[k] = f_2 * gf_s_113[k]
                    + pb_x[k] * gd_69[k];
     }
+}
+
+static auto
+compute_prim_gf_kinetic_energy_0_piece1(CSimdMatrix &buffer, const size_t target,
+                                        const size_t pa, const size_t pb, const size_t df_s,
+                                        const size_t df, const size_t fd, const size_t ff,
+                                        const size_t gp_s, const size_t gf_s, const size_t gp,
+                                        const size_t gd, const size_t ncols, const double alpha,
+                                        const double beta, const double p) -> void
+{
+    // NOTE: the factors are fixed by the pair of primitives, so they are formed
+    // once rather than for every atom pair the pair reaches.
+
+    const auto f_0 = 2.0 / p;
+    const auto f_1 = 2.0 * alpha / p;
+    const auto f_2 = 2.0 * alpha * beta / p;
+    const auto f_3 = 1.0 / p;
+    const auto f_4 = 0.5 / p;
+    const auto f_5 = 1.5 / p;
+    const auto f_6 = 2.0 * beta / p;
+    const auto f_7 = alpha / p;
+    const auto f_8 = beta / p;
+
+    auto *t_114 = buffer.data(target + 114);
+    auto *t_115 = buffer.data(target + 115);
+    auto *t_116 = buffer.data(target + 116);
+    auto *t_117 = buffer.data(target + 117);
+    auto *t_118 = buffer.data(target + 118);
+    auto *t_119 = buffer.data(target + 119);
+    auto *t_120 = buffer.data(target + 120);
+    auto *t_121 = buffer.data(target + 121);
+    auto *t_122 = buffer.data(target + 122);
+    auto *t_123 = buffer.data(target + 123);
+    auto *t_124 = buffer.data(target + 124);
+    auto *t_125 = buffer.data(target + 125);
+    auto *t_126 = buffer.data(target + 126);
+    auto *t_127 = buffer.data(target + 127);
+    auto *t_128 = buffer.data(target + 128);
+    auto *t_129 = buffer.data(target + 129);
+    auto *t_130 = buffer.data(target + 130);
+    auto *t_131 = buffer.data(target + 131);
+    auto *t_132 = buffer.data(target + 132);
+    auto *t_133 = buffer.data(target + 133);
+    auto *t_134 = buffer.data(target + 134);
+    auto *t_135 = buffer.data(target + 135);
+    auto *t_136 = buffer.data(target + 136);
+    auto *t_137 = buffer.data(target + 137);
+    auto *t_138 = buffer.data(target + 138);
+    auto *t_139 = buffer.data(target + 139);
+    auto *t_140 = buffer.data(target + 140);
+    auto *t_141 = buffer.data(target + 141);
+    auto *t_142 = buffer.data(target + 142);
+    auto *t_143 = buffer.data(target + 143);
+    auto *t_144 = buffer.data(target + 144);
+    auto *t_145 = buffer.data(target + 145);
+    auto *t_146 = buffer.data(target + 146);
+    auto *t_147 = buffer.data(target + 147);
+    auto *t_148 = buffer.data(target + 148);
+    auto *t_149 = buffer.data(target + 149);
+
+    const auto *pa_y = buffer.data(pa + 1);
+    const auto *pa_z = buffer.data(pa + 2);
+
+    const auto *pb_x = buffer.data(pb + 0);
+    const auto *pb_y = buffer.data(pb + 1);
+    const auto *pb_z = buffer.data(pb + 2);
+
+    const auto *df_s_36 = buffer.data(df_s + 36);
+    const auto *df_s_49 = buffer.data(df_s + 49);
+    const auto *df_s_59 = buffer.data(df_s + 59);
+
+    const auto *df_36 = buffer.data(df + 36);
+    const auto *df_49 = buffer.data(df + 49);
+    const auto *df_59 = buffer.data(df + 59);
+
+    const auto *fd_39 = buffer.data(fd + 39);
+    const auto *fd_45 = buffer.data(fd + 45);
+    const auto *fd_47 = buffer.data(fd + 47);
+    const auto *fd_51 = buffer.data(fd + 51);
+    const auto *fd_53 = buffer.data(fd + 53);
+    const auto *fd_54 = buffer.data(fd + 54);
+    const auto *fd_57 = buffer.data(fd + 57);
+    const auto *fd_59 = buffer.data(fd + 59);
+
+    const auto *ff_66 = buffer.data(ff + 66);
+    const auto *ff_76 = buffer.data(ff + 76);
+    const auto *ff_79 = buffer.data(ff + 79);
+    const auto *ff_89 = buffer.data(ff + 89);
+    const auto *ff_90 = buffer.data(ff + 90);
+    const auto *ff_91 = buffer.data(ff + 91);
+    const auto *ff_92 = buffer.data(ff + 92);
+    const auto *ff_96 = buffer.data(ff + 96);
+    const auto *ff_99 = buffer.data(ff + 99);
+
+    const auto *gp_s_36 = buffer.data(gp_s + 36);
+    const auto *gp_s_37 = buffer.data(gp_s + 37);
+    const auto *gp_s_38 = buffer.data(gp_s + 38);
+    const auto *gp_s_42 = buffer.data(gp_s + 42);
+    const auto *gp_s_43 = buffer.data(gp_s + 43);
+    const auto *gp_s_44 = buffer.data(gp_s + 44);
+
+    const auto *gf_s_114 = buffer.data(gf_s + 114);
+    const auto *gf_s_115 = buffer.data(gf_s + 115);
+    const auto *gf_s_116 = buffer.data(gf_s + 116);
+    const auto *gf_s_117 = buffer.data(gf_s + 117);
+    const auto *gf_s_118 = buffer.data(gf_s + 118);
+    const auto *gf_s_119 = buffer.data(gf_s + 119);
+    const auto *gf_s_120 = buffer.data(gf_s + 120);
+    const auto *gf_s_121 = buffer.data(gf_s + 121);
+    const auto *gf_s_122 = buffer.data(gf_s + 122);
+    const auto *gf_s_123 = buffer.data(gf_s + 123);
+    const auto *gf_s_124 = buffer.data(gf_s + 124);
+    const auto *gf_s_125 = buffer.data(gf_s + 125);
+    const auto *gf_s_126 = buffer.data(gf_s + 126);
+    const auto *gf_s_127 = buffer.data(gf_s + 127);
+    const auto *gf_s_128 = buffer.data(gf_s + 128);
+    const auto *gf_s_129 = buffer.data(gf_s + 129);
+    const auto *gf_s_130 = buffer.data(gf_s + 130);
+    const auto *gf_s_131 = buffer.data(gf_s + 131);
+    const auto *gf_s_132 = buffer.data(gf_s + 132);
+    const auto *gf_s_133 = buffer.data(gf_s + 133);
+    const auto *gf_s_134 = buffer.data(gf_s + 134);
+    const auto *gf_s_135 = buffer.data(gf_s + 135);
+    const auto *gf_s_136 = buffer.data(gf_s + 136);
+    const auto *gf_s_137 = buffer.data(gf_s + 137);
+    const auto *gf_s_138 = buffer.data(gf_s + 138);
+    const auto *gf_s_139 = buffer.data(gf_s + 139);
+    const auto *gf_s_140 = buffer.data(gf_s + 140);
+    const auto *gf_s_141 = buffer.data(gf_s + 141);
+    const auto *gf_s_142 = buffer.data(gf_s + 142);
+    const auto *gf_s_143 = buffer.data(gf_s + 143);
+    const auto *gf_s_144 = buffer.data(gf_s + 144);
+    const auto *gf_s_145 = buffer.data(gf_s + 145);
+    const auto *gf_s_146 = buffer.data(gf_s + 146);
+    const auto *gf_s_147 = buffer.data(gf_s + 147);
+    const auto *gf_s_148 = buffer.data(gf_s + 148);
+    const auto *gf_s_149 = buffer.data(gf_s + 149);
+
+    const auto *gp_36 = buffer.data(gp + 36);
+    const auto *gp_37 = buffer.data(gp + 37);
+    const auto *gp_38 = buffer.data(gp + 38);
+    const auto *gp_42 = buffer.data(gp + 42);
+    const auto *gp_43 = buffer.data(gp + 43);
+    const auto *gp_44 = buffer.data(gp + 44);
+
+    const auto *gd_69 = buffer.data(gd + 69);
+    const auto *gd_70 = buffer.data(gd + 70);
+    const auto *gd_71 = buffer.data(gd + 71);
+    const auto *gd_72 = buffer.data(gd + 72);
+    const auto *gd_73 = buffer.data(gd + 73);
+    const auto *gd_74 = buffer.data(gd + 74);
+    const auto *gd_75 = buffer.data(gd + 75);
+    const auto *gd_76 = buffer.data(gd + 76);
+    const auto *gd_77 = buffer.data(gd + 77);
+    const auto *gd_81 = buffer.data(gd + 81);
+    const auto *gd_82 = buffer.data(gd + 82);
+    const auto *gd_83 = buffer.data(gd + 83);
+    const auto *gd_84 = buffer.data(gd + 84);
+    const auto *gd_86 = buffer.data(gd + 86);
+    const auto *gd_87 = buffer.data(gd + 87);
+    const auto *gd_88 = buffer.data(gd + 88);
+    const auto *gd_89 = buffer.data(gd + 89);
 
 #pragma omp simd aligned(t_114, t_115, t_116, t_117, pa_z, pb_x, pb_z, fd_39, ff_66, gf_s_114, \
                          gf_s_115, gf_s_116, gf_s_117, gd_69, gd_70, \
@@ -1337,6 +1393,21 @@ compute_prim_gf_kinetic_energy_0(CSimdMatrix &buffer, const size_t target, const
                    + f_3 * gp_44[k]
                    + pb_z[k] * gd_89[k];
     }
+}
+
+auto
+compute_prim_gf_kinetic_energy_0(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                 const size_t pb, const size_t df_s, const size_t df,
+                                 const size_t fd, const size_t ff, const size_t gp_s,
+                                 const size_t gf_s, const size_t gp, const size_t gd,
+                                 const size_t ncols, const double alpha, const double beta,
+                                 const double p) -> void
+{
+    compute_prim_gf_kinetic_energy_0_piece0(buffer, target, pa, pb, df_s, df, fd, ff, gp_s,
+                                            gf_s, gp, gd, ncols, alpha, beta, p);
+
+    compute_prim_gf_kinetic_energy_0_piece1(buffer, target, pa, pb, df_s, df, fd, ff, gp_s,
+                                            gf_s, gp, gd, ncols, alpha, beta, p);
 }
 
 }  // namespace simdkin

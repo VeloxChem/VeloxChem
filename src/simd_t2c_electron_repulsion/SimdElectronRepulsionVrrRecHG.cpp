@@ -37,13 +37,13 @@
 
 namespace simdt2ceri {  // simdt2ceri namespace
 
-auto
-compute_prim_hg_electron_repulsion_0(CSimdMatrix &buffer, const size_t target, const size_t pa,
-                                     const size_t pb, const size_t fg0, const size_t fg1,
-                                     const size_t gf, const size_t gg, const size_t hd0,
-                                     const size_t hd1, const size_t hf, const size_t ncols,
-                                     const double alpha, const double beta,
-                                     const double p) -> void
+static auto
+compute_prim_hg_electron_repulsion_0_piece0(CSimdMatrix &buffer, const size_t target,
+                                            const size_t pa, const size_t pb, const size_t fg0,
+                                            const size_t fg1, const size_t gf, const size_t gg,
+                                            const size_t hd0, const size_t hd1, const size_t hf,
+                                            const size_t ncols, const double alpha,
+                                            const double beta, const double p) -> void
 {
     // NOTE: the factors are fixed by the pair of primitives, so they are formed
     // once rather than for every atom pair the pair reaches.
@@ -206,177 +206,6 @@ compute_prim_hg_electron_repulsion_0(CSimdMatrix &buffer, const size_t target, c
     auto *t_141 = buffer.data(target + 141);
     auto *t_142 = buffer.data(target + 142);
     auto *t_143 = buffer.data(target + 143);
-    auto *t_144 = buffer.data(target + 144);
-    auto *t_145 = buffer.data(target + 145);
-    auto *t_146 = buffer.data(target + 146);
-    auto *t_147 = buffer.data(target + 147);
-    auto *t_148 = buffer.data(target + 148);
-    auto *t_149 = buffer.data(target + 149);
-    auto *t_150 = buffer.data(target + 150);
-    auto *t_151 = buffer.data(target + 151);
-    auto *t_152 = buffer.data(target + 152);
-    auto *t_153 = buffer.data(target + 153);
-    auto *t_154 = buffer.data(target + 154);
-    auto *t_155 = buffer.data(target + 155);
-    auto *t_156 = buffer.data(target + 156);
-    auto *t_157 = buffer.data(target + 157);
-    auto *t_158 = buffer.data(target + 158);
-    auto *t_159 = buffer.data(target + 159);
-    auto *t_160 = buffer.data(target + 160);
-    auto *t_161 = buffer.data(target + 161);
-    auto *t_162 = buffer.data(target + 162);
-    auto *t_163 = buffer.data(target + 163);
-    auto *t_164 = buffer.data(target + 164);
-    auto *t_165 = buffer.data(target + 165);
-    auto *t_166 = buffer.data(target + 166);
-    auto *t_167 = buffer.data(target + 167);
-    auto *t_168 = buffer.data(target + 168);
-    auto *t_169 = buffer.data(target + 169);
-    auto *t_170 = buffer.data(target + 170);
-    auto *t_171 = buffer.data(target + 171);
-    auto *t_172 = buffer.data(target + 172);
-    auto *t_173 = buffer.data(target + 173);
-    auto *t_174 = buffer.data(target + 174);
-    auto *t_175 = buffer.data(target + 175);
-    auto *t_176 = buffer.data(target + 176);
-    auto *t_177 = buffer.data(target + 177);
-    auto *t_178 = buffer.data(target + 178);
-    auto *t_179 = buffer.data(target + 179);
-    auto *t_180 = buffer.data(target + 180);
-    auto *t_181 = buffer.data(target + 181);
-    auto *t_182 = buffer.data(target + 182);
-    auto *t_183 = buffer.data(target + 183);
-    auto *t_184 = buffer.data(target + 184);
-    auto *t_185 = buffer.data(target + 185);
-    auto *t_186 = buffer.data(target + 186);
-    auto *t_187 = buffer.data(target + 187);
-    auto *t_188 = buffer.data(target + 188);
-    auto *t_189 = buffer.data(target + 189);
-    auto *t_190 = buffer.data(target + 190);
-    auto *t_191 = buffer.data(target + 191);
-    auto *t_192 = buffer.data(target + 192);
-    auto *t_193 = buffer.data(target + 193);
-    auto *t_194 = buffer.data(target + 194);
-    auto *t_195 = buffer.data(target + 195);
-    auto *t_196 = buffer.data(target + 196);
-    auto *t_197 = buffer.data(target + 197);
-    auto *t_198 = buffer.data(target + 198);
-    auto *t_199 = buffer.data(target + 199);
-    auto *t_200 = buffer.data(target + 200);
-    auto *t_201 = buffer.data(target + 201);
-    auto *t_202 = buffer.data(target + 202);
-    auto *t_203 = buffer.data(target + 203);
-    auto *t_204 = buffer.data(target + 204);
-    auto *t_205 = buffer.data(target + 205);
-    auto *t_206 = buffer.data(target + 206);
-    auto *t_207 = buffer.data(target + 207);
-    auto *t_208 = buffer.data(target + 208);
-    auto *t_209 = buffer.data(target + 209);
-    auto *t_210 = buffer.data(target + 210);
-    auto *t_211 = buffer.data(target + 211);
-    auto *t_212 = buffer.data(target + 212);
-    auto *t_213 = buffer.data(target + 213);
-    auto *t_214 = buffer.data(target + 214);
-    auto *t_215 = buffer.data(target + 215);
-    auto *t_216 = buffer.data(target + 216);
-    auto *t_217 = buffer.data(target + 217);
-    auto *t_218 = buffer.data(target + 218);
-    auto *t_219 = buffer.data(target + 219);
-    auto *t_220 = buffer.data(target + 220);
-    auto *t_221 = buffer.data(target + 221);
-    auto *t_222 = buffer.data(target + 222);
-    auto *t_223 = buffer.data(target + 223);
-    auto *t_224 = buffer.data(target + 224);
-    auto *t_225 = buffer.data(target + 225);
-    auto *t_226 = buffer.data(target + 226);
-    auto *t_227 = buffer.data(target + 227);
-    auto *t_228 = buffer.data(target + 228);
-    auto *t_229 = buffer.data(target + 229);
-    auto *t_230 = buffer.data(target + 230);
-    auto *t_231 = buffer.data(target + 231);
-    auto *t_232 = buffer.data(target + 232);
-    auto *t_233 = buffer.data(target + 233);
-    auto *t_234 = buffer.data(target + 234);
-    auto *t_235 = buffer.data(target + 235);
-    auto *t_236 = buffer.data(target + 236);
-    auto *t_237 = buffer.data(target + 237);
-    auto *t_238 = buffer.data(target + 238);
-    auto *t_239 = buffer.data(target + 239);
-    auto *t_240 = buffer.data(target + 240);
-    auto *t_241 = buffer.data(target + 241);
-    auto *t_242 = buffer.data(target + 242);
-    auto *t_243 = buffer.data(target + 243);
-    auto *t_244 = buffer.data(target + 244);
-    auto *t_245 = buffer.data(target + 245);
-    auto *t_246 = buffer.data(target + 246);
-    auto *t_247 = buffer.data(target + 247);
-    auto *t_248 = buffer.data(target + 248);
-    auto *t_249 = buffer.data(target + 249);
-    auto *t_250 = buffer.data(target + 250);
-    auto *t_251 = buffer.data(target + 251);
-    auto *t_252 = buffer.data(target + 252);
-    auto *t_253 = buffer.data(target + 253);
-    auto *t_254 = buffer.data(target + 254);
-    auto *t_255 = buffer.data(target + 255);
-    auto *t_256 = buffer.data(target + 256);
-    auto *t_257 = buffer.data(target + 257);
-    auto *t_258 = buffer.data(target + 258);
-    auto *t_259 = buffer.data(target + 259);
-    auto *t_260 = buffer.data(target + 260);
-    auto *t_261 = buffer.data(target + 261);
-    auto *t_262 = buffer.data(target + 262);
-    auto *t_263 = buffer.data(target + 263);
-    auto *t_264 = buffer.data(target + 264);
-    auto *t_265 = buffer.data(target + 265);
-    auto *t_266 = buffer.data(target + 266);
-    auto *t_267 = buffer.data(target + 267);
-    auto *t_268 = buffer.data(target + 268);
-    auto *t_269 = buffer.data(target + 269);
-    auto *t_270 = buffer.data(target + 270);
-    auto *t_271 = buffer.data(target + 271);
-    auto *t_272 = buffer.data(target + 272);
-    auto *t_273 = buffer.data(target + 273);
-    auto *t_274 = buffer.data(target + 274);
-    auto *t_275 = buffer.data(target + 275);
-    auto *t_276 = buffer.data(target + 276);
-    auto *t_277 = buffer.data(target + 277);
-    auto *t_278 = buffer.data(target + 278);
-    auto *t_279 = buffer.data(target + 279);
-    auto *t_280 = buffer.data(target + 280);
-    auto *t_281 = buffer.data(target + 281);
-    auto *t_282 = buffer.data(target + 282);
-    auto *t_283 = buffer.data(target + 283);
-    auto *t_284 = buffer.data(target + 284);
-    auto *t_285 = buffer.data(target + 285);
-    auto *t_286 = buffer.data(target + 286);
-    auto *t_287 = buffer.data(target + 287);
-    auto *t_288 = buffer.data(target + 288);
-    auto *t_289 = buffer.data(target + 289);
-    auto *t_290 = buffer.data(target + 290);
-    auto *t_291 = buffer.data(target + 291);
-    auto *t_292 = buffer.data(target + 292);
-    auto *t_293 = buffer.data(target + 293);
-    auto *t_294 = buffer.data(target + 294);
-    auto *t_295 = buffer.data(target + 295);
-    auto *t_296 = buffer.data(target + 296);
-    auto *t_297 = buffer.data(target + 297);
-    auto *t_298 = buffer.data(target + 298);
-    auto *t_299 = buffer.data(target + 299);
-    auto *t_300 = buffer.data(target + 300);
-    auto *t_301 = buffer.data(target + 301);
-    auto *t_302 = buffer.data(target + 302);
-    auto *t_303 = buffer.data(target + 303);
-    auto *t_304 = buffer.data(target + 304);
-    auto *t_305 = buffer.data(target + 305);
-    auto *t_306 = buffer.data(target + 306);
-    auto *t_307 = buffer.data(target + 307);
-    auto *t_308 = buffer.data(target + 308);
-    auto *t_309 = buffer.data(target + 309);
-    auto *t_310 = buffer.data(target + 310);
-    auto *t_311 = buffer.data(target + 311);
-    auto *t_312 = buffer.data(target + 312);
-    auto *t_313 = buffer.data(target + 313);
-    auto *t_314 = buffer.data(target + 314);
 
     const auto *pa_x = buffer.data(pa + 0);
     const auto *pa_y = buffer.data(pa + 1);
@@ -392,9 +221,6 @@ compute_prim_hg_electron_repulsion_0(CSimdMatrix &buffer, const size_t target, c
     const auto *fg0_55 = buffer.data(fg0 + 55);
     const auto *fg0_89 = buffer.data(fg0 + 89);
     const auto *fg0_100 = buffer.data(fg0 + 100);
-    const auto *fg0_115 = buffer.data(fg0 + 115);
-    const auto *fg0_134 = buffer.data(fg0 + 134);
-    const auto *fg0_149 = buffer.data(fg0 + 149);
 
     const auto *fg1_0 = buffer.data(fg1 + 0);
     const auto *fg1_15 = buffer.data(fg1 + 15);
@@ -402,9 +228,6 @@ compute_prim_hg_electron_repulsion_0(CSimdMatrix &buffer, const size_t target, c
     const auto *fg1_55 = buffer.data(fg1 + 55);
     const auto *fg1_89 = buffer.data(fg1 + 89);
     const auto *fg1_100 = buffer.data(fg1 + 100);
-    const auto *fg1_115 = buffer.data(fg1 + 115);
-    const auto *fg1_134 = buffer.data(fg1 + 134);
-    const auto *fg1_149 = buffer.data(fg1 + 149);
 
     const auto *gf_0 = buffer.data(gf + 0);
     const auto *gf_1 = buffer.data(gf + 1);
@@ -443,66 +266,19 @@ compute_prim_hg_electron_repulsion_0(CSimdMatrix &buffer, const size_t target, c
     const auto *gf_57 = buffer.data(gf + 57);
     const auto *gf_58 = buffer.data(gf + 58);
     const auto *gf_59 = buffer.data(gf + 59);
-    const auto *gf_60 = buffer.data(gf + 60);
     const auto *gf_63 = buffer.data(gf + 63);
     const auto *gf_66 = buffer.data(gf + 66);
     const auto *gf_68 = buffer.data(gf + 68);
     const auto *gf_69 = buffer.data(gf + 69);
-    const auto *gf_70 = buffer.data(gf + 70);
-    const auto *gf_72 = buffer.data(gf + 72);
     const auto *gf_77 = buffer.data(gf + 77);
     const auto *gf_78 = buffer.data(gf + 78);
     const auto *gf_79 = buffer.data(gf + 79);
-    const auto *gf_80 = buffer.data(gf + 80);
-    const auto *gf_82 = buffer.data(gf + 82);
     const auto *gf_86 = buffer.data(gf + 86);
     const auto *gf_87 = buffer.data(gf + 87);
     const auto *gf_88 = buffer.data(gf + 88);
-    const auto *gf_90 = buffer.data(gf + 90);
-    const auto *gf_92 = buffer.data(gf + 92);
     const auto *gf_95 = buffer.data(gf + 95);
     const auto *gf_96 = buffer.data(gf + 96);
     const auto *gf_97 = buffer.data(gf + 97);
-    const auto *gf_99 = buffer.data(gf + 99);
-    const auto *gf_100 = buffer.data(gf + 100);
-    const auto *gf_102 = buffer.data(gf + 102);
-    const auto *gf_103 = buffer.data(gf + 103);
-    const auto *gf_105 = buffer.data(gf + 105);
-    const auto *gf_106 = buffer.data(gf + 106);
-    const auto *gf_107 = buffer.data(gf + 107);
-    const auto *gf_108 = buffer.data(gf + 108);
-    const auto *gf_109 = buffer.data(gf + 109);
-    const auto *gf_110 = buffer.data(gf + 110);
-    const auto *gf_112 = buffer.data(gf + 112);
-    const auto *gf_115 = buffer.data(gf + 115);
-    const auto *gf_116 = buffer.data(gf + 116);
-    const auto *gf_117 = buffer.data(gf + 117);
-    const auto *gf_118 = buffer.data(gf + 118);
-    const auto *gf_119 = buffer.data(gf + 119);
-    const auto *gf_120 = buffer.data(gf + 120);
-    const auto *gf_122 = buffer.data(gf + 122);
-    const auto *gf_123 = buffer.data(gf + 123);
-    const auto *gf_125 = buffer.data(gf + 125);
-    const auto *gf_126 = buffer.data(gf + 126);
-    const auto *gf_127 = buffer.data(gf + 127);
-    const auto *gf_128 = buffer.data(gf + 128);
-    const auto *gf_129 = buffer.data(gf + 129);
-    const auto *gf_130 = buffer.data(gf + 130);
-    const auto *gf_132 = buffer.data(gf + 132);
-    const auto *gf_133 = buffer.data(gf + 133);
-    const auto *gf_136 = buffer.data(gf + 136);
-    const auto *gf_137 = buffer.data(gf + 137);
-    const auto *gf_138 = buffer.data(gf + 138);
-    const auto *gf_139 = buffer.data(gf + 139);
-    const auto *gf_140 = buffer.data(gf + 140);
-    const auto *gf_141 = buffer.data(gf + 141);
-    const auto *gf_142 = buffer.data(gf + 142);
-    const auto *gf_143 = buffer.data(gf + 143);
-    const auto *gf_145 = buffer.data(gf + 145);
-    const auto *gf_146 = buffer.data(gf + 146);
-    const auto *gf_147 = buffer.data(gf + 147);
-    const auto *gf_148 = buffer.data(gf + 148);
-    const auto *gf_149 = buffer.data(gf + 149);
 
     const auto *gg_0 = buffer.data(gg + 0);
     const auto *gg_3 = buffer.data(gg + 3);
@@ -539,52 +315,7 @@ compute_prim_hg_electron_repulsion_0(CSimdMatrix &buffer, const size_t target, c
     const auto *gg_85 = buffer.data(gg + 85);
     const auto *gg_87 = buffer.data(gg + 87);
     const auto *gg_89 = buffer.data(gg + 89);
-    const auto *gg_90 = buffer.data(gg + 90);
-    const auto *gg_91 = buffer.data(gg + 91);
-    const auto *gg_93 = buffer.data(gg + 93);
-    const auto *gg_96 = buffer.data(gg + 96);
     const auto *gg_100 = buffer.data(gg + 100);
-    const auto *gg_135 = buffer.data(gg + 135);
-    const auto *gg_137 = buffer.data(gg + 137);
-    const auto *gg_140 = buffer.data(gg + 140);
-    const auto *gg_144 = buffer.data(gg + 144);
-    const auto *gg_149 = buffer.data(gg + 149);
-    const auto *gg_150 = buffer.data(gg + 150);
-    const auto *gg_151 = buffer.data(gg + 151);
-    const auto *gg_153 = buffer.data(gg + 153);
-    const auto *gg_155 = buffer.data(gg + 155);
-    const auto *gg_160 = buffer.data(gg + 160);
-    const auto *gg_162 = buffer.data(gg + 162);
-    const auto *gg_163 = buffer.data(gg + 163);
-    const auto *gg_164 = buffer.data(gg + 164);
-    const auto *gg_170 = buffer.data(gg + 170);
-    const auto *gg_175 = buffer.data(gg + 175);
-    const auto *gg_176 = buffer.data(gg + 176);
-    const auto *gg_177 = buffer.data(gg + 177);
-    const auto *gg_178 = buffer.data(gg + 178);
-    const auto *gg_179 = buffer.data(gg + 179);
-    const auto *gg_180 = buffer.data(gg + 180);
-    const auto *gg_183 = buffer.data(gg + 183);
-    const auto *gg_185 = buffer.data(gg + 185);
-    const auto *gg_190 = buffer.data(gg + 190);
-    const auto *gg_191 = buffer.data(gg + 191);
-    const auto *gg_192 = buffer.data(gg + 192);
-    const auto *gg_193 = buffer.data(gg + 193);
-    const auto *gg_194 = buffer.data(gg + 194);
-    const auto *gg_198 = buffer.data(gg + 198);
-    const auto *gg_205 = buffer.data(gg + 205);
-    const auto *gg_206 = buffer.data(gg + 206);
-    const auto *gg_207 = buffer.data(gg + 207);
-    const auto *gg_208 = buffer.data(gg + 208);
-    const auto *gg_209 = buffer.data(gg + 209);
-    const auto *gg_210 = buffer.data(gg + 210);
-    const auto *gg_212 = buffer.data(gg + 212);
-    const auto *gg_213 = buffer.data(gg + 213);
-    const auto *gg_215 = buffer.data(gg + 215);
-    const auto *gg_220 = buffer.data(gg + 220);
-    const auto *gg_221 = buffer.data(gg + 221);
-    const auto *gg_222 = buffer.data(gg + 222);
-    const auto *gg_224 = buffer.data(gg + 224);
 
     const auto *hd0_0 = buffer.data(hd0 + 0);
     const auto *hd0_3 = buffer.data(hd0 + 3);
@@ -599,20 +330,7 @@ compute_prim_hg_electron_repulsion_0(CSimdMatrix &buffer, const size_t target, c
     const auto *hd0_39 = buffer.data(hd0 + 39);
     const auto *hd0_41 = buffer.data(hd0 + 41);
     const auto *hd0_54 = buffer.data(hd0 + 54);
-    const auto *hd0_57 = buffer.data(hd0 + 57);
     const auto *hd0_59 = buffer.data(hd0 + 59);
-    const auto *hd0_90 = buffer.data(hd0 + 90);
-    const auto *hd0_93 = buffer.data(hd0 + 93);
-    const auto *hd0_95 = buffer.data(hd0 + 95);
-    const auto *hd0_102 = buffer.data(hd0 + 102);
-    const auto *hd0_105 = buffer.data(hd0 + 105);
-    const auto *hd0_107 = buffer.data(hd0 + 107);
-    const auto *hd0_108 = buffer.data(hd0 + 108);
-    const auto *hd0_111 = buffer.data(hd0 + 111);
-    const auto *hd0_113 = buffer.data(hd0 + 113);
-    const auto *hd0_120 = buffer.data(hd0 + 120);
-    const auto *hd0_123 = buffer.data(hd0 + 123);
-    const auto *hd0_125 = buffer.data(hd0 + 125);
 
     const auto *hd1_0 = buffer.data(hd1 + 0);
     const auto *hd1_3 = buffer.data(hd1 + 3);
@@ -627,20 +345,7 @@ compute_prim_hg_electron_repulsion_0(CSimdMatrix &buffer, const size_t target, c
     const auto *hd1_39 = buffer.data(hd1 + 39);
     const auto *hd1_41 = buffer.data(hd1 + 41);
     const auto *hd1_54 = buffer.data(hd1 + 54);
-    const auto *hd1_57 = buffer.data(hd1 + 57);
     const auto *hd1_59 = buffer.data(hd1 + 59);
-    const auto *hd1_90 = buffer.data(hd1 + 90);
-    const auto *hd1_93 = buffer.data(hd1 + 93);
-    const auto *hd1_95 = buffer.data(hd1 + 95);
-    const auto *hd1_102 = buffer.data(hd1 + 102);
-    const auto *hd1_105 = buffer.data(hd1 + 105);
-    const auto *hd1_107 = buffer.data(hd1 + 107);
-    const auto *hd1_108 = buffer.data(hd1 + 108);
-    const auto *hd1_111 = buffer.data(hd1 + 111);
-    const auto *hd1_113 = buffer.data(hd1 + 113);
-    const auto *hd1_120 = buffer.data(hd1 + 120);
-    const auto *hd1_123 = buffer.data(hd1 + 123);
-    const auto *hd1_125 = buffer.data(hd1 + 125);
 
     const auto *hf_0 = buffer.data(hf + 0);
     const auto *hf_1 = buffer.data(hf + 1);
@@ -709,80 +414,6 @@ compute_prim_hg_electron_repulsion_0(CSimdMatrix &buffer, const size_t target, c
     const auto *hf_95 = buffer.data(hf + 95);
     const auto *hf_96 = buffer.data(hf + 96);
     const auto *hf_97 = buffer.data(hf + 97);
-    const auto *hf_98 = buffer.data(hf + 98);
-    const auto *hf_99 = buffer.data(hf + 99);
-    const auto *hf_100 = buffer.data(hf + 100);
-    const auto *hf_101 = buffer.data(hf + 101);
-    const auto *hf_103 = buffer.data(hf + 103);
-    const auto *hf_106 = buffer.data(hf + 106);
-    const auto *hf_108 = buffer.data(hf + 108);
-    const auto *hf_109 = buffer.data(hf + 109);
-    const auto *hf_110 = buffer.data(hf + 110);
-    const auto *hf_112 = buffer.data(hf + 112);
-    const auto *hf_117 = buffer.data(hf + 117);
-    const auto *hf_118 = buffer.data(hf + 118);
-    const auto *hf_119 = buffer.data(hf + 119);
-    const auto *hf_120 = buffer.data(hf + 120);
-    const auto *hf_122 = buffer.data(hf + 122);
-    const auto *hf_126 = buffer.data(hf + 126);
-    const auto *hf_127 = buffer.data(hf + 127);
-    const auto *hf_128 = buffer.data(hf + 128);
-    const auto *hf_129 = buffer.data(hf + 129);
-    const auto *hf_130 = buffer.data(hf + 130);
-    const auto *hf_132 = buffer.data(hf + 132);
-    const auto *hf_136 = buffer.data(hf + 136);
-    const auto *hf_137 = buffer.data(hf + 137);
-    const auto *hf_138 = buffer.data(hf + 138);
-    const auto *hf_140 = buffer.data(hf + 140);
-    const auto *hf_142 = buffer.data(hf + 142);
-    const auto *hf_145 = buffer.data(hf + 145);
-    const auto *hf_146 = buffer.data(hf + 146);
-    const auto *hf_147 = buffer.data(hf + 147);
-    const auto *hf_149 = buffer.data(hf + 149);
-    const auto *hf_150 = buffer.data(hf + 150);
-    const auto *hf_151 = buffer.data(hf + 151);
-    const auto *hf_153 = buffer.data(hf + 153);
-    const auto *hf_155 = buffer.data(hf + 155);
-    const auto *hf_156 = buffer.data(hf + 156);
-    const auto *hf_157 = buffer.data(hf + 157);
-    const auto *hf_158 = buffer.data(hf + 158);
-    const auto *hf_159 = buffer.data(hf + 159);
-    const auto *hf_160 = buffer.data(hf + 160);
-    const auto *hf_162 = buffer.data(hf + 162);
-    const auto *hf_166 = buffer.data(hf + 166);
-    const auto *hf_167 = buffer.data(hf + 167);
-    const auto *hf_168 = buffer.data(hf + 168);
-    const auto *hf_169 = buffer.data(hf + 169);
-    const auto *hf_170 = buffer.data(hf + 170);
-    const auto *hf_172 = buffer.data(hf + 172);
-    const auto *hf_173 = buffer.data(hf + 173);
-    const auto *hf_175 = buffer.data(hf + 175);
-    const auto *hf_176 = buffer.data(hf + 176);
-    const auto *hf_177 = buffer.data(hf + 177);
-    const auto *hf_178 = buffer.data(hf + 178);
-    const auto *hf_179 = buffer.data(hf + 179);
-    const auto *hf_180 = buffer.data(hf + 180);
-    const auto *hf_182 = buffer.data(hf + 182);
-    const auto *hf_183 = buffer.data(hf + 183);
-    const auto *hf_185 = buffer.data(hf + 185);
-    const auto *hf_186 = buffer.data(hf + 186);
-    const auto *hf_187 = buffer.data(hf + 187);
-    const auto *hf_188 = buffer.data(hf + 188);
-    const auto *hf_189 = buffer.data(hf + 189);
-    const auto *hf_190 = buffer.data(hf + 190);
-    const auto *hf_192 = buffer.data(hf + 192);
-    const auto *hf_196 = buffer.data(hf + 196);
-    const auto *hf_197 = buffer.data(hf + 197);
-    const auto *hf_198 = buffer.data(hf + 198);
-    const auto *hf_199 = buffer.data(hf + 199);
-    const auto *hf_200 = buffer.data(hf + 200);
-    const auto *hf_202 = buffer.data(hf + 202);
-    const auto *hf_203 = buffer.data(hf + 203);
-    const auto *hf_205 = buffer.data(hf + 205);
-    const auto *hf_206 = buffer.data(hf + 206);
-    const auto *hf_207 = buffer.data(hf + 207);
-    const auto *hf_208 = buffer.data(hf + 208);
-    const auto *hf_209 = buffer.data(hf + 209);
 
 #pragma omp simd aligned(t_0, t_1, t_2, t_3, t_4, t_5, pb_x, pb_y, pb_z, gf_0, hd0_0, hd1_0, \
                          hf_0, hf_1, hf_2 : simd::cache_line_size())
@@ -1351,6 +982,390 @@ compute_prim_hg_electron_repulsion_0(CSimdMatrix &buffer, const size_t target, c
 
         t_143[k] = pb_y[k] * hf_95[k];
     }
+}
+
+static auto
+compute_prim_hg_electron_repulsion_0_piece1(CSimdMatrix &buffer, const size_t target,
+                                            const size_t pa, const size_t pb, const size_t fg0,
+                                            const size_t fg1, const size_t gf, const size_t gg,
+                                            const size_t hd0, const size_t hd1, const size_t hf,
+                                            const size_t ncols, const double alpha,
+                                            const double beta, const double p) -> void
+{
+    // NOTE: the factors are fixed by the pair of primitives, so they are formed
+    // once rather than for every atom pair the pair reaches.
+
+    const auto f_0 = 2.5 / p;
+    const auto f_1 = 1.5 / beta;
+    const auto f_2 = 1.5 * alpha / (beta * p);
+    const auto f_3 = 0.5 / beta;
+    const auto f_4 = 0.5 * alpha / (beta * p);
+    const auto f_5 = 0.5 / p;
+    const auto f_6 = 1.0 / p;
+    const auto f_7 = 2.0 / p;
+    const auto f_8 = 0.5 / alpha;
+    const auto f_9 = 0.5 * beta / (alpha * p);
+    const auto f_10 = 1.5 / p;
+    const auto f_11 = 1.0 / alpha;
+    const auto f_12 = beta / (alpha * p);
+
+    auto *t_144 = buffer.data(target + 144);
+    auto *t_145 = buffer.data(target + 145);
+    auto *t_146 = buffer.data(target + 146);
+    auto *t_147 = buffer.data(target + 147);
+    auto *t_148 = buffer.data(target + 148);
+    auto *t_149 = buffer.data(target + 149);
+    auto *t_150 = buffer.data(target + 150);
+    auto *t_151 = buffer.data(target + 151);
+    auto *t_152 = buffer.data(target + 152);
+    auto *t_153 = buffer.data(target + 153);
+    auto *t_154 = buffer.data(target + 154);
+    auto *t_155 = buffer.data(target + 155);
+    auto *t_156 = buffer.data(target + 156);
+    auto *t_157 = buffer.data(target + 157);
+    auto *t_158 = buffer.data(target + 158);
+    auto *t_159 = buffer.data(target + 159);
+    auto *t_160 = buffer.data(target + 160);
+    auto *t_161 = buffer.data(target + 161);
+    auto *t_162 = buffer.data(target + 162);
+    auto *t_163 = buffer.data(target + 163);
+    auto *t_164 = buffer.data(target + 164);
+    auto *t_165 = buffer.data(target + 165);
+    auto *t_166 = buffer.data(target + 166);
+    auto *t_167 = buffer.data(target + 167);
+    auto *t_168 = buffer.data(target + 168);
+    auto *t_169 = buffer.data(target + 169);
+    auto *t_170 = buffer.data(target + 170);
+    auto *t_171 = buffer.data(target + 171);
+    auto *t_172 = buffer.data(target + 172);
+    auto *t_173 = buffer.data(target + 173);
+    auto *t_174 = buffer.data(target + 174);
+    auto *t_175 = buffer.data(target + 175);
+    auto *t_176 = buffer.data(target + 176);
+    auto *t_177 = buffer.data(target + 177);
+    auto *t_178 = buffer.data(target + 178);
+    auto *t_179 = buffer.data(target + 179);
+    auto *t_180 = buffer.data(target + 180);
+    auto *t_181 = buffer.data(target + 181);
+    auto *t_182 = buffer.data(target + 182);
+    auto *t_183 = buffer.data(target + 183);
+    auto *t_184 = buffer.data(target + 184);
+    auto *t_185 = buffer.data(target + 185);
+    auto *t_186 = buffer.data(target + 186);
+    auto *t_187 = buffer.data(target + 187);
+    auto *t_188 = buffer.data(target + 188);
+    auto *t_189 = buffer.data(target + 189);
+    auto *t_190 = buffer.data(target + 190);
+    auto *t_191 = buffer.data(target + 191);
+    auto *t_192 = buffer.data(target + 192);
+    auto *t_193 = buffer.data(target + 193);
+    auto *t_194 = buffer.data(target + 194);
+    auto *t_195 = buffer.data(target + 195);
+    auto *t_196 = buffer.data(target + 196);
+    auto *t_197 = buffer.data(target + 197);
+    auto *t_198 = buffer.data(target + 198);
+    auto *t_199 = buffer.data(target + 199);
+    auto *t_200 = buffer.data(target + 200);
+    auto *t_201 = buffer.data(target + 201);
+    auto *t_202 = buffer.data(target + 202);
+    auto *t_203 = buffer.data(target + 203);
+    auto *t_204 = buffer.data(target + 204);
+    auto *t_205 = buffer.data(target + 205);
+    auto *t_206 = buffer.data(target + 206);
+    auto *t_207 = buffer.data(target + 207);
+    auto *t_208 = buffer.data(target + 208);
+    auto *t_209 = buffer.data(target + 209);
+    auto *t_210 = buffer.data(target + 210);
+    auto *t_211 = buffer.data(target + 211);
+    auto *t_212 = buffer.data(target + 212);
+    auto *t_213 = buffer.data(target + 213);
+    auto *t_214 = buffer.data(target + 214);
+    auto *t_215 = buffer.data(target + 215);
+    auto *t_216 = buffer.data(target + 216);
+    auto *t_217 = buffer.data(target + 217);
+    auto *t_218 = buffer.data(target + 218);
+    auto *t_219 = buffer.data(target + 219);
+    auto *t_220 = buffer.data(target + 220);
+    auto *t_221 = buffer.data(target + 221);
+    auto *t_222 = buffer.data(target + 222);
+    auto *t_223 = buffer.data(target + 223);
+    auto *t_224 = buffer.data(target + 224);
+    auto *t_225 = buffer.data(target + 225);
+    auto *t_226 = buffer.data(target + 226);
+    auto *t_227 = buffer.data(target + 227);
+    auto *t_228 = buffer.data(target + 228);
+    auto *t_229 = buffer.data(target + 229);
+    auto *t_230 = buffer.data(target + 230);
+    auto *t_231 = buffer.data(target + 231);
+    auto *t_232 = buffer.data(target + 232);
+    auto *t_233 = buffer.data(target + 233);
+    auto *t_234 = buffer.data(target + 234);
+    auto *t_235 = buffer.data(target + 235);
+    auto *t_236 = buffer.data(target + 236);
+    auto *t_237 = buffer.data(target + 237);
+    auto *t_238 = buffer.data(target + 238);
+    auto *t_239 = buffer.data(target + 239);
+    auto *t_240 = buffer.data(target + 240);
+    auto *t_241 = buffer.data(target + 241);
+    auto *t_242 = buffer.data(target + 242);
+    auto *t_243 = buffer.data(target + 243);
+    auto *t_244 = buffer.data(target + 244);
+    auto *t_245 = buffer.data(target + 245);
+    auto *t_246 = buffer.data(target + 246);
+    auto *t_247 = buffer.data(target + 247);
+    auto *t_248 = buffer.data(target + 248);
+    auto *t_249 = buffer.data(target + 249);
+    auto *t_250 = buffer.data(target + 250);
+    auto *t_251 = buffer.data(target + 251);
+    auto *t_252 = buffer.data(target + 252);
+    auto *t_253 = buffer.data(target + 253);
+    auto *t_254 = buffer.data(target + 254);
+    auto *t_255 = buffer.data(target + 255);
+    auto *t_256 = buffer.data(target + 256);
+    auto *t_257 = buffer.data(target + 257);
+    auto *t_258 = buffer.data(target + 258);
+    auto *t_259 = buffer.data(target + 259);
+    auto *t_260 = buffer.data(target + 260);
+    auto *t_261 = buffer.data(target + 261);
+    auto *t_262 = buffer.data(target + 262);
+    auto *t_263 = buffer.data(target + 263);
+    auto *t_264 = buffer.data(target + 264);
+    auto *t_265 = buffer.data(target + 265);
+    auto *t_266 = buffer.data(target + 266);
+    auto *t_267 = buffer.data(target + 267);
+    auto *t_268 = buffer.data(target + 268);
+    auto *t_269 = buffer.data(target + 269);
+    auto *t_270 = buffer.data(target + 270);
+    auto *t_271 = buffer.data(target + 271);
+    auto *t_272 = buffer.data(target + 272);
+    auto *t_273 = buffer.data(target + 273);
+    auto *t_274 = buffer.data(target + 274);
+    auto *t_275 = buffer.data(target + 275);
+    auto *t_276 = buffer.data(target + 276);
+    auto *t_277 = buffer.data(target + 277);
+    auto *t_278 = buffer.data(target + 278);
+    auto *t_279 = buffer.data(target + 279);
+    auto *t_280 = buffer.data(target + 280);
+    auto *t_281 = buffer.data(target + 281);
+    auto *t_282 = buffer.data(target + 282);
+    auto *t_283 = buffer.data(target + 283);
+    auto *t_284 = buffer.data(target + 284);
+    auto *t_285 = buffer.data(target + 285);
+    auto *t_286 = buffer.data(target + 286);
+    auto *t_287 = buffer.data(target + 287);
+    auto *t_288 = buffer.data(target + 288);
+    auto *t_289 = buffer.data(target + 289);
+    auto *t_290 = buffer.data(target + 290);
+    auto *t_291 = buffer.data(target + 291);
+    auto *t_292 = buffer.data(target + 292);
+    auto *t_293 = buffer.data(target + 293);
+    auto *t_294 = buffer.data(target + 294);
+    auto *t_295 = buffer.data(target + 295);
+    auto *t_296 = buffer.data(target + 296);
+
+    const auto *pa_x = buffer.data(pa + 0);
+    const auto *pa_y = buffer.data(pa + 1);
+    const auto *pa_z = buffer.data(pa + 2);
+
+    const auto *pb_x = buffer.data(pb + 0);
+    const auto *pb_y = buffer.data(pb + 1);
+    const auto *pb_z = buffer.data(pb + 2);
+
+    const auto *fg0_100 = buffer.data(fg0 + 100);
+    const auto *fg0_115 = buffer.data(fg0 + 115);
+    const auto *fg0_134 = buffer.data(fg0 + 134);
+    const auto *fg0_149 = buffer.data(fg0 + 149);
+
+    const auto *fg1_100 = buffer.data(fg1 + 100);
+    const auto *fg1_115 = buffer.data(fg1 + 115);
+    const auto *fg1_134 = buffer.data(fg1 + 134);
+    const auto *fg1_149 = buffer.data(fg1 + 149);
+
+    const auto *gf_56 = buffer.data(gf + 56);
+    const auto *gf_60 = buffer.data(gf + 60);
+    const auto *gf_70 = buffer.data(gf + 70);
+    const auto *gf_72 = buffer.data(gf + 72);
+    const auto *gf_80 = buffer.data(gf + 80);
+    const auto *gf_82 = buffer.data(gf + 82);
+    const auto *gf_90 = buffer.data(gf + 90);
+    const auto *gf_92 = buffer.data(gf + 92);
+    const auto *gf_99 = buffer.data(gf + 99);
+    const auto *gf_100 = buffer.data(gf + 100);
+    const auto *gf_102 = buffer.data(gf + 102);
+    const auto *gf_103 = buffer.data(gf + 103);
+    const auto *gf_105 = buffer.data(gf + 105);
+    const auto *gf_106 = buffer.data(gf + 106);
+    const auto *gf_107 = buffer.data(gf + 107);
+    const auto *gf_108 = buffer.data(gf + 108);
+    const auto *gf_109 = buffer.data(gf + 109);
+    const auto *gf_110 = buffer.data(gf + 110);
+    const auto *gf_112 = buffer.data(gf + 112);
+    const auto *gf_115 = buffer.data(gf + 115);
+    const auto *gf_116 = buffer.data(gf + 116);
+    const auto *gf_117 = buffer.data(gf + 117);
+    const auto *gf_118 = buffer.data(gf + 118);
+    const auto *gf_119 = buffer.data(gf + 119);
+    const auto *gf_120 = buffer.data(gf + 120);
+    const auto *gf_122 = buffer.data(gf + 122);
+    const auto *gf_123 = buffer.data(gf + 123);
+    const auto *gf_125 = buffer.data(gf + 125);
+    const auto *gf_126 = buffer.data(gf + 126);
+    const auto *gf_127 = buffer.data(gf + 127);
+    const auto *gf_128 = buffer.data(gf + 128);
+    const auto *gf_129 = buffer.data(gf + 129);
+    const auto *gf_130 = buffer.data(gf + 130);
+    const auto *gf_132 = buffer.data(gf + 132);
+    const auto *gf_133 = buffer.data(gf + 133);
+    const auto *gf_136 = buffer.data(gf + 136);
+    const auto *gf_137 = buffer.data(gf + 137);
+    const auto *gf_138 = buffer.data(gf + 138);
+    const auto *gf_139 = buffer.data(gf + 139);
+    const auto *gf_140 = buffer.data(gf + 140);
+    const auto *gf_141 = buffer.data(gf + 141);
+    const auto *gf_142 = buffer.data(gf + 142);
+    const auto *gf_143 = buffer.data(gf + 143);
+    const auto *gf_145 = buffer.data(gf + 145);
+    const auto *gf_146 = buffer.data(gf + 146);
+    const auto *gf_147 = buffer.data(gf + 147);
+    const auto *gf_149 = buffer.data(gf + 149);
+
+    const auto *gg_90 = buffer.data(gg + 90);
+    const auto *gg_91 = buffer.data(gg + 91);
+    const auto *gg_93 = buffer.data(gg + 93);
+    const auto *gg_96 = buffer.data(gg + 96);
+    const auto *gg_135 = buffer.data(gg + 135);
+    const auto *gg_137 = buffer.data(gg + 137);
+    const auto *gg_140 = buffer.data(gg + 140);
+    const auto *gg_144 = buffer.data(gg + 144);
+    const auto *gg_149 = buffer.data(gg + 149);
+    const auto *gg_150 = buffer.data(gg + 150);
+    const auto *gg_151 = buffer.data(gg + 151);
+    const auto *gg_153 = buffer.data(gg + 153);
+    const auto *gg_155 = buffer.data(gg + 155);
+    const auto *gg_160 = buffer.data(gg + 160);
+    const auto *gg_162 = buffer.data(gg + 162);
+    const auto *gg_163 = buffer.data(gg + 163);
+    const auto *gg_164 = buffer.data(gg + 164);
+    const auto *gg_170 = buffer.data(gg + 170);
+    const auto *gg_175 = buffer.data(gg + 175);
+    const auto *gg_176 = buffer.data(gg + 176);
+    const auto *gg_177 = buffer.data(gg + 177);
+    const auto *gg_178 = buffer.data(gg + 178);
+    const auto *gg_179 = buffer.data(gg + 179);
+    const auto *gg_180 = buffer.data(gg + 180);
+    const auto *gg_183 = buffer.data(gg + 183);
+    const auto *gg_185 = buffer.data(gg + 185);
+    const auto *gg_190 = buffer.data(gg + 190);
+    const auto *gg_191 = buffer.data(gg + 191);
+    const auto *gg_192 = buffer.data(gg + 192);
+    const auto *gg_193 = buffer.data(gg + 193);
+    const auto *gg_194 = buffer.data(gg + 194);
+    const auto *gg_198 = buffer.data(gg + 198);
+    const auto *gg_205 = buffer.data(gg + 205);
+    const auto *gg_206 = buffer.data(gg + 206);
+    const auto *gg_207 = buffer.data(gg + 207);
+    const auto *gg_208 = buffer.data(gg + 208);
+    const auto *gg_209 = buffer.data(gg + 209);
+    const auto *gg_210 = buffer.data(gg + 210);
+    const auto *gg_212 = buffer.data(gg + 212);
+    const auto *gg_213 = buffer.data(gg + 213);
+    const auto *gg_215 = buffer.data(gg + 215);
+    const auto *gg_220 = buffer.data(gg + 220);
+    const auto *gg_221 = buffer.data(gg + 221);
+    const auto *gg_222 = buffer.data(gg + 222);
+    const auto *gg_224 = buffer.data(gg + 224);
+
+    const auto *hd0_57 = buffer.data(hd0 + 57);
+    const auto *hd0_59 = buffer.data(hd0 + 59);
+    const auto *hd0_90 = buffer.data(hd0 + 90);
+    const auto *hd0_93 = buffer.data(hd0 + 93);
+    const auto *hd0_95 = buffer.data(hd0 + 95);
+    const auto *hd0_102 = buffer.data(hd0 + 102);
+    const auto *hd0_105 = buffer.data(hd0 + 105);
+    const auto *hd0_107 = buffer.data(hd0 + 107);
+    const auto *hd0_108 = buffer.data(hd0 + 108);
+    const auto *hd0_111 = buffer.data(hd0 + 111);
+    const auto *hd0_113 = buffer.data(hd0 + 113);
+
+    const auto *hd1_57 = buffer.data(hd1 + 57);
+    const auto *hd1_59 = buffer.data(hd1 + 59);
+    const auto *hd1_90 = buffer.data(hd1 + 90);
+    const auto *hd1_93 = buffer.data(hd1 + 93);
+    const auto *hd1_95 = buffer.data(hd1 + 95);
+    const auto *hd1_102 = buffer.data(hd1 + 102);
+    const auto *hd1_105 = buffer.data(hd1 + 105);
+    const auto *hd1_107 = buffer.data(hd1 + 107);
+    const auto *hd1_108 = buffer.data(hd1 + 108);
+    const auto *hd1_111 = buffer.data(hd1 + 111);
+    const auto *hd1_113 = buffer.data(hd1 + 113);
+
+    const auto *hf_96 = buffer.data(hf + 96);
+    const auto *hf_98 = buffer.data(hf + 98);
+    const auto *hf_99 = buffer.data(hf + 99);
+    const auto *hf_100 = buffer.data(hf + 100);
+    const auto *hf_101 = buffer.data(hf + 101);
+    const auto *hf_103 = buffer.data(hf + 103);
+    const auto *hf_106 = buffer.data(hf + 106);
+    const auto *hf_108 = buffer.data(hf + 108);
+    const auto *hf_109 = buffer.data(hf + 109);
+    const auto *hf_110 = buffer.data(hf + 110);
+    const auto *hf_112 = buffer.data(hf + 112);
+    const auto *hf_117 = buffer.data(hf + 117);
+    const auto *hf_118 = buffer.data(hf + 118);
+    const auto *hf_119 = buffer.data(hf + 119);
+    const auto *hf_120 = buffer.data(hf + 120);
+    const auto *hf_122 = buffer.data(hf + 122);
+    const auto *hf_126 = buffer.data(hf + 126);
+    const auto *hf_127 = buffer.data(hf + 127);
+    const auto *hf_128 = buffer.data(hf + 128);
+    const auto *hf_129 = buffer.data(hf + 129);
+    const auto *hf_130 = buffer.data(hf + 130);
+    const auto *hf_132 = buffer.data(hf + 132);
+    const auto *hf_136 = buffer.data(hf + 136);
+    const auto *hf_137 = buffer.data(hf + 137);
+    const auto *hf_138 = buffer.data(hf + 138);
+    const auto *hf_140 = buffer.data(hf + 140);
+    const auto *hf_142 = buffer.data(hf + 142);
+    const auto *hf_145 = buffer.data(hf + 145);
+    const auto *hf_146 = buffer.data(hf + 146);
+    const auto *hf_147 = buffer.data(hf + 147);
+    const auto *hf_149 = buffer.data(hf + 149);
+    const auto *hf_150 = buffer.data(hf + 150);
+    const auto *hf_151 = buffer.data(hf + 151);
+    const auto *hf_153 = buffer.data(hf + 153);
+    const auto *hf_155 = buffer.data(hf + 155);
+    const auto *hf_156 = buffer.data(hf + 156);
+    const auto *hf_157 = buffer.data(hf + 157);
+    const auto *hf_158 = buffer.data(hf + 158);
+    const auto *hf_159 = buffer.data(hf + 159);
+    const auto *hf_160 = buffer.data(hf + 160);
+    const auto *hf_162 = buffer.data(hf + 162);
+    const auto *hf_166 = buffer.data(hf + 166);
+    const auto *hf_167 = buffer.data(hf + 167);
+    const auto *hf_168 = buffer.data(hf + 168);
+    const auto *hf_169 = buffer.data(hf + 169);
+    const auto *hf_170 = buffer.data(hf + 170);
+    const auto *hf_172 = buffer.data(hf + 172);
+    const auto *hf_173 = buffer.data(hf + 173);
+    const auto *hf_175 = buffer.data(hf + 175);
+    const auto *hf_176 = buffer.data(hf + 176);
+    const auto *hf_177 = buffer.data(hf + 177);
+    const auto *hf_178 = buffer.data(hf + 178);
+    const auto *hf_179 = buffer.data(hf + 179);
+    const auto *hf_180 = buffer.data(hf + 180);
+    const auto *hf_182 = buffer.data(hf + 182);
+    const auto *hf_183 = buffer.data(hf + 183);
+    const auto *hf_185 = buffer.data(hf + 185);
+    const auto *hf_186 = buffer.data(hf + 186);
+    const auto *hf_187 = buffer.data(hf + 187);
+    const auto *hf_188 = buffer.data(hf + 188);
+    const auto *hf_189 = buffer.data(hf + 189);
+    const auto *hf_190 = buffer.data(hf + 190);
+    const auto *hf_192 = buffer.data(hf + 192);
+    const auto *hf_196 = buffer.data(hf + 196);
+    const auto *hf_197 = buffer.data(hf + 197);
+    const auto *hf_198 = buffer.data(hf + 198);
+    const auto *hf_199 = buffer.data(hf + 199);
 
 #pragma omp simd aligned(t_144, t_145, t_146, t_147, pb_x, pb_y, pb_z, gf_56, gf_99, hd0_57, \
                          hd0_59, hd1_57, hd1_59, hf_96, hf_98, hf_99 : simd::cache_line_size())
@@ -1940,6 +1955,77 @@ compute_prim_hg_electron_repulsion_0(CSimdMatrix &buffer, const size_t target, c
         t_296[k] = f_7 * gf_136[k]
                    + pb_z[k] * hf_196[k];
     }
+}
+
+static auto
+compute_prim_hg_electron_repulsion_0_piece2(CSimdMatrix &buffer, const size_t target,
+                                            const size_t pa, const size_t pb, const size_t gf,
+                                            const size_t gg, const size_t hd0, const size_t hd1,
+                                            const size_t hf, const size_t ncols,
+                                            const double alpha, const double beta,
+                                            const double p) -> void
+{
+    // NOTE: the factors are fixed by the pair of primitives, so they are formed
+    // once rather than for every atom pair the pair reaches.
+
+    const auto f_0 = 2.5 / p;
+    const auto f_1 = 1.5 / beta;
+    const auto f_2 = 1.5 * alpha / (beta * p);
+    const auto f_3 = 0.5 / beta;
+    const auto f_4 = 0.5 * alpha / (beta * p);
+    const auto f_5 = 0.5 / p;
+    const auto f_6 = 1.0 / p;
+
+    auto *t_297 = buffer.data(target + 297);
+    auto *t_298 = buffer.data(target + 298);
+    auto *t_299 = buffer.data(target + 299);
+    auto *t_300 = buffer.data(target + 300);
+    auto *t_301 = buffer.data(target + 301);
+    auto *t_302 = buffer.data(target + 302);
+    auto *t_303 = buffer.data(target + 303);
+    auto *t_304 = buffer.data(target + 304);
+    auto *t_305 = buffer.data(target + 305);
+    auto *t_306 = buffer.data(target + 306);
+    auto *t_307 = buffer.data(target + 307);
+    auto *t_308 = buffer.data(target + 308);
+    auto *t_309 = buffer.data(target + 309);
+    auto *t_310 = buffer.data(target + 310);
+    auto *t_311 = buffer.data(target + 311);
+    auto *t_312 = buffer.data(target + 312);
+    auto *t_313 = buffer.data(target + 313);
+    auto *t_314 = buffer.data(target + 314);
+
+    const auto *pa_y = buffer.data(pa + 1);
+
+    const auto *pb_x = buffer.data(pb + 0);
+    const auto *pb_y = buffer.data(pb + 1);
+    const auto *pb_z = buffer.data(pb + 2);
+
+    const auto *gf_140 = buffer.data(gf + 140);
+    const auto *gf_146 = buffer.data(gf + 146);
+    const auto *gf_148 = buffer.data(gf + 148);
+    const auto *gf_149 = buffer.data(gf + 149);
+
+    const auto *gg_222 = buffer.data(gg + 222);
+    const auto *gg_224 = buffer.data(gg + 224);
+
+    const auto *hd0_120 = buffer.data(hd0 + 120);
+    const auto *hd0_123 = buffer.data(hd0 + 123);
+    const auto *hd0_125 = buffer.data(hd0 + 125);
+
+    const auto *hd1_120 = buffer.data(hd1 + 120);
+    const auto *hd1_123 = buffer.data(hd1 + 123);
+    const auto *hd1_125 = buffer.data(hd1 + 125);
+
+    const auto *hf_199 = buffer.data(hf + 199);
+    const auto *hf_200 = buffer.data(hf + 200);
+    const auto *hf_202 = buffer.data(hf + 202);
+    const auto *hf_203 = buffer.data(hf + 203);
+    const auto *hf_205 = buffer.data(hf + 205);
+    const auto *hf_206 = buffer.data(hf + 206);
+    const auto *hf_207 = buffer.data(hf + 207);
+    const auto *hf_208 = buffer.data(hf + 208);
+    const auto *hf_209 = buffer.data(hf + 209);
 
 #pragma omp simd aligned(t_297, t_298, t_299, t_300, t_301, pa_y, pb_x, pb_y, gf_148, gf_149, \
                          gg_222, gg_224, hd0_120, hd1_120, hf_199, \
@@ -2016,6 +2102,24 @@ compute_prim_hg_electron_repulsion_0(CSimdMatrix &buffer, const size_t target, c
                    - f_2 * hd1_125[k]
                    + pb_z[k] * hf_209[k];
     }
+}
+
+auto
+compute_prim_hg_electron_repulsion_0(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                     const size_t pb, const size_t fg0, const size_t fg1,
+                                     const size_t gf, const size_t gg, const size_t hd0,
+                                     const size_t hd1, const size_t hf, const size_t ncols,
+                                     const double alpha, const double beta,
+                                     const double p) -> void
+{
+    compute_prim_hg_electron_repulsion_0_piece0(buffer, target, pa, pb, fg0, fg1, gf, gg, hd0,
+                                                hd1, hf, ncols, alpha, beta, p);
+
+    compute_prim_hg_electron_repulsion_0_piece1(buffer, target, pa, pb, fg0, fg1, gf, gg, hd0,
+                                                hd1, hf, ncols, alpha, beta, p);
+
+    compute_prim_hg_electron_repulsion_0_piece2(buffer, target, pa, pb, gf, gg, hd0, hd1, hf,
+                                                ncols, alpha, beta, p);
 }
 
 }  // namespace simdt2ceri

@@ -270,7 +270,7 @@ compute_fg_kinetic_energy(double               *values,
         }
     }
 
-    simdtrf::transform_g_inner(buffer, 1556, 1406, 10, nmax);
+    simdtrf::transform_g_inner(buffer, 1556, 1406, 10, 1, nmax);
 
     simdtrf::transform_f_outer(values, nvalues, buffer, 1556, 9, nmax);
 

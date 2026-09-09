@@ -194,7 +194,7 @@ compute_ip_electron_repulsion(double               *values,
         }
     }
 
-    simdtrf::transform_p_inner(buffer, 550, 466, 28, nmax);
+    simdtrf::transform_p_inner(buffer, 550, 466, 28, 1, nmax);
 
     simdtrf::transform_i_outer(values, nvalues, buffer, 550, 3, nmax);
 }

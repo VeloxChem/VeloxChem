@@ -147,9 +147,9 @@ compute_ip_overlap(double               *values,
         }
     }
 
-    simdtrf::compute_hrr_ip(buffer, coordinates, 187, 123, 151, nmax);
+    simdtrf::compute_hrr_ip(buffer, coordinates, 187, 123, 151, 1, nmax);
 
-    simdtrf::transform_p_inner(buffer, 271, 187, 28, nmax);
+    simdtrf::transform_p_inner(buffer, 271, 187, 28, 1, nmax);
 
     simdtrf::transform_i_outer(values, nvalues, buffer, 271, 3, nmax);
 

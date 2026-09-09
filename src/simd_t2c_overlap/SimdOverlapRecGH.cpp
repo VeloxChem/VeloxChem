@@ -162,27 +162,27 @@ compute_gh_overlap(double               *values,
         }
     }
 
-    simdtrf::compute_hrr_ph(buffer, coordinates, 408, 223, 244, nmax);
+    simdtrf::compute_hrr_ph(buffer, coordinates, 408, 223, 244, 1, nmax);
 
-    simdtrf::compute_hrr_pi(buffer, coordinates, 471, 244, 272, nmax);
+    simdtrf::compute_hrr_pi(buffer, coordinates, 471, 244, 272, 1, nmax);
 
-    simdtrf::compute_hrr_pk(buffer, coordinates, 555, 272, 308, nmax);
+    simdtrf::compute_hrr_pk(buffer, coordinates, 555, 272, 308, 1, nmax);
 
-    simdtrf::compute_hrr_pl(buffer, coordinates, 663, 308, 353, nmax);
+    simdtrf::compute_hrr_pl(buffer, coordinates, 663, 308, 353, 1, nmax);
 
-    simdtrf::compute_hrr_dh(buffer, coordinates, 798, 408, 471, nmax);
+    simdtrf::compute_hrr_dh(buffer, coordinates, 798, 408, 471, 1, nmax);
 
-    simdtrf::compute_hrr_di(buffer, coordinates, 924, 471, 555, nmax);
+    simdtrf::compute_hrr_di(buffer, coordinates, 924, 471, 555, 1, nmax);
 
-    simdtrf::compute_hrr_dk(buffer, coordinates, 1092, 555, 663, nmax);
+    simdtrf::compute_hrr_dk(buffer, coordinates, 1092, 555, 663, 1, nmax);
 
-    simdtrf::compute_hrr_fh(buffer, coordinates, 1308, 798, 924, nmax);
+    simdtrf::compute_hrr_fh(buffer, coordinates, 1308, 798, 924, 1, nmax);
 
-    simdtrf::compute_hrr_fi(buffer, coordinates, 1518, 924, 1092, nmax);
+    simdtrf::compute_hrr_fi(buffer, coordinates, 1518, 924, 1092, 1, nmax);
 
-    simdtrf::compute_hrr_gh(buffer, coordinates, 1798, 1308, 1518, nmax);
+    simdtrf::compute_hrr_gh(buffer, coordinates, 1798, 1308, 1518, 1, nmax);
 
-    simdtrf::transform_h_inner(buffer, 2113, 1798, 15, nmax);
+    simdtrf::transform_h_inner(buffer, 2113, 1798, 15, 1, nmax);
 
     simdtrf::transform_g_outer(values, nvalues, buffer, 2113, 11, nmax);
 

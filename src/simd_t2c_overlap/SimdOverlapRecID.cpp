@@ -152,13 +152,13 @@ compute_id_overlap(double               *values,
         }
     }
 
-    simdtrf::compute_hrr_ip(buffer, coordinates, 277, 168, 196, nmax);
+    simdtrf::compute_hrr_ip(buffer, coordinates, 277, 168, 196, 1, nmax);
 
-    simdtrf::compute_hrr_kp(buffer, coordinates, 361, 196, 232, nmax);
+    simdtrf::compute_hrr_kp(buffer, coordinates, 361, 196, 232, 1, nmax);
 
-    simdtrf::compute_hrr_id(buffer, coordinates, 469, 277, 361, nmax);
+    simdtrf::compute_hrr_id(buffer, coordinates, 469, 277, 361, 1, nmax);
 
-    simdtrf::transform_d_inner(buffer, 637, 469, 28, nmax);
+    simdtrf::transform_d_inner(buffer, 637, 469, 28, 1, nmax);
 
     simdtrf::transform_i_outer(values, nvalues, buffer, 637, 5, nmax);
 

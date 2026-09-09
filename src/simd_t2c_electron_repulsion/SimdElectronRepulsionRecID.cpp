@@ -333,7 +333,7 @@ compute_id_electron_repulsion(double               *values,
         }
     }
 
-    simdtrf::transform_d_inner(buffer, 2190, 2022, 28, nmax);
+    simdtrf::transform_d_inner(buffer, 2190, 2022, 28, 1, nmax);
 
     simdtrf::transform_i_outer(values, nvalues, buffer, 2190, 5, nmax);
 }

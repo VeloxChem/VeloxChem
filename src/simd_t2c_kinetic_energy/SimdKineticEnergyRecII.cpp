@@ -490,7 +490,7 @@ compute_ii_kinetic_energy(double               *values,
         }
     }
 
-    simdtrf::transform_i_inner(buffer, 14902, 14118, 28, nmax);
+    simdtrf::transform_i_inner(buffer, 14902, 14118, 28, 1, nmax);
 
     simdtrf::transform_i_outer_tri(values, nvalues, buffer, 14902, nmax);
 

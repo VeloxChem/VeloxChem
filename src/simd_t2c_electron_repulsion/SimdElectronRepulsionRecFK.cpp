@@ -495,7 +495,7 @@ compute_fk_electron_repulsion(double               *values,
         }
     }
 
-    simdtrf::transform_k_inner(buffer, 6472, 6112, 10, nmax);
+    simdtrf::transform_k_inner(buffer, 6472, 6112, 10, 1, nmax);
 
     simdtrf::transform_f_outer(values, nvalues, buffer, 6472, 15, nmax);
 }

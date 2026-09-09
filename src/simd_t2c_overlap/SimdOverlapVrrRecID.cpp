@@ -37,11 +37,11 @@
 
 namespace simdovl {  // simdovl namespace
 
-auto
-compute_prim_id_overlap_0(CSimdMatrix &buffer, const size_t target, const size_t pa,
-                          const size_t pb, const size_t gd, const size_t hp, const size_t hd,
-                          const size_t is, const size_t ip, const size_t ncols,
-                          const double p) -> void
+static auto
+compute_prim_id_overlap_0_piece0(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                 const size_t pb, const size_t gd, const size_t hp,
+                                 const size_t hd, const size_t is, const size_t ip,
+                                 const size_t ncols, const double p) -> void
 {
     // NOTE: the factors are fixed by the pair of primitives, so they are formed
     // once rather than for every atom pair the pair reaches.
@@ -215,12 +215,6 @@ compute_prim_id_overlap_0(CSimdMatrix &buffer, const size_t target, const size_t
     auto *t_159 = buffer.data(target + 159);
     auto *t_160 = buffer.data(target + 160);
     auto *t_161 = buffer.data(target + 161);
-    auto *t_162 = buffer.data(target + 162);
-    auto *t_163 = buffer.data(target + 163);
-    auto *t_164 = buffer.data(target + 164);
-    auto *t_165 = buffer.data(target + 165);
-    auto *t_166 = buffer.data(target + 166);
-    auto *t_167 = buffer.data(target + 167);
 
     const auto *pa_x = buffer.data(pa + 0);
     const auto *pa_y = buffer.data(pa + 1);
@@ -350,7 +344,6 @@ compute_prim_id_overlap_0(CSimdMatrix &buffer, const size_t target, const size_t
     const auto *is_23 = buffer.data(is + 23);
     const auto *is_24 = buffer.data(is + 24);
     const auto *is_25 = buffer.data(is + 25);
-    const auto *is_27 = buffer.data(is + 27);
 
     const auto *ip_0 = buffer.data(ip + 0);
     const auto *ip_1 = buffer.data(ip + 1);
@@ -412,9 +405,6 @@ compute_prim_id_overlap_0(CSimdMatrix &buffer, const size_t target, const size_t
     const auto *ip_77 = buffer.data(ip + 77);
     const auto *ip_79 = buffer.data(ip + 79);
     const auto *ip_80 = buffer.data(ip + 80);
-    const auto *ip_81 = buffer.data(ip + 81);
-    const auto *ip_82 = buffer.data(ip + 82);
-    const auto *ip_83 = buffer.data(ip + 83);
 
 #pragma omp simd aligned(t_0, t_1, t_2, t_3, t_4, t_5, pb_x, pb_y, pb_z, hp_0, is_0, ip_0, \
                          ip_1, ip_2 : simd::cache_line_size())
@@ -987,6 +977,37 @@ compute_prim_id_overlap_0(CSimdMatrix &buffer, const size_t target, const size_t
 
         t_161[k] = pa_y[k] * hd_125[k];
     }
+}
+
+static auto
+compute_prim_id_overlap_0_piece1(CSimdMatrix &buffer, const size_t target, const size_t pb,
+                                 const size_t hp, const size_t is, const size_t ip,
+                                 const size_t ncols, const double p) -> void
+{
+    // NOTE: the factors are fixed by the pair of primitives, so they are formed
+    // once rather than for every atom pair the pair reaches.
+
+    const auto f_0 = 3.0 / p;
+    const auto f_1 = 0.5 / p;
+
+    auto *t_162 = buffer.data(target + 162);
+    auto *t_163 = buffer.data(target + 163);
+    auto *t_164 = buffer.data(target + 164);
+    auto *t_165 = buffer.data(target + 165);
+    auto *t_166 = buffer.data(target + 166);
+    auto *t_167 = buffer.data(target + 167);
+
+    const auto *pb_x = buffer.data(pb + 0);
+    const auto *pb_y = buffer.data(pb + 1);
+    const auto *pb_z = buffer.data(pb + 2);
+
+    const auto *hp_62 = buffer.data(hp + 62);
+
+    const auto *is_27 = buffer.data(is + 27);
+
+    const auto *ip_81 = buffer.data(ip + 81);
+    const auto *ip_82 = buffer.data(ip + 82);
+    const auto *ip_83 = buffer.data(ip + 83);
 
 #pragma omp simd aligned(t_162, t_163, t_164, t_165, t_166, t_167, pb_x, pb_y, pb_z, hp_62, \
                          is_27, ip_81, ip_82, ip_83 : simd::cache_line_size())
@@ -1008,6 +1029,17 @@ compute_prim_id_overlap_0(CSimdMatrix &buffer, const size_t target, const size_t
                    + f_1 * is_27[k]
                    + pb_z[k] * ip_83[k];
     }
+}
+
+auto
+compute_prim_id_overlap_0(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                          const size_t pb, const size_t gd, const size_t hp, const size_t hd,
+                          const size_t is, const size_t ip, const size_t ncols,
+                          const double p) -> void
+{
+    compute_prim_id_overlap_0_piece0(buffer, target, pa, pb, gd, hp, hd, is, ip, ncols, p);
+
+    compute_prim_id_overlap_0_piece1(buffer, target, pb, hp, is, ip, ncols, p);
 }
 
 }  // namespace simdovl

@@ -218,7 +218,7 @@ compute_ip_kinetic_energy(double               *values,
         }
     }
 
-    simdtrf::transform_p_inner(buffer, 756, 672, 28, nmax);
+    simdtrf::transform_p_inner(buffer, 756, 672, 28, 1, nmax);
 
     simdtrf::transform_i_outer(values, nvalues, buffer, 756, 3, nmax);
 

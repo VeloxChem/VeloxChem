@@ -138,9 +138,9 @@ compute_pf_overlap(double               *values,
         }
     }
 
-    simdtrf::compute_hrr_pf(buffer, coordinates, 63, 38, 48, nmax);
+    simdtrf::compute_hrr_pf(buffer, coordinates, 63, 38, 48, 1, nmax);
 
-    simdtrf::transform_f_inner(buffer, 93, 63, 3, nmax);
+    simdtrf::transform_f_inner(buffer, 93, 63, 3, 1, nmax);
 
     simdtrf::transform_p_outer(values, nvalues, buffer, 93, 7, nmax);
 

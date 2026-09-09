@@ -197,7 +197,7 @@ compute_pi_electron_repulsion(double               *values,
         }
     }
 
-    simdtrf::transform_i_inner(buffer, 553, 469, 3, nmax);
+    simdtrf::transform_i_inner(buffer, 553, 469, 3, 1, nmax);
 
     simdtrf::transform_p_outer(values, nvalues, buffer, 553, 13, nmax);
 }

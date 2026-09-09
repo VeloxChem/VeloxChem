@@ -872,7 +872,7 @@ compute_gl_electron_repulsion(double               *values,
         }
     }
 
-    simdtrf::transform_l_inner(buffer, 19839, 19164, 15, nmax);
+    simdtrf::transform_l_inner(buffer, 19839, 19164, 15, 1, nmax);
 
     simdtrf::transform_g_outer(values, nvalues, buffer, 19839, 17, nmax);
 }

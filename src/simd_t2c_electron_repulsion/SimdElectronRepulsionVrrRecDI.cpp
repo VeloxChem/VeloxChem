@@ -37,12 +37,13 @@
 
 namespace simdt2ceri {  // simdt2ceri namespace
 
-auto
-compute_prim_di_electron_repulsion_0(CSimdMatrix &buffer, const size_t target, const size_t pa,
-                                     const size_t pb, const size_t ph, const size_t pi,
-                                     const size_t dg0, const size_t dg1, const size_t dh,
-                                     const size_t ncols, const double alpha, const double beta,
-                                     const double p) -> void
+static auto
+compute_prim_di_electron_repulsion_0_piece0(CSimdMatrix &buffer, const size_t target,
+                                            const size_t pa, const size_t pb, const size_t ph,
+                                            const size_t pi, const size_t dg0, const size_t dg1,
+                                            const size_t dh, const size_t ncols,
+                                            const double alpha, const double beta,
+                                            const double p) -> void
 {
     // NOTE: the factors are fixed by the pair of primitives, so they are formed
     // once rather than for every atom pair the pair reaches.
@@ -212,22 +213,6 @@ compute_prim_di_electron_repulsion_0(CSimdMatrix &buffer, const size_t target, c
     auto *t_149 = buffer.data(target + 149);
     auto *t_150 = buffer.data(target + 150);
     auto *t_151 = buffer.data(target + 151);
-    auto *t_152 = buffer.data(target + 152);
-    auto *t_153 = buffer.data(target + 153);
-    auto *t_154 = buffer.data(target + 154);
-    auto *t_155 = buffer.data(target + 155);
-    auto *t_156 = buffer.data(target + 156);
-    auto *t_157 = buffer.data(target + 157);
-    auto *t_158 = buffer.data(target + 158);
-    auto *t_159 = buffer.data(target + 159);
-    auto *t_160 = buffer.data(target + 160);
-    auto *t_161 = buffer.data(target + 161);
-    auto *t_162 = buffer.data(target + 162);
-    auto *t_163 = buffer.data(target + 163);
-    auto *t_164 = buffer.data(target + 164);
-    auto *t_165 = buffer.data(target + 165);
-    auto *t_166 = buffer.data(target + 166);
-    auto *t_167 = buffer.data(target + 167);
 
     const auto *pa_x = buffer.data(pa + 0);
     const auto *pa_y = buffer.data(pa + 1);
@@ -267,7 +252,6 @@ compute_prim_di_electron_repulsion_0(CSimdMatrix &buffer, const size_t target, c
     const auto *ph_51 = buffer.data(ph + 51);
     const auto *ph_54 = buffer.data(ph + 54);
     const auto *ph_56 = buffer.data(ph + 56);
-    const auto *ph_57 = buffer.data(ph + 57);
     const auto *ph_58 = buffer.data(ph + 58);
     const auto *ph_59 = buffer.data(ph + 59);
     const auto *ph_60 = buffer.data(ph + 60);
@@ -331,9 +315,6 @@ compute_prim_di_electron_repulsion_0(CSimdMatrix &buffer, const size_t target, c
     const auto *dg0_81 = buffer.data(dg0 + 81);
     const auto *dg0_84 = buffer.data(dg0 + 84);
     const auto *dg0_85 = buffer.data(dg0 + 85);
-    const auto *dg0_87 = buffer.data(dg0 + 87);
-    const auto *dg0_88 = buffer.data(dg0 + 88);
-    const auto *dg0_89 = buffer.data(dg0 + 89);
 
     const auto *dg1_0 = buffer.data(dg1 + 0);
     const auto *dg1_1 = buffer.data(dg1 + 1);
@@ -359,9 +340,6 @@ compute_prim_di_electron_repulsion_0(CSimdMatrix &buffer, const size_t target, c
     const auto *dg1_81 = buffer.data(dg1 + 81);
     const auto *dg1_84 = buffer.data(dg1 + 84);
     const auto *dg1_85 = buffer.data(dg1 + 85);
-    const auto *dg1_87 = buffer.data(dg1 + 87);
-    const auto *dg1_88 = buffer.data(dg1 + 88);
-    const auto *dg1_89 = buffer.data(dg1 + 89);
 
     const auto *dh_0 = buffer.data(dh + 0);
     const auto *dh_1 = buffer.data(dh + 1);
@@ -433,14 +411,6 @@ compute_prim_di_electron_repulsion_0(CSimdMatrix &buffer, const size_t target, c
     const auto *dh_111 = buffer.data(dh + 111);
     const auto *dh_114 = buffer.data(dh + 114);
     const auto *dh_115 = buffer.data(dh + 115);
-    const auto *dh_117 = buffer.data(dh + 117);
-    const auto *dh_119 = buffer.data(dh + 119);
-    const auto *dh_120 = buffer.data(dh + 120);
-    const auto *dh_121 = buffer.data(dh + 121);
-    const auto *dh_122 = buffer.data(dh + 122);
-    const auto *dh_123 = buffer.data(dh + 123);
-    const auto *dh_124 = buffer.data(dh + 124);
-    const auto *dh_125 = buffer.data(dh + 125);
 
 #pragma omp simd aligned(t_0, t_1, t_2, t_3, t_4, t_5, pb_x, pb_y, pb_z, ph_0, dg0_0, dg1_0, \
                          dh_0, dh_1, dh_2 : simd::cache_line_size())
@@ -1016,6 +986,71 @@ compute_prim_di_electron_repulsion_0(CSimdMatrix &buffer, const size_t target, c
         t_151[k] = f_0 * ph_48[k]
                    + pb_z[k] * dh_111[k];
     }
+}
+
+static auto
+compute_prim_di_electron_repulsion_0_piece1(CSimdMatrix &buffer, const size_t target,
+                                            const size_t pb, const size_t ph, const size_t dg0,
+                                            const size_t dg1, const size_t dh,
+                                            const size_t ncols, const double alpha,
+                                            const double beta, const double p) -> void
+{
+    // NOTE: the factors are fixed by the pair of primitives, so they are formed
+    // once rather than for every atom pair the pair reaches.
+
+    const auto f_0 = 1.0 / p;
+    const auto f_1 = 2.5 / beta;
+    const auto f_2 = 2.5 * alpha / (beta * p);
+    const auto f_3 = 0.5 / beta;
+    const auto f_4 = 0.5 * alpha / (beta * p);
+    const auto f_5 = 1.0 / beta;
+    const auto f_6 = alpha / (beta * p);
+    const auto f_7 = 1.5 / beta;
+    const auto f_8 = 1.5 * alpha / (beta * p);
+
+    auto *t_152 = buffer.data(target + 152);
+    auto *t_153 = buffer.data(target + 153);
+    auto *t_154 = buffer.data(target + 154);
+    auto *t_155 = buffer.data(target + 155);
+    auto *t_156 = buffer.data(target + 156);
+    auto *t_157 = buffer.data(target + 157);
+    auto *t_158 = buffer.data(target + 158);
+    auto *t_159 = buffer.data(target + 159);
+    auto *t_160 = buffer.data(target + 160);
+    auto *t_161 = buffer.data(target + 161);
+    auto *t_162 = buffer.data(target + 162);
+    auto *t_163 = buffer.data(target + 163);
+    auto *t_164 = buffer.data(target + 164);
+    auto *t_165 = buffer.data(target + 165);
+    auto *t_166 = buffer.data(target + 166);
+    auto *t_167 = buffer.data(target + 167);
+
+    const auto *pb_x = buffer.data(pb + 0);
+    const auto *pb_y = buffer.data(pb + 1);
+    const auto *pb_z = buffer.data(pb + 2);
+
+    const auto *ph_57 = buffer.data(ph + 57);
+    const auto *ph_62 = buffer.data(ph + 62);
+
+    const auto *dg0_85 = buffer.data(dg0 + 85);
+    const auto *dg0_87 = buffer.data(dg0 + 87);
+    const auto *dg0_88 = buffer.data(dg0 + 88);
+    const auto *dg0_89 = buffer.data(dg0 + 89);
+
+    const auto *dg1_85 = buffer.data(dg1 + 85);
+    const auto *dg1_87 = buffer.data(dg1 + 87);
+    const auto *dg1_88 = buffer.data(dg1 + 88);
+    const auto *dg1_89 = buffer.data(dg1 + 89);
+
+    const auto *dh_114 = buffer.data(dh + 114);
+    const auto *dh_117 = buffer.data(dh + 117);
+    const auto *dh_119 = buffer.data(dh + 119);
+    const auto *dh_120 = buffer.data(dh + 120);
+    const auto *dh_121 = buffer.data(dh + 121);
+    const auto *dh_122 = buffer.data(dh + 122);
+    const auto *dh_123 = buffer.data(dh + 123);
+    const auto *dh_124 = buffer.data(dh + 124);
+    const auto *dh_125 = buffer.data(dh + 125);
 
 #pragma omp simd aligned(t_152, t_153, t_154, t_155, t_156, pb_x, pb_y, dg0_87, dg0_89, \
                          dg1_87, dg1_89, dh_114, dh_117, dh_119, dh_120, \
@@ -1085,6 +1120,20 @@ compute_prim_di_electron_repulsion_0(CSimdMatrix &buffer, const size_t target, c
                    - f_2 * dg1_89[k]
                    + pb_z[k] * dh_125[k];
     }
+}
+
+auto
+compute_prim_di_electron_repulsion_0(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                     const size_t pb, const size_t ph, const size_t pi,
+                                     const size_t dg0, const size_t dg1, const size_t dh,
+                                     const size_t ncols, const double alpha, const double beta,
+                                     const double p) -> void
+{
+    compute_prim_di_electron_repulsion_0_piece0(buffer, target, pa, pb, ph, pi, dg0, dg1, dh,
+                                                ncols, alpha, beta, p);
+
+    compute_prim_di_electron_repulsion_0_piece1(buffer, target, pb, ph, dg0, dg1, dh, ncols,
+                                                alpha, beta, p);
 }
 
 }  // namespace simdt2ceri
