@@ -36,6 +36,7 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <map>
 #include <ranges>
 #include <vector>
 
@@ -57,6 +58,23 @@
 /// combinations of basis functions whose integrals are below the threshold.
 class CSimdOverlapDriver
 {
+    /// @brief One combination of basis functions of one block, which is the unit of
+    /// work the threads draw on.
+    struct TPairTask
+    {
+        /// @brief The index of the block among the off-diagonal blocks.
+        size_t iblock;
+
+        /// @brief The index of the basis function on bra side within its atom basis.
+        size_t i;
+
+        /// @brief The index of the basis function on ket side within its atom basis.
+        size_t j;
+
+        /// @brief The number of atom pairs the combination reaches.
+        size_t nvalues;
+    };
+
    public:
     /// @brief The constructor with screening threshold and target block size.
     /// @param threshold The screening threshold of the integrals.
@@ -217,52 +235,39 @@ CSimdOverlapDriver::_compute_pair_blocks(const CSparsityPattern              &pa
                                          const denseidx::TBasisFunctionIndex &b_indices,
                                          D                                   &distributor) const -> void
 {
-    // NOTE: the blocks are independent, as each of them forms its own coordinates
-    // and hands the distributor the values of its own combinations of basis
-    // functions, which no other block addresses. Dynamic scheduling is used as the
-    // blocks hold a comparable number of atom pairs but differ in the number of the
-    // combinations of basis functions and in the cost of their kernels.
+    // NOTE: the unit of work is one combination of basis functions of one block and
+    // not one block. A block is what the sparsity and the storage are described in,
+    // and it carries a fixed cost of some microseconds, so it cannot be made small
+    // enough to feed a large machine: an ordinary molecule holds tens of blocks
+    // whatever the number of the threads, as the target size of a block is bounded
+    // from below. The combinations of a block are tens to hundreds and cost nothing
+    // to enumerate, and each of them writes its own values and reads the coordinates
+    // of its block without changing them, so they are independent of one another.
 
-    const auto nblocks = static_cast<int>(pattern.number_of_pair_blocks());
+    const auto nblocks = static_cast<size_t>(pattern.number_of_pair_blocks());
 
-    // NOTE: the blocks are visited from the most costly to the least, so that a
-    // costly block is taken while there is still work to fill the other threads
-    // with. The threads draw two or three blocks each, so a costly block drawn last
-    // is finished alone and sets the time of the whole loop.
+    if (nblocks == 0) return;
 
-    // NOTE: the cost of a block is the number of atom pairs surviving the screening
-    // of each of its combinations of basis functions, weighted by the number of the
-    // spherical components the combination carries and by the number of the pairs of
-    // primitives it sums over. The weight is an estimate and orders the blocks, it is
-    // not used for anything else.
+    // NOTE: the blocks are visited from the most costly to the least, and within a
+    // block the combinations likewise, so that a costly task is taken while there is
+    // still work to fill the other threads with. A costly task drawn last is
+    // finished alone and sets the time of the whole loop.
 
-    std::vector<size_t> order(static_cast<size_t>(nblocks));
+    std::vector<size_t> order(nblocks);
 
-    std::vector<double> costs(static_cast<size_t>(nblocks), 0.0);
+    std::vector<double> costs(nblocks, 0.0);
 
     auto arena_rows = size_t{0};
 
     auto arena_cols = size_t{0};
 
-    // NOTE: the cost of a block is read off the block and not recomputed here. It is
-    // accumulated where the sparsity of the block is described, which is inside a
-    // parallel region, so this pass is a read of one number per block rather than a
-    // walk over every combination of basis functions of every block. That walk was
-    // serial and its cost grew with the number of threads, as the number of blocks
-    // does.
-
-    // NOTE: the shape of the arena is gathered in the same pass. It spans the largest
-    // combination any block carries, which is the one of the highest angular momenta
-    // of the two atom bases of the block, as the rows a combination needs do not
-    // decrease with either momentum.
-
-    for (int iblk = 0; iblk < nblocks; iblk++)
+    for (size_t iblk = 0; iblk < nblocks; iblk++)
     {
-        const auto &block = pattern.pair_block(static_cast<size_t>(iblk));
+        const auto &block = pattern.pair_block(iblk);
 
-        order[static_cast<size_t>(iblk)] = static_cast<size_t>(iblk);
+        order[iblk] = iblk;
 
-        costs[static_cast<size_t>(iblk)] = block.weight();
+        costs[iblk] = block.weight();
 
         arena_rows = std::max(arena_rows,
                               simdovl::number_of_buffer_rows(bra_basis.basis_set(block.bra_index()).max_angular_momentum(),
@@ -273,85 +278,156 @@ CSimdOverlapDriver::_compute_pair_blocks(const CSparsityPattern              &pa
 
     std::ranges::sort(order, [&](const size_t a, const size_t b) { return costs[a] > costs[b]; });
 
+    // NOTE: the order of the combinations by cost depends on the pair of atom bases
+    // and not on the block, as the components and the primitives of a combination are
+    // properties of its two basis functions. It is therefore formed once for every
+    // pair of atom bases the blocks draw on, and not once per block. Sorting the
+    // tasks themselves would cost more than the ordering saves, as they are hundreds
+    // of thousands of them for a large fitting set.
 
-    // NOTE: the arena is formed once per thread and not once per block. Its
-    // largest shape serves every block, and holding it over the whole loop costs
-    // no more memory than a block at a time did, as every thread held one of them
-    // at once in any case. What it saves is the allocation and the page faults of
-    // a mapping this large, which the cache of blocks is too small to hold back.
+    std::map<std::pair<int, int>, std::vector<std::pair<size_t, size_t>>> orders;
 
-#pragma omp parallel if (nblocks > 1)
+    for (size_t iblk = 0; iblk < nblocks; iblk++)
     {
-        auto arena = CSimdMatrix(arena_rows, arena_cols);
+        const auto &block = pattern.pair_block(iblk);
 
-        // NOTE: the combinations work over a view of the arena and not over the
-        // arena itself, so that each takes the shape of the atom pairs it reaches.
-        // A view stretched to the pairs of the whole block would leave every row of
-        // a combination which reaches fewer of them a page away from the next, and
-        // the zeroing alone then costs more than the allocations this saves.
+        const auto key = std::pair<int, int>{block.bra_index(), block.ket_index()};
+
+        if (orders.contains(key)) continue;
+
+        const auto &a_basis = bra_basis.basis_set(block.bra_index());
+
+        const auto &b_basis = ket_basis.basis_set(block.ket_index());
+
+        const auto &a_index = a_indices[block.bra_index()];
+
+        const auto &b_index = b_indices[block.ket_index()];
+
+        std::vector<std::pair<size_t, size_t>> combinations;
+
+        std::vector<double> weights;
+
+        for (size_t i = 0; i < a_index.size(); i++)
+        {
+            for (size_t j = 0; j < b_index.size(); j++)
+            {
+                const auto [la, ia] = a_index[i];
+
+                const auto [lb, jb] = b_index[j];
+
+                const auto ncomps = static_cast<double>(tensor::number_of_spherical_components(std::array<int, 2>{la, lb}));
+
+                const auto nprims = static_cast<double>(a_basis.functions()[i].exponents().size() *
+                                                        b_basis.functions()[j].exponents().size());
+
+                combinations.emplace_back(i, j);
+
+                weights.push_back(ncomps * nprims);
+            }
+        }
+
+        std::vector<size_t> perm(combinations.size());
+
+        std::ranges::copy(std::views::iota(size_t{0}, combinations.size()), perm.begin());
+
+        std::ranges::sort(perm, [&](const size_t a, const size_t b) { return weights[a] > weights[b]; });
+
+        std::vector<std::pair<size_t, size_t>> sorted;
+
+        sorted.reserve(perm.size());
+
+        for (const auto k : perm) sorted.push_back(combinations[k]);
+
+        orders.emplace(key, std::move(sorted));
+    }
+
+    // NOTE: a combination which reaches no atom pair is left out here rather than
+    // skipped in the loop, so that every task the threads draw carries work.
+
+    std::vector<TPairTask> tasks;
+
+    for (const auto iblk : order)
+    {
+        const auto &block = pattern.pair_block(iblk);
+
+        const auto &a_index = a_indices[block.bra_index()];
+
+        const auto &b_index = b_indices[block.ket_index()];
+
+        for (const auto [i, j] : orders.at({block.bra_index(), block.ket_index()}))
+        {
+            const auto [la, ia] = a_index[i];
+
+            const auto [lb, jb] = b_index[j];
+
+            if (const auto nvalues = block.number_of_pairs(la, ia, lb, jb); nvalues > 0)
+            {
+                tasks.push_back({iblk, i, j, nvalues});
+            }
+        }
+    }
+
+    const auto ntasks = static_cast<int>(tasks.size());
+
+    if (ntasks == 0) return;
+
+    // NOTE: the coordinates of a block are formed before the tasks are drawn and not
+    // inside a task, as the combinations of a block are computed by different threads
+    // and all of them read the same coordinates.
+
+    std::vector<CSimdMatrix> coordinates(nblocks);
+
+    const auto nblk = static_cast<int>(nblocks);
+
+#pragma omp parallel if (ntasks > 1)
+    {
+#pragma omp for schedule(dynamic)
+        for (int iblk = 0; iblk < nblk; iblk++)
+        {
+            coordinates[static_cast<size_t>(iblk)] = simdfunc::make_coordinates(pattern.pair_block(static_cast<size_t>(iblk)), molecule);
+        }
+
+        // NOTE: the arena is formed once per thread and spans the largest combination
+        // any block carries. The combinations work over a view of it, so that each
+        // takes the shape of the atom pairs it reaches.
+
+        auto arena = CSimdMatrix(arena_rows, arena_cols);
 
         auto buffer = CSimdMatrix(arena.data(), arena.capacity());
 
 #pragma omp for schedule(dynamic)
-        for (int iblk = 0; iblk < nblocks; iblk++)
+        for (int itask = 0; itask < ntasks; itask++)
         {
-            const auto jblk = order[static_cast<size_t>(iblk)];
+            const auto &task = tasks[static_cast<size_t>(itask)];
 
-            const auto &block = pattern.pair_block(jblk);
-
-            // NOTE: the coordinates of the atom pairs are created once for the whole
-            // block, as all combinations of basis functions of the block share them.
-
-            const auto coordinates = simdfunc::make_coordinates(block, molecule);
+            const auto &block = pattern.pair_block(task.iblock);
 
             const auto &a_basis = bra_basis.basis_set(block.bra_index());
 
             const auto &b_basis = ket_basis.basis_set(block.ket_index());
 
-            const auto &a_index = a_indices[block.bra_index()];
+            const auto [la, ia] = a_indices[block.bra_index()][task.i];
 
-            const auto &b_index = b_indices[block.ket_index()];
+            const auto [lb, jb] = b_indices[block.ket_index()][task.j];
 
-            // NOTE: the atom bases of an off-diagonal block sit on different atoms, so
-            // all combinations of basis functions are computed and none of them shares
-            // the storage of its values with the reverse order.
+            const auto ncomps = static_cast<size_t>(tensor::number_of_spherical_components(std::array<int, 2>{la, lb}));
 
-            // NOTE: the combinations of basis functions are independent, as each of them
-            // writes its own values and reads the coordinates of the block without
-            // changing them.
+            auto *values = distributor.target(block, task.iblock, la, ia, lb, jb, task.nvalues, ncomps);
 
-            for (size_t i = 0; i < a_index.size(); i++)
-            {
-                for (size_t j = 0; j < b_index.size(); j++)
-                {
-                    const auto [la, ia] = a_index[i];
+            // NOTE: the pairs of primitives are screened with the threshold the atom
+            // pairs of the pattern were screened with, so that the two screenings of a
+            // computation cannot disagree when the pattern comes from the caller
+            // rather than from this driver.
 
-                    const auto [lb, jb] = b_index[j];
+            simdovl::compute_overlap(values,
+                                     task.nvalues,
+                                     a_basis.functions()[task.i],
+                                     b_basis.functions()[task.j],
+                                     coordinates[task.iblock],
+                                     buffer,
+                                     pattern.get_threshold());
 
-                    const auto nvalues = block.number_of_pairs(la, ia, lb, jb);
-
-                    if (nvalues == 0) continue;
-
-                    const auto ncomps = static_cast<size_t>(tensor::number_of_spherical_components(std::array<int, 2>{la, lb}));
-
-                    auto *values = distributor.target(block, jblk, la, ia, lb, jb, nvalues, ncomps);
-
-                    // NOTE: the pairs of primitives are screened with the threshold the
-                    // atom pairs of the pattern were screened with, so that the two
-                    // screenings of a computation cannot disagree when the pattern comes
-                    // from the caller rather than from this driver.
-
-                    simdovl::compute_overlap(values,
-                                             nvalues,
-                                             a_basis.functions()[i],
-                                             b_basis.functions()[j],
-                                             coordinates,
-                                             buffer,
-                                             pattern.get_threshold());
-
-                    distributor.commit(block, jblk, la, ia, lb, jb, nvalues, ncomps);
-                }
-            }
+            distributor.commit(block, task.iblock, la, ia, lb, jb, task.nvalues, ncomps);
         }
     }
 }
