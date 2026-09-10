@@ -144,7 +144,14 @@ export_simdintegrals(py::module &m) -> void
              py::arg("aux_basis"),
              py::arg("inverse_metric"),
              py::arg("threshold"),
-             py::arg("aux_atoms") = std::vector<int>{});
+             py::arg("aux_atoms") = std::vector<int>{})
+        .def("compute_y_vector",
+             &CSimdRIJFockDriver::compute_y_vector,
+             "Contracts the B vectors with a density matrix.",
+             py::arg("bq_vectors"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("density"));
 }
 
 }  // namespace vlx_simdintegrals

@@ -524,3 +524,196 @@ CSimdRIJFockDriver::compute_bq_vectors(const CMolecule        &molecule,
 
     return bq_vectors;
 }
+
+auto
+CSimdRIJFockDriver::compute_y_vector(const CSparseTensor   &bq_vectors,
+                                     const CMolecularBasis &basis,
+                                     const CMolecularBasis &aux_basis,
+                                     const CPackedMatrix   &density) const -> std::vector<double>
+{
+    const auto nao = basis.dimensions_of_basis();
+
+    const auto naux = aux_basis.dimensions_of_basis();
+
+    errors::assertMsgCritical((density.number_of_rows() == nao) && (density.number_of_columns() == nao),
+                              std::string("RIJFockDriver: The density does not match the molecular basis"));
+
+    errors::assertMsgCritical((density.get_type() == mat_t::symmetric) || (density.get_type() == mat_t::general),
+                              std::string("RIJFockDriver: The density must be symmetric or general"));
+
+    // NOTE: a symmetric density is stored as one triangle and its transposed
+    // element is the element itself, so the off-diagonal pairs of atoms carry
+    // twice it. A general density is stored in full and carries the element and
+    // its transpose, which is what a response density needs.
+
+    const auto symmetric = (density.get_type() == mat_t::symmetric);
+
+    const auto indices = denseidx::index_functions(basis);
+
+    const auto starts = denseidx::make_dense_starts(basis);
+
+    const auto strides = denseidx::make_dense_strides(basis);
+
+    const auto nmoms = static_cast<size_t>(basis.max_angular_momentum() + 1);
+
+    const auto aux_indices = denseidx::index_functions(aux_basis);
+
+    const auto aux_starts = denseidx::make_dense_starts(aux_basis);
+
+    const auto aux_strides = denseidx::make_dense_strides(aux_basis);
+
+    const auto aux_nmoms = static_cast<size_t>(aux_basis.max_angular_momentum() + 1);
+
+    std::vector<double> yvector(naux, 0.0);
+
+    const auto nblocks = static_cast<int>(bq_vectors.number_of_blocks());
+
+#pragma omp parallel
+    {
+        // NOTE: the blocks of the B vectors carry the auxiliary functions of any
+        // atom of their group, so two blocks add to the same element of the Y
+        // vector. Each thread sums into one of its own, which are added up once
+        // at the end rather than through an atomic on every element.
+
+        std::vector<double> partial(naux, 0.0);
+
+        std::vector<double> weights;
+
+        std::vector<size_t> aux_rows;
+
+#pragma omp for schedule(dynamic)
+        for (int i = 0; i < nblocks; i++)
+        {
+            const auto iblock = static_cast<size_t>(i);
+
+            const auto &block = bq_vectors.block(iblock);
+
+            const auto &a_atoms = block.a_atoms();
+
+            const auto &b_atoms = block.b_atoms();
+
+            const auto &c_atoms = block.c_atoms();
+
+            const auto npairs_max = a_atoms.size();
+
+            const auto natoms = c_atoms.size();
+
+            if ((npairs_max == 0) || (natoms == 0)) continue;
+
+            // NOTE: the diagonal pairs of atoms are at zero interatomic distance
+            // and lead the atom pairs of a block, so counting them is enough to
+            // tell the two kinds of pair apart.
+
+            size_t ndiag = 0;
+
+            while ((ndiag < npairs_max) && (a_atoms[ndiag] == b_atoms[ndiag])) ndiag++;
+
+            weights.resize(npairs_max);
+
+            const auto &a_list = indices[static_cast<size_t>(block.a_index())];
+
+            const auto &b_list = indices[static_cast<size_t>(block.b_index())];
+
+            const auto &c_list = aux_indices[static_cast<size_t>(block.c_index())];
+
+            for (const auto [la, ia] : a_list)
+            {
+                for (const auto [lb, jb] : b_list)
+                {
+                    const auto ncomps_a = static_cast<size_t>(2 * la + 1);
+
+                    const auto ncomps_b = static_cast<size_t>(2 * lb + 1);
+
+                    const auto lval_a = static_cast<size_t>(la);
+
+                    const auto lval_b = static_cast<size_t>(lb);
+
+                    for (size_t ma = 0; ma < ncomps_a; ma++)
+                    {
+                        for (size_t mb = 0; mb < ncomps_b; mb++)
+                        {
+                            // NOTE: the elements of the density a combination needs
+                            // do not depend on the auxiliary side, so they are
+                            // gathered once and reused by every basis function of it.
+
+                            for (size_t k = 0; k < npairs_max; k++)
+                            {
+                                const auto row = starts[static_cast<size_t>(a_atoms[k]) * nmoms + lval_a] + ia +
+                                                 ma * strides[lval_a];
+
+                                const auto col = starts[static_cast<size_t>(b_atoms[k]) * nmoms + lval_b] + jb +
+                                                 mb * strides[lval_b];
+
+                                if (k < ndiag)
+                                {
+                                    weights[k] = density.at(row, col);
+                                }
+                                else if (symmetric)
+                                {
+                                    weights[k] = 2.0 * density.at(row, col);
+                                }
+                                else
+                                {
+                                    weights[k] = density.at(row, col) + density.at(col, row);
+                                }
+                            }
+
+                            for (const auto [lc, kc] : c_list)
+                            {
+                                const auto npairs = block.number_of_pairs(la, ia, lb, jb, lc, kc);
+
+                                if (npairs == 0) continue;
+
+                                const auto ncomps_c = static_cast<size_t>(2 * lc + 1);
+
+                                const auto lval_c = static_cast<size_t>(lc);
+
+                                const auto nq = ncomps_c * natoms;
+
+                                const auto *values =
+                                    bq_vectors.values(iblock, la, ia, lb, jb, lc, kc) + (ma * ncomps_b + mb) * nq * npairs;
+
+                                aux_rows.resize(nq);
+
+                                for (size_t mc = 0; mc < ncomps_c; mc++)
+                                {
+                                    for (size_t n = 0; n < natoms; n++)
+                                    {
+                                        aux_rows[mc * natoms + n] =
+                                            aux_starts[static_cast<size_t>(c_atoms[n]) * aux_nmoms + lval_c] + kc +
+                                            mc * aux_strides[lval_c];
+                                    }
+                                }
+
+                                for (size_t q = 0; q < nq; q++)
+                                {
+                                    const auto *row = values + q * npairs;
+
+                                    double sum = 0.0;
+
+#pragma omp simd reduction(+ : sum)
+                                    for (size_t p = 0; p < npairs; p++)
+                                    {
+                                        sum += row[p] * weights[p];
+                                    }
+
+                                    partial[aux_rows[q]] += sum;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+#pragma omp critical
+        {
+            for (size_t k = 0; k < naux; k++)
+            {
+                yvector[k] += partial[k];
+            }
+        }
+    }
+
+    return yvector;
+}

@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 
 from veloxchem.veloxchemlib import AtomBasis, BasisFunction, MolecularBasis
+from veloxchem.veloxchemlib import PackedMatrix, mat_t
 from veloxchem.veloxchemlib import SimdRIJFockDriver
 from veloxchem.veloxchemlib import SimdThreeCenterElectronRepulsionDriver
 from veloxchem.veloxchemlib import SimdTwoCenterElectronRepulsionDriver
@@ -183,3 +184,125 @@ class TestSimdRIJFockDriver:
         # are no longer reached, which would let the comparison pass while checking
         # almost nothing.
         assert total > 200000
+
+    def y_case(self, molecule, identifiers, bra_momenta, aux_momentum, kind):
+        """Y(q) = sum over i and j of B(q)_ij D_ij, against the same in numpy."""
+
+        basis, aux_basis = MolecularBasis(), MolecularBasis()
+
+        for identifier, momentum in zip(identifiers, bra_momenta):
+            basis.add(self.one_function_basis(momentum, identifier))
+
+        for identifier in identifiers:
+            aux_basis.add(self.one_function_basis(aux_momentum, identifier))
+
+        nao = basis.get_dimensions_of_basis()
+        naux = aux_basis.get_dimensions_of_basis()
+
+        maps = self.dense_maps(basis, molecule)
+        aux_maps = self.dense_maps(aux_basis, molecule)
+
+        inverse = SimdTwoCenterElectronRepulsionDriver().compute(molecule, aux_basis).invert()
+
+        drv = SimdRIJFockDriver()
+        bq = drv.compute_bq_vectors(molecule, basis, aux_basis, inverse, 0.0)
+
+        dense_bq, visited = self.expand(bq, basis, aux_basis, maps, aux_maps, nao, naux)
+
+        # the density: symmetric for the field, genuinely asymmetric for response
+
+        rng = np.random.default_rng(17 + nao)
+        raw = rng.standard_normal((nao, nao))
+
+        if kind == 'symmetric':
+            dmat = raw + raw.T
+            packed = PackedMatrix(nao, nao, mat_t.symmetric)
+        else:
+            dmat = raw
+            packed = PackedMatrix(nao, nao, mat_t.general)
+
+        packed.from_numpy(np.ascontiguousarray(dmat))
+
+        expected = np.einsum('ijq,ij->q', dense_bq, dmat)
+
+        computed = np.asarray(drv.compute_y_vector(bq, basis, aux_basis, packed))
+
+        scale = max(float(np.max(np.abs(expected))), 1.0)
+
+        return float(np.max(np.abs(computed - expected))) / scale, visited, computed
+
+    def test_y_vector_symmetric_density(self, molecule):
+        """The density of a self consistent field calculation."""
+
+        total = 0
+
+        for la in range(4):
+            for lb in range(4):
+                for lc in range(4):
+                    worst, visited, _ = self.y_case(molecule, (8, 1, 7, 6),
+                                                    (la, la, lb, lb), lc, 'symmetric')
+                    total += visited
+
+                    assert visited > 0
+                    assert worst < 1.0e-10, (
+                        f"({LABELS[la]}{LABELS[lb]}|{LABELS[lc]}) differs by {worst:.2e}")
+
+        # NOTE: the sweep visited close to two hundred thousand elements of the B
+        # vectors when it was written. A large fall means the layout moved and the
+        # contraction no longer reaches most of them.
+        assert total > 150000
+
+    def test_y_vector_general_density(self, molecule):
+        """The density of a response calculation, which is not symmetric."""
+
+        total = 0
+
+        for la in range(4):
+            for lb in range(4):
+                for lc in range(4):
+                    worst, visited, _ = self.y_case(molecule, (8, 1, 7, 6),
+                                                    (la, la, lb, lb), lc, 'general')
+                    total += visited
+
+                    assert visited > 0
+                    assert worst < 1.0e-10, (
+                        f"({LABELS[la]}{LABELS[lb]}|{LABELS[lc]}) differs by {worst:.2e}")
+
+        # NOTE: the sweep visited close to two hundred thousand elements of the B
+        # vectors when it was written. A large fall means the layout moved and the
+        # contraction no longer reaches most of them.
+        assert total > 150000
+
+    def test_general_path_reproduces_symmetric(self, molecule):
+        """A symmetric density must give the same Y down either path."""
+
+        basis, aux_basis = MolecularBasis(), MolecularBasis()
+
+        for identifier, momentum in zip((8, 1, 7, 6), (1, 1, 0, 0)):
+            basis.add(self.one_function_basis(momentum, identifier))
+
+        for identifier in (8, 1, 7, 6):
+            aux_basis.add(self.one_function_basis(1, identifier))
+
+        nao = basis.get_dimensions_of_basis()
+
+        inverse = SimdTwoCenterElectronRepulsionDriver().compute(molecule, aux_basis).invert()
+
+        drv = SimdRIJFockDriver()
+        bq = drv.compute_bq_vectors(molecule, basis, aux_basis, inverse, 0.0)
+
+        rng = np.random.default_rng(5)
+        raw = rng.standard_normal((nao, nao))
+        dmat = np.ascontiguousarray(raw + raw.T)
+
+        sym = PackedMatrix(nao, nao, mat_t.symmetric)
+        sym.from_numpy(dmat)
+
+        gen = PackedMatrix(nao, nao, mat_t.general)
+        gen.from_numpy(dmat)
+
+        y_sym = np.asarray(drv.compute_y_vector(bq, basis, aux_basis, sym))
+        y_gen = np.asarray(drv.compute_y_vector(bq, basis, aux_basis, gen))
+
+        assert np.max(np.abs(y_sym)) > 0.0
+        assert np.allclose(y_sym, y_gen, rtol=1.0e-12, atol=1.0e-12)

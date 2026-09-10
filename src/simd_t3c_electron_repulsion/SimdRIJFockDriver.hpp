@@ -87,6 +87,28 @@ class CSimdRIJFockDriver
                             const double            threshold,
                             const std::vector<int> &aux_atoms = {}) const -> CSparseTensor;
 
+    /// @brief Contracts the B vectors with a density matrix.
+    /// @param bq_vectors The B vectors, as compute_bq_vectors returns them.
+    /// @param basis The molecular basis on a and b sides.
+    /// @param aux_basis The auxiliary molecular basis.
+    /// @param density The density matrix, in the packed format.
+    /// @return The Y vector, Y(q) = sum over i and j of B(q)_ij D_ij, indexed by the
+    /// dense index of the auxiliary basis function and zero where the B vectors carry
+    /// no auxiliary function of their own.
+    /// @note A symmetric density is the one of a self consistent field calculation
+    /// and a general density is the one of a response calculation. Which of the two
+    /// is contracted follows from the type of the matrix, so that the caller cannot
+    /// ask for the wrong one.
+    /// @note The B vectors hold each unordered pair of atoms once, and hold the
+    /// diagonal pairs of atoms with the basis functions of both sides. The elements
+    /// of a diagonal pair of atoms are therefore summed as they are, and those of an
+    /// off-diagonal pair are summed with the transposed element of the density, which
+    /// is twice the element itself when the density is symmetric.
+    auto compute_y_vector(const CSparseTensor    &bq_vectors,
+                          const CMolecularBasis  &basis,
+                          const CMolecularBasis  &aux_basis,
+                          const CPackedMatrix    &density) const -> std::vector<double>;
+
    private:
     /// @brief The memory a batch of the three-center integrals is allowed to reach.
     /// @note The batch is the blocks of atomic orbital pairs whose integrals are
