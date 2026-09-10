@@ -151,7 +151,25 @@ export_simdintegrals(py::module &m) -> void
              py::arg("bq_vectors"),
              py::arg("basis"),
              py::arg("aux_basis"),
-             py::arg("density"));
+             py::arg("density"))
+        .def("compute_fock_matrix",
+             static_cast<CPackedMatrix (CSimdRIJFockDriver::*)(
+                 const CSparseTensor &, const CMolecularBasis &, const CMolecularBasis &,
+                 const CPackedMatrix &) const>(&CSimdRIJFockDriver::compute_fock_matrix),
+             "Computes the Coulomb matrix of the resolution of the identity for a density.",
+             py::arg("bq_vectors"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("density"))
+        .def("compute_fock_matrix",
+             static_cast<CPackedMatrix (CSimdRIJFockDriver::*)(
+                 const CSparseTensor &, const CMolecularBasis &, const CMolecularBasis &,
+                 const std::vector<double> &) const>(&CSimdRIJFockDriver::compute_fock_matrix),
+             "Computes the Coulomb matrix of the resolution of the identity for a Y vector.",
+             py::arg("bq_vectors"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("y_vector"));
 }
 
 }  // namespace vlx_simdintegrals

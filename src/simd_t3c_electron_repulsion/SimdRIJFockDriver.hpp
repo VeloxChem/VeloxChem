@@ -109,6 +109,37 @@ class CSimdRIJFockDriver
                           const CMolecularBasis  &aux_basis,
                           const CPackedMatrix    &density) const -> std::vector<double>;
 
+    /// @brief Computes the Coulomb matrix of the resolution of the identity.
+    /// @param bq_vectors The B vectors, as compute_bq_vectors returns them.
+    /// @param basis The molecular basis on a and b sides.
+    /// @param aux_basis The auxiliary molecular basis.
+    /// @param y_vector The Y vector, as compute_y_vector returns it.
+    /// @return The Coulomb matrix, F_ij = sum over q of B(q)_ij Y(q), in the packed
+    /// format as a symmetric matrix.
+    /// @note This is the form which takes the Y vector, so that a calculation which
+    /// contracts many densities with one set of B vectors forms them once.
+    auto compute_fock_matrix(const CSparseTensor        &bq_vectors,
+                             const CMolecularBasis      &basis,
+                             const CMolecularBasis      &aux_basis,
+                             const std::vector<double>  &y_vector) const -> CPackedMatrix;
+
+    /// @brief Computes the Coulomb matrix of the resolution of the identity for a
+    /// density matrix.
+    /// @param bq_vectors The B vectors, as compute_bq_vectors returns them.
+    /// @param basis The molecular basis on a and b sides.
+    /// @param aux_basis The auxiliary molecular basis.
+    /// @param density The density matrix, in the packed format.
+    /// @return The Coulomb matrix, in the packed format as a symmetric matrix.
+    /// @note The Coulomb matrix is symmetric whether the density is symmetric or
+    /// general, so it is stored as a symmetric matrix in either case.
+    /// @note No factor of the occupancy or of the spin is applied. This is the
+    /// contraction as it is written, and a convention which carries such a factor
+    /// applies it to the density or to the matrix returned.
+    auto compute_fock_matrix(const CSparseTensor   &bq_vectors,
+                             const CMolecularBasis &basis,
+                             const CMolecularBasis &aux_basis,
+                             const CPackedMatrix   &density) const -> CPackedMatrix;
+
    private:
     /// @brief The memory a batch of the three-center integrals is allowed to reach.
     /// @note The batch is the blocks of atomic orbital pairs whose integrals are

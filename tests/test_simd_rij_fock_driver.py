@@ -374,3 +374,148 @@ class TestSimdRIJFockDriver:
             assert np.max(np.abs(missed - target)) / scale > 1.0e-2
 
         assert compared > 0
+
+    def fock_case(self, molecule, identifiers, bra_momenta, aux_momentum, kind):
+        """The whole chain: L inverted, B vectors, Y vector, Coulomb matrix."""
+
+        basis, aux_basis = MolecularBasis(), MolecularBasis()
+
+        for identifier, momentum in zip(identifiers, bra_momenta):
+            basis.add(self.one_function_basis(momentum, identifier))
+
+        for identifier in identifiers:
+            aux_basis.add(self.one_function_basis(aux_momentum, identifier))
+
+        nao = basis.get_dimensions_of_basis()
+        naux = aux_basis.get_dimensions_of_basis()
+
+        maps = self.dense_maps(basis, molecule)
+        aux_maps = self.dense_maps(aux_basis, molecule)
+
+        metric = SimdTwoCenterElectronRepulsionDriver().compute(molecule, aux_basis)
+
+        integrals = SimdThreeCenterElectronRepulsionDriver().compute(
+            molecule, basis, aux_basis, 0.0)
+
+        dense_ints, _ = self.expand(integrals, basis, aux_basis, maps, aux_maps, nao, naux)
+
+        rng = np.random.default_rng(23 + nao)
+        raw = rng.standard_normal((nao, nao))
+
+        if kind == 'symmetric':
+            dmat = np.ascontiguousarray(raw + raw.T)
+            packed = PackedMatrix(nao, nao, mat_t.symmetric)
+        else:
+            dmat = np.ascontiguousarray(raw)
+            packed = PackedMatrix(nao, nao, mat_t.general)
+
+        packed.from_numpy(dmat)
+
+        drv = SimdRIJFockDriver()
+
+        bq = drv.compute_bq_vectors(molecule, basis, aux_basis,
+                                    metric.cholesky_inverse(), 0.0)
+
+        dense_bq, visited = self.expand(bq, basis, aux_basis, maps, aux_maps, nao, naux)
+
+        fock = drv.compute_fock_matrix(bq, basis, aux_basis, packed)
+
+        assert fock.get_type() == mat_t.symmetric
+
+        computed = fock.to_numpy(max_memory=8.0)
+
+        # the Coulomb matrix is symmetric to the last bit, as one triangle is stored
+
+        assert np.array_equal(computed, computed.T)
+
+        # the reference, built independently from the raw integrals and the inverse
+
+        reference = np.einsum('ijp,pt,klt,kl->ij', dense_ints,
+                              np.linalg.inv(metric.to_numpy(max_memory=8.0)),
+                              dense_ints, dmat)
+
+        scale = max(float(np.max(np.abs(reference))), 1.0)
+
+        return float(np.max(np.abs(computed - reference))) / scale, visited
+
+    def test_fock_matrix_symmetric_density(self, molecule):
+        """The Coulomb matrix against the resolution of the identity written out."""
+
+        total = 0
+
+        for la in range(4):
+            for lb in range(4):
+                for lc in range(4):
+                    worst, visited = self.fock_case(molecule, (8, 1, 7, 6),
+                                                    (la, la, lb, lb), lc, 'symmetric')
+                    total += visited
+
+                    assert visited > 0
+                    assert worst < 1.0e-11, (
+                        f"({LABELS[la]}{LABELS[lb]}|{LABELS[lc]}) differs by {worst:.2e}")
+
+        # NOTE: the sweep visited close to two hundred thousand elements of the B
+        # vectors when it was written, and a large fall means most of them are no
+        # longer reached.
+        assert total > 150000
+
+    def test_fock_matrix_general_density(self, molecule):
+        """A response density, which is not symmetric, still gives a symmetric matrix."""
+
+        total = 0
+
+        for la in range(4):
+            for lb in range(4):
+                for lc in range(4):
+                    worst, visited = self.fock_case(molecule, (8, 1, 7, 6),
+                                                    (la, la, lb, lb), lc, 'general')
+                    total += visited
+
+                    assert visited > 0
+                    assert worst < 1.0e-11, (
+                        f"({LABELS[la]}{LABELS[lb]}|{LABELS[lc]}) differs by {worst:.2e}")
+
+        # NOTE: the sweep visited close to two hundred thousand elements of the B
+        # vectors when it was written, and a large fall means most of them are no
+        # longer reached.
+        assert total > 150000
+
+    def test_fock_matrix_from_y_vector(self, molecule):
+        """The two forms must agree, as one is written in terms of the other."""
+
+        basis, aux_basis = MolecularBasis(), MolecularBasis()
+
+        for identifier, momentum in zip((8, 1, 7, 6), (1, 1, 0, 0)):
+            basis.add(self.one_function_basis(momentum, identifier))
+
+        for identifier in (8, 1, 7, 6):
+            aux_basis.add(self.one_function_basis(1, identifier))
+
+        nao = basis.get_dimensions_of_basis()
+
+        metric = SimdTwoCenterElectronRepulsionDriver().compute(molecule, aux_basis)
+
+        drv = SimdRIJFockDriver()
+        bq = drv.compute_bq_vectors(molecule, basis, aux_basis,
+                                    metric.cholesky_inverse(), 0.0)
+
+        rng = np.random.default_rng(31)
+        raw = rng.standard_normal((nao, nao))
+        dmat = np.ascontiguousarray(raw + raw.T)
+
+        packed = PackedMatrix(nao, nao, mat_t.symmetric)
+        packed.from_numpy(dmat)
+
+        yvec = drv.compute_y_vector(bq, basis, aux_basis, packed)
+
+        from_density = drv.compute_fock_matrix(bq, basis, aux_basis, packed).to_numpy()
+        from_yvector = drv.compute_fock_matrix(bq, basis, aux_basis, yvec).to_numpy()
+
+        assert np.max(np.abs(from_density)) > 0.0
+
+        # NOTE: not bit for bit. The blocks are handed to the threads dynamically,
+        # so which of them a thread sums varies between runs and the last bit of the
+        # total varies with it. The spread is one unit in the last place, which the
+        # tolerance below is far tighter than while still catching a real difference.
+
+        assert np.allclose(from_density, from_yvector, rtol=1.0e-13, atol=1.0e-14)

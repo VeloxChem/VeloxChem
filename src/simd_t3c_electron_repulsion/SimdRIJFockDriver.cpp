@@ -44,6 +44,7 @@
 #include "AtomBasisTripleSparsity.hpp"
 #include "DenseIndexFunc.hpp"
 #include "ErrorHandler.hpp"
+#include "OpenMPFunc.hpp"
 #include "ScreeningFunc.hpp"
 #include "SimdT3CDistributor.hpp"
 #include "SimdThreeCenterElectronRepulsionDriver.hpp"
@@ -575,14 +576,19 @@ CSimdRIJFockDriver::compute_y_vector(const CSparseTensor   &bq_vectors,
 
     const auto nblocks = static_cast<int>(bq_vectors.number_of_blocks());
 
+    // NOTE: the blocks of the B vectors carry the auxiliary functions of any atom
+    // of their group, so two blocks add to the same element of the Y vector. Each
+    // thread sums into a vector of its own rather than through an atomic on every
+    // element, and the vectors are added up in the order of the threads, so that
+    // the result does not depend on the order the threads happen to finish in.
+
+    const auto nthreads = static_cast<size_t>(omp::get_number_of_threads());
+
+    std::vector<double> buffers(nthreads * naux, 0.0);
+
 #pragma omp parallel
     {
-        // NOTE: the blocks of the B vectors carry the auxiliary functions of any
-        // atom of their group, so two blocks add to the same element of the Y
-        // vector. Each thread sums into one of its own, which are added up once
-        // at the end rather than through an atomic on every element.
-
-        std::vector<double> partial(naux, 0.0);
+        auto *partial = buffers.data() + static_cast<size_t>(omp_get_thread_num()) * naux;
 
         std::vector<double> weights;
 
@@ -713,14 +719,228 @@ CSimdRIJFockDriver::compute_y_vector(const CSparseTensor   &bq_vectors,
             }
         }
 
-#pragma omp critical
+    }
+
+    const auto nelems = static_cast<int>(naux);
+
+#pragma omp parallel for schedule(static) if (nelems > 1)
+    for (int k = 0; k < nelems; k++)
+    {
+        double sum = 0.0;
+
+        for (size_t t = 0; t < nthreads; t++)
         {
-            for (size_t k = 0; k < naux; k++)
-            {
-                yvector[k] += partial[k];
-            }
+            sum += buffers[t * naux + static_cast<size_t>(k)];
         }
+
+        yvector[static_cast<size_t>(k)] = sum;
     }
 
     return yvector;
+}
+
+auto
+CSimdRIJFockDriver::compute_fock_matrix(const CSparseTensor       &bq_vectors,
+                                        const CMolecularBasis     &basis,
+                                        const CMolecularBasis     &aux_basis,
+                                        const std::vector<double> &y_vector) const -> CPackedMatrix
+{
+    const auto nao = basis.dimensions_of_basis();
+
+    const auto naux = aux_basis.dimensions_of_basis();
+
+    errors::assertMsgCritical(y_vector.size() == naux,
+                              std::string("RIJFockDriver: The Y vector does not match the auxiliary basis"));
+
+    const auto indices = denseidx::index_functions(basis);
+
+    const auto starts = denseidx::make_dense_starts(basis);
+
+    const auto strides = denseidx::make_dense_strides(basis);
+
+    const auto nmoms = static_cast<size_t>(basis.max_angular_momentum() + 1);
+
+    const auto aux_indices = denseidx::index_functions(aux_basis);
+
+    const auto aux_starts = denseidx::make_dense_starts(aux_basis);
+
+    const auto aux_strides = denseidx::make_dense_strides(aux_basis);
+
+    const auto aux_nmoms = static_cast<size_t>(aux_basis.max_angular_momentum() + 1);
+
+    auto fock = CPackedMatrix(nao, nao, mat_t::symmetric);
+
+    fock.zero();
+
+    auto *fock_values = fock.data();
+
+    const auto nblocks = static_cast<int>(bq_vectors.number_of_blocks());
+
+    // NOTE: one pair of atoms is carried by one block per atom basis group on the
+    // auxiliary side, and all of them add into the same element of the Coulomb
+    // matrix, so the blocks are not free of one another. Each thread sums into a
+    // matrix of its own, and they are added up in the order of the threads, so
+    // that the result does not depend on the order the threads finish in.
+
+    const auto nvalues = fock.number_of_elements();
+
+    const auto nthreads = static_cast<size_t>(omp::get_number_of_threads());
+
+    std::vector<double> buffers(nthreads * nvalues, 0.0);
+
+#pragma omp parallel
+    {
+        auto *partial = buffers.data() + static_cast<size_t>(omp_get_thread_num()) * nvalues;
+
+        std::vector<double> contributions;
+
+#pragma omp for schedule(dynamic)
+        for (int i = 0; i < nblocks; i++)
+        {
+            const auto iblock = static_cast<size_t>(i);
+
+            const auto &block = bq_vectors.block(iblock);
+
+            const auto &a_atoms = block.a_atoms();
+
+            const auto &b_atoms = block.b_atoms();
+
+            const auto &c_atoms = block.c_atoms();
+
+            const auto npairs_max = a_atoms.size();
+
+            const auto natoms = c_atoms.size();
+
+            if ((npairs_max == 0) || (natoms == 0)) continue;
+
+            // NOTE: the diagonal pairs of atoms lead the atom pairs of a block, and
+            // are the ones the tensor carries with the basis functions of both
+            // sides, so they deliver an element of the matrix and its transpose.
+
+            size_t ndiag = 0;
+
+            while ((ndiag < npairs_max) && (a_atoms[ndiag] == b_atoms[ndiag])) ndiag++;
+
+            contributions.resize(npairs_max);
+
+            const auto &a_list = indices[static_cast<size_t>(block.a_index())];
+
+            const auto &b_list = indices[static_cast<size_t>(block.b_index())];
+
+            const auto &c_list = aux_indices[static_cast<size_t>(block.c_index())];
+
+            for (const auto [la, ia] : a_list)
+            {
+                for (const auto [lb, jb] : b_list)
+                {
+                    const auto ncomps_a = static_cast<size_t>(2 * la + 1);
+
+                    const auto ncomps_b = static_cast<size_t>(2 * lb + 1);
+
+                    const auto lval_a = static_cast<size_t>(la);
+
+                    const auto lval_b = static_cast<size_t>(lb);
+
+                    for (size_t ma = 0; ma < ncomps_a; ma++)
+                    {
+                        for (size_t mb = 0; mb < ncomps_b; mb++)
+                        {
+                            std::fill(contributions.begin(), contributions.end(), 0.0);
+
+                            auto touched = size_t{0};
+
+                            for (const auto [lc, kc] : c_list)
+                            {
+                                const auto npairs = block.number_of_pairs(la, ia, lb, jb, lc, kc);
+
+                                if (npairs == 0) continue;
+
+                                const auto ncomps_c = static_cast<size_t>(2 * lc + 1);
+
+                                const auto lval_c = static_cast<size_t>(lc);
+
+                                const auto nq = ncomps_c * natoms;
+
+                                const auto *values =
+                                    bq_vectors.values(iblock, la, ia, lb, jb, lc, kc) + (ma * ncomps_b + mb) * nq * npairs;
+
+                                touched = std::max(touched, npairs);
+
+                                for (size_t mc = 0; mc < ncomps_c; mc++)
+                                {
+                                    for (size_t n = 0; n < natoms; n++)
+                                    {
+                                        const auto gq = aux_starts[static_cast<size_t>(c_atoms[n]) * aux_nmoms + lval_c] +
+                                                        kc + mc * aux_strides[lval_c];
+
+                                        const auto factor = y_vector[gq];
+
+                                        const auto *row = values + (mc * natoms + n) * npairs;
+
+#pragma omp simd
+                                        for (size_t p = 0; p < npairs; p++)
+                                        {
+                                            contributions[p] += row[p] * factor;
+                                        }
+                                    }
+                                }
+                            }
+
+                            // NOTE: the Coulomb matrix is symmetric and one triangle
+                            // of it is stored, so an element and its transpose share
+                            // a place. A diagonal pair of atoms delivers both of them
+                            // and one of the two is dropped, while an off-diagonal
+                            // pair delivers each unordered pair of orbitals once.
+
+                            for (size_t k = 0; k < touched; k++)
+                            {
+                                const auto row = starts[static_cast<size_t>(a_atoms[k]) * nmoms + lval_a] + ia +
+                                                 ma * strides[lval_a];
+
+                                const auto col = starts[static_cast<size_t>(b_atoms[k]) * nmoms + lval_b] + jb +
+                                                 mb * strides[lval_b];
+
+                                if ((k < ndiag) && (row < col)) continue;
+
+                                const auto upper = (row < col) ? col : row;
+
+                                const auto lower = (row < col) ? row : col;
+
+                                partial[upper * (upper + 1) / 2 + lower] += contributions[k];
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+    }
+
+    const auto nchunks = static_cast<int>(nvalues);
+
+#pragma omp parallel for schedule(static) if (nchunks > 1)
+    for (int k = 0; k < nchunks; k++)
+    {
+        double sum = 0.0;
+
+        for (size_t t = 0; t < nthreads; t++)
+        {
+            sum += buffers[t * nvalues + static_cast<size_t>(k)];
+        }
+
+        fock_values[static_cast<size_t>(k)] = sum;
+    }
+
+    return fock;
+}
+
+auto
+CSimdRIJFockDriver::compute_fock_matrix(const CSparseTensor   &bq_vectors,
+                                        const CMolecularBasis &basis,
+                                        const CMolecularBasis &aux_basis,
+                                        const CPackedMatrix   &density) const -> CPackedMatrix
+{
+    const auto yvector = compute_y_vector(bq_vectors, basis, aux_basis, density);
+
+    return compute_fock_matrix(bq_vectors, basis, aux_basis, yvector);
 }
