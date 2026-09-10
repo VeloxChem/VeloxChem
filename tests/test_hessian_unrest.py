@@ -158,3 +158,36 @@ class TestScfUnrestrictedHessian:
                                        ref_hessian,
                                        rtol=1.0e-8,
                                        atol=1.0e-10)
+
+    @pytest.mark.solvers
+    def test_hessian_unrest_camb3lyp(self):
+        mol = Molecule.read_xyz_string("""4
+        xyz
+        C       -0.8246083505   -2.6364102075   -0.0255277471
+        H       -0.4137775504   -3.6364807662   -0.1702755824
+        H       -1.8972335969   -2.4672317696   -0.1290827158
+        H       -0.1628531453   -1.8055908756    0.2228478391
+        """)
+        mol.set_multiplicity(2)
+
+        bas = MolecularBasis.read(mol, 'def2-svp')
+
+        scf_drv = ScfUnrestrictedDriver()
+        scf_drv.ostream.mute()
+        scf_drv.xcfun = 'cam-b3lyp'
+        scf_drv.compute(mol, bas)
+
+        hess_drv = ScfHessianDriver(scf_drv)
+        hess_drv.ostream.mute()
+        hess_drv.update_settings({'xcfun': 'cam-b3lyp'})
+        hess_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            here = Path(__file__).parent
+            reffile = str(here / 'data' /
+                          'methyl_analytical_hessian_unrest_camb3lyp.txt')
+            ref_hessian = np.loadtxt(reffile)
+            np.testing.assert_allclose(hess_drv.hessian,
+                                       ref_hessian,
+                                       rtol=1.0e-8,
+                                       atol=1.0e-10)
