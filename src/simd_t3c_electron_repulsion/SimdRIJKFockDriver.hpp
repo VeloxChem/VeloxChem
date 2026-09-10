@@ -40,7 +40,7 @@
 #include "MolecularBasis.hpp"
 #include "Molecule.hpp"
 #include "PackedMatrix.hpp"
-#include "SimdRIJFockDriver.hpp"
+#include "SimdRIFockDriver.hpp"
 #include "SparseTensor.hpp"
 
 /// @brief Class CSimdRIJKFockDriver builds the Fock matrices of the resolution of
@@ -150,7 +150,7 @@ class CSimdRIJKFockDriver
     std::vector<CPackedMatrix> _w_vectors;
 
     /// @brief The driver of the B vectors and of the matrices formed from them.
-    CSimdRIJFockDriver _drv;
+    CSimdRIFockDriver _drv;
 
     /// @brief Whether the B vectors have been formed.
     bool _prepared = false;

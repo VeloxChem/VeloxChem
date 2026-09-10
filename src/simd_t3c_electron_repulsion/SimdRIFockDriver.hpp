@@ -31,8 +31,8 @@
 //  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
-#ifndef SimdRIJFockDriver_hpp
-#define SimdRIJFockDriver_hpp
+#ifndef SimdRIFockDriver_hpp
+#define SimdRIFockDriver_hpp
 
 #include <cstddef>
 #include <vector>
@@ -42,7 +42,7 @@
 #include "PackedMatrix.hpp"
 #include "SparseTensor.hpp"
 
-/// @brief Class CSimdRIJFockDriver computes the B vectors of the resolution of the
+/// @brief Class CSimdRIFockDriver computes the B vectors of the resolution of the
 /// identity approximation of the Coulomb interaction.
 ///
 /// @note The B vectors are defined as B(q)_ij = sum over p of (ij|p) L(-1)_pq, where
@@ -62,11 +62,11 @@
 /// are formed in batches of the blocks of atomic orbital pairs instead, and each
 /// batch is contracted and dropped before the next is formed, so that the peak is the
 /// B vectors and one batch rather than the whole three-center tensor.
-class CSimdRIJFockDriver
+class CSimdRIFockDriver
 {
    public:
     /// @brief The default constructor.
-    CSimdRIJFockDriver() = default;
+    CSimdRIFockDriver() = default;
 
     /// @brief Computes the B vectors of the resolution of the identity approximation.
     /// @param molecule The molecule to compute the B vectors of.
@@ -230,4 +230,4 @@ class CSimdRIJFockDriver
     static constexpr size_t _batch_budget = size_t{4} * 1024 * 1024 * 1024;
 };
 
-#endif /* SimdRIJFockDriver_hpp */
+#endif /* SimdRIFockDriver_hpp */

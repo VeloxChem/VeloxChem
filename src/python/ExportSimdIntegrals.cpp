@@ -43,7 +43,7 @@
 #include "SparseTensor.hpp"
 #include "SimdKineticEnergyDriver.hpp"
 #include "SimdOverlapDriver.hpp"
-#include "SimdRIJFockDriver.hpp"
+#include "SimdRIFockDriver.hpp"
 #include "SimdRIJKFockDriver.hpp"
 #include "SimdThreeCenterElectronRepulsionDriver.hpp"
 #include "SimdTwoCenterElectronRepulsionDriver.hpp"
@@ -133,12 +133,12 @@ export_simdintegrals(py::module &m) -> void
              py::arg("threshold"),
              py::arg("atoms"));
 
-    // CSimdRIJFockDriver class
+    // CSimdRIFockDriver class
 
-    PyClass<CSimdRIJFockDriver>(m, "SimdRIJFockDriver")
+    PyClass<CSimdRIFockDriver>(m, "SimdRIFockDriver")
         .def(py::init<>())
         .def("compute_bq_vectors",
-             &CSimdRIJFockDriver::compute_bq_vectors,
+             &CSimdRIFockDriver::compute_bq_vectors,
              "Computes sparse tensor of the B vectors of the resolution of the identity.",
              py::arg("molecule"),
              py::arg("basis"),
@@ -147,35 +147,35 @@ export_simdintegrals(py::module &m) -> void
              py::arg("threshold"),
              py::arg("aux_atoms") = std::vector<int>{})
         .def("compute_y_vector",
-             &CSimdRIJFockDriver::compute_y_vector,
+             &CSimdRIFockDriver::compute_y_vector,
              "Contracts the B vectors with a density matrix.",
              py::arg("bq_vectors"),
              py::arg("basis"),
              py::arg("aux_basis"),
              py::arg("density"))
         .def("compute_fock_matrix",
-             static_cast<CPackedMatrix (CSimdRIJFockDriver::*)(
+             static_cast<CPackedMatrix (CSimdRIFockDriver::*)(
                  const CSparseTensor &, const CMolecularBasis &, const CMolecularBasis &,
-                 const CPackedMatrix &) const>(&CSimdRIJFockDriver::compute_fock_matrix),
+                 const CPackedMatrix &) const>(&CSimdRIFockDriver::compute_fock_matrix),
              "Computes the Coulomb matrix of the resolution of the identity for a density.",
              py::arg("bq_vectors"),
              py::arg("basis"),
              py::arg("aux_basis"),
              py::arg("density"))
         .def("compute_fock_matrix",
-             static_cast<CPackedMatrix (CSimdRIJFockDriver::*)(
+             static_cast<CPackedMatrix (CSimdRIFockDriver::*)(
                  const CSparseTensor &, const CMolecularBasis &, const CMolecularBasis &,
-                 const std::vector<double> &) const>(&CSimdRIJFockDriver::compute_fock_matrix),
+                 const std::vector<double> &) const>(&CSimdRIFockDriver::compute_fock_matrix),
              "Computes the Coulomb matrix of the resolution of the identity for a Y vector.",
              py::arg("bq_vectors"),
              py::arg("basis"),
              py::arg("aux_basis"),
              py::arg("y_vector"))
         .def("compute_w_vectors",
-             static_cast<std::vector<CPackedMatrix> (CSimdRIJFockDriver::*)(
+             static_cast<std::vector<CPackedMatrix> (CSimdRIFockDriver::*)(
                  const CSparseTensor &, const CMolecularBasis &, const CMolecularBasis &,
                  const CPackedMatrix &, const size_t, const size_t) const>(
-                 &CSimdRIJFockDriver::compute_w_vectors),
+                 &CSimdRIFockDriver::compute_w_vectors),
              "Transforms one index of the B vectors into the molecular orbitals.",
              py::arg("bq_vectors"),
              py::arg("basis"),
@@ -184,7 +184,7 @@ export_simdintegrals(py::module &m) -> void
              py::arg("qfirst"),
              py::arg("qlast"))
         .def("compute_exchange_matrix",
-             &CSimdRIJFockDriver::compute_exchange_matrix,
+             &CSimdRIFockDriver::compute_exchange_matrix,
              "Adds the exchange contribution of a range of the auxiliary basis to a matrix.",
              py::arg("w_vectors"),
              py::arg("matrix"),

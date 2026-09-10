@@ -31,7 +31,7 @@
 //  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
-#include "SimdRIJFockDriver.hpp"
+#include "SimdRIFockDriver.hpp"
 
 #include <algorithm>
 #include <limits>
@@ -248,7 +248,7 @@ _make_dense_indices(const std::vector<TAuxFunction>    &functions,
 }  // anonymous namespace
 
 auto
-CSimdRIJFockDriver::compute_bq_vectors(const CMolecule        &molecule,
+CSimdRIFockDriver::compute_bq_vectors(const CMolecule        &molecule,
                                        const CMolecularBasis  &basis,
                                        const CMolecularBasis  &aux_basis,
                                        const CPackedMatrix    &inverse_metric,
@@ -534,7 +534,7 @@ CSimdRIJFockDriver::compute_bq_vectors(const CMolecule        &molecule,
 }
 
 auto
-CSimdRIJFockDriver::compute_y_vector(const CSparseTensor   &bq_vectors,
+CSimdRIFockDriver::compute_y_vector(const CSparseTensor   &bq_vectors,
                                      const CMolecularBasis &basis,
                                      const CMolecularBasis &aux_basis,
                                      const CPackedMatrix   &density) const -> std::vector<double>
@@ -740,7 +740,7 @@ CSimdRIJFockDriver::compute_y_vector(const CSparseTensor   &bq_vectors,
 }
 
 auto
-CSimdRIJFockDriver::compute_fock_matrix(const CSparseTensor       &bq_vectors,
+CSimdRIFockDriver::compute_fock_matrix(const CSparseTensor       &bq_vectors,
                                         const CMolecularBasis     &basis,
                                         const CMolecularBasis     &aux_basis,
                                         const std::vector<double> &y_vector) const -> CPackedMatrix
@@ -935,7 +935,7 @@ CSimdRIJFockDriver::compute_fock_matrix(const CSparseTensor       &bq_vectors,
 }
 
 auto
-CSimdRIJFockDriver::compute_fock_matrix(const CSparseTensor   &bq_vectors,
+CSimdRIFockDriver::compute_fock_matrix(const CSparseTensor   &bq_vectors,
                                         const CMolecularBasis &basis,
                                         const CMolecularBasis &aux_basis,
                                         const CPackedMatrix   &density) const -> CPackedMatrix
@@ -968,7 +968,7 @@ struct TAuxEntry
 }  // anonymous namespace
 
 auto
-CSimdRIJFockDriver::compute_w_vectors(const CSparseTensor        &bq_vectors,
+CSimdRIFockDriver::compute_w_vectors(const CSparseTensor        &bq_vectors,
                                       const CMolecularBasis      &basis,
                                       const CMolecularBasis      &aux_basis,
                                       const CPackedMatrix        &coefficients,
@@ -1167,7 +1167,7 @@ CSimdRIJFockDriver::compute_w_vectors(const CSparseTensor        &bq_vectors,
 }
 
 auto
-CSimdRIJFockDriver::compute_w_vectors(const CSparseTensor   &bq_vectors,
+CSimdRIFockDriver::compute_w_vectors(const CSparseTensor   &bq_vectors,
                                       const CMolecularBasis &basis,
                                       const CMolecularBasis &aux_basis,
                                       const CPackedMatrix   &coefficients,
@@ -1196,7 +1196,7 @@ CSimdRIJFockDriver::compute_w_vectors(const CSparseTensor   &bq_vectors,
 }
 
 auto
-CSimdRIJFockDriver::compute_exchange_matrix(const std::vector<CPackedMatrix> &w_vectors,
+CSimdRIFockDriver::compute_exchange_matrix(const std::vector<CPackedMatrix> &w_vectors,
                                             CPackedMatrix                    &matrix,
                                             const double                      factor) const -> void
 {

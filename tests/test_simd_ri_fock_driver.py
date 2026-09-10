@@ -5,7 +5,7 @@ import pytest
 
 from veloxchem.veloxchemlib import AtomBasis, BasisFunction, MolecularBasis
 from veloxchem.veloxchemlib import PackedMatrix, mat_t
-from veloxchem.veloxchemlib import SimdRIJFockDriver
+from veloxchem.veloxchemlib import SimdRIFockDriver
 from veloxchem.veloxchemlib import SimdThreeCenterElectronRepulsionDriver
 from veloxchem.veloxchemlib import SimdTwoCenterElectronRepulsionDriver
 from veloxchem.molecule import Molecule
@@ -19,7 +19,7 @@ from veloxchem.molecule import Molecule
 LABELS = "spdfghikl"
 
 
-class TestSimdRIJFockDriver:
+class TestSimdRIFockDriver:
 
     def one_function_basis(self, angular_momentum, identifier):
 
@@ -135,7 +135,7 @@ class TestSimdRIJFockDriver:
 
         # the B vectors
 
-        bq = SimdRIJFockDriver().compute_bq_vectors(
+        bq = SimdRIFockDriver().compute_bq_vectors(
             molecule, basis, aux_basis, inverse, 0.0)
 
         computed, visited = self.expand(bq, basis, aux_basis, maps, aux_maps, nao, naux)
@@ -204,7 +204,7 @@ class TestSimdRIJFockDriver:
 
         inverse = SimdTwoCenterElectronRepulsionDriver().compute(molecule, aux_basis).invert()
 
-        drv = SimdRIJFockDriver()
+        drv = SimdRIFockDriver()
         bq = drv.compute_bq_vectors(molecule, basis, aux_basis, inverse, 0.0)
 
         dense_bq, visited = self.expand(bq, basis, aux_basis, maps, aux_maps, nao, naux)
@@ -288,7 +288,7 @@ class TestSimdRIJFockDriver:
 
         inverse = SimdTwoCenterElectronRepulsionDriver().compute(molecule, aux_basis).invert()
 
-        drv = SimdRIJFockDriver()
+        drv = SimdRIFockDriver()
         bq = drv.compute_bq_vectors(molecule, basis, aux_basis, inverse, 0.0)
 
         rng = np.random.default_rng(5)
@@ -348,7 +348,7 @@ class TestSimdRIJFockDriver:
 
             scale = float(np.max(np.abs(target)))
 
-            drv = SimdRIJFockDriver()
+            drv = SimdRIFockDriver()
 
             bq = drv.compute_bq_vectors(molecule, basis, aux_basis,
                                         metric.cholesky_inverse(), 0.0)
@@ -411,7 +411,7 @@ class TestSimdRIJFockDriver:
 
         packed.from_numpy(dmat)
 
-        drv = SimdRIJFockDriver()
+        drv = SimdRIFockDriver()
 
         bq = drv.compute_bq_vectors(molecule, basis, aux_basis,
                                     metric.cholesky_inverse(), 0.0)
@@ -495,7 +495,7 @@ class TestSimdRIJFockDriver:
 
         metric = SimdTwoCenterElectronRepulsionDriver().compute(molecule, aux_basis)
 
-        drv = SimdRIJFockDriver()
+        drv = SimdRIFockDriver()
         bq = drv.compute_bq_vectors(molecule, basis, aux_basis,
                                     metric.cholesky_inverse(), 0.0)
 
@@ -539,7 +539,7 @@ class TestSimdRIJFockDriver:
 
         metric = SimdTwoCenterElectronRepulsionDriver().compute(molecule, aux_basis)
 
-        drv = SimdRIJFockDriver()
+        drv = SimdRIFockDriver()
 
         bq = drv.compute_bq_vectors(molecule, basis, aux_basis,
                                     metric.cholesky_inverse(), 0.0)
@@ -613,7 +613,7 @@ class TestSimdRIJFockDriver:
 
         metric = SimdTwoCenterElectronRepulsionDriver().compute(molecule, aux_basis)
 
-        drv = SimdRIJFockDriver()
+        drv = SimdRIFockDriver()
         bq = drv.compute_bq_vectors(molecule, basis, aux_basis,
                                     metric.cholesky_inverse(), 0.0)
 
@@ -651,7 +651,7 @@ class TestSimdRIJFockDriver:
 
         metric = SimdTwoCenterElectronRepulsionDriver().compute(molecule, aux_basis)
 
-        drv = SimdRIJFockDriver()
+        drv = SimdRIFockDriver()
 
         bq = drv.compute_bq_vectors(molecule, basis, aux_basis,
                                     metric.cholesky_inverse(), 0.0)
@@ -716,7 +716,7 @@ class TestSimdRIJFockDriver:
 
         metric = SimdTwoCenterElectronRepulsionDriver().compute(molecule, aux_basis)
 
-        drv = SimdRIJFockDriver()
+        drv = SimdRIFockDriver()
         bq = drv.compute_bq_vectors(molecule, basis, aux_basis,
                                     metric.cholesky_inverse(), 0.0)
 
@@ -776,7 +776,7 @@ class TestSimdRIJFockDriver:
 
         metric = SimdTwoCenterElectronRepulsionDriver().compute(molecule, aux_basis)
 
-        drv = SimdRIJFockDriver()
+        drv = SimdRIFockDriver()
         bq = drv.compute_bq_vectors(molecule, basis, aux_basis,
                                     metric.cholesky_inverse(), 0.0)
 

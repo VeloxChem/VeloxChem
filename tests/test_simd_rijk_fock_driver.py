@@ -3,11 +3,11 @@ import pytest
 
 from veloxchem.veloxchemlib import AtomBasis, BasisFunction, MolecularBasis
 from veloxchem.veloxchemlib import PackedMatrix, mat_t
-from veloxchem.veloxchemlib import SimdRIJFockDriver, SimdRIJKFockDriver
+from veloxchem.veloxchemlib import SimdRIFockDriver, SimdRIJKFockDriver
 from veloxchem.veloxchemlib import SimdTwoCenterElectronRepulsionDriver
 from veloxchem.molecule import Molecule
 
-# NOTE: the driver is the free standing routines of CSimdRIJFockDriver held
+# NOTE: the driver is the free standing routines of CSimdRIFockDriver held
 # together, so it is checked against those composed by hand rather than against a
 # reference of its own. What it adds is the state it keeps between the calls, the
 # memory check, and the ranges the W matrices are formed in, and those are what the
@@ -85,7 +85,7 @@ class TestSimdRIJKFockDriver:
 
         metric = SimdTwoCenterElectronRepulsionDriver().compute(molecule, aux_basis)
 
-        drv = SimdRIJFockDriver()
+        drv = SimdRIFockDriver()
 
         bq = drv.compute_bq_vectors(molecule, basis, aux_basis,
                                     metric.cholesky_inverse(), threshold)
