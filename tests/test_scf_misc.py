@@ -1024,6 +1024,23 @@ class TestScfDriverMiscellaneous:
             assert np.allclose(scf_drv_copy.scf_results['D_alpha'],
                                scf_drv.scf_results['D_alpha'])
 
+    def test_environment_state_initialized_in_constructor(self):
+
+        # External consumers such as the gradient driver read
+        # scf_driver._gostshyp_drv, and the energy printout reads smd_energy
+        # and _e_gostshyp. These attributes must exist on a freshly
+        # constructed driver, e.g. when SCF results are restored from a
+        # checkpoint file without running compute() on this instance.
+
+        for driver in (ScfRestrictedDriver(), ScfUnrestrictedDriver(),
+                       ScfRestrictedOpenDriver()):
+            driver.ostream.mute()
+
+            assert driver._gostshyp_drv is None
+            assert driver._e_gostshyp == 0.0
+            assert driver.smd_energy == 0.0
+            assert driver.smd_cds_energy == 0.0
+
     def test_restricted_driver_helper_branches(self):
 
         driver = ScfRestrictedDriver()

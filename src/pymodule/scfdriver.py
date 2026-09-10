@@ -248,6 +248,8 @@ class ScfDriver:
 
         # gostshyp setup
         self._gostshyp = False
+        self._gostshyp_drv = None
+        self._e_gostshyp = 0.0
         self.pressure = 0.0
         self.pressure_units = 'MPa'
         self.gostshyp_num_lebedev_points = 110
@@ -271,6 +273,8 @@ class ScfDriver:
         self._smd = False
         self.smd_drv = None
         self.smd_solvent = 'water'
+        self.smd_energy = 0.0
+        self.smd_cds_energy = 0.0
 
         # point charges (in case we want a simple MM environment without PE)
         self.point_charges = None
