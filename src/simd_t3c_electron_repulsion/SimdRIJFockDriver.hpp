@@ -168,7 +168,38 @@ class CSimdRIJFockDriver
                            const size_t           qfirst,
                            const size_t           qlast) const -> std::vector<CPackedMatrix>;
 
+    /// @brief Adds the exchange contribution of a range of the auxiliary basis to
+    /// a matrix.
+    /// @param w_vectors The W matrices of the range, as compute_w_vectors returns
+    /// them.
+    /// @param matrix The symmetric matrix to add the contribution to, in the packed
+    /// format, which the Coulomb matrix of the same calculation has been formed in.
+    /// @param factor The factor the contribution is added with.
+    /// @note The contribution is factor times the sum over q of W(q) times W(q)
+    /// transposed, summed over the range the W matrices hold. The ranges of a
+    /// calculation are added one after another into the same matrix, as the W
+    /// matrices of the whole auxiliary basis do not fit in the memory of a large
+    /// molecule.
+    /// @note No sign is applied. The exchange enters a Fock matrix with a sign and
+    /// a factor which depend on the convention of the caller, which passes them as
+    /// the factor rather than having them built in here.
+    auto compute_exchange_matrix(const std::vector<CPackedMatrix> &w_vectors,
+                                 CPackedMatrix                    &matrix,
+                                 const double                      factor = 1.0) const -> void;
+
    private:
+    /// @brief The number of auxiliary basis functions whose W matrices are staged
+    /// into one buffer before the rank k update.
+    /// @note The update of one auxiliary function alone is too small a piece of
+    /// work for the library to spread over the cores, as its depth is the orbitals
+    /// alone. Staging several of them makes one update of that many times the
+    /// depth. Measured on tagrisso with def2-svp, in gigaflops per second: 274 for
+    /// one, 442 for sixteen and 526 for sixty four, which is what the library
+    /// reaches on this machine, so there is nothing further to gain. The staging
+    /// buffer is this many times the orbitals times the dimensions of the basis,
+    /// which is a hundred megabytes at the sizes the W matrices are formed in.
+    static constexpr size_t _syrk_chunk = 64;
+
     /// @brief The memory a batch of the three-center integrals is allowed to reach.
     /// @note The batch is the blocks of atomic orbital pairs whose integrals are
     /// formed at once. Making it larger costs memory and buys nothing beyond the

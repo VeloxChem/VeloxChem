@@ -1165,3 +1165,118 @@ CSimdRIJFockDriver::compute_w_vectors(const CSparseTensor   &bq_vectors,
 
     return wvectors;
 }
+
+auto
+CSimdRIJFockDriver::compute_exchange_matrix(const std::vector<CPackedMatrix> &w_vectors,
+                                            CPackedMatrix                    &matrix,
+                                            const double                      factor) const -> void
+{
+    if (w_vectors.empty()) return;
+
+    errors::assertMsgCritical(matrix.get_type() == mat_t::symmetric,
+                              std::string("RIJFockDriver: The exchange is added to a symmetric matrix"));
+
+    const auto nao = matrix.number_of_rows();
+
+    const auto nocc = w_vectors.front().number_of_columns();
+
+    for (const auto &wmat : w_vectors)
+    {
+        errors::assertMsgCritical((wmat.get_type() == mat_t::general) && (wmat.number_of_rows() == nao) &&
+                                      (wmat.number_of_columns() == nocc),
+                                  std::string("RIJFockDriver: The W matrices do not match the matrix of the exchange"));
+    }
+
+    if (nocc == 0) return;
+
+    // NOTE: the rank k update writes one triangle of a dense matrix, so the
+    // contributions are gathered in one and its triangle is added to the packed
+    // matrix at the end. The dense matrix is the square of the dimensions of the
+    // basis, which is nothing beside the W matrices themselves.
+
+    auto dense = std::vector<double>(nao * nao, 0.0);
+
+    // NOTE: the W matrices are row major, and the column major matrix of a row
+    // major array is its transpose, so the array of W is W transposed and the
+    // update of it transposed times itself is W times W transposed. The upper
+    // triangle of the library is the lower triangle of the array, which is the
+    // triangle the packed matrix stores.
+
+    const auto nchunk = std::min(_syrk_chunk, w_vectors.size());
+
+    auto staged = std::vector<double>(nchunk * nocc * nao, 0.0);
+
+    for (size_t first = 0; first < w_vectors.size(); first += nchunk)
+    {
+        const auto count = std::min(nchunk, w_vectors.size() - first);
+
+        // NOTE: the W matrices of a chunk are stacked into one buffer, so that one
+        // update of the depth of the chunk is made rather than one of the depth of
+        // a single auxiliary function, which is too small to spread over the cores.
+
+        const auto depth = count * nocc;
+
+        for (size_t j = 0; j < count; j++)
+        {
+            const auto *values = w_vectors[first + j].data();
+
+            for (size_t irow = 0; irow < nao; irow++)
+            {
+                std::copy(values + irow * nocc, values + (irow + 1) * nocc, staged.data() + irow * depth + j * nocc);
+            }
+        }
+
+#ifdef VLX_USE_MATHLIB
+
+        const char uplo = 'U';
+
+        const char trans = 'T';
+
+        auto n_arg = static_cast<lapack_int_t>(nao);
+
+        auto k_arg = static_cast<lapack_int_t>(depth);
+
+        auto lda = static_cast<lapack_int_t>(depth);
+
+        auto ldc = static_cast<lapack_int_t>(nao);
+
+        const double one = 1.0;
+
+        dsyrk_(&uplo, &trans, &n_arg, &k_arg, &one, staged.data(), &lda, &one, dense.data(), &ldc);
+
+#else
+
+        using RowMajorMatrix = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
+
+        Eigen::Map<const RowMajorMatrix> wmap(staged.data(), static_cast<Eigen::Index>(nao),
+                                              static_cast<Eigen::Index>(depth));
+
+        Eigen::Map<RowMajorMatrix> cmap(dense.data(), static_cast<Eigen::Index>(nao), static_cast<Eigen::Index>(nao));
+
+        cmap.template selfadjointView<Eigen::Lower>().rankUpdate(wmap, 1.0);
+
+#endif /* VLX_USE_MATHLIB */
+    }
+
+    // NOTE: only the lower triangle of the dense matrix has been written, and it
+    // is the triangle the packed matrix holds, so the two are added row by row.
+
+    auto *values = matrix.data();
+
+    const auto nrows = static_cast<int>(nao);
+
+#pragma omp parallel for schedule(static, 1) if (nrows > 1)
+    for (int i = 0; i < nrows; i++)
+    {
+        const auto irow = static_cast<size_t>(i);
+
+        const auto *row = dense.data() + irow * nao;
+
+        auto *packed = values + irow * (irow + 1) / 2;
+
+        for (size_t j = 0; j <= irow; j++)
+        {
+            packed[j] += factor * row[j];
+        }
+    }
+}

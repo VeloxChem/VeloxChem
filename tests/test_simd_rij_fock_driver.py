@@ -634,3 +634,180 @@ class TestSimdRIJFockDriver:
 
         for j in range(last - first):
             assert np.array_equal(part[j].to_numpy(), whole[first + j].to_numpy())
+
+    def exchange_case(self, molecule, identifiers, bra_momenta, aux_momentum, nocc):
+        """K_ij = sum over q and s of W(q)_is W(q)_js, against the same in numpy."""
+
+        basis, aux_basis = MolecularBasis(), MolecularBasis()
+
+        for identifier, momentum in zip(identifiers, bra_momenta):
+            basis.add(self.one_function_basis(momentum, identifier))
+
+        for identifier in identifiers:
+            aux_basis.add(self.one_function_basis(aux_momentum, identifier))
+
+        nao = basis.get_dimensions_of_basis()
+        naux = aux_basis.get_dimensions_of_basis()
+
+        metric = SimdTwoCenterElectronRepulsionDriver().compute(molecule, aux_basis)
+
+        drv = SimdRIJFockDriver()
+
+        bq = drv.compute_bq_vectors(molecule, basis, aux_basis,
+                                    metric.cholesky_inverse(), 0.0)
+
+        rng = np.random.default_rng(53 + nao)
+        cmat = np.ascontiguousarray(rng.standard_normal((nao, nocc)))
+
+        packed = PackedMatrix(nao, nocc, mat_t.general)
+        packed.from_numpy(cmat)
+
+        wvecs = drv.compute_w_vectors(bq, basis, aux_basis, packed, 0, naux)
+
+        dense_w = np.stack([w.to_numpy(max_memory=8.0) for w in wvecs])
+
+        expected = np.einsum('qis,qjs->ij', dense_w, dense_w)
+
+        matrix = PackedMatrix(nao, nao, mat_t.symmetric)
+        matrix.zero()
+
+        drv.compute_exchange_matrix(wvecs, matrix)
+
+        computed = matrix.to_numpy(max_memory=8.0)
+
+        assert np.array_equal(computed, computed.T)
+
+        scale = max(float(np.max(np.abs(expected))), 1.0)
+
+        return float(np.max(np.abs(computed - expected))) / scale, computed.size
+
+    def test_exchange_against_contraction(self, molecule):
+
+        total = 0
+
+        for la in range(3):
+            for lb in range(3):
+                for lc in range(3):
+                    worst, visited = self.exchange_case(
+                        molecule, (8, 1, 7, 6), (la, la, lb, lb), lc, 3)
+                    total += visited
+
+                    assert visited > 0
+                    assert worst < 1.0e-12, (
+                        f"({LABELS[la]}{LABELS[lb]}|{LABELS[lc]}) differs by {worst:.2e}")
+
+        assert total > 2000
+
+    def test_exchange_accumulates(self, molecule):
+        """It adds to the matrix rather than replacing it, applies the factor, and
+        gives the same result whether the auxiliary basis is taken in one range or
+        in several. All three are what a calculation relies on."""
+
+        basis, aux_basis = MolecularBasis(), MolecularBasis()
+
+        for identifier, momentum in zip((8, 1, 7, 6), (1, 1, 0, 0)):
+            basis.add(self.one_function_basis(momentum, identifier))
+
+        for identifier in (8, 1, 7, 6):
+            aux_basis.add(self.one_function_basis(1, identifier))
+
+        nao = basis.get_dimensions_of_basis()
+        naux = aux_basis.get_dimensions_of_basis()
+
+        metric = SimdTwoCenterElectronRepulsionDriver().compute(molecule, aux_basis)
+
+        drv = SimdRIJFockDriver()
+        bq = drv.compute_bq_vectors(molecule, basis, aux_basis,
+                                    metric.cholesky_inverse(), 0.0)
+
+        rng = np.random.default_rng(61)
+        cmat = np.ascontiguousarray(rng.standard_normal((nao, 3)))
+
+        packed = PackedMatrix(nao, 3, mat_t.general)
+        packed.from_numpy(cmat)
+
+        whole = drv.compute_w_vectors(bq, basis, aux_basis, packed, 0, naux)
+
+        once = PackedMatrix(nao, nao, mat_t.symmetric)
+        once.zero()
+        drv.compute_exchange_matrix(whole, once)
+        single = once.to_numpy(max_memory=8.0)
+
+        assert np.max(np.abs(single)) > 0.0
+
+        twice = PackedMatrix(nao, nao, mat_t.symmetric)
+        twice.zero()
+        drv.compute_exchange_matrix(whole, twice)
+        drv.compute_exchange_matrix(whole, twice)
+
+        assert np.allclose(twice.to_numpy(), 2.0 * single, rtol=1.0e-13, atol=1.0e-14)
+
+        scaled = PackedMatrix(nao, nao, mat_t.symmetric)
+        scaled.zero()
+        drv.compute_exchange_matrix(whole, scaled, -0.5)
+
+        assert np.allclose(scaled.to_numpy(), -0.5 * single, rtol=1.0e-13, atol=1.0e-14)
+
+        # the same auxiliary basis, taken in two ranges
+
+        split = PackedMatrix(nao, nao, mat_t.symmetric)
+        split.zero()
+        middle = naux // 2
+        drv.compute_exchange_matrix(
+            drv.compute_w_vectors(bq, basis, aux_basis, packed, 0, middle), split)
+        drv.compute_exchange_matrix(
+            drv.compute_w_vectors(bq, basis, aux_basis, packed, middle, naux), split)
+
+        assert np.allclose(split.to_numpy(), single, rtol=1.0e-12, atol=1.0e-13)
+
+    def test_coulomb_and_exchange_compose(self, molecule):
+        """The exchange is added onto the matrix the Coulomb build produced."""
+
+        basis, aux_basis = MolecularBasis(), MolecularBasis()
+
+        for identifier, momentum in zip((8, 1, 7, 6), (1, 1, 0, 0)):
+            basis.add(self.one_function_basis(momentum, identifier))
+
+        for identifier in (8, 1, 7, 6):
+            aux_basis.add(self.one_function_basis(1, identifier))
+
+        nao = basis.get_dimensions_of_basis()
+        naux = aux_basis.get_dimensions_of_basis()
+
+        metric = SimdTwoCenterElectronRepulsionDriver().compute(molecule, aux_basis)
+
+        drv = SimdRIJFockDriver()
+        bq = drv.compute_bq_vectors(molecule, basis, aux_basis,
+                                    metric.cholesky_inverse(), 0.0)
+
+        nocc = 3
+        rng = np.random.default_rng(67)
+        cmat = np.ascontiguousarray(rng.standard_normal((nao, nocc)))
+
+        coeffs = PackedMatrix(nao, nocc, mat_t.general)
+        coeffs.from_numpy(cmat)
+
+        # the density of those orbitals, which is what a field calculation carries
+
+        dmat = np.ascontiguousarray(cmat @ cmat.T)
+        density = PackedMatrix(nao, nao, mat_t.symmetric)
+        density.from_numpy(dmat)
+
+        fock = drv.compute_fock_matrix(bq, basis, aux_basis, density)
+        coulomb = fock.to_numpy(max_memory=8.0).copy()
+
+        wvecs = drv.compute_w_vectors(bq, basis, aux_basis, coeffs, 0, naux)
+        drv.compute_exchange_matrix(wvecs, fock, -1.0)
+
+        combined = fock.to_numpy(max_memory=8.0)
+
+        dense_w = np.stack([w.to_numpy(max_memory=8.0) for w in wvecs])
+        exchange = np.einsum('qis,qjs->ij', dense_w, dense_w)
+
+        assert np.max(np.abs(coulomb)) > 0.0
+        assert np.max(np.abs(exchange)) > 0.0
+        assert np.array_equal(combined, combined.T)
+
+        scale = float(np.max(np.abs(combined)))
+
+        assert np.max(np.abs(combined - (coulomb - exchange))) / scale < 1.0e-12

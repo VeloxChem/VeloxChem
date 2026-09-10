@@ -178,7 +178,13 @@ export_simdintegrals(py::module &m) -> void
              py::arg("aux_basis"),
              py::arg("coefficients"),
              py::arg("qfirst"),
-             py::arg("qlast"));
+             py::arg("qlast"))
+        .def("compute_exchange_matrix",
+             &CSimdRIJFockDriver::compute_exchange_matrix,
+             "Adds the exchange contribution of a range of the auxiliary basis to a matrix.",
+             py::arg("w_vectors"),
+             py::arg("matrix"),
+             py::arg("factor") = 1.0);
 }
 
 }  // namespace vlx_simdintegrals

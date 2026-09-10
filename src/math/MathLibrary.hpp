@@ -82,6 +82,18 @@ auto dsytrf_(const char          *uplo,
              const lapack_int_t  *lwork,
              lapack_int_t        *info) -> void;
 
+/// @brief Computes a symmetric rank k update of a matrix.
+auto dsyrk_(const char         *uplo,
+            const char         *trans,
+            const lapack_int_t *n,
+            const lapack_int_t *k,
+            const double       *alpha,
+            const double       *a,
+            const lapack_int_t *lda,
+            const double       *beta,
+            double             *c,
+            const lapack_int_t *ldc) -> void;
+
 /// @brief Computes the inverse of a triangular matrix.
 auto dtrtri_(const char         *uplo,
              const char         *diag,
