@@ -4814,3 +4814,160 @@ which of them a thread sums varies between runs and the last bit of the total
 varies with it. The measured spread over five runs is one unit in the last place.
 Making it exact would need a static schedule and the imbalance which comes with
 it, and is not worth that.
+
+## The field calculation through the resolution of the identity
+
+The chain is reachable from the input of a closed shell calculation, as the
+alternative path through the Fock build which ri_jk_simd selects. This is what it
+does to a whole calculation rather than to one matrix.
+
+### Caffeine, restricted Hartree-Fock
+
+Twenty four atoms, fifty one occupied orbitals, against def2-universal-jkfit with
+1242 auxiliary functions throughout. The convergence threshold is 1e-8 and the
+time is of the whole calculation, taken as the better of two runs where a run is
+short enough to repeat.
+
+| basis | nao | method | time | speedup | iterations | energy | against full |
+| --- | ---: | --- | ---: | ---: | ---: | ---: | ---: |
+| def2-svp | 246 | full | 12.63 | 1.00 | 19 | -675.8010164955 | |
+| | | RI-JK conventional | 3.05 | 4.13 | 21 | -675.8004490084 | 5.67e-04 |
+| | | RI-JK simd | 3.51 | 3.60 | 21 | -675.8004490084 | 5.67e-04 |
+| def2-svpd | 366 | full | 51.35 | 1.00 | 19 | -675.8324037911 | |
+| | | RI-JK conventional | 8.31 | 6.18 | 22 | -675.8318417532 | 5.62e-04 |
+| | | RI-JK simd | 9.24 | 5.56 | 22 | -675.8318417532 | 5.62e-04 |
+| def2-tzvp | 494 | full | 177.50 | 1.00 | 19 | -676.5558320985 | |
+| | | RI-JK conventional | 19.17 | 9.26 | 22 | -676.5554233126 | 4.09e-04 |
+| | | RI-JK simd | 21.97 | 8.08 | 22 | -676.5554233126 | 4.09e-04 |
+| def2-tzvpd | 614 | full | 431.21 | 1.00 | 19 | -676.5579379117 | |
+| | | RI-JK conventional | 40.37 | 10.68 | 22 | -676.5575291942 | 4.09e-04 |
+| | | RI-JK simd | 41.73 | 10.33 | 22 | -676.5575291942 | 4.09e-04 |
+
+**The two routes converge to the same energy in every basis, to all ten of the
+digits printed, and in the same number of iterations.** That is what the table is
+for. The new path is the same approximation reached another way, in a single and
+in a triple zeta basis, with and without diffuse functions.
+
+**The new path is three to fifteen per cent slower than the conventional one
+here.** The component benchmarks of the earlier sections have it three to four
+times faster per Fock build on the larger molecules, and that does not appear in
+this table. Two things differ, and neither is separated by these runs.
+
+The auxiliary basis is the same in every row: 1242 functions, from the twenty four
+atoms of caffeine. The advantage measured per build came from the auxiliary basis
+being large, 2176 for tagrisso and 3528 for taxol, and here only the orbital basis
+grows. The molecule and the auxiliary basis are the axis the component numbers
+were taken along, and the orbital basis is not that axis.
+
+The setup is also a large part of a run of twenty two iterations at this size. The
+new path spends its metric once, in the B vectors, and the conventional path
+spends it inside every build, so a short calculation favours the second and a long
+one the first. Which of the two dominates here is not resolved by a total.
+
+**Both are eight to eleven times faster than the calculation without the
+approximation**, which is the resolution of the identity doing its work rather
+than either implementation of it.
+
+### On the metric of these bases
+
+The Cholesky factorization succeeded for all four bases, including both of the
+diffuse ones, so the fallback to the inverted square root was never taken and no
+warning was printed. The metrics of the universal fitting set are well enough
+conditioned for the cheaper factorization at this size. The fallback is therefore
+still covered by constructed matrices alone and not by a calculation.
+
+### Tagrisso, restricted Hartree-Fock
+
+Seventy atoms and a hundred and thirty three occupied orbitals, in def2-svp
+against def2-universal-jkfit, whose 3387 auxiliary functions are close to three
+times the 1242 of caffeine. One run of each.
+
+| method | time | speedup | iterations | energy | against full |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| full | 153.77 | 1.00 | 21 | -1609.0900864188 | |
+| RI-JK conventional | 99.20 | 1.55 | 23 | -1609.0890443496 | 1.04e-03 |
+| RI-JK simd | 80.51 | 1.91 | 23 | -1609.0890443498 | 1.04e-03 |
+
+**This is the axis the table of caffeine was missing.** The new path is 1.23 times
+faster than the conventional one here, where on caffeine it was three to fifteen
+per cent slower in every basis. The question left open there was whether the
+orbital basis or the auxiliary basis is what the advantage follows, and this
+answers it: growing the orbital basis of caffeine from 246 to 614 functions with
+the auxiliary basis held at 1242 gained nothing, and going to a molecule whose
+auxiliary basis is 3387 gained a quarter. The component benchmarks were taken
+along the second axis and this agrees with them.
+
+The energies of the two routes differ in the last of the ten digits printed, which
+is the different order the arithmetic is summed in over twenty three iterations
+rather than a difference of the approximation. The iterations are the same.
+
+**The approximation itself gains much less here than on caffeine**: 1.55 and 1.91
+times the calculation without it, against four to eleven times on caffeine. The
+four-center build screens well at seventy atoms while the work of the resolution
+of the identity follows the auxiliary basis, which is what has grown. The
+approximation is not uniformly worth taking, and this is where it stops paying
+what it pays on a compact molecule.
+
+The Cholesky factorization succeeded here as well, so the fallback remains
+exercised by constructed matrices alone.
+
+### Tagrisso with the diffuse basis
+
+The same molecule and the same fitting set, in def2-svpd, whose 1010 orbital
+functions are half again the 683 of def2-svp. One run of each.
+
+| method | time | speedup | iterations | energy | against full |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| full | 1199.89 | 1.00 | 21 | -1609.1565808182 | |
+| RI-JK conventional | 370.46 | 3.24 | 24 | -1609.1555344827 | 1.05e-03 |
+| RI-JK simd | 272.44 | 4.40 | 24 | -1609.1555344829 | 1.05e-03 |
+
+**The new path is 1.36 times the conventional one here**, against 1.23 on the same
+molecule in def2-svp. Taken with the four bases of caffeine, where it was slower
+in every one of them, the two axes now separate cleanly:
+
+| molecule | auxiliary functions | orbital basis | simd against conventional |
+| --- | ---: | --- | ---: |
+| caffeine | 1242 | def2-svp to def2-tzvpd | 0.87 to 0.97 |
+| tagrisso | 3387 | def2-svp | 1.23 |
+| tagrisso | 3387 | def2-svpd | 1.36 |
+
+Quadrupling the orbital basis of caffeine with the fitting set held at 1242
+functions gained nothing. Going to a molecule whose fitting set is 3387 gained a
+quarter, and growing the orbital basis on top of that gained a third. The
+advantage follows the auxiliary basis, and the orbital basis multiplies whatever
+the auxiliary basis has already given. This is what the benchmarks of the B
+vectors and of the Coulomb matrix said, measured through a whole calculation.
+
+**The approximation gains 3.24 times here against 1.55 in def2-svp**, the mirror
+of the above: the four-center build grows steeply with the orbital basis while the
+work of the resolution of the identity follows the fitting set, which has not
+changed. The two axes push the two comparisons in opposite directions.
+
+### What the memory check did
+
+This row did not run at the default budget. The B vectors need 10.67 gigabytes and
+the driver was given 10.57, which is half of what was free, and it refused:
+
+    RIJKFockDriver.prepare: The B vectors need 10.674862 GB and the budget is 10.568748 GB
+
+It refused before computing the integrals, from the sparsity pattern alone, and
+after twenty minutes of the calculation which preceded it rather than at the end
+of the ten it would have spent forming them. The row above was taken with
+ri_memory_budget set to 24 gigabytes, which the machine has.
+
+**The default is too tight for a case of this shape.** Half of what is free is a
+reasonable guard when the B vectors are one term among several, and a poor one
+when they are the term which dominates, as they are here: they alone are a third
+of the memory of the machine. A default of what is free less a fixed reserve would
+have taken this run. The check itself did what it exists to do, which is to say
+which number is too small rather than to die in the allocator.
+
+### A note on how these rows were taken
+
+The three rows of a table are one run each, on an idle machine, and the tables of
+one molecule and basis were taken in one process except where said otherwise. The
+simd row of def2-svpd is the exception: it was taken in a process of its own,
+after the first attempt was refused, and the two rows above it are quoted from the
+run which produced them rather than measured again. The ratios of that table
+therefore cross two processes, which is worth knowing though both were idle.
