@@ -43,6 +43,7 @@
 #include "SparseTensor.hpp"
 #include "SimdKineticEnergyDriver.hpp"
 #include "SimdOverlapDriver.hpp"
+#include "SimdRIJFockDriver.hpp"
 #include "SimdThreeCenterElectronRepulsionDriver.hpp"
 #include "SimdTwoCenterElectronRepulsionDriver.hpp"
 #include "SparseMatrix.hpp"
@@ -130,6 +131,20 @@ export_simdintegrals(py::module &m) -> void
              py::arg("aux_basis"),
              py::arg("threshold"),
              py::arg("atoms"));
+
+    // CSimdRIJFockDriver class
+
+    PyClass<CSimdRIJFockDriver>(m, "SimdRIJFockDriver")
+        .def(py::init<>())
+        .def("compute_bq_vectors",
+             &CSimdRIJFockDriver::compute_bq_vectors,
+             "Computes sparse tensor of the B vectors of the resolution of the identity.",
+             py::arg("molecule"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("inverse_metric"),
+             py::arg("threshold"),
+             py::arg("aux_atoms") = std::vector<int>{});
 }
 
 }  // namespace vlx_simdintegrals

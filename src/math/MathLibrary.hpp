@@ -82,6 +82,21 @@ auto dsytrf_(const char          *uplo,
              const lapack_int_t  *lwork,
              lapack_int_t        *info) -> void;
 
+/// @brief Computes a general matrix product.
+auto dgemm_(const char         *transa,
+            const char         *transb,
+            const lapack_int_t *m,
+            const lapack_int_t *n,
+            const lapack_int_t *k,
+            const double       *alpha,
+            const double       *a,
+            const lapack_int_t *lda,
+            const double       *b,
+            const lapack_int_t *ldb,
+            const double       *beta,
+            double             *c,
+            const lapack_int_t *ldc) -> void;
+
 /// @brief Computes the inverse of a symmetric matrix from its Bunch-Kaufman
 /// factorization.
 auto dsytri_(const char         *uplo,
