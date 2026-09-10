@@ -4343,3 +4343,129 @@ the pair groups, the task list, the diagonal blocks, the description -- of three
 hundredths to a tenth of a millisecond each, several of which get *worse* as threads are
 added.
 
+## The three-center Coulomb driver
+
+The driver takes a molecular basis and an auxiliary basis and returns a
+`CSparseTensor`. Its kernels cover every combination to angular momentum six on the
+two bra sides and eight on the auxiliary side, four hundred and forty one of them,
+dispatched on the three momenta taken as one index.
+
+### What it is checked against
+
+`ThreeCenterElectronRepulsionDriver` dispatches to momentum four on the bra and six on
+the auxiliary side, and **returns zeros without an error above that**. It can
+therefore validate 175 of the 441 kernels, and the rest -- everything reaching h or i
+on the bra, or k or l on the auxiliary side, `(ii|l)` among them -- has no independent
+check. `tests/test_simd_three_center_electron_repulsion.py` sweeps the 175 element by
+element and compares 1.5 million integrals; the worst disagreement is 3.1e-13, and the
+error grows smoothly with angular momentum as accumulated round off should.
+
+Two properties of that test are worth keeping. It proves its own index mapping on
+`(ss|s)` and `(ps|s)` before the sweep, and it asserts on the number of elements it
+compared, so a mapping which visits nothing fails rather than passes. **Summed values
+must never be compared**: `T3FlatBuffer` keeps the upper triangle of an atom pair
+while `CSparseTensor` keeps its own blocks, so their totals differ by tens of per cent
+even when every integral agrees to 1e-15.
+
+### The size of a block
+
+A thread holds one buffer, spanning the largest combination any block carries, and its
+size is the rows that combination needs times the atom pairs of a block. The rows
+range over two orders of magnitude: three thousand for cc-pVDZ against its fitting
+set, above half a million for `(ii|l)`. A fixed number of atom pairs therefore either
+starves an ordinary combination or lets an extreme one run away, so the atom pairs are
+chosen from a budget of 256 MB for the buffer, bounded to at most 256 and at least 8.
+
+Measured by sweeping the size at fourteen threads, best of three:
+
+| atom pairs | caffeine, def2-TZVP + jfit | tagrisso, def2-SVP + jkfit | c60, cc-pVDZ + RIFIT |
+| --- | --- | --- | --- |
+| 8 | 138.3 ms | 724.2 ms | 1803.9 ms |
+| 32, the fixed size before | 99.4 | 417.3 | 1102.8 |
+| 128 | 93.4 | 332.8 | 863.0 |
+| 256 | 92.2 | 310.8 | 837.6 |
+| 512 | 92.2 | 310.7 | 840.0 |
+
+The curve is flat past 256, which is where the ceiling sits. Ordinary combinations
+reach that ceiling far below the budget -- c60 holds 5.9 MB a thread, caffeine in
+def2-TZVP 29.5 -- while `(ii|l)` is held to 57 atom pairs and the full 256 MB.
+
+### Against the reference
+
+`OMP_NUM_THREADS=14`. Every case runs in its own process, so the peak resident size is
+its own; the driver is warmed up once and then timed best of two to five runs within a
+four second budget. **ref** is `ThreeCenterElectronRepulsionDriver`, which carries no
+threshold, so one number serves both threshold columns. The grid stops where the dense
+tensor of the reference stops fitting, at twelve gigabytes.
+
+| molecule | orbital | aux | nao | naux | ref ms | 1e-12 ms | 1e-14 ms | x ref | ref GB | simd GB |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Caffeine | aug-cc-pvdz | rifit | 412 | 1238 | 91.2 | 81.3 | 82.0 | 1.11 | 0.78 | 0.81 |
+| Caffeine | aug-cc-pvtz | rifit | 874 | 1944 | 781.8 | 490.3 | 492.3 | 1.59 | 5.54 | 5.56 |
+| Caffeine | cc-pvdz | rifit | 246 | 924 | 44.5 | 32.0 | 32.8 | 1.36 | 0.21 | 0.21 |
+| Caffeine | cc-pvqz | rifit | 1070 | 2398 | 1622.5 | 1099.7 | 1119.3 | 1.45 | 10.24 | 9.03 |
+| Caffeine | cc-pvtz | rifit | 560 | 1434 | 194.4 | 155.7 | 158.8 | 1.22 | 1.68 | 1.59 |
+| Caffeine | def2-qzvp | jfit | 1098 | 796 | 571.3 | 381.4 | 390.3 | 1.46 | 3.58 | 3.15 |
+| Caffeine | def2-qzvpd | jfit | 1218 | 796 | 684.4 | 458.4 | 469.4 | 1.46 | 4.40 | 4.01 |
+| Caffeine | def2-qzvpp | jfit | 1098 | 796 | 582.6 | 381.5 | 394.8 | 1.48 | 3.58 | 3.15 |
+| Caffeine | def2-qzvppd | jfit | 1218 | 796 | 692.6 | 465.3 | 468.0 | 1.48 | 4.40 | 4.01 |
+| Caffeine | def2-svp | jfit | 246 | 796 | 24.5 | 23.9 | 24.2 | 1.01 | 0.18 | 0.18 |
+| Caffeine | def2-svpd | jfit | 366 | 796 | 43.8 | 44.5 | 45.3 | 0.97 | 0.40 | 0.40 |
+| Caffeine | def2-tzvp | jfit | 494 | 796 | 90.0 | 90.4 | 91.9 | 0.98 | 0.73 | 0.71 |
+| Caffeine | def2-tzvpd | jfit | 614 | 796 | 123.6 | 128.7 | 129.5 | 0.96 | 1.12 | 1.13 |
+| Caffeine | def2-tzvpp | jfit | 574 | 796 | 115.2 | 104.0 | 106.6 | 1.08 | 0.98 | 0.92 |
+| Caffeine | def2-tzvppd | jfit | 694 | 796 | 158.8 | 145.1 | 146.6 | 1.08 | 1.43 | 1.39 |
+| Caffeine | def2-qzvp | jkfit | 1098 | 1242 | 803.6 | 503.7 | 524.9 | 1.53 | 5.58 | 4.90 |
+| Caffeine | def2-qzvpd | jkfit | 1218 | 1242 | 969.2 | 614.5 | 641.5 | 1.51 | 6.87 | 6.24 |
+| Caffeine | def2-qzvpp | jkfit | 1098 | 1242 | 832.8 | 505.7 | 511.8 | 1.63 | 5.58 | 4.90 |
+| Caffeine | def2-qzvppd | jkfit | 1218 | 1242 | 981.4 | 640.6 | 617.1 | 1.59 | 6.87 | 6.24 |
+| Caffeine | def2-svp | jkfit | 246 | 1242 | 33.4 | 31.3 | 31.7 | 1.05 | 0.28 | 0.27 |
+| Caffeine | def2-svpd | jkfit | 366 | 1242 | 63.3 | 58.6 | 59.0 | 1.07 | 0.62 | 0.63 |
+| Caffeine | def2-tzvp | jkfit | 494 | 1242 | 125.0 | 118.0 | 119.9 | 1.04 | 1.13 | 1.11 |
+| Caffeine | def2-tzvpd | jkfit | 614 | 1242 | 173.8 | 170.2 | 178.7 | 0.97 | 1.75 | 1.76 |
+| Caffeine | def2-tzvpp | jkfit | 574 | 1242 | 162.0 | 143.3 | 139.0 | 1.17 | 1.53 | 1.43 |
+| Caffeine | def2-tzvppd | jkfit | 694 | 1242 | 217.4 | 191.9 | 194.5 | 1.12 | 2.23 | 2.17 |
+| tagrisso | cc-pvdz | rifit | 683 | 2534 | 740.3 | 268.1 | 285.9 | 2.59 | 4.41 | 3.24 |
+| tagrisso | def2-svp | jfit | 683 | 2176 | 470.3 | 222.2 | 235.0 | 2.00 | 3.79 | 2.62 |
+| tagrisso | def2-svpd | jfit | 1010 | 2176 | 1177.9 | 536.5 | 557.9 | 2.11 | 8.28 | 7.08 |
+| tagrisso | def2-svp | jkfit | 683 | 3387 | 628.5 | 288.6 | 306.2 | 2.05 | 5.89 | 4.05 |
+| c60 | cc-pvdz | rifit | 840 | 3360 | 2250.3 | 797.3 | 845.3 | 2.66 | 8.84 | 8.94 |
+| c60 | def2-svp | jfit | 840 | 2940 | 1420.7 | 605.4 | 642.6 | 2.21 | 7.74 | 7.14 |
+| c60 | def2-svp | jkfit | 840 | 4500 | 1868.2 | 789.5 | 837.1 | 2.23 | 11.84 | 10.86 |
+
+### What these numbers say
+
+The geometric mean over the 32 combinations is **1.41**, and it divides sharply by
+the extent of the molecule rather than by the basis:
+
+| molecule | atoms | cases | x ref |
+| --- | --- | --- | --- |
+| caffeine | 24 | 25 | 1.23 |
+| tagrisso | 70 | 4 | 2.18 |
+| c60 | 60 | 3 | 2.36 |
+
+**On caffeine the driver is close to parity**, and five of its twenty five cases are at
+or just below it, the lowest at 0.96. A molecule of twenty four atoms has almost
+nothing to screen away, so the sparse tensor holds very nearly the dense set and the
+comparison becomes kernel against kernel. On the extended molecules the screening has
+something to remove and the driver runs at better than twice the reference.
+
+The same explains the thresholds. 1e-12 and 1e-14 differ by one to three per cent
+throughout, because at either threshold nearly every atom pair of a compact molecule
+survives.
+
+**The memory is a wash: 1.08 times on the geometric mean, at best 1.46.** For
+caffeine the two tensors are the same size to two digits. The sparse storage does not
+pay here for the same reason the speed does not, and the regime where it should -- an
+extended system -- is the one the twelve gigabyte cap on the reference excludes.
+
+### A note on measuring this
+
+The first two runs of this grid gave 1.50 and 1.71 for the geometric mean. Both were
+wrong. The reference was timed once, with no warm up, and single shot timings of a
+driver that allocates gigabytes moved by as much as 1.73 times between runs on
+unchanged code -- six of thirty two cases beyond fifteen per cent. Warming up and
+taking the best of several runs brought the reference times down by as much as 2.4
+times and gave the 1.41 above. A timing which is not repeated is not a
+measurement.
+
