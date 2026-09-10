@@ -168,6 +168,28 @@ class CSimdRIJFockDriver
                            const size_t           qfirst,
                            const size_t           qlast) const -> std::vector<CPackedMatrix>;
 
+    /// @brief Transforms one index of the B vectors into the molecular orbitals,
+    /// into matrices the caller holds.
+    /// @param bq_vectors The B vectors, as compute_bq_vectors returns them.
+    /// @param basis The molecular basis on a and b sides.
+    /// @param aux_basis The auxiliary molecular basis.
+    /// @param coefficients The molecular orbital coefficients.
+    /// @param qfirst The first auxiliary basis function to transform.
+    /// @param qlast The auxiliary basis function past the last one to transform.
+    /// @param w_vectors The matrices to store the result in, one per auxiliary
+    /// basis function of the range, each of one row per basis function and one
+    /// column per orbital. They are set rather than added to.
+    /// @note This is the form which does not allocate, so that a calculation which
+    /// forms the W matrices of one range after another reuses one set of them
+    /// rather than allocating and freeing gigabytes on every range.
+    auto compute_w_vectors(const CSparseTensor         &bq_vectors,
+                           const CMolecularBasis       &basis,
+                           const CMolecularBasis       &aux_basis,
+                           const CPackedMatrix         &coefficients,
+                           const size_t                 qfirst,
+                           const size_t                 qlast,
+                           std::vector<CPackedMatrix>  &w_vectors) const -> void;
+
     /// @brief Adds the exchange contribution of a range of the auxiliary basis to
     /// a matrix.
     /// @param w_vectors The W matrices of the range, as compute_w_vectors returns

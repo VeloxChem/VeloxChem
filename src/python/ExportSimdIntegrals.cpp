@@ -44,6 +44,7 @@
 #include "SimdKineticEnergyDriver.hpp"
 #include "SimdOverlapDriver.hpp"
 #include "SimdRIJFockDriver.hpp"
+#include "SimdRIJKFockDriver.hpp"
 #include "SimdThreeCenterElectronRepulsionDriver.hpp"
 #include "SimdTwoCenterElectronRepulsionDriver.hpp"
 #include "SparseMatrix.hpp"
@@ -171,7 +172,10 @@ export_simdintegrals(py::module &m) -> void
              py::arg("aux_basis"),
              py::arg("y_vector"))
         .def("compute_w_vectors",
-             &CSimdRIJFockDriver::compute_w_vectors,
+             static_cast<std::vector<CPackedMatrix> (CSimdRIJFockDriver::*)(
+                 const CSparseTensor &, const CMolecularBasis &, const CMolecularBasis &,
+                 const CPackedMatrix &, const size_t, const size_t) const>(
+                 &CSimdRIJFockDriver::compute_w_vectors),
              "Transforms one index of the B vectors into the molecular orbitals.",
              py::arg("bq_vectors"),
              py::arg("basis"),
@@ -185,6 +189,37 @@ export_simdintegrals(py::module &m) -> void
              py::arg("w_vectors"),
              py::arg("matrix"),
              py::arg("factor") = 1.0);
+
+    // CSimdRIJKFockDriver class
+
+    PyClass<CSimdRIJKFockDriver>(m, "SimdRIJKFockDriver")
+        .def(py::init<>())
+        .def("required_memory",
+             &CSimdRIJKFockDriver::required_memory,
+             "Gets the memory of the B vectors in bytes.",
+             py::arg("molecule"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("threshold"))
+        .def("prepare",
+             &CSimdRIJKFockDriver::prepare,
+             "Forms the inverted factor of the metric and the B vectors.",
+             py::arg("molecule"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("threshold"),
+             py::arg("memory_budget"))
+        .def("compute",
+             &CSimdRIJKFockDriver::compute,
+             "Computes the Fock matrix of a density and a set of orbitals.",
+             py::arg("density"),
+             py::arg("coefficients"),
+             py::arg("exchange_factor"))
+        .def("is_prepared", &CSimdRIJKFockDriver::is_prepared, "Checks that the driver has been prepared.")
+        .def("get_bq_vectors", &CSimdRIJKFockDriver::get_bq_vectors,
+             py::return_value_policy::reference_internal, "Gets the B vectors the driver holds.")
+        .def("get_metric", &CSimdRIJKFockDriver::get_metric,
+             py::return_value_policy::reference_internal, "Gets the inverted factor of the metric.");
 }
 
 }  // namespace vlx_simdintegrals

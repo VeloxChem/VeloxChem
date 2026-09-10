@@ -968,12 +968,13 @@ struct TAuxEntry
 }  // anonymous namespace
 
 auto
-CSimdRIJFockDriver::compute_w_vectors(const CSparseTensor   &bq_vectors,
-                                      const CMolecularBasis &basis,
-                                      const CMolecularBasis &aux_basis,
-                                      const CPackedMatrix   &coefficients,
-                                      const size_t           qfirst,
-                                      const size_t           qlast) const -> std::vector<CPackedMatrix>
+CSimdRIJFockDriver::compute_w_vectors(const CSparseTensor        &bq_vectors,
+                                      const CMolecularBasis      &basis,
+                                      const CMolecularBasis      &aux_basis,
+                                      const CPackedMatrix        &coefficients,
+                                      const size_t                qfirst,
+                                      const size_t                qlast,
+                                      std::vector<CPackedMatrix> &w_vectors) const -> void
 {
     const auto nao = basis.dimensions_of_basis();
 
@@ -992,18 +993,19 @@ CSimdRIJFockDriver::compute_w_vectors(const CSparseTensor   &bq_vectors,
 
     const auto nrange = qlast - qfirst;
 
-    std::vector<CPackedMatrix> wvectors;
+    errors::assertMsgCritical(w_vectors.size() == nrange,
+                              std::string("RIJFockDriver: The W matrices do not match the range of the auxiliary basis"));
 
-    wvectors.reserve(nrange);
-
-    for (size_t q = 0; q < nrange; q++)
+    for (auto &wmat : w_vectors)
     {
-        wvectors.emplace_back(nao, nocc, mat_t::general);
+        errors::assertMsgCritical((wmat.get_type() == mat_t::general) && (wmat.number_of_rows() == nao) &&
+                                      (wmat.number_of_columns() == nocc),
+                                  std::string("RIJFockDriver: The W matrices do not match the basis and the orbitals"));
 
-        wvectors.back().zero();
+        wmat.zero();
     }
 
-    if ((nrange == 0) || (nocc == 0)) return wvectors;
+    if ((nrange == 0) || (nocc == 0)) return;
 
     const auto indices = denseidx::index_functions(basis);
 
@@ -1073,7 +1075,7 @@ CSimdRIJFockDriver::compute_w_vectors(const CSparseTensor   &bq_vectors,
     {
         const auto iq = static_cast<size_t>(t);
 
-        auto *wvalues = wvectors[iq].data();
+        auto *wvalues = w_vectors[iq].data();
 
         for (const auto &entry : entries[iq])
         {
@@ -1162,8 +1164,35 @@ CSimdRIJFockDriver::compute_w_vectors(const CSparseTensor   &bq_vectors,
             }
         }
     }
+}
 
-    return wvectors;
+auto
+CSimdRIJFockDriver::compute_w_vectors(const CSparseTensor   &bq_vectors,
+                                      const CMolecularBasis &basis,
+                                      const CMolecularBasis &aux_basis,
+                                      const CPackedMatrix   &coefficients,
+                                      const size_t           qfirst,
+                                      const size_t           qlast) const -> std::vector<CPackedMatrix>
+{
+    errors::assertMsgCritical(qfirst <= qlast,
+                              std::string("RIJFockDriver: The range of the auxiliary basis is out of range"));
+
+    const auto nao = basis.dimensions_of_basis();
+
+    const auto nocc = coefficients.number_of_columns();
+
+    std::vector<CPackedMatrix> w_vectors;
+
+    w_vectors.reserve(qlast - qfirst);
+
+    for (size_t q = qfirst; q < qlast; q++)
+    {
+        w_vectors.emplace_back(nao, nocc, mat_t::general);
+    }
+
+    compute_w_vectors(bq_vectors, basis, aux_basis, coefficients, qfirst, qlast, w_vectors);
+
+    return w_vectors;
 }
 
 auto
