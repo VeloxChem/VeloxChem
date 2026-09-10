@@ -29,7 +29,6 @@
 #  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
 #  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
 """
 Walking an active site onto a template by editing it.
 
@@ -179,7 +178,11 @@ def described_site(builder):
         core.connectivity_bonds(active_site['connectivity_matrix']))
 
 
-def _shoehorn(builder, template, max_include_radius, max_mappings=matching.DEFAULT_MAX_MAPPINGS, ostream=None):
+def _shoehorn(builder,
+              template,
+              max_include_radius,
+              max_mappings=matching.DEFAULT_MAX_MAPPINGS,
+              ostream=None):
     """
     The three stages of a shoehorning, in order.
 
@@ -247,10 +250,7 @@ def _print_shoehorn_summary(builder, name, ostream=None):
                 for res_index, variant in sorted(modes['variants'].items())
                 if res_index in site]
 
-    printing.print_shoehorn_summary(name,
-                                    modes,
-                                    variants,
-                                    ostream=ostream)
+    printing.print_shoehorn_summary(name, modes, variants, ostream=ostream)
 
 
 def _candidate_residues(builder, max_radius):
@@ -296,10 +296,8 @@ def _candidate_residues(builder, max_radius):
         donor = {}
 
         for res_index, metal in metals.items():
-            measured = [
-                (float(np.linalg.norm(positions[atom.index] - metal)),
-                 atom) for atom in atoms
-            ]
+            measured = [(float(np.linalg.norm(positions[atom.index] - metal)),
+                         atom) for atom in atoms]
             reach[res_index] = min(distance for distance, _ in measured)
             donors = [(distance, atom) for distance, atom in measured
                       if atom.element.symbol in core.DONOR_ELEMENTS]
@@ -307,8 +305,7 @@ def _candidate_residues(builder, max_radius):
                 distance, atom = min(donors, key=lambda found: found[0])
                 donor[res_index] = (distance, atom.name)
 
-        if residue.index not in members and min(
-                reach.values()) > max_radius:
+        if residue.index not in members and min(reach.values()) > max_radius:
             continue
 
         candidates.append({
@@ -343,9 +340,12 @@ def _template_slots(template):
 
     for node in matching.residue_nodes(coarse):
         slots.append({
-            'key': coarse.nodes[node]['family'],
-            'formula': coarse.nodes[node]['formula'],
-            'metals': sorted(image[1] for image in coarse.neighbors(node)),
+            'key':
+            coarse.nodes[node]['family'],
+            'formula':
+            coarse.nodes[node]['formula'],
+            'metals':
+            sorted(image[1] for image in coarse.neighbors(node)),
         })
 
     return slots
@@ -415,7 +415,9 @@ def _slot_cost(slot, candidate, pairing, max_radius):
     :param pairing:
         Which site metal center stands for which of the template's.
     :param max_radius:
-        The furthest a bond may be stretched to.
+        How far from a metal center a residue may be picked up from,
+        measured on the residue rather than on the atom it would bind
+        through.
 
     :return:
         The cost, or infinity when this residue cannot fill this slot.
@@ -440,9 +442,25 @@ def _slot_cost(slot, candidate, pairing, max_radius):
     total = 0.0
 
     for metal in metals:
-        found = candidate['donor'].get(metal)
-        if found is None or found[0] > max_radius:
+        # Whether the residue is in reach is asked of the residue, not of
+        # the atom it would bind through. A sidechain turns about its own
+        # bonds, so a histidine sitting against the metal with its ring
+        # rotated away has its nitrogens further off than its carbons --
+        # which says how it is posed, not whether it belongs to the site,
+        # and posing it is what the shoehorning goes on to do. Gating on
+        # the donor atom rejected exactly the residues worth reaching for.
+        if candidate['reach'][metal] > max_radius:
             return math.inf
+
+        found = candidate['donor'].get(metal)
+
+        # nothing to bind through at all, however close it comes
+        if found is None:
+            return math.inf
+
+        # the bond as it stands is still what ranks one admissible
+        # candidate against another: a sidechain already pointing at the
+        # metal is likelier the one the template means
         total += found[0]
 
     return total
@@ -466,7 +484,7 @@ def _assign_residues(slots, candidates, pairing, max_radius):
     :param pairing:
         Which site metal center stands for which of the template's.
     :param max_radius:
-        The furthest a bond may be stretched to.
+        How far from a metal center a residue may be picked up from.
 
     :return:
         The tuple of the total cost and the slot to candidate mapping, or
@@ -481,11 +499,10 @@ def _assign_residues(slots, candidates, pairing, max_radius):
     if len(candidates) < len(slots):
         return None
 
-    costs = np.array(
-        [[
-            _slot_cost(slot, candidate, pairing, max_radius)
-            for candidate in candidates
-        ] for slot in slots])
+    costs = np.array([[
+        _slot_cost(slot, candidate, pairing, max_radius)
+        for candidate in candidates
+    ] for slot in slots])
 
     finite = np.isfinite(costs)
 
@@ -513,7 +530,12 @@ def _assign_residues(slots, candidates, pairing, max_radius):
     return total, assignment
 
 
-def _assignment_failure(template, slots, candidates, pairings, max_radius, ostream=None):
+def _assignment_failure(template,
+                        slots,
+                        candidates,
+                        pairings,
+                        max_radius,
+                        ostream=None):
     """
     Says which of a template's residues the structure cannot supply.
 
@@ -529,7 +551,7 @@ def _assignment_failure(template, slots, candidates, pairings, max_radius, ostre
     :param pairings:
         The pairings of the metal centers that were tried.
     :param max_radius:
-        The furthest a bond may be stretched to.
+        How far from a metal center a residue may be picked up from.
 
     :return:
         What stood in the way.
@@ -546,20 +568,39 @@ def _assignment_failure(template, slots, candidates, pairings, max_radius, ostre
                     for candidate in candidates):
                 continue
             missing.append(slot)
-        if best is None or len(missing) < len(best):
-            best = missing
+        if best is None or len(missing) < len(best[1]):
+            best = (pairing, missing)
 
-    if best:
-        formulas = ', '.join(sorted(slot['formula'] for slot in best))
-        return (f'{template["name"]} is made of residues the structure '
-                f'does not have within {max_radius:.1f} A of the right '
-                f'metal center: {formulas}')
+    pairing, missing = best
+
+    if missing:
+        formulas = ', '.join(sorted(slot['formula'] for slot in missing))
+        return (
+            f'Template {template["name"]} is made of residues the structure '
+            f'does not have within {max_radius:.1f} A of the right '
+            f'metal center ({formulas})')
 
     # every residue of the template can be filled by something, but not
     # by enough different somethings at once: two of them are competing
-    # for the one residue the structure has in reach
+    # for the one residue the structure has in reach.
+    #
+    # What is available is counted over the residues a slot of that kind
+    # could actually be built from, which is not the same as the residues
+    # of that kind the structure holds: a histidine whose ring nitrogen is
+    # out of reach of the metal the template wants it on is no use here,
+    # however close the rest of it comes. Counting it left this case
+    # falling through to the message below, which says a competition was
+    # lost without naming the distance that lost it.
     counts = Counter(slot['key'] for slot in slots)
-    available = Counter(candidate['key'] for candidate in candidates)
+    available = Counter()
+
+    for key in counts:
+        wanted = [slot for slot in slots if slot['key'] == key]
+        available[key] = sum(
+            any(
+                math.isfinite(_slot_cost(slot, candidate, pairing, max_radius))
+                for slot in wanted) for candidate in candidates)
+
     short = [
         slot['formula'] for slot in slots
         if available[slot['key']] < counts[slot['key']]
@@ -572,8 +613,7 @@ def _assignment_failure(template, slots, candidates, pairings, max_radius, ostre
                 'centers')
 
     return (f'the residues of the structure cannot be shared out over '
-            f'those of {template["name"]}: two of them are wanted in '
-            'places only one residue can reach')
+            f'those of {template["name"]}')
 
 
 def _shoehorn_composition(builder, template, max_radius, ostream=None):
@@ -642,16 +682,20 @@ def _shoehorn_composition(builder, template, max_radius, ostream=None):
                       assignment,
                       ostream=ostream)
 
-    if not matching.coarse_mappings(template,
-                                    described_site(builder),
-                                    match_protonation=False):
+    if not matching.coarse_mappings(
+            template, described_site(builder), match_protonation=False):
         return ('which residue coordinates which metal still differs from '
                 f'{template["name"]}')
 
     return None
 
 
-def _apply_assignment(builder, template, slots, pairing, assignment, ostream=None):
+def _apply_assignment(builder,
+                      template,
+                      slots,
+                      pairing,
+                      assignment,
+                      ostream=None):
     """
     Edits the site into the assignment that was solved.
 
@@ -678,8 +722,9 @@ def _apply_assignment(builder, template, slots, pairing, assignment, ostream=Non
 
     for index, candidate in assignment.items():
         res_index = candidate['res_index']
-        wanted.setdefault(res_index, set()).update(
-            pairing[metal] for metal in slots[index]['metals'])
+        wanted.setdefault(res_index,
+                          set()).update(pairing[metal]
+                                        for metal in slots[index]['metals'])
         donors[res_index] = candidate
 
     _include_assigned(builder, template, donors, ostream=ostream)
@@ -713,14 +758,12 @@ def _include_assigned(builder, template, donors, ostream=None):
     for res_index, candidate in sorted(donors.items()):
         if res_index in members:
             continue
-        builder.include_residue(candidate['resid'],
-                                chain=candidate['chain'])
+        builder.include_residue(candidate['resid'], chain=candidate['chain'])
         included.append(candidate['label'])
 
     if included:
-        ostream.print_info(
-            'Included ' + ', '.join(included) +
-            f', which {template["name"]} is made of.')
+        ostream.print_info('Included ' + ', '.join(included) +
+                           f', which {template["name"]} is made of.')
         ostream.flush()
 
 
@@ -739,7 +782,8 @@ def _remove_unwanted_bonds(builder, wanted, ostream=None):
 
     modes = builder.binding_modes
     metal_res = {
-        entry['index']: entry['res_index'] for entry in modes['metals']
+        entry['index']: entry['res_index']
+        for entry in modes['metals']
     }
 
     for ligand in modes['ligands']:
@@ -762,9 +806,9 @@ def _remove_unwanted_bonds(builder, wanted, ostream=None):
                                   chain=entry['chain'])
 
     if unwanted:
-        ostream.print_info(
-            'Unbound ' + ', '.join(entry['label'] for entry in unwanted) +
-            ', which the template does not coordinate.')
+        ostream.print_info('Unbound ' + ', '.join(entry['label']
+                                                  for entry in unwanted) +
+                           ', which the template does not coordinate.')
         ostream.flush()
 
 
@@ -831,8 +875,8 @@ def _bonded(builder, res_index, metal_res_index):
     if not metal:
         return False
 
-    return any(ligand['res_index'] == res_index and metal[0]
-               in ligand['metals'] for ligand in modes['ligands'])
+    return any(ligand['res_index'] == res_index and metal[0] in ligand['metals']
+               for ligand in modes['ligands'])
 
 
 def _drop_unassigned(builder, template, donors, ostream=None):
@@ -858,14 +902,12 @@ def _drop_unassigned(builder, template, donors, ostream=None):
             set(core.active_site_residues(builder.binding_modes)) -
             set(donors)):
         residue = residues[res_index]
-        builder.remove_residue(str(residue.id),
-                               chain=str(residue.chain.id))
+        builder.remove_residue(str(residue.id), chain=str(residue.chain.id))
         dropped.append(core.residue_label(residue))
 
     if dropped:
-        ostream.print_info(
-            'Dropped ' + ', '.join(dropped) +
-            f', which {template["name"]} is not made of.')
+        ostream.print_info('Dropped ' + ', '.join(dropped) +
+                           f', which {template["name"]} is not made of.')
         ostream.flush()
 
 
@@ -891,8 +933,10 @@ def _metal_res_index(modes, described, metal):
     """
 
     index = described['atom_map'][metal]
-    res_index = {entry['index']: entry['res_index']
-                 for entry in modes['metals']}
+    res_index = {
+        entry['index']: entry['res_index']
+        for entry in modes['metals']
+    }
 
     known = index in res_index
     assert_msg_critical(
@@ -919,8 +963,10 @@ def _metal_entry(builder, res_index):
         The metal entry of the binding modes.
     """
 
-    entries = {entry['res_index']: entry
-               for entry in builder.binding_modes['metals']}
+    entries = {
+        entry['res_index']: entry
+        for entry in builder.binding_modes['metals']
+    }
 
     known = res_index in entries
     assert_msg_critical(
@@ -930,7 +976,11 @@ def _metal_entry(builder, res_index):
     return entries[res_index]
 
 
-def _best_heavy_mapping(template, described, match_h_count=True, max_mappings=matching.DEFAULT_MAX_MAPPINGS, ostream=None):
+def _best_heavy_mapping(template,
+                        described,
+                        match_h_count=True,
+                        max_mappings=matching.DEFAULT_MAX_MAPPINGS,
+                        ostream=None):
     """
     Solves which of the site's atoms is which of the template's.
 
@@ -996,7 +1046,10 @@ def _hydrogen_count(described, index):
                if labels[other] == 'H')
 
 
-def _shoehorn_protonation(builder, template, max_mappings=matching.DEFAULT_MAX_MAPPINGS, ostream=None):
+def _shoehorn_protonation(builder,
+                          template,
+                          max_mappings=matching.DEFAULT_MAX_MAPPINGS,
+                          ostream=None):
     """
     Protonates every residue of the site the way the template has it.
 
@@ -1040,16 +1093,21 @@ def _shoehorn_protonation(builder, template, max_mappings=matching.DEFAULT_MAX_M
                                          chain=change['chain'])
 
     if changes:
-        ostream.print_info(
-            'Set ' + ', '.join(f'{change["label"]} to {change["variant"]}'
-                               for change in changes) +
-            f', which is how {template["name"]} is protonated.')
+        ostream.print_info('Set ' +
+                           ', '.join(f'{change["label"]} to {change["variant"]}'
+                                     for change in changes) +
+                           f', which is how {template["name"]} is protonated.')
         ostream.flush()
 
     return None
 
 
-def _protonation_changes(builder, template, described, heavy_map, max_mappings=matching.DEFAULT_MAX_MAPPINGS, ostream=None):
+def _protonation_changes(builder,
+                         template,
+                         described,
+                         heavy_map,
+                         max_mappings=matching.DEFAULT_MAX_MAPPINGS,
+                         ostream=None):
     """
     Works out which residues are protonated unlike the template.
 
@@ -1093,8 +1151,7 @@ def _protonation_changes(builder, template, described, heavy_map, max_mappings=m
             for first, name in pairs
         }
         delta = sum(wanted.values()) - sum(
-            _hydrogen_count(described, heavy_map[first])
-            for first, _ in pairs)
+            _hydrogen_count(described, heavy_map[first]) for first, _ in pairs)
 
         if delta == 0 and not _tautomer_differs(
                 template, described, heavy_map, pairs,
@@ -1122,7 +1179,11 @@ def _protonation_changes(builder, template, described, heavy_map, max_mappings=m
     return changes
 
 
-def _tautomer_differs(template, described, heavy_map, pairs, max_mappings=matching.DEFAULT_MAX_MAPPINGS):
+def _tautomer_differs(template,
+                      described,
+                      heavy_map,
+                      pairs,
+                      max_mappings=matching.DEFAULT_MAX_MAPPINGS):
     """
     Whether a residue carries its hydrogens on other atoms than the
     template does, with the same number of them.
@@ -1211,7 +1272,10 @@ def _target_variant(residue, current, delta, wanted):
     return named.pop() if len(named) == 1 else None
 
 
-def _shoehorn_denticity(builder, template, max_mappings=matching.DEFAULT_MAX_MAPPINGS, ostream=None):
+def _shoehorn_denticity(builder,
+                        template,
+                        max_mappings=matching.DEFAULT_MAX_MAPPINGS,
+                        ostream=None):
     """
     Bonds every metal center to exactly the atoms the template bonds it
     to.
@@ -1273,7 +1337,12 @@ def _shoehorn_denticity(builder, template, max_mappings=matching.DEFAULT_MAX_MAP
     return None
 
 
-def _denticity_changes(builder, template, described, heavy_map, max_mappings=matching.DEFAULT_MAX_MAPPINGS, ostream=None):
+def _denticity_changes(builder,
+                       template,
+                       described,
+                       heavy_map,
+                       max_mappings=matching.DEFAULT_MAX_MAPPINGS,
+                       ostream=None):
     """
     Works out which metal-ligand bonds the site makes and the template
     does not, and the other way round.
@@ -1321,8 +1390,7 @@ def _denticity_changes(builder, template, described, heavy_map, max_mappings=mat
     for kind, pairs in (('added', wanted - current), ('removed',
                                                       current - wanted)):
         for pair in sorted(pairs, key=sorted):
-            changes[kind].append(
-                _bond_record(atoms, modes, described, pair))
+            changes[kind].append(_bond_record(atoms, modes, described, pair))
 
     return changes
 
