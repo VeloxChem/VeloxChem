@@ -4469,3 +4469,137 @@ taking the best of several runs brought the reference times down by as much as 2
 times and gave the 1.41 above. A timing which is not repeated is not a
 measurement.
 
+
+## Inverting the packed metric
+
+The Coulomb metric of a fitting basis has to be inverted, and it is held in the
+packed format, as its slow decay leaves no atom pair below the threshold. The
+inversion is `packlin::invert`, which takes a packed matrix and returns the
+inverted one.
+
+### Why it does not invert in place
+
+The packed layout of `CPackedMatrix` is the lower triangle in row major order, so
+the element of row i and column j with j <= i sits at i (i + 1) / 2 + j. Read as
+column major, which is what a math library expects, that is exactly the upper
+triangle of LAPACK packed storage. The two agree bit for bit, which was checked
+by handing our bytes straight to `dpptrf` and `dpptri` and getting the right
+inverse back.
+
+So the packed factorizations could be called on our values with no unpacking at
+all, and would hold nothing beyond the matrix itself. They are still the wrong
+choice. `dpptrf` and `dpptri` are level 2 BLAS and are not threaded, while the
+dense `dpotrf` and `dpotri` are blocked and run on every core. The memory the
+packed routines save is one dense matrix, which is a gigabyte at the sizes where
+it matters and is not worth several times the run. The inversion therefore
+expands the matrix, inverts it dense, and packs the result, at a peak of about
+twice the dense matrix.
+
+### The math library against Eigen
+
+The math library is what is compiled when `Makefile.setup` sets one for the
+platform, which is Accelerate on macOS and is MKL or OpenBLAS elsewhere. Eigen is
+compiled in its place when none is set, so a machine without one needs no change
+to build.
+
+The two are not close. Times in seconds, on the M4 Max:
+
+| molecule | fitting basis | n | math library | Eigen | ratio |
+| --- | --- | ---: | ---: | ---: | ---: |
+| Caffeine | def2-jfit | 796 | 0.003 | 0.023 | 7.7 |
+| Caffeine | cc-pV5Z-rifit | 3612 | 0.105 | 2.324 | 22.1 |
+| tagrisso | def2-jkfit | 3387 | 0.086 | 1.881 | 21.9 |
+| tagrisso | cc-pV5Z-rifit | 10144 | 1.966 | 51.478 | 26.2 |
+| c60 | def2-jkfit | 4500 | 0.189 | 4.625 | 24.5 |
+| c60 | cc-pV5Z-rifit | 11580 | 3.103 | 76.609 | 24.7 |
+
+Eigen sits at twenty to twenty two gigaflops at every size, which is one core.
+The math library climbs to about five hundred, which is the machine. The gap is
+threading and blocking, not the algorithm: both factorize and both invert. This
+is why the math library is the default and Eigen is the fallback rather than the
+other way round.
+
+### The whole grid
+
+With the math library. The build column is the two-center Coulomb driver making
+the metric, and is there to show that it is not the cost. Counting n cubed for
+the factorization and the inversion together:
+
+| molecule | fitting basis | n | packed | build | invert | Gflop/s |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| Caffeine | def2-jfit | 796 | 2.4 M | 0.00 | 0.003 | 191 |
+| Caffeine | def2-jkfit | 1242 | 5.9 M | 0.00 | 0.007 | 292 |
+| Caffeine | cc-pVDZ-rifit | 924 | 3.3 M | 0.00 | 0.004 | 211 |
+| Caffeine | cc-pVTZ-rifit | 1434 | 7.8 M | 0.00 | 0.009 | 334 |
+| Caffeine | cc-pVQZ-rifit | 2398 | 21.9 M | 0.00 | 0.032 | 428 |
+| Caffeine | cc-pV5Z-rifit | 3612 | 49.8 M | 0.01 | 0.105 | 450 |
+| tagrisso | def2-jfit | 2176 | 18.1 M | 0.00 | 0.023 | 446 |
+| tagrisso | def2-jkfit | 3387 | 43.8 M | 0.00 | 0.086 | 454 |
+| tagrisso | cc-pVDZ-rifit | 2534 | 24.5 M | 0.00 | 0.038 | 433 |
+| tagrisso | cc-pVTZ-rifit | 3987 | 60.7 M | 0.00 | 0.136 | 465 |
+| tagrisso | cc-pVQZ-rifit | 6699 | 171 M | 0.02 | 0.608 | 495 |
+| tagrisso | cc-pV5Z-rifit | 10144 | 393 M | 0.06 | 1.966 | 531 |
+| c60 | def2-jfit | 2940 | 33.0 M | 0.00 | 0.055 | 458 |
+| c60 | def2-jkfit | 4500 | 77.3 M | 0.01 | 0.189 | 482 |
+| c60 | cc-pVDZ-rifit | 3360 | 43.1 M | 0.00 | 0.079 | 478 |
+| c60 | cc-pVTZ-rifit | 4860 | 90.1 M | 0.01 | 0.236 | 487 |
+| c60 | cc-pVQZ-rifit | 7920 | 239 M | 0.03 | 0.941 | 528 |
+| c60 | cc-pV5Z-rifit | 11580 | 512 M | 0.09 | 3.103 | 500 |
+| taxol | def2-jfit | 3528 | 47.5 M | 0.01 | 0.095 | 464 |
+| taxol | def2-jkfit | 5489 | 115 M | 0.01 | 0.350 | 472 |
+| taxol | cc-pVDZ-rifit | 4102 | 64.2 M | 0.00 | 0.157 | 439 |
+| taxol | cc-pVTZ-rifit | 6411 | 157 M | 0.01 | 0.559 | 471 |
+| taxol | cc-pVQZ-rifit | 10747 | 441 M | 0.04 | 2.584 | 480 |
+| taxol | cc-pV5Z-rifit | 16232 | 1005 M | 0.14 | 7.989 | 535 |
+| crambin | def2-jfit | 19500 | 1451 M | 0.14 | 14.40 | 515 |
+| crambin | def2-jkfit | 30751 | 3607 M | 0.39 | 61.54 | 473 |
+| crambin | cc-pVDZ-rifit | 22842 | 1990 M | 0.19 | 23.97 | 497 |
+| crambin | cc-pVTZ-rifit | 36183 | 4994 M | 0.37 | 99.23 | 477 |
+
+**The throughput plateaus near five hundred gigaflops from about n of 2500 and
+holds it to 36183.** Nothing degrades at scale. The small cases are below the
+plateau because a factorization of a few hundred rows cannot fill the machine,
+not because anything is wrong with them.
+
+**Building the metric is not the cost.** For crambin with jkfit it is 0.39
+seconds against 61.5 for the inversion, a factor of 160. The integrals are cheap
+and the cubic step is what is paid for.
+
+The two largest crambin cases were skipped, and on memory rather than on time.
+cc-pVQZ-rifit is n of 60645, whose peak of two dense matrices is 54.8 gigabytes
+against the 36 of the machine, and cc-pV5Z-rifit is 126 gigabytes.
+
+### The residual, and what it says about the metric
+
+The inversion was checked as the largest element of A A inverse minus the
+identity, wherever the dense matrices of the check were small enough to be cheap:
+
+| molecule | fitting basis | n | max abs residual |
+| --- | --- | ---: | ---: |
+| Caffeine | def2-jfit | 796 | 4.0e-10 |
+| Caffeine | def2-jkfit | 1242 | 2.2e-07 |
+| Caffeine | cc-pVTZ-rifit | 1434 | 2.3e-09 |
+| Caffeine | cc-pV5Z-rifit | 3612 | 8.2e-07 |
+| tagrisso | def2-jfit | 2176 | 6.1e-10 |
+| tagrisso | def2-jkfit | 3387 | 9.3e-06 |
+| tagrisso | cc-pVTZ-rifit | 3987 | 8.7e-09 |
+| c60 | def2-jfit | 2940 | 2.6e-09 |
+| taxol | def2-jfit | 3528 | 1.7e-09 |
+
+**The residual tracks the basis, not the size.** tagrisso with jfit at n of 2176
+gives 6e-10, and with jkfit at n of 3387 gives 9e-06, four orders apart at
+comparable size. The residual of a solved system is about the condition number
+times the machine epsilon, so 9e-06 says the jkfit metric of tagrisso has a
+condition number near 4e10. That is the fitting basis being close to linearly
+dependent, which is a property of the basis and not of the inversion. It is worth
+knowing before an inverse of a jkfit or a high zeta RIFIT metric is fed to
+anything that cares about its accuracy.
+
+### The Cholesky and the fallback
+
+The metrics are positive definite and are inverted through their Cholesky
+factorization. Near linear dependence can still push one numerically indefinite,
+and rather than fail there the inversion falls back to the Bunch-Kaufman
+factorization and prints a warning. Nothing in the grid above reached the
+fallback; the test suite reaches it with a constructed indefinite matrix, and
+gets the right inverse from it.

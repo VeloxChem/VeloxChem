@@ -44,6 +44,7 @@
 #include "ExportGeneral.hpp"
 #include "Matrix.hpp"
 #include "MolecularBasis.hpp"
+#include "PackedLinearAlgebra.hpp"
 #include "PackedMatrix.hpp"
 
 namespace vlx_packed {  // vlx_packed namespace
@@ -117,6 +118,34 @@ dense_to_numpy(const CPackedMatrix &matrix, py::array_t<double> &array) -> void
     matrix.to_dense(array.mutable_data());
 }
 
+/// @brief Sets a packed matrix from the dense matrix in an array given by the
+/// caller.
+/// @param matrix The packed matrix to set.
+/// @param array The array to set the matrix from.
+/// @note The array is taken without conversion, for the reason dense_to_numpy
+/// takes its array without conversion: an array of another type would be
+/// converted into a temporary, and the matrix would be set from that.
+static auto
+dense_from_numpy(CPackedMatrix &matrix, const py::array_t<double> &array) -> void
+{
+    const auto nrows = matrix.number_of_rows();
+
+    const auto ncols = matrix.number_of_columns();
+
+    if ((array.ndim() != 2) || (static_cast<size_t>(array.shape(0)) != nrows) || (static_cast<size_t>(array.shape(1)) != ncols))
+    {
+        throw std::runtime_error("PackedMatrix.from_numpy: Array must have " + std::to_string(nrows) + " rows and " +
+                                 std::to_string(ncols) + " columns");
+    }
+
+    if ((array.flags() & py::array::c_style) == 0)
+    {
+        throw std::runtime_error("PackedMatrix.from_numpy: Array must be C contiguous");
+    }
+
+    matrix.from_dense(array.data());
+}
+
 auto
 export_packed(py::module &m) -> void
 {
@@ -168,7 +197,16 @@ export_packed(py::module &m) -> void
             "fill_numpy",
             [](const CPackedMatrix &self, py::array_t<double> &array) -> void { vlx_packed::dense_to_numpy(self, array); },
             "Expands the matrix into the dense matrix in atomic orbital basis in the array of the caller.",
-            py::arg("array").noconvert());
+            py::arg("array").noconvert())
+        .def(
+            "from_numpy",
+            [](CPackedMatrix &self, const py::array_t<double> &array) -> void { vlx_packed::dense_from_numpy(self, array); },
+            "Sets the matrix from the dense matrix in atomic orbital basis.",
+            py::arg("array").noconvert())
+        .def(
+            "invert",
+            [](const CPackedMatrix &self) -> CPackedMatrix { return packlin::invert(self); },
+            "Gets the inverted matrix, which is assumed to exist.");
 }
 
 }  // namespace vlx_packed

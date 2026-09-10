@@ -72,6 +72,27 @@ EIGEN_INC := -I /Users/rinkevic/Development/Libraries/Eigen
 CXX_REL_FLG += $(EIGEN_INC)
 CXX_DEB_FLG += $(EIGEN_INC)
 
+# Math library interface
+#
+# The hardware specific math library provides the dense linear algebra, such as
+# the Cholesky factorization used to invert the packed matrices. It is selected
+# per platform below: Accelerate on macOS, and MKL or OpenBLAS elsewhere, whose
+# link line is set by the person building the code.
+#
+# Defining VLX_USE_MATHLIB is what selects it. When no math library is set the
+# define is absent and the Eigen implementation is compiled in its place, so a
+# machine without one needs no further change.
+
+UNAME_S := $(shell uname -s)
+
+ifeq ($(UNAME_S),Darwin)
+  MATH_LD  := -framework Accelerate
+  MATH_FLG := -DVLX_USE_MATHLIB -DACCELERATE_NEW_LAPACK
+endif
+
+CXX_REL_FLG += $(MATH_FLG)
+CXX_DEB_FLG += $(MATH_FLG)
+
 # Native shell commands
 
 CP := cp -f

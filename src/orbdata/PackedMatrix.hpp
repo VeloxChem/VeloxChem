@@ -381,6 +381,50 @@ class CPackedMatrix
         }
     }
 
+    /// @brief Sets the values of matrix from the dense matrix in atomic orbital
+    /// basis.
+    /// @param values The values of the dense matrix, as a row major array of
+    /// number_of_rows() rows and number_of_columns() columns.
+    /// @note This is the inverse of to_dense. Only the lower triangle of a
+    /// triangular matrix is read, as the elements above the diagonal are not
+    /// stored and are determined by those below it. The dense matrix is assumed
+    /// to have the symmetry of this matrix, and its upper triangle is not
+    /// checked against its lower one.
+    auto
+    from_dense(const double *values) -> void
+    {
+        if (_type == mat_t::general)
+        {
+            const auto nchunks = _number_of_chunks();
+
+#pragma omp parallel for schedule(static) if (nchunks > 1)
+            for (int i = 0; i < nchunks; i++)
+            {
+                const auto [first, last] = _chunk_range(i);
+
+                std::copy(values + first, values + last, _values.data() + first);
+            }
+
+            return;
+        }
+
+        const auto nrows = static_cast<int>(_nrows);
+
+        // NOTE: the rows are interleaved over the threads, as row i copies i + 1
+        // elements and a thread given a contiguous stretch of the rows would get
+        // either the short rows or the long ones.
+
+#pragma omp parallel for schedule(static, 1) if (nrows > 1)
+        for (int i = 0; i < nrows; i++)
+        {
+            const auto irow = static_cast<size_t>(i);
+
+            const auto *row = values + irow * _ncols;
+
+            std::copy(row, row + irow + 1, _values.data() + irow * (irow + 1) / 2);
+        }
+    }
+
    private:
     /// @brief Gets number of values required to store a matrix.
     /// @param nrows The number of rows of matrix.
