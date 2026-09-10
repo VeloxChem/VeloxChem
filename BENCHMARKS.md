@@ -4815,6 +4815,139 @@ varies with it. The measured spread over five runs is one unit in the last place
 Making it exact would need a static schedule and the imbalance which comes with
 it, and is not worth that.
 
+## The W matrices, and the matrix unit of the machine
+
+The transformation of one index of the B vectors into the molecular orbitals,
+W(q)_is = sum over r of B(q)_ir C_rs, turned out to be where a calculation spends
+most of its time, and the way it was written could not reach the machine. This is
+how that was found and what was done about it.
+
+### Where a calculation spends its time
+
+Tagrisso in def2-svp against def2-universal-jkfit, the whole calculation:
+
+| phase | time | share |
+| --- | ---: | ---: |
+| setup: the B vectors and the metric | 10.79 | 13.3% |
+| of which the two-center integrals | 0.00 | 0.0% |
+| of which inverting the Cholesky factor | 0.06 | 0.1% |
+| the Fock builds, twenty three of them | 61.83 | 76.5% |
+| everything else | 8.26 | 10.2% |
+
+and one Fock build:
+
+| | time | share of the build |
+| --- | ---: | ---: |
+| Coulomb and exchange | 2.671 | 100% |
+| the Coulomb alone | 0.050 | 1.9% |
+| the exchange, by difference | 2.620 | 98.1% |
+
+**The exchange is the calculation.** It is 98 per cent of a build and three
+quarters of the run, and the Coulomb matrix, which the earlier sections are about,
+is under two per cent of a build. Within the exchange the W matrices are 84 per
+cent and the rank k update which follows them is 16.
+
+The metric is nothing at all: six hundredths of a second to invert the Cholesky
+factor. The choice between that and the inverted square root, which the earlier
+section measures as a factor of eight to twenty seven, cannot matter to a
+calculation of this shape.
+
+### What the sum was reaching, and what the machine has
+
+The transformation as first written walks the values of the B vectors and adds a
+scaled row of the coefficients for each of them. Over the threads:
+
+| threads | time | gigaflops per second |
+| ---: | ---: | ---: |
+| 1 | 20.00 | 13.7 |
+| 2 | 10.28 | 26.6 |
+| 4 | 5.38 | 50.8 |
+| 8 | 2.98 | 91.9 |
+| 12 | 2.34 | 117.2 |
+| 16 | 2.19 | 125.0 |
+
+Nine times on sixteen cores, and not flat, so the sum is not held up by the memory.
+Against that, what a matrix product reaches on the same machine:
+
+| threads | shape | gigaflops per second |
+| ---: | --- | ---: |
+| 1 | 683 x 683 x 133 | 417.7 |
+| 1 | 2000 cubed | 415.6 |
+| 16 | 2000 cubed | 887.9 |
+| 16 | 683 x 3387 x 133 | 747.2 |
+
+**One thread of a matrix product is three times the whole of the sum on sixteen.**
+That is the matrix unit of the processor, which the library reaches through its
+matrix product and which a loop of the compiler does not reach at any number of
+threads. Per core the two are 13.7 against 417.7, a factor of thirty.
+
+So the question is not how to write a better sum. It is whether the work can be
+put into a matrix product at all.
+
+### The trade
+
+The B vectors are not sparse. Of the square that one auxiliary function expands
+into, better than half is filled, and for a compact molecule better than nine
+tenths. Expanding them and handing the square to a matrix product is about one and
+a half times the arithmetic of walking their values, and the matrix unit runs it
+several times faster than the sum runs the smaller amount. Measured, against
+def2-universal-jkfit throughout:
+
+| molecule | basis | nao | naux | norb | sum | product | gain | sum Gf/s | product Gf/s |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Caffeine | def2-svp | 246 | 1242 | 51 | 0.06 | 0.03 | 2.32 | 118.8 | 286.2 |
+| tagrisso | def2-svp | 683 | 3387 | 133 | 2.05 | 0.66 | 3.13 | 133.4 | 640.7 |
+| tagrisso | def2-svpd | 1010 | 3387 | 133 | 6.16 | 1.60 | 3.86 | 123.7 | 575.7 |
+| c60 | def2-svp | 840 | 4500 | 180 | 7.67 | 1.56 | 4.92 | 131.9 | 734.1 |
+| taxol | def2-svp | 1099 | 5489 | 223 | 12.61 | 4.41 | 2.86 | 128.0 | 670.1 |
+
+and over the basis sets of one molecule, where the orbitals stay at fifty one
+however large the basis grows:
+
+| basis | nao | sum | product | gain | product Gf/s |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| def2-svp | 246 | 0.06 | 0.03 | 2.36 | 284.2 |
+| def2-svpd | 366 | 0.14 | 0.05 | 2.66 | 312.9 |
+| def2-tzvp | 494 | 0.25 | 0.10 | 2.57 | 322.0 |
+| def2-tzvpd | 614 | 0.39 | 0.15 | 2.56 | 313.2 |
+| def2-qzvp | 1098 | 1.01 | 0.63 | 1.61 | 242.8 |
+| def2-qzvpd | 1218 | 1.33 | 0.76 | 1.74 | 246.1 |
+
+**The product won every one of the eleven.** The sum sits at 119 to 133 gigaflops
+whatever it is given, which is the rate of the loop and not of the problem. The
+product reaches 640 to 734 where the orbitals are many, and falls to 243 at
+quadruple zeta, where fifty one orbitals make the third dimension of the product
+too thin for the matrix unit. Caffeine has fifty one occupied orbitals whatever
+basis it is given, so that is a property of the molecule and not of the basis.
+
+### The density, and the threshold which is not set
+
+Which form is taken follows from how dense the B vectors are, and the density is
+the filled places of the square over its size. An off-diagonal pair of atoms is
+held once and fills two places; a diagonal pair is held with the basis functions
+of both sides and fills one. Counting the values twice over, which is the obvious
+thing to write, counts the diagonal pairs twice and puts the answer above one:
+
+| molecule | basis | counting twice | counted properly |
+| --- | --- | ---: | ---: |
+| Caffeine | def2-svp | 96.1% | 91.2% |
+| Caffeine | def2-svpd | 100.9% | 96.0% |
+| Caffeine | def2-tzvpd | 99.7% | 94.3% |
+| Caffeine | def2-qzvp | 85.4% | 80.9% |
+| tagrisso | def2-svp | 65.1% | 63.4% |
+
+The density columns of the two tables above are of the first kind, as they were
+taken before this was found. They are two to five points high and none of the
+timings depends on them.
+
+**The threshold is zero, which is to say that the product is always taken.** The
+density at which the two forms change places was never reached: every case which
+fits in the memory of this machine is denser than half, and the product won all of
+them. A threshold naming a density would be a guess dressed as a measurement. A
+caller which meets a sparse enough set of B vectors can raise it, and the two
+forms are held to one another by a test so that the sum does not rot while it is
+not the default.
+
 ## The field calculation through the resolution of the identity
 
 The chain is reachable from the input of a closed shell calculation, as the
@@ -4825,136 +4958,99 @@ does to a whole calculation rather than to one matrix.
 
 Twenty four atoms, fifty one occupied orbitals, against def2-universal-jkfit with
 1242 auxiliary functions throughout. The convergence threshold is 1e-8 and the
-time is of the whole calculation, taken as the better of two runs where a run is
-short enough to repeat.
+time is of the whole calculation.
 
 | basis | nao | method | time | speedup | iterations | energy | against full |
 | --- | ---: | --- | ---: | ---: | ---: | ---: | ---: |
 | def2-svp | 246 | full | 12.63 | 1.00 | 19 | -675.8010164955 | |
 | | | RI-JK conventional | 3.05 | 4.13 | 21 | -675.8004490084 | 5.67e-04 |
-| | | RI-JK simd | 3.51 | 3.60 | 21 | -675.8004490084 | 5.67e-04 |
+| | | RI-JK simd | 2.64 | 4.78 | 21 | -675.8004490084 | 5.67e-04 |
 | def2-svpd | 366 | full | 51.35 | 1.00 | 19 | -675.8324037911 | |
 | | | RI-JK conventional | 8.31 | 6.18 | 22 | -675.8318417532 | 5.62e-04 |
-| | | RI-JK simd | 9.24 | 5.56 | 22 | -675.8318417532 | 5.62e-04 |
+| | | RI-JK simd | 6.87 | 7.47 | 22 | -675.8318417532 | 5.62e-04 |
 | def2-tzvp | 494 | full | 177.50 | 1.00 | 19 | -676.5558320985 | |
 | | | RI-JK conventional | 19.17 | 9.26 | 22 | -676.5554233126 | 4.09e-04 |
-| | | RI-JK simd | 21.97 | 8.08 | 22 | -676.5554233126 | 4.09e-04 |
+| | | RI-JK simd | 17.16 | 10.34 | 22 | -676.5554233126 | 4.09e-04 |
 | def2-tzvpd | 614 | full | 431.21 | 1.00 | 19 | -676.5579379117 | |
 | | | RI-JK conventional | 40.37 | 10.68 | 22 | -676.5575291942 | 4.09e-04 |
-| | | RI-JK simd | 41.73 | 10.33 | 22 | -676.5575291942 | 4.09e-04 |
+| | | RI-JK simd | 34.68 | 12.43 | 22 | -676.5575291942 | 4.09e-04 |
 
 **The two routes converge to the same energy in every basis, to all ten of the
 digits printed, and in the same number of iterations.** That is what the table is
 for. The new path is the same approximation reached another way, in a single and
 in a triple zeta basis, with and without diffuse functions.
 
-**The new path is three to fifteen per cent slower than the conventional one
-here.** The component benchmarks of the earlier sections have it three to four
-times faster per Fock build on the larger molecules, and that does not appear in
-this table. Two things differ, and neither is separated by these runs.
-
-The auxiliary basis is the same in every row: 1242 functions, from the twenty four
-atoms of caffeine. The advantage measured per build came from the auxiliary basis
-being large, 2176 for tagrisso and 3528 for taxol, and here only the orbital basis
-grows. The molecule and the auxiliary basis are the axis the component numbers
-were taken along, and the orbital basis is not that axis.
-
-The setup is also a large part of a run of twenty two iterations at this size. The
-new path spends its metric once, in the B vectors, and the conventional path
-spends it inside every build, so a short calculation favours the second and a long
-one the first. Which of the two dominates here is not resolved by a total.
-
-**Both are eight to eleven times faster than the calculation without the
-approximation**, which is the resolution of the identity doing its work rather
-than either implementation of it.
-
-### On the metric of these bases
-
-The Cholesky factorization succeeded for all four bases, including both of the
-diffuse ones, so the fallback to the inverted square root was never taken and no
-warning was printed. The metrics of the universal fitting set are well enough
-conditioned for the cheaper factorization at this size. The fallback is therefore
-still covered by constructed matrices alone and not by a calculation.
+The new path is twelve to twenty one per cent faster than the conventional one.
+Before the W matrices were formed by a matrix product it was three to fifteen per
+cent slower in every one of these four bases, and the entry of that table is kept
+in the history of this file. Caffeine gains the least of anything measured because
+its fifty one occupied orbitals make the exchange a smaller part of its run than
+of a larger molecule.
 
 ### Tagrisso, restricted Hartree-Fock
 
 Seventy atoms and a hundred and thirty three occupied orbitals, in def2-svp
 against def2-universal-jkfit, whose 3387 auxiliary functions are close to three
-times the 1242 of caffeine. One run of each.
+times the 1242 of caffeine.
 
 | method | time | speedup | iterations | energy | against full |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | full | 153.77 | 1.00 | 21 | -1609.0900864188 | |
 | RI-JK conventional | 99.20 | 1.55 | 23 | -1609.0890443496 | 1.04e-03 |
-| RI-JK simd | 80.51 | 1.91 | 23 | -1609.0890443498 | 1.04e-03 |
+| RI-JK simd | 46.01 | 3.34 | 23 | -1609.0890443498 | 1.04e-03 |
 
-**This is the axis the table of caffeine was missing.** The new path is 1.23 times
-faster than the conventional one here, where on caffeine it was three to fifteen
-per cent slower in every basis. The question left open there was whether the
-orbital basis or the auxiliary basis is what the advantage follows, and this
-answers it: growing the orbital basis of caffeine from 246 to 614 functions with
-the auxiliary basis held at 1242 gained nothing, and going to a molecule whose
-auxiliary basis is 3387 gained a quarter. The component benchmarks were taken
-along the second axis and this agrees with them.
+**Twice the conventional route**, where caffeine gains a fifth. The advantage
+follows the auxiliary basis and the occupied orbitals, both of which are what the
+exchange is built from, and both of which are larger here.
 
 The energies of the two routes differ in the last of the ten digits printed, which
 is the different order the arithmetic is summed in over twenty three iterations
-rather than a difference of the approximation. The iterations are the same.
+rather than a difference of the approximation.
 
-**The approximation itself gains much less here than on caffeine**: 1.55 and 1.91
-times the calculation without it, against four to eleven times on caffeine. The
-four-center build screens well at seventy atoms while the work of the resolution
-of the identity follows the auxiliary basis, which is what has grown. The
-approximation is not uniformly worth taking, and this is where it stops paying
-what it pays on a compact molecule.
-
-The Cholesky factorization succeeded here as well, so the fallback remains
-exercised by constructed matrices alone.
+**The approximation itself gains much less here than on caffeine**: 1.55 times the
+calculation without it for the conventional route, against four to eleven on
+caffeine. The four-center build screens well at seventy atoms while the work of
+the resolution of the identity follows the auxiliary basis, which is what has
+grown.
 
 ### Tagrisso with the diffuse basis
 
 The same molecule and the same fitting set, in def2-svpd, whose 1010 orbital
-functions are half again the 683 of def2-svp. One run of each.
+functions are half again the 683 of def2-svp.
 
 | method | time | speedup | iterations | energy | against full |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | full | 1199.89 | 1.00 | 21 | -1609.1565808182 | |
 | RI-JK conventional | 370.46 | 3.24 | 24 | -1609.1555344827 | 1.05e-03 |
-| RI-JK simd | 272.44 | 4.40 | 24 | -1609.1555344829 | 1.05e-03 |
+| RI-JK simd | 150.02 | 8.00 | 24 | -1609.1555344829 | 1.05e-03 |
 
-**The new path is 1.36 times the conventional one here**, against 1.23 on the same
-molecule in def2-svp. Taken with the four bases of caffeine, where it was slower
-in every one of them, the two axes now separate cleanly:
+**Two and a half times the conventional route.** Taken together, the six
+calculations of these three tables:
 
 | molecule | auxiliary functions | orbital basis | simd against conventional |
 | --- | ---: | --- | ---: |
-| caffeine | 1242 | def2-svp to def2-tzvpd | 0.87 to 0.97 |
-| tagrisso | 3387 | def2-svp | 1.23 |
-| tagrisso | 3387 | def2-svpd | 1.36 |
+| caffeine | 1242 | def2-svp to def2-tzvpd | 1.12 to 1.21 |
+| tagrisso | 3387 | def2-svp | 2.16 |
+| tagrisso | 3387 | def2-svpd | 2.47 |
 
-Quadrupling the orbital basis of caffeine with the fitting set held at 1242
-functions gained nothing. Going to a molecule whose fitting set is 3387 gained a
-quarter, and growing the orbital basis on top of that gained a third. The
-advantage follows the auxiliary basis, and the orbital basis multiplies whatever
-the auxiliary basis has already given. This is what the benchmarks of the B
-vectors and of the Coulomb matrix said, measured through a whole calculation.
-
-**The approximation gains 3.24 times here against 1.55 in def2-svp**, the mirror
-of the above: the four-center build grows steeply with the orbital basis while the
-work of the resolution of the identity follows the fitting set, which has not
-changed. The two axes push the two comparisons in opposite directions.
+The advantage follows the auxiliary basis and the occupied orbitals, and the
+orbital basis multiplies whatever those have already given. The whole-calculation
+gains are well under the two and a half to five times the W matrices themselves
+gained, which is what a part of a calculation being made faster does to the whole
+of it: the W matrices were three quarters of a tagrisso run, so three times on
+them cannot give more than about twice on the run, and 2.16 is most of that.
 
 ### What the memory check did
 
-This row did not run at the default budget. The B vectors need 10.67 gigabytes and
-the driver was given 10.57, which is half of what was free, and it refused:
+The diffuse row did not run at the default budget. The B vectors need 10.67
+gigabytes and the driver was given 10.57, which is half of what was free, and it
+refused:
 
     RIJKFockDriver.prepare: The B vectors need 10.674862 GB and the budget is 10.568748 GB
 
-It refused before computing the integrals, from the sparsity pattern alone, and
-after twenty minutes of the calculation which preceded it rather than at the end
-of the ten it would have spent forming them. The row above was taken with
-ri_memory_budget set to 24 gigabytes, which the machine has.
+It refused before computing the integrals, from the sparsity pattern alone, rather
+than at the end of the ten minutes it would have spent forming them. The row above
+was taken with ri_memory_budget set to 24 gigabytes, which the machine has.
 
 **The default is too tight for a case of this shape.** Half of what is free is a
 reasonable guard when the B vectors are one term among several, and a poor one
@@ -4963,11 +5059,19 @@ of the memory of the machine. A default of what is free less a fixed reserve wou
 have taken this run. The check itself did what it exists to do, which is to say
 which number is too small rather than to die in the allocator.
 
+### On the metric of these bases
+
+The Cholesky factorization succeeded for every basis of every molecule here,
+including the diffuse ones, so the fallback to the inverted square root was never
+taken and no warning was printed. The metrics of the universal fitting set are
+well enough conditioned for the cheaper factorization at these sizes. The fallback
+is therefore still covered by constructed matrices alone and not by a calculation.
+
 ### A note on how these rows were taken
 
-The three rows of a table are one run each, on an idle machine, and the tables of
-one molecule and basis were taken in one process except where said otherwise. The
-simd row of def2-svpd is the exception: it was taken in a process of its own,
-after the first attempt was refused, and the two rows above it are quoted from the
-run which produced them rather than measured again. The ratios of that table
-therefore cross two processes, which is worth knowing though both were idle.
+The full and the conventional columns of these three tables were measured once
+each, on an idle machine, before the W matrices were changed. They do not go
+through the changed code and were not measured again. The simd column was measured
+again afterwards, in a process of its own. The ratios therefore cross two runs,
+which is worth knowing though both were idle and the energies of the two agree to
+every digit printed.
