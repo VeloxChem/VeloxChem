@@ -72,6 +72,28 @@ auto invert(const CPackedMatrix &matrix) -> CPackedMatrix;
 /// not positive definite has no Cholesky factor to invert.
 auto cholesky_inverse(const CPackedMatrix &matrix) -> CPackedMatrix;
 
+/// @brief Inverts the square root of a symmetric positive semidefinite matrix
+/// stored in the packed format, dropping the directions of its small eigenvalues.
+/// @param matrix The symmetric matrix to invert the square root of.
+/// @param threshold The eigenvalues at or below which a direction is dropped.
+/// @return The inverted square root, in the packed format as a symmetric matrix.
+/// @note The matrix returned is V times the inverted square root of the
+/// eigenvalues times V transposed, with the inverted square root set to zero for
+/// the eigenvalues at or below the threshold. It is therefore the inverted square
+/// root of the matrix on the directions which are kept and zero on the rest, and
+/// multiplied by itself it is the pseudo inverse of the matrix.
+/// @note This is what the resolution of the identity needs of a fitting basis
+/// which is close to linearly dependent, where the Cholesky factorization either
+/// fails or returns a factor whose inverse is meaningless. The directions which
+/// carry no information are projected out rather than inverted.
+/// @note The matrix is square and symmetric, and its dimensions are those of the
+/// matrix it inverts whatever is dropped, so an auxiliary basis function keeps the
+/// index it had. A rectangular form of one column per direction kept would be
+/// smaller, and would leave the index of the auxiliary side meaning nothing.
+/// @note A warning names the number of directions dropped when any are, as a
+/// fitting basis which loses them is worth knowing about.
+auto inverse_square_root(const CPackedMatrix &matrix, const double threshold = 1.0e-12) -> CPackedMatrix;
+
 }  // namespace packlin
 
 #endif /* PackedLinearAlgebra_hpp */

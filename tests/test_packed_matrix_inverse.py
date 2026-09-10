@@ -119,3 +119,71 @@ class TestPackedMatrixInverse:
 
             assert np.allclose(factor.T @ factor, np.linalg.inv(dense),
                                rtol=1.0e-9, atol=1.0e-11)
+
+    def test_inverse_square_root(self):
+        """Multiplied by itself it is the inverse, and it is symmetric."""
+
+        for ndim in [1, 2, 3, 7, 32, 65]:
+
+            dense = self._random_spd(ndim, seed=ndim + 2)
+
+            root = self._to_packed(dense).inverse_square_root(1.0e-12)
+
+            assert root.get_type() == mat_t.symmetric
+
+            computed = root.to_numpy()
+
+            # symmetric to the last bit, as one triangle is stored
+
+            assert np.array_equal(computed, computed.T)
+
+            assert np.allclose(computed @ computed, np.linalg.inv(dense),
+                               rtol=1.0e-9, atol=1.0e-11)
+
+    def test_inverse_square_root_drops_null_directions(self):
+        """A matrix which is not of full rank has no Cholesky factor to invert, and
+        this is what the resolution of the identity uses in its place."""
+
+        ndim, defect = 30, 4
+
+        rng = np.random.default_rng(97)
+
+        amat = rng.standard_normal((ndim, ndim))
+
+        eigvals, eigvecs = np.linalg.eigh(amat @ amat.T + ndim * np.eye(ndim))
+
+        # push some directions far below the threshold
+
+        eigvals[:defect] = 1.0e-16
+
+        dense = eigvecs @ np.diag(eigvals) @ eigvecs.T
+        dense = 0.5 * (dense + dense.T)
+
+        root = self._to_packed(dense).inverse_square_root(1.0e-12).to_numpy()
+
+        assert np.array_equal(root, root.T)
+
+        # the directions which were dropped are gone from the result
+
+        assert np.linalg.matrix_rank(root) == ndim - defect
+
+        # and it is the inverse on the directions which remain, which is to say
+        # that the matrix times it is the projector onto them
+
+        projector = root @ dense @ root
+
+        assert np.max(np.abs(projector @ projector - projector)) < 1.0e-10
+
+        assert np.allclose(root @ root, np.linalg.pinv(dense, rcond=1.0e-12),
+                           rtol=1.0e-8, atol=1.0e-10)
+
+    def test_inverse_square_root_keeps_everything_above_the_threshold(self):
+        """Nothing is dropped from a well conditioned matrix."""
+
+        ndim = 24
+
+        dense = self._random_spd(ndim, seed=5)
+
+        root = self._to_packed(dense).inverse_square_root(1.0e-12).to_numpy()
+
+        assert np.linalg.matrix_rank(root) == ndim

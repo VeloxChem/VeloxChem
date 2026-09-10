@@ -82,6 +82,31 @@ auto dsytrf_(const char          *uplo,
              const lapack_int_t  *lwork,
              lapack_int_t        *info) -> void;
 
+/// @brief Computes the eigenvalues and eigenvectors of a symmetric matrix, by
+/// divide and conquer.
+auto dsyevd_(const char         *jobz,
+             const char         *uplo,
+             const lapack_int_t *n,
+             double             *a,
+             const lapack_int_t *lda,
+             double             *w,
+             double             *work,
+             const lapack_int_t *lwork,
+             lapack_int_t       *iwork,
+             const lapack_int_t *liwork,
+             lapack_int_t       *info) -> void;
+
+/// @brief Computes the eigenvalues and eigenvectors of a symmetric matrix.
+auto dsyev_(const char         *jobz,
+            const char         *uplo,
+            const lapack_int_t *n,
+            double             *a,
+            const lapack_int_t *lda,
+            double             *w,
+            double             *work,
+            const lapack_int_t *lwork,
+            lapack_int_t       *info) -> void;
+
 /// @brief Computes a symmetric rank k update of a matrix.
 auto dsyrk_(const char         *uplo,
             const char         *trans,

@@ -335,3 +335,181 @@ cholesky_inverse(const CPackedMatrix &matrix) -> CPackedMatrix
 }
 
 }  // namespace packlin
+
+namespace packlin {  // packlin namespace
+
+/// @brief Computes the eigenvalues and eigenvectors of the symmetric matrix held
+/// in the dense array, in place.
+/// @param values The values of the dense matrix, as a row major array of ndim rows
+/// and ndim columns, which is overwritten by the eigenvectors.
+/// @param ndim The number of rows of matrix.
+/// @return The eigenvalues, in ascending order.
+/// @note The array is row major and the library is column major, so the array is
+/// overwritten by the eigenvectors as its rows rather than as its columns.
+static auto
+_eigenvectors_in_place(double *values, const size_t ndim) -> std::vector<double>
+{
+    std::vector<double> eigenvalues(ndim, 0.0);
+
+#ifdef VLX_USE_MATHLIB
+
+    const char jobz = 'V';
+
+    const char uplo = 'U';
+
+    auto ndim_arg = static_cast<lapack_int_t>(ndim);
+
+    lapack_int_t info = 0;
+
+    // NOTE: the problem is solved by divide and conquer rather than by the plain
+    // driver, which spends its time in a sequential iteration and reaches a
+    // fraction of the machine. The sizes of the two work arrays are the ones the
+    // routine asks for, which it reports when it is called with sizes of minus one.
+
+    lapack_int_t lwork = -1;
+
+    lapack_int_t liwork = -1;
+
+    double work_size = 0.0;
+
+    lapack_int_t iwork_size = 0;
+
+    dsyevd_(&jobz, &uplo, &ndim_arg, values, &ndim_arg, eigenvalues.data(), &work_size, &lwork, &iwork_size, &liwork,
+            &info);
+
+    errors::assertMsgCritical(info == 0, "PackedMatrix inverse square root: Failed to size the eigenvalue problem");
+
+    lwork = static_cast<lapack_int_t>(work_size);
+
+    liwork = iwork_size;
+
+    std::vector<double> work(static_cast<size_t>(lwork));
+
+    std::vector<lapack_int_t> iwork(static_cast<size_t>(liwork));
+
+    dsyevd_(&jobz, &uplo, &ndim_arg, values, &ndim_arg, eigenvalues.data(), work.data(), &lwork, iwork.data(), &liwork,
+            &info);
+
+    errors::assertMsgCritical(info == 0, "PackedMatrix inverse square root: The eigenvalue problem did not converge");
+
+#else
+
+    const auto nrows = static_cast<Eigen::Index>(ndim);
+
+    Eigen::Map<Eigen::MatrixXd> matrix(values, nrows, nrows);
+
+    Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> solver(matrix);
+
+    errors::assertMsgCritical(solver.info() == Eigen::Success,
+                              "PackedMatrix inverse square root: The eigenvalue problem did not converge");
+
+    std::copy(solver.eigenvalues().data(), solver.eigenvalues().data() + ndim, eigenvalues.data());
+
+    const auto &vectors = solver.eigenvectors();
+
+    std::copy(vectors.data(), vectors.data() + ndim * ndim, values);
+
+#endif /* VLX_USE_MATHLIB */
+
+    return eigenvalues;
+}
+
+auto
+inverse_square_root(const CPackedMatrix &matrix, const double threshold) -> CPackedMatrix
+{
+    errors::assertMsgCritical(matrix.get_type() == mat_t::symmetric,
+                              std::string("PackedMatrix inverse square root: The matrix must be symmetric"));
+
+    const auto ndim = matrix.number_of_rows();
+
+    errors::assertMsgCritical(ndim > 0, std::string("PackedMatrix inverse square root: The matrix must not be empty"));
+
+    auto dense = std::make_unique_for_overwrite<double[]>(ndim * ndim);
+
+    matrix.to_dense(dense.get());
+
+    const auto eigenvalues = _eigenvectors_in_place(dense.get(), ndim);
+
+    // NOTE: the eigenvectors are the rows of the array, as the library is column
+    // major and the array is read as row major. Scaling row k by the fourth root
+    // of the inverted eigenvalue and forming the array times its transpose gives V
+    // times the inverted square root of the eigenvalues times V transposed, which
+    // is symmetric by construction rather than by cancellation.
+
+    size_t ndropped = 0;
+
+    for (size_t k = 0; k < ndim; k++)
+    {
+        auto *row = dense.get() + k * ndim;
+
+        if (eigenvalues[k] > threshold)
+        {
+            const auto factor = 1.0 / std::sqrt(std::sqrt(eigenvalues[k]));
+
+            for (size_t j = 0; j < ndim; j++)
+            {
+                row[j] *= factor;
+            }
+        }
+        else
+        {
+            std::fill(row, row + ndim, 0.0);
+
+            ndropped++;
+        }
+    }
+
+    if (ndropped > 0)
+    {
+        errors::msg(std::string("PackedMatrix inverse square root: ") + std::to_string(ndropped) + std::string(" of ") +
+                        std::to_string(ndim) +
+                        std::string(" directions of the matrix were dropped. This is a nearly linearly dependent "
+                                    "basis, and the matrix returned is the inverse on the directions which remain."),
+                    "Warning");
+    }
+
+    auto result = CPackedMatrix(ndim, ndim, mat_t::symmetric);
+
+    auto product = std::vector<double>(ndim * ndim, 0.0);
+
+#ifdef VLX_USE_MATHLIB
+
+    // NOTE: the rows of the array are the eigenvectors, so the columns of the
+    // array read as column major are the scaled eigenvectors, which is the matrix
+    // whose product with its own transpose is wanted. That is the untransposed
+    // update, unlike the exchange, where the array read as column major is the
+    // transposed matrix. The upper triangle of the library is the lower triangle
+    // of the array, which is the triangle the packed matrix stores.
+
+    const char uplo = 'U';
+
+    const char trans = 'N';
+
+    auto ndim_arg = static_cast<lapack_int_t>(ndim);
+
+    const double one = 1.0;
+
+    const double zero = 0.0;
+
+    dsyrk_(&uplo, &trans, &ndim_arg, &ndim_arg, &one, dense.get(), &ndim_arg, &zero, product.data(), &ndim_arg);
+
+#else
+
+    using RowMajorMatrix = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
+
+    const auto nrows = static_cast<Eigen::Index>(ndim);
+
+    Eigen::Map<const RowMajorMatrix> vmap(dense.get(), nrows, nrows);
+
+    Eigen::Map<RowMajorMatrix> pmap(product.data(), nrows, nrows);
+
+    pmap.noalias() = vmap.transpose() * vmap;
+
+#endif /* VLX_USE_MATHLIB */
+
+    result.from_dense(product.data());
+
+    return result;
+}
+
+}  // namespace packlin

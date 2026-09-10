@@ -350,17 +350,25 @@ class TestSimdRIFockDriver:
 
             drv = SimdRIFockDriver()
 
-            bq = drv.compute_bq_vectors(molecule, basis, aux_basis,
-                                        metric.cholesky_inverse(), 0.0)
+            # both forms of the metric must close: the inverted Cholesky factor,
+            # and the inverted square root which drops the directions of the small
+            # eigenvalues and is what a nearly linearly dependent basis needs
 
-            dense_bq, visited = self.expand(bq, basis, aux_basis, maps, aux_maps, nao, naux)
+            for metric_matrix in (metric.cholesky_inverse(),
+                                  metric.inverse_square_root(1.0e-12)):
 
-            closes = np.einsum('ijq,klq->ijkl', dense_bq, dense_bq)
+                bq = drv.compute_bq_vectors(molecule, basis, aux_basis,
+                                            metric_matrix, 0.0)
 
-            compared += visited
+                dense_bq, visited = self.expand(bq, basis, aux_basis, maps, aux_maps,
+                                                nao, naux)
 
-            assert np.max(np.abs(closes - target)) / scale < 1.0e-12, (
-                f"({LABELS[la]}{LABELS[lb]}|{LABELS[lc]}) does not close")
+                closes = np.einsum('ijq,klq->ijkl', dense_bq, dense_bq)
+
+                compared += visited
+
+                assert np.max(np.abs(closes - target)) / scale < 1.0e-11, (
+                    f"({LABELS[la]}{LABELS[lb]}|{LABELS[lc]}) does not close")
 
             # the full inverse is the wrong matrix here, and wrong by order one
             # rather than subtly, which is what makes this worth asserting
