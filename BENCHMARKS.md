@@ -4646,3 +4646,171 @@ and rather than fail there the inversion falls back to the Bunch-Kaufman
 factorization and prints a warning. Nothing in the grid above reached the
 fallback; the test suite reaches it with a constructed indefinite matrix, and
 gets the right inverse from it.
+
+## The Coulomb matrix of the resolution of the identity
+
+The chain is four steps. The metric (p|J|q) of the fitting basis is factorized as
+L L transposed and its factor inverted; the B vectors are formed as B(q)_ij = sum
+over p of Linv_qp (ij|p); a density is contracted into Y(q) = sum over i and j of
+B(q)_ij D_ij; and the Coulomb matrix is F_ij = sum over q of B(q)_ij Y(q).
+
+### Why the factor and not the inverse
+
+The closing step is what fixes which matrix builds the B vectors. Writing M for
+that matrix,
+
+    sum over q of B(q)_ij B(q)_kl = sum over p and t of (ij|p) [M transposed M]_pt (kl|t)
+
+and the resolution of the identity needs the bracket to be the inverse of the
+metric. With the metric equal to L L transposed its inverse is L inverted
+transposed times L inverted, so M is L inverted. **The plain inverse of the metric
+is not a substitute for it**, and not by a little:
+
+| combination | closes with L inverted | closes with the inverse |
+| --- | ---: | ---: |
+| (ss\|s) | 7.4e-16 | 8.97e-01 |
+| (ps\|p) | 4.8e-16 | 7.09e-01 |
+| (pp\|d) | 8.0e-16 | 5.41e-01 |
+| (ds\|p) | 7.4e-16 | 7.12e-01 |
+
+The right matrix closes to the last bit and the wrong one is wrong by most of the
+answer. The test suite asserts both halves of that table, so the two cannot be
+confused again.
+
+Inverting the factor is also the cheaper of the two. The factorization costs a
+third of the cube of the dimensions and the inversion of the factor another
+third, against a further third to form the whole inverse:
+
+| molecule | fitting basis | n | invert | cholesky_inverse | ratio |
+| --- | --- | ---: | ---: | ---: | ---: |
+| Caffeine | def2-jfit | 796 | 0.003 | 0.002 | 1.35 |
+| Caffeine | cc-pV5Z-RIFIT | 3612 | 0.104 | 0.072 | 1.44 |
+| tagrisso | def2-jkfit | 3387 | 0.087 | 0.060 | 1.44 |
+| c60 | cc-pVQZ-RIFIT | 7920 | 0.962 | 0.681 | 1.41 |
+| taxol | cc-pV5Z-RIFIT | 16232 | 7.980 | 5.628 | 1.42 |
+| crambin | def2-jfit | 19500 | 14.480 | 10.234 | 1.41 |
+| crambin | def2-jkfit | 30751 | 59.980 | 42.291 | 1.42 |
+
+The measured 1.42 is the ratio of the flop counts, which is 1.5, less what the
+triangular inversion loses to the shape of its blocks.
+
+### What the screening is worth
+
+The B vectors are screened on the pair of atomic orbitals, as the three-center
+integrals are, and are dense in q, as the metric is. Their memory is therefore the
+surviving pairs times the auxiliary basis. Against the dense triangle of the
+reference, with the overlap bound at 1e-12:
+
+| molecule | basis | nao | naux | dense triangle | screened | kept |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| Caffeine | def2-svp | 246 | 796 | 30381 | 26712 | 87.9% |
+| Caffeine | def2-tzvp | 494 | 796 | 122265 | 107767 | 88.1% |
+| tagrisso | def2-svp | 683 | 2176 | 233586 | 132082 | 56.5% |
+| c60 | def2-svp | 840 | 2940 | 353220 | 283430 | 80.2% |
+| taxol | def2-svp | 1099 | 3528 | 604450 | 281682 | 46.6% |
+| crambin | def2-svp | 6177 | 19500 | 19080753 | 2934925 | 15.4% |
+
+Screening is worth a tenth on a compact molecule and six and a half times on
+crambin. It pays where it matters and nowhere else, which is the same shape the
+timings below have.
+
+### Forming the B vectors
+
+Against the two routes of the reference which form the same thing,
+compute_screened_bq_vectors and compute_bq_vectors of CRIJKFockDriver, at 1e-12:
+
+| molecule | basis | nao | naux | simd | ref screened | ref full | vs screened | vs full |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Caffeine | def2-svp | 246 | 796 | 0.343 | 0.394 | 0.421 | 1.15 | 1.23 |
+| Caffeine | def2-tzvp | 494 | 796 | 1.657 | 1.777 | 2.152 | 1.07 | 1.30 |
+| tagrisso | def2-svp | 683 | 2176 | 4.548 | 15.917 | 41.580 | 3.50 | 9.14 |
+| c60 | def2-svp | 840 | 2940 | 10.163 | 96.498 | 141.301 | 9.50 | 13.90 |
+| taxol | def2-svp | 1099 | 3528 | 21.192 | 130.246 | 444.399 | 6.15 | 20.97 |
+
+**The gap grows with the molecule**, from a tenth on caffeine to six and ten times
+on taxol and c60. The reference walks the auxiliary functions one at a time and
+adds one scaled vector per surviving pair of them, which is level 1 work and as
+many calls as the square of the auxiliary basis. The new driver contracts a block
+at a time with one matrix product per pair of angular components, which is level
+3. As the fitting basis grows, level 1 against level 3 is the whole story.
+
+### The Coulomb matrix
+
+Against CRIFockDriver, whose route keeps the raw integrals and applies the metric
+inside every build. Setup is the B vectors for the new driver and prepare_buffers
+for the reference; the Coulomb column is one build for one density:
+
+| molecule | basis | nao | naux | setup | ref setup | F | ref F | speedup | B | ref |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Caffeine | def2-svp | 246 | 796 | 0.346 | 0.029 | 0.0051 | 0.0045 | 0.89 | 0.17 GB | 0.18 GB |
+| Caffeine | def2-tzvp | 494 | 796 | 1.494 | 0.116 | 0.0200 | 0.0178 | 0.89 | 0.70 GB | 0.73 GB |
+| tagrisso | def2-svp | 683 | 2176 | 4.450 | 0.593 | 0.0306 | 0.0955 | 3.12 | 2.49 GB | 3.79 GB |
+| c60 | def2-svp | 840 | 2940 | 10.328 | 1.705 | 0.0565 | 0.1975 | 3.49 | 6.90 GB | 7.74 GB |
+| taxol | def2-svp | 1099 | 3528 | 20.992 | 3.274 | 0.0933 | 0.4114 | 4.41 | 8.76 GB | 15.89 GB |
+
+**Three to four times faster per build on the real systems**, and level with the
+reference on caffeine, where nothing is large enough for the fixed costs to
+disappear. The memory is 1.8 times better on taxol, as the reference stores a
+dense triangle of atomic orbitals for every auxiliary function and the new driver
+only the pairs which survive.
+
+The intermediate step, the Y vector alone, is close to level: 1.0, 1.1 and 1.5 on
+tagrisso, c60 and taxol, and slower than the reference on caffeine at 0.3. Both
+read a structure of the same size and are bound by the memory rather than by the
+arithmetic. The new driver loses on the small molecules because it walks a blocked
+sparse structure with a short inner loop per pair of angular components, while the
+reference runs one long contiguous loop per auxiliary function.
+
+### Where the two routes cross
+
+The new driver spends its metric transform once, in the B vectors, and the
+reference spends it inside every build. Their totals for n densities cross where
+the difference of the setups equals n times the difference of the builds, which
+for taxol is
+
+    (20.99 - 3.27) / (0.4114 - 0.0933) = 56 densities
+
+Above a field calculation and well inside a response one. Assembling the Coulomb
+matrix is what moves that number: on the Y vector alone the same molecule crosses
+at about 780, and adding the step which uses the B vectors a second time brings it
+down by a factor of fourteen.
+
+### A note on which setup is being compared
+
+There are two reference routes and they do not do the same work, which makes
+"setup" ambiguous unless it is said which one is meant. On taxol with def2-svp:
+
+| what it produces | route | time |
+| --- | --- | ---: |
+| B vectors, metric applied | the new driver | 21.0 |
+| B vectors, metric applied | CRIJKFockDriver::compute_screened_bq_vectors | 130.2 |
+| raw three-center integrals, no metric | CRIFockDriver::prepare_buffers | 3.3 |
+
+Against the route which produces the same thing the new driver is six times
+faster. Against the route which only computes the integrals it is six times
+slower, and that is not a comparison of like with like: prepare_buffers never
+applies the metric, and CRIFockDriver pays for it again in every build. The two
+ratios both land near six by coincidence, which is exactly how a comparison of
+this kind gets reported the wrong way round.
+
+### Accuracy against the reference
+
+The Coulomb matrix agrees with the one CRIFockDriver builds to between 1.5e-10 and
+2.9e-10 relative across the set, and the Y vector to between 7.8e-11 and 9.0e-10.
+The two routes sum in different orders and take their three-center integrals from
+different drivers, and the metrics of the fitting bases have condition numbers
+which reach 1e10, so agreement of this order is what a correct implementation
+looks like rather than a sign of one.
+
+Turning the screening from 1e-12 down to nothing moves the Coulomb matrix by 1e-13
+relative, so the screening is not what limits the agreement.
+
+### On reproducibility
+
+The Y vector and the Coulomb matrix are summed by the threads into vectors of
+their own, which are added up in the order of the threads. The order the blocks
+reach the threads is not fixed, though, as they are handed out dynamically, so
+which of them a thread sums varies between runs and the last bit of the total
+varies with it. The measured spread over five runs is one unit in the last place.
+Making it exact would need a static schedule and the imbalance which comes with
+it, and is not worth that.
