@@ -895,21 +895,19 @@ class ScfGradientDriver(GradientDriver):
                     self.gradient[iatom, :] -= 0.5 * np.array(atomgrad_Ka)
                     self.gradient[iatom, :] -= 0.5 * np.array(atomgrad_Kb)
 
-                    if need_omega:
-                        # for range-separated functional
-                        atomgrad_Ka_rs = fock_grad_drv.compute(
-                            basis, screener_atom, screener, Da_for_fock,
-                            Da_for_fock_2, iatom, 'kx_rs', erf_k_coef, omega,
-                            thresh_int)
-                        atomgrad_Kb_rs = fock_grad_drv.compute(
-                            basis, screener_atom, screener, Db_for_fock,
-                            Db_for_fock_2, iatom, 'kx_rs', erf_k_coef, omega,
-                            thresh_int)
+                # for range-separated functional
+                if need_omega:
+                    atomgrad_Ka_rs = fock_grad_drv.compute(
+                        basis, screener_atom, screener, Da_for_fock,
+                        Da_for_fock_2, iatom, 'kx_rs', erf_k_coef, omega,
+                        thresh_int)
+                    atomgrad_Kb_rs = fock_grad_drv.compute(
+                        basis, screener_atom, screener, Db_for_fock,
+                        Db_for_fock_2, iatom, 'kx_rs', erf_k_coef, omega,
+                        thresh_int)
 
-                        self.gradient[
-                            iatom, :] -= 0.5 * np.array(atomgrad_Ka_rs)
-                        self.gradient[
-                            iatom, :] -= 0.5 * np.array(atomgrad_Kb_rs)
+                    self.gradient[iatom, :] -= 0.5 * np.array(atomgrad_Ka_rs)
+                    self.gradient[iatom, :] -= 0.5 * np.array(atomgrad_Kb_rs)
 
                 grad_timing['Fock_grad'] += time.time() - t0
 

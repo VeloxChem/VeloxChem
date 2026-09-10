@@ -128,9 +128,6 @@ class ScfHessianDriver(HessianDriver):
             The input dictionary of Hessian settings group.
         :param cphf_dict:
             The input dictionary of CPHF (orbital response) settings.
-        :param rsp_dict:
-            The input dictionary for linear response settings
-            (needed to compute the polarizability gradient).
         """
 
         super().update_settings(method_dict, hess_dict)
@@ -160,6 +157,14 @@ class ScfHessianDriver(HessianDriver):
         assert_msg_critical(
             self.scf_driver.electric_field is None,
             f'{type(self).__name__}.compute: electric_field is not supported')
+
+        # the analytical dipole gradient needs CPHF solutions for all atoms,
+        # which are not available when the Hessian is restricted to atom_pairs
+        if not self.numerical:
+            assert_msg_critical(
+                not (self.atom_pairs is not None and self.do_dipole_gradient),
+                f'{type(self).__name__}.compute: do_dipole_gradient is not '
+                'supported together with atom_pairs')
 
         scf_results = self.scf_driver.scf_results
         if scf_results is None:
@@ -1554,16 +1559,14 @@ class ScfHessianDriver(HessianDriver):
                     Db_for_fock_2, i, j, 'kx', exchange_scaling_factor, 0.0,
                     thresh_int)
 
-                # range-separated functionals
-                if need_omega:
-                    hess_Ka_1100_rs = fock_hess_1100_drv.compute(
-                        ao_basis, screener_atom_pair, screener, Da_for_fock,
-                        Da_for_fock_2, i, j, 'kx_rs', erf_k_coef, omega,
-                        thresh_int)
-                    hess_Kb_1100_rs = fock_hess_1100_drv.compute(
-                        ao_basis, screener_atom_pair, screener, Db_for_fock,
-                        Db_for_fock_2, i, j, 'kx_rs', erf_k_coef, omega,
-                        thresh_int)
+            # for range-separated functionals
+            if need_omega:
+                hess_Ka_1100_rs = fock_hess_1100_drv.compute(
+                    ao_basis, screener_atom_pair, screener, Da_for_fock,
+                    Da_for_fock_2, i, j, 'kx_rs', erf_k_coef, omega, thresh_int)
+                hess_Kb_1100_rs = fock_hess_1100_drv.compute(
+                    ao_basis, screener_atom_pair, screener, Db_for_fock,
+                    Db_for_fock_2, i, j, 'kx_rs', erf_k_coef, omega, thresh_int)
 
             screener_atom_i = T4CScreener()
             screener_atom_i.partition_atom(ao_basis, molecule, 'eri', i)
@@ -1587,17 +1590,15 @@ class ScfHessianDriver(HessianDriver):
                     Db_for_fock_2, i, j, 'kx', exchange_scaling_factor, 0.0,
                     thresh_int)
 
-                # for range-separated functionals
-                if need_omega:
-                    # Note: use general matrix on both sides
-                    hess_Ka_1010_rs = fock_hess_1010_drv.compute(
-                        ao_basis, screener_atom_i, screener_atom_j,
-                        Da_for_fock_2, Da_for_fock_2, i, j, 'kx_rs', erf_k_coef,
-                        omega, thresh_int)
-                    hess_Kb_1010_rs = fock_hess_1010_drv.compute(
-                        ao_basis, screener_atom_i, screener_atom_j,
-                        Db_for_fock_2, Db_for_fock_2, i, j, 'kx_rs', erf_k_coef,
-                        omega, thresh_int)
+            # for range-separated functionals
+            if need_omega:
+                # Note: use general matrix on both sides
+                hess_Ka_1010_rs = fock_hess_1010_drv.compute(
+                    ao_basis, screener_atom_i, screener_atom_j, Da_for_fock_2,
+                    Da_for_fock_2, i, j, 'kx_rs', erf_k_coef, omega, thresh_int)
+                hess_Kb_1010_rs = fock_hess_1010_drv.compute(
+                    ao_basis, screener_atom_i, screener_atom_j, Db_for_fock_2,
+                    Db_for_fock_2, i, j, 'kx_rs', erf_k_coef, omega, thresh_int)
 
             # 'X_X', 'X_Y', 'X_Z', 'Y_X', 'Y_Y', 'Y_Z', 'Z_X', 'Z_Y', 'Z_Z'
             xy_pairs = [(x, y) for x in range(3) for y in range(3)]
@@ -1611,11 +1612,11 @@ class ScfHessianDriver(HessianDriver):
                         i, j, x,
                         y] -= 0.5 * (hess_Ka_1100[idx] + hess_Ka_1010[idx] +
                                      hess_Kb_1100[idx] + hess_Kb_1010[idx])
-                    if need_omega:
-                        # range-separated functional contribution
-                        hessian_2nd_order_derivatives[i, j, x, y] -= 0.5 * (
-                            hess_Ka_1100_rs[idx] + hess_Ka_1010_rs[idx] +
-                            hess_Kb_1100_rs[idx] + hess_Kb_1010_rs[idx])
+                if need_omega:
+                    # range-separated functional contribution
+                    hessian_2nd_order_derivatives[i, j, x, y] -= 0.5 * (
+                        hess_Ka_1100_rs[idx] + hess_Ka_1010_rs[idx] +
+                        hess_Kb_1100_rs[idx] + hess_Kb_1010_rs[idx])
 
             # lower triangle is transpose of the upper part
             if i != j:
