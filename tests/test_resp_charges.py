@@ -1,5 +1,7 @@
 from pathlib import Path
 import numpy as np
+import pytest
+from mpi4py import MPI
 
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.molecule import Molecule
@@ -109,13 +111,9 @@ class TestRespCharges:
             scf_h5_file = Path(chg_drv.filename + '_scf.h5')
             scf_h5_file.unlink(missing_ok=True)
 
-    def test_get_dipole_moment(self):
+    def test_get_origin_and_charge_dipole(self):
 
-        # H2 molecule: two H atoms separated by 1 bohr along the x-axis.
-        # Nuclear charges are both 1, so the nuclear charge centroid is at
-        # (0.5, 0, 0). With charges [+0.5, -0.5], the expected dipole is:
-        #   x: (0 - 0.5)*0.5 + (1 - 0.5)*(-0.5) = -0.25 - 0.25 = -0.5
-        #   y, z: 0
+        # H2 with bond length 1 bohr and charges [+0.5, -0.5].
 
         mol_str = 'H  0.0  0.0  0.0\nH  1.0  0.0  0.0'
         molecule = Molecule.read_str(mol_str, units='au')
@@ -123,17 +121,32 @@ class TestRespCharges:
         charges = np.array([0.5, -0.5])
 
         chg_drv = RespChargesDriver()
-        dipole = chg_drv.get_dipole_moment(molecule, charges)
+        origin, dipole = chg_drv._get_origin_and_charge_dipole(molecule, charges)
 
+        assert np.allclose(origin, np.array([0.5, 0.0, 0.0]), atol=1.0e-10)
         assert np.allclose(dipole, np.array([-0.5, 0.0, 0.0]), atol=1.0e-10)
 
-        # For a neutral charge set (sum of charges = 0), the dipole moment
-        # must be independent of the choice of origin (origin invariance).
-        # Shift the molecule by an arbitrary vector (5, 3, 2) bohr.
+        # Consistency check: the dipole should be translation-invariant since
+        # the origin moves with the molecule.
 
         mol_str_shifted = 'H  5.0  3.0  2.0\nH  6.0  3.0  2.0'
         molecule_shifted = Molecule.read_str(mol_str_shifted, units='au')
 
-        dipole_shifted = chg_drv.get_dipole_moment(molecule_shifted, charges)
+        origin_shifted, dipole_shifted = (
+            chg_drv._get_origin_and_charge_dipole(molecule_shifted, charges))
 
+        assert np.allclose(origin_shifted, np.array([5.5, 3.0, 2.0]),
+                           atol=1.0e-10)
         assert np.allclose(dipole, dipole_shifted, atol=1.0e-10)
+
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='skip pytest.raises for multiple MPI processes')
+    def test_get_origin_and_charge_dipole_wrong_charge_count(self):
+
+        mol_str = 'H  0.0  0.0  0.0\nH  1.0  0.0  0.0'
+        molecule = Molecule.read_str(mol_str, units='au')
+
+        chg_drv = RespChargesDriver()
+
+        with pytest.raises(ValueError, match='Expected 2 charges but got 3'):
+            chg_drv._get_origin_and_charge_dipole(molecule, np.zeros(3))
