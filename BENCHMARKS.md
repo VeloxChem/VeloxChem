@@ -4595,6 +4595,49 @@ dependent, which is a property of the basis and not of the inversion. It is wort
 knowing before an inverse of a jkfit or a high zeta RIFIT metric is fed to
 anything that cares about its accuracy.
 
+### What this residual cannot be used for
+
+The number above is the largest element of A A inverse minus the identity. It is
+a fair measure of one inversion against another **only when both results are
+constrained the same way**, and it is worthless across that line. Two traps,
+both of which were walked into while writing this section.
+
+**Do not compare a symmetric inverse against an unconstrained one.** The packed
+format stores one triangle, so what comes back is symmetric to the last bit. The
+LU route of the reference returns a matrix which is not, and the residual rewards
+it for that: the error is free to be antisymmetric, and antisymmetric error is
+invisible to the identity it is measured against. Taking the same LU inverse and
+symmetrizing it, which is all that storing it in the packed format would do,
+moves its residual from 3.1e-08 to 4.5e-01 on caffeine with cc-pV5Z-RIFIT. Seven
+orders, from the same numbers, for no other reason than being made symmetric. A
+comparison run this way reported the packed inversion as ten to two hundred
+times less accurate than numpy. On forward error, against a refined reference,
+it is within one to five times of it and better on some cases.
+
+**Do not read small differences as quality.** The condition number of these
+metrics reaches 1e10, and the residual multiplies whatever perturbs the inverse
+by roughly that. A Newton step written two ways which differ only in the order
+the library accumulates -- the same matrix mathematically, and agreeing to
+1.6e-11 where the two were compared element by element -- gives residuals of
+3.0e-07 and 5.0e-01 on tagrisso with jkfit. A four order spread from an
+accumulation order. Anything the residual says at that scale is the condition
+number talking, not the algorithm.
+
+What the residual is good for is what the table above uses it for: the order of
+magnitude, against the conditioning of the same matrix, for results produced the
+same way. For comparing two methods, use the forward error against a reference
+refined until it stops moving, and check that the reference is converged further
+than the difference being claimed.
+
+Why the plain Cholesky inverse is hard to beat here is worth recording too. With
+A about L L transposed and X about L inverse transposed times L inverse, the
+product A X cancels structurally rather than numerically, which is why its
+residual sits below the condition number times the epsilon. Refining it breaks
+that cancellation. In working precision there is nothing to gain: iterative
+refinement lowers the backward error only when the residual is formed in higher
+precision than the working one, and without that the inversion is already at the
+floor.
+
 ### The Cholesky and the fallback
 
 The metrics are positive definite and are inverted through their Cholesky
