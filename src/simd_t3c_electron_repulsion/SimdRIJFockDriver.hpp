@@ -140,6 +140,34 @@ class CSimdRIJFockDriver
                              const CMolecularBasis &aux_basis,
                              const CPackedMatrix   &density) const -> CPackedMatrix;
 
+    /// @brief Transforms one index of the B vectors into the molecular orbitals.
+    /// @param bq_vectors The B vectors, as compute_bq_vectors returns them.
+    /// @param basis The molecular basis on a and b sides.
+    /// @param aux_basis The auxiliary molecular basis.
+    /// @param coefficients The molecular orbital coefficients of the orbitals to
+    /// transform into, as a general matrix of one row per basis function and one
+    /// column per orbital.
+    /// @param qfirst The first auxiliary basis function to transform, as its dense
+    /// index in the auxiliary basis.
+    /// @param qlast The auxiliary basis function past the last one to transform.
+    /// @return The W matrices, W(q)_is = sum over r of B(q)_ir C_rs, one general
+    /// matrix of one row per basis function and one column per orbital for each
+    /// auxiliary basis function of the range.
+    /// @note The sum over r leaves nothing of the sparsity of the pairs of basis
+    /// functions: an atom on the auxiliary side is reached by every atom of the
+    /// molecule, as the pair of an atom with itself is at zero distance and
+    /// survives any threshold. The W matrices are therefore dense, and are the
+    /// dimensions of the basis times the orbitals times the auxiliary basis, which
+    /// grows as the cube of the size of the molecule with nothing to screen. They
+    /// are formed for a range of the auxiliary basis rather than for all of it, so
+    /// that the caller forms what it can hold, uses it and asks for the next range.
+    auto compute_w_vectors(const CSparseTensor   &bq_vectors,
+                           const CMolecularBasis &basis,
+                           const CMolecularBasis &aux_basis,
+                           const CPackedMatrix   &coefficients,
+                           const size_t           qfirst,
+                           const size_t           qlast) const -> std::vector<CPackedMatrix>;
+
    private:
     /// @brief The memory a batch of the three-center integrals is allowed to reach.
     /// @note The batch is the blocks of atomic orbital pairs whose integrals are

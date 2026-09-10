@@ -519,3 +519,118 @@ class TestSimdRIJFockDriver:
         # tolerance below is far tighter than while still catching a real difference.
 
         assert np.allclose(from_density, from_yvector, rtol=1.0e-13, atol=1.0e-14)
+
+    def w_case(self, molecule, identifiers, bra_momenta, aux_momentum, nocc):
+        """W(q)_is = sum over r of B(q)_ir C_rs, against the same in numpy."""
+
+        basis, aux_basis = MolecularBasis(), MolecularBasis()
+
+        for identifier, momentum in zip(identifiers, bra_momenta):
+            basis.add(self.one_function_basis(momentum, identifier))
+
+        for identifier in identifiers:
+            aux_basis.add(self.one_function_basis(aux_momentum, identifier))
+
+        nao = basis.get_dimensions_of_basis()
+        naux = aux_basis.get_dimensions_of_basis()
+
+        maps = self.dense_maps(basis, molecule)
+        aux_maps = self.dense_maps(aux_basis, molecule)
+
+        metric = SimdTwoCenterElectronRepulsionDriver().compute(molecule, aux_basis)
+
+        drv = SimdRIJFockDriver()
+
+        bq = drv.compute_bq_vectors(molecule, basis, aux_basis,
+                                    metric.cholesky_inverse(), 0.0)
+
+        dense_bq, _ = self.expand(bq, basis, aux_basis, maps, aux_maps, nao, naux)
+
+        # NOTE: the columns of the coefficients are different from one another, so
+        # that a contribution which is dropped cannot be hidden by another.
+
+        rng = np.random.default_rng(41 + nao)
+        cmat = np.ascontiguousarray(rng.standard_normal((nao, nocc)))
+
+        packed = PackedMatrix(nao, nocc, mat_t.general)
+        packed.from_numpy(cmat)
+
+        wvecs = drv.compute_w_vectors(bq, basis, aux_basis, packed, 0, naux)
+
+        assert len(wvecs) == naux
+
+        computed = np.stack([w.to_numpy(max_memory=8.0) for w in wvecs])
+
+        expected = np.einsum('irq,rs->qis', dense_bq, cmat)
+
+        # every row of W must be reached. The B vectors keep one of the two orders
+        # of an off-diagonal pair of atoms, and the transformation has to add into
+        # the rows of both sides of it, so a row left at zero means half of the
+        # contributions were dropped.
+
+        rows_touched = int(np.sum(np.max(np.abs(computed), axis=(0, 2)) > 0.0))
+
+        scale = max(float(np.max(np.abs(expected))), 1.0)
+
+        return (float(np.max(np.abs(computed - expected))) / scale,
+                computed.size, rows_touched, nao)
+
+    def test_w_vectors_against_transformation(self, molecule):
+
+        total = 0
+
+        for la in range(4):
+            for lb in range(4):
+                for lc in range(4):
+                    worst, visited, touched, nao = self.w_case(
+                        molecule, (8, 1, 7, 6), (la, la, lb, lb), lc, 3)
+                    total += visited
+
+                    assert touched == nao, (
+                        f"({LABELS[la]}{LABELS[lb]}|{LABELS[lc]}) reached "
+                        f"{touched} of {nao} rows")
+
+                    assert worst < 1.0e-12, (
+                        f"({LABELS[la]}{LABELS[lb]}|{LABELS[lc]}) differs by {worst:.2e}")
+
+        # NOTE: the sweep visited close to fifty thousand elements of W when it was
+        # written, and a large fall means most of them are no longer reached.
+        assert total > 40000
+
+    def test_w_vectors_range(self, molecule):
+        """A range of the auxiliary basis must be the same as that slice of all."""
+
+        basis, aux_basis = MolecularBasis(), MolecularBasis()
+
+        for identifier, momentum in zip((8, 1, 7, 6), (1, 1, 0, 0)):
+            basis.add(self.one_function_basis(momentum, identifier))
+
+        for identifier in (8, 1, 7, 6):
+            aux_basis.add(self.one_function_basis(1, identifier))
+
+        nao = basis.get_dimensions_of_basis()
+        naux = aux_basis.get_dimensions_of_basis()
+
+        metric = SimdTwoCenterElectronRepulsionDriver().compute(molecule, aux_basis)
+
+        drv = SimdRIJFockDriver()
+        bq = drv.compute_bq_vectors(molecule, basis, aux_basis,
+                                    metric.cholesky_inverse(), 0.0)
+
+        rng = np.random.default_rng(7)
+        cmat = np.ascontiguousarray(rng.standard_normal((nao, 4)))
+
+        packed = PackedMatrix(nao, 4, mat_t.general)
+        packed.from_numpy(cmat)
+
+        whole = drv.compute_w_vectors(bq, basis, aux_basis, packed, 0, naux)
+
+        first, last = 2, min(7, naux)
+
+        part = drv.compute_w_vectors(bq, basis, aux_basis, packed, first, last)
+
+        assert len(part) == last - first
+        assert np.max(np.abs(whole[first].to_numpy())) > 0.0
+
+        for j in range(last - first):
+            assert np.array_equal(part[j].to_numpy(), whole[first + j].to_numpy())

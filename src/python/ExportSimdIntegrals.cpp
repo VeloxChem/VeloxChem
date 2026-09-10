@@ -169,7 +169,16 @@ export_simdintegrals(py::module &m) -> void
              py::arg("bq_vectors"),
              py::arg("basis"),
              py::arg("aux_basis"),
-             py::arg("y_vector"));
+             py::arg("y_vector"))
+        .def("compute_w_vectors",
+             &CSimdRIJFockDriver::compute_w_vectors,
+             "Transforms one index of the B vectors into the molecular orbitals.",
+             py::arg("bq_vectors"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("coefficients"),
+             py::arg("qfirst"),
+             py::arg("qlast"));
 }
 
 }  // namespace vlx_simdintegrals

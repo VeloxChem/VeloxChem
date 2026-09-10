@@ -944,3 +944,224 @@ CSimdRIJFockDriver::compute_fock_matrix(const CSparseTensor   &bq_vectors,
 
     return compute_fock_matrix(bq_vectors, basis, aux_basis, yvector);
 }
+
+namespace {  // anonymous namespace
+
+/// @brief One auxiliary basis function of one block of the B vectors, and where
+/// its values sit in that block.
+struct TAuxEntry
+{
+    /// @brief The index of the block.
+    size_t block;
+
+    /// @brief The angular momentum of the basis function on the auxiliary side.
+    int momentum;
+
+    /// @brief The index of the basis function within its angular momentum.
+    size_t index;
+
+    /// @brief The row of the values of a combination, i.e. the angular component
+    /// and the atom of the auxiliary function among those of the combination.
+    size_t row;
+};
+
+}  // anonymous namespace
+
+auto
+CSimdRIJFockDriver::compute_w_vectors(const CSparseTensor   &bq_vectors,
+                                      const CMolecularBasis &basis,
+                                      const CMolecularBasis &aux_basis,
+                                      const CPackedMatrix   &coefficients,
+                                      const size_t           qfirst,
+                                      const size_t           qlast) const -> std::vector<CPackedMatrix>
+{
+    const auto nao = basis.dimensions_of_basis();
+
+    const auto naux = aux_basis.dimensions_of_basis();
+
+    errors::assertMsgCritical(coefficients.get_type() == mat_t::general,
+                              std::string("RIJFockDriver: The orbital coefficients must be a general matrix"));
+
+    errors::assertMsgCritical(coefficients.number_of_rows() == nao,
+                              std::string("RIJFockDriver: The orbital coefficients do not match the molecular basis"));
+
+    errors::assertMsgCritical((qfirst <= qlast) && (qlast <= naux),
+                              std::string("RIJFockDriver: The range of the auxiliary basis is out of range"));
+
+    const auto nocc = coefficients.number_of_columns();
+
+    const auto nrange = qlast - qfirst;
+
+    std::vector<CPackedMatrix> wvectors;
+
+    wvectors.reserve(nrange);
+
+    for (size_t q = 0; q < nrange; q++)
+    {
+        wvectors.emplace_back(nao, nocc, mat_t::general);
+
+        wvectors.back().zero();
+    }
+
+    if ((nrange == 0) || (nocc == 0)) return wvectors;
+
+    const auto indices = denseidx::index_functions(basis);
+
+    const auto starts = denseidx::make_dense_starts(basis);
+
+    const auto strides = denseidx::make_dense_strides(basis);
+
+    const auto nmoms = static_cast<size_t>(basis.max_angular_momentum() + 1);
+
+    const auto aux_indices = denseidx::index_functions(aux_basis);
+
+    const auto aux_starts = denseidx::make_dense_starts(aux_basis);
+
+    const auto aux_strides = denseidx::make_dense_strides(aux_basis);
+
+    const auto aux_nmoms = static_cast<size_t>(aux_basis.max_angular_momentum() + 1);
+
+    // NOTE: the blocks are gathered by the auxiliary basis function they carry, so
+    // that the work is divided over the functions rather than over the blocks. A
+    // block adds into the rows of every atom it touches, and two blocks of one
+    // atom basis group on the auxiliary side add into the same rows, so dividing
+    // over the blocks would have the threads writing over one another. Dividing
+    // over the auxiliary functions gives each thread a matrix of its own.
+
+    std::vector<std::vector<TAuxEntry>> entries(nrange);
+
+    const auto nblocks = bq_vectors.number_of_blocks();
+
+    for (size_t ib = 0; ib < nblocks; ib++)
+    {
+        const auto &block = bq_vectors.block(ib);
+
+        const auto &c_atoms = block.c_atoms();
+
+        const auto natoms = c_atoms.size();
+
+        if ((natoms == 0) || (block.a_atoms().empty())) continue;
+
+        for (const auto [lc, kc] : aux_indices[static_cast<size_t>(block.c_index())])
+        {
+            const auto ncomps_c = static_cast<size_t>(2 * lc + 1);
+
+            const auto lval_c = static_cast<size_t>(lc);
+
+            for (size_t mc = 0; mc < ncomps_c; mc++)
+            {
+                for (size_t n = 0; n < natoms; n++)
+                {
+                    const auto gq = aux_starts[static_cast<size_t>(c_atoms[n]) * aux_nmoms + lval_c] + kc +
+                                    mc * aux_strides[lval_c];
+
+                    if ((gq >= qfirst) && (gq < qlast))
+                    {
+                        entries[gq - qfirst].push_back(TAuxEntry{ib, lc, kc, mc * natoms + n});
+                    }
+                }
+            }
+        }
+    }
+
+    const auto *cvalues = coefficients.data();
+
+    const auto ntasks = static_cast<int>(nrange);
+
+#pragma omp parallel for schedule(dynamic) if (ntasks > 1)
+    for (int t = 0; t < ntasks; t++)
+    {
+        const auto iq = static_cast<size_t>(t);
+
+        auto *wvalues = wvectors[iq].data();
+
+        for (const auto &entry : entries[iq])
+        {
+            const auto &block = bq_vectors.block(entry.block);
+
+            const auto &a_atoms = block.a_atoms();
+
+            const auto &b_atoms = block.b_atoms();
+
+            const auto natoms = block.c_atoms().size();
+
+            // NOTE: the diagonal pairs of atoms lead the atom pairs of a block and
+            // are carried with the basis functions of both sides, so the sum over r
+            // reaches them from both. An off-diagonal pair is carried once and adds
+            // into the rows of the atoms of both of its sides.
+
+            size_t ndiag = 0;
+
+            while ((ndiag < a_atoms.size()) && (a_atoms[ndiag] == b_atoms[ndiag])) ndiag++;
+
+            const auto ncomps_c = static_cast<size_t>(2 * entry.momentum + 1);
+
+            const auto nq_cell = ncomps_c * natoms;
+
+            for (const auto [la, ia] : indices[static_cast<size_t>(block.a_index())])
+            {
+                for (const auto [lb, jb] : indices[static_cast<size_t>(block.b_index())])
+                {
+                    const auto npairs = block.number_of_pairs(la, ia, lb, jb, entry.momentum, entry.index);
+
+                    if (npairs == 0) continue;
+
+                    const auto ncomps_a = static_cast<size_t>(2 * la + 1);
+
+                    const auto ncomps_b = static_cast<size_t>(2 * lb + 1);
+
+                    const auto lval_a = static_cast<size_t>(la);
+
+                    const auto lval_b = static_cast<size_t>(lb);
+
+                    const auto *base = bq_vectors.values(entry.block, la, ia, lb, jb, entry.momentum, entry.index);
+
+                    for (size_t ma = 0; ma < ncomps_a; ma++)
+                    {
+                        for (size_t mb = 0; mb < ncomps_b; mb++)
+                        {
+                            const auto *values = base + ((ma * ncomps_b + mb) * nq_cell + entry.row) * npairs;
+
+                            for (size_t k = 0; k < npairs; k++)
+                            {
+                                const auto factor = values[k];
+
+                                if (factor == 0.0) continue;
+
+                                const auto irow = starts[static_cast<size_t>(a_atoms[k]) * nmoms + lval_a] + ia +
+                                                  ma * strides[lval_a];
+
+                                const auto rrow = starts[static_cast<size_t>(b_atoms[k]) * nmoms + lval_b] + jb +
+                                                  mb * strides[lval_b];
+
+                                auto       *wrow = wvalues + irow * nocc;
+
+                                const auto *crow = cvalues + rrow * nocc;
+
+#pragma omp simd
+                                for (size_t s = 0; s < nocc; s++)
+                                {
+                                    wrow[s] += factor * crow[s];
+                                }
+
+                                if (k < ndiag) continue;
+
+                                auto       *wrow_t = wvalues + rrow * nocc;
+
+                                const auto *crow_t = cvalues + irow * nocc;
+
+#pragma omp simd
+                                for (size_t s = 0; s < nocc; s++)
+                                {
+                                    wrow_t[s] += factor * crow_t[s];
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    return wvectors;
+}
