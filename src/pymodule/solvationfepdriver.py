@@ -562,10 +562,19 @@ class SolvationFepDriver:
                             elif self.stage == 2:
                                 force.setParticleParameters(i, 0, 0, 0)
 
-                    # Handle exceptions (interaction exclusions)
+                    # Handle exceptions (interaction exclusions and 1-4 scaling)
                     for i in range(force.getNumExceptions()):
                         p1, p2, ch, si, ep = force.getExceptionParameters(i)
                         gsc_force.addExclusion(p1, p2)
+                        
+                        # Scale the base NonbondedForce exception if it involves the alchemical region
+                        if p1 in alchemical_region or p2 in alchemical_region:
+                            if self.stage == 1:
+                                # Scale down the charge product and epsilon linearly
+                                force.setExceptionParameters(i, p1, p2, ch * (1 - lambda_val), si, ep * (1 - lambda_val))
+                            elif self.stage == 2:
+                                # Remove the nonbonded interaction entirely
+                                force.setExceptionParameters(i, p1, p2, 0, si, 0)
 
             # Add interaction group for GSC potential
             gsc_force.addInteractionGroup(alchemical_region, chemical_region)
@@ -620,10 +629,17 @@ class SolvationFepDriver:
                         elif self.stage == 4:
                             force.setParticleParameters(i, 0, 0, 0)
 
-                    # Handle exceptions (interaction exclusions)
+                    # Handle exceptions (interaction exclusions and 1-4 scaling)
                     for i in range(force.getNumExceptions()):
                         p1, p2, ch, si, ep = force.getExceptionParameters(i)
                         gsc_force.addExclusion(p1, p2)
+                        # Scale the base NonbondedForce exception for the vacuum stages
+                        if self.stage == 3:
+                            # Scale down the charge product and epsilon linearly
+                            force.setExceptionParameters(i, p1, p2, ch * (1 - lambda_val), si, ep * (1 - lambda_val))
+                        elif self.stage == 4:
+                            # Remove the nonbonded interaction entirely
+                            force.setExceptionParameters(i, p1, p2, 0, si, 0)
 
             vacuum_system.addForce(gsc_force)
             vacuum_systems.append(vacuum_system)
@@ -634,7 +650,7 @@ class SolvationFepDriver:
         """
         Define the Gaussian softcore potential.
         """
-        gsc_energy = 'lambda * alpha * exp(-beta * (r/sigma)^x); sigma = 0.5 * (sigma1 + sigma2);'
+        gsc_energy = 'lambda * alpha * exp(-beta * (r/Rmin)^x); Rmin = 1.122462 * sigma; sigma = 0.5 * (sigma1 + sigma2);'
         gsc_force = mm.CustomNonbondedForce(gsc_energy)
         gsc_force.addGlobalParameter('lambda', lambda_val)
         gsc_force.addGlobalParameter('alpha', self.alpha)
