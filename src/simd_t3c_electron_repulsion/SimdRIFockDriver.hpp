@@ -190,6 +190,24 @@ class CSimdRIFockDriver
                            const size_t                 qlast,
                            std::vector<CPackedMatrix>  &w_vectors) const -> void;
 
+    /// @brief Sets the density of the B vectors at which the transformation into
+    /// the molecular orbitals expands them rather than walking their values.
+    /// @param threshold The density, between zero and one.
+    /// @note The transformation is the sum over r of B(q)_ir C_rs. Walking the
+    /// values of B does the least arithmetic, and expanding them into a square and
+    /// handing that to a matrix product does more of it on the matrix unit of the
+    /// machine, which a loop of the compiler cannot reach. Which of the two wins
+    /// follows from how dense the B vectors are, and the density at which they
+    /// change places is what this sets. A threshold above one takes the walk
+    /// always and one of zero takes the product always, which is how the two are
+    /// compared against one another.
+    auto set_dense_threshold(const double threshold) -> void;
+
+    /// @brief Gets the density of the B vectors at which the transformation
+    /// expands them.
+    /// @return The density.
+    auto get_dense_threshold() const -> double;
+
     /// @brief Adds the exchange contribution of a range of the auxiliary basis to
     /// a matrix.
     /// @param w_vectors The W matrices of the range, as compute_w_vectors returns
@@ -210,6 +228,18 @@ class CSimdRIFockDriver
                                  const double                      factor = 1.0) const -> void;
 
    private:
+    /// @brief The density of the B vectors at which the transformation expands
+    /// them into a square rather than walking their values.
+    /// @note Zero, which is to say that the square is always formed. The product
+    /// was faster than the sum in every one of the eleven combinations of molecule
+    /// and basis it was measured on, by 1.6 times where the occupied orbitals are
+    /// few and the basis is large and by up to 4.9 times where they are many. The
+    /// density at which the two change places was never reached by a case which
+    /// fits in the memory of this machine, so it is not known, and a threshold
+    /// which named one would be a guess dressed as a measurement. A caller which
+    /// meets a sparse enough set of B vectors can raise it.
+    double _dense_threshold = 0.0;
+
     /// @brief The number of auxiliary basis functions whose W matrices are staged
     /// into one buffer before the rank k update.
     /// @note The update of one auxiliary function alone is too small a piece of

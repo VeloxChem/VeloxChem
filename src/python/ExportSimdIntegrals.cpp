@@ -183,6 +183,11 @@ export_simdintegrals(py::module &m) -> void
              py::arg("coefficients"),
              py::arg("qfirst"),
              py::arg("qlast"))
+        .def("set_dense_threshold", &CSimdRIFockDriver::set_dense_threshold,
+             "Sets the density at which the transformation expands the B vectors.",
+             py::arg("threshold"))
+        .def("get_dense_threshold", &CSimdRIFockDriver::get_dense_threshold,
+             "Gets the density at which the transformation expands the B vectors.")
         .def("compute_exchange_matrix",
              &CSimdRIFockDriver::compute_exchange_matrix,
              "Adds the exchange contribution of a range of the auxiliary basis to a matrix.",

@@ -1070,6 +1070,154 @@ CSimdRIFockDriver::compute_w_vectors(const CSparseTensor        &bq_vectors,
 
     const auto ntasks = static_cast<int>(nrange);
 
+    // NOTE: a threshold of zero or less takes the product always and one above one
+    // takes the sum always, and neither needs the density, which costs a walk over
+    // the combinations of every block to answer.
+
+    auto use_dense = (_dense_threshold <= 0.0);
+
+    if ((_dense_threshold > 0.0) && (_dense_threshold <= 1.0))
+    {
+        // NOTE: an off-diagonal pair of atoms is held once and fills two places of
+        // the square, and a diagonal pair is held with the basis functions of both
+        // sides and fills one. Counting the values twice over would put the density
+        // above one, which a fraction cannot be.
+
+        size_t filled = 0;
+
+        for (size_t ib = 0; ib < bq_vectors.number_of_blocks(); ib++)
+        {
+            const auto &block = bq_vectors.block(ib);
+
+            const auto &a_atoms = block.a_atoms();
+
+            const auto &b_atoms = block.b_atoms();
+
+            const auto natoms = block.c_atoms().size();
+
+            if ((a_atoms.empty()) || (natoms == 0)) continue;
+
+            size_t ndiag = 0;
+
+            while ((ndiag < a_atoms.size()) && (a_atoms[ndiag] == b_atoms[ndiag])) ndiag++;
+
+            for (const auto [la, ia] : indices[static_cast<size_t>(block.a_index())])
+            {
+                for (const auto [lb, jb] : indices[static_cast<size_t>(block.b_index())])
+                {
+                    for (const auto [lc, kc] : aux_indices[static_cast<size_t>(block.c_index())])
+                    {
+                        const auto npairs = block.number_of_pairs(la, ia, lb, jb, lc, kc);
+
+                        if (npairs == 0) continue;
+
+                        const auto ncomps = static_cast<size_t>((2 * la + 1) * (2 * lb + 1) * (2 * lc + 1));
+
+                        const auto diagonal = std::min(ndiag, npairs);
+
+                        filled += (2 * npairs - diagonal) * natoms * ncomps;
+                    }
+                }
+            }
+        }
+
+        const auto density = (naux > 0) ? static_cast<double>(filled) / (static_cast<double>(naux) *
+                                                                        static_cast<double>(nao) *
+                                                                        static_cast<double>(nao))
+                                        : 0.0;
+
+        use_dense = (density >= _dense_threshold);
+    }
+
+    if (use_dense)
+    {
+        // NOTE: the values of one auxiliary function are scattered into a square
+        // and the square is handed to a matrix product. That is more arithmetic
+        // than the sum below does, and the matrix unit of the machine runs it
+        // several times faster than a loop of the compiler runs the sum, which is
+        // why the trade is worth taking wherever the B vectors are not sparse.
+
+#pragma omp parallel
+        {
+            std::vector<double> square(nao * nao, 0.0);
+
+#pragma omp for schedule(dynamic)
+            for (int t = 0; t < ntasks; t++)
+            {
+                const auto iq = static_cast<size_t>(t);
+
+                std::fill(square.begin(), square.end(), 0.0);
+
+                for (const auto &entry : entries[iq])
+                {
+                    const auto &block = bq_vectors.block(entry.block);
+
+                    const auto &a_atoms = block.a_atoms();
+
+                    const auto &b_atoms = block.b_atoms();
+
+                    const auto natoms = block.c_atoms().size();
+
+                    size_t ndiag = 0;
+
+                    while ((ndiag < a_atoms.size()) && (a_atoms[ndiag] == b_atoms[ndiag])) ndiag++;
+
+                    const auto nq_cell = static_cast<size_t>(2 * entry.momentum + 1) * natoms;
+
+                    for (const auto [la, ia] : indices[static_cast<size_t>(block.a_index())])
+                    {
+                        for (const auto [lb, jb] : indices[static_cast<size_t>(block.b_index())])
+                        {
+                            const auto npairs = block.number_of_pairs(la, ia, lb, jb, entry.momentum, entry.index);
+
+                            if (npairs == 0) continue;
+
+                            const auto ncomps_a = static_cast<size_t>(2 * la + 1);
+
+                            const auto ncomps_b = static_cast<size_t>(2 * lb + 1);
+
+                            const auto lval_a = static_cast<size_t>(la);
+
+                            const auto lval_b = static_cast<size_t>(lb);
+
+                            const auto *base =
+                                bq_vectors.values(entry.block, la, ia, lb, jb, entry.momentum, entry.index);
+
+                            for (size_t ma = 0; ma < ncomps_a; ma++)
+                            {
+                                for (size_t mb = 0; mb < ncomps_b; mb++)
+                                {
+                                    const auto *values = base + ((ma * ncomps_b + mb) * nq_cell + entry.row) * npairs;
+
+                                    for (size_t k = 0; k < npairs; k++)
+                                    {
+                                        const auto irow = starts[static_cast<size_t>(a_atoms[k]) * nmoms + lval_a] +
+                                                          ia + ma * strides[lval_a];
+
+                                        const auto rrow = starts[static_cast<size_t>(b_atoms[k]) * nmoms + lval_b] +
+                                                          jb + mb * strides[lval_b];
+
+                                        square[irow * nao + rrow] = values[k];
+
+                                        // an off-diagonal pair of atoms is held
+                                        // once and fills both halves of the square
+
+                                        if (k >= ndiag) square[rrow * nao + irow] = values[k];
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                _matrix_product(nao, nocc, nao, 1.0, square.data(), nao, cvalues, nocc, 0.0, w_vectors[iq].data(),
+                                nocc);
+            }
+        }
+
+        return;
+    }
+
 #pragma omp parallel for schedule(dynamic) if (ntasks > 1)
     for (int t = 0; t < ntasks; t++)
     {
@@ -1308,4 +1456,16 @@ CSimdRIFockDriver::compute_exchange_matrix(const std::vector<CPackedMatrix> &w_v
             packed[j] += factor * row[j];
         }
     }
+}
+
+auto
+CSimdRIFockDriver::set_dense_threshold(const double threshold) -> void
+{
+    _dense_threshold = threshold;
+}
+
+auto
+CSimdRIFockDriver::get_dense_threshold() const -> double
+{
+    return _dense_threshold;
 }

@@ -819,3 +819,61 @@ class TestSimdRIFockDriver:
         scale = float(np.max(np.abs(combined)))
 
         assert np.max(np.abs(combined - (coulomb - exchange))) / scale < 1.0e-12
+
+    def test_both_forms_of_the_transformation_agree(self, molecule):
+        """W is formed either by walking the values of the B vectors or by expanding
+        them into a square and handing that to a matrix product. Which is taken
+        follows from how dense they are, and the two must give the same matrices.
+        The product is the default, so without this the sum would go unexercised."""
+
+        total = 0
+
+        for la, lb, lc in ((0, 0, 0), (1, 0, 1), (1, 1, 1), (2, 1, 2)):
+
+            basis, aux_basis = MolecularBasis(), MolecularBasis()
+
+            for identifier, momentum in zip((8, 1, 7, 6), (la, la, lb, lb)):
+                basis.add(self.one_function_basis(momentum, identifier))
+
+            for identifier in (8, 1, 7, 6):
+                aux_basis.add(self.one_function_basis(lc, identifier))
+
+            nao = basis.get_dimensions_of_basis()
+            naux = aux_basis.get_dimensions_of_basis()
+
+            metric = SimdTwoCenterElectronRepulsionDriver().compute(molecule, aux_basis)
+
+            drv = SimdRIFockDriver()
+
+            # the default takes the product, so the sum is what needs asking for
+
+            assert drv.get_dense_threshold() == 0.0
+
+            bq = drv.compute_bq_vectors(molecule, basis, aux_basis,
+                                        metric.cholesky_inverse(), 0.0)
+
+            rng = np.random.default_rng(89 + nao)
+            cmat = np.ascontiguousarray(rng.standard_normal((nao, 4)))
+
+            coeffs = PackedMatrix(nao, 4, mat_t.general)
+            coeffs.from_numpy(cmat)
+
+            matrices = {}
+
+            for tag, threshold in (('product', 0.0), ('sum', 2.0)):
+                drv.set_dense_threshold(threshold)
+                wvecs = drv.compute_w_vectors(bq, basis, aux_basis, coeffs, 0, naux)
+                matrices[tag] = np.stack([w.to_numpy(max_memory=8.0) for w in wvecs])
+
+            scale = max(float(np.max(np.abs(matrices['sum']))), 1.0)
+
+            assert np.max(np.abs(matrices['sum'])) > 0.0
+
+            assert np.max(np.abs(matrices['product'] - matrices['sum'])) / scale < 1.0e-12, (
+                f"({LABELS[la]}{LABELS[lb]}|{LABELS[lc]}) the two forms disagree")
+
+            total += matrices['sum'].size
+
+        # NOTE: the four combinations visited a couple of thousand elements of W
+        # when this was written, over both forms of the transformation.
+        assert total > 2000
