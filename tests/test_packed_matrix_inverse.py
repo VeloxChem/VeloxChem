@@ -82,3 +82,40 @@ class TestPackedMatrixInverse:
         inverse = self._to_packed(dense).invert().to_numpy()
 
         assert np.allclose(inverse, np.linalg.inv(dense), rtol=1.0e-8, atol=1.0e-10)
+
+    def test_cholesky_inverse(self):
+        """The inverted Cholesky factor, which is what the fitting needs."""
+
+        for ndim in [1, 2, 3, 7, 32, 65]:
+
+            dense = self._random_spd(ndim, seed=ndim)
+
+            factor = self._to_packed(dense).cholesky_inverse()
+
+            assert factor.get_type() == mat_t.lower_triangular
+
+            # the packed storage is the triangle, not the square
+
+            assert factor.number_of_elements() == ndim * (ndim + 1) // 2
+
+            computed = factor.to_numpy()
+
+            # nothing above the diagonal, rather than the mirrored elements
+
+            assert np.array_equal(computed, np.tril(computed))
+
+            assert np.allclose(computed, np.linalg.inv(np.linalg.cholesky(dense)),
+                               rtol=1.0e-10, atol=1.0e-12)
+
+    def test_cholesky_inverse_gives_the_inverse(self):
+        """L inverted, transposed, times itself is the inverted matrix. This is the
+        property the resolution of the identity rests on."""
+
+        for ndim in [3, 17, 64]:
+
+            dense = self._random_spd(ndim, seed=ndim + 1)
+
+            factor = self._to_packed(dense).cholesky_inverse().to_numpy()
+
+            assert np.allclose(factor.T @ factor, np.linalg.inv(dense),
+                               rtol=1.0e-9, atol=1.0e-11)

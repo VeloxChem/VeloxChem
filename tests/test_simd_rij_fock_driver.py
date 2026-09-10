@@ -306,3 +306,71 @@ class TestSimdRIJFockDriver:
 
         assert np.max(np.abs(y_sym)) > 0.0
         assert np.allclose(y_sym, y_gen, rtol=1.0e-12, atol=1.0e-12)
+
+    def test_resolution_of_identity_closes(self, molecule):
+        """The property the whole chain rests on: with L inverted, where the metric
+        is L L transposed, the B vectors satisfy
+
+            sum over q of B(q)_ij B(q)_kl = sum over p, t of (ij|p) Jinv_pt (kl|t)
+
+        which is what makes F = sum over q of B(q) Y(q) the Coulomb matrix. The full
+        inverse of the metric does not have this property, and the second assertion
+        below records that, so the two are never confused again.
+        """
+
+        compared = 0
+
+        for la, lb, lc in ((0, 0, 0), (1, 0, 1), (1, 1, 2), (2, 1, 1)):
+
+            basis, aux_basis = MolecularBasis(), MolecularBasis()
+
+            for identifier, momentum in zip((8, 1, 7, 6), (la, la, lb, lb)):
+                basis.add(self.one_function_basis(momentum, identifier))
+
+            for identifier in (8, 1, 7, 6):
+                aux_basis.add(self.one_function_basis(lc, identifier))
+
+            nao = basis.get_dimensions_of_basis()
+            naux = aux_basis.get_dimensions_of_basis()
+
+            maps = self.dense_maps(basis, molecule)
+            aux_maps = self.dense_maps(aux_basis, molecule)
+
+            metric = SimdTwoCenterElectronRepulsionDriver().compute(molecule, aux_basis)
+
+            integrals = SimdThreeCenterElectronRepulsionDriver().compute(
+                molecule, basis, aux_basis, 0.0)
+
+            dense_ints, _ = self.expand(integrals, basis, aux_basis, maps, aux_maps, nao, naux)
+
+            target = np.einsum('ijp,pt,klt->ijkl', dense_ints,
+                               np.linalg.inv(metric.to_numpy(max_memory=8.0)), dense_ints)
+
+            scale = float(np.max(np.abs(target)))
+
+            drv = SimdRIJFockDriver()
+
+            bq = drv.compute_bq_vectors(molecule, basis, aux_basis,
+                                        metric.cholesky_inverse(), 0.0)
+
+            dense_bq, visited = self.expand(bq, basis, aux_basis, maps, aux_maps, nao, naux)
+
+            closes = np.einsum('ijq,klq->ijkl', dense_bq, dense_bq)
+
+            compared += visited
+
+            assert np.max(np.abs(closes - target)) / scale < 1.0e-12, (
+                f"({LABELS[la]}{LABELS[lb]}|{LABELS[lc]}) does not close")
+
+            # the full inverse is the wrong matrix here, and wrong by order one
+            # rather than subtly, which is what makes this worth asserting
+
+            wrong = drv.compute_bq_vectors(molecule, basis, aux_basis, metric.invert(), 0.0)
+
+            dense_wrong, _ = self.expand(wrong, basis, aux_basis, maps, aux_maps, nao, naux)
+
+            missed = np.einsum('ijq,klq->ijkl', dense_wrong, dense_wrong)
+
+            assert np.max(np.abs(missed - target)) / scale > 1.0e-2
+
+        assert compared > 0

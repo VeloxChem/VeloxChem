@@ -259,8 +259,15 @@ CSimdRIJFockDriver::compute_bq_vectors(const CMolecule        &molecule,
     errors::assertMsgCritical((inverse_metric.number_of_rows() == naux) && (inverse_metric.number_of_columns() == naux),
                               std::string("RIJFockDriver: The inverse metric does not match the auxiliary basis"));
 
-    errors::assertMsgCritical(inverse_metric.get_type() == mat_t::symmetric,
-                              std::string("RIJFockDriver: The inverse metric must be symmetric"));
+    // NOTE: the metric is read as at(q, p), so the B vectors are the sum over p of
+    // M_qp times the integrals of p. A symmetric matrix makes the two orders of the
+    // index the same, and a lower triangular one does not: the inverted Cholesky
+    // factor L, with the matrix equal to L L transposed, is what makes B transposed
+    // times B the inverse of the matrix and closes the Coulomb matrix of the fitting.
+
+    errors::assertMsgCritical((inverse_metric.get_type() == mat_t::symmetric) ||
+                                  (inverse_metric.get_type() == mat_t::lower_triangular),
+                              std::string("RIJFockDriver: The inverse metric must be symmetric or lower triangular"));
 
     // the blocks of atom pairs, which both the integrals and the B vectors carry
 

@@ -55,6 +55,23 @@ namespace packlin {  // packlin namespace
 /// twice the dense matrix.
 auto invert(const CPackedMatrix &matrix) -> CPackedMatrix;
 
+/// @brief Inverts the Cholesky factor of a symmetric positive definite matrix
+/// stored in the packed format.
+/// @param matrix The symmetric positive definite matrix to factorize.
+/// @return The inverse of the lower triangular Cholesky factor, in the packed
+/// format, as a lower triangular matrix.
+/// @note The matrix is factorized as L L transposed, and the returned matrix is
+/// L inverted. It is what the resolution of the identity needs: the B vectors
+/// formed with it satisfy B transposed times B equal to the inverse of the
+/// matrix, which is what makes the Coulomb matrix of the fitting close.
+/// @note The factorization costs a third of the cube of the dimensions and the
+/// inversion of the factor another third, so this is cheaper than invert, which
+/// pays a further third to form the whole inverse.
+/// @note The matrix must be positive definite, which the metrics of the fitting
+/// bases are. There is no fallback of the kind invert has, as a matrix which is
+/// not positive definite has no Cholesky factor to invert.
+auto cholesky_inverse(const CPackedMatrix &matrix) -> CPackedMatrix;
+
 }  // namespace packlin
 
 #endif /* PackedLinearAlgebra_hpp */

@@ -120,6 +120,7 @@ export_math(py::module &m) -> void
     py::enum_<mat_t>(m, "mat_t")
         .value("symmetric", mat_t::symmetric)
         .value("antisymmetric", mat_t::antisymmetric)
+        .value("lower_triangular", mat_t::lower_triangular)
         .value("general", mat_t::general);
     // clang-format on
 

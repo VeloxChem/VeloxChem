@@ -359,6 +359,13 @@ make_pattern(const CMolecule       &molecule,
              const diagstor         storage,
              const size_t           block_size = 0) -> CSparsityPattern
 {
+    // NOTE: a lower triangular quantity is stored by CPackedMatrix alone. A sparse
+    // quantity reconstructs both halves of a matrix from the triangle it keeps,
+    // which would turn the zeros above the diagonal into the elements below it.
+
+    errors::assertMsgCritical(mat_type != mat_t::lower_triangular,
+                              std::string("SparsityPattern.make_pattern: A lower triangular quantity is not supported"));
+
     // NOTE: a symmetric or antisymmetric quantity needs the upper triangle of the
     // atom basis pair groups only, while a general one needs their full direct
     // product, which the two molecular bases factory delivers even when handed the

@@ -82,6 +82,14 @@ auto dsytrf_(const char          *uplo,
              const lapack_int_t  *lwork,
              lapack_int_t        *info) -> void;
 
+/// @brief Computes the inverse of a triangular matrix.
+auto dtrtri_(const char         *uplo,
+             const char         *diag,
+             const lapack_int_t *n,
+             double             *a,
+             const lapack_int_t *lda,
+             lapack_int_t       *info) -> void;
+
 /// @brief Computes a general matrix product.
 auto dgemm_(const char         *transa,
             const char         *transb,

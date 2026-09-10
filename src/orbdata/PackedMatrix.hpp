@@ -289,6 +289,12 @@ class CPackedMatrix
             errors::assertMsgCritical(false, std::string("PackedMatrix.at: Index of element is out of range"));
         }
 
+        // NOTE: a lower triangular matrix shares the storage of a symmetric one,
+        // but its elements above the diagonal are zero rather than the elements
+        // below it, so they are not read from the triangle which is stored.
+
+        if ((_type == mat_t::lower_triangular) && (irow < icol)) return 0.0;
+
         const auto fval = _values[index(irow, icol)];
 
         return ((_type == mat_t::antisymmetric) && (irow < icol)) ? -fval : fval;
@@ -373,6 +379,13 @@ class CPackedMatrix
             const auto *packed = _values.data() + irow * (irow + 1) / 2;
 
             std::copy(packed, packed + irow + 1, row);
+
+            if (_type == mat_t::lower_triangular)
+            {
+                std::fill(row + irow + 1, row + _ncols, 0.0);
+
+                continue;
+            }
 
             for (size_t j = irow + 1; j < _ncols; j++)
             {

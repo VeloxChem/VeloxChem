@@ -206,7 +206,11 @@ export_packed(py::module &m) -> void
         .def(
             "invert",
             [](const CPackedMatrix &self) -> CPackedMatrix { return packlin::invert(self); },
-            "Gets the inverted matrix, which is assumed to exist.");
+            "Gets the inverted matrix, which is assumed to exist.")
+        .def(
+            "cholesky_inverse",
+            [](const CPackedMatrix &self) -> CPackedMatrix { return packlin::cholesky_inverse(self); },
+            "Gets the inverse of the lower triangular Cholesky factor of the matrix.");
 }
 
 }  // namespace vlx_packed

@@ -238,3 +238,100 @@ invert(const CPackedMatrix &matrix) -> CPackedMatrix
 }
 
 }  // namespace packlin
+
+namespace packlin {  // packlin namespace
+
+/// @brief Inverts the Cholesky factor of the symmetric matrix held in the dense
+/// array, in place.
+/// @param values The values of the dense matrix, as a row major array of ndim
+/// rows and ndim columns, whose lower triangle is overwritten by the inverted
+/// factor.
+/// @param ndim The number of rows of matrix.
+static auto
+_invert_dense_factor(double *values, const size_t ndim) -> void
+{
+#ifdef VLX_USE_MATHLIB
+
+    // NOTE: the array is row major and the library is column major, so the upper
+    // triangle of the library is the lower triangle of the array. The
+    // factorization of the upper triangle therefore leaves the lower triangle of
+    // the array holding L, with the matrix equal to L L transposed, and the
+    // inversion of that triangle leaves it holding L inverted.
+
+    const char uplo = 'U';
+
+    const char diag = 'N';
+
+    auto ndim_arg = static_cast<lapack_int_t>(ndim);
+
+    lapack_int_t info = 0;
+
+    dpotrf_(&uplo, &ndim_arg, values, &ndim_arg, &info);
+
+    errors::assertMsgCritical(info >= 0, "PackedMatrix Cholesky inversion: Invalid argument of the factorization");
+
+    errors::assertMsgCritical(info == 0, "PackedMatrix Cholesky inversion: The matrix is not positive definite");
+
+    dtrtri_(&uplo, &diag, &ndim_arg, values, &ndim_arg, &info);
+
+    errors::assertMsgCritical(info == 0, "PackedMatrix Cholesky inversion: The factor is singular");
+
+#else
+
+    const auto nrows = static_cast<Eigen::Index>(ndim);
+
+    // NOTE: the array is mapped as column major, which is the transposed matrix
+    // and is the matrix itself, as it is symmetric. Eigen factorizes it as L L
+    // transposed with L in the column major lower triangle, which is the upper
+    // triangle of the row major array, so the factor is transposed into the lower
+    // triangle the packed matrix stores.
+
+    Eigen::Map<Eigen::MatrixXd> matrix(values, nrows, nrows);
+
+    Eigen::LLT<Eigen::Ref<Eigen::MatrixXd>> llt(matrix);
+
+    errors::assertMsgCritical(llt.info() == Eigen::Success,
+                              "PackedMatrix Cholesky inversion: The matrix is not positive definite");
+
+    auto factor = Eigen::MatrixXd::Identity(nrows, nrows).eval();
+
+    llt.matrixL().solveInPlace(factor);
+
+    // NOTE: the inverted factor is column major and lower triangular, and the
+    // array is read as row major, so it is stored transposed.
+
+    for (Eigen::Index i = 0; i < nrows; i++)
+    {
+        for (Eigen::Index j = 0; j <= i; j++)
+        {
+            values[static_cast<size_t>(i) * ndim + static_cast<size_t>(j)] = factor(i, j);
+        }
+    }
+
+#endif /* VLX_USE_MATHLIB */
+}
+
+auto
+cholesky_inverse(const CPackedMatrix &matrix) -> CPackedMatrix
+{
+    errors::assertMsgCritical(matrix.get_type() == mat_t::symmetric,
+                              std::string("PackedMatrix Cholesky inversion: The matrix must be symmetric"));
+
+    const auto ndim = matrix.number_of_rows();
+
+    errors::assertMsgCritical(ndim > 0, std::string("PackedMatrix Cholesky inversion: The matrix must not be empty"));
+
+    auto dense = std::make_unique_for_overwrite<double[]>(ndim * ndim);
+
+    matrix.to_dense(dense.get());
+
+    _invert_dense_factor(dense.get(), ndim);
+
+    auto factor = CPackedMatrix(ndim, ndim, mat_t::lower_triangular);
+
+    factor.from_dense(dense.get());
+
+    return factor;
+}
+
+}  // namespace packlin
