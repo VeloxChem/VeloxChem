@@ -42,6 +42,7 @@ from ..veloxchemlib import mpi_master
 from ..outputstream import OutputStream
 from ..errorhandler import assert_msg_critical
 from . import core
+from . import openmmxml
 from . import printing
 
 try:
@@ -96,7 +97,7 @@ STAGE_FIELDS = {
     # the whole of the ordering rather than the part of it that owns state.
     Stage.ACTIVE_SITE: (),
     Stage.FITTED: ('_forcefield', ),
-    Stage.ENZYME: ('_enzyme_system', ),
+    Stage.ENZYME: ('_enzyme_system', '_enzyme_forcefield'),
 }
 
 
@@ -437,6 +438,7 @@ class MetalSiteForceFieldBuilder:
         self._hessian = None
         self._partial_charges = None
         self._enzyme_system = None
+        self._enzyme_forcefield = None
 
     @property
     def report_cutoff(self):
@@ -507,6 +509,15 @@ class MetalSiteForceFieldBuilder:
         """
 
         return self._enzyme_system
+
+    @property
+    def enzyme_forcefield(self):
+        """
+        The metal site written as an OpenMM force field, as
+        create_enzyme_forcefield returned it.
+        """
+
+        return self._enzyme_forcefield
 
     @property
     def protonated_topology(self):
@@ -1635,6 +1646,83 @@ class MetalSiteForceFieldBuilder:
         self._enter(Stage.ENZYME)
 
         return self._enzyme_system, self._protonated_topology
+
+    def create_enzyme_forcefield(self):
+        """
+        Writes the fitted metal site as an OpenMM force field XML.
+
+        The counterpart of create_enzyme_system and what a simulation
+        should be built from: that one puts the fitted terms onto one
+        System, which describes the topology it was built for and nothing
+        else, while this writes a force field that can be loaded beside
+        the protein force field to build whatever system is wanted --
+        solvated, extended, or rebuilt after any change to the structure.
+
+        The active site is moved into a residue of its own and the
+        metal-ligand contacts become real bonds of the topology, so the
+        system built from the file carries the 1-2 and 1-3 exclusions and
+        the 1-4 scaling that a bonded metal model should have. Everything
+        else -- every covalent term, every charge, every Lennard-Jones
+        parameter -- comes out exactly as create_enzyme_system leaves it.
+
+        Nothing expensive is triggered: it is an error to call this before
+        build_forcefield.
+
+        :return:
+            A dictionary holding the XML, the restructured topology, its
+            positions in Angstrom and the residue templates.
+        """
+
+        self._require('create_enzyme_forcefield', Stage.FITTED)
+
+        self._enzyme_forcefield = self._on_master(
+            self._create_enzyme_forcefield)
+        self._enter(Stage.ENZYME)
+
+        return self._enzyme_forcefield
+
+    def _create_enzyme_forcefield(self):
+        """
+        The work of create_enzyme_forcefield, on one rank.
+
+        The XML and the topology it is for are written together, since
+        neither says anything without the other: the templates are keyed
+        on the chain and residue id of a topology whose active site has
+        been moved into one residue.
+        """
+
+        result = openmmxml.create_enzyme_forcefield(
+            self._protonated_topology,
+            self._protonated_positions,
+            self._active_site,
+            self._forcefield,
+            partial_charges=self._partial_charges,
+            forcefield_files=self.protein_forcefield_files,
+            ostream=self.ostream)
+
+        self._save_intermediate(
+            openmmxml.SITE_XML_FILE,
+            lambda path: path.write_text(result['xml']))
+        self._save_intermediate(
+            openmmxml.SITE_TOPOLOGY_FILE, lambda path: mmapp.PDBFile.writeFile(
+                result['topology'],
+                # a bare list of numbers is written as Angstrom whatever
+                # the values mean, so the unit goes on here
+                result['positions'] * mmunit.angstrom,
+                str(path),
+                # the templates are keyed on chain and residue id, and
+                # PDBFile numbers the residues from one unless told to keep
+                # them, which would leave the file unable to load its own
+                # topology back
+                keepIds=True))
+
+        return {
+            'xml': result['xml'],
+            'topology': result['topology'],
+            'positions': result['positions'],
+            'templates': result['templates'],
+            'backbone_shift': result['backbone_shift'],
+        }
 
     def _create_enzyme_system(self):
         """

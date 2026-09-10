@@ -172,8 +172,8 @@ class MetalForceFieldManager:
             },
             'metal_shell': {
                 'bonds': {
-                    'rms': 0.25,
-                    'max': 0.5
+                    'rms': 0.5,
+                    'max': 1.0
                 }
             },
             'metal_beta_carbons': {
@@ -192,8 +192,8 @@ class MetalForceFieldManager:
             },
             'metal_shell': {
                 'bonds': {
-                    'rms': 0.5,
-                    'max': 1.0
+                    'rms': 1.0,
+                    'max': 1.5
                 }
             },
             'metal_beta_carbons': {

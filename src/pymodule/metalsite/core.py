@@ -4845,33 +4845,35 @@ def redistribute_charges(system,
     return cap_charge, shift
 
 
-def redistribute_backbone_charges(system,
-                                  topology,
-                                  active_site,
-                                  partial_charges,
-                                  ostream=None):
+def backbone_charge_shift(charge_of, topology, active_site, partial_charges):
     """
-    Restores the charge of the coordination region after the fitted
-    charges are written into a protein system.
+    Works out how much charge the coordination region loses when the fitted
+    charges replace the protein force field's own, and what each atom the
+    active site does not cover has to take on to give it back.
 
-    :param system:
-        The OpenMM system to modify in place.
+    Kept apart from redistribute_backbone_charges because the same
+    correction is applied in two places -- onto a built system, and into
+    the residue templates of an OpenMM force field XML -- and a rule
+    stated twice is a rule that drifts. Nothing here knows about a system:
+    the caller looks the protein charges up and hands over the lookup.
+
+    :param charge_of:
+        A callable taking a topology atom index and returning the charge
+        the protein force field gives that atom.
     :param topology:
-        The protonated topology the system was built from.
+        The protonated topology the active site was extracted from.
     :param active_site:
         The active site, for the map back to the topology.
     :param partial_charges:
-        The active site charges, with the capping hydrogens already folded in.
+        The active site charges, with the capping hydrogens already folded
+        in.
 
     :return:
-        The shift applied to each uncovered atom.
+        A dictionary holding the charges the active site covers, keyed by
+        topology index, the residues and atoms of the region they sit in,
+        the atoms of it the site does not cover, and the shift each of
+        those takes on.
     """
-
-    ostream = _stream(ostream)
-
-    assert_msg_critical('openmm' in sys.modules,
-                        'redistribute_backbone_charges: openmm '
-                        'is required')
 
     charges = np.asarray(partial_charges)
     caps = set(active_site['cap_indices'])
@@ -4900,10 +4902,68 @@ def redistribute_backbone_charges(system,
     ]
 
     assert_msg_critical(
-        not mismatched, 'redistribute_backbone_charges: the '
+        not mismatched, 'backbone_charge_shift: the '
         'atom map does not match this topology. Extract the active site '
         'from the same topology the system is built from; '
         'prepare_protein renumbers the atoms, so it must run first.')
+
+    residue_indices = {atoms[index].residue.index for index in covered}
+    region = [
+        atom for residue in topology.residues()
+        if residue.index in residue_indices for atom in residue.atoms()
+    ]
+    uncovered = [atom for atom in region if atom.index not in covered]
+
+    total_before = sum(charge_of(atom.index) for atom in region)
+    total_after = (sum(covered.values()) +
+                   sum(charge_of(atom.index) for atom in uncovered))
+    difference = total_before - total_after
+
+    assert_msg_critical(
+        len(uncovered) > 0 or abs(difference) < 1.0e-6,
+        'backbone_charge_shift: the '
+        f'coordination region is off by {difference:+.4f} e with no '
+        'uncovered atom to absorb it')
+
+    return {
+        'covered': covered,
+        'residue_indices': residue_indices,
+        'region': region,
+        'uncovered': uncovered,
+        'shift': difference / len(uncovered) if uncovered else 0.0,
+        'total_before': total_before,
+        'total_after': total_after,
+        'difference': difference,
+    }
+
+
+def redistribute_backbone_charges(system,
+                                  topology,
+                                  active_site,
+                                  partial_charges,
+                                  ostream=None):
+    """
+    Restores the charge of the coordination region after the fitted
+    charges are written into a protein system.
+
+    :param system:
+        The OpenMM system to modify in place.
+    :param topology:
+        The protonated topology the system was built from.
+    :param active_site:
+        The active site, for the map back to the topology.
+    :param partial_charges:
+        The active site charges, with the capping hydrogens already folded in.
+
+    :return:
+        The shift applied to each uncovered atom.
+    """
+
+    ostream = _stream(ostream)
+
+    assert_msg_critical('openmm' in sys.modules,
+                        'redistribute_backbone_charges: openmm '
+                        'is required')
 
     nonbonded = None
     for force in system.getForces():
@@ -4919,25 +4979,17 @@ def redistribute_backbone_charges(system,
         return nonbonded.getParticleParameters(index)[0].value_in_unit(
             mmunit.elementary_charge)
 
-    residue_indices = {atoms[index].residue.index for index in covered}
-    region = [
-        atom for residue in topology.residues()
-        if residue.index in residue_indices for atom in residue.atoms()
-    ]
-    uncovered = [atom for atom in region if atom.index not in covered]
+    correction = backbone_charge_shift(get_charge, topology, active_site,
+                                       partial_charges)
 
-    total_before = sum(get_charge(atom.index) for atom in region)
-    total_after = (sum(covered.values()) +
-                   sum(get_charge(atom.index) for atom in uncovered))
-    difference = total_before - total_after
-
-    assert_msg_critical(
-        len(uncovered) > 0 or abs(difference) < 1.0e-6,
-        'redistribute_backbone_charges: the '
-        f'coordination region is off by {difference:+.4f} e with no '
-        'uncovered atom to absorb it')
-
-    shift = difference / len(uncovered) if uncovered else 0.0
+    covered = correction['covered']
+    residue_indices = correction['residue_indices']
+    region = correction['region']
+    uncovered = correction['uncovered']
+    shift = correction['shift']
+    total_before = correction['total_before']
+    total_after = correction['total_after']
+    difference = correction['difference']
 
     for atom in region:
         parameters = nonbonded.getParticleParameters(atom.index)
@@ -4984,6 +5036,93 @@ def redistribute_backbone_charges(system,
     ostream.flush()
 
     return shift
+
+
+def rescale_14_exceptions(system, topology, coulomb14scale):
+    """
+    Puts the fitted charges into the 1-4 exceptions as well.
+
+    OpenMM works the exceptions out inside createSystem, from the charges
+    the protein force field gave the atoms, and writing the fitted charges
+    onto the particles afterwards leaves them behind: every 1-4
+    electrostatic interaction of the coordination region goes on being
+    scaled from the charge the fit replaced. Which pairs those are is
+    worked out the way createSystem works it out, from the bond graph --
+    a pair three bonds apart is scaled, anything closer is excluded
+    outright and has nothing to rescale.
+
+    :param system:
+        The OpenMM system to modify in place.
+    :param topology:
+        The topology the system was built from.
+    :param coulomb14scale:
+        The 1-4 electrostatic scaling of the protein force field.
+
+    :return:
+        The number of exceptions that were brought up to date.
+    """
+
+    assert_msg_critical('openmm' in sys.modules,
+                        'rescale_14_exceptions: openmm is required')
+
+    nonbonded = None
+    for force in system.getForces():
+        if isinstance(force, mm.NonbondedForce):
+            nonbonded = force
+            break
+
+    assert_msg_critical(
+        nonbonded is not None, 'rescale_14_exceptions: the system has no '
+        'nonbonded force to read exceptions from')
+
+    bonded = {}
+    for first, second in topology.bonds():
+        bonded.setdefault(first.index, set()).add(second.index)
+        bonded.setdefault(second.index, set()).add(first.index)
+
+    def charge_of(index):
+        return nonbonded.getParticleParameters(index)[0].value_in_unit(
+            mmunit.elementary_charge)
+
+    rescaled = 0
+    for index in range(nonbonded.getNumExceptions()):
+        first, second, charge_product, sigma, epsilon = (
+            nonbonded.getExceptionParameters(index))
+        if _bond_separation(bonded, first, second) != 3:
+            continue
+        updated = coulomb14scale * charge_of(first) * charge_of(second)
+        if abs(updated - charge_product.value_in_unit(
+                mmunit.elementary_charge**2)) > 1.0e-10:
+            rescaled += 1
+        nonbonded.setExceptionParameters(index, first, second, updated, sigma,
+                                         epsilon)
+
+    return rescaled
+
+
+def _bond_separation(bonded, first, second, limit=3):
+    """
+    How many bonds apart two atoms are, up to a limit.
+
+    :return:
+        The number of bonds on the shortest path, or limit + 1 when there
+        is none that short.
+    """
+
+    reached = {first}
+    frontier = [first]
+    for distance in range(1, limit + 1):
+        frontier = [
+            neighbour for atom in frontier
+            for neighbour in bonded.get(atom, ()) if neighbour not in reached
+        ]
+        if not frontier:
+            break
+        if second in frontier:
+            return distance
+        reached.update(frontier)
+
+    return limit + 1
 
 
 def create_enzyme_system(topology,
@@ -5048,6 +5187,17 @@ def create_enzyme_system(topology,
                          active_site,
                          partial_charges,
                          ostream=ostream)
+
+    # the exceptions were worked out from the protein force field's own
+    # charges, inside createSystem, and know nothing of the ones just
+    # written over them
+    for generator in openmm_ff.getGenerators():
+        if isinstance(generator, mmapp.forcefield.NonbondedGenerator):
+            rescaled = rescale_14_exceptions(system, topology,
+                                             generator.coulomb14scale)
+            ostream.print_info(
+                f'Brought {rescaled} 1-4 exception(s) up to date with the '
+                'fitted charges.')
 
     atom_map = active_site['atom_map']
     caps = set(active_site['cap_indices'])
