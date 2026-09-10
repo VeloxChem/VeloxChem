@@ -154,23 +154,13 @@ class CTripleSparsityPattern
 
 namespace sparsity {  // sparsity namespace
 
-/// @brief The number of blocks per thread aimed at when the target number of atom
-/// pairs of a block of a three-center quantity is chosen. It only ever raises the
-/// size above the floor below, which is what decides every molecule measured here.
-inline constexpr size_t triple_blocks_per_thread = 2;
-
-/// @brief The target number of atom pairs of a block of a three-center quantity.
-/// @note A block holds the buffer of the largest combination its atom bases carry,
-/// which for an (ii|l) combination is above half a million rows. The buffer is the
-/// rows times the atom pairs of the block, and one is held by every thread, so the
-/// atom pairs of a block are what bounds it: at thirty two the arena is 142 MB per
-/// thread, at two hundred and fifty six it is over a gigabyte. The size does not
-/// follow the number of the threads, as the parallelism comes from the combinations
-/// of a block and not from the blocks.
-inline constexpr size_t triple_min_block_size = 32;
-
-/// @brief The largest number of atom pairs of a block of a three-center quantity.
-inline constexpr size_t triple_max_block_size = 32;
+/// @brief The target number of atom pairs of a block of a three-center quantity when
+/// the caller does not choose one.
+/// @note A caller which knows the operator should choose the size itself, from the
+/// rows its largest combination needs and a budget for the buffer. This is what the
+/// callers which cannot do that fall back on. See the driver of the three-center
+/// Coulomb quantity for the rule.
+inline constexpr size_t triple_default_block_size = 32;
 
 /// @brief Selects the atom basis groups on c side which carry the given atoms.
 /// @param molecule The molecule the atoms belong to.
@@ -220,7 +210,8 @@ select_aux_groups(const CMolecule &molecule, const CMolecularBasis &aux_basis, c
 /// @note This is the half of the pattern which depends on the geometry and the bases
 /// alone, and not on the operator or the threshold.
 inline auto
-make_triple_blocks(const CMolecule &molecule, std::vector<CAtomBasisPairGroup> &groups) -> std::vector<CAtomBasisPairGroup>
+make_triple_blocks(const CMolecule &molecule, std::vector<CAtomBasisPairGroup> &groups, const size_t block_size)
+    -> std::vector<CAtomBasisPairGroup>
 {
     // NOTE: the atom basis pair groups are as many as the pairs of the unique atom
     // bases, so their number is set by the variety of the elements of the molecule
@@ -229,9 +220,14 @@ make_triple_blocks(const CMolecule &molecule, std::vector<CAtomBasisPairGroup> &
     // work below divides for any number of threads. Batching the c side does not do
     // this, as the cost of a block follows the atom pairs on the a and b sides.
 
-    const auto nblock_pairs = CAtomBasisPairGroup::make_block_size(groups, triple_blocks_per_thread, triple_min_block_size, triple_max_block_size);
+    // NOTE: the size does not follow the number of the threads. The parallelism of a
+    // three-center quantity comes from the combinations of basis functions of a block
+    // and not from the blocks, and the size is bounded by the buffer a combination
+    // needs rather than by the machine.
 
-    auto blocks = (nblock_pairs == 0) ? std::move(groups) : CAtomBasisPairGroup::divide(groups, nblock_pairs);
+    const auto nblock_pairs = (block_size == 0) ? triple_default_block_size : block_size;
+
+    auto blocks = CAtomBasisPairGroup::divide(groups, nblock_pairs);
 
     // NOTE: the atom pairs of all the blocks are ordered by interatomic distance
     // before the sparsity patterns are described, as the patterns are read off the
@@ -311,11 +307,12 @@ make_triple_pattern(const CMolecule        &molecule,
                     const B                &bound,
                     const double            threshold,
                     const mat_t             mat_type,
-                    const std::vector<int> &aux_atoms) -> CTripleSparsityPattern
+                    const std::vector<int> &aux_atoms,
+                    const size_t            block_size = 0) -> CTripleSparsityPattern
 {
     auto groups = (mat_type == mat_t::general) ? basis.basis_pair_groups(basis) : basis.basis_pair_groups();
 
-    auto blocks = make_triple_blocks(molecule, groups);
+    auto blocks = make_triple_blocks(molecule, groups, block_size);
 
     return describe_triples(blocks, select_aux_groups(molecule, aux_basis, aux_atoms), bound, threshold, mat_type);
 }
@@ -329,11 +326,12 @@ make_triple_pattern(const CMolecule       &molecule,
                     const CMolecularBasis &aux_basis,
                     const B               &bound,
                     const double           threshold,
-                    const mat_t            mat_type) -> CTripleSparsityPattern
+                    const mat_t            mat_type,
+                    const size_t           block_size = 0) -> CTripleSparsityPattern
 {
     auto groups = (mat_type == mat_t::general) ? basis.basis_pair_groups(basis) : basis.basis_pair_groups();
 
-    auto blocks = make_triple_blocks(molecule, groups);
+    auto blocks = make_triple_blocks(molecule, groups, block_size);
 
     return describe_triples(blocks, aux_basis.basis_groups(), bound, threshold, mat_type);
 }

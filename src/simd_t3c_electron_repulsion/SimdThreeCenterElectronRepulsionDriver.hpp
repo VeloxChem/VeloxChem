@@ -106,8 +106,13 @@ class CSimdThreeCenterElectronRepulsionDriver
     make_pattern(const CMolecule &molecule, const CMolecularBasis &basis, const CMolecularBasis &aux_basis,
                  const double threshold) const -> CTripleSparsityPattern
     {
-        return sparsity::make_triple_pattern(
-            molecule, basis, aux_basis, screenfunc::three_center_electron_repulsion_bound, threshold, mat_t::symmetric);
+        return sparsity::make_triple_pattern(molecule,
+                                             basis,
+                                             aux_basis,
+                                             screenfunc::three_center_electron_repulsion_bound,
+                                             threshold,
+                                             mat_t::symmetric,
+                                             _block_size(basis, aux_basis));
     }
 
     /// @brief Creates the sparsity pattern the driver computes in, for the given
@@ -123,7 +128,51 @@ class CSimdThreeCenterElectronRepulsionDriver
                                              screenfunc::three_center_electron_repulsion_bound,
                                              threshold,
                                              mat_t::symmetric,
-                                             atoms);
+                                             atoms,
+                                             _block_size(basis, aux_basis));
+    }
+
+    /// @brief The number of bytes of the buffer a thread may hold.
+    /// @note A thread holds one buffer, spanning the largest combination of basis
+    /// functions any block carries, and its size is the rows that combination needs
+    /// times the atom pairs of a block. The rows range over two orders of magnitude
+    /// with the angular momenta -- three thousand for cc-pVDZ against a fitting set,
+    /// above half a million for (ii|l) -- so a fixed number of atom pairs either
+    /// wastes the buffer of an ordinary combination or lets the buffer of an extreme
+    /// one run away. Bounding the bytes instead lets the atom pairs follow the rows.
+    static constexpr size_t _arena_budget = size_t{256} * 1024 * 1024;
+
+    /// @brief The largest number of atom pairs of a block.
+    /// @note Measured by sweeping the size at fourteen threads: caffeine in def2-TZVP
+    /// with the universal jfit set runs 99.4 ms at thirty two atom pairs and 92.2 at
+    /// two hundred and fifty six, tagrisso in def2-SVP with the jkfit set 417.3
+    /// against 310.8, and c60 in cc-pVDZ with its fitting set 1102.8 against 837.6.
+    /// The curve is flat from here to five hundred and twelve.
+    static constexpr size_t _max_block_size = 256;
+
+    /// @brief The smallest number of atom pairs of a block.
+    /// @note Reached only by a combination whose buffer is enormous, where the budget
+    /// above would otherwise ask for a block of a handful of atom pairs.
+    static constexpr size_t _min_block_size = 8;
+
+    /// @brief Gets the target number of atom pairs of a block.
+    /// @param basis The molecular basis on a and b sides.
+    /// @param aux_basis The auxiliary molecular basis on c side.
+    /// @return The number of atom pairs a block aims at.
+    /// @note The rows are those of the largest combination the bases can form, which
+    /// is the one of their highest angular momenta, as the rows a combination needs
+    /// do not decrease with any of the three.
+    static auto
+    _block_size(const CMolecularBasis &basis, const CMolecularBasis &aux_basis) -> size_t
+    {
+        const auto rows = simdt3ceri::number_of_buffer_rows(
+            basis.max_angular_momentum(), basis.max_angular_momentum(), aux_basis.max_angular_momentum());
+
+        if (rows == 0) return _max_block_size;
+
+        const auto npairs = _arena_budget / (rows * sizeof(double));
+
+        return std::min(std::max(npairs, _min_block_size), _max_block_size);
     }
 
     /// @brief Computes the integrals of a sparsity pattern and hands them to a
