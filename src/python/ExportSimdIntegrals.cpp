@@ -208,13 +208,15 @@ export_simdintegrals(py::module &m) -> void
              py::arg("basis"),
              py::arg("aux_basis"),
              py::arg("threshold"),
-             py::arg("memory_budget"))
+             py::arg("memory_budget"),
+             py::arg("metric_threshold") = 1.0e-12,
+             py::arg("use_inverse_square_root") = false)
         .def("compute",
              &CSimdRIJKFockDriver::compute,
-             "Computes the Fock matrix of a density and a set of orbitals.",
+             "Computes the Fock matrix, twice the Coulomb less the scaled exchange.",
              py::arg("density"),
              py::arg("coefficients"),
-             py::arg("exchange_factor"))
+             py::arg("exchange_scaling_factor"))
         .def("is_prepared", &CSimdRIJKFockDriver::is_prepared, "Checks that the driver has been prepared.")
         .def("get_bq_vectors", &CSimdRIJKFockDriver::get_bq_vectors,
              py::return_value_policy::reference_internal, "Gets the B vectors the driver holds.")

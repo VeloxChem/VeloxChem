@@ -92,9 +92,14 @@ class TestSimdRIJKFockDriver:
 
         fock = drv.compute_fock_matrix(bq, basis, aux_basis, density)
 
+        # the driver returns twice the Coulomb less the scaled exchange, which is
+        # the convention of a closed shell calculation
+
+        fock.scale(2.0)
+
         if factor != 0.0:
             wvecs = drv.compute_w_vectors(bq, basis, aux_basis, coeffs, 0, naux)
-            drv.compute_exchange_matrix(wvecs, fock, factor)
+            drv.compute_exchange_matrix(wvecs, fock, -factor)
 
         return fock.to_numpy(max_memory=8.0)
 
@@ -113,7 +118,7 @@ class TestSimdRIJKFockDriver:
 
             assert driver.is_prepared()
 
-            for factor in (-1.0, 0.0, -0.25):
+            for factor in (1.0, 0.0, 0.25):
 
                 computed = driver.compute(density, coeffs, factor).to_numpy(max_memory=8.0)
 
@@ -141,8 +146,8 @@ class TestSimdRIJKFockDriver:
         driver.prepare(molecule, basis, aux_basis, 0.0, 1 << 30)
 
         coulomb = driver.compute(density, coeffs, 0.0).to_numpy(max_memory=8.0)
-        full = driver.compute(density, coeffs, -1.0).to_numpy(max_memory=8.0)
-        quarter = driver.compute(density, coeffs, -0.25).to_numpy(max_memory=8.0)
+        full = driver.compute(density, coeffs, 1.0).to_numpy(max_memory=8.0)
+        quarter = driver.compute(density, coeffs, 0.25).to_numpy(max_memory=8.0)
 
         exchange = coulomb - full
 
@@ -168,9 +173,9 @@ class TestSimdRIJKFockDriver:
         driver = SimdRIJKFockDriver()
         driver.prepare(chain, basis, aux_basis, 0.0, 1 << 30)
 
-        computed = driver.compute(density, coeffs, -1.0).to_numpy(max_memory=8.0)
+        computed = driver.compute(density, coeffs, 1.0).to_numpy(max_memory=8.0)
 
-        expected = self.by_hand(chain, basis, aux_basis, density, coeffs, -1.0, 0.0)
+        expected = self.by_hand(chain, basis, aux_basis, density, coeffs, 1.0, 0.0)
 
         scale = float(np.max(np.abs(expected)))
 
@@ -209,3 +214,31 @@ class TestSimdRIJKFockDriver:
         driver = SimdRIJKFockDriver()
 
         assert not driver.is_prepared()
+
+    def test_either_metric_gives_the_same_fock_matrix(self, molecule):
+        """The inverted Cholesky factor and the inverted square root both close the
+        resolution of the identity, so the Fock matrix does not depend on which was
+        used. The flag takes the second when a caller wants it from the start."""
+
+        basis, aux_basis = self.bases((8, 1, 7, 6), (1, 1, 0, 0), 1)
+
+        nao = basis.get_dimensions_of_basis()
+
+        coeffs, density = self.orbitals(nao, 3, 71)
+
+        matrices = []
+
+        for use_root in (False, True):
+
+            driver = SimdRIJKFockDriver()
+            driver.prepare(molecule, basis, aux_basis, 0.0, 1 << 30,
+                           metric_threshold=1.0e-12,
+                           use_inverse_square_root=use_root)
+
+            matrices.append(driver.compute(density, coeffs, 1.0).to_numpy(max_memory=8.0))
+
+        assert np.max(np.abs(matrices[0])) > 0.0
+
+        scale = float(np.max(np.abs(matrices[0])))
+
+        assert np.max(np.abs(matrices[0] - matrices[1])) / scale < 1.0e-10

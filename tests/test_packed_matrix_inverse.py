@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 from veloxchem.veloxchemlib import PackedMatrix, mat_t
 
@@ -187,3 +188,21 @@ class TestPackedMatrixInverse:
         root = self._to_packed(dense).inverse_square_root(1.0e-12).to_numpy()
 
         assert np.linalg.matrix_rank(root) == ndim
+
+    def test_cholesky_inverse_refuses_an_indefinite_matrix(self):
+        """It has to be an exception. The resolution of the identity catches it and
+        inverts the square root instead, which it could not do if the interpreter
+        were ended."""
+
+        ndim = 12
+
+        rng = np.random.default_rng(83)
+
+        amat = rng.standard_normal((ndim, ndim))
+
+        dense = amat + amat.T
+
+        assert np.min(np.linalg.eigvalsh(dense)) < 0.0
+
+        with pytest.raises(RuntimeError, match="not positive definite"):
+            self._to_packed(dense).cholesky_inverse()

@@ -34,6 +34,7 @@
 #include "PackedLinearAlgebra.hpp"
 
 #include <memory>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -270,7 +271,14 @@ _invert_dense_factor(double *values, const size_t ndim) -> void
 
     errors::assertMsgCritical(info >= 0, "PackedMatrix Cholesky inversion: Invalid argument of the factorization");
 
-    errors::assertMsgCritical(info == 0, "PackedMatrix Cholesky inversion: The matrix is not positive definite");
+    // NOTE: this is an exception rather than a critical error, so that a caller
+    // which has another way of inverting the matrix, as the resolution of the
+    // identity has, can catch it and take that way instead of being ended.
+
+    if (info != 0)
+    {
+        throw std::runtime_error("PackedMatrix.cholesky_inverse: The matrix is not positive definite");
+    }
 
     dtrtri_(&uplo, &diag, &ndim_arg, values, &ndim_arg, &info);
 
@@ -290,8 +298,10 @@ _invert_dense_factor(double *values, const size_t ndim) -> void
 
     Eigen::LLT<Eigen::Ref<Eigen::MatrixXd>> llt(matrix);
 
-    errors::assertMsgCritical(llt.info() == Eigen::Success,
-                              "PackedMatrix Cholesky inversion: The matrix is not positive definite");
+    if (llt.info() != Eigen::Success)
+    {
+        throw std::runtime_error("PackedMatrix.cholesky_inverse: The matrix is not positive definite");
+    }
 
     auto factor = Eigen::MatrixXd::Identity(nrows, nrows).eval();
 

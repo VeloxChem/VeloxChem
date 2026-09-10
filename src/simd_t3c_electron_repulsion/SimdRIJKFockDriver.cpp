@@ -71,7 +71,9 @@ CSimdRIJKFockDriver::prepare(const CMolecule       &molecule,
                              const CMolecularBasis &basis,
                              const CMolecularBasis &aux_basis,
                              const double           threshold,
-                             const size_t           memory_budget) -> void
+                             const size_t           memory_budget,
+                             const double           metric_threshold,
+                             const bool             use_inverse_square_root) -> void
 {
     const auto memory = required_memory(molecule, basis, aux_basis, threshold);
 
@@ -97,7 +99,33 @@ CSimdRIJKFockDriver::prepare(const CMolecule       &molecule,
 
     _aux_basis = aux_basis;
 
-    _metric = packlin::cholesky_inverse(CSimdTwoCenterElectronRepulsionDriver().compute(molecule, aux_basis));
+    const auto two_center = CSimdTwoCenterElectronRepulsionDriver().compute(molecule, aux_basis);
+
+    // NOTE: both forms of the metric close the resolution of the identity, and the
+    // Cholesky factor costs an order of magnitude less, so it is tried first. A
+    // fitting basis which is close to linearly dependent has none, and the square
+    // root is inverted in its place, dropping the directions which carry nothing.
+
+    if (use_inverse_square_root)
+    {
+        _metric = packlin::inverse_square_root(two_center, metric_threshold);
+    }
+    else
+    {
+        try
+        {
+            _metric = packlin::cholesky_inverse(two_center);
+        }
+        catch (const std::runtime_error &)
+        {
+            errors::msg(std::string("RIJKFockDriver: The metric of the fitting basis has no Cholesky factor, so its "
+                                    "square root is inverted instead. This is a nearly linearly dependent fitting "
+                                    "basis."),
+                        "Warning");
+
+            _metric = packlin::inverse_square_root(two_center, metric_threshold);
+        }
+    }
 
     _bq_vectors = _drv.compute_bq_vectors(molecule, basis, aux_basis, _metric, threshold);
 
@@ -109,15 +137,19 @@ CSimdRIJKFockDriver::prepare(const CMolecule       &molecule,
 auto
 CSimdRIJKFockDriver::compute(const CPackedMatrix &density,
                              const CPackedMatrix &coefficients,
-                             const double         exchange_factor) -> CPackedMatrix
+                             const double         exchange_scaling_factor) -> CPackedMatrix
 {
     errors::assertMsgCritical(_prepared, std::string("RIJKFockDriver: The driver has not been prepared"));
 
-    // the Coulomb matrix, which the exchange is added onto
+    // NOTE: the density of a closed shell calculation is that of one spin, so the
+    // Coulomb matrix enters twice and the exchange once, scaled by the fraction of
+    // exact exchange the functional asks for.
 
     auto fock = _drv.compute_fock_matrix(_bq_vectors, _basis, _aux_basis, density);
 
-    if (exchange_factor == 0.0) return fock;
+    fock.scale(2.0);
+
+    if (exchange_scaling_factor == 0.0) return fock;
 
     const auto nao = _basis.dimensions_of_basis();
 
@@ -163,7 +195,7 @@ CSimdRIJKFockDriver::compute(const CPackedMatrix &density,
         {
             _drv.compute_w_vectors(_bq_vectors, _basis, _aux_basis, coefficients, first, last, _w_vectors);
 
-            _drv.compute_exchange_matrix(_w_vectors, fock, exchange_factor);
+            _drv.compute_exchange_matrix(_w_vectors, fock, -exchange_scaling_factor);
         }
         else
         {
@@ -171,7 +203,7 @@ CSimdRIJKFockDriver::compute(const CPackedMatrix &density,
 
             _drv.compute_w_vectors(_bq_vectors, _basis, _aux_basis, coefficients, first, last, tail);
 
-            _drv.compute_exchange_matrix(tail, fock, exchange_factor);
+            _drv.compute_exchange_matrix(tail, fock, -exchange_scaling_factor);
         }
     }
 

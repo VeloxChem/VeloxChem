@@ -56,6 +56,8 @@ from .matrix import Matrix
 from .aodensitymatrix import AODensityMatrix
 from .rifockdriver import RIFockDriver
 from .rijkfockdriver import RIJKFockDriver
+from .veloxchemlib import SimdRIJKFockDriver
+from .veloxchemlib import PackedMatrix
 from .fockdriver import FockDriver
 from .profiler import Profiler
 from .griddriver import GridDriver
@@ -221,6 +223,8 @@ class ScfDriver:
         self.ri_jk = False
         self.ri_auxiliary_basis = 'def2-universal-jfit'
         self.ri_metric_threshold = 1.0e-12
+        self.ri_jk_simd = False
+        self.ri_memory_budget = None
         self._ri_drv = None
 
         # dft
@@ -339,6 +343,10 @@ class ScfDriver:
                 'ri_auxiliary_basis': ('str', 'RI auxiliary basis set'),
                 'ri_metric_threshold':
                     ('float', 'linear dependence threshold for RI-JK metric'),
+                'ri_jk_simd':
+                    ('bool', 'use the SIMD RI-JK driver instead of the conventional one'),
+                'ri_memory_budget':
+                    ('float', 'memory the SIMD RI-JK driver may hold, in GB'),
                 'dispersion': ('bool', 'use D4 dispersion correction'),
                 'xcfun': ('str_upper', 'exchange-correlation functional'),
                 'grid_level': ('int', 'accuracy level of DFT grid (1-8)'),
@@ -1756,6 +1764,45 @@ class ScfDriver:
                                          self.ri_auxiliary_basis,
                                          k_metric=False,
                                          verbose=True)
+        elif self.ri_jk and self.ri_jk_simd:
+            # NOTE: the SIMD driver holds the whole of the B vectors on the rank
+            # which forms them, and the Fock matrices below are reduced over the
+            # ranks. Running it on more than one would multiply the result by the
+            # number of them, so it is refused rather than silently wrong.
+            assert_msg_critical(
+                self.nodes == 1, 'SCF driver: SIMD RI-JK is not yet ' +
+                'implemented for more than one MPI rank')
+
+            if isinstance(self.ri_auxiliary_basis, str):
+                basis_ri = MolecularBasis.read(molecule, self.ri_auxiliary_basis)
+            else:
+                basis_ri = MolecularBasis(self.ri_auxiliary_basis)
+
+            budget = self._get_ri_memory_budget()
+
+            self._ri_drv = SimdRIJKFockDriver()
+
+            needed = self._ri_drv.required_memory(molecule, ao_basis, basis_ri,
+                                                  self.eri_thresh)
+
+            self.ostream.print_info(
+                'Using the SIMD resolution of the identity (RI-JK) driver.')
+            self.ostream.print_info(
+                f'B vectors need {needed / (1024**3):.2f} GB of ' +
+                f'{budget / (1024**3):.2f} GB available.')
+            self.ostream.print_blank()
+            self.ostream.flush()
+
+            ri_prep_t0 = tm.time()
+
+            self._ri_drv.prepare(molecule, ao_basis, basis_ri, self.eri_thresh,
+                                 budget, self.ri_metric_threshold, False)
+
+            self.ostream.print_info(
+                f'B vectors for RI done in {tm.time() - ri_prep_t0:.2f} sec.')
+            self.ostream.print_blank()
+            self.ostream.flush()
+
         elif self.ri_jk:
             self._ri_drv = RIJKFockDriver(self.comm, self.ostream)
             self._ri_drv.metric_threshold = self.ri_metric_threshold
@@ -2459,6 +2506,61 @@ class ScfDriver:
 
         return npot_mat
 
+    def _simd_ri_jk_fock(self, density, exchange_scaling_factor):
+        """
+        Computes the closed shell Fock matrix with the SIMD RI-JK driver.
+
+        :param density:
+            The alpha density matrix as a numpy array.
+        :param exchange_scaling_factor:
+            The fraction of exact exchange.
+
+        :return:
+            The Fock matrix as a numpy array.
+        """
+
+        nao = density.shape[0]
+
+        # the occupied orbitals, which the exchange is formed from
+
+        nocc = int(np.sum(self.molecular_orbitals.occa_to_numpy()))
+
+        coeffs = PackedMatrix(nao, nocc, mat_t.general)
+        coeffs.from_numpy(
+            np.ascontiguousarray(
+                self.molecular_orbitals.alpha_to_numpy()[:, :nocc]))
+
+        packed_density = PackedMatrix(nao, nao, mat_t.symmetric)
+        packed_density.from_numpy(np.ascontiguousarray(density))
+
+        fock = self._ri_drv.compute(packed_density, coeffs,
+                                    exchange_scaling_factor)
+
+        return fock.to_numpy(max_memory=self._get_ri_memory_budget() / 1024**3)
+
+    def _get_ri_memory_budget(self):
+        """
+        Gets the memory the SIMD RI-JK driver may hold, in bytes.
+
+        :return:
+            The memory budget in bytes.
+        """
+
+        if self.ri_memory_budget is not None:
+            return int(self.ri_memory_budget * 1024**3)
+
+        # NOTE: the driver holds the B vectors for the whole calculation, so it is
+        # given a part of what is free rather than all of it. The rest is needed by
+        # the density, the orbitals and the matrices of the iteration.
+
+        try:
+            import psutil
+            available = psutil.virtual_memory().available
+        except ImportError:
+            available = 8 * 1024**3
+
+        return int(0.5 * available)
+
     def _prepare_for_ri_fock_build(self, fock_type):
         """
         Performs RI-specific SCF checks and broadcasts molecular orbitals when
@@ -2552,6 +2654,13 @@ class ScfDriver:
         if self.ri_coulomb and fock_type == 'j':
             fock_mat = self._ri_drv.compute(den_mat_for_fock, 'j')
             fock_mat_np = fock_mat.to_numpy()
+        elif self.ri_jk and self.ri_jk_simd and fock_type != 'j' and (
+                not self.molecular_orbitals.is_empty()):
+            # NOTE: the driver returns twice the Coulomb less the scaled exchange
+            # already, which is the matrix this branch is asked for, so nothing is
+            # scaled here.
+            fock_mat_np = self._simd_ri_jk_fock(den_mat[0],
+                                                exchange_scaling_factor)
         elif self.ri_jk and fock_type != 'j' and (
                 not self.molecular_orbitals.is_empty()):
             fock_mat_j = self._ri_drv.compute_screened_j_fock(den_mat_for_fock,

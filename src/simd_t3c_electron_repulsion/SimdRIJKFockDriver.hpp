@@ -92,11 +92,21 @@ class CSimdRIJKFockDriver
     /// @note The memory is checked against the budget before the integrals are
     /// computed, from the sparsity pattern alone, so a calculation which cannot fit
     /// is told so rather than dying in the allocator after minutes of work.
+    /// @param metric_threshold The eigenvalues of the metric at or below which a
+    /// direction is dropped, when the metric is inverted through its square root.
+    /// @param use_inverse_square_root True to invert the square root of the metric
+    /// rather than its Cholesky factor.
+    /// @note The Cholesky factor is the cheaper of the two by an order of
+    /// magnitude and is tried first. A fitting basis which is close to linearly
+    /// dependent has no Cholesky factor to invert, and the square root is inverted
+    /// instead, with a warning. Setting the flag takes that way from the start.
     auto prepare(const CMolecule       &molecule,
                  const CMolecularBasis &basis,
                  const CMolecularBasis &aux_basis,
                  const double           threshold,
-                 const size_t           memory_budget) -> void;
+                 const size_t           memory_budget,
+                 const double           metric_threshold        = 1.0e-12,
+                 const bool             use_inverse_square_root = false) -> void;
 
     /// @brief Computes the Fock matrix of a density and a set of orbitals.
     /// @param density The density matrix, in the packed format, symmetric for a
@@ -104,14 +114,17 @@ class CSimdRIJKFockDriver
     /// @param coefficients The molecular orbital coefficients of the occupied
     /// orbitals, as a general matrix of one row per basis function and one column
     /// per orbital.
-    /// @param exchange_factor The factor the exchange is added with, which is minus
-    /// one for the exchange of a field calculation and minus the fraction of exact
+    /// @param exchange_scaling_factor The factor the exchange is scaled by, which
+    /// is one for the exchange of a field calculation and the fraction of exact
     /// exchange of a hybrid functional. The exchange is not formed at all when it
     /// is zero.
     /// @return The Fock matrix, in the packed format as a symmetric matrix.
+    /// @note The matrix is twice the Coulomb matrix less the scaled exchange,
+    /// which is the convention of a closed shell calculation, whose density is
+    /// that of one spin.
     auto compute(const CPackedMatrix &density,
                  const CPackedMatrix &coefficients,
-                 const double         exchange_factor) -> CPackedMatrix;
+                 const double         exchange_scaling_factor) -> CPackedMatrix;
 
     /// @brief Checks that the driver has been prepared.
     /// @return True if the B vectors have been formed.
