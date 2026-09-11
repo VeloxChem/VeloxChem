@@ -8565,8 +8565,14 @@ computeFockOnGPU(const              CMolecule& molecule,
             if (d_exchange_prec_cut_flat != nullptr)
             {
                 gpuSafe(gpuFreeAsync(d_exchange_prec_cut_flat, stream));
-                gpuSafe(gpuFreeAsync(d_exchange_screen_cut_flat, stream));
+                d_exchange_prec_cut_flat = nullptr;
             }
+            if (d_exchange_screen_cut_flat != nullptr)
+            {
+                gpuSafe(gpuFreeAsync(d_exchange_screen_cut_flat, stream));
+                d_exchange_screen_cut_flat = nullptr;
+            }
+            exchange_cut_capacity = 0;
             gpuSafe(gpuMallocAsync(&d_exchange_prec_cut_flat,   sizeof(uint32_t) * cut_count, stream));
             gpuSafe(gpuMallocAsync(&d_exchange_screen_cut_flat, sizeof(uint32_t) * cut_count, stream));
             exchange_cut_capacity = cut_count;
@@ -8577,6 +8583,8 @@ computeFockOnGPU(const              CMolecule& molecule,
             if (d_exchange_displ_cuts != nullptr)
             {
                 gpuSafe(gpuFreeAsync(d_exchange_displ_cuts, stream));
+                d_exchange_displ_cuts   = nullptr;
+                exchange_displ_capacity = 0;
             }
             gpuSafe(gpuMallocAsync(&d_exchange_displ_cuts, sizeof(uint32_t) * displ_count, stream));
             exchange_displ_capacity = displ_count;
@@ -13941,11 +13949,17 @@ computeFockOnGPU(const              CMolecule& molecule,
     if (d_exchange_prec_cut_flat != nullptr)
     {
         gpuSafe(gpuFreeAsync(d_exchange_prec_cut_flat, stream));
+        d_exchange_prec_cut_flat = nullptr;
+    }
+    if (d_exchange_screen_cut_flat != nullptr)
+    {
         gpuSafe(gpuFreeAsync(d_exchange_screen_cut_flat, stream));
+        d_exchange_screen_cut_flat = nullptr;
     }
     if (d_exchange_displ_cuts != nullptr)
     {
         gpuSafe(gpuFreeAsync(d_exchange_displ_cuts, stream));
+        d_exchange_displ_cuts = nullptr;
     }
     if (d_exchange_work_counts != nullptr)
     {
