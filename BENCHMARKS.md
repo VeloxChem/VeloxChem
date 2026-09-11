@@ -5244,3 +5244,45 @@ exchange: the setup is an eighth of it, the Fock builds are a little over two
 fifths, and everything else, which is not the resolution of the identity at all, is
 the other two fifths. For B3LYP the quadrature is three fifths of the run on its
 own.
+
+## Caffeine over the def2 basis sets, the two routes side by side
+
+The tables of the earlier section were taken as sets, with the conventional column
+measured once and the simd column measured again later, so their ratios cross two
+runs. This one does not: both routes were run one after the other in the same
+process, at Hartree-Fock, against def2-universal-jkfit with 1242 auxiliary
+functions throughout. Caffeine has fifty one occupied orbitals whatever basis it
+is given.
+
+| basis | nao | conventional | simd | gain | iterations | energy, conventional | energy, simd |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| def2-svp | 246 | 3.41 | 2.18 | 1.57 | 21 | -675.8004490084 | -675.8004490084 |
+| def2-svpd | 366 | 8.43 | 5.83 | 1.45 | 22 | -675.8318417532 | -675.8318417532 |
+| def2-tzvp | 494 | 18.39 | 14.67 | 1.25 | 22 | -676.5554233126 | -676.5554233126 |
+| def2-tzvpd | 614 | 38.88 | 30.88 | 1.26 | 22 | -676.5575291942 | -676.5575291942 |
+| def2-qzvp | 1098 | 217.12 | 187.38 | 1.16 | 22 | -676.5876077721 | -676.5876077721 |
+| def2-qzvpd | 1218 | 355.66 | 310.29 | 1.15 | 23 | -676.5878809521 | -676.5878809522 |
+
+**The two routes reach the same energy** to all ten digits in five of the six, and
+to nine in the sixth, in the same number of iterations throughout.
+
+**The gain falls as the basis grows**, from 1.57 at a single zeta to 1.15 at a
+quadruple one. The fitting set is 1242 functions in every row and the occupied
+orbitals are fifty one in every row, so what grows is the part of the work where
+the new path has least to give: the products of the exchange are as thin as the
+occupied orbitals make them, and fifty one is thin. The same molecule with a larger
+fitting set, or a larger molecule, goes the other way, which the tables of tagrisso
+show.
+
+### Against the numbers recorded earlier
+
+The conventional column here is 3.41, 8.43, 18.39 and 38.88 against the 3.05, 8.31,
+19.17 and 40.37 of the earlier section, which is a few per cent either way on a
+route that has not changed. That is the run to run variation of this machine, and
+it is worth knowing as the scale below which none of the ratios in this file should
+be read.
+
+The simd column is 2.18, 5.83, 14.67 and 30.88 against 2.64, 6.87, 17.16 and 34.68.
+That difference is the gather of the auxiliary groups, worth 1.12 to 1.21 times
+here, which is the setup being a smaller part of a caffeine run than of the
+tagrisso one where it was worth 1.08 on the whole calculation.
