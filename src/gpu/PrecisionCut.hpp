@@ -43,7 +43,7 @@ struct ExchangeCuts {
     std::vector<uint32_t> prec_cut_flat;    // optional host-side flat cut array
     std::vector<uint32_t> screen_cut_flat;  // optional host-side flat cut array
     std::vector<uint32_t> displ_cuts;       // [n_ik] offset into flat arrays
-    std::vector<uint32_t> cut_weights;      // optional host-only m-tile weight per cut entry
+    // std::vector<uint32_t> cut_weights;   // unused: host-only m-tile weight per cut entry
     uint32_t total_cut_entries = 0;         // number of flat cut entries
 };
 

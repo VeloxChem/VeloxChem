@@ -10,6 +10,7 @@
 #endif
 
 // Return the max value in each tile
+// Currently unused.
 std::vector<double> tile_max_abs(const std::vector<double>& arr, int tile_dim) {
     const size_t n = arr.size();
     const size_t n_tiles = (n + tile_dim - 1) / tile_dim;
@@ -28,6 +29,7 @@ std::vector<double> tile_max_abs(const std::vector<double>& arr, int tile_dim) {
 }
 
 // Reutrn the index of the first <= thr (i.e. count(>thr))
+// Currently unused.
 uint32_t cut_descending(const std::vector<double>& desc, double thr) {
     uint32_t left = 0, right = (uint32_t)desc.size();
     while(left < right) {
@@ -139,6 +141,7 @@ std::vector<uint32_t> build_cut_ij_tile_dd(
     return cut;
 }
 
+// Currently unused.
 ExchangeCuts
 build_exchange_cuts(
     const std::vector<uint32_t>& pair_inds_i,
@@ -221,6 +224,7 @@ build_exchange_cuts(
 }
 
 
+// Currently unused.
 static uint32_t
 lower_bound_desc_strided(const std::vector<double>& q,
                          uint32_t displ,
@@ -245,6 +249,7 @@ lower_bound_desc_strided(const std::vector<double>& q,
     return left;
 }
 
+// Currently unused.
 ExchangeCuts
 build_exchange_cuts_strided(
     const std::vector<uint32_t>& pair_inds_i,
@@ -307,6 +312,7 @@ build_exchange_cuts_strided(
 }
 
 
+// Currently unused.
 static uint32_t
 lower_bound_desc(const std::vector<double>& q_tile,
                         double thr)
@@ -315,6 +321,7 @@ lower_bound_desc(const std::vector<double>& q_tile,
     return static_cast<uint32_t>(it - q_tile.begin());
 }
 
+// Currently unused.
 ExchangeCuts
 build_exchange_cuts_cached_k(
     const std::vector<uint32_t>& pair_inds_i,
@@ -390,6 +397,7 @@ build_exchange_cuts_cached_k(
 }
 
 
+// Currently unused.
 ExchangeCuts
 build_exchange_cut_layout_grouped_m(
     const std::vector<uint32_t>& pair_inds_i,
@@ -411,7 +419,7 @@ build_exchange_cut_layout_grouped_m(
         total += (n_m + m_group_size - 1) / m_group_size;
     }
 
-    return {{}, {}, displ_cuts, {}, total};
+    return {{}, {}, displ_cuts, total};
 }
 
 ExchangeCuts
@@ -430,9 +438,10 @@ build_exchange_cut_layout(
         total += n_m;
     }
 
-    return {{}, {}, displ_cuts, {}, total};
+    return {{}, {}, displ_cuts, total};
 }
 
+// Currently unused.
 ExchangeCuts
 build_exchange_cuts_grouped_m_cached_k(
     const std::vector<uint32_t>& pair_inds_i,
@@ -466,7 +475,7 @@ build_exchange_cuts_grouped_m_cached_k(
 
     std::vector<uint32_t> prec_cut_flat(total, 0);
     std::vector<uint32_t> screen_cut_flat(total, 0);
-    std::vector<uint32_t> cut_weights(total, 1);
+    // std::vector<uint32_t> cut_weights(total, 1);
 
     std::vector<std::vector<double>> q_tile_cache(pair_counts_CD.size());
     std::vector<unsigned char> q_tile_cached(pair_counts_CD.size(), 0);
@@ -499,7 +508,7 @@ build_exchange_cuts_grouped_m_cached_k(
             const uint32_t m_begin = g * m_group_size;
             const uint32_t m_end = std::min(n_m, m_begin + m_group_size);
 
-            cut_weights[displ_cuts[ik] + g] = m_end - m_begin;
+            // cut_weights[displ_cuts[ik] + g] = m_end - m_begin;
 
             // double Q_ij_group = 0.0;
             // for (uint32_t m = m_begin; m < m_end; ++m) {
@@ -520,13 +529,14 @@ build_exchange_cuts_grouped_m_cached_k(
         }
     }
 
-    return {prec_cut_flat, screen_cut_flat, displ_cuts, cut_weights};
+    return {prec_cut_flat, screen_cut_flat, displ_cuts};
 }
 
 #if defined(USE_CUDA) || defined(USE_HIP)
 
 namespace {
 
+// Search descending values at stride tile_dim directly, without building a q_tile array.
 __device__ uint32_t
 lower_bound_desc_device(const double* q,
                         uint32_t      displ,
@@ -668,6 +678,7 @@ accumulate_exchange_cut_work_kernel(
 
 // Grouped-m cut builder kept for benchmarking/reference. The active PPPP MP path
 // uses build_exchange_cuts_kernel because testing showed m_group_size=1 is fastest.
+// Currently unused.
 __global__ void
 build_exchange_cuts_grouped_m_kernel(
     uint32_t*       d_prec_cut_flat,
@@ -780,6 +791,9 @@ build_exchange_cuts_device(
         tau,
         eri_threshold);
 
+    // Check the host-held pointer, not the contents of device memory.
+    // FockDriverGPU allocates this buffer only when VLX_EXCHANGE_FRACTION_STATS=1;
+    // otherwise it passes nullptr to skip work statistics.
     if (d_work_counts != nullptr) {
         accumulate_exchange_cut_work_kernel<<<n_ik, threads_per_block, 0, stream>>>(
             d_prec_cut_flat,
@@ -796,6 +810,7 @@ build_exchange_cuts_device(
     }
 }
 
+// Currently unused.
 void
 build_exchange_cuts_grouped_m_device(
     uint32_t*       d_prec_cut_flat,
