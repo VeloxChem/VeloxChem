@@ -33,8 +33,10 @@
 from contextlib import nullcontext
 from mpi4py import MPI
 import atexit
+import ctypes
 import hashlib
 import os
+import re
 import shutil
 import sys
 import tempfile
@@ -60,6 +62,168 @@ try:
     import qcserenity as qc
 except ImportError:
     pass
+
+
+class SerenityCalculationError(RuntimeError):
+    """
+    A Serenity step that must not be used as a valid electronic point.
+
+    Serenity reports a non-converged Davidson solver (and, with
+    ``allowNotConverged``, a non-converged SCF) only as a printed warning and
+    carries on with the unconverged numbers.  The VeloxChem interface raises
+    this error instead, so an optimizer can never receive an energy or
+    gradient from such a step.
+
+    :param message:
+        The error message.
+    :param stage:
+        ``'scf'``, ``'response'``, ``'gradient'``, ``'state_selection'`` or
+        ``'root_identity'``.
+    :param details:
+        Optional diagnostics dictionary.
+    """
+
+    def __init__(self, message, stage=None, details=None):
+        super().__init__(message)
+        self.stage = stage
+        self.details = {} if details is None else dict(details)
+
+
+class AdiabaticStateSelectionError(SerenityCalculationError):
+    """The computed root window does not contain the requested manifold state."""
+
+    def __init__(self, message, details=None):
+        super().__init__(message, stage='state_selection', details=details)
+
+
+# Serenity's own warning texts (src/postHF/LRSCF/Tools/IterativeSolver.h,
+# src/scf/Scf.cpp, src/postHF/LRSCF/Tools/LRSCFRestart.cpp).  They are the only
+# convergence/restart information Serenity exposes to Python.
+SERENITY_LR_NOT_CONVERGED = 'Convergence criterion not reached'
+SERENITY_SCF_NOT_CONVERGED = 'SCF did NOT converge'
+SERENITY_LR_RESTART_LOADED = 'Successfully loaded'
+SERENITY_LR_RESTART_SCRATCH = 'Will continue from scratch'
+_SERENITY_LR_ITERATIONS = re.compile(
+    r'Iterative solver converged in\s+(\d+)\s+iterations')
+
+
+def parse_serenity_lr_output(text):
+    """
+    Extracts convergence and restart information from captured LRSCF output.
+
+    The non-convergence warning is printed at every print level, but
+    "Iterative solver converged in N iterations" and the restart messages
+    are silenced at print level MINIMUM.  Convergence is therefore only
+    accepted on positive evidence: without either message ``converged`` is
+    None, and callers must treat that as "not verified".
+
+    :param text:
+        Everything Serenity wrote to stdout during one LRSCF solve (an
+        ``LRSCFTask`` or the LRSCF step inside a ``GradientTask``).
+
+    :return:
+        Dictionary with ``converged`` (True, False or None),
+        ``restart_loaded`` (True, False or None if no restart message was
+        printed), ``davidson_iterations`` (last reported count),
+        ``n_converged_solves`` and ``warnings``.
+    """
+
+    text = '' if text is None else str(text)
+    warnings = [
+        line.strip() for line in text.splitlines()
+        if SERENITY_LR_NOT_CONVERGED in line
+    ]
+    iterations = [int(match) for match in
+                  _SERENITY_LR_ITERATIONS.findall(text)]
+    if warnings:
+        converged = False
+    elif iterations:
+        converged = True
+    else:
+        converged = None
+    if SERENITY_LR_RESTART_LOADED in text:
+        restart_loaded = True
+    elif SERENITY_LR_RESTART_SCRATCH in text:
+        restart_loaded = False
+    else:
+        restart_loaded = None
+    return {
+        'converged': converged,
+        'restart_loaded': restart_loaded,
+        'davidson_iterations': iterations[-1] if iterations else None,
+        'n_converged_solves': len(iterations),
+        'warnings': warnings,
+    }
+
+
+def _flush_c_stdio():
+    """Flushes C stdio buffers; Serenity mixes printf and std::cout."""
+
+    try:
+        ctypes.CDLL(None).fflush(None)
+    except Exception:
+        pass
+
+
+class SerenityOutputCapture:
+    """
+    Captures everything written to file descriptor 1 during a Serenity task.
+
+    ``qcserenity.redirectOutputToFile`` does not flush C stdio before it
+    restores the descriptor, so ``printf`` output such as the Davidson
+    iteration count can be lost or emitted after the task.  This capture
+    flushes both Python and C buffers on entry and exit, keeps the text for
+    inspection and, when ``echo`` is set, replays it to the real stdout.
+
+    :param directory:
+        Directory for the temporary capture file; ``None`` uses TMPDIR.
+    :param echo:
+        Write the captured text to stdout after the task (verbose mode).
+    """
+
+    def __init__(self, directory=None, echo=False):
+        self.directory = directory
+        self.echo = bool(echo)
+        self.text = ''
+        self._file = None
+        self._saved_fd = None
+
+    def __enter__(self):
+        try:
+            sys.stdout.flush()
+        except Exception:
+            pass
+        _flush_c_stdio()
+        directory = self.directory
+        if directory is not None and not os.path.isdir(directory):
+            directory = None
+        self._file = tempfile.TemporaryFile(mode='w+b', dir=directory)
+        self._saved_fd = os.dup(1)
+        os.dup2(self._file.fileno(), 1)
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        try:
+            sys.stdout.flush()
+        except Exception:
+            pass
+        _flush_c_stdio()
+        os.dup2(self._saved_fd, 1)
+        os.close(self._saved_fd)
+        self._saved_fd = None
+        try:
+            self._file.seek(0)
+            self.text = self._file.read().decode('utf-8', errors='replace')
+        finally:
+            self._file.close()
+            self._file = None
+        if self.echo and self.text:
+            try:
+                sys.stdout.write(self.text)
+                sys.stdout.flush()
+            except Exception:
+                pass
+        return False
 
 
 class SerenityScfDriver:
@@ -147,7 +311,20 @@ class SerenityScfDriver:
         self._gradient = None
         self._scf_results = None
         self._current_scf_mode = None
-        
+
+        # SCF provenance.  ``_scf_revision`` increases with every SCF that
+        # actually runs, so an LR solution can be tied to the exact MO
+        # coefficients it was solved in (same geometry is not enough: a new
+        # SCF at the same geometry may return orbitals with different phases).
+        # ``_system_name`` identifies the Serenity System, whose scratch
+        # directory holds the LRSCF restart file.
+        self._scf_revision = 0
+        self._system_name = None
+        self._system_generation = 0
+        self._system_scf_count = 0
+        self._scf_provenance = None
+        self.last_serenity_output = {}
+
         # h5 part of the file
         self.filename = None
         self._skip_writing_h5 = False
@@ -409,9 +586,16 @@ class SerenityScfDriver:
 
     def _invalidate_cache(self):
         """
-        This function is crucial for resetting the full object
-        as the new initalizaiton for the dynamics is necessary
-        for a correct basis function integration!
+        Forces a new Serenity System at the next calculation.
+
+        ``_system_signature`` is reset, so ``_ensure_system`` builds a new
+        System (new name, new scratch directory) instead of moving the atoms
+        of the current one.  A new System means a fresh SCF guess and no LRSCF
+        restart file.  Surface-hopping measurements found that moving the
+        atoms of a System on which a gradient had been evaluated shifted the
+        SF reference energy (basis-function-on-grid data stayed tied to the
+        old geometry), so callers that evaluate gradients reset the System
+        after each evaluation unless same-System reuse has been validated.
         """
 
         # self._system = None
@@ -433,17 +617,84 @@ class SerenityScfDriver:
 
         if self._last_scf_geom_signature != geom_signature:
 
+            # SCF warm start: on a reused System Serenity starts the SCF from
+            # the electronic structure it already holds, i.e. the orbitals of
+            # the previous geometry.  This is independent of (and never
+            # implies) an LRSCF restart; see SerenityLinearResponseSolver.
+            warm_start = self._system_scf_count > 0
+            capture = self.capture_serenity_output('scf')
+            try:
+                with capture:
+                    self.print_title()
+                    self._scf_task.run()
+            except Exception as error:
+                raise SerenityCalculationError(
+                    f'Serenity SCF failed: {error}', stage='scf',
+                    details={'serenity_output_tail':
+                             capture.text[-4000:]}) from error
+
+            energy = float(self._system.getEnergy())
+            converged = (SERENITY_SCF_NOT_CONVERGED not in capture.text and
+                         np.isfinite(energy))
+            if not converged:
+                raise SerenityCalculationError(
+                    'Serenity SCF did not converge (or returned a nonfinite '
+                    'energy); the point is not usable.', stage='scf',
+                    details={'energy': energy,
+                             'serenity_output_tail': capture.text[-4000:]})
+
+            self._energy = energy
             with self._serenity_output_context():
-                self.print_title()
-                self._scf_task.run()
-                self._energy = float(self._system.getEnergy())
                 ao_basis = self._veloxchem_basis(molecule)
                 self._scf_results = self._collect_scf_results(molecule, ao_basis)
-                self._last_scf_geom_signature = geom_signature
-                self._last_grad_geom_signature = None
-                self._gradient = None
+            self._last_scf_geom_signature = geom_signature
+            self._last_grad_geom_signature = None
+            self._gradient = None
+
+            self._scf_revision += 1
+            self._system_scf_count += 1
+            self._scf_provenance = {
+                'scf_revision': int(self._scf_revision),
+                'system_name': self._system_name,
+                'system_generation': int(self._system_generation),
+                'system_reused': bool(warm_start),
+                'scf_warm_start': bool(warm_start),
+                'geometry_signature': geom_signature,
+                'scf_converged': True,
+                'reference_energy': float(energy),
+                'scf_mode': self._current_scf_mode,
+                'rohf_type': self.rohf_type or 'NONE',
+                'reference_type': self._reference_type_label(),
+            }
 
         return self._scf_results
+
+    def _reference_type_label(self):
+        """Human-readable reference label, e.g. ``CUHF-DFT(bhlyp)``."""
+
+        method = ('HF' if self.method == 'hf' else
+                  f'DFT({self.dft_functional})')
+        if self._current_scf_mode == 'restricted':
+            prefix = 'R'
+        elif self.rohf_type not in (None, 'NONE'):
+            prefix = self.rohf_type + '-'
+        else:
+            prefix = 'U'
+        return prefix + method
+
+    def get_scf_provenance(self):
+        """
+        Returns the provenance of the SCF solution currently held.
+
+        :return:
+            Dictionary with the SCF revision, System identity, whether the
+            SCF started from a previous geometry's orbitals (warm start), the
+            reference energy and the reference type, or ``None``.
+        """
+
+        if self._scf_provenance is None:
+            return None
+        return dict(self._scf_provenance)
 
     def _compute_gradient_master(self, molecule):
         
@@ -553,6 +804,10 @@ class SerenityScfDriver:
         self._gradient = None
         self._scf_results = None
         self._current_scf_mode = mode
+        self._system_name = settings.name
+        self._system_generation += 1
+        self._system_scf_count = 0
+        self._scf_provenance = None
 
     def _sync_geometry_if_needed(self, molecule):
         """
@@ -662,10 +917,41 @@ class SerenityScfDriver:
         return hasher.hexdigest()
 
     def _serenity_output_context(self):
-        print(self.serenity_verbose, self.ostream.is_muted)
         if self.serenity_verbose and not self.ostream.is_muted:
             return nullcontext()
         return qc.redirectOutputToFile(os.devnull)
+
+    def capture_serenity_output(self, stage):
+        """
+        Returns a context manager that captures Serenity's stdout for a task.
+
+        The captured text is kept in ``last_serenity_output[stage]`` so the
+        caller can inspect Serenity's convergence warnings.  In verbose mode
+        it is replayed to stdout once the task has finished.
+
+        :param stage:
+            Label of the task, e.g. ``'scf'``, ``'response'``, ``'gradient'``.
+        """
+
+        echo = bool(self.serenity_verbose and not self.ostream.is_muted)
+        capture = SerenityOutputCapture(self.scratch_dir, echo=echo)
+        driver = self
+
+        class _StageCapture:
+
+            text = ''
+
+            def __enter__(self):
+                capture.__enter__()
+                return self
+
+            def __exit__(self, exc_type, exc_value, traceback):
+                result = capture.__exit__(exc_type, exc_value, traceback)
+                self.text = capture.text
+                driver.last_serenity_output[stage] = capture.text
+                return result
+
+        return _StageCapture()
     
     def get_final_h5py_file(self):
         

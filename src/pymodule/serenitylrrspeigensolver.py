@@ -34,9 +34,12 @@ import numpy as np
 from contextlib import nullcontext
 import os
 
+import hashlib
+
 from .veloxchemlib import mpi_master, hartree_in_ev
 from .errorhandler import assert_msg_critical
-from .serenityscfdriver import SerenityScfDriver
+from .serenityscfdriver import (SerenityScfDriver, SerenityCalculationError,
+                                parse_serenity_lr_output)
 
 from .resultsio import write_rsp_results_to_hdf5
 from .resultsio import write_rsp_full_solution_to_hdf5
@@ -62,6 +65,24 @@ class SerenityLinearResponseSolver:
         - densfit_j: Density fitting setup for Coulomb terms.
         - grid_accuracy: Main LR integration grid accuracy.
         - small_grid_accuracy: Pre-optimization LR integration grid accuracy.
+        - lr_restart_policy: ``'same_geometry'`` (default) or ``'never'``.
+        - lr_convergence_retries: Fresh re-solves with doubled Davidson
+          cycles before a non-converged spectrum is rejected.
+
+    LRSCF restart versus SCF warm start versus state tracking
+        Serenity's LRSCF restart loads the stored excitation vectors of the
+        System as raw coefficients in the *current* MO basis and then follows
+        those roots.  Between two geometries the MOs change phase, order and
+        shape, while the stored vectors do not (X_ai must become s_a s_i X_ai
+        under phi -> s phi), so a cross-geometry restart can steer the
+        Davidson solver onto the wrong roots and lose states (T1 vanished at
+        bend 130 / torsion 10).  A restart is therefore only requested when
+        the stored solution was obtained at the same geometry, on the same
+        System, from the same SCF solution and with the same response
+        settings.  Reusing the previous SCF orbitals (SCF warm start) is a
+        separate matter decided by the SCF driver, and comparing old and new
+        excited states (transition-density tracking) never feeds a previous
+        geometry's vectors into the eigensolver.
     """
 
     def __init__(self, serenity_scf_drv):
@@ -91,8 +112,19 @@ class SerenityLinearResponseSolver:
         self.grid_accuracy = serenity_scf_drv.grid_accuracy
         self.small_grid_accuracy = serenity_scf_drv.small_grid_accuracy
 
+        self.lr_restart_policy = 'same_geometry'
+        self.lr_convergence_retries = 1
+
         self._lr_task = None
         self._rsp_results = None
+        self._rsp_results_key = None
+        self.last_lr_provenance = None
+
+        # Ledger of the LR solution currently stored in the System's restart
+        # file.  Updated only after a converged LRSCF solve (by this solver or
+        # by the LRSCF step of an excited-state GradientTask) and cleared on
+        # any failure, so a restart can never pick up a foreign solution.
+        # _last_system_signature is (System name, SCF revision).
         self._last_rsp_geom_signature = None
         self._last_rsp_settings_signature = None
         self._last_system_signature = None
@@ -203,6 +235,14 @@ class SerenityLinearResponseSolver:
             self.small_grid_accuracy = int(rsp_dict['small_grid_accuracy'])
             self._invalidate_rsp_cache()
 
+        for key in ('lr_restart_policy', 'restart_policy'):
+            if key in rsp_dict:
+                self.set_lr_restart_policy(rsp_dict[key])
+                break
+
+        if 'lr_convergence_retries' in rsp_dict:
+            self.lr_convergence_retries = int(rsp_dict['lr_convergence_retries'])
+
         if 'grid_level' in method_dict:
             lvl = int(method_dict['grid_level'])
             self.grid_accuracy = lvl
@@ -225,11 +265,24 @@ class SerenityLinearResponseSolver:
         errmsg = 'SerenityLinearResponseSolver: qcserenity is not available. '
         errmsg += 'Please install/build Serenity python bindings.'
         assert_msg_critical(self.is_available(), errmsg)
-    
+
+        failure = None
         if self.rank == mpi_master():
-            rsp_results = self._compute_master(molecule)
+            try:
+                rsp_results = self._compute_master(molecule)
+            except SerenityCalculationError as error:
+                # Master-only callers (broadcast=False) handle it themselves.
+                if self.nodes == 1 or not broadcast:
+                    raise
+                rsp_results = None
+                failure = (str(error), error.stage, error.details)
         else:
             rsp_results = None
+
+        if broadcast and self.nodes > 1:
+            failure = self.comm.bcast(failure, root=mpi_master())
+            if failure is not None:
+                raise SerenityCalculationError(*failure)
 
         if broadcast:
             rsp_results = self.comm.bcast(rsp_results, root=mpi_master())
@@ -284,74 +337,332 @@ class SerenityLinearResponseSolver:
     def compute_lrresp_master(self, molecule):
         return self._compute_master(molecule)
 
+    def set_lr_restart_policy(self, policy):
+        """
+        Sets when a stored LRSCF solution may seed the Davidson solver.
+
+        :param policy:
+            ``'same_geometry'``: only when the stored solution belongs to the
+            same geometry, System, SCF solution and response settings, e.g.
+            the LRSCF step of a gradient task right after the spectrum was
+            solved at that geometry.  ``'never'``: always solve from scratch.
+        """
+
+        label = str(policy).strip().lower()
+        assert_msg_critical(
+            label in ('same_geometry', 'never'),
+            'SerenityLinearResponseSolver: lr_restart_policy must be '
+            '"same_geometry" or "never"; cross-geometry restarts are not '
+            'supported because Serenity does not transform stored vectors '
+            'to the MO basis of the new geometry.')
+        self.lr_restart_policy = label
+
     def _invalidate_rsp_cache(self):
         self._lr_task = None
         self._rsp_results = None
+        self._rsp_results_key = None
+        self.invalidate_lr_restart_ledger()
+
+    def invalidate_lr_restart_ledger(self):
+        """Forgets the stored LR solution; the next solve starts fresh."""
+
         self._last_rsp_geom_signature = None
         self._last_rsp_settings_signature = None
         self._last_system_signature = None
+
+    def _current_system_signature(self):
+        """(System name, SCF revision): identifies the MO basis in use."""
+
+        return (getattr(self.scf_driver, '_system_name', None),
+                int(getattr(self.scf_driver, '_scf_revision', 0)))
+
+    def lr_restart_file(self):
+        """Path of the System's isolated LRSCF restart file, or ``None``."""
+
+        name = getattr(self.scf_driver, '_system_name', None)
+        root = getattr(self.scf_driver, 'scratch_dir', None)
+        if not name or not root:
+            return None
+        suffix = ('res.h5' if self.scf_driver._current_scf_mode == 'restricted'
+                  else 'unres.h5')
+        return os.path.join(root, name, f'{name}_lrscf.iso.{suffix}')
+
+    def decide_lr_restart(self, settings_signature=None):
+        """
+        Decides whether the next LRSCF solve may restart from the stored one.
+
+        :param settings_signature:
+            Response-settings signature of the solve about to run; defaults
+            to this solver's settings.
+
+        :return:
+            Dictionary with ``restart`` (bool), ``reason`` and ``policy``.
+        """
+
+        if settings_signature is None:
+            settings_signature = self._get_rsp_signature()
+        current_system = self._current_system_signature()
+        geometry = self.scf_driver._active_geom_signature
+
+        restart = False
+        if self.lr_restart_policy == 'never':
+            reason = 'restart policy is "never"'
+        elif (self._last_rsp_geom_signature is None or
+              self._last_system_signature is None):
+            reason = 'no converged LR solution is stored for this System'
+        elif self._last_system_signature[0] != current_system[0]:
+            reason = ('the stored LR solution belongs to a different '
+                      'Serenity System')
+        elif self._last_rsp_geom_signature != geometry:
+            reason = 'geometry changed since the stored LR solution'
+        elif self._last_system_signature[1] != current_system[1]:
+            reason = ('the SCF was re-run since the stored LR solution '
+                      '(the MO phases may differ)')
+        elif self._last_rsp_settings_signature != settings_signature:
+            reason = 'response settings differ from the stored LR solution'
+        else:
+            path = self.lr_restart_file()
+            if path is None or not os.path.isfile(path):
+                reason = 'the LRSCF restart file is missing'
+            else:
+                restart = True
+                reason = ('same geometry, System, SCF solution and response '
+                          'settings as the stored LR solution')
+
+        return {
+            'restart': restart,
+            'reason': reason,
+            'policy': self.lr_restart_policy,
+        }
+
+    def record_lr_solution(self, settings_signature):
+        """
+        Registers the converged LR solution now held in the restart file.
+
+        :param settings_signature:
+            Response-settings signature the solution was obtained with.
+        """
+
+        self._last_rsp_geom_signature = self.scf_driver._active_geom_signature
+        self._last_rsp_settings_signature = settings_signature
+        self._last_system_signature = self._current_system_signature()
+
+    def get_lr_controller(self):
+        """Returns the LRSCF controller of the latest converged solve."""
+
+        assert_msg_critical(
+            self._lr_task is not None,
+            'SerenityLinearResponseSolver: no LRSCF task is available.')
+        return self._lr_task.getLRSCFControllers()[0]
+
+    @staticmethod
+    def signature_digest(signature):
+        """Short stable digest of a settings signature for the records."""
+
+        return hashlib.sha1(repr(signature).encode('utf-8')).hexdigest()[:16]
 
     def _compute_master(self, molecule):
         # Ensure SCF/system are up-to-date for this geometry.
         self.scf_driver._compute_energy_master(molecule)
 
         geom_signature = self.scf_driver._active_geom_signature
-        system_signature = self.scf_driver._system_signature
+        system_signature = self._current_system_signature()
         rsp_signature = self._get_rsp_signature()
+        results_key = (geom_signature, system_signature, rsp_signature)
 
-        recompute_lr = (self._lr_task is None or
-                        self._last_rsp_geom_signature != geom_signature or
-                        self._last_rsp_settings_signature != rsp_signature or
-                        self._last_system_signature != system_signature)
+        if (self._lr_task is not None and self._rsp_results is not None and
+                self._rsp_results_key == results_key):
+            results = self._copy_rsp_results(self._rsp_results)
+            provenance = dict(results.get('lr_provenance') or {})
+            provenance['cache_hit'] = True
+            results['lr_provenance'] = provenance
+            return results
 
-        if recompute_lr:
-            mode = self.scf_driver._current_scf_mode
-            with self.scf_driver._serenity_output_context():
-                if mode == 'restricted':
-                    self._lr_task = spy.LRSCFTask_R(self.scf_driver._system)
-                else:
-                    self._lr_task = spy.LRSCFTask_U(self.scf_driver._system)
+        # Cross-geometry LR vectors are never used as a Davidson guess; see
+        # the class docstring and decide_lr_restart().
+        decision = self.decide_lr_restart(rsp_signature)
+        attempts = []
+        max_cycles = None
+        for attempt in range(1 + max(0, int(self.lr_convergence_retries))):
+            # A retry after non-convergence always starts from scratch.
+            restart = bool(decision['restart']) and attempt == 0
+            run = self._run_lr_task(restart, max_cycles)
+            attempts.append(run)
+            # converged is None when Serenity printed no convergence status;
+            # more Davidson cycles cannot fix that.
+            if run['converged'] is not False:
+                break
+            max_cycles = 2 * int(run['max_cycles'])
 
-            self._configure_lr_task()
+        if attempts[-1]['converged'] is not True:
+            # A non-converged solve may have overwritten the restart file.
+            self.invalidate_lr_restart_ledger()
+            self._rsp_results = None
+            self._rsp_results_key = None
+            if attempts[-1]['converged'] is None:
+                reason = ('Serenity printed no convergence status for the '
+                          'LRSCF solve, so convergence cannot be verified')
+            else:
+                reason = ('Serenity LRSCF did not converge ("Convergence '
+                          'criterion not reached") in '
+                          f'{len(attempts)} attempt(s)')
+            raise SerenityCalculationError(
+                f'{reason}; the spectrum is not usable.', stage='response',
+                details={'attempts': attempts})
 
-            
-            with self.scf_driver._serenity_output_context():
-                self._lr_task.run()
+        transitions = self._get_serenity_transitions()
+        eigvecs = self._get_serenity_excitation_vectors()
+        self._validate_lr_solution(transitions, eigvecs)
 
-            transitions = self._get_serenity_transitions()
-            eigvecs = self._get_serenity_excitation_vectors()
+        rsp_results = self._build_rsp_results(transitions)
+        rsp_results["exc_method"] = self.exc_method
+        rsp_results["eigenvectors"] = eigvecs
 
-            rsp_results = self._build_rsp_results(transitions)
-            rsp_results["exc_method"] = self.exc_method
-            rsp_results["eigenvectors"] = eigvecs
+        controller = self._lr_task.getLRSCFControllers()[0]
+        if self.spinflip:
+            self._add_spinflip_metadata(rsp_results, controller)
 
-            controller = self._lr_task.getLRSCFControllers()[0]
-            if self.spinflip:
-                self._add_spinflip_metadata(rsp_results, controller)
+        self._add_native_rsp_metadata(rsp_results, eigvecs)
 
-            self._add_native_rsp_metadata(rsp_results, eigvecs)
-            self._rsp_results = rsp_results
+        final_run = attempts[-1]
+        rsp_results['lr_provenance'] = {
+            'geometry_signature': geom_signature,
+            'settings_signature': self.signature_digest(rsp_signature),
+            'system_name': system_signature[0],
+            'scf_revision': system_signature[1],
+            'restart_policy': self.lr_restart_policy,
+            'restart_requested': bool(final_run['restart_requested']),
+            'restart_used': final_run['restart_used'],
+            'restart_reason': decision['reason'],
+            'converged': True,
+            'davidson_iterations': final_run['davidson_iterations'],
+            'attempts': attempts,
+            'nstates': int(self.nstates),
+            'exc_method': self.exc_method,
+            'cache_hit': False,
+            'scf': self.scf_driver.get_scf_provenance(),
+        }
+        self.last_lr_provenance = dict(rsp_results['lr_provenance'])
 
-            self._write_final_hdf5(molecule, self._rsp_results)
-            self._write_response_vectors(self.scf_driver.get_final_h5py_file(), eigvecs)
-                        
+        # Only a converged, validated solution enters the ledger.
+        self.record_lr_solution(rsp_signature)
+        self._rsp_results = rsp_results
+        self._rsp_results_key = results_key
+
+        self._write_final_hdf5(molecule, self._rsp_results)
+        self._write_response_vectors(self.scf_driver.get_final_h5py_file(),
+                                     eigvecs)
+
         return self._copy_rsp_results(self._rsp_results)
 
-    def _configure_lr_task(self):
+    def _run_lr_task(self, restart, max_cycles=None):
+        """
+        Runs one LRSCF solve on the current System and parses its output.
+
+        :param restart:
+            Explicit Serenity restart flag for this solve.
+        :param max_cycles:
+            Optional Davidson cycle limit overriding ``max_cycles``.
+
+        :return:
+            Dictionary describing the solve (restart requested/used,
+            convergence, Davidson iterations, cycle limit, warnings).
+        """
+
+        mode = self.scf_driver._current_scf_mode
+        with self.scf_driver._serenity_output_context():
+            if mode == 'restricted':
+                self._lr_task = spy.LRSCFTask_R(self.scf_driver._system)
+            else:
+                self._lr_task = spy.LRSCFTask_U(self.scf_driver._system)
+
+        self._configure_lr_task(restart=restart, max_cycles=max_cycles)
+
+        capture = self.scf_driver.capture_serenity_output('response')
+        try:
+            with capture:
+                self._lr_task.run()
+        except Exception as error:
+            self.invalidate_lr_restart_ledger()
+            raise SerenityCalculationError(
+                f'Serenity LRSCF failed: {error}', stage='response',
+                details={'serenity_output_tail': capture.text[-4000:]}
+            ) from error
+
+        parsed = parse_serenity_lr_output(capture.text)
+        return {
+            'restart_requested': bool(restart),
+            # None if Serenity printed no restart message.
+            'restart_used': parsed['restart_loaded'] if restart else False,
+            'converged': parsed['converged'],
+            'davidson_iterations': parsed['davidson_iterations'],
+            'max_cycles': int(self._lr_task.settings.maxCycles),
+            'warnings': parsed['warnings'],
+        }
+
+    def _validate_lr_solution(self, transitions, eigvecs):
+        """Rejects spectra with missing, nonfinite or empty roots."""
+
+        nroots = int(transitions.shape[0])
+        energies = transitions[:, 0] if nroots else np.zeros(0)
+        vectors = np.asarray(eigvecs, dtype=float)
+        problems = []
+        if nroots < int(self.nstates):
+            problems.append(
+                f'{nroots} root(s) returned but {self.nstates} requested')
+        if not np.all(np.isfinite(energies)):
+            problems.append('nonfinite excitation energies')
+        if vectors.ndim != 2 or vectors.shape[1] != nroots:
+            problems.append('inconsistent excitation-vector shape')
+        else:
+            if not np.all(np.isfinite(vectors)):
+                problems.append('nonfinite excitation vectors')
+            elif np.any(np.linalg.norm(vectors, axis=0) <= 1.0e-12):
+                problems.append('zero-norm excitation vector')
+        if problems:
+            self.invalidate_lr_restart_ledger()
+            raise SerenityCalculationError(
+                'Serenity LRSCF returned an invalid spectrum: ' +
+                '; '.join(problems), stage='response',
+                details={'problems': problems})
+
+    def _configure_lr_task(self, restart=False, max_cycles=None):
+        """
+        Configures the LRSCF task.
+
+        :param restart:
+            Explicit Serenity restart flag.  Must only be True when
+            ``decide_lr_restart`` allows it; never set it for a new geometry.
+        :param max_cycles:
+            Optional Davidson cycle limit overriding ``max_cycles``.
+        """
+
+        # Print level NORMAL: at MINIMUM Serenity silences "Iterative solver
+        # converged in N iterations" and the restart messages, which are
+        # the only evidence of convergence and restart use.  The output is
+        # captured and only echoed in verbose mode.
         if hasattr(self._lr_task, 'generalSettings'):
             self._lr_task.generalSettings.printLevel = (
-                spy.GLOBAL_PRINT_LEVELS.MINIMUM)
+                spy.GLOBAL_PRINT_LEVELS.NORMAL)
 
         self._lr_task.settings.method = self.exc_method
         self._lr_task.settings.nEigen = int(self.nstates)
-        self._lr_task.settings.restart = True
+        self._lr_task.settings.restart = bool(restart)
         if self.spinflip:
             self._lr_task.settings.scfstab = 'spinflip'
         if self.conv_thresh is not None:
             self._lr_task.settings.conv = float(self.conv_thresh)
 
-        if self.max_cycles is not None:
-            self._lr_task.settings.maxCycles = int(self.max_cycles)
+        if max_cycles is None:
+            max_cycles = self.max_cycles
+        if max_cycles is not None:
+            # Serenity treats maxCycles == 1 as an FDEc step and reports
+            # neither convergence nor failure.
+            assert_msg_critical(
+                int(max_cycles) >= 2,
+                'SerenityLinearResponseSolver: max_cycles must be at least '
+                '2; Serenity reports no convergence status for 1 cycle')
+            self._lr_task.settings.maxCycles = int(max_cycles)
 
         if self.max_subspace_dimension is not None:
             self._lr_task.settings.maxSubspaceDimension = int(
@@ -367,11 +678,21 @@ class SerenityLinearResponseSolver:
             self._lr_task.settings.grid.smallGridAccuracy = int(
                 self.small_grid_accuracy)
 
-    def _get_rsp_signature(self):
+    def _get_rsp_signature(self, nstates=None, exc_method=None):
+        """
+        Returns the response-settings signature.
+
+        :param nstates:
+            Optional root count overriding ``nstates`` (gradient tasks).
+        :param exc_method:
+            Optional method overriding ``exc_method`` (SF gradients are
+            always SF-TDA).
+        """
+
         return (
-            self.exc_method,
+            self.exc_method if exc_method is None else str(exc_method),
             bool(self.spinflip),
-            int(self.nstates),
+            int(self.nstates if nstates is None else nstates),
             self.conv_thresh,
             self.max_cycles,
             self.max_subspace_dimension,

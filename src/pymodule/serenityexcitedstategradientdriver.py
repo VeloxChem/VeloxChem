@@ -38,7 +38,9 @@ from .veloxchemlib import mpi_master, hartree_in_ev
 
 from .errorhandler import assert_msg_critical
 from .gradientdriver import GradientDriver
-from .serenityscfdriver import SerenityScfDriver
+from .serenityscfdriver import (SerenityScfDriver, SerenityCalculationError,
+                                AdiabaticStateSelectionError,
+                                parse_serenity_lr_output)
 from .serenitylrrspeigensolver import SerenityLinearResponseSolver
 from .transitiondensitytracker import (StateTrackingError,
                                        StateTrackingResult,
@@ -49,6 +51,267 @@ try:
     from qcserenity import serenipy as spy
 except ImportError:
     pass
+
+
+_MULTIPLICITY_LETTERS = {1: 'S', 2: 'D', 3: 'T', 4: 'Q'}
+
+
+def manifold_state_label(multiplicity, manifold_state_index):
+    """
+    Physical label of the n-th state of a spin manifold.
+
+    Singlets count from the ground state (index 1 -> S0, 2 -> S1); other
+    manifolds count from 1 (triplet index 1 -> T1).
+    """
+
+    multiplicity = int(multiplicity)
+    index = int(manifold_state_index)
+    if multiplicity == 1:
+        return f'S{index - 1}'
+    letter = _MULTIPLICITY_LETTERS.get(multiplicity, f'M{multiplicity}_')
+    return f'{letter}{index}'
+
+
+def spin_classification_boundaries(multiplicities):
+    """<S^2> values halfway between neighbouring ideal multiplicities."""
+
+    mults = np.asarray(multiplicities, dtype=int).reshape(-1)
+    first = 2 if mults.size and int(mults[0]) % 2 == 0 else 1
+    candidates = np.arange(first, first + 12, 2)
+    spins = 0.5 * (candidates - 1)
+    ideal = spins * (spins + 1.0)
+    return 0.5 * (ideal[:-1] + ideal[1:])
+
+
+def classify_spin_quality(state_s2, s2_deviation, multiplicities,
+                          ambiguity_margin=0.25, contamination_threshold=0.3):
+    """
+    Per-root spin-quality diagnostics for approximate SF <S^2> values.
+
+    ``spin_ambiguous`` marks roots whose <S^2> lies within
+    ``ambiguity_margin`` of a classification boundary (<S^2> ~ 1 between
+    singlet and triplet), where the nearest-multiplicity assignment is not
+    meaningful.  ``spin_contaminated`` marks roots further than
+    ``contamination_threshold`` from their nearest ideal <S^2>.
+    """
+
+    s2 = np.asarray(state_s2, dtype=float).reshape(-1)
+    deviation = np.asarray(s2_deviation, dtype=float).reshape(-1)
+    boundaries = spin_classification_boundaries(multiplicities)
+    distance = np.min(np.abs(s2[:, None] - boundaries[None, :]), axis=1)
+    ambiguous = distance < float(ambiguity_margin)
+    contaminated = deviation > float(contamination_threshold)
+    quality = np.where(ambiguous, 'ambiguous',
+                       np.where(contaminated, 'contaminated', 'clean'))
+    return {
+        'spin_ambiguous': ambiguous,
+        'spin_contaminated': contaminated,
+        'distance_to_spin_boundary': distance,
+        'spin_quality': [str(value) for value in quality],
+    }
+
+
+def select_adiabatic_manifold_root(excitation_energies_ev,
+                                   multiplicities,
+                                   state_s2,
+                                   s2_deviation,
+                                   target_multiplicity=1,
+                                   manifold_state_index=2,
+                                   manifold_filter='nearest',
+                                   s2_tolerance=0.5,
+                                   spin_ambiguity_margin=0.25,
+                                   spin_contamination_threshold=0.3,
+                                   near_crossing_threshold_ev=0.15):
+    """
+    Selects the adiabatic n-th state of a spin manifold from one spectrum.
+
+    A pure function of the CURRENT spectrum -- no previous geometry enters:
+    the raw roots are ordered by current excitation energy, the roots of
+    ``target_multiplicity`` are kept, and the ``manifold_state_index``-th is
+    returned.  With the defaults this is S1, the second-lowest singlet,
+    whatever its raw Serenity root number.
+
+    Roots are assigned to a multiplicity by the nearest ideal <S^2>
+    (``manifold_filter='nearest'``).  The legacy hard tolerance
+    (``'strict'``: |<S^2> - ideal| <= s2_tolerance) is reported for
+    comparison only: it moved S0 in and out of the counted manifold when
+    its <S^2> crossed 0.5 and so switched the optimization between S1 and
+    S2.  Any root at or below the selected energy whose <S^2> lies near a
+    classification boundary makes the selection non-robust
+    (``selection_robust = False``); it is flagged, never silently trusted.
+
+    :param excitation_energies_ev:
+        Excitation energies of the raw roots (eV, any common zero).
+    :param multiplicities:
+        Nearest-multiplicity classification of every raw root.
+    :param state_s2:
+        Approximate <S^2> of every raw root.
+    :param s2_deviation:
+        |<S^2> - ideal <S^2>| of every raw root.
+    :param target_multiplicity:
+        Multiplicity of the manifold (1 = singlets).
+    :param manifold_state_index:
+        One-based position in the manifold (2 = S1 for singlets).
+    :param manifold_filter:
+        ``'nearest'`` or ``'strict'``.
+    :param s2_tolerance:
+        Tolerance of the strict filter.
+    :param spin_ambiguity_margin:
+        <S^2> margin around classification boundaries flagged as ambiguous.
+    :param spin_contamination_threshold:
+        Deviation above which a root is flagged as spin contaminated.
+    :param near_crossing_threshold_ev:
+        Gap below which a near crossing is flagged.
+
+    :return:
+        ``(raw_root, info)`` with a one-based raw root.
+
+    :raises AdiabaticStateSelectionError:
+        When the window holds fewer than ``manifold_state_index`` roots of
+        the target multiplicity.
+    """
+
+    energies = np.asarray(excitation_energies_ev, dtype=float).reshape(-1)
+    mults = np.asarray(multiplicities, dtype=int).reshape(-1)
+    s2 = np.asarray(state_s2, dtype=float).reshape(-1)
+    deviation = np.asarray(s2_deviation, dtype=float).reshape(-1)
+    nroots = int(energies.size)
+    filter_label = str(manifold_filter).strip().lower()
+    target = int(target_multiplicity)
+    index = int(manifold_state_index)
+
+    if not (mults.size == s2.size == deviation.size == nroots):
+        raise AdiabaticStateSelectionError(
+            'energy, multiplicity and <S^2> arrays have different sizes')
+    if filter_label not in ('nearest', 'strict'):
+        raise ValueError(
+            f"manifold_filter must be 'nearest' or 'strict', not "
+            f'{manifold_filter!r}')
+    if index < 1:
+        raise ValueError('manifold_state_index must be >= 1')
+    if not (np.all(np.isfinite(energies)) and np.all(np.isfinite(s2))):
+        raise AdiabaticStateSelectionError(
+            'nonfinite excitation energy or <S^2> in the spectrum')
+
+    order = [int(i) for i in np.argsort(energies, kind='stable')]
+    quality = classify_spin_quality(s2, deviation, mults,
+                                    spin_ambiguity_margin,
+                                    spin_contamination_threshold)
+    nearest = [i for i in order if mults[i] == target]
+    strict = [i for i in nearest if deviation[i] <= float(s2_tolerance)]
+    manifold = nearest if filter_label == 'nearest' else strict
+    label = manifold_state_label(target, index)
+
+    info = {
+        'target_multiplicity': target,
+        'manifold_state_index': index,
+        'state_label': label,
+        'manifold_filter': filter_label,
+        's2_tolerance': float(s2_tolerance),
+        'n_roots': nroots,
+        'energy_ordered_roots': [i + 1 for i in order],
+        'manifold_roots': [i + 1 for i in manifold],
+        'manifold_labels': [manifold_state_label(target, k + 1)
+                            for k in range(len(manifold))],
+        'nearest_multiplicity_roots': [i + 1 for i in nearest],
+        'strict_s2_roots': [i + 1 for i in strict],
+        'spin_quality': quality['spin_quality'],
+        'distance_to_spin_boundary':
+            quality['distance_to_spin_boundary'].tolist(),
+        'spin_ambiguous_roots': [
+            i + 1 for i in range(nroots) if quality['spin_ambiguous'][i]],
+        'spin_contaminated_roots': [
+            i + 1 for i in range(nroots) if quality['spin_contaminated'][i]],
+        'warnings': [],
+    }
+
+    if len(manifold) < index:
+        info['selected_raw_root'] = None
+        raise AdiabaticStateSelectionError(
+            f'the computed window of {nroots} root(s) contains only '
+            f'{len(manifold)} root(s) of multiplicity {target} '
+            f'({filter_label} classification: raw roots '
+            f'{[i + 1 for i in manifold]}), but {label} (manifold state '
+            f'{index}) was requested; enlarge the response root window',
+            details=info)
+
+    chosen = manifold[index - 1]
+    position = order.index(chosen)
+    ambiguous_below = [i + 1 for i in order[:position + 1]
+                       if quality['spin_ambiguous'][i]]
+    lower = manifold[index - 2] if index >= 2 else None
+    upper = manifold[index] if len(manifold) > index else None
+    gap_lower = (None if lower is None else
+                 float(energies[chosen] - energies[lower]))
+    gap_upper = (None if upper is None else
+                 float(energies[upper] - energies[chosen]))
+    others = [i for i in range(nroots) if i != chosen]
+    closest = (min(others, key=lambda i: abs(energies[i] - energies[chosen]))
+               if others else None)
+    closest_gap = (None if closest is None else
+                   float(abs(energies[closest] - energies[chosen])))
+    strict_choice = strict[index - 1] + 1 if len(strict) >= index else None
+    threshold = float(near_crossing_threshold_ev)
+
+    info.update({
+        'selected_raw_root': chosen + 1,
+        'selected_excitation_energy_ev': float(energies[chosen]),
+        'selected_multiplicity': int(mults[chosen]),
+        'selected_s2': float(s2[chosen]),
+        'selected_s2_deviation': float(deviation[chosen]),
+        'selected_spin_quality': quality['spin_quality'][chosen],
+        'manifold_ground_root': manifold[0] + 1,
+        'lower_manifold_root': None if lower is None else lower + 1,
+        'upper_manifold_root': None if upper is None else upper + 1,
+        'gap_to_lower_manifold_state_ev': gap_lower,
+        'gap_to_upper_manifold_state_ev': gap_upper,
+        'closest_root': None if closest is None else closest + 1,
+        'gap_to_closest_root_ev': closest_gap,
+        'near_crossing_threshold_ev': threshold,
+        'near_crossing_lower': bool(gap_lower is not None and
+                                    gap_lower < threshold),
+        'near_crossing_upper': bool(gap_upper is not None and
+                                    gap_upper < threshold),
+        'near_degenerate_any_root': bool(closest_gap is not None and
+                                         closest_gap < threshold),
+        'ambiguous_roots_at_or_below_selected': ambiguous_below,
+        'selection_robust': not ambiguous_below,
+        'strict_filter_selected_root': strict_choice,
+        'strict_filter_disagrees': strict_choice != chosen + 1,
+    })
+    if target == 1 and index == 2:
+        info['gap_s0_s1_ev'] = gap_lower
+        info['gap_s1_s2_ev'] = gap_upper
+
+    if ambiguous_below:
+        info['warnings'].append(
+            f'raw root(s) {ambiguous_below} at or below the selected energy '
+            f'have <S^2> within {float(spin_ambiguity_margin):.2f} of a '
+            f'multiplicity boundary; the {label} assignment depends on '
+            'their classification')
+    if quality['spin_contaminated'][chosen]:
+        info['warnings'].append(
+            f'selected raw root {chosen + 1} is spin contaminated '
+            f'(<S^2> = {s2[chosen]:.4f}, deviation {deviation[chosen]:.4f})')
+    if info['near_crossing_lower'] or info['near_crossing_upper']:
+        info['warnings'].append(
+            f'near crossing: gap below {gap_lower} eV / above {gap_upper} eV '
+            f'(threshold {threshold} eV)')
+    return chosen + 1, info
+
+
+class _PresolvedResponse:
+    """
+    A solved LR spectrum presented through the ``getLRSCFController()``
+    interface of a Serenity GradientTask, so the state-selection hooks can be
+    applied before any gradient is requested.
+    """
+
+    def __init__(self, controller):
+        self._controller = controller
+
+    def getLRSCFController(self):
+        return self._controller
 
 
 class SerenityExcitedStateGradientDriver(GradientDriver):
@@ -86,6 +349,35 @@ class SerenityExcitedStateGradientDriver(GradientDriver):
         self.enforce_same_multiplicity = True
         self.target_multiplicity = None
         self.s2_tolerance = 0.5
+
+        # State selection.  'adiabatic' optimizes the manifold_state_index-th
+        # root of target_multiplicity ordered by CURRENT energy (S1 = second
+        # singlet) and uses transition-density tracking only as a diagnostic
+        # guard.  None keeps the historical behaviour: overlap tracking when
+        # enforce_same_multiplicity is set or a tracker is attached, the raw
+        # root otherwise.  See set_adiabatic_state().
+        self.state_selection_mode = None
+        self.manifold_state_index = None
+        self.manifold_filter = 'nearest'
+        self.spin_ambiguity_margin = 0.25
+        self.spin_contamination_threshold = 0.3
+        self.near_crossing_threshold_ev = 0.15
+        self.max_root_window_expansions = 2
+        self.root_window_increment = 5
+        self.expand_root_window_on_low_overlap = True
+        self.root_identity_tolerance_ev = 1.0e-3
+        self.root_identity_min_overlap = 0.99
+
+        # SCF warm start: keep the Serenity System (and hence the previous
+        # orbitals as SCF guess) across geometries.  Off by default; see
+        # SerenityScfDriver._invalidate_cache.  Never implies an LR restart.
+        self.reuse_scf_system = False
+
+        self.state_selection_info = None
+        self.evaluation_record = None
+        self.evaluation_history = []
+        self.last_gradient_task_provenance = None
+        self._guard_initialized_this_evaluation = False
 
         self.excited_state_energy = None
         self.selected_excitation_energy = None
@@ -137,6 +429,18 @@ class SerenityExcitedStateGradientDriver(GradientDriver):
                 ('int', 'target spin multiplicity; omit to infer initially'),
             's2_tolerance':
                 ('float', 'maximum deviation from ideal spin squared'),
+            'state_selection_mode':
+                ('str_lower', 'raw, tracked or adiabatic state selection'),
+            'manifold_state_index':
+                ('int', 'one-based state index in the target spin manifold'),
+            'manifold_filter':
+                ('str_lower', 'nearest or strict multiplicity classification'),
+            'spin_ambiguity_margin':
+                ('float', '<S^2> margin flagged ambiguous at boundaries'),
+            'near_crossing_threshold_ev':
+                ('float', 'gap below which a near crossing is flagged'),
+            'reuse_scf_system':
+                ('bool', 'reuse the Serenity System across geometries'),
         })
 
 
@@ -224,6 +528,7 @@ class SerenityExcitedStateGradientDriver(GradientDriver):
             self.s2_tolerance >= 0.0,
             'SerenityExcitedStateGradientDriver: s2_tolerance must be '
             'non-negative.')
+        self._validate_selection_settings()
 
     def compute(self, molecule):
         """
@@ -235,8 +540,11 @@ class SerenityExcitedStateGradientDriver(GradientDriver):
 
         self._tracking_applied_in_compute = False
         self._current_gradient_task_roots = []
+        self.evaluation_record = None
+        self._guard_initialized_this_evaluation = False
 
         tracking_error = None
+        calculation_error = None
         try:
             if self.numerical:
                 if self.rank == mpi_master():
@@ -250,12 +558,24 @@ class SerenityExcitedStateGradientDriver(GradientDriver):
                     self.gradient = None
         except StateTrackingError as error:
             tracking_error = (str(error), error.result)
+        except SerenityCalculationError as error:
+            # Fail closed: a failed SCF, LR solve, state selection or
+            # gradient never yields an energy or gradient.
+            self._reset_serenity_state_after_failure()
+            if self.comm.Get_size() == 1:
+                raise
+            calculation_error = (str(error), error.stage, error.details)
 
         tracking_error = self.comm.bcast(
             tracking_error, root=mpi_master())
         if tracking_error is not None:
             message, result = tracking_error
             raise StateTrackingError(message, result)
+        if self.comm.Get_size() > 1:
+            calculation_error = self.comm.bcast(
+                calculation_error, root=mpi_master())
+            if calculation_error is not None:
+                raise SerenityCalculationError(*calculation_error)
 
         self.gradient = self.comm.bcast(self.gradient, root=mpi_master())
         if self.rank == mpi_master():
@@ -280,6 +600,8 @@ class SerenityExcitedStateGradientDriver(GradientDriver):
                 'selected_s2_deviation': self.selected_s2_deviation,
                 'tracking_info': self.tracking_info,
                 'tracking_applied': self._tracking_applied_in_compute,
+                'state_selection_info': self.state_selection_info,
+                'evaluation_record': self.evaluation_record,
             }
         else:
             state_payload = None
@@ -309,15 +631,25 @@ class SerenityExcitedStateGradientDriver(GradientDriver):
         self.tracking_info = state_payload['tracking_info']
         self._tracking_applied_in_compute = bool(
             state_payload['tracking_applied'])
+        self.state_selection_info = state_payload['state_selection_info']
+        self.evaluation_record = state_payload['evaluation_record']
         if (self._tracking_applied_in_compute and
                 self.tracking_info is not None):
             self.tracking_history.append(deepcopy(self.tracking_info))
+        if self.evaluation_record is not None:
+            self.evaluation_history.append(
+                self._evaluation_summary(self.evaluation_record))
 
         self.print_geometry(molecule)
         self.print_gradient(molecule, [self.state_deriv_index])
 
-        self.serenity_driver._invalidate_cache()
-        self.rsp_driver._invalidate_rsp_cache()
+        if not self.reuse_scf_system:
+            # Fresh Serenity System for the next geometry: fresh SCF guess,
+            # no LR restart file.  With reuse_scf_system the System (and its
+            # orbitals, i.e. the SCF warm start) is kept; an LR restart is
+            # still refused across geometries by decide_lr_restart().
+            self.serenity_driver._invalidate_cache()
+            self.rsp_driver._invalidate_rsp_cache()
 
         self.ostream.print_blank()
         self.ostream.flush()
@@ -336,13 +668,24 @@ class SerenityExcitedStateGradientDriver(GradientDriver):
         if self.rank != mpi_master():
             return None
 
-        rsp_results = self.rsp_driver.compute(molecule, broadcast=False)
+        adiabatic = self._effective_selection_mode() == 'adiabatic'
+        if adiabatic:
+            # Energy-only evaluations (numerical gradients) follow the same
+            # adiabatic definition; the tracking guard is not run for them.
+            spectrum, selection, _ = (
+                self._adiabatic_spectrum_selection_and_guard(
+                    molecule, None, with_guard=False))
+            rsp_results = spectrum['results']
+            self.state_deriv_index = int(selection['selected_raw_root'])
+            self.state_selection_info = selection
+        else:
+            rsp_results = self.rsp_driver.compute(molecule, broadcast=False)
         eigenvalues = np.asarray(
             rsp_results['eigenvalues'], dtype=float).reshape(-1)
 
         if self.rsp_driver.spinflip:
             self._set_spin_metadata(rsp_results)
-            if self.enforce_same_multiplicity:
+            if self.enforce_same_multiplicity and not adiabatic:
                 self.state_deriv_index = (
                     self._select_energy_root_by_multiplicity(
                         self.state_deriv_index))
@@ -358,45 +701,85 @@ class SerenityExcitedStateGradientDriver(GradientDriver):
         return self.total_energy
 
     def _compute_analytical_master(self, molecule):
-        # Ensure SCF/system for current geometry is available and synchronized.
+        """
+        Energy and gradient of the selected state at the current geometry.
+
+        The response spectrum is solved and inspected BEFORE any gradient is
+        requested, so the gradient task runs once, for the selected root:
+
+          1. SCF at the current geometry (fail-closed);
+          2. LR spectrum at the current geometry, solved in the current MO
+             basis -- a stored LR solution seeds the Davidson solver only if
+             it belongs to this geometry, System and SCF solution;
+          3. convergence/completeness checks and spin diagnostics;
+          4. selection: ``adiabatic`` (n-th root of a spin manifold by current
+             energy), overlap ``tracked``, or ``raw``;
+          5. comparison with the last accepted state (a diagnostic guard in
+             adiabatic mode);
+          6. excited-state gradient for the selected raw root; its LRSCF step
+             may restart from step 2, which was solved at this geometry;
+          7. verification that the gradient task's root is the selected one.
+        """
+
+        # 1. SCF (raises SerenityCalculationError when not converged).
         self.serenity_driver._compute_energy_master(molecule)
 
         mode = self.serenity_driver._current_scf_mode
         requested_state = int(self.state_deriv_index)
-        grad_task = self._run_excited_gradient_task(mode)
+        selection_mode = self._effective_selection_mode()
+        self._current_gradient_task_roots = []
+        self.state_selection_info = None
         tracking_applied = False
+        selection = None
+        guard = None
 
-        if self.rsp_driver.spinflip:
-            self._update_spin_metadata(
-                grad_task.getLRSCFController())
+        if selection_mode == 'adiabatic':
+            # 2.-5. Spectrum, adiabatic selection, tracking guard.
+            spectrum, selection, guard = (
+                self._adiabatic_spectrum_selection_and_guard(molecule, mode))
+            selected_state = int(selection['selected_raw_root'])
+            tracking_applied = guard is not None
+        else:
+            # 2. Spectrum at the current geometry; the historical selection
+            # hooks receive it through the GradientTask-like adapter.
+            spectrum = self._solve_response_spectrum(
+                molecule, minimum_roots=requested_state)
+            presolved = _PresolvedResponse(spectrum['controller'])
+            if self.rsp_driver.spinflip:
+                self._update_spin_metadata(presolved.getLRSCFController())
 
-            if self.enforce_same_multiplicity:
-                selected_state = self._select_same_multiplicity_state(
-                    molecule, grad_task, mode, requested_state)
-                tracking_applied = self.state_tracker is not None
+            if selection_mode == 'raw':
+                selected_state = requested_state
+            elif self.rsp_driver.spinflip:
+                if self.enforce_same_multiplicity:
+                    selected_state = self._select_same_multiplicity_state(
+                        molecule, presolved, mode, requested_state)
+                    tracking_applied = self.state_tracker is not None
+                elif self.state_tracker is not None:
+                    selected_state = self._select_tracked_state(
+                        presolved, mode, requested_state)
+                    tracking_applied = True
+                else:
+                    selected_state = requested_state
             elif self.state_tracker is not None:
+                # Ordinary TDA/TDDFT has no interleaved spin manifolds, but its
+                # raw roots can still exchange character. Select the
+                # continuation from the transition-density overlap before the
+                # gradient is requested, without any spin filter.
                 selected_state = self._select_tracked_state(
-                    grad_task, mode, requested_state)
+                    presolved, mode, requested_state)
                 tracking_applied = True
             else:
                 selected_state = requested_state
-        elif self.state_tracker is not None:
-            # Ordinary TDA/TDDFT has no interleaved spin manifolds, but its raw
-            # roots can still exchange character. Select the continuation from
-            # the transition-density overlap before finalizing the energy and
-            # gradient, without applying any spin/multiplicity filter.
-            selected_state = self._select_tracked_state(
-                grad_task, mode, requested_state)
-            tracking_applied = True
-        else:
-            selected_state = requested_state
 
-        if selected_state != requested_state:
-            self.state_deriv_index = selected_state
-            grad_task = self._run_excited_gradient_task(mode)
-            if self.rsp_driver.spinflip:
-                self._update_spin_metadata(
-                    grad_task.getLRSCFController())
+        # 6. One gradient task, for the selected raw root only.
+        self.state_deriv_index = int(selected_state)
+        grad_task = self._run_excited_gradient_task(mode)
+
+        # 7. The gradient task re-solves the LR problem; check that its root
+        # with this index is the root that was selected.
+        verification = self._verify_gradient_root_identity(
+            grad_task, spectrum, int(selected_state))
 
         self.state_deriv_index = int(selected_state)
         if self.rsp_driver.spinflip:
@@ -429,12 +812,23 @@ class SerenityExcitedStateGradientDriver(GradientDriver):
         gradient = np.array(
             self.serenity_driver._system.getGeometry().getGradients(),
             dtype=float)
+        if not (np.isfinite(self.total_energy) and
+                np.all(np.isfinite(gradient))):
+            raise SerenityCalculationError(
+                'Serenity returned a nonfinite excited-state energy or '
+                'gradient.', stage='gradient',
+                details={'root': int(self.state_deriv_index)})
 
         self._grad_task = grad_task
         self.last_lrscf_controller = controller
         self._last_tracking_system = self.serenity_driver._system
         self._last_tracking_mode = mode
         self._last_tracking_molecule = molecule
+
+        if selection_mode == 'adiabatic':
+            self._finalize_adiabatic_evaluation(
+                spectrum, selection, guard, verification, gradient, mode)
+            return gradient
 
         if tracking_applied:
             if (self.tracking_info is not None and
@@ -484,27 +878,834 @@ class SerenityExcitedStateGradientDriver(GradientDriver):
             self._tracking_evaluation_counter += 1
             self._print_tracking_diagnostics(self.tracking_info)
 
+        self.evaluation_record = self._build_evaluation_record(
+            selection_mode, spectrum, None, None, verification, gradient)
         return gradient
 
-    def _run_excited_gradient_task(self, mode):
+    # ------------------------------------------------------------------
+    # State-selection configuration
+    # ------------------------------------------------------------------
+
+    def set_adiabatic_state(self, target_multiplicity=1,
+                            manifold_state_index=2,
+                            manifold_filter='nearest'):
+        """
+        Optimizes the n-th state of a spin manifold defined by current energy.
+
+        With the defaults the driver follows the adiabatic S1 surface: at
+        every geometry all roots are classified by nearest multiplicity, the
+        singlets are ordered by their current energy and the gradient of the
+        second one is computed.  Raw Serenity root numbers may change freely;
+        an attached transition-density tracker only reports on changes of
+        state character and never overrides the energy ordering.
+
+        :param target_multiplicity:
+            Spin multiplicity of the manifold (1 = singlets).
+        :param manifold_state_index:
+            One-based position in the manifold (1 = S0, 2 = S1, ...).
+        :param manifold_filter:
+            ``'nearest'`` (recommended) or ``'strict'`` (legacy hard
+            <S^2> tolerance, for comparisons only).
+        """
+
+        self.state_selection_mode = 'adiabatic'
+        self.target_multiplicity = int(target_multiplicity)
+        self.manifold_state_index = int(manifold_state_index)
+        self.manifold_filter = str(manifold_filter).strip().lower()
+        self._validate_selection_settings()
+
+    def _validate_selection_settings(self):
+        mode = getattr(self, 'state_selection_mode', None)
+        assert_msg_critical(
+            mode in (None, 'raw', 'tracked', 'adiabatic'),
+            'SerenityExcitedStateGradientDriver: state_selection_mode must '
+            'be raw, tracked or adiabatic.')
+        assert_msg_critical(
+            getattr(self, 'manifold_filter', 'nearest') in ('nearest',
+                                                            'strict'),
+            'SerenityExcitedStateGradientDriver: manifold_filter must be '
+            'nearest or strict.')
+        if mode == 'adiabatic':
+            # Adiabatic S1 unless configured otherwise.
+            if self.target_multiplicity is None:
+                self.target_multiplicity = 1
+            if self.manifold_state_index is None:
+                self.manifold_state_index = 2
+            assert_msg_critical(
+                int(self.manifold_state_index) >= 1 and
+                int(self.target_multiplicity) >= 1,
+                'SerenityExcitedStateGradientDriver: adiabatic selection '
+                'needs target_multiplicity >= 1 and manifold_state_index '
+                '>= 1.')
+
+    def _effective_selection_mode(self):
+        """``'adiabatic'``, ``'tracked'`` or ``'raw'``."""
+
+        mode = getattr(self, 'state_selection_mode', None)
+        if mode is not None:
+            return str(mode)
+        spinflip = bool(getattr(self.rsp_driver, 'spinflip', False))
+        if (getattr(self, 'state_tracker', None) is not None or
+                (spinflip and getattr(self, 'enforce_same_multiplicity',
+                                      False))):
+            return 'tracked'
+        return 'raw'
+
+    # ------------------------------------------------------------------
+    # Response spectrum and adiabatic selection
+    # ------------------------------------------------------------------
+
+    def _solve_response_spectrum(self, molecule, minimum_roots=None):
+        """
+        Solves (or reuses) the LR spectrum at the current geometry.
+
+        Serenity's spin-flip gradient is always SF-TDA, so the spectrum used
+        for the selection is solved with SF-TDA too; otherwise the raw root
+        numbers of the two solves need not refer to the same states.
+
+        :return:
+            Dictionary with ``results``, ``controller``, ``energies_ev``,
+            ``vectors`` (first component, copied before the gradient task
+            runs) and ``provenance``.
+        """
+
+        rsp = self.rsp_driver
+        if rsp.spinflip and rsp.exc_method != 'tda':
+            self.ostream.print_info(
+                'Serenity spin-flip gradients are SF-TDA; the spectrum used '
+                'for state selection is solved with SF-TDA as well.')
+            self.ostream.flush()
+            rsp.set_exc_method('tda')
+            self.exc_method = 'tda'
+        if minimum_roots is not None and int(minimum_roots) > int(rsp.nstates):
+            rsp.set_nstates(int(minimum_roots))
+
+        results = rsp.compute(molecule, broadcast=False)
+        controller = rsp.get_lr_controller()
+        energies_ev = (np.asarray(results['eigenvalues'],
+                                  dtype=float).reshape(-1) * hartree_in_ev())
+        return {
+            'results': results,
+            'controller': controller,
+            'energies_ev': energies_ev,
+            'vectors': self._first_vector_component(controller),
+            'provenance': results.get('lr_provenance'),
+        }
+
+    @staticmethod
+    def _first_vector_component(controller):
+        """Copy of the first excitation-vector component, or ``None``."""
+
+        try:
+            vectors = controller.getExcitationVectors('isolated')
+            first = np.array(vectors[0], dtype=float, copy=True)
+        except Exception:
+            return None
+        return first if first.ndim == 2 else None
+
+    def _adiabatic_spectrum_selection_and_guard(self, molecule, mode,
+                                                with_guard=True):
+        """
+        Solves the spectrum, selects the adiabatic state and runs the guard.
+
+        The root window is enlarged (at most ``max_root_window_expansions``
+        times) when the target manifold is incomplete, and once when the
+        previous state's character overlaps with no current root, which can
+        mean that it has left the window.
+
+        :return:
+            ``(spectrum, selection, guard)``; ``guard`` is ``None`` without a
+            tracker or with ``with_guard=False``.
+        """
+
+        assert_msg_critical(
+            bool(self.rsp_driver.spinflip),
+            'SerenityExcitedStateGradientDriver: adiabatic manifold selection '
+            'requires a spin-flip response, whose spectrum contains the '
+            'ground state and a multiplicity for every root.')
+        self._validate_selection_settings()
+
+        expansions = []
+        low_overlap_retry = False
+        while True:
+            spectrum = self._solve_response_spectrum(molecule)
+            self._set_spin_metadata(spectrum['results'])
+            try:
+                selection = self._select_adiabatic_root(spectrum['energies_ev'])
+            except AdiabaticStateSelectionError as error:
+                if len(expansions) >= int(self.max_root_window_expansions):
+                    error.details['root_window_expansions'] = expansions
+                    raise
+                expansions.append(self._expand_root_window(
+                    'target manifold incomplete'))
+                continue
+
+            guard = (self._adiabatic_tracking_guard(spectrum, mode, selection)
+                     if with_guard else None)
+            if (guard is not None and guard.get('low_overlap') and
+                    self.expand_root_window_on_low_overlap and
+                    not low_overlap_retry and
+                    len(expansions) < int(self.max_root_window_expansions)):
+                low_overlap_retry = True
+                expansions.append(self._expand_root_window(
+                    'the previous state character overlaps with no root in '
+                    'the window'))
+                continue
+            break
+
+        selection['root_window_expansions'] = expansions
+        selection['nstates'] = int(self.rsp_driver.nstates)
+        selection['reference_s2'] = (None if self.reference_s2 is None else
+                                     float(self.reference_s2))
+        if guard is not None and guard.get('low_overlap') and low_overlap_retry:
+            guard['warnings'].append(
+                'low overlap persists after enlarging the root window; the '
+                'adiabatic selection is kept')
+        self.state_selection_info = selection
+        return spectrum, selection, guard
+
+    def _select_adiabatic_root(self, energies_ev):
+        """Applies select_adiabatic_manifold_root to the current metadata."""
+
+        _, info = select_adiabatic_manifold_root(
+            energies_ev,
+            self.state_multiplicities,
+            self.state_s2,
+            self.s2_deviation,
+            target_multiplicity=int(self.target_multiplicity),
+            manifold_state_index=int(self.manifold_state_index),
+            manifold_filter=self.manifold_filter,
+            s2_tolerance=float(self.s2_tolerance),
+            spin_ambiguity_margin=float(self.spin_ambiguity_margin),
+            spin_contamination_threshold=float(
+                self.spin_contamination_threshold),
+            near_crossing_threshold_ev=float(self.near_crossing_threshold_ev))
+        return info
+
+    def _expand_root_window(self, reason):
+        """Enlarges the response root window by ``root_window_increment``."""
+
+        old = int(self.rsp_driver.nstates)
+        new = old + int(self.root_window_increment)
+        self.rsp_driver.set_nstates(new)
+        self.ostream.print_info(
+            f'Serenity adiabatic selection: enlarging the response window '
+            f'from {old} to {new} roots ({reason}).')
+        self.ostream.flush()
+        return {'from_nstates': old, 'to_nstates': new, 'reason': str(reason)}
+
+    def _adiabatic_tracking_guard(self, spectrum, mode, selection):
+        """
+        Compares the current spectrum with the last accepted adiabatic state.
+
+        Diagnostic only; the result never changes the selected root.  It
+        reports where the previous state's character went (largest
+        transition-density overlap, ground state included), how much of it
+        the current adiabatic root carries, whether a character crossing is
+        suggested and whether continuity is lost (low overlap).
+        """
+
+        tracker = getattr(self, 'state_tracker', None)
+        if tracker is None:
+            return None
+
+        controller = spectrum['controller']
+        selected = int(selection['selected_raw_root'])
+        nroots = int(np.asarray(spectrum['energies_ev']).size)
+        in_manifold = np.zeros(nroots, dtype=bool)
+        for root in selection['manifold_roots']:
+            in_manifold[int(root) - 1] = True
+        metadata = self._tracking_candidate_metadata(controller, in_manifold)
+        previous_root = (int(tracker.reference_state)
+                         if tracker.has_reference() else None)
+        label = selection['state_label']
+
+        guard = {
+            'state_label': label,
+            'previous_selected_root': previous_root,
+            'current_adiabatic_root': selected,
+            'reference_staged': False,
+            'reference_updated': False,
+            'warnings': [],
+        }
+        try:
+            result = tracker.track(
+                self.serenity_driver._system, controller, mode,
+                active_reference_state=selected, allowed_states=None,
+                candidate_metadata=metadata)
+        except Exception as error:
+            guard.update({
+                'status': 'UNAVAILABLE', 'initialized': False,
+                'guard_available': False, 'low_overlap': False,
+                'character_crossing_suspected': False,
+                'tracked_matches_adiabatic': None, 'overlap_matrix': None,
+                'continuity': 'unavailable',
+            })
+            guard['warnings'].append(
+                f'transition-density tracking failed: {error}')
+            return guard
+
+        info = result.to_dict()
+        initialized = bool(info.get('initialized', False))
+        if initialized:
+            self._guard_initialized_this_evaluation = True
+        overlap = info.get('overlap_matrix')
+        guard.update({
+            'status': info.get('status'),
+            'initialized': initialized,
+            'reference_state': info.get('reference_state'),
+            'tracked_root': info.get('new_state'),
+            'max_overlap': info.get('max_overlap'),
+            'second_state': info.get('second_state'),
+            'second_overlap': info.get('second_overlap'),
+            'overlap_ratio': info.get('overlap_ratio'),
+            'ground_state_root': info.get('ground_state_root'),
+            'ground_state_collision': bool(
+                info.get('ground_state_collision', False)),
+            'global_state': info.get('global_state'),
+            'overlap_matrix': overlap,
+            'candidate_table': info.get('candidate_table'),
+        })
+        guard['warnings'].extend(info.get('warnings') or [])
+
+        if initialized:
+            guard.update({
+                'guard_available': True, 'tracked_root_any': selected,
+                'tracked_overlap_any': 1.0,
+                'overlap_with_adiabatic_root': 1.0,
+                'tracked_matches_adiabatic': True,
+                'character_crossing_suspected': False, 'low_overlap': False,
+                'continuity': 'reference_initialized',
+            })
+            return guard
+
+        reference = guard.get('reference_state')
+        matrix = None if overlap is None else np.asarray(overlap)
+        if (matrix is None or matrix.ndim != 2 or reference is None or
+                not 1 <= int(reference) <= matrix.shape[1] or
+                matrix.shape[0] != nroots):
+            guard.update({
+                'guard_available': False, 'low_overlap': False,
+                'character_crossing_suspected': False,
+                'tracked_matches_adiabatic': None,
+                'continuity': 'unavailable',
+            })
+            guard['warnings'].append(
+                'no transition-density overlap is available for this '
+                'evaluation')
+            return guard
+
+        column = np.abs(np.real(matrix[:, int(reference) - 1])).astype(float)
+        scores = np.where(np.isfinite(column), column, -np.inf)
+        any_root = int(np.argmax(scores)) + 1
+        any_overlap = float(column[any_root - 1])
+        adiabatic_overlap = float(column[selected - 1])
+        minimum = float(getattr(tracker, 'min_overlap', 0.5))
+        low = (not np.isfinite(any_overlap)) or any_overlap < minimum
+        matches = any_root == selected
+        crossing = (not low) and (not matches)
+        guard.update({
+            'guard_available': True,
+            'tracked_root_any': any_root,
+            'tracked_overlap_any': any_overlap,
+            'overlap_with_adiabatic_root': adiabatic_overlap,
+            'tracked_matches_adiabatic': bool(matches),
+            'character_crossing_suspected': bool(crossing),
+            'low_overlap': bool(low),
+            'continuity': ('continuous' if matches and not low else
+                           'character_crossing' if crossing else
+                           'low_overlap'),
+        })
+        if crossing:
+            guard['warnings'].append(
+                f'the character of the previous {label} (raw root '
+                f'{reference}) now overlaps most ({any_overlap:.3f}) with raw '
+                f'root {any_root}, while the adiabatic {label} is raw root '
+                f'{selected} (overlap {adiabatic_overlap:.3f}); the adiabatic '
+                'definition is kept (possible physical crossing)')
+        if low:
+            guard['warnings'].append(
+                f'largest overlap with the previous {label} character is '
+                f'{any_overlap:.3f} < {minimum:.3f}; continuity is not '
+                'established')
+        return guard
+
+    def _finalize_adiabatic_evaluation(self, spectrum, selection, guard,
+                                       verification, gradient, mode):
+        """Stages the tracking reference and writes the evaluation records."""
+
+        selected = int(selection['selected_raw_root'])
+        if guard is not None:
+            if not guard.get('initialized', False):
+                # In adiabatic mode the accepted-step reference is always the
+                # current adiabatic state; the overlap classification does not
+                # decide what is staged.  geomeTRIC's accepted-step hook
+                # commits it and a rejected trial rolls it back, so every
+                # comparison is against the last ACCEPTED geometry.
+                self.state_tracker.propose_reference(
+                    self._last_tracking_system, spectrum['controller'], mode,
+                    selected)
+                guard['reference_staged'] = True
+            self._tracking_applied_in_compute = True
+
+        record = self._build_evaluation_record(
+            'adiabatic', spectrum, selection, guard, verification, gradient)
+        self.evaluation_record = record
+        self.state_selection_info = selection
+
+        g = guard or {}
+        warnings = list(selection.get('warnings') or [])
+        warnings.extend(g.get('warnings') or [])
+        self.tracking_info = {
+            'tracking_framework': 'serenity_spinflip',
+            'state_selection_mode': 'adiabatic',
+            'overlap_source': ('serenity_transition_density_overlap'
+                               if guard is not None else None),
+            'status': 'ADIABATIC' if guard is None else g.get('status'),
+            'initialized': bool(g.get('initialized', False)),
+            'state_label': selection['state_label'],
+            'selected_raw_root': selected,
+            'selected_state': selected,
+            'new_state': selected,
+            'old_state': g.get('previous_selected_root'),
+            'assignment_confident': bool(selection['selection_robust'] and
+                                         verification['verified']),
+            'selection_robust': bool(selection['selection_robust']),
+            'tracked_root': g.get('tracked_root'),
+            'tracked_root_any': g.get('tracked_root_any'),
+            'tracked_overlap_any': g.get('tracked_overlap_any'),
+            'overlap_with_adiabatic_root': g.get('overlap_with_adiabatic_root'),
+            'tracked_matches_adiabatic': g.get('tracked_matches_adiabatic'),
+            'character_crossing_suspected':
+                g.get('character_crossing_suspected'),
+            'low_overlap': g.get('low_overlap'),
+            'max_overlap': g.get('max_overlap'),
+            'second_overlap': g.get('second_overlap'),
+            'reference_staged': bool(g.get('reference_staged', False)),
+            'reference_updated': False,
+            'overlap_matrix': g.get('overlap_matrix'),
+            'gradient_root': selected,
+            'gradient_task_roots': list(self._current_gradient_task_roots),
+            'gradient_recomputed': False,
+            'selected_excitation_energy': float(self.selected_excitation_energy),
+            'total_energy': float(self.total_energy),
+            'gradient_rms': float(np.sqrt(np.mean(gradient**2))),
+            'state_excitation_energies_hartree': np.asarray(
+                self.excited_state_energy, dtype=float).copy(),
+            'state_multiplicities': np.asarray(
+                self.state_multiplicities, dtype=int).copy(),
+            'state_s2': np.asarray(self.state_s2, dtype=float).copy(),
+            's2_deviation': np.asarray(self.s2_deviation, dtype=float).copy(),
+            'gap_to_lower_manifold_state_ev':
+                selection.get('gap_to_lower_manifold_state_ev'),
+            'gap_to_upper_manifold_state_ev':
+                selection.get('gap_to_upper_manifold_state_ev'),
+            'near_crossing_lower': selection.get('near_crossing_lower'),
+            'near_crossing_upper': selection.get('near_crossing_upper'),
+            'warnings': warnings,
+        }
+        self._tracking_evaluation_counter += 1
+        self._print_adiabatic_selection(record)
+
+    # ------------------------------------------------------------------
+    # Gradient task
+    # ------------------------------------------------------------------
+
+    def _gradient_lr_signature(self):
+        """Response-settings signature of the gradient task's LRSCF step."""
+
+        rsp = self.rsp_driver
+        nstates = max(int(self.state_deriv_index), int(rsp.nstates))
+        method = 'tda' if rsp.spinflip else self.exc_method
+        return rsp._get_rsp_signature(nstates=nstates, exc_method=method)
+
+    def _run_excited_gradient_task(self, mode, lr_restart=None):
         """
         Runs one Serenity gradient task for the current raw response root.
+
+        The task re-solves the LR problem.  Its Serenity restart flag is set
+        only when the System's stored LR solution was obtained at this
+        geometry, with this SCF solution and the same response settings
+        (normally the spectrum just solved for the state selection); after
+        any geometry change it is False.
+
+        :param mode:
+            ``'restricted'`` or ``'unrestricted'``.
+        :param lr_restart:
+            Optional explicit restart flag; ``None`` applies the policy of
+            ``SerenityLinearResponseSolver.decide_lr_restart``.
+
+        :return:
+            The finished Serenity gradient task.
         """
 
         self._current_gradient_task_roots.append(
             int(self.state_deriv_index))
+
+        signature = self._gradient_lr_signature()
+        if lr_restart is None:
+            decision = self.rsp_driver.decide_lr_restart(signature)
+        else:
+            decision = {
+                'restart': bool(lr_restart),
+                'reason': 'explicitly requested by the caller',
+                'policy': getattr(self.rsp_driver, 'lr_restart_policy', None),
+            }
 
         if mode == 'restricted':
             grad_task = spy.GradientTask_R(self.serenity_driver._system)
         else:
             grad_task = spy.GradientTask_U(self.serenity_driver._system)
 
-        self._configure_excited_gradient_task(grad_task)
+        self._configure_excited_gradient_task(
+            grad_task, lr_restart=decision['restart'])
 
-        with self.serenity_driver._serenity_output_context():
-            grad_task.run()
+        capture = self.serenity_driver.capture_serenity_output('gradient')
+        try:
+            with capture:
+                grad_task.run()
+        except Exception as error:
+            self.rsp_driver.invalidate_lr_restart_ledger()
+            raise SerenityCalculationError(
+                f'Serenity excited-state gradient task failed: {error}',
+                stage='gradient',
+                details={'root': int(self.state_deriv_index),
+                         'serenity_output_tail': capture.text[-4000:]}
+            ) from error
 
+        # The captured text covers every iterative solve of the task (the
+        # LRSCF step and the Z-vector equations).
+        parsed = parse_serenity_lr_output(capture.text)
+        provenance = {
+            'root': int(self.state_deriv_index),
+            'lr_restart_requested': bool(decision['restart']),
+            # None if Serenity printed no restart message.
+            'lr_restart_used': (parsed['restart_loaded']
+                                if decision['restart'] else False),
+            'lr_restart_reason': decision['reason'],
+            'lr_converged': parsed['converged'],
+            'davidson_iterations': parsed['davidson_iterations'],
+            'n_converged_solves': parsed['n_converged_solves'],
+            'warnings': parsed['warnings'],
+        }
+        self.last_gradient_task_provenance = provenance
+        if parsed['converged'] is not True:
+            self.rsp_driver.invalidate_lr_restart_ledger()
+            if parsed['converged'] is None:
+                reason = ('Serenity printed no convergence status for the '
+                          'iterative solves of the gradient task, so '
+                          'convergence cannot be verified')
+            else:
+                reason = ('An iterative solve of the Serenity gradient task '
+                          '(LRSCF step or Z-vector) did not converge '
+                          '("Convergence criterion not reached")')
+            raise SerenityCalculationError(
+                f'{reason}; the gradient is not usable.', stage='gradient',
+                details=provenance)
+
+        # The gradient task left its converged LR solution in the System.
+        self.rsp_driver.record_lr_solution(signature)
         return grad_task
+
+    def _verify_gradient_root_identity(self, grad_task, spectrum,
+                                       selected_state):
+        """
+        Checks that the gradient task's root is the selected root.
+
+        Compares the excitation energy (and, when available, the excitation
+        vector) of ``selected_state`` between the spectrum used for the
+        selection and the LRSCF step of the gradient task.
+
+        :raises SerenityCalculationError:
+            When the two roots differ.
+        """
+
+        controller = grad_task.getLRSCFController()
+        grad_energies = np.asarray(
+            controller.getExcitationEnergies('isolated'),
+            dtype=float).reshape(-1)
+        spectrum_energies = np.asarray(spectrum['energies_ev'],
+                                       dtype=float).reshape(-1)
+        index = int(selected_state) - 1
+        info = {
+            'requested_root': int(selected_state),
+            'n_roots_spectrum': int(spectrum_energies.size),
+            'n_roots_gradient_task': int(grad_energies.size),
+            'selected_energy_difference_ev': None,
+            'max_energy_difference_ev': None,
+            'selected_vector_overlap': None,
+        }
+        problems = []
+        if not (0 <= index < grad_energies.size and
+                index < spectrum_energies.size):
+            problems.append('the selected root is outside the gradient-task '
+                            'spectrum')
+        else:
+            difference = float(abs(grad_energies[index] -
+                                   spectrum_energies[index]))
+            count = min(grad_energies.size, spectrum_energies.size)
+            info['selected_energy_difference_ev'] = difference
+            info['max_energy_difference_ev'] = float(np.max(np.abs(
+                grad_energies[:count] - spectrum_energies[:count])))
+            tolerance = float(getattr(self, 'root_identity_tolerance_ev',
+                                      1.0e-3))
+            minimum_overlap = float(getattr(self, 'root_identity_min_overlap',
+                                            0.99))
+            if not np.isfinite(difference) or difference > tolerance:
+                problems.append(
+                    f'the excitation energy of raw root {selected_state} '
+                    f'differs by {difference:.3e} eV between the selection '
+                    'spectrum and the gradient task')
+
+            before = spectrum.get('vectors')
+            after = self._first_vector_component(controller)
+            if (before is not None and after is not None and
+                    before.shape[0] == after.shape[0] and
+                    index < before.shape[1] and index < after.shape[1]):
+                a = before[:, index]
+                b = after[:, index]
+                norm = float(np.linalg.norm(a) * np.linalg.norm(b))
+                overlap = float(abs(a @ b) / norm) if norm > 0.0 else 0.0
+                info['selected_vector_overlap'] = overlap
+                if overlap < minimum_overlap:
+                    problems.append(
+                        f'the excitation vector of raw root {selected_state} '
+                        f'has overlap {overlap:.6f} with the selected root')
+        info['verified'] = not problems
+        info['problems'] = problems
+        if problems:
+            raise SerenityCalculationError(
+                'The Serenity gradient task did not solve for the selected '
+                'root: ' + '; '.join(problems), stage='root_identity',
+                details=info)
+        return info
+
+    def _reset_serenity_state_after_failure(self):
+        """Drops the System, the LR ledger and a just-created reference."""
+
+        for action in (getattr(self.serenity_driver, '_invalidate_cache',
+                               None),
+                       getattr(self.rsp_driver, '_invalidate_rsp_cache',
+                               None)):
+            if action is not None:
+                try:
+                    action()
+                except Exception:
+                    pass
+        tracker = getattr(self, 'state_tracker', None)
+        if (tracker is not None and
+                getattr(self, '_guard_initialized_this_evaluation', False)):
+            clear = getattr(tracker, 'clear_reference', None)
+            if clear is not None:
+                clear()
+        self._guard_initialized_this_evaluation = False
+
+    # ------------------------------------------------------------------
+    # Records
+    # ------------------------------------------------------------------
+
+    def _build_evaluation_record(self, selection_mode, spectrum, selection,
+                                 guard, verification, gradient):
+        """
+        Everything needed to reconstruct the state selection of one
+        evaluation: SCF provenance, LR provenance (restart requested/used),
+        full spectrum with spin diagnostics, the selection, the tracking
+        guard and the gradient task with its root verification.
+        """
+
+        results = spectrum.get('results') or {}
+        energies = np.asarray(results.get('eigenvalues', []),
+                              dtype=float).reshape(-1)
+        reference_energy = self.reference_energy
+        gradient = np.asarray(gradient, dtype=float)
+        scf_provenance = getattr(self.serenity_driver, 'get_scf_provenance',
+                                 None)
+
+        def as_list(value, dtype=float):
+            if value is None:
+                return None
+            return np.asarray(value, dtype=dtype).reshape(-1).tolist()
+
+        tracking = None
+        if guard is not None:
+            tracking = {key: value for key, value in guard.items()
+                        if key not in ('overlap_matrix', 'candidate_table')}
+
+        return {
+            'evaluation_id': len(getattr(self, 'evaluation_history', []) or
+                                 []),
+            'state_selection_mode': selection_mode,
+            'state_label': (None if selection is None else
+                            selection.get('state_label')),
+            'geometry_signature': getattr(self.serenity_driver,
+                                          '_active_geom_signature', None),
+            'scf': scf_provenance() if callable(scf_provenance) else None,
+            'reference_s2': getattr(self, 'reference_s2', None),
+            'response': spectrum.get('provenance'),
+            'spectrum': {
+                'excitation_energies_hartree': energies.tolist(),
+                'excitation_energies_ev':
+                    (energies * hartree_in_ev()).tolist(),
+                'total_energies_hartree': (
+                    None if reference_energy is None else
+                    (float(reference_energy) + energies).tolist()),
+                'delta_s2': as_list(getattr(self, 'delta_s2', None)),
+                'state_s2': as_list(getattr(self, 'state_s2', None)),
+                'multiplicities': as_list(
+                    getattr(self, 'state_multiplicities', None), int),
+                's2_deviation': as_list(getattr(self, 's2_deviation', None)),
+            },
+            'selection': (selection if selection is not None else {
+                'selected_raw_root': int(self.state_deriv_index),
+                'state_selection_mode': selection_mode,
+            }),
+            'tracking': tracking,
+            'gradient': {
+                'requested_root': int(self.state_deriv_index),
+                'gradient_task_roots':
+                    list(self._current_gradient_task_roots),
+                'task': getattr(self, 'last_gradient_task_provenance', None),
+                'root_identity': verification,
+                'gradient_rms': float(np.sqrt(np.mean(gradient**2))),
+                'gradient_max': (float(np.max(np.linalg.norm(
+                    gradient.reshape(-1, 3), axis=1))) if gradient.size
+                                 else None),
+                'finite': bool(np.all(np.isfinite(gradient))),
+            },
+            'reference_energy': reference_energy,
+            'selected_excitation_energy_hartree':
+                self.selected_excitation_energy,
+            'total_energy': self.total_energy,
+        }
+
+    @staticmethod
+    def _evaluation_summary(record):
+        """Compact per-evaluation summary kept in ``evaluation_history``."""
+
+        selection = record.get('selection') or {}
+        tracking = record.get('tracking') or {}
+        response = record.get('response') or {}
+        scf = record.get('scf') or {}
+        task = (record.get('gradient') or {}).get('task') or {}
+        return {
+            'evaluation_id': record.get('evaluation_id'),
+            'geometry_signature': record.get('geometry_signature'),
+            'state_label': record.get('state_label'),
+            'selected_raw_root': selection.get('selected_raw_root'),
+            'manifold_roots': selection.get('manifold_roots'),
+            'total_energy': record.get('total_energy'),
+            'selected_excitation_energy_ev':
+                selection.get('selected_excitation_energy_ev'),
+            'selected_s2': selection.get('selected_s2'),
+            'selection_robust': selection.get('selection_robust'),
+            'strict_filter_selected_root':
+                selection.get('strict_filter_selected_root'),
+            'gap_to_lower_manifold_state_ev':
+                selection.get('gap_to_lower_manifold_state_ev'),
+            'gap_to_upper_manifold_state_ev':
+                selection.get('gap_to_upper_manifold_state_ev'),
+            'near_crossing_lower': selection.get('near_crossing_lower'),
+            'near_crossing_upper': selection.get('near_crossing_upper'),
+            'tracked_root_any': tracking.get('tracked_root_any'),
+            'tracked_overlap_any': tracking.get('tracked_overlap_any'),
+            'overlap_with_adiabatic_root':
+                tracking.get('overlap_with_adiabatic_root'),
+            'character_crossing_suspected':
+                tracking.get('character_crossing_suspected'),
+            'low_overlap': tracking.get('low_overlap'),
+            'tracking_status': tracking.get('status'),
+            'lr_restart_requested': response.get('restart_requested'),
+            'lr_restart_requested': response.get('restart_requested'),
+            'lr_restart_used': response.get('restart_used'),
+            'lr_converged': response.get('converged'),
+            'gradient_lr_restart_requested': task.get('lr_restart_requested'),
+            'gradient_lr_restart_used': task.get('lr_restart_used'),
+            'gradient_lr_converged': task.get('lr_converged'),
+            'scf_warm_start': scf.get('scf_warm_start'),
+            'reference_s2': record.get('reference_s2'),
+        }
+
+    def _print_adiabatic_selection(self, record):
+        """Prints the adiabatic selection table of one evaluation."""
+
+        selection = record['selection']
+        tracking = record.get('tracking') or {}
+        response = record.get('response') or {}
+        gradient = record.get('gradient') or {}
+        task = gradient.get('task') or {}
+        identity = gradient.get('root_identity') or {}
+        scf = record.get('scf') or {}
+        spectrum = record['spectrum']
+        label = selection['state_label']
+        info = self.ostream.print_info
+
+        def ev(value):
+            return 'n/a' if value is None else f'{value:.4f} eV'
+
+        self.ostream.print_header(
+            'Serenity Spin-Flip Adiabatic State Selection')
+        info(f"Rule                 : {label} = state "
+             f"{selection['manifold_state_index']} of multiplicity "
+             f"{selection['target_multiplicity']} by current energy "
+             f"({selection['manifold_filter']} classification)")
+        info(f"Selected raw root    : {selection['selected_raw_root']} "
+             f"({selection['selected_excitation_energy_ev']:.6f} eV, "
+             f"<S^2> = {selection['selected_s2']:.4f}, "
+             f"{selection['selected_spin_quality']})")
+        info('Manifold             : ' + ', '.join(
+            f'{name}=raw {root}' for name, root in
+            zip(selection['manifold_labels'], selection['manifold_roots'])))
+        info(f"Gap lower / upper    : "
+             f"{ev(selection['gap_to_lower_manifold_state_ev'])} / "
+             f"{ev(selection['gap_to_upper_manifold_state_ev'])}; closest "
+             f"root {selection['closest_root']} at "
+             f"{ev(selection['gap_to_closest_root_ev'])}")
+        info(f"Selection robust     : {selection['selection_robust']}; "
+             f"strict <S^2> filter would pick raw root "
+             f"{selection['strict_filter_selected_root']}")
+        info(f"Reference            : {scf.get('reference_type')}, "
+             f"<S^2>_ref = {record.get('reference_s2')}, SCF warm start = "
+             f"{scf.get('scf_warm_start')}")
+        info(f"LR spectrum          : restart requested "
+             f"{response.get('restart_requested')}, used "
+             f"{response.get('restart_used')} "
+             f"({response.get('restart_reason')}); converged "
+             f"{response.get('converged')} in "
+             f"{response.get('davidson_iterations')} iterations")
+        info(f"Gradient task        : root {task.get('root')}, LR restart "
+             f"requested {task.get('lr_restart_requested')}, used "
+             f"{task.get('lr_restart_used')} "
+             f"({task.get('lr_restart_reason')}); converged "
+             f"{task.get('lr_converged')}; root verified "
+             f"{identity.get('verified')} (dE = "
+             f"{identity.get('selected_energy_difference_ev')} eV, overlap "
+             f"{identity.get('selected_vector_overlap')})")
+        if tracking:
+            info(f"Tracking guard       : {tracking.get('status')} / "
+                 f"{tracking.get('continuity')}; previous {label} raw root "
+                 f"{tracking.get('previous_selected_root')} -> max overlap "
+                 f"raw root {tracking.get('tracked_root_any')} "
+                 f"({tracking.get('tracked_overlap_any')}), adiabatic root "
+                 f"overlap {tracking.get('overlap_with_adiabatic_root')}")
+        for message in (list(selection.get('warnings') or []) +
+                        list(tracking.get('warnings') or [])):
+            info(f'WARNING: {message}')
+
+        energies = spectrum['excitation_energies_ev']
+        spins = spectrum['state_s2'] or [float('nan')] * len(energies)
+        mults = spectrum['multiplicities'] or [0] * len(energies)
+        names = dict(zip(selection['manifold_roots'],
+                         selection['manifold_labels']))
+        info(' raw   excitation/eV     <S^2>  mult  spin quality  manifold')
+        for root in selection['energy_ordered_roots']:
+            k = root - 1
+            marker = (f'  <== {label}' if root == selection['selected_raw_root']
+                      else '')
+            info(f'{root:4d} {energies[k]:16.6f} {spins[k]:9.4f} '
+                 f'{mults[k]:5d}  {selection["spin_quality"][k]:>12s}  '
+                 f'{names.get(root, "-"):>8s}{marker}')
+        self.ostream.print_blank()
+        self.ostream.flush()
 
     def _update_spin_metadata(self, controller):
         metadata = self.rsp_driver.get_spinflip_metadata(controller)
@@ -847,10 +2048,20 @@ class SerenityExcitedStateGradientDriver(GradientDriver):
             f'{self.state_tracker.failure_policy}).')
         self.ostream.flush()
 
-    def _configure_excited_gradient_task(self, grad_task):
+    def _configure_excited_gradient_task(self, grad_task, lr_restart=False):
+        """
+        Configures an excited-state gradient task for ``state_deriv_index``.
+
+        :param lr_restart:
+            Serenity restart flag of the task's LRSCF step; only True when the
+            stored LR solution was obtained at this geometry and SCF solution.
+        """
+
+        # Print level NORMAL keeps Serenity's convergence and restart
+        # messages in the captured output (see parse_serenity_lr_output).
         if hasattr(grad_task, 'generalSettings'):
             grad_task.generalSettings.printLevel = (
-                spy.GLOBAL_PRINT_LEVELS.MINIMUM)
+                spy.GLOBAL_PRINT_LEVELS.NORMAL)
 
         grad_task.settings.gradType = 'analytical'
         grad_task.settings.excMethod = self.exc_method
@@ -861,10 +2072,11 @@ class SerenityExcitedStateGradientDriver(GradientDriver):
 
         grad_task.settings.lrscfSettings.method = self.exc_method
         grad_task.settings.lrscfSettings.nEigen = int(nstates_req)
-        grad_task.settings.lrscfSettings.restart = True
+        grad_task.settings.lrscfSettings.restart = bool(lr_restart)
         if self.rsp_driver.conv_thresh is not None:
             grad_task.settings.lrscfSettings.conv = float(
                 self.rsp_driver.conv_thresh)
+            
 
         if self.rsp_driver.max_cycles is not None:
             grad_task.settings.lrscfSettings.maxCycles = int(

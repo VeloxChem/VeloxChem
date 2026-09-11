@@ -391,10 +391,14 @@ class OptimizationEngine(geometric.engine.Engine):
         """Collects common state-energy/root metadata from the gradient driver."""
 
         record = {}
+        # evaluation_record (Serenity) carries the SCF/LR provenance, the full
+        # spectrum with spin diagnostics, the state selection and the
+        # gradient root verification of this evaluation.
         for attribute in (
                 'total_energy', 'reference_energy', 'excited_state_energy',
                 'selected_excitation_energy', 'target_state_energies',
-                'state_deriv_index', 'target_state_index'):
+                'state_deriv_index', 'target_state_index',
+                'evaluation_record'):
             value = getattr(self.grad_drv, attribute, None)
             if value is not None:
                 record[attribute] = value

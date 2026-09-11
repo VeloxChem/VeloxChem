@@ -241,6 +241,9 @@ from .serenityscfdriver import SerenityScfDriver
 from .serenitygradientdriver import SerenityGradientDriver
 from .serenitylrrspeigensolver import SerenityLinearResponseSolver
 from .serenityexcitedstategradientdriver import SerenityExcitedStateGradientDriver
+from .serenityexcitedstategradientdriver import select_adiabatic_manifold_root
+from .serenityscfdriver import (SerenityCalculationError,
+                                AdiabaticStateSelectionError)
 from .openqpscfdriver import OpenQPScfDriver
 from .openqpgradientdriver import OpenQPGradientDriver
 from .openqpexcitedstatesdriver import OpenQPExcitedStatesDriver

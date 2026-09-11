@@ -293,6 +293,20 @@ class TransitionDensityTracker:
         self.propose_reference(system, lrscf_controller, mode, reference_state)
         return self.commit()
 
+    def clear_reference(self):
+        """Forgets every reference, e.g. when the initializing evaluation
+        failed before it produced a usable energy and gradient."""
+
+        self._ref_exc = None
+        self._ref_geom = None
+        self._ref_coeff = None
+        self._ref_nstates = None
+        self._ref_energies_ev = None
+        self._pending = None
+        self._retry_base = None
+        self.reference_state = self.target_state
+        self._reference_revision += 1
+
     def track(self,
               system,
               lrscf_controller,
