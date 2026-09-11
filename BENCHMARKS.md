@@ -5472,14 +5472,14 @@ the new driver has of doing the same thing.
 
 | basis | nao | mode | time | against full | iterations | energy |
 | --- | ---: | --- | ---: | ---: | ---: | ---: |
-| def2-svp | 683 | full four-center | 152.26 | 1.00 | 21 | -1609.0900864188 |
-| | | RI-JK veloxchem | 97.04 | 1.57 | 23 | -1609.0890443496 |
-| | | RI-JK simd, in memory | 42.71 | 3.57 | 23 | -1609.0890443498 |
-| | | RI-JK simd, direct | 100.54 | 1.51 | 23 | -1609.0890443495 |
-| def2-svpd | 1010 | full four-center | 1185.83 | 1.00 | 21 | -1609.1565808182 |
-| | | RI-JK veloxchem | 359.07 | 3.30 | 24 | -1609.1555344827 |
-| | | RI-JK simd, in memory | 137.91 | 8.60 | 24 | -1609.1555344829 |
-| | | RI-JK simd, direct | 283.05 | 4.19 | 24 | -1609.1555344827 |
+| def2-svp | 683 | full four-center | 152.49 | 1.00 | 21 | -1609.0900864188 |
+| | | RI-JK veloxchem | 97.89 | 1.56 | 23 | -1609.0890443496 |
+| | | RI-JK simd, in memory | 42.04 | 3.63 | 23 | -1609.0890443498 |
+| | | RI-JK simd, direct | 87.72 | 1.74 | 23 | -1609.0890443494 |
+| def2-svpd | 1010 | full four-center | 1185.67 | 1.00 | 21 | -1609.1565808182 |
+| | | RI-JK veloxchem | 360.31 | 3.29 | 24 | -1609.1555344827 |
+| | | RI-JK simd, in memory | 137.49 | 8.62 | 24 | -1609.1555344829 |
+| | | RI-JK simd, direct | 237.38 | 4.99 | 24 | -1609.1555344826 |
 
 **The three routes of the approximation agree to the ninth decimal**, and differ
 from the four center build by the error of the approximation alone, a thousandth of
@@ -5494,9 +5494,9 @@ holds them sweeps them once for the whole calculation.
 
 | | def2-svp | def2-svpd |
 | --- | ---: | ---: |
-| against the way which holds them | 2.35 slower | 2.05 slower |
-| against the route VeloxChem had | 1.04 slower | **1.27 faster** |
-| against the four center build | **1.51 faster** | **4.19 faster** |
+| against the way which holds them | 2.09 slower | 1.73 slower |
+| against the route VeloxChem had | **1.12 faster** | **1.52 faster** |
+| against the four center build | **1.74 faster** | **4.99 faster** |
 
 A factor of two for holding nothing, not the five or ten a count of the passes
 would suggest. The reason is in the section on the setup: **the three-center
@@ -5504,8 +5504,141 @@ integrals are 2.6 per cent of forming the B vectors** and the contraction with t
 metric is the rest, so repeating the integrals costs far less than repeating the
 work around them.
 
-That makes the direct way more than a fallback. On the diffuse basis it is faster
-than the route VeloxChem had while holding a small fraction of the memory, on a
+That makes the direct way more than a fallback. It is faster than the route
+VeloxChem had in both basis sets while holding a small fraction of the memory, on a
 molecule which fits either way. The gap to the way which holds the B vectors also
-narrows as the basis grows, 2.35 to 2.05, which is the direction that suits it:
+narrows as the basis grows, 2.09 to 1.73, which is the direction that suits it:
 the calculations which need it are the large ones.
+
+These are the numbers after the two corrections of the next section. Before them
+the direct way took 100.54 and 283.05 seconds, and was 1.04 slower than the route
+VeloxChem had on the smaller basis rather than 1.12 faster.
+
+## Where the direct mode spent its time
+
+The direct way was two to four times slower than the way which holds the B
+vectors, which sounded like the price of holding nothing. It was not. Most of the
+gap was work being done more than once, and a profile of one Fock build said so
+plainly.
+
+Tagrisso in def2-svpd, direct mode, the whole SCF, the twenty four Fock builds
+averaged. The driver was instrumented for the measurement and the instrumentation
+thrown away afterwards.
+
+| phase | before | after | share after |
+| --- | ---: | ---: | ---: |
+| build and zero the half transformed integrals | 0.056 | 0.049 | 0.7% |
+| three-center integrals, first pass | 1.430 | 1.434 | 19.4% |
+| **the half transform** | **3.709** | **1.703** | 23.1% |
+| the closure onto the fitting coefficients | 0.066 | 0.068 | 0.9% |
+| copies into and out of the stacked array | 0.201 | 0.262 | 3.5% |
+| **the triangular solve** | 2.334 | 2.342 | **31.7%** |
+| the exchange square | 0.709 | 0.696 | 9.4% |
+| three-center integrals, second pass | 0.709 | 0.716 | 9.7% |
+| the Coulomb matrix and its accumulate | 0.083 | 0.071 | 1.0% |
+| rest | 0.022 | 0.045 | 0.6% |
+| **total, seconds per Fock build** | **9.318** | **7.387** | |
+
+**Every arithmetic phase already ran at 650 to 745 Gflop/s.** The copies and the
+allocations, which is where one looks first, were 2.8 per cent between them. There
+was no slow code to speed up.
+
+### The half transform did three times the arithmetic it needed to
+
+The sparsity pattern describes its blocks pair block by pair block and every
+auxiliary group within one:
+
+```cpp
+const auto npatterns = static_cast<int>(blocks.size() * naux);
+patterns[index].emplace(blocks[index / naux], aux_groups[index % naux], ...);
+```
+
+so the list runs pair block major, auxiliary group minor. The direct mode swept it
+in runs sized to fit the integrals in memory, and **a contiguous run of that list
+touches every auxiliary function**. Counted rather than assumed: 3387 auxiliary
+functions carried blocks in each of the three sweeps, all of them, every time.
+
+The dense path of the W build scatters one auxiliary function into a square of the
+whole basis and hands it to a matrix product, and it did so whether or not the
+sweep carried anything for that function. Three sweeps, three products for every
+function, two thirds of them multiplying zeros — real arithmetic at a good rate,
+for nothing.
+
+Restricting the product to the rows a run touches would not have helped: a run
+spanning every auxiliary group touches nearly every atom, so the square it needs is
+nearly the whole square. **The fix is to sweep parts which own disjoint auxiliary
+functions**, so a function belongs to one part and is transformed once. The
+auxiliary basis has only four groups here, the largest of them 6.62 GB of a 10.675
+GB whole, so the parts are cut by auxiliary atom rather than by group, each atom's
+share measured from the blocks which carry it.
+
+With the parts disjoint, a guard for a function no block of the call carries turns
+from dead code into the thing which collects the saving. It is inert for the way
+which holds the B vectors, which sweeps once and carries every function, and that
+way is unchanged at 137 seconds.
+
+### The integrals were formed once per batch of orbitals, and the batch was a constant
+
+The batch of occupied orbitals came from a hardcoded four gigabytes rather than
+from the memory budget the driver is given. Tagrisso in def2-svpd ran two batches
+where the whole 133 orbitals fit in one, and so formed the integrals twice per Fock
+build instead of once. Taking the batch from the budget removed the second pass.
+
+The budget feeds two things which are live together — the half transformed
+integrals held twice over, and the integrals of the part being swept — so each is
+given half of it and the whole stays inside the number asked for.
+
+### What is left is the floor
+
+| | before | after |
+| --- | ---: | ---: |
+| tagrisso def2-svp | 100.54 | **87.72** |
+| tagrisso def2-svpd | 283.05 | **237.38** |
+| [Cu(PPh3)4]+ def2-svp | 10164.16 | **2466.47** |
+
+The triangular solve is now the largest phase at 31.7 per cent, and it is the one
+thing the direct way cannot avoid: **it solves against the factor on every
+iteration, where the way which holds the B vectors solves once at the setup.** At
+2.33 seconds a build over twenty four builds that is 56 seconds. The integrals are
+the other thing paid every iteration rather than once, about 1.44 seconds a build
+now that the orbitals fit in one batch, another 35 seconds. Together 91 of the 100
+seconds by which the direct way trails the resident one, which is as close an
+account as these phases allow. There is no third thing hiding in the gap.
+
+### The molecule which fits no other way
+
+Tetrakis(triphenylphosphine)copper(I), 137 atoms, closed shell d10 singlet at
+charge +1, in def2-svp against def2-universal-jkfit: 1411 basis functions, 7256
+auxiliary functions, 290 occupied orbitals. Both modes in one process.
+
+| mode | time | iterations | energy |
+| --- | ---: | ---: | ---: |
+| RI-JK simd, direct | 2466.47 | 31 | -5755.2979742886 |
+| full four-center | 2860.53 | 30 | -5755.2998281850 |
+
+The B vectors would want **34.44 GB** and the conventional dense triangle **53.85
+GB**, against 36 GB of machine. Neither the way which holds them nor the route
+VeloxChem had can start this calculation. The direct way is the only one of the
+four which runs, which is what it was written for.
+
+It also wins. **1.16 times faster than making no approximation at all**, on a
+molecule where the four center build is at its best: extended, mostly light atoms,
+four phenyl-laden arms, which is the shape screening likes most. Before the two
+corrections the same calculation took 10164 seconds and lost to the four center
+build by 3.56, so the whole of that reversal is the duplicated work, not the
+formulation.
+
+The gain is larger here than on tagrisso — 4.12 against 1.19 — because the
+duplication was paid more times over: twelve batches of orbitals rather than two,
+and a larger integral set cut into more parts.
+
+### A note on the budget
+
+The table of the four ways pins the budget at 24 GB. Run instead with the default
+this machine computes, 19.90 GB, the same def2-svpd calculation took 216 seconds
+rather than 237. The two were measured in separate processes so the difference is
+not established, but the direction is worth knowing: **more memory is not
+automatically faster.** A larger budget makes one part where two would do, and the
+one part plus the half transformed integrals held twice over comes to about 25 GB
+on a 36 GB machine. Whether that is memory pressure or something else has not been
+measured.
