@@ -5462,3 +5462,50 @@ hartree that is two parts in ten to the thirteenth, so it is the arithmetic bein
 summed in different orders over twenty three iterations rather than a difference of
 the approximation. It is worth recording that the absolute agreement of two routes
 follows the size of the number they are computing.
+
+## The four ways of building a Fock matrix
+
+Tagrisso at Hartree-Fock against def2-universal-jkfit, all eight calculations one
+after another in the same process: the four center build which makes no
+approximation, the resolution of the identity as VeloxChem had it, and the two ways
+the new driver has of doing the same thing.
+
+| basis | nao | mode | time | against full | iterations | energy |
+| --- | ---: | --- | ---: | ---: | ---: | ---: |
+| def2-svp | 683 | full four-center | 152.26 | 1.00 | 21 | -1609.0900864188 |
+| | | RI-JK veloxchem | 97.04 | 1.57 | 23 | -1609.0890443496 |
+| | | RI-JK simd, in memory | 42.71 | 3.57 | 23 | -1609.0890443498 |
+| | | RI-JK simd, direct | 100.54 | 1.51 | 23 | -1609.0890443495 |
+| def2-svpd | 1010 | full four-center | 1185.83 | 1.00 | 21 | -1609.1565808182 |
+| | | RI-JK veloxchem | 359.07 | 3.30 | 24 | -1609.1555344827 |
+| | | RI-JK simd, in memory | 137.91 | 8.60 | 24 | -1609.1555344829 |
+| | | RI-JK simd, direct | 283.05 | 4.19 | 24 | -1609.1555344827 |
+
+**The three routes of the approximation agree to the ninth decimal**, and differ
+from the four center build by the error of the approximation alone, a thousandth of
+a hartree.
+
+### The direct way costs less than counting its passes suggests
+
+The direct way holds no B vectors. It forms the three-center integrals again for
+every batch of occupied orbitals and once more for the Coulomb matrix, which for
+this molecule is several sweeps of them for every Fock matrix, where the way which
+holds them sweeps them once for the whole calculation.
+
+| | def2-svp | def2-svpd |
+| --- | ---: | ---: |
+| against the way which holds them | 2.35 slower | 2.05 slower |
+| against the route VeloxChem had | 1.04 slower | **1.27 faster** |
+| against the four center build | **1.51 faster** | **4.19 faster** |
+
+A factor of two for holding nothing, not the five or ten a count of the passes
+would suggest. The reason is in the section on the setup: **the three-center
+integrals are 2.6 per cent of forming the B vectors** and the contraction with the
+metric is the rest, so repeating the integrals costs far less than repeating the
+work around them.
+
+That makes the direct way more than a fallback. On the diffuse basis it is faster
+than the route VeloxChem had while holding a small fraction of the memory, on a
+molecule which fits either way. The gap to the way which holds the B vectors also
+narrows as the basis grows, 2.35 to 2.05, which is the direction that suits it:
+the calculations which need it are the large ones.
