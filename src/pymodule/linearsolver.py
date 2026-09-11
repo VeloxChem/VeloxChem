@@ -123,7 +123,7 @@ class LinearSolver:
 
         self.mixed_precision_threshold_j = 1.0e-6
 
-        self.mixed_precision_threshold_k = 1.0e-6
+        self.mixed_precision_threshold_k = 1.0e-5
 
         # dft
         self.xcfun = None
