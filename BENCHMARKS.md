@@ -5324,3 +5324,76 @@ against 54.6 for taxol by the counting of the section on the W matrices, and the
 denser they are the more the expanded form of the transformation pays. That is not
 separated by these runs and is offered as the likely reason rather than a measured
 one.
+
+## A transition metal complex
+
+A dinuclear copper guanidinate, C18H40Cu2N6, built from the SMILES
+
+    CC(C)N1C(N(C)C)=[N+](C(C)C)[Cu-]N(C(C)C)C(N(C)C)=[N+](C(C)C)[Cu-]1
+
+which is two copper centers bridged by two guanidinate ligands in an eight
+membered ring, each ligand carrying a dimethylamino group on its central carbon
+and an isopropyl on each of its two ring nitrogens. Sixty six atoms, two hundred
+and forty eight electrons, a neutral closed shell singlet: the SMILES writes the
+ring nitrogens as positive and the metals as negative, which nets to nothing and
+reads chemically as copper in its first oxidation state, with a filled d shell.
+
+Hartree-Fock against def2-universal-jkfit with 3060 auxiliary functions, both
+routes one after the other in the same process.
+
+| basis | nao | conventional | simd | gain | iterations | energy, conventional | energy, simd |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| def2-svp | 598 | 75.71 | 35.53 | 2.13 | 23 | -4307.9982685253 | -4307.9982685252 |
+| def2-tzvp | 1074 | 371.88 | 181.98 | 2.04 | 24 | -4309.5477190075 | -4309.5477190075 |
+
+Both converged, in the same number of iterations by either route, to energies which
+agree to the tenth decimal.
+
+**The gain barely moves as the orbital basis nearly doubles**, 2.13 to 2.04, which
+is the same thing caffeine showed over its own basis sets. What differs is where
+it sits: caffeine fell from 1.57 to 1.15 over a comparable range and this holds
+near two. The fitting set is 3060 functions in both rows and the occupied orbitals
+are 124 in both, and 124 is enough to keep the products of the exchange from being
+thin, where the fifty one of caffeine is not.
+
+Taken with everything else in this file, the two axes separate: **the occupied
+orbitals set the level, the orbital basis hardly matters, and the fitting set moves
+it further.**
+
+| molecule | auxiliary functions | occupied orbitals | simd against conventional |
+| --- | ---: | ---: | ---: |
+| caffeine | 1242 | 51 | 1.15 to 1.57 |
+| copper guanidinate | 3060 | 124 | 2.04 to 2.13 |
+| tagrisso | 3387 | 133 | 2.16 to 2.67 |
+| taxol | 5489 | 223 | 2.66 |
+| c60 | 4500 | 180 | 3.05 |
+
+### On the geometry, and on what would not fit
+
+The structure is a distance geometry embedding and is **not optimized at any level
+of theory**. Its copper to nitrogen distances are 1.885 to 1.908 angstrom and its
+shortest contact of any kind is a carbon to hydrogen bond, so it is a reasonable
+structure to time a calculation on, and it is not a structure to draw any chemistry
+from. The copper to copper separation in particular, which is the interesting
+quantity in these compounds, is whatever the embedding produced.
+
+Building it through the force field which the SMILES reader applies gave a copper
+to nitrogen distance of 0.776 angstrom, shorter than a carbon to hydrogen bond,
+because the force field has no parameters for copper and left the metals
+unconstrained while it pulled everything else into place. The embedding without
+that step is what the table above was run on. A geometry from a structure builder
+is worth looking at before it is used.
+
+A larger complex was tried first and did not fit: tetrakis(triphenylphosphine)
+copper as its cation, a hundred and thirty seven atoms, needs 1411 orbital
+functions and 7256 auxiliary ones in def2-svp, which is 34.4 gigabytes of B vectors
+against the 36 of this machine, and 53.9 gigabytes for the dense triangle the
+conventional route keeps. Neither route can take it here. That brackets what this
+machine holds at around a hundred atoms of that composition.
+
+### The metric of a fitting set which carries a metal
+
+The Cholesky factorization succeeded for both bases, so the fallback to the
+inverted square root was not taken. The compact functions a first row transition
+metal puts into a fitting set did not make its metric indefinite at either zeta
+level. The fallback is still exercised by constructed matrices alone.
