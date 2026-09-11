@@ -1832,27 +1832,6 @@ computeCoulombFockDDPD9(double*         mat_J,
                        const double*   boys_func_ft,
                        const double    eri_threshold);
 
-
-
-__global__ void __launch_bounds__(TILE_SIZE_J)
-computeCoulombFockDDDD0(double*         mat_J,
-                       const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
-                       const double*   dd_mat_D,
-                       const double*   dd_mat_Q_local,
-                       const double*   dd_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
-                       const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
-                       const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
-                       const double*   boys_func_table,
-                       const double*   boys_func_ft,
-                       const double    eri_threshold);
-
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD0_FP64(double*         mat_J,
                        const double*   d_prim_info,
@@ -1887,25 +1866,6 @@ computeCoulombFockDDDD0_FP32(double*         mat_J,
                        const float*    boys_func_ft_f,
                        const uint32_t* prec_cut_ij_tile,
                        const uint32_t* screen_cut_ij_tile);
-
-__global__ void __launch_bounds__(TILE_SIZE_J)
-computeCoulombFockDDDD1(double*         mat_J,
-                       const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
-                       const double*   dd_mat_D,
-                       const double*   dd_mat_Q_local,
-                       const double*   dd_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
-                       const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
-                       const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
-                       const double*   boys_func_table,
-                       const double*   boys_func_ft,
-                       const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD1_FP64(double*         mat_J,
@@ -1943,25 +1903,6 @@ computeCoulombFockDDDD1_FP32(double*         mat_J,
                        const uint32_t* screen_cut_ij_tile);
 
 __global__ void __launch_bounds__(TILE_SIZE_J)
-computeCoulombFockDDDD2(double*         mat_J,
-                       const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
-                       const double*   dd_mat_D,
-                       const double*   dd_mat_Q_local,
-                       const double*   dd_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
-                       const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
-                       const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
-                       const double*   boys_func_table,
-                       const double*   boys_func_ft,
-                       const double    eri_threshold);
-
-__global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD2_FP64(double*         mat_J,
                        const double*   d_prim_info,
                        const uint32_t  d_prim_count,
@@ -1995,25 +1936,6 @@ computeCoulombFockDDDD2_FP32(double*         mat_J,
                        const float*    boys_func_ft_f,
                        const uint32_t* prec_cut_ij_tile,
                        const uint32_t* screen_cut_ij_tile);
-
-__global__ void __launch_bounds__(TILE_SIZE_J)
-computeCoulombFockDDDD3(double*         mat_J,
-                       const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
-                       const double*   dd_mat_D,
-                       const double*   dd_mat_Q_local,
-                       const double*   dd_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
-                       const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
-                       const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
-                       const double*   boys_func_table,
-                       const double*   boys_func_ft,
-                       const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD3_FP64(double*         mat_J,
@@ -2051,25 +1973,6 @@ computeCoulombFockDDDD3_FP32(double*         mat_J,
                        const uint32_t* screen_cut_ij_tile);
 
 __global__ void __launch_bounds__(TILE_SIZE_J)
-computeCoulombFockDDDD4(double*         mat_J,
-                       const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
-                       const double*   dd_mat_D,
-                       const double*   dd_mat_Q_local,
-                       const double*   dd_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
-                       const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
-                       const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
-                       const double*   boys_func_table,
-                       const double*   boys_func_ft,
-                       const double    eri_threshold);
-
-__global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD4_FP64(double*         mat_J,
                        const double*   d_prim_info,
                        const uint32_t  d_prim_count,
@@ -2103,25 +2006,6 @@ computeCoulombFockDDDD4_FP32(double*         mat_J,
                        const float*    boys_func_ft_f,
                        const uint32_t* prec_cut_ij_tile,
                        const uint32_t* screen_cut_ij_tile);
-
-__global__ void __launch_bounds__(TILE_SIZE_J)
-computeCoulombFockDDDD5(double*         mat_J,
-                       const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
-                       const double*   dd_mat_D,
-                       const double*   dd_mat_Q_local,
-                       const double*   dd_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
-                       const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
-                       const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
-                       const double*   boys_func_table,
-                       const double*   boys_func_ft,
-                       const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD5_FP64(double*         mat_J,
@@ -2159,25 +2043,6 @@ computeCoulombFockDDDD5_FP32(double*         mat_J,
                        const uint32_t* screen_cut_ij_tile);
 
 __global__ void __launch_bounds__(TILE_SIZE_J)
-computeCoulombFockDDDD6(double*         mat_J,
-                       const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
-                       const double*   dd_mat_D,
-                       const double*   dd_mat_Q_local,
-                       const double*   dd_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
-                       const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
-                       const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
-                       const double*   boys_func_table,
-                       const double*   boys_func_ft,
-                       const double    eri_threshold);
-
-__global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD6_FP64(double*         mat_J,
                        const double*   d_prim_info,
                        const uint32_t  d_prim_count,
@@ -2211,25 +2076,6 @@ computeCoulombFockDDDD6_FP32(double*         mat_J,
                        const float*    boys_func_ft_f,
                        const uint32_t* prec_cut_ij_tile,
                        const uint32_t* screen_cut_ij_tile);
-
-__global__ void __launch_bounds__(TILE_SIZE_J)
-computeCoulombFockDDDD7(double*         mat_J,
-                       const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
-                       const double*   dd_mat_D,
-                       const double*   dd_mat_Q_local,
-                       const double*   dd_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
-                       const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
-                       const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
-                       const double*   boys_func_table,
-                       const double*   boys_func_ft,
-                       const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD7_FP64(double*         mat_J,
@@ -2267,25 +2113,6 @@ computeCoulombFockDDDD7_FP32(double*         mat_J,
                        const uint32_t* screen_cut_ij_tile);
 
 __global__ void __launch_bounds__(TILE_SIZE_J)
-computeCoulombFockDDDD8(double*         mat_J,
-                       const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
-                       const double*   dd_mat_D,
-                       const double*   dd_mat_Q_local,
-                       const double*   dd_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
-                       const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
-                       const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
-                       const double*   boys_func_table,
-                       const double*   boys_func_ft,
-                       const double    eri_threshold);
-
-__global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD8_FP64(double*         mat_J,
                        const double*   d_prim_info,
                        const uint32_t  d_prim_count,
@@ -2319,25 +2146,6 @@ computeCoulombFockDDDD8_FP32(double*         mat_J,
                        const float*    boys_func_ft_f,
                        const uint32_t* prec_cut_ij_tile,
                        const uint32_t* screen_cut_ij_tile);
-
-__global__ void __launch_bounds__(TILE_SIZE_J)
-computeCoulombFockDDDD9(double*         mat_J,
-                       const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
-                       const double*   dd_mat_D,
-                       const double*   dd_mat_Q_local,
-                       const double*   dd_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
-                       const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
-                       const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
-                       const double*   boys_func_table,
-                       const double*   boys_func_ft,
-                       const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD9_FP64(double*         mat_J,
@@ -2375,25 +2183,6 @@ computeCoulombFockDDDD9_FP32(double*         mat_J,
                        const uint32_t* screen_cut_ij_tile);
 
 __global__ void __launch_bounds__(TILE_SIZE_J)
-computeCoulombFockDDDD10(double*         mat_J,
-                       const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
-                       const double*   dd_mat_D,
-                       const double*   dd_mat_Q_local,
-                       const double*   dd_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
-                       const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
-                       const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
-                       const double*   boys_func_table,
-                       const double*   boys_func_ft,
-                       const double    eri_threshold);
-
-__global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD10_FP64(double*         mat_J,
                        const double*   d_prim_info,
                        const uint32_t  d_prim_count,
@@ -2427,25 +2216,6 @@ computeCoulombFockDDDD10_FP32(double*         mat_J,
                        const float*    boys_func_ft_f,
                        const uint32_t* prec_cut_ij_tile,
                        const uint32_t* screen_cut_ij_tile);
-
-__global__ void __launch_bounds__(TILE_SIZE_J)
-computeCoulombFockDDDD11(double*         mat_J,
-                       const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
-                       const double*   dd_mat_D,
-                       const double*   dd_mat_Q_local,
-                       const double*   dd_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
-                       const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
-                       const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
-                       const double*   boys_func_table,
-                       const double*   boys_func_ft,
-                       const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD11_FP64(double*         mat_J,
@@ -2483,25 +2253,6 @@ computeCoulombFockDDDD11_FP32(double*         mat_J,
                        const uint32_t* screen_cut_ij_tile);
 
 __global__ void __launch_bounds__(TILE_SIZE_J)
-computeCoulombFockDDDD12(double*         mat_J,
-                       const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
-                       const double*   dd_mat_D,
-                       const double*   dd_mat_Q_local,
-                       const double*   dd_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
-                       const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
-                       const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
-                       const double*   boys_func_table,
-                       const double*   boys_func_ft,
-                       const double    eri_threshold);
-
-__global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD12_FP64(double*         mat_J,
                        const double*   d_prim_info,
                        const uint32_t  d_prim_count,
@@ -2535,25 +2286,6 @@ computeCoulombFockDDDD12_FP32(double*         mat_J,
                        const float*    boys_func_ft_f,
                        const uint32_t* prec_cut_ij_tile,
                        const uint32_t* screen_cut_ij_tile);
-
-__global__ void __launch_bounds__(TILE_SIZE_J)
-computeCoulombFockDDDD13(double*         mat_J,
-                       const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
-                       const double*   dd_mat_D,
-                       const double*   dd_mat_Q_local,
-                       const double*   dd_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
-                       const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
-                       const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
-                       const double*   boys_func_table,
-                       const double*   boys_func_ft,
-                       const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD13_FP64(double*         mat_J,
@@ -2591,25 +2323,6 @@ computeCoulombFockDDDD13_FP32(double*         mat_J,
                        const uint32_t* screen_cut_ij_tile);
 
 __global__ void __launch_bounds__(TILE_SIZE_J)
-computeCoulombFockDDDD14(double*         mat_J,
-                       const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
-                       const double*   dd_mat_D,
-                       const double*   dd_mat_Q_local,
-                       const double*   dd_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
-                       const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
-                       const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
-                       const double*   boys_func_table,
-                       const double*   boys_func_ft,
-                       const double    eri_threshold);
-
-__global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD14_FP64(double*         mat_J,
                        const double*   d_prim_info,
                        const uint32_t  d_prim_count,
@@ -2643,25 +2356,6 @@ computeCoulombFockDDDD14_FP32(double*         mat_J,
                        const float*    boys_func_ft_f,
                        const uint32_t* prec_cut_ij_tile,
                        const uint32_t* screen_cut_ij_tile);
-
-__global__ void __launch_bounds__(TILE_SIZE_J)
-computeCoulombFockDDDD15(double*         mat_J,
-                       const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
-                       const double*   dd_mat_D,
-                       const double*   dd_mat_Q_local,
-                       const double*   dd_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
-                       const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
-                       const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
-                       const double*   boys_func_table,
-                       const double*   boys_func_ft,
-                       const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD15_FP64(double*         mat_J,
@@ -2699,25 +2393,6 @@ computeCoulombFockDDDD15_FP32(double*         mat_J,
                        const uint32_t* screen_cut_ij_tile);
 
 __global__ void __launch_bounds__(TILE_SIZE_J)
-computeCoulombFockDDDD16(double*         mat_J,
-                       const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
-                       const double*   dd_mat_D,
-                       const double*   dd_mat_Q_local,
-                       const double*   dd_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
-                       const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
-                       const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
-                       const double*   boys_func_table,
-                       const double*   boys_func_ft,
-                       const double    eri_threshold);
-
-__global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD16_FP64(double*         mat_J,
                        const double*   d_prim_info,
                        const uint32_t  d_prim_count,
@@ -2751,25 +2426,6 @@ computeCoulombFockDDDD16_FP32(double*         mat_J,
                        const float*    boys_func_ft_f,
                        const uint32_t* prec_cut_ij_tile,
                        const uint32_t* screen_cut_ij_tile);
-
-__global__ void __launch_bounds__(TILE_SIZE_J)
-computeCoulombFockDDDD17(double*         mat_J,
-                       const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
-                       const double*   dd_mat_D,
-                       const double*   dd_mat_Q_local,
-                       const double*   dd_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
-                       const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
-                       const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
-                       const double*   boys_func_table,
-                       const double*   boys_func_ft,
-                       const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD17_FP64(double*         mat_J,
@@ -2807,25 +2463,6 @@ computeCoulombFockDDDD17_FP32(double*         mat_J,
                        const uint32_t* screen_cut_ij_tile);
 
 __global__ void __launch_bounds__(TILE_SIZE_J)
-computeCoulombFockDDDD18(double*         mat_J,
-                       const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
-                       const double*   dd_mat_D,
-                       const double*   dd_mat_Q_local,
-                       const double*   dd_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
-                       const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
-                       const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
-                       const double*   boys_func_table,
-                       const double*   boys_func_ft,
-                       const double    eri_threshold);
-
-__global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD18_FP64(double*         mat_J,
                        const double*   d_prim_info,
                        const uint32_t  d_prim_count,
@@ -2859,25 +2496,6 @@ computeCoulombFockDDDD18_FP32(double*         mat_J,
                        const float*    boys_func_ft_f,
                        const uint32_t* prec_cut_ij_tile,
                        const uint32_t* screen_cut_ij_tile);
-
-__global__ void __launch_bounds__(TILE_SIZE_J)
-computeCoulombFockDDDD19(double*         mat_J,
-                       const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
-                       const double*   dd_mat_D,
-                       const double*   dd_mat_Q_local,
-                       const double*   dd_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
-                       const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
-                       const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
-                       const double*   boys_func_table,
-                       const double*   boys_func_ft,
-                       const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD19_FP64(double*         mat_J,
@@ -2915,25 +2533,6 @@ computeCoulombFockDDDD19_FP32(double*         mat_J,
                        const uint32_t* screen_cut_ij_tile);
 
 __global__ void __launch_bounds__(TILE_SIZE_J)
-computeCoulombFockDDDD20(double*         mat_J,
-                       const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
-                       const double*   dd_mat_D,
-                       const double*   dd_mat_Q_local,
-                       const double*   dd_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
-                       const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
-                       const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
-                       const double*   boys_func_table,
-                       const double*   boys_func_ft,
-                       const double    eri_threshold);
-
-__global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD20_FP64(double*         mat_J,
                        const double*   d_prim_info,
                        const uint32_t  d_prim_count,
@@ -2967,25 +2566,6 @@ computeCoulombFockDDDD20_FP32(double*         mat_J,
                        const float*    boys_func_ft_f,
                        const uint32_t* prec_cut_ij_tile,
                        const uint32_t* screen_cut_ij_tile);
-
-__global__ void __launch_bounds__(TILE_SIZE_J)
-computeCoulombFockDDDD21(double*         mat_J,
-                       const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
-                       const double*   dd_mat_D,
-                       const double*   dd_mat_Q_local,
-                       const double*   dd_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
-                       const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
-                       const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
-                       const double*   boys_func_table,
-                       const double*   boys_func_ft,
-                       const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD21_FP64(double*         mat_J,
@@ -3023,25 +2603,6 @@ computeCoulombFockDDDD21_FP32(double*         mat_J,
                        const uint32_t* screen_cut_ij_tile);
 
 __global__ void __launch_bounds__(TILE_SIZE_J)
-computeCoulombFockDDDD22(double*         mat_J,
-                       const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
-                       const double*   dd_mat_D,
-                       const double*   dd_mat_Q_local,
-                       const double*   dd_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
-                       const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
-                       const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
-                       const double*   boys_func_table,
-                       const double*   boys_func_ft,
-                       const double    eri_threshold);
-
-__global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD22_FP64(double*         mat_J,
                        const double*   d_prim_info,
                        const uint32_t  d_prim_count,
@@ -3075,25 +2636,6 @@ computeCoulombFockDDDD22_FP32(double*         mat_J,
                        const float*    boys_func_ft_f,
                        const uint32_t* prec_cut_ij_tile,
                        const uint32_t* screen_cut_ij_tile);
-
-__global__ void __launch_bounds__(TILE_SIZE_J)
-computeCoulombFockDDDD23(double*         mat_J,
-                       const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
-                       const double*   dd_mat_D,
-                       const double*   dd_mat_Q_local,
-                       const double*   dd_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
-                       const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
-                       const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
-                       const double*   boys_func_table,
-                       const double*   boys_func_ft,
-                       const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD23_FP64(double*         mat_J,
@@ -3131,25 +2673,6 @@ computeCoulombFockDDDD23_FP32(double*         mat_J,
                        const uint32_t* screen_cut_ij_tile);
 
 __global__ void __launch_bounds__(TILE_SIZE_J)
-computeCoulombFockDDDD24(double*         mat_J,
-                       const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
-                       const double*   dd_mat_D,
-                       const double*   dd_mat_Q_local,
-                       const double*   dd_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
-                       const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
-                       const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
-                       const double*   boys_func_table,
-                       const double*   boys_func_ft,
-                       const double    eri_threshold);
-
-__global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD24_FP64(double*         mat_J,
                        const double*   d_prim_info,
                        const uint32_t  d_prim_count,
@@ -3185,25 +2708,6 @@ computeCoulombFockDDDD24_FP32(double*         mat_J,
                        const uint32_t* screen_cut_ij_tile);
 
 __global__ void __launch_bounds__(TILE_SIZE_J)
-computeCoulombFockDDDD25(double*         mat_J,
-                       const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
-                       const double*   dd_mat_D,
-                       const double*   dd_mat_Q_local,
-                       const double*   dd_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
-                       const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
-                       const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
-                       const double*   boys_func_table,
-                       const double*   boys_func_ft,
-                       const double    eri_threshold);
-
-__global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD25_FP64(double*         mat_J,
                        const double*   d_prim_info,
                        const uint32_t  d_prim_count,
@@ -3222,222 +2726,6 @@ computeCoulombFockDDDD25_FP64(double*         mat_J,
 
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockDDDD25_FP32(double*         mat_J,
-                       const float*    d_prim_info_f,
-                       const uint32_t  d_prim_count,
-                       const float*    dd_mat_D_f,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
-                       const float*    dd_pair_data_local_f,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
-                       const float*    dd_pair_data_f,
-                       const uint32_t  dd_prim_pair_count,
-                       const float*    boys_func_table_f,
-                       const float*    boys_func_ft_f,
-                       const uint32_t* prec_cut_ij_tile,
-                       const uint32_t* screen_cut_ij_tile);
-
-__global__ void __launch_bounds__(TILE_SIZE_J)
-computeCoulombFockDDDD26(double*         mat_J,
-                       const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
-                       const double*   dd_mat_D,
-                       const double*   dd_mat_Q_local,
-                       const double*   dd_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
-                       const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
-                       const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
-                       const double*   boys_func_table,
-                       const double*   boys_func_ft,
-                       const double    eri_threshold);
-
-__global__ void __launch_bounds__(TILE_SIZE_J)
-computeCoulombFockDDDD26_FP64(double*         mat_J,
-                       const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
-                       const double*   dd_mat_D,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
-                       const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
-                       const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
-                       const double*   boys_func_table,
-                       const double*   boys_func_ft,
-                       const uint32_t* prec_cut_ij_tile);
-
-__global__ void __launch_bounds__(TILE_SIZE_J)
-computeCoulombFockDDDD26_FP32(double*         mat_J,
-                       const float*    d_prim_info_f,
-                       const uint32_t  d_prim_count,
-                       const float*    dd_mat_D_f,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
-                       const float*    dd_pair_data_local_f,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
-                       const float*    dd_pair_data_f,
-                       const uint32_t  dd_prim_pair_count,
-                       const float*    boys_func_table_f,
-                       const float*    boys_func_ft_f,
-                       const uint32_t* prec_cut_ij_tile,
-                       const uint32_t* screen_cut_ij_tile);
-
-__global__ void __launch_bounds__(TILE_SIZE_J)
-computeCoulombFockDDDD27(double*         mat_J,
-                       const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
-                       const double*   dd_mat_D,
-                       const double*   dd_mat_Q_local,
-                       const double*   dd_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
-                       const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
-                       const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
-                       const double*   boys_func_table,
-                       const double*   boys_func_ft,
-                       const double    eri_threshold);
-
-__global__ void __launch_bounds__(TILE_SIZE_J)
-computeCoulombFockDDDD27_FP64(double*         mat_J,
-                       const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
-                       const double*   dd_mat_D,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
-                       const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
-                       const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
-                       const double*   boys_func_table,
-                       const double*   boys_func_ft,
-                       const uint32_t* prec_cut_ij_tile);
-
-__global__ void __launch_bounds__(TILE_SIZE_J)
-computeCoulombFockDDDD27_FP32(double*         mat_J,
-                       const float*    d_prim_info_f,
-                       const uint32_t  d_prim_count,
-                       const float*    dd_mat_D_f,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
-                       const float*    dd_pair_data_local_f,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
-                       const float*    dd_pair_data_f,
-                       const uint32_t  dd_prim_pair_count,
-                       const float*    boys_func_table_f,
-                       const float*    boys_func_ft_f,
-                       const uint32_t* prec_cut_ij_tile,
-                       const uint32_t* screen_cut_ij_tile);
-
-__global__ void __launch_bounds__(TILE_SIZE_J)
-computeCoulombFockDDDD28(double*         mat_J,
-                       const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
-                       const double*   dd_mat_D,
-                       const double*   dd_mat_Q_local,
-                       const double*   dd_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
-                       const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
-                       const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
-                       const double*   boys_func_table,
-                       const double*   boys_func_ft,
-                       const double    eri_threshold);
-
-__global__ void __launch_bounds__(TILE_SIZE_J)
-computeCoulombFockDDDD28_FP64(double*         mat_J,
-                       const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
-                       const double*   dd_mat_D,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
-                       const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
-                       const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
-                       const double*   boys_func_table,
-                       const double*   boys_func_ft,
-                       const uint32_t* prec_cut_ij_tile);
-
-__global__ void __launch_bounds__(TILE_SIZE_J)
-computeCoulombFockDDDD28_FP32(double*         mat_J,
-                       const float*    d_prim_info_f,
-                       const uint32_t  d_prim_count,
-                       const float*    dd_mat_D_f,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
-                       const float*    dd_pair_data_local_f,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
-                       const float*    dd_pair_data_f,
-                       const uint32_t  dd_prim_pair_count,
-                       const float*    boys_func_table_f,
-                       const float*    boys_func_ft_f,
-                       const uint32_t* prec_cut_ij_tile,
-                       const uint32_t* screen_cut_ij_tile);
-
-__global__ void __launch_bounds__(TILE_SIZE_J)
-computeCoulombFockDDDD29(double*         mat_J,
-                       const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
-                       const double*   dd_mat_D,
-                       const double*   dd_mat_Q_local,
-                       const double*   dd_mat_Q,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
-                       const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
-                       const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
-                       const double*   boys_func_table,
-                       const double*   boys_func_ft,
-                       const double    eri_threshold);
-
-__global__ void __launch_bounds__(TILE_SIZE_J)
-computeCoulombFockDDDD29_FP64(double*         mat_J,
-                       const double*   d_prim_info,
-                       const uint32_t  d_prim_count,
-                       const double*   dd_mat_D,
-                       const uint32_t* dd_first_inds_local,
-                       const uint32_t* dd_second_inds_local,
-                       const double*   dd_pair_data_local,
-                       const uint32_t  dd_prim_pair_count_local,
-                       const uint32_t* dd_first_inds,
-                       const uint32_t* dd_second_inds,
-                       const double*   dd_pair_data,
-                       const uint32_t  dd_prim_pair_count,
-                       const double*   boys_func_table,
-                       const double*   boys_func_ft,
-                       const uint32_t* prec_cut_ij_tile);
-
-__global__ void __launch_bounds__(TILE_SIZE_J)
-computeCoulombFockDDDD29_FP32(double*         mat_J,
                        const float*    d_prim_info_f,
                        const uint32_t  d_prim_count,
                        const float*    dd_mat_D_f,
@@ -4431,98 +3719,6 @@ computeCoulombFockPPPP(double*         mat_J,
                        const double    eri_threshold);
 
 __global__ void __launch_bounds__(TILE_SIZE_J)
-computeCoulombFockPPPP_ori(double*         mat_J,
-                       const double*   p_prim_info,
-                       const uint32_t  p_prim_count,
-                       const double*   pp_mat_D,
-                       const double*   pp_mat_Q_local,
-                       const double*   pp_mat_Q,
-                       const uint32_t* pp_first_inds_local,
-                       const uint32_t* pp_second_inds_local,
-                       const double*   pp_pair_data_local,
-                       const uint32_t  pp_prim_pair_count_local,
-                       const uint32_t* pp_first_inds,
-                       const uint32_t* pp_second_inds,
-                       const double*   pp_pair_data,
-                       const uint32_t  pp_prim_pair_count,
-                       const double*   boys_func_table,
-                       const double*   boys_func_ft,
-                       const double    eri_threshold);
-
-__global__ void __launch_bounds__(TILE_SIZE_J)
-computeCoulombFockPPPP_MP_inside_cast(double*         mat_J,
-                       const double*   p_prim_info,
-                       const uint32_t  p_prim_count,
-                       const double*   pp_mat_D,
-                       const double*   pp_mat_Q_local,
-                       const double*   pp_mat_Q,
-                       const uint32_t* pp_first_inds_local,
-                       const uint32_t* pp_second_inds_local,
-                       const double*   pp_pair_data_local,
-                       const uint32_t  pp_prim_pair_count_local,
-                       const uint32_t* pp_first_inds,
-                       const uint32_t* pp_second_inds,
-                       const double*   pp_pair_data,
-                       const uint32_t  pp_prim_pair_count,
-                       const double*   boys_func_table,
-                       const double*   boys_func_ft,
-                       const float*    boys_func_table_f,
-                       const float*    boys_func_ft_f,
-                       const double    eri_threshold,
-                       const uint32_t*  cut_ij_tile,
-                       const double    tau_precision);
-
-__global__ void __launch_bounds__(TILE_SIZE_J)
-computeCoulombFockPPPP_MP_alld(double*         mat_J,
-                       const double*   p_prim_info,
-                       const uint32_t  p_prim_count,
-                       const double*   pp_mat_D,
-                       const double*   pp_mat_Q_local,
-                       const double*   pp_mat_Q,
-                       const uint32_t* pp_first_inds_local,
-                       const uint32_t* pp_second_inds_local,
-                       const double*   pp_pair_data_local,
-                       const uint32_t  pp_prim_pair_count_local,
-                       const uint32_t* pp_first_inds,
-                       const uint32_t* pp_second_inds,
-                       const double*   pp_pair_data,
-                       const uint32_t  pp_prim_pair_count,
-                       const double*   boys_func_table,
-                       const double*   boys_func_ft,
-                       const double    eri_threshold,
-                       const uint32_t*  cut_ij_tile,
-                       const double    tau_precision);
-                       
-__global__ void __launch_bounds__(TILE_SIZE_J)
-computeCoulombFockPPPP_MP(double*         mat_J,
-                       const double*   p_prim_info,
-                       const uint32_t  p_prim_count,
-                       const double*   pp_mat_D,
-                       const double*   pp_mat_Q_local,
-                       const double*   pp_mat_Q,
-                       const uint32_t* pp_first_inds_local,
-                       const uint32_t* pp_second_inds_local,
-                       const double*   pp_pair_data_local,
-                       const uint32_t  pp_prim_pair_count_local,
-                       const uint32_t* pp_first_inds,
-                       const uint32_t* pp_second_inds,
-                       const double*   pp_pair_data,
-                       const uint32_t  pp_prim_pair_count,
-                       const double*   boys_func_table,
-                       const double*   boys_func_ft,
-                       const double    eri_threshold,
-                       const uint32_t*  cut_ij_tile,
-                       const double    tau_precision,
-                       const float*   p_prim_info_f,
-                       const float*   pp_mat_D_f,
-                       const float*   pp_mat_Q_local_f,
-                       const float*   pp_mat_Q_f,
-                       const float*   pp_pair_data_local_f,
-                       const float*   pp_pair_data_f,
-                       const float*   boys_func_table_f,
-                       const float*   boys_func_ft_f);
-
-__global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockPPPP_FP64(double*         mat_J,
                        const double*   p_prim_info,
                        const uint32_t  p_prim_count,
@@ -4538,35 +3734,6 @@ computeCoulombFockPPPP_FP64(double*         mat_J,
                        const double*   boys_func_table,
                        const double*   boys_func_ft,
                        const uint32_t*  prec_cut_ij_tile);
-
-__global__ void __launch_bounds__(TILE_SIZE_J)
-computeCoulombFockPPPP_FP32_old(double*         mat_J,
-                       const double*   p_prim_info,
-                       const uint32_t  p_prim_count,
-                       const double*   pp_mat_D,
-                       const double*   pp_mat_Q_local,
-                       const double*   pp_mat_Q,
-                       const uint32_t* pp_first_inds_local,
-                       const uint32_t* pp_second_inds_local,
-                       const double*   pp_pair_data_local,
-                       const uint32_t  pp_prim_pair_count_local,
-                       const uint32_t* pp_first_inds,
-                       const uint32_t* pp_second_inds,
-                       const double*   pp_pair_data,
-                       const uint32_t  pp_prim_pair_count,
-                       const double*   boys_func_table,
-                       const double*   boys_func_ft,
-                       const double    eri_threshold,
-                       const uint32_t*  cut_ij_tile,
-                       const double    tau_precision,
-                       const float*   p_prim_info_f,
-                       const float*   pp_mat_D_f,
-                       const float*   pp_mat_Q_local_f,
-                       const float*   pp_mat_Q_f,
-                       const float*   pp_pair_data_local_f,
-                       const float*   pp_pair_data_f,
-                       const float*   boys_func_table_f,
-                       const float*   boys_func_ft_f);
 
 __global__ void __launch_bounds__(TILE_SIZE_J)
 computeCoulombFockPPPP_FP32(double*         mat_J,
