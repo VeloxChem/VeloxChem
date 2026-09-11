@@ -1128,6 +1128,27 @@ class IMDatabasePointCollecter:
     def _reload_interpolation_root_from_hdf5(self, root, inv_sqrt_masses):
         driver_object = self.impes_drivers[root]
 
+        if driver_object.construction_mode == 'grouped_symmetry_aware':
+            from .grouped_interpolation.runtime import GroupedRuntimeModel
+
+            driver_object._grouped_runtime_model = GroupedRuntimeModel.from_hdf5(
+                self.interpolation_settings[root]['imforcefield_file'],
+                model_id=driver_object.grouped_model_id,
+                z_matrix=self.root_z_matrix[root],
+                interpolation_settings=self.interpolation_settings[root],
+                require_published=True,
+            )
+            driver_object.grouped_model_id = driver_object._grouped_runtime_model.model_id
+            driver_object.impes_coordinate.eq_bond_lengths = (
+                driver_object._grouped_runtime_model.eq_bond_lengths.copy())
+            self.qm_data_point_dict[root] = []
+            self.qm_symmetry_datapoint_dict[root] = {}
+            self.qm_energies_dict[root] = []
+            self.sorted_state_spec_im_labels[root] = []
+            driver_object.qm_data_points = self.qm_data_point_dict[root]
+            driver_object.labels = []
+            return
+
         im_labels, _ = driver_object.read_labels()
         sorted_im_labels = sorted(im_labels, key=lambda x: int(x.split('_')[1]))
         self.qm_data_point_dict[root] = []
@@ -1314,7 +1335,12 @@ class IMDatabasePointCollecter:
 
             self.impes_drivers[root] = driver_object
             self._reload_interpolation_root_from_hdf5(root, self.inv_sqrt_masses)
-            self.prev_dens_of_points[root] = len(self.qm_data_point_dict[root])
+            if driver_object.construction_mode == 'grouped_symmetry_aware':
+                self.prev_dens_of_points[root] = int(
+                    driver_object._grouped_runtime_model.metadata.get(
+                        'physical_point_count', 0))
+            else:
+                self.prev_dens_of_points[root] = len(self.qm_data_point_dict[root])
 
             # Set the object as an attribute of the instance
             setattr(self, attribute_name, driver_object)

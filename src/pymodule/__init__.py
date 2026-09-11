@@ -217,6 +217,17 @@ from .imdatabasepointcollecter import IMDatabasePointCollecter
 from .openmmimdynamics import OpenMMIMDynamics
 from .interpolationdriver import InterpolationDriver
 from .interpolationdatapoint import InterpolationDatapoint
+from .grouped_interpolation import (
+    CoordinateDefinition,
+    GroupedCalculationRequest,
+    GroupedCalculationResult,
+    GroupedRuntimeModel,
+    LocalSubset,
+    PrimitiveRotor,
+    PrimitiveRotorDetector,
+    RigidRotorStructureGenerator,
+    SymmetryOperation,
+)
 from .mofbuilder.core.builder import MetalOrganicFrameworkBuilder as MofBuilder
 from .imtrustradiusoptimizer import IMTrustRadiusOptimizer
 from .conformergenerator import ConformerGenerator

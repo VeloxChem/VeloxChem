@@ -269,6 +269,40 @@ class IMForceFieldGenerator:
         self.use_mass_weight = True # set True as it is standard in the YM scheme --> small differences
         self.consider_locality = False
 
+        # The established flat MSI path remains the default. Grouped construction
+        # is a separate, explicit model family and registry.
+        self.construction_mode = 'legacy_flat'
+        self.grouped_model_id = None
+        self.requested_motion_ids = None
+        self.grouped_training_phases_degrees = (0.0, 30.0, 60.0, 90.0, 120.0)
+        self.grouped_held_out_phases_degrees = (15.0, 45.0, 75.0, 105.0)
+        self.grouped_group_rotation_training_phases_degrees = (
+            0.0, 20.0, 40.0, 60.0, 80.0, 100.0, 120.0, 140.0, 160.0, 180.0, 200.0, 220.0, 240.0, 260.0, 280.0, 300.0, 320.0, 340.0
+        )
+        self.grouped_group_rotation_held_out_phases_degrees = (
+            30.0, 90.0, 150.0, 210.0, 270.0, 330.0
+        )
+        self.grouped_enforce_exact_permutation_symmetry = True
+        self.grouped_detect_group_rotors = False
+        self.grouped_confidence_radius = 1.0
+        self.grouped_exact_center_tolerance = 1.0e-10
+        self.grouped_phase_tolerance = 2.0e-5
+        self.grouped_signature_scale = 1.0
+        self.grouped_excluded_axis_bonds = ()
+        self.grouped_symmetry_geometry_tolerance_bohr = 0.35
+        self.grouped_symmetry_energy_tolerance_hartree = 2.0e-3
+        self.grouped_symmetry_gradient_tolerance = 2.0e-2
+        self.grouped_symmetry_hessian_tolerance = 1.0e-1
+        self.grouped_coupling_energy_threshold_hartree = 2.0e-3
+        self.grouped_coupling_gradient_rms_threshold = 2.0e-3
+        self.grouped_coupling_probe_phases_degrees = (
+            (30.0, 30.0), (30.0, 60.0), (60.0, 30.0),
+            (60.0, 60.0), (90.0, 30.0), (30.0, 90.0),
+        )
+        self.grouped_sidechain_basin_id = 'canonical_input_basin'
+        self.grouped_run_validation_calculations = False
+        self.grouped_validation_report = None
+
         self.eq_bond_length = None
         self.eq_bond_length_irc_bonds = None
 
@@ -632,6 +666,61 @@ class IMForceFieldGenerator:
                 self.imforcefieldfiles[self.roots_to_follow[root_idx]] = standard_file
                 self.sampling_imforcefieldfiles[self.roots_to_follow[root_idx]] = standard_smapling_files[root_idx]
 
+        if self.construction_mode == 'grouped_symmetry_aware':
+            if self.construction_mode not in {'legacy_flat', 'grouped_symmetry_aware'}:
+                raise ValueError(
+                    "construction_mode must be 'legacy_flat' or 'grouped_symmetry_aware'.")
+            from .grouped_interpolation.registry import read_grouped_coordinate_z_matrix
+
+            self.all_rotatable_bonds = []
+            for root in self.roots_to_follow:
+                database_file = self.imforcefieldfiles[root]
+                recovered = False
+                if Path(database_file).exists():
+                    try:
+                        recovered_model_id, z_matrix = read_grouped_coordinate_z_matrix(
+                            database_file, self.grouped_model_id)
+                        self.grouped_model_id = recovered_model_id
+                        self.roots_z_matrix[root] = z_matrix
+                        recovered = True
+                    except (KeyError, ValueError, OSError):
+                        recovered = False
+                if not recovered:
+                    self.roots_z_matrix[root] = self.define_z_matrix_dict(molecule)
+
+                n_bonds = len(self.roots_z_matrix[root]['bonds'])
+                n_angles = len(self.roots_z_matrix[root]['angles'])
+                n_dihedrals = len(self.roots_z_matrix[root]['dihedrals'])
+                dihedral_start = n_bonds + n_angles
+                dihedral_end = dihedral_start + n_dihedrals
+                self.symmetry_information['gs'] = [
+                    list(range(len(molecule.get_labels()))), [], [],
+                    list(range(len(molecule.get_labels()))), [], [], [], {}, [],
+                    [dihedral_start, dihedral_end],
+                ]
+                settings = {
+                    'interpolation_type': self.interpolation_type,
+                    'weightfunction_type': self.weightfunction_type,
+                    'exponent_p': self.exponent_p,
+                    'exponent_q': self.exponent_q,
+                    'confidence_radius': self.confidence_radius,
+                    'imforcefield_file': database_file,
+                    'use_inverse_bond_length': self.use_inverse_bond_length,
+                    'use_eq_bond_length': self.use_eq_bond_length,
+                    'use_cos_angle': self.use_cos_angle,
+                    'use_tc_weights': self.use_tc_weights,
+                    'tc_weight_mode': self.tc_weight_mode,
+                    'use_mass_weight': self.use_mass_weight,
+                    'construction_mode': self.construction_mode,
+                    'grouped_model_id': self.grouped_model_id,
+                }
+                self.states_interpolation_settings[root] = settings
+                self.sampling_states_interpolation_settings[root] = settings.copy()
+                self.sampling_states_interpolation_settings[root][
+                    'imforcefield_file'] = self.sampling_imforcefieldfiles[root]
+            self._system_is_set_up = True
+            return
+
         ff_gen = MMForceFieldGenerator()
         ff_gen.ostream.mute()
         ff_gen.partial_charges = molecule.get_partial_charges(molecule.get_charge())
@@ -668,26 +757,73 @@ class IMForceFieldGenerator:
                 self.roots_z_matrix[root] = _promote_nonrotatable_ring_torsions_to_impropers(self.roots_z_matrix[root], ff_gen, rotatable_bonds_zero_based, impropers=impropers)
             elif root not in self.roots_z_matrix:
                 # generate the z-matrix based for the interpolation database provided
-                int_driver = InterpolationDriver()
-                int_driver.update_settings({
-                    'interpolation_type':self.interpolation_type,
-                    'weightfunction_type':self.weightfunction_type,
-                    'exponent_p':self.exponent_p,
-                    'exponent_q':self.exponent_q,
-                    'confidence_radius':self.confidence_radius,
-                    'imforcefield_file':self.imforcefieldfiles[root],
-                    'use_inverse_bond_length':self.use_inverse_bond_length,
-                    'use_eq_bond_length':self.use_eq_bond_length,
-                    'use_tc_weights':self.use_tc_weights,
-                    'tc_weight_mode':self.tc_weight_mode,
-                    'use_mass_weight':self.use_mass_weight,
-                })
+                if self.construction_mode == 'grouped_symmetry_aware':
+                    from .grouped_interpolation.registry import read_grouped_coordinate_z_matrix
+                    try:
+                        recovered_model_id, z_matrix = read_grouped_coordinate_z_matrix(
+                            self.imforcefieldfiles[root], self.grouped_model_id)
+                        self.grouped_model_id = recovered_model_id
+                        self.roots_z_matrix[root] = z_matrix
+                    except (KeyError, ValueError, OSError):
+                        self.roots_z_matrix[root] = self.define_z_matrix_dict(molecule)
+                        impropers = list(ff_gen.impropers.keys())
+                        self.roots_z_matrix[root] = _promote_nonrotatable_ring_torsions_to_impropers(
+                            self.roots_z_matrix[root], ff_gen, rotatable_bonds_zero_based,
+                            impropers=impropers)
+                else:
+                    int_driver = InterpolationDriver()
+                    int_driver.update_settings({
+                        'interpolation_type':self.interpolation_type,
+                        'weightfunction_type':self.weightfunction_type,
+                        'exponent_p':self.exponent_p,
+                        'exponent_q':self.exponent_q,
+                        'confidence_radius':self.confidence_radius,
+                        'imforcefield_file':self.imforcefieldfiles[root],
+                        'use_inverse_bond_length':self.use_inverse_bond_length,
+                        'use_eq_bond_length':self.use_eq_bond_length,
+                        'use_tc_weights':self.use_tc_weights,
+                        'tc_weight_mode':self.tc_weight_mode,
+                        'use_mass_weight':self.use_mass_weight,
+                    })
 
-                _, z_matrix = int_driver.read_labels()
-                self.roots_z_matrix[root] = z_matrix
+                    _, z_matrix = int_driver.read_labels()
+                    self.roots_z_matrix[root] = z_matrix
 
             dihedral_start = len(self.roots_z_matrix[root]['bonds']) + len(self.roots_z_matrix[root]['angles'])
             dihedral_end = dihedral_start + len(self.roots_z_matrix[root]['dihedrals'])
+
+            if self.construction_mode == 'grouped_symmetry_aware':
+                # Grouped motion discovery is performed later by the fresh
+                # topology detector; no legacy symmetry grouping is consulted.
+                self.all_rotatable_bonds = rotatable_bonds_zero_based
+                self.symmetry_information['gs'] = [
+                    list(range(len(molecule.get_labels()))), [], [],
+                    list(range(len(molecule.get_labels()))), [],
+                    rotatable_bonds_zero_based, [], {}, [],
+                    [dihedral_start, dihedral_end],
+                ]
+                imforcefieldfile = self.imforcefieldfiles[root]
+                self.states_interpolation_settings[root] = {
+                    'interpolation_type': self.interpolation_type,
+                    'weightfunction_type': self.weightfunction_type,
+                    'exponent_p': self.exponent_p,
+                    'exponent_q': self.exponent_q,
+                    'confidence_radius': self.confidence_radius,
+                    'imforcefield_file': imforcefieldfile,
+                    'use_inverse_bond_length': self.use_inverse_bond_length,
+                    'use_eq_bond_length': self.use_eq_bond_length,
+                    'use_cos_angle': self.use_cos_angle,
+                    'use_tc_weights': self.use_tc_weights,
+                    'tc_weight_mode': self.tc_weight_mode,
+                    'use_mass_weight': self.use_mass_weight,
+                    'construction_mode': self.construction_mode,
+                    'grouped_model_id': self.grouped_model_id,
+                }
+                self.sampling_states_interpolation_settings[root] = (
+                    self.states_interpolation_settings[root].copy())
+                self.sampling_states_interpolation_settings[root][
+                    'imforcefield_file'] = self.sampling_imforcefieldfiles[root]
+                continue
 
             self.all_rotatable_bonds = rotatable_bonds_zero_based
             all_exclision = [element for rot_bond in rotatable_bonds_zero_based for element in rot_bond]
@@ -723,10 +859,21 @@ class IMForceFieldGenerator:
                 'use_tc_weights': self.use_tc_weights,
                 'tc_weight_mode': self.tc_weight_mode,
                 'use_mass_weight': self.use_mass_weight,
+                'construction_mode': self.construction_mode,
+                'grouped_model_id': self.grouped_model_id,
             }
             self.sampling_states_interpolation_settings[self.roots_to_follow[0]] = self.states_interpolation_settings[self.roots_to_follow[0]].copy()
             self.sampling_states_interpolation_settings[self.roots_to_follow[0]]['imforcefield_file'] = self.sampling_imforcefieldfiles[self.roots_to_follow[0]]
         
+        if self.construction_mode not in {'legacy_flat', 'grouped_symmetry_aware'}:
+            raise ValueError(
+                "construction_mode must be 'legacy_flat' or 'grouped_symmetry_aware'."
+            )
+
+        if self.construction_mode == 'grouped_symmetry_aware':
+            self._system_is_set_up = True
+            return
+
         if self.exclude_non_core:
             new_exclusion = {}
             new_inclusion = {}
@@ -924,10 +1071,22 @@ class IMForceFieldGenerator:
             self.reference_struc_energy_file = None
 
         # First set up the system for which the database needs to be constructed
-        states_basis = {'gs':self.gs_basis_set_label, 'es':self.es_basis_set_label}
+        if states_basis is None:
+            states_basis = {'gs': self.gs_basis_set_label, 'es': self.es_basis_set_label}
+        else:
+            states_basis = {
+                'gs': states_basis.get('gs', self.gs_basis_set_label),
+                'es': states_basis.get('es', self.es_basis_set_label),
+            }
         if not self._system_is_set_up:
             self.ostream.print_warning('System is not set up. Automatic set up ')
             self.set_up_the_system(molecule)
+
+        if self.construction_mode == 'grouped_symmetry_aware':
+            from .grouped_interpolation.construction import GroupedModelConstructor
+            self.im_results = GroupedModelConstructor(self).construct(
+                molecule, states_basis=states_basis)
+            return self.im_results
 
         self.ostream.print_blank()
         self.ostream.print_header('IM Database Construction')
@@ -956,7 +1115,7 @@ class IMForceFieldGenerator:
                 'drivers': self.drivers,
                 'basis_set_label': states_basis,
                 'duration': self.duration, 'temperature': self.temperature, 'solvent': self.solvent,
-                'pressure': self.force_constant, 'force_constant': self.force_constant, 'ensemble': self.ensemble,
+                'pressure': self.pressure, 'force_constant': self.force_constant, 'ensemble': self.ensemble,
                 'timestep': self.timestep, 'nsteps': self.nsteps, 'friction': self.friction,
                 'snapshots': self.snapshots, 'trajectory_file': self.trajectory_file, 'reference_struc_energy_file': self.reference_struc_energy_file,
                 'desired_datapoint_density': self.desired_point_density, 'converged_cycle': self.converged_cycle,
@@ -2109,7 +2268,7 @@ class IMForceFieldGenerator:
         dt = h5py.string_dtype(encoding="utf-8")
         h5f.create_dataset(name, data=np.array(value, dtype=object), dtype=dt)
 
-    def add_point(self, molecule_specific_information, interpolation_settings, symmetry_information={}):
+    def add_point(self, molecule_specific_information, interpolation_settings, symmetry_information=None):
         """ Adds a new point to the database.
 
             :param molecule:

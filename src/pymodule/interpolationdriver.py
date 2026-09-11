@@ -145,6 +145,9 @@ class InterpolationDriver:
         self.use_eq_bond_length = False
         self.use_cos_angle = False
         self.use_mass_weight = False
+        self.construction_mode = 'legacy_flat'
+        self.grouped_model_id = None
+        self._grouped_runtime_model = None
 
         # General target customized schemes
         self.use_tc_weights = False
@@ -182,6 +185,8 @@ class InterpolationDriver:
                     'use_tc_weights':('bool', 'weither to use target coustomized weights'),
                     'tc_weight_mode':('str', 'the mode for the target customized weights (multiplicative/additive)'),
                     'use_mass_weight':('bool', 'weither to use mass weighting in coordinates'),
+                    'construction_mode': ('str', 'legacy_flat or grouped_symmetry_aware'),
+                    'grouped_model_id': ('str', 'published grouped model identifier'),
                 'labels': ('seq_fixed_str', 'the list of QM data point labels'),
             }
         }
@@ -207,6 +212,11 @@ class InterpolationDriver:
         }
 
         parse_input(self, im_keywords, impes_dict)
+
+        if self.construction_mode not in {'legacy_flat', 'grouped_symmetry_aware'}:
+            raise ValueError(
+                "construction_mode must be 'legacy_flat' or 'grouped_symmetry_aware'."
+            )
 
         if self.interpolation_type == 'simple':
             AssertionError("simple interpolation scheme is not supported as it is considered worse then shepard interpolation.")
@@ -401,6 +411,35 @@ class InterpolationDriver:
         self.dihedral_rmsd = []
 
         self.molecule = molecule
+
+        if self.construction_mode == 'grouped_symmetry_aware':
+            from .grouped_interpolation.runtime import GroupedRuntimeModel
+
+            if self._grouped_runtime_model is None:
+                self._grouped_runtime_model = GroupedRuntimeModel.from_hdf5(
+                    self.imforcefield_file,
+                    model_id=self.grouped_model_id,
+                    z_matrix=self.impes_coordinate.z_matrix_dict,
+                    interpolation_settings=self.impes_dict,
+                    require_published=True,
+                )
+                self.grouped_model_id = self._grouped_runtime_model.model_id
+            self.impes_coordinate.eq_bond_lengths = (
+                self._grouped_runtime_model.eq_bond_lengths.copy()
+            )
+            if self.use_mass_weight:
+                masses = np.repeat(np.asarray(molecule.get_masses(), dtype=float), 3)
+                self.impes_coordinate.inv_sqrt_masses = 1.0 / np.sqrt(masses)
+            else:
+                self.impes_coordinate.inv_sqrt_masses = None
+            self.define_impes_coordinate(molecule.get_coordinates_in_bohr())
+            energy, gradient = self._grouped_runtime_model.evaluate_coordinate(
+                self.impes_coordinate, molecule
+            )
+            print(energy, gradient)
+            self.impes_coordinate.energy = energy
+            self.impes_coordinate.gradient = gradient
+            return
 
         self.define_impes_coordinate(molecule.get_coordinates_in_bohr())
 
