@@ -84,207 +84,6 @@ to_float_vec(const std::vector<double>& src)
     return dst;
 }
 
-// Allow per-run benchmark log naming via environment variable.
-const std::string& report_file_path()
-{
-    static const std::string path = []() {
-        if (const char* env = std::getenv("VLX_ABLATION_LOG"); env && *env)
-        {
-            return std::string(env);
-        }
-        return std::string("ablation_results.log");
-    }();
-
-    return path;
-}
-
-// Truncate the report exactly once per process launch, then append under a mutex.
-static std::once_flag s_ablation_init;
-static std::mutex     s_ablation_mutex;
-
-static void write_to_ablation_file(const std::string& text)
-{
-    std::call_once(s_ablation_init, []() {
-        std::ofstream(report_file_path(), std::ios_base::trunc);
-    });
-
-    std::lock_guard<std::mutex> lock(s_ablation_mutex);
-    std::ofstream outfile(report_file_path(), std::ios_base::app);
-    if (outfile.is_open()) {
-        outfile << text;
-    } else {
-        std::cout << text;
-    }
-}
-
-// ====== Helper 1: Error Checking ======
-// ====== Helper 2: Cut Status Printing ======
-void print_cut_status(const std::string& tag,
-                      const std::vector<uint32_t>& prec_cut_ij_tile_h,
-                      const std::vector<uint32_t>& screen_cut_ij_tile_h,
-                      uint32_t cd_prim_pair_count,
-                      uint32_t tile_dim)
-{
-    const uint32_t m_tiles = (cd_prim_pair_count + tile_dim - 1) / tile_dim;
-    uint32_t prec_cut_min = UINT_MAX;
-    uint32_t prec_cut_max = 0;
-    uint64_t prec_cut_sum = 0;
-    uint32_t screen_cut_min = UINT_MAX;
-    uint32_t screen_cut_max = 0;
-    uint64_t screen_cut_sum = 0;
-
-    uint32_t n_prec_cut0 = 0;
-    uint32_t n_prec_cutfull = 0;
-
-    uint64_t fp32_tile_sum = 0;
-
-    for (size_t t = 0; t < prec_cut_ij_tile_h.size(); ++t) {
-        const uint32_t prec = prec_cut_ij_tile_h[t];
-        const uint32_t screen = screen_cut_ij_tile_h[t];
-
-        prec_cut_min = std::min(prec_cut_min, prec);
-        prec_cut_max = std::max(prec_cut_max, prec);
-        prec_cut_sum += prec;
-        if (prec == 0) n_prec_cut0++;
-        if (prec >= m_tiles) n_prec_cutfull++;
-
-        screen_cut_min = std::min(screen_cut_min, screen);
-        screen_cut_max = std::max(screen_cut_max, screen);
-        screen_cut_sum += screen;
-
-        fp32_tile_sum += (screen >= prec) ? (screen - prec) : 0;
-    }
-
-    const double prec_cut_avg = (double)prec_cut_sum / (double)prec_cut_ij_tile_h.size();
-    const double screen_cut_avg = (double)screen_cut_sum / (double)screen_cut_ij_tile_h.size();
-    const double fp32_frac_among_computed =
-        (screen_cut_sum > 0) ? (double)fp32_tile_sum / (double)screen_cut_sum : 0.0;
-    const double fp64_frac_among_computed =
-        (screen_cut_sum > 0) ? (double)prec_cut_sum / (double)screen_cut_sum : 0.0;
-    const double screened_frac_among_all =
-        (m_tiles > 0) ? (double)(m_tiles * prec_cut_ij_tile_h.size() - screen_cut_sum) /
-                            (double)(m_tiles * prec_cut_ij_tile_h.size())
-                      : 0.0;
-
-    std::stringstream ss;
-    ss << "=== " << tag << " cut stats (host) ===\n"
-       << "  ij_tiles         = " << prec_cut_ij_tile_h.size() << "\n"
-       << "  kl_tiles (m_tiles)= " << m_tiles << "\n"
-       << "  prec cut min/max = " << prec_cut_min << " / " << prec_cut_max << "\n"
-       << "  prec cut avg     = " << prec_cut_avg << "\n"
-       << "  screen cut min/max = " << screen_cut_min << " / " << screen_cut_max << "\n"
-       << "  screen cut avg   = " << screen_cut_avg << "\n"
-       << "  FP64 fraction among computed = " << fp64_frac_among_computed * 100.0 << " %\n"
-       << "  FP32 fraction among computed = " << fp32_frac_among_computed * 100.0 << " %\n"
-       << "  screened fraction among all  = " << screened_frac_among_all * 100.0 << " %\n"
-       << "  prec cut==0 tiles     = " << n_prec_cut0 << "\n"
-       << "  prec cut>=m_tiles     = " << n_prec_cutfull << "\n"
-       << "===============================\n";
-    write_to_ablation_file(ss.str());
-}
-
-// Legacy ungrouped exchange cut statistics kept disabled while the PPPP
-// validation path uses grouped m-tile statistics below.
-// void print_exchange_cut_status(const std::string& tag,
-//                                const std::vector<uint32_t>& prec_cut_flat,
-//                                const std::vector<uint32_t>& screen_cut_flat,
-//                                const std::vector<uint32_t>& cut_weights = {})
-// {
-//     const size_t n = prec_cut_flat.size();
-// 
-//     uint32_t prec_min   = UINT_MAX, prec_max   = 0;
-//     uint32_t screen_min = UINT_MAX, screen_max = 0;
-//     uint64_t prec_sum   = 0, screen_sum = 0, fp32_sum = 0;
-//     uint64_t eff_entries = 0;
-//     uint32_t n_prec0    = 0, n_eq = 0;
-// 
-//     for (size_t idx = 0; idx < n; idx++) {
-//         const uint32_t prec   = prec_cut_flat[idx];
-//         const uint32_t screen = screen_cut_flat[idx];
-//         const uint32_t weight = (idx < cut_weights.size()) ? cut_weights[idx] : 1;
-// 
-//         prec_min   = std::min(prec_min,   prec);
-//         prec_max   = std::max(prec_max,   prec);
-//         screen_min = std::min(screen_min, screen);
-//         screen_max = std::max(screen_max, screen);
-//         prec_sum   += static_cast<uint64_t>(prec) * weight;
-//         screen_sum += static_cast<uint64_t>(screen) * weight;
-//         fp32_sum   += static_cast<uint64_t>((screen >= prec) ? (screen - prec) : 0) * weight;
-//         eff_entries += weight;
-//         if (prec == 0)      n_prec0++;
-//         if (prec == screen) n_eq++;
-//     }
-// 
-//     const double fp64_frac = (screen_sum > 0) ? (double)prec_sum / (double)screen_sum : 0.0;
-//     const double fp32_frac = (screen_sum > 0) ? (double)fp32_sum / (double)screen_sum : 0.0;
-// 
-//     std::stringstream ss;
-//     ss << "=== " << tag << " exchange cut stats ===\n"
-//        << "  cut entries         = " << n << "\n"
-//        << "  effective (ik,m) entries = " << eff_entries << "\n"
-//        << "  prec  cut min/max   = " << prec_min   << " / " << prec_max   << "\n"
-//        << "  prec  cut avg       = " << (eff_entries > 0 ? (double)prec_sum   / (double)eff_entries : 0.0) << "\n"
-//        << "  screen cut min/max  = " << screen_min << " / " << screen_max << "\n"
-//        << "  screen cut avg      = " << (eff_entries > 0 ? (double)screen_sum / (double)eff_entries : 0.0) << "\n"
-//        << "  FP64 fraction       = " << fp64_frac * 100.0 << " %\n"
-//        << "  FP32 fraction       = " << fp32_frac * 100.0 << " %\n"
-//        << "  prec==0 entries     = " << n_prec0 << "\n"
-//        << "  prec==screen entries= " << n_eq << "\n"
-//        << "===============================\n";
-// 
-//     std::ofstream outfile = open_report_file();
-//     if (outfile.is_open()) {
-//         outfile << ss.str();
-//         outfile.close();
-//     } else {
-//         std::cout << ss.str();
-//     }
-// }
-
-[[maybe_unused]] void print_exchange_cut_status(const std::string& tag,
-                               const std::vector<uint32_t>& prec_cut_flat,
-                               const std::vector<uint32_t>& screen_cut_flat)
-{
-    uint32_t prec_min   = UINT_MAX, prec_max   = 0;
-    uint32_t screen_min = UINT_MAX, screen_max = 0;
-    uint64_t prec_sum   = 0, screen_sum = 0, fp32_sum = 0;
-    uint32_t n_prec0    = 0, n_eq = 0;
-
-    for (size_t idx = 0; idx < prec_cut_flat.size(); ++idx) {
-        const uint32_t prec   = prec_cut_flat[idx];
-        const uint32_t screen = screen_cut_flat[idx];
-
-        prec_min   = std::min(prec_min,   prec);
-        prec_max   = std::max(prec_max,   prec);
-        screen_min = std::min(screen_min, screen);
-        screen_max = std::max(screen_max, screen);
-        prec_sum   += prec;
-        screen_sum += screen;
-        fp32_sum   += (screen >= prec) ? (screen - prec) : 0;
-        if (prec == 0)      n_prec0++;
-        if (prec == screen) n_eq++;
-    }
-
-    const uint64_t n_entries = prec_cut_flat.size();
-    const double fp64_frac = (screen_sum > 0) ? (double)prec_sum / (double)screen_sum : 0.0;
-    const double fp32_frac = (screen_sum > 0) ? (double)fp32_sum / (double)screen_sum : 0.0;
-
-    std::stringstream ss;
-    ss << "=== " << tag << " exchange cut stats ===\n"
-       << "  cut entries         = " << n_entries << "\n"
-       << "  prec  cut min/max   = " << prec_min   << " / " << prec_max   << "\n"
-       << "  prec  cut avg       = " << (n_entries > 0 ? (double)prec_sum   / (double)n_entries : 0.0) << "\n"
-       << "  screen cut min/max  = " << screen_min << " / " << screen_max << "\n"
-       << "  screen cut avg      = " << (n_entries > 0 ? (double)screen_sum / (double)n_entries : 0.0) << "\n"
-       << "  FP64 fraction       = " << fp64_frac * 100.0 << " %\n"
-       << "  FP32 fraction       = " << fp32_frac * 100.0 << " %\n"
-       << "  prec==0 entries     = " << n_prec0 << "\n"
-       << "  prec==screen entries= " << n_eq << "\n"
-       << "===============================\n";
-
-    write_to_ablation_file(ss.str());
-}
-
 } // namespace
 
 namespace gpu {  // gpu namespace
@@ -6033,7 +5832,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
             const uint32_t nij_tiles = (pp_prim_pair_count_local + TILE_DIM - 1) / TILE_DIM;
 
-            omptimers[thread_id].start("    J PPPP MP cuts build");
+            //omptimers[thread_id].start("    J PPPP MP cuts build");
 
             auto prec_cut_ij_tile_h = build_cut_ij_tile(
                 pp_mat_Q_local,
@@ -6057,8 +5856,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
             gpuSafe(gpuMemcpyStaged(d_screen_cut_ij_tile, screen_cut_ij_tile_h.data(), nij_tiles * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
-            omptimers[thread_id].stop("    J PPPP MP cuts build");
-            print_cut_status("PPPP Coulomb", prec_cut_ij_tile_h, screen_cut_ij_tile_h, static_cast<uint32_t>(pp_prim_pair_count), TILE_DIM);
+            //omptimers[thread_id].stop("    J PPPP MP cuts build");
 
             
             gpu::computeCoulombFockPPPP_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
