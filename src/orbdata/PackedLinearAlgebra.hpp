@@ -72,6 +72,19 @@ auto invert(const CPackedMatrix &matrix) -> CPackedMatrix;
 /// not positive definite has no Cholesky factor to invert.
 auto cholesky_inverse(const CPackedMatrix &matrix) -> CPackedMatrix;
 
+/// @brief Factorizes a symmetric positive definite matrix stored in the packed
+/// format into its lower triangular Cholesky factor.
+/// @param matrix The symmetric positive definite matrix to factorize.
+/// @return The lower triangular factor L, with the matrix equal to L L transposed,
+/// in the packed format as a lower triangular matrix.
+/// @note The factor itself rather than its inverse, for a caller which solves with
+/// it rather than multiplying by it. Solving is both cheaper than forming the
+/// inverse and better behaved, and is what the direct form of the resolution of
+/// the identity does with it.
+/// @note This throws rather than ending the calculation when the matrix is not
+/// positive definite, as cholesky_inverse does and for the same reason.
+auto cholesky_factor(const CPackedMatrix &matrix) -> CPackedMatrix;
+
 /// @brief Inverts the square root of a symmetric positive semidefinite matrix
 /// stored in the packed format, dropping the directions of its small eigenvalues.
 /// @param matrix The symmetric matrix to invert the square root of.

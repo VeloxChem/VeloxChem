@@ -119,6 +119,28 @@ auto dsyrk_(const char         *uplo,
             double             *c,
             const lapack_int_t *ldc) -> void;
 
+/// @brief Solves a triangular system with many right hand sides.
+auto dtrsm_(const char         *side,
+            const char         *uplo,
+            const char         *transa,
+            const char         *diag,
+            const lapack_int_t *m,
+            const lapack_int_t *n,
+            const double       *alpha,
+            const double       *a,
+            const lapack_int_t *lda,
+            double             *b,
+            const lapack_int_t *ldb) -> void;
+
+/// @brief Solves a triangular system in the packed format with one right hand side.
+auto dtpsv_(const char         *uplo,
+            const char         *trans,
+            const char         *diag,
+            const lapack_int_t *n,
+            const double       *ap,
+            double             *x,
+            const lapack_int_t *incx) -> void;
+
 /// @brief Computes the inverse of a triangular matrix.
 auto dtrtri_(const char         *uplo,
              const char         *diag,

@@ -4,6 +4,7 @@ import pytest
 from veloxchem.veloxchemlib import AtomBasis, BasisFunction, MolecularBasis
 from veloxchem.veloxchemlib import PackedMatrix, mat_t
 from veloxchem.veloxchemlib import SimdRIFockDriver, SimdRIJKFockDriver
+from veloxchem.veloxchemlib import rimode
 from veloxchem.veloxchemlib import SimdTwoCenterElectronRepulsionDriver
 from veloxchem.molecule import Molecule
 
@@ -196,18 +197,72 @@ class TestSimdRIJKFockDriver:
 
         assert needed == driver.get_bq_vectors().number_of_elements() * 8
 
-    def test_a_budget_which_is_too_small_is_refused(self, molecule):
-        """It has to be an exception the caller can act on. A critical error would
-        end the interpreter, which is what the check exists to avoid."""
+    def test_a_budget_which_is_too_small_takes_the_direct_way(self, molecule):
+        """The B vectors of a large molecule fit nowhere, and a budget they exceed
+        selects the way which does not hold them rather than refusing the work."""
 
         basis, aux_basis = self.bases((8, 1, 7, 6), (1, 1, 0, 0), 2)
 
-        driver = SimdRIJKFockDriver()
+        nao = basis.get_dimensions_of_basis()
 
-        with pytest.raises(RuntimeError, match="B vectors need"):
-            driver.prepare(molecule, basis, aux_basis, 0.0, 8)
+        coeffs, density = self.orbitals(nao, 3, 101)
 
-        assert not driver.is_prepared()
+        roomy = SimdRIJKFockDriver()
+        roomy.prepare(molecule, basis, aux_basis, 0.0, 1 << 30)
+
+        assert roomy.get_mode() == rimode.in_memory
+
+        cramped = SimdRIJKFockDriver()
+        cramped.prepare(molecule, basis, aux_basis, 0.0, 8)
+
+        assert cramped.is_prepared()
+        assert cramped.get_mode() == rimode.direct
+
+        # and the way it took has to give the same matrix as the way it did not
+
+        held = roomy.compute(density, coeffs, 1.0).to_numpy(max_memory=8.0)
+        formed = cramped.compute(density, coeffs, 1.0).to_numpy(max_memory=8.0)
+
+        assert np.max(np.abs(held)) > 0.0
+
+        scale = float(np.max(np.abs(held)))
+
+        assert np.max(np.abs(formed - held)) / scale < 1.0e-12
+
+    def test_the_two_ways_agree(self, molecule):
+        """The direct way forms the integrals again for every batch of orbitals and
+        solves the factor of the metric against them, where the way which holds the
+        B vectors multiplies by its inverse. They are different arithmetic and must
+        reach the same matrix."""
+
+        for la, lb, lc in ((0, 0, 0), (1, 0, 1), (1, 1, 1), (2, 1, 2)):
+
+            basis, aux_basis = self.bases((8, 1, 7, 6), (la, la, lb, lb), lc)
+
+            nao = basis.get_dimensions_of_basis()
+
+            coeffs, density = self.orbitals(nao, 3, 11 + nao)
+
+            matrices = {}
+
+            for mode in (rimode.in_memory, rimode.direct):
+                driver = SimdRIJKFockDriver()
+                driver.prepare(molecule, basis, aux_basis, 0.0, 1 << 30, 1.0e-12, False, mode)
+
+                assert driver.get_mode() == mode
+
+                matrices[mode] = driver.compute(density, coeffs, 1.0).to_numpy(max_memory=8.0)
+
+            held = matrices[rimode.in_memory]
+            formed = matrices[rimode.direct]
+
+            assert np.max(np.abs(held)) > 0.0
+            assert np.array_equal(formed, formed.T)
+
+            scale = float(np.max(np.abs(held)))
+
+            assert np.max(np.abs(formed - held)) / scale < 1.0e-12, (
+                f"({LABELS[la]}{LABELS[lb]}|{LABELS[lc]}) the two ways disagree")
 
     def test_compute_before_prepare_is_refused(self):
 

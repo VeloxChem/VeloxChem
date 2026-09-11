@@ -212,6 +212,10 @@ export_packed(py::module &m) -> void
             [](const CPackedMatrix &self) -> CPackedMatrix { return packlin::cholesky_inverse(self); },
             "Gets the inverse of the lower triangular Cholesky factor of the matrix.")
         .def(
+            "cholesky_factor",
+            [](const CPackedMatrix &self) -> CPackedMatrix { return packlin::cholesky_factor(self); },
+            "Gets the lower triangular Cholesky factor of the matrix.")
+        .def(
             "inverse_square_root",
             [](const CPackedMatrix &self, const double threshold) -> CPackedMatrix {
                 return packlin::inverse_square_root(self, threshold);

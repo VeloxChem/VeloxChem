@@ -182,13 +182,17 @@ class CSimdRIFockDriver
     /// @note This is the form which does not allocate, so that a calculation which
     /// forms the W matrices of one range after another reuses one set of them
     /// rather than allocating and freeing gigabytes on every range.
+    /// @param accumulate True to add to the matrices rather than to set them, for a
+    /// caller which forms them from the integrals of one batch of blocks of atom
+    /// pairs after another and needs the sum over all of them.
     auto compute_w_vectors(const CSparseTensor         &bq_vectors,
                            const CMolecularBasis       &basis,
                            const CMolecularBasis       &aux_basis,
                            const CPackedMatrix         &coefficients,
                            const size_t                 qfirst,
                            const size_t                 qlast,
-                           std::vector<CPackedMatrix>  &w_vectors) const -> void;
+                           std::vector<CPackedMatrix>  &w_vectors,
+                           const bool                   accumulate = false) const -> void;
 
     /// @brief Sets the density of the B vectors at which the transformation into
     /// the molecular orbitals expands them rather than walking their values.

@@ -523,3 +523,78 @@ inverse_square_root(const CPackedMatrix &matrix, const double threshold) -> CPac
 }
 
 }  // namespace packlin
+
+namespace packlin {  // packlin namespace
+
+auto
+cholesky_factor(const CPackedMatrix &matrix) -> CPackedMatrix
+{
+    errors::assertMsgCritical(matrix.get_type() == mat_t::symmetric,
+                              std::string("PackedMatrix Cholesky factorization: The matrix must be symmetric"));
+
+    const auto ndim = matrix.number_of_rows();
+
+    errors::assertMsgCritical(ndim > 0, std::string("PackedMatrix Cholesky factorization: The matrix must not be empty"));
+
+    auto dense = std::make_unique_for_overwrite<double[]>(ndim * ndim);
+
+    matrix.to_dense(dense.get());
+
+#ifdef VLX_USE_MATHLIB
+
+    // NOTE: the array is row major and the library is column major, so the upper
+    // triangle of the library is the lower triangle of the array. Factorizing the
+    // upper triangle therefore leaves the lower triangle of the array holding L,
+    // with the matrix equal to L L transposed, which is the triangle the packed
+    // matrix stores.
+
+    const char uplo = 'U';
+
+    auto ndim_arg = static_cast<lapack_int_t>(ndim);
+
+    lapack_int_t info = 0;
+
+    dpotrf_(&uplo, &ndim_arg, dense.get(), &ndim_arg, &info);
+
+    errors::assertMsgCritical(info >= 0, "PackedMatrix Cholesky factorization: Invalid argument of the factorization");
+
+    if (info != 0)
+    {
+        throw std::runtime_error("PackedMatrix.cholesky_factor: The matrix is not positive definite");
+    }
+
+#else
+
+    const auto nrows = static_cast<Eigen::Index>(ndim);
+
+    Eigen::Map<Eigen::MatrixXd> mapped(dense.get(), nrows, nrows);
+
+    Eigen::LLT<Eigen::Ref<Eigen::MatrixXd>> llt(mapped);
+
+    if (llt.info() != Eigen::Success)
+    {
+        throw std::runtime_error("PackedMatrix.cholesky_factor: The matrix is not positive definite");
+    }
+
+    // NOTE: Eigen leaves the factor in the column major lower triangle, which is
+    // the upper triangle of the row major array, so it is transposed into the
+    // lower one the packed matrix reads.
+
+    for (Eigen::Index i = 0; i < nrows; i++)
+    {
+        for (Eigen::Index j = 0; j <= i; j++)
+        {
+            dense[static_cast<size_t>(i) * ndim + static_cast<size_t>(j)] = mapped(i, j);
+        }
+    }
+
+#endif /* VLX_USE_MATHLIB */
+
+    auto factor = CPackedMatrix(ndim, ndim, mat_t::lower_triangular);
+
+    factor.from_dense(dense.get());
+
+    return factor;
+}
+
+}  // namespace packlin

@@ -81,3 +81,60 @@ class TestScfRiJkSimd:
 
         assert not driver.ri_jk_simd
         assert driver.ri_memory_budget is None
+
+    def test_the_mode_can_be_chosen(self, molecule, basis):
+        """The way the Fock matrices are formed is an input setting, and both ways
+        must reach the same energy."""
+
+        settings = {
+            'ri_jk': True,
+            'ri_jk_simd': True,
+            'ri_auxiliary_basis': 'def2-universal-jkfit',
+        }
+
+        energies = {}
+
+        for mode in ('in_memory', 'direct'):
+            energies[mode] = self.run_scf(molecule, basis, ri_mode=mode, **settings)
+
+        assert abs(energies['in_memory'] - energies['direct']) < 1.0e-10
+
+    def test_a_budget_which_does_not_hold_the_b_vectors_goes_direct(self, molecule,
+                                                                    basis):
+        """A budget below what the B vectors need selects the way which does not
+        hold them, and the energy is the same either way. This is what makes a
+        molecule too large to hold reachable."""
+
+        settings = {
+            'ri_jk': True,
+            'ri_jk_simd': True,
+            'ri_auxiliary_basis': 'def2-universal-jkfit',
+        }
+
+        roomy = self.run_scf(molecule, basis, ri_memory_budget=1.0, **settings)
+
+        # ten kilobytes, which the B vectors of any molecule exceed
+
+        cramped = self.run_scf(molecule, basis, ri_memory_budget=1.0e-5, **settings)
+
+        assert abs(roomy - cramped) < 1.0e-10
+
+    def test_an_unknown_mode_is_refused(self, molecule, basis):
+        """A name which is not one of the two ways has to be caught, not quietly
+        treated as one of them."""
+
+        from veloxchem.errorhandler import VeloxChemError
+
+        with pytest.raises(VeloxChemError, match='ri_mode'):
+            self.run_scf(molecule,
+                         basis,
+                         ri_jk=True,
+                         ri_jk_simd=True,
+                         ri_auxiliary_basis='def2-universal-jkfit',
+                         ri_mode='sideways')
+
+    def test_the_mode_defaults_to_automatic(self):
+
+        driver = ScfRestrictedDriver(ostream=OutputStream(None))
+
+        assert driver.ri_mode == 'automatic'

@@ -1013,7 +1013,8 @@ CSimdRIFockDriver::compute_w_vectors(const CSparseTensor        &bq_vectors,
                                       const CPackedMatrix        &coefficients,
                                       const size_t                qfirst,
                                       const size_t                qlast,
-                                      std::vector<CPackedMatrix> &w_vectors) const -> void
+                                      std::vector<CPackedMatrix> &w_vectors,
+                                      const bool                  accumulate) const -> void
 {
     const auto nao = basis.dimensions_of_basis();
 
@@ -1041,7 +1042,7 @@ CSimdRIFockDriver::compute_w_vectors(const CSparseTensor        &bq_vectors,
                                       (wmat.number_of_columns() == nocc),
                                   std::string("RIJFockDriver: The W matrices do not match the basis and the orbitals"));
 
-        wmat.zero();
+        if (!accumulate) wmat.zero();
     }
 
     if ((nrange == 0) || (nocc == 0)) return;
@@ -1249,8 +1250,8 @@ CSimdRIFockDriver::compute_w_vectors(const CSparseTensor        &bq_vectors,
                     }
                 }
 
-                _matrix_product(nao, nocc, nao, 1.0, square.data(), nao, cvalues, nocc, 0.0, w_vectors[iq].data(),
-                                nocc);
+                _matrix_product(nao, nocc, nao, 1.0, square.data(), nao, cvalues, nocc,
+                                accumulate ? 1.0 : 0.0, w_vectors[iq].data(), nocc);
             }
         }
 

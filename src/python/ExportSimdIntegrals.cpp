@@ -195,6 +195,13 @@ export_simdintegrals(py::module &m) -> void
              py::arg("matrix"),
              py::arg("factor") = 1.0);
 
+    // the way the resolution of the identity driver forms its Fock matrices
+
+    py::enum_<rimode>(m, "rimode")
+        .value("automatic", rimode::automatic)
+        .value("in_memory", rimode::in_memory)
+        .value("direct", rimode::direct);
+
     // CSimdRIJKFockDriver class
 
     PyClass<CSimdRIJKFockDriver>(m, "SimdRIJKFockDriver")
@@ -215,7 +222,8 @@ export_simdintegrals(py::module &m) -> void
              py::arg("threshold"),
              py::arg("memory_budget"),
              py::arg("metric_threshold") = 1.0e-12,
-             py::arg("use_inverse_square_root") = false)
+             py::arg("use_inverse_square_root") = false,
+             py::arg("mode") = rimode::automatic)
         .def("compute",
              &CSimdRIJKFockDriver::compute,
              "Computes the Fock matrix, twice the Coulomb less the scaled exchange.",
@@ -223,6 +231,7 @@ export_simdintegrals(py::module &m) -> void
              py::arg("coefficients"),
              py::arg("exchange_scaling_factor"))
         .def("is_prepared", &CSimdRIJKFockDriver::is_prepared, "Checks that the driver has been prepared.")
+        .def("get_mode", &CSimdRIJKFockDriver::get_mode, "Gets the way the driver forms the Fock matrices.")
         .def("get_bq_vectors", &CSimdRIJKFockDriver::get_bq_vectors,
              py::return_value_policy::reference_internal, "Gets the B vectors the driver holds.")
         .def("get_metric", &CSimdRIJKFockDriver::get_metric,

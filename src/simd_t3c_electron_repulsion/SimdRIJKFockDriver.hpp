@@ -42,6 +42,7 @@
 #include "PackedMatrix.hpp"
 #include "SimdRIFockDriver.hpp"
 #include "SparseTensor.hpp"
+#include "TripleSparsityPattern.hpp"
 
 /// @brief Class CSimdRIJKFockDriver builds the Fock matrices of the resolution of
 /// the identity for one molecule and one pair of bases, one matrix per call.
@@ -61,6 +62,16 @@
 /// @note The exchange is added with a factor the caller passes, so that a hybrid
 /// functional scales it by its fraction of exact exchange. A pure functional is
 /// served by a driver which never forms the B vectors and is not this one.
+/// @brief How the driver forms the Fock matrices.
+/// rimode::in_memory - the B vectors are formed once and held
+/// rimode::direct - the integrals are formed again on every call
+enum class rimode
+{
+    automatic,
+    in_memory,
+    direct
+};
+
 class CSimdRIJKFockDriver
 {
    public:
@@ -100,13 +111,23 @@ class CSimdRIJKFockDriver
     /// magnitude and is tried first. A fitting basis which is close to linearly
     /// dependent has no Cholesky factor to invert, and the square root is inverted
     /// instead, with a warning. Setting the flag takes that way from the start.
+    /// @param mode Which way the Fock matrices are formed, or automatic to hold the
+    /// B vectors when they fit in the budget and to form the integrals again on
+    /// every call when they do not.
+    /// @note The B vectors of a large molecule do not fit in the memory of any one
+    /// machine, and the direct mode is what makes such a molecule reachable. It
+    /// forms the integrals once for every batch of occupied orbitals and once more
+    /// for the Coulomb matrix, so it is several times slower for each Fock matrix
+    /// and asks for a hundredth of the memory. The automatic choice takes the held
+    /// form wherever it fits.
     auto prepare(const CMolecule       &molecule,
                  const CMolecularBasis &basis,
                  const CMolecularBasis &aux_basis,
                  const double           threshold,
                  const size_t           memory_budget,
                  const double           metric_threshold        = 1.0e-12,
-                 const bool             use_inverse_square_root = false) -> void;
+                 const bool             use_inverse_square_root = false,
+                 const rimode           mode                    = rimode::automatic) -> void;
 
     /// @brief Computes the Fock matrix of a density and a set of orbitals.
     /// @param density The density matrix, in the packed format, symmetric for a
@@ -127,8 +148,12 @@ class CSimdRIJKFockDriver
                  const double         exchange_scaling_factor) -> CPackedMatrix;
 
     /// @brief Checks that the driver has been prepared.
-    /// @return True if the B vectors have been formed.
+    /// @return True if the driver is ready to form a Fock matrix.
     auto is_prepared() const -> bool;
+
+    /// @brief Gets the way the driver forms the Fock matrices.
+    /// @return The mode, which is never automatic once the driver is prepared.
+    auto get_mode() const -> rimode;
 
     /// @brief Gets the B vectors the driver holds.
     /// @return The B vectors.
@@ -139,6 +164,27 @@ class CSimdRIJKFockDriver
     auto get_metric() const -> const CPackedMatrix &;
 
    private:
+    /// @brief Computes the Fock matrix by forming the integrals again on every
+    /// call, holding no B vectors.
+    /// @param density The density matrix.
+    /// @param coefficients The molecular orbital coefficients.
+    /// @param exchange_scaling_factor The factor the exchange is scaled by.
+    /// @return The Fock matrix, twice the Coulomb less the scaled exchange.
+    auto _compute_direct(const CPackedMatrix &density,
+                         const CPackedMatrix &coefficients,
+                         const double         exchange_scaling_factor) -> CPackedMatrix;
+
+    /// @brief Solves the Cholesky factor of the metric against a set of right hand
+    /// sides, in place.
+    /// @param values The right hand sides, as a row major array of one row per
+    /// auxiliary basis function and ncols columns, overwritten by the solution.
+    /// @param nrows The number of auxiliary basis functions.
+    /// @param ncols The number of right hand sides.
+    /// @param transposed True to solve against the transpose of the factor.
+    /// @note Solving rather than multiplying by an inverse, which is both cheaper
+    /// and better behaved, and is why the direct way keeps the factor itself.
+    auto _solve_factor(double *values, const size_t nrows, const size_t ncols, const bool transposed) const -> void;
+
     /// @brief The number of auxiliary basis functions whose W matrices are formed
     /// at a time.
     /// @note The exchange of a range is added before the next is formed, so this
@@ -146,6 +192,28 @@ class CSimdRIJKFockDriver
     /// depend on it. It is the depth the rank k update of the exchange is given,
     /// which wants to be large enough to fill the cores.
     static constexpr size_t _w_batch = 64;
+
+    /// @brief The memory a batch of the half transformed integrals is allowed to
+    /// reach in the direct mode.
+    /// @note The half transformed integrals are the auxiliary basis by the basis
+    /// functions by the orbitals of a batch, and the batch of orbitals is chosen
+    /// from this. Every batch forms the integrals again, so a larger batch is
+    /// fewer passes over them and more memory.
+    static constexpr size_t _direct_budget = size_t{4} * 1024 * 1024 * 1024;
+
+    /// @brief The way the driver forms the Fock matrices.
+    rimode _mode = rimode::automatic;
+
+    /// @brief The molecule, which the direct mode forms the integrals of again on
+    /// every call.
+    CMolecule _molecule;
+
+    /// @brief The sparsity pattern of the integrals, described once.
+    CTripleSparsityPattern _pattern;
+
+    /// @brief The lower triangular Cholesky factor of the metric, which the direct
+    /// mode solves with.
+    CPackedMatrix _factor;
 
     /// @brief The molecular basis.
     CMolecularBasis _basis;

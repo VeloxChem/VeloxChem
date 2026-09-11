@@ -57,6 +57,7 @@ from .aodensitymatrix import AODensityMatrix
 from .rifockdriver import RIFockDriver
 from .rijkfockdriver import RIJKFockDriver
 from .veloxchemlib import SimdRIJKFockDriver
+from .veloxchemlib import rimode
 from .veloxchemlib import PackedMatrix
 from .fockdriver import FockDriver
 from .profiler import Profiler
@@ -225,6 +226,7 @@ class ScfDriver:
         self.ri_metric_threshold = 1.0e-12
         self.ri_jk_simd = False
         self.ri_memory_budget = None
+        self.ri_mode = 'automatic'
         self._ri_drv = None
 
         # dft
@@ -347,6 +349,8 @@ class ScfDriver:
                     ('bool', 'use the SIMD RI-JK driver instead of the conventional one'),
                 'ri_memory_budget':
                     ('float', 'memory the SIMD RI-JK driver may hold, in GB'),
+                'ri_mode':
+                    ('str_lower', 'SIMD RI-JK mode: automatic, in_memory or direct'),
                 'dispersion': ('bool', 'use D4 dispersion correction'),
                 'xcfun': ('str_upper', 'exchange-correlation functional'),
                 'grid_level': ('int', 'accuracy level of DFT grid (1-8)'),
@@ -1795,8 +1799,25 @@ class ScfDriver:
 
             ri_prep_t0 = tm.time()
 
+            modes = {
+                'automatic': rimode.automatic,
+                'in_memory': rimode.in_memory,
+                'direct': rimode.direct,
+            }
+
+            assert_msg_critical(
+                self.ri_mode in modes,
+                'SCF driver: ri_mode must be automatic, in_memory or direct')
+
             self._ri_drv.prepare(molecule, ao_basis, basis_ri, self.eri_thresh,
-                                 budget, self.ri_metric_threshold, False)
+                                 budget, self.ri_metric_threshold, False,
+                                 modes[self.ri_mode])
+
+            taken = ('held in memory'
+                     if self._ri_drv.get_mode() == rimode.in_memory else
+                     'formed again on every Fock build')
+
+            self.ostream.print_info(f'B vectors are {taken}.')
 
             self.ostream.print_info(
                 f'B vectors for RI done in {tm.time() - ri_prep_t0:.2f} sec.')
@@ -2536,7 +2557,11 @@ class ScfDriver:
         fock = self._ri_drv.compute(packed_density, coeffs,
                                     exchange_scaling_factor)
 
-        return fock.to_numpy(max_memory=self._get_ri_memory_budget() / 1024**3)
+        # NOTE: the limit is of the Fock matrix being expanded, which is the square
+        # of the basis and is modest, and not the budget of the B vectors, which
+        # bounds something else entirely and may be set small on purpose.
+
+        return fock.to_numpy(max_memory=2.0 * nao * nao * 8 / 1024**3 + 1.0)
 
     def _get_ri_memory_budget(self):
         """
@@ -2549,9 +2574,12 @@ class ScfDriver:
         if self.ri_memory_budget is not None:
             return int(self.ri_memory_budget * 1024**3)
 
-        # NOTE: the driver holds the B vectors for the whole calculation, so it is
-        # given a part of what is free rather than all of it. The rest is needed by
-        # the density, the orbitals and the matrices of the iteration.
+        # NOTE: what is free less a reserve, rather than a fraction of what is
+        # free. The B vectors are the one thing which has to stay resident for the
+        # whole calculation, and everything else the iteration needs is a few
+        # gigabytes, so halving the free memory refuses calculations which fit.
+        # Since a budget which is too small now selects the direct mode rather than
+        # refusing, too tight a default costs speed silently instead of loudly.
 
         try:
             import psutil
@@ -2559,7 +2587,9 @@ class ScfDriver:
         except ImportError:
             available = 8 * 1024**3
 
-        return int(0.5 * available)
+        reserve = 4 * 1024**3
+
+        return int(max(available - reserve, 0.25 * available))
 
     def _prepare_for_ri_fock_build(self, fock_type):
         """
