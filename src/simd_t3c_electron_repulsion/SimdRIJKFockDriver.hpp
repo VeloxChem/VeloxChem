@@ -185,6 +185,19 @@ class CSimdRIJKFockDriver
     /// and better behaved, and is why the direct way keeps the factor itself.
     auto _solve_factor(double *values, const size_t nrows, const size_t ncols, const bool transposed) const -> void;
 
+    /// @brief Divides the auxiliary basis into the parts the direct mode sweeps.
+    /// @param molecule The molecule to compute the integrals of.
+    /// @param basis The molecular basis.
+    /// @param aux_basis The auxiliary molecular basis.
+    /// @param threshold The screening threshold.
+    /// @param pattern The sparsity pattern of the whole, to measure the parts from.
+    /// @return The pattern of each part.
+    auto _make_parts(const CMolecule              &molecule,
+                     const CMolecularBasis        &basis,
+                     const CMolecularBasis        &aux_basis,
+                     const double                  threshold,
+                     const CTripleSparsityPattern &pattern) const -> std::vector<CTripleSparsityPattern>;
+
     /// @brief The number of auxiliary basis functions whose W matrices are formed
     /// at a time.
     /// @note The exchange of a range is added before the next is formed, so this
@@ -193,13 +206,15 @@ class CSimdRIJKFockDriver
     /// which wants to be large enough to fill the cores.
     static constexpr size_t _w_batch = 64;
 
-    /// @brief The memory a batch of the half transformed integrals is allowed to
-    /// reach in the direct mode.
-    /// @note The half transformed integrals are the auxiliary basis by the basis
-    /// functions by the orbitals of a batch, and the batch of orbitals is chosen
-    /// from this. Every batch forms the integrals again, so a larger batch is
-    /// fewer passes over them and more memory.
-    static constexpr size_t _direct_budget = size_t{4} * 1024 * 1024 * 1024;
+    /// @brief The memory the direct mode is allowed to reach, taken from the budget
+    /// the driver was prepared with.
+    /// @note The direct mode holds two things of its own: the half transformed
+    /// integrals of a batch of orbitals, held twice over, and the integrals of the
+    /// part of the auxiliary basis being swept. Both are live at once, so each is
+    /// given half of this and the whole stays within it. A larger batch of orbitals
+    /// is fewer passes over the integrals and more memory, which is the trade this
+    /// sets.
+    size_t _budget = size_t{4} * 1024 * 1024 * 1024;
 
     /// @brief The way the driver forms the Fock matrices.
     rimode _mode = rimode::automatic;
@@ -208,8 +223,15 @@ class CSimdRIJKFockDriver
     /// every call.
     CMolecule _molecule;
 
-    /// @brief The sparsity pattern of the integrals, described once.
-    CTripleSparsityPattern _pattern;
+    /// @brief The sparsity patterns the direct mode sweeps, one for each part of
+    /// the auxiliary basis, described once.
+    /// @note The blocks of a pattern are described pair block by pair block and
+    /// every auxiliary group within one, so a run of them spans every auxiliary
+    /// function. Sweeping runs like that would take the half transform of one
+    /// function once for every run. The parts hold disjoint atoms of the auxiliary
+    /// basis instead, so each function belongs to exactly one of them and is
+    /// transformed once.
+    std::vector<CTripleSparsityPattern> _parts;
 
     /// @brief The lower triangular Cholesky factor of the metric, which the direct
     /// mode solves with.

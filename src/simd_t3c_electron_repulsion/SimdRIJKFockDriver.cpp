@@ -85,6 +85,8 @@ CSimdRIJKFockDriver::prepare(const CMolecule       &molecule,
 {
     const auto memory = required_memory(molecule, basis, aux_basis, threshold);
 
+    _budget = memory_budget;
+
     // NOTE: the memory is answered from the sparsity pattern, before any integral
     // is computed, so a molecule whose B vectors do not fit is put on the direct
     // way at once rather than after the work of forming them.
@@ -111,7 +113,9 @@ CSimdRIJKFockDriver::prepare(const CMolecule       &molecule,
 
     if (_mode == rimode::direct)
     {
-        _pattern = CSimdThreeCenterElectronRepulsionDriver().make_pattern(molecule, basis, aux_basis, threshold);
+        const auto pattern = CSimdThreeCenterElectronRepulsionDriver().make_pattern(molecule, basis, aux_basis, threshold);
+
+        _parts = _make_parts(molecule, basis, aux_basis, threshold, pattern);
 
         if (!use_inverse_square_root)
         {
@@ -298,7 +302,7 @@ CSimdRIJKFockDriver::_compute_direct(const CPackedMatrix &density,
 
     const auto per_orbital = 2 * naux * nao * sizeof(double);
 
-    const auto nbatch = std::max(size_t{1}, std::min(norbitals, _direct_budget / std::max(per_orbital, size_t{1})));
+    const auto nbatch = std::max(size_t{1}, std::min(norbitals, (_budget / 2) / std::max(per_orbital, size_t{1})));
 
     auto fock = CPackedMatrix(nao, nao, mat_t::symmetric);
 
@@ -311,37 +315,6 @@ CSimdRIJKFockDriver::_compute_direct(const CPackedMatrix &density,
     std::vector<double> gamma(naux, 0.0);
 
     CSimdThreeCenterElectronRepulsionDriver eri_drv;
-
-    // the blocks of the pattern are formed in batches, so that the integrals of a
-    // batch are held and dropped rather than all of them at once
-
-    const auto &blocks = _pattern.blocks();
-
-    std::vector<size_t> starts;
-
-    {
-        size_t memory = 0, first = 0;
-
-        for (size_t i = 0; i < blocks.size(); i++)
-        {
-            const auto values = blocks[i].number_of_elements() * sizeof(double);
-
-            if ((i > first) && (memory + values > _direct_budget))
-            {
-                starts.push_back(first);
-
-                first = i;
-
-                memory = 0;
-            }
-
-            memory += values;
-        }
-
-        starts.push_back(first);
-    }
-
-    starts.push_back(blocks.size());
 
     // the first pass: one sweep of the integrals for every batch of orbitals
 
@@ -376,15 +349,8 @@ CSimdRIJKFockDriver::_compute_direct(const CPackedMatrix &density,
         // sum over every block of atom pairs, so the blocks are swept and added
         // into rather than each one setting them.
 
-        for (size_t k = 0; k + 1 < starts.size(); k++)
+        for (const auto &pattern : _parts)
         {
-            auto part = std::vector<CAtomBasisTripleSparsity>(blocks.begin() + static_cast<long>(starts[k]),
-                                                              blocks.begin() + static_cast<long>(starts[k + 1]));
-
-            if (part.empty()) continue;
-
-            const auto pattern = CTripleSparsityPattern(std::move(part), mat_t::symmetric, _pattern.get_threshold());
-
             auto integrals = CSparseTensor(pattern);
 
             integrals.allocate();
@@ -452,15 +418,8 @@ CSimdRIJKFockDriver::_compute_direct(const CPackedMatrix &density,
 
     // the second pass: the Coulomb matrix from the integrals and those coefficients
 
-    for (size_t k = 0; k + 1 < starts.size(); k++)
+    for (const auto &pattern : _parts)
     {
-        auto part = std::vector<CAtomBasisTripleSparsity>(blocks.begin() + static_cast<long>(starts[k]),
-                                                          blocks.begin() + static_cast<long>(starts[k + 1]));
-
-        if (part.empty()) continue;
-
-        const auto pattern = CTripleSparsityPattern(std::move(part), mat_t::symmetric, _pattern.get_threshold());
-
         auto integrals = CSparseTensor(pattern);
 
         integrals.allocate();
@@ -489,6 +448,70 @@ CSimdRIJKFockDriver::_compute_direct(const CPackedMatrix &density,
     }
 
     return fock;
+}
+
+auto
+CSimdRIJKFockDriver::_make_parts(const CMolecule              &molecule,
+                                 const CMolecularBasis        &basis,
+                                 const CMolecularBasis        &aux_basis,
+                                 const double                  threshold,
+                                 const CTripleSparsityPattern &pattern) const -> std::vector<CTripleSparsityPattern>
+{
+    const auto natoms = static_cast<size_t>(molecule.number_of_atoms());
+
+    // NOTE: a block holds as many values for one of its atoms on the auxiliary side
+    // as for any other, so its memory divides evenly over them and the memory of an
+    // atom is the sum of the shares of the blocks which carry it.
+
+    std::vector<double> shares(natoms, 0.0);
+
+    for (const auto &block : pattern.blocks())
+    {
+        const auto &c_atoms = block.c_atoms();
+
+        if (c_atoms.empty()) continue;
+
+        const auto share = static_cast<double>(block.number_of_elements() * sizeof(double)) /
+                           static_cast<double>(c_atoms.size());
+
+        for (const auto atom : c_atoms) shares[static_cast<size_t>(atom)] += share;
+    }
+
+    // NOTE: the atoms are gathered in the order they are given until the integrals
+    // of a part reach the budget. An atom whose own integrals are above it is a part
+    // of its own, as there is nothing smaller to divide.
+
+    const CSimdThreeCenterElectronRepulsionDriver eri_drv;
+
+    std::vector<CTripleSparsityPattern> parts;
+
+    std::vector<int> atoms;
+
+    double memory = 0.0;
+
+    for (size_t atom = 0; atom < natoms; atom++)
+    {
+        const auto share = shares[atom];
+
+        if (share <= 0.0) continue;
+
+        if ((!atoms.empty()) && ((memory + share) > static_cast<double>(_budget / 2)))
+        {
+            parts.push_back(eri_drv.make_pattern(molecule, basis, aux_basis, threshold, atoms));
+
+            atoms.clear();
+
+            memory = 0.0;
+        }
+
+        atoms.push_back(static_cast<int>(atom));
+
+        memory += share;
+    }
+
+    if (!atoms.empty()) parts.push_back(eri_drv.make_pattern(molecule, basis, aux_basis, threshold, atoms));
+
+    return parts;
 }
 
 auto

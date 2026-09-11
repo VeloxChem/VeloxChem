@@ -1186,6 +1186,15 @@ CSimdRIFockDriver::compute_w_vectors(const CSparseTensor        &bq_vectors,
             {
                 const auto iq = static_cast<size_t>(t);
 
+                // NOTE: an auxiliary function which no block of this call carries
+                // has a square of zeros, whose product adds nothing. The direct
+                // mode sweeps parts of the auxiliary basis, so most of the
+                // functions of a part are of that kind and skipping them is what
+                // takes the half transform of a function once rather than once for
+                // every part.
+
+                if (entries[iq].empty()) continue;
+
                 std::fill(square.begin(), square.end(), 0.0);
 
                 for (const auto &entry : entries[iq])
