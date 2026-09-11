@@ -5397,3 +5397,68 @@ The Cholesky factorization succeeded for both bases, so the fallback to the
 inverted square root was not taken. The compact functions a first row transition
 metal puts into a fitting set did not make its metric indefinite at either zeta
 level. The fallback is still exercised by constructed matrices alone.
+
+## A metal oxide cluster, where the occupied orbitals are many
+
+A Ti15O30 cluster of forty five atoms, cut from the bulk and left unrelaxed: one
+titanium at its center keeps the six neighbours of the bulk, the rest carry four or
+five, and most of its oxygens bridge two titaniums where the bulk gives them three.
+Five hundred and seventy electrons and a neutral closed shell singlet.
+
+This is the system which pushes the occupied orbitals hardest. Titanium puts many
+electrons behind few basis functions, so the occupied orbitals are 285 of 885,
+against about a fifth for every organic molecule in this file.
+
+| basis | nao | naux | occupied over nao | B vectors | conventional triangle |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| def2-svp | 885 | 6270 | 0.32 | 15.17 GB | 18.31 GB |
+| def2-tzvp | 1605 | 6270 | 0.18 | 46.05 GB | 60.21 GB |
+
+**Only the single zeta basis fits.** The triple zeta one needs forty six gigabytes
+of B vectors against the thirty six of this machine, and sixty for the triangle the
+conventional route keeps.
+
+| route | time | iterations | energy |
+| --- | ---: | ---: | ---: |
+| RI-JK conventional | 795.36 | 23 | -14971.0615474580 |
+| RI-JK simd | 266.17 | 23 | -14971.0615474553 |
+
+**Three times the conventional route**, and both converged in twenty three
+iterations, which a cut cluster with undercoordinated surface atoms was not certain
+to do.
+
+### What it says about which axis matters
+
+| molecule | auxiliary functions | occupied orbitals | occupied over nao | simd against conventional |
+| --- | ---: | ---: | ---: | ---: |
+| caffeine | 1242 | 51 | 0.21 | 1.15 to 1.57 |
+| copper guanidinate | 3060 | 124 | 0.21 | 2.04 to 2.13 |
+| tagrisso | 3387 | 133 | 0.19 | 2.16 to 2.67 |
+| taxol | 5489 | 223 | 0.20 | 2.66 |
+| c60 | 4500 | 180 | 0.21 | 3.05 |
+| Ti15O30 | 6270 | 285 | 0.32 | 2.99 |
+
+The oxide has the most occupied orbitals and much the largest fitting set of
+anything here, and it sits at the top of the table beside c60. Both quantities are
+dimensions of the products the exchange is built from, and this system is large in
+both while its orbital basis stays small. It is the clearest case in the file of
+what the exchange wants: **many occupied orbitals and a large fitting set behind a
+compact orbital basis.** Caffeine is the opposite of it in every one of those and
+sits at the bottom.
+
+### Two things about the input
+
+The coordinates as given were in bohr, and the reader of an xyz file takes
+angstrom. Read as angstrom the nearest titanium to oxygen distance is 3.43
+angstrom and the cluster has no bonds at all: forty five atoms sitting apart from
+one another, which would have run and returned a number rather than failing.
+Divided by the bohr radius it is 1.82 angstrom and the coordination comes out as
+above. **A geometry whose bonds are not checked can be computed successfully and
+mean nothing.**
+
+The two routes agree to 2.7e-09 here, which is the largest disagreement in this
+file, against about 1e-11 elsewhere. Against a total energy of fifteen thousand
+hartree that is two parts in ten to the thirteenth, so it is the arithmetic being
+summed in different orders over twenty three iterations rather than a difference of
+the approximation. It is worth recording that the absolute agreement of two routes
+follows the size of the number they are computing.
