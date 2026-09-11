@@ -5286,3 +5286,41 @@ The simd column is 2.18, 5.83, 14.67 and 30.88 against 2.64, 6.87, 17.16 and 34.
 That difference is the gather of the auxiliary groups, worth 1.12 to 1.21 times
 here, which is the setup being a smaller part of a caffeine run than of the
 tagrisso one where it was worth 1.08 on the whole calculation.
+
+## The larger molecules, the two routes side by side
+
+c60 and taxol at Hartree-Fock in def2-svp against def2-universal-jkfit, both routes
+one after the other in the same process, as for caffeine above.
+
+| molecule | nao | naux | occupied | conventional | simd | gain | iterations | energy, conventional | energy, simd |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| c60 | 840 | 4500 | 180 | 389.87 | 127.86 | 3.05 | 24 | -2269.9104513062 | -2269.9104513050 |
+| taxol | 1099 | 5489 | 223 | 622.40 | 233.57 | 2.66 | 23 | -2907.5505875335 | -2907.5505875339 |
+
+Both converged, in the same number of iterations by either route, to energies which
+agree to the ninth decimal. The last digit or two differ, which is the order the
+arithmetic is summed in over twenty odd iterations.
+
+**These are the largest gains of any calculation in this file.** Taken with the
+tables above:
+
+| molecule | auxiliary functions | occupied orbitals | simd against conventional |
+| --- | ---: | ---: | ---: |
+| caffeine | 1242 | 51 | 1.15 to 1.57 |
+| tagrisso | 3387 | 133 | 2.16 to 2.67 |
+| taxol | 5489 | 223 | 2.66 |
+| c60 | 4500 | 180 | 3.05 |
+
+The advantage follows the fitting set and the occupied orbitals together, which is
+what the benchmarks of the exchange said it should: those two are the rows and the
+third dimension of the products the exchange is built from, and a product which is
+thin in either of them leaves the matrix unit idle. Caffeine has fifty one occupied
+orbitals whatever basis it is given, and that is what holds it to the bottom of the
+table however large its orbital basis grows.
+
+c60 gains more than taxol although its fitting set is smaller. The likely reason is
+that its sixty identical atoms in a cage make the B vectors denser, 88.5 per cent
+against 54.6 for taxol by the counting of the section on the W matrices, and the
+denser they are the more the expanded form of the transformation pays. That is not
+separated by these runs and is offered as the likely reason rather than a measured
+one.
