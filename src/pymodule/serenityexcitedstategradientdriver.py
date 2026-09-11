@@ -1370,6 +1370,9 @@ class SerenityExcitedStateGradientDriver(GradientDriver):
                 f'Serenity excited-state gradient task failed: {error}',
                 stage='gradient',
                 details={'root': int(self.state_deriv_index),
+                         'scf_provenance': getattr(
+                             self.serenity_driver, 'get_scf_provenance',
+                             lambda: None)(),
                          'serenity_output_tail': capture.text[-4000:]}
             ) from error
 
@@ -1623,6 +1626,8 @@ class SerenityExcitedStateGradientDriver(GradientDriver):
             'gradient_lr_converged': task.get('lr_converged'),
             'scf_warm_start': scf.get('scf_warm_start'),
             'reference_s2': record.get('reference_s2'),
+            'reference_nesting_error':
+                (scf.get('occupied_space_nesting') or {}).get('nesting_error'),
         }
 
     def _print_adiabatic_selection(self, record):
@@ -1666,6 +1671,12 @@ class SerenityExcitedStateGradientDriver(GradientDriver):
         info(f"Reference            : {scf.get('reference_type')}, "
              f"<S^2>_ref = {record.get('reference_s2')}, SCF warm start = "
              f"{scf.get('scf_warm_start')}")
+        nesting = scf.get('occupied_space_nesting') or {}
+        if nesting.get('nesting_error') is not None:
+            info(f"Nesting              : alpha/beta occupied spaces nested to "
+                 f"{nesting['nesting_error']:.2e} (within ROHF gradient "
+                 f"tolerance: {nesting['within_serenity_rohf_tolerance']}); "
+                 f"SCF thresholds {scf.get('scf_thresholds')}")
         info(f"LR spectrum          : restart requested "
              f"{response.get('restart_requested')}, used "
              f"{response.get('restart_used')} "

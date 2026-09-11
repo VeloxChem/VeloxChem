@@ -156,6 +156,79 @@ def parse_serenity_lr_output(text):
     }
 
 
+# Serenity ends an SCF as soon as any two of |dE|, rmsd(P) and ||[F,P]|| are
+# below their thresholds (ConvergenceController, _nNecessaryToConverge = 2).
+# The ROHF branch of Serenity's excited-state gradient (setupROHFReference)
+# rejects a reference whose alpha and beta occupied spaces are not nested to
+# SERENITY_ROHF_NESTING_TOLERANCE.  The nesting error of a CUHF solution
+# follows the orbital gradient: CUHF-BHHLYP/6-31G* SCFs of a 38-atom azo
+# compound, stopped by the default ||[F,P]|| < 5e-7, were nested to 1.3-2.6
+# times ||[F,P]|| (and up to 15 times rmsd(P)), i.e. 4e-7 ... 1.3e-6, so the
+# default thresholds fail the gradient check at random.  Near convergence
+# |dE| < 5e-8 always holds, so whichever of the two tightened criteria below
+# ends the SCF, the nesting error stays below 1e-7.  |dE| keeps its default:
+# it is second order in the orbital error and scattered by 1e-8 between
+# converged iterations.  The same SCF stagnated at rmsd(P) ~ 2e-9 and
+# ||[F,P]|| ~ 9e-9 (1e-10/1e-10/1e-9 did not converge in 52 cycles).
+SERENITY_ROHF_NESTING_TOLERANCE = 1.0e-6
+CUHF_SCF_THRESHOLDS = {'rmsd': 5.0e-9, 'diis': 2.0e-8}
+
+
+def occupied_space_nesting(C_alpha, C_beta, S, occ_alpha, occ_beta):
+    """
+    Measures how far the minority-spin occupied space lies outside the
+    majority-spin occupied space.
+
+    The singular values of C_minority,virt^T S C_majority,occ are 1 for the
+    n_open open-shell orbitals, followed by sin(theta_k) for the principal
+    angles theta_k between the two occupied spaces.  Serenity's ROHF gradient
+    prints sigma_{n_open} and sigma_{n_open + 1} as its "open-shell overlap
+    eigenvalues" and requires them to be 1 and 0 within
+    SERENITY_ROHF_NESTING_TOLERANCE.  The nesting error is first order in the
+    angle, whereas <S^2> - S(S + 1) = sum_k sin^2(theta_k) is second order and
+    cannot detect it.
+
+    :return:
+        Dictionary with ``n_open``, ``open_shell_singular_value``
+        (sigma_{n_open}), ``nesting_error`` (sigma_{n_open + 1}) and
+        ``within_serenity_rohf_tolerance``.
+    """
+
+    occ_alpha = np.asarray(occ_alpha, dtype=float)
+    occ_beta = np.asarray(occ_beta, dtype=float)
+    if np.sum(occ_alpha) >= np.sum(occ_beta):
+        c_major, occ_major, c_minor, occ_minor = (C_alpha, occ_alpha, C_beta,
+                                                  occ_beta)
+    else:
+        c_major, occ_major, c_minor, occ_minor = (C_beta, occ_beta, C_alpha,
+                                                  occ_alpha)
+    major_occ = np.flatnonzero(occ_major > 0.5)
+    minor_virt = np.flatnonzero(occ_minor <= 0.5)
+    n_open = int(major_occ.size - np.count_nonzero(occ_minor > 0.5))
+
+    overlap = (np.asarray(c_minor, dtype=float)[:, minor_virt].T @
+               np.asarray(S, dtype=float) @
+               np.asarray(c_major, dtype=float)[:, major_occ])
+    sigma = (np.linalg.svd(overlap, compute_uv=False)
+             if overlap.size else np.zeros(0))
+
+    if n_open == 0:
+        open_value = 1.0
+    elif n_open <= sigma.size:
+        open_value = float(sigma[n_open - 1])
+    else:
+        open_value = float('nan')
+    error = float(sigma[n_open]) if sigma.size > n_open else 0.0
+    return {
+        'n_open': n_open,
+        'open_shell_singular_value': open_value,
+        'nesting_error': error,
+        'within_serenity_rohf_tolerance': bool(
+            abs(1.0 - open_value) <= SERENITY_ROHF_NESTING_TOLERANCE and
+            error <= SERENITY_ROHF_NESTING_TOLERANCE),
+    }
+
+
 def _flush_c_stdio():
     """Flushes C stdio buffers; Serenity mixes printf and std::cout."""
 
@@ -242,6 +315,9 @@ class SerenityScfDriver:
         - dft_functional: DFT functional label for Serenity.
         - scratch_dir: Base scratch directory for Serenity files.
         - serenity_verbose: Print Serenity output directly to stdout.
+        - scf_energy_threshold, scf_rmsd_threshold, scf_diis_threshold:
+          Serenity SCF convergence thresholds; None keeps Serenity's default
+          (CUHF references default to CUHF_SCF_THRESHOLDS).
     """
 
     def __init__(self, comm=None, ostream=None):
@@ -306,6 +382,13 @@ class SerenityScfDriver:
         self._last_grad_geom_signature = None
         
         self.max_cycles = 1000
+
+        # SCF convergence thresholds (Serenity settings.scf.energyThreshold,
+        # rmsdThreshold and diisThreshold).  None keeps Serenity's default,
+        # except for CUHF references, which use CUHF_SCF_THRESHOLDS.
+        self.scf_energy_threshold = None
+        self.scf_rmsd_threshold = None
+        self.scf_diis_threshold = None
 
         self._energy = None
         self._gradient = None
@@ -432,6 +515,31 @@ class SerenityScfDriver:
             self.rohf_type = label
 
         self._invalidate_cache()
+
+    def get_scf_thresholds(self):
+        """
+        Returns the SCF convergence thresholds passed to Serenity.
+
+        Explicitly set thresholds win.  A CUHF reference takes the remaining
+        ones from CUHF_SCF_THRESHOLDS, because the ROHF branch of Serenity's
+        excited-state gradient needs the alpha and beta occupied spaces
+        nested to SERENITY_ROHF_NESTING_TOLERANCE, which Serenity's default
+        thresholds do not guarantee.  None keeps Serenity's default.
+
+        :return:
+            Dictionary with the ``energy``, ``rmsd`` and ``diis`` thresholds.
+        """
+
+        defaults = CUHF_SCF_THRESHOLDS if self.rohf_type == 'CUHF' else {}
+        explicit = {
+            'energy': self.scf_energy_threshold,
+            'rmsd': self.scf_rmsd_threshold,
+            'diis': self.scf_diis_threshold,
+        }
+        return {
+            key: (float(value) if value is not None else defaults.get(key))
+            for key, value in explicit.items()
+        }
 
     def set_scf_mode(self, scf_mode):
         """
@@ -665,6 +773,9 @@ class SerenityScfDriver:
                 'scf_mode': self._current_scf_mode,
                 'rohf_type': self.rohf_type or 'NONE',
                 'reference_type': self._reference_type_label(),
+                'scf_thresholds': self.get_scf_thresholds(),
+                'occupied_space_nesting':
+                    self._scf_results.get('occupied_space_nesting'),
             }
 
         return self._scf_results
@@ -754,6 +865,13 @@ class SerenityScfDriver:
         settings.grid.accuracy = self.grid_accuracy
         settings.grid.smallGridAccuracy = self.small_grid_accuracy
         settings.scf.maxCycles = self.max_cycles
+        thresholds = self.get_scf_thresholds()
+        if thresholds['energy'] is not None:
+            settings.scf.energyThreshold = thresholds['energy']
+        if thresholds['rmsd'] is not None:
+            settings.scf.rmsdThreshold = thresholds['rmsd']
+        if thresholds['diis'] is not None:
+            settings.scf.diisThreshold = thresholds['diis']
 
         # if mode == 'restricted':
         #     settings.scfMode = spy.SCF_MODES.RESTRICTED
@@ -902,6 +1020,7 @@ class SerenityScfDriver:
             self.basis.upper(),
             self.dft_functional.lower(),
             self.rohf_type or 'NONE',
+            tuple(sorted(self.get_scf_thresholds().items())),
             int(molecule.get_charge()),
             int(molecule.get_multiplicity()),
             labels,
@@ -1082,6 +1201,10 @@ class SerenityScfDriver:
             'F_beta': F_beta,
             'F': (F_alpha, F_beta),
         }
+
+        if scf_type == 'unrestricted':
+            scf_results['occupied_space_nesting'] = occupied_space_nesting(
+                C_alpha, C_beta, S, occ_alpha, occ_beta)
 
         if self.method == 'dft':
             scf_results['xcfun'] = self.dft_functional.upper()
