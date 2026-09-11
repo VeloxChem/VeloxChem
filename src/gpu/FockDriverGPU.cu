@@ -7087,11 +7087,11 @@ computeFockOnGPU(const              CMolecule& molecule,
                                eri_threshold);
             */
 
-            auto prec_cut_ij_tile_h = build_cut_ij_tile_dd(dd_mat_Q_local, ss_mat_Q, ss_mat_D, (uint32_t)dd_prim_pair_count_local, (uint32_t)ss_prim_pair_count, TILE_DIM_SMALL, TILE_DIM_LARGE, tau_precision);
+            auto prec_cut_ij_tile_h = build_cut_ij_tile(dd_mat_Q_local, ss_mat_Q, ss_mat_D, (uint32_t)dd_prim_pair_count_local, (uint32_t)ss_prim_pair_count, TILE_DIM_SMALL, TILE_DIM_LARGE, tau_precision);
             const uint32_t nij_tiles = (dd_prim_pair_count_local + TILE_DIM_SMALL - 1) / TILE_DIM_SMALL;
             gpuSafe(gpuMemcpyStaged(d_prec_cut_ij_tile, prec_cut_ij_tile_h.data(), nij_tiles * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
-            auto screen_cut_ij_tile_h = build_cut_ij_tile_dd(dd_mat_Q_local, ss_mat_Q, ss_mat_D, (uint32_t)dd_prim_pair_count_local, (uint32_t)ss_prim_pair_count, TILE_DIM_SMALL, TILE_DIM_LARGE, eri_threshold);
+            auto screen_cut_ij_tile_h = build_cut_ij_tile(dd_mat_Q_local, ss_mat_Q, ss_mat_D, (uint32_t)dd_prim_pair_count_local, (uint32_t)ss_prim_pair_count, TILE_DIM_SMALL, TILE_DIM_LARGE, eri_threshold);
             gpuSafe(gpuMemcpyStaged(d_screen_cut_ij_tile, screen_cut_ij_tile_h.data(), nij_tiles * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
             gpu::computeCoulombFockDDSS_FP64<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
@@ -7145,11 +7145,11 @@ computeFockOnGPU(const              CMolecule& molecule,
                                eri_threshold);
             */
 
-            auto prec_cut_ij_tile_h = build_cut_ij_tile_dd(dd_mat_Q_local, sp_mat_Q, sp_mat_D, (uint32_t)dd_prim_pair_count_local, (uint32_t)sp_prim_pair_count, TILE_DIM_SMALL, TILE_DIM_LARGE, tau_precision);
+            auto prec_cut_ij_tile_h = build_cut_ij_tile(dd_mat_Q_local, sp_mat_Q, sp_mat_D, (uint32_t)dd_prim_pair_count_local, (uint32_t)sp_prim_pair_count, TILE_DIM_SMALL, TILE_DIM_LARGE, tau_precision);
             const uint32_t nij_tiles = (dd_prim_pair_count_local + TILE_DIM_SMALL - 1) / TILE_DIM_SMALL;
             gpuSafe(gpuMemcpyStaged(d_prec_cut_ij_tile, prec_cut_ij_tile_h.data(), nij_tiles * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
-            auto screen_cut_ij_tile_h = build_cut_ij_tile_dd(dd_mat_Q_local, sp_mat_Q, sp_mat_D, (uint32_t)dd_prim_pair_count_local, (uint32_t)sp_prim_pair_count, TILE_DIM_SMALL, TILE_DIM_LARGE, eri_threshold);
+            auto screen_cut_ij_tile_h = build_cut_ij_tile(dd_mat_Q_local, sp_mat_Q, sp_mat_D, (uint32_t)dd_prim_pair_count_local, (uint32_t)sp_prim_pair_count, TILE_DIM_SMALL, TILE_DIM_LARGE, eri_threshold);
             gpuSafe(gpuMemcpyStaged(d_screen_cut_ij_tile, screen_cut_ij_tile_h.data(), nij_tiles * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
             gpu::computeCoulombFockDDSP_FP64<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
@@ -7201,11 +7201,11 @@ computeFockOnGPU(const              CMolecule& molecule,
                                eri_threshold);
             */
 
-            auto prec_cut_ij_tile_h = build_cut_ij_tile_dd(dd_mat_Q_local, sd_mat_Q, sd_mat_D, (uint32_t)dd_prim_pair_count_local, (uint32_t)sd_prim_pair_count, TILE_DIM_SMALL, TILE_DIM_LARGE, tau_precision);
+            auto prec_cut_ij_tile_h = build_cut_ij_tile(dd_mat_Q_local, sd_mat_Q, sd_mat_D, (uint32_t)dd_prim_pair_count_local, (uint32_t)sd_prim_pair_count, TILE_DIM_SMALL, TILE_DIM_LARGE, tau_precision);
             const uint32_t nij_tiles = (dd_prim_pair_count_local + TILE_DIM_SMALL - 1) / TILE_DIM_SMALL;
             gpuSafe(gpuMemcpyStaged(d_prec_cut_ij_tile, prec_cut_ij_tile_h.data(), nij_tiles * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
-            auto screen_cut_ij_tile_h = build_cut_ij_tile_dd(dd_mat_Q_local, sd_mat_Q, sd_mat_D, (uint32_t)dd_prim_pair_count_local, (uint32_t)sd_prim_pair_count, TILE_DIM_SMALL, TILE_DIM_LARGE, eri_threshold);
+            auto screen_cut_ij_tile_h = build_cut_ij_tile(dd_mat_Q_local, sd_mat_Q, sd_mat_D, (uint32_t)dd_prim_pair_count_local, (uint32_t)sd_prim_pair_count, TILE_DIM_SMALL, TILE_DIM_LARGE, eri_threshold);
             gpuSafe(gpuMemcpyStaged(d_screen_cut_ij_tile, screen_cut_ij_tile_h.data(), nij_tiles * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
             gpu::computeCoulombFockDDSD_FP64<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
@@ -7257,11 +7257,11 @@ computeFockOnGPU(const              CMolecule& molecule,
                                eri_threshold);
             */
 
-            auto prec_cut_ij_tile_h = build_cut_ij_tile_dd(dd_mat_Q_local, pp_mat_Q, pp_mat_D, (uint32_t)dd_prim_pair_count_local, (uint32_t)pp_prim_pair_count, TILE_DIM_SMALL, TILE_DIM_LARGE, tau_precision);
+            auto prec_cut_ij_tile_h = build_cut_ij_tile(dd_mat_Q_local, pp_mat_Q, pp_mat_D, (uint32_t)dd_prim_pair_count_local, (uint32_t)pp_prim_pair_count, TILE_DIM_SMALL, TILE_DIM_LARGE, tau_precision);
             const uint32_t nij_tiles = (dd_prim_pair_count_local + TILE_DIM_SMALL - 1) / TILE_DIM_SMALL;
             gpuSafe(gpuMemcpyStaged(d_prec_cut_ij_tile, prec_cut_ij_tile_h.data(), nij_tiles * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
-            auto screen_cut_ij_tile_h = build_cut_ij_tile_dd(dd_mat_Q_local, pp_mat_Q, pp_mat_D, (uint32_t)dd_prim_pair_count_local, (uint32_t)pp_prim_pair_count, TILE_DIM_SMALL, TILE_DIM_LARGE, eri_threshold);
+            auto screen_cut_ij_tile_h = build_cut_ij_tile(dd_mat_Q_local, pp_mat_Q, pp_mat_D, (uint32_t)dd_prim_pair_count_local, (uint32_t)pp_prim_pair_count, TILE_DIM_SMALL, TILE_DIM_LARGE, eri_threshold);
             gpuSafe(gpuMemcpyStaged(d_screen_cut_ij_tile, screen_cut_ij_tile_h.data(), nij_tiles * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
             gpu::computeCoulombFockDDPP_FP64<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
@@ -7502,11 +7502,11 @@ computeFockOnGPU(const              CMolecule& molecule,
                                eri_threshold);
             */
 
-            auto prec_cut_ij_tile_h = build_cut_ij_tile_dd(dd_mat_Q_local, pd_mat_Q, pd_mat_D, (uint32_t)dd_prim_pair_count_local, (uint32_t)pd_prim_pair_count, TILE_DIM_SMALL, TILE_DIM_LARGE, tau_precision);
+            auto prec_cut_ij_tile_h = build_cut_ij_tile(dd_mat_Q_local, pd_mat_Q, pd_mat_D, (uint32_t)dd_prim_pair_count_local, (uint32_t)pd_prim_pair_count, TILE_DIM_SMALL, TILE_DIM_LARGE, tau_precision);
             const uint32_t nij_tiles = (dd_prim_pair_count_local + TILE_DIM_SMALL - 1) / TILE_DIM_SMALL;
             gpuSafe(gpuMemcpyStaged(d_prec_cut_ij_tile, prec_cut_ij_tile_h.data(), nij_tiles * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
-            auto screen_cut_ij_tile_h = build_cut_ij_tile_dd(dd_mat_Q_local, pd_mat_Q, pd_mat_D, (uint32_t)dd_prim_pair_count_local, (uint32_t)pd_prim_pair_count, TILE_DIM_SMALL, TILE_DIM_LARGE, eri_threshold);
+            auto screen_cut_ij_tile_h = build_cut_ij_tile(dd_mat_Q_local, pd_mat_Q, pd_mat_D, (uint32_t)dd_prim_pair_count_local, (uint32_t)pd_prim_pair_count, TILE_DIM_SMALL, TILE_DIM_LARGE, eri_threshold);
             gpuSafe(gpuMemcpyStaged(d_screen_cut_ij_tile, screen_cut_ij_tile_h.data(), nij_tiles * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
             gpu::computeCoulombFockDDPD0_FP64<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(
@@ -8157,11 +8157,11 @@ computeFockOnGPU(const              CMolecule& molecule,
                                eri_threshold);
             */
 
-            auto prec_cut_ij_tile_h = build_cut_ij_tile_dd(dd_mat_Q_local, dd_mat_Q, dd_mat_D, (uint32_t)dd_prim_pair_count_local, (uint32_t)dd_prim_pair_count, TILE_DIM_SMALL, TILE_DIM_LARGE, tau_precision);
+            auto prec_cut_ij_tile_h = build_cut_ij_tile(dd_mat_Q_local, dd_mat_Q, dd_mat_D, (uint32_t)dd_prim_pair_count_local, (uint32_t)dd_prim_pair_count, TILE_DIM_SMALL, TILE_DIM_LARGE, tau_precision);
             const uint32_t nij_tiles = (dd_prim_pair_count_local + TILE_DIM_SMALL - 1) / TILE_DIM_SMALL;
             gpuSafe(gpuMemcpyStaged(d_prec_cut_ij_tile, prec_cut_ij_tile_h.data(), nij_tiles * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
-            auto screen_cut_ij_tile_h = build_cut_ij_tile_dd(dd_mat_Q_local, dd_mat_Q, dd_mat_D, (uint32_t)dd_prim_pair_count_local, (uint32_t)dd_prim_pair_count, TILE_DIM_SMALL, TILE_DIM_LARGE, eri_threshold);
+            auto screen_cut_ij_tile_h = build_cut_ij_tile(dd_mat_Q_local, dd_mat_Q, dd_mat_D, (uint32_t)dd_prim_pair_count_local, (uint32_t)dd_prim_pair_count, TILE_DIM_SMALL, TILE_DIM_LARGE, eri_threshold);
             gpuSafe(gpuMemcpyStaged(d_screen_cut_ij_tile, screen_cut_ij_tile_h.data(), nij_tiles * sizeof(uint32_t), gpuMemcpyHostToDevice, stream));
 
             gpu::computeCoulombFockDDDD0_FP64<<<dd_num_blocks, dd_threads_per_block, 0, stream>>>(d_mat_J, d_d_prim_info, static_cast<uint32_t>(d_prim_count), d_mat_D, d_dd_first_inds_local, d_dd_second_inds_local, d_dd_pair_data_local, static_cast<uint32_t>(dd_prim_pair_count_local), d_dd_first_inds, d_dd_second_inds, d_dd_pair_data, static_cast<uint32_t>(dd_prim_pair_count), d_boys_func_table, d_boys_func_ft, d_prec_cut_ij_tile);

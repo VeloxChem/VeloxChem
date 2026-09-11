@@ -1,49 +1,79 @@
+//
+//                                   VELOXCHEM
+//              ----------------------------------------------------
+//                          An Electronic Structure Code
+//
+//  SPDX-License-Identifier: BSD-3-Clause
+//
+//  Copyright 2018-2025 VeloxChem developers
+//
+//  Redistribution and use in source and binary forms, with or without modification,
+//  are permitted provided that the following conditions are met:
+//
+//  1. Redistributions of source code must retain the above copyright notice, this
+//     list of conditions and the following disclaimer.
+//  2. Redistributions in binary form must reproduce the above copyright notice,
+//     this list of conditions and the following disclaimer in the documentation
+//     and/or other materials provided with the distribution.
+//  3. Neither the name of the copyright holder nor the names of its contributors
+//     may be used to endorse or promote products derived from this software without
+//     specific prior written permission.
+//
+//  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+//  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+//  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+//  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+//  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+//  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+//  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+//  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+//  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+//  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
 #include "PrecisionCut.hpp"
 
 #include <algorithm>
 #include <cmath>
 #include <functional>
 
-#if defined(USE_CUDA) || defined(USE_HIP)
 #include "GpuRuntime.hpp"
 #include "GpuWrapper.hpp"
-#endif
 
-// Build cut_ij_tile at tile granularity using scheme A / per ij-tile cuts.
+// Build cut_ij_tile at tile granularity, per ij-tile cuts.
+// General variant: ij side is tiled with ij_tile_dim, kl side with kl_tile_dim.
 std::vector<uint32_t> build_cut_ij_tile(
-    const std::vector<double>& Q_ij_local,   // len >= ij_count_local
-    const std::vector<double>& Q_kl,         // len >= kl_count
-    const std::vector<double>& D_kl,         // len >= kl_count
+    const std::vector<double>& Q_ij_local,
+    const std::vector<double>& Q_kl,
+    const std::vector<double>& D_kl,
     uint32_t ij_count_local,
     uint32_t kl_count,
-    int tile_dim,
-    double tau) 
+    int ij_tile_dim,
+    int kl_tile_dim,
+    double tau)
 {
     const uint32_t nij_tiles =
-    (ij_count_local + tile_dim - 1) / tile_dim;
+    (ij_count_local + ij_tile_dim - 1) / ij_tile_dim;
 
     // QD_tile_max along kl
-    //    QD_kl = |Q_kl| * |D_kl|
+    // QD_kl = |Q_kl| * |D_kl|
     std::vector<double> QD_kl(kl_count);
     for (uint32_t kl = 0; kl < kl_count; ++kl) {
         QD_kl[kl] = std::abs(Q_kl[kl]) * std::abs(D_kl[kl]);
     }
-    const uint32_t nkl_tiles = (kl_count + tile_dim - 1) / tile_dim;
+    const uint32_t nkl_tiles = (kl_count + kl_tile_dim - 1) / kl_tile_dim;
     std::vector<double> QD_tile_max(nkl_tiles);
 
     for(uint32_t t = 0; t < nkl_tiles; ++t)
     {
-        QD_tile_max[t] = QD_kl[t * tile_dim];
+        QD_tile_max[t] = QD_kl[t * kl_tile_dim];
     }
 
-    // Build cut_ij_tile at tile granularity using scheme A / per ij-tile cuts.
     std::vector<uint32_t> cut(nij_tiles, 0);
     for(uint32_t t = 0; t < nij_tiles; ++t) {
-        // const double qmax = Q_tile_max[t];
-        const double qmax = Q_ij_local[t*tile_dim];
+        const double qmax = Q_ij_local[t*ij_tile_dim];
         if(qmax <= 0.0) {
             // This ij-tile has no contribution.
-            cut[t] = 0; 
+            cut[t] = 0;
             continue;
         }
 
@@ -59,49 +89,18 @@ std::vector<uint32_t> build_cut_ij_tile(
     return cut;
 }
 
-std::vector<uint32_t> build_cut_ij_tile_dd(
+// Convenience overload: same tile dimension on both ij and kl sides.
+std::vector<uint32_t> build_cut_ij_tile(
     const std::vector<double>& Q_ij_local,
     const std::vector<double>& Q_kl,
     const std::vector<double>& D_kl,
     uint32_t ij_count_local,
     uint32_t kl_count,
-    int ij_tile_dim,
-    int kl_tile_dim,
+    int tile_dim,
     double tau)
 {
-    const uint32_t nij_tiles = (ij_count_local + ij_tile_dim - 1) / ij_tile_dim;
-
-    std::vector<double> QD_kl(kl_count);
-    for (uint32_t kl = 0; kl < kl_count; ++kl) {
-        QD_kl[kl] = std::abs(Q_kl[kl]) * std::abs(D_kl[kl]);
-    }
-
-    const uint32_t nkl_tiles = (kl_count + kl_tile_dim - 1) / kl_tile_dim;
-    std::vector<double> QD_tile_max(nkl_tiles);
-
-    for (uint32_t t = 0; t < nkl_tiles; ++t)
-    {
-        QD_tile_max[t] = QD_kl[t * kl_tile_dim];
-    }
-
-    std::vector<uint32_t> cut(nij_tiles, 0);
-    for (uint32_t t = 0; t < nij_tiles; ++t) {
-        const double qmax = Q_ij_local[t * ij_tile_dim];
-        if (qmax <= 0.0) {
-            cut[t] = 0;
-            continue;
-        }
-
-        const double thr = tau / qmax;
-        auto it = std::lower_bound(
-            QD_tile_max.begin(),
-            QD_tile_max.end(),
-            thr,
-            std::greater<double>()
-        );
-        cut[t] = static_cast<uint32_t>(it - QD_tile_max.begin());
-    }
-    return cut;
+    return build_cut_ij_tile(Q_ij_local, Q_kl, D_kl, ij_count_local,
+                             kl_count, tile_dim, tile_dim, tau);
 }
 
 ExchangeCuts
@@ -122,8 +121,6 @@ build_exchange_cut_layout(
 
     return {{}, {}, displ_cuts, total};
 }
-
-#if defined(USE_CUDA) || defined(USE_HIP)
 
 namespace {
 
@@ -337,5 +334,3 @@ build_exchange_cuts_device(
 }
 
 }  // namespace gpu
-
-#endif  // USE_CUDA || USE_HIP
