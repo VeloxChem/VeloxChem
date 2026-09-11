@@ -82,7 +82,7 @@ METAL_ELEMENTS = ('Zn', 'Fe', 'Cu', 'Mg', 'Mn', 'Co', 'Ni', 'Ca', 'Cd')
 # formal charges and the coordination rules have only been checked against
 # zinc sites, so anything else is rejected instead of silently treated as
 # if it behaved the same way.
-SUPPORTED_METAL_ELEMENTS = ('Zn',)
+SUPPORTED_METAL_ELEMENTS = ('Zn', )
 
 # Formal charges assumed for bare metal ions. Only used for the active site
 # charge bookkeeping, which is checked rather than trusted.
@@ -177,9 +177,11 @@ BACKBONE_ATOM_NAMES = ('N', 'C', 'O', 'OXT', 'H', 'H2', 'H3', 'HA', 'HA2',
 # here, but include_residue takes any residue at all, so the rule the
 # truncation relies on is written down where it is enforced.
 UNTRUNCATABLE_RESIDUES = {
-    'GLY': 'has no CB to cut at',
-    'PRO': 'has a sidechain that closes back onto the backbone nitrogen, '
-           'so cutting at CA-CB leaves CD with a dangling valence and no cap',
+    'GLY':
+    'has no CB to cut at',
+    'PRO':
+    'has a sidechain that closes back onto the backbone nitrogen, '
+    'so cutting at CA-CB leaves CD with a dangling valence and no cap',
 }
 
 # Net charge of each protonation variant, for the active site charge
@@ -284,32 +286,6 @@ DEFAULT_METAL_PLANARITY_FORCE_CONSTANT = 4.184
 # ----------------------------------------------------------------------
 
 
-def _resolve_report_cutoff(metal_bond_cutoff, report_cutoff=None):
-    """
-    Returns the distance a coordination scan looks out to.
-
-    The two cutoffs are not independent. The scan collects candidates out to
-    the reporting distance and decides bonding inside it, so a reporting
-    distance below the bonding one silently drops contacts that are bonds:
-    raising metal_bond_cutoff past a fixed report_cutoff used to have no
-    effect whatever. It is therefore a margin above the bonding cutoff, and
-    a distance given explicitly is never allowed underneath it.
-
-    :param metal_bond_cutoff:
-        The distance a donor atom is bonded to a metal within.
-    :param report_cutoff:
-        The distance to report out to, or None for the margin.
-
-    :return:
-        The distance to scan out to.
-    """
-
-    if report_cutoff is None:
-        return metal_bond_cutoff + REPORT_CUTOFF_MARGIN
-
-    return max(float(report_cutoff), float(metal_bond_cutoff))
-
-
 def _folder_file(name, folder=None):
     """
     Returns the path of an intermediate in the working folder, or None
@@ -334,7 +310,7 @@ def residue_label(residue):
     """
     Returns the ASP130-style label a residue is named by.
 
-    This label is load-bearing rather than cosmetic: it is what a user
+    This label is load-bearing: it is what a user
     request is matched against, what update_protonation_state writes as a
     protonation_overrides key, and what active_site['residues'] holds. It
     is built in one place so that all of those agree on it.
@@ -411,40 +387,17 @@ def _site_index_map(active_site):
 
 def load_and_prepare_protein(structure, prepare=True):
     """
-    Reads a structure and repairs it for a protein force field.
+    Reads a structure and prepares it for a protein force field.
 
-    The two are one step because the repair renumbers atoms: every index
-    downstream refers to the topology this returns, so a structure that is
-    read and then prepared separately is a chance to extract from the
-    wrong one.
-
+    Preparation adds missing heavy atoms so that a protein force field can match
+    templates.  Missing residues are deliberately not built.
+    Necessary for building full enzymatic systemms. 
+    Can be skipped if the provided topology file is already  correct.
+    
     :param structure:
         The path to a .pdb, .cif or .pdbx file.
     :param prepare:
-        Whether to run the repair. It is what gives a protein force field a
-        topology it can template, so a run that ends in an enzyme system
-        needs it; a run that only wants the metal site can skip it, and skip
-        pdbfixer with it.
-
-    :return:
-        The tuple of the OpenMM topology and the positions as an (N, 3)
-        numpy array in Angstrom.
-    """
-
-    topology, positions = _load_structure(structure)
-
-    if prepare:
-        topology, positions = _prepare_protein(topology, positions)
-
-    return topology, positions
-
-
-def _load_structure(structure):
-    """
-    Reads a PDB or mmCIF structure.
-
-    :param structure:
-        The path to a .pdb, .cif or .pdbx file.
+        Whether to run the preparation
 
     :return:
         The tuple of the OpenMM topology and the positions as an (N, 3)
@@ -454,6 +407,11 @@ def _load_structure(structure):
     assert_msg_critical('openmm' in sys.modules,
                         'load_and_prepare_protein: openmm is '
                         'required')
+
+    if prepare:
+        assert_msg_critical(
+            'pdbfixer' in sys.modules or 'PDBFixer' in globals(),
+            'prepare_protein: pdbfixer is require when preparing a protein')
 
     path = Path(structure)
 
@@ -467,31 +425,13 @@ def _load_structure(structure):
 
     positions = np.array(pdb.positions.value_in_unit(mmunit.angstrom))
 
-    return pdb.topology, positions
-
-
-def _prepare_protein(topology, positions):
-    """
-    Adds missing heavy atoms so that a protein force field can match
-    templates.  Missing residues are deliberately not built.
-    Only needed before create_enzyme_system.
-
-    :param topology:
-        The OpenMM topology.
-    :param positions:
-        The positions as an (N, 3) numpy array in Angstrom.
-
-    :return:
-        The tuple of the repaired topology and positions in Angstrom.
-    """
-
-    assert_msg_critical('pdbfixer' in sys.modules or 'PDBFixer' in globals(),
-                        'prepare_protein: pdbfixer is required')
+    if not prepare:
+        return pdb.topology, positions
 
     with tempfile.TemporaryDirectory() as temp_dir:
         path = Path(temp_dir) / 'input.pdb'
         with path.open('w') as fh:
-            mmapp.PDBFile.writeFile(topology,
+            mmapp.PDBFile.writeFile(pdb.topology,
                                     np.asarray(positions) * mmunit.angstrom,
                                     fh,
                                     keepIds=True)
@@ -506,33 +446,6 @@ def _prepare_protein(topology, positions):
     positions = np.array(fixer.positions.value_in_unit(mmunit.angstrom))
 
     return fixer.topology, positions
-
-
-def _check_supported_metals(metals, method):
-    """
-    Rejects metal centers the builder is not validated for.
-
-    The literature distances, the assumed formal charges and the
-    coordination rules have only been checked against zinc, so a site
-    built around any other metal would be produced with zinc's assumptions
-    silently applied to it.
-
-    :param metals:
-        The list of metal entries of the binding modes.
-    :param method:
-        The name of the calling method, for the error message.
-    """
-
-    found = sorted({metal['element'] for metal in metals})
-    unsupported = [
-        element for element in found if element not in SUPPORTED_METAL_ELEMENTS
-    ]
-
-    assert_msg_critical(
-        not unsupported, f'{method}: found {unsupported}, but '
-        f'only {list(SUPPORTED_METAL_ELEMENTS)} is supported. The '
-        'literature distances, formal charges and coordination rules have '
-        'only been validated for zinc.')
 
 
 # ----------------------------------------------------------------------
@@ -577,29 +490,19 @@ def site_request():
     }
 
 
-def suggest_binding_modes(topology,
-                          positions,
-                          coordinating_residues=None,
-                          metal_elements=METAL_ELEMENTS,
-                          metal_formal_charges=None,
-                          ostream=None,
-                          bidentate_asymmetry=BIDENTATE_ASYMMETRY,
-                          metal_bond_cutoff=METAL_BOND_CUTOFF,
-                          report_cutoff=REPORT_CUTOFF,
-                          request=None):
+def derive_binding_modes(topology,
+                         positions,
+                         coordinating_residues=None,
+                         metal_elements=METAL_ELEMENTS,
+                         metal_formal_charges=None,
+                         ostream=None,
+                         bidentate_asymmetry=BIDENTATE_ASYMMETRY,
+                         metal_bond_cutoff=METAL_BOND_CUTOFF,
+                         report_cutoff=REPORT_CUTOFF,
+                         request=None):
     """
     Derives the coordination topology of the metal centers from geometry.
 
-    This is a query, not a record: it is called again whenever the answer
-    could have changed -- after the hydrogens are placed, after a
-    relaxation, after an edit -- and nothing keeps what it returned. The
-    atom indices it writes therefore always belong to the topology it was
-    handed, which is what makes them safe to use.
-
-    What survives instead is the request: the metal bonds decided by hand
-    and the protonation variants, both keyed on residue indices and atom
-    names, neither of which adding hydrogens disturbs. They are replayed
-    here, so a derivation reproduces every edit that was ever made.
 
     :param topology:
         The OpenMM topology.
@@ -657,6 +560,7 @@ def suggest_binding_modes(topology,
 
     _check_supported_metals(metals, 'suggest_binding_modes')
 
+    # Resolve which residues are forced to be ligands
     forced = _resolve_residues(topology, coordinating_residues, ostream=ostream)
     forced |= set(request.get('coordinating_residues', []))
 
@@ -666,6 +570,7 @@ def suggest_binding_modes(topology,
         return positions[index]
 
     notes = []
+    # Collect all close-lying ligands
     ligands = _collect_ligands(atoms,
                                position_of,
                                metals,
@@ -692,10 +597,6 @@ def suggest_binding_modes(topology,
         'ligands': ligands,
         'variants': dict(request.get('variants', {})),
         'coordinating_residues': sorted(forced),
-        # what the caller asked for on top of the coordination, rather
-        # than the membership those requests work out to: which residues
-        # the cluster holds is derived by active_site_residues, so a
-        # re-detection cannot leave the two disagreeing
         'extra_residues': sorted(request.get('extra_residues', [])),
         'excluded_residues': sorted(request.get('excluded_residues', [])),
         'manual_bonds': deepcopy(records),
@@ -739,12 +640,17 @@ def _collect_ligands(atoms,
         The list of ligand contacts, each carrying its mode.
     """
 
-    report_cutoff = _resolve_report_cutoff(metal_bond_cutoff, report_cutoff)
+    if report_cutoff is None:
+        report_cutoff = metal_bond_cutoff + REPORT_CUTOFF_MARGIN
+
+    else:
+        report_cutoff = max(float(report_cutoff), float(metal_bond_cutoff))
 
     metal_indices = [metal['index'] for metal in metals]
     atoms = list(atoms)
     contacts = []
 
+    # Find the contacting donor atom
     for atom in atoms:
         if atom.element is None or atom.index in metal_indices:
             continue
@@ -765,7 +671,7 @@ def _collect_ligands(atoms,
         if atom.name in BACKBONE_ATOM_NAMES:
             notes.append(
                 f'backbone atom {label} {atom.name} is {closest:.2f} A '
-                'from a metal; the truncation scheme is sidechain-only, '
+                'from a metal; the truncation scheme currently is sidechain-only, '
                 'so it is not treated as a ligand')
             continue
 
@@ -775,13 +681,20 @@ def _collect_ligands(atoms,
         ])
 
         contacts.append({
-            'residue': label,
-            'res_name': atom.residue.name,
-            'res_index': atom.residue.index,
-            'chain': atom.residue.chain.id,
-            'atom': atom.name,
-            'index': atom.index,
-            'metals': bonded_to,
+            'residue':
+            label,
+            'res_name':
+            atom.residue.name,
+            'res_index':
+            atom.residue.index,
+            'chain':
+            atom.residue.chain.id,
+            'atom':
+            atom.name,
+            'index':
+            atom.index,
+            'metals':
+            bonded_to,
             'distances': [round(distances[i], 3) for i in bonded_to],
         })
 
@@ -809,8 +722,8 @@ def _collect_ligands(atoms,
                           bidentate_asymmetry=bidentate_asymmetry)
 
     for metal in metals:
-        n_ligands = sum(
-            1 for ligand in ligands if metal['index'] in ligand['metals'])
+        n_ligands = sum(1 for ligand in ligands
+                        if metal['index'] in ligand['metals'])
         if n_ligands < 3:
             notes.append(
                 f'metal {metal["element"]} (index {metal["index"]}) has '
@@ -911,7 +824,8 @@ def _force_ligands(atoms,
         return
 
     already = {
-        contact['res_index'] for contact in contacts if contact['metals']
+        contact['res_index']
+        for contact in contacts if contact['metals']
     }
 
     for res_index in sorted(forced):
@@ -920,8 +834,8 @@ def _force_ligands(atoms,
 
         donors = [
             atom for atom in atoms
-            if atom.residue.index == res_index and atom.element is not None and
-            atom.element.symbol in DONOR_ELEMENTS and atom.name not in
+            if atom.residue.index == res_index and atom.element is not None
+            and atom.element.symbol in DONOR_ELEMENTS and atom.name not in
             BACKBONE_ATOM_NAMES and atom.index not in metal_indices
         ]
 
@@ -1109,8 +1023,8 @@ def _assign_binding_modes(ligands,
         # A carboxylate whose two oxygens sit at very different distances
         # is not chelating: the far oxygen points away, and holding it at
         # the metal anyway would bend the group open.
-        if (len(group) == 2 and res_name in carboxylates and
-                all(ligand['mode'] == 'bidentate' for ligand in group)):
+        if (len(group) == 2 and res_name in carboxylates
+                and all(ligand['mode'] == 'bidentate' for ligand in group)):
             near, far = sorted(group, key=lambda ligand: ligand['distances'][0])
             separation = far['distances'][0] - near['distances'][0]
             asked_for = any((ligand['res_index'], ligand['atom']) in protected
@@ -1230,8 +1144,8 @@ def _record_manual_bond(records,
     """
 
     for record in records:
-        if (record['res_index'] == res_index and record['atom'] == atom_name and
-                record['metal_res_index'] == metal_res_index):
+        if (record['res_index'] == res_index and record['atom'] == atom_name
+                and record['metal_res_index'] == metal_res_index):
             record['action'] = action
             # the key is only there when there is a distance to say, so
             # editing the bond again without one takes it back out
@@ -1265,29 +1179,7 @@ def _manual_protected(records):
     """
 
     return {(record['res_index'], record['atom'])
-            for record in records
-            if record['action'] == 'add'}
-
-
-def _merge_notes(binding_modes, notes):
-    """
-    Adds review notes without repeating the ones already there.
-
-    Editing the coordination classifies it again, and most of what that
-    produces is what the last pass produced, so the notes are merged by
-    their text rather than appended to.
-
-    :param binding_modes:
-        The binding modes. Its notes are updated in place.
-    :param notes:
-        The notes to merge in.
-    """
-
-    existing = binding_modes.setdefault('notes', [])
-
-    for note in notes:
-        if note not in existing:
-            existing.append(note)
+            for record in records if record['action'] == 'add'}
 
 
 def _apply_manual_bonds(ligands, records, metals, atoms, position_of, notes):
@@ -1472,8 +1364,8 @@ def add_metal_bond(request,
     metal_label = f'{metal_entry["element"]} (index {metal_entry["index"]})'
 
     assert_msg_critical(
-        ligand_atom.element is not None and
-        ligand_atom.element.symbol in DONOR_ELEMENTS, 'add_metal_bond: '
+        ligand_atom.element is not None
+        and ligand_atom.element.symbol in DONOR_ELEMENTS, 'add_metal_bond: '
         f'{label} {ligand_atom.name} is not one of '
         f'{list(DONOR_ELEMENTS)}, so it has no lone pair to donate '
         'to a metal')
@@ -1491,8 +1383,8 @@ def add_metal_bond(request,
 
     already = [
         ligand for ligand in residue_contacts
-        if ligand['index'] == ligand_atom.index and
-        metal_entry['index'] in ligand['metals']
+        if ligand['index'] == ligand_atom.index
+        and metal_entry['index'] in ligand['metals']
     ]
 
     if already:
@@ -1563,8 +1455,8 @@ def add_metal_bond(request,
                         ligand_atom.name,
                         metal_entry['res_index'],
                         'add',
-                        equilibrium=None
-                        if equilibrium is None else 0.1 * float(equilibrium))
+                        equilibrium=None if equilibrium is None else 0.1 *
+                        float(equilibrium))
 
     ostream.print_info(f'Bonded {label} {ligand_atom.name} to {metal_label} at '
                        f'{distance:.2f} A.')
@@ -1586,7 +1478,6 @@ def remove_metal_bond(request,
                       metal=None,
                       atom=None,
                       chain=None,
-                      bidentate_asymmetry=BIDENTATE_ASYMMETRY,
                       ostream=None):
     """
     Takes a residue's bond to a metal center back out.
@@ -1624,8 +1515,8 @@ def remove_metal_bond(request,
     matched = [
         ligand for ligand in binding_modes['ligands']
         if wanted in (ligand['residue'],
-                      ligand['residue'][len(ligand['res_name']):]) and
-        (chain is None or str(ligand['chain']) == str(chain))
+                      ligand['residue'][len(ligand['res_name']):]) and (
+                          chain is None or str(ligand['chain']) == str(chain))
     ]
 
     assert_msg_critical(
@@ -1647,7 +1538,9 @@ def remove_metal_bond(request,
     label = matched[0]['residue']
     res_index = matched[0]['res_index']
     reached = sorted(
-        {index for ligand in matched for index in ligand['metals']})
+        {index
+         for ligand in matched
+         for index in ligand['metals']})
 
     if metal is None:
         assert_msg_critical(
@@ -1678,9 +1571,9 @@ def remove_metal_bond(request,
         assert_msg_critical(
             len(targets) > 0, 'remove_metal_bond: '
             f'{label} {atom} is not bonded to {metal_label}; its bonds '
-            'to it are ' + ', '.join(ligand['atom']
-                                     for ligand in matched
-                                     if metal_index in ligand['metals']))
+            'to it are ' +
+            ', '.join(ligand['atom']
+                      for ligand in matched if metal_index in ligand['metals']))
 
     if binding_modes.get('variants'):
         ostream.print_warning(
@@ -1747,8 +1640,8 @@ def _resolve_residue(topology, resid, chain=None):
     wanted = str(resid).strip()
     matched = [
         residue for residue in topology.residues()
-        if wanted in (str(residue.id), residue_label(residue)) and
-        (chain is None or str(residue.chain.id) == str(chain))
+        if wanted in (str(residue.id), residue_label(residue)) and (
+            chain is None or str(residue.chain.id) == str(chain))
     ]
 
     in_chain = '' if chain is None else f' of chain {chain}'
@@ -1912,8 +1805,8 @@ def _resolve_ligand_atom(residue, atom, metal_entry, positions, ligands):
     ]
     oxygens = [donor for donor in donors if donor.element.symbol == 'O']
 
-    if (residue.name in CARBOXYLATE_RESIDUES and not bound and
-            len(oxygens) == 2):
+    if (residue.name in CARBOXYLATE_RESIDUES and not bound
+            and len(oxygens) == 2):
         # until one of them is bound the two oxygens are interchangeable,
         # so which one is picked does not matter; the nearer one keeps the
         # geometry closest to what it already is
@@ -1963,7 +1856,8 @@ def _histidine_variant(residue, positions, metal_positions):
         if atom.name not in BACKBONE_ATOM_NAMES and atom.name != 'CA'
     ]
     ring_nitrogens = {
-        atom.name: atom for atom in sidechain if atom.name in ('ND1', 'NE2')
+        atom.name: atom
+        for atom in sidechain if atom.name in ('ND1', 'NE2')
     }
 
     if len(ring_nitrogens) < 2:
@@ -2120,17 +2014,11 @@ def suggest_variants(topology,
         if variant is not None:
             variants[res_index] = variant
 
-    # An override is matched against the residue id, the ASP130 label and,
-    # for a caller that has a residue in hand, the residue index. Note that
-    # ids and indices overlap almost completely -- a single chain numbered
-    # from one has index i for id i+1 -- so a key that hits both is a
-    # collision rather than two ways of saying the same thing, and naming it
-    # beats protonating a residue nobody asked about.
     overrides = protonation_overrides or {}
     for key, variant in overrides.items():
         by_id = [
-            residue for residue in residues if str(residue.id) == str(key) or
-            residue_label(residue) == str(key)
+            residue for residue in residues
+            if str(residue.id) == str(key) or residue_label(residue) == str(key)
         ]
         matched = by_id or [
             residue for residue in residues if residue.index == key
@@ -2160,15 +2048,6 @@ def protonate(topology, positions, binding_modes, protonation_overrides=None):
     Adds hydrogens with the protonation variants that the metal site
     requires.
 
-    Adding hydrogens renumbers the atoms, which invalidates every atom
-    index the coordination holds. Nothing is remapped: the coordination is
-    derived from geometry, so the caller runs suggest_binding_modes again
-    on what comes back and gets indices that are correct by construction.
-    That is safe because addHydrogens only adds hydrogens -- they are not
-    donors and they do not move a heavy atom -- so the same contacts are
-    found either way.
-
-    Residue indices do survive, which is why the variants are keyed by one.
 
     :param topology:
         The OpenMM topology.
@@ -2186,6 +2065,8 @@ def protonate(topology, positions, binding_modes, protonation_overrides=None):
     assert_msg_critical('openmm' in sys.modules,
                         'protonate: openmm is required')
 
+    # Figure out the correct residue variants
+    # based on the positions and the binding modes
     variants_by_index, notes = suggest_variants(
         topology,
         positions,
@@ -2199,15 +2080,6 @@ def protonate(topology, positions, binding_modes, protonation_overrides=None):
     modeller = mmapp.Modeller(topology, np.asarray(positions) * mmunit.angstrom)
     actual_variants = modeller.addHydrogens(variants=variant_list)
 
-    # A residue put in the cluster without a metal bond is left to the pH
-    # by suggest_variants, so what it ended up as is only known here.
-    # Recording it means the charge count reads what was built rather than
-    # falling back on the residue name and warning about it.
-    # addHydrogens only names a variant it chose between - the cysteines and
-    # the histidines - and reports None for a residue it left at the default
-    # for the pH. That default is the variant the residue is named after:
-    # every alternative in hydrogens.xml is gated behind a maxph the default
-    # pH of 7 does not reach.
     topology_residues = list(topology.residues())
     for res_index in active_site_residues(binding_modes):
         if variants_by_index.get(res_index) is not None:
@@ -2284,19 +2156,16 @@ def extract_active_site(topology,
 
     Sidechains are cut at the CA-CB bond and capped with a hydrogen placed
     along the CB to CA direction. No second-shell fragments and no
-    backbone: the scheme is fixed, which also guarantees that the RESP and
-    Hessian calculations see the same truncation.
+    backbone
 
-    The connectivity comes with it, under 'connectivity_matrix'. It is not
-    a separate object: which atoms are bonded is a property of the site
+    The connectivity is included in the returned data under 'connectivity_matrix'. 
+    Which atoms are bonded is a property of the site
     that was extracted, and nothing downstream should be able to pair the
     two up wrongly.
 
     It also comes with 'labels', one string per atom, holding what
-    add_metal_bond and remove_metal_bond want to be told about that atom:
-    the atom index for a metal, the resid on the beta carbon that stands
-    for its residue, the atom name on any other heavy atom, and an empty
-    string on every hydrogen. Passing it to Molecule.show as atom_labels
+    add_metal_bond and remove_metal_bond want to be told about that atom.
+    Passing it to Molecule.show as atom_labels
     therefore draws the coordination edit straight onto the structure.
     These are not the element labels, which are read off the molecule with
     get_labels().
@@ -2304,12 +2173,8 @@ def extract_active_site(topology,
     To draw the site, hand Molecule.show the bonds that
     connectivity_bonds(active_site['connectivity_matrix']) returns rather
     than letting it perceive them by distance. That matters here for two
-    reasons: the metal-ligand bonds are a decision rather than a distance
-    and nothing perceives them, and OpenMM places hydrogens at about 1.19
-    Angstrom, past the C-H threshold of Molecule.get_connectivity_matrix.
-    The bonds are derived where they are drawn rather than stored beside
-    the matrix, so the two cannot drift apart.
-
+    reasons.
+    
     :param topology:
         The protonated OpenMM topology.
     :param positions:
@@ -2330,9 +2195,7 @@ def extract_active_site(topology,
 
     res_indices = active_site_residues(binding_modes)
 
-    # a ligand whose residue was excluded would be left with a metal bond
-    # to an atom the cluster does not hold, which _build_connectivity
-    # would only find out about several steps later
+    # Check that all residues that coordinate a metal are included in the active site
     orphaned = sorted({
         ligand['residue']
         for ligand in binding_modes['ligands']
@@ -2347,6 +2210,7 @@ def extract_active_site(topology,
     for res_index in res_indices:
         check_truncatable(residues[res_index])
 
+    # Data for all active site elements
     labels = []
     atom_labels = []
     coords = []
@@ -2367,9 +2231,11 @@ def extract_active_site(topology,
         res_atoms = list(residue.atoms())
 
         for atom in res_atoms:
+            # Discard all backbone atoms
             if atom.name in BACKBONE_ATOM_NAMES:
                 continue
 
+            # Discard the alpha carbon and replace it with a hydrogen at shorter bond length
             if atom.name == 'CA':
                 cb_atom = None
                 for other in res_atoms:
@@ -2391,6 +2257,8 @@ def extract_active_site(topology,
                               direction * cap_bond_length)
                 labels.append('H')
                 atom_labels.append('')
+
+            # Include the rest of the atoms
             else:
                 if atom.name == 'CB':
                     beta_carbon_indices.append(len(coords))
@@ -2435,9 +2303,8 @@ def extract_active_site(topology,
         'beta_carbon_indices': beta_carbon_indices,
         'metal_indices': metal_indices,
         'labels': atom_labels,
-        'residues': [
-            f'{residues[i].name}{residues[i].id}' for i in res_indices
-        ],
+        'residues':
+        [f'{residues[i].name}{residues[i].id}' for i in res_indices],
     }
 
     active_site['connectivity_matrix'] = _build_connectivity(topology,
@@ -2464,45 +2331,15 @@ def connectivity_bonds(connectivity_matrix):
 
     matrix = np.asarray(connectivity_matrix)
 
-    return [(int(i), int(j))
-            for i, j in zip(*np.triu_indices_from(matrix, k=1))
+    return [(int(i), int(j)) for i, j in zip(*np.triu_indices_from(matrix, k=1))
             if matrix[i, j]]
 
 
 def show_active_site(active_site, **kwargs):
-    """
-    Draws the extracted active site.
-
-    Two things about a truncated metal site are not recoverable from the
-    geometry, so they are handed to Molecule.show rather than left to it:
-
-    - the bonds. Perceiving them by distance loses every metal-ligand bond,
-      which is a decision rather than a distance and which nothing
-      perceives, and invents C-H ones, since OpenMM places hydrogens at
-      about 1.19 Angstrom -- past the threshold of
-      Molecule.get_connectivity_matrix.
-    - the atom labels. These are what the edit methods want to be told
-      about an atom: the atom index on a metal, the resid on the beta
-      carbon standing for its residue, the atom name on any other heavy
-      atom, and nothing on a hydrogen. Drawing them puts the argument for
-      add_metal_bond or remove_metal_bond straight onto the structure.
-
-    Every other keyword goes to Molecule.show untouched, so width, height,
-    forming_bonds and the rest work as they always do. Passing bonds or
-    atom_labels explicitly overrides what is worked out here.
-
-    :param active_site:
-        The active site to draw.
-    :param kwargs:
-        Further keyword arguments for Molecule.show.
-
-    :return:
-        Whatever Molecule.show returns.
-    """
 
     kwargs.setdefault('atom_labels', active_site['labels'])
-    kwargs.setdefault(
-        'bonds', connectivity_bonds(active_site['connectivity_matrix']))
+    kwargs.setdefault('bonds',
+                      connectivity_bonds(active_site['connectivity_matrix']))
 
     return active_site['molecule'].show(**kwargs)
 
@@ -2537,7 +2374,8 @@ def _build_connectivity(topology,
 
     atom_map = active_site['atom_map']
     reverse_map = {
-        top_index: site_index for site_index, top_index in atom_map.items()
+        top_index: site_index
+        for site_index, top_index in atom_map.items()
     }
 
     n_atoms = len(atom_map)
@@ -2869,7 +2707,8 @@ def update_binding_modes(topology,
     new_coordination = coordination(new_ligands)
 
     old_ligands = {
-        ligand['index']: ligand for ligand in binding_modes['ligands']
+        ligand['index']: ligand
+        for ligand in binding_modes['ligands']
     }
     new_by_index = {ligand['index']: ligand for ligand in new_ligands}
 
@@ -2922,7 +2761,8 @@ def update_binding_modes(topology,
         ligand['residue']
         for ligand in binding_modes['ligands']
         if ligand['index'] not in new_by_index
-    } - {ligand['residue'] for ligand in new_ligands})
+    } - {ligand['residue']
+         for ligand in new_ligands})
 
     _print_binding_mode_update(changes,
                                largest_shift,
@@ -2930,15 +2770,22 @@ def update_binding_modes(topology,
                                ostream=ostream)
 
     new_binding_modes = {
-        'metals': deepcopy(binding_modes['metals']),
-        'ligands': new_ligands,
-        'variants': deepcopy(binding_modes.get('variants', {})),
-        'coordinating_residues': sorted(
-            binding_modes.get('coordinating_residues', [])),
-        'extra_residues': sorted(binding_modes.get('extra_residues', [])),
-        'excluded_residues': sorted(binding_modes.get('excluded_residues', [])),
-        'manual_bonds': deepcopy(records),
-        'notes': notes,
+        'metals':
+        deepcopy(binding_modes['metals']),
+        'ligands':
+        new_ligands,
+        'variants':
+        deepcopy(binding_modes.get('variants', {})),
+        'coordinating_residues':
+        sorted(binding_modes.get('coordinating_residues', [])),
+        'extra_residues':
+        sorted(binding_modes.get('extra_residues', [])),
+        'excluded_residues':
+        sorted(binding_modes.get('excluded_residues', [])),
+        'manual_bonds':
+        deepcopy(records),
+        'notes':
+        notes,
     }
 
     # only the metal-ligand bonds are read off the geometry, so the
@@ -2961,6 +2808,33 @@ def update_binding_modes(topology,
     return new_binding_modes, new_active_site, True
 
 
+def _check_supported_metals(metals, method):
+    """
+    Rejects metal centers the builder is not validated for.
+
+    The literature distances, the assumed formal charges and the
+    coordination rules have only been checked against zinc, so a site
+    built around any other metal would be produced with zinc's assumptions
+    silently applied to it.
+
+    :param metals:
+        The list of metal entries of the binding modes.
+    :param method:
+        The name of the calling method, for the error message.
+    """
+
+    found = sorted({metal['element'] for metal in metals})
+    unsupported = [
+        element for element in found if element not in SUPPORTED_METAL_ELEMENTS
+    ]
+
+    assert_msg_critical(
+        not unsupported, f'{method}: found {unsupported}, but '
+        f'only {list(SUPPORTED_METAL_ELEMENTS)} is supported. The '
+        'literature distances, formal charges and coordination rules have '
+        'only been validated for zinc.')
+
+
 def _metal_contact_label(ligand, binding_modes):
     """
     Names the metals a contact reaches and how far away they are.
@@ -2975,7 +2849,8 @@ def _metal_contact_label(ligand, binding_modes):
     """
 
     elements = {
-        metal['index']: metal['element'] for metal in binding_modes['metals']
+        metal['index']: metal['element']
+        for metal in binding_modes['metals']
     }
 
     return ', '.join(
@@ -3163,7 +3038,6 @@ def _add_untemplated_impropers(system, forcefield):
 def minimize_active_site(active_site,
                          forcefield,
                          frozen_indices=None,
-                         max_iterations=0,
                          constrain_capping_hydrogens=False):
     """
     Minimizes the active site with its own force field.
@@ -3177,9 +3051,6 @@ def minimize_active_site(active_site,
     :param frozen_indices:
         The active site indices to hold fixed. Defaults to
         constrained_indices(); an empty list minimizes freely.
-    :param max_iterations:
-        The maximum number of minimization steps. Zero runs until
-        convergence.
 
     :return:
         The minimized coordinates as an (N, 3) numpy array in Angstrom.
@@ -3216,7 +3087,7 @@ def minimize_active_site(active_site,
         integrator = mm.VerletIntegrator(0.001 * mmunit.picoseconds)
         simulation = mmapp.Simulation(pdb.topology, system, integrator)
         simulation.context.setPositions(pdb.positions)
-        simulation.minimizeEnergy(maxIterations=max_iterations)
+        simulation.minimizeEnergy()
 
         state = simulation.context.getState(getPositions=True)
         coords = np.array(state.getPositions().value_in_unit(mmunit.angstrom))
@@ -3229,7 +3100,6 @@ def mm_optimize_active_site(active_site,
                             frozen_indices=None,
                             constrain_metals=False,
                             constrain_capping_hydrogens=False,
-                            max_iterations=0,
                             bond_change_warning=0.25,
                             ostream=None):
     """
@@ -3264,8 +3134,6 @@ def mm_optimize_active_site(active_site,
     :param constrain_capping_hydrogens:
         Whether the capping hydrogens are frozen along with the beta
         carbons, when frozen_indices is left to the default.
-    :param max_iterations:
-        The iteration limit. Zero runs until convergence.
     :param bond_change_warning:
         How far a metal-ligand bond may move before it is reported.
 
@@ -3287,10 +3155,11 @@ def mm_optimize_active_site(active_site,
         frozen_indices = sorted(
             set(frozen_indices) | set(active_site['metal_indices']))
 
-    coordinates = minimize_active_site(active_site,
-                                       forcefield,
-                                       frozen_indices=frozen_indices,
-                                       max_iterations=max_iterations)
+    coordinates = minimize_active_site(
+        active_site,
+        forcefield,
+        frozen_indices=frozen_indices,
+    )
 
     relaxed = Molecule(molecule.get_labels(), coordinates, 'angstrom')
     relaxed.set_charge(molecule.get_charge())
@@ -3300,7 +3169,6 @@ def mm_optimize_active_site(active_site,
                            forcefield,
                            relaxed,
                            frozen_indices,
-                           max_iterations=max_iterations,
                            bond_change_warning=bond_change_warning,
                            ostream=ostream)
 
@@ -3774,8 +3642,8 @@ def manual_bond_keys(active_site, topology, binding_modes):
         The bond keys, as a set of sorted index pairs.
     """
 
-    return set(
-        _manual_bond_records_by_key(active_site, topology, binding_modes))
+    return set(_manual_bond_records_by_key(active_site, topology,
+                                           binding_modes))
 
 
 def manual_bond_equilibria(active_site, topology, binding_modes):
@@ -3805,9 +3673,9 @@ def manual_bond_equilibria(active_site, topology, binding_modes):
     """
 
     return {
-        key: record['equilibrium'] for key, record in
-        _manual_bond_records_by_key(active_site, topology,
-                                    binding_modes).items()
+        key: record['equilibrium']
+        for key, record in _manual_bond_records_by_key(active_site, topology,
+                                                       binding_modes).items()
         if record.get('equilibrium') is not None
     }
 
@@ -3902,8 +3770,8 @@ def _add_metal_planarity_impropers(
         for donor in sorted(ligand_atoms):
             if elements[donor] != 'N':
                 continue
-            ring_neighbors = sorted(atom for atom in neighbors(donor) -
-                                    metals if elements[atom] != 'H')
+            ring_neighbors = sorted(atom for atom in neighbors(donor) - metals
+                                    if elements[atom] != 'H')
             if len(ring_neighbors) != 2:
                 continue
             install((donor, ring_neighbors[0], ring_neighbors[1], metal))
@@ -3911,8 +3779,7 @@ def _add_metal_planarity_impropers(
 
         # bidentate carboxylate: two oxygens on this metal sharing one
         # covalently bonded carbon
-        oxygens = sorted(atom for atom in ligand_atoms
-                         if elements[atom] == 'O')
+        oxygens = sorted(atom for atom in ligand_atoms if elements[atom] == 'O')
         for i, oxygen_1 in enumerate(oxygens):
             for oxygen_2 in oxygens[i + 1:]:
                 shared = (neighbors(oxygen_1) & neighbors(oxygen_2)) - metals
@@ -4021,7 +3888,8 @@ def build_forcefield(
     # rather than the shared one being muted, since OutputStream.mute is
     # reference counted and an unbalanced pair silences everything after it.
     forcefield = MMForceFieldGenerator(
-        comm, OutputStream(None) if mute_generator else ostream)
+        comm,
+        OutputStream(None) if mute_generator else ostream)
     # copied, not aliased: np.asarray hands back the caller's own array, and
     # the weak bridge pruning edits the generator's matrix, so sharing it
     # would have this function quietly rewriting the active site it was
@@ -4047,7 +3915,7 @@ def build_forcefield(
 
     partial_charges = np.asarray(partial_charges)
     assert_msg_critical(
-        partial_charges.shape == (n_atoms,), 'build_forcefield: expected '
+        partial_charges.shape == (n_atoms, ), 'build_forcefield: expected '
         f'{n_atoms} partial charges, got {partial_charges.shape}')
     # The capping hydrogens stand in for alpha carbons and do not
     # exist anywhere the force field is used, so their charge is
@@ -4167,8 +4035,8 @@ def annotate_atoms(forcefield, active_site):
             if note in comment:
                 continue
 
-            atom['comment'] = '; '.join(
-                part for part in (comment, note) if part)
+            atom['comment'] = '; '.join(part for part in (comment, note)
+                                        if part)
 
 
 def _lookup_equilibrium(table, elements):
@@ -4402,8 +4270,8 @@ def _prune_weak_bridges(forcefield,
         forcefield.connectivity_matrix[key[0], key[1]] = 0
         forcefield.connectivity_matrix[key[1], key[0]] = 0
 
-        counts = ', '.join(
-            f'{len(found)} {name}(s)' for name, found in crossing.items())
+        counts = ', '.join(f'{len(found)} {name}(s)'
+                           for name, found in crossing.items())
         ostream.print_info(
             f'Removed the bridging bond {key} {names}: it was fitted to '
             f'no force constant and is {length:.2f} A long against '
@@ -4548,11 +4416,9 @@ def _check_force_constants(forcefield,
 
     labels = active_site['molecule'].get_labels()
 
-    zero = [(key, 'bond')
-            for key in bonds
+    zero = [(key, 'bond') for key in bonds
             if forcefield.bonds[key]['force_constant'] == 0.0]
-    zero += [(key, 'angle')
-             for key in angles
+    zero += [(key, 'angle') for key in angles
              if forcefield.angles[key]['force_constant'] == 0.0]
 
     if not zero:
@@ -4561,9 +4427,8 @@ def _check_force_constants(forcefield,
     n_bonds = sum(1 for _, kind in zero if kind == 'bond')
     n_angles = len(zero) - n_bonds
 
-    uncovered = [
-        (key, kind) for key, kind in zero if not _hessian_covers(hessian, key)
-    ]
+    uncovered = [(key, kind) for key, kind in zero
+                 if not _hessian_covers(hessian, key)]
     clamped = [pair for pair in zero if pair not in uncovered]
 
     def report(terms):
@@ -4698,17 +4563,21 @@ def _check_atom_types(forcefield,
         neighbours.setdefault(second, set()).add(first)
 
     ligands = {
-        index for metal in metals for index in neighbours.get(metal, ())
+        index
+        for metal in metals
+        for index in neighbours.get(metal, ())
     } - metals
-    shell = (ligands | {
-        index for ligand in ligands for index in neighbours.get(ligand, ())
-    }) - metals
+    shell = (
+        ligands
+        | {index
+           for ligand in ligands
+           for index in neighbours.get(ligand, ())}) - metals
 
     def flat_keys(terms):
         return [
             key for key, term in terms.items()
-            if term.get('comment') == UNPARAMETERIZED_COMMENT and
-            not metals & set(key)
+            if term.get('comment') == UNPARAMETERIZED_COMMENT and not metals
+            & set(key)
         ]
 
     flat = [(key, 'bond') for key in flat_keys(forcefield.bonds)]
@@ -4883,8 +4752,7 @@ def backbone_charge_shift(charge_of, topology, active_site, partial_charges):
     # left out or CA would be counted as covered by the active site
     covered = {
         atom_map[index]: charges[index]
-        for index in range(len(charges))
-        if index not in caps
+        for index in range(len(charges)) if index not in caps
     }
 
     # The atom map indexes the topology the active site was extracted
@@ -4897,8 +4765,8 @@ def backbone_charge_shift(charge_of, topology, active_site, partial_charges):
     site_of = _site_index_map(active_site)
     mismatched = [
         index for index in covered
-        if index >= len(atoms) or atoms[index].element is None or
-        atoms[index].element.symbol != labels[site_of[index]]
+        if index >= len(atoms) or atoms[index].element is None
+        or atoms[index].element.symbol != labels[site_of[index]]
     ]
 
     assert_msg_critical(
@@ -5091,8 +4959,9 @@ def rescale_14_exceptions(system, topology, coulomb14scale):
         if _bond_separation(bonded, first, second) != 3:
             continue
         updated = coulomb14scale * charge_of(first) * charge_of(second)
-        if abs(updated - charge_product.value_in_unit(
-                mmunit.elementary_charge**2)) > 1.0e-10:
+        if abs(updated -
+               charge_product.value_in_unit(mmunit.elementary_charge**2)
+               ) > 1.0e-10:
             rescaled += 1
         nonbonded.setExceptionParameters(index, first, second, updated, sigma,
                                          epsilon)
@@ -5258,15 +5127,17 @@ def create_enzyme_system(topology,
         # what the active site is relaxed on. Adding it in the key's own
         # order instead would measure a different dihedral of the same four
         # atoms.
-        torsion_force.addTorsion(
-            atom_map[key[1]], atom_map[key[2]], atom_map[key[0]],
-            atom_map[key[3]], params['periodicity'],
-            params['phase'] * mmunit.degree,
-            params['barrier'] * mmunit.kilojoule_per_mole)
+        torsion_force.addTorsion(atom_map[key[1]], atom_map[key[2]],
+                                 atom_map[key[0]], atom_map[key[3]],
+                                 params['periodicity'],
+                                 params['phase'] * mmunit.degree,
+                                 params['barrier'] * mmunit.kilojoule_per_mole)
         added.append(('improper', key))
 
-    counts = {kind: sum(1 for term in added if term[0] == kind)
-              for kind in ('bond', 'angle', 'improper')}
+    counts = {
+        kind: sum(1 for term in added if term[0] == kind)
+        for kind in ('bond', 'angle', 'improper')
+    }
     ostream.print_info(
         f'Added {counts["bond"]} metal bond(s), {counts["angle"]} metal '
         f'angle(s) and {counts["improper"]} metal improper(s) to the enzyme '
@@ -5507,7 +5378,7 @@ def _resolve_partial_charges(active_site,
     n_atoms = active_site['molecule'].number_of_atoms()
 
     assert_msg_critical(
-        charges.shape == (n_atoms,),
+        charges.shape == (n_atoms, ),
         f'_resolve_partial_charges: the charges have shape '
         f'{charges.shape} but the extracted active site has {n_atoms} atoms')
 
@@ -5686,8 +5557,8 @@ def _print_binding_modes(binding_modes, ostream=None):
 
         for row in rows:
             atoms = ', '.join(ligand['atom'] for ligand in row)
-            distances = ', '.join(
-                f'{d:.2f}' for ligand in row for d in ligand['distances'])
+            distances = ', '.join(f'{d:.2f}' for ligand in row
+                                  for d in ligand['distances'])
             modes = '/'.join(dict.fromkeys(ligand['mode'] for ligand in row))
             valstr = '{:>10} {:>9} | {:>18} | {:>16}'.format(
                 row[0]['residue'], atoms, distances, modes)
@@ -5908,7 +5779,6 @@ def _print_mm_optimization(active_site,
                            forcefield,
                            relaxed,
                            frozen_indices,
-                           max_iterations=0,
                            bond_change_warning=0.25,
                            ostream=None):
     """
@@ -5931,8 +5801,6 @@ def _print_mm_optimization(active_site,
         The relaxed molecule.
     :param frozen_indices:
         The indices that were held fixed.
-    :param max_iterations:
-        The iteration limit the relaxation was given.
     :param bond_change_warning:
         How far a metal-ligand bond may move before it is reported.
     """
@@ -5956,9 +5824,6 @@ def _print_mm_optimization(active_site,
     ostream.print_header(
         _param('metal centers',
                'frozen' if set(metals) <= set(frozen_indices) else 'free'))
-    ostream.print_header(
-        _param('iteration limit',
-               max_iterations if max_iterations > 0 else 'convergence'))
     ostream.print_header(
         _param(
             'metal bonds',
