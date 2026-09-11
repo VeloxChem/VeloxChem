@@ -448,77 +448,116 @@ CSimdRIFockDriver::compute_bq_vectors(const CMolecule        &molecule,
         // the contraction of the batch, over the blocks of atom pairs, which write
         // into blocks of the B vectors of their own and never into a shared one
 
+        // NOTE: every basis function on the auxiliary side of the B vectors is a
+        // sum over every one of them in the integrals, so the sum over the input
+        // reaches across all of the atom basis groups. Taking one group at a time
+        // would make the depth of the product the functions of that group alone,
+        // which is forty on average and leaves the matrix unit idle. The integrals
+        // of all the groups are gathered into one buffer first, so that the depth
+        // is the whole auxiliary basis and one product replaces eighty one.
+
         const auto nblocks = static_cast<int>(last - first);
 
-#pragma omp parallel for schedule(dynamic) if (nblocks > 1)
-        for (int b = 0; b < nblocks; b++)
+#pragma omp parallel
         {
-            const auto iab = first + static_cast<size_t>(b);
+            std::vector<double> gathered;
 
-            const auto &a_list = basis_indices[static_cast<size_t>(ab_blocks[iab].bra_index())];
-
-            const auto &b_list = basis_indices[static_cast<size_t>(ab_blocks[iab].ket_index())];
-
-            for (const auto &out_function : out_functions)
+#pragma omp for schedule(dynamic)
+            for (int b = 0; b < nblocks; b++)
             {
-                const auto oblock = out_map[iab * nout_groups + out_function.group];
+                const auto iab = first + static_cast<size_t>(b);
 
-                if (oblock == npos) continue;
+                const auto &a_list = basis_indices[static_cast<size_t>(ab_blocks[iab].bra_index())];
 
-                const auto &out_pattern = bq_vectors.block(oblock);
+                const auto &b_list = basis_indices[static_cast<size_t>(ab_blocks[iab].ket_index())];
 
-                for (const auto &in_function : in_functions)
+                // NOTE: the widest the gathered buffer has to be is every atom pair
+                // of the block, as no combination of it keeps more than all of
+                // them. The diagonal pairs lead the off-diagonal ones and are
+                // counted apart from them.
+
+                const auto width =
+                    ab_blocks[iab].number_of_diagonal_atoms() + ab_blocks[iab].number_of_pairs();
+
+                if (width == 0) continue;
+
+                gathered.resize(ncols * width);
+
+                for (const auto [la, ia] : a_list)
                 {
-                    const auto iblock = batch_map[static_cast<size_t>(b) * nin_groups + in_function.group];
-
-                    if (iblock == npos) continue;
-
-                    const auto &in_pattern = integrals.block(iblock);
-
-                    const auto *submetric = metric.get() + out_function.offset * ncols + in_function.offset;
-
-                    for (const auto [la, ia] : a_list)
+                    for (const auto [lb, jb] : b_list)
                     {
-                        for (const auto [lb, jb] : b_list)
+                        const auto ncomps = static_cast<size_t>((2 * la + 1) * (2 * lb + 1));
+
+                        for (size_t m = 0; m < ncomps; m++)
                         {
-                            const auto npairs_out =
-                                out_pattern.number_of_pairs(la, ia, lb, jb, out_function.momentum, out_function.index);
+                            // NOTE: a group whose block is absent, and the atom pairs
+                            // a group keeps fewer of than the widest, leave zeros.
+                            // The pairs are the leading ones of one ordered list, so
+                            // a zero beyond the last one a group keeps adds nothing,
+                            // which is what the sum of the group would have added.
 
-                            const auto npairs_in =
-                                in_pattern.number_of_pairs(la, ia, lb, jb, in_function.momentum, in_function.index);
-
-                            // NOTE: the surviving atom pairs of a combination are the
-                            // leading ones of the same ordered list, so the pairs the
-                            // integrals carry are the pairs the B vectors carry until
-                            // one of the two runs out. The bound depends on the
-                            // angular momentum on the auxiliary side, so either may be
-                            // the shorter, and the pairs beyond the shorter are
-                            // dropped rather than written outside the block.
-
-                            const auto npairs = std::min(npairs_in, npairs_out);
-
-                            if (npairs == 0) continue;
-
-                            auto *out_values =
-                                bq_vectors.values(oblock, la, ia, lb, jb, out_function.momentum, out_function.index);
-
-                            const auto *in_values =
-                                integrals.values(iblock, la, ia, lb, jb, in_function.momentum, in_function.index);
-
-                            const auto ncomps = static_cast<size_t>((2 * la + 1) * (2 * lb + 1));
-
-                            for (size_t m = 0; m < ncomps; m++)
+                            for (const auto &in_function : in_functions)
                             {
+                                auto *rows = gathered.data() + in_function.offset * width;
+
+                                const auto iblock =
+                                    batch_map[static_cast<size_t>(b) * nin_groups + in_function.group];
+
+                                size_t npairs_in = 0;
+
+                                const double *in_values = nullptr;
+
+                                if (iblock != npos)
+                                {
+                                    npairs_in = integrals.block(iblock).number_of_pairs(
+                                        la, ia, lb, jb, in_function.momentum, in_function.index);
+
+                                    if (npairs_in > 0)
+                                    {
+                                        in_values = integrals.values(iblock, la, ia, lb, jb, in_function.momentum,
+                                                                     in_function.index) +
+                                                    m * in_function.count * npairs_in;
+                                    }
+                                }
+
+                                const auto kept = std::min(npairs_in, width);
+
+                                for (size_t r = 0; r < in_function.count; r++)
+                                {
+                                    auto *row = rows + r * width;
+
+                                    if (kept > 0) std::copy(in_values + r * npairs_in, in_values + r * npairs_in + kept, row);
+
+                                    std::fill(row + kept, row + width, 0.0);
+                                }
+                            }
+
+                            for (const auto &out_function : out_functions)
+                            {
+                                const auto oblock = out_map[iab * nout_groups + out_function.group];
+
+                                if (oblock == npos) continue;
+
+                                const auto npairs_out = bq_vectors.block(oblock).number_of_pairs(
+                                    la, ia, lb, jb, out_function.momentum, out_function.index);
+
+                                if (npairs_out == 0) continue;
+
+                                auto *out_values = bq_vectors.values(oblock, la, ia, lb, jb, out_function.momentum,
+                                                                     out_function.index) +
+                                                   m * out_function.count * npairs_out;
+
                                 _matrix_product(out_function.count,
-                                                npairs,
-                                                in_function.count,
-                                                1.0,
-                                                submetric,
+                                                std::min(npairs_out, width),
                                                 ncols,
-                                                in_values + m * in_function.count * npairs_in,
-                                                npairs_in,
                                                 1.0,
-                                                out_values + m * out_function.count * npairs_out,
+                                                metric.get() + out_function.offset * ncols,
+                                                ncols,
+                                                gathered.data(),
+                                                width,
+                                                1.0,
+                                                out_values,
                                                 npairs_out);
                             }
                         }
