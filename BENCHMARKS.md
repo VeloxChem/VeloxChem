@@ -5197,3 +5197,50 @@ sixty seconds to a hundred and twenty three, which is sixty two per cent of the
 run. Nothing in the resolution of the identity is the bottleneck of a hybrid
 calculation of this size: the exchange is 2.4 seconds a build against some 2.8
 seconds a step of quadrature.
+
+## The exchange build, once both of its halves are products
+
+The matrix product form of the W matrices changed which half of the exchange build
+costs what. Tagrisso in def2-svpd, with 3387 auxiliary functions and 133 occupied
+orbitals:
+
+| stage | time | share | teraflops | gigaflops per second |
+| --- | ---: | ---: | ---: | ---: |
+| W, expanding and multiplying | 1.63 | 66.8% | 0.92 | 563.0 |
+| the exchange, a rank k update | 0.81 | 33.2% | 0.46 | 565.5 |
+| the build | 2.44 | 100% | 1.38 | |
+
+against what it was when the W matrices were formed by walking the values of the B
+vectors, where W was 84 per cent of the build at 119 gigaflops per second and the
+rank k update 16 per cent at 480.
+
+**The two halves now run at the same rate**, 563 against 565, within half a per
+cent of one another. **The two to one split of the time is the arithmetic and not
+an inefficiency.** W is the product of a square by the orbitals, which is two
+flops for every element of the square and every orbital; the rank k update writes
+one triangle and is half of that. Twice the arithmetic at the same rate is twice
+the time, which is what the table shows.
+
+### What is left in it
+
+Both halves are at 563 against the 750 a product of these dimensions reaches and
+the 888 of a square one. Two things account for the difference and neither is worth
+much.
+
+The occupied orbitals are 133, which is a thin third dimension for the matrix unit
+and is a property of the molecule rather than of anything that can be written
+differently.
+
+The squares the B vectors are expanded into are zeroed and scattered into once for
+every auxiliary function, which is 25.7 gigabytes of writing. At a hundred
+gigabytes a second that is 0.28 of the 1.63 seconds above, a sixth of the W matrices
+and an eighth of the build. It cannot be removed, as the squares have to be built
+somehow, but it could be trimmed: the auxiliary functions of one group write the
+same places, so clearing those places rather than the whole square would do.
+
+**The whole of that is worth about a twentieth of a calculation**, and the exchange
+build is left as it is. What is left in a Hartree-Fock run of this size is not the
+exchange: the setup is an eighth of it, the Fock builds are a little over two
+fifths, and everything else, which is not the resolution of the identity at all, is
+the other two fifths. For B3LYP the quadrature is three fifths of the run on its
+own.
