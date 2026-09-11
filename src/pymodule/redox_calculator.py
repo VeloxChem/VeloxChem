@@ -2977,6 +2977,9 @@ class RedoxCalculator:
             log.info("  [%s] Step 2: geometry optimisation", label)
             opt_drv              = vlx.OptimizationDriver(scf_opt)
             opt_drv.max_iter     = 150
+            opt_drv.conv_energy  = 1e-5
+            opt_drv.conv_grms    = 3e-4
+            opt_drv.conv_gmax    = 1.2e-3
             opt_drv.conv_maxiter = True
             
 
