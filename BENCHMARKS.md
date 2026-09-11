@@ -5069,9 +5069,131 @@ is therefore still covered by constructed matrices alone and not by a calculatio
 
 ### A note on how these rows were taken
 
+**These three tables predate the change to the setup described in the section
+which follows.** That change takes the tagrisso def2-svpd run from 150.02 seconds
+to 138.75, which is 8.65 times the calculation without the approximation and 2.67
+times the conventional route rather than the 8.00 and 2.47 above. The other rows
+were not measured again, and the tables are left as the set they were taken as
+rather than with one row of a later state mixed into them.
+
 The full and the conventional columns of these three tables were measured once
 each, on an idle machine, before the W matrices were changed. They do not go
 through the changed code and were not measured again. The simd column was measured
 again afterwards, in a process of its own. The ratios therefore cross two runs,
 which is worth knowing though both were idle and the energies of the two agree to
 every digit printed.
+
+## Forming the B vectors, and the depth of its products
+
+Once the W matrices were formed by a matrix product, the setup became the largest
+fixed cost of a calculation: thirty seconds of a hundred and fifty for tagrisso in
+def2-svpd, a fifth of the run. This is what it was made of and what was done to it.
+
+### What the setup is
+
+| stage | time | share |
+| --- | ---: | ---: |
+| the two-center integrals | 0.007 | 0.0% |
+| inverting the Cholesky factor | 0.070 | 0.2% |
+| the three-center integrals | 0.75 | 2.6% |
+| contracting them with the metric | 28.33 | 97.4% |
+
+**The integrals are not the setup; the contraction is.** Forming every three-center
+integral of the molecule takes three quarters of a second, and turning them into
+the B vectors took twenty eight. Each of the 1.43 billion values of B is a sum over
+all 3387 auxiliary functions, which is 9.7 teraflops, and it was running at 343
+gigaflops per second where a large product reaches seven hundred.
+
+### Why it was slow
+
+The contraction was one matrix product for each block of atom pairs, each basis
+function on the auxiliary side of the output, **each basis function on the
+auxiliary side of the input**, each combination of basis functions and each angular
+component. The auxiliary side of tagrisso against def2-universal-jkfit is four
+groups of atoms carrying eighty one basis functions between them, and the products
+were of this shape:
+
+| | rows | depth | columns | flops |
+| --- | ---: | ---: | ---: | ---: |
+| one product | 42 | 42 | 31 | 107 thousand |
+
+A hundred and seven thousand flops is a third of a microsecond of arithmetic, which
+is the same order as the call itself. The depth of forty two is the functions of
+one group, and the machine was given eighty one slivers where it wanted one
+product.
+
+### The gather
+
+Every one of those eighty one products adds into the same rows of the output, so
+they are one sum over the whole auxiliary basis broken into pieces. Gathering the
+integrals of all the groups into one buffer first makes the depth the whole
+auxiliary basis:
+
+| | rows | depth | columns | flops |
+| --- | ---: | ---: | ---: | ---: |
+| gathered | 42 | 3387 | 31 | 9 million |
+
+The buffer is the auxiliary basis by the atom pairs of the block, which is under a
+megabyte, and it is written once and read eighty one times. Against the arithmetic
+it enables that is some eight hundred and fifty flops for every byte written, which
+is why it costs nothing worth measuring. A group whose block is absent, and the
+atom pairs a group keeps fewer of than the widest, leave zeros in the buffer, and a
+zero adds what the sum of that group would have added.
+
+| | before | after | gain |
+| --- | ---: | ---: | ---: |
+| the contraction | 343 Gflop/s | 554 Gflop/s | 1.62 |
+| forming the B vectors | 29.08 | 18.26 | 1.59 |
+
+**The products are still thin.** Thirty one columns is the atom pairs of a block,
+and no gathering of the auxiliary side changes that, which is why 554 and not the
+seven hundred and fifty a squarer product reaches.
+
+### What it is worth
+
+| mode | before | after | gain |
+| --- | ---: | ---: | ---: |
+| Hartree-Fock | 150.22 | 138.75 | 1.08 |
+| B3LYP | 212.07 | 199.91 | 1.06 |
+
+**A sixth off the setup is a fifteenth off the calculation**, because the setup was
+a fifth of it. This is the smallest of the three changes these benchmarks record:
+the matrix product form of the W matrices was worth 1.8 times on a run and this is
+worth 1.08. It is worth more to a calculation which forms the B vectors once and
+uses them many times, as a geometry optimization or a response calculation does,
+than to a single field calculation.
+
+The energies are unchanged to all ten digits in both modes, and the Fock builds and
+the rest of the calculation are unchanged, so the change is where it was meant to
+be and nowhere else.
+
+## The two modes of a hybrid
+
+Tagrisso in def2-svpd, Hartree-Fock against B3LYP, with the setup above:
+
+| mode | total | setup | Fock builds | share | per build | the rest | share | iterations |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Hartree-Fock | 138.75 | 18.60 | 60.21 | 43.4% | 2.509 | 59.93 | 43.2% | 24 |
+| B3LYP | 199.91 | 18.60 | 58.14 | 29.1% | 2.528 | 123.17 | 61.6% | 23 |
+
+and one Fock build of each:
+
+| | time |
+| --- | ---: |
+| Hartree-Fock, exchange scaled by one | 2.510 |
+| B3LYP, exchange scaled by 0.20 | 2.498 |
+| the Coulomb alone, exchange scaled by zero | 0.115 |
+| the exchange, by difference | 2.395 |
+
+**Scaling the exchange costs nothing.** A build of B3LYP and a build of
+Hartree-Fock are the same time to a twentieth of a per cent, because the whole of
+the W matrices and the whole of the exchange are formed and the fraction is applied
+to the result. A hybrid pays the full price of the exact exchange whatever fraction
+of it the functional asks for.
+
+**What a functional adds is its quadrature, and for B3LYP that is the calculation.**
+The Fock builds of the two modes are the same, and everything else doubles from
+sixty seconds to a hundred and twenty three, which is sixty two per cent of the
+run. Nothing in the resolution of the identity is the bottleneck of a hybrid
+calculation of this size: the exchange is 2.4 seconds a build against some 2.8
+seconds a step of quadrature.
