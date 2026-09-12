@@ -34,6 +34,7 @@
 #include "SimdRIJKFockDriver.hpp"
 
 #include <algorithm>
+#include <memory>
 #include <stdexcept>
 #include <string>
 
@@ -338,11 +339,13 @@ CSimdRIJKFockDriver::_compute_direct(const CPackedMatrix &density,
 
         half.reserve(naux);
 
+        // NOTE: the constructor zeroes the values, and does it on the threads, so
+        // zeroing them again here would be a second sweep of several gigabytes on
+        // the calling thread alone.
+
         for (size_t q = 0; q < naux; q++)
         {
             half.emplace_back(nao, ncols, mat_t::general);
-
-            half.back().zero();
         }
 
         // NOTE: the half transformed integrals of one batch of orbitals are the
@@ -365,8 +368,17 @@ CSimdRIJKFockDriver::_compute_direct(const CPackedMatrix &density,
         // the Coulomb vector, which is the half transformed integrals closed with
         // the orbitals they were transformed by
 
-        for (size_t q = 0; q < naux; q++)
+        // NOTE: an auxiliary function is closed against the orbitals it was
+        // transformed by, and each one adds into a place of its own, so the
+        // functions are divided over the threads without anything to reduce.
+
+        const auto nrange = static_cast<int>(naux);
+
+#pragma omp parallel for schedule(static) if (nrange > 1)
+        for (int iq = 0; iq < nrange; iq++)
         {
+            const auto q = static_cast<size_t>(iq);
+
             const auto *values = half[q].data();
 
             double sum = 0.0;
@@ -393,18 +405,30 @@ CSimdRIJKFockDriver::_compute_direct(const CPackedMatrix &density,
 
         const auto width = nao * ncols;
 
-        std::vector<double> stacked(naux * width);
+        // NOTE: every element of the array is written by the copy below before it is
+        // read, so it is left with the content of the allocation rather than zeroed
+        // first. Zeroing it would be a sweep of several gigabytes for nothing.
 
-        for (size_t q = 0; q < naux; q++)
+        auto stacked = std::make_unique_for_overwrite<double[]>(naux * width);
+
+        const auto ncopies = static_cast<int>(naux);
+
+#pragma omp parallel for schedule(static) if (ncopies > 1)
+        for (int iq = 0; iq < ncopies; iq++)
         {
-            std::copy(half[q].data(), half[q].data() + width, stacked.data() + q * width);
+            const auto q = static_cast<size_t>(iq);
+
+            std::copy(half[q].data(), half[q].data() + width, stacked.get() + q * width);
         }
 
-        _solve_factor(stacked.data(), naux, width, false);
+        _solve_factor(stacked.get(), naux, width, false);
 
-        for (size_t q = 0; q < naux; q++)
+#pragma omp parallel for schedule(static) if (ncopies > 1)
+        for (int iq = 0; iq < ncopies; iq++)
         {
-            std::copy(stacked.data() + q * width, stacked.data() + (q + 1) * width, half[q].data());
+            const auto q = static_cast<size_t>(iq);
+
+            std::copy(stacked.get() + q * width, stacked.get() + (q + 1) * width, half[q].data());
         }
 
         _drv.compute_exchange_matrix(half, fock, -exchange_scaling_factor);
