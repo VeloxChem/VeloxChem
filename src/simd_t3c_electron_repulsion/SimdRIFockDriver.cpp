@@ -1430,7 +1430,12 @@ CSimdRIFockDriver::compute_exchange_matrix(const std::vector<CPackedMatrix> &w_v
 
     const auto nchunk = std::min(_syrk_chunk, w_vectors.size());
 
-    auto staged = std::vector<double>(nchunk * nocc * nao, 0.0);
+    // NOTE: every value the update reads is written by the staging below before it
+    // is read, so the buffer is left with the content of its allocation rather than
+    // zeroed first. It is tens of megabytes, and zeroing it would be that much
+    // again on the calling thread alone.
+
+    auto staged = std::make_unique_for_overwrite<double[]>(nchunk * nocc * nao);
 
     for (size_t first = 0; first < w_vectors.size(); first += nchunk)
     {
@@ -1442,13 +1447,23 @@ CSimdRIFockDriver::compute_exchange_matrix(const std::vector<CPackedMatrix> &w_v
 
         const auto depth = count * nocc;
 
-        for (size_t j = 0; j < count; j++)
-        {
-            const auto *values = w_vectors[first + j].data();
+        // NOTE: the rows are divided over the threads rather than the matrices of
+        // the chunk. There are more of them, which balances better, and a thread
+        // then writes whole rows of the buffer while reading in pieces, which is
+        // the way round that costs less.
 
-            for (size_t irow = 0; irow < nao; irow++)
+        const auto nstaged = static_cast<int>(nao);
+
+#pragma omp parallel for schedule(static) if (nstaged > 1)
+        for (int ir = 0; ir < nstaged; ir++)
+        {
+            const auto irow = static_cast<size_t>(ir);
+
+            for (size_t j = 0; j < count; j++)
             {
-                std::copy(values + irow * nocc, values + (irow + 1) * nocc, staged.data() + irow * depth + j * nocc);
+                const auto *values = w_vectors[first + j].data();
+
+                std::copy(values + irow * nocc, values + (irow + 1) * nocc, staged.get() + irow * depth + j * nocc);
             }
         }
 
@@ -1468,13 +1483,13 @@ CSimdRIFockDriver::compute_exchange_matrix(const std::vector<CPackedMatrix> &w_v
 
         const double one = 1.0;
 
-        dsyrk_(&uplo, &trans, &n_arg, &k_arg, &one, staged.data(), &lda, &one, dense.data(), &ldc);
+        dsyrk_(&uplo, &trans, &n_arg, &k_arg, &one, staged.get(), &lda, &one, dense.data(), &ldc);
 
 #else
 
         using RowMajorMatrix = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
 
-        Eigen::Map<const RowMajorMatrix> wmap(staged.data(), static_cast<Eigen::Index>(nao),
+        Eigen::Map<const RowMajorMatrix> wmap(staged.get(), static_cast<Eigen::Index>(nao),
                                               static_cast<Eigen::Index>(depth));
 
         Eigen::Map<RowMajorMatrix> cmap(dense.data(), static_cast<Eigen::Index>(nao), static_cast<Eigen::Index>(nao));
