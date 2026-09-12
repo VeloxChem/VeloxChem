@@ -718,79 +718,6 @@ class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
                         if self.rank == mpi_master():
                             dens_cube_files.append(dens_cube_fnames)
 
-                if self.esa:
-                    if self.esa_from_state is None:
-                        source_states = list(range(self.nstates))
-                    else:
-                        source_states = [self.esa_from_state - 1]
-
-                    esa_pairs = [(s_1, s_2)
-                                 for s_1 in source_states
-                                 for s_2 in range(s_1 + 1, self.nstates)]
-
-                    if self.rank == mpi_master():
-                        esa_results = []
-                        dipole_integrals = compute_electric_dipole_integrals(
-                            molecule, basis, [0.0, 0.0, 0.0])
-
-                    for s_1, s_2 in esa_pairs:
-                        eigvec_full_1 = self.get_full_solution_vector(
-                            exc_solutions[s_1])
-                        eigvec_full_2 = self.get_full_solution_vector(
-                            exc_solutions[s_2])
-
-                        if self.rank == mpi_master():
-                            n_ov_a = mo_occ_a.shape[1] * mo_vir_a.shape[1]
-                            n_ov_b = mo_occ_b.shape[1] * mo_vir_b.shape[1]
-
-                            eigvec_a_1 = np.hstack((
-                                eigvec_full_1[:n_ov_a],
-                                eigvec_full_1[n_ov_a + n_ov_b:n_ov_a +
-                                              n_ov_b + n_ov_a],
-                            ))
-                            eigvec_b_1 = np.hstack((
-                                eigvec_full_1[n_ov_a:n_ov_a + n_ov_b],
-                                eigvec_full_1[n_ov_a + n_ov_b + n_ov_a:],
-                            ))
-                            eigvec_a_2 = np.hstack((
-                                eigvec_full_2[:n_ov_a],
-                                eigvec_full_2[n_ov_a + n_ov_b:n_ov_a +
-                                              n_ov_b + n_ov_a],
-                            ))
-                            eigvec_b_2 = np.hstack((
-                                eigvec_full_2[n_ov_a:n_ov_a + n_ov_b],
-                                eigvec_full_2[n_ov_a + n_ov_b + n_ov_a:],
-                            ))
-
-                            (z_mat_a_1, z_mat_b_1), (y_mat_a_1, y_mat_b_1) = self._get_z_mat_and_y_mat_unrestricted(
-                                eigvec_a_1, eigvec_b_1, nocc_a, nocc_b)
-                            (z_mat_a_2, z_mat_b_2), (y_mat_a_2, y_mat_b_2) = self._get_z_mat_and_y_mat_unrestricted(
-                                eigvec_a_2, eigvec_b_2, nocc_a, nocc_b)
-
-                            esa_trans_dens = self._get_esa_transition_density(
-                                z_mat_a_1, y_mat_a_1, z_mat_a_2, y_mat_a_2,
-                                mo_occ_a, mo_vir_a)
-                            esa_trans_dens += self._get_esa_transition_density(
-                                z_mat_b_1, y_mat_b_1, z_mat_b_2, y_mat_b_2,
-                                mo_occ_b, mo_vir_b)
-
-                            esa_trans_dipole = np.array([
-                                np.sum(esa_trans_dens * dipole_integrals[i])
-                                for i in range(3)
-                            ])
-
-                            esa_exc_ene = exc_energies[s_2] - exc_energies[s_1]
-                            esa_osc_str = (2.0 / 3.0) * esa_exc_ene * np.sum(
-                                esa_trans_dipole**2)
-
-                            esa_results.append({
-                                'from_state': f'S{s_1 + 1}',
-                                'to_state': f'S{s_2 + 1}',
-                                'excitation_energy': esa_exc_ene,
-                                'oscillator_strength': esa_osc_str,
-                                'transition_dipole': esa_trans_dipole,
-                            })
-
                 if self.rank == mpi_master():
                     for ind, comp in enumerate('xyz'):
                         elec_trans_dipoles[s, ind] = np.vdot(
@@ -818,6 +745,79 @@ class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
                             (eigvec_a, eigvec_b),
                             (mo_occ_a.shape[1], mo_occ_b.shape[1]),
                             (mo_vir_a.shape[1], mo_vir_b.shape[1])))
+
+            if self.esa:
+                if self.esa_from_state is None:
+                    source_states = list(range(self.nstates))
+                else:
+                    source_states = [self.esa_from_state - 1]
+
+                esa_pairs = [(s_1, s_2)
+                             for s_1 in source_states
+                             for s_2 in range(s_1 + 1, self.nstates)]
+
+                if self.rank == mpi_master():
+                    esa_results = []
+                    dipole_integrals = compute_electric_dipole_integrals(
+                        molecule, basis, [0.0, 0.0, 0.0])
+
+                for s_1, s_2 in esa_pairs:
+                    eigvec_full_1 = self.get_full_solution_vector(
+                        exc_solutions[s_1])
+                    eigvec_full_2 = self.get_full_solution_vector(
+                        exc_solutions[s_2])
+
+                    if self.rank == mpi_master():
+                        n_ov_a = mo_occ_a.shape[1] * mo_vir_a.shape[1]
+                        n_ov_b = mo_occ_b.shape[1] * mo_vir_b.shape[1]
+
+                        eigvec_a_1 = np.hstack((
+                            eigvec_full_1[:n_ov_a],
+                            eigvec_full_1[n_ov_a + n_ov_b:n_ov_a +
+                                          n_ov_b + n_ov_a],
+                        ))
+                        eigvec_b_1 = np.hstack((
+                            eigvec_full_1[n_ov_a:n_ov_a + n_ov_b],
+                            eigvec_full_1[n_ov_a + n_ov_b + n_ov_a:],
+                        ))
+                        eigvec_a_2 = np.hstack((
+                            eigvec_full_2[:n_ov_a],
+                            eigvec_full_2[n_ov_a + n_ov_b:n_ov_a +
+                                          n_ov_b + n_ov_a],
+                        ))
+                        eigvec_b_2 = np.hstack((
+                            eigvec_full_2[n_ov_a:n_ov_a + n_ov_b],
+                            eigvec_full_2[n_ov_a + n_ov_b + n_ov_a:],
+                        ))
+
+                        (z_mat_a_1, z_mat_b_1), (y_mat_a_1, y_mat_b_1) = self._get_z_mat_and_y_mat_unrestricted(
+                            eigvec_a_1, eigvec_b_1, nocc_a, nocc_b)
+                        (z_mat_a_2, z_mat_b_2), (y_mat_a_2, y_mat_b_2) = self._get_z_mat_and_y_mat_unrestricted(
+                            eigvec_a_2, eigvec_b_2, nocc_a, nocc_b)
+
+                        esa_trans_dens = self._get_esa_transition_density(
+                            z_mat_a_1, y_mat_a_1, z_mat_a_2, y_mat_a_2,
+                            mo_occ_a, mo_vir_a)
+                        esa_trans_dens += self._get_esa_transition_density(
+                            z_mat_b_1, y_mat_b_1, z_mat_b_2, y_mat_b_2,
+                            mo_occ_b, mo_vir_b)
+
+                        esa_trans_dipole = np.array([
+                            np.sum(esa_trans_dens * dipole_integrals[i])
+                            for i in range(3)
+                        ])
+
+                        esa_exc_ene = exc_energies[s_2] - exc_energies[s_1]
+                        esa_osc_str = (2.0 / 3.0) * esa_exc_ene * np.sum(
+                            esa_trans_dipole**2)
+
+                        esa_results.append({
+                            'from_state': f'S{s_1 + 1}',
+                            'to_state': f'S{s_2 + 1}',
+                            'excitation_energy': esa_exc_ene,
+                            'oscillator_strength': esa_osc_str,
+                            'transition_dipole': esa_trans_dipole,
+                        })
 
             if self.nto or self.detach_attach:
                 self.ostream.print_blank()
