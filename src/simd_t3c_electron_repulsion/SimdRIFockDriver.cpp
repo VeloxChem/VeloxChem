@@ -810,9 +810,11 @@ CSimdRIFockDriver::compute_fock_matrix(const CSparseTensor       &bq_vectors,
 
     const auto aux_nmoms = static_cast<size_t>(aux_basis.max_angular_momentum() + 1);
 
-    auto fock = CPackedMatrix(nao, nao, mat_t::symmetric);
+    // NOTE: the constructor zeroes the values, and the triangle of an ordinary
+    // basis is under the chunk the packed matrix divides its zeroing by, so zeroing
+    // it again here would be a second sweep of it on the calling thread.
 
-    fock.zero();
+    auto fock = CPackedMatrix(nao, nao, mat_t::symmetric);
 
     auto *fock_values = fock.data();
 
@@ -828,11 +830,19 @@ CSimdRIFockDriver::compute_fock_matrix(const CSparseTensor       &bq_vectors,
 
     const auto nthreads = static_cast<size_t>(omp::get_number_of_threads());
 
-    std::vector<double> buffers(nthreads * nvalues, 0.0);
+    // NOTE: there is a matrix for every thread, so zeroing them on the calling
+    // thread would be work which grows with the cores of the machine rather than
+    // falling with them, and it was the one phase of a build which took longer the
+    // more threads it was given. Each thread zeroes the one it owns instead, which
+    // also leaves the memory on the core which will read it.
+
+    auto buffers = std::make_unique_for_overwrite<double[]>(nthreads * nvalues);
 
 #pragma omp parallel
     {
-        auto *partial = buffers.data() + static_cast<size_t>(omp_get_thread_num()) * nvalues;
+        auto *partial = buffers.get() + static_cast<size_t>(omp_get_thread_num()) * nvalues;
+
+        std::fill(partial, partial + nvalues, 0.0);
 
         std::vector<double> contributions;
 
