@@ -718,15 +718,7 @@ class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
                         if self.rank == mpi_master():
                             dens_cube_files.append(dens_cube_fnames)
 
-                # TODO: enable esa
-                assert_msg_critical(
-                    not self.esa, f'{type(self).__name__}: ' +
-                    'not yet implemented for excited state absorption')
-
                 if self.esa:
-                    if self.rank == mpi_master():
-                        esa_results = []
-                    """
                     if self.esa_from_state is None:
                         source_states = list(range(self.nstates))
                     else:
@@ -798,7 +790,6 @@ class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
                                 'oscillator_strength': esa_osc_str,
                                 'transition_dipole': esa_trans_dipole,
                             })
-                    """
 
                 if self.rank == mpi_master():
                     for ind, comp in enumerate('xyz'):
