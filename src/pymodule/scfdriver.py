@@ -179,6 +179,13 @@ class ScfDriver:
 
         # DIIS data
         self._fock_matrices_alpha = deque()
+
+        # NOTE: the residual of a stored pair is built by the gradient, which is
+        # taken before the pair is stored, so it is kept beside them rather than
+        # built a second time by the accelerator.
+        self._residual_matrices_alpha = deque()
+
+        self._current_residual = None
         self._fock_matrices_beta = deque()
         self._fock_matrices_proj = deque()
 
@@ -1065,6 +1072,8 @@ class ScfDriver:
                 f'SCF driver: Invalid acceleration type: {self.acc_type}')
 
         self._fock_matrices_alpha.clear()
+
+        self._residual_matrices_alpha.clear()
         self._fock_matrices_beta.clear()
         self._fock_matrices_proj.clear()
 
@@ -1667,6 +1676,8 @@ class ScfDriver:
         diis_start_time = tm.time()
 
         self._fock_matrices_alpha.clear()
+
+        self._residual_matrices_alpha.clear()
         self._fock_matrices_beta.clear()
         self._fock_matrices_proj.clear()
 

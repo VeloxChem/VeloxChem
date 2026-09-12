@@ -106,6 +106,12 @@ class ScfRestrictedDriver(ScfDriver):
             e_mat = np.matmul(tmat.T, np.matmul(fds - fds.T, tmat))
             e_grad = 2.0 * np.linalg.norm(e_mat)
             max_grad = np.max(np.abs(e_mat))
+
+            # NOTE: this is the residual the accelerator wants of the pair about to
+            # be stored, four products of the whole basis. It is kept so that the
+            # accelerator does not build the same thing again a moment later.
+
+            self._current_residual = e_mat
         else:
             e_grad = 0.0
             max_grad = 0.0
@@ -162,9 +168,18 @@ class ScfRestrictedDriver(ScfDriver):
             if len(self._fock_matrices_alpha) == self.max_err_vecs:
                 self._fock_matrices_alpha.popleft()
                 self._density_matrices_alpha.popleft()
+                self._residual_matrices_alpha.popleft()
 
             self._fock_matrices_alpha.append(fock_mat[0].copy())
             self._density_matrices_alpha.append(den_mat[0].copy())
+            self._residual_matrices_alpha.append(self._current_residual)
+
+            # NOTE: the residual belongs to the pair just stored and to no other,
+            # so it is let go of here. A store which follows no gradient then leaves
+            # nothing behind rather than the residual of an earlier pair, and the
+            # accelerator below sees that and builds them itself.
+
+            self._current_residual = None
 
     def _get_effective_fock(self, fock_mat, ovl_mat, oao_mat):
         """
@@ -195,9 +210,22 @@ class ScfRestrictedDriver(ScfDriver):
                 elif self.acc_type.upper() in ['DIIS', 'L2_DIIS']:
                     acc_diis = Diis()
 
-                acc_diis.compute_error_vectors_restricted(
-                    self._fock_matrices_alpha, self._density_matrices_alpha,
-                    ovl_mat, oao_mat)
+                # NOTE: the residuals are built by the gradient of each iteration
+                # and kept, so they are handed over rather than built again. That
+                # holds while the gradient is taken before the pair is stored, which
+                # is the order of the iteration but not of a caller which drives the
+                # steps itself, so it is checked rather than assumed.
+
+                residuals = list(self._residual_matrices_alpha)
+
+                if (len(residuals) == len(self._fock_matrices_alpha) and
+                        all(residual is not None for residual in residuals)):
+                    acc_diis.error_vectors = residuals
+                else:
+                    acc_diis.compute_error_vectors_restricted(
+                        self._fock_matrices_alpha,
+                        self._density_matrices_alpha, ovl_mat, oao_mat)
+
                 weights = acc_diis.compute_weights()
 
                 return self._get_scaled_fock(weights)
