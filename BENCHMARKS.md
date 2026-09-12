@@ -5256,17 +5256,23 @@ is given.
 
 | basis | nao | conventional | simd | gain | iterations | energy, conventional | energy, simd |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| def2-svp | 246 | 3.41 | 2.18 | 1.57 | 21 | -675.8004490084 | -675.8004490084 |
-| def2-svpd | 366 | 8.43 | 5.83 | 1.45 | 22 | -675.8318417532 | -675.8318417532 |
-| def2-tzvp | 494 | 18.39 | 14.67 | 1.25 | 22 | -676.5554233126 | -676.5554233126 |
-| def2-tzvpd | 614 | 38.88 | 30.88 | 1.26 | 22 | -676.5575291942 | -676.5575291942 |
-| def2-qzvp | 1098 | 217.12 | 187.38 | 1.16 | 22 | -676.5876077721 | -676.5876077721 |
-| def2-qzvpd | 1218 | 355.66 | 310.29 | 1.15 | 23 | -676.5878809521 | -676.5878809522 |
+| def2-svp | 246 | 3.19 | 2.13 | 1.49 | 21 | -675.8004490084 | -675.8004490084 |
+| def2-svpd | 366 | 8.27 | 5.67 | 1.46 | 22 | -675.8318417532 | -675.8318417532 |
+| def2-tzvp | 494 | 18.98 | 14.57 | 1.30 | 22 | -676.5554233126 | -676.5554233126 |
+| def2-tzvpd | 614 | 39.22 | 30.93 | 1.27 | 22 | -676.5575291942 | -676.5575291942 |
+| def2-qzvp | 1098 | 216.26 | 187.26 | 1.15 | 22 | -676.5876077721 | -676.5876077721 |
+| def2-qzvpd | 1218 | 355.57 | 310.98 | 1.14 | 23 | -676.5878809521 | -676.5878809522 |
 
 **The two routes reach the same energy** to all ten digits in five of the six, and
 to nine in the sixth, in the same number of iterations throughout.
 
-**The gain falls as the basis grows**, from 1.57 at a single zeta to 1.15 at a
+These were taken again after all of the work done for a node with many cores, and
+every row of them moved by under three per cent, in both directions, which is the
+noise of this machine. **A molecule of this size on sixteen cores neither gained nor
+lost from any of it** -- the gains of that work are in the phases which only appear
+when there are cores enough to expose them.
+
+**The gain falls as the basis grows**, from 1.49 at a single zeta to 1.14 at a
 quadruple one. The fitting set is 1242 functions in every row and the occupied
 orbitals are fifty one in every row, so what grows is the part of the work where
 the new path has least to give: the products of the exchange are as thin as the
@@ -5276,14 +5282,14 @@ show.
 
 ### Against the numbers recorded earlier
 
-The conventional column here is 3.41, 8.43, 18.39 and 38.88 against the 3.05, 8.31,
+The conventional column here is 3.19, 8.27, 18.98 and 39.22 against the 3.05, 8.31,
 19.17 and 40.37 of the earlier section, which is a few per cent either way on a
 route that has not changed. That is the run to run variation of this machine, and
 it is worth knowing as the scale below which none of the ratios in this file should
 be read.
 
-The simd column is 2.18, 5.83, 14.67 and 30.88 against 2.64, 6.87, 17.16 and 34.68.
-That difference is the gather of the auxiliary groups, worth 1.12 to 1.21 times
+The simd column is 2.13, 5.67, 14.57 and 30.93 against 2.64, 6.87, 17.16 and 34.68.
+That difference is the gather of the auxiliary groups, worth 1.12 to 1.24 times
 here, which is the setup being a smaller part of a caffeine run than of the
 tagrisso one where it was worth 1.08 on the whole calculation.
 
@@ -5472,14 +5478,14 @@ the new driver has of doing the same thing.
 
 | basis | nao | mode | time | against full | iterations | energy |
 | --- | ---: | --- | ---: | ---: | ---: | ---: |
-| def2-svp | 683 | full four-center | 152.49 | 1.00 | 21 | -1609.0900864188 |
-| | | RI-JK veloxchem | 97.89 | 1.56 | 23 | -1609.0890443496 |
-| | | RI-JK simd, in memory | 42.04 | 3.63 | 23 | -1609.0890443498 |
-| | | RI-JK simd, direct | 87.72 | 1.74 | 23 | -1609.0890443494 |
-| def2-svpd | 1010 | full four-center | 1185.67 | 1.00 | 21 | -1609.1565808182 |
-| | | RI-JK veloxchem | 360.31 | 3.29 | 24 | -1609.1555344827 |
-| | | RI-JK simd, in memory | 137.49 | 8.62 | 24 | -1609.1555344829 |
-| | | RI-JK simd, direct | 237.38 | 4.99 | 24 | -1609.1555344826 |
+| def2-svp | 683 | full four-center | 151.48 | 1.00 | 21 | -1609.0900864188 |
+| | | RI-JK veloxchem | 97.19 | 1.56 | 23 | -1609.0890443496 |
+| | | RI-JK simd, in memory | 40.02 | 3.79 | 23 | -1609.0890443498 |
+| | | RI-JK simd, direct | 81.10 | 1.87 | 23 | -1609.0890443496 |
+| def2-svpd | 1010 | full four-center | 1179.59 | 1.00 | 21 | -1609.1565808182 |
+| | | RI-JK veloxchem | 359.15 | 3.28 | 24 | -1609.1555344827 |
+| | | RI-JK simd, in memory | 134.95 | 8.74 | 24 | -1609.1555344829 |
+| | | RI-JK simd, direct | 205.50 | 5.74 | 24 | -1609.1555344827 |
 
 **The three routes of the approximation agree to the ninth decimal**, and differ
 from the four center build by the error of the approximation alone, a thousandth of
@@ -5494,9 +5500,9 @@ holds them sweeps them once for the whole calculation.
 
 | | def2-svp | def2-svpd |
 | --- | ---: | ---: |
-| against the way which holds them | 2.09 slower | 1.73 slower |
-| against the route VeloxChem had | **1.12 faster** | **1.52 faster** |
-| against the four center build | **1.74 faster** | **4.99 faster** |
+| against the way which holds them | 2.03 slower | 1.52 slower |
+| against the route VeloxChem had | **1.20 faster** | **1.75 faster** |
+| against the four center build | **1.87 faster** | **5.74 faster** |
 
 A factor of two for holding nothing, not the five or ten a count of the passes
 would suggest. The reason is in the section on the setup: **the three-center
@@ -5510,9 +5516,20 @@ molecule which fits either way. The gap to the way which holds the B vectors als
 narrows as the basis grows, 2.09 to 1.73, which is the direction that suits it:
 the calculations which need it are the large ones.
 
-These are the numbers after the two corrections of the next section. Before them
-the direct way took 100.54 and 283.05 seconds, and was 1.04 slower than the route
-VeloxChem had on the smaller basis rather than 1.12 faster.
+These are the numbers as the driver stands, measured again after all of the work of
+the sections below. Before the two corrections of the next section the direct way
+took 100.54 and 283.05 seconds, and was 1.04 slower than the route VeloxChem had on
+the smaller basis rather than 1.20 faster.
+
+The work which came after those, and which was driven entirely by what a node with
+many cores showed, was measured here again to see what it cost a machine with few.
+**It cost nothing and gained a little**: the direct way fell 7.5 per cent at def2-svp
+and 13.4 at def2-svpd, the way which holds the B vectors fell 4.8 and 1.8, and the
+two builds which were not touched moved by under one per cent, which is the noise of
+this machine. The exchange in particular now takes a triangle for every thread where
+it took one matrix between them, which is more memory in exchange for work the
+threads can divide -- a trade made for a hundred and twenty eight cores which turns
+out to pay at sixteen as well, only by less.
 
 ## Where the direct mode spent its time
 
@@ -5885,7 +5902,7 @@ The three ways of the approximation agree to a ten thousand millionth of a hartr
 as they do everywhere else.
 
 **The way which holds the B vectors is now the slower of the two, by two times.**
-On the laptop it was 1.53 times the faster. On the node it is beaten by the direct
+On the laptop it is 1.52 times the faster. On the node it is beaten by the direct
 way at both basis sets and, in the smaller one, by the build which makes no
 approximation at all. The two differ in one thing which matters here: the way which
 holds them forms the W matrices in batches of sixty four auxiliary functions, so a
