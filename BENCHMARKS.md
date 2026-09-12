@@ -5642,3 +5642,139 @@ automatically faster.** A larger budget makes one part where two would do, and t
 one part plus the half transformed integrals held twice over comes to about 25 GB
 on a 36 GB machine. Whether that is memory pressure or something else has not been
 measured.
+
+## The direct mode across the cores of a node
+
+Everything above was measured on a laptop with sixteen cores. The work has to run
+on a node with hundreds, and the first measurement there was disappointing in a way
+the laptop could never have shown.
+
+Tagrisso through the direct way on an AMD EPYC 9755, Turin, 128 cores at 2.7 GHz.
+The driver is timed on its own rather than through an SCF -- the setup once, and one
+Fock build, which is what every iteration repeats -- so that the diagonalisation and
+the DIIS, which thread on their own, do not blur the curve.
+
+### What the first curve said
+
+| threads | def2-svp | speedup | def2-svpd | speedup |
+| ---: | ---: | ---: | ---: | ---: |
+| 1 | 26.009 | 1.00 | 49.677 | 1.00 |
+| 2 | 14.155 | 1.84 | 27.472 | 1.81 |
+| 4 | 8.157 | 3.19 | 14.344 | 3.46 |
+| 8 | 5.046 | 5.15 | 8.115 | 6.12 |
+| 16 | 3.368 | 7.72 | 4.972 | 9.99 |
+| 32 | 2.568 | 10.13 | 3.791 | 13.11 |
+| 48 | 2.158 | **12.05** | 3.381 | **14.69** |
+
+Twelve times on forty eight cores, a quarter of them doing anything. But the shape
+of it says more than the number. Fit `T(n) = T(1) (s + (1 - s) / n)` and the whole
+table follows from one figure: **a serial fraction of 6.3 per cent**, which predicts
+7.74 seconds at four threads against 8.16 measured, 3.17 against 3.37, and 2.16
+against 2.16. Nothing pathological, no threading storm. One serial section, and it caps the
+speedup at `1/0.063`, about **sixteen times, however many cores are added**.
+
+The larger basis scales better, which is the direction that suits the method: the
+serial traffic grows as `naux nao nocc` while the arithmetic grows as `naux nao^2
+nocc` and `naux^2 nao nocc`, so a bigger calculation dilutes the defect.
+
+### Four things which did not widen with the threads
+
+They were found by timing the phases of a build, behind VLX_RIJK_PROFILE, at one
+thread and at forty eight. The phase whose time does not fall between the two is the
+one to work on. None of the four had been visible on the laptop.
+
+| what | why it was serial |
+| --- | --- |
+| the zeroing of the half transformed integrals | the matrix of one auxiliary function is smaller than the chunk the packed matrix divides its zeroing by, so its constructor zeroed it on the calling thread, several thousand times over |
+| the copies into and out of the stacked array | plain loops, and the array was value initialised besides, for values every one of which is written before it is read |
+| the closure onto the fitting coefficients | the vectorised inner loop was inside a serial outer one |
+| the staging of the exchange update | a plain loop, gigabytes of it per build |
+
+and a fifth, which was not serial at all but would not spread:
+
+| what | why it would not spread |
+| --- | --- |
+| the rank k update of the exchange | the library divides an update over the blocks of the triangle it writes, and the triangle of a thousand functions holds about ten of them, which is nothing for forty eight cores. The depth is thousands, but the depth is the sum, which it cannot divide |
+
+The last one is the interesting case, because it is not a defect in the loop but a
+mismatch between the shape of the work and the way a library parallelises it. The
+answer is to divide it ourselves: **a triangle for every thread, a share of the
+auxiliary functions each, the library left to run one update on one thread, and the
+triangles summed at the end.** The functions are thousands and divide perfectly
+where the triangle does not.
+
+### What it came to
+
+| at 48 threads, def2-svpd | build | speedup | serial |
+| --- | ---: | ---: | ---: |
+| as it was | 3.381 | 14.69 | 4.8% |
+| the copies and the zeroing divided | 2.724 | 18.29 | 3.4% |
+| a thread to each matrix it zeroes | 2.572 | 19.67 | 3.1% |
+| the staging of the exchange divided | 1.857 | 27.0 | 1.65% |
+| a triangle to each thread | **1.474** | **34.0** | **0.88%** |
+
+**2.29 times faster on the same cores, and the ceiling from sixteen to a hundred
+and fourteen.** Perfect scaling at forty eight threads would be 1.044 seconds, so
+what is left is seventy one per cent of ideal, against thirty per cent at the start.
+
+### Where the time goes now
+
+def2-svpd, one thread against forty eight, the fastest of three builds.
+
+| phase | 1 thread | 48 threads | scaling |
+| --- | ---: | ---: | ---: |
+| integrals, second pass | 7.853 | 0.183 | 42.9 |
+| integrals, first pass | 7.839 | 0.185 | 42.4 |
+| the half transform | 12.726 | 0.317 | 40.1 |
+| the triangular solve | 15.511 | 0.399 | 38.9 |
+| the exchange | 4.753 | 0.142 | 33.5 |
+| the zeroing | 0.490 | 0.046 | 10.7 |
+| the copies | 0.415 | 0.051 | 8.1 |
+| the closure | 0.099 | 0.014 | 7.1 |
+| the Coulomb matrix | 0.340 | 0.066 | 5.2 |
+| the rest | 0.115 | 0.071 | 1.6 |
+| **whole build** | **50.142** | **1.474** | **34.0** |
+
+The five which carry the work now run between 33 and 43 times, and are 1.23 seconds
+of the 1.474. The five which lag are 0.248 seconds together, and most of that is not
+a threading defect at all: **the copies move about 14.6 GB in 0.051 s, which is 286
+GB/s, and that is the memory of the machine rather than its cores.** No number of
+threads improves it; only not copying would. The rest, the part the phases do not
+account for, is most likely the allocation and destruction of the sparse tensor of
+integrals, which is gigabytes through mmap and munmap twice a build.
+
+So about 0.2 seconds is what remains to be had from the code, which would be 1.26
+seconds and a speedup near forty.
+
+### The library is now the ceiling
+
+The OpenBLAS of that node is built with `MAX_THREADS=48` on a machine with 128
+cores. That is not merely a limit: **this driver calls BLAS from inside its own
+parallel regions, and an OpenBLAS built USE_OPENMP indexes its per thread buffers by
+`omp_get_thread_num()`.** A call arriving from thread 200 of a 256 wide region writes
+to slot 200 of a table with 48 of them. The heap is corrupt from there on and the
+abort lands somewhere unrelated -- in our case inside an allocation in the four
+centre code, which had nothing to do with it. `OPENBLAS_NUM_THREADS` does not help,
+as it caps the threads BLAS spawns rather than the id of the thread calling in.
+`OMP_NUM_THREADS` itself must stay within the limit.
+
+At 0.88 per cent serial the model puts 128 threads at 0.83 seconds and 256 at 0.63,
+against 1.474 at forty eight. **The library costs more than everything left in the
+code together**, and it is a module to swap rather than a change to make.
+
+### A note on measuring this at all
+
+Two things made the laptop useless for this question, and both are worth knowing
+before trusting a scaling number from one.
+
+Accelerate exposes no way to set its thread count, so a run with one OpenMP thread
+still has a fully threaded BLAS underneath it. Its one thread column is not one
+thread, every speedup computed against it is wrong, and the phases which are mostly
+BLAS -- the solve, the exchange -- appear not to scale at all, because they were
+already parallel at the first point. **Four predictions were made from the laptop
+and all four were wrong**, twice about which phase was even the problem. The node
+settled each of them in a single run.
+
+The first build of a run is slower than the rest, by about eight per cent here,
+which is first touch settling. Three builds and the fastest kept; one build
+overstates.
