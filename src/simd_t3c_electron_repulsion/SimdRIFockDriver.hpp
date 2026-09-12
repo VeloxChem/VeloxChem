@@ -244,17 +244,24 @@ class CSimdRIFockDriver
     /// meets a sparse enough set of B vectors can raise it.
     double _dense_threshold = 0.0;
 
-    /// @brief The number of auxiliary basis functions whose W matrices are staged
-    /// into one buffer before the rank k update.
-    /// @note The update of one auxiliary function alone is too small a piece of
-    /// work for the library to spread over the cores, as its depth is the orbitals
-    /// alone. Staging several of them makes one update of that many times the
-    /// depth. Measured on tagrisso with def2-svp, in gigaflops per second: 274 for
-    /// one, 442 for sixteen and 526 for sixty four, which is what the library
-    /// reaches on this machine, so there is nothing further to gain. The staging
-    /// buffer is this many times the orbitals times the dimensions of the basis,
-    /// which is a hundred megabytes at the sizes the W matrices are formed in.
-    static constexpr size_t _syrk_chunk = 64;
+    /// @brief The memory one thread may stage the W matrices into before the rank
+    /// k update, which sets how many auxiliary functions go into one update.
+    /// @note The update of one auxiliary function alone reads the whole triangle of
+    /// the basis for a depth of the orbitals alone, so the triangle would be read
+    /// once for every function. Gathering several of them reads it once for the
+    /// chunk instead, and the arithmetic of an update grows with the depth while
+    /// what it reads does not. Measured on tagrisso with def2-svp, in gigaflops per
+    /// second: 274 for a depth of one function, 442 for sixteen and 526 for sixty
+    /// four. Against that stands the memory, which every thread holds one of, so
+    /// the count is taken from these bytes and falls as the basis and the orbitals
+    /// grow.
+    static constexpr size_t _syrk_staging = size_t{32} * 1024 * 1024;
+
+    /// @brief The memory the triangles of the exchange may hold together.
+    /// @note One triangle for each thread, so that the auxiliary functions divide
+    /// over them without the threads writing over one another, bounded so that a
+    /// large basis does not ask for more than it should.
+    static constexpr size_t _syrk_triangles = size_t{2} * 1024 * 1024 * 1024;
 
     /// @brief The memory a batch of the three-center integrals is allowed to reach.
     /// @note The batch is the blocks of atomic orbital pairs whose integrals are

@@ -34,6 +34,9 @@
 #include "SimdRIFockDriver.hpp"
 
 #include <algorithm>
+#include <chrono>
+#include <cstdio>
+#include <cstdlib>
 #include <limits>
 #include <memory>
 #include <numeric>
@@ -1415,12 +1418,14 @@ CSimdRIFockDriver::compute_exchange_matrix(const std::vector<CPackedMatrix> &w_v
 
     if (nocc == 0) return;
 
-    // NOTE: the rank k update writes one triangle of a dense matrix, so the
-    // contributions are gathered in one and its triangle is added to the packed
-    // matrix at the end. The dense matrix is the square of the dimensions of the
-    // basis, which is nothing beside the W matrices themselves.
-
-    auto dense = std::vector<double>(nao * nao, 0.0);
+    // NOTE: the update of one auxiliary function writes the whole triangle of the
+    // basis, so the functions cannot be divided over the threads without dividing
+    // what they write as well. Each thread is therefore given a triangle of its
+    // own and a share of the functions, and the triangles are summed into the
+    // matrix at the end. The library is left to run the update on one thread: the
+    // triangle is the square of the basis and holds too few blocks to spread a
+    // single update over many cores, where the auxiliary functions are thousands
+    // and spread perfectly.
 
     // NOTE: the W matrices are row major, and the column major matrix of a row
     // major array is its transpose, so the array of W is W transposed and the
@@ -1428,79 +1433,126 @@ CSimdRIFockDriver::compute_exchange_matrix(const std::vector<CPackedMatrix> &w_v
     // triangle of the library is the lower triangle of the array, which is the
     // triangle the packed matrix stores.
 
-    const auto nchunk = std::min(_syrk_chunk, w_vectors.size());
+    // NOTE: the functions are still gathered into chunks before the update, so that
+    // one update reads the triangle once for the whole chunk rather than once for
+    // every function. The chunk is chosen from what a thread may stage, and the
+    // number of triangles from what they may hold together.
 
-    // NOTE: every value the update reads is written by the staging below before it
-    // is read, so the buffer is left with the content of its allocation rather than
-    // zeroed first. It is tens of megabytes, and zeroing it would be that much
-    // again on the calling thread alone.
+    const auto row_bytes = nocc * nao * sizeof(double);
 
-    auto staged = std::make_unique_for_overwrite<double[]>(nchunk * nocc * nao);
+    const auto nthreads = static_cast<size_t>(omp::get_number_of_threads());
 
-    for (size_t first = 0; first < w_vectors.size(); first += nchunk)
+    // NOTE: the chunk is the smaller of what a thread may stage and what leaves a
+    // chunk for every thread. Taking the staging alone would give a caller with few
+    // W matrices, as the way which holds the B vectors has, fewer chunks than
+    // threads and leave most of them with nothing to do.
+
+    const auto staged_limit = std::max(size_t{1}, _syrk_staging / std::max(row_bytes, size_t{1}));
+
+    const auto shared_limit = std::max(size_t{1}, (w_vectors.size() + nthreads - 1) / nthreads);
+
+    const auto nchunk = std::max(size_t{1}, std::min({w_vectors.size(), staged_limit, shared_limit}));
+
+    const auto nchunks = (w_vectors.size() + nchunk - 1) / nchunk;
+
+    const auto square_bytes = nao * nao * sizeof(double);
+
+    const auto ntriangles =
+        std::max(size_t{1},
+                 std::min({nthreads, nchunks, _syrk_triangles / std::max(square_bytes, size_t{1})}));
+
+    std::vector<std::vector<double>> triangles(ntriangles);
+
+    double staging_time = 0.0, update_time = 0.0;
+
+    const auto profiled = (std::getenv("VLX_RIJK_PROFILE") != nullptr);
+
+    const auto ntasks = static_cast<int>(nchunks);
+
+#pragma omp parallel num_threads(static_cast<int>(ntriangles)) reduction(+ : staging_time, update_time)
     {
-        const auto count = std::min(nchunk, w_vectors.size() - first);
+        const auto mine = static_cast<size_t>(omp_get_thread_num());
 
-        // NOTE: the W matrices of a chunk are stacked into one buffer, so that one
-        // update of the depth of the chunk is made rather than one of the depth of
-        // a single auxiliary function, which is too small to spread over the cores.
+        auto &triangle = triangles[mine];
 
-        const auto depth = count * nocc;
+        triangle.assign(nao * nao, 0.0);
 
-        // NOTE: the rows are divided over the threads rather than the matrices of
-        // the chunk. There are more of them, which balances better, and a thread
-        // then writes whole rows of the buffer while reading in pieces, which is
-        // the way round that costs less.
+        // NOTE: every value the update reads is written by the staging below before
+        // it is read, so the buffer is left with the content of its allocation
+        // rather than zeroed first.
 
-        const auto nstaged = static_cast<int>(nao);
+        auto staged = std::make_unique_for_overwrite<double[]>(nchunk * nocc * nao);
 
-#pragma omp parallel for schedule(static) if (nstaged > 1)
-        for (int ir = 0; ir < nstaged; ir++)
+#pragma omp for schedule(dynamic)
+        for (int itask = 0; itask < ntasks; itask++)
         {
-            const auto irow = static_cast<size_t>(ir);
+            const auto first = static_cast<size_t>(itask) * nchunk;
+
+            const auto count = std::min(nchunk, w_vectors.size() - first);
+
+            const auto depth = count * nocc;
+
+            const auto mark_staging = profiled ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
 
             for (size_t j = 0; j < count; j++)
             {
                 const auto *values = w_vectors[first + j].data();
 
-                std::copy(values + irow * nocc, values + (irow + 1) * nocc, staged.get() + irow * depth + j * nocc);
+                for (size_t irow = 0; irow < nao; irow++)
+                {
+                    std::copy(values + irow * nocc, values + (irow + 1) * nocc, staged.get() + irow * depth + j * nocc);
+                }
             }
-        }
+
+            if (profiled)
+            {
+                staging_time += std::chrono::duration<double>(std::chrono::steady_clock::now() - mark_staging).count();
+            }
+
+            const auto mark_update = profiled ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
 
 #ifdef VLX_USE_MATHLIB
 
-        const char uplo = 'U';
+            const char uplo = 'U';
 
-        const char trans = 'T';
+            const char trans = 'T';
 
-        auto n_arg = static_cast<lapack_int_t>(nao);
+            auto n_arg = static_cast<lapack_int_t>(nao);
 
-        auto k_arg = static_cast<lapack_int_t>(depth);
+            auto k_arg = static_cast<lapack_int_t>(depth);
 
-        auto lda = static_cast<lapack_int_t>(depth);
+            auto lda = static_cast<lapack_int_t>(depth);
 
-        auto ldc = static_cast<lapack_int_t>(nao);
+            auto ldc = static_cast<lapack_int_t>(nao);
 
-        const double one = 1.0;
+            const double one = 1.0;
 
-        dsyrk_(&uplo, &trans, &n_arg, &k_arg, &one, staged.get(), &lda, &one, dense.data(), &ldc);
+            dsyrk_(&uplo, &trans, &n_arg, &k_arg, &one, staged.get(), &lda, &one, triangle.data(), &ldc);
 
 #else
 
-        using RowMajorMatrix = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
+            using RowMajorMatrix = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
 
-        Eigen::Map<const RowMajorMatrix> wmap(staged.get(), static_cast<Eigen::Index>(nao),
-                                              static_cast<Eigen::Index>(depth));
+            Eigen::Map<const RowMajorMatrix> wmap(staged.get(), static_cast<Eigen::Index>(nao),
+                                                  static_cast<Eigen::Index>(depth));
 
-        Eigen::Map<RowMajorMatrix> cmap(dense.data(), static_cast<Eigen::Index>(nao), static_cast<Eigen::Index>(nao));
+            Eigen::Map<RowMajorMatrix> cmap(triangle.data(), static_cast<Eigen::Index>(nao),
+                                            static_cast<Eigen::Index>(nao));
 
-        cmap.template selfadjointView<Eigen::Lower>().rankUpdate(wmap, 1.0);
+            cmap.template selfadjointView<Eigen::Lower>().rankUpdate(wmap, 1.0);
 
 #endif /* VLX_USE_MATHLIB */
+
+            if (profiled)
+            {
+                update_time += std::chrono::duration<double>(std::chrono::steady_clock::now() - mark_update).count();
+            }
+        }
     }
 
-    // NOTE: only the lower triangle of the dense matrix has been written, and it
-    // is the triangle the packed matrix holds, so the two are added row by row.
+    // NOTE: only the lower triangle of each dense matrix has been written, and it
+    // is the triangle the packed matrix holds, so the triangles are summed into it
+    // row by row.
 
     auto *values = matrix.data();
 
@@ -1511,14 +1563,27 @@ CSimdRIFockDriver::compute_exchange_matrix(const std::vector<CPackedMatrix> &w_v
     {
         const auto irow = static_cast<size_t>(i);
 
-        const auto *row = dense.data() + irow * nao;
-
         auto *packed = values + irow * (irow + 1) / 2;
 
-        for (size_t j = 0; j <= irow; j++)
+        for (const auto &triangle : triangles)
         {
-            packed[j] += factor * row[j];
+            const auto *row = triangle.data() + irow * nao;
+
+            for (size_t j = 0; j <= irow; j++)
+            {
+                packed[j] += factor * row[j];
+            }
         }
+    }
+
+    if (profiled)
+    {
+        const auto share = static_cast<double>(ntriangles);
+
+        std::printf("RIJK   exchange on %zu triangles, chunk %zu: staging %.3f s, update %.3f s\n", ntriangles, nchunk,
+                    staging_time / share, update_time / share);
+
+        std::fflush(stdout);
     }
 }
 
