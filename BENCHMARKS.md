@@ -6002,3 +6002,103 @@ one: measure on the machine the answer is for.
 The first build of a run is slower than the rest, by about eight per cent here,
 which is first touch settling. Three builds and the fastest kept; one build
 overstates.
+
+## Binding the threads costs numpy a factor of thirty
+
+This one is not about the driver at all, and it is the most broadly useful thing in
+this file: **a VeloxChem calculation which pins its threads runs numpy's dense
+algebra on a single core**, silently, and the cost grows with the basis.
+
+### What it looks like
+
+Tagrisso at def2-qzvp, 3099 basis functions, on 128 cores of the node, timing the
+same calculation twice:
+
+| per iteration | pinned | pinned, with numpy given the cores back |
+| --- | ---: | ---: |
+| the Fock build | 7.10 | 7.00 |
+| the new orbitals | 3.83 | **1.05** |
+| the error vectors | 2.34 | **0.14** |
+| the new density | 0.32 | 0.06 |
+| the effective Fock matrix | 0.25 | 0.12 |
+| **whole iteration** | **14.83** | **9.41** |
+| **whole calculation** | **355.95** | **225.72** |
+
+**One and a half times, from two lines of setup.** The share of an iteration spent
+in the Fock build goes from 48 back to 74 per cent.
+
+### What is happening
+
+A product of three thousand square, timed in the same process:
+
+| | Gflop/s |
+| --- | ---: |
+| numpy alone, threads pinned | 3418 |
+| numpy after veloxchem is imported, threads pinned | **105** |
+| numpy after veloxchem is imported, threads not pinned | 3519 |
+| numpy pinned, with the mask widened and its pool rebuilt | 3485 |
+
+Neither pinning nor importing the code is enough on its own. Together they are, and
+the reason is in what the libraries report of themselves:
+
+```
+libopenblas ......... 128 threads, threading_layer openmp     (the driver's)
+libgomp ............. 128 threads
+libscipy_openblas ...   1 thread,  threading_layer pthreads   (numpy's)
+```
+
+**numpy carries its own BLAS, and it is a pthreads build which sizes its pool from
+the affinity mask the first time it is used.** Importing veloxchem loads libgomp,
+which honours `OMP_PROC_BIND` by pinning the process to one core. numpy then builds
+a pool of one thread and keeps it for the life of the process. The driver's own
+library is untouched because it threads through OpenMP, which binds per region from
+its own list of places rather than from the mask.
+
+Three things which do not fix it, each tried:
+
+| | |
+| --- | --- |
+| `OMP_WAIT_POLICY=passive`, `GOMP_SPINCOUNT=0` | 105 Gflop/s. It is not spin waiting |
+| widening the mask after the first product | 105 Gflop/s. The pool already exists |
+| forcing 64 threads without widening the mask | **16** Gflop/s. Sixty four threads on one core is worse than one |
+
+### The fix
+
+Widen the mask, then rebuild the pool, in that order, before numpy touches a
+matrix:
+
+```python
+import os
+import veloxchem as vlx                     # this is what pins the process
+
+os.sched_setaffinity(0, range(os.cpu_count()))
+
+from threadpoolctl import ThreadpoolController
+ThreadpoolController().select(prefix='libscipy_openblas').limit(limits=64)
+```
+
+Only numpy's library is retargeted. Limiting every BLAS in the process would cap
+the driver's own at sixty four, which it does not want.
+
+### What is left after it, and what it says about the basis
+
+The parts which are matrix products gain by the factor the measurement above
+predicts -- the residual of the gradient by twenty, the transformation of the
+orbitals by twenty one. **The eigen decomposition gains only 2.1**, from 0.322 to
+0.152 seconds, because an eigensolver divides over cores far worse than a product
+does. At 268 gigaflops in 0.152 seconds it is reaching 1.76 teraflops, which is as
+much as it is going to give. That one is real work.
+
+It also corrects something this file nearly concluded. Across the basis sets the
+part outside the Fock build grows as the cube of the basis while the build grows as
+its square, since the fitting set does not grow with the orbital set, and the two
+were seen to cross over at def2-qzvp: 48 per cent Fock build, 52 per cent
+everything else. **Most of that crossover was the single core.** With numpy given
+the machine it is 74 against 26, which is where the smaller basis sets sit. The
+exponents are still what they are and the crossing will come, but it comes much
+later than the pinned measurement suggested.
+
+**The numbers of the sections above this one were taken pinned**, so the part of
+them outside the Fock build is overstated -- by less at the smaller basis sets,
+where the cube has not yet grown into anything, and by a factor of three at
+def2-qzvp.
