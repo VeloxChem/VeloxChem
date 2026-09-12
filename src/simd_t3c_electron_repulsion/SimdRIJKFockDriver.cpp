@@ -335,17 +335,21 @@ CSimdRIJKFockDriver::_compute_direct(const CPackedMatrix &density,
                       bvalues + irow * ncols);
         }
 
-        std::vector<CPackedMatrix> half;
+        // NOTE: the matrix of one auxiliary function is smaller than the chunk the
+        // packed matrix divides its zeroing by, so its constructor zeroes it on the
+        // calling thread alone. Several thousand of them is several gigabytes of
+        // memset, and of first touch besides, which is why the functions are
+        // divided over the threads here and each thread allocates and zeroes its
+        // own. The constructor is what zeroes them; nothing zeroes them twice.
 
-        half.reserve(naux);
+        std::vector<CPackedMatrix> half(naux);
 
-        // NOTE: the constructor zeroes the values, and does it on the threads, so
-        // zeroing them again here would be a second sweep of several gigabytes on
-        // the calling thread alone.
+        const auto nmatrices = static_cast<int>(naux);
 
-        for (size_t q = 0; q < naux; q++)
+#pragma omp parallel for schedule(static) if (nmatrices > 1)
+        for (int iq = 0; iq < nmatrices; iq++)
         {
-            half.emplace_back(nao, ncols, mat_t::general);
+            half[static_cast<size_t>(iq)] = CPackedMatrix(nao, ncols, mat_t::general);
         }
 
         // NOTE: the half transformed integrals of one batch of orbitals are the
