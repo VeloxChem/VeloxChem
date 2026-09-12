@@ -34,6 +34,9 @@
 #include "SimdRIJKFockDriver.hpp"
 
 #include <algorithm>
+#include <chrono>
+#include <cstdio>
+#include <cstdlib>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -50,7 +53,81 @@
 #include "SimdThreeCenterElectronRepulsionDriver.hpp"
 #include "SimdT3CDistributor.hpp"
 #include "SimdTwoCenterElectronRepulsionDriver.hpp"
+#include "OpenMPFunc.hpp"
 #include "TripleSparsityPattern.hpp"
+
+namespace {
+
+/// @brief The clock the phases of a Fock build are timed on.
+using prof_clock = std::chrono::steady_clock;
+
+/// @brief Whether the phases of a Fock build are to be reported.
+/// @note Answered once, from the environment, so that an ordinary calculation pays
+/// nothing for the question.
+inline auto
+prof_wanted() -> bool
+{
+    static const bool wanted = (std::getenv("VLX_RIJK_PROFILE") != nullptr);
+
+    return wanted;
+}
+
+/// @brief The seconds since a mark.
+inline auto
+prof_since(const prof_clock::time_point &mark) -> double
+{
+    return std::chrono::duration<double>(prof_clock::now() - mark).count();
+}
+
+/// @brief The times of the phases of one Fock build of the direct mode.
+/// @note The direct mode repeats every phase on every iteration, so a phase which
+/// does not widen with the threads bounds the whole calculation however many cores
+/// are given to it. Run a calculation at one thread and again at many, with
+/// VLX_RIJK_PROFILE set, and the phase whose time does not fall between the two is
+/// the one worth working on. The whole is timed as well as the parts, so that what
+/// the parts do not account for is visible rather than assumed.
+struct CDirectProfile
+{
+    double allocate = 0.0;
+    double integrals_a = 0.0;
+    double transform = 0.0;
+    double closure = 0.0;
+    double copies = 0.0;
+    double solve = 0.0;
+    double exchange = 0.0;
+    double integrals_b = 0.0;
+    double coulomb = 0.0;
+    double total = 0.0;
+
+    /// @brief Writes the phases of this build, and their share of it.
+    auto report() const -> void
+    {
+        static size_t builds = 0;
+
+        builds++;
+
+        const auto accounted = allocate + integrals_a + transform + closure + copies +
+                               solve + exchange + integrals_b + coulomb;
+
+        const char *names[] = {"allocate", "integrals a", "transform", "closure", "copies",
+                               "solve",    "exchange",    "integrals b", "coulomb", "rest"};
+
+        const double times[] = {allocate, integrals_a, transform, closure,  copies,
+                                solve,    exchange,    integrals_b, coulomb, total - accounted};
+
+        std::printf("RIJK build %zu on %d threads, %.3f s\n", builds, omp::get_number_of_threads(), total);
+
+        for (size_t i = 0; i < 10; i++)
+        {
+            std::printf("RIJK   %-12s %9.3f s %6.1f %%\n", names[i], times[i],
+                        (total > 0.0) ? 100.0 * times[i] / total : 0.0);
+        }
+
+        std::fflush(stdout);
+    }
+};
+
+}  // namespace
 
 auto
 CSimdRIJKFockDriver::required_memory(const CMolecule       &molecule,
@@ -305,6 +382,10 @@ CSimdRIJKFockDriver::_compute_direct(const CPackedMatrix &density,
 
     const auto nbatch = std::max(size_t{1}, std::min(norbitals, (_budget / 2) / std::max(per_orbital, size_t{1})));
 
+    CDirectProfile profile;
+
+    const auto profile_start = prof_clock::now();
+
     auto fock = CPackedMatrix(nao, nao, mat_t::symmetric);
 
     fock.zero();
@@ -342,6 +423,8 @@ CSimdRIJKFockDriver::_compute_direct(const CPackedMatrix &density,
         // divided over the threads here and each thread allocates and zeroes its
         // own. The constructor is what zeroes them; nothing zeroes them twice.
 
+        const auto mark_allocate = prof_clock::now();
+
         std::vector<CPackedMatrix> half(naux);
 
         const auto nmatrices = static_cast<int>(naux);
@@ -351,6 +434,8 @@ CSimdRIJKFockDriver::_compute_direct(const CPackedMatrix &density,
         {
             half[static_cast<size_t>(iq)] = CPackedMatrix(nao, ncols, mat_t::general);
         }
+
+        profile.allocate += prof_since(mark_allocate);
 
         // NOTE: the half transformed integrals of one batch of orbitals are the
         // sum over every block of atom pairs, so the blocks are swept and added
@@ -364,9 +449,17 @@ CSimdRIJKFockDriver::_compute_direct(const CPackedMatrix &density,
 
             auto distributor = CSimdT3CDistributor<CSparseTensor>(&integrals);
 
+            const auto mark_integrals = prof_clock::now();
+
             eri_drv.compute(pattern, _molecule, _basis, _aux_basis, distributor);
 
+            profile.integrals_a += prof_since(mark_integrals);
+
+            const auto mark_transform = prof_clock::now();
+
             _drv.compute_w_vectors(integrals, _basis, _aux_basis, batch, 0, naux, half, true);
+
+            profile.transform += prof_since(mark_transform);
         }
 
         // the Coulomb vector, which is the half transformed integrals closed with
@@ -375,6 +468,8 @@ CSimdRIJKFockDriver::_compute_direct(const CPackedMatrix &density,
         // NOTE: an auxiliary function is closed against the orbitals it was
         // transformed by, and each one adds into a place of its own, so the
         // functions are divided over the threads without anything to reduce.
+
+        const auto mark_closure = prof_clock::now();
 
         const auto nrange = static_cast<int>(naux);
 
@@ -403,6 +498,8 @@ CSimdRIJKFockDriver::_compute_direct(const CPackedMatrix &density,
             gamma[q] += sum;
         }
 
+        profile.closure += prof_since(mark_closure);
+
         // the exchange: solve the factor against the half transformed integrals,
         // which gives the B vectors of this batch of orbitals, and add their
         // square into the matrix
@@ -412,6 +509,8 @@ CSimdRIJKFockDriver::_compute_direct(const CPackedMatrix &density,
         // NOTE: every element of the array is written by the copy below before it is
         // read, so it is left with the content of the allocation rather than zeroed
         // first. Zeroing it would be a sweep of several gigabytes for nothing.
+
+        auto mark_copies = prof_clock::now();
 
         auto stacked = std::make_unique_for_overwrite<double[]>(naux * width);
 
@@ -425,7 +524,15 @@ CSimdRIJKFockDriver::_compute_direct(const CPackedMatrix &density,
             std::copy(half[q].data(), half[q].data() + width, stacked.get() + q * width);
         }
 
+        profile.copies += prof_since(mark_copies);
+
+        const auto mark_solve = prof_clock::now();
+
         _solve_factor(stacked.get(), naux, width, false);
+
+        profile.solve += prof_since(mark_solve);
+
+        mark_copies = prof_clock::now();
 
 #pragma omp parallel for schedule(static) if (ncopies > 1)
         for (int iq = 0; iq < ncopies; iq++)
@@ -435,14 +542,24 @@ CSimdRIJKFockDriver::_compute_direct(const CPackedMatrix &density,
             std::copy(stacked.get() + q * width, stacked.get() + (q + 1) * width, half[q].data());
         }
 
+        profile.copies += prof_since(mark_copies);
+
+        const auto mark_exchange = prof_clock::now();
+
         _drv.compute_exchange_matrix(half, fock, -exchange_scaling_factor);
+
+        profile.exchange += prof_since(mark_exchange);
     }
 
     // the coefficients of the fitting, from the factor and its transpose
 
+    const auto mark_gamma = prof_clock::now();
+
     _solve_factor(gamma.data(), naux, 1, false);
 
     _solve_factor(gamma.data(), naux, 1, true);
+
+    profile.solve += prof_since(mark_gamma);
 
     // the second pass: the Coulomb matrix from the integrals and those coefficients
 
@@ -454,7 +571,13 @@ CSimdRIJKFockDriver::_compute_direct(const CPackedMatrix &density,
 
         auto distributor = CSimdT3CDistributor<CSparseTensor>(&integrals);
 
+        const auto mark_integrals = prof_clock::now();
+
         eri_drv.compute(pattern, _molecule, _basis, _aux_basis, distributor);
+
+        profile.integrals_b += prof_since(mark_integrals);
+
+        const auto mark_coulomb = prof_clock::now();
 
         // NOTE: the blocks of atom pairs of one batch write elements of the matrix
         // no other batch writes, so the parts are added and nothing is counted
@@ -473,7 +596,13 @@ CSimdRIJKFockDriver::_compute_direct(const CPackedMatrix &density,
         {
             values[static_cast<size_t>(i)] += 2.0 * added[static_cast<size_t>(i)];
         }
+
+        profile.coulomb += prof_since(mark_coulomb);
     }
+
+    profile.total = prof_since(profile_start);
+
+    if (prof_wanted()) profile.report();
 
     return fock;
 }
