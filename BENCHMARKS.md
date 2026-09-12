@@ -5712,10 +5712,17 @@ the triangle does not.
 | a thread to each matrix it zeroes | 2.572 | 19.67 | 3.1% |
 | the staging of the exchange divided | 1.857 | 27.0 | 1.65% |
 | a triangle to each thread | **1.474** | **34.0** | **0.88%** |
+| a thread to each Coulomb matrix, and the threads bound | **1.392** | **36.0** | **0.71%** |
 
-**2.29 times faster on the same cores, and the ceiling from sixteen to a hundred
-and fourteen.** Perfect scaling at forty eight threads would be 1.044 seconds, so
-what is left is seventy one per cent of ideal, against thirty per cent at the start.
+**2.43 times faster on the same cores, and the ceiling from sixteen to a hundred
+and forty.** Perfect scaling at forty eight threads would be 1.044 seconds, so what
+is left is seventy five per cent of ideal, against thirty per cent at the start.
+
+The last row is two changes at once, and they are separated in the sections below:
+the Coulomb matrix was the one phase which took longer the more threads it was
+given, and binding the threads to the cores is worth a third at 128 threads though
+almost nothing at 48, which is why it appears here as a rounding rather than a
+result.
 
 ### Where the time goes now
 
@@ -5746,55 +5753,111 @@ integrals, which is gigabytes through mmap and munmap twice a build.
 So about 0.2 seconds is what remains to be had from the code, which would be 1.26
 seconds and a speedup near forty.
 
-### The library is the ceiling, and it is the wrong library
+### Lifting the thread limit, and binding the threads
 
-The node linked OpenBLAS, which reports itself as
+The limit was lifted by building OpenBLAS 0.3.30 again, in a directory of our own,
+with `NUM_THREADS=256` and the same `COOPERLAKE` target. **The target was kept on
+purpose.** OpenBLAS has a `ZEN` target, but it is an AVX2 one inherited from
+Haswell, where COOPERLAKE is AVX-512, and Zen 5 carries AVX-512. The kernels of the
+module were already reaching 70 to 93 per cent of what the cores can do, which is
+not a library needing to be replaced. Only the thread count was wrong.
 
-```
-OpenBLAS 0.3.30 NO_AFFINITY USE_OPENMP COOPERLAKE MAX_THREADS=48
-```
+Two things about loading it are worth recording, as neither is obvious and the
+first cost an afternoon.
 
-Three things in that line matter, and two of them are wrong for this machine.
+**`LD_LIBRARY_PATH` did not work.** The library is named by an RPATH written into
+the module at link time, and an RPATH is read before `LD_LIBRARY_PATH` is. The
+`ldd` of the built module still named the one from the software tree, with the path
+expanded as `.../lib/../lib64/`, which is the shape of a recorded search path rather
+than of an environment one. `LD_PRELOAD` is read before either and is what worked.
 
-**COOPERLAKE is an Intel target**, on a part which is AMD Zen 5. It runs, because the
-vector instructions are there, but its blocking and its prefetching are cut for
-another cache hierarchy. The phases which are a library call and little else -- the
-half transform, the solve, the update of the exchange -- are 0.86 of the 1.474
-seconds, and they are served by kernels tuned for a different processor.
+**A process may hold more than one of them.** numpy carries its own, under a name of
+its own, loaded by an absolute path, and a tool which asks the process for its
+configuration will answer with whichever copy it meets first. The thread limit of a
+library is a property of the file, not of the machine, so an answer from the wrong
+file is worse than no answer -- it reports a limit which does not apply, or misses
+one which does. The way to ask is to find which file answers for dgemm, by dladdr,
+and read the configuration from that one.
 
-**MAX_THREADS=48 on a machine with 128 cores** is the other, and it is not merely a
-limit but a trap, described below.
+### Binding the threads is worth a third
 
-USE_OPENMP is the one which is right: the library threads through OpenMP and shares
-the runtime of the code, so a call from inside one of our parallel regions runs on
-one thread and a call from outside gets the whole machine. That is what this driver
-wants, and it is why the exchange could be given a triangle for each thread with the
-library left to run one update on one thread.
+The node is two EPYC 9755, 128 cores each, 256 in all with no threading. Left
+unbound, the threads wander between the sockets and read memory placed on the other
+one. Bound, with `OMP_PROC_BIND=spread` and `OMP_PLACES=cores`, the first touch of
+each buffer holds where it was made.
 
-So the scaling of 34 times was reached against kernels for the wrong processor, on 48
-of 128 cores. What a library built for this part is worth on top of that has not been
-measured.
+| threads | unbound | bound |
+| ---: | ---: | ---: |
+| 32 | 1.973 | 1.912 |
+| 48 | 1.412 | 1.392 |
+| 64 | 1.160 | 1.157 |
+| 96 | 1.095 | 1.015 |
+| 128 | 1.172 | **0.878** |
+| 256 | 1.166 | 0.978 |
 
-### The thread limit of a library, and how it fails
+**Binding is worth 1.33 at 128 threads**, and it moves the best point from 96 to
+128. Below 64 it is worth nothing at all, which is the tell: one socket holds 128
+cores, so a run which fits inside one has nothing to wander across.
 
-An OpenBLAS built USE_OPENMP sizes its per thread buffers from
-`omp_get_max_threads()` and indexes them by `omp_get_thread_num()`. **This driver
-calls the library from inside its own parallel regions**, so a process whose OpenMP
-width is above what the library was built for writes past the end of that table.
+It also corrected a diagnosis. Unbound, the half transform grew with the threads --
+0.256 at 64, 0.285 at 96, 0.377 at 128, 0.433 at 256 -- and the cause looked like
+the memory it moves: it clears a square of the whole basis for every auxiliary
+function, 27.6 GB a call at this size, which no number of cores can hurry. Bound,
+the same phase reads 0.248, 0.200, 0.191, 0.284. **It was the placement, not the
+bandwidth.** The zeroing is real but it was never the limit, and the work which
+would have removed it would have bought little.
 
-It does not stop there. The message, `precompiled NUM_THREADS exceeded`, is a warning
-and it carries on with the heap corrupt. **The abort arrives later, in whatever
-allocates next** -- here inside the four centre integrals, which had nothing to do
-with any of it.
+### The curve on two sockets
 
-`OPENBLAS_NUM_THREADS` does not help. It caps the threads the library spawns, not the
-id of the thread calling into it, and the id is what indexes the table. **The limit is
-on `OMP_NUM_THREADS` itself**, and it holds whatever else is set.
+Tagrisso in def2-svpd, the direct way, bound, the fastest of three builds.
 
-At 0.88 per cent serial the model puts 128 threads at 0.83 seconds and 256 at 0.63,
-against 1.474 at forty eight. The library costs more than everything left in the code
-together, and a build of it which fits the machine is a module to load rather than a
-change to make.
+| threads | build | speedup | efficiency | serial |
+| ---: | ---: | ---: | ---: | ---: |
+| 1 | 50.155 | 1.00 | 100% | |
+| 8 | 6.727 | 7.46 | 93.2% | 1.04% |
+| 16 | 3.467 | 14.47 | 90.4% | 0.71% |
+| 32 | 1.912 | 26.23 | 82.0% | 0.71% |
+| 48 | 1.392 | 36.03 | 75.1% | 0.71% |
+| 64 | 1.157 | 43.35 | 67.7% | 0.76% |
+| 96 | 1.015 | 49.41 | 51.5% | 0.99% |
+| **128** | **0.878** | **57.12** | 44.6% | 0.98% |
+| 256 | 0.978 | 51.28 | 20.0% | 1.57% |
+
+**The best point is 128 threads, one socket's worth, and the second socket makes it
+worse.** The serial fraction holds at about 0.7 per cent to 64 threads, rises to 1.0
+at 128, and to 1.6 at 256, which is the interconnect appearing in the arithmetic.
+At this size the calculation does not have enough work per unit of traffic to pay
+for crossing between the sockets. A larger one might: the copper complex has twice
+the basis and twice the orbitals, so four times the arithmetic against twice the
+traffic.
+
+**From where this started -- 3.381 seconds on 48 threads -- to 0.878 is 3.85 times**,
+of which 2.4 is the code and 1.6 the threads and the library it may now use.
+
+### What is left, and why it is not worth much
+
+| phase | 1 thread | 128 threads | scaling |
+| --- | ---: | ---: | ---: |
+| integrals, first pass | 7.729 | 0.103 | 75.0 |
+| integrals, second pass | 7.717 | 0.103 | 74.9 |
+| the half transform | 13.018 | 0.191 | 68.2 |
+| the exchange | 4.813 | 0.077 | 62.5 |
+| the triangular solve | 15.570 | 0.257 | 60.6 |
+| the zeroing | 0.366 | 0.009 | 40.7 |
+| the copies | 0.412 | 0.029 | 14.2 |
+| the closure | 0.096 | 0.007 | 13.7 |
+| the Coulomb matrix | 0.356 | 0.059 | 6.0 |
+| the rest | 0.077 | 0.043 | 1.8 |
+
+The five which carry the work run between 60 and 75 times. The four which lag are
+**0.138 seconds together, 15.7 per cent of the build**, and taking all four to the
+rate of the others would give 0.75 seconds. **A ceiling of 1.17 for the hardest
+work left**, which is where this stops being worth doing.
+
+The Coulomb matrix is the largest of the four and the one which cannot simply be
+divided harder: it holds a triangle for every thread and sums them at the end, so
+both the memory it takes and the sum at the end grow with the cores. It no longer
+grows in time, which was the defect worth fixing, but it will not fall much either.
 
 ### A note on measuring this at all
 
@@ -5805,9 +5868,11 @@ Accelerate exposes no way to set its thread count, so a run with one OpenMP thre
 still has a fully threaded BLAS underneath it. Its one thread column is not one
 thread, every speedup computed against it is wrong, and the phases which are mostly
 BLAS -- the solve, the exchange -- appear not to scale at all, because they were
-already parallel at the first point. **Four predictions were made from the laptop and
-all four were wrong**, twice about which phase was even the problem. The node settled
-each of them in a single run.
+already parallel at the first point. **Five predictions were made from this side and
+all five were wrong**, three of them about which phase was even the problem, and one
+blaming the memory of the machine for what turned out to be where its threads were
+standing. The node settled each of them in a single run, and the lesson is the dull
+one: measure on the machine the answer is for.
 
 The first build of a run is slower than the rest, by about eight per cent here,
 which is first touch settling. Three builds and the fastest kept; one build
