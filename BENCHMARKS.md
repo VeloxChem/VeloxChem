@@ -5696,12 +5696,12 @@ and a fifth, which was not serial at all but would not spread:
 | --- | --- |
 | the rank k update of the exchange | the library divides an update over the blocks of the triangle it writes, and the triangle of a thousand functions holds about ten of them, which is nothing for forty eight cores. The depth is thousands, but the depth is the sum, which it cannot divide |
 
-The last one is the interesting case, because it is not a defect in the loop but a
-mismatch between the shape of the work and the way a library parallelises it. The
+The last one is the interesting case, because it is not a defect in a loop of ours
+but a mismatch between the shape of the work and the way a library divides it. The
 answer is to divide it ourselves: **a triangle for every thread, a share of the
 auxiliary functions each, the library left to run one update on one thread, and the
-triangles summed at the end.** The functions are thousands and divide perfectly
-where the triangle does not.
+triangles summed at the end.** The functions are thousands and divide perfectly where
+the triangle does not.
 
 ### What it came to
 
@@ -5746,21 +5746,55 @@ integrals, which is gigabytes through mmap and munmap twice a build.
 So about 0.2 seconds is what remains to be had from the code, which would be 1.26
 seconds and a speedup near forty.
 
-### The library is now the ceiling
+### The library is the ceiling, and it is the wrong library
 
-The OpenBLAS of that node is built with `MAX_THREADS=48` on a machine with 128
-cores. That is not merely a limit: **this driver calls BLAS from inside its own
-parallel regions, and an OpenBLAS built USE_OPENMP indexes its per thread buffers by
-`omp_get_thread_num()`.** A call arriving from thread 200 of a 256 wide region writes
-to slot 200 of a table with 48 of them. The heap is corrupt from there on and the
-abort lands somewhere unrelated -- in our case inside an allocation in the four
-centre code, which had nothing to do with it. `OPENBLAS_NUM_THREADS` does not help,
-as it caps the threads BLAS spawns rather than the id of the thread calling in.
-`OMP_NUM_THREADS` itself must stay within the limit.
+The node linked OpenBLAS, which reports itself as
+
+```
+OpenBLAS 0.3.30 NO_AFFINITY USE_OPENMP COOPERLAKE MAX_THREADS=48
+```
+
+Three things in that line matter, and two of them are wrong for this machine.
+
+**COOPERLAKE is an Intel target**, on a part which is AMD Zen 5. It runs, because the
+vector instructions are there, but its blocking and its prefetching are cut for
+another cache hierarchy. The phases which are a library call and little else -- the
+half transform, the solve, the update of the exchange -- are 0.86 of the 1.474
+seconds, and they are served by kernels tuned for a different processor.
+
+**MAX_THREADS=48 on a machine with 128 cores** is the other, and it is not merely a
+limit but a trap, described below.
+
+USE_OPENMP is the one which is right: the library threads through OpenMP and shares
+the runtime of the code, so a call from inside one of our parallel regions runs on
+one thread and a call from outside gets the whole machine. That is what this driver
+wants, and it is why the exchange could be given a triangle for each thread with the
+library left to run one update on one thread.
+
+So the scaling of 34 times was reached against kernels for the wrong processor, on 48
+of 128 cores. What a library built for this part is worth on top of that has not been
+measured.
+
+### The thread limit of a library, and how it fails
+
+An OpenBLAS built USE_OPENMP sizes its per thread buffers from
+`omp_get_max_threads()` and indexes them by `omp_get_thread_num()`. **This driver
+calls the library from inside its own parallel regions**, so a process whose OpenMP
+width is above what the library was built for writes past the end of that table.
+
+It does not stop there. The message, `precompiled NUM_THREADS exceeded`, is a warning
+and it carries on with the heap corrupt. **The abort arrives later, in whatever
+allocates next** -- here inside the four centre integrals, which had nothing to do
+with any of it.
+
+`OPENBLAS_NUM_THREADS` does not help. It caps the threads the library spawns, not the
+id of the thread calling into it, and the id is what indexes the table. **The limit is
+on `OMP_NUM_THREADS` itself**, and it holds whatever else is set.
 
 At 0.88 per cent serial the model puts 128 threads at 0.83 seconds and 256 at 0.63,
-against 1.474 at forty eight. **The library costs more than everything left in the
-code together**, and it is a module to swap rather than a change to make.
+against 1.474 at forty eight. The library costs more than everything left in the code
+together, and a build of it which fits the machine is a module to load rather than a
+change to make.
 
 ### A note on measuring this at all
 
@@ -5771,9 +5805,9 @@ Accelerate exposes no way to set its thread count, so a run with one OpenMP thre
 still has a fully threaded BLAS underneath it. Its one thread column is not one
 thread, every speedup computed against it is wrong, and the phases which are mostly
 BLAS -- the solve, the exchange -- appear not to scale at all, because they were
-already parallel at the first point. **Four predictions were made from the laptop
-and all four were wrong**, twice about which phase was even the problem. The node
-settled each of them in a single run.
+already parallel at the first point. **Four predictions were made from the laptop and
+all four were wrong**, twice about which phase was even the problem. The node settled
+each of them in a single run.
 
 The first build of a run is slower than the rest, by about eight per cent here,
 which is first touch settling. Three builds and the fastest kept; one build
