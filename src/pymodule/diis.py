@@ -34,6 +34,15 @@ from .mathutils import safe_solve
 
 import numpy as np
 
+# NOTE: the accelerator is built again on every iteration by the drivers which use
+# it, so the residuals are kept here rather than on the object. The bound holds a
+# full subspace of both spins with room to spare, and what it holds is no more than
+# the residuals which were being rebuilt and kept for one iteration in any case.
+
+_RESIDUAL_CACHE = {}
+
+_RESIDUAL_CACHE_SIZE = 24
+
 
 class Diis:
     """
@@ -181,11 +190,40 @@ class Diis:
 
         smat = overlap_matrix
         tmat = oao_matrix
+
+        # NOTE: a Fock matrix and the density it came from do not change once they
+        # are stored, and neither the overlap nor the orthogonalization matrix
+        # changes at all, so the residual of a stored pair is the same on every
+        # iteration which sees it. Only the newest pair is new. Computing them all
+        # again is four products of the whole basis for each of them, which came to
+        # as much as the Fock build itself once the subspace was full, so they are
+        # kept by the identity of the matrices they were built from.
+
         errs = []
+
         for fmat, dmat in zip(fock_matrices, density_matrices):
+            key = (id(fmat), id(dmat), id(smat), id(tmat))
+
+            held = _RESIDUAL_CACHE.get(key)
+
+            if (held is not None and held[0] is fmat and held[1] is dmat and
+                    held[2] is smat and held[3] is tmat):
+                errs.append(held[4])
+                continue
+
             fds = np.matmul(fmat, np.matmul(dmat, smat))
             err = np.matmul(tmat.T, np.matmul(fds - fds.T, tmat))
+
+            # NOTE: the matrices are held with the residual so that their
+            # identities cannot be given to something else while it is cached.
+
+            _RESIDUAL_CACHE[key] = (fmat, dmat, smat, tmat, err)
+
             errs.append(err)
+
+        while len(_RESIDUAL_CACHE) > _RESIDUAL_CACHE_SIZE:
+            _RESIDUAL_CACHE.pop(next(iter(_RESIDUAL_CACHE)))
+
         return errs
 
     def _build_bmatrix(self):
