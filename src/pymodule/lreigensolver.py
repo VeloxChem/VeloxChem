@@ -702,29 +702,14 @@ class LinearResponseEigenSolver(LinearResponseEigenSolverBase):
                             exc_solutions[s_2])
 
                         if self.rank == mpi_master():
-                            half_size = eigvec_1.shape[0] // 2
+                            z_mat_1, y_mat_1 = self._get_z_mat_and_y_mat(
+                                eigvec_1, mo_occ.shape[1])
+                            z_mat_2, y_mat_2 = self._get_z_mat_and_y_mat(
+                                eigvec_2, mo_occ.shape[1])
 
-                            z_mat_1 = eigvec_1[:half_size].reshape(
-                                mo_occ.shape[1], -1)
-                            y_mat_1 = eigvec_1[half_size:].reshape(
-                                mo_occ.shape[1], -1)
-
-                            z_mat_2 = eigvec_2[:half_size].reshape(
-                                mo_occ.shape[1], -1)
-                            y_mat_2 = eigvec_2[half_size:].reshape(
-                                mo_occ.shape[1], -1)
-
-                            esa_trans_dens = (
-                                np.linalg.multi_dot(
-                                    [mo_vir, z_mat_1.T, z_mat_2, mo_vir.T]) -
-                                np.linalg.multi_dot(
-                                    [mo_occ, z_mat_1, z_mat_2.T, mo_occ.T]))
-
-                            esa_trans_dens += (
-                                np.linalg.multi_dot(
-                                    [mo_vir, y_mat_1.T, y_mat_2, mo_vir.T]) -
-                                np.linalg.multi_dot(
-                                    [mo_occ, y_mat_1, y_mat_2.T, mo_occ.T]))
+                            esa_trans_dens = self._get_esa_transition_density(
+                                z_mat_1, y_mat_1, z_mat_2, y_mat_2, mo_occ,
+                                mo_vir)
 
                             esa_trans_dipole = np.array([
                                 np.sum(esa_trans_dens * dipole_integrals[i])

@@ -742,31 +742,45 @@ class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
                             molecule, basis, [0.0, 0.0, 0.0])
 
                     for s_1, s_2 in esa_pairs:
-                        eigvec_1 = self.get_full_solution_vector(
+                        eigvec_full_1 = self.get_full_solution_vector(
                             exc_solutions[s_1])
-                        eigvec_2 = self.get_full_solution_vector(
+                        eigvec_full_2 = self.get_full_solution_vector(
                             exc_solutions[s_2])
 
                         if self.rank == mpi_master():
-                            half_size = eigvec_1.shape[0] // 2
+                            n_ov_a = mo_occ_a.shape[1] * mo_vir_a.shape[1]
+                            n_ov_b = mo_occ_b.shape[1] * mo_vir_b.shape[1]
 
-                            z_mat_1 = eigvec_1[:half_size].reshape(nocc, -1)
-                            y_mat_1 = eigvec_1[half_size:].reshape(nocc, -1)
+                            eigvec_a_1 = np.hstack((
+                                eigvec_full_1[:n_ov_a],
+                                eigvec_full_1[n_ov_a + n_ov_b:n_ov_a +
+                                              n_ov_b + n_ov_a],
+                            ))
+                            eigvec_b_1 = np.hstack((
+                                eigvec_full_1[n_ov_a:n_ov_a + n_ov_b],
+                                eigvec_full_1[n_ov_a + n_ov_b + n_ov_a:],
+                            ))
+                            eigvec_a_2 = np.hstack((
+                                eigvec_full_2[:n_ov_a],
+                                eigvec_full_2[n_ov_a + n_ov_b:n_ov_a +
+                                              n_ov_b + n_ov_a],
+                            ))
+                            eigvec_b_2 = np.hstack((
+                                eigvec_full_2[n_ov_a:n_ov_a + n_ov_b],
+                                eigvec_full_2[n_ov_a + n_ov_b + n_ov_a:],
+                            ))
 
-                            z_mat_2 = eigvec_2[:half_size].reshape(nocc, -1)
-                            y_mat_2 = eigvec_2[half_size:].reshape(nocc, -1)
+                            (z_mat_a_1, z_mat_b_1), (y_mat_a_1, y_mat_b_1) = self._get_z_mat_and_y_mat_unrestricted(
+                                eigvec_a_1, eigvec_b_1, nocc_a, nocc_b)
+                            (z_mat_a_2, z_mat_b_2), (y_mat_a_2, y_mat_b_2) = self._get_z_mat_and_y_mat_unrestricted(
+                                eigvec_a_2, eigvec_b_2, nocc_a, nocc_b)
 
-                            esa_trans_dens = (
-                                np.linalg.multi_dot(
-                                    [mo_vir, z_mat_1.T, z_mat_2, mo_vir.T]) -
-                                np.linalg.multi_dot(
-                                    [mo_occ, z_mat_1, z_mat_2.T, mo_occ.T]))
-
-                            esa_trans_dens += (
-                                np.linalg.multi_dot(
-                                    [mo_vir, y_mat_1.T, y_mat_2, mo_vir.T]) -
-                                np.linalg.multi_dot(
-                                    [mo_occ, y_mat_1, y_mat_2.T, mo_occ.T]))
+                            esa_trans_dens = self._get_esa_transition_density(
+                                z_mat_a_1, y_mat_a_1, z_mat_a_2, y_mat_a_2,
+                                mo_occ_a, mo_vir_a)
+                            esa_trans_dens += self._get_esa_transition_density(
+                                z_mat_b_1, y_mat_b_1, z_mat_b_2, y_mat_b_2,
+                                mo_occ_b, mo_vir_b)
 
                             esa_trans_dipole = np.array([
                                 np.sum(esa_trans_dens * dipole_integrals[i])

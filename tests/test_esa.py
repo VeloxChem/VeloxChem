@@ -62,20 +62,6 @@ class TestExcitedStateAbsorption:
         return None
 
     @staticmethod
-    def _get_esa_trans_dens(z_mat_1, y_mat_1, z_mat_2, y_mat_2, mo_occ, mo_vir):
-
-        # same expression as in lreigensolver.py
-        esa_trans_dens = (
-            np.linalg.multi_dot([mo_vir, z_mat_1.T, z_mat_2, mo_vir.T]) -
-            np.linalg.multi_dot([mo_occ, z_mat_1, z_mat_2.T, mo_occ.T]))
-
-        esa_trans_dens += (
-            np.linalg.multi_dot([mo_vir, y_mat_1.T, y_mat_2, mo_vir.T]) -
-            np.linalg.multi_dot([mo_occ, y_mat_1, y_mat_2.T, mo_occ.T]))
-
-        return esa_trans_dens
-
-    @staticmethod
     def _match_signs(dipoles, ref_dipoles):
 
         for i in range(dipoles.shape[0]):
@@ -86,7 +72,7 @@ class TestExcitedStateAbsorption:
 
     def test_esa_transition_density_of_identical_states(self):
 
-        # For identical states the ESA density must reduce to the unrelaxed density.
+        # For identical states the ESA transition density must reduce to the unrelaxed density.
 
         mol, bas = self._get_water_and_basis()
 
@@ -121,14 +107,10 @@ class TestExcitedStateAbsorption:
                 nocc = mol.number_of_alpha_occupied_orbitals(bas)
                 mo_occ, mo_vir = lr_drv._get_mo_occ_and_mo_vir(
                     scf_results, nocc)
+                z_mat, y_mat = lr_drv._get_z_mat_and_y_mat(eigvec, nocc)
 
-                half_size = eigvec.shape[0] // 2
-                z_mat_1 = eigvec[:half_size].reshape(mo_occ.shape[1], -1)
-                y_mat_1 = eigvec[half_size:].reshape(mo_occ.shape[1], -1)
-                z_mat_2, y_mat_2 = z_mat_1, y_mat_1
-
-                esa_trans_dens = self._get_esa_trans_dens(
-                    z_mat_1, y_mat_1, z_mat_2, y_mat_2, mo_occ, mo_vir)
+                esa_trans_dens = lr_drv._get_esa_transition_density(
+                    z_mat, y_mat, z_mat, y_mat, mo_occ, mo_vir)
 
                 assert np.max(np.abs(esa_trans_dens -
                                      unrelaxed_densities[s])) < 1.0e-12

@@ -4231,6 +4231,46 @@ class LinearSolver:
 
         return dens_D, dens_A
 
+    def _get_esa_transition_density(self, z_mat_1, y_mat_1, z_mat_2, y_mat_2,
+                                    mo_occ, mo_vir):
+        """
+        Gets the transition density between two excited states.
+
+        :param z_mat_1:
+            The excitation vector of the first state in matrix form
+            (N_occ x N_virt).
+        :param y_mat_1:
+            The de-excitation vector of the first state in matrix form
+            (N_occ x N_virt).
+        :param z_mat_2:
+            The excitation vector of the second state in matrix form
+            (N_occ x N_virt).
+        :param y_mat_2:
+            The de-excitation vector of the second state in matrix form
+            (N_occ x N_virt).
+        :param mo_occ:
+            The MO coefficients of occupied orbitals.
+        :param mo_vir:
+            The MO coefficients of virtual orbitals.
+
+        :return:
+            The transition density matrix in the AO basis.
+        """
+
+        esa_trans_dens = (
+            np.linalg.multi_dot(
+                [mo_vir, z_mat_1.T, z_mat_2, mo_vir.T]) -
+            np.linalg.multi_dot(
+                [mo_occ, z_mat_1, z_mat_2.T, mo_occ.T]))
+
+        esa_trans_dens += (
+            np.linalg.multi_dot(
+                [mo_vir, y_mat_1.T, y_mat_2, mo_vir.T]) -
+            np.linalg.multi_dot(
+                [mo_occ, y_mat_1, y_mat_2.T, mo_occ.T]))
+
+        return esa_trans_dens
+
     def write_detach_attach_cubes(self, cubic_grid, molecule, basis, root,
                                   dens_DA):
         """
