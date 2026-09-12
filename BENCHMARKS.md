@@ -5256,29 +5256,33 @@ is given.
 
 | basis | nao | conventional | simd | gain | iterations | energy, conventional | energy, simd |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| def2-svp | 246 | 3.19 | 2.13 | 1.49 | 21 | -675.8004490084 | -675.8004490084 |
-| def2-svpd | 366 | 8.27 | 5.67 | 1.46 | 22 | -675.8318417532 | -675.8318417532 |
-| def2-tzvp | 494 | 18.98 | 14.57 | 1.30 | 22 | -676.5554233126 | -676.5554233126 |
-| def2-tzvpd | 614 | 39.22 | 30.93 | 1.27 | 22 | -676.5575291942 | -676.5575291942 |
-| def2-qzvp | 1098 | 216.26 | 187.26 | 1.15 | 22 | -676.5876077721 | -676.5876077721 |
-| def2-qzvpd | 1218 | 355.57 | 310.98 | 1.14 | 23 | -676.5878809521 | -676.5878809522 |
+| def2-svp | 246 | 3.14 | 1.66 | 1.89 | 21 | -675.8004490084 | -675.8004490084 |
+| def2-svpd | 366 | 8.25 | 3.39 | 2.44 | 22 | -675.8318417532 | -675.8318417532 |
+| def2-tzvp | 494 | 18.58 | 6.30 | 2.95 | 22 | -676.5554233126 | -676.5554233126 |
+| def2-tzvpd | 614 | 39.00 | 9.83 | 3.97 | 22 | -676.5575291942 | -676.5575291942 |
+| def2-qzvp | 1098 | 216.78 | 33.64 | 6.44 | 22 | -676.5876077721 | -676.5876077721 |
+| def2-qzvpd | 1218 | 357.17 | 43.70 | 8.17 | 23 | -676.5878809521 | -676.5878809522 |
 
 **The two routes reach the same energy** to all ten digits in five of the six, and
 to nine in the sixth, in the same number of iterations throughout.
 
-These were taken again after all of the work done for a node with many cores, and
-every row of them moved by under three per cent, in both directions, which is the
-noise of this machine. **A molecule of this size on sixteen cores neither gained nor
-lost from any of it** -- the gains of that work are in the phases which only appear
-when there are cores enough to expose them.
+**The gain rises as the basis grows**, from 1.89 at a single zeta to 8.17 at a
+quadruple one.
 
-**The gain falls as the basis grows**, from 1.49 at a single zeta to 1.14 at a
-quadruple one. The fitting set is 1242 functions in every row and the occupied
-orbitals are fifty one in every row, so what grows is the part of the work where
-the new path has least to give: the products of the exchange are as thin as the
-occupied orbitals make them, and fifty one is thin. The same molecule with a larger
-fitting set, or a larger molecule, goes the other way, which the tables of tagrisso
-show.
+An earlier reading of this table had it falling, from 1.57 to 1.15, and drew a
+conclusion from that: the exchange is as thin as the occupied orbitals make it,
+fifty one is thin, and a larger basis was said to add work the new path could not
+help with. **That was not what the numbers meant.** Both routes were paying for one
+build of the four center integrals before either of them could start -- the exchange
+is formed from the occupied orbitals, and at the first iteration there are none, so
+the driver fell back to the build which needs none. That build grows with the basis
+far faster than anything else in the calculation. At def2-qzvpd it was about 290 of
+the 311 seconds the simd route took.
+
+Taking the orbitals of the first exchange from the density instead removed it from
+this route, and the trend reversed. The section on it is below. **The conventional
+route still pays it**, so part of every gain in this table is that fix rather than
+the driver, and a like for like comparison would be narrower.
 
 ### Against the numbers recorded earlier
 
@@ -5300,8 +5304,8 @@ one after the other in the same process, as for caffeine above.
 
 | molecule | nao | naux | occupied | conventional | simd | gain | iterations | energy, conventional | energy, simd |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| c60 | 840 | 4500 | 180 | 389.87 | 127.86 | 3.05 | 24 | -2269.9104513062 | -2269.9104513050 |
-| taxol | 1099 | 5489 | 223 | 622.40 | 233.57 | 2.66 | 23 | -2907.5505875335 | -2907.5505875339 |
+| c60 | 840 | 4500 | 180 | 391.53 | 91.28 | 4.29 | 24 | -2269.9104513062 | -2269.9104513050 |
+| taxol | 1099 | 5489 | 223 | 623.92 | 207.34 | 3.01 | 23 | -2907.5505875335 | -2907.5505875339 |
 
 Both converged, in the same number of iterations by either route, to energies which
 agree to the ninth decimal. The last digit or two differ, which is the order the
@@ -5312,10 +5316,10 @@ tables above:
 
 | molecule | auxiliary functions | occupied orbitals | simd against conventional |
 | --- | ---: | ---: | ---: |
-| caffeine | 1242 | 51 | 1.15 to 1.57 |
-| tagrisso | 3387 | 133 | 2.16 to 2.67 |
-| taxol | 5489 | 223 | 2.66 |
-| c60 | 4500 | 180 | 3.05 |
+| caffeine | 1242 | 51 | 1.89 to 8.17 |
+| tagrisso | 3387 | 133 | 2.73 to 4.23 |
+| taxol | 5489 | 223 | 3.01 |
+| c60 | 4500 | 180 | 4.29 |
 
 The advantage follows the fitting set and the occupied orbitals together, which is
 what the benchmarks of the exchange said it should: those two are the rows and the
@@ -5349,8 +5353,8 @@ routes one after the other in the same process.
 
 | basis | nao | conventional | simd | gain | iterations | energy, conventional | energy, simd |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| def2-svp | 598 | 75.71 | 35.53 | 2.13 | 23 | -4307.9982685253 | -4307.9982685252 |
-| def2-tzvp | 1074 | 371.88 | 181.98 | 2.04 | 24 | -4309.5477190075 | -4309.5477190075 |
+| def2-svp | 598 | 77.76 | 26.48 | 2.94 | 23 | -4307.9982685253 | -4307.9982685252 |
+| def2-tzvp | 1074 | 374.85 | 97.20 | 3.86 | 24 | -4309.5477190075 | -4309.5477190075 |
 
 Both converged, in the same number of iterations by either route, to energies which
 agree to the tenth decimal.
@@ -5368,11 +5372,11 @@ it further.**
 
 | molecule | auxiliary functions | occupied orbitals | simd against conventional |
 | --- | ---: | ---: | ---: |
-| caffeine | 1242 | 51 | 1.15 to 1.57 |
-| copper guanidinate | 3060 | 124 | 2.04 to 2.13 |
-| tagrisso | 3387 | 133 | 2.16 to 2.67 |
-| taxol | 5489 | 223 | 2.66 |
-| c60 | 4500 | 180 | 3.05 |
+| caffeine | 1242 | 51 | 1.89 to 8.17 |
+| copper guanidinate | 3060 | 124 | 2.94 to 3.86 |
+| tagrisso | 3387 | 133 | 2.73 to 4.23 |
+| taxol | 5489 | 223 | 3.01 |
+| c60 | 4500 | 180 | 4.29 |
 
 ### On the geometry, and on what would not fit
 
@@ -5426,8 +5430,8 @@ conventional route keeps.
 
 | route | time | iterations | energy |
 | --- | ---: | ---: | ---: |
-| RI-JK conventional | 795.36 | 23 | -14971.0615474580 |
-| RI-JK simd | 266.17 | 23 | -14971.0615474553 |
+| RI-JK conventional | 792.01 | 23 | -14971.0615474580 |
+| RI-JK simd | 193.43 | 23 | -14971.0615474553 |
 
 **Three times the conventional route**, and both converged in twenty three
 iterations, which a cut cluster with undercoordinated surface atoms was not certain
@@ -5437,12 +5441,12 @@ to do.
 
 | molecule | auxiliary functions | occupied orbitals | occupied over nao | simd against conventional |
 | --- | ---: | ---: | ---: | ---: |
-| caffeine | 1242 | 51 | 0.21 | 1.15 to 1.57 |
-| copper guanidinate | 3060 | 124 | 0.21 | 2.04 to 2.13 |
-| tagrisso | 3387 | 133 | 0.19 | 2.16 to 2.67 |
-| taxol | 5489 | 223 | 0.20 | 2.66 |
-| c60 | 4500 | 180 | 0.21 | 3.05 |
-| Ti15O30 | 6270 | 285 | 0.32 | 2.99 |
+| caffeine | 1242 | 51 | 0.21 | 1.89 to 8.17 |
+| copper guanidinate | 3060 | 124 | 0.21 | 2.94 to 3.86 |
+| tagrisso | 3387 | 133 | 0.19 | 2.73 to 4.23 |
+| taxol | 5489 | 223 | 0.20 | 3.01 |
+| c60 | 4500 | 180 | 0.21 | 4.29 |
+| Ti15O30 | 6270 | 285 | 0.32 | 4.09 |
 
 The oxide has the most occupied orbitals and much the largest fitting set of
 anything here, and it sits at the top of the table beside c60. Both quantities are
@@ -5478,14 +5482,14 @@ the new driver has of doing the same thing.
 
 | basis | nao | mode | time | against full | iterations | energy |
 | --- | ---: | --- | ---: | ---: | ---: | ---: |
-| def2-svp | 683 | full four-center | 151.48 | 1.00 | 21 | -1609.0900864188 |
-| | | RI-JK veloxchem | 97.19 | 1.56 | 23 | -1609.0890443496 |
-| | | RI-JK simd, in memory | 40.02 | 3.79 | 23 | -1609.0890443498 |
-| | | RI-JK simd, direct | 81.10 | 1.87 | 23 | -1609.0890443496 |
-| def2-svpd | 1010 | full four-center | 1179.59 | 1.00 | 21 | -1609.1565808182 |
-| | | RI-JK veloxchem | 359.15 | 3.28 | 24 | -1609.1555344827 |
-| | | RI-JK simd, in memory | 134.95 | 8.74 | 24 | -1609.1555344829 |
-| | | RI-JK simd, direct | 205.50 | 5.74 | 24 | -1609.1555344827 |
+| def2-svp | 683 | full four-center | 152.37 | 1.00 | 21 | -1609.0900864188 |
+| | | RI-JK veloxchem | 95.59 | 1.59 | 23 | -1609.0890443496 |
+| | | RI-JK simd, in memory | 35.07 | 4.35 | 23 | -1609.0890443498 |
+| | | RI-JK simd, direct | 79.04 | 1.93 | 23 | -1609.0890443496 |
+| def2-svpd | 1010 | full four-center | 1182.67 | 1.00 | 21 | -1609.1565808182 |
+| | | RI-JK veloxchem | 359.81 | 3.29 | 24 | -1609.1555344827 |
+| | | RI-JK simd, in memory | 85.12 | 13.89 | 24 | -1609.1555344829 |
+| | | RI-JK simd, direct | 162.13 | 7.29 | 24 | -1609.1555344827 |
 
 **The three routes of the approximation agree to the ninth decimal**, and differ
 from the four center build by the error of the approximation alone, a thousandth of
@@ -5500,9 +5504,9 @@ holds them sweeps them once for the whole calculation.
 
 | | def2-svp | def2-svpd |
 | --- | ---: | ---: |
-| against the way which holds them | 2.03 slower | 1.52 slower |
-| against the route VeloxChem had | **1.20 faster** | **1.75 faster** |
-| against the four center build | **1.87 faster** | **5.74 faster** |
+| against the way which holds them | 2.25 slower | 1.90 slower |
+| against the route VeloxChem had | **1.21 faster** | **2.22 faster** |
+| against the four center build | **1.93 faster** | **7.29 faster** |
 
 A factor of two for holding nothing, not the five or ten a count of the passes
 would suggest. The reason is in the section on the setup: **the three-center
@@ -5898,6 +5902,11 @@ at restricted Hartree-Fock, the four builds one after another in a single proces
 | | RI-JK simd, in memory | 104.54 | 4.356 | 1.49 |
 | | RI-JK simd, direct | **51.80** | **2.158** | **3.01** |
 
+**These were taken before the first exchange was fixed**, two sections below, and
+every row of them carries one build of the four center integrals which the simd
+rows no longer pay. On this node that build is about 7.4 seconds, so the two simd
+rows should each fall by about six once measured again.
+
 The three ways of the approximation agree to a ten thousand millionth of a hartree,
 as they do everywhere else.
 
@@ -5913,21 +5922,67 @@ direct way has no such batch.
 It is within six per cent of the RI-JK route VeloxChem had, where on the laptop it
 was 3.3 times behind. Screening divides over cores well; the old route does not.
 
-### More than half an iteration is no longer the Fock matrix
+### What an iteration spends outside the Fock matrix
 
-The direct way at def2-svpd takes **2.158 seconds an iteration**, and a Fock build
-of the same molecule, basis, mode, threads and binding takes **0.878**. So **1.28
-seconds of every iteration, 59 per cent, is everything else** -- the
-diagonalisation, the DIIS, the density, the transforms.
+The direct way at def2-svpd took **2.158 seconds an iteration** on the node, against
+a Fock build of **0.878** for the same molecule, basis, mode, threads and binding.
+That looked like 1.28 seconds an iteration of something else, and a first reading of
+it blamed the diagonalisation.
 
-That is what a build falling from 3.4 seconds to under one does to the rest of a
-calculation. The remainder was noise when the build was slow and is now the
-majority, and it is not this driver: it is numpy and LAPACK on matrices of a
-thousand by a thousand, where starting a hundred and twenty eight threads costs
-more than the work being divided is worth.
+Profiling a whole calculation said otherwise. The labels the driver keeps -- the
+error vectors, the effective Fock matrix, the new orbitals, the new density -- come
+to 0.19 seconds an iteration between them, and the diagonalisation is 0.06 of that.
+**The rest was not an iteration cost at all.** It was one call, before the first
+iteration, to the build of the four center integrals: on this machine 53.99 seconds
+of a 207 second calculation, spread over twenty four iterations by the arithmetic
+and made to look like overhead.
 
-Nothing in the sections above touched it, because nothing in the sections above
-measured it. A driver benchmark cannot see it by construction.
+The reason is that the exchange is formed from the occupied orbitals, and at the
+first iteration there are none, so **both** resolution of the identity routes fell
+back to the build which needs none. Every RI-JK calculation paid one exact build
+before it could start. The section below removes it from the simd route.
+
+What is left after that, on the node, is about 0.97 seconds an iteration against
+0.23 here -- real, and larger where the threads are many, which is the shape of
+starting a hundred and twenty eight threads for work of a thousand rows. It has not
+been profiled on the node and is not explained by anything measured here.
+
+### The first exchange, from the density which has the orbitals in it
+
+Any C whose product with its own transpose is the density gives that density's
+exchange. The eigenvectors of the density, scaled by the roots of its eigenvalues,
+are such a C, and the initial guess is a sum of atomic densities whose rank is the
+occupied orbitals of the atoms: **218 for tagrisso, against 133 occupied orbitals of
+the molecule and 683 or 1010 basis functions, and the same 218 in either basis.**
+The eigenvalues below it are at the level of the arithmetic, 5e-16, so the rank is
+sharp and no threshold has to be chosen carefully.
+
+So the first exchange costs about 1.64 times an ordinary one, in place of a build of
+the four center integrals. What that is worth, on this machine, with the energies
+and the iteration counts unchanged in every case:
+
+| calculation | before | after | |
+| --- | ---: | ---: | ---: |
+| caffeine def2-tzvp, in memory | 14.77 | 6.11 | 2.42 |
+| caffeine def2-tzvp, direct | 20.10 | 11.20 | 1.79 |
+| tagrisso def2-svpd, in memory | 137.25 | 84.36 | 1.63 |
+| tagrisso def2-svpd, direct | 210.36 | 161.16 | 1.31 |
+
+The savings match what the arithmetic says they should to within a second: direct
+saved 44.3 seconds where one build of 54 replaced by 1.64 of 6 predicts 44, and the
+way which holds the B vectors saved 50.6 against 48.6 predicted. **The way which
+holds them gains more**, as its own builds are cheaper and the fixed cost was a
+larger share of them.
+
+It is worth most where the four center build is dearest beside the rest of the
+calculation, which is the small molecule in the large basis: caffeine in def2-qzvpd
+went from 311 seconds to 44.
+
+**The conventional route still pays it.** It takes the orbitals as an object rather
+than as a matrix of coefficients, so giving it the same treatment is more than the
+one change made here. Every table in this file which sets the two side by side
+therefore compares a route with this fixed against a route without it, and part of
+each gain is this rather than the driver.
 
 ### A note on measuring this at all
 
