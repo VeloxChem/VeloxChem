@@ -6089,16 +6089,33 @@ orbitals by twenty one. **The eigen decomposition gains only 2.1**, from 0.322 t
 does. At 268 gigaflops in 0.152 seconds it is reaching 1.76 teraflops, which is as
 much as it is going to give. That one is real work.
 
-It also corrects something this file nearly concluded. Across the basis sets the
-part outside the Fock build grows as the cube of the basis while the build grows as
-its square, since the fitting set does not grow with the orbital set, and the two
-were seen to cross over at def2-qzvp: 48 per cent Fock build, 52 per cent
-everything else. **Most of that crossover was the single core.** With numpy given
-the machine it is 74 against 26, which is where the smaller basis sets sit. The
-exponents are still what they are and the crossing will come, but it comes much
-later than the pinned measurement suggested.
+### It also undoes a conclusion this file nearly reached
+
+Pinned, the part outside the Fock build appeared to grow as the cube of the basis
+while the build grew as its square -- the fitting set does not grow with the orbital
+set -- and the two were seen to cross at def2-qzvp: 48 per cent Fock build against
+52 everything else. The reading was that the calculation around the driver would
+overtake the driver as the basis grew.
+
+The three basis sets measured again, with numpy given the machine:
+
+| basis | nao | the iteration | the Fock build | the rest | the rest, as a share |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| def2-svpd | 1010 | 1.134 | 0.90 | 0.23 | 21% |
+| def2-tzvp | 1345 | 1.850 | 1.47 | 0.38 | 21% |
+| def2-qzvp | 3099 | 9.405 | 7.00 | 2.41 | 26% |
+
+and the whole calculations, 32.88 to 27.23, 52.74 to 44.41, 355.95 to 225.72. The
+Fock build is unmoved in every row, which is what makes the three comparisons
+clean.
+
+**The share is flat at about a fifth, and there is no crossing in sight.** Taking
+the two steps as they stand, the part outside the build grows with exponents of 1.68
+and 2.21 against the build's 1.70 and 1.87. Near enough the same. **The cube was the
+single core, not the arithmetic**: an eigen decomposition divides over the cores
+better the larger it is, so its cost climbs far more slowly than its flop count, and
+it was only the pinned measurement which made it look otherwise.
 
 **The numbers of the sections above this one were taken pinned**, so the part of
-them outside the Fock build is overstated -- by less at the smaller basis sets,
-where the cube has not yet grown into anything, and by a factor of three at
-def2-qzvp.
+them outside the Fock build is overstated -- by a fifth at def2-svpd and by a factor
+of three at def2-qzvp.
