@@ -5859,6 +5859,59 @@ divided harder: it holds a triangle for every thread and sums them at the end, s
 both the memory it takes and the sum at the end grow with the cores. It no longer
 grows in time, which was the defect worth fixing, but it will not fall much either.
 
+That 1.17 is the ceiling for the Fock build alone, which is what every section above
+this one measures. The section after it measures a whole calculation and finds most
+of an iteration is no longer the Fock build at all, so the ceiling on the build is
+not the ceiling on the calculation.
+
+### The whole calculation, on the node
+
+Everything above times a Fock build. This times what an SCF does with it: tagrisso
+at restricted Hartree-Fock, the four builds one after another in a single process,
+128 threads, bound, against the rebuilt OpenBLAS.
+
+| basis | build | time | per iteration | against the exact one |
+| --- | --- | ---: | ---: | ---: |
+| def2-svp | four center | 33.21 | 1.581 | 1.00 |
+| | RI-JK veloxchem | 44.92 | 1.953 | 0.74 |
+| | RI-JK simd, in memory | 48.71 | 2.118 | 0.68 |
+| | RI-JK simd, direct | **18.77** | **0.816** | **1.77** |
+| def2-svpd | four center | 155.85 | 7.421 | 1.00 |
+| | RI-JK veloxchem | 146.86 | 6.119 | 1.06 |
+| | RI-JK simd, in memory | 104.54 | 4.356 | 1.49 |
+| | RI-JK simd, direct | **51.80** | **2.158** | **3.01** |
+
+The three ways of the approximation agree to a ten thousand millionth of a hartree,
+as they do everywhere else.
+
+**The way which holds the B vectors is now the slower of the two, by two times.**
+On the laptop it was 1.53 times the faster. On the node it is beaten by the direct
+way at both basis sets and, in the smaller one, by the build which makes no
+approximation at all. The two differ in one thing which matters here: the way which
+holds them forms the W matrices in batches of sixty four auxiliary functions, so a
+call has sixty four pieces of work to divide however many threads are waiting. The
+direct way has no such batch.
+
+**The build which makes no approximation is also much better than the laptop said.**
+It is within six per cent of the RI-JK route VeloxChem had, where on the laptop it
+was 3.3 times behind. Screening divides over cores well; the old route does not.
+
+### More than half an iteration is no longer the Fock matrix
+
+The direct way at def2-svpd takes **2.158 seconds an iteration**, and a Fock build
+of the same molecule, basis, mode, threads and binding takes **0.878**. So **1.28
+seconds of every iteration, 59 per cent, is everything else** -- the
+diagonalisation, the DIIS, the density, the transforms.
+
+That is what a build falling from 3.4 seconds to under one does to the rest of a
+calculation. The remainder was noise when the build was slow and is now the
+majority, and it is not this driver: it is numpy and LAPACK on matrices of a
+thousand by a thousand, where starting a hundred and twenty eight threads costs
+more than the work being divided is worth.
+
+Nothing in the sections above touched it, because nothing in the sections above
+measured it. A driver benchmark cannot see it by construction.
+
 ### A note on measuring this at all
 
 Two things made the laptop useless for this question, and both are worth knowing
