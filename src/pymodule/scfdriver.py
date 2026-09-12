@@ -277,6 +277,13 @@ class ScfDriver:
         # timing and profiling
         self.timing = False
         self.profiling = False
+
+        # NOTE: the smallest eigenvalue of the initial density, relative to the
+        # largest, whose eigenvector is kept as an orbital of the first exchange.
+        # The guess is positive semidefinite and its rank is sharp -- the
+        # eigenvalues below it are at the level of the arithmetic -- so this only
+        # has to separate them from nothing.
+        self.ri_guess_thresh = 1.0e-10
         self.memory_profiling = False
         self.memory_tracing = False
 
@@ -2544,12 +2551,30 @@ class ScfDriver:
 
         # the occupied orbitals, which the exchange is formed from
 
-        nocc = int(np.sum(self.molecular_orbitals.occa_to_numpy()))
+        if self.molecular_orbitals.is_empty():
+            # NOTE: the first build has no orbitals yet, as they come from the
+            # matrix it is about to make. Any C with C C^T equal to the density
+            # gives that density's exchange, and the eigenvectors of the density
+            # scaled by the roots of its eigenvalues are such a C. The initial
+            # guess is a sum of atomic densities, whose rank is the occupied
+            # orbitals of the atoms and is about half again the occupied orbitals
+            # of the molecule, so this costs about that much more than an ordinary
+            # build -- against a build of the four center integrals, which is what
+            # it replaces and which is an order of magnitude dearer.
+            occupation, vectors = np.linalg.eigh(density)
 
-        coeffs = PackedMatrix(nao, nocc, mat_t.general)
-        coeffs.from_numpy(
-            np.ascontiguousarray(
-                self.molecular_orbitals.alpha_to_numpy()[:, :nocc]))
+            kept = occupation > self.ri_guess_thresh * max(occupation[-1], 1.0)
+
+            orbitals = np.ascontiguousarray(vectors[:, kept] *
+                                            np.sqrt(occupation[kept]))
+        else:
+            nocc = int(np.sum(self.molecular_orbitals.occa_to_numpy()))
+
+            orbitals = np.ascontiguousarray(
+                self.molecular_orbitals.alpha_to_numpy()[:, :nocc])
+
+        coeffs = PackedMatrix(nao, orbitals.shape[1], mat_t.general)
+        coeffs.from_numpy(orbitals)
 
         packed_density = PackedMatrix(nao, nao, mat_t.symmetric)
         packed_density.from_numpy(np.ascontiguousarray(density))
@@ -2684,8 +2709,7 @@ class ScfDriver:
         if self.ri_coulomb and fock_type == 'j':
             fock_mat = self._ri_drv.compute(den_mat_for_fock, 'j')
             fock_mat_np = fock_mat.to_numpy()
-        elif self.ri_jk and self.ri_jk_simd and fock_type != 'j' and (
-                not self.molecular_orbitals.is_empty()):
+        elif self.ri_jk and self.ri_jk_simd and fock_type != 'j':
             # NOTE: the driver returns twice the Coulomb less the scaled exchange
             # already, which is the matrix this branch is asked for, so nothing is
             # scaled here.
