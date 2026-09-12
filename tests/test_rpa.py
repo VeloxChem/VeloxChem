@@ -222,10 +222,10 @@ class TestRPA:
             esa_results = lr_results['esa_results']
 
             ref_excitation_energies = np.array([0.0706309931, 0.0887848965])
-            ref_oscillator_strengths = np.array([0.1379665336, 0.0013975526])
+            ref_oscillator_strengths = np.array([0.1379630687, 0.0013910509])
             ref_transition_dipoles = np.array([
-                [-0.0794559666, -0.5972010928, 1.6022021187],
-                [0.1515690613, -0.0251919303, -0.0018734103],
+                [-0.0794549688, -0.5971935937, 1.6021820000],
+                [0.1512160878, -0.0251332634, -0.0018690476],
             ])
 
             src_states = [item['from_state'] for item in esa_results]

@@ -764,9 +764,9 @@ class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
 
                             esa_trans_dens += (
                                 np.linalg.multi_dot(
-                                    [mo_occ, y_mat_1, y_mat_2.T, mo_occ.T]) -
+                                    [mo_vir, y_mat_1.T, y_mat_2, mo_vir.T]) -
                                 np.linalg.multi_dot(
-                                    [mo_vir, y_mat_1.T, y_mat_2, mo_vir.T]))
+                                    [mo_occ, y_mat_1, y_mat_2.T, mo_occ.T]))
 
                             esa_trans_dipole = np.array([
                                 np.sum(esa_trans_dens * dipole_integrals[i])
