@@ -269,6 +269,15 @@ class CSimdRIFockDriver
     /// point where the threads are busy, as the contraction of a batch is what is
     /// parallelized and not the batches.
     static constexpr size_t _batch_budget = size_t{4} * 1024 * 1024 * 1024;
+
+    /// @brief The memory one thread may hold the columns of one contraction of the
+    /// B vectors in, which sets how many atom pairs go into one product.
+    /// @note The contraction gathers the integrals of every atom basis group into
+    /// one buffer and multiplies the metric by it. Both sides of that product are
+    /// the whole auxiliary basis deep, so a chunk of the atom pairs costs the pair
+    /// of buffers this many bytes and the count follows from it rather than from
+    /// the block, which has no bound of its own.
+    static constexpr size_t _bq_columns = size_t{32} * 1024 * 1024;
 };
 
 #endif /* SimdRIFockDriver_hpp */
