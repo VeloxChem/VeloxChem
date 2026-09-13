@@ -6028,6 +6028,96 @@ one change made here. Every table in this file which sets the two side by side
 therefore compares a route with this fixed against a route without it, and part of
 each gain is this rather than the driver.
 
+### The four builds on the node, and which mode to choose
+
+Everything in the sections above was measured on a laptop with sixteen cores. The
+same two molecules on the node, 128 cores, bound, with numpy given the machine.
+
+Caffeine, Hartree-Fock, def2-universal-jkfit with 1242 auxiliary functions in every
+row:
+
+| basis | nao | four center | veloxchem | in memory | direct | direct against exact |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| def2-svp | 246 | 7.82 | 2.44 | 5.11 | **2.28** | 3.43 |
+| def2-svpd | 366 | 12.23 | 4.26 | 7.60 | **3.43** | 3.57 |
+| def2-tzvp | 494 | 35.63 | 7.94 | 9.71 | **4.26** | 8.36 |
+| def2-tzvpd | 614 | 61.82 | 13.33 | 13.94 | **5.57** | 11.10 |
+| def2-qzvp | 1098 | 460.01 | 61.76 | 34.58 | **15.24** | **30.19** |
+
+Tagrisso, the same fitting set with 3387 functions:
+
+| basis | nao | four center | veloxchem | in memory | direct | direct against exact |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| def2-svp | 683 | 29.74 | 41.71 | 43.93 | **12.82** | 2.32 |
+| def2-svpd | 1010 | 142.31 | 142.31 | 87.72 | **29.48** | 4.83 |
+| def2-tzvp | 1345 | 331.07 | 215.75 | 150.41 | **52.25** | 6.34 |
+
+### The way which holds the B vectors loses on a node, and by a constant
+
+**On sixteen cores the way which holds them is about twice the speed of the direct
+way. On a hundred and twenty eight it is between two and three times slower.** The
+code is the same in both.
+
+| in memory against direct | caffeine | tagrisso |
+| --- | ---: | ---: |
+| def2-svp | 2.24 | 3.43 |
+| def2-svpd | 2.22 | 2.98 |
+| def2-tzvp | 2.28 | 2.88 |
+| def2-tzvpd | 2.50 | |
+| def2-qzvp | 2.27 | |
+
+**The ratio hardly moves across basis sets spanning 246 to 1345 functions**, which
+is what a fixed quantity predicts and not what anything which grows with the
+calculation would. It is `_w_batch`: the way which holds the B vectors forms its W
+matrices sixty four auxiliary functions at a time, so a call has sixty four pieces
+of work however many threads are waiting. Sixty four divides over sixteen cores and
+leaves half of a hundred and twenty eight idle. The direct way has no such batch.
+
+**Which mode to choose is settled by the cores, not by the molecule** -- until that
+batch is sized from the threads rather than fixed.
+
+### What the approximation is worth depends on the machine
+
+| caffeine, best route against the exact build | sixteen cores | 128 cores |
+| --- | ---: | ---: |
+| def2-svp | 7.9 | 3.4 |
+| def2-svpd | 15.4 | 3.6 |
+| def2-tzvp | 29.0 | 8.4 |
+| def2-tzvpd | 46.0 | 11.1 |
+
+**The approximation is worth two to four times less on the larger machine**, because
+the build which makes none divides over cores well and caffeine is too small to keep
+a hundred and twenty eight of them busy: at def2-svp the whole calculation is 2.28
+seconds. The denominator falls faster than the numerator.
+
+**Caffeine at def2-svp is quicker on the laptop than on the node**: 1.57 seconds of
+the way which holds the B vectors against 2.28 of the direct way, with a ninth of
+the cores. The exact build does go 1.6 times quicker on the node, having work enough
+to divide, but the approximation has so little left to do that a hundred and twenty
+eight cores cannot be given any of it. The molecule is the limit there, not the
+machine.
+
+It returns as the basis grows. At def2-qzvp the direct way is thirty times the exact
+build on the node, the largest figure in this file, and there the exact build has
+work enough to spread. **Its cost also steepens**: from def2-tzvpd to def2-qzvp it
+grows as the 3.45 power of the basis where the earlier steps gave 2.5, as screening
+loses its grip on diffuse and high angular momentum functions.
+
+**At def2-svp both older routes lose to making no approximation at all** -- 41.71
+and 43.93 seconds against 29.74 for tagrisso. On a node of this size VeloxChem's
+RI-JK is not worth using below a thousand basis functions, and at def2-svpd it ties
+the exact build to the second.
+
+### A caveat on the tables above
+
+The four builds of a row are measured one after another in a single process, and the
+direct way is measured last, after three others have taken and released gigabytes.
+Against the same calculation run alone this morning -- 27.23 seconds at def2-svpd and
+44.41 at def2-tzvp -- the table reads 29.48 and 52.25. **The direct way is charged 8
+and 18 per cent it does not owe**, and the penalty grows with the basis. The order of
+the rows is not affected, but its margin is larger than shown.
+
+
 ### A note on measuring this at all
 
 Two things made the laptop useless for this question, and both are worth knowing
