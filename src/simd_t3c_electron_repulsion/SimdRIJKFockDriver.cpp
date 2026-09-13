@@ -127,6 +127,46 @@ struct CDirectProfile
     }
 };
 
+/// @brief The times of the phases of one Fock build of the mode which holds the B
+/// vectors.
+/// @note The phases are those of the direct mode which this one does not repeat.
+/// It forms no integrals, so what is left is the Coulomb matrix, the transformation
+/// which forms the W matrices of a range, and the exchange. The exchange writes a
+/// line of its own from the driver beneath this one, and is counted here as well so
+/// that what the phases leave over is the rest and nothing else.
+struct CInMemoryProfile
+{
+    double coulomb = 0.0;
+    double allocate = 0.0;
+    double transform = 0.0;
+    double exchange = 0.0;
+    double total = 0.0;
+
+    /// @brief Writes the phases of this build, and their share of it.
+    auto report() const -> void
+    {
+        static size_t builds = 0;
+
+        builds++;
+
+        const auto accounted = coulomb + allocate + transform + exchange;
+
+        const char *names[] = {"coulomb", "allocate", "transform", "exchange", "rest"};
+
+        const double times[] = {coulomb, allocate, transform, exchange, total - accounted};
+
+        std::printf("RIJK memory build %zu on %d threads, %.3f s\n", builds, omp::get_number_of_threads(), total);
+
+        for (size_t i = 0; i < 5; i++)
+        {
+            std::printf("RIJK   %-12s %9.3f s %6.1f %%\n", names[i], times[i],
+                        (total > 0.0) ? 100.0 * times[i] / total : 0.0);
+        }
+
+        std::fflush(stdout);
+    }
+};
+
 }  // namespace
 
 auto
@@ -266,15 +306,30 @@ CSimdRIJKFockDriver::compute(const CPackedMatrix &density,
 
     if (_mode == rimode::direct) return _compute_direct(density, coefficients, exchange_scaling_factor);
 
+    CInMemoryProfile profile;
+
+    const auto profile_start = prof_clock::now();
+
     // NOTE: the density of a closed shell calculation is that of one spin, so the
     // Coulomb matrix enters twice and the exchange once, scaled by the fraction of
     // exact exchange the functional asks for.
+
+    const auto mark_coulomb = prof_clock::now();
 
     auto fock = _drv.compute_fock_matrix(_bq_vectors, _basis, _aux_basis, density);
 
     fock.scale(2.0);
 
-    if (exchange_scaling_factor == 0.0) return fock;
+    profile.coulomb += prof_since(mark_coulomb);
+
+    if (exchange_scaling_factor == 0.0)
+    {
+        profile.total = prof_since(profile_start);
+
+        if (prof_wanted()) profile.report();
+
+        return fock;
+    }
 
     const auto nao = _basis.dimensions_of_basis();
 
@@ -285,7 +340,14 @@ CSimdRIJKFockDriver::compute(const CPackedMatrix &density,
     errors::assertMsgCritical((coefficients.get_type() == mat_t::general) && (coefficients.number_of_rows() == nao),
                               std::string("RIJKFockDriver: The orbital coefficients do not match the molecular basis"));
 
-    if (norbitals == 0) return fock;
+    if (norbitals == 0)
+    {
+        profile.total = prof_since(profile_start);
+
+        if (prof_wanted()) profile.report();
+
+        return fock;
+    }
 
     // NOTE: the W matrices of a range are formed into storage the driver keeps, so
     // that the ranges of a call and the calls of a calculation reuse it. The number
@@ -305,6 +367,8 @@ CSimdRIJKFockDriver::compute(const CPackedMatrix &density,
 
     const auto nbatch = std::min({naux, by_memory, std::max(_w_batch, by_threads)});
 
+    const auto mark_allocate = prof_clock::now();
+
     if ((_w_vectors.size() != nbatch) || (_w_vectors.front().number_of_columns() != norbitals) ||
         (_w_vectors.front().number_of_rows() != nao))
     {
@@ -318,6 +382,8 @@ CSimdRIJKFockDriver::compute(const CPackedMatrix &density,
         }
     }
 
+    profile.allocate += prof_since(mark_allocate);
+
     for (size_t first = 0; first < naux; first += nbatch)
     {
         const auto last = std::min(first + nbatch, naux);
@@ -327,11 +393,19 @@ CSimdRIJKFockDriver::compute(const CPackedMatrix &density,
         // NOTE: the last range is shorter than the others, and the storage is
         // handed to the transformation as the range it is asked to fill.
 
+        const auto mark_transform = prof_clock::now();
+
         if (count == nbatch)
         {
             _drv.compute_w_vectors(_bq_vectors, _basis, _aux_basis, coefficients, first, last, _w_vectors);
 
+            profile.transform += prof_since(mark_transform);
+
+            const auto mark_exchange = prof_clock::now();
+
             _drv.compute_exchange_matrix(_w_vectors, fock, -exchange_scaling_factor);
+
+            profile.exchange += prof_since(mark_exchange);
         }
         else
         {
@@ -339,9 +413,19 @@ CSimdRIJKFockDriver::compute(const CPackedMatrix &density,
 
             _drv.compute_w_vectors(_bq_vectors, _basis, _aux_basis, coefficients, first, last, tail);
 
+            profile.transform += prof_since(mark_transform);
+
+            const auto mark_exchange = prof_clock::now();
+
             _drv.compute_exchange_matrix(tail, fock, -exchange_scaling_factor);
+
+            profile.exchange += prof_since(mark_exchange);
         }
     }
+
+    profile.total = prof_since(profile_start);
+
+    if (prof_wanted()) profile.report();
 
     return fock;
 }
