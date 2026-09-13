@@ -12039,7 +12039,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
             d_pair_inds_i_for_K_pd, d_pair_inds_k_for_K_pd, d_Q_K_pd, d_Q_K_dd, d_pair_displs_K_pd, d_pair_displs_K_dd, d_pair_counts_K_pd, d_pair_counts_K_dd,
             static_cast<uint32_t>(pair_inds_count_for_K_pd), TILE_DIM_Y_K, TILE_DIM_X_K, dd_max_D, mixed_precision_threshold_k, eri_threshold, stream, d_exchange_work_counts);
-            gpu::computeExchangeFockPDDD0_K4_M23_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+            gpu::computeExchangeFockPDDD0_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_pd,
             d_pair_inds_k_for_K_pd,
@@ -12065,7 +12065,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             omega,
             d_exchange_prec_cut_flat,
             d_exchange_displ_cuts);
-            gpu::computeExchangeFockPDDD1_K4_M23_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+            gpu::computeExchangeFockPDDD1_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_pd,
             d_pair_inds_k_for_K_pd,
@@ -12091,7 +12091,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             omega,
             d_exchange_prec_cut_flat,
             d_exchange_displ_cuts);
-            gpu::computeExchangeFockPDDD2_K4_M23_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+            gpu::computeExchangeFockPDDD2_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_pd,
             d_pair_inds_k_for_K_pd,
@@ -12117,7 +12117,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             omega,
             d_exchange_prec_cut_flat,
             d_exchange_displ_cuts);
-            gpu::computeExchangeFockPDDD3_K4_M23_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+            gpu::computeExchangeFockPDDD3_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_pd,
             d_pair_inds_k_for_K_pd,
@@ -12143,7 +12143,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             omega,
             d_exchange_prec_cut_flat,
             d_exchange_displ_cuts);
-            gpu::computeExchangeFockPDDD0_K4_M23_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+            gpu::computeExchangeFockPDDD0_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_pd,
             d_pair_inds_k_for_K_pd,
@@ -12170,7 +12170,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             d_exchange_prec_cut_flat,
             d_exchange_screen_cut_flat,
             d_exchange_displ_cuts);
-            gpu::computeExchangeFockPDDD1_K4_M23_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+            gpu::computeExchangeFockPDDD1_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_pd,
             d_pair_inds_k_for_K_pd,
@@ -12197,7 +12197,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             d_exchange_prec_cut_flat,
             d_exchange_screen_cut_flat,
             d_exchange_displ_cuts);
-            gpu::computeExchangeFockPDDD2_K4_M23_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+            gpu::computeExchangeFockPDDD2_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_pd,
             d_pair_inds_k_for_K_pd,
@@ -12224,7 +12224,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             d_exchange_prec_cut_flat,
             d_exchange_screen_cut_flat,
             d_exchange_displ_cuts);
-            gpu::computeExchangeFockPDDD3_K4_M23_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+            gpu::computeExchangeFockPDDD3_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_pd,
             d_pair_inds_k_for_K_pd,
@@ -12722,7 +12722,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
             d_pair_inds_i_for_K_dd, d_pair_inds_k_for_K_dd, d_Q_K_dp, d_Q_K_dd, d_pair_displs_K_dp, d_pair_displs_K_dd, d_pair_counts_K_dp, d_pair_counts_K_dd,
             static_cast<uint32_t>(pair_inds_count_for_K_dd), TILE_DIM_Y_K, TILE_DIM_X_K, pd_max_D, mixed_precision_threshold_k, eri_threshold, stream, d_exchange_work_counts);
-            gpu::computeExchangeFockDPDD0_K4_RS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+            gpu::computeExchangeFockDPDD0_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_dd,
             d_pair_inds_k_for_K_dd,
@@ -12748,7 +12748,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             omega,
             d_exchange_prec_cut_flat,
             d_exchange_displ_cuts);
-            gpu::computeExchangeFockDPDD1_K4_RS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+            gpu::computeExchangeFockDPDD1_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_dd,
             d_pair_inds_k_for_K_dd,
@@ -12774,7 +12774,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             omega,
             d_exchange_prec_cut_flat,
             d_exchange_displ_cuts);
-            gpu::computeExchangeFockDPDD2_K4_RS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+            gpu::computeExchangeFockDPDD2_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_dd,
             d_pair_inds_k_for_K_dd,
@@ -12800,7 +12800,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             omega,
             d_exchange_prec_cut_flat,
             d_exchange_displ_cuts);
-            gpu::computeExchangeFockDPDD3_K4_RS_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+            gpu::computeExchangeFockDPDD3_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_dd,
             d_pair_inds_k_for_K_dd,
@@ -12826,7 +12826,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             omega,
             d_exchange_prec_cut_flat,
             d_exchange_displ_cuts);
-            gpu::computeExchangeFockDPDD0_K4_RS_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+            gpu::computeExchangeFockDPDD0_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_dd,
             d_pair_inds_k_for_K_dd,
@@ -12853,7 +12853,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             d_exchange_prec_cut_flat,
             d_exchange_screen_cut_flat,
             d_exchange_displ_cuts);
-            gpu::computeExchangeFockDPDD1_K4_RS_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+            gpu::computeExchangeFockDPDD1_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_dd,
             d_pair_inds_k_for_K_dd,
@@ -12880,7 +12880,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             d_exchange_prec_cut_flat,
             d_exchange_screen_cut_flat,
             d_exchange_displ_cuts);
-            gpu::computeExchangeFockDPDD2_K4_RS_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+            gpu::computeExchangeFockDPDD2_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_dd,
             d_pair_inds_k_for_K_dd,
@@ -12907,7 +12907,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             d_exchange_prec_cut_flat,
             d_exchange_screen_cut_flat,
             d_exchange_displ_cuts);
-            gpu::computeExchangeFockDPDD3_K4_RS_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+            gpu::computeExchangeFockDPDD3_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_dd,
             d_pair_inds_k_for_K_dd,
@@ -12949,7 +12949,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
             d_pair_inds_i_for_K_dd, d_pair_inds_k_for_K_dd, d_Q_K_dd, d_Q_K_dp, d_pair_displs_K_dd, d_pair_displs_K_dp, d_pair_counts_K_dd, d_pair_counts_K_dp,
             static_cast<uint32_t>(pair_inds_count_for_K_dd), TILE_DIM_Y_K, TILE_DIM_X_K, dp_max_D, mixed_precision_threshold_k, eri_threshold, stream, d_exchange_work_counts);
-            gpu::computeExchangeFockDDDP0_K5_OLD_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+            gpu::computeExchangeFockDDDP0_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_dd,
             d_pair_inds_k_for_K_dd,
@@ -12975,7 +12975,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             omega,
             d_exchange_prec_cut_flat,
             d_exchange_displ_cuts);
-            gpu::computeExchangeFockDDDP1_K5_OLD_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+            gpu::computeExchangeFockDDDP1_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_dd,
             d_pair_inds_k_for_K_dd,
@@ -13001,7 +13001,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             omega,
             d_exchange_prec_cut_flat,
             d_exchange_displ_cuts);
-            gpu::computeExchangeFockDDDP2_K5_OLD_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+            gpu::computeExchangeFockDDDP2_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_dd,
             d_pair_inds_k_for_K_dd,
@@ -13027,7 +13027,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             omega,
             d_exchange_prec_cut_flat,
             d_exchange_displ_cuts);
-            gpu::computeExchangeFockDDDP3_K5_OLD_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+            gpu::computeExchangeFockDDDP3_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_dd,
             d_pair_inds_k_for_K_dd,
@@ -13053,7 +13053,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             omega,
             d_exchange_prec_cut_flat,
             d_exchange_displ_cuts);
-            gpu::computeExchangeFockDDDP4_K5_OLD_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+            gpu::computeExchangeFockDDDP4_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_dd,
             d_pair_inds_k_for_K_dd,
@@ -13079,7 +13079,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             omega,
             d_exchange_prec_cut_flat,
             d_exchange_displ_cuts);
-            gpu::computeExchangeFockDDDP0_K5_OLD_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+            gpu::computeExchangeFockDDDP0_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_dd,
             d_pair_inds_k_for_K_dd,
@@ -13106,7 +13106,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             d_exchange_prec_cut_flat,
             d_exchange_screen_cut_flat,
             d_exchange_displ_cuts);
-            gpu::computeExchangeFockDDDP1_K5_OLD_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+            gpu::computeExchangeFockDDDP1_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_dd,
             d_pair_inds_k_for_K_dd,
@@ -13133,7 +13133,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             d_exchange_prec_cut_flat,
             d_exchange_screen_cut_flat,
             d_exchange_displ_cuts);
-            gpu::computeExchangeFockDDDP2_K5_OLD_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+            gpu::computeExchangeFockDDDP2_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_dd,
             d_pair_inds_k_for_K_dd,
@@ -13160,7 +13160,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             d_exchange_prec_cut_flat,
             d_exchange_screen_cut_flat,
             d_exchange_displ_cuts);
-            gpu::computeExchangeFockDDDP3_K5_OLD_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+            gpu::computeExchangeFockDDDP3_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_dd,
             d_pair_inds_k_for_K_dd,
@@ -13187,7 +13187,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             d_exchange_prec_cut_flat,
             d_exchange_screen_cut_flat,
             d_exchange_displ_cuts);
-            gpu::computeExchangeFockDDDP4_K5_OLD_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+            gpu::computeExchangeFockDDDP4_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_dd,
             d_pair_inds_k_for_K_dd,
@@ -13229,7 +13229,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             build_exchange_cuts_device(d_exchange_prec_cut_flat, d_exchange_screen_cut_flat, d_exchange_displ_cuts,
             d_pair_inds_i_for_K_dd, d_pair_inds_k_for_K_dd, d_Q_K_dd, d_Q_K_dd, d_pair_displs_K_dd, d_pair_displs_K_dd, d_pair_counts_K_dd, d_pair_counts_K_dd,
             static_cast<uint32_t>(pair_inds_count_for_K_dd), TILE_DIM_Y_K, TILE_DIM_X_K, dd_max_D, mixed_precision_threshold_k, eri_threshold, stream, d_exchange_work_counts);
-            gpu::computeExchangeFockDDDD0_K16_OLD_RUNTIME_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+            gpu::computeExchangeFockDDDD0_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_dd,
             d_pair_inds_k_for_K_dd,
@@ -13248,7 +13248,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             omega,
             d_exchange_prec_cut_flat,
             d_exchange_displ_cuts);
-            gpu::computeExchangeFockDDDD1_K16_OLD_RUNTIME_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+            gpu::computeExchangeFockDDDD1_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_dd,
             d_pair_inds_k_for_K_dd,
@@ -13267,7 +13267,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             omega,
             d_exchange_prec_cut_flat,
             d_exchange_displ_cuts);
-            gpu::computeExchangeFockDDDD2_K16_OLD_RUNTIME_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+            gpu::computeExchangeFockDDDD2_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_dd,
             d_pair_inds_k_for_K_dd,
@@ -13286,7 +13286,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             omega,
             d_exchange_prec_cut_flat,
             d_exchange_displ_cuts);
-            gpu::computeExchangeFockDDDD3_K16_OLD_RUNTIME_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+            gpu::computeExchangeFockDDDD3_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_dd,
             d_pair_inds_k_for_K_dd,
@@ -13305,7 +13305,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             omega,
             d_exchange_prec_cut_flat,
             d_exchange_displ_cuts);
-            gpu::computeExchangeFockDDDD4_K16_OLD_RUNTIME_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+            gpu::computeExchangeFockDDDD4_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_dd,
             d_pair_inds_k_for_K_dd,
@@ -13324,7 +13324,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             omega,
             d_exchange_prec_cut_flat,
             d_exchange_displ_cuts);
-            gpu::computeExchangeFockDDDD5_K16_OLD_RUNTIME_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+            gpu::computeExchangeFockDDDD5_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_dd,
             d_pair_inds_k_for_K_dd,
@@ -13343,7 +13343,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             omega,
             d_exchange_prec_cut_flat,
             d_exchange_displ_cuts);
-            gpu::computeExchangeFockDDDD6_K16_OLD_RUNTIME_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+            gpu::computeExchangeFockDDDD6_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_dd,
             d_pair_inds_k_for_K_dd,
@@ -13362,7 +13362,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             omega,
             d_exchange_prec_cut_flat,
             d_exchange_displ_cuts);
-            gpu::computeExchangeFockDDDD7_K16_OLD_RUNTIME_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+            gpu::computeExchangeFockDDDD7_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_dd,
             d_pair_inds_k_for_K_dd,
@@ -13381,7 +13381,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             omega,
             d_exchange_prec_cut_flat,
             d_exchange_displ_cuts);
-            gpu::computeExchangeFockDDDD8_K16_OLD_RUNTIME_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+            gpu::computeExchangeFockDDDD8_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_dd,
             d_pair_inds_k_for_K_dd,
@@ -13400,7 +13400,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             omega,
             d_exchange_prec_cut_flat,
             d_exchange_displ_cuts);
-            gpu::computeExchangeFockDDDD9_K16_OLD_RUNTIME_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+            gpu::computeExchangeFockDDDD9_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_dd,
             d_pair_inds_k_for_K_dd,
@@ -13419,7 +13419,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             omega,
             d_exchange_prec_cut_flat,
             d_exchange_displ_cuts);
-            gpu::computeExchangeFockDDDD10_K16_OLD_RUNTIME_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+            gpu::computeExchangeFockDDDD10_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_dd,
             d_pair_inds_k_for_K_dd,
@@ -13438,7 +13438,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             omega,
             d_exchange_prec_cut_flat,
             d_exchange_displ_cuts);
-            gpu::computeExchangeFockDDDD11_K16_OLD_RUNTIME_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+            gpu::computeExchangeFockDDDD11_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_dd,
             d_pair_inds_k_for_K_dd,
@@ -13457,7 +13457,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             omega,
             d_exchange_prec_cut_flat,
             d_exchange_displ_cuts);
-            gpu::computeExchangeFockDDDD12_K16_OLD_RUNTIME_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+            gpu::computeExchangeFockDDDD12_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_dd,
             d_pair_inds_k_for_K_dd,
@@ -13476,7 +13476,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             omega,
             d_exchange_prec_cut_flat,
             d_exchange_displ_cuts);
-            gpu::computeExchangeFockDDDD13_K16_OLD_RUNTIME_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+            gpu::computeExchangeFockDDDD13_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_dd,
             d_pair_inds_k_for_K_dd,
@@ -13495,7 +13495,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             omega,
             d_exchange_prec_cut_flat,
             d_exchange_displ_cuts);
-            gpu::computeExchangeFockDDDD14_K16_OLD_RUNTIME_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+            gpu::computeExchangeFockDDDD14_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_dd,
             d_pair_inds_k_for_K_dd,
@@ -13514,7 +13514,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             omega,
             d_exchange_prec_cut_flat,
             d_exchange_displ_cuts);
-            gpu::computeExchangeFockDDDD15_K16_OLD_RUNTIME_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
+            gpu::computeExchangeFockDDDD15_FP64<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_dd,
             d_pair_inds_k_for_K_dd,
@@ -13533,7 +13533,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             omega,
             d_exchange_prec_cut_flat,
             d_exchange_displ_cuts);
-            gpu::computeExchangeFockDDDD0_K16_OLD_RUNTIME_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+            gpu::computeExchangeFockDDDD0_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_dd,
             d_pair_inds_k_for_K_dd,
@@ -13553,7 +13553,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             d_exchange_prec_cut_flat,
             d_exchange_screen_cut_flat,
             d_exchange_displ_cuts);
-            gpu::computeExchangeFockDDDD1_K16_OLD_RUNTIME_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+            gpu::computeExchangeFockDDDD1_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_dd,
             d_pair_inds_k_for_K_dd,
@@ -13573,7 +13573,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             d_exchange_prec_cut_flat,
             d_exchange_screen_cut_flat,
             d_exchange_displ_cuts);
-            gpu::computeExchangeFockDDDD2_K16_OLD_RUNTIME_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+            gpu::computeExchangeFockDDDD2_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_dd,
             d_pair_inds_k_for_K_dd,
@@ -13593,7 +13593,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             d_exchange_prec_cut_flat,
             d_exchange_screen_cut_flat,
             d_exchange_displ_cuts);
-            gpu::computeExchangeFockDDDD3_K16_OLD_RUNTIME_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+            gpu::computeExchangeFockDDDD3_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_dd,
             d_pair_inds_k_for_K_dd,
@@ -13613,7 +13613,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             d_exchange_prec_cut_flat,
             d_exchange_screen_cut_flat,
             d_exchange_displ_cuts);
-            gpu::computeExchangeFockDDDD4_K16_OLD_RUNTIME_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+            gpu::computeExchangeFockDDDD4_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_dd,
             d_pair_inds_k_for_K_dd,
@@ -13633,7 +13633,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             d_exchange_prec_cut_flat,
             d_exchange_screen_cut_flat,
             d_exchange_displ_cuts);
-            gpu::computeExchangeFockDDDD5_K16_OLD_RUNTIME_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+            gpu::computeExchangeFockDDDD5_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_dd,
             d_pair_inds_k_for_K_dd,
@@ -13653,7 +13653,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             d_exchange_prec_cut_flat,
             d_exchange_screen_cut_flat,
             d_exchange_displ_cuts);
-            gpu::computeExchangeFockDDDD6_K16_OLD_RUNTIME_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+            gpu::computeExchangeFockDDDD6_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_dd,
             d_pair_inds_k_for_K_dd,
@@ -13673,7 +13673,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             d_exchange_prec_cut_flat,
             d_exchange_screen_cut_flat,
             d_exchange_displ_cuts);
-            gpu::computeExchangeFockDDDD7_K16_OLD_RUNTIME_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+            gpu::computeExchangeFockDDDD7_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_dd,
             d_pair_inds_k_for_K_dd,
@@ -13693,7 +13693,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             d_exchange_prec_cut_flat,
             d_exchange_screen_cut_flat,
             d_exchange_displ_cuts);
-            gpu::computeExchangeFockDDDD8_K16_OLD_RUNTIME_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+            gpu::computeExchangeFockDDDD8_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_dd,
             d_pair_inds_k_for_K_dd,
@@ -13713,7 +13713,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             d_exchange_prec_cut_flat,
             d_exchange_screen_cut_flat,
             d_exchange_displ_cuts);
-            gpu::computeExchangeFockDDDD9_K16_OLD_RUNTIME_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+            gpu::computeExchangeFockDDDD9_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_dd,
             d_pair_inds_k_for_K_dd,
@@ -13733,7 +13733,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             d_exchange_prec_cut_flat,
             d_exchange_screen_cut_flat,
             d_exchange_displ_cuts);
-            gpu::computeExchangeFockDDDD10_K16_OLD_RUNTIME_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+            gpu::computeExchangeFockDDDD10_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_dd,
             d_pair_inds_k_for_K_dd,
@@ -13753,7 +13753,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             d_exchange_prec_cut_flat,
             d_exchange_screen_cut_flat,
             d_exchange_displ_cuts);
-            gpu::computeExchangeFockDDDD11_K16_OLD_RUNTIME_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+            gpu::computeExchangeFockDDDD11_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_dd,
             d_pair_inds_k_for_K_dd,
@@ -13773,7 +13773,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             d_exchange_prec_cut_flat,
             d_exchange_screen_cut_flat,
             d_exchange_displ_cuts);
-            gpu::computeExchangeFockDDDD12_K16_OLD_RUNTIME_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+            gpu::computeExchangeFockDDDD12_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_dd,
             d_pair_inds_k_for_K_dd,
@@ -13793,7 +13793,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             d_exchange_prec_cut_flat,
             d_exchange_screen_cut_flat,
             d_exchange_displ_cuts);
-            gpu::computeExchangeFockDDDD13_K16_OLD_RUNTIME_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+            gpu::computeExchangeFockDDDD13_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_dd,
             d_pair_inds_k_for_K_dd,
@@ -13813,7 +13813,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             d_exchange_prec_cut_flat,
             d_exchange_screen_cut_flat,
             d_exchange_displ_cuts);
-            gpu::computeExchangeFockDDDD14_K16_OLD_RUNTIME_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+            gpu::computeExchangeFockDDDD14_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_dd,
             d_pair_inds_k_for_K_dd,
@@ -13833,7 +13833,7 @@ computeFockOnGPU(const              CMolecule& molecule,
             d_exchange_prec_cut_flat,
             d_exchange_screen_cut_flat,
             d_exchange_displ_cuts);
-            gpu::computeExchangeFockDDDD15_K16_OLD_RUNTIME_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
+            gpu::computeExchangeFockDDDD15_FP32<<<num_blocks, threads_per_block, 0, stream>>>(
             d_mat_K,
             d_pair_inds_i_for_K_dd,
             d_pair_inds_k_for_K_dd,

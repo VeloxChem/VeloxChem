@@ -2795,10 +2795,10 @@ computeExchangeFockDDDS_FP32(double*         mat_K,
 // Selected exchange mixed-precision split variants.
 
 
-// PDDD: K4_M23
+// PDDD
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
-computeExchangeFockPDDD0_K4_M23_FP64(double*         mat_K,
+computeExchangeFockPDDD0_FP64(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_pd,
                         const uint32_t* pair_inds_k_for_K_pd,
                         const uint32_t  pair_inds_count_for_K_pd,
@@ -2825,7 +2825,7 @@ computeExchangeFockPDDD0_K4_M23_FP64(double*         mat_K,
                        const uint32_t* displ_cuts);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
-computeExchangeFockPDDD1_K4_M23_FP64(double*         mat_K,
+computeExchangeFockPDDD1_FP64(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_pd,
                         const uint32_t* pair_inds_k_for_K_pd,
                         const uint32_t  pair_inds_count_for_K_pd,
@@ -2852,7 +2852,7 @@ computeExchangeFockPDDD1_K4_M23_FP64(double*         mat_K,
                        const uint32_t* displ_cuts);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
-computeExchangeFockPDDD2_K4_M23_FP64(double*         mat_K,
+computeExchangeFockPDDD2_FP64(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_pd,
                         const uint32_t* pair_inds_k_for_K_pd,
                         const uint32_t  pair_inds_count_for_K_pd,
@@ -2879,7 +2879,7 @@ computeExchangeFockPDDD2_K4_M23_FP64(double*         mat_K,
                        const uint32_t* displ_cuts);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
-computeExchangeFockPDDD3_K4_M23_FP64(double*         mat_K,
+computeExchangeFockPDDD3_FP64(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_pd,
                         const uint32_t* pair_inds_k_for_K_pd,
                         const uint32_t  pair_inds_count_for_K_pd,
@@ -2906,7 +2906,7 @@ computeExchangeFockPDDD3_K4_M23_FP64(double*         mat_K,
                        const uint32_t* displ_cuts);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
-computeExchangeFockPDDD0_K4_M23_FP32(double*         mat_K,
+computeExchangeFockPDDD0_FP32(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_pd,
                         const uint32_t* pair_inds_k_for_K_pd,
                         const uint32_t  pair_inds_count_for_K_pd,
@@ -2934,7 +2934,7 @@ computeExchangeFockPDDD0_K4_M23_FP32(double*         mat_K,
                        const uint32_t* displ_cuts);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
-computeExchangeFockPDDD1_K4_M23_FP32(double*         mat_K,
+computeExchangeFockPDDD1_FP32(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_pd,
                         const uint32_t* pair_inds_k_for_K_pd,
                         const uint32_t  pair_inds_count_for_K_pd,
@@ -2962,7 +2962,7 @@ computeExchangeFockPDDD1_K4_M23_FP32(double*         mat_K,
                        const uint32_t* displ_cuts);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
-computeExchangeFockPDDD2_K4_M23_FP32(double*         mat_K,
+computeExchangeFockPDDD2_FP32(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_pd,
                         const uint32_t* pair_inds_k_for_K_pd,
                         const uint32_t  pair_inds_count_for_K_pd,
@@ -2990,7 +2990,7 @@ computeExchangeFockPDDD2_K4_M23_FP32(double*         mat_K,
                        const uint32_t* displ_cuts);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
-computeExchangeFockPDDD3_K4_M23_FP32(double*         mat_K,
+computeExchangeFockPDDD3_FP32(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_pd,
                         const uint32_t* pair_inds_k_for_K_pd,
                         const uint32_t  pair_inds_count_for_K_pd,
@@ -3018,10 +3018,10 @@ computeExchangeFockPDDD3_K4_M23_FP32(double*         mat_K,
                        const uint32_t* displ_cuts);
 
 
-// DDDD: K16_OLD_RUNTIME
+// DDDD
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
-computeExchangeFockDDDD0_K16_OLD_RUNTIME_FP64(double*         mat_K,
+computeExchangeFockDDDD0_FP64(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
                         const uint32_t  pair_inds_count_for_K_dd,
@@ -3041,7 +3041,7 @@ computeExchangeFockDDDD0_K16_OLD_RUNTIME_FP64(double*         mat_K,
                        const uint32_t* displ_cuts);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
-computeExchangeFockDDDD1_K16_OLD_RUNTIME_FP64(double*         mat_K,
+computeExchangeFockDDDD1_FP64(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
                         const uint32_t  pair_inds_count_for_K_dd,
@@ -3061,7 +3061,7 @@ computeExchangeFockDDDD1_K16_OLD_RUNTIME_FP64(double*         mat_K,
                        const uint32_t* displ_cuts);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
-computeExchangeFockDDDD2_K16_OLD_RUNTIME_FP64(double*         mat_K,
+computeExchangeFockDDDD2_FP64(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
                         const uint32_t  pair_inds_count_for_K_dd,
@@ -3081,7 +3081,7 @@ computeExchangeFockDDDD2_K16_OLD_RUNTIME_FP64(double*         mat_K,
                        const uint32_t* displ_cuts);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
-computeExchangeFockDDDD3_K16_OLD_RUNTIME_FP64(double*         mat_K,
+computeExchangeFockDDDD3_FP64(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
                         const uint32_t  pair_inds_count_for_K_dd,
@@ -3101,7 +3101,7 @@ computeExchangeFockDDDD3_K16_OLD_RUNTIME_FP64(double*         mat_K,
                        const uint32_t* displ_cuts);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
-computeExchangeFockDDDD4_K16_OLD_RUNTIME_FP64(double*         mat_K,
+computeExchangeFockDDDD4_FP64(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
                         const uint32_t  pair_inds_count_for_K_dd,
@@ -3121,7 +3121,7 @@ computeExchangeFockDDDD4_K16_OLD_RUNTIME_FP64(double*         mat_K,
                        const uint32_t* displ_cuts);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
-computeExchangeFockDDDD5_K16_OLD_RUNTIME_FP64(double*         mat_K,
+computeExchangeFockDDDD5_FP64(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
                         const uint32_t  pair_inds_count_for_K_dd,
@@ -3141,7 +3141,7 @@ computeExchangeFockDDDD5_K16_OLD_RUNTIME_FP64(double*         mat_K,
                        const uint32_t* displ_cuts);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
-computeExchangeFockDDDD6_K16_OLD_RUNTIME_FP64(double*         mat_K,
+computeExchangeFockDDDD6_FP64(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
                         const uint32_t  pair_inds_count_for_K_dd,
@@ -3161,7 +3161,7 @@ computeExchangeFockDDDD6_K16_OLD_RUNTIME_FP64(double*         mat_K,
                        const uint32_t* displ_cuts);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
-computeExchangeFockDDDD7_K16_OLD_RUNTIME_FP64(double*         mat_K,
+computeExchangeFockDDDD7_FP64(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
                         const uint32_t  pair_inds_count_for_K_dd,
@@ -3181,7 +3181,7 @@ computeExchangeFockDDDD7_K16_OLD_RUNTIME_FP64(double*         mat_K,
                        const uint32_t* displ_cuts);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
-computeExchangeFockDDDD8_K16_OLD_RUNTIME_FP64(double*         mat_K,
+computeExchangeFockDDDD8_FP64(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
                         const uint32_t  pair_inds_count_for_K_dd,
@@ -3201,7 +3201,7 @@ computeExchangeFockDDDD8_K16_OLD_RUNTIME_FP64(double*         mat_K,
                        const uint32_t* displ_cuts);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
-computeExchangeFockDDDD9_K16_OLD_RUNTIME_FP64(double*         mat_K,
+computeExchangeFockDDDD9_FP64(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
                         const uint32_t  pair_inds_count_for_K_dd,
@@ -3221,7 +3221,7 @@ computeExchangeFockDDDD9_K16_OLD_RUNTIME_FP64(double*         mat_K,
                        const uint32_t* displ_cuts);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
-computeExchangeFockDDDD10_K16_OLD_RUNTIME_FP64(double*         mat_K,
+computeExchangeFockDDDD10_FP64(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
                         const uint32_t  pair_inds_count_for_K_dd,
@@ -3241,7 +3241,7 @@ computeExchangeFockDDDD10_K16_OLD_RUNTIME_FP64(double*         mat_K,
                        const uint32_t* displ_cuts);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
-computeExchangeFockDDDD11_K16_OLD_RUNTIME_FP64(double*         mat_K,
+computeExchangeFockDDDD11_FP64(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
                         const uint32_t  pair_inds_count_for_K_dd,
@@ -3261,7 +3261,7 @@ computeExchangeFockDDDD11_K16_OLD_RUNTIME_FP64(double*         mat_K,
                        const uint32_t* displ_cuts);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
-computeExchangeFockDDDD12_K16_OLD_RUNTIME_FP64(double*         mat_K,
+computeExchangeFockDDDD12_FP64(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
                         const uint32_t  pair_inds_count_for_K_dd,
@@ -3281,7 +3281,7 @@ computeExchangeFockDDDD12_K16_OLD_RUNTIME_FP64(double*         mat_K,
                        const uint32_t* displ_cuts);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
-computeExchangeFockDDDD13_K16_OLD_RUNTIME_FP64(double*         mat_K,
+computeExchangeFockDDDD13_FP64(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
                         const uint32_t  pair_inds_count_for_K_dd,
@@ -3301,7 +3301,7 @@ computeExchangeFockDDDD13_K16_OLD_RUNTIME_FP64(double*         mat_K,
                        const uint32_t* displ_cuts);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
-computeExchangeFockDDDD14_K16_OLD_RUNTIME_FP64(double*         mat_K,
+computeExchangeFockDDDD14_FP64(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
                         const uint32_t  pair_inds_count_for_K_dd,
@@ -3321,7 +3321,7 @@ computeExchangeFockDDDD14_K16_OLD_RUNTIME_FP64(double*         mat_K,
                        const uint32_t* displ_cuts);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
-computeExchangeFockDDDD15_K16_OLD_RUNTIME_FP64(double*         mat_K,
+computeExchangeFockDDDD15_FP64(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
                         const uint32_t  pair_inds_count_for_K_dd,
@@ -3341,7 +3341,7 @@ computeExchangeFockDDDD15_K16_OLD_RUNTIME_FP64(double*         mat_K,
                        const uint32_t* displ_cuts);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
-computeExchangeFockDDDD0_K16_OLD_RUNTIME_FP32(double*         mat_K,
+computeExchangeFockDDDD0_FP32(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
                         const uint32_t  pair_inds_count_for_K_dd,
@@ -3362,7 +3362,7 @@ computeExchangeFockDDDD0_K16_OLD_RUNTIME_FP32(double*         mat_K,
                        const uint32_t* displ_cuts);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
-computeExchangeFockDDDD1_K16_OLD_RUNTIME_FP32(double*         mat_K,
+computeExchangeFockDDDD1_FP32(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
                         const uint32_t  pair_inds_count_for_K_dd,
@@ -3383,7 +3383,7 @@ computeExchangeFockDDDD1_K16_OLD_RUNTIME_FP32(double*         mat_K,
                        const uint32_t* displ_cuts);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
-computeExchangeFockDDDD2_K16_OLD_RUNTIME_FP32(double*         mat_K,
+computeExchangeFockDDDD2_FP32(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
                         const uint32_t  pair_inds_count_for_K_dd,
@@ -3404,7 +3404,7 @@ computeExchangeFockDDDD2_K16_OLD_RUNTIME_FP32(double*         mat_K,
                        const uint32_t* displ_cuts);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
-computeExchangeFockDDDD3_K16_OLD_RUNTIME_FP32(double*         mat_K,
+computeExchangeFockDDDD3_FP32(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
                         const uint32_t  pair_inds_count_for_K_dd,
@@ -3425,7 +3425,7 @@ computeExchangeFockDDDD3_K16_OLD_RUNTIME_FP32(double*         mat_K,
                        const uint32_t* displ_cuts);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
-computeExchangeFockDDDD4_K16_OLD_RUNTIME_FP32(double*         mat_K,
+computeExchangeFockDDDD4_FP32(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
                         const uint32_t  pair_inds_count_for_K_dd,
@@ -3446,7 +3446,7 @@ computeExchangeFockDDDD4_K16_OLD_RUNTIME_FP32(double*         mat_K,
                        const uint32_t* displ_cuts);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
-computeExchangeFockDDDD5_K16_OLD_RUNTIME_FP32(double*         mat_K,
+computeExchangeFockDDDD5_FP32(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
                         const uint32_t  pair_inds_count_for_K_dd,
@@ -3467,7 +3467,7 @@ computeExchangeFockDDDD5_K16_OLD_RUNTIME_FP32(double*         mat_K,
                        const uint32_t* displ_cuts);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
-computeExchangeFockDDDD6_K16_OLD_RUNTIME_FP32(double*         mat_K,
+computeExchangeFockDDDD6_FP32(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
                         const uint32_t  pair_inds_count_for_K_dd,
@@ -3488,7 +3488,7 @@ computeExchangeFockDDDD6_K16_OLD_RUNTIME_FP32(double*         mat_K,
                        const uint32_t* displ_cuts);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
-computeExchangeFockDDDD7_K16_OLD_RUNTIME_FP32(double*         mat_K,
+computeExchangeFockDDDD7_FP32(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
                         const uint32_t  pair_inds_count_for_K_dd,
@@ -3509,7 +3509,7 @@ computeExchangeFockDDDD7_K16_OLD_RUNTIME_FP32(double*         mat_K,
                        const uint32_t* displ_cuts);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
-computeExchangeFockDDDD8_K16_OLD_RUNTIME_FP32(double*         mat_K,
+computeExchangeFockDDDD8_FP32(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
                         const uint32_t  pair_inds_count_for_K_dd,
@@ -3530,7 +3530,7 @@ computeExchangeFockDDDD8_K16_OLD_RUNTIME_FP32(double*         mat_K,
                        const uint32_t* displ_cuts);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
-computeExchangeFockDDDD9_K16_OLD_RUNTIME_FP32(double*         mat_K,
+computeExchangeFockDDDD9_FP32(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
                         const uint32_t  pair_inds_count_for_K_dd,
@@ -3551,7 +3551,7 @@ computeExchangeFockDDDD9_K16_OLD_RUNTIME_FP32(double*         mat_K,
                        const uint32_t* displ_cuts);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
-computeExchangeFockDDDD10_K16_OLD_RUNTIME_FP32(double*         mat_K,
+computeExchangeFockDDDD10_FP32(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
                         const uint32_t  pair_inds_count_for_K_dd,
@@ -3572,7 +3572,7 @@ computeExchangeFockDDDD10_K16_OLD_RUNTIME_FP32(double*         mat_K,
                        const uint32_t* displ_cuts);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
-computeExchangeFockDDDD11_K16_OLD_RUNTIME_FP32(double*         mat_K,
+computeExchangeFockDDDD11_FP32(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
                         const uint32_t  pair_inds_count_for_K_dd,
@@ -3593,7 +3593,7 @@ computeExchangeFockDDDD11_K16_OLD_RUNTIME_FP32(double*         mat_K,
                        const uint32_t* displ_cuts);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
-computeExchangeFockDDDD12_K16_OLD_RUNTIME_FP32(double*         mat_K,
+computeExchangeFockDDDD12_FP32(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
                         const uint32_t  pair_inds_count_for_K_dd,
@@ -3614,7 +3614,7 @@ computeExchangeFockDDDD12_K16_OLD_RUNTIME_FP32(double*         mat_K,
                        const uint32_t* displ_cuts);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
-computeExchangeFockDDDD13_K16_OLD_RUNTIME_FP32(double*         mat_K,
+computeExchangeFockDDDD13_FP32(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
                         const uint32_t  pair_inds_count_for_K_dd,
@@ -3635,7 +3635,7 @@ computeExchangeFockDDDD13_K16_OLD_RUNTIME_FP32(double*         mat_K,
                        const uint32_t* displ_cuts);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
-computeExchangeFockDDDD14_K16_OLD_RUNTIME_FP32(double*         mat_K,
+computeExchangeFockDDDD14_FP32(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
                         const uint32_t  pair_inds_count_for_K_dd,
@@ -3656,7 +3656,7 @@ computeExchangeFockDDDD14_K16_OLD_RUNTIME_FP32(double*         mat_K,
                        const uint32_t* displ_cuts);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
-computeExchangeFockDDDD15_K16_OLD_RUNTIME_FP32(double*         mat_K,
+computeExchangeFockDDDD15_FP32(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
                         const uint32_t  pair_inds_count_for_K_dd,
@@ -3677,10 +3677,10 @@ computeExchangeFockDDDD15_K16_OLD_RUNTIME_FP32(double*         mat_K,
                        const uint32_t* displ_cuts);
 
 
-// DDDP: K5_OLD
+// DDDP
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
-computeExchangeFockDDDP0_K5_OLD_FP64(double*         mat_K,
+computeExchangeFockDDDP0_FP64(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
                         const uint32_t  pair_inds_count_for_K_dd,
@@ -3707,7 +3707,7 @@ computeExchangeFockDDDP0_K5_OLD_FP64(double*         mat_K,
                        const uint32_t* displ_cuts);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
-computeExchangeFockDDDP1_K5_OLD_FP64(double*         mat_K,
+computeExchangeFockDDDP1_FP64(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
                         const uint32_t  pair_inds_count_for_K_dd,
@@ -3734,7 +3734,7 @@ computeExchangeFockDDDP1_K5_OLD_FP64(double*         mat_K,
                        const uint32_t* displ_cuts);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
-computeExchangeFockDDDP2_K5_OLD_FP64(double*         mat_K,
+computeExchangeFockDDDP2_FP64(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
                         const uint32_t  pair_inds_count_for_K_dd,
@@ -3761,7 +3761,7 @@ computeExchangeFockDDDP2_K5_OLD_FP64(double*         mat_K,
                        const uint32_t* displ_cuts);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
-computeExchangeFockDDDP3_K5_OLD_FP64(double*         mat_K,
+computeExchangeFockDDDP3_FP64(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
                         const uint32_t  pair_inds_count_for_K_dd,
@@ -3788,7 +3788,7 @@ computeExchangeFockDDDP3_K5_OLD_FP64(double*         mat_K,
                        const uint32_t* displ_cuts);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
-computeExchangeFockDDDP4_K5_OLD_FP64(double*         mat_K,
+computeExchangeFockDDDP4_FP64(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
                         const uint32_t  pair_inds_count_for_K_dd,
@@ -3815,7 +3815,7 @@ computeExchangeFockDDDP4_K5_OLD_FP64(double*         mat_K,
                        const uint32_t* displ_cuts);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
-computeExchangeFockDDDP0_K5_OLD_FP32(double*         mat_K,
+computeExchangeFockDDDP0_FP32(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
                         const uint32_t  pair_inds_count_for_K_dd,
@@ -3843,7 +3843,7 @@ computeExchangeFockDDDP0_K5_OLD_FP32(double*         mat_K,
                        const uint32_t* displ_cuts);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
-computeExchangeFockDDDP1_K5_OLD_FP32(double*         mat_K,
+computeExchangeFockDDDP1_FP32(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
                         const uint32_t  pair_inds_count_for_K_dd,
@@ -3871,7 +3871,7 @@ computeExchangeFockDDDP1_K5_OLD_FP32(double*         mat_K,
                        const uint32_t* displ_cuts);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
-computeExchangeFockDDDP2_K5_OLD_FP32(double*         mat_K,
+computeExchangeFockDDDP2_FP32(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
                         const uint32_t  pair_inds_count_for_K_dd,
@@ -3899,7 +3899,7 @@ computeExchangeFockDDDP2_K5_OLD_FP32(double*         mat_K,
                        const uint32_t* displ_cuts);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
-computeExchangeFockDDDP3_K5_OLD_FP32(double*         mat_K,
+computeExchangeFockDDDP3_FP32(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
                         const uint32_t  pair_inds_count_for_K_dd,
@@ -3927,7 +3927,7 @@ computeExchangeFockDDDP3_K5_OLD_FP32(double*         mat_K,
                        const uint32_t* displ_cuts);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
-computeExchangeFockDDDP4_K5_OLD_FP32(double*         mat_K,
+computeExchangeFockDDDP4_FP32(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
                         const uint32_t  pair_inds_count_for_K_dd,
@@ -3955,10 +3955,10 @@ computeExchangeFockDDDP4_K5_OLD_FP32(double*         mat_K,
                        const uint32_t* displ_cuts);
 
 
-// DPDD: K4_RS
+// DPDD
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
-computeExchangeFockDPDD0_K4_RS_FP64(double*         mat_K,
+computeExchangeFockDPDD0_FP64(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
                         const uint32_t  pair_inds_count_for_K_dd,
@@ -3985,7 +3985,7 @@ computeExchangeFockDPDD0_K4_RS_FP64(double*         mat_K,
                        const uint32_t* displ_cuts);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
-computeExchangeFockDPDD1_K4_RS_FP64(double*         mat_K,
+computeExchangeFockDPDD1_FP64(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
                         const uint32_t  pair_inds_count_for_K_dd,
@@ -4012,7 +4012,7 @@ computeExchangeFockDPDD1_K4_RS_FP64(double*         mat_K,
                        const uint32_t* displ_cuts);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
-computeExchangeFockDPDD2_K4_RS_FP64(double*         mat_K,
+computeExchangeFockDPDD2_FP64(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
                         const uint32_t  pair_inds_count_for_K_dd,
@@ -4039,7 +4039,7 @@ computeExchangeFockDPDD2_K4_RS_FP64(double*         mat_K,
                        const uint32_t* displ_cuts);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
-computeExchangeFockDPDD3_K4_RS_FP64(double*         mat_K,
+computeExchangeFockDPDD3_FP64(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
                         const uint32_t  pair_inds_count_for_K_dd,
@@ -4066,7 +4066,7 @@ computeExchangeFockDPDD3_K4_RS_FP64(double*         mat_K,
                        const uint32_t* displ_cuts);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
-computeExchangeFockDPDD0_K4_RS_FP32(double*         mat_K,
+computeExchangeFockDPDD0_FP32(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
                         const uint32_t  pair_inds_count_for_K_dd,
@@ -4094,7 +4094,7 @@ computeExchangeFockDPDD0_K4_RS_FP32(double*         mat_K,
                        const uint32_t* displ_cuts);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
-computeExchangeFockDPDD1_K4_RS_FP32(double*         mat_K,
+computeExchangeFockDPDD1_FP32(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
                         const uint32_t  pair_inds_count_for_K_dd,
@@ -4122,7 +4122,7 @@ computeExchangeFockDPDD1_K4_RS_FP32(double*         mat_K,
                        const uint32_t* displ_cuts);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
-computeExchangeFockDPDD2_K4_RS_FP32(double*         mat_K,
+computeExchangeFockDPDD2_FP32(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
                         const uint32_t  pair_inds_count_for_K_dd,
@@ -4150,7 +4150,7 @@ computeExchangeFockDPDD2_K4_RS_FP32(double*         mat_K,
                        const uint32_t* displ_cuts);
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
-computeExchangeFockDPDD3_K4_RS_FP32(double*         mat_K,
+computeExchangeFockDPDD3_FP32(double*         mat_K,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
                         const uint32_t  pair_inds_count_for_K_dd,
