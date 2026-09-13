@@ -292,7 +292,18 @@ CSimdRIJKFockDriver::compute(const CPackedMatrix &density,
     // of orbitals is taken from the coefficients rather than asked for, and the
     // storage is formed again only when it changes.
 
-    const auto nbatch = std::min(_w_batch, naux);
+    // NOTE: the range is what the transformation divides over the threads, so it
+    // follows the threads rather than being fixed. The memory it may take bounds it
+    // from above, as each function of the range holds a matrix of the basis by the
+    // occupied orbitals.
+
+    const auto per_function = nao * norbitals * sizeof(double);
+
+    const auto by_memory = std::max(size_t{1}, _w_batch_memory / std::max(per_function, size_t{1}));
+
+    const auto by_threads = _w_batch_per_thread * static_cast<size_t>(omp::get_number_of_threads());
+
+    const auto nbatch = std::min({naux, by_memory, std::max(_w_batch, by_threads)});
 
     if ((_w_vectors.size() != nbatch) || (_w_vectors.front().number_of_columns() != norbitals) ||
         (_w_vectors.front().number_of_rows() != nao))

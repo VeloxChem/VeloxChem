@@ -198,13 +198,28 @@ class CSimdRIJKFockDriver
                      const double                  threshold,
                      const CTripleSparsityPattern &pattern) const -> std::vector<CTripleSparsityPattern>;
 
-    /// @brief The number of auxiliary basis functions whose W matrices are formed
-    /// at a time.
-    /// @note The exchange of a range is added before the next is formed, so this
-    /// sets the memory of the W matrices rather than the work, which does not
-    /// depend on it. It is the depth the rank k update of the exchange is given,
-    /// which wants to be large enough to fill the cores.
+    /// @brief The smallest number of auxiliary basis functions whose W matrices are
+    /// formed at a time, and how many of them are wanted for each thread.
+    /// @note The transformation divides the functions of a range over the threads,
+    /// so the range is also the work there is to divide: a range of sixty four
+    /// leaves half of a hundred and twenty eight cores with nothing. Measured on a
+    /// node of that width, the way which holds the B vectors was between two and
+    /// three times slower than the direct way at every basis set of two molecules,
+    /// by a ratio which did not move with the size of the calculation -- which is
+    /// what a fixed range predicts and nothing which grows with the work would.
+    /// Four ranges for each thread keeps the schedule balanced, as the functions
+    /// differ in how many blocks they touch, and it gives back the sixty four this
+    /// was on the sixteen cores it was chosen on.
     static constexpr size_t _w_batch = 64;
+
+    /// @brief How many ranges are wanted for each thread.
+    static constexpr size_t _w_batch_per_thread = 4;
+
+    /// @brief The memory the W matrices of a batch may take together.
+    /// @note They are the basis by the occupied orbitals, one for each function of
+    /// the range, so the range a large calculation may have is set by this rather
+    /// than by the threads.
+    static constexpr size_t _w_batch_memory = size_t{2} * 1024 * 1024 * 1024;
 
     /// @brief The memory the direct mode is allowed to reach, taken from the budget
     /// the driver was prepared with.
