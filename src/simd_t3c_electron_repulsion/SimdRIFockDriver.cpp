@@ -248,6 +248,20 @@ _make_dense_indices(const std::vector<TAuxFunction>    &functions,
     return dense;
 }
 
+/// @brief One product of a contraction of the B vectors: the block of atom pairs
+/// and the combination of angular momenta whose integrals it multiplies.
+/// @note Every combination gathers and multiplies on its own and writes where no
+/// other one writes, so this is the unit the contraction divides over.
+struct TBqTask
+{
+    size_t block;
+    int    la;
+    size_t ia;
+    int    lb;
+    size_t jb;
+    size_t component;
+};
+
 /// @brief The clock the phases of the B vectors are timed on.
 using prof_clock = std::chrono::steady_clock;
 
@@ -281,7 +295,7 @@ struct CBqProfile
     size_t nread = 0;
     size_t nblocks = 0;
     size_t nbatches = 0;
-    size_t nsmallest = 0;
+    size_t ntasks = 0;
     size_t nchunk = 0;
 
     /// @brief Writes the phases of the B vectors, and their share of them.
@@ -310,8 +324,8 @@ struct CBqProfile
         std::printf("RIJK   %zu products, %.2f GB gathered, %.2f GB read back from it\n", nproducts, gb(ngathered),
                     gb(nread));
 
-        std::printf("RIJK   %zu blocks in %zu batches, smallest %zu, on %d threads, chunk %zu\n", nblocks, nbatches,
-                    nsmallest, omp::get_number_of_threads(), nchunk);
+        std::printf("RIJK   %zu blocks in %zu batches, %zu tasks, on %d threads, chunk %zu\n", nblocks, nbatches,
+                    ntasks, omp::get_number_of_threads(), nchunk);
 
         std::fflush(stdout);
     }
@@ -508,14 +522,14 @@ CSimdRIFockDriver::compute_bq_vectors(const CMolecule        &molecule,
 
     // NOTE: the gathered integrals and the product of the metric with them are both
     // the whole auxiliary basis deep, so a column of the pair costs the rows and
-    // the columns together and the chunk follows from the memory rather than from
-    // the block.
+    // the columns together, and the memory one thread may hold bounds the chunk
+    // from above.
 
     const auto per_column = (nrows + ncols) * sizeof(double);
 
     const auto nchunk = std::max(size_t{1}, _bq_columns / std::max(per_column, size_t{1}));
 
-    size_t nbatches = 0, nsmallest = std::numeric_limits<size_t>::max();
+    size_t nbatches = 0, ntasks = 0;
 
     while (first < nab)
     {
@@ -583,11 +597,47 @@ CSimdRIFockDriver::compute_bq_vectors(const CMolecule        &molecule,
         // product is as tall as the auxiliary basis. The rows of a block which was
         // screened away are formed and dropped, which is a few per cent of them.
 
-        const auto nblocks = static_cast<int>(last - first);
+        // NOTE: the blocks of atom pairs are the distinct pairs of atom bases, of
+        // which a molecule has a dozen or two whatever its size, so dividing the
+        // contraction over them alone leaves all but a dozen threads idle on a
+        // large machine. The chunks of columns of a block are independent of one
+        // another and write into disjoint columns of the same output, so the work
+        // is divided over every pair of a block and a chunk instead, which is
+        // hundreds of times as many.
+
+        // NOTE: the columns of a block are its atom pairs, of which a molecule of
+        // seventy atoms holds a hundred or so in a block, so they do not divide
+        // usefully. What is plentiful is the combinations of angular momenta: every
+        // one of them gathers and multiplies on its own and writes where no other
+        // one does, and a basis of triple zeta quality makes tens of thousands of
+        // them. The work is divided over those, one product each.
+
+        std::vector<TBqTask> tasks;
+
+        for (size_t b = 0; b < last - first; b++)
+        {
+            const auto iab = first + b;
+
+            const auto width = ab_blocks[iab].number_of_diagonal_atoms() + ab_blocks[iab].number_of_pairs();
+
+            if (width == 0) continue;
+
+            for (const auto [la, ia] : basis_indices[static_cast<size_t>(ab_blocks[iab].bra_index())])
+            {
+                for (const auto [lb, jb] : basis_indices[static_cast<size_t>(ab_blocks[iab].ket_index())])
+                {
+                    const auto ncomps = static_cast<size_t>((2 * la + 1) * (2 * lb + 1));
+
+                    for (size_t m = 0; m < ncomps; m++) tasks.push_back(TBqTask{b, la, ia, lb, jb, m});
+                }
+            }
+        }
 
         nbatches++;
 
-        nsmallest = std::min(nsmallest, last - first);
+        ntasks += tasks.size();
+
+        const auto nwork = static_cast<int>(tasks.size());
 
         const auto mark_contract = prof_clock::now();
 
@@ -598,135 +648,109 @@ CSimdRIFockDriver::compute_bq_vectors(const CMolecule        &molecule,
             std::vector<double> product(nrows * nchunk);
 
 #pragma omp for schedule(dynamic)
-            for (int b = 0; b < nblocks; b++)
+            for (int t = 0; t < nwork; t++)
             {
-                const auto iab = first + static_cast<size_t>(b);
+                const auto &task = tasks[static_cast<size_t>(t)];
 
-                const auto &a_list = basis_indices[static_cast<size_t>(ab_blocks[iab].bra_index())];
+                const auto iab = first + task.block;
 
-                const auto &b_list = basis_indices[static_cast<size_t>(ab_blocks[iab].ket_index())];
+                const auto la = task.la, lb = task.lb;
 
-                // NOTE: the widest a chunk has to be is every atom pair of the
-                // block, as no combination of it keeps more than all of them. The
-                // diagonal pairs lead the off-diagonal ones and are counted apart
-                // from them.
+                const auto ia = task.ia, jb = task.jb, m = task.component;
 
                 const auto width =
                     ab_blocks[iab].number_of_diagonal_atoms() + ab_blocks[iab].number_of_pairs();
 
-                if (width == 0) continue;
-
-                for (const auto [la, ia] : a_list)
+                for (size_t cfirst = 0; cfirst < width; cfirst += nchunk)
                 {
-                    for (const auto [lb, jb] : b_list)
+                    const auto count = std::min(nchunk, width - cfirst);
+
+                    // NOTE: a group whose block is absent, and the atom pairs a
+                    // group keeps fewer of than the widest, leave zeros. The pairs
+                    // are the leading ones of one ordered list, so a zero beyond the
+                    // last one a group keeps adds nothing, which is what the sum of
+                    // the group would have added.
+
+                    ngathered += ncols * count * sizeof(double);
+
+                    for (const auto &in_function : in_functions)
                     {
-                        const auto ncomps = static_cast<size_t>((2 * la + 1) * (2 * lb + 1));
+                        auto *rows = gathered.data() + in_function.offset * count;
 
-                        for (size_t m = 0; m < ncomps; m++)
+                        const auto iblock = batch_map[task.block * nin_groups + in_function.group];
+
+                        size_t npairs_in = 0;
+
+                        const double *in_values = nullptr;
+
+                        if (iblock != npos)
                         {
-                            for (size_t cfirst = 0; cfirst < width; cfirst += nchunk)
+                            npairs_in = integrals.block(iblock).number_of_pairs(la, ia, lb, jb,
+                                                                                in_function.momentum,
+                                                                                in_function.index);
+
+                            if (npairs_in > 0)
                             {
-                                const auto count = std::min(nchunk, width - cfirst);
-
-                                // NOTE: a group whose block is absent, and the atom
-                                // pairs a group keeps fewer of than the widest,
-                                // leave zeros. The pairs are the leading ones of one
-                                // ordered list, so a zero beyond the last one a
-                                // group keeps adds nothing, which is what the sum of
-                                // the group would have added.
-
-                                ngathered += ncols * count * sizeof(double);
-
-                                for (const auto &in_function : in_functions)
-                                {
-                                    auto *rows = gathered.data() + in_function.offset * count;
-
-                                    const auto iblock =
-                                        batch_map[static_cast<size_t>(b) * nin_groups + in_function.group];
-
-                                    size_t npairs_in = 0;
-
-                                    const double *in_values = nullptr;
-
-                                    if (iblock != npos)
-                                    {
-                                        npairs_in = integrals.block(iblock).number_of_pairs(
-                                            la, ia, lb, jb, in_function.momentum, in_function.index);
-
-                                        if (npairs_in > 0)
-                                        {
-                                            in_values = integrals.values(iblock, la, ia, lb, jb,
-                                                                         in_function.momentum, in_function.index) +
-                                                        m * in_function.count * npairs_in;
-                                        }
-                                    }
-
-                                    const auto kept = std::min(npairs_in, width);
-
-                                    const auto taken = (kept > cfirst) ? std::min(kept - cfirst, count) : size_t{0};
-
-                                    for (size_t r = 0; r < in_function.count; r++)
-                                    {
-                                        auto *row = rows + r * count;
-
-                                        if (taken > 0)
-                                        {
-                                            const auto *from = in_values + r * npairs_in + cfirst;
-
-                                            std::copy(from, from + taken, row);
-                                        }
-
-                                        std::fill(row + taken, row + count, 0.0);
-                                    }
-                                }
-
-                                nproducts++;
-
-                                nread += ncols * count * sizeof(double);
-
-                                _matrix_product(nrows,
-                                                count,
-                                                ncols,
-                                                1.0,
-                                                metric.get(),
-                                                ncols,
-                                                gathered.data(),
-                                                count,
-                                                0.0,
-                                                product.data(),
-                                                count);
-
-                                for (const auto &out_function : out_functions)
-                                {
-                                    const auto oblock = out_map[iab * nout_groups + out_function.group];
-
-                                    if (oblock == npos) continue;
-
-                                    const auto npairs_out = bq_vectors.block(oblock).number_of_pairs(
-                                        la, ia, lb, jb, out_function.momentum, out_function.index);
-
-                                    if (npairs_out == 0) continue;
-
-                                    const auto limit = std::min(npairs_out, width);
-
-                                    if (limit <= cfirst) continue;
-
-                                    const auto written = std::min(limit - cfirst, count);
-
-                                    auto *out_values = bq_vectors.values(oblock, la, ia, lb, jb,
-                                                                         out_function.momentum, out_function.index) +
-                                                       m * out_function.count * npairs_out;
-
-                                    for (size_t r = 0; r < out_function.count; r++)
-                                    {
-                                        const auto *from = product.data() + (out_function.offset + r) * count;
-
-                                        auto *into = out_values + r * npairs_out + cfirst;
-
-                                        for (size_t k = 0; k < written; k++) into[k] += from[k];
-                                    }
-                                }
+                                in_values = integrals.values(iblock, la, ia, lb, jb, in_function.momentum,
+                                                             in_function.index) +
+                                            m * in_function.count * npairs_in;
                             }
+                        }
+
+                        const auto kept = std::min(npairs_in, width);
+
+                        const auto taken = (kept > cfirst) ? std::min(kept - cfirst, count) : size_t{0};
+
+                        for (size_t r = 0; r < in_function.count; r++)
+                        {
+                            auto *row = rows + r * count;
+
+                            if (taken > 0)
+                            {
+                                const auto *from = in_values + r * npairs_in + cfirst;
+
+                                std::copy(from, from + taken, row);
+                            }
+
+                            std::fill(row + taken, row + count, 0.0);
+                        }
+                    }
+
+                    nproducts++;
+
+                    nread += ncols * count * sizeof(double);
+
+                    _matrix_product(nrows, count, ncols, 1.0, metric.get(), ncols, gathered.data(), count, 0.0,
+                                    product.data(), count);
+
+                    for (const auto &out_function : out_functions)
+                    {
+                        const auto oblock = out_map[iab * nout_groups + out_function.group];
+
+                        if (oblock == npos) continue;
+
+                        const auto npairs_out = bq_vectors.block(oblock).number_of_pairs(
+                            la, ia, lb, jb, out_function.momentum, out_function.index);
+
+                        if (npairs_out == 0) continue;
+
+                        const auto limit = std::min(npairs_out, width);
+
+                        if (limit <= cfirst) continue;
+
+                        const auto written = std::min(limit - cfirst, count);
+
+                        auto *out_values = bq_vectors.values(oblock, la, ia, lb, jb, out_function.momentum,
+                                                             out_function.index) +
+                                           m * out_function.count * npairs_out;
+
+                        for (size_t r = 0; r < out_function.count; r++)
+                        {
+                            const auto *from = product.data() + (out_function.offset + r) * count;
+
+                            auto *into = out_values + r * npairs_out + cfirst;
+
+                            for (size_t k = 0; k < written; k++) into[k] += from[k];
                         }
                     }
                 }
@@ -742,7 +766,7 @@ CSimdRIFockDriver::compute_bq_vectors(const CMolecule        &molecule,
 
     profile.nbatches = nbatches;
 
-    profile.nsmallest = (nbatches > 0) ? nsmallest : 0;
+    profile.ntasks = ntasks;
 
     profile.nchunk = nchunk;
 

@@ -278,6 +278,7 @@ class CSimdRIFockDriver
     /// of buffers this many bytes and the count follows from it rather than from
     /// the block, which has no bound of its own.
     static constexpr size_t _bq_columns = size_t{32} * 1024 * 1024;
+
 };
 
 #endif /* SimdRIFockDriver_hpp */
