@@ -420,18 +420,19 @@ CSimdRIJKFockDriver::compute(const CPackedMatrix &density,
     // of orbitals is taken from the coefficients rather than asked for, and the
     // storage is formed again only when it changes.
 
-    // NOTE: the range is what the transformation divides over the threads, so it
-    // follows the threads rather than being fixed. The memory it may take bounds it
-    // from above, as each function of the range holds a matrix of the basis by the
-    // occupied orbitals.
+    // NOTE: the range is as long as the memory allows. The transformation divides
+    // it over the threads, so it has to be at least as long as there are threads,
+    // but what it costs beside its tasks -- the parallel region, and a square of
+    // the basis allocated and zeroed for every thread -- is paid once for the call
+    // however long the range is. Taking the longest range the memory allows makes
+    // the fewest calls, and each function of the range holds a matrix of the basis
+    // by the occupied orbitals.
 
     const auto per_function = nao * norbitals * sizeof(double);
 
     const auto by_memory = std::max(size_t{1}, _w_batch_memory / std::max(per_function, size_t{1}));
 
-    const auto by_threads = _w_batch_per_thread * static_cast<size_t>(omp::get_number_of_threads());
-
-    const auto nbatch = std::min({naux, by_memory, std::max(_w_batch, by_threads)});
+    const auto nbatch = std::min(naux, std::max(_w_batch, by_memory));
 
     const auto mark_allocate = prof_clock::now();
 

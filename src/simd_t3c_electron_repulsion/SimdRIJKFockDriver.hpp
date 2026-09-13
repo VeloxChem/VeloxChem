@@ -198,27 +198,19 @@ class CSimdRIJKFockDriver
                      const double                  threshold,
                      const CTripleSparsityPattern &pattern) const -> std::vector<CTripleSparsityPattern>;
 
-    /// @brief The smallest number of auxiliary basis functions whose W matrices are
-    /// formed at a time, and how many of them are wanted for each thread.
-    /// @note The transformation divides the functions of a range over the threads,
-    /// so the range is also the work there is to divide: a range of sixty four
-    /// leaves half of a hundred and twenty eight cores with nothing. Measured on a
-    /// node of that width, the way which holds the B vectors was between two and
-    /// three times slower than the direct way at every basis set of two molecules,
-    /// by a ratio which did not move with the size of the calculation -- which is
-    /// what a fixed range predicts and nothing which grows with the work would.
-    /// Four ranges for each thread keeps the schedule balanced, as the functions
-    /// differ in how many blocks they touch, and it gives back the sixty four this
-    /// was on the sixteen cores it was chosen on.
+    /// @brief The fewest auxiliary functions a range of the W matrices holds.
+    /// @note The range is what the transformation divides over the threads, and a
+    /// range fixed at sixty four -- four times the sixteen cores it was chosen on --
+    /// left half of a hundred and twenty eight with nothing. Measured on a node of
+    /// that width, the way which holds the B vectors was then between two and three
+    /// times slower than the direct way at every basis set of two molecules, by a
+    /// ratio which did not move with the size of the calculation. This is only the
+    /// floor now: the range is taken from the memory below, as what a call costs
+    /// beside its tasks is paid once for the call however long the range is, and
+    /// seven calls of five hundred and twelve carried 0.3 seconds a build of that
+    /// over one call of the whole basis.
     static constexpr size_t _w_batch = 64;
 
-    /// @brief How many ranges are wanted for each thread.
-    static constexpr size_t _w_batch_per_thread = 4;
-
-    /// @brief The memory the W matrices of a batch may take together.
-    /// @note They are the basis by the occupied orbitals, one for each function of
-    /// the range, so the range a large calculation may have is set by this rather
-    /// than by the threads.
     static constexpr size_t _w_batch_memory = size_t{2} * 1024 * 1024 * 1024;
 
     /// @brief The memory the direct mode is allowed to reach, taken from the budget
