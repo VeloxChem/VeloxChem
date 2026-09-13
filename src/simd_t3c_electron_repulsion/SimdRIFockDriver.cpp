@@ -1308,13 +1308,20 @@ CSimdRIFockDriver::compute_w_vectors(const CSparseTensor        &bq_vectors,
     errors::assertMsgCritical(w_vectors.size() == nrange,
                               std::string("RIJFockDriver: The W matrices do not match the range of the auxiliary basis"));
 
+    // NOTE: the W matrices are not zeroed here. The way below which scatters into a
+    // square hands the square to a product which writes with a factor of zero on
+    // the matrix, so a function which carries anything overwrites it and the zero
+    // would be undone at once -- 2.1 gigabytes of it for every call of a molecule
+    // of a thousand functions and two hundred orbitals. Only a function which
+    // carries nothing needs it, and it is done there. The way which sums into the
+    // matrix needs it always, and does it at the start of its own task, where the
+    // thread which writes the matrix is the one which touches it first.
+
     for (auto &wmat : w_vectors)
     {
         errors::assertMsgCritical((wmat.get_type() == mat_t::general) && (wmat.number_of_rows() == nao) &&
                                       (wmat.number_of_columns() == nocc),
                                   std::string("RIJFockDriver: The W matrices do not match the basis and the orbitals"));
-
-        if (!accumulate) wmat.zero();
     }
 
     if ((nrange == 0) || (nocc == 0)) return;
@@ -1492,7 +1499,20 @@ CSimdRIFockDriver::compute_w_vectors(const CSparseTensor        &bq_vectors,
                 // takes the half transform of a function once rather than once for
                 // every part.
 
-                if (entries[iq].empty()) continue;
+                if (entries[iq].empty())
+                {
+                    // NOTE: nothing writes this one, so it is what it must be only
+                    // if it is made so here.
+
+                    if (!accumulate)
+                    {
+                        auto *wvalues = w_vectors[iq].data();
+
+                        std::fill(wvalues, wvalues + nao * nocc, 0.0);
+                    }
+
+                    continue;
+                }
 
                 nfilled++;
 
@@ -1607,6 +1627,8 @@ CSimdRIFockDriver::compute_w_vectors(const CSparseTensor        &bq_vectors,
         const auto iq = static_cast<size_t>(t);
 
         auto *wvalues = w_vectors[iq].data();
+
+        if (!accumulate) std::fill(wvalues, wvalues + nao * nocc, 0.0);
 
         for (const auto &entry : entries[iq])
         {
