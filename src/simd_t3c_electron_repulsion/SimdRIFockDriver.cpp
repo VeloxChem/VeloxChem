@@ -252,23 +252,6 @@ _make_dense_indices(const std::vector<TAuxFunction>    &functions,
 /// and the combination of angular momenta whose integrals it multiplies.
 /// @note Every combination gathers and multiplies on its own and writes where no
 /// other one writes, so this is the unit the contraction divides over.
-/// @brief What one block of atom pairs keeps of the auxiliary basis.
-/// @note The screening leaves a block reaching only the auxiliary atoms near it.
-/// These are the functions of those atoms, where their rows and columns sit in the
-/// matrix the products of the block use, and that matrix when it is one of its own.
-struct TBqBlock
-{
-    std::vector<size_t> in_sel;
-    std::vector<size_t> out_sel;
-    std::vector<size_t> in_off;
-    std::vector<size_t> out_off;
-    std::vector<double> metric;
-
-    size_t in_dim = 0;
-    size_t out_dim = 0;
-    bool   compacted = false;
-};
-
 struct TBqTask
 {
     size_t block;
@@ -310,10 +293,6 @@ struct CBqProfile
     size_t nproducts = 0;
     size_t ngathered = 0;
     size_t nread = 0;
-    size_t ncompacted = 0;
-    size_t nblocks_seen = 0;
-    size_t nrows_kept = 0;
-    size_t ncols_kept = 0;
     size_t nblocks = 0;
     size_t nbatches = 0;
     size_t ntasks = 0;
@@ -347,10 +326,6 @@ struct CBqProfile
 
         std::printf("RIJK   %zu blocks in %zu batches, %zu tasks, on %d threads, chunk %zu\n", nblocks, nbatches,
                     ntasks, omp::get_number_of_threads(), nchunk);
-
-        std::printf("RIJK   %zu of %zu blocks compacted, rows %.0f of %zu, columns %.0f of %zu\n", ncompacted,
-                    nblocks_seen, (nblocks_seen > 0) ? static_cast<double>(nrows_kept) / nblocks_seen : 0.0, nrows,
-                    (nblocks_seen > 0) ? static_cast<double>(ncols_kept) / nblocks_seen : 0.0, ncols);
 
         std::fflush(stdout);
     }
@@ -554,7 +529,7 @@ CSimdRIFockDriver::compute_bq_vectors(const CMolecule        &molecule,
 
     const auto nchunk = std::max(size_t{1}, _bq_columns / std::max(per_column, size_t{1}));
 
-    size_t nbatches = 0, ntasks = 0, ncompacted = 0, nblocks_seen = 0, nrows_kept = 0, ncols_kept = 0;
+    size_t nbatches = 0, ntasks = 0;
 
     while (first < nab)
     {
@@ -637,137 +612,6 @@ CSimdRIFockDriver::compute_bq_vectors(const CMolecule        &molecule,
         // one does, and a basis of triple zeta quality makes tens of thousands of
         // them. The work is divided over those, one product each.
 
-        // NOTE: a block of atom pairs reaches only the auxiliary atoms near it, and
-        // the screening says which. The product was over the whole auxiliary basis
-        // on both sides, so a cluster of three hundred and twenty atoms formed
-        // fifteen thousand rows of which five thousand were kept and summed over
-        // fifteen thousand columns of which ten thousand were zeros -- nine times
-        // the arithmetic the answer needs. The rows and the columns which survive
-        // are gathered here, once for every block of a batch rather than once for
-        // every combination of angular momenta, and the metric they need is
-        // gathered with them. Compacting one side alone would want the surviving
-        // rows by the whole basis, which is larger than both sides compacted.
-
-        std::vector<TBqBlock> blocks(last - first);
-
-        {
-            size_t compacted_bytes = 0;
-
-            for (size_t b = 0; b < last - first; b++)
-            {
-                const auto iab = first + b;
-
-                auto &blk = blocks[b];
-
-                for (size_t i = 0; i < in_functions.size(); i++)
-                {
-                    if (batch_map[b * nin_groups + in_functions[i].group] == npos) continue;
-
-                    blk.in_sel.push_back(i);
-                }
-
-                for (size_t j = 0; j < out_functions.size(); j++)
-                {
-                    if (out_map[iab * nout_groups + out_functions[j].group] == npos) continue;
-
-                    blk.out_sel.push_back(j);
-                }
-
-                size_t in_dim = 0, out_dim = 0;
-
-                for (const auto i : blk.in_sel) in_dim += in_functions[i].count;
-
-                for (const auto j : blk.out_sel) out_dim += out_functions[j].count;
-
-                // NOTE: a block which keeps most of the basis saves little and pays
-                // for the gathering of the metric, so it keeps the whole of it. The
-                // memory of a batch is bounded as well, and a block beyond the
-                // bound keeps the whole metric rather than a part of it.
-
-                const auto bytes = out_dim * in_dim * sizeof(double);
-
-                blk.compacted = (out_dim * in_dim * 5 <= nrows * ncols * 4) &&
-                                (compacted_bytes + bytes <= _bq_metric_memory);
-
-                if (blk.compacted)
-                {
-                    compacted_bytes += bytes;
-
-                    blk.in_dim = in_dim;
-
-                    blk.out_dim = out_dim;
-
-                    size_t offset = 0;
-
-                    for (const auto i : blk.in_sel)
-                    {
-                        blk.in_off.push_back(offset);
-
-                        offset += in_functions[i].count;
-                    }
-
-                    offset = 0;
-
-                    for (const auto j : blk.out_sel)
-                    {
-                        blk.out_off.push_back(offset);
-
-                        offset += out_functions[j].count;
-                    }
-                }
-                nblocks_seen++;
-
-                nrows_kept += out_dim;
-
-                ncols_kept += in_dim;
-
-                if (blk.compacted) ncompacted++;
-
-                if (!blk.compacted)
-                {
-                    blk.in_dim = ncols;
-
-                    blk.out_dim = nrows;
-
-                    for (const auto i : blk.in_sel) blk.in_off.push_back(in_functions[i].offset);
-
-                    for (const auto j : blk.out_sel) blk.out_off.push_back(out_functions[j].offset);
-                }
-            }
-
-            const auto nmetrics = static_cast<int>(last - first);
-
-#pragma omp parallel for schedule(dynamic) if (nmetrics > 1)
-            for (int b = 0; b < nmetrics; b++)
-            {
-                auto &blk = blocks[static_cast<size_t>(b)];
-
-                if (!blk.compacted) continue;
-
-                blk.metric.resize(blk.out_dim * blk.in_dim);
-
-                for (size_t jo = 0; jo < blk.out_sel.size(); jo++)
-                {
-                    const auto &out_function = out_functions[blk.out_sel[jo]];
-
-                    for (size_t r = 0; r < out_function.count; r++)
-                    {
-                        const auto *from = metric.get() + (out_function.offset + r) * ncols;
-
-                        auto *into = blk.metric.data() + (blk.out_off[jo] + r) * blk.in_dim;
-
-                        for (size_t ii = 0; ii < blk.in_sel.size(); ii++)
-                        {
-                            const auto &in_function = in_functions[blk.in_sel[ii]];
-
-                            std::copy(from + in_function.offset, from + in_function.offset + in_function.count,
-                                      into + blk.in_off[ii]);
-                        }
-                    }
-                }
-            }
-        }
-
         std::vector<TBqTask> tasks;
 
         for (size_t b = 0; b < last - first; b++)
@@ -808,8 +652,6 @@ CSimdRIFockDriver::compute_bq_vectors(const CMolecule        &molecule,
             {
                 const auto &task = tasks[static_cast<size_t>(t)];
 
-                const auto &blk = blocks[task.block];
-
                 const auto iab = first + task.block;
 
                 const auto la = task.la, lb = task.lb;
@@ -829,13 +671,11 @@ CSimdRIFockDriver::compute_bq_vectors(const CMolecule        &molecule,
                     // last one a group keeps adds nothing, which is what the sum of
                     // the group would have added.
 
-                    ngathered += blk.in_dim * count * sizeof(double);
+                    ngathered += ncols * count * sizeof(double);
 
-                    for (size_t ii = 0; ii < blk.in_sel.size(); ii++)
+                    for (const auto &in_function : in_functions)
                     {
-                        const auto &in_function = in_functions[blk.in_sel[ii]];
-
-                        auto *rows = gathered.data() + blk.in_off[ii] * count;
+                        auto *rows = gathered.data() + in_function.offset * count;
 
                         const auto iblock = batch_map[task.block * nin_groups + in_function.group];
 
@@ -878,17 +718,16 @@ CSimdRIFockDriver::compute_bq_vectors(const CMolecule        &molecule,
 
                     nproducts++;
 
-                    nread += blk.in_dim * count * sizeof(double);
+                    nread += ncols * count * sizeof(double);
 
-                    _matrix_product(blk.out_dim, count, blk.in_dim, 1.0,
-                                    blk.compacted ? blk.metric.data() : metric.get(),
-                                    blk.in_dim, gathered.data(), count, 0.0, product.data(), count);
+                    _matrix_product(nrows, count, ncols, 1.0, metric.get(), ncols, gathered.data(), count, 0.0,
+                                    product.data(), count);
 
-                    for (size_t jo = 0; jo < blk.out_sel.size(); jo++)
+                    for (const auto &out_function : out_functions)
                     {
-                        const auto &out_function = out_functions[blk.out_sel[jo]];
-
                         const auto oblock = out_map[iab * nout_groups + out_function.group];
+
+                        if (oblock == npos) continue;
 
                         const auto npairs_out = bq_vectors.block(oblock).number_of_pairs(
                             la, ia, lb, jb, out_function.momentum, out_function.index);
@@ -907,7 +746,7 @@ CSimdRIFockDriver::compute_bq_vectors(const CMolecule        &molecule,
 
                         for (size_t r = 0; r < out_function.count; r++)
                         {
-                            const auto *from = product.data() + (blk.out_off[jo] + r) * count;
+                            const auto *from = product.data() + (out_function.offset + r) * count;
 
                             auto *into = out_values + r * npairs_out + cfirst;
 
@@ -928,14 +767,6 @@ CSimdRIFockDriver::compute_bq_vectors(const CMolecule        &molecule,
     profile.nbatches = nbatches;
 
     profile.ntasks = ntasks;
-
-    profile.ncompacted = ncompacted;
-
-    profile.nblocks_seen = nblocks_seen;
-
-    profile.nrows_kept = nrows_kept;
-
-    profile.ncols_kept = ncols_kept;
 
     profile.nchunk = nchunk;
 
