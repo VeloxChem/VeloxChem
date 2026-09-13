@@ -60,8 +60,14 @@ namespace xcintgga {  // xcintgga namespace
 /// @brief The memory the copies of the Kohn-Sham matrix may take together.
 /// @note One for every thread, so that the boxes of the grid add into them without
 /// taking turns. A basis whose square does not fit this for every thread keeps the
-/// critical section, which is correct and only slow.
-static constexpr size_t _vxc_copies = size_t{2} * 1024 * 1024 * 1024;
+/// critical section, which is correct and only slow -- and slow by a factor of
+/// three, as the queue cost sixty five per cent of the integration on a hundred and
+/// twenty eight threads. This bounds the basis rather than the memory of the
+/// machine: sixteen gigabytes carries four thousand functions at that width and
+/// twenty nine hundred at twice it, where two gigabytes stopped at fourteen
+/// hundred, which tagrisso in def2-tzvp very nearly reached. The copies are zeroed
+/// on every call, which is about three per cent of one at any size within this.
+static constexpr size_t _vxc_copies = size_t{16} * 1024 * 1024 * 1024;
 
 auto
 integrateVxcFockForGgaClosedShell(const CMolecule&                  molecule,
