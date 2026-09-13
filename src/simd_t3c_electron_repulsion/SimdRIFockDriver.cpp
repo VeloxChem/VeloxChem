@@ -1225,6 +1225,49 @@ struct TAuxEntry
     size_t row;
 };
 
+/// @brief The times of the phases of one half transformation.
+/// @note Both modes call it with the same arithmetic to do, the one from the B
+/// vectors it holds and the other from the integrals of a part it has just formed,
+/// so the two reports of one run are to be read against each other. The functions
+/// which carry nothing are counted apart, as the direct mode sweeps parts and most
+/// of the functions of a part are of that kind.
+struct CWProfile
+{
+    double entries = 0.0;
+    double fill = 0.0;
+    double scatter = 0.0;
+    double product = 0.0;
+    double total = 0.0;
+
+    size_t nrange = 0;
+    size_t nfilled = 0;
+    size_t nvalues = 0;
+
+    /// @brief Writes the phases of the transformation, and their share of it.
+    auto report(const bool dense) const -> void
+    {
+        const auto accounted = entries + fill + scatter + product;
+
+        const char *names[] = {"entries", "fill", "scatter", "product", "rest"};
+
+        const double times[] = {entries, fill, scatter, product, total - accounted};
+
+        std::printf("RIJK %s transform of %zu of %zu on %d threads, %.3f s\n", dense ? "dense" : "sparse", nfilled,
+                    nrange, omp::get_number_of_threads(), total);
+
+        for (size_t i = 0; i < 5; i++)
+        {
+            std::printf("RIJK   %-12s %9.3f s %6.1f %%\n", names[i], times[i],
+                        (total > 0.0) ? 100.0 * times[i] / total : 0.0);
+        }
+
+        std::printf("RIJK   %.2f GB scattered\n", static_cast<double>(nvalues * sizeof(double)) /
+                                                       (1024.0 * 1024.0 * 1024.0));
+
+        std::fflush(stdout);
+    }
+};
+
 }  // anonymous namespace
 
 auto
@@ -1267,6 +1310,16 @@ CSimdRIFockDriver::compute_w_vectors(const CSparseTensor        &bq_vectors,
     }
 
     if ((nrange == 0) || (nocc == 0)) return;
+
+    CWProfile profile;
+
+    const auto profile_start = prof_clock::now();
+
+    const auto profiled = (std::getenv("VLX_RIJK_PROFILE") != nullptr);
+
+    profile.nrange = nrange;
+
+    const auto mark_entries = prof_clock::now();
 
     const auto indices = denseidx::index_functions(basis);
 
@@ -1326,6 +1379,8 @@ CSimdRIFockDriver::compute_w_vectors(const CSparseTensor        &bq_vectors,
             }
         }
     }
+
+    profile.entries += prof_since(mark_entries);
 
     const auto *cvalues = coefficients.data();
 
@@ -1398,7 +1453,11 @@ CSimdRIFockDriver::compute_w_vectors(const CSparseTensor        &bq_vectors,
         // several times faster than a loop of the compiler runs the sum, which is
         // why the trade is worth taking wherever the B vectors are not sparse.
 
-#pragma omp parallel
+        double fill_time = 0.0, scatter_time = 0.0, product_time = 0.0;
+
+        size_t nfilled = 0, nvalues = 0;
+
+#pragma omp parallel reduction(+ : fill_time, scatter_time, product_time, nfilled, nvalues)
         {
             std::vector<double> square(nao * nao, 0.0);
 
@@ -1416,7 +1475,15 @@ CSimdRIFockDriver::compute_w_vectors(const CSparseTensor        &bq_vectors,
 
                 if (entries[iq].empty()) continue;
 
+                nfilled++;
+
+                const auto mark_fill = prof_clock::now();
+
                 std::fill(square.begin(), square.end(), 0.0);
+
+                fill_time += prof_since(mark_fill);
+
+                const auto mark_scatter = prof_clock::now();
 
                 for (const auto &entry : entries[iq])
                 {
@@ -1474,15 +1541,42 @@ CSimdRIFockDriver::compute_w_vectors(const CSparseTensor        &bq_vectors,
 
                                         if (k >= ndiag) square[rrow * nao + irow] = values[k];
                                     }
+
+                                    nvalues += npairs;
                                 }
                             }
                         }
                     }
                 }
 
+                scatter_time += prof_since(mark_scatter);
+
+                const auto mark_product = prof_clock::now();
+
                 _matrix_product(nao, nocc, nao, 1.0, square.data(), nao, cvalues, nocc,
                                 accumulate ? 1.0 : 0.0, w_vectors[iq].data(), nocc);
+
+                product_time += prof_since(mark_product);
             }
+        }
+
+        if (profiled)
+        {
+            const auto share = static_cast<double>(omp::get_number_of_threads());
+
+            profile.fill = fill_time / share;
+
+            profile.scatter = scatter_time / share;
+
+            profile.product = product_time / share;
+
+            profile.nfilled = nfilled;
+
+            profile.nvalues = nvalues;
+
+            profile.total = prof_since(profile_start);
+
+            profile.report(true);
         }
 
         return;
