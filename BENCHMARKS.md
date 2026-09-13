@@ -6543,3 +6543,75 @@ at the level B3LYP asks for has 384 and tagrisso 1036 -- three and eight for eve
 thread at 128. The `rest` of the two reports, 20.4 and 13.1 per cent, is what that
 granularity costs, and it eases as the molecule grows. On 256 threads caffeine would
 have 1.5 boxes a thread, which cannot work.
+
+## Three hundred and twenty atoms, where the integrals are three per cent
+
+A cluster of paracetamol, 320 atoms and 640 occupied orbitals, at def2-svp against
+def2-universal-jkfit: 3184 basis functions and 15888 auxiliary ones. The B vectors
+would be 196.94 GB, which is most of the memory of the node, so this is the direct
+way. Three iterations on 128 threads, bound.
+
+| a build | seconds | |
+| --- | ---: | ---: |
+| solve | 69.5 | **44.7%** |
+| transform | 66.6 | **42.8%** |
+| exchange | 10.2 | 6.6% |
+| integrals a + b | 4.6 | **3.0%** |
+| allocate, copies, closure, coulomb, rest | 4.7 | 3.0% |
+| **the whole build** | **155.6** | |
+
+**The integrals are three per cent.** The direct way forms them again on every
+build, twice, and at this size that costs 4.6 seconds of 155.6. Screening is what
+does it: three hundred and twenty atoms in a cluster leave most pairs of them with
+nothing to compute, while the two dense phases grow with the square of the basis
+times the occupied orbitals. On tagrisso at def2-tzvp the same two sweeps were
+19.7 per cent of a build. **The larger the system, the less of the direct way is
+integrals** -- which is the opposite of what the name suggests, and it is worth
+knowing before choosing what to make quicker.
+
+**Eighty eight per cent of the build is two phases**, and neither is an integral.
+The solve applies the Cholesky factor of the metric to the half transformed
+integrals, 15888 squared by 3184 by 640, about 514 teraflops a build at 7.4
+teraflops a second, which is what this machine gives for a triangular solve. The
+transform is the half transformation, of which seven tenths is its product and a
+fifth its scatter.
+
+The setup is nothing: 0.63 seconds, five sixths of it the Cholesky factor of a
+15888 by 15888 metric.
+
+### A third cap which was chosen on a laptop
+
+The exchange gathers the W matrices into triangles of the basis, one for each
+thread, and `_syrk_triangles` bounded them together at two gigabytes. A triangle
+here is 3184 squared by eight, 81.1 megabytes, so the bound allowed **twenty six of
+them on a hundred and twenty eight threads**. A fifth of the build ran on a fifth of
+the cores.
+
+| | 2 GB | 16 GB |
+| --- | ---: | ---: |
+| taxol, 1099 functions | 128 of 128 | 128 |
+| tagrisso def2-tzvp, 1345 | 128 of 128 | 128 |
+| tagrisso def2-tzvpd, 1673 | 95 | 128 |
+| paracetamol, 3184 | **26** | 128 |
+| 4096 | 16 | 128 |
+
+Raised to sixteen, the exchange of this build fell from 38.7 seconds to 10.2, and
+three iterations from 880.2 to 731.9. Everything which should not have moved did
+not -- the solve to a tenth of a second, the transform by one per cent, the
+integrals not at all -- which is what makes the one number trustworthy.
+
+**The rank k update itself went from 28.71 seconds to 7.26**, a factor of 3.95 where
+twenty six threads to a hundred and twenty eight predicts 4.92. The missing fifth is
+the price of adding a hundred and twenty eight triangles of 81 megabytes instead of
+twenty six: 10.4 gigabytes of summation which was 2.1 before. It is worth paying
+four times over, and it is a real cost rather than a rounding error.
+
+**The energy moved by one unit in the tenth decimal**, -8191.8161913019 against
+-8191.8161913018, from the same change of the order of the arithmetic.
+
+**Three bounds were found too small on one day**, and all three were two gigabytes:
+the copies of the Kohn-Sham matrix, the range of the W matrices, and the triangles
+of the exchange. All three are the square of something by the threads, so all three
+bind at about fourteen hundred and fifty basis functions on a hundred and twenty
+eight threads, and all three were chosen on a machine with sixteen cores where that
+is four thousand. The lesson is not about any of the three numbers.
