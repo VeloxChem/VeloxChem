@@ -279,6 +279,10 @@ struct CBqProfile
     size_t nproducts = 0;
     size_t ngathered = 0;
     size_t nread = 0;
+    size_t nblocks = 0;
+    size_t nbatches = 0;
+    size_t nsmallest = 0;
+    size_t nchunk = 0;
 
     /// @brief Writes the phases of the B vectors, and their share of them.
     auto report(const size_t nbytes) const -> void
@@ -305,6 +309,9 @@ struct CBqProfile
 
         std::printf("RIJK   %zu products, %.2f GB gathered, %.2f GB read back from it\n", nproducts, gb(ngathered),
                     gb(nread));
+
+        std::printf("RIJK   %zu blocks in %zu batches, smallest %zu, on %d threads, chunk %zu\n", nblocks, nbatches,
+                    nsmallest, omp::get_number_of_threads(), nchunk);
 
         std::fflush(stdout);
     }
@@ -508,6 +515,8 @@ CSimdRIFockDriver::compute_bq_vectors(const CMolecule        &molecule,
 
     const auto nchunk = std::max(size_t{1}, _bq_columns / std::max(per_column, size_t{1}));
 
+    size_t nbatches = 0, nsmallest = std::numeric_limits<size_t>::max();
+
     while (first < nab)
     {
         auto last = first;
@@ -575,6 +584,10 @@ CSimdRIFockDriver::compute_bq_vectors(const CMolecule        &molecule,
         // screened away are formed and dropped, which is a few per cent of them.
 
         const auto nblocks = static_cast<int>(last - first);
+
+        nbatches++;
+
+        nsmallest = std::min(nsmallest, last - first);
 
         const auto mark_contract = prof_clock::now();
 
@@ -724,6 +737,14 @@ CSimdRIFockDriver::compute_bq_vectors(const CMolecule        &molecule,
 
         first = last;
     }
+
+    profile.nblocks = nab;
+
+    profile.nbatches = nbatches;
+
+    profile.nsmallest = (nbatches > 0) ? nsmallest : 0;
+
+    profile.nchunk = nchunk;
 
     profile.nproducts = nproducts;
 
