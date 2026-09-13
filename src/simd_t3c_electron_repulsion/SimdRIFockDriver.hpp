@@ -304,6 +304,17 @@ class CSimdRIFockDriver
     /// the block, which has no bound of its own.
     static constexpr size_t _bq_columns = size_t{32} * 1024 * 1024;
 
+    /// @brief The memory the compacted metrics of one batch may take together.
+    /// @note A block of atom pairs reaches only the auxiliary atoms near it, so the
+    /// product which makes its B vectors wants the rows and the columns of those
+    /// and no others. The metric of a block is the surviving rows by the surviving
+    /// columns, held for every block of the batch and read by every combination of
+    /// angular momenta of that block. A cluster of three hundred and twenty atoms
+    /// keeps a third of the basis on each side, which is 216 megabytes a block and
+    /// about seven gigabytes a batch. A batch beyond this keeps the whole metric,
+    /// which is correct and only slower.
+    static constexpr size_t _bq_metric_memory = size_t{16} * 1024 * 1024 * 1024;
+
 };
 
 #endif /* SimdRIFockDriver_hpp */
