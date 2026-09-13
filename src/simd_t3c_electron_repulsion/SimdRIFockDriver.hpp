@@ -279,9 +279,14 @@ class CSimdRIFockDriver
 
     /// @brief The memory the triangles of the exchange may hold together.
     /// @note One triangle for each thread, so that the auxiliary functions divide
-    /// over them without the threads writing over one another, bounded so that a
-    /// large basis does not ask for more than it should.
-    static constexpr size_t _syrk_triangles = size_t{2} * 1024 * 1024 * 1024;
+    /// over them without the threads writing over one another. The bound is on the
+    /// basis rather than on the machine: a triangle is the square of the basis, so
+    /// two gigabytes stopped at fourteen hundred functions on a hundred and twenty
+    /// eight threads, and a cluster of three thousand two hundred was given twenty
+    /// six of them -- a fifth of the build running on a fifth of the cores. Sixteen
+    /// carries four thousand at that width, for ten gigabytes of buffers, which is
+    /// nothing beside the integrals of such a calculation.
+    static constexpr size_t _syrk_triangles = size_t{16} * 1024 * 1024 * 1024;
 
     /// @brief The memory a batch of the three-center integrals is allowed to reach.
     /// @note The batch is the blocks of atomic orbital pairs whose integrals are
