@@ -5297,6 +5297,50 @@ That difference is the gather of the auxiliary groups, worth 1.12 to 1.24 times
 here, which is the setup being a smaller part of a caffeine run than of the
 tagrisso one where it was worth 1.08 on the whole calculation.
 
+## Caffeine against the build which makes no approximation
+
+The table above this one sets the two resolution of the identity routes against each
+other. This one adds the build which makes none, so that what the approximation is
+worth can be read beside what the driver is worth. Caffeine, Hartree-Fock, against
+def2-universal-jkfit with 1242 auxiliary functions in every row, all four builds one
+after another in the same process, on sixteen cores.
+
+| basis | nao | four center | RI-JK veloxchem | simd, in memory | simd, direct |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| def2-svp | 246 | 12.43 | 3.40 | **1.57** | 3.23 |
+| def2-svpd | 366 | 50.58 | 8.28 | **3.28** | 6.07 |
+| def2-tzvp | 494 | 174.12 | 18.38 | **6.01** | 10.85 |
+| def2-tzvpd | 614 | 426.00 | 39.72 | **9.26** | 15.96 |
+
+and the same as ratios against the exact build:
+
+| basis | nao | RI-JK veloxchem | simd, in memory | simd, direct |
+| --- | ---: | ---: | ---: | ---: |
+| def2-svp | 246 | 3.66 | **7.92** | 3.85 |
+| def2-svpd | 366 | 6.11 | **15.42** | 8.33 |
+| def2-tzvp | 494 | 9.47 | **28.97** | 16.05 |
+| def2-tzvpd | 614 | 10.73 | **46.00** | 26.69 |
+
+The three routes of the approximation agree to the ninth decimal and take the same
+number of iterations. The exact build takes nineteen where they take twenty one or
+twenty two, and lands a thousandth of a hartree lower, which is the approximation
+and not an error.
+
+**The advantage climbs steeply with the basis, from eight times to forty six.** The
+fitting set is 1242 functions in every row while the orbital set nearly triples, so
+the work the driver saves grows while the work it must do grows much more slowly.
+This is the same thing the sections on the node describe from the other side, where
+the Fock build was seen to grow as the square of the basis and the fitting set not
+at all.
+
+**The way which holds the B vectors beats the direct way by about two to one here,
+at every basis.** On a node with a hundred and twenty eight cores it loses to it by
+the same factor. The code is the same; what differs is that the way which holds them
+forms its W matrices sixty four auxiliary functions at a time, which is work enough
+to divide over sixteen cores and not over a hundred and twenty eight. **Which mode
+to choose is settled by the cores, not by the molecule.**
+
+
 ## The larger molecules, the two routes side by side
 
 c60 and taxol at Hartree-Fock in def2-svp against def2-universal-jkfit, both routes
@@ -5482,14 +5526,14 @@ the new driver has of doing the same thing.
 
 | basis | nao | mode | time | against full | iterations | energy |
 | --- | ---: | --- | ---: | ---: | ---: | ---: |
-| def2-svp | 683 | full four-center | 152.37 | 1.00 | 21 | -1609.0900864188 |
-| | | RI-JK veloxchem | 95.59 | 1.59 | 23 | -1609.0890443496 |
-| | | RI-JK simd, in memory | 35.07 | 4.35 | 23 | -1609.0890443498 |
-| | | RI-JK simd, direct | 79.04 | 1.93 | 23 | -1609.0890443496 |
-| def2-svpd | 1010 | full four-center | 1182.67 | 1.00 | 21 | -1609.1565808182 |
-| | | RI-JK veloxchem | 359.81 | 3.29 | 24 | -1609.1555344827 |
-| | | RI-JK simd, in memory | 85.12 | 13.89 | 24 | -1609.1555344829 |
-| | | RI-JK simd, direct | 162.13 | 7.29 | 24 | -1609.1555344827 |
+| def2-svp | 683 | full four-center | 158.24 | 1.00 | 21 | -1609.0900864188 |
+| | | RI-JK veloxchem | 95.39 | 1.66 | 23 | -1609.0890443496 |
+| | | RI-JK simd, in memory | 34.53 | 4.58 | 23 | -1609.0890443498 |
+| | | RI-JK simd, direct | 78.66 | 2.01 | 23 | -1609.0890443496 |
+| def2-svpd | 1010 | full four-center | 1183.39 | 1.00 | 21 | -1609.1565808182 |
+| | | RI-JK veloxchem | 358.80 | 3.30 | 24 | -1609.1555344827 |
+| | | RI-JK simd, in memory | 82.82 | 14.29 | 24 | -1609.1555344829 |
+| | | RI-JK simd, direct | 158.26 | 7.48 | 24 | -1609.1555344827 |
 
 **The three routes of the approximation agree to the ninth decimal**, and differ
 from the four center build by the error of the approximation alone, a thousandth of
@@ -5504,9 +5548,9 @@ holds them sweeps them once for the whole calculation.
 
 | | def2-svp | def2-svpd |
 | --- | ---: | ---: |
-| against the way which holds them | 2.25 slower | 1.90 slower |
-| against the route VeloxChem had | **1.21 faster** | **2.22 faster** |
-| against the four center build | **1.93 faster** | **7.29 faster** |
+| against the way which holds them | 2.28 slower | 1.91 slower |
+| against the route VeloxChem had | **1.21 faster** | **2.27 faster** |
+| against the four center build | **2.01 faster** | **7.48 faster** |
 
 A factor of two for holding nothing, not the five or ten a count of the passes
 would suggest. The reason is in the section on the setup: **the three-center
