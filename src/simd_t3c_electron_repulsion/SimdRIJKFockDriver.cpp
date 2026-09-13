@@ -167,6 +167,40 @@ struct CInMemoryProfile
     }
 };
 
+/// @brief The times of the phases of the setup of a calculation.
+/// @note The setup is paid once, where the phases of a build are paid on every
+/// iteration, so the two reports are not to be added. It is here because the mode
+/// which holds the B vectors forms them here and the direct mode does not, which is
+/// the whole of what the two modes do differently outside a Fock build.
+struct CPrepareProfile
+{
+    double two_center = 0.0;
+    double pattern = 0.0;
+    double metric = 0.0;
+    double bq_vectors = 0.0;
+    double total = 0.0;
+
+    /// @brief Writes the phases of the setup, and their share of it.
+    auto report(const char *mode) const -> void
+    {
+        const auto accounted = two_center + pattern + metric + bq_vectors;
+
+        const char *names[] = {"two center", "pattern", "metric", "b vectors", "rest"};
+
+        const double times[] = {two_center, pattern, metric, bq_vectors, total - accounted};
+
+        std::printf("RIJK setup of the %s way on %d threads, %.3f s\n", mode, omp::get_number_of_threads(), total);
+
+        for (size_t i = 0; i < 5; i++)
+        {
+            std::printf("RIJK   %-12s %9.3f s %6.1f %%\n", names[i], times[i],
+                        (total > 0.0) ? 100.0 * times[i] / total : 0.0);
+        }
+
+        std::fflush(stdout);
+    }
+};
+
 }  // namespace
 
 auto
@@ -201,6 +235,10 @@ CSimdRIJKFockDriver::prepare(const CMolecule       &molecule,
                              const bool             use_inverse_square_root,
                              const rimode           mode) -> void
 {
+    CPrepareProfile profile;
+
+    const auto profile_start = prof_clock::now();
+
     const auto memory = required_memory(molecule, basis, aux_basis, threshold);
 
     _budget = memory_budget;
@@ -217,7 +255,11 @@ CSimdRIJKFockDriver::prepare(const CMolecule       &molecule,
 
     _aux_basis = aux_basis;
 
+    const auto mark_two_center = prof_clock::now();
+
     const auto two_center = CSimdTwoCenterElectronRepulsionDriver().compute(molecule, aux_basis);
+
+    profile.two_center += prof_since(mark_two_center);
 
     // NOTE: both forms of the metric close the resolution of the identity, and the
     // Cholesky factor costs an order of magnitude less, so it is tried first. A
@@ -231,21 +273,33 @@ CSimdRIJKFockDriver::prepare(const CMolecule       &molecule,
 
     if (_mode == rimode::direct)
     {
+        const auto mark_pattern = prof_clock::now();
+
         const auto pattern = CSimdThreeCenterElectronRepulsionDriver().make_pattern(molecule, basis, aux_basis, threshold);
 
         _parts = _make_parts(molecule, basis, aux_basis, threshold, pattern);
+
+        profile.pattern += prof_since(mark_pattern);
 
         if (!use_inverse_square_root)
         {
             try
             {
+                const auto mark_metric = prof_clock::now();
+
                 _factor = packlin::cholesky_factor(two_center);
+
+                profile.metric += prof_since(mark_metric);
 
                 _bq_vectors = CSparseTensor();
 
                 _w_vectors.clear();
 
                 _prepared = true;
+
+                profile.total = prof_since(profile_start);
+
+                if (prof_wanted()) profile.report("direct");
 
                 return;
             }
@@ -269,6 +323,8 @@ CSimdRIJKFockDriver::prepare(const CMolecule       &molecule,
         }
     }
 
+    const auto mark_metric = prof_clock::now();
+
     if (use_inverse_square_root)
     {
         _metric = packlin::inverse_square_root(two_center, metric_threshold);
@@ -290,11 +346,21 @@ CSimdRIJKFockDriver::prepare(const CMolecule       &molecule,
         }
     }
 
+    profile.metric += prof_since(mark_metric);
+
+    const auto mark_bq_vectors = prof_clock::now();
+
     _bq_vectors = _drv.compute_bq_vectors(molecule, basis, aux_basis, _metric, threshold);
+
+    profile.bq_vectors += prof_since(mark_bq_vectors);
 
     _w_vectors.clear();
 
     _prepared = true;
+
+    profile.total = prof_since(profile_start);
+
+    if (prof_wanted()) profile.report("memory");
 }
 
 auto
