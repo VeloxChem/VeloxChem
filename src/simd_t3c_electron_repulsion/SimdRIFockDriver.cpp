@@ -248,6 +248,52 @@ _make_dense_indices(const std::vector<TAuxFunction>    &functions,
     return dense;
 }
 
+/// @brief The clock the phases of the B vectors are timed on.
+using prof_clock = std::chrono::steady_clock;
+
+/// @brief The seconds since a mark.
+inline auto
+prof_since(const prof_clock::time_point &mark) -> double
+{
+    return std::chrono::duration<double>(prof_clock::now() - mark).count();
+}
+
+/// @brief The times of the phases of forming the B vectors.
+/// @note They are formed once, where the mode which holds them reads them on every
+/// iteration. What the phases are worth measuring against is the direct mode, which
+/// sweeps the same integrals on every build: the sweep here is the same work, so a
+/// phase of this which is many times that one is not the price of holding them.
+struct CBqProfile
+{
+    double metric = 0.0;
+    double pattern = 0.0;
+    double allocate = 0.0;
+    double integrals = 0.0;
+    double contract = 0.0;
+    double total = 0.0;
+
+    /// @brief Writes the phases of the B vectors, and their share of them.
+    auto report(const size_t nbytes) const -> void
+    {
+        const auto accounted = metric + pattern + allocate + integrals + contract;
+
+        const char *names[] = {"metric", "pattern", "allocate", "integrals", "contract", "rest"};
+
+        const double times[] = {metric, pattern, allocate, integrals, contract, total - accounted};
+
+        std::printf("RIJK b vectors of %.2f GB on %d threads, %.3f s\n",
+                    static_cast<double>(nbytes) / (1024.0 * 1024.0 * 1024.0), omp::get_number_of_threads(), total);
+
+        for (size_t i = 0; i < 6; i++)
+        {
+            std::printf("RIJK   %-12s %9.3f s %6.1f %%\n", names[i], times[i],
+                        (total > 0.0) ? 100.0 * times[i] / total : 0.0);
+        }
+
+        std::fflush(stdout);
+    }
+};
+
 }  // anonymous namespace
 
 auto
@@ -290,7 +336,15 @@ CSimdRIFockDriver::compute_bq_vectors(const CMolecule        &molecule,
 
     const auto out_groups = sparsity::select_aux_groups(molecule, aux_basis, aux_atoms.empty() ? all_atoms : aux_atoms);
 
+    CBqProfile profile;
+
+    const auto profile_start = prof_clock::now();
+
+    const auto profiled = (std::getenv("VLX_RIJK_PROFILE") != nullptr);
+
     // the basis functions on the auxiliary side and the permuted metric
+
+    const auto mark_metric = prof_clock::now();
 
     const auto aux_indices = denseidx::index_functions(aux_basis);
 
@@ -332,6 +386,8 @@ CSimdRIFockDriver::compute_bq_vectors(const CMolecule        &molecule,
         }
     }
 
+    profile.metric += prof_since(mark_metric);
+
     // the sparsity pattern of the B vectors, and the block each pair of a block of
     // atom pairs and a basis function on the auxiliary side is held in
 
@@ -344,6 +400,8 @@ CSimdRIFockDriver::compute_bq_vectors(const CMolecule        &molecule,
     const auto nout_groups = out_groups.size();
 
     const auto nin_groups = in_groups.size();
+
+    const auto mark_out_blocks = prof_clock::now();
 
     std::vector<CAtomBasisTripleSparsity> out_blocks;
 
@@ -364,15 +422,23 @@ CSimdRIFockDriver::compute_bq_vectors(const CMolecule        &molecule,
         }
     }
 
+    profile.pattern += prof_since(mark_out_blocks);
+
+    const auto mark_allocate = prof_clock::now();
+
     auto bq_vectors = CSparseTensor(CTripleSparsityPattern(std::move(out_blocks), mat_t::symmetric, threshold));
 
     bq_vectors.allocate();
 
     bq_vectors.zero();
 
+    profile.allocate += prof_since(mark_allocate);
+
     // NOTE: the blocks of the integrals are described once rather than once per
     // batch, so that the batches are formed from the memory they are known to
     // need rather than from an estimate of it.
+
+    const auto mark_in_blocks = prof_clock::now();
 
     std::vector<CAtomBasisTripleSparsity> in_blocks;
 
@@ -396,6 +462,8 @@ CSimdRIFockDriver::compute_bq_vectors(const CMolecule        &molecule,
             }
         }
     }
+
+    profile.pattern += prof_since(mark_in_blocks);
 
     const auto basis_indices = denseidx::index_functions(basis);
 
@@ -438,6 +506,8 @@ CSimdRIFockDriver::compute_bq_vectors(const CMolecule        &molecule,
             }
         }
 
+        const auto mark_integrals = prof_clock::now();
+
         const auto pattern = CTripleSparsityPattern(std::move(batch_blocks), mat_t::symmetric, threshold);
 
         auto integrals = CSparseTensor(pattern);
@@ -447,6 +517,8 @@ CSimdRIFockDriver::compute_bq_vectors(const CMolecule        &molecule,
         auto distributor = CSimdT3CDistributor<CSparseTensor>(&integrals);
 
         eri_drv.compute(pattern, molecule, basis, aux_basis, distributor);
+
+        profile.integrals += prof_since(mark_integrals);
 
         // the contraction of the batch, over the blocks of atom pairs, which write
         // into blocks of the B vectors of their own and never into a shared one
@@ -460,6 +532,8 @@ CSimdRIFockDriver::compute_bq_vectors(const CMolecule        &molecule,
         // is the whole auxiliary basis and one product replaces eighty one.
 
         const auto nblocks = static_cast<int>(last - first);
+
+        const auto mark_contract = prof_clock::now();
 
 #pragma omp parallel
         {
@@ -569,8 +643,14 @@ CSimdRIFockDriver::compute_bq_vectors(const CMolecule        &molecule,
             }
         }
 
+        profile.contract += prof_since(mark_contract);
+
         first = last;
     }
+
+    profile.total = prof_since(profile_start);
+
+    if (profiled) profile.report(bq_vectors.memory_size());
 
     return bq_vectors;
 }
