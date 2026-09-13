@@ -211,7 +211,18 @@ class CSimdRIJKFockDriver
     /// over one call of the whole basis.
     static constexpr size_t _w_batch = 64;
 
-    static constexpr size_t _w_batch_memory = size_t{2} * 1024 * 1024 * 1024;
+    /// @brief The memory the W matrices of a range may take together.
+    /// @note They are the basis by the occupied orbitals, one for each function of
+    /// the range, so this and not the threads is what sets the range of a large
+    /// calculation -- and the bound is on the calculation rather than on the
+    /// machine. Two gigabytes gave a cluster of three hundred and twenty atoms a
+    /// hundred and thirty one functions a call, which is a hundred and twenty two
+    /// calls of the transformation for every build, and every one of them ends with
+    /// an exchange which adds a triangle of the basis for each thread. Sixteen
+    /// makes it sixteen calls. The matrices are held once, where the direct mode
+    /// holds its half transformed integrals twice, so this is the smaller of the
+    /// two claims on the memory of such a calculation.
+    static constexpr size_t _w_batch_memory = size_t{16} * 1024 * 1024 * 1024;
 
     /// @brief The memory the direct mode is allowed to reach, taken from the budget
     /// the driver was prepared with.
