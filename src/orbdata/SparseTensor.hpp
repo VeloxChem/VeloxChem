@@ -303,14 +303,29 @@ class CSparseTensor
     }
 
     /// @brief Sets the values of all values blocks of tensor to zero.
+    /// @note The blocks are divided over the threads, and not only to go quicker.
+    /// A large allocation is handed back untouched, so this is what first touches
+    /// the pages and where they are touched is where they stay. Zeroed on one
+    /// thread, a tensor of fifteen gigabytes lands wholly on the memory of one
+    /// socket, and every thread of the other one reads it across the link
+    /// afterwards -- which halved the rate at which the half transformation read
+    /// the B vectors, against the integrals the direct way forms in place and
+    /// never zeroes.
     auto
     zero() -> void
     {
         errors::assertMsgCritical(_values_state == valstat::allocated,
                                   std::string("SparseTensor.zero: Values blocks of tensor are not allocated"));
 
-        std::ranges::for_each(std::views::iota(size_t{0}, _values.size()),
-                              [&](const auto i) { std::fill(_values[i], _values[i] + number_of_elements(i), 0.0); });
+        const auto nblocks = static_cast<int>(_values.size());
+
+#pragma omp parallel for schedule(dynamic) if (nblocks > 1)
+        for (int i = 0; i < nblocks; i++)
+        {
+            const auto iblock = static_cast<size_t>(i);
+
+            std::fill(_values[iblock], _values[iblock] + number_of_elements(iblock), 0.0);
+        }
     }
 
     /// @brief Scales the values of all values blocks of tensor.
