@@ -6402,3 +6402,144 @@ it was only the pinned measurement which made it look otherwise.
 **The numbers of the sections above this one were taken pinned**, so the part of
 them outside the Fock build is overstated -- by a fifth at def2-svpd and by a factor
 of three at def2-qzvp.
+
+## Density functional theory, where the integration is the other half
+
+Everything above is Hartree-Fock. A hybrid functional adds the exchange correlation
+integration to every iteration and asks for only a fifth of the exact exchange, so
+it changes both sides of the balance at once. Caffeine and tagrisso at B3LYP against
+def2-universal-jkfit, the grid at the level the functional asks for.
+
+Caffeine on the laptop, sixteen cores, beside the same rows at Hartree-Fock:
+
+| basis | nao | HF, in memory | B3LYP, in memory | B3LYP against the exact build |
+| --- | ---: | ---: | ---: | ---: |
+| def2-svp | 246 | 1.27 | 4.13 | 3.6 |
+| def2-svpd | 366 | 2.69 | 8.86 | 6.3 |
+| def2-tzvp | 494 | 4.81 | 13.73 | 13.1 |
+| def2-tzvpd | 614 | 7.80 | 22.92 | 18.8 |
+
+**B3LYP costs caffeine three and a half times what Hartree-Fock does here, and the
+approximation is worth a third of what it was**: the advantage over the exact build
+falls from 9.7 to 3.6 and from 54.2 to 18.8. The integration is a fixed addition
+which lands on the quick routes and the slow one alike, so it hurts whichever is
+quickest. It adds 2.7 seconds to a calculation of 1.27 and 8 seconds to one of 423.
+
+Tagrisso on the node, 128 threads, all four builds:
+
+| basis | nao | four center | veloxchem | in memory | direct | best against exact |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| def2-svp | 683 | 26.14 | 41.85 | **13.62** | 14.92 | 1.92 |
+| def2-svpd | 1010 | 139.81 | 140.74 | 34.20 | **33.11** | 4.22 |
+| def2-tzvp | 1345 | 302.22 | 217.49 | **45.29** | 48.07 | 6.67 |
+
+**On tagrisso B3LYP costs what Hartree-Fock costs, and at def2-tzvp it costs less**
+-- 45.29 against 48.10, a factor of 0.94, with 1.07 and 1.12 at the two smaller
+bases. The integration adds 0.275 seconds an iteration and the fifth of the exchange
+gives about as much back. The contrast with caffeine is the balance: the grid grows
+with the atoms and the fitting set does not, so the integration is 1.5 times the
+Fock build for caffeine and the build is 3.9 times the integration for tagrisso.
+
+**The two ways of the driver are level under a hybrid** -- 0.91, 1.03 and 0.94 --
+where at Hartree-Fock the way which holds the B vectors led by seven per cent at
+def2-tzvp. What separates them is a smaller share of a larger iteration.
+
+**The conventional route loses to making no approximation at all at two of the three
+bases**, 41.85 against 26.14 and 140.74 against 139.81. A hybrid makes the exact
+build cheaper, as only a fifth of the exchange is wanted, and the older route does
+not gain from that. The crossing moves against it.
+
+### What the integration is made of
+
+The phases the integrator already timed, reported under VLX_XC_PROFILE. One call,
+128 threads, def2-tzvp:
+
+| phase | caffeine | | tagrisso | |
+| --- | ---: | ---: | ---: | ---: |
+| gtoeval | 0.013 | 26.5% | 0.063 | 22.9% |
+| Generate density grid | 0.011 | 22.4% | 0.065 | 23.6% |
+| Vxc matmul and symm. | 0.008 | 16.3% | 0.055 | 20.0% |
+| Vxc matrix G | 0.004 | 8.2% | 0.025 | 9.1% |
+| Density matrix slicing | 0.001 | 2.0% | 0.015 | 5.5% |
+| XC functional eval. | 0.001 | 2.0% | 0.003 | 1.1% |
+| Vxc dist. | 0.001 | 2.0% | 0.012 | 4.4% |
+| rest | 0.010 | 20.4% | 0.036 | 13.1% |
+| **total** | **0.049** | | **0.275** | |
+
+**The functional itself is one per cent.** Whatever B3LYP costs, it is not the
+formula: it is evaluating the basis functions on the grid points and multiplying by
+them. Three phases -- the density on the grid, the Vxc product and the values
+themselves -- are two thirds of the integration on both molecules, and the screening
+and the distribution are nothing.
+
+Measured on the laptop the three scale as the algorithm says they should: the two
+products as the square of the basis, 2.09 and 2.15 against the 2.0 they must be, and
+exactly linear in the points; the evaluation of the values as the first power of the
+basis, 1.08. Nothing is being computed twice.
+
+### One critical section was two thirds of it
+
+The phases above are of the current build. Before it, on the same machine and the
+same calculation, the distribution was **0.104 seconds of a 0.159 second call, sixty
+five per cent**, where on the laptop it was 0.005 and one per cent.
+
+| caffeine def2-tzvp, one call | laptop, 14 threads | node, 128 threads |
+| --- | ---: | ---: |
+| everything but the distribution | 0.386 | 0.028 |
+| the distribution | 0.005 | **0.104** |
+
+**The arithmetic scaled better than the cores did** -- 13.8 times on 9.1 times the
+threads -- and the distribution went twenty times the other way. Every box added its
+partial matrix into the shared Kohn-Sham matrix inside one `omp critical`, so the
+threads queued. At fourteen it does not show; at a hundred and twenty eight it is
+the calculation.
+
+Giving each thread a matrix of its own and adding them at the end, as the exchange
+of the RI-JK driver does with its triangles:
+
+| caffeine def2-tzvp, node | before | after | |
+| --- | ---: | ---: | ---: |
+| Vxc dist. | 0.104 | **0.001** | 100 |
+| rest | 0.027 | 0.010 | 2.7 |
+| the whole call | 0.159 | **0.049** | 3.2 |
+| an iteration | 0.327 | 0.212 | 1.54 |
+| the calculation | 6.87 | **4.45** | 1.54 |
+
+The `rest` line fell with it, which is what says most of that was tasks waiting on
+the same lock rather than work.
+
+**The energy moved by one unit in the tenth decimal**, -680.6196125485 against
+-680.6196125486. A hundred and twenty eight partial sums are added where there was
+one running total; at 1, 4 and 14 threads it is unchanged to every digit. It is the
+order of the arithmetic.
+
+**The memory is the square of the basis for every thread**, so it is bounded, and a
+basis too large for the bound keeps the critical section rather than half of the
+new way. Sixteen gigabytes carries four thousand functions at 128 threads and
+twenty nine hundred at 256. It was two to begin with, which stopped at fourteen
+hundred -- and tagrisso in def2-tzvp is 1345, which is closer than a bound should
+ever be to the case it was measured on.
+
+**Only the closed shell GGA path has this.** LDA, meta-GGA and both open shell paths
+carry the same critical section, and will show the same two thirds on a machine of
+this width.
+
+### What is left
+
+| def2-tzvp, node, one iteration | caffeine | tagrisso |
+| --- | ---: | ---: |
+| the Fock build | 0.073 | 1.060 |
+| the integration | 0.049 | 0.275 |
+| everything else | 0.090 | 0.691 |
+| the Fock build against the integration | 1.49 | 3.85 |
+| everything else, as a share | **42%** | **34%** |
+
+**Neither of the two is the largest piece any more.** What is left is the
+diagonalisation and the DIIS, a third to a half of an iteration in both molecules,
+and nothing in this file has yet looked at it.
+
+The integration also still divides its work by boxes of the grid, of which caffeine
+at the level B3LYP asks for has 384 and tagrisso 1036 -- three and eight for every
+thread at 128. The `rest` of the two reports, 20.4 and 13.1 per cent, is what that
+granularity costs, and it eases as the molecule grows. On 256 threads caffeine would
+have 1.5 boxes a thread, which cannot work.
