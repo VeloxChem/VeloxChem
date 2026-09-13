@@ -6038,84 +6038,163 @@ row:
 
 | basis | nao | four center | veloxchem | in memory | direct | direct against exact |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| def2-svp | 246 | 7.82 | 2.44 | 5.11 | **2.28** | 3.43 |
-| def2-svpd | 366 | 12.23 | 4.26 | 7.60 | **3.43** | 3.57 |
-| def2-tzvp | 494 | 35.63 | 7.94 | 9.71 | **4.26** | 8.36 |
-| def2-tzvpd | 614 | 61.82 | 13.33 | 13.94 | **5.57** | 11.10 |
-| def2-qzvp | 1098 | 460.01 | 61.76 | 34.58 | **15.24** | **30.19** |
+| def2-svp | 246 | 8.69 | 2.28 | 2.44 | **1.89** | 4.60 |
+| def2-svpd | 366 | 12.20 | 4.49 | **3.26** | 3.55 | 3.44 |
+| def2-tzvp | 494 | 35.70 | 7.74 | 4.40 | **4.19** | 8.52 |
+| def2-tzvpd | 614 | 61.42 | 13.03 | 5.92 | **5.32** | 11.54 |
+| def2-qzvp | 1098 | 489.54 | 58.11 | 18.29 | **14.22** | **34.43** |
 
 Tagrisso, the same fitting set with 3387 functions:
 
 | basis | nao | four center | veloxchem | in memory | direct | direct against exact |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| def2-svp | 683 | 29.74 | 41.71 | 43.93 | **12.82** | 2.32 |
-| def2-svpd | 1010 | 142.31 | 142.31 | 87.72 | **29.48** | 4.83 |
-| def2-tzvp | 1345 | 331.07 | 215.75 | 150.41 | **52.25** | 6.34 |
+| def2-svp | 683 | 27.61 | 41.71 | 18.14 | **12.85** | 2.15 |
+| def2-svpd | 1010 | 141.44 | 133.00 | 38.53 | **29.56** | 4.79 |
+| def2-tzvp | 1345 | 329.65 | 209.68 | 63.09 | **53.13** | 6.20 |
 
-### The way which holds the B vectors loses on a node, and by a constant
+The direct column of the last row was measured on its own, the allocation having
+expired before it; four runs of that cell in one day gave 52.38, 52.61, 52.80 and
+53.13, so the spread of this machine on a quiet day is under a per cent and a half.
 
-**On sixteen cores the way which holds them is about twice the speed of the direct
-way. On a hundred and twenty eight it is between two and three times slower.** The
-code is the same in both.
+### What the way which holds the B vectors was paying, and for what
+
+The tables above are the current build. Against the ones this section replaces, the
+way which holds them is **1.9 to 2.4 times quicker in every row of both molecules**,
+and the direct way is unchanged to within a per cent, which is what it should be as
+nothing here touched its path. The ratio between the two went from a flat 2.2 to 3.4
+to between 0.92 and 1.41.
 
 | in memory against direct | caffeine | tagrisso |
 | --- | ---: | ---: |
-| def2-svp | 2.24 | 3.43 |
-| def2-svpd | 2.22 | 2.98 |
-| def2-tzvp | 2.28 | 2.88 |
-| def2-tzvpd | 2.50 | |
-| def2-qzvp | 2.27 | |
+| def2-svp | 1.29 | 1.41 |
+| def2-svpd | 0.92 | 1.30 |
+| def2-tzvp | 1.05 | 1.19 |
+| def2-tzvpd | 1.11 | |
+| def2-qzvp | 1.29 | |
 
-**The ratio hardly moves across basis sets spanning 246 to 1345 functions**, which
-is what a fixed quantity predicts and not what anything which grows with the
-calculation would. It is `_w_batch`: the way which holds the B vectors forms its W
-matrices sixty four auxiliary functions at a time, so a call has sixty four pieces
-of work however many threads are waiting. Sixty four divides over sixteen cores and
-leaves half of a hundred and twenty eight idle. The direct way has no such batch.
+Read the caffeine def2-svpd row as a tie rather than a win: the direct column of it
+measured 2.79 and 3.55 on the same day.
 
-**Which mode to choose is settled by the cores, not by the molecule** -- until that
-batch is sized from the threads rather than fixed.
+Three things were in the way, and only the first was where it looked.
+
+**The range of the W matrices was fixed at sixty four.** The ratio above used to
+hardly move across basis sets spanning 246 to 1345 functions, which is what a fixed
+quantity predicts and not what anything growing with the calculation would. The
+transformation divides the range it is given over the threads, so a call had sixty
+four pieces of work however many threads were waiting -- sixty four being four times
+the sixteen cores of the machine it was tuned on. It divides over sixteen and leaves
+half of a hundred and twenty eight idle. Taken from the threads instead, tagrisso at
+def2-tzvp fell from 150.41 to 103.51 seconds.
+
+**Forming the B vectors cost forty four seconds of a hundred.** What was left after
+the batch was not the Fock build at all: the builds of the two modes were 1.496 and
+1.350 seconds, three and a half seconds apart over the whole calculation, while
+everything outside them differed by 42.75. The mode which holds the B vectors forms
+them before the first iteration and the direct mode does not, which is the whole of
+what the two do differently outside a build. Timing the setup put 43.68 seconds on
+forming them against 0.13 for the direct setup, and timing that put **42.51 of the
+43.68 on the contraction of the metric with the integrals, and 0.27 on the integrals
+themselves**. The front-loading of the integrals was doing exactly what it should
+and costing nothing; the multiply afterwards was the price.
+
+That multiply is the same operation the direct mode performs on every build, where
+it costs 0.265 seconds and runs at 7.7 teraflops. Forming B carries all 1345 columns
+where the direct solve carries only the 133 occupied ones, so six and a half times
+the arithmetic is intrinsic. Running it at 318 gigaflops, a twenty fourth of the
+rate, was not.
+
+**The contraction issued one product per output group and threaded over the blocks.**
+The comment above that loop already explained that the integrals of every atom basis
+group are gathered into one buffer so that the depth of the product is the whole
+auxiliary basis rather than one group's forty functions, "and one product replaces
+eighty one". That was done for the depth and never for the rows: the output was
+still written one group at a time, so the gathered buffer was read eighty one times
+over and every product was fifteen rows tall. Counted: 0.29 GB gathered and 23.80 GB
+read back from it on caffeine at def2-svp, the ratio 81.1 in every case measured.
+
+Forming the whole output in one product and scattering it afterwards **made it
+worse**, from 42.51 to 49.62 seconds. The rate rose by a third, to 427 gigaflops,
+and the dense intermediate then formed every auxiliary row of a block including
+those whose sparse block had been screened away -- 23.29 GB against 14.88 GB of B
+vectors, 57 per cent more arithmetic, which swallowed the gain.
+
+427 gigaflops on 128 cores was the tell. The contraction divided over the blocks of
+atom pairs, and **a molecule has a dozen or two of those whatever its size**: the
+distinct pairs of atom bases, fourteen for caffeine at every basis set and 81 for
+tagrisso, against 128 threads. The columns of a block are its atom pairs, a hundred
+or so, which do not divide usefully either. What is plentiful is the combinations of
+angular momenta -- every one gathers and multiplies on its own and writes where no
+other one does -- and a basis of triple zeta quality makes tens of thousands of
+them: 31 116 for tagrisso at def2-tzvp where the blocks gave 81.
+
+| tagrisso def2-tzvp, contraction | seconds | rate |
+| --- | ---: | ---: |
+| one product per output group, over blocks | 42.51 | 318 GF/s |
+| one product per block, over blocks | 49.62 | 427 GF/s |
+| one product per block, over the angular combinations | **3.33** | **6.35 TF/s** |
+
+**Twelve and a half times, and the two changes only make sense together**: the
+shape is what lets a product reach the matrix unit, and the threading is what puts
+128 cores on it. Either alone reads as a regression. The rate now sits beside the
+7.7 teraflops of the direct solve, so the 57 per cent of rows formed and dropped
+costs about 1.2 seconds and is worth the shape that earns it.
+
+Forming the B vectors is now 4.48 seconds of a 61.29 second calculation where it was
+43.68 of 102.35.
+
+**Which mode to choose is no longer settled by the cores.** It is close on the node
+now -- within 5 to 30 per cent in six of the eight rows -- and what separates them
+is the per-iteration transformation, 1.02 seconds against the direct mode's 0.46 for
+the same routine, which reads B vectors written once at setup where the direct mode
+transforms integrals its own threads have just written. That is the next thing and
+it has not been touched.
 
 ### What the approximation is worth depends on the machine
 
 | caffeine, best route against the exact build | sixteen cores | 128 cores |
 | --- | ---: | ---: |
-| def2-svp | 7.9 | 3.4 |
-| def2-svpd | 15.4 | 3.6 |
-| def2-tzvp | 29.0 | 8.4 |
-| def2-tzvpd | 46.0 | 11.1 |
+| def2-svp | 7.9 | 4.6 |
+| def2-svpd | 15.4 | 3.7 |
+| def2-tzvp | 29.0 | 8.5 |
+| def2-tzvpd | 46.0 | 11.5 |
 
 **The approximation is worth two to four times less on the larger machine**, because
 the build which makes none divides over cores well and caffeine is too small to keep
-a hundred and twenty eight of them busy: at def2-svp the whole calculation is 2.28
+a hundred and twenty eight of them busy: at def2-svp the whole calculation is 1.89
 seconds. The denominator falls faster than the numerator.
 
 **Caffeine at def2-svp is quicker on the laptop than on the node**: 1.57 seconds of
-the way which holds the B vectors against 2.28 of the direct way, with a ninth of
+the way which holds the B vectors against 1.89 of the direct way, with a ninth of
 the cores. The exact build does go 1.6 times quicker on the node, having work enough
 to divide, but the approximation has so little left to do that a hundred and twenty
 eight cores cannot be given any of it. The molecule is the limit there, not the
 machine.
 
-It returns as the basis grows. At def2-qzvp the direct way is thirty times the exact
-build on the node, the largest figure in this file, and there the exact build has
-work enough to spread. **Its cost also steepens**: from def2-tzvpd to def2-qzvp it
+It returns as the basis grows. At def2-qzvp the direct way is thirty four times the
+exact build on the node, the largest figure in this file, and there the exact build
+has work enough to spread. **Its cost also steepens**: from def2-tzvpd to def2-qzvp it
 grows as the 3.45 power of the basis where the earlier steps gave 2.5, as screening
 loses its grip on diffuse and high angular momentum functions.
 
-**At def2-svp both older routes lose to making no approximation at all** -- 41.71
-and 43.93 seconds against 29.74 for tagrisso. On a node of this size VeloxChem's
-RI-JK is not worth using below a thousand basis functions, and at def2-svpd it ties
-the exact build to the second.
+**At def2-svp the conventional route loses to making no approximation at all** --
+41.71 seconds against 27.61 for tagrisso, and at def2-svpd it ties the exact build
+to within six per cent. On a node of this size VeloxChem's RI-JK is not worth using
+below a thousand basis functions. The way which holds the B vectors used to lose
+there too, at 43.93 seconds; it now takes 18.14 and is ahead of the exact build by a
+third.
 
 ### A caveat on the tables above
 
 The four builds of a row are measured one after another in a single process, and the
 direct way is measured last, after three others have taken and released gigabytes.
-Against the same calculation run alone this morning -- 27.23 seconds at def2-svpd and
-44.41 at def2-tzvp -- the table reads 29.48 and 52.25. **The direct way is charged 8
-and 18 per cent it does not owe**, and the penalty grows with the basis. The order of
-the rows is not affected, but its margin is larger than shown.
+An earlier version of this file charged it 8 and 18 per cent for that, from a
+comparison against runs made alone on another day -- 27.23 seconds at def2-svpd and
+44.41 at def2-tzvp against 29.48 and 52.25 in the table. **That penalty is not there
+now.** Tagrisso at def2-tzvp measured 52.38, 52.61 and 52.80 seconds with the way
+which holds the B vectors running before it, and 53.13 alone, so the order costs
+nothing and the spread of the machine covers the difference. The older figures
+predate several changes to the setup and should not be read against the present
+table.
 
 
 ### A note on measuring this at all
