@@ -34,6 +34,7 @@
 #define MultiTimer_hpp
 
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "Timer.hpp"
@@ -80,6 +81,17 @@ class CMultiTimer
      @return the summary as a string.
      */
     std::string getSummary() const;
+
+    /**
+     Gets the label and the elapsed time of each timer.
+
+     @return the labels and the elapsed times, in the order the timers were
+             started for the first time.
+
+     @note getSummary formats the same numbers for reading. This returns them so
+           that a caller holding one timer for every thread can add them together.
+     */
+    std::vector<std::pair<std::string, double>> getTimings() const;
 };
 
 #endif /* MultiTimer_hpp */

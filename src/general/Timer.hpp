@@ -96,6 +96,16 @@ class CTimer
      @return the elapsed time as a string.
      */
     std::string getElapsedTime() const;
+
+    /**
+     Gets elapsed time (accumulated) in seconds.
+
+     @return the elapsed time in seconds.
+
+     @note getElapsedTime formats the same number for reading. This returns it so
+           that a caller may add the times of several timers together.
+     */
+    double getElapsedSeconds() const;
 };
 
 #endif /* Timer_hpp */

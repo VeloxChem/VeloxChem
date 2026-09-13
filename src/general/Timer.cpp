@@ -97,3 +97,13 @@ CTimer::getElapsedTime() const
 
     return ss.str();
 }
+
+double
+CTimer::getElapsedSeconds() const
+{
+#ifndef _MSC_VER
+    return std::chrono::duration_cast<std::chrono::duration<double>>(_duration).count();
+#else
+    return _duration;
+#endif
+}

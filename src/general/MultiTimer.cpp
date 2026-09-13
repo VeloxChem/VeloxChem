@@ -104,3 +104,18 @@ CMultiTimer::getSummary() const
 
     return ss.str();
 }
+
+std::vector<std::pair<std::string, double>>
+CMultiTimer::getTimings() const
+{
+    std::vector<std::pair<std::string, double>> timings;
+
+    timings.reserve(_timers.size());
+
+    for (size_t timer_id = 0; timer_id < _timers.size(); timer_id++)
+    {
+        timings.push_back({_labels[timer_id], _timers[timer_id].getElapsedSeconds()});
+    }
+
+    return timings;
+}
