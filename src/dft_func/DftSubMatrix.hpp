@@ -80,6 +80,21 @@ auto getSubMatrixByColumnSlicing(const CDenseMatrix& denseMatrix, const std::vec
  */
 auto distributeSubMatrixToKohnSham(CAOKohnShamMatrix& aoKohnShamMatrix, const CDenseMatrix& subMatrix, const std::vector<int>& aoIndices) -> void;
 
+/**
+ Distributes partial matrix into a square array of the full basis.
+
+ @param values the values of the full matrix, row major, naos by naos.
+ @param naos the number of atomic orbitals.
+ @param subMatrix the partial matrix.
+ @param aoIndices the index mapping from partial matrix to full matrix.
+
+ @note This is the same as the overload above, written into an array rather than
+       into a Kohn-Sham matrix, so that every thread may hold one of its own and
+       the threads need not take turns at a shared one.
+ */
+auto distributeSubMatrixToKohnSham(double* values, const int naos, const CDenseMatrix& subMatrix, const std::vector<int>& aoIndices)
+    -> void;
+
 auto distributeSubMatrixToKohnSham(CAOKohnShamMatrix&      aoKohnShamMatrix,
                                    const CDenseMatrix&     subMatrix_a,
                                    const CDenseMatrix&     subMatrix_b,

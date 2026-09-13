@@ -157,6 +157,31 @@ distributeSubMatrixToKohnSham(CAOKohnShamMatrix& aoKohnShamMatrix, const CDenseM
 }
 
 auto
+distributeSubMatrixToKohnSham(double* values, const int naos, const CDenseMatrix& subMatrix, const std::vector<int>& aoIndices) -> void
+{
+    const auto aocount = static_cast<int>(aoIndices.size());
+
+    if (aocount <= naos)
+    {
+        for (int row = 0; row < subMatrix.getNumberOfRows(); row++)
+        {
+            auto row_orig = aoIndices[row];
+
+            auto ksmat_row_orig = values + row_orig * naos;
+
+            auto submat_row = subMatrix.row(row);
+
+            for (int col = 0; col < subMatrix.getNumberOfColumns(); col++)
+            {
+                auto col_orig = aoIndices[col];
+
+                ksmat_row_orig[col_orig] += submat_row[col];
+            }
+        }
+    }
+}
+
+auto
 distributeSubMatrixToKohnSham(CAOKohnShamMatrix&               aoKohnShamMatrix,
                               const CDenseMatrix&              subMatrix_a,
                               const CDenseMatrix&              subMatrix_b,

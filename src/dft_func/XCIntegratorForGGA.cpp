@@ -57,6 +57,12 @@
 
 namespace xcintgga {  // xcintgga namespace
 
+/// @brief The memory the copies of the Kohn-Sham matrix may take together.
+/// @note One for every thread, so that the boxes of the grid add into them without
+/// taking turns. A basis whose square does not fit this for every thread keeps the
+/// critical section, which is correct and only slow.
+static constexpr size_t _vxc_copies = size_t{2} * 1024 * 1024 * 1024;
+
 auto
 integrateVxcFockForGgaClosedShell(const CMolecule&                  molecule,
                                   const CMolecularBasis&            basis,
@@ -89,6 +95,26 @@ integrateVxcFockForGgaClosedShell(const CMolecule&                  molecule,
 
     double nele = 0.0, xcene = 0.0;
 
+    // NOTE: every box adds its partial matrix into the Kohn-Sham matrix through
+    // indices of its own, so two boxes may touch the same element and the boxes
+    // took turns at it inside a critical section. On fourteen cores that cost one
+    // per cent of the integration; on a hundred and twenty eight it cost sixty
+    // five, the threads standing in the queue. Each thread is given one of its own
+    // here and they are added together at the end, as the exchange of the RI-JK
+    // driver does with its triangles. The memory is the square of the basis for
+    // every thread, so a basis too large for that keeps the old way rather than
+    // half of the new one.
+
+    const auto square_bytes = static_cast<size_t>(naos) * static_cast<size_t>(naos) * sizeof(double);
+
+    const auto ncopies = (square_bytes * static_cast<size_t>(nthreads) <= _vxc_copies)
+                             ? static_cast<size_t>(nthreads)
+                             : size_t{0};
+
+    std::vector<std::vector<double>> partial_ksmat(ncopies);
+
+    std::vector<double> partial_nele(ncopies, 0.0), partial_xcene(ncopies, 0.0);
+
     // coordinates and weights of grid points
 
     auto xcoords = molecularGrid.getCoordinatesX();
@@ -119,6 +145,13 @@ integrateVxcFockForGgaClosedShell(const CMolecule&                  molecule,
                             ptr_gto_blocks, gsDensityPointers, ptr_xcFunctional, \
                             n_boxes, n_gto_blocks, naos, nele, xcene, mat_Vxc)
     {
+
+    // NOTE: the copy of a thread is zeroed by that thread, so its pages are first
+    // touched where they will be written.
+
+    if (ncopies > 0) partial_ksmat[static_cast<size_t>(omp_get_thread_num())].assign(naos * naos, 0.0);
+
+#pragma omp barrier
 
 #pragma omp single nowait
     {
@@ -324,6 +357,18 @@ integrateVxcFockForGgaClosedShell(const CMolecule&                  molecule,
                 local_xcene += local_weights[g] * exc[g] * rho_total;
             }
 
+            if (ncopies > 0)
+            {
+                const auto mine = static_cast<size_t>(thread_id);
+
+                partial_nele[mine] += local_nele;
+
+                partial_xcene[mine] += local_xcene;
+
+                dftsubmat::distributeSubMatrixToKohnSham(partial_ksmat[mine].data(), naos, partial_mat_Vxc, aoinds);
+            }
+            else
+            {
             #pragma omp critical
             {
                 nele += local_nele;
@@ -332,12 +377,41 @@ integrateVxcFockForGgaClosedShell(const CMolecule&                  molecule,
 
                 dftsubmat::distributeSubMatrixToKohnSham(mat_Vxc, partial_mat_Vxc, aoinds);
             }
+            }
 
             omptimers[thread_id].stop("Vxc dist.");
         }
     }
     }
     }
+    }
+
+    if (ncopies > 0)
+    {
+        // NOTE: the rows are divided over the threads and each of them reads the
+        // same row of every copy, so no two threads write the same element.
+
+        auto ksvalues = mat_Vxc.alphaValues();
+
+#pragma omp parallel for schedule(static)
+        for (int row = 0; row < naos; row++)
+        {
+            auto *into = ksvalues + static_cast<size_t>(row) * static_cast<size_t>(naos);
+
+            for (size_t copy = 0; copy < ncopies; copy++)
+            {
+                const auto *from = partial_ksmat[copy].data() + static_cast<size_t>(row) * static_cast<size_t>(naos);
+
+                for (int col = 0; col < naos; col++) into[col] += from[col];
+            }
+        }
+
+        for (size_t copy = 0; copy < ncopies; copy++)
+        {
+            nele += partial_nele[copy];
+
+            xcene += partial_xcene[copy];
+        }
     }
 
     mat_Vxc.setNumberOfElectrons(nele);
