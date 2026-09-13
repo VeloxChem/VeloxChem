@@ -212,6 +212,11 @@ class CSimdRIFockDriver
     /// @return The density.
     auto get_dense_threshold() const -> double;
 
+    /// @brief Releases the squares the dense half transformation keeps.
+    /// @note They are formed again on the next transformation. A driver prepared
+    /// for another molecule has no use for the ones it holds.
+    auto release_squares() const -> void;
+
     /// @brief Adds the exchange contribution of a range of the auxiliary basis to
     /// a matrix.
     /// @param w_vectors The W matrices of the range, as compute_w_vectors returns
@@ -243,6 +248,21 @@ class CSimdRIFockDriver
     /// which named one would be a guess dressed as a measurement. A caller which
     /// meets a sparse enough set of B vectors can raise it.
     double _dense_threshold = 0.0;
+
+    /// @brief One square of the molecular basis for every thread, which the dense
+    /// half transformation scatters the values of one auxiliary function into.
+    /// @note It was allocated and zeroed inside the transformation, so every call
+    /// paid for it: a square is the basis by the basis, nine megabytes at eleven
+    /// hundred functions, and a thread holds one. At a hundred and twenty eight
+    /// threads that is 1.2 gigabytes an call and six calls a build, which is why
+    /// what the transformation spends beside its phases grew with the threads
+    /// rather than falling -- 0.018 seconds on fourteen against 0.081 on a hundred
+    /// and twenty eight. Kept here it is allocated once. The peak is what it always
+    /// was; what changes is that it is held between calls rather than returned.
+    /// @note It is mutable because the transformation is const, and it is safe
+    /// because every thread reaches only its own square and no caller enters the
+    /// transformation from inside a parallel region.
+    mutable std::vector<std::vector<double>> _squares;
 
     /// @brief The memory one thread may stage the W matrices into before the rank
     /// k update, which sets how many auxiliary functions go into one update.

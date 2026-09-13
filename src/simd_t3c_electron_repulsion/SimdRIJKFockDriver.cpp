@@ -356,6 +356,8 @@ CSimdRIJKFockDriver::prepare(const CMolecule       &molecule,
 
     _w_vectors.clear();
 
+    _drv.release_squares();
+
     _prepared = true;
 
     profile.total = prof_since(profile_start);

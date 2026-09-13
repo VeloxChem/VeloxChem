@@ -1271,6 +1271,14 @@ struct CWProfile
 }  // anonymous namespace
 
 auto
+CSimdRIFockDriver::release_squares() const -> void
+{
+    _squares.clear();
+
+    _squares.shrink_to_fit();
+}
+
+auto
 CSimdRIFockDriver::compute_w_vectors(const CSparseTensor        &bq_vectors,
                                       const CMolecularBasis      &basis,
                                       const CMolecularBasis      &aux_basis,
@@ -1457,9 +1465,20 @@ CSimdRIFockDriver::compute_w_vectors(const CSparseTensor        &bq_vectors,
 
         size_t nfilled = 0, nvalues = 0;
 
+        // NOTE: the squares are kept between calls, so the allocation and the first
+        // touch of them are paid once rather than on every call. Each thread takes
+        // its own and touches it first, which is where it stays.
+
+        if (_squares.size() != static_cast<size_t>(omp::get_number_of_threads()))
+        {
+            _squares.resize(static_cast<size_t>(omp::get_number_of_threads()));
+        }
+
 #pragma omp parallel reduction(+ : fill_time, scatter_time, product_time, nfilled, nvalues)
         {
-            std::vector<double> square(nao * nao, 0.0);
+            auto &square = _squares[static_cast<size_t>(omp_get_thread_num())];
+
+            if (square.size() != nao * nao) square.assign(nao * nao, 0.0);
 
 #pragma omp for schedule(dynamic)
             for (int t = 0; t < ntasks; t++)
