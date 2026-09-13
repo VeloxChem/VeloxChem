@@ -5307,38 +5307,43 @@ after another in the same process, on sixteen cores.
 
 | basis | nao | four center | RI-JK veloxchem | simd, in memory | simd, direct |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| def2-svp | 246 | 12.43 | 3.40 | **1.57** | 3.23 |
-| def2-svpd | 366 | 50.58 | 8.28 | **3.28** | 6.07 |
-| def2-tzvp | 494 | 174.12 | 18.38 | **6.01** | 10.85 |
-| def2-tzvpd | 614 | 426.00 | 39.72 | **9.26** | 15.96 |
+| def2-svp | 246 | 12.32 | 3.15 | **1.27** | 3.22 |
+| def2-svpd | 366 | 50.42 | 7.71 | **2.69** | 6.04 |
+| def2-tzvp | 494 | 173.48 | 18.49 | **4.81** | 10.87 |
+| def2-tzvpd | 614 | 422.89 | 38.50 | **7.80** | 15.97 |
 
 and the same as ratios against the exact build:
 
 | basis | nao | RI-JK veloxchem | simd, in memory | simd, direct |
 | --- | ---: | ---: | ---: | ---: |
-| def2-svp | 246 | 3.66 | **7.92** | 3.85 |
-| def2-svpd | 366 | 6.11 | **15.42** | 8.33 |
-| def2-tzvp | 494 | 9.47 | **28.97** | 16.05 |
-| def2-tzvpd | 614 | 10.73 | **46.00** | 26.69 |
+| def2-svp | 246 | 3.91 | **9.73** | 3.82 |
+| def2-svpd | 366 | 6.54 | **18.74** | 8.35 |
+| def2-tzvp | 494 | 9.38 | **36.08** | 15.96 |
+| def2-tzvpd | 614 | 10.98 | **54.20** | 26.47 |
 
 The three routes of the approximation agree to the ninth decimal and take the same
 number of iterations. The exact build takes nineteen where they take twenty one or
 twenty two, and lands a thousandth of a hartree lower, which is the approximation
 and not an error.
 
-**The advantage climbs steeply with the basis, from eight times to forty six.** The
+**The advantage climbs steeply with the basis, from ten times to fifty four.** The
 fitting set is 1242 functions in every row while the orbital set nearly triples, so
 the work the driver saves grows while the work it must do grows much more slowly.
 This is the same thing the sections on the node describe from the other side, where
 the Fock build was seen to grow as the square of the basis and the fitting set not
 at all.
 
-**The way which holds the B vectors beats the direct way by about two to one here,
-at every basis.** On a node with a hundred and twenty eight cores it loses to it by
-the same factor. The code is the same; what differs is that the way which holds them
-forms its W matrices sixty four auxiliary functions at a time, which is work enough
-to divide over sixteen cores and not over a hundred and twenty eight. **Which mode
-to choose is settled by the cores, not by the molecule.**
+**The way which holds the B vectors beats the direct way by two and a half times
+here, at every basis.** On a node with a hundred and twenty eight cores it leads by
+between 14 and 30 per cent. It used to lose there by two to three times, and the
+sections on the node say what it was paying and what was done about it. **The
+machines no longer disagree about which mode to use, only about the margin.**
+
+These were measured again after that work. The way which holds the B vectors gained
+16 to 20 per cent of these rows from it, all of it from making one call of the half
+transformation for each build where it made twenty; the first touch which the node
+gained so much from buys nothing on a machine with one memory domain. The other
+three builds moved by under a per cent, which is what says the machine was quiet.
 
 
 ## The larger molecules, the two routes side by side
@@ -5526,18 +5531,26 @@ the new driver has of doing the same thing.
 
 | basis | nao | mode | time | against full | iterations | energy |
 | --- | ---: | --- | ---: | ---: | ---: | ---: |
-| def2-svp | 683 | full four-center | 158.24 | 1.00 | 21 | -1609.0900864188 |
-| | | RI-JK veloxchem | 95.39 | 1.66 | 23 | -1609.0890443496 |
-| | | RI-JK simd, in memory | 34.53 | 4.58 | 23 | -1609.0890443498 |
-| | | RI-JK simd, direct | 78.66 | 2.01 | 23 | -1609.0890443496 |
-| def2-svpd | 1010 | full four-center | 1183.39 | 1.00 | 21 | -1609.1565808182 |
-| | | RI-JK veloxchem | 358.80 | 3.30 | 24 | -1609.1555344827 |
-| | | RI-JK simd, in memory | 82.82 | 14.29 | 24 | -1609.1555344829 |
-| | | RI-JK simd, direct | 158.26 | 7.48 | 24 | -1609.1555344827 |
+| def2-svp | 683 | full four-center | 150.59 | 1.00 | 21 | -1609.0900864188 |
+| | | RI-JK veloxchem | 96.76 | 1.56 | 23 | -1609.0890443496 |
+| | | RI-JK simd, in memory | **31.38** | **4.80** | 23 | -1609.0890443498 |
+| | | RI-JK simd, direct | 78.14 | 1.93 | 23 | -1609.0890443496 |
+| def2-svpd | 1010 | full four-center | 1177.14 | 1.00 | 21 | -1609.1565808182 |
+| | | RI-JK veloxchem | 357.00 | 3.30 | 24 | -1609.1555344827 |
+| | | RI-JK simd, in memory | **74.26** | **15.85** | 24 | -1609.1555344829 |
+| | | RI-JK simd, direct | 158.72 | 7.42 | 24 | -1609.1555344827 |
 
 **The three routes of the approximation agree to the ninth decimal**, and differ
 from the four center build by the error of the approximation alone, a thousandth of
 a hartree.
+
+Measured again after the work the sections on the node describe. The way which holds
+the B vectors gained 9 and 10 per cent of these two rows, less than the 16 to 20 of
+caffeine above, as it made fifty three calls of the half transformation for each
+build here and twenty there -- and now makes two and one. The other three builds
+moved by under a per cent, except the four center one at def2-svp which came in five
+per cent quicker without having been touched, and is the one figure here outside the
+spread of the machine.
 
 ### The direct way costs less than counting its passes suggests
 
@@ -5961,6 +5974,12 @@ approximation at all. The two differ in one thing which matters here: the way wh
 holds them forms the W matrices in batches of sixty four auxiliary functions, so a
 call has sixty four pieces of work to divide however many threads are waiting. The
 direct way has no such batch.
+
+That paragraph was written of this measurement and **neither half of it holds now**.
+The batch was the first of four things wrong with the way which holds them, and with
+all four mended it leads on both machines: 2.0 to 2.5 times on the laptop and 14 to
+30 per cent on the node. The sections on the four builds on the node carry the
+current figures and what each of the four was worth.
 
 **The build which makes no approximation is also much better than the laptop said.**
 It is within six per cent of the RI-JK route VeloxChem had, where on the laptop it
