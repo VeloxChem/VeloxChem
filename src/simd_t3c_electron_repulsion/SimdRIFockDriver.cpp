@@ -272,6 +272,14 @@ struct CBqProfile
     double contract = 0.0;
     double total = 0.0;
 
+    size_t nrows = 0;
+    size_t ncols = 0;
+    size_t out_entries = 0;
+    size_t in_entries = 0;
+    size_t nproducts = 0;
+    size_t ngathered = 0;
+    size_t nread = 0;
+
     /// @brief Writes the phases of the B vectors, and their share of them.
     auto report(const size_t nbytes) const -> void
     {
@@ -289,6 +297,14 @@ struct CBqProfile
             std::printf("RIJK   %-12s %9.3f s %6.1f %%\n", names[i], times[i],
                         (total > 0.0) ? 100.0 * times[i] / total : 0.0);
         }
+
+        const auto gb = [](const size_t bytes) { return static_cast<double>(bytes) / (1024.0 * 1024.0 * 1024.0); };
+
+        std::printf("RIJK   %zu rows in %zu entries, %zu columns in %zu entries\n", nrows, out_entries, ncols,
+                    in_entries);
+
+        std::printf("RIJK   %zu products, %.2f GB gathered, %.2f GB read back from it\n", nproducts, gb(ngathered),
+                    gb(nread));
 
         std::fflush(stdout);
     }
@@ -388,6 +404,14 @@ CSimdRIFockDriver::compute_bq_vectors(const CMolecule        &molecule,
 
     profile.metric += prof_since(mark_metric);
 
+    profile.nrows = nrows;
+
+    profile.ncols = ncols;
+
+    profile.out_entries = out_functions.size();
+
+    profile.in_entries = in_functions.size();
+
     // the sparsity pattern of the B vectors, and the block each pair of a block of
     // atom pairs and a basis function on the auxiliary side is held in
 
@@ -473,6 +497,8 @@ CSimdRIFockDriver::compute_bq_vectors(const CMolecule        &molecule,
 
     size_t first = 0;
 
+    size_t nproducts = 0, ngathered = 0, nread = 0;
+
     while (first < nab)
     {
         auto last = first;
@@ -535,7 +561,7 @@ CSimdRIFockDriver::compute_bq_vectors(const CMolecule        &molecule,
 
         const auto mark_contract = prof_clock::now();
 
-#pragma omp parallel
+#pragma omp parallel reduction(+ : nproducts, ngathered, nread)
         {
             std::vector<double> gathered;
 
@@ -573,6 +599,8 @@ CSimdRIFockDriver::compute_bq_vectors(const CMolecule        &molecule,
                             // The pairs are the leading ones of one ordered list, so
                             // a zero beyond the last one a group keeps adds nothing,
                             // which is what the sum of the group would have added.
+
+                            ngathered += ncols * width * sizeof(double);
 
                             for (const auto &in_function : in_functions)
                             {
@@ -625,6 +653,10 @@ CSimdRIFockDriver::compute_bq_vectors(const CMolecule        &molecule,
                                                                      out_function.index) +
                                                    m * out_function.count * npairs_out;
 
+                                nproducts++;
+
+                                nread += ncols * width * sizeof(double);
+
                                 _matrix_product(out_function.count,
                                                 std::min(npairs_out, width),
                                                 ncols,
@@ -647,6 +679,12 @@ CSimdRIFockDriver::compute_bq_vectors(const CMolecule        &molecule,
 
         first = last;
     }
+
+    profile.nproducts = nproducts;
+
+    profile.ngathered = ngathered;
+
+    profile.nread = nread;
 
     profile.total = prof_since(profile_start);
 
