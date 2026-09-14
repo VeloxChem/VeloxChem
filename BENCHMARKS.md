@@ -6615,3 +6615,157 @@ of the exchange. All three are the square of something by the threads, so all th
 bind at about fourteen hundred and fifty basis functions on a hundred and twenty
 eight threads, and all three were chosen on a machine with sixteen cores where that
 is four thousand. The lesson is not about any of the three numbers.
+
+## Dividing the resolution of the identity over the ranks
+
+MPI in VeloxChem lives in the Python layer alone: the C++ takes a share of the work
+and answers a partial quantity, and Python reduces. The SIMD RI-JK driver was
+refused on more than one rank until now, with an assertion saying so. Three changes
+lifted it, and each way of building is divided over a different index.
+
+**The way which holds the B vectors is divided over the atoms of the auxiliary
+basis.** Every term of both the Coulomb and the exchange is a sum over the auxiliary
+basis, so a rank given a share of its atoms forms a share of every Fock matrix and
+the existing reduction at the end of the build adds the shares.
+
+**The direct way is divided over the orbitals, and over the parts it sweeps.** Its
+exchange pass is a sum over the orbitals; the auxiliary basis is not an index it can
+be divided over, because the triangular solve of that pass reaches across the whole
+of it. Dividing it that way was tried first and gives a Fock matrix wrong in the
+third figure -- a two way split of a matrix of order 1e3 was out by 7.2e+03, which is
+the forward substitution missing the rows above its own. The Coulomb pass is a sum
+over the parts and is divided that way, with the fitting between the two passes
+gathered by the one communication a build makes, of one value per auxiliary function.
+
+**The metric is inverted once on the master and broadcast.** Which fallback the
+inversion takes is decided from the matrix itself -- the Cholesky factor, or the
+inverted square root when a fitting basis is close to linear dependence -- so two
+ranks could decide differently and build with metrics which are not the same. The
+packed matrix learned to cross the ranks without a copy of itself for this, through
+an array which writes into the matrix rather than into a buffer beside it.
+
+### The energies do not move with the number of ranks
+
+A water dimer and carbon monoxide, 8 atoms, def2-svp against def2-universal-jkfit,
+against the conventional RI-JK driver of the same approximation.
+
+| ranks | the B vectors held | the direct way |
+| --- | ---: | ---: |
+| 1 | -264.536932129285 | -264.536932129281 |
+| 2 | -264.536932129285 | -264.536932129282 |
+| 3 | -264.536932129285 | -264.536932129281 |
+| 5 | -264.536932129285 | -264.536932129282 |
+
+The conventional driver gives -264.536932129281, so the largest disagreement is
+4.1e-12 and it does not grow with the ranks. B3LYP, which scales the exchange rather
+than taking all of it, agrees to the same figure.
+
+**Bit for bit was the wrong thing to ask for.** Calling the driver twice on one rank
+with the same input already differs by 8.9e-16: the threaded reductions are not order
+stable. Agreement to rounding is the most any division can be held to, and it is what
+the shares meet.
+
+### What the division was for: the memory divides
+
+Tagrisso at def2-tzvp, 70 atoms, 1345 basis functions and 3387 auxiliary ones. The
+memory is answered from the sparsity pattern before any integral is computed, which
+is what the driver itself asks before choosing a way of building.
+
+| ranks | the B vectors together | the largest rank | the smallest | spread |
+| --- | ---: | ---: | ---: | ---: |
+| 1 | 15.28 GB | 15.28 GB | 15.28 GB | 1.000 |
+| 2 | 15.28 GB | 7.77 GB | 7.50 GB | 1.036 |
+| 4 | 15.28 GB | 4.06 GB | 3.71 GB | 1.094 |
+| 8 | 15.28 GB | 2.04 GB | 1.69 GB | 1.207 |
+
+**This is the point of the exercise.** The atoms are dealt out sorted by their
+distance from the centre of mass and by element, so the shares are not equal, but at
+eight ranks the largest is a fifth above the smallest and nothing is lost: the sum
+is the same 15.28 gigabytes at every count. A molecule whose B vectors do not fit on
+one rank fits on enough of them, and the choice of way is made from the largest
+share against the smallest budget rather than from the whole against one machine.
+
+### The exchange does not divide, and gets worse
+
+Caffeine at def2-tzvp, the way which holds the B vectors, **four threads on every
+rank** so that what changes is the division and not the cores. One build, its phases.
+
+| phase | 1 rank | 2 ranks | 4 ranks |
+| --- | ---: | ---: | ---: |
+| transform | 0.217 s | 0.116 s | 0.063 s |
+| coulomb | 0.074 s | 0.067 s | 0.048 s |
+| **exchange** | **0.034 s** | **0.058 s** | **0.092 s** |
+
+**The transform divides, 3.4 times over four ranks. The exchange grows, 2.7 times
+the wrong way.** The correctness tests could not see this, and did not: every rank
+answers its share and the shares add to the right matrix. What they do not measure is
+whether the work was divided at all.
+
+The cause is that a rank sweeps the whole auxiliary basis whichever share of it it
+holds. `_compute_in_memory` steps `first` from zero to `naux`, `compute_w_vectors`
+builds its table of entries over the whole range asked for, and the functions this
+rank carries nothing for are zeroed and then multiplied as zeros. So the rank
+allocates the full range of W matrices, zeroes seven eighths of them at eight ranks,
+and the rank k update of the exchange runs over all of them. **The transform divides
+because only a function which carries something is transformed; the exchange does not
+because a zero is multiplied like anything else.**
+
+### A cap which is per rank on a machine which is not
+
+Tagrisso at def2-svp on fourteen ranks of a laptop asked for **68 gigabytes on a
+machine with 36**, and was killed.
+
+| | |
+| --- | ---: |
+| basis functions | 683 |
+| auxiliary functions | 3387 |
+| occupied orbitals | 133 |
+| one W matrix | 0.69 MB |
+| the range `_w_batch_memory` allows | 23640 functions |
+| the range after `min(naux, ...)` | 3387 |
+| W matrices held by one rank | **2.29 GB** |
+| by fourteen ranks | **32.09 GB** |
+
+`_w_batch_memory` is sixteen gigabytes, and it is a constant of the process. Fourteen
+processes on one node are therefore allowed two hundred and twenty four gigabytes
+between them, and here the auxiliary basis cut the range down to 2.29 gigabytes
+each -- which is 32.09 together, before the B vectors, the dense Fock matrices and
+fourteen Python interpreters. `_syrk_triangles` and the copies of the Kohn-Sham
+matrix are sixteen gigabytes in the same way; they did not bind here only because a
+rank with one thread wants one triangle.
+
+**`_get_ri_memory_budget` was divided by the ranks sharing a host and the caps were
+not.** The budget counts the host names of the communicator and gives each rank its
+share, which is right; the three sixteen gigabyte constants beneath it know nothing
+about the communicator. Dividing the budget alone is worth very little when what the
+driver allocates is not bounded by the budget.
+
+### What a laptop can and cannot say
+
+Fourteen cores, the total held constant, so that R ranks get 14/R threads each. This
+measures what the division costs, not what it buys: no core is added, and a rank is
+never cheaper than a thread doing the same work.
+
+| caffeine | 1 rank | 2 ranks | 7 ranks | 14 ranks |
+| --- | ---: | ---: | ---: | ---: |
+| def2-svp, held | 1.02 s | 1.21 s | 2.15 s | 4.62 s |
+| def2-svp, direct | 2.51 s | 3.68 s | 10.03 s | 20.03 s |
+| def2-tzvp, held | 4.02 s | 4.65 s | 8.16 s | 17.16 s |
+| def2-tzvp, direct | 8.67 s | 13.20 s | 38.69 s | 75.37 s |
+
+Every row is slower, and that alone would say nothing -- one rank on fourteen threads
+ought to beat fourteen ranks on one, since the OpenMP division of the same work has
+no communication and no duplicated sweep. **What the rows do say is how much slower.**
+Four and a half times on caffeine def2-tzvp held, eight and a half times direct, for
+a division into fourteen. If the work divided cleanly these would be near one.
+
+The direct way is the worse of the two here for a reason which is not a defect: each
+rank sweeps the integrals for its own range of orbitals, so fourteen ranks make
+fourteen sweeps where one rank made one, and the sweep is a fixed cost per rank. At
+caffeine's size the integrals are a large share of a direct build. At three hundred
+and twenty atoms they were three per cent, which is the size the division is for.
+
+**Nothing here is a measurement of scaling.** Scaling is more cores, not the same
+cores cut up, and it belongs on the node. What the laptop settles is that the answers
+are right at every rank count, that the memory divides as it should, and that two of
+the phases do not.
