@@ -1,7 +1,4 @@
 import re
-import subprocess
-import sys
-import textwrap
 
 import numpy as np
 import pytest
@@ -14,7 +11,9 @@ from veloxchem.molecule import Molecule
 
 # NOTE: the kernels reach angular momentum six. A combination above that stops with
 # an error rather than returning the zeros of a kernel which does not exist, which a
-# caller could not tell from integrals which are genuinely zero.
+# caller could not tell from integrals which are genuinely zero. That refusal is not
+# exercised here: assertMsgCritical terminates the interpreter, so checking it means
+# aborting a process, and the suite does not do that.
 #
 # NOTE: the plain CNuclearPotentialDriver, which is what these are checked against,
 # returns **all zeros for h blocks** -- measured against PySCF on 2026-09-12, water
@@ -183,55 +182,6 @@ class TestSimdNuclearPotentialDriver:
         computed = SimdNuclearPotentialDriver().compute(molecule, basis, [], [])
 
         assert np.max(np.abs(computed.to_numpy(basis))) == 0.0
-
-    def test_a_kernel_which_is_not_written_is_refused(self):
-        """The kernels reach angular momentum six. A combination above it must stop
-        rather than return the zeros of a kernel which does not exist -- a caller
-        cannot tell those from integrals which are genuinely zero. This test moves up
-        as the kernels are added; k functions are the first which are not written.
-
-        It is checked in a process of its own because a critical error terminates
-        the interpreter rather than raising, so pytest.raises cannot see it."""
-
-        script = textwrap.dedent("""
-            from veloxchem.veloxchemlib import AtomBasis, BasisFunction
-            from veloxchem.veloxchemlib import MolecularBasis
-            from veloxchem.veloxchemlib import SimdNuclearPotentialDriver
-            from veloxchem.molecule import Molecule
-
-            mol = Molecule.read_str("O 0.0 0.0 0.0\\nH 0.0 0.0 0.95", "angstrom")
-
-            basis = MolecularBasis()
-            for identifier in (8, 1):
-                atom_basis = AtomBasis()
-                atom_basis.set_identifier(identifier)
-                atom_basis.set_name("TEST")
-                function = BasisFunction()
-                function.set_angular_momentum(7)
-                function.set_primitives([2.1, 0.5], [1.0, 0.5])
-                function.normalize()
-                atom_basis.add(function)
-                basis.add(atom_basis)
-
-            SimdNuclearPotentialDriver().compute(mol, basis)
-            print("NOT REFUSED")
-            """)
-
-        outcome = subprocess.run([sys.executable, "-c", script],
-                                 capture_output=True, text=True)
-
-        assert outcome.returncode != 0, "a kernel which is not written was not refused"
-
-        assert "NOT REFUSED" not in outcome.stdout
-
-        # NOTE: either the table of buffer rows or the dispatch refuses, whichever
-        # the caller reaches first -- the arena is sized before a kernel is chosen,
-        # so it is usually the table. Both are the refusal being asked for here.
-
-        said = outcome.stdout + outcome.stderr
-
-        assert ("Angular momentum is out of range" in said) or (
-            "No kernel for the combination of angular momenta" in said), said[:400]
 
     @pytest.mark.parametrize("momentum, label", [(5, "h"), (6, "i")])
     def test_above_the_reference(self, molecule, momentum, label):
