@@ -43,6 +43,8 @@ from .veloxchemlib import EcpGradientDriver
 from .veloxchemlib import ElectricDipoleMomentDriver
 from .veloxchemlib import NuclearPotentialGeom200Driver
 from .veloxchemlib import NuclearPotentialGeom101Driver
+from .veloxchemlib import SimdKineticEnergyDriver
+from .veloxchemlib import SimdNuclearPotentialDriver
 from .veloxchemlib import compute_quadrupole_integrals
 from .veloxchemlib import compute_linear_momentum_integrals
 from .veloxchemlib import compute_angular_momentum_integrals
@@ -118,6 +120,53 @@ def compute_nuclear_potential_integrals(molecule,
 
     # Note: factor -1.0 for electron charge
     return -1.0 * npot_mat.to_numpy()
+
+
+def compute_simd_kinetic_energy_integrals(molecule, basis):
+    """
+    Computes kinetic energy integrals with the SIMD driver.
+
+    :param molecule:
+        The molecule.
+    :param basis:
+        The molecular basis set.
+
+    :return:
+        The kinetic energy integral matrix.
+    """
+
+    kin_drv = SimdKineticEnergyDriver()
+    kin_mat = kin_drv.compute(molecule, basis)
+
+    return kin_mat.to_numpy(basis)
+
+
+def compute_simd_nuclear_potential_integrals(molecule, basis, charges,
+                                             coordinates):
+    """
+    Computes nuclear potential integrals with the SIMD driver.
+
+    :param molecule:
+        The molecule.
+    :param basis:
+        The molecular basis set.
+    :param charges:
+        The charges of the points.
+    :param coordinates:
+        The coordinates of the points in bohr, as a flat array of three
+        coordinates each or as an array of shape (N, 3).
+
+    :return:
+        The nuclear potential integral matrix.
+    """
+
+    points = np.asarray(coordinates, dtype=float).reshape(-1)
+
+    npot_drv = SimdNuclearPotentialDriver()
+    npot_mat = npot_drv.compute(molecule, basis, list(charges), list(points))
+
+    # Note: factor -1.0 for electron charge
+    return -1.0 * npot_mat.to_numpy(basis)
 
 
 def compute_nuclear_potential_gradient(molecule,

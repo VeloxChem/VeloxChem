@@ -42,9 +42,10 @@ import re
 import numpy as np
 from mpi4py import MPI
 
-from .oneeints import compute_nuclear_potential_integrals
+from .oneeints import compute_simd_kinetic_energy_integrals
+from .oneeints import compute_simd_nuclear_potential_integrals
 from .oneeints import compute_electric_dipole_integrals
-from .veloxchemlib import OverlapDriver, KineticEnergyDriver
+from .veloxchemlib import OverlapDriver
 from .veloxchemlib import T4CScreener
 from .veloxchemlib import XCIntegrator
 from .veloxchemlib import EcpDriver
@@ -1718,8 +1719,8 @@ class ScfDriver:
             charges = self.point_charges[3, :].copy()[start:end]
             coords = self.point_charges[:3, :].T.copy()[start:end, :]
 
-            V_es = compute_nuclear_potential_integrals(molecule, ao_basis,
-                                                       charges, coords)
+            V_es = compute_simd_nuclear_potential_integrals(
+                molecule, ao_basis, charges, coords)
 
             self._V_es = self.comm.reduce(V_es, root=mpi_master())
             if self.rank != mpi_master():
@@ -2502,9 +2503,7 @@ class ScfDriver:
             ovl_dt = tm.time() - t0
             t0 = tm.time()
 
-            kin_drv = KineticEnergyDriver()
-            kin_mat = kin_drv.compute(molecule, basis)
-            kin_mat = kin_mat.to_numpy()
+            kin_mat = compute_simd_kinetic_energy_integrals(molecule, basis)
 
             kin_dt = tm.time() - t0
         else:
@@ -2523,7 +2522,7 @@ class ScfDriver:
             mol_charges = molecule.get_effective_nuclear_charges(basis)
             mol_coords = molecule.get_coordinates_in_bohr()
             if self.rank == mpi_master():
-                npot_mat = compute_nuclear_potential_integrals(
+                npot_mat = compute_simd_nuclear_potential_integrals(
                     molecule, basis, mol_charges, mol_coords)
             else:
                 npot_mat = None
@@ -2628,8 +2627,8 @@ class ScfDriver:
         charges = molecule.get_effective_nuclear_charges(basis)[start:end]
         coords = molecule.get_coordinates_in_bohr()[start:end, :]
 
-        npot_mat = compute_nuclear_potential_integrals(molecule, basis, charges,
-                                                       coords)
+        npot_mat = compute_simd_nuclear_potential_integrals(
+            molecule, basis, charges, coords)
 
         npot_mat = self.comm.reduce(npot_mat, root=mpi_master())
 
