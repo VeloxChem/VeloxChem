@@ -29,7 +29,6 @@
 #  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
 #  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
 """
 Formatting for the metal site force field code.
 
@@ -44,9 +43,9 @@ or the manager, which is what lets all three import it.
 
 from pathlib import Path
 import numpy as np
+import math
 
 from ..outputstream import OutputStream
-
 
 # ----------------------------------------------------------------------
 # the shared line shapes
@@ -179,8 +178,7 @@ def print_template(template, bonds, angles, ostream=None):
     ostream.print_blank()
     print_section(f'Template {template["name"]}', ostream)
     ostream.print_header(param('geometry', template['geometry_kind']))
-    ostream.print_header(
-        param('atoms', template['molecule'].number_of_atoms()))
+    ostream.print_header(param('atoms', template['molecule'].number_of_atoms()))
     ostream.print_header(param('metal centers', metals))
     ostream.print_header(
         param('capping hydrogens', len(template['cap_indices'])))
@@ -207,8 +205,8 @@ def print_templates(templates, ostream=None):
 
     ostream.print_header(f'Loaded templates ({len(templates)})')
     ostream.print_header(60 * '-')
-    valstr = '{:>24} | {:>7} | {:>7} | {:>13}'.format('name', 'atoms',
-                                                      'metals', 'geometry')
+    valstr = '{:>24} | {:>7} | {:>7} | {:>13}'.format('name', 'atoms', 'metals',
+                                                      'geometry')
     ostream.print_header(valstr)
     ostream.print_header(60 * '-')
 
@@ -500,6 +498,34 @@ def print_comparison_summary(results, ranked_on, scores, ostream=None):
     ostream.flush()
 
 
+def print_no_selection(decision, ostream=None):
+    """
+    Says which template came closest when none of them was good enough.
+
+    :param decision:
+        The decision, as _select_template makes it.
+    """
+    ostream = stream(ostream)
+    closest = min(decision['scores'],
+                  key=lambda name: decision['scores'][name],
+                  default=None)
+
+    if closest is not None and math.isfinite(decision['scores'][closest]):
+        ostream.print_info(
+            f'No template is within the {decision["criteria_name"]} '
+            f'criteria. The closest is {closest}: '
+            f'{decision["verdicts"][closest]}.')
+    else:
+        ostream.print_info(
+            'No template describes this site: none of them maps onto all '
+            'of its atoms.')
+
+    ostream.print_info(
+        "Set selection_criteria to 'loose' to widen what counts as a "
+        'match, or build this site with MetalSiteForceFieldBuilder.')
+    ostream.flush()
+
+
 def print_comparison(results, specs, ranked_on, scores, ostream=None):
     """
     Prints everything compare_active_site measured.
@@ -552,7 +578,11 @@ def print_comparison(results, specs, ranked_on, scores, ostream=None):
     print_comparison_summary(results, ranked_on, scores, ostream=ostream)
 
 
-def print_selection(comparison, decision, rmsd_regions, ic_types, ranked_on,
+def print_selection(comparison,
+                    decision,
+                    rmsd_regions,
+                    ic_types,
+                    ranked_on,
                     ostream=None):
     """
     Prints how every template stands against the criteria, and which one was
@@ -593,9 +623,9 @@ def print_selection(comparison, decision, rmsd_regions, ic_types, ranked_on,
         # only the measures the set actually holds, since either of them may
         # be left out of one
         measures = {
-            name: ' / '.join(f'{measure} {limit:.2f}'
-                             for measure, limit in given.items()
-                             if limit is not None)
+            name:
+            ' / '.join(f'{measure} {limit:.2f}'
+                       for measure, limit in given.items() if limit is not None)
             for name, given in thresholds.items() if given
         }
         limits = '; '.join(f'{name} {shown} {ic_types[name]}'
@@ -622,8 +652,8 @@ def print_selection(comparison, decision, rmsd_regions, ic_types, ranked_on,
         cells = []
         for region in regions:
             found = entry['regions'].get(region)
-            cells.append('' if found is None else ic_cell(
-                found['ic_rmsd'], 'bonds'))
+            cells.append('' if found is
+                         None else ic_cell(found['ic_rmsd'], 'bonds'))
 
         verdict = decision['verdicts'][name] or 'within the criteria'
         ostream.print_header(
@@ -647,4 +677,492 @@ def print_selection(comparison, decision, rmsd_regions, ic_types, ranked_on,
             f'{decision["score"]:.3f} is the lowest of them.')
 
     ostream.print_blank()
+    ostream.flush()
+
+
+# ----------------------------------------------------------------------
+# reporting from the core
+# ----------------------------------------------------------------------
+
+
+def print_binding_modes(binding_modes, ostream=None):
+    """
+    Prints the detected coordination sphere.
+    """
+
+    ostream = stream(ostream)
+
+    ostream.print_blank()
+    ostream.print_header('Coordination sphere')
+    ostream.print_header(19 * '-')
+
+    for metal in binding_modes['metals']:
+        ostream.print_header(
+            param(f'metal {metal["element"]} (index {metal["index"]})',
+                  f'charge {metal["formal_charge"]:+d}'))
+
+    ostream.print_blank()
+    valstr = '{:>10} {:>9} | {:>18} | {:>16}'.format('residue', 'atoms',
+                                                     'distances (A)', 'mode')
+    ostream.print_header(valstr)
+    ostream.print_header(60 * '-')
+
+    by_residue = {}
+    for ligand in binding_modes['ligands']:
+        by_residue.setdefault(ligand['res_index'], []).append(ligand)
+
+    for group in by_residue.values():
+        # a residue binding through several atoms is one ligand, so it gets
+        # one row listing them side by side, the same way an atom bridging
+        # two metals lists both of its distances. Merging is only
+        # unambiguous while every atom contributes exactly one distance;
+        # otherwise the distances could not be read back onto their atoms,
+        # so that group stays one row per atom
+        if any(len(ligand['distances']) != 1 for ligand in group):
+            rows = [[ligand] for ligand in group]
+        else:
+            rows = [group]
+
+        for row in rows:
+            atoms = ', '.join(ligand['atom'] for ligand in row)
+            distances = ', '.join(f'{d:.2f}' for ligand in row
+                                  for d in ligand['distances'])
+            modes = '/'.join(dict.fromkeys(ligand['mode'] for ligand in row))
+            valstr = '{:>10} {:>9} | {:>18} | {:>16}'.format(
+                row[0]['residue'], atoms, distances, modes)
+            ostream.print_header(valstr)
+
+    for note in binding_modes['notes']:
+        ostream.print_warning(note)
+
+    ostream.print_blank()
+    ostream.flush()
+
+
+def print_binding_mode_update(changes,
+                              largest_shift,
+                              dropped_residues=None,
+                              ostream=None):
+    """
+    Prints what re-detecting the coordination on a new geometry did.
+
+    :param changes:
+        The list of (kind, atom, detail) tuples describing the contacts
+        that were gained, lost or reclassified. Empty when the coordination
+        is unchanged.
+    :param largest_shift:
+        The largest change in Angstrom that the recorded metal-ligand
+        bonds underwent.
+    :param dropped_residues:
+        The residues that no longer coordinate at all.
+    """
+
+    ostream = stream(ostream)
+
+    ostream.print_blank()
+    ostream.print_header('Coordination update')
+    ostream.print_header(19 * '-')
+    ostream.print_header(param('largest bond change', f'{largest_shift:.2f} A'))
+
+    if not changes:
+        ostream.print_header(param('coordination', 'unchanged'))
+        ostream.print_blank()
+        ostream.print_info(
+            'The new geometry gives the same coordination sphere; the '
+            'binding modes and the connectivity matrix are kept as they '
+            'are.')
+        ostream.print_blank()
+        ostream.flush()
+        return
+
+    ostream.print_header(param('contacts changed', len(changes)))
+    ostream.print_blank()
+
+    valstr = '{:>10} {:>12} | {:>46}'.format('change', 'atom', 'detail')
+    ostream.print_header(valstr)
+    ostream.print_header(72 * '-')
+
+    for kind, atom, detail in changes:
+        ostream.print_header('{:>10} {:>12} | {:>46}'.format(
+            kind, atom, detail))
+
+    ostream.print_blank()
+    ostream.print_info(
+        'The binding modes and the connectivity matrix were updated to '
+        'the new geometry. Overwrite the ones you hold, or the fit will '
+        'use a coordination the geometry no longer has.')
+
+    for residue in dropped_residues or []:
+        ostream.print_warning(
+            f'{residue} no longer coordinates a metal, but it is still '
+            'part of the truncated active site; extract the active site '
+            'again to leave it out')
+
+    ostream.print_blank()
+    ostream.flush()
+
+
+def print_active_site(active_site, binding_modes, ostream=None):
+    """
+    Prints the composition of the truncated active site.
+    """
+
+    ostream = stream(ostream)
+
+    molecule = active_site['molecule']
+
+    ostream.print_blank()
+    ostream.print_header('Truncated active site')
+    ostream.print_header(21 * '-')
+    ostream.print_header(param('atoms', molecule.number_of_atoms()))
+    ostream.print_header(param('charge', f'{int(molecule.get_charge()):+d}'))
+    ostream.print_header(param('multiplicity',
+                               int(molecule.get_multiplicity())))
+    ostream.print_header(
+        param('capping hydrogens', len(active_site['cap_indices'])))
+    ostream.print_header(
+        param('bonds', int(active_site['connectivity_matrix'].sum() // 2)))
+    print_param_list('residues', active_site['residues'], ostream=ostream)
+
+    variants = sorted(binding_modes['variants'].values())
+    print_param_list('protonation', variants, ostream=ostream)
+
+    ostream.print_blank()
+    ostream.flush()
+
+
+def print_partial_charges(topology,
+                          active_site,
+                          partial_charges,
+                          corrected_charges,
+                          residue_labels,
+                          ostream=None):
+    """
+    Prints the fitted charges and what the capping correction did to them.
+
+    :param topology:
+        The protonated topology, for the residue each active site atom belongs
+        to.
+    :param active_site:
+        The active site.
+    :param partial_charges:
+        The charges as fitted, capping hydrogens included.
+    :param corrected_charges:
+        The same charges after redistribute_cap_charges.
+    :param residue_labels:
+        The ASP130-style label of every topology residue, by residue index.
+    :param ostream:
+        The output stream, or None to print nothing.
+    """
+
+    ostream = stream(ostream)
+
+    charges = np.asarray(partial_charges)
+    caps = sorted(active_site['cap_indices'])
+    metals = active_site['metal_indices']
+    labels = active_site['molecule'].get_labels()
+    n_atoms = len(charges)
+    rest = [index for index in range(n_atoms) if index not in caps]
+    cap_charge = float(sum(charges[index] for index in caps))
+
+    ostream.print_blank()
+    ostream.print_header('Partial charges')
+    ostream.print_header(15 * '-')
+    ostream.print_header(
+        param('active site charge',
+              f'{int(active_site["molecule"].get_charge()):+d}'))
+    ostream.print_header(param('fitted total', f'{charges.sum():+.4f} e'))
+    ostream.print_header(param('on capping hydrogens', f'{cap_charge:+.4f} e'))
+    ostream.print_header(
+        param(f'spread over {len(rest)} atoms',
+              f'{cap_charge / len(rest):+.4f} e each'))
+    ostream.print_blank()
+
+    # group what is left by the residue each atom came from
+    atoms = list(topology.atoms())
+    by_residue = {}
+    for index in rest:
+        residue = atoms[active_site['atom_map'][index]].residue
+        by_residue.setdefault(residue, []).append(index)
+
+    corrected = np.asarray(corrected_charges)
+
+    valstr = '{:>16} {:>7} | {:>12}'.format('fragment', 'atoms', 'charge')
+    ostream.print_header(valstr)
+    ostream.print_header(45 * '-')
+
+    for residue, indices in by_residue.items():
+        total = sum(corrected[index] for index in indices)
+        if len(indices) == 1 and indices[0] in metals:
+            name = f'{labels[indices[0]]} (metal)'
+        else:
+            name = residue_labels[residue.index]
+        valstr = '{:>16} {:>7} | {:>12.4f}'.format(name, len(indices), total)
+        ostream.print_header(valstr)
+
+    ostream.print_blank()
+    ostream.flush()
+
+
+def print_mm_optimization(active_site,
+                          forcefield,
+                          relaxed,
+                          frozen_indices,
+                          metal_keys,
+                          equilibrium_labels,
+                          bond_change_warning=0.25,
+                          ostream=None):
+    """
+    Prints what the crude MM relaxation did to the coordination sphere.
+
+    The metal-ligand distances before and against after are the point of
+    the table: the pass is there to clean up contacts and hydrogens, and
+    a coordination sphere that moved more than a few hundredths of an
+    Angstrom is the sign that it did something else instead.
+
+    What the seeding did is read off the force field rather than off the
+    settings that asked for it, so the table describes the terms the
+    relaxation actually ran with.
+
+    :param active_site:
+        The active site, holding the geometry the pass started from.
+    :param forcefield:
+        The seeded force field the relaxation ran on.
+    :param relaxed:
+        The relaxed molecule.
+    :param frozen_indices:
+        The indices that were held fixed.
+    :param metal_keys:
+        The (bonds, angles) keys of the metal terms, from get_metal_keys.
+    :param equilibrium_labels:
+        The table from a seeded term's comment to the label its equilibrium
+        source is printed as (SEEDED_EQUILIBRIUM_LABELS).
+    :param bond_change_warning:
+        How far a metal-ligand bond may move before it is reported.
+    :param ostream:
+        The output stream, or None to print nothing.
+    """
+
+    def _seeded_constant(table, keys):
+        """
+        Returns the force constant the seeding put on a set of terms.
+
+        :param table:
+            The bond or angle table of the force field.
+        :param keys:
+            The keys of the metal terms.
+
+        :return:
+            The constant as a string, or 'varies' when they are not all the
+            same, which the crude pass never makes them.
+        """
+
+        constants = {round(table[key]['force_constant'], 6) for key in keys}
+
+        if len(constants) != 1:
+            return 'varies'
+
+        return f'{constants.pop():.0f}'
+
+    def _seeded_equilibria(table, keys):
+        """
+        Returns where the seeding took its equilibrium values from.
+
+        _seed_metal_terms writes that into the comment of every term it
+        touches, so the force field says it without being asked again.
+
+        :param table:
+            The bond or angle table of the force field.
+        :param keys:
+            The keys of the metal terms.
+
+        :return:
+            'requested', 'given', 'measured', or 'mixed'.
+        """
+
+        sources = {table[key].get('comment') for key in keys}
+
+        if len(sources) != 1:
+            return 'mixed'
+
+        return equilibrium_labels.get(sources.pop(), 'mixed')
+
+    ostream = stream(ostream)
+
+    labels = active_site['molecule'].get_labels()
+    molecule = active_site['molecule']
+    metals = sorted(active_site['metal_indices'])
+    bonds, angles = metal_keys
+
+    before = molecule.get_coordinates_in_angstrom()
+    after = relaxed.get_coordinates_in_angstrom()
+    shift = np.linalg.norm(after - before, axis=1)
+
+    ostream.print_blank()
+    ostream.print_header('Crude MM relaxation')
+    ostream.print_header(19 * '-')
+
+    ostream.print_header(param('frozen atoms', len(frozen_indices)))
+    ostream.print_header(
+        param('metal centers',
+              'frozen' if set(metals) <= set(frozen_indices) else 'free'))
+    ostream.print_header(
+        param('metal bonds',
+              f'{len(bonds)}, k = {_seeded_constant(forcefield.bonds, bonds)}'))
+    ostream.print_header(
+        param(
+            'metal angles', f'{len(angles)}, k = '
+            f'{_seeded_constant(forcefield.angles, angles)}'
+            if angles else 'left untouched'))
+    ostream.print_header(
+        param('bond equilibria', _seeded_equilibria(forcefield.bonds, bonds)))
+    if angles:
+        ostream.print_header(
+            param('angle equilibria',
+                  _seeded_equilibria(forcefield.angles, angles)))
+    ostream.print_blank()
+
+    valstr = '{:>12} {:>8} | {:>10} | {:>9} | {:>8}'.format(
+        'atoms', 'elements', 'before (A)', 'after (A)', 'change')
+    ostream.print_header(valstr)
+    ostream.print_header(60 * '-')
+
+    worst_bond = None
+    for key in bonds:
+        one_based = [index + 1 for index in key]
+        was = molecule.get_distance_in_angstroms(one_based)
+        now = relaxed.get_distance_in_angstroms(one_based)
+        names = '-'.join(labels[index] for index in key)
+        valstr = '{:>12} {:>8} | {:>10.2f} | {:>9.2f} | {:>+8.2f}'.format(
+            str(key), names, was, now, now - was)
+        ostream.print_header(valstr)
+        if worst_bond is None or abs(now - was) > abs(worst_bond[1]):
+            worst_bond = (names, now - was)
+
+    for first in range(len(metals)):
+        for second in range(first + 1, len(metals)):
+            pair = (metals[first], metals[second])
+            one_based = [index + 1 for index in pair]
+            was = molecule.get_distance_in_angstroms(one_based)
+            now = relaxed.get_distance_in_angstroms(one_based)
+            names = '-'.join(labels[index] for index in pair)
+            valstr = ('{:>12} {:>8} | {:>10.2f} | {:>9.2f} | '
+                      '{:>+8.2f}').format(str(pair), names, was, now, now - was)
+            ostream.print_header(valstr)
+
+    ostream.print_blank()
+
+    largest = int(np.argmax(shift))
+    ostream.print_header(
+        param('largest shift', f'{shift[largest]:.2f} A on '
+              f'{labels[largest]} {largest}'))
+    ostream.print_header(param('mean shift', f'{shift.mean():.2f} A'))
+
+    # A ligand swinging around its metal moves a long way in Cartesian
+    # terms while the coordination sphere itself is untouched, so what
+    # the pass has to be held to is the bond lengths, not the shifts.
+    if worst_bond is not None:
+        ostream.print_header(
+            param('largest bond change',
+                  f'{worst_bond[1]:+.2f} A on {worst_bond[0]}'))
+        if abs(worst_bond[1]) > bond_change_warning:
+            ostream.print_warning(
+                f'The crude relaxation changed a {worst_bond[0]} bond by '
+                f'{worst_bond[1]:+.2f} A. Check the metal terms it was '
+                'given before trusting the geometry it produced.')
+
+    ostream.print_blank()
+    ostream.flush()
+
+
+def print_metal_parameters(active_site, forcefield, metal_keys, ostream=None):
+    """
+    Prints the fitted metal bonds and angles.
+
+    :param active_site:
+        The active site.
+    :param forcefield:
+        The fitted force field.
+    :param metal_keys:
+        The (bonds, angles) keys of the metal terms, from get_metal_keys.
+    :param ostream:
+        The output stream, or None to print nothing.
+    """
+
+    ostream = stream(ostream)
+
+    labels = active_site['molecule'].get_labels()
+    metals = set(active_site['metal_indices'])
+    coords = active_site['molecule'].get_coordinates_in_angstrom()
+    bonds, angles = metal_keys
+
+    ostream.print_blank()
+    ostream.print_header('Metal bonds')
+    ostream.print_header(11 * '-')
+    valstr = '{:>12} {:>7} | {:>9} | {:>21}'.format('atoms', 'elements',
+                                                    'r0 (A)',
+                                                    'k (kcal/mol/A^2)')
+    ostream.print_header(valstr)
+    ostream.print_header(60 * '-')
+
+    for key in bonds:
+        params = forcefield.bonds[key]
+        names = '-'.join(labels[index] for index in key)
+        # kJ/mol/nm^2 to kcal/mol/A^2
+        force_constant = params['force_constant'] / 100.0 / 4.184
+        valstr = '{:>12} {:>7} | {:>9.3f} | {:>21.1f}'.format(
+            str(key), names, params['equilibrium'] * 10.0, force_constant)
+        ostream.print_header(valstr)
+
+    ostream.print_blank()
+    ostream.print_header('Metal angles')
+    ostream.print_header(12 * '-')
+    valstr = '{:>14} {:>9} | {:>12} | {:>19}'.format('atoms', 'elements',
+                                                     'theta0 (deg)',
+                                                     'k (kJ/mol/rad^2)')
+    ostream.print_header(valstr)
+    ostream.print_header(60 * '-')
+
+    for key in angles:
+        params = forcefield.angles[key]
+        names = '-'.join(labels[index] for index in key)
+        bridging = key[0] in metals and key[2] in metals
+        # the marker gets a fixed-width field of its own, otherwise the
+        # centering of print_header would shift the marked line
+        valstr = '{:>14} {:>9} | {:>12.1f} | {:>19.1f} {:<9}'.format(
+            str(key), names, params['equilibrium'], params['force_constant'],
+            'bridging' if bridging else '')
+        ostream.print_header(valstr)
+
+    ostream.print_blank()
+
+    for metal_a in sorted(metals):
+        for metal_b in sorted(metals):
+            if metal_a >= metal_b:
+                continue
+            distance = np.linalg.norm(coords[metal_a] - coords[metal_b])
+            ostream.print_header(
+                param(f'{labels[metal_a]}-{labels[metal_b]} distance',
+                      f'{distance:.3f} A'))
+
+    ostream.print_blank()
+    ostream.flush()
+
+
+def print_muted_notice(step, mute_scf=True, ostream=None):
+    """
+    Announces a long calculation whose output is being suppressed.
+
+    :param step:
+        A description of the step about to run.
+    """
+
+    ostream = stream(ostream)
+
+    if mute_scf:
+        ostream.print_info(
+            f'Running {step} with muted QM output. Set mute_scf to False '
+            'to follow it.')
+    else:
+        ostream.print_info(f'Running {step}.')
     ostream.flush()

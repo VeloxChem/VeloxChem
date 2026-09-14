@@ -359,14 +359,13 @@ class MetalForceFieldManager:
         geometry, kind = templates.load_geometry(folder, fallback)
         forcefield.molecule = geometry
 
-        template = templates.build(
-            name,
-            forcefield,
-            geometry,
-            kind,
-            folder,
-            metal_elements=self.builder.metal_elements,
-            ostream=self.ostream)
+        template = templates.build(name,
+                                   forcefield,
+                                   geometry,
+                                   kind,
+                                   folder,
+                                   metal_elements=self.builder.metal_elements,
+                                   ostream=self.ostream)
 
         if name in self.templates:
             self.ostream.print_warning(
@@ -586,8 +585,8 @@ class MetalForceFieldManager:
             heavy_map, rot, trans = matching.best_heavy_map(
                 template, maps, coordinates)
             mapping = matching.complete_hydrogens(template, described,
-                                                  heavy_map, coordinates,
-                                                  rot, trans)
+                                                  heavy_map, coordinates, rot,
+                                                  trans)
 
             entry['mapping'] = mapping
             entry['metal_bonds'] = matching.metal_bond_summary(
@@ -756,58 +755,6 @@ class MetalForceFieldManager:
 
         return decision
 
-    def _print_decision(self, decision):
-        """
-        Prints how every template stood against the criteria, and which one
-        was taken.
-
-        Separate from _select_template because a decision is made twice --
-        once to answer compare_active_site's boolean and once to act on in
-        build_ff_from_template -- and printing the whole field twice for one
-        comparison only invited the reader to look for what had changed
-        between them. Nothing had.
-
-        :param decision:
-            The decision, as _select_template makes it.
-        """
-
-        printing.print_selection(self._comparison,
-                                 decision,
-                                 self.RMSD_REGIONS,
-                                 self.IC_TYPES,
-                                 self.SELECTION_RANKED_ON,
-                                 ostream=self.ostream)
-
-        if decision['name'] is None:
-            self._print_no_selection(decision)
-
-    def _print_no_selection(self, decision):
-        """
-        Says which template came closest when none of them was good enough.
-
-        :param decision:
-            The decision, as _select_template makes it.
-        """
-
-        closest = min(decision['scores'],
-                      key=lambda name: decision['scores'][name],
-                      default=None)
-
-        if closest is not None and math.isfinite(decision['scores'][closest]):
-            self.ostream.print_info(
-                f'No template is within the {decision["criteria_name"]} '
-                f'criteria. The closest is {closest}: '
-                f'{decision["verdicts"][closest]}.')
-        else:
-            self.ostream.print_info(
-                'No template describes this site: none of them maps onto all '
-                'of its atoms.')
-
-        self.ostream.print_info(
-            "Set selection_criteria to 'loose' to widen what counts as a "
-            'match, or build this site with MetalSiteForceFieldBuilder.')
-        self.ostream.flush()
-
     def _prefer_the_shoehorned_template(self, decision):
         """
         Takes the template the site was shoehorned into, over whatever the
@@ -959,7 +906,15 @@ class MetalForceFieldManager:
         if template is None:
             decision = self._prefer_the_shoehorned_template(decision)
 
-        self._print_decision(decision)
+        printing.print_selection(self._comparison,
+                                 decision,
+                                 self.RMSD_REGIONS,
+                                 self.IC_TYPES,
+                                 self.SELECTION_RANKED_ON,
+                                 ostream=self.ostream)
+
+        if decision['name'] is None:
+            printing.print_no_selection(decision, self.ostream)
 
         matched = decision['name'] is not None
         assert_msg_critical(
@@ -1002,9 +957,11 @@ class MetalForceFieldManager:
         forcefield = self._active_site_builder.adopt_forcefield(
             forcefield, active_site=builder_active_site)
 
-        core._print_metal_parameters(active_site,
-                                     forcefield,
-                                     ostream=self.ostream)
+        printing.print_metal_parameters(
+            active_site,
+            forcefield,
+            core.get_metal_keys(forcefield, active_site),
+            ostream=self.ostream)
 
         return forcefield
 
@@ -1226,7 +1183,8 @@ class MetalForceFieldManager:
 
             # a criterion that could not be evaluated is not one that was
             # passed, so the region is held to strictly here
-            violation = matching.ic_violation(found['ic_rmsd'], thresholds,
+            violation = matching.ic_violation(found['ic_rmsd'],
+                                              thresholds,
                                               ic_types=self.IC_TYPES)
             if violation is not None:
                 return f'{region} {violation}'
@@ -1289,11 +1247,10 @@ class MetalForceFieldManager:
 
         # this geometry is a way of comparing, not a result of a run, so
         # nothing about it is written to a folder
-        return core.mm_optimize_active_site(
-            active_site,
-            forcefield,
-            ostream=self.ostream,
-            **builder.relax_settings())
+        return core.mm_optimize_active_site(active_site,
+                                            forcefield,
+                                            ostream=self.ostream,
+                                            **builder.relax_settings())
 
     # ------------------------------------------------------------------
     # transfer
@@ -1374,7 +1331,8 @@ class MetalForceFieldManager:
             'connectivity_matrix': matrix,
         }
 
-        return matching.describe(active_site, core.connectivity_bonds(matrix)), changes
+        return matching.describe(active_site,
+                                 core.connectivity_bonds(matrix)), changes
 
     def _print_forced_bonds(self, template, active_site, changes):
         """

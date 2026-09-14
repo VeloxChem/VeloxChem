@@ -41,7 +41,9 @@ import sys
 from ..veloxchemlib import mpi_master
 from ..outputstream import OutputStream
 from ..errorhandler import assert_msg_critical
+from ..mmforcefieldgenerator import MMForceFieldGenerator
 from . import core
+from . import qm
 from . import openmmxml
 from . import printing
 
@@ -280,7 +282,7 @@ class MetalSiteForceFieldBuilder:
         self.folder = f'metal_site_{int(time.time())}'
 
         self._stage = Stage.EMPTY
-        self._request = core.site_request()
+        self._request = core.empty_request()
         self._mm_opt = True
         self._topology = None
         self._positions = None
@@ -421,9 +423,9 @@ class MetalSiteForceFieldBuilder:
 
         self._require('print_active_site', Stage.ACTIVE_SITE)
 
-        core._print_active_site(self._active_site,
-                                self.binding_modes,
-                                ostream=self.ostream)
+        printing.print_active_site(self._active_site,
+                                   self.binding_modes,
+                                   ostream=self.ostream)
 
     @property
     def optimization_constraints(self):
@@ -563,7 +565,7 @@ class MetalSiteForceFieldBuilder:
             topology, positions, coordinating_residues=coordinating_residues)
 
         if cif_path is not None:
-            core._print_binding_modes(binding_modes, ostream=self.ostream)
+            printing.print_binding_modes(binding_modes, ostream=self.ostream)
 
         # Protonate the topology based on the derived binding modes
         protonated_topology, protonated_positions, variants, notes = (
@@ -591,9 +593,9 @@ class MetalSiteForceFieldBuilder:
             protonated_modes,
             cap_bond_length=self.cap_bond_length,
             ostream=self.ostream)
-        core._print_active_site(active_site,
-                                protonated_modes,
-                                ostream=self.ostream)
+        printing.print_active_site(active_site,
+                                   protonated_modes,
+                                   ostream=self.ostream)
 
         self._save_intermediate(
             'protonated.pdb', lambda path: self._write_pdb(
@@ -1227,7 +1229,7 @@ class MetalSiteForceFieldBuilder:
         self._require('optimize_geometry', Stage.ACTIVE_SITE)
         active_site = self._active_site
 
-        optimized, opt_results = core.optimize_active_site(
+        optimized, opt_results = qm.optimize_active_site(
             active_site,
             constrain_capping_hydrogens=self.constrain_capping_hydrogens,
             comm=self.comm,
@@ -1261,7 +1263,7 @@ class MetalSiteForceFieldBuilder:
         self._require('calculate_hessian', Stage.ACTIVE_SITE)
         active_site = self._active_site
 
-        atom_pairs, atoms = core.hessian_pairs(
+        atom_pairs, atoms = qm.hessian_pairs(
             active_site,
             bond_count=2,
             partial_hessian_cutoff=self.partial_hessian_cutoff)
@@ -1281,7 +1283,7 @@ class MetalSiteForceFieldBuilder:
                 f'metal terms read {len(atom_pairs)} of its blocks.')
         self.ostream.flush()
 
-        hessian = core.compute_hessian(
+        hessian = qm.compute_hessian(
             active_site,
             atom_pairs=atom_pairs if self.calculate_partial_hessian else None,
             comm=self.comm,
@@ -1317,10 +1319,10 @@ class MetalSiteForceFieldBuilder:
         active_site = self._active_site
 
         if self.do_resp:
-            charges = core.compute_resp_charges(active_site,
-                                                mute_scf=self.mute_scf,
-                                                comm=self.comm,
-                                                ostream=self.ostream)
+            charges = qm.compute_resp_charges(active_site,
+                                              mute_scf=self.mute_scf,
+                                              comm=self.comm,
+                                              ostream=self.ostream)
         else:
             charges = self._on_master(
                 lambda: core.d4_charges(active_site, ostream=self.ostream))
@@ -1413,11 +1415,16 @@ class MetalSiteForceFieldBuilder:
         else:
             charges = self.calculate_partial_charges()
 
-        self._on_master(
-            lambda: core._print_partial_charges(self._protonated_topology,
-                                                self._active_site,
-                                                charges,
-                                                ostream=self.ostream))
+        printing.print_partial_charges(
+            self._protonated_topology,
+            self._active_site,
+            charges,
+            core.redistribute_cap_charges(self._active_site, charges),
+            {
+                residue.index: core.residue_label(residue)
+                for residue in self._protonated_topology.residues()
+            },
+            ostream=self.ostream)
 
         return self._fit_and_broadcast(hessian, charges)
 
@@ -1587,7 +1594,8 @@ class MetalSiteForceFieldBuilder:
             lambda path: path.write_text(mm.XmlSerializer.serialize(system)))
         self._save_intermediate(
             core.FORCEFIELD_FILE,
-            lambda path: core.save_forcefield(path, self._forcefield))
+            lambda path: MMForceFieldGenerator.save_forcefield_as_json(
+                self._forcefield, str(path)))
 
         return system
 
@@ -1675,7 +1683,8 @@ class MetalSiteForceFieldBuilder:
                                 lambda path: np.savetxt(path, corrected))
         self._save_intermediate(
             core.FORCEFIELD_FILE,
-            lambda path: core.save_forcefield(path, forcefield))
+            lambda path: MMForceFieldGenerator.save_forcefield_as_json(
+                forcefield, str(path)))
 
     @staticmethod
     def _write_pdb(path, topology, positions):
@@ -1890,11 +1899,6 @@ class MetalSiteForceFieldBuilder:
         keeps everything the JSON on disk leaves out - the pairs, the
         connectivity matrix and the atom type tables.
 
-        The mirror of _on_master, and here for the same reason it is: the
-        shell owns the MPI rule, so the one rank-aware helper the core held
-        belongs on this side of the line. The core builds no driver for it and
-        nothing else called it.
-
         :param forcefield:
             The force field on the master rank, ignored elsewhere.
 
@@ -1951,9 +1955,11 @@ class MetalSiteForceFieldBuilder:
                 ostream=self.ostream,
                 protected_bonds=self._protected_bonds(),
                 **self.fit_settings())
-            core._print_metal_parameters(self._active_site,
-                                         forcefield,
-                                         ostream=self.ostream)
+            printing.print_metal_parameters(
+                self._active_site,
+                forcefield,
+                core.get_metal_keys(forcefield, self._active_site),
+                ostream=self.ostream)
             self._write_run_artifacts(forcefield, hessian, charges)
 
         self._forcefield = self._broadcast_forcefield(forcefield)
