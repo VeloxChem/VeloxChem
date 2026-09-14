@@ -116,6 +116,7 @@ from .inputparser import InputParser
 from .outputstream import OutputStream
 from .matrix import Matrix
 from .matrices import Matrices
+from .packedmatrix import PackedMatrix
 from .molecule import Molecule
 from .molecularbasis import MolecularBasis
 from .aodensitymatrix import AODensityMatrix

@@ -187,6 +187,18 @@ export_packed(py::module &m) -> void
             },
             "Gets the values of matrix as they are stored, i.e. the lower triangle of a triangular matrix.")
         .def(
+            "values_view",
+            [](py::object self) -> py::array_t<double> {
+                auto &matrix = self.cast<CPackedMatrix &>();
+
+                return py::array_t<double>(std::vector<py::ssize_t>{static_cast<py::ssize_t>(matrix.number_of_elements())},
+                                           matrix.data(),
+                                           self);
+            },
+            "Gets the values of matrix as they are stored, as an array which writes into the matrix itself. "
+            "The array holds the matrix alive and must not outlive the use of the values, which is what lets "
+            "a communicator read into the matrix without a copy of it.")
+        .def(
             "to_numpy",
             [](const CPackedMatrix &self, const double max_memory) -> py::array_t<double> {
                 return vlx_packed::dense_to_numpy(self, max_memory);
