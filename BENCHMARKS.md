@@ -7403,3 +7403,64 @@ speed, and the difference is large enough to change which way of building is the
 quicker one: with Accelerate the direct way costs 2.5 times the held way at tagrisso
 def2-tzvp, and with Eigen it costs 8.3. A machine built without a math library named
 would reach conclusions about this driver which do not hold on a machine with one.
+
+## c60 in def2-tzvp, which was not the driver
+
+Open since 12 September: c60 at restricted Hartree-Fock in def2-tzvp did not converge
+in fifty iterations through the SIMD RI-JK path. The first ten iterations were healthy
+and monotonic, reaching a gradient of 1.1e-4, so it was a late stall and not an
+unstable start. It was left open because each attempt was believed to cost 1.9 hours
+on this machine, and the comparison against the four-center build another five or six.
+
+It took two eigendecompositions and no SCF at all.
+
+**The fitting metric is not the difference, and cannot be.** `def2-universal-jkfit`
+does not depend on the orbital basis, so c60 has the same 4500 auxiliary functions and
+the same metric at def2-svp, which converges, as at def2-tzvp, which does not:
+
+| molecule | basis | naux | smallest | condition |
+| --- | --- | ---: | ---: | ---: |
+| caffeine | def2-tzvp | 1242 | 1.812e-06 | 9.877e+08 |
+| tagrisso | def2-tzvp | 3387 | 4.259e-07 | 7.139e+09 |
+| c60 | def2-svp | 4500 | 3.805e-08 | 1.322e+11 |
+| c60 | def2-tzvp | 4500 | 3.805e-08 | 1.322e+11 |
+
+c60's metric is the worst conditioned of the four by twenty times, and it is the same
+1.322e+11 in the run which converges. A number shared by both sides of a comparison
+explains neither.
+
+**The orbital basis is the difference.** The twenty smallest eigenvalues of the overlap:
+
+```
+c60 def2-svp   3.202e-05  3.241e-05  3.279e-05  5.825e-05 ...
+c60 def2-tzvp  9.043e-07  9.088e-07  9.151e-07 | 1.441e-06  1.463e-06  1.475e-06 ...
+```
+
+The default `ovl_thresh` is 1e-6, and it falls inside a cluster: **three directions are
+dropped at 9.0e-07 and five are kept at 1.44e-06**, within a factor of 1.6 of the ones
+just discarded. Near-null directions retained and allowed into the orbital rotations
+are the textbook late stall. At 1e-5 the whole cluster goes -- 37 of 1860 dropped, the
+smallest kept 1.564e-05, a clean gap.
+
+| | smallest overlap eigenvalue | below 1e-6 |
+| --- | ---: | ---: |
+| caffeine def2-tzvp | 4.518e-05 | 0 |
+| tagrisso def2-tzvp | 4.321e-06 | 0 |
+| c60 def2-svp | 3.202e-05 | 0 |
+| **c60 def2-tzvp** | **9.043e-07** | **3** |
+
+**With `ovl_thresh = 1e-5` it converges in twenty five iterations** to
+-2272.3448501388, monotonic throughout, passing through the region it used to stall in
+at iterations ten and eleven without pausing. 1330 seconds on the M4 Max by the direct
+way.
+
+**A late stall is worth checking against the overlap spectrum before the Fock driver is
+suspected.** One eigendecomposition, four seconds, against 1.9 hours an attempt -- and
+the driver was never in question: c60 at def2-svp agrees between the two ways to
+9.9e-10 and caffeine at def2-tzvp to 1.4e-11.
+
+**What this does not settle.** The direct way solves with the Cholesky factor of the
+metric and has no other option, so that run used it throughout. Whether the eigenvalue
+route -- which the conventional RI-JK driver uses, and which `ri_metric_route` now
+selects for the way which holds the B vectors -- also cures it at the default
+`ovl_thresh` is untested. The two are independent and both may be real.
