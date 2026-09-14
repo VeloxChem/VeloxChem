@@ -7109,3 +7109,77 @@ reported as a rate rather than as seconds, catches all four of them in the first
 of output -- about a hundred gigaflops a rank is one core whatever the launcher was
 told. It was in the script from the start and it was reported in units which needed a
 number nobody had.
+
+### The direct way is not divided over the ranks of a node
+
+The same sweep, the same molecule, the way which forms the integrals again on every
+build instead of holding the B vectors.
+
+| ranks x threads | Fock build | spread | outside | setup | whole |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 1 x 256 | **1.420 s** | 1.00 | 7.47 s | 1.58 s | **35.45 s** |
+| 2 x 128 | 1.596 s | 1.22 | 8.03 s | 1.64 s | 38.97 s |
+| 4 x 64 | 2.442 s | 1.23 | 8.31 s | 1.63 s | 55.23 s |
+| 8 x 32 | 4.267 s | 1.22 | 8.99 s | 1.97 s | 90.73 s |
+
+**Three times slower on eight ranks than on one, with the same cores.** Where the way
+which holds the B vectors gained 1.73, this loses 3.0, and the whole calculation goes
+from 35 seconds to 91.
+
+**It is not the imbalance it was predicted to be.** The Coulomb pass of the direct way
+is divided over the parts the auxiliary basis is swept in, and the parts are cut to
+fit a memory budget rather than to fit the ranks, so a budget of hundreds of
+gigabytes gives one part and one rank takes the whole of that pass while the others
+take none. That is real -- seven of eight ranks take no part at eight -- and it is
+not what costs: the spread of the slowest rank over the quickest is 1.22 at two
+ranks, 1.23 at four and 1.22 at eight. Flat. An imbalance which one rank carries
+alone would grow with the ranks, and this does not.
+
+**What costs is that every rank sweeps every integral.** The exchange pass is divided
+over the orbitals: a rank takes a range of them, forms the half transformed integrals
+of that range, and for each batch of the range it sweeps the whole of the three
+center integrals. The number of batches is set by the memory a rank may hold:
+
+| | |
+| --- | ---: |
+| one orbital of the half transform, twice over | 2 x 3387 x 1345 x 8 = 72.9 MB |
+| orbitals a batch may hold, at a budget of hundreds of gigabytes | about 5000 |
+| occupied orbitals of the molecule | 133 |
+| batches a rank makes, at any rank count | **one** |
+
+One rank makes one sweep of the integrals. Eight ranks make eight, one each, on a
+thirty second of the cores apiece. **The integral work multiplies by the number of
+ranks**, and it does so precisely when the memory is plentiful, which is the case
+this machine is.
+
+The plan for this division said the opposite -- that the sweeps a rank makes fall as
+its orbitals do, so the integral work is conserved -- and that is true only where
+`nbatch` is smaller than the occupied orbitals, so that there are several batches to
+divide. It was written for a molecule of three hundred and twenty atoms where the
+integrals are three per cent of a build and the batches are several; it was measured
+on one of seventy where they are a fifth and the batch is one. Integrals at 19.7 per
+cent of a build, multiplied by eight, is 158 per cent of the original build in
+integrals alone. Measured: 0.28 seconds of integrals a build at one rank, eight
+sweeps on an eighth of the cores is 2.24, plus 1.14 for the phases which do divide,
+against 4.27 measured. The mechanism accounts for it.
+
+### What to run, then
+
+| tagrisso def2-tzvp, 256 cores | best | |
+| --- | --- | ---: |
+| the B vectors held | **8 x 32** | 23.68 s |
+| " | 4 x 64 | 23.53 s |
+| the direct way | **1 x 256** | 35.45 s |
+
+**The way which holds the B vectors wants the ranks; the direct way wants one rank
+and all of the threads.** Within a node the direct way should not be divided at all,
+and across nodes each node will duplicate the sweep, which is the price of not
+sending several gigabytes of half transformed integrals between them.
+
+Two ways out, neither taken yet. The parts of the exchange pass could be divided over
+the ranks as well as the orbitals, with the half transformed integrals summed between
+them -- 4.85 gigabytes a batch for this molecule, against eight sweeps of the
+integrals, and which of the two is dearer is a question with a number rather than an
+opinion. Or the orbitals could be divided only as far as the batches go, leaving the
+ranks beyond that to divide the parts instead, which costs nothing to decide and
+needs the same sum.
