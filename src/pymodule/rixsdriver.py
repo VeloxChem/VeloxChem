@@ -74,7 +74,7 @@ class RixsDriver(LinearSolver):
         - num_valence_orbitals: Number of involved valence orbitals.
         - num_virtual_orbitals: Number of involved virtual orbitals.
         - twoshot: Whether the two-shot approach is used
-          (set during compute).
+          (read-only; derived from restricted_subspace).
     """
 
     def __init__(self, comm=None, ostream=None):
@@ -139,6 +139,17 @@ class RixsDriver(LinearSolver):
             'num_virtual_orbitals':
                 ('int', 'number of involved virtual orbitals'),
         })
+
+    @property
+    def twoshot(self):
+        """
+        Returns whether the two-shot approach is used.
+
+        :return:
+            Whether the two-shot approach is used.
+        """
+
+        return not self.restricted_subspace
 
     def update_settings(self, rsp_dict, method_dict=None):
         """
@@ -293,7 +304,6 @@ class RixsDriver(LinearSolver):
 
         nocc = molecule.number_of_alpha_occupied_orbitals(basis)
 
-        self.twoshot = (not self.restricted_subspace)
         init_photon_set = True
 
         if self.rank == mpi_master():
