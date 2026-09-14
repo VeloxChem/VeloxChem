@@ -62,7 +62,7 @@ namespace simdnpot {  // simdnpot namespace
 /// @note The values of the combination of basis functions are stored as one row of
 /// nvalues columns for each of the (2 l_bra + 1) (2 l_ket + 1) spherical components,
 /// with the components of the bra side running slowest.
-/// @note The kernels reach angular momentum one. A combination above it stops with
+/// @note The kernels reach angular momentum six. A combination above it stops with
 /// an error rather than returning the zeros of an unwritten kernel, which a caller
 /// could not tell from integrals which are genuinely zero.
 /// @note Unlike the overlap and the kinetic energy, there is no closed form for two

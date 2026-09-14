@@ -57,13 +57,18 @@ namespace simdnpot {  // simdnpot namespace
 inline auto
 number_of_buffer_rows(const int bra_angular_momentum, const int ket_angular_momentum) -> size_t
 {
-    constexpr std::array<std::array<size_t, 2>, 2> rows{{
-        {       5,      15},
-        {      15,      49}
+    constexpr std::array<std::array<size_t, 7>, 7> rows{{
+        {       5,      15,      28,      52,      92,     154,     245},
+        {      15,      49,      91,     153,     241,     362,     524},
+        {      28,      94,     222,     356,     533,     761,    1049},
+        {      52,     162,     364,     749,    1085,    1501,    2007},
+        {      92,     259,     554,    1100,    2051,    2777,    3639},
+        {     154,     392,     800,    1538,    2801,    4851,    6265},
+        {     245,     569,    1111,    2073,    3696,    6300,   10297}
     }};
 
-    errors::assertMsgCritical((bra_angular_momentum >= 0) && (bra_angular_momentum < 2) &&
-                                  (ket_angular_momentum >= 0) && (ket_angular_momentum < 2),
+    errors::assertMsgCritical((bra_angular_momentum >= 0) && (bra_angular_momentum < 7) &&
+                                  (ket_angular_momentum >= 0) && (ket_angular_momentum < 7),
                               std::string("SimdNuclearPotentialBufferRows.number_of_buffer_rows: Angular momentum is out of range"));
 
     return rows[static_cast<size_t>(bra_angular_momentum)][static_cast<size_t>(ket_angular_momentum)];
