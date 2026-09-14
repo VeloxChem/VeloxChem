@@ -6803,7 +6803,10 @@ Before this they read 1242 on every rank at every count, and the sum was 1242 ti
 the ranks. The values of the B vectors always divided exactly -- 147 980 640 of them,
 at one rank and at four -- which is why the memory divided and nothing else did.
 
-**One build, one thread on every rank, so that only the division changes:**
+**One build, one thread on every rank.** Read this as one rank's share against one
+rank's resource: the cores grow with the ranks here, so it is not a comparison at a
+fixed machine, and the section below is. It says whether the share of a rank shrank,
+and nothing about what a division costs.
 
 | phase | 1 rank | 2 ranks | 4 ranks | divides by |
 | --- | ---: | ---: | ---: | ---: |
@@ -6939,3 +6942,45 @@ assertion which never fires. A cost model says where to look and not what to cha
 and the only way to tell the difference is to measure each change on its own -- which
 is what said that two hundred lines of grouping were seven per cent slower than the
 code they replaced.
+
+## The same cores divided into ranks, and the rank which finishes last
+
+Every phase breakdown above is either one thread to a rank, where the cores grow with
+the ranks, or four threads to a rank on fourteen cores, which oversubscribes. Neither
+is what anybody runs. A hybrid calculation has `ranks x threads` equal to the cores
+of the machine, and this is caffeine def2-tzvp at fourteen cores divided four ways.
+
+**The number which matters is the slowest rank**, because the Fock matrices are
+reduced and every rank waits for it. The range is given beside it.
+
+| ranks x threads | transform | exchange | coulomb | the three together |
+| --- | ---: | ---: | ---: | ---: |
+| 1 x 14 | 0.075 | 0.022 | 0.024 | 0.121 |
+| 2 x 7 | 0.082 (0.065) | 0.020 (0.012) | 0.027 (0.026) | 0.129 |
+| 7 x 2 | 0.093 (0.054) | 0.017 (0.006) | 0.065 (0.030) | 0.175 |
+| 14 x 1 | **0.152** (0.046) | 0.028 (0.004) | 0.075 (0.035) | 0.255 |
+
+**The transform of the slowest rank is 0.152 seconds where the quickest is 0.046, a
+spread of 3.3.** The phases of the quickest rank fall with the ranks exactly as the
+sections above say they do. The build does not, because it ends when the last rank
+ends, and taking a single rank's report -- which is what every measurement of this
+session did -- shows the share and hides the wait.
+
+**The imbalance is in the partition and not in the arithmetic.**
+`Molecule.partition_atoms` sorts the atoms by their distance from the centre of mass
+and by element and deals them round robin, which balances the count of atoms and so
+roughly the count of auxiliary functions: 93 and 95 at fourteen ranks. It does not
+balance the work. An auxiliary function on an atom in the middle of a molecule
+survives screening against far more atom pairs than one on an atom at the edge, so
+equal counts of functions are unequal counts of values, and it is values which cost.
+
+The weights to do it properly are already computed, in the driver and for another
+purpose: `_make_parts` sums the memory of each atom's integrals out of the sparsity
+pattern into `shares[atom]`, to cut the direct way into parts which fit a budget. A
+partition which dealt atoms to ranks by those weights rather than by their count is
+the obvious next thing, and it is a change to the Python layer alone.
+
+**What this does not say.** Fourteen cores of a laptop is not a node, and a molecule
+of twenty four atoms is not what any of this is for. What it settles is the shape of
+the measurement: at a fixed machine, report the rank which finishes last, and never a
+single rank's profile.
