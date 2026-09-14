@@ -40,6 +40,7 @@ import sys
 import re
 
 import numpy as np
+from mpi4py import MPI
 
 from .oneeints import compute_nuclear_potential_integrals
 from .oneeints import compute_electric_dipole_integrals
@@ -1832,16 +1833,12 @@ class ScfDriver:
                 mode = (rimode.direct
                         if largest > budget else rimode.in_memory)
 
-            # NOTE: the direct way accumulates every part of the auxiliary basis
-            # into one array and then solves the Cholesky factor of the metric
-            # against the whole of it. A forward substitution over a share of the
-            # rows is missing the rows above it, so the direct way cannot be
-            # divided this way and is refused on more than one rank.
-            assert_msg_critical(
-                (mode == rimode.in_memory) or (self.nodes == 1),
-                'SCF driver: the direct SIMD RI-JK way is not yet implemented ' +
-                'for more than one MPI rank. Give the ranks more memory, or ' +
-                'run on more of them, so that the B vectors of a rank fit.')
+            # NOTE: the direct way is divided over the orbitals and not over the
+            # auxiliary basis, as the triangular solve of its exchange pass reaches
+            # across the whole of it. Every rank therefore holds the whole of the
+            # auxiliary basis, and the division is made in the build.
+            if mode == rimode.direct:
+                self._ri_aux_atoms = []
 
             self.ostream.print_info(
                 'Using the SIMD resolution of the identity (RI-JK) driver.')
@@ -2651,14 +2648,66 @@ class ScfDriver:
         packed_density = PackedMatrix(nao, nao, mat_t.symmetric)
         packed_density.from_numpy(np.ascontiguousarray(density))
 
-        fock = self._ri_drv.compute(packed_density, coeffs,
-                                    exchange_scaling_factor)
+        if (self.nodes > 1) and (self._ri_drv.get_mode() == rimode.direct):
+            fock = self._simd_ri_jk_direct_share(coeffs, exchange_scaling_factor)
+        else:
+            fock = self._ri_drv.compute(packed_density, coeffs,
+                                        exchange_scaling_factor)
 
         # NOTE: the limit is of the Fock matrix being expanded, which is the square
         # of the basis and is modest, and not the budget of the B vectors, which
         # bounds something else entirely and may be set small on purpose.
 
         return fock.to_numpy(max_memory=2.0 * nao * nao * 8 / 1024**3 + 1.0)
+
+    def _simd_ri_jk_direct_share(self, coeffs, exchange_scaling_factor):
+        """
+        Computes this rank's share of the closed shell Fock matrix of the direct
+        SIMD RI-JK way.
+
+        :param coeffs:
+            The occupied orbital coefficients as a packed matrix.
+        :param exchange_scaling_factor:
+            The fraction of exact exchange.
+
+        :return:
+            This rank's share of the Fock matrix as a packed matrix.
+        """
+
+        # NOTE: the direct way is two sweeps of the integrals with the fitting
+        # between them, and the two sweeps divide over different things. The first
+        # is a sum over the orbitals, so the ranks take a range of them each; the
+        # auxiliary basis is not an index it can be divided over, as its triangular
+        # solve reaches across all of it. The second is a sum over the parts of the
+        # auxiliary basis, so the ranks take some parts each. What couples them is
+        # the fitting, whose right hand side has to be complete before it is
+        # solved, which is the one thing the ranks exchange.
+
+        norbitals = coeffs.number_of_columns()
+
+        ofirst = (norbitals * self.rank) // self.nodes
+        olast = (norbitals * (self.rank + 1)) // self.nodes
+
+        fock, gamma = self._ri_drv.compute_exchange(coeffs,
+                                                    exchange_scaling_factor,
+                                                    ofirst, olast)
+
+        local = np.array(gamma, dtype=np.float64)
+        total = np.zeros_like(local)
+        self.comm.Allreduce(local, total, op=MPI.SUM)
+
+        # NOTE: every rank holds the factor of the metric, so each of them solves
+        # the fitting rather than one solving and sending. It is the square of the
+        # auxiliary basis against one right hand side, which is nothing beside
+        # either sweep.
+
+        gamma = self._ri_drv.solve_fitting(total)
+
+        parts = list(range(self._ri_drv.number_of_parts()))
+
+        self._ri_drv.compute_coulomb(gamma, parts[self.rank::self.nodes], fock)
+
+        return fock
 
     def _get_ri_memory_budget(self):
         """

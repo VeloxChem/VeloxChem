@@ -15,10 +15,11 @@ from veloxchem.scfrestdriver import ScfRestrictedDriver
 # matrices and the exchange, through a calculation rather than through constructed
 # input.
 
-# NOTE: run under mpirun the same comparison covers the division of the auxiliary
-# basis over the ranks, as each of them then forms a share of every Fock matrix and
-# the shares are reduced. The direct way is not divided that way and its tests are
-# skipped there.
+# NOTE: run under mpirun the same comparisons cover the division of the work over
+# the ranks, as each of them then forms a share of every Fock matrix and the shares
+# are reduced. The two ways are divided over different things -- the way which holds
+# the B vectors over the atoms of the auxiliary basis, the direct way over the
+# orbitals and over the parts it sweeps -- so both are worth running there.
 
 
 class TestScfRiJkSimd:
@@ -97,8 +98,6 @@ class TestScfRiJkSimd:
         assert not driver.ri_jk_simd
         assert driver.ri_memory_budget is None
 
-    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
-                        reason="the direct way is not divided over the ranks")
     def test_the_mode_can_be_chosen(self, molecule, basis):
         """The way the Fock matrices are formed is an input setting, and both ways
         must reach the same energy."""
@@ -116,8 +115,6 @@ class TestScfRiJkSimd:
 
         assert abs(energies['in_memory'] - energies['direct']) < 1.0e-10
 
-    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
-                        reason="the direct way is not divided over the ranks")
     def test_a_budget_which_does_not_hold_the_b_vectors_goes_direct(self, molecule,
                                                                     basis):
         """A budget below what the B vectors need selects the way which does not

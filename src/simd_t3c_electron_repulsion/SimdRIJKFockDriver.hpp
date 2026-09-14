@@ -45,6 +45,33 @@
 #include "SparseTensor.hpp"
 #include "TripleSparsityPattern.hpp"
 
+/// @brief The times of the phases of one Fock build of the direct mode.
+/// @note The direct mode repeats every phase on every iteration, so a phase which
+/// does not widen with the threads bounds the whole calculation however many cores
+/// are given to it. Run a calculation at one thread and again at many, with
+/// VLX_RIJK_PROFILE set, and the phase whose time does not fall between the two is
+/// the one worth working on. The whole is timed as well as the parts, so that what
+/// the parts do not account for is visible rather than assumed.
+/// @note A build is made of the exchange pass, the fitting and the Coulomb pass,
+/// which are three calls so that a communicator can gather the fitting between the
+/// first and the last. The times of the three are gathered here and reported once,
+/// at the end of the last of them, so that a build still reads as one build. The
+/// total is the time of the calls and not of the gap between them, which belongs to
+/// whoever is dividing the work.
+struct CDirectTimes
+{
+    double allocate    = 0.0;
+    double integrals_a = 0.0;
+    double transform   = 0.0;
+    double closure     = 0.0;
+    double copies      = 0.0;
+    double solve       = 0.0;
+    double exchange    = 0.0;
+    double integrals_b = 0.0;
+    double coulomb     = 0.0;
+    double total       = 0.0;
+};
+
 /// @brief Class CSimdRIJKFockDriver builds the Fock matrices of the resolution of
 /// the identity for one molecule and one pair of bases, one matrix per call.
 ///
@@ -187,6 +214,59 @@ class CSimdRIJKFockDriver
                  const CPackedMatrix &coefficients,
                  const double         exchange_scaling_factor) -> CPackedMatrix;
 
+    /// @brief Computes the exchange of a range of the orbitals, and the right hand
+    /// side of the fitting it closes on the way.
+    /// @param coefficients The molecular orbital coefficients of all the occupied
+    /// orbitals, as a general matrix of one row per basis function and one column
+    /// per orbital.
+    /// @param exchange_scaling_factor The factor the exchange is scaled by.
+    /// @param ofirst The first orbital of the range.
+    /// @param olast One past the last orbital of the range.
+    /// @return The scaled exchange, negated as it enters the Fock matrix, and the
+    /// right hand side of the fitting of this range of the orbitals.
+    /// @note Every term of both is a sum over the orbitals, so the ranks of a
+    /// communicator take a range each and their exchange matrices and right hand
+    /// sides add. This is the index the direct way divides over: the auxiliary
+    /// basis is not one, as the triangular solve of this pass reaches across all
+    /// of it.
+    /// @note Only the direct way builds this way, as the way which holds the B
+    /// vectors has no pass to divide.
+    auto compute_exchange(const CPackedMatrix &coefficients,
+                          const double         exchange_scaling_factor,
+                          const size_t         ofirst,
+                          const size_t         olast) -> std::pair<CPackedMatrix, std::vector<double>>;
+
+    /// @brief Solves the metric against the right hand side of the fitting.
+    /// @param gamma The right hand side, of one value per auxiliary basis function,
+    /// summed over every orbital there is.
+    /// @return The coefficients of the fitting.
+    /// @note This is what couples the two passes, and is why they are two calls: the
+    /// solve reaches across the whole auxiliary basis and needs a right hand side
+    /// which is complete, so the ranks of a communicator have to add theirs
+    /// together before it. It costs the square of the auxiliary basis and every rank
+    /// holds the factor, so each of them solves it rather than one solving and
+    /// sending.
+    auto solve_fitting(std::vector<double> gamma) -> std::vector<double>;
+
+    /// @brief Adds the Coulomb matrix of the given parts of the auxiliary basis to
+    /// a matrix.
+    /// @param gamma The coefficients of the fitting, of one value per auxiliary
+    /// basis function.
+    /// @param parts The parts to sweep, as their indices, which number_of_parts
+    /// bounds. The ranks of a communicator take some each and their matrices add.
+    /// @param matrix The matrix to add to, which is the Fock matrix being built.
+    /// @note The Coulomb matrix enters twice, as the density is that of one spin,
+    /// and this adds it that way.
+    auto compute_coulomb(const std::vector<double> &gamma,
+                         const std::vector<int>    &parts,
+                         CPackedMatrix             &matrix) -> void;
+
+    /// @brief Gets the number of parts the direct mode sweeps the auxiliary basis
+    /// in.
+    /// @return The number of parts, which is zero in the mode which holds the B
+    /// vectors.
+    auto number_of_parts() const -> size_t;
+
     /// @brief Checks that the driver has been prepared.
     /// @return True if the driver is ready to form a Fock matrix.
     auto is_prepared() const -> bool;
@@ -206,12 +286,12 @@ class CSimdRIJKFockDriver
    private:
     /// @brief Computes the Fock matrix by forming the integrals again on every
     /// call, holding no B vectors.
-    /// @param density The density matrix.
     /// @param coefficients The molecular orbital coefficients.
     /// @param exchange_scaling_factor The factor the exchange is scaled by.
     /// @return The Fock matrix, twice the Coulomb less the scaled exchange.
-    auto _compute_direct(const CPackedMatrix &density,
-                         const CPackedMatrix &coefficients,
+    /// @note The density is not needed and is not taken: the Coulomb matrix of this
+    /// way comes from the orbitals, through the fitting they close.
+    auto _compute_direct(const CPackedMatrix &coefficients,
                          const double         exchange_scaling_factor) -> CPackedMatrix;
 
     /// @brief Solves the Cholesky factor of the metric against a set of right hand
@@ -312,6 +392,10 @@ class CSimdRIJKFockDriver
 
     /// @brief The driver of the B vectors and of the matrices formed from them.
     CSimdRIFockDriver _drv;
+
+    /// @brief The times of the phases of the build being made, gathered over the
+    /// calls it is made of and reported at the end of the last of them.
+    CDirectTimes _direct_times;
 
     /// @brief Whether the B vectors have been formed.
     bool _prepared = false;

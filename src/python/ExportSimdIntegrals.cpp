@@ -244,6 +244,27 @@ export_simdintegrals(py::module &m) -> void
              py::arg("density"),
              py::arg("coefficients"),
              py::arg("exchange_scaling_factor"))
+        .def("compute_exchange",
+             &CSimdRIJKFockDriver::compute_exchange,
+             "Computes the exchange of a range of the orbitals, and the right hand side of the fitting it "
+             "closes on the way. The ranks of a communicator take a range each and add what they answer.",
+             py::arg("coefficients"),
+             py::arg("exchange_scaling_factor"),
+             py::arg("ofirst"),
+             py::arg("olast"))
+        .def("solve_fitting",
+             &CSimdRIJKFockDriver::solve_fitting,
+             "Solves the metric against the right hand side of the fitting, which has to be complete.",
+             py::arg("gamma"))
+        .def("compute_coulomb",
+             &CSimdRIJKFockDriver::compute_coulomb,
+             "Adds the Coulomb matrix of the given parts of the auxiliary basis to a matrix. The ranks of a "
+             "communicator take some parts each.",
+             py::arg("gamma"),
+             py::arg("parts"),
+             py::arg("matrix"))
+        .def("number_of_parts", &CSimdRIJKFockDriver::number_of_parts,
+             "Gets the number of parts the direct way sweeps the auxiliary basis in.")
         .def("is_prepared", &CSimdRIJKFockDriver::is_prepared, "Checks that the driver has been prepared.")
         .def("get_mode", &CSimdRIJKFockDriver::get_mode, "Gets the way the driver forms the Fock matrices.")
         .def("get_bq_vectors", &CSimdRIJKFockDriver::get_bq_vectors,

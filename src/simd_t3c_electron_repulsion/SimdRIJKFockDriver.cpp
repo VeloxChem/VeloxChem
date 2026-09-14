@@ -38,6 +38,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <memory>
+#include <numeric>
 #include <stdexcept>
 #include <string>
 
@@ -79,53 +80,35 @@ prof_since(const prof_clock::time_point &mark) -> double
     return std::chrono::duration<double>(prof_clock::now() - mark).count();
 }
 
-/// @brief The times of the phases of one Fock build of the direct mode.
-/// @note The direct mode repeats every phase on every iteration, so a phase which
-/// does not widen with the threads bounds the whole calculation however many cores
-/// are given to it. Run a calculation at one thread and again at many, with
-/// VLX_RIJK_PROFILE set, and the phase whose time does not fall between the two is
-/// the one worth working on. The whole is timed as well as the parts, so that what
-/// the parts do not account for is visible rather than assumed.
-struct CDirectProfile
+/// @brief Writes the phases of a build of the direct mode, and their share of it.
+/// @param times The times gathered over the calls the build was made of.
+static auto
+report_direct(const CDirectTimes &times) -> void
 {
-    double allocate = 0.0;
-    double integrals_a = 0.0;
-    double transform = 0.0;
-    double closure = 0.0;
-    double copies = 0.0;
-    double solve = 0.0;
-    double exchange = 0.0;
-    double integrals_b = 0.0;
-    double coulomb = 0.0;
-    double total = 0.0;
+    static size_t builds = 0;
 
-    /// @brief Writes the phases of this build, and their share of it.
-    auto report() const -> void
+    builds++;
+
+    const auto accounted = times.allocate + times.integrals_a + times.transform + times.closure +
+                           times.copies + times.solve + times.exchange + times.integrals_b + times.coulomb;
+
+    const char *names[] = {"allocate", "integrals a", "transform",   "closure", "copies",
+                           "solve",    "exchange",    "integrals b", "coulomb", "rest"};
+
+    const double values[] = {times.allocate, times.integrals_a, times.transform,   times.closure,
+                             times.copies,   times.solve,       times.exchange,    times.integrals_b,
+                             times.coulomb,  times.total - accounted};
+
+    std::printf("RIJK build %zu on %d threads, %.3f s\n", builds, omp::get_number_of_threads(), times.total);
+
+    for (size_t i = 0; i < 10; i++)
     {
-        static size_t builds = 0;
-
-        builds++;
-
-        const auto accounted = allocate + integrals_a + transform + closure + copies +
-                               solve + exchange + integrals_b + coulomb;
-
-        const char *names[] = {"allocate", "integrals a", "transform", "closure", "copies",
-                               "solve",    "exchange",    "integrals b", "coulomb", "rest"};
-
-        const double times[] = {allocate, integrals_a, transform, closure,  copies,
-                                solve,    exchange,    integrals_b, coulomb, total - accounted};
-
-        std::printf("RIJK build %zu on %d threads, %.3f s\n", builds, omp::get_number_of_threads(), total);
-
-        for (size_t i = 0; i < 10; i++)
-        {
-            std::printf("RIJK   %-12s %9.3f s %6.1f %%\n", names[i], times[i],
-                        (total > 0.0) ? 100.0 * times[i] / total : 0.0);
-        }
-
-        std::fflush(stdout);
+        std::printf("RIJK   %-12s %9.3f s %6.1f %%\n", names[i], values[i],
+                    (times.total > 0.0) ? 100.0 * values[i] / times.total : 0.0);
     }
-};
+
+    std::fflush(stdout);
+}
 
 /// @brief The times of the phases of one Fock build of the mode which holds the B
 /// vectors.
@@ -461,7 +444,7 @@ CSimdRIJKFockDriver::compute(const CPackedMatrix &density,
 {
     errors::assertMsgCritical(_prepared, std::string("RIJKFockDriver: The driver has not been prepared"));
 
-    if (_mode == rimode::direct) return _compute_direct(density, coefficients, exchange_scaling_factor);
+    if (_mode == rimode::direct) return _compute_direct(coefficients, exchange_scaling_factor);
 
     CInMemoryProfile profile;
 
@@ -613,10 +596,17 @@ CSimdRIJKFockDriver::get_metric() const -> const CPackedMatrix &
 }
 
 auto
-CSimdRIJKFockDriver::_compute_direct(const CPackedMatrix &density,
-                                     const CPackedMatrix &coefficients,
-                                     const double         exchange_scaling_factor) -> CPackedMatrix
+CSimdRIJKFockDriver::compute_exchange(const CPackedMatrix &coefficients,
+                                      const double         exchange_scaling_factor,
+                                      const size_t         ofirst,
+                                      const size_t         olast) -> std::pair<CPackedMatrix, std::vector<double>>
 {
+    errors::assertMsgCritical(_prepared, std::string("RIJKFockDriver: The driver has not been prepared"));
+
+    errors::assertMsgCritical(_mode == rimode::direct,
+                              std::string("RIJKFockDriver: The exchange pass belongs to the direct way, and the way "
+                                          "which holds the B vectors forms its Fock matrices in one call"));
+
     const auto nao = _basis.dimensions_of_basis();
 
     const auto naux = _aux_basis.dimensions_of_basis();
@@ -626,16 +616,13 @@ CSimdRIJKFockDriver::_compute_direct(const CPackedMatrix &density,
     errors::assertMsgCritical((coefficients.get_type() == mat_t::general) && (coefficients.number_of_rows() == nao),
                               std::string("RIJKFockDriver: The orbital coefficients do not match the molecular basis"));
 
-    // NOTE: the half transformed integrals are the auxiliary basis by the basis
-    // functions by the orbitals of a batch, and are held twice: once as the
-    // matrices the transformation writes and once as the square the triangular
-    // solve reads. The batch of orbitals is chosen so that the two fit.
+    errors::assertMsgCritical((ofirst <= olast) && (olast <= norbitals),
+                              std::string("RIJKFockDriver: The range of orbitals is not a range of the coefficients"));
 
-    const auto per_orbital = 2 * naux * nao * sizeof(double);
+    // NOTE: the times of the whole build are gathered from here, as this is the
+    // first of the calls a build is made of.
 
-    const auto nbatch = std::max(size_t{1}, std::min(norbitals, (_budget / 2) / std::max(per_orbital, size_t{1})));
-
-    CDirectProfile profile;
+    _direct_times = CDirectTimes();
 
     const auto profile_start = prof_clock::now();
 
@@ -643,21 +630,37 @@ CSimdRIJKFockDriver::_compute_direct(const CPackedMatrix &density,
 
     fock.zero();
 
-    if (norbitals == 0) return fock;
+    std::vector<double> gamma(naux, 0.0);
+
+    if (ofirst == olast)
+    {
+        _direct_times.total += prof_since(profile_start);
+
+        return {std::move(fock), std::move(gamma)};
+    }
+
+    // NOTE: the half transformed integrals are the auxiliary basis by the basis
+    // functions by the orbitals of a batch, and are held twice: once as the
+    // matrices the transformation writes and once as the square the triangular
+    // solve reads. The batch of orbitals is chosen so that the two fit.
+
+    const auto per_orbital = 2 * naux * nao * sizeof(double);
+
+    const auto ntaken = olast - ofirst;
+
+    const auto nbatch = std::max(size_t{1}, std::min(ntaken, (_budget / 2) / std::max(per_orbital, size_t{1})));
 
     const auto *cvalues = coefficients.data();
 
-    std::vector<double> gamma(naux, 0.0);
-
     CSimdThreeCenterElectronRepulsionDriver eri_drv;
 
-    // the first pass: one sweep of the integrals for every batch of orbitals
+    // one sweep of the integrals for every batch of the orbitals asked for
 
-    for (size_t ofirst = 0; ofirst < norbitals; ofirst += nbatch)
+    for (size_t first = ofirst; first < olast; first += nbatch)
     {
-        const auto olast = std::min(ofirst + nbatch, norbitals);
+        const auto last = std::min(first + nbatch, olast);
 
-        const auto ncols = olast - ofirst;
+        const auto ncols = last - first;
 
         auto batch = CPackedMatrix(nao, ncols, mat_t::general);
 
@@ -665,7 +668,7 @@ CSimdRIJKFockDriver::_compute_direct(const CPackedMatrix &density,
 
         for (size_t irow = 0; irow < nao; irow++)
         {
-            std::copy(cvalues + irow * norbitals + ofirst, cvalues + irow * norbitals + olast,
+            std::copy(cvalues + irow * norbitals + first, cvalues + irow * norbitals + last,
                       bvalues + irow * ncols);
         }
 
@@ -688,7 +691,7 @@ CSimdRIJKFockDriver::_compute_direct(const CPackedMatrix &density,
             half[static_cast<size_t>(iq)] = CPackedMatrix(nao, ncols, mat_t::general);
         }
 
-        profile.allocate += prof_since(mark_allocate);
+        _direct_times.allocate += prof_since(mark_allocate);
 
         // NOTE: the half transformed integrals of one batch of orbitals are the
         // sum over every block of atom pairs, so the blocks are swept and added
@@ -706,13 +709,13 @@ CSimdRIJKFockDriver::_compute_direct(const CPackedMatrix &density,
 
             eri_drv.compute(pattern, _molecule, _basis, _aux_basis, distributor);
 
-            profile.integrals_a += prof_since(mark_integrals);
+            _direct_times.integrals_a += prof_since(mark_integrals);
 
             const auto mark_transform = prof_clock::now();
 
             _drv.compute_w_vectors(integrals, _basis, _aux_basis, batch, 0, naux, half, true);
 
-            profile.transform += prof_since(mark_transform);
+            _direct_times.transform += prof_since(mark_transform);
         }
 
         // the Coulomb vector, which is the half transformed integrals closed with
@@ -751,7 +754,7 @@ CSimdRIJKFockDriver::_compute_direct(const CPackedMatrix &density,
             gamma[q] += sum;
         }
 
-        profile.closure += prof_since(mark_closure);
+        _direct_times.closure += prof_since(mark_closure);
 
         // the exchange: solve the factor against the half transformed integrals,
         // which gives the B vectors of this batch of orbitals, and add their
@@ -777,13 +780,13 @@ CSimdRIJKFockDriver::_compute_direct(const CPackedMatrix &density,
             std::copy(half[q].data(), half[q].data() + width, stacked.get() + q * width);
         }
 
-        profile.copies += prof_since(mark_copies);
+        _direct_times.copies += prof_since(mark_copies);
 
         const auto mark_solve = prof_clock::now();
 
         _solve_factor(stacked.get(), naux, width, false);
 
-        profile.solve += prof_since(mark_solve);
+        _direct_times.solve += prof_since(mark_solve);
 
         mark_copies = prof_clock::now();
 
@@ -795,29 +798,81 @@ CSimdRIJKFockDriver::_compute_direct(const CPackedMatrix &density,
             std::copy(stacked.get() + q * width, stacked.get() + (q + 1) * width, half[q].data());
         }
 
-        profile.copies += prof_since(mark_copies);
+        _direct_times.copies += prof_since(mark_copies);
 
         const auto mark_exchange = prof_clock::now();
 
         _drv.compute_exchange_matrix(half, fock, -exchange_scaling_factor);
 
-        profile.exchange += prof_since(mark_exchange);
+        _direct_times.exchange += prof_since(mark_exchange);
     }
 
-    // the coefficients of the fitting, from the factor and its transpose
+    _direct_times.total += prof_since(profile_start);
 
-    const auto mark_gamma = prof_clock::now();
+    return {std::move(fock), std::move(gamma)};
+}
+
+auto
+CSimdRIJKFockDriver::solve_fitting(std::vector<double> gamma) -> std::vector<double>
+{
+    errors::assertMsgCritical(_prepared, std::string("RIJKFockDriver: The driver has not been prepared"));
+
+    errors::assertMsgCritical(_mode == rimode::direct,
+                              std::string("RIJKFockDriver: The fitting belongs to the direct way"));
+
+    const auto naux = _aux_basis.dimensions_of_basis();
+
+    errors::assertMsgCritical(gamma.size() == naux,
+                              std::string("RIJKFockDriver: The right hand side of the fitting is not one value per "
+                                          "auxiliary basis function"));
+
+    const auto profile_start = prof_clock::now();
+
+    // the coefficients of the fitting, from the factor and its transpose
 
     _solve_factor(gamma.data(), naux, 1, false);
 
     _solve_factor(gamma.data(), naux, 1, true);
 
-    profile.solve += prof_since(mark_gamma);
+    _direct_times.solve += prof_since(profile_start);
 
-    // the second pass: the Coulomb matrix from the integrals and those coefficients
+    _direct_times.total += prof_since(profile_start);
 
-    for (const auto &pattern : _parts)
+    return gamma;
+}
+
+auto
+CSimdRIJKFockDriver::compute_coulomb(const std::vector<double> &gamma,
+                                     const std::vector<int>    &parts,
+                                     CPackedMatrix             &matrix) -> void
+{
+    errors::assertMsgCritical(_prepared, std::string("RIJKFockDriver: The driver has not been prepared"));
+
+    errors::assertMsgCritical(_mode == rimode::direct,
+                              std::string("RIJKFockDriver: The Coulomb pass belongs to the direct way"));
+
+    const auto nao = _basis.dimensions_of_basis();
+
+    errors::assertMsgCritical(gamma.size() == _aux_basis.dimensions_of_basis(),
+                              std::string("RIJKFockDriver: The coefficients of the fitting are not one value per "
+                                          "auxiliary basis function"));
+
+    errors::assertMsgCritical((matrix.number_of_rows() == nao) && (matrix.number_of_columns() == nao),
+                              std::string("RIJKFockDriver: The matrix to add the Coulomb matrix to does not match the "
+                                          "molecular basis"));
+
+    const auto profile_start = prof_clock::now();
+
+    CSimdThreeCenterElectronRepulsionDriver eri_drv;
+
+    for (const auto index : parts)
     {
+        errors::assertMsgCritical((index >= 0) && (static_cast<size_t>(index) < _parts.size()),
+                                  std::string("RIJKFockDriver: The Coulomb matrix was asked for a part of the "
+                                              "auxiliary basis which the driver does not sweep"));
+
+        const auto &pattern = _parts[static_cast<size_t>(index)];
+
         auto integrals = CSparseTensor(pattern);
 
         integrals.allocate();
@@ -828,7 +883,7 @@ CSimdRIJKFockDriver::_compute_direct(const CPackedMatrix &density,
 
         eri_drv.compute(pattern, _molecule, _basis, _aux_basis, distributor);
 
-        profile.integrals_b += prof_since(mark_integrals);
+        _direct_times.integrals_b += prof_since(mark_integrals);
 
         const auto mark_coulomb = prof_clock::now();
 
@@ -838,11 +893,11 @@ CSimdRIJKFockDriver::_compute_direct(const CPackedMatrix &density,
 
         auto part_fock = _drv.compute_fock_matrix(integrals, _basis, _aux_basis, gamma);
 
-        auto       *values = fock.data();
+        auto       *values = matrix.data();
 
         const auto *added = part_fock.data();
 
-        const auto nvalues = static_cast<int>(fock.number_of_elements());
+        const auto nvalues = static_cast<int>(matrix.number_of_elements());
 
 #pragma omp parallel for schedule(static) if (nvalues > 1)
         for (int i = 0; i < nvalues; i++)
@@ -850,12 +905,43 @@ CSimdRIJKFockDriver::_compute_direct(const CPackedMatrix &density,
             values[static_cast<size_t>(i)] += 2.0 * added[static_cast<size_t>(i)];
         }
 
-        profile.coulomb += prof_since(mark_coulomb);
+        _direct_times.coulomb += prof_since(mark_coulomb);
     }
 
-    profile.total = prof_since(profile_start);
+    // NOTE: the times of the whole build are reported from here, as this is the
+    // last of the calls a build is made of.
 
-    if (prof_wanted()) profile.report();
+    _direct_times.total += prof_since(profile_start);
+
+    if (prof_wanted()) report_direct(_direct_times);
+}
+
+auto
+CSimdRIJKFockDriver::number_of_parts() const -> size_t
+{
+    return _parts.size();
+}
+
+auto
+CSimdRIJKFockDriver::_compute_direct(const CPackedMatrix &coefficients,
+                                     const double         exchange_scaling_factor) -> CPackedMatrix
+{
+    // NOTE: the three calls of a build, in a row, over the whole of the orbitals
+    // and the whole of the auxiliary basis. A caller dividing the work over a
+    // communicator makes the same three calls with a range and a share of the
+    // parts each, and adds the matrices; this is here so that one rank is one
+    // call, and so that the two ways read the same from the outside.
+
+    auto [fock, gamma] = compute_exchange(coefficients, exchange_scaling_factor, 0,
+                                          coefficients.number_of_columns());
+
+    gamma = solve_fitting(std::move(gamma));
+
+    std::vector<int> parts(_parts.size());
+
+    std::iota(parts.begin(), parts.end(), 0);
+
+    compute_coulomb(gamma, parts, fock);
 
     return fock;
 }

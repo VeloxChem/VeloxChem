@@ -402,3 +402,129 @@ class TestSimdRIJKFockDriver:
 
         assert all(share > 0 for share in shares)
         assert sum(shares) == whole
+
+    def test_the_direct_way_in_three_calls_is_the_direct_way_in_one(self, molecule):
+        """The direct build is two sweeps of the integrals with the fitting between
+        them, and a communicator has to gather the fitting, so the build is three
+        calls. Made in a row over the whole of the orbitals and the whole of the
+        auxiliary basis they have to be the one call they replace."""
+
+        basis, aux_basis = self.bases((8, 1, 7, 6), (1, 1, 0, 0), 2)
+
+        nao = basis.get_dimensions_of_basis()
+
+        coeffs, density = self.orbitals(nao, 4, 83)
+
+        driver = SimdRIJKFockDriver()
+        driver.prepare(molecule, basis, aux_basis, 0.0, 1 << 30, 1.0e-12, False,
+                       rimode.direct)
+
+        expected = driver.compute(density, coeffs, 1.0).to_numpy(max_memory=8.0)
+
+        fock, gamma = driver.compute_exchange(coeffs, 1.0, 0, 4)
+
+        gamma = driver.solve_fitting(gamma)
+
+        driver.compute_coulomb(gamma, list(range(driver.number_of_parts())), fock)
+
+        computed = fock.to_numpy(max_memory=8.0)
+
+        scale = float(np.max(np.abs(expected)))
+
+        assert scale > 0.0
+        assert np.max(np.abs(computed - expected)) / scale < 1.0e-13
+
+    def test_a_share_of_the_orbitals_and_the_parts_is_a_share_of_the_direct_build(
+            self, chain):
+        """This is what divides the direct way over a communicator. The exchange and
+        the right hand side of the fitting are sums over the orbitals, so the ranks
+        take a range of them each; the Coulomb matrix is a sum over the parts of the
+        auxiliary basis, so they take some parts each. A budget small enough to cut
+        the auxiliary basis into several parts is what makes the second division
+        worth anything."""
+
+        basis, aux_basis = self.bases(tuple([1] * 10), tuple([0] * 10), 3)
+
+        nao = basis.get_dimensions_of_basis()
+
+        norbitals = 5
+
+        coeffs, density = self.orbitals(nao, norbitals, 97)
+
+        budget = 1 << 14
+
+        whole = SimdRIJKFockDriver()
+        whole.prepare(chain, basis, aux_basis, 0.0, budget, 1.0e-12, False,
+                      rimode.direct)
+
+        nparts = whole.number_of_parts()
+
+        assert nparts > 1, f"the auxiliary basis is swept in {nparts} part"
+
+        expected = whole.compute(density, coeffs, 1.0).to_numpy(max_memory=8.0)
+
+        for nranks in (2, 3, 7):
+
+            shares = []
+
+            # the exchange pass first, as the fitting cannot be solved until every
+            # rank has added its right hand side to the others
+
+            rights = []
+
+            for rank in range(nranks):
+
+                part = SimdRIJKFockDriver()
+                part.prepare(chain, basis, aux_basis, 0.0, budget, 1.0e-12, False,
+                             rimode.direct)
+
+                ofirst = (norbitals * rank) // nranks
+                olast = (norbitals * (rank + 1)) // nranks
+
+                fock, gamma = part.compute_exchange(coeffs, 1.0, ofirst, olast)
+
+                shares.append((part, fock))
+                rights.append(np.asarray(gamma))
+
+            gathered = np.sum(rights, axis=0)
+
+            summed = None
+
+            for rank, (part, fock) in enumerate(shares):
+
+                gamma = part.solve_fitting(gathered)
+
+                part.compute_coulomb(gamma, list(range(nparts))[rank::nranks], fock)
+
+                matrix = fock.to_numpy(max_memory=8.0)
+
+                summed = matrix if summed is None else summed + matrix
+
+            scale = float(np.max(np.abs(expected)))
+
+            assert scale > 0.0
+            assert np.max(np.abs(summed - expected)) / scale < 1.0e-12, (
+                f"the shares of {nranks} ranks over {nparts} parts do not add up")
+
+    def test_a_rank_with_nothing_to_do_answers_nothing(self, molecule):
+        """More ranks than orbitals leaves some of them an empty range, and more
+        ranks than parts leaves some of them no parts. Neither may be read as all of
+        them, which is what an empty list would mean if it were a default."""
+
+        basis, aux_basis = self.bases((8, 1, 7, 6), (1, 1, 0, 0), 2)
+
+        nao = basis.get_dimensions_of_basis()
+
+        coeffs, _ = self.orbitals(nao, 3, 103)
+
+        driver = SimdRIJKFockDriver()
+        driver.prepare(molecule, basis, aux_basis, 0.0, 1 << 30, 1.0e-12, False,
+                       rimode.direct)
+
+        fock, gamma = driver.compute_exchange(coeffs, 1.0, 2, 2)
+
+        assert np.max(np.abs(np.asarray(gamma))) == 0.0
+
+        driver.compute_coulomb(driver.solve_fitting(gamma), [], fock)
+
+        assert np.max(np.abs(fock.to_numpy(max_memory=8.0))) == 0.0
