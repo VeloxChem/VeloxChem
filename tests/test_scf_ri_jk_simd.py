@@ -1,5 +1,7 @@
 import pytest
+from mpi4py import MPI
 
+from veloxchem.veloxchemlib import mpi_master
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.outputstream import OutputStream
@@ -12,6 +14,11 @@ from veloxchem.scfrestdriver import ScfRestrictedDriver
 # the inverted metric, the B vectors, the Y vector, the Coulomb matrix, the W
 # matrices and the exchange, through a calculation rather than through constructed
 # input.
+
+# NOTE: run under mpirun the same comparison covers the division of the auxiliary
+# basis over the ranks, as each of them then forms a share of every Fock matrix and
+# the shares are reduced. The direct way is not divided that way and its tests are
+# skipped there.
 
 
 class TestScfRiJkSimd:
@@ -38,7 +45,15 @@ class TestScfRiJkSimd:
         for key, value in settings.items():
             setattr(driver, key, value)
 
-        return driver.compute(molecule, basis)['scf_energy']
+        results = driver.compute(molecule, basis)
+
+        # NOTE: the results are returned on the master alone, and every rank has to
+        # reach the comparison, so the energy is handed to all of them.
+
+        energy = (results['scf_energy']
+                  if driver.rank == mpi_master() else None)
+
+        return driver.comm.bcast(energy, root=mpi_master())
 
     @pytest.mark.parametrize('xcfun', [None, 'PBE0', 'B3LYP'])
     def test_simd_matches_the_conventional_driver(self, molecule, basis, xcfun):
@@ -82,6 +97,8 @@ class TestScfRiJkSimd:
         assert not driver.ri_jk_simd
         assert driver.ri_memory_budget is None
 
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason="the direct way is not divided over the ranks")
     def test_the_mode_can_be_chosen(self, molecule, basis):
         """The way the Fock matrices are formed is an input setting, and both ways
         must reach the same energy."""
@@ -99,6 +116,8 @@ class TestScfRiJkSimd:
 
         assert abs(energies['in_memory'] - energies['direct']) < 1.0e-10
 
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason="the direct way is not divided over the ranks")
     def test_a_budget_which_does_not_hold_the_b_vectors_goes_direct(self, molecule,
                                                                     basis):
         """A budget below what the B vectors need selects the way which does not
@@ -119,6 +138,8 @@ class TestScfRiJkSimd:
 
         assert abs(roomy - cramped) < 1.0e-10
 
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason="pytest.raises only valid in serial")
     def test_an_unknown_mode_is_refused(self, molecule, basis):
         """A name which is not one of the two ways has to be caught, not quietly
         treated as one of them."""

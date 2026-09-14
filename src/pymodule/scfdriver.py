@@ -58,7 +58,7 @@ from .rifockdriver import RIFockDriver
 from .rijkfockdriver import RIJKFockDriver
 from .veloxchemlib import SimdRIJKFockDriver
 from .veloxchemlib import rimode
-from .veloxchemlib import PackedMatrix
+from .packedmatrix import PackedMatrix
 from .fockdriver import FockDriver
 from .profiler import Profiler
 from .griddriver import GridDriver
@@ -233,6 +233,7 @@ class ScfDriver:
         self.ri_metric_threshold = 1.0e-12
         self.ri_jk_simd = False
         self.ri_memory_budget = None
+        self._ri_aux_atoms = []
         self.ri_mode = 'automatic'
         self._ri_drv = None
 
@@ -1787,35 +1788,12 @@ class ScfDriver:
                                          k_metric=False,
                                          verbose=True)
         elif self.ri_jk and self.ri_jk_simd:
-            # NOTE: the SIMD driver holds the whole of the B vectors on the rank
-            # which forms them, and the Fock matrices below are reduced over the
-            # ranks. Running it on more than one would multiply the result by the
-            # number of them, so it is refused rather than silently wrong.
-            assert_msg_critical(
-                self.nodes == 1, 'SCF driver: SIMD RI-JK is not yet ' +
-                'implemented for more than one MPI rank')
-
             if isinstance(self.ri_auxiliary_basis, str):
                 basis_ri = MolecularBasis.read(molecule, self.ri_auxiliary_basis)
             else:
                 basis_ri = MolecularBasis(self.ri_auxiliary_basis)
 
-            budget = self._get_ri_memory_budget()
-
             self._ri_drv = SimdRIJKFockDriver()
-
-            needed = self._ri_drv.required_memory(molecule, ao_basis, basis_ri,
-                                                  self.eri_thresh)
-
-            self.ostream.print_info(
-                'Using the SIMD resolution of the identity (RI-JK) driver.')
-            self.ostream.print_info(
-                f'B vectors need {needed / (1024**3):.2f} GB of ' +
-                f'{budget / (1024**3):.2f} GB available.')
-            self.ostream.print_blank()
-            self.ostream.flush()
-
-            ri_prep_t0 = tm.time()
 
             modes = {
                 'automatic': rimode.automatic,
@@ -1827,9 +1805,80 @@ class ScfDriver:
                 self.ri_mode in modes,
                 'SCF driver: ri_mode must be automatic, in_memory or direct')
 
+            # NOTE: every term of the Coulomb and of the exchange is a sum over the
+            # auxiliary basis, so a rank given a share of its atoms forms a share of
+            # the Fock matrix and the reduction at the end of the build adds the
+            # shares. One rank is given the whole of it in the order of the
+            # molecule, which is what it was given before this was divided.
+            self._ri_aux_atoms = ([] if self.nodes == 1 else
+                                  molecule.partition_atoms(self.comm))
+
+            budget = self._get_ri_memory_budget()
+
+            needed = self._ri_drv.required_memory(molecule, ao_basis, basis_ri,
+                                                  self.eri_thresh,
+                                                  self._ri_aux_atoms)
+
+            # NOTE: the way of building has to be the same on every rank, as the
+            # metric it is formed with differs between the two. The shares are not
+            # equal, so the decision is taken from the largest of them against the
+            # smallest budget rather than from each rank's own.
+            largest = max(self.comm.allgather(needed))
+            budget = min(self.comm.allgather(budget))
+
+            mode = modes[self.ri_mode]
+
+            if mode == rimode.automatic:
+                mode = (rimode.direct
+                        if largest > budget else rimode.in_memory)
+
+            # NOTE: the direct way accumulates every part of the auxiliary basis
+            # into one array and then solves the Cholesky factor of the metric
+            # against the whole of it. A forward substitution over a share of the
+            # rows is missing the rows above it, so the direct way cannot be
+            # divided this way and is refused on more than one rank.
+            assert_msg_critical(
+                (mode == rimode.in_memory) or (self.nodes == 1),
+                'SCF driver: the direct SIMD RI-JK way is not yet implemented ' +
+                'for more than one MPI rank. Give the ranks more memory, or ' +
+                'run on more of them, so that the B vectors of a rank fit.')
+
+            self.ostream.print_info(
+                'Using the SIMD resolution of the identity (RI-JK) driver.')
+            if self.nodes == 1:
+                self.ostream.print_info(
+                    f'B vectors need {largest / (1024**3):.2f} GB of ' +
+                    f'{budget / (1024**3):.2f} GB available.')
+            else:
+                total = sum(self.comm.allgather(needed))
+                self.ostream.print_info(
+                    f'B vectors need {total / (1024**3):.2f} GB over ' +
+                    f'{self.nodes:d} ranks, at most ' +
+                    f'{largest / (1024**3):.2f} GB of ' +
+                    f'{budget / (1024**3):.2f} GB on a rank.')
+            self.ostream.print_blank()
+            self.ostream.flush()
+
+            ri_prep_t0 = tm.time()
+
+            # NOTE: the metric is inverted once on the master and handed to the
+            # ranks. The fallbacks are chosen from the matrix itself, and a fitting
+            # basis close to linear dependence could have two ranks choose
+            # differently and build with metrics which are not the same, so the
+            # choice is taken in one place. The way of building comes back with it,
+            # as a fallback can change it.
+            if self.rank == mpi_master():
+                metric, mode = self._ri_drv.make_metric(
+                    molecule, basis_ri, self.ri_metric_threshold, False, mode)
+            else:
+                metric = PackedMatrix()
+
+            mode = self.comm.bcast(mode, root=mpi_master())
+            metric = metric.broadcast(self.comm, root=mpi_master())
+
             self._ri_drv.prepare(molecule, ao_basis, basis_ri, self.eri_thresh,
-                                 budget, self.ri_metric_threshold, False,
-                                 modes[self.ri_mode])
+                                 budget, self.ri_metric_threshold, False, mode,
+                                 self._ri_aux_atoms, metric)
 
             taken = ('held in memory'
                      if self._ri_drv.get_mode() == rimode.in_memory else
@@ -2572,12 +2621,24 @@ class ScfDriver:
             # of the molecule, so this costs about that much more than an ordinary
             # build -- against a build of the four center integrals, which is what
             # it replaces and which is an order of magnitude dearer.
-            occupation, vectors = np.linalg.eigh(density)
 
-            kept = occupation > self.ri_guess_thresh * max(occupation[-1], 1.0)
+            # NOTE: they are formed on the master and handed over rather than
+            # formed again on every rank. The exchange depends on C only through
+            # C C^T, so a sign or a rotation between the ranks would not matter,
+            # but which eigenvalues the threshold keeps could differ between them
+            # and then their shares would not be shares of one matrix.
+            if self.rank == mpi_master():
+                occupation, vectors = np.linalg.eigh(density)
 
-            orbitals = np.ascontiguousarray(vectors[:, kept] *
-                                            np.sqrt(occupation[kept]))
+                kept = occupation > self.ri_guess_thresh * max(
+                    occupation[-1], 1.0)
+
+                orbitals = np.ascontiguousarray(vectors[:, kept] *
+                                                np.sqrt(occupation[kept]))
+            else:
+                orbitals = None
+
+            orbitals = self.comm.bcast(orbitals, root=mpi_master())
         else:
             nocc = int(np.sum(self.molecular_orbitals.occa_to_numpy()))
 
@@ -2625,7 +2686,15 @@ class ScfDriver:
 
         reserve = 4 * 1024**3
 
-        return int(max(available - reserve, 0.25 * available))
+        # NOTE: the ranks of one node see the same free memory and would each claim
+        # the whole of it, so the node would be promised several times over. The
+        # ranks sharing a node are counted by their host name and the memory is
+        # divided between them.
+        import platform
+        here = platform.node()
+        on_this_node = max(self.comm.allgather(here).count(here), 1)
+
+        return int(max(available - reserve, 0.25 * available) / on_this_node)
 
     def _prepare_for_ri_fock_build(self, fock_type):
         """
