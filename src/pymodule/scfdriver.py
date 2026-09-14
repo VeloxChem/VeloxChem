@@ -232,6 +232,7 @@ class ScfDriver:
         self.ri_jk = False
         self.ri_auxiliary_basis = 'def2-universal-jfit'
         self.ri_metric_threshold = 1.0e-12
+        self.ri_metric_route = 'cholesky'
         self.ri_jk_simd = False
         self.ri_memory_budget = None
         self._ri_aux_atoms = []
@@ -359,6 +360,9 @@ class ScfDriver:
                 'ri_coulomb': ('bool', 'use RI-J approximation'),
                 'ri_jk': ('bool', 'use RI-JK approximation'),
                 'ri_auxiliary_basis': ('str', 'RI auxiliary basis set'),
+                'ri_metric_route':
+                    ('str', 'how the RI-JK metric is inverted, cholesky or '
+                     'eigenvalues'),
                 'ri_metric_threshold':
                     ('float', 'linear dependence threshold for RI-JK metric'),
                 'ri_jk_simd':
@@ -1846,6 +1850,34 @@ class ScfDriver:
                 mode = (rimode.direct
                         if largest > budget else rimode.in_memory)
 
+            # NOTE: the metric may be inverted through its Cholesky factor, which
+            # is an order of magnitude cheaper, or through its eigenvalues, which
+            # is what the conventional RI-JK driver does. The two are not equally
+            # behaved on a fitting basis whose metric is poorly conditioned: the
+            # Cholesky route solves triangular systems whose error accumulates down
+            # the substitution, and convergence trouble with the resolution of the
+            # identity is known to come from it.
+            routes = {'cholesky': False, 'eigenvalues': True}
+
+            assert_msg_critical(
+                self.ri_metric_route in routes,
+                'SCF driver: ri_metric_route must be cholesky or eigenvalues')
+
+            use_inverse_square_root = routes[self.ri_metric_route]
+
+            # NOTE: the direct way does not multiply by an inverted metric, it
+            # solves the Cholesky factor against the half transformed integrals, so
+            # there is nothing for the eigenvalue route to give it. Asking for both
+            # is refused here rather than in the driver, which would answer by
+            # holding the B vectors -- and it was put on the direct way because they
+            # do not fit.
+            assert_msg_critical(
+                not (use_inverse_square_root and mode == rimode.direct),
+                'SCF driver: the direct way solves with the Cholesky factor of ' +
+                'the metric and cannot use ri_metric_route=eigenvalues. Give the ' +
+                'ranks more memory, or run on more of them, so that the B ' +
+                'vectors are held.')
+
             # NOTE: the direct way is divided over the orbitals and not over the
             # auxiliary basis, as the triangular solve of its exchange pass reaches
             # across the whole of it. Every rank therefore holds the whole of the
@@ -1879,7 +1911,8 @@ class ScfDriver:
             # as a fallback can change it.
             if self.rank == mpi_master():
                 metric, mode = self._ri_drv.make_metric(
-                    molecule, basis_ri, self.ri_metric_threshold, False, mode)
+                    molecule, basis_ri, self.ri_metric_threshold,
+                    use_inverse_square_root, mode)
             else:
                 metric = PackedMatrix()
 
@@ -1893,8 +1926,12 @@ class ScfDriver:
             # a build, measured on two nodes. At least one part per rank is asked for
             # so there is something for each of them to take.
             self._ri_drv.prepare(molecule, ao_basis, basis_ri, self.eri_thresh,
-                                 budget, self.ri_metric_threshold, False, mode,
+                                 budget, self.ri_metric_threshold,
+                                 use_inverse_square_root, mode,
                                  self._ri_aux_atoms, metric, self.nodes)
+
+            self.ostream.print_info(
+                f'Metric inverted through its {self.ri_metric_route}.')
 
             taken = ('held in memory'
                      if self._ri_drv.get_mode() == rimode.in_memory else

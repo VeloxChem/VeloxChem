@@ -156,3 +156,50 @@ class TestScfRiJkSimd:
         driver = ScfRestrictedDriver(ostream=OutputStream(None))
 
         assert driver.ri_mode == 'automatic'
+
+    def test_the_metric_route_is_a_setting(self, molecule, basis):
+        """The metric may be inverted through its Cholesky factor or through its
+        eigenvalues. The conventional RI-JK driver does the second, and convergence
+        trouble with the resolution of the identity is known to come from the first
+        on a poorly conditioned fitting basis, so the SIMD driver has to be able to
+        do it too. Both close the same sum, so a well conditioned metric gives the
+        same energy either way."""
+
+        settings = {
+            'ri_jk': True,
+            'ri_jk_simd': True,
+            'ri_auxiliary_basis': 'def2-universal-jkfit',
+            'ri_mode': 'in_memory',
+        }
+
+        through_cholesky = self.run_scf(molecule, basis,
+                                        ri_metric_route='cholesky', **settings)
+
+        through_eigenvalues = self.run_scf(molecule, basis,
+                                           ri_metric_route='eigenvalues',
+                                           **settings)
+
+        assert abs(through_eigenvalues - through_cholesky) < 1.0e-9, (
+            f"{through_eigenvalues:.12f} against {through_cholesky:.12f}")
+
+    def test_the_metric_route_defaults_to_cholesky(self):
+        """It is an order of magnitude cheaper, and it is the right default where
+        the metric is well conditioned, which is most of the time."""
+
+        driver = ScfRestrictedDriver(ostream=OutputStream(None))
+
+        assert driver.ri_metric_route == 'cholesky'
+
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason="pytest.raises only valid in serial")
+    def test_an_unknown_metric_route_is_refused(self, molecule, basis):
+
+        from veloxchem.errorhandler import VeloxChemError
+
+        with pytest.raises(VeloxChemError, match='ri_metric_route'):
+            self.run_scf(molecule,
+                         basis,
+                         ri_jk=True,
+                         ri_jk_simd=True,
+                         ri_auxiliary_basis='def2-universal-jkfit',
+                         ri_metric_route='sideways')
