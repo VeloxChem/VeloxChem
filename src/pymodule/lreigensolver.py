@@ -45,7 +45,8 @@ from .visualizationdriver import VisualizationDriver
 from .cubicgrid import CubicGrid
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            ri_sanity_check, dft_sanity_check, pe_sanity_check,
-                           solvation_model_sanity_check)
+                           solvation_model_sanity_check, gostshyp_sanity_check,
+                           environment_compatibility_sanity_check)
 from .errorhandler import assert_msg_critical
 from .mathutils import screened_eigh, symmetric_matrix_function
 from .checkpoint import check_rsp_hdf5
@@ -151,8 +152,14 @@ class LinearResponseEigenSolver(LinearResponseEigenSolverBase):
         # check pe setup
         pe_sanity_check(self, molecule=molecule)
 
-        # check solvation
+        # check solvation model setup
         solvation_model_sanity_check(self)
+
+        # check GOSTSHYP setup
+        gostshyp_sanity_check(self)
+
+        # check pairwise compatibility of the environment settings
+        environment_compatibility_sanity_check(self)
 
         # check print level (verbosity of output)
         self.print_level = max(1, min(self.print_level, 3))
@@ -210,8 +217,11 @@ class LinearResponseEigenSolver(LinearResponseEigenSolverBase):
         # PE information
         pe_dict = self._init_pe(molecule, basis)
 
-        # CPCM_information
+        # CPCM information
         self._init_cpcm(molecule, basis)
+
+        # GOSTSHYP information
+        self._init_gostshyp(molecule, basis, scf_results)
 
         if self.nonlinear:
             rsp_vector_labels = [
@@ -407,6 +417,8 @@ class LinearResponseEigenSolver(LinearResponseEigenSolverBase):
                 profiler.print_memory_tracing(self.ostream)
 
                 self._print_iteration(relative_residual_norm, wn)
+
+                self._print_gostshyp_neg_amp_info()
 
             profiler.stop_timer('ReducedSpace')
 
@@ -668,69 +680,6 @@ class LinearResponseEigenSolver(LinearResponseEigenSolverBase):
                         if self.rank == mpi_master():
                             dens_cube_files.append(dens_cube_fnames)
 
-                if self.esa:
-                    if self.esa_from_state is None:
-                        source_states = list(range(self.nstates))
-                    else:
-                        source_states = [self.esa_from_state - 1]
-
-                    esa_pairs = [(s_1, s_2)
-                                 for s_1 in source_states
-                                 for s_2 in range(s_1 + 1, self.nstates)]
-
-                    if self.rank == mpi_master():
-                        esa_results = []
-                        dipole_integrals = compute_electric_dipole_integrals(
-                            molecule, basis, [0.0, 0.0, 0.0])
-
-                    for s_1, s_2 in esa_pairs:
-                        eigvec_1 = self.get_full_solution_vector(
-                            exc_solutions[s_1])
-                        eigvec_2 = self.get_full_solution_vector(
-                            exc_solutions[s_2])
-
-                        if self.rank == mpi_master():
-                            half_size = eigvec_1.shape[0] // 2
-
-                            z_mat_1 = eigvec_1[:half_size].reshape(
-                                mo_occ.shape[1], -1)
-                            y_mat_1 = eigvec_1[half_size:].reshape(
-                                mo_occ.shape[1], -1)
-
-                            z_mat_2 = eigvec_2[:half_size].reshape(
-                                mo_occ.shape[1], -1)
-                            y_mat_2 = eigvec_2[half_size:].reshape(
-                                mo_occ.shape[1], -1)
-
-                            esa_trans_dens = (
-                                np.linalg.multi_dot(
-                                    [mo_vir, z_mat_1.T, z_mat_2, mo_vir.T]) -
-                                np.linalg.multi_dot(
-                                    [mo_occ, z_mat_1, z_mat_2.T, mo_occ.T]))
-
-                            esa_trans_dens += (
-                                np.linalg.multi_dot(
-                                    [mo_occ, y_mat_1, y_mat_2.T, mo_occ.T]) -
-                                np.linalg.multi_dot(
-                                    [mo_vir, y_mat_1.T, y_mat_2, mo_vir.T]))
-
-                            esa_trans_dipole = np.array([
-                                np.sum(esa_trans_dens * dipole_integrals[i])
-                                for i in range(3)
-                            ])
-
-                            esa_exc_ene = exc_energies[s_2] - exc_energies[s_1]
-                            esa_osc_str = (2.0 / 3.0) * esa_exc_ene * np.sum(
-                                esa_trans_dipole**2)
-
-                            esa_results.append({
-                                'from_state': f'S{s_1 + 1}',
-                                'to_state': f'S{s_2 + 1}',
-                                'excitation_energy': esa_exc_ene,
-                                'oscillator_strength': esa_osc_str,
-                                'transition_dipole': esa_trans_dipole,
-                            })
-
                 if self.rank == mpi_master():
                     for ind, comp in enumerate('xyz'):
                         elec_trans_dipoles[s, ind] = np.vdot(
@@ -749,6 +698,54 @@ class LinearResponseEigenSolver(LinearResponseEigenSolverBase):
                     excitation_details.append(
                         self.get_excitation_details(eigvec, mo_occ.shape[1],
                                                     mo_vir.shape[1]))
+
+            if self.esa:
+                if self.esa_from_state is None:
+                    source_states = list(range(self.nstates))
+                else:
+                    source_states = [self.esa_from_state - 1]
+
+                esa_pairs = [(s_1, s_2)
+                             for s_1 in source_states
+                             for s_2 in range(s_1 + 1, self.nstates)]
+
+                if self.rank == mpi_master():
+                    esa_results = []
+                    dipole_integrals = compute_electric_dipole_integrals(
+                        molecule, basis, [0.0, 0.0, 0.0])
+
+                for s_1, s_2 in esa_pairs:
+                    eigvec_1 = self.get_full_solution_vector(
+                        exc_solutions[s_1])
+                    eigvec_2 = self.get_full_solution_vector(
+                        exc_solutions[s_2])
+
+                    if self.rank == mpi_master():
+                        z_mat_1, y_mat_1 = self._get_z_mat_and_y_mat(
+                            eigvec_1, mo_occ.shape[1])
+                        z_mat_2, y_mat_2 = self._get_z_mat_and_y_mat(
+                            eigvec_2, mo_occ.shape[1])
+
+                        esa_trans_dens = self._get_esa_transition_density(
+                            z_mat_1, y_mat_1, z_mat_2, y_mat_2, mo_occ,
+                            mo_vir)
+
+                        esa_trans_dipole = np.array([
+                            np.sum(esa_trans_dens * dipole_integrals[i])
+                            for i in range(3)
+                        ])
+
+                        esa_exc_ene = exc_energies[s_2] - exc_energies[s_1]
+                        esa_osc_str = (2.0 / 3.0) * esa_exc_ene * np.sum(
+                            esa_trans_dipole**2)
+
+                        esa_results.append({
+                            'from_state': f'S{s_1 + 1}',
+                            'to_state': f'S{s_2 + 1}',
+                            'excitation_energy': esa_exc_ene,
+                            'oscillator_strength': esa_osc_str,
+                            'transition_dipole': esa_trans_dipole,
+                        })
 
             if self.nto or self.detach_attach:
                 self.ostream.print_blank()
@@ -1161,6 +1158,27 @@ class LinearResponseEigenSolver(LinearResponseEigenSolverBase):
 
         molecule_sanity_check(molecule, 'restricted', type(self).__name__)
 
+        # check SCF results
+        scf_results_sanity_check(self, scf_results)
+
+        # check RI setup
+        ri_sanity_check(self)
+
+        # check dft setup
+        dft_sanity_check(self, 'compute')
+
+        # check pe setup
+        pe_sanity_check(self, molecule=molecule)
+
+        # check solvation model setup
+        solvation_model_sanity_check(self)
+
+        # check GOSTSHYP setup
+        gostshyp_sanity_check(self)
+
+        # check pairwise compatibility of the environment settings
+        environment_compatibility_sanity_check(self)
+
         if self.rank == mpi_master():
             orb_ene = scf_results['E_alpha']
         else:
@@ -1177,6 +1195,12 @@ class LinearResponseEigenSolver(LinearResponseEigenSolverBase):
 
         # PE information
         pe_dict = self._init_pe(molecule, basis)
+
+        # CPCM information
+        self._init_cpcm(molecule, basis)
+
+        # GOSTSHYP information
+        self._init_gostshyp(molecule, basis, scf_results)
 
         # generate initial guess from scratch
 

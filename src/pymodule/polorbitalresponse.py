@@ -37,7 +37,11 @@ from .veloxchemlib import XCIntegrator
 from .veloxchemlib import mpi_master
 from .cphfsolver import CphfSolver
 from .inputparser import parse_input
-from .sanitychecks import polorbrsp_sanity_check_1, polorbrsp_sanity_check_2
+from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
+                           ri_sanity_check, dft_sanity_check, pe_sanity_check,
+                           solvation_model_sanity_check, gostshyp_sanity_check,
+                           polorbrsp_sanity_check_1, polorbrsp_sanity_check_2,
+                           environment_compatibility_sanity_check)
 from .oneeints import compute_electric_dipole_integrals
 from .distributedarray import DistributedArray
 from .profiler import Profiler
@@ -2539,6 +2543,30 @@ class PolOrbitalResponse(CphfSolver):
             The results from the linear response calculation.
         """
 
+        # check molecule
+        molecule_sanity_check(molecule)
+
+        # check SCF results
+        scf_results_sanity_check(self, scf_tensors)
+
+        # check RI setup
+        ri_sanity_check(self)
+
+        # check dft setup
+        dft_sanity_check(self, 'compute')
+
+        # check pe setup
+        pe_sanity_check(self, molecule=molecule)
+
+        # check solvation model setup
+        solvation_model_sanity_check(self)
+
+        # check GOSTSHYP setup
+        gostshyp_sanity_check(self)
+
+        # check pairwise compatibility of the environment settings
+        environment_compatibility_sanity_check(self)
+
         if self.is_complex:
             return self.compute_omega_complex_red_dim(molecule, basis, scf_tensors,
                                                       lr_results)
@@ -2574,6 +2602,12 @@ class PolOrbitalResponse(CphfSolver):
         dft_dict = self._init_dft(molecule, scf_tensors)
         # PE information
         pe_dict = self._init_pe(molecule, basis)
+
+        # CPCM information
+        self._init_cpcm(molecule, basis)
+
+        # GOSTSHYP information
+        self._init_gostshyp(molecule, basis, scf_tensors)
 
         # number of vector components
         dof = len(self.vector_components)
@@ -2854,6 +2888,12 @@ class PolOrbitalResponse(CphfSolver):
         # PE information
         pe_dict = self._init_pe(molecule, basis)
 
+        # CPCM information
+        self._init_cpcm(molecule, basis)
+
+        # GOSTSHYP information
+        self._init_gostshyp(molecule, basis, scf_tensors)
+
         # number of vector components
         dof = len(self.vector_components)
 
@@ -3122,6 +3162,12 @@ class PolOrbitalResponse(CphfSolver):
         dft_dict = self._init_dft(molecule, scf_tensors)
         # PE information
         pe_dict = self._init_pe(molecule, basis)
+
+        # CPCM information
+        self._init_cpcm(molecule, basis)
+
+        # GOSTSHYP information
+        self._init_gostshyp(molecule, basis, scf_tensors)
 
         # number of vector components
         dof = len(self.vector_components)
@@ -3464,6 +3510,12 @@ class PolOrbitalResponse(CphfSolver):
         dft_dict = self._init_dft(molecule, scf_tensors)
         # PE information
         pe_dict = self._init_pe(molecule, basis)
+
+        # CPCM information
+        self._init_cpcm(molecule, basis)
+
+        # GOSTSHYP information
+        self._init_gostshyp(molecule, basis, scf_tensors)
 
         # number of vector components
         dof = len(self.vector_components)

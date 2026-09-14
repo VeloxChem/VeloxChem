@@ -33,6 +33,8 @@ class TestCPPCpcm:
         basis_label = 'def2-svp'
         bas = MolecularBasis.read(mol, basis_label, ostream=None)
 
+        # Note: vacuum-SCF + CPCM-response for testing purposes only
+
         scf_drv = ScfRestrictedDriver()
         scf_drv.ostream.mute()
         scf_drv.xcfun = xcfun_label

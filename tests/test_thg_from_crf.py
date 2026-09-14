@@ -132,4 +132,4 @@ class TestthgFromCrf:
     @pytest.mark.timeconsuming
     def test_thg_from_crf_mgga(self):
 
-        self.run_thg_from_crf('tpssh')
+        self.run_thg_from_crf('m06-2x')
