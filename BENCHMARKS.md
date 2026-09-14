@@ -7215,3 +7215,41 @@ for tagrisso at def2-tzvp, which caps the speedup at five however many nodes are
 given, and three per cent for the cluster of three hundred and twenty atoms, which
 caps it at thirty three. That ceiling is real and the parts division would lift it.
 Whether it binds before the nodes run out is a measurement rather than an argument.
+
+### Two nodes, and what the division was built for
+
+Sixteen ranks of thirty two threads over two nodes, five hundred and twelve cores,
+against the same molecule on one node. The launcher is srun with PMIx; the site's
+mpirun has no transport between nodes.
+
+| | nodes | cores | Fock build | spread | outside | setup | whole |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 1 x 256 | 1 | 256 | 0.978 s | 1.00 | 11.08 s | 4.73 s | 31.34 s |
+| 8 x 32 | 1 | 256 | 0.565 s | 1.06 | 13.44 s | 4.87 s | 23.68 s |
+| 16 x 32 | 2 | 512 | **0.305 s** | 1.16 | 10.87 s | 3.79 s | **16.58 s** |
+
+**The build is 1.85 times quicker on two nodes than on one, against a doubling of the
+cores** -- ninety three per cent of what the cores could give, across an interconnect,
+for a phase which sends one Fock matrix and one metric between the ranks and nothing
+else. The B vectors of a rank are 0.95 gigabytes where one rank held 15.28, which is
+the whole point: the molecule which does not fit fits on enough of them.
+
+**The part outside the builds fell as well**, 13.44 seconds to 10.87, because the
+setup divides too -- the B vectors are formed by sixteen ranks rather than eight. It
+is still 66 per cent of the calculation, and it is still where the next work is.
+
+| an iteration | 1 x 256, one node | 16 x 32, two nodes |
+| --- | ---: | ---: |
+| the Fock build | 0.978 s | **0.305 s** |
+| the orbitals, on the master | 0.199 s | 0.134 s |
+| everything else | 0.153 s | 0.259 s |
+
+**Two cautions about these rows.** The single node rows were taken where the module's
+BLAS has a high thread ceiling and the two node rows where it has one of forty eight,
+so the rows asking for sixty four threads a rank and more are not on the same library;
+the rows at thirty two threads are unaffected, which is the comparison above. And the
+control of equal work now reads 110 to 1277 gigaflops a rank, a spread of 11.6, which
+is the measurement and not the machine: numpy's mask is widened to the whole node so
+that its pool can be built at all, and sixteen pools of thirty two threads then roam
+two nodes unplaced. The driver's own spread is 1.16 and is placed by OpenMP, which is
+why the build is trustworthy where the control beside it is not.
