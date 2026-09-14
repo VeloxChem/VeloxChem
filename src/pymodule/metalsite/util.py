@@ -895,3 +895,128 @@ def _bond_separation(bonded, first, second, limit=3):
         reached.update(frontier)
 
     return limit + 1
+
+
+def redistribute_cap_charges(active_site, partial_charges):
+    """
+    Moves the charge of the capping hydrogens onto the rest of the active site.
+
+    The operation is idempotent: the caps end up at zero, so a second pass
+    finds nothing left to move. Both build_forcefield and
+    redistribute_charges apply it, and either may be handed charges that
+    have already been through it.
+
+    :param active_site:
+        The active site, for the indices of the capping hydrogens.
+    :param partial_charges:
+        The charges fitted on the whole active site.
+
+    :return:
+        A copy of the charges with the caps emptied and their charge spread
+        over the other atoms.
+    """
+
+    charges = np.array(partial_charges, dtype=float)
+    caps = set(active_site['cap_indices'])
+    rest = [index for index in range(charges.size) if index not in caps]
+
+    assert_msg_critical(
+        len(rest) > 0, 'redistribute_cap_charges: the active site '
+        'is nothing but capping hydrogens')
+
+    cap_charge = sum(charges[index] for index in caps)
+    charges[list(caps)] = 0.0
+    charges[rest] += cap_charge / len(rest)
+
+    return charges
+
+
+def backbone_charge_shift(charge_of, topology, active_site, partial_charges):
+    """
+    Works out how much charge the coordination region loses when the fitted
+    charges replace the protein force field's own, and what each atom the
+    active site does not cover has to take on to give it back.
+
+    Kept apart from redistribute_backbone_charges because the same
+    correction is applied in two places -- onto a built system, and into
+    the residue templates of an OpenMM force field XML -- and a rule
+    stated twice is a rule that drifts. Nothing here knows about a system:
+    the caller looks the protein charges up and hands over the lookup.
+
+    :param charge_of:
+        A callable taking a topology atom index and returning the charge
+        the protein force field gives that atom.
+    :param topology:
+        The protonated topology the active site was extracted from.
+    :param active_site:
+        The active site, for the map back to the topology.
+    :param partial_charges:
+        The active site charges, with the capping hydrogens already folded
+        in.
+
+    :return:
+        A dictionary holding the charges the active site covers, keyed by
+        topology index, the residues and atoms of the region they sit in,
+        the atoms of it the site does not cover, and the shift each of
+        those takes on.
+    """
+
+    charges = np.asarray(partial_charges)
+    caps = set(active_site['cap_indices'])
+    atom_map = active_site['atom_map']
+
+    # the caps map to the alpha carbons they replaced, so they have to be
+    # left out or CA would be counted as covered by the active site
+    covered = {
+        atom_map[index]: charges[index]
+        for index in range(len(charges)) if index not in caps
+    }
+
+    # The atom map indexes the topology the active site was extracted
+    # from. Handing over a different one - most easily by running
+    # prepare_protein after the extraction rather than before it - silently
+    # writes the active site charges onto whatever atoms happen to hold those
+    # indices, so the elements are checked before anything is modified.
+    atoms = list(topology.atoms())
+    labels = active_site['molecule'].get_labels()
+    site_of = _site_index_map(active_site)
+    mismatched = [
+        index for index in covered
+        if index >= len(atoms) or atoms[index].element is None
+        or atoms[index].element.symbol != labels[site_of[index]]
+    ]
+
+    assert_msg_critical(
+        not mismatched, 'backbone_charge_shift: the '
+        'atom map does not match this topology. Extract the active site '
+        'from the same topology the system is built from; '
+        'prepare_protein renumbers the atoms, so it must run first.')
+
+    residue_indices = {atoms[index].residue.index for index in covered}
+    region = [
+        atom for residue in topology.residues()
+        if residue.index in residue_indices for atom in residue.atoms()
+    ]
+    uncovered = [atom for atom in region if atom.index not in covered]
+
+    total_before = sum(charge_of(atom.index) for atom in region)
+    total_after = (sum(covered.values()) +
+                   sum(charge_of(atom.index) for atom in uncovered))
+    difference = total_before - total_after
+
+    assert_msg_critical(
+        len(uncovered) > 0 or abs(difference) < 1.0e-6,
+        'backbone_charge_shift: the '
+        f'coordination region is off by {difference:+.4f} e with no '
+        'uncovered atom to absorb it')
+
+    return {
+        'covered': covered,
+        'residue_indices': residue_indices,
+        'region': region,
+        'uncovered': uncovered,
+        'shift': difference / len(uncovered) if uncovered else 0.0,
+        'total_before': total_before,
+        'total_after': total_after,
+        'difference': difference,
+    }

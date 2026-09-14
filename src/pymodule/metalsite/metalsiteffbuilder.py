@@ -47,6 +47,7 @@ from . import util
 from . import qm
 from . import openmmxml
 from . import printing
+from .enzyme import EnzymeSystemBuilder
 
 try:
     import openmm as mm
@@ -231,6 +232,9 @@ class MetalSiteForceFieldBuilder:
         self.comm = comm
         self.rank = self.comm.Get_rank()
         self.nodes = self.comm.Get_size()
+
+        # the phase classes: stateless, and MPI-safe by construction
+        self._enzyme = EnzymeSystemBuilder(self.comm, self.ostream)
 
         self.metal_bond_cutoff = util.METAL_BOND_CUTOFF
         self.report_cutoff_margin = util.REPORT_CUTOFF_MARGIN
@@ -1420,7 +1424,7 @@ class MetalSiteForceFieldBuilder:
             self._protonated_topology,
             self._active_site,
             charges,
-            core.redistribute_cap_charges(self._active_site, charges),
+            util.redistribute_cap_charges(self._active_site, charges),
             {
                 residue.index: util.residue_label(residue)
                 for residue in self._protonated_topology.residues()
@@ -1489,7 +1493,7 @@ class MetalSiteForceFieldBuilder:
 
         self._require('create_enzyme_system', Stage.FITTED)
 
-        self._enzyme_system = self._on_master(self._create_enzyme_system)
+        self._enzyme_system = self._create_enzyme_system()
         self._enter(Stage.ENZYME)
 
         return self._enzyme_system, self._protonated_topology
@@ -1522,15 +1526,14 @@ class MetalSiteForceFieldBuilder:
 
         self._require('create_enzyme_forcefield', Stage.FITTED)
 
-        self._enzyme_forcefield = self._on_master(
-            self._create_enzyme_forcefield)
+        self._enzyme_forcefield = self._create_enzyme_forcefield()
         self._enter(Stage.ENZYME)
 
         return self._enzyme_forcefield
 
     def _create_enzyme_forcefield(self):
         """
-        The work of create_enzyme_forcefield, on one rank.
+        The work of create_enzyme_forcefield.
 
         The XML and the topology it is for are written together, since
         neither says anything without the other: the templates are keyed
@@ -1538,14 +1541,13 @@ class MetalSiteForceFieldBuilder:
         been moved into one residue.
         """
 
-        result = openmmxml.create_enzyme_forcefield(
+        result = self._enzyme.create_enzyme_forcefield(
             self._protonated_topology,
             self._protonated_positions,
             self._active_site,
             self._forcefield,
             partial_charges=self._partial_charges,
-            forcefield_files=self.protein_forcefield_files,
-            ostream=self.ostream)
+            forcefield_files=self.protein_forcefield_files)
 
         self._save_intermediate(openmmxml.SITE_XML_FILE,
                                 lambda path: path.write_text(result['xml']))
@@ -1573,7 +1575,7 @@ class MetalSiteForceFieldBuilder:
 
     def _create_enzyme_system(self):
         """
-        The work of create_enzyme_system, on one rank.
+        The work of create_enzyme_system.
 
         The force field is written out again alongside the system. Building
         the enzyme reads it rather than changing it, so the file it replaces
@@ -1582,13 +1584,12 @@ class MetalSiteForceFieldBuilder:
         reached this point.
         """
 
-        system, _ = core.create_enzyme_system(
+        system, _ = self._enzyme.create_enzyme_system(
             self._protonated_topology,
             self._active_site,
             self._forcefield,
             partial_charges=self._partial_charges,
-            forcefield_files=self.protein_forcefield_files,
-            ostream=self.ostream)
+            forcefield_files=self.protein_forcefield_files)
 
         self._save_intermediate(
             util.ENZYME_SYSTEM_FILE,

@@ -81,9 +81,7 @@ import sys
 import numpy as np
 
 from ..errorhandler import assert_msg_critical
-from . import core
 from . import util
-from .printing import stream
 
 try:
     import openmm.app as mmapp
@@ -118,8 +116,7 @@ def restructure_topology(topology,
                          positions,
                          active_site,
                          forcefield,
-                         site_residue_name=SITE_RESIDUE_NAME,
-                         ostream=None):
+                         site_residue_name=SITE_RESIDUE_NAME):
     """
     Moves the active site into a residue of its own and bonds the metals.
 
@@ -150,8 +147,6 @@ def restructure_topology(topology,
         up and under what name, and the new residues the sidechains were
         taken out of, keyed by the index they had in the old topology.
     """
-
-    ostream = stream(ostream)
 
     assert_msg_critical('openmm.app' in sys.modules,
                         'restructure_topology: openmm is required')
@@ -236,12 +231,6 @@ def restructure_topology(topology,
     for old_index, new_index in index_map.items():
         new_positions[new_index] = positions[old_index]
 
-    ostream.print_info(
-        f'Moved {len(site_indices)} atoms out of {len(stub_residues)} '
-        f'residues into residue {site_residue_name}, and bonded '
-        f'{len(metal_bonds)} metal-ligand contacts.')
-    ostream.flush()
-
     return {
         'topology': new_topology,
         'positions': new_positions,
@@ -252,6 +241,7 @@ def restructure_topology(topology,
         'atom_source': {new: old for old, new in index_map.items()},
         'site_residue': site_residue,
         'stub_residues': stub_residues,
+        'metal_bonds': metal_bonds,
     }
 
 
@@ -350,7 +340,7 @@ def metal_term_keys(forcefield, active_site):
 # ----------------------------------------------------------------------
 
 
-def protein_atom_parameters(topology, forcefield_files, ostream=None):
+def protein_atom_parameters(topology, forcefield_files):
     """
     Reads the atom type and charge the protein force field gives every atom.
 
@@ -369,8 +359,6 @@ def protein_atom_parameters(topology, forcefield_files, ostream=None):
         The tuple of the loaded ForceField and, per topology atom index,
         the atom type and charge it was given.
     """
-
-    ostream = stream(ostream)
 
     assert_msg_critical('openmm.app' in sys.modules,
                         'protein_atom_parameters: openmm is required')
@@ -413,8 +401,7 @@ def build_templates(topology,
                     active_site,
                     restructured,
                     partial_charges,
-                    protein_parameters,
-                    ostream=None):
+                    protein_parameters):
     """
     Builds the residue templates the restructured topology needs.
 
@@ -437,14 +424,13 @@ def build_templates(topology,
         What protein_atom_parameters returned for the original topology.
 
     :return:
-        The tuple of the template list and the shift each atom the active
-        site does not cover took on.
+        The tuple of the template list and the backbone charge correction
+        of util.backbone_charge_shift, whose 'shift' is what each atom the
+        active site does not cover took on.
     """
 
-    ostream = stream(ostream)
-
-    charges = core.redistribute_cap_charges(active_site, partial_charges)
-    correction = core.backbone_charge_shift(
+    charges = util.redistribute_cap_charges(active_site, partial_charges)
+    correction = util.backbone_charge_shift(
         lambda index: protein_parameters[index]['charge'], topology,
         active_site, charges)
     shift = correction['shift']
@@ -485,13 +471,7 @@ def build_templates(topology,
                 stub, bonded, types, new_charges,
                 f'{stub.name}-{stub.chain.id}{stub.id}-{site_residue.name}'))
 
-    ostream.print_info(
-        f'Built {len(templates)} residue templates; the coordination region '
-        f'gives each of the {len(correction["uncovered"])} atoms the active '
-        f'site does not cover {shift:+.4f} e.')
-    ostream.flush()
-
-    return templates, shift
+    return templates, correction
 
 
 def _template_of_residue(residue, bonded, types, charges, name):
@@ -665,8 +645,7 @@ def forcefield_xml(active_site,
                    restructured,
                    templates,
                    forcefield_files=(),
-                   drop_torsions_across_metal_bonds=True,
-                   ostream=None):
+                   drop_torsions_across_metal_bonds=True):
     """
     Writes the force field XML for the restructured topology.
 
@@ -690,8 +669,6 @@ def forcefield_xml(active_site,
     :return:
         The XML as a string.
     """
-
-    ostream = stream(ostream)
 
     root = ET.Element('ForceField')
 
@@ -756,112 +733,9 @@ def forcefield_xml(active_site,
 
     ET.indent(root, space=' ')
 
-    ostream.print_info(
-        f'Wrote {len(templates)} residue templates, {len(bond_terms)} metal '
-        f'bonds, {len(angle_terms)} metal angles and {len(improper_terms)} '
-        'metal impropers.')
-    ostream.flush()
-
     return ET.tostring(root, encoding='unicode') + '\n'
 
 
 # ----------------------------------------------------------------------
 # the whole of it
 # ----------------------------------------------------------------------
-
-
-def create_enzyme_forcefield(topology,
-                             positions,
-                             active_site,
-                             forcefield,
-                             partial_charges=None,
-                             forcefield_files=('amber14-all.xml',
-                                               'amber14/tip3pfb.xml'),
-                             site_residue_name=SITE_RESIDUE_NAME,
-                             drop_torsions_across_metal_bonds=True,
-                             ostream=None):
-    """
-    Writes the fitted metal site as an OpenMM force field XML.
-
-    The counterpart of create_enzyme_system, and what it should be
-    preferred to: that one puts the fitted terms onto one System and can
-    describe nothing else, while this returns a force field and the
-    topology it is for, which can be solvated, extended and rebuilt as
-    often as the caller likes.
-
-    The metal-ligand bonds become real bonds of the topology it returns,
-    so the system built from it carries the 1-2 and 1-3 exclusions and the
-    1-4 scaling a bonded metal model should have. The injected system has
-    none of those, and that is the one place the two are meant to differ.
-
-    :param topology:
-        The protonated OpenMM topology of the whole enzyme.
-    :param positions:
-        Its positions as an (N, 3) array in Angstrom.
-    :param active_site:
-        The active site, for the map back to the topology.
-    :param forcefield:
-        The force field generator carrying the fitted metal parameters.
-    :param partial_charges:
-        The charges fitted on the active site. D4 charges are used when
-        none are given, the way create_enzyme_system falls back, so that
-        the file carries the same charges as the force field built beside
-        it rather than the protein force field's own.
-    :param forcefield_files:
-        The OpenMM force field files for the protein. Every atom keeps the
-        type these give it, so the file that comes back has to be loaded
-        beside the same ones.
-    :param site_residue_name:
-        The name of the residue the site is moved into.
-    :param drop_torsions_across_metal_bonds:
-        Whether to zero the wildcard proper torsions the protein force
-        field writes across a metal bond once it is a real one.
-
-    :return:
-        A dictionary holding the XML, the restructured topology and its
-        positions, the residue templates and what restructure_topology
-        returned.
-    """
-
-    ostream = stream(ostream)
-
-    assert_msg_critical('openmm.app' in sys.modules,
-                        'create_enzyme_forcefield: openmm is required')
-
-    if partial_charges is None:
-        partial_charges = core.d4_charges(active_site, ostream=ostream)
-
-    protein_ff_not_used, protein_parameters = protein_atom_parameters(
-        topology, forcefield_files, ostream=ostream)
-
-    restructured = restructure_topology(topology,
-                                        positions,
-                                        active_site,
-                                        forcefield,
-                                        site_residue_name=site_residue_name,
-                                        ostream=ostream)
-
-    templates, shift = build_templates(topology,
-                                       active_site,
-                                       restructured,
-                                       partial_charges,
-                                       protein_parameters,
-                                       ostream=ostream)
-
-    xml = forcefield_xml(
-        active_site,
-        forcefield,
-        restructured,
-        templates,
-        forcefield_files=forcefield_files,
-        drop_torsions_across_metal_bonds=drop_torsions_across_metal_bonds,
-        ostream=ostream)
-
-    return {
-        'xml': xml,
-        'topology': restructured['topology'],
-        'positions': restructured['positions'],
-        'templates': templates,
-        'backbone_shift': shift,
-        'restructured': restructured,
-    }
