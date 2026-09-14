@@ -326,7 +326,7 @@ def residue_label(residue):
 
 
 @contextmanager
-def _muted(drivers, mute_scf=True):
+def _muted(driver, mute_scf=True):
     """
     Mutes the output streams of the given drivers for the duration of a run.
 
@@ -337,22 +337,17 @@ def _muted(drivers, mute_scf=True):
     :param drivers:
         The drivers whose streams to mute.
     :param mute_scf:
-        Whether to mute at all. When False this does nothing, so a caller
-        need not branch on it.
+        Whether to mute at all.
     """
 
-    if not mute_scf:
-        yield
-        return
-
-    for driver in drivers:
+    if mute_scf:
         driver.ostream.mute()
-
     try:
         yield
     finally:
-        for driver in drivers:
+        if mute_scf:
             driver.ostream.unmute()
+    return
 
 
 def _site_index_map(active_site):
@@ -3254,7 +3249,7 @@ def _run_scf(scf_drv, molecule, basis, mute_scf=True):
         Whether to mute the driver while it runs.
     """
 
-    with _muted([scf_drv], mute_scf):
+    with _muted(scf_drv, mute_scf):
         scf_drv.compute(molecule, basis)
 
 
@@ -3309,11 +3304,10 @@ def optimize_active_site(active_site,
                                      comm=comm,
                                      ostream=ostream)
 
-    grad_drv = ScfGradientDriver(scf_drv)
-    opt_drv = OptimizationDriver(grad_drv)
+    opt_drv = OptimizationDriver(scf_drv)
     opt_drv.constraints = constraints
 
-    with _muted([grad_drv, opt_drv], mute_scf):
+    with _muted(opt_drv, mute_scf):
         opt_results = opt_drv.compute(molecule, basis)
 
     optimized = Molecule.read_xyz_string(opt_results['final_geometry'])
@@ -3445,7 +3439,7 @@ def compute_hessian(active_site,
     else:
         hessian_drv.atom_pairs = [tuple(pair) for pair in atom_pairs]
 
-    with _muted([hessian_drv], mute_scf):
+    with _muted(hessian_drv, mute_scf):
         hessian_drv.compute(molecule, basis)
 
     hessian = np.copy(hessian_drv.hessian)
@@ -3477,7 +3471,7 @@ def compute_resp_charges(active_site, mute_scf=True, comm=None, ostream=None):
     # be fitted to, and runs its own SCF. Handing it the active site's own
     # functional and basis would silently fit the charges at a level the
     # RESP parameters were never derived for.
-    with _muted([resp_drv], mute_scf):
+    with _muted(resp_drv, mute_scf):
         charges = resp_drv.compute(molecule)
 
     charges = comm.bcast(charges, root=mpi_master())
