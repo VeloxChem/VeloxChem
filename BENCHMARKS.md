@@ -7018,3 +7018,94 @@ node, and a molecule of twenty four atoms is not what any of this is for. What i
 settles is the shape of the measurement: at a fixed machine, report the rank which
 finishes last, never a single rank's profile -- and run the control before blaming the
 code for what the machine did.
+
+## The ranks of a node, on the node
+
+Everything above this was measured on a laptop with two kinds of core, which is not
+what a hybrid code is for. This is the node: two EPYC 9755 Turin, 256 cores, eight
+NUMA domains of thirty two. A rank is meant to hold a domain, so the sweep is
+1 x 256, 2 x 128, 4 x 64 and 8 x 32, the cores held constant and only the division
+changing. Tagrisso at def2-tzvp against def2-universal-jkfit, 1345 basis functions
+and 3387 auxiliary, B vectors of 15.28 GB, eighteen iterations.
+
+| ranks x threads | Fock build | spread | control spread | orbitals | outside | whole |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| 1 x 256 | 0.978 s | 1.00 | 1.00 | 0.199 s | 11.08 s | 31.34 s |
+| 2 x 128 | 0.733 s | 1.07 | 1.04 | 0.212 s | 11.77 s | 26.69 s |
+| 4 x 64 | 0.591 s | 1.06 | 2.77 | 0.178 s | 11.88 s | **23.53 s** |
+| 8 x 32 | **0.565 s** | 1.09 | 1.76 | **0.157 s** | 13.44 s | 23.68 s |
+
+**The Fock build is 1.73 times quicker on eight ranks than on one, with the same two
+hundred and fifty six cores.** Ranks beat threads, which is the opposite of what a
+division usually costs, and the reason is where the memory sits: one rank is one
+allocation of fifteen gigabytes touched by two hundred and fifty six threads across
+eight domains, and eight ranks is each rank's share sitting in the domain which
+reads it. The whole calculation gains 1.33, best at four ranks with eight tied inside
+the noise.
+
+**Nothing here is load imbalance.** The slowest rank's build is within 1.09 of the
+quickest, while the machine's own spread on identical work is 1.76 at eight ranks and
+2.77 at four. The ranks differ less than the hardware does, so the partition by work
+has nothing left to give and the next thing to fix is not it.
+
+### What the division costs, which is not what was expected
+
+| an iteration | 1 x 256 | 8 x 32 | |
+| --- | ---: | ---: | --- |
+| the Fock build | 0.978 s | **0.565 s** | 1.73 quicker |
+| the orbitals, on the master | 0.199 s | **0.157 s** | 1.27 quicker |
+| everything else | 0.153 s | **0.326 s** | **2.13 slower** |
+
+**The eigen decomposition was the thing to worry about and is not.** It is behind a
+rank guard, so it runs on the master's threads while every other rank waits, and
+cutting the node into eight ought to have cost it eight fold. It got quicker: an
+eigensolver divides over cores so poorly that thirty two threads beat two hundred and
+fifty six, and the library numpy carries is built with a ceiling of sixty four in any
+case, so the rows above it were never using what they asked for.
+
+**What does cost is everything else**, which doubles: the extrapolation, the density,
+the energy and the error vector, all of them master only or replicated, all of them
+on threads which shrink as the ranks grow. It gives back about two fifths of what the
+build gains, and at eight ranks the part outside the builds is 57 per cent of the
+calculation. That is where the next work is, and it is not in the driver.
+
+### Four ways the measurement lied before it told the truth
+
+The numbers above are the fourth run of this sweep. The first three were wrong, and
+each was wrong in a way worth writing down, because none of them looked wrong.
+
+**numpy on one thread, every rank, every row.** The published fix in this file widens
+the affinity mask to the whole machine before numpy builds its pool. Generalising it
+to a communicator, the mask of a rank looked like the right thing to widen to instead
+of the machine -- but a launcher binding a rank to a NUMA domain pins the process to
+one core of it and lets OpenMP spread from its own list of places, so the mask reads
+one core where the rank has thirty two. Sizing the pool from it put every rank's
+linear algebra on one core. The control said so and was not read: 0.115 seconds on
+one rank, on two, on four and on eight, when the same work on more cores cannot take
+the same time.
+
+**A driver on one core, in the row which had no launcher.** Told not to bind, the
+launcher leaves the inherited mask, and libgomp builds its places from what is
+available -- one core, two hundred and fifty six threads on it. The Fock build read
+28.3 seconds against 0.73 on two ranks with the same cores, while numpy in that row
+was the quickest of the four. A single rank is now run with no launcher at all, which
+is how every pure OpenMP measurement in this file was taken.
+
+**A printout which announced `4 ranks x 1 threads = 4 cores`** for a run on two
+hundred and fifty six. The thread count was derived from the mask and presented as a
+fact about the machine, when the driver and numpy take their threads by different
+mechanisms and had different answers. Both are now read from their own sources -- the
+driver's from the library, numpy's from threadpoolctl -- and the header says what was
+asked for rather than asserting what was got.
+
+**A label of 256 numpy threads on a library built with a ceiling of 64.** Asked for
+more than it can give, it clamps and says nothing. The pool is now read back after it
+is set, and where it cannot be read the line says `not verified` rather than
+repeating the request.
+
+The common thread is one mistake in four costumes: **printing a number that was
+assumed in the place where a measured one belongs.** A control of identical work,
+reported as a rate rather than as seconds, catches all four of them in the first row
+of output -- about a hundred gigaflops a rank is one core whatever the launcher was
+told. It was in the script from the start and it was reported in units which needed a
+number nobody had.
