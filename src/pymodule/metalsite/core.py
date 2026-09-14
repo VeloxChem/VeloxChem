@@ -121,7 +121,7 @@ REPORT_CUTOFF_MARGIN = 0.5
 
 # Distance, in Angstrom, out to which a contact is reported without being
 # made a bond. Only the default pairing of the two; what a scan uses is
-# resolved from the bonding cutoff it is given, by _resolve_report_cutoff.
+# resolved from the bonding cutoff it is given, in _collect_ligands.
 REPORT_CUTOFF = METAL_BOND_CUTOFF + REPORT_CUTOFF_MARGIN
 
 # Distance, in Angstrom, within which a donor atom is given Hessian blocks
@@ -391,9 +391,9 @@ def load_and_prepare_protein(structure, prepare=True):
 
     Preparation adds missing heavy atoms so that a protein force field can match
     templates.  Missing residues are deliberately not built.
-    Necessary for building full enzymatic systemms. 
+    Necessary for building full enzymatic systemms.
     Can be skipped if the provided topology file is already  correct.
-    
+
     :param structure:
         The path to a .pdb, .cif or .pdbx file.
     :param prepare:
@@ -459,7 +459,7 @@ def site_request():
 
     This is the only thing worth keeping between derivations. The
     coordination itself is not: it is a function of the geometry and of
-    this record, so suggest_binding_modes is called again whenever the
+    this record, so derive_binding_modes is called again whenever the
     answer could have changed rather than a copy being carried forward and
     kept in step.
 
@@ -555,10 +555,10 @@ def derive_binding_modes(topology,
         })
 
     assert_msg_critical(
-        len(metals) > 0, 'suggest_binding_modes: no metal atom '
+        len(metals) > 0, 'derive_binding_modes: no metal atom '
         f'found. Recognized elements: {metal_elements}')
 
-    _check_supported_metals(metals, 'suggest_binding_modes')
+    _check_supported_metals(metals, 'derive_binding_modes')
 
     # Resolve which residues are forced to be ligands
     forced = _resolve_residues(topology, coordinating_residues, ostream=ostream)
@@ -618,7 +618,7 @@ def _collect_ligands(atoms,
     """
     Builds the classified ligand contact list of a set of candidate atoms.
 
-    Shared by suggest_binding_modes, which offers it every atom of the
+    Shared by derive_binding_modes, which offers it every atom of the
     topology, and by update_binding_modes, which offers it the atoms of the
     truncated active site only, so that the two apply the same cutoffs and
     the same classification rules.
@@ -2158,7 +2158,7 @@ def extract_active_site(topology,
     along the CB to CA direction. No second-shell fragments and no
     backbone
 
-    The connectivity is included in the returned data under 'connectivity_matrix'. 
+    The connectivity is included in the returned data under 'connectivity_matrix'.
     Which atoms are bonded is a property of the site
     that was extracted, and nothing downstream should be able to pair the
     two up wrongly.
@@ -2174,7 +2174,7 @@ def extract_active_site(topology,
     connectivity_bonds(active_site['connectivity_matrix']) returns rather
     than letting it perceive them by distance. That matters here for two
     reasons.
-    
+
     :param topology:
         The protonated OpenMM topology.
     :param positions:
@@ -2564,7 +2564,7 @@ def derive_site_coordination(topology,
     geometry.
 
     Restricted to the atoms the cluster holds, which is the difference
-    between this and suggest_binding_modes: once the site is extracted and
+    between this and derive_binding_modes: once the site is extracted and
     a force field is keyed to it, a protein atom that drifts within the
     cutoff is not something the site can gain, so it is not looked at.
 
@@ -2649,7 +2649,7 @@ def update_binding_modes(topology,
     Relaxing the active site moves the metal-ligand distances: a contact
     that started just inside the primary cutoff can end up outside it, an
     asymmetric carboxylate can open into a monodentate one, and a second
-    oxygen can rotate onto a metal. The rules of suggest_binding_modes are
+    oxygen can rotate onto a metal. The rules of derive_binding_modes are
     applied again to the new coordinates so that what is fitted afterwards
     is the coordination the geometry actually has. Residues that were
     asked for through coordinating_residues stay ligands, since a distance is

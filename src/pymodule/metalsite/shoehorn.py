@@ -243,7 +243,7 @@ def _print_shoehorn_summary(builder, name, ostream=None):
 
     # bound once: binding_modes derives a new object per access
     modes = builder.binding_modes
-    residues = list(builder.protonated_topology.residues())
+    residues = list(builder._protonated_topology.residues())
     site = set(core.active_site_residues(modes))
 
     variants = [(core.residue_label(residues[res_index]), variant)
@@ -272,7 +272,7 @@ def _candidate_residues(builder, max_radius):
         distances to every metal center by that center's residue index.
     """
 
-    topology = builder.protonated_topology
+    topology = builder._protonated_topology
     positions = np.asarray(builder.enzyme_positions)
     modes = builder.binding_modes
 
@@ -895,7 +895,7 @@ def _drop_unassigned(builder, template, donors, ostream=None):
         The candidate of each assigned residue.
     """
 
-    residues = list(builder.protonated_topology.residues())
+    residues = list(builder._protonated_topology.residues())
     dropped = []
 
     for res_index in sorted(
@@ -1125,7 +1125,7 @@ def _protonation_changes(builder,
         way as a string.
     """
 
-    topology = builder.protonated_topology
+    topology = builder._protonated_topology
     atoms = list(topology.atoms())
     residues = list(topology.residues())
     variants = builder.binding_modes['variants']
@@ -1384,7 +1384,7 @@ def _denticity_changes(builder,
     # returned -- and both would otherwise be rebuilt per bond: the atom
     # list walks the whole protein, and binding_modes derives a new object
     # per access by design.
-    atoms = list(builder.protonated_topology.atoms())
+    atoms = list(builder._protonated_topology.atoms())
     modes = builder.binding_modes
 
     for kind, pairs in (('added', wanted - current), ('removed',

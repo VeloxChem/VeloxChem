@@ -62,12 +62,12 @@ class Stage(IntEnum):
     Staging state for this class
     - EMPTY: nothing built yet.
     - ACTIVE_SITE: a truncated cluster exists and is fully editable.
-    - FITTED: the QM has been paid for and the metal terms are fitted. Bonds 
-        and angles can be added or removed, but the site cannot be changed in
+    - FITTED: the QM has been paid for and the metal terms are fitted. Metal
+        bonds can be added or removed, but the site cannot be changed in
         any other way.
     - ENZYME: An enzyme system has been created with the fitted metal terms.
-        the fitted terms are in a system for the whole enzyme. Not
-        terminal: a bond edit still refits, and drops the system it invalidates.
+        Not terminal: a bond edit still refits, and drops the system it
+        invalidates.
     """
 
     EMPTY = 0
@@ -92,7 +92,7 @@ class MetalSiteForceFieldBuilder:
     Builds a bonded force field for the zinc center of a metallo-enzyme.
 
     Identifies the coordination sphere, fixes the protonation of the
-    coordinating residues, truncates a QM active site at the CA-CB bonds, 
+    coordinating residues, truncates a QM active site at the CA-CB bonds,
     optimises the truncated active site, calculates a partial hessian and resp charges
     and fits the metal-ligand bond and angle parameters to a QM Hessian with the
     Seminario method. The fitted parameters can then be injected into a
@@ -106,8 +106,8 @@ class MetalSiteForceFieldBuilder:
 
     The active site can be edited in between them, and how much of it can be
     edited is what separates the two gaps.
-    
-    The build_forcefield function calls all expensive QM steps, including by default 
+
+    The build_forcefield function calls all expensive QM steps, including by default
     a constrained optimization, a partial Hessian calculation, and a RESP charge calculation.
 
     Between the first and the second step, the
@@ -133,10 +133,10 @@ class MetalSiteForceFieldBuilder:
         - metal_bond_cutoff: The distance in Angstrom within which a donor atom
           is taken to be bonded to a metal center.
         - report_cutoff_margin: How much further in Angstrom than
-          metal_bond_cutoff a contact is still reported for review. 
+          metal_bond_cutoff a contact is still reported for review.
         - metal_elements: The elements treated as metal centers.
         - metal_formal_charges: The formal charges assumed for the metal ions.
-        
+
         - cap_bond_length: The C-H distance in Angstrom of the capping
           hydrogen that replaces CA.
         - prepare_protein: if the loaded pdb structure should be prepared with pdbfixer first
@@ -147,17 +147,17 @@ class MetalSiteForceFieldBuilder:
         - mute_scf: The flag for muting the output of the QM drivers.
         - do_qm_optimization: The flag for optimizing the active site before the
           Hessian is computed.
-        - do_hessian: The flag for computing the Hessian. With this off, build_forcefield 
+        - do_hessian: The flag for computing the Hessian. With this off, build_forcefield
           will use default force constants
         - do_resp: The flag for computing RESP charges. Falls back on D4 charges.
         - calculate_partial_hessian: The flag for restricting the Hessian to
           the atom pairs the metal terms are fitted from. False computes the
-          whole thing, which is signifacntly more expensive but can useful if 
+          whole thing, which is signifacntly more expensive but can useful if
           vibrational modes are of interest
         - partial_hessian_cutoff: The radius at which bonds are percieved for
-          the partial Hessian. Intentionally slightly larger than the metal_bond_cutoff, 
-          so that a donor atom that is not bonded to a metal but is close enough 
-          to be covered by the partial Hessian can be added as a bond afterwards 
+          the partial Hessian. Intentionally slightly larger than the metal_bond_cutoff,
+          so that a donor atom that is not bonded to a metal but is close enough
+          to be covered by the partial Hessian can be added as a bond afterwards
           without paying for the Hessian again. None restricts it to the bonding as perceived.
         - constrain_capping_hydrogens: The flag for constraining the capping
           hydrogens in addition to the beta carbons.
@@ -170,14 +170,15 @@ class MetalSiteForceFieldBuilder:
           if the metal bonds were not there, so that a coordinating residue
           is typed as the amino acid it is.
         - mute_forcefield_generator: The flag for keeping the force field
-          generator's own commentary out of the output. 
+          generator's own commentary out of the output.
         - prune_weak_bridge_bonds: The flag for dropping the long arm of a
           bridging residue when the fit gave it no force constant.
         - weak_bridge_tolerance: How much longer than the residue's shortest
           metal bond, in Angstrom, the unfitted arm has to be before it is
           dropped.
         - add_metal_planarity_impropers: The flag for adding a weak improper
-          nudging a metal into the plane of a coordinating histidine.
+          nudging a metal into the plane of a coordinating histidine ring or
+          a bidentate carboxylate.
         - metal_planarity_force_constant: The barrier of that improper, in
           kJ/mol.
         - reparameterize_metal_angles: The flag for touching the metal angles
@@ -491,7 +492,7 @@ class MetalSiteForceFieldBuilder:
                           mm_opt=True,
                           coordinating_residues=None):
         """
-        Builds the truncated active site from a new pdb or rebuilds with edited binding 
+        Builds the truncated active site from a new pdb or rebuilds with edited binding
         modes from an earlier pdb
 
         With a path, the structure is read and repaired, the coordination
@@ -502,7 +503,7 @@ class MetalSiteForceFieldBuilder:
         The coordinating residues are then protonated, the site is truncated
         at the CA-CB bonds, and unless mm_opt is switched off it is relaxed on
         a crude default force field.
-        
+
         Calling this by hand is only needed to start from a different
         structure, to change mm_opt, or to reopen editing after
         build_forcefield.
@@ -577,11 +578,11 @@ class MetalSiteForceFieldBuilder:
         protonated_modes = self._derive_binding_modes(protonated_topology,
                                                       protonated_positions)
 
-        # Merge the notes from the binding_modes derivation
-        protonated_modes.setdefault('notes', [])
+        # Merge the protonation notes into the binding_modes notes
+        existing = protonated_modes.setdefault('notes', [])
         for note in notes:
-            if note not in protonated_modes:
-                protonated_modes.append(note)
+            if note not in existing:
+                existing.append(note)
 
         # Extract and truncate the active site
         active_site = core.extract_active_site(

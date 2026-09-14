@@ -607,7 +607,7 @@ class MetalForceFieldManager:
             findings[name] = entry
 
         results = {
-            'source': str(builder.output_folder),
+            'source': str(builder.folder),
             'geometry': geometry,
             'include_hydrogens': include_hydrogens,
             'active_site': described,
