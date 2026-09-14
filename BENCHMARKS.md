@@ -7368,12 +7368,28 @@ The Fock build of an iteration:
 The energies agree to the twelfth decimal in every row, which is what makes the
 comparison a comparison.
 
-**The two ways are not affected alike, and the reason is which operations they use.**
-The way which holds the B vectors inverts the metric once, at setup, and its build is a
-half transformation and a rank k update -- both matrix products, which Eigen does
-respectably: 1.5 to 1.8 times the cost. The direct way solves the Cholesky factor of
-the metric against the half transformed integrals **on every build**, and that solve is
-where Eigen is weakest: 2.8 to 7.5 times, and worse the larger the molecule.
+**The two ways are not affected alike, and the two figures do not mean the same
+thing.** Both builds were run at fourteen threads, so neither library was held back;
+what differs is where the threads come from.
+
+| operation | where it is called | Eigen | the math library |
+| --- | --- | --- | --- |
+| the half transformation | inside an OpenMP region | one thread a call, fourteen calls at once | the same |
+| the rank k update of the exchange | inside an OpenMP region | one thread a call | the same |
+| **the triangular solve** | **at the top level** | **one thread** | **fourteen** |
+| the Cholesky of the metric | at the top level, in the setup | one thread | fourteen |
+
+**The 1.5 to 1.8 of the way which holds the B vectors is a comparison of kernels.**
+Its build is a half transformation and a rank k update, both called from inside a
+parallel region with one small product to a thread, so neither library threads and what
+is measured is Eigen's arithmetic against the matrix unit of the machine.
+
+**The 2.8 to 7.5 of the direct way is mostly a comparison of thread counts.** It solves
+the Cholesky factor of the metric against the half transformed integrals on every
+build, at the top level, and Eigen parallelises general matrix products and little
+else -- a triangular solve and a Cholesky are not among them. So that phase ran on one
+core of fourteen where the library used all of them. It is a fair account of what each
+build gives, and it is not a fair account of the two kernels.
 
 **The setup divides the same way.** Forming the B vectors of tagrisso def2-tzvp took
 31.73 seconds against 58.01, and at def2-svp 8.11 against 15.21 -- 1.8 in both, which
