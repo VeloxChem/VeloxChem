@@ -35,6 +35,7 @@
 #define SimdRIJKFockDriver_hpp
 
 #include <cstddef>
+#include <utility>
 #include <vector>
 
 #include "MolecularBasis.hpp"
@@ -83,16 +84,44 @@ class CSimdRIJKFockDriver
     /// @param basis The molecular basis.
     /// @param aux_basis The auxiliary molecular basis.
     /// @param threshold The screening threshold.
+    /// @param aux_atoms The atoms of the auxiliary basis to answer for, or none of
+    /// them to answer for all of them. A rank of a communicator asks for its own
+    /// share, as answering the memory of the whole molecule would put every rank on
+    /// the direct way for a calculation each of them holds a fitting share of.
     /// @return The memory of the B vectors in bytes.
     /// @note The sparsity pattern of the B vectors is described to answer this,
     /// which is what the driver would do anyway and is a small part of forming
     /// them, so the answer is the memory they will take rather than an estimate of
     /// it. The W matrices are not counted, as one range of them is held at a time
     /// and is small beside the B vectors.
-    auto required_memory(const CMolecule       &molecule,
-                         const CMolecularBasis &basis,
-                         const CMolecularBasis &aux_basis,
-                         const double           threshold) const -> size_t;
+    auto required_memory(const CMolecule        &molecule,
+                         const CMolecularBasis  &basis,
+                         const CMolecularBasis  &aux_basis,
+                         const double            threshold,
+                         const std::vector<int> &aux_atoms = {}) const -> size_t;
+
+    /// @brief Forms the metric a way of building asks for, and the way it is for.
+    /// @param molecule The molecule to compute the metric of.
+    /// @param aux_basis The auxiliary molecular basis.
+    /// @param metric_threshold The threshold below which a direction of the metric
+    /// carries nothing and is dropped.
+    /// @param use_inverse_square_root Whether to invert the square root of the
+    /// metric rather than take the factor or its inverse.
+    /// @param mode The way of building the metric is for, which must be named: the
+    /// two ways want different metrics, so there is nothing to form for a way which
+    /// has not been chosen.
+    /// @return The metric, and the way it is for -- which is the way asked for
+    /// unless the metric has no Cholesky factor, when the direct way cannot be had
+    /// and the way which holds the B vectors is returned instead.
+    /// @note prepare forms the metric with this, and a caller which prepares the
+    /// ranks of a communicator forms it once with this and hands it to them, so
+    /// that the fallbacks are decided in one place rather than raced for on every
+    /// rank.
+    auto make_metric(const CMolecule       &molecule,
+                     const CMolecularBasis &aux_basis,
+                     const double           metric_threshold,
+                     const bool             use_inverse_square_root,
+                     const rimode           mode) const -> std::pair<CPackedMatrix, rimode>;
 
     /// @brief Forms the inverted factor of the metric and the B vectors.
     /// @param molecule The molecule to compute the Fock matrices of.
@@ -111,6 +140,15 @@ class CSimdRIJKFockDriver
     /// magnitude and is tried first. A fitting basis which is close to linearly
     /// dependent has no Cholesky factor to invert, and the square root is inverted
     /// instead, with a warning. Setting the flag takes that way from the start.
+    /// @param aux_atoms The atoms of the auxiliary basis this driver forms the B
+    /// vectors of, or none of them for all of them. This is how the work is divided
+    /// over a communicator: each rank is given a share of the atoms and answers a
+    /// share of the Fock matrix, which the ranks sum. The direct way refuses a
+    /// division, as its triangular solve reaches across the whole auxiliary basis.
+    /// @param metric The metric to build with, or an empty matrix to form it here.
+    /// A metric given must be the one make_metric answers for the mode given, and
+    /// the mode must then be named rather than automatic, as the fallbacks which
+    /// change the mode have already been taken where the metric was formed.
     /// @param mode Which way the Fock matrices are formed, or automatic to hold the
     /// B vectors when they fit in the budget and to form the integrals again on
     /// every call when they do not.
@@ -127,7 +165,9 @@ class CSimdRIJKFockDriver
                  const size_t           memory_budget,
                  const double           metric_threshold        = 1.0e-12,
                  const bool             use_inverse_square_root = false,
-                 const rimode           mode                    = rimode::automatic) -> void;
+                 const rimode           mode                    = rimode::automatic,
+                 const std::vector<int> &aux_atoms              = {},
+                 const CPackedMatrix    &metric                 = CPackedMatrix()) -> void;
 
     /// @brief Computes the Fock matrix of a density and a set of orbitals.
     /// @param density The density matrix, in the packed format, symmetric for a

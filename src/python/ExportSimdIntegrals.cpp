@@ -37,6 +37,8 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
+#include <vector>
+
 #include "MolecularBasis.hpp"
 #include "Molecule.hpp"
 #include "PackedMatrix.hpp"
@@ -208,11 +210,21 @@ export_simdintegrals(py::module &m) -> void
         .def(py::init<>())
         .def("required_memory",
              &CSimdRIJKFockDriver::required_memory,
-             "Gets the memory of the B vectors in bytes.",
+             "Gets the memory of the B vectors of the given auxiliary atoms in bytes, or of all of them.",
              py::arg("molecule"),
              py::arg("basis"),
              py::arg("aux_basis"),
-             py::arg("threshold"))
+             py::arg("threshold"),
+             py::arg("aux_atoms") = std::vector<int>{})
+        .def("make_metric",
+             &CSimdRIJKFockDriver::make_metric,
+             "Forms the metric a way of building asks for, and answers the way it is for, "
+             "which is the way asked for unless a fallback has changed it.",
+             py::arg("molecule"),
+             py::arg("aux_basis"),
+             py::arg("metric_threshold") = 1.0e-12,
+             py::arg("use_inverse_square_root") = false,
+             py::arg("mode") = rimode::in_memory)
         .def("prepare",
              &CSimdRIJKFockDriver::prepare,
              "Forms the inverted factor of the metric and the B vectors.",
@@ -223,7 +235,9 @@ export_simdintegrals(py::module &m) -> void
              py::arg("memory_budget"),
              py::arg("metric_threshold") = 1.0e-12,
              py::arg("use_inverse_square_root") = false,
-             py::arg("mode") = rimode::automatic)
+             py::arg("mode") = rimode::automatic,
+             py::arg("aux_atoms") = std::vector<int>{},
+             py::arg("metric") = CPackedMatrix())
         .def("compute",
              &CSimdRIJKFockDriver::compute,
              "Computes the Fock matrix, twice the Coulomb less the scaled exchange.",

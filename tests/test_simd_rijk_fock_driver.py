@@ -297,3 +297,108 @@ class TestSimdRIJKFockDriver:
         scale = float(np.max(np.abs(matrices[0])))
 
         assert np.max(np.abs(matrices[0] - matrices[1])) / scale < 1.0e-10
+
+    def test_the_metric_formed_outside_is_the_metric_formed_inside(self, molecule):
+        """The ranks of a communicator cannot each invert the metric: the fallbacks
+        are chosen from the matrix, and two ranks could choose differently. The
+        master forms it once with make_metric, which answers the way of building as
+        well, and hands both over. A metric given has to give what forming it inside
+        would have given."""
+
+        basis, aux_basis = self.bases((8, 1, 7, 6), (1, 1, 0, 0), 2)
+
+        nao = basis.get_dimensions_of_basis()
+
+        coeffs, density = self.orbitals(nao, 3, 53)
+
+        for mode in (rimode.in_memory, rimode.direct):
+
+            inside = SimdRIJKFockDriver()
+            inside.prepare(molecule, basis, aux_basis, 0.0, 1 << 30, 1.0e-12, False, mode)
+
+            outside = SimdRIJKFockDriver()
+
+            metric, answered = outside.make_metric(molecule, aux_basis, 1.0e-12, False, mode)
+
+            assert answered == mode
+            assert metric.number_of_elements() > 0
+
+            outside.prepare(molecule, basis, aux_basis, 0.0, 1 << 30, 1.0e-12, False,
+                            answered, metric=metric)
+
+            assert outside.get_mode() == mode
+
+            held = inside.compute(density, coeffs, 1.0).to_numpy(max_memory=8.0)
+            given = outside.compute(density, coeffs, 1.0).to_numpy(max_memory=8.0)
+
+            scale = float(np.max(np.abs(held)))
+
+            assert scale > 0.0
+            assert np.max(np.abs(given - held)) / scale < 1.0e-14
+
+    def test_a_share_of_the_auxiliary_atoms_is_a_share_of_the_fock_matrix(self, molecule):
+        """This is what divides the work over a communicator. Every term of both the
+        Coulomb and the exchange is a sum over the auxiliary basis, so a rank given
+        some of its atoms answers a part of the matrix and the parts add up to the
+        whole. The atoms are dealt out in turn, as a communicator deals them, rather
+        than cut into runs."""
+
+        basis, aux_basis = self.bases((8, 1, 7, 6), (1, 1, 0, 0), 2)
+
+        nao = basis.get_dimensions_of_basis()
+
+        coeffs, density = self.orbitals(nao, 3, 59)
+
+        whole = SimdRIJKFockDriver()
+        whole.prepare(molecule, basis, aux_basis, 0.0, 1 << 30, 1.0e-12, False,
+                      rimode.in_memory)
+
+        expected = whole.compute(density, coeffs, 1.0).to_numpy(max_memory=8.0)
+
+        natoms = molecule.number_of_atoms()
+
+        for nranks in (2, 3):
+
+            shares = []
+
+            for rank in range(nranks):
+
+                atoms = list(range(natoms))[rank::nranks]
+
+                part = SimdRIJKFockDriver()
+                part.prepare(molecule, basis, aux_basis, 0.0, 1 << 30, 1.0e-12, False,
+                             rimode.in_memory, aux_atoms=atoms)
+
+                shares.append(part.compute(density, coeffs, 1.0).to_numpy(max_memory=8.0))
+
+            summed = sum(shares)
+
+            scale = float(np.max(np.abs(expected)))
+
+            assert scale > 0.0
+            assert np.max(np.abs(summed - expected)) / scale < 1.0e-12, (
+                f"the shares of {nranks} ranks do not add up to the whole")
+
+    def test_the_memory_of_the_shares_is_the_memory_of_the_whole(self, molecule):
+        """A rank chooses the way it builds from the memory it would hold, which is
+        the memory of its own atoms and not of the molecule. Asked for all of them
+        the answer must be what it always was."""
+
+        basis, aux_basis = self.bases((8, 1, 7, 6), (1, 1, 0, 0), 2)
+
+        driver = SimdRIJKFockDriver()
+
+        natoms = molecule.number_of_atoms()
+
+        whole = driver.required_memory(molecule, basis, aux_basis, 0.0)
+
+        assert whole == driver.required_memory(molecule, basis, aux_basis, 0.0,
+                                               list(range(natoms)))
+
+        shares = [
+            driver.required_memory(molecule, basis, aux_basis, 0.0,
+                                   list(range(natoms))[rank::2]) for rank in range(2)
+        ]
+
+        assert all(share > 0 for share in shares)
+        assert sum(shares) == whole

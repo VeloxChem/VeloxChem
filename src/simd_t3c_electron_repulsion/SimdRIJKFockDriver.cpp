@@ -204,16 +204,25 @@ struct CPrepareProfile
 }  // namespace
 
 auto
-CSimdRIJKFockDriver::required_memory(const CMolecule       &molecule,
-                                     const CMolecularBasis &basis,
-                                     const CMolecularBasis &aux_basis,
-                                     const double           threshold) const -> size_t
+CSimdRIJKFockDriver::required_memory(const CMolecule        &molecule,
+                                     const CMolecularBasis  &basis,
+                                     const CMolecularBasis  &aux_basis,
+                                     const double            threshold,
+                                     const std::vector<int> &aux_atoms) const -> size_t
 {
     // NOTE: the pattern of the B vectors is the pattern of the three-center
     // integrals, as the metric is dense and the transformation of the auxiliary
     // side keeps every atom which survives.
 
-    const auto pattern = CSimdThreeCenterElectronRepulsionDriver().make_pattern(molecule, basis, aux_basis, threshold);
+    // NOTE: the memory answered is the memory of the atoms asked for, which is the
+    // memory of this rank when the auxiliary basis is divided over a communicator.
+    // Answering the memory of the whole molecule there would put every rank on the
+    // direct way for a calculation each of them holds a fitting share of.
+
+    const CSimdThreeCenterElectronRepulsionDriver eri_drv;
+
+    const auto pattern = aux_atoms.empty() ? eri_drv.make_pattern(molecule, basis, aux_basis, threshold)
+                                           : eri_drv.make_pattern(molecule, basis, aux_basis, threshold, aux_atoms);
 
     size_t nvalues = 0;
 
@@ -225,6 +234,116 @@ CSimdRIJKFockDriver::required_memory(const CMolecule       &molecule,
     return nvalues * sizeof(double);
 }
 
+namespace {
+
+/// @brief Forms the metric a way of building asks for, and the way it is for.
+/// @param molecule The molecule to compute the metric of.
+/// @param aux_basis The auxiliary molecular basis.
+/// @param metric_threshold The threshold below which a direction is dropped.
+/// @param use_inverse_square_root Whether to invert the square root of the metric.
+/// @param mode The way of building the metric is for.
+/// @param two_center_time Where to add the time of the two-center integrals, if
+/// anywhere.
+/// @param metric_time Where to add the time of the inversion, if anywhere.
+/// @return The metric, and the way it is for.
+static auto
+form_metric(const CMolecule       &molecule,
+            const CMolecularBasis &aux_basis,
+            const double           metric_threshold,
+            const bool             use_inverse_square_root,
+            const rimode           mode,
+            double                *two_center_time,
+            double                *metric_time) -> std::pair<CPackedMatrix, rimode>
+{
+    const auto mark_two_center = prof_clock::now();
+
+    const auto two_center = CSimdTwoCenterElectronRepulsionDriver().compute(molecule, aux_basis);
+
+    if (two_center_time) *two_center_time += prof_since(mark_two_center);
+
+    const auto mark_metric = prof_clock::now();
+
+    // NOTE: both forms of the metric close the resolution of the identity, and the
+    // Cholesky factor costs an order of magnitude less, so it is tried first. A
+    // fitting basis which is close to linearly dependent has none, and the square
+    // root is inverted in its place, dropping the directions which carry nothing.
+
+    // NOTE: the direct way solves with the factor rather than multiplying by its
+    // inverse, so it is the factor which is kept. The inverted square root is
+    // taken for a metric which has no factor, in either way, as the B vectors
+    // formed with it close the same sum.
+
+    if (mode == rimode::direct)
+    {
+        if (!use_inverse_square_root)
+        {
+            try
+            {
+                auto factor = packlin::cholesky_factor(two_center);
+
+                if (metric_time) *metric_time += prof_since(mark_metric);
+
+                return {std::move(factor), rimode::direct};
+            }
+            catch (const std::runtime_error &)
+            {
+                errors::msg(std::string("RIJKFockDriver: The metric of the fitting basis has no Cholesky factor. The "
+                                        "direct way needs one, so the B vectors are formed with the inverted square "
+                                        "root of the metric instead and the calculation is held in memory."),
+                            "Warning");
+            }
+        }
+        else
+        {
+            errors::msg(std::string("RIJKFockDriver: The direct way solves with the Cholesky factor of the metric, "
+                                    "which the inverted square root is not, so the calculation is held in memory."),
+                        "Warning");
+        }
+    }
+
+    auto metric = CPackedMatrix();
+
+    if (use_inverse_square_root)
+    {
+        metric = packlin::inverse_square_root(two_center, metric_threshold);
+    }
+    else
+    {
+        try
+        {
+            metric = packlin::cholesky_inverse(two_center);
+        }
+        catch (const std::runtime_error &)
+        {
+            errors::msg(std::string("RIJKFockDriver: The metric of the fitting basis has no Cholesky factor, so its "
+                                    "square root is inverted instead. This is a nearly linearly dependent fitting "
+                                    "basis."),
+                        "Warning");
+
+            metric = packlin::inverse_square_root(two_center, metric_threshold);
+        }
+    }
+
+    if (metric_time) *metric_time += prof_since(mark_metric);
+
+    return {std::move(metric), rimode::in_memory};
+}
+
+}  // namespace
+
+auto
+CSimdRIJKFockDriver::make_metric(const CMolecule       &molecule,
+                                 const CMolecularBasis &aux_basis,
+                                 const double           metric_threshold,
+                                 const bool             use_inverse_square_root,
+                                 const rimode           mode) const -> std::pair<CPackedMatrix, rimode>
+{
+    errors::assertMsgCritical(mode != rimode::automatic,
+                              std::string("RIJKFockDriver: The metric is formed for a named way of building"));
+
+    return form_metric(molecule, aux_basis, metric_threshold, use_inverse_square_root, mode, nullptr, nullptr);
+}
+
 auto
 CSimdRIJKFockDriver::prepare(const CMolecule       &molecule,
                              const CMolecularBasis &basis,
@@ -233,13 +352,15 @@ CSimdRIJKFockDriver::prepare(const CMolecule       &molecule,
                              const size_t           memory_budget,
                              const double           metric_threshold,
                              const bool             use_inverse_square_root,
-                             const rimode           mode) -> void
+                             const rimode           mode,
+                             const std::vector<int> &aux_atoms,
+                             const CPackedMatrix   &metric) -> void
 {
     CPrepareProfile profile;
 
     const auto profile_start = prof_clock::now();
 
-    const auto memory = required_memory(molecule, basis, aux_basis, threshold);
+    const auto memory = required_memory(molecule, basis, aux_basis, threshold, aux_atoms);
 
     _budget = memory_budget;
 
@@ -255,102 +376,70 @@ CSimdRIJKFockDriver::prepare(const CMolecule       &molecule,
 
     _aux_basis = aux_basis;
 
-    const auto mark_two_center = prof_clock::now();
+    // NOTE: a metric given by the caller is taken as it is, and the way of building
+    // with it must be named, as the fallbacks which change that way have already
+    // been taken where it was formed. This is what lets the ranks of a communicator
+    // share one metric: the master forms it with make_metric, which answers the way
+    // as well, and hands both to every rank rather than each of them inverting the
+    // same matrix and racing for the same fallback.
 
-    const auto two_center = CSimdTwoCenterElectronRepulsionDriver().compute(molecule, aux_basis);
+    const auto given = (metric.number_of_elements() > 0);
 
-    profile.two_center += prof_since(mark_two_center);
+    errors::assertMsgCritical(!(given && (_mode == rimode::automatic)),
+                              std::string("RIJKFockDriver: A metric given to the driver is for a named way of building"));
 
-    // NOTE: both forms of the metric close the resolution of the identity, and the
-    // Cholesky factor costs an order of magnitude less, so it is tried first. A
-    // fitting basis which is close to linearly dependent has none, and the square
-    // root is inverted in its place, dropping the directions which carry nothing.
+    auto [formed, formed_mode] =
+        given ? std::pair<CPackedMatrix, rimode>{metric, _mode}
+              : form_metric(molecule, aux_basis, metric_threshold, use_inverse_square_root, _mode, &profile.two_center, &profile.metric);
 
-    // NOTE: the direct way solves with the factor rather than multiplying by its
-    // inverse, so it is the factor which is kept. The inverted square root is
-    // taken for a metric which has no factor, in either way, as the B vectors
-    // formed with it close the same sum.
+    _mode = formed_mode;
 
     if (_mode == rimode::direct)
     {
+        // NOTE: the direct way divides the auxiliary basis into parts to hold the
+        // half transformed integrals, but every part adds into the same array and
+        // one triangular solve over the whole auxiliary basis follows, so a part is
+        // not a summand: a rank given some of the atoms would solve a forward
+        // substitution missing the rows above its own and answer a Fock matrix
+        // which is not a share of anything. Dividing this way over a communicator
+        // is refused here rather than silently answered wrongly.
+
+        errors::assertMsgCritical(aux_atoms.empty(),
+                                  std::string("RIJKFockDriver: The direct way cannot be divided over the atoms of the "
+                                              "auxiliary basis, as its triangular solve reaches across all of them"));
+
         const auto mark_pattern = prof_clock::now();
 
-        const auto pattern = CSimdThreeCenterElectronRepulsionDriver().make_pattern(molecule, basis, aux_basis, threshold);
+        const CSimdThreeCenterElectronRepulsionDriver eri_drv;
+
+        const auto pattern = eri_drv.make_pattern(molecule, basis, aux_basis, threshold);
 
         _parts = _make_parts(molecule, basis, aux_basis, threshold, pattern);
 
         profile.pattern += prof_since(mark_pattern);
 
-        if (!use_inverse_square_root)
-        {
-            try
-            {
-                const auto mark_metric = prof_clock::now();
+        _factor = std::move(formed);
 
-                _factor = packlin::cholesky_factor(two_center);
+        _bq_vectors = CSparseTensor();
 
-                profile.metric += prof_since(mark_metric);
+        _w_vectors.clear();
 
-                _bq_vectors = CSparseTensor();
+        _prepared = true;
 
-                _w_vectors.clear();
+        profile.total = prof_since(profile_start);
 
-                _prepared = true;
+        if (prof_wanted()) profile.report("direct");
 
-                profile.total = prof_since(profile_start);
-
-                if (prof_wanted()) profile.report("direct");
-
-                return;
-            }
-            catch (const std::runtime_error &)
-            {
-                errors::msg(std::string("RIJKFockDriver: The metric of the fitting basis has no Cholesky factor. The "
-                                        "direct way needs one, so the B vectors are formed with the inverted square "
-                                        "root of the metric instead and the calculation is held in memory."),
-                            "Warning");
-
-                _mode = rimode::in_memory;
-            }
-        }
-        else
-        {
-            errors::msg(std::string("RIJKFockDriver: The direct way solves with the Cholesky factor of the metric, "
-                                    "which the inverted square root is not, so the calculation is held in memory."),
-                        "Warning");
-
-            _mode = rimode::in_memory;
-        }
+        return;
     }
 
-    const auto mark_metric = prof_clock::now();
+    _metric = std::move(formed);
 
-    if (use_inverse_square_root)
-    {
-        _metric = packlin::inverse_square_root(two_center, metric_threshold);
-    }
-    else
-    {
-        try
-        {
-            _metric = packlin::cholesky_inverse(two_center);
-        }
-        catch (const std::runtime_error &)
-        {
-            errors::msg(std::string("RIJKFockDriver: The metric of the fitting basis has no Cholesky factor, so its "
-                                    "square root is inverted instead. This is a nearly linearly dependent fitting "
-                                    "basis."),
-                        "Warning");
-
-            _metric = packlin::inverse_square_root(two_center, metric_threshold);
-        }
-    }
-
-    profile.metric += prof_since(mark_metric);
+    _parts.clear();
 
     const auto mark_bq_vectors = prof_clock::now();
 
-    _bq_vectors = _drv.compute_bq_vectors(molecule, basis, aux_basis, _metric, threshold);
+    _bq_vectors = _drv.compute_bq_vectors(molecule, basis, aux_basis, _metric, threshold, aux_atoms);
 
     profile.bq_vectors += prof_since(mark_bq_vectors);
 
