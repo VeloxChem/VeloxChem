@@ -6730,9 +6730,16 @@ machine with 36**, and was killed.
 processes on one node are therefore allowed two hundred and twenty four gigabytes
 between them, and here the auxiliary basis cut the range down to 2.29 gigabytes
 each -- which is 32.09 together, before the B vectors, the dense Fock matrices and
-fourteen Python interpreters. `_syrk_triangles` and the copies of the Kohn-Sham
-matrix are sixteen gigabytes in the same way; they did not bind here only because a
-rank with one thread wants one triangle.
+fourteen Python interpreters.
+
+**The other two sixteen gigabyte bounds do not multiply, and it is worth being clear
+why.** `_syrk_triangles` and the copies of the Kohn-Sham matrix are `min(nthreads,
+cap / square)`: they are bounded by the threads as well as by the constant, and the
+threads of a rank shrink as the ranks of a node grow, so their total over a node is
+what one rank with all the cores would have taken. `_w_batch_memory` is bounded by
+the auxiliary basis instead, and the auxiliary basis does not shrink when a node is
+divided. A bound which is a constant is safe where something else already scales with
+the share; this one had nothing else.
 
 **`_get_ri_memory_budget` was divided by the ranks sharing a host and the caps were
 not.** The budget counts the host names of the communicator and gives each rank its
@@ -6769,3 +6776,87 @@ and twenty atoms they were three per cent, which is the size the division is for
 cores cut up, and it belongs on the node. What the laptop settles is that the answers
 are right at every rank count, that the memory divides as it should, and that two of
 the phases do not.
+
+### Sweeping the share instead of the whole
+
+The share of a rank is a set of auxiliary functions and not a range of them. The
+dense index runs over the angular momenta of the whole molecule before it runs over
+the atoms, so the functions of one atom are scattered through it, and a rank given
+every fourth atom holds no interval of anything. The transformation could only be
+asked for a range, `qfirst` to `qlast`, so the build asked for the range which covers
+the share -- which is the whole auxiliary basis on every rank.
+
+`compute_w_vectors` gained a form which takes the functions by name. It looks up
+where a function belongs in the call, in a table of one entry per auxiliary function
+of the molecule, instead of subtracting the first of a range. The build keeps the
+dense indices its atoms give it and sweeps those.
+
+**The functions a rank sweeps, caffeine at def2-tzvp, 1242 auxiliary functions:**
+
+| ranks | swept by each rank | together |
+| --- | ---: | ---: |
+| 1 | 1242 | 1242 |
+| 2 | 621, 621 | 1242 |
+| 4 | 340, 340, 281, 281 | 1242 |
+
+Before this they read 1242 on every rank at every count, and the sum was 1242 times
+the ranks. The values of the B vectors always divided exactly -- 147 980 640 of them,
+at one rank and at four -- which is why the memory divided and nothing else did.
+
+**One build, one thread on every rank, so that only the division changes:**
+
+| phase | 1 rank | 2 ranks | 4 ranks | divides by |
+| --- | ---: | ---: | ---: | ---: |
+| transform | 0.625 s | 0.354 s | 0.174-0.208 s | **3.3** |
+| exchange | 0.047 s | 0.026 s | 0.014-0.041 s | **2.5** |
+| coulomb | 0.241 s | 0.202 s | 0.135-0.189 s | 1.5 |
+
+The exchange divided by 2.5 where it had **grown** by 2.7, and the transform kept the
+division it already had. Measured at four threads on every rank instead of one, the
+Coulomb looks flat rather than 1.5; four ranks of four threads is sixteen threads on
+fourteen cores and the phase is bandwidth bound, so that reading is of the laptop and
+not of the code. **At one thread the Coulomb still divides by 1.5 where its values
+divide by 4**, which is the code: the walk keeps its per block and per combination
+overhead while only the values inside divide, and a rank holds the same 56 blocks
+however few auxiliary atoms it was given. That one is not fixed.
+
+**The whole calculation, caffeine def2-tzvp, fourteen cores divided R ways:**
+
+| | 1 rank | 2 ranks | 7 ranks | 14 ranks |
+| --- | ---: | ---: | ---: | ---: |
+| held, before | 4.02 s | 4.65 s | 8.16 s | 17.16 s |
+| held, after | 4.00 s | **4.31 s** | **6.07 s** | **8.01 s** |
+| direct | 8.60 s | 13.08 s | 38.76 s | 71.32 s |
+
+Fourteen ranks of one thread went from four and a quarter times the cost of one rank
+of fourteen threads to twice it. It is still a cost, and it should be: the same work
+on the same cores, divided by processes which do not share memory rather than by
+threads which do. The direct way does not move, and should not -- it is divided over
+the orbitals, and its sweep of the auxiliary basis is the whole of it by construction.
+
+**And the memory a node is asked for stops growing with the ranks.** Tagrisso at
+def2-svp, a budget of 28 GB divided by the ranks sharing the host:
+
+| ranks | budget a rank | functions held | W matrices a rank | over the node |
+| --- | ---: | ---: | ---: | ---: |
+| 1 | 28.00 GB | 3387 | 2.29 GB | 2.29 GB |
+| 2 | 14.00 GB | 1719 | 1.16 GB | 2.33 GB |
+| 7 | 4.00 GB | 526 | 0.36 GB | 2.49 GB |
+| 14 | 2.00 GB | 263 | **0.18 GB** | **2.49 GB** |
+
+Two and a half gigabytes over the node at every rank count, against 32.09 at fourteen
+ranks before. Two changes do it and both were needed: the range is now the share, and
+the bound on it is the smaller of the constant and a quarter of the budget, which is
+itself already divided by the ranks of the host.
+
+### The test which would have caught it
+
+Every correctness test passed throughout. They had to: a rank which sweeps a function
+it holds nothing of adds a matrix of zeros, and the shares add to the right Fock
+matrix whether the zeros were multiplied or skipped. **An energy cannot tell a
+division which divides from one which only looks like it.**
+
+`number_of_aux_functions` is on the driver for that reason, and the test asserts of a
+partition that the shares sum to the auxiliary basis and that no share is the whole
+of it. It is two numbers rather than a time, so it does not flicker with the machine,
+and it fails on the code as it was written the first time.

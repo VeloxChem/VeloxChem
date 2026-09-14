@@ -528,3 +528,57 @@ class TestSimdRIJKFockDriver:
         driver.compute_coulomb(driver.solve_fitting(gamma), [], fock)
 
         assert np.max(np.abs(fock.to_numpy(max_memory=8.0))) == 0.0
+
+    def test_a_share_of_the_atoms_is_a_share_of_the_work(self, molecule):
+        """A rank answers a share of the Fock matrix whether or not the work was
+        divided: a function it holds nothing of contributes nothing either way. So
+        the energy cannot tell a division which divides from one which only looks
+        like it, and this counts the auxiliary functions a build sweeps instead.
+
+        This is the test the first division did not have, and it would have failed:
+        every rank swept the whole auxiliary basis, formed a W matrix for every
+        function of every other rank, zeroed it and multiplied it as zeros."""
+
+        basis, aux_basis = self.bases((8, 1, 7, 6), (1, 1, 0, 0), 2)
+
+        naux = aux_basis.get_dimensions_of_basis()
+
+        whole = SimdRIJKFockDriver()
+        whole.prepare(molecule, basis, aux_basis, 0.0, 1 << 30, 1.0e-12, False,
+                      rimode.in_memory)
+
+        assert whole.number_of_aux_functions() == naux
+
+        natoms = molecule.number_of_atoms()
+
+        for nranks in (2, 4):
+
+            swept = []
+
+            for rank in range(nranks):
+
+                part = SimdRIJKFockDriver()
+                part.prepare(molecule, basis, aux_basis, 0.0, 1 << 30, 1.0e-12, False,
+                             rimode.in_memory,
+                             aux_atoms=list(range(natoms))[rank::nranks])
+
+                swept.append(part.number_of_aux_functions())
+
+            assert sum(swept) == naux, (
+                f"{nranks} ranks sweep {sum(swept)} of {naux} functions")
+
+            assert max(swept) < naux, (
+                f"a rank of {nranks} sweeps {max(swept)} of {naux} functions, "
+                "which is the whole of them")
+
+    def test_the_direct_way_sweeps_the_whole_auxiliary_basis(self, molecule):
+        """It is not divided over the atoms, and says so rather than reporting a
+        share it does not take."""
+
+        basis, aux_basis = self.bases((8, 1, 7, 6), (1, 1, 0, 0), 2)
+
+        driver = SimdRIJKFockDriver()
+        driver.prepare(molecule, basis, aux_basis, 0.0, 1 << 30, 1.0e-12, False,
+                       rimode.direct)
+
+        assert driver.number_of_aux_functions() == aux_basis.get_dimensions_of_basis()

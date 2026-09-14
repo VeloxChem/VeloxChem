@@ -1288,6 +1288,25 @@ CSimdRIFockDriver::compute_w_vectors(const CSparseTensor        &bq_vectors,
                                       std::vector<CPackedMatrix> &w_vectors,
                                       const bool                  accumulate) const -> void
 {
+    errors::assertMsgCritical(qfirst <= qlast,
+                              std::string("RIJFockDriver: The range of the auxiliary basis is not a range"));
+
+    std::vector<size_t> functions(qlast - qfirst);
+
+    std::iota(functions.begin(), functions.end(), qfirst);
+
+    compute_w_vectors(bq_vectors, basis, aux_basis, coefficients, functions, w_vectors, accumulate);
+}
+
+auto
+CSimdRIFockDriver::compute_w_vectors(const CSparseTensor        &bq_vectors,
+                                      const CMolecularBasis      &basis,
+                                      const CMolecularBasis      &aux_basis,
+                                      const CPackedMatrix        &coefficients,
+                                      const std::vector<size_t>  &functions,
+                                      std::vector<CPackedMatrix> &w_vectors,
+                                      const bool                  accumulate) const -> void
+{
     const auto nao = basis.dimensions_of_basis();
 
     const auto naux = aux_basis.dimensions_of_basis();
@@ -1298,12 +1317,9 @@ CSimdRIFockDriver::compute_w_vectors(const CSparseTensor        &bq_vectors,
     errors::assertMsgCritical(coefficients.number_of_rows() == nao,
                               std::string("RIJFockDriver: The orbital coefficients do not match the molecular basis"));
 
-    errors::assertMsgCritical((qfirst <= qlast) && (qlast <= naux),
-                              std::string("RIJFockDriver: The range of the auxiliary basis is out of range"));
-
     const auto nocc = coefficients.number_of_columns();
 
-    const auto nrange = qlast - qfirst;
+    const auto nrange = functions.size();
 
     errors::assertMsgCritical(w_vectors.size() == nrange,
                               std::string("RIJFockDriver: The W matrices do not match the range of the auxiliary basis"));
@@ -1361,6 +1377,23 @@ CSimdRIFockDriver::compute_w_vectors(const CSparseTensor        &bq_vectors,
 
     std::vector<std::vector<TAuxEntry>> entries(nrange);
 
+    // NOTE: the functions are named rather than being a range, so where a function
+    // of a block belongs in this call is looked up rather than subtracted. The
+    // table is one entry per auxiliary function of the molecule, which is nothing
+    // beside one W matrix, and a function this call does not fill is marked as
+    // belonging nowhere.
+
+    std::vector<long> places(naux, -1);
+
+    for (size_t i = 0; i < nrange; i++)
+    {
+        errors::assertMsgCritical(functions[i] < naux,
+                                  std::string("RIJFockDriver: An auxiliary basis function to transform is not one of "
+                                              "the auxiliary basis"));
+
+        places[functions[i]] = static_cast<long>(i);
+    }
+
     const auto nblocks = bq_vectors.number_of_blocks();
 
     for (size_t ib = 0; ib < nblocks; ib++)
@@ -1386,9 +1419,9 @@ CSimdRIFockDriver::compute_w_vectors(const CSparseTensor        &bq_vectors,
                     const auto gq = aux_starts[static_cast<size_t>(c_atoms[n]) * aux_nmoms + lval_c] + kc +
                                     mc * aux_strides[lval_c];
 
-                    if ((gq >= qfirst) && (gq < qlast))
+                    if (const auto place = places[gq]; place >= 0)
                     {
-                        entries[gq - qfirst].push_back(TAuxEntry{ib, lc, kc, mc * natoms + n});
+                        entries[static_cast<size_t>(place)].push_back(TAuxEntry{ib, lc, kc, mc * natoms + n});
                     }
                 }
             }

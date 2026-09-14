@@ -261,6 +261,15 @@ class CSimdRIJKFockDriver
                          const std::vector<int>    &parts,
                          CPackedMatrix             &matrix) -> void;
 
+    /// @brief Gets the number of auxiliary basis functions this driver holds the B
+    /// vectors of, which is the whole auxiliary basis unless the atoms were divided.
+    /// @return The number of functions a build sweeps.
+    /// @note This is what says whether a division divided anything. A rank given a
+    /// share of the atoms answers a share of the Fock matrix whether or not the work
+    /// was divided -- a function it holds nothing of contributes nothing either way
+    /// -- so an energy cannot tell the two apart, and this can.
+    auto number_of_aux_functions() const -> size_t;
+
     /// @brief Gets the number of parts the direct mode sweeps the auxiliary basis
     /// in.
     /// @return The number of parts, which is zero in the mode which holds the B
@@ -342,7 +351,21 @@ class CSimdRIJKFockDriver
     /// makes it sixteen calls. The matrices are held once, where the direct mode
     /// holds its half transformed integrals twice, so this is the smaller of the
     /// two claims on the memory of such a calculation.
+    /// @note Sixteen gigabytes is the bound on a driver, and a node given to several
+    /// ranks holds several drivers, so this alone let fourteen ranks of a laptop ask
+    /// for thirty two gigabytes of W matrices between them on a machine with thirty
+    /// six. The triangles of the exchange and the copies of the Kohn-Sham matrix are
+    /// bounded by the threads as well, which shrink as the ranks of a node grow, and
+    /// do not multiply this way; this one is bounded by the auxiliary basis, which
+    /// does not. The share of the memory budget below bounds it for that reason.
     static constexpr size_t _w_batch_memory = size_t{16} * 1024 * 1024 * 1024;
+
+    /// @brief The share of the memory budget a range of the W matrices may take.
+    /// @note The budget is what one rank may hold, already divided by the ranks
+    /// sharing a host, so a share of it is a bound which knows about the machine
+    /// where the constant above does not. A quarter leaves the B vectors, which the
+    /// budget was measured against, the room they were given.
+    static constexpr size_t _w_batch_divisor = 4;
 
     /// @brief The memory the direct mode is allowed to reach, taken from the budget
     /// the driver was prepared with.
@@ -392,6 +415,16 @@ class CSimdRIJKFockDriver
 
     /// @brief The driver of the B vectors and of the matrices formed from them.
     CSimdRIFockDriver _drv;
+
+    /// @brief The dense indices of the auxiliary basis functions this driver holds
+    /// the B vectors of, in ascending order.
+    /// @note The functions of an atom are not consecutive -- the dense index is
+    /// ordered by angular momentum across the whole molecule -- so the share of a
+    /// rank is a set and not a range, and a build sweeps the set. Sweeping the range
+    /// which covers it instead would have every rank form, zero and multiply a
+    /// matrix for every function of every other rank, which divides the memory of
+    /// the B vectors and nothing else.
+    std::vector<size_t> _aux_functions;
 
     /// @brief The times of the phases of the build being made, gathered over the
     /// calls it is made of and reported at the end of the last of them.

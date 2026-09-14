@@ -42,6 +42,7 @@
 #include <stdexcept>
 #include <string>
 
+#include "DenseIndexFunc.hpp"
 #include "ErrorHandler.hpp"
 #include "PackedLinearAlgebra.hpp"
 
@@ -218,6 +219,60 @@ CSimdRIJKFockDriver::required_memory(const CMolecule        &molecule,
 }
 
 namespace {
+
+/// @brief Gets the dense indices of the auxiliary basis functions of given atoms.
+/// @param aux_basis The auxiliary molecular basis.
+/// @param atoms The atoms, as their indices in the molecule, or none of them for all
+/// of them.
+/// @return The indices, in ascending order.
+/// @note The dense index runs over the angular momenta of the whole molecule before
+/// it runs over the atoms, so the functions of one atom are scattered through it and
+/// the functions of a set of atoms are a set rather than a range.
+static auto
+aux_functions_of(const CMolecularBasis &aux_basis, const std::vector<int> &atoms) -> std::vector<size_t>
+{
+    const auto set_indices = aux_basis.basis_sets_indices();
+
+    const auto natoms = set_indices.size();
+
+    const auto indices = denseidx::index_functions(aux_basis);
+
+    const auto starts = denseidx::make_dense_starts(aux_basis);
+
+    const auto strides = denseidx::make_dense_strides(aux_basis);
+
+    const auto nmoms = static_cast<size_t>(aux_basis.max_angular_momentum() + 1);
+
+    std::vector<int> all_atoms;
+
+    if (atoms.empty())
+    {
+        all_atoms.reserve(natoms);
+
+        for (size_t atom = 0; atom < natoms; atom++) all_atoms.push_back(static_cast<int>(atom));
+    }
+
+    std::vector<size_t> functions;
+
+    for (const auto atom : (atoms.empty() ? all_atoms : atoms))
+    {
+        const auto index = static_cast<size_t>(atom);
+
+        for (const auto [lc, kc] : indices[static_cast<size_t>(set_indices[index])])
+        {
+            const auto lval = static_cast<size_t>(lc);
+
+            for (size_t mc = 0; mc < static_cast<size_t>(2 * lc + 1); mc++)
+            {
+                functions.push_back(starts[index * nmoms + lval] + kc + mc * strides[lval]);
+            }
+        }
+    }
+
+    std::sort(functions.begin(), functions.end());
+
+    return functions;
+}
 
 /// @brief Forms the metric a way of building asks for, and the way it is for.
 /// @param molecule The molecule to compute the metric of.
@@ -403,6 +458,11 @@ CSimdRIJKFockDriver::prepare(const CMolecule       &molecule,
 
         _factor = std::move(formed);
 
+        // NOTE: the direct way holds no B vectors and refuses a division of the
+        // atoms, so it sweeps the whole auxiliary basis and says so.
+
+        _aux_functions = aux_functions_of(aux_basis, {});
+
         _bq_vectors = CSparseTensor();
 
         _w_vectors.clear();
@@ -419,6 +479,8 @@ CSimdRIJKFockDriver::prepare(const CMolecule       &molecule,
     _metric = std::move(formed);
 
     _parts.clear();
+
+    _aux_functions = aux_functions_of(aux_basis, aux_atoms);
 
     const auto mark_bq_vectors = prof_clock::now();
 
@@ -504,9 +566,18 @@ CSimdRIJKFockDriver::compute(const CPackedMatrix &density,
 
     const auto per_function = nao * norbitals * sizeof(double);
 
-    const auto by_memory = std::max(size_t{1}, _w_batch_memory / std::max(per_function, size_t{1}));
+    // NOTE: the bound is the smaller of the constant and a share of the budget of
+    // this driver, which is the share of a rank of whatever machine it is on. The
+    // constant alone is a bound on a process, and a node given to several of them
+    // would be promised its memory several times over.
 
-    const auto nbatch = std::min(naux, std::max(_w_batch, by_memory));
+    const auto allowance = std::min(_w_batch_memory, std::max(_budget / _w_batch_divisor, size_t{1}));
+
+    const auto by_memory = std::max(size_t{1}, allowance / std::max(per_function, size_t{1}));
+
+    const auto nheld = _aux_functions.size();
+
+    const auto nbatch = std::min(nheld, std::max(_w_batch, by_memory));
 
     const auto mark_allocate = prof_clock::now();
 
@@ -525,11 +596,20 @@ CSimdRIJKFockDriver::compute(const CPackedMatrix &density,
 
     profile.allocate += prof_since(mark_allocate);
 
-    for (size_t first = 0; first < naux; first += nbatch)
+    for (size_t first = 0; first < nheld; first += nbatch)
     {
-        const auto last = std::min(first + nbatch, naux);
+        const auto last = std::min(first + nbatch, nheld);
 
         const auto count = last - first;
+
+        // NOTE: the functions of this range of the set this driver holds, which is
+        // what the transformation is asked for. A rank which holds a share of the
+        // atoms therefore forms a share of the W matrices, and its exchange is the
+        // square of that share rather than of the whole auxiliary basis with the
+        // other ranks' functions in it as zeros.
+
+        const auto batch = std::vector<size_t>(_aux_functions.begin() + static_cast<long>(first),
+                                               _aux_functions.begin() + static_cast<long>(last));
 
         // NOTE: the last range is shorter than the others, and the storage is
         // handed to the transformation as the range it is asked to fill.
@@ -538,7 +618,7 @@ CSimdRIJKFockDriver::compute(const CPackedMatrix &density,
 
         if (count == nbatch)
         {
-            _drv.compute_w_vectors(_bq_vectors, _basis, _aux_basis, coefficients, first, last, _w_vectors);
+            _drv.compute_w_vectors(_bq_vectors, _basis, _aux_basis, coefficients, batch, _w_vectors);
 
             profile.transform += prof_since(mark_transform);
 
@@ -552,7 +632,7 @@ CSimdRIJKFockDriver::compute(const CPackedMatrix &density,
         {
             auto tail = std::vector<CPackedMatrix>(_w_vectors.begin(), _w_vectors.begin() + static_cast<long>(count));
 
-            _drv.compute_w_vectors(_bq_vectors, _basis, _aux_basis, coefficients, first, last, tail);
+            _drv.compute_w_vectors(_bq_vectors, _basis, _aux_basis, coefficients, batch, tail);
 
             profile.transform += prof_since(mark_transform);
 
@@ -914,6 +994,12 @@ CSimdRIJKFockDriver::compute_coulomb(const std::vector<double> &gamma,
     _direct_times.total += prof_since(profile_start);
 
     if (prof_wanted()) report_direct(_direct_times);
+}
+
+auto
+CSimdRIJKFockDriver::number_of_aux_functions() const -> size_t
+{
+    return _aux_functions.size();
 }
 
 auto

@@ -263,6 +263,9 @@ export_simdintegrals(py::module &m) -> void
              py::arg("gamma"),
              py::arg("parts"),
              py::arg("matrix"))
+        .def("number_of_aux_functions", &CSimdRIJKFockDriver::number_of_aux_functions,
+             "Gets the number of auxiliary basis functions a build sweeps, which is what says whether a "
+             "division over the ranks divided the work and not only the memory.")
         .def("number_of_parts", &CSimdRIJKFockDriver::number_of_parts,
              "Gets the number of parts the direct way sweeps the auxiliary basis in.")
         .def("is_prepared", &CSimdRIJKFockDriver::is_prepared, "Checks that the driver has been prepared.")

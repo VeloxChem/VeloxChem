@@ -194,6 +194,32 @@ class CSimdRIFockDriver
                            std::vector<CPackedMatrix>  &w_vectors,
                            const bool                   accumulate = false) const -> void;
 
+    /// @brief Transforms one index of the B vectors into the molecular orbitals,
+    /// for the auxiliary basis functions named rather than for a range of them.
+    /// @param bq_vectors The B vectors, as compute_bq_vectors returns them.
+    /// @param basis The molecular basis on a and b sides.
+    /// @param aux_basis The auxiliary molecular basis.
+    /// @param coefficients The molecular orbital coefficients.
+    /// @param functions The auxiliary basis functions to transform, as their dense
+    /// indices in the auxiliary basis. One matrix is filled for each, in the order
+    /// they are given.
+    /// @param w_vectors The matrices to store the result in, one per function.
+    /// @param accumulate True to add to the matrices rather than to set them.
+    /// @note A rank of a communicator holds the B vectors of a share of the atoms
+    /// of the auxiliary basis, and the functions of an atom are not consecutive in
+    /// the dense index -- the index is ordered by angular momentum across the whole
+    /// molecule -- so the share it holds is not a range and cannot be asked for as
+    /// one. Asking for a range which covers it would have the rank form, zero and
+    /// multiply a matrix for every function it holds nothing of, which is the work
+    /// of every other rank done again as zeros.
+    auto compute_w_vectors(const CSparseTensor         &bq_vectors,
+                           const CMolecularBasis       &basis,
+                           const CMolecularBasis       &aux_basis,
+                           const CPackedMatrix         &coefficients,
+                           const std::vector<size_t>   &functions,
+                           std::vector<CPackedMatrix>  &w_vectors,
+                           const bool                   accumulate = false) const -> void;
+
     /// @brief Sets the density of the B vectors at which the transformation into
     /// the molecular orbitals expands them rather than walking their values.
     /// @param threshold The density, between zero and one.
