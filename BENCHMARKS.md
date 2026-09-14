@@ -7183,3 +7183,35 @@ integrals, and which of the two is dearer is a question with a number rather tha
 opinion. Or the orbitals could be divided only as far as the batches go, leaving the
 ranks beyond that to divide the parts instead, which costs nothing to decide and
 needs the same sum.
+
+### Why the duplication is not worth removing on one node
+
+The obvious fix for the direct way is to divide the parts of its exchange pass rather
+than the orbitals, summing the half transformed integrals between the ranks so that
+each integral is formed once. It was planned and then not built, because of an
+arithmetic which applies to any division at a fixed machine.
+
+Take `C` cores split into `R` ranks of `C/R`. A phase whose work divides by `R` runs
+on `C/R` cores, so its wall time is `(W/R)/(C/R) = W/C` -- **the same as one rank**. A
+phase which is duplicated runs its whole work on `C/R` cores and takes `R` times as
+long. **No phase can be quicker than it is on one rank**, so no division of the direct
+way can beat one rank on one node; removing the duplication would take the eight rank
+build from 4.27 seconds to about 1.42 plus the communication, and 1.42 is the one rank
+build.
+
+**The way which holds the B vectors gained 1.73 from the ranks, and that is not a
+counter-example.** Its gain is not from dividing work but from where the memory sits:
+fifteen gigabytes of B vectors touched by two hundred and fifty six threads over eight
+NUMA domains, against each rank's share sitting in the domain which reads it. The
+direct way allocates its half transformed integrals afresh for every batch and first
+touches them in parallel, so they are already placed, and there is no such gain to
+collect. **A division at a fixed machine wins only where the threads were not using
+the machine properly.**
+
+**Across nodes it is a different question and the answer is not yet known.** With one
+rank to a node the integral sweep is formed on every node while everything else
+divides, which is an Amdahl term equal to the integral fraction of a build: a fifth
+for tagrisso at def2-tzvp, which caps the speedup at five however many nodes are
+given, and three per cent for the cluster of three hundred and twenty atoms, which
+caps it at thirty three. That ceiling is real and the parts division would lift it.
+Whether it binds before the nodes run out is a measurement rather than an argument.
