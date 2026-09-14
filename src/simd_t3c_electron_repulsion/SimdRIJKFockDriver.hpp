@@ -137,9 +137,10 @@ class CSimdRIJKFockDriver
     /// @param mode The way of building the metric is for, which must be named: the
     /// two ways want different metrics, so there is nothing to form for a way which
     /// has not been chosen.
-    /// @return The metric, and the way it is for -- which is the way asked for
-    /// unless the metric has no Cholesky factor, when the direct way cannot be had
-    /// and the way which holds the B vectors is returned instead.
+    /// @return The metric, and the way it is for, which is the way asked for. The
+    /// direct way takes either metric: it solves the Cholesky factor where it has
+    /// one and multiplies by the inverted square root where it was asked for one or
+    /// where the fitting basis has no factor to be had.
     /// @note prepare forms the metric with this, and a caller which prepares the
     /// ranks of a communicator forms it once with this and hands it to them, so
     /// that the fallbacks are decided in one place rather than raced for on every
@@ -341,16 +342,37 @@ class CSimdRIJKFockDriver
     auto _compute_direct(const CPackedMatrix &coefficients,
                          const double         exchange_scaling_factor) -> CPackedMatrix;
 
-    /// @brief Solves the Cholesky factor of the metric against a set of right hand
+    /// @brief Applies the metric the direct mode holds to a set of right hand
     /// sides, in place.
     /// @param values The right hand sides, as a row major array of one row per
-    /// auxiliary basis function and ncols columns, overwritten by the solution.
+    /// auxiliary basis function and ncols columns, overwritten by the result.
     /// @param nrows The number of auxiliary basis functions.
     /// @param ncols The number of right hand sides.
-    /// @param transposed True to solve against the transpose of the factor.
-    /// @note Solving rather than multiplying by an inverse, which is both cheaper
-    /// and better behaved, and is why the direct way keeps the factor itself.
-    auto _solve_factor(double *values, const size_t nrows, const size_t ncols, const bool transposed) const -> void;
+    /// @param transposed True to apply the transpose, which the Cholesky factor has
+    /// and the inverted square root, being symmetric, does not.
+    /// @note What is applied depends on which metric the driver was given. The
+    /// Cholesky factor is solved against, which is cheaper than multiplying by an
+    /// inverse and is why the direct way keeps the factor where it can; the inverted
+    /// square root is multiplied by. Both close the same sum: solving the factor
+    /// gives B with B^T B equal to A^T V^-1 A, and so does multiplying by the root,
+    /// since the root is its own transpose.
+    auto _apply_metric(double *values, const size_t nrows, const size_t ncols, const bool transposed) const -> void;
+
+    /// @brief Multiplies a set of right hand sides by the metric, in place.
+    /// @param metric The metric, expanded into a row major square.
+    /// @param values The right hand sides, of one row per auxiliary basis function
+    /// and ncols columns, overwritten by the product.
+    /// @param nrows The number of auxiliary basis functions.
+    /// @param ncols The number of right hand sides.
+    auto _multiply_metric(const double *metric, double *values, const size_t nrows, const size_t ncols) const -> void;
+
+    /// @brief The most values the buffer of a multiplication by the metric may hold.
+    /// @note The product cannot be taken in place, and the right hand sides of a
+    /// batch are the auxiliary basis by the basis by the orbitals -- gigabytes -- so
+    /// a buffer of that size would be added to the peak of a build. The columns are
+    /// taken in chunks against a buffer of this size instead, and what the chunking
+    /// costs is a copy for each, which is nothing beside the product.
+    static constexpr size_t _metric_buffer = size_t{32} * 1024 * 1024;
 
     /// @brief Divides the auxiliary basis into the parts the direct mode sweeps.
     /// @param molecule The molecule to compute the integrals of.
@@ -450,9 +472,13 @@ class CSimdRIJKFockDriver
     /// transformed once.
     std::vector<CTripleSparsityPattern> _parts;
 
-    /// @brief The lower triangular Cholesky factor of the metric, which the direct
-    /// mode solves with.
-    CPackedMatrix _factor;
+    /// @brief The metric the direct mode builds with, which is the lower triangular
+    /// Cholesky factor of it or the inverted square root of it.
+    /// @note Which of the two it is, is read from the matrix rather than remembered
+    /// beside it: a Cholesky factor is lower triangular and an inverted square root
+    /// is symmetric, so the type of the matrix says how it is to be applied and
+    /// cannot disagree with it.
+    CPackedMatrix _direct_metric;
 
     /// @brief The molecular basis.
     CMolecularBasis _basis;

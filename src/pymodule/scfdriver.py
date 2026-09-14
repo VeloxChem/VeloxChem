@@ -1865,18 +1865,6 @@ class ScfDriver:
 
             use_inverse_square_root = routes[self.ri_metric_route]
 
-            # NOTE: the direct way does not multiply by an inverted metric, it
-            # solves the Cholesky factor against the half transformed integrals, so
-            # there is nothing for the eigenvalue route to give it. Asking for both
-            # is refused here rather than in the driver, which would answer by
-            # holding the B vectors -- and it was put on the direct way because they
-            # do not fit.
-            assert_msg_critical(
-                not (use_inverse_square_root and mode == rimode.direct),
-                'SCF driver: the direct way solves with the Cholesky factor of ' +
-                'the metric and cannot use ri_metric_route=eigenvalues. Give the ' +
-                'ranks more memory, or run on more of them, so that the B ' +
-                'vectors are held.')
 
             # NOTE: the direct way is divided over the orbitals and not over the
             # auxiliary basis, as the triangular solve of its exchange pass reaches

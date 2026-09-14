@@ -637,3 +637,49 @@ class TestSimdRIJKFockDriver:
 
             assert scale > 0.0
             assert np.max(np.abs(computed - expected)) / scale < 1.0e-12
+
+    def test_the_direct_way_takes_either_metric(self, molecule):
+        """The direct way solves the Cholesky factor of the metric against the half
+        transformed integrals, and multiplies by the inverted square root where that
+        is what it was given. Both close the same sum -- solving the factor gives B
+        with B^T B equal to A^T V^-1 A, and so does multiplying by the root, the root
+        being its own transpose -- so the Fock matrix must not depend on which."""
+
+        for la, lb, lc in ((0, 0, 0), (1, 1, 1), (2, 1, 2)):
+
+            basis, aux_basis = self.bases((8, 1, 7, 6), (la, la, lb, lb), lc)
+
+            nao = basis.get_dimensions_of_basis()
+
+            coeffs, density = self.orbitals(nao, 3, 41 + nao)
+
+            matrices = {}
+
+            for use_root in (False, True):
+
+                driver = SimdRIJKFockDriver()
+
+                metric, answered = driver.make_metric(molecule, aux_basis, 1.0e-12,
+                                                      use_root, rimode.direct)
+
+                # the direct way keeps the direct way with either metric
+
+                assert answered == rimode.direct
+
+                assert metric.is_triangular()
+
+                driver.prepare(molecule, basis, aux_basis, 0.0, 1 << 30, 1.0e-12,
+                               use_root, rimode.direct, metric=metric)
+
+                assert driver.get_mode() == rimode.direct
+
+                matrices[use_root] = driver.compute(density, coeffs,
+                                                    1.0).to_numpy(max_memory=8.0)
+
+            solved, multiplied = matrices[False], matrices[True]
+
+            scale = float(np.max(np.abs(solved)))
+
+            assert scale > 0.0
+            assert np.max(np.abs(multiplied - solved)) / scale < 1.0e-10, (
+                f"({LABELS[la]}{LABELS[lb]}|{LABELS[lc]}) the two metrics disagree")

@@ -352,18 +352,28 @@ form_metric(const CMolecule       &molecule,
             }
             catch (const std::runtime_error &)
             {
-                errors::msg(std::string("RIJKFockDriver: The metric of the fitting basis has no Cholesky factor. The "
-                                        "direct way needs one, so the B vectors are formed with the inverted square "
-                                        "root of the metric instead and the calculation is held in memory."),
+                errors::msg(std::string("RIJKFockDriver: The metric of the fitting basis has no Cholesky factor, so "
+                                        "its square root is inverted instead and multiplied by. This is a nearly "
+                                        "linearly dependent fitting basis."),
                             "Warning");
             }
         }
-        else
-        {
-            errors::msg(std::string("RIJKFockDriver: The direct way solves with the Cholesky factor of the metric, "
-                                    "which the inverted square root is not, so the calculation is held in memory."),
-                        "Warning");
-        }
+
+        // NOTE: the direct way solves the Cholesky factor against the half
+        // transformed integrals where it has one, and multiplies by the inverted
+        // square root where that is what was asked for, or where there is no factor
+        // to be had. The two close the same sum: solving the factor gives B with
+        // B^T B equal to A^T V^-1 A, and so does multiplying by the root, the root
+        // being its own transpose. The root costs twice the arithmetic and is a
+        // product rather than a substitution, which is the trade. Falling back to
+        // holding the B vectors instead, which is what this did, asks for the
+        // memory the direct way was chosen for want of.
+
+        auto root = packlin::inverse_square_root(two_center, metric_threshold);
+
+        if (metric_time) *metric_time += prof_since(mark_metric);
+
+        return {std::move(root), rimode::direct};
     }
 
     auto metric = CPackedMatrix();
@@ -496,7 +506,7 @@ CSimdRIJKFockDriver::prepare(const CMolecule       &molecule,
 
         profile.pattern += prof_since(mark_pattern);
 
-        _factor = std::move(formed);
+        _direct_metric = std::move(formed);
 
         // NOTE: the direct way holds no B vectors and refuses a division of the
         // atoms, so it sweeps the whole auxiliary basis and says so.
@@ -906,7 +916,7 @@ CSimdRIJKFockDriver::compute_exchange(const CPackedMatrix &coefficients,
 
         const auto mark_solve = prof_clock::now();
 
-        _solve_factor(stacked.get(), naux, width, false);
+        _apply_metric(stacked.get(), naux, width, false);
 
         _direct_times.solve += prof_since(mark_solve);
 
@@ -952,9 +962,9 @@ CSimdRIJKFockDriver::solve_fitting(std::vector<double> gamma) -> std::vector<dou
 
     // the coefficients of the fitting, from the factor and its transpose
 
-    _solve_factor(gamma.data(), naux, 1, false);
+    _apply_metric(gamma.data(), naux, 1, false);
 
-    _solve_factor(gamma.data(), naux, 1, true);
+    _apply_metric(gamma.data(), naux, 1, true);
 
     _direct_times.solve += prof_since(profile_start);
 
@@ -1049,6 +1059,86 @@ CSimdRIJKFockDriver::aux_atom_weights(const CMolecule       &molecule,
     const auto pattern = CSimdThreeCenterElectronRepulsionDriver().make_pattern(molecule, basis, aux_basis, threshold);
 
     return atom_shares(pattern, static_cast<size_t>(molecule.number_of_atoms()));
+}
+
+auto
+CSimdRIJKFockDriver::_multiply_metric(const double *metric, double *values, const size_t nrows, const size_t ncols) const
+    -> void
+{
+    // NOTE: the product cannot be taken in place, and the right hand sides of a
+    // batch are gigabytes, so the columns are taken in chunks against a buffer of a
+    // bounded size rather than a copy of the whole. What the chunking costs is one
+    // copy for each chunk, which is nothing beside the product it holds.
+
+    const auto per_column = nrows * sizeof(double);
+
+    const auto chunk = std::max(size_t{1}, std::min(ncols, _metric_buffer / std::max(per_column, size_t{1})));
+
+    auto buffer = std::vector<double>(nrows * chunk, 0.0);
+
+    for (size_t first = 0; first < ncols; first += chunk)
+    {
+        const auto count = std::min(chunk, ncols - first);
+
+        // the chunk of the right hand sides, gathered from their rows
+
+        for (size_t irow = 0; irow < nrows; irow++)
+        {
+            std::copy(values + irow * ncols + first, values + irow * ncols + first + count,
+                      buffer.data() + irow * count);
+        }
+
+        // out = M in, the chunk written back into the columns it came from
+
+        double *out = values + first;
+
+#ifdef VLX_USE_MATHLIB
+
+        // NOTE: the library is column major and the column major matrix of a row
+        // major array is its transpose, so the product of the row major arrays is
+        // the product of the two in the other order with the rows and columns
+        // swapped, as everywhere else in these drivers.
+
+        const char trans = 'N';
+
+        auto m_arg = static_cast<lapack_int_t>(count);
+
+        auto n_arg = static_cast<lapack_int_t>(nrows);
+
+        auto k_arg = static_cast<lapack_int_t>(nrows);
+
+        auto ldb_arg = static_cast<lapack_int_t>(count);
+
+        auto lda_arg = static_cast<lapack_int_t>(nrows);
+
+        auto ldc_arg = static_cast<lapack_int_t>(ncols);
+
+        const double one = 1.0, zero = 0.0;
+
+        dgemm_(&trans, &trans, &m_arg, &n_arg, &k_arg, &one, buffer.data(), &ldb_arg, metric, &lda_arg, &zero, out,
+               &ldc_arg);
+
+#else
+
+        using RowMajorMatrix = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
+
+        using RowMajorStride = Eigen::Stride<Eigen::Dynamic, 1>;
+
+        const auto n = static_cast<Eigen::Index>(nrows);
+
+        const auto m = static_cast<Eigen::Index>(count);
+
+        Eigen::Map<const RowMajorMatrix> mmap(metric, n, n);
+
+        Eigen::Map<const RowMajorMatrix> bmap(buffer.data(), n, m);
+
+        Eigen::Map<RowMajorMatrix, 0, RowMajorStride> omap(out, n, m,
+                                                           RowMajorStride(static_cast<Eigen::Index>(ncols), 1));
+
+        omap.noalias() = mmap * bmap;
+
+#endif /* VLX_USE_MATHLIB */
+    }
 }
 
 auto
@@ -1169,16 +1259,28 @@ CSimdRIJKFockDriver::_make_parts(const CMolecule              &molecule,
 }
 
 auto
-CSimdRIJKFockDriver::_solve_factor(double *values, const size_t nrows, const size_t ncols, const bool transposed) const
+CSimdRIJKFockDriver::_apply_metric(double *values, const size_t nrows, const size_t ncols, const bool transposed) const
     -> void
 {
-    // NOTE: the factor is held in the packed format and the library solves against
-    // a square, so it is expanded once here. It is the square of the auxiliary
-    // basis, which is small beside the half transformed integrals it solves.
+    // NOTE: the metric is held in the packed format and the library works on a
+    // square, so it is expanded once here. It is the square of the auxiliary basis,
+    // which is small beside the right hand sides it is applied to.
 
     auto dense = std::vector<double>(nrows * nrows, 0.0);
 
-    _factor.to_dense(dense.data());
+    _direct_metric.to_dense(dense.data());
+
+    // NOTE: a Cholesky factor is lower triangular and an inverted square root is
+    // symmetric, so the type of the matrix says which it is and how it is to be
+    // applied. The root is its own transpose, so the transposed flag asks for the
+    // same operation either way and is ignored for it.
+
+    if (_direct_metric.get_type() == mat_t::symmetric)
+    {
+        _multiply_metric(dense.data(), values, nrows, ncols);
+
+        return;
+    }
 
 #ifdef VLX_USE_MATHLIB
 
