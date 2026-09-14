@@ -6860,3 +6860,82 @@ division which divides from one which only looks like it.**
 partition that the shares sum to the auxiliary basis and that no share is the whole
 of it. It is two numbers rather than a time, so it does not flicker with the machine,
 and it fails on the code as it was written the first time.
+
+## Two changes which measured nothing, and one which was not the plan
+
+The Coulomb of the way which holds the B vectors divided by 1.5 where its values
+divided by 4. A two term model of a probe which times `compute_y_vector` and
+`compute_fock_matrix` on their own -- a cost following the blocks and a cost
+following the values -- put the block bound term at 44 per cent of the phase at one
+rank and 74 at eight, which pointed at the one thing in those loops which is paid per
+block and does not depend on the auxiliary side:
+
+```cpp
+for (size_t k = 0; k < npairs_max; k++) {
+    row = starts[a_atoms[k]*nmoms + lval_a] + ia + ma*strides[lval_a];
+    col = starts[b_atoms[k]*nmoms + lval_b] + jb + mb*strides[lval_b];
+    weights[k] = ... density.at(row, col) ...;
+}
+```
+
+Two changes followed from that reading, and the redundancy was real: the blocks of
+the B vectors which carry the same atom pairs differ only in their group on the
+auxiliary side, and there are **four of them to a group for caffeine and 3.4 for
+tagrisso**, so this gather was being done three or four times over.
+
+| caffeine def2-tzvp | blocks | distinct lists of atom pairs | repeated |
+| --- | ---: | ---: | ---: |
+| 1 rank | 56 | 14 | 4.00 |
+| 2 ranks | 56 | 14 | 4.00 |
+| 4 ranks | 42 | 14 | 3.00 |
+| 8 ranks | 28 | 14 | 2.00 |
+
+**Both changes measured nothing.** Hoisting the places of the pairs out of the loops
+over the angular components: 0.1490 seconds against 0.1491, which is noise. Gathering
+the density once for a group of blocks instead of once for each of them, which is two
+hundred lines and a restructured loop: **0.1602 against 0.1491, seven per cent
+slower** -- the indirection through the group and the jumping between blocks for every
+pair of components cost more than the gather it saved. Both were reverted.
+
+**The cost was `CSparseTensor::_check_values`.**
+
+```cpp
+errors::assertMsgCritical(_values_state == valstat::allocated,
+                          std::string("SparseTensor.") + label + std::string(": ..."));
+```
+
+The message is an argument, so it is built whether or not the check fails: two
+concatenations of a string, and so two turns of the allocator, on a call which
+otherwise reads one pointer out of a vector. `values(block, la, ia, lb, jb, lc, kc)`
+is called once for every combination of basis functions of every block, which is
+where the cost that followed the blocks was. `CSparseMatrix::_check_values` had been
+fixed for exactly this, with a comment saying so; the tensor had been missed.
+
+| caffeine def2-tzvp, one thread | before | after | |
+| --- | ---: | ---: | ---: |
+| 1 rank | 0.2397 s | **0.1494 s** | 1.60 |
+| 2 ranks | 0.1997 s | **0.1092 s** | 1.83 |
+| 4 ranks | 0.1310 s | **0.0696 s** | 1.88 |
+| 8 ranks | 0.0715 s | **0.0375 s** | 1.91 |
+
+The per value cost falls from 0.81 to 0.50 nanoseconds at one rank, and the phase now
+divides by 4.0 over eight ranks where it divided by 3.4. It is not only the Coulomb:
+the transformation calls the same accessor, and a build of caffeine def2-tzvp at one
+thread moved from 0.625 to 0.534 seconds there and 0.241 to 0.150 in the Coulomb.
+
+**The whole calculation, fourteen cores divided R ways:**
+
+| caffeine def2-tzvp, held | 1 rank | 2 ranks | 7 ranks | 14 ranks |
+| --- | ---: | ---: | ---: | ---: |
+| before the sweep was the share | 4.02 s | 4.65 s | 8.16 s | 17.16 s |
+| after it | 4.00 s | 4.31 s | 6.07 s | 8.01 s |
+| after this | **3.73 s** | **3.76 s** | **5.14 s** | **8.08 s** |
+
+**What to take from it.** The model was right that the cost followed the blocks and
+wrong about which cost it was, and the two changes it recommended were built and
+measured before that was known. Reading the loop for what is obviously expensive
+found the density gather; what was actually expensive was a string built inside an
+assertion which never fires. A cost model says where to look and not what to change,
+and the only way to tell the difference is to measure each change on its own -- which
+is what said that two hundred lines of grouping were seven per cent slower than the
+code they replaced.

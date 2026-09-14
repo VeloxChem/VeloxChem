@@ -398,7 +398,7 @@ class CSparseTensor
     auto
     values(const size_t index) -> double *
     {
-        _check_values(index, std::string("values"));
+        _check_values(index, "values");
 
         return _values[index];
     }
@@ -409,7 +409,7 @@ class CSparseTensor
     auto
     values(const size_t index) const -> const double *
     {
-        _check_values(index, std::string("values"));
+        _check_values(index, "values");
 
         return _values[index];
     }
@@ -500,13 +500,26 @@ class CSparseTensor
     /// @param index The index of block.
     /// @param label The name of the accessor requesting the check.
     auto
-    _check_values(const size_t index, const std::string &label) const -> void
+    _check_values(const size_t index, const char *label) const -> void
     {
-        errors::assertMsgCritical(_values_state == valstat::allocated,
-                                  std::string("SparseTensor.") + label + std::string(": Values blocks of tensor are not allocated"));
+        // NOTE: the message of a check is formed only where the check fails. The
+        // accessors guarded here are called once for every combination of basis
+        // functions of every block, and forming two messages on every call, which
+        // the arguments of the assertions would do, costs two turns of the allocator
+        // on a call which otherwise reads one pointer out of a vector.
 
-        errors::assertMsgCritical(index < _blocks.size(),
-                                  std::string("SparseTensor.") + label + std::string(": Index of block is out of range"));
+        if (_values_state != valstat::allocated)
+        {
+            errors::assertMsgCritical(false,
+                                      std::string("SparseTensor.") + label +
+                                          std::string(": Values blocks of tensor are not allocated"));
+        }
+
+        if (index >= _blocks.size())
+        {
+            errors::assertMsgCritical(false,
+                                      std::string("SparseTensor.") + label + std::string(": Index of block is out of range"));
+        }
     }
 
     /// @brief Deallocates the values blocks of tensor.
