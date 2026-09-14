@@ -40,6 +40,8 @@ VLX_LIBS_DIR += simd_t2c_overlap
 VLX_LIBS_DIR += simd_transfer
 VLX_LIBS_DIR += simd_transform
 VLX_LIBS_DIR += simd_t2c_kinetic_energy
+
+VLX_LIBS_DIR += simd_t2c_nuclear_potential
 VLX_LIBS_DIR += simd_t2c_electron_repulsion
 VLX_LIBS_DIR += simd_t3c_electron_repulsion
 VLX_LIBS_DIR += python

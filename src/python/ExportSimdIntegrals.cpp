@@ -44,6 +44,7 @@
 #include "PackedMatrix.hpp"
 #include "SparseTensor.hpp"
 #include "SimdKineticEnergyDriver.hpp"
+#include "SimdNuclearPotentialDriver.hpp"
 #include "SimdOverlapDriver.hpp"
 #include "SimdRIFockDriver.hpp"
 #include "SimdRIJKFockDriver.hpp"
@@ -94,6 +95,33 @@ export_simdintegrals(py::module &m) -> void
              py::arg("basis"))
         .def("get_threshold", &CSimdKineticEnergyDriver::get_threshold, "Gets screening threshold of the integrals.")
         .def("get_block_size", &CSimdKineticEnergyDriver::get_block_size, "Gets target number of atom pairs of a block.");
+
+    // CSimdNuclearPotentialDriver class
+
+    PyClass<CSimdNuclearPotentialDriver>(m, "SimdNuclearPotentialDriver")
+        .def(py::init<>())
+        .def(py::init<const double, const size_t>(),
+             "Creates a nuclear potential driver with given screening threshold and target block size.",
+             py::arg("threshold"),
+             py::arg("block_size") = 0)
+        .def("compute",
+             py::overload_cast<const CMolecule &, const CMolecularBasis &, const std::vector<double> &,
+                               const std::vector<double> &>(&CSimdNuclearPotentialDriver::compute_matrix, py::const_),
+             "Computes sparse nuclear potential matrix for given molecule, basis and set of point charges. "
+             "The positions of the charges are a flat array of three coordinates each, in bohr.",
+             py::arg("molecule"),
+             py::arg("basis"),
+             py::arg("charges"),
+             py::arg("points"))
+        .def("compute",
+             py::overload_cast<const CMolecule &, const CMolecularBasis &>(
+                 &CSimdNuclearPotentialDriver::compute_matrix, py::const_),
+             "Computes sparse nuclear potential matrix for given molecule and basis, the point charges being "
+             "the nuclei of the molecule.",
+             py::arg("molecule"),
+             py::arg("basis"))
+        .def("get_threshold", &CSimdNuclearPotentialDriver::get_threshold, "Gets screening threshold of the integrals.")
+        .def("get_block_size", &CSimdNuclearPotentialDriver::get_block_size, "Gets target number of atom pairs of a block.");
 
     // CSimdTwoCenterElectronRepulsionDriver class
 
