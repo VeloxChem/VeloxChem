@@ -31,27 +31,20 @@
 //  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
-#ifndef SimdNuclearPotentialRecSS_hpp
-#define SimdNuclearPotentialRecSS_hpp
+#ifndef SimdNuclearPotentialCtrVrrSS_hpp
+#define SimdNuclearPotentialCtrVrrSS_hpp
 
 #include <cstddef>
-#include <vector>
-#include "BasisFunction.hpp"
 #include "SimdMatrix.hpp"
 
 namespace simdnpot {  // simdnpot namespace
 
-/// @brief Computes the integrals of one combination of basis functions.
-auto compute_ss_nuclear_potential(double                    *values,
-                                  const size_t               nvalues,
-                                  const CBasisFunction      &bra,
-                                  const CBasisFunction      &ket,
-                                  const CSimdMatrix         &coordinates,
-                                  const std::vector<double> &charges,
-                                  const std::vector<double> &points,
-                                  CSimdMatrix               &buffer,
-                                  const double               threshold) -> void;
+/// @brief Takes one step of the recurrence, transforms the result and adds it
+/// to the integrals, for one pair of primitives.
+auto
+compute_ctr_ss_nuclear_potential_0(double *values, const size_t nvalues, CSimdMatrix &buffer,
+                                   const size_t ss, const size_t ncols) -> void;
 
 }  // namespace simdnpot
 
-#endif /* SimdNuclearPotentialRecSS_hpp */
+#endif /* SimdNuclearPotentialCtrVrrSS_hpp */

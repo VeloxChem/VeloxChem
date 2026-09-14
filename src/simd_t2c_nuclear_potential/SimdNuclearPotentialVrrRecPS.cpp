@@ -31,27 +31,46 @@
 //  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
-#ifndef SimdNuclearPotentialRecSS_hpp
-#define SimdNuclearPotentialRecSS_hpp
+#include "SimdNuclearPotentialVrrRecPS.hpp"
 
-#include <cstddef>
-#include <vector>
-#include "BasisFunction.hpp"
-#include "SimdMatrix.hpp"
+#include "SimdAlign.hpp"
 
 namespace simdnpot {  // simdnpot namespace
 
-/// @brief Computes the integrals of one combination of basis functions.
-auto compute_ss_nuclear_potential(double                    *values,
-                                  const size_t               nvalues,
-                                  const CBasisFunction      &bra,
-                                  const CBasisFunction      &ket,
-                                  const CSimdMatrix         &coordinates,
-                                  const std::vector<double> &charges,
-                                  const std::vector<double> &points,
-                                  CSimdMatrix               &buffer,
-                                  const double               threshold) -> void;
+auto
+compute_prim_ps_nuclear_potential_0(CSimdMatrix &buffer, const size_t target, const size_t pa,
+                                    const size_t pc, const size_t ss0, const size_t ss1,
+                                    const size_t ncols) -> void
+{
+    auto *t_0 = buffer.data(target + 0);
+    auto *t_1 = buffer.data(target + 1);
+    auto *t_2 = buffer.data(target + 2);
+
+    const auto *pa_x = buffer.data(pa + 0);
+    const auto *pa_y = buffer.data(pa + 1);
+    const auto *pa_z = buffer.data(pa + 2);
+
+    const auto *pc_x = buffer.data(pc + 0);
+    const auto *pc_y = buffer.data(pc + 1);
+    const auto *pc_z = buffer.data(pc + 2);
+
+    const auto *ss0_0 = buffer.data(ss0 + 0);
+
+    const auto *ss1_0 = buffer.data(ss1 + 0);
+
+#pragma omp simd aligned(t_0, t_1, t_2, pa_x, pa_y, pa_z, pc_x, pc_y, pc_z, ss0_0, \
+                         ss1_0 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        t_0[k] = pa_x[k] * ss0_0[k]
+                 - pc_x[k] * ss1_0[k];
+
+        t_1[k] = pa_y[k] * ss0_0[k]
+                 - pc_y[k] * ss1_0[k];
+
+        t_2[k] = pa_z[k] * ss0_0[k]
+                 - pc_z[k] * ss1_0[k];
+    }
+}
 
 }  // namespace simdnpot
-
-#endif /* SimdNuclearPotentialRecSS_hpp */

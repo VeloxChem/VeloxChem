@@ -10,26 +10,30 @@ from veloxchem.veloxchemlib import NuclearPotentialDriver
 from veloxchem.veloxchemlib import SimdNuclearPotentialDriver
 from veloxchem.molecule import Molecule
 
-# NOTE: the SIMD nuclear potential driver is a skeleton: the scaffolding is
-# complete -- the sparsity pattern, the division of the work over the threads, the
-# off-diagonal and the diagonal blocks, both forms of compute -- and one kernel is
-# written, for two s functions. A combination of higher angular momenta stops with
-# an error rather than returning the zeros of a kernel which does not exist, so the
-# bases below are built of s functions alone. A real basis would hit the error,
-# which is the point of it.
+# NOTE: the kernels of the SIMD nuclear potential driver reach angular momentum one,
+# so the bases below are built of s and p functions. A combination above that stops
+# with an error rather than returning the zeros of a kernel which does not exist,
+# which a caller could not tell from integrals which are genuinely zero.
+#
+# NOTE: the p functions are what put the driver through its paces. The s only case
+# has one angular component, so it exercises neither the transformation nor the
+# angular coupling of the diagonal blocks -- and the nuclear potential, unlike the
+# overlap, has no closed form there and computes them with the same kernels.
 
 
-def one_s_basis(exponents, coefficients, identifier):
+def atom_basis_of(exponents, coefficients, identifier, momenta):
+    """An atom basis with one contracted function of each angular momentum given."""
 
     atom_basis = AtomBasis()
     atom_basis.set_identifier(identifier)
     atom_basis.set_name("TEST")
 
-    basis_function = BasisFunction()
-    basis_function.set_angular_momentum(0)
-    basis_function.set_primitives(exponents, coefficients)
-    basis_function.normalize()
-    atom_basis.add(basis_function)
+    for momentum in momenta:
+        basis_function = BasisFunction()
+        basis_function.set_angular_momentum(momentum)
+        basis_function.set_primitives(exponents, coefficients)
+        basis_function.normalize()
+        atom_basis.add(basis_function)
 
     return atom_basis
 
@@ -45,14 +49,18 @@ class TestSimdNuclearPotentialDriver:
                N  2.60 0.30 0.10
                C  1.40 1.70 0.20""", "angstrom")
 
-    @pytest.fixture
-    def basis(self):
+    @pytest.fixture(params=[(0,), (0, 1), (1,)],
+                    ids=["s only", "s and p", "p only"])
+    def basis(self, request):
+        """Three bases over the kernels which exist: the s only case, which was all
+        the skeleton could do, and the two which reach angular momentum one."""
 
         basis = MolecularBasis()
 
         for identifier, exponents in ((8, [7.5, 1.3]), (1, [3.4, 0.7]),
                                       (7, [6.1, 1.1]), (6, [4.9, 0.9])):
-            basis.add(one_s_basis(exponents, [1.0, 0.6], identifier))
+            basis.add(atom_basis_of(exponents, [1.0, 0.6], identifier,
+                                    request.param))
 
         return basis
 
@@ -114,10 +122,10 @@ class TestSimdNuclearPotentialDriver:
         assert np.max(np.abs(computed.to_numpy(basis))) == 0.0
 
     def test_a_kernel_which_is_not_written_is_refused(self):
-        """The scaffolding is complete and one kernel is written. A combination of
-        higher angular momenta must stop rather than return the zeros of a kernel
-        which does not exist -- a caller cannot tell those from integrals which are
-        genuinely zero.
+        """The kernels reach angular momentum one. A combination above it must stop
+        rather than return the zeros of a kernel which does not exist -- a caller
+        cannot tell those from integrals which are genuinely zero. This test moves up
+        as the kernels are added; d functions are the first which are not written.
 
         It is checked in a process of its own because a critical error terminates
         the interpreter rather than raising, so pytest.raises cannot see it."""
@@ -136,7 +144,7 @@ class TestSimdNuclearPotentialDriver:
                 atom_basis.set_identifier(identifier)
                 atom_basis.set_name("TEST")
                 function = BasisFunction()
-                function.set_angular_momentum(1)
+                function.set_angular_momentum(2)
                 function.set_primitives([2.1, 0.5], [1.0, 0.5])
                 function.normalize()
                 atom_basis.add(function)
@@ -159,5 +167,5 @@ class TestSimdNuclearPotentialDriver:
 
         said = outcome.stdout + outcome.stderr
 
-        assert ("Only the S S combination is written" in said) or (
+        assert ("Angular momentum is out of range" in said) or (
             "No kernel for the combination of angular momenta" in said), said[:400]

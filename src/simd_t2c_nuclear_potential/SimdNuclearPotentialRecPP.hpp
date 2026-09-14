@@ -31,8 +31,8 @@
 //  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
-#ifndef SimdNuclearPotentialRecSS_hpp
-#define SimdNuclearPotentialRecSS_hpp
+#ifndef SimdNuclearPotentialRecPP_hpp
+#define SimdNuclearPotentialRecPP_hpp
 
 #include <cstddef>
 #include <vector>
@@ -42,7 +42,7 @@
 namespace simdnpot {  // simdnpot namespace
 
 /// @brief Computes the integrals of one combination of basis functions.
-auto compute_ss_nuclear_potential(double                    *values,
+auto compute_pp_nuclear_potential(double                    *values,
                                   const size_t               nvalues,
                                   const CBasisFunction      &bra,
                                   const CBasisFunction      &ket,
@@ -54,4 +54,4 @@ auto compute_ss_nuclear_potential(double                    *values,
 
 }  // namespace simdnpot
 
-#endif /* SimdNuclearPotentialRecSS_hpp */
+#endif /* SimdNuclearPotentialRecPP_hpp */

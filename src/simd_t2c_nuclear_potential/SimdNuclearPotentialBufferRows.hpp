@@ -48,25 +48,25 @@ namespace simdnpot {  // simdnpot namespace
 /// @param ket_angular_momentum The angular momentum of basis function on ket side.
 /// @return The number of rows.
 /// @note The buffer belongs to the block and not to the combination, so a caller
-/// sizes it once from the highest angular momenta the block carries.
-/// @note This table is written with the kernels and describes them. Only the S S
-/// kernel is written, so only its entry is known; every other combination stops
-/// here rather than sizing a buffer for a kernel which does not exist and letting
-/// the caller discover the gap as zeros. The entries are filled in as the kernels
-/// are generated, and this table is regenerated with them.
+/// sizes it once from the highest angular momenta the block carries. The numbers
+/// below do not decrease with either angular momentum, so the largest combination of
+/// a block is the one of its highest momenta and no other combination needs more.
+/// @note This table is written with the kernels and describes them. Regenerating the
+/// kernels without regenerating it leaves a buffer which is too small, which the
+/// assertions of simdfunc::prepare_buffer report rather than let pass.
 inline auto
 number_of_buffer_rows(const int bra_angular_momentum, const int ket_angular_momentum) -> size_t
 {
-    errors::assertMsgCritical(
-        (bra_angular_momentum == 0) && (ket_angular_momentum == 0),
-        std::string("SimdNuclearPotentialBufferRows.number_of_buffer_rows: Only the S S combination is written"));
+    constexpr std::array<std::array<size_t, 2>, 2> rows{{
+        {       5,      15},
+        {      15,      49}
+    }};
 
-    // NOTE: three rows for the Gaussian product centre, one for the argument of
-    // the Boys function and one for its value of order zero. A kernel of higher
-    // angular momenta needs a row for every order its recursion climbs and for
-    // every intermediate it carries, which is what makes this a table.
+    errors::assertMsgCritical((bra_angular_momentum >= 0) && (bra_angular_momentum < 2) &&
+                                  (ket_angular_momentum >= 0) && (ket_angular_momentum < 2),
+                              std::string("SimdNuclearPotentialBufferRows.number_of_buffer_rows: Angular momentum is out of range"));
 
-    return 5;
+    return rows[static_cast<size_t>(bra_angular_momentum)][static_cast<size_t>(ket_angular_momentum)];
 }
 
 }  // namespace simdnpot

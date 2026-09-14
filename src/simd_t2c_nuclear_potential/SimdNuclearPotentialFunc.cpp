@@ -37,6 +37,9 @@
 
 #include "ErrorHandler.hpp"
 
+#include "SimdNuclearPotentialRecPP.hpp"
+#include "SimdNuclearPotentialRecPS.hpp"
+#include "SimdNuclearPotentialRecSP.hpp"
 #include "SimdNuclearPotentialRecSS.hpp"
 
 namespace simdnpot {  // simdnpot namespace
@@ -63,6 +66,27 @@ compute_nuclear_potential(double                    *values,
         return;
     }
 
+    if ((lbra == 0) && (lket == 1))
+    {
+        compute_sp_nuclear_potential(values, nvalues, bra, ket, coordinates, charges, points, buffer, threshold);
+
+        return;
+    }
+
+    if ((lbra == 1) && (lket == 0))
+    {
+        compute_ps_nuclear_potential(values, nvalues, bra, ket, coordinates, charges, points, buffer, threshold);
+
+        return;
+    }
+
+    if ((lbra == 1) && (lket == 1))
+    {
+        compute_pp_nuclear_potential(values, nvalues, bra, ket, coordinates, charges, points, buffer, threshold);
+
+        return;
+    }
+
     // NOTE: falling through to nothing would leave the values as the caller found
     // them and say nothing, and a caller cannot tell integrals which were not
     // computed from integrals which are zero. The kernels are added one pair of
@@ -71,7 +95,7 @@ compute_nuclear_potential(double                    *values,
     errors::assertMsgCritical(false,
                               std::string("compute_nuclear_potential: No kernel for the combination of angular momenta ") +
                                   std::to_string(lbra) + std::string(" and ") + std::to_string(lket) +
-                                  std::string("; only S S is written"));
+                                  std::string("; the kernels reach angular momentum one"));
 }
 
 }  // namespace simdnpot

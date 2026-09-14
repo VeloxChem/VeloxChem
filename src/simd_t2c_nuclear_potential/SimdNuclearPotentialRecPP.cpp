@@ -31,7 +31,7 @@
 //  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
-#include "SimdNuclearPotentialRecSS.hpp"
+#include "SimdNuclearPotentialRecPP.hpp"
 
 #include <algorithm>
 #include <cstddef>
@@ -45,12 +45,15 @@
 #include "SimdPrimitives.hpp"
 #include "SimdBoysFunc.hpp"
 
-#include "SimdNuclearPotentialCtrVrrSS.hpp"
+#include "SimdNuclearPotentialVrrRecSD.hpp"
+#include "SimdNuclearPotentialVrrRecSP.hpp"
+#include "SimdTransferPP.hpp"
+#include "SimdTransformP.hpp"
 
 namespace simdnpot {  // simdnpot namespace
 
 auto
-compute_ss_nuclear_potential(double                    *values,
+compute_pp_nuclear_potential(double                    *values,
                              const size_t               nvalues,
                              const CBasisFunction      &bra,
                              const CBasisFunction      &ket,
@@ -63,22 +66,21 @@ compute_ss_nuclear_potential(double                    *values,
     if (nvalues > coordinates.number_of_columns())
     {
         errors::assertMsgCritical(
-            false, std::string("compute_ss_nuclear_potential: Number of values exceeds number of atom pairs"));
+            false, std::string("compute_pp_nuclear_potential: Number of values exceeds number of atom pairs"));
     }
 
     if (nvalues == 0) return;
 
     errors::assertMsgCritical(
         points.size() == 3 * charges.size(),
-        std::string("compute_ss_nuclear_potential: Expecting three coordinates for each charge"));
+        std::string("compute_pp_nuclear_potential: Expecting three coordinates for each charge"));
 
-    // NOTE: the values are zeroed before anything writes them, the composed
-    // step accumulating into them as the sum over primitives runs. The atom
-    // pairs no pair of primitives reaches keep the zeros set here.
+    if (charges.empty())
+    {
+        std::fill(values, values + 9 * nvalues, 0.0);
 
-    std::fill(values, values + 1 * nvalues, 0.0);
-
-    if (charges.empty()) return;
+        return;
+    }
 
     const auto &a_exps = bra.exponents();
 
@@ -104,9 +106,14 @@ compute_ss_nuclear_potential(double                    *values,
     const auto dimensions = simdfunc::make_column_dimensions(
         bra, ket, nvalues, coordinates, screenfunc::two_center_nuclear_potential_primitive_bound, threshold / terms);
 
-    simdfunc::prepare_buffer(buffer, 5, 0, 0, dimensions);
+    const auto nmax = simdfunc::prepare_buffer(buffer, 49, 22, 9, dimensions);
 
-    if (buffer.number_of_columns() == 0) return;
+    if (nmax == 0)
+    {
+        std::fill(values, values + 9 * nvalues, 0.0);
+
+        return;
+    }
 
     errors::assertMsgCritical(dimensions.size() == nprim_a * nprim_b,
                               std::string("Dimensions do not match the pairs of primitives"));
@@ -125,20 +132,45 @@ compute_ss_nuclear_potential(double                    *values,
 
             const auto fnpot = 2.0 * mathconst::pi_value() / p * a_norms[i] * b_norms[j];
 
+            const auto fb = a_exps[i] / p;
+
             const auto fc = b_exps[j] / p;
+
+            simdfunc::compute_pb(buffer, coordinates, 0, ncols, fb);
 
             for (size_t ic = 0; ic < charges.size(); ic++)
             {
                 const auto fz = fnpot * charges[ic];
 
-                simdfunc::compute_pc(buffer, coordinates, 0, points, ic, ncols, fc);
+                simdfunc::compute_pc(buffer, coordinates, 3, points, ic, ncols, fc);
 
-                simdfunc::compute_full_npot_boys_function(buffer, coordinates, 3, 0, 0, ncols,
+                simdfunc::compute_full_npot_boys_function(buffer, coordinates, 6, 3, 2, ncols,
                                                           fz, mu, p);
 
-                compute_ctr_ss_nuclear_potential_0(values, nvalues, buffer, 4, ncols);
+                compute_prim_sp_nuclear_potential_0(buffer, 10, 0, 3, 7, 8, ncols);
+
+                compute_prim_sp_nuclear_potential_0(buffer, 13, 0, 3, 8, 9, ncols);
+
+                compute_prim_sd_nuclear_potential_0(buffer, 16, 0, 3, 7, 10, 8, 13, ncols, p);
+
+                simdfunc::contract_primitives(buffer, 22, 10, 3, ncols);
+
+                simdfunc::contract_primitives(buffer, 25, 16, 6, ncols);
             }
         }
+    }
+
+    simdtrf::compute_hrr_pp(buffer, coordinates, 31, 22, 25, 1, nmax);
+
+    simdtrf::transform_p_inner(buffer, 40, 31, 3, 1, nmax);
+
+    simdtrf::transform_p_outer(values, nvalues, buffer, 40, 3, nmax);
+
+    for (size_t m = 0; m < 9; m++)
+    {
+        auto *pv = values + m * nvalues;
+
+        std::fill(pv + nmax, pv + nvalues, 0.0);
     }
 }
 

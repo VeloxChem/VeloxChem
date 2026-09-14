@@ -31,27 +31,28 @@
 //  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
-#ifndef SimdNuclearPotentialRecSS_hpp
-#define SimdNuclearPotentialRecSS_hpp
+#include "SimdNuclearPotentialCtrVrrSS.hpp"
 
-#include <cstddef>
-#include <vector>
-#include "BasisFunction.hpp"
-#include "SimdMatrix.hpp"
+#include "SimdAlign.hpp"
 
 namespace simdnpot {  // simdnpot namespace
 
-/// @brief Computes the integrals of one combination of basis functions.
-auto compute_ss_nuclear_potential(double                    *values,
-                                  const size_t               nvalues,
-                                  const CBasisFunction      &bra,
-                                  const CBasisFunction      &ket,
-                                  const CSimdMatrix         &coordinates,
-                                  const std::vector<double> &charges,
-                                  const std::vector<double> &points,
-                                  CSimdMatrix               &buffer,
-                                  const double               threshold) -> void;
+auto
+compute_ctr_ss_nuclear_potential_0(double *values, const size_t nvalues, CSimdMatrix &buffer,
+                                   const size_t ss, const size_t ncols) -> void
+{
+    // NOTE: the rows of the values are not aligned, starting at this combination's
+    // offset in the values block, so they are kept out of the clause below.
+
+    auto *g_0 = values + 0 * nvalues;
+
+    const auto *ss_0 = buffer.data(ss + 0);
+
+#pragma omp simd aligned(ss_0 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        g_0[k] += ss_0[k];
+    }
+}
 
 }  // namespace simdnpot
-
-#endif /* SimdNuclearPotentialRecSS_hpp */
