@@ -67,3 +67,8 @@ target_sources(vlxobjs
     SimdTransferPO.cpp
     SimdTransferPP.cpp
   )
+
+target_include_directories(vlxobjs
+  PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}>
+  )

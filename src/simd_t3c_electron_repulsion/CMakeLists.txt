@@ -1,5 +1,7 @@
 target_sources(vlxobjs
   PRIVATE
+    SimdRIFockDriver.cpp
+    SimdRIJKFockDriver.cpp
     SimdThreeCenterElectronRepulsionCtrVrrSSS.cpp
     SimdThreeCenterElectronRepulsionDriver.cpp
     SimdThreeCenterElectronRepulsionFunc.cpp

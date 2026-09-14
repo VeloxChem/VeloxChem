@@ -16,6 +16,7 @@ target_sources(vlxobjs
     GtoPairBlock.cpp
     GtoPairBlockFunc.cpp
     MolecularBasis.cpp
+    PackedLinearAlgebra.cpp
   )
 
 target_include_directories(vlxobjs
