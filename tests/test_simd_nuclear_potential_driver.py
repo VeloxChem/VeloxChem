@@ -1,3 +1,4 @@
+import re
 import subprocess
 import sys
 import textwrap
@@ -7,6 +8,7 @@ import pytest
 
 from veloxchem.veloxchemlib import AtomBasis, BasisFunction, MolecularBasis
 from veloxchem.veloxchemlib import NuclearPotentialDriver
+from veloxchem.veloxchemlib import OverlapDriver
 from veloxchem.veloxchemlib import SimdNuclearPotentialDriver
 from veloxchem.molecule import Molecule
 
@@ -25,6 +27,60 @@ from veloxchem.molecule import Molecule
 # transformation nor the angular coupling of the diagonal blocks -- and the nuclear
 # potential, unlike the overlap, has no closed form there and computes them with the
 # same kernels. Every case above s is what puts the driver through its paces.
+
+
+L_OF = {"s": 0, "p": 1, "d": 2, "f": 3, "g": 4, "h": 5, "i": 6}
+
+GEOMETRY = """O  0.00 0.00 0.00
+H  0.00 0.00 0.95
+N  2.60 0.30 0.10
+C  1.40 1.70 0.20"""
+
+
+def _veloxchem_keys(molecule, basis):
+    """(atom, l, index within l, m) for each veloxchem AO, in its own order.
+
+    Its labels read "  1 O   1d-2": a one based atom, the element, then the index of
+    the function within its angular momentum, the letter of that momentum, and the
+    magnetic quantum number as a signed integer.
+    """
+    keys = []
+
+    for label in basis.get_ao_basis_map(molecule):
+        fields = label.split()
+
+        index, letter, magnetic = re.match(
+            r"(\d+)([spdfghi])([+-]?\d*)$", fields[2]).groups()
+
+        keys.append((int(fields[0]) - 1, L_OF[letter], int(index),
+                     int(magnetic or 0)))
+
+    return keys
+
+
+def _pyscf_keys(pmol):
+    """The same key for each pyscf AO, in pyscf's order.
+
+    Its structured labels read (0, "O", "3d", "xy"). The index within the momentum is
+    n - l, and the components of a shell run with m from -l upwards -- except l of
+    one, which runs x, y, z, that is m of +1, -1, 0.
+    """
+    order, keys = {}, []
+
+    for atom, _symbol, shell, _component in pmol.ao_labels(fmt=False):
+        momentum = L_OF[shell[-1]]
+
+        index = int(shell[:-1]) - momentum
+
+        seen = order.get((atom, momentum, index), 0)
+
+        order[(atom, momentum, index)] = seen + 1
+
+        magnetic = (1, -1, 0)[seen] if momentum == 1 else -momentum + seen
+
+        keys.append((atom, momentum, index, magnetic))
+
+    return keys
 
 
 def atom_basis_of(exponents, coefficients, identifier, momenta):
@@ -216,3 +272,70 @@ class TestSimdNuclearPotentialDriver:
             assert np.max(np.abs(reference)) == 0.0, (
                 "the plain driver no longer returns zeros at h, so these blocks can "
                 "and should be compared against it")
+
+    def test_h_and_i_against_pyscf(self, molecule):
+        """What the plain driver cannot be a reference for, pyscf can.
+
+        Not through cc-pV6Z, though: veloxchem and pyscf disagree about what that
+        basis contains -- the ss block of the overlap differs, before any angular
+        momentum enters -- so it settles nothing about i functions. The exponents are
+        written out here and handed to both codes, which removes the question of
+        whose basis file is right from the question of whether the kernels are.
+
+        The AO map is built from the quantum numbers of the two labellings and then
+        verified against the overlap. A map which is wrong gives a confident wrong
+        answer, so nothing is compared until the overlap agrees.
+        """
+        gto = pytest.importorskip("pyscf.gto",
+                                  reason="pyscf is the only reference above g")
+
+        exponents, coefficients = [3.2, 0.85], [0.6, 0.4]
+
+        letters = "spdfghi"
+
+        for momenta in [(5,), (6,), (5, 6), (0, 2, 4, 6)]:
+
+            basis = MolecularBasis()
+
+            for identifier in molecule.get_identifiers():
+                basis.add(atom_basis_of(exponents, coefficients, int(identifier),
+                                        momenta))
+
+            shells = [[momentum] + [[e, c] for e, c
+                                    in zip(exponents, coefficients)]
+                      for momentum in momenta]
+
+            geometry = "; ".join(" ".join(line.split())
+                                 for line in GEOMETRY.strip().split("\n"))
+
+            pmol = gto.M(atom=geometry, unit="angstrom",
+                         basis={"O": shells, "H": shells, "N": shells,
+                                "C": shells})
+
+            order = {key: index for index, key
+                     in enumerate(_pyscf_keys(pmol))}
+
+            perm = np.array([order[key] for key
+                             in _veloxchem_keys(molecule, basis)], dtype=int)
+
+            overlap = np.max(np.abs(
+                OverlapDriver().compute(molecule, basis).to_numpy()
+                - pmol.intor("int1e_ovlp")[np.ix_(perm, perm)]))
+
+            assert overlap < 1.0e-10, (
+                f"the AO map does not verify for {momenta}: overlap {overlap:.3e}")
+
+            # NOTE: pyscf carries the charge of the electron and the drivers here do
+            # not, so the reference is negated to their convention.
+
+            reference = -pmol.intor("int1e_nuc")[np.ix_(perm, perm)]
+
+            computed = SimdNuclearPotentialDriver().compute(
+                molecule, basis).to_numpy(basis)
+
+            scale = np.max(np.abs(reference))
+
+            label = "".join(letters[m] for m in momenta)
+
+            assert np.max(np.abs(computed - reference)) / scale < 1.0e-9, (
+                f"{label} disagrees with pyscf")
