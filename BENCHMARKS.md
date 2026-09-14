@@ -7340,3 +7340,50 @@ they do not agree.** The driver's takes them from OpenMP and is untouched by a l
 pinning the process; numpy's sizes a pool from the affinity mask and is ruined by it.
 Reporting one of them as though it described the process is how a run on two hundred
 and fifty six cores came to be labelled as four.
+
+## The math library, and what the Eigen fallback costs
+
+The dense linear algebra has two implementations. `Makefile.setup` selects a hardware
+math library per platform and defines `VLX_USE_MATHLIB`; where no library is named the
+define is absent and an implementation in Eigen is compiled in its place, so a machine
+without one needs no further change. Three files carry the branch -- the packed linear
+algebra, which inverts the metric, and the two resolution of the identity drivers,
+which hold the half transformation, the triangular solve and the rank k update of the
+exchange.
+
+The two built on this laptop, an M4 Max of fourteen cores, Accelerate against Eigen.
+The Fock build of an iteration:
+
+| molecule, basis, way | Accelerate | Eigen | Eigen is |
+| --- | ---: | ---: | ---: |
+| caffeine def2-svp, held | 0.030 s | 0.046 s | 1.53 |
+| caffeine def2-svp, direct | 0.131 s | 0.499 s | **3.81** |
+| caffeine def2-tzvp, held | 0.120 s | 0.177 s | 1.48 |
+| caffeine def2-tzvp, direct | 0.430 s | 1.208 s | **2.81** |
+| tagrisso def2-svp, held | 0.845 s | 1.491 s | 1.76 |
+| tagrisso def2-svp, direct | 3.155 s | 23.761 s | **7.53** |
+| tagrisso def2-tzvp, held | 3.937 s | 6.244 s | 1.59 |
+| tagrisso def2-tzvp, direct | 9.801 s | 51.578 s | **5.26** |
+
+The energies agree to the twelfth decimal in every row, which is what makes the
+comparison a comparison.
+
+**The two ways are not affected alike, and the reason is which operations they use.**
+The way which holds the B vectors inverts the metric once, at setup, and its build is a
+half transformation and a rank k update -- both matrix products, which Eigen does
+respectably: 1.5 to 1.8 times the cost. The direct way solves the Cholesky factor of
+the metric against the half transformed integrals **on every build**, and that solve is
+where Eigen is weakest: 2.8 to 7.5 times, and worse the larger the molecule.
+
+**The setup divides the same way.** Forming the B vectors of tagrisso def2-tzvp took
+31.73 seconds against 58.01, and at def2-svp 8.11 against 15.21 -- 1.8 in both, which
+is the matrix product figure, as it should be.
+
+**The whole calculation of tagrisso def2-tzvp by the direct way was 197.53 seconds
+against 1020.19**, a factor of 5.2, from a build flag.
+
+**What to take from it.** The Eigen path is a fallback for correctness and not for
+speed, and the difference is large enough to change which way of building is the
+quicker one: with Accelerate the direct way costs 2.5 times the held way at tagrisso
+def2-tzvp, and with Eigen it costs 8.3. A machine built without a math library named
+would reach conclusions about this driver which do not hold on a machine with one.
