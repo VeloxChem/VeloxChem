@@ -56,17 +56,15 @@ from .util import (
     METAL_ELEMENTS, SUPPORTED_METAL_ELEMENTS, METAL_FORMAL_CHARGES,
     DONOR_ELEMENTS, BIDENTATE_ASYMMETRY, METAL_BOND_CUTOFF,
     REPORT_CUTOFF_MARGIN, REPORT_CUTOFF, CAP_BOND_LENGTH,
-    WEAK_BRIDGE_TOLERANCE, SEEDED_FROM_REQUEST, SEEDED_FROM_TABLE,
+    SEEDED_FROM_REQUEST, SEEDED_FROM_TABLE,
     SEEDED_FROM_GEOMETRY, SEEDED_EQUILIBRIUM_LABELS, BRIDGING_RESIDUES,
     CARBOXYLATE_RESIDUES, BACKBONE_ATOM_NAMES, UNTRUNCATABLE_RESIDUES,
-    VARIANT_CHARGES, GEOMETRY_FILE, HESSIAN_FILE, CHARGES_FILE,
-    BETA_CARBON_COMMENT, CAP_COMMENT, UNPARAMETERIZED_COMMENT,
+    VARIANT_CHARGES, BETA_CARBON_COMMENT, CAP_COMMENT, UNPARAMETERIZED_COMMENT,
     UFF_TYPE_COMMENT, DEFAULT_METAL_BOND_FORCE_CONSTANT,
     DEFAULT_METAL_ANGLE_FORCE_CONSTANT,
-    DEFAULT_METAL_PLANARITY_FORCE_CONSTANT, _folder_file, residue_label,
-    _site_index_map, empty_request, connectivity_bonds, extract_pairs,
-    get_metal_keys, active_site_residues, check_variant,
-    redistribute_cap_charges
+    DEFAULT_METAL_PLANARITY_FORCE_CONSTANT, residue_label,
+    _site_index_map, empty_request, connectivity_bonds, get_metal_keys,
+    active_site_residues, check_variant, redistribute_cap_charges
 )
 
 try:
@@ -2688,36 +2686,6 @@ def mm_optimize_active_site(active_site,
 # ----------------------------------------------------------------------
 
 
-def d4_charges(active_site, ostream=None):
-    """
-    Returns D4 partial charges for the active site.
-
-    The fallback wherever charges are wanted and none were fitted. They
-    are cheap - a fraction of a millisecond - and they sum to the charge
-    of the site exactly, but they are not RESP: on a binuclear zinc site
-    they put about 0.3 e less on each metal. Good enough to relax a
-    geometry on, and worth knowing about before they reach anything else.
-
-    :param active_site:
-        The active site.
-
-    :return:
-        The charges as an (N,) numpy array, capping hydrogens included.
-    """
-
-    ostream = printing.stream(ostream)
-
-    molecule = active_site['molecule']
-    charges = np.array(molecule.get_partial_charges(molecule.get_charge()))
-
-    ostream.print_info(
-        f'Using D4 partial charges: {charges.size} atoms summing to '
-        f'{charges.sum():+.3f} e. No RESP charges were supplied.')
-    ostream.flush()
-
-    return charges
-
-
 # ----------------------------------------------------------------------
 # fitting
 # ----------------------------------------------------------------------
@@ -2957,12 +2925,8 @@ def _add_metal_planarity_impropers(
 
 def build_forcefield(
         active_site,
-        hessian=None,
-        partial_charges=None,
+        partial_charges,
         metal_blind_typing=True,
-        average_metal_terms=False,
-        metal_hessian_fitting_method='seminario',
-        prune_weak_bridge_bonds=True,
         reparameterize_metal_angles=True,
         comm=None,
         ostream=None,
@@ -2970,35 +2934,29 @@ def build_forcefield(
         default_metal_bond_force_constant=DEFAULT_METAL_BOND_FORCE_CONSTANT,
         metal_angle_equilibria=None,
         metal_bond_equilibria=None,
-        protected_bonds=None,
         bond_equilibria=None,
-        weak_bridge_tolerance=WEAK_BRIDGE_TOLERANCE,
         add_metal_planarity_impropers=True,
         metal_planarity_force_constant=DEFAULT_METAL_PLANARITY_FORCE_CONSTANT,
         mute_generator=True):
     """
-    Builds the active site force field and fits the metal terms.
+    Builds the active site force field with seeded metal terms.
 
-    Without a Hessian the metal terms are seeded by _seed_metal_terms
-    instead of fitted, which is the force field the crude pre-QM pass
-    runs on: getting the equilibrium geometry roughly right matters far
-    more than the stiffness at that stage.
+    The metal terms are seeded by _seed_metal_terms rather than fitted:
+    equilibria measured on the geometry unless a table or a request
+    overrides them, and a flat default stiffness. That is the force field
+    the crude pre-QM pass runs on, where getting the equilibrium geometry
+    roughly right matters far more than the stiffness, and it is what
+    QmParameterizer.fit_forcefield fits the metal terms of once there is a
+    Hessian.
 
-    :param hessian:
-        The Hessian as a (3N, 3N) numpy array. If None, default values for the metal terms are used instead of fitted.
     :param partial_charges:
-        The partial charges fitted on the active site. The charge of the
-        capping hydrogens is redistributed over the remaining atoms before
-        they are applied, since the caps do not exist in the protein.
-        If None, D4 charges are used.
-    :param protected_bonds:
-        The metal bond keys the weak bridge pruning must leave alone,
-        which is what a bond added by hand needs: manual_bond_keys turns
-        the records of the binding modes into them.
+        The partial charges of the active site. The charge of the capping
+        hydrogens is redistributed over the remaining atoms before they are
+        applied, since the caps do not exist in the protein. util.d4_charges
+        is the cheap choice when none were fitted.
     :param bond_equilibria:
         Equilibrium distances in nanometers for individual metal bonds,
-        from manual_bond_equilibria. Only the seeded pass reads them: with
-        a Hessian the equilibria come from the geometry it was computed on.
+        from manual_bond_equilibria.
     :param metal_blind_typing:
         Whether the generator perceives the atom types as if the metal
         bonds were not there, so that a coordinating residue is typed as
@@ -3008,15 +2966,9 @@ def build_forcefield(
     :param add_metal_planarity_impropers:
         Whether to add a weak improper nudging each metal into the plane
         of a coordinating histidine ring or a bidentate carboxylate; see
-        _add_metal_planarity_impropers. Added on both passes -- the seeded
-        one and the fitted one -- since both call this function.
+        _add_metal_planarity_impropers.
     :param metal_planarity_force_constant:
         The barrier of that improper, in kJ/mol.
-    :param metal_hessian_fitting_method:
-        The method MMForceFieldGenerator.reparameterize fits the metal
-        bonds and angles with: 'seminario' (default), 'improved-seminario'
-        or 'phf'/'phf(k)'. Only used when a Hessian is given; the seeded
-        pass ignores it.
     :param mute_generator:
         Whether the generator reports its own work. It names every
         parameter it looks up and every bond and angle it re-measures,
@@ -3031,10 +2983,6 @@ def build_forcefield(
 
     comm = MPI.COMM_WORLD if comm is None else comm
     ostream = printing.stream(ostream)
-
-    assert_msg_critical(
-        not isinstance(hessian, str), 'build_forcefield: the Hessian must be '
-        'a numpy array.')
 
     molecule = active_site['molecule']
     n_atoms = molecule.number_of_atoms()
@@ -3066,9 +3014,6 @@ def build_forcefield(
     # take effect, also resets partial_charges to None, and resp=False
     # then fills them with zeros. Assigning them beforehand is silently
     # discarded.
-    if partial_charges is None:
-        partial_charges = d4_charges(active_site, ostream=ostream)
-
     partial_charges = np.asarray(partial_charges)
     assert_msg_critical(
         partial_charges.shape == (n_atoms, ), 'build_forcefield: expected '
@@ -3085,56 +3030,25 @@ def build_forcefield(
 
     bonds, angles = get_metal_keys(forcefield, active_site)
 
-    # switching the angles off has to leave them at whatever the generator
-    # guessed in both passes, so it is gated once, here
+    # switching the angles off leaves them at whatever the generator
+    # guessed, here and in the fit
     if not reparameterize_metal_angles:
         angles = []
 
-    if hessian is None:
-        _seed_metal_terms(
-            forcefield,
-            active_site,
-            bonds,
-            angles,
-            default_metal_angle_force_constant=(
-                default_metal_angle_force_constant),
-            default_metal_bond_force_constant=default_metal_bond_force_constant,
-            metal_angle_equilibria=metal_angle_equilibria,
-            metal_bond_equilibria=metal_bond_equilibria,
-            bond_equilibria=bond_equilibria,
-            ostream=ostream)
-    else:
-        hessian = np.asarray(hessian)
-        assert_msg_critical(
-            hessian.shape == (3 * n_atoms, 3 * n_atoms),
-            'build_forcefield: Hessian shape '
-            f'{hessian.shape} does not match {(3 * n_atoms, 3 * n_atoms)}')
+    _seed_metal_terms(
+        forcefield,
+        active_site,
+        bonds,
+        angles,
+        default_metal_angle_force_constant=default_metal_angle_force_constant,
+        default_metal_bond_force_constant=default_metal_bond_force_constant,
+        metal_angle_equilibria=metal_angle_equilibria,
+        metal_bond_equilibria=metal_bond_equilibria,
+        bond_equilibria=bond_equilibria,
+        ostream=ostream)
 
-        forcefield.reparameterize(hessian,
-                                  reparameterize_keys=bonds + angles,
-                                  average_metal_terms=average_metal_terms,
-                                  method=metal_hessian_fitting_method)
-
-        if prune_weak_bridge_bonds:
-            bonds, angles = _prune_weak_bridges(
-                forcefield,
-                active_site,
-                bonds,
-                angles,
-                weak_bridge_tolerance=weak_bridge_tolerance,
-                protected=protected_bonds,
-                ostream=ostream)
-
-        _check_force_constants(forcefield,
-                               active_site,
-                               bonds,
-                               angles,
-                               hessian,
-                               ostream=ostream)
-
-    # after the pruning, so that a mu-1,3 arm just dropped cannot leave a
-    # bidentate improper behind it; outside the Hessian branch, since the
-    # seeded pass wants this nudge just as much as the fitted one does
+    # A fit that later prunes a weak bridge arm takes every improper across
+    # the dropped bond with it, so one added here cannot outlive its bond.
     if add_metal_planarity_impropers:
         _add_metal_planarity_impropers(
             forcefield,
@@ -3142,9 +3056,8 @@ def build_forcefield(
             force_constant=metal_planarity_force_constant,
             ostream=ostream)
 
-    # after the pruning, so that what is reported is what is handed back,
-    # and outside the Hessian branch, since the typing that puts a term
-    # here is done by create_topology either way
+    # the typing that puts a term here is done by create_topology, and a
+    # fit of the metal terms changes none of it
     _print_check_atom_types(forcefield,
                             active_site,
                             metal_blind_typing=metal_blind_typing,
@@ -3299,359 +3212,6 @@ def _seed_metal_terms(
     ostream.flush()
 
 
-def _prune_weak_bridges(forcefield,
-                        active_site,
-                        bonds,
-                        angles,
-                        weak_bridge_tolerance=WEAK_BRIDGE_TOLERANCE,
-                        protected=None,
-                        ostream=None):
-    """
-    Drops the long arm of a bridging residue that the fit gave no force
-    constant.
-
-    A residue that reaches two metals can hold one of them far more
-    weakly than the other, whether it does the bridging through one atom
-    that binds both (mu-1,1) or through two atoms of the same group that
-    take one metal each (a mu-1,3 carboxylate). Both are the same
-    situation seen from the residue, so the residue is what is looked at:
-    the metal bonds of everything the metals leave connected together.
-
-    Two independent things have to agree before an arm is dropped: the
-    Hessian, by giving it no force constant at all, and the geometry, by
-    holding it at least weak_bridge_tolerance further out than the
-    shortest metal bond of that same residue. A zero on its own says
-    nothing here - it can equally mean a geometry that is not stationary,
-    or a Hessian that never covered the pair - which is why the distance
-    has to agree.
-
-    A bond with no stiffness is not the same thing as no bond: it leaves
-    the pair at an equilibrium the dynamics never restores while its
-    angles, torsions and exclusions all still act as though the two were
-    bonded. So the bond goes, and with it every angle, torsion and
-    improper that crosses it, the entry in the generator's own
-    connectivity matrix and the 1-4 pairs derived from it. The generator
-    is left describing one topology rather than two: a stale matrix would
-    put the bond straight back the next time anything called
-    create_topology on it, and a stale pair list keeps a scaled 1-4
-    interaction for atoms that are no longer 1-4 at all.
-
-    The active site's connectivity is not this function's to rewrite --
-    it must not mutate its arguments -- so a caller that keeps a site
-    beside the force field lifts it across with
-    connectivity_from_forcefield.
-
-    Only the longer arms are ever dropped, so a bridging residue can
-    never lose the contact it is held by.
-
-    :param forcefield:
-        The force field being built, whose terms are removed in place.
-    :param active_site:
-        The active site, for the metal indices and the geometry the fit
-        was made on.
-    :param bonds:
-        The metal bond keys.
-    :param angles:
-        The metal angle keys.
-
-    :return:
-        The metal bond and angle keys that are left.
-    """
-
-    ostream = printing.stream(ostream)
-
-    # a bond asked for by hand is a decision, and the two things this
-    # reads - a zero force constant and a long distance - are exactly what
-    # a hand-added bond looks like when the Hessian does not cover it, so
-    # leaving it in reach of the heuristic would take it straight back out
-    protected = {tuple(key) for key in (protected or ())}
-
-    metals = set(active_site['metal_indices'])
-    coordinates = active_site['molecule'].get_coordinates_in_angstrom()
-    labels = active_site['molecule'].get_labels()
-    fragments = _ligand_fragments(forcefield, metals)
-
-    # the metal bonds of each residue, keyed by the fragment it is
-    reached = {}
-    for key in bonds:
-        ligands = [index for index in key if index not in metals]
-        if len(ligands) != 1:
-            # a metal-metal bond belongs to no residue
-            continue
-        reached.setdefault(fragments[ligands[0]], []).append(key)
-
-    removed = []
-    for keys in reached.values():
-        touched = {index for key in keys for index in key if index in metals}
-        if len(touched) < 2:
-            # one metal is a grip, however many atoms it is made with
-            continue
-
-        def length(key):
-            return float(
-                np.linalg.norm(coordinates[key[0]] - coordinates[key[1]]))
-
-        lengths = {key: length(key) for key in keys}
-        shortest = min(lengths.values())
-
-        for key in keys:
-            if key in protected:
-                continue
-            if forcefield.bonds[key]['force_constant'] != 0.0:
-                continue
-            if lengths[key] - shortest < weak_bridge_tolerance:
-                continue
-            removed.append((key, lengths[key], shortest))
-
-    if not removed:
-        return bonds, angles
-
-    for key, length, shortest in removed:
-        pair = set(key)
-        names = '-'.join(labels[index] for index in key)
-
-        crossing = {
-            'angle': _terms_crossing(forcefield.angles, pair),
-            'torsion': _terms_crossing(forcefield.dihedrals, pair),
-            'improper': _terms_crossing(forcefield.impropers, pair, path=False),
-        }
-
-        del forcefield.bonds[key]
-        for table, found in ((forcefield.angles, crossing['angle']),
-                             (forcefield.dihedrals, crossing['torsion']),
-                             (forcefield.impropers, crossing['improper'])):
-            for crossed in found:
-                del table[crossed]
-
-        forcefield.connectivity_matrix[key[0], key[1]] = 0
-        forcefield.connectivity_matrix[key[1], key[0]] = 0
-
-        counts = ', '.join(f'{len(found)} {name}(s)'
-                           for name, found in crossing.items())
-        ostream.print_info(
-            f'Removed the bridging bond {key} {names}: it was fitted to '
-            f'no force constant and is {length:.2f} A long against '
-            f'{shortest:.2f} A for the shortest metal bond of the same '
-            f'residue. {counts} crossing it were removed with it.')
-
-    # The 1-4 pairs are a function of the connectivity and are not a table
-    # a term can be deleted out of: a pair reached by a second dihedral path
-    # is still 1-4 once this bond is gone, so filtering by key would drop
-    # pairs that must stay. Re-deriving them off the pruned matrix gives
-    # exactly what create_topology would have produced had the bond never
-    # been there, which is the point.
-    *_, forcefield.pairs = forcefield.generate_topology_indices(len(labels))
-
-    ostream.flush()
-
-    # filtered rather than re-derived, so that an angle list the caller
-    # emptied on purpose stays empty
-    return ([key for key in bonds if key in forcefield.bonds],
-            [key for key in angles if key in forcefield.angles])
-
-
-def _ligand_fragments(forcefield, metals):
-    """
-    Numbers the residues a force field holds, as what the metals leave
-    connected together.
-
-    The bonds of the force field are walked rather than the connectivity
-    matrix, so that what counts as one residue is what this force field
-    is actually wired as. A metal is not part of any of them, which is
-    the whole point: it is what would otherwise join two residues into
-    one.
-
-    :param forcefield:
-        The force field.
-    :param metals:
-        The indices of the metal centers.
-
-    :return:
-        A dictionary from atom index to fragment number, holding every
-        atom that is not a metal.
-    """
-
-    neighbors = {}
-    for first, second in forcefield.bonds:
-        if first in metals or second in metals:
-            continue
-        neighbors.setdefault(first, set()).add(second)
-        neighbors.setdefault(second, set()).add(first)
-
-    fragments = {}
-    count = 0
-
-    for atom in forcefield.atoms:
-        if atom in metals or atom in fragments:
-            continue
-
-        stack = [atom]
-        while stack:
-            current = stack.pop()
-            if current in fragments:
-                continue
-            fragments[current] = count
-            stack.extend(neighbors.get(current, set()) - fragments.keys())
-
-        count += 1
-
-    return fragments
-
-
-def _terms_crossing(table, pair, path=True):
-    """
-    Finds the terms of one table that act across a bond.
-
-    A bond, an angle and a torsion are paths, so a term crosses the bond
-    when the two atoms are neighbours in its key. An improper is not a
-    path - its central atom is written first, with the substituents after
-    it - so there it is enough that both atoms are in the key at all.
-
-    :param table:
-        The bonds, angles, dihedrals or impropers of a force field.
-    :param pair:
-        The two atoms of the bond, as a set.
-    :param path:
-        Whether the keys of the table are paths.
-
-    :return:
-        The keys that cross the bond.
-    """
-
-    if not path:
-        return [key for key in table if pair <= set(key)]
-
-    return [
-        key for key in table if any({key[index], key[index + 1]} == pair
-                                    for index in range(len(key) - 1))
-    ]
-
-
-def _check_force_constants(forcefield,
-                           active_site,
-                           bonds,
-                           angles,
-                           hessian=None,
-                           ostream=None):
-    """
-    Warns about metal terms whose force constant was fitted to zero, and
-    says which of the two reasons put it there.
-
-    A term reads its own blocks of the Hessian and nothing else: a bond
-    (i, j) reads the (i, j) block and an angle (i, j, k) reads the (i, j)
-    and (j, k) blocks. So a zero comes from one of two places, and the fix
-    is not the same:
-
-    - **the Hessian does not cover the term.** compute_hessian is
-      restricted to the pairs hessian_pairs walks out of the connectivity,
-      and everything else is left at zero. A bond that was not there when
-      those pairs were taken, and further out than
-      partial_hessian_cutoff was forgiving of, has nothing to project,
-      which is what a Hessian reused from a folder or supplied by hand
-      runs into when the coordination has moved on since. Only recomputing
-      it on this coordination fixes that.
-    - **the projection was negative and Seminario clamped it**, which
-      means the geometry is not stationary along that coordinate. On an
-      unrelaxed structure this typically wipes out the long, strained
-      metal-ligand bonds, which are exactly the ones that matter for a
-      bridged binuclear site.
-
-    Without a Hessian the two cannot be told apart and everything is
-    reported as the second.
-
-    :param bonds:
-        The metal bond keys.
-    :param angles:
-        The metal angle keys.
-    :param hessian:
-        The Hessian the terms were fitted to, for telling an uncovered
-        term from a clamped one.
-    """
-
-    ostream = printing.stream(ostream)
-
-    labels = active_site['molecule'].get_labels()
-
-    zero = [(key, 'bond') for key in bonds
-            if forcefield.bonds[key]['force_constant'] == 0.0]
-    zero += [(key, 'angle') for key in angles
-             if forcefield.angles[key]['force_constant'] == 0.0]
-
-    if not zero:
-        return
-
-    n_bonds = sum(1 for _, kind in zero if kind == 'bond')
-    n_angles = len(zero) - n_bonds
-
-    uncovered = [(key, kind) for key, kind in zero
-                 if not _hessian_covers(hessian, key)]
-    clamped = [pair for pair in zero if pair not in uncovered]
-
-    def report(terms):
-        for key, kind in terms:
-            names = '-'.join(labels[index] for index in key)
-            ostream.print_warning(
-                f'  zero force constant: {kind} {key} {names}')
-
-    ostream.print_warning(
-        f'{n_bonds} of {len(bonds)} metal bond(s) and {n_angles} of '
-        f'{len(angles)} metal angle(s) got a zero force constant.')
-
-    if uncovered:
-        ostream.print_warning(
-            f'{len(uncovered)} of them are not covered by the Hessian at '
-            'all: it was restricted to the atom pairs of a different '
-            'coordination, so it holds no data for these terms. Recompute '
-            'it on this one rather than reusing it.')
-        report(uncovered)
-
-    if clamped:
-        ostream.print_warning(
-            f'{len(clamped)} of them were clamped from a negative '
-            'projection. The Hessian is most likely not evaluated at a '
-            'stationary point; run optimize_active_site first.')
-        report(clamped)
-
-    ostream.flush()
-
-
-def _hessian_covers(hessian, key):
-    """
-    Says whether a Hessian holds anything for one term.
-
-    The blocks a term reads are the bonded pairs of its key, which is what
-    extract_pairs walks out of the connectivity: (i, j) for a bond and
-    (i, j) together with (j, k) for an angle. A block left at exactly zero
-    was never computed, since compute_hessian fills only the pairs it is
-    given.
-
-    :param hessian:
-        The Hessian, or None when there is none to look at.
-    :param key:
-        The bond or angle key.
-
-    :return:
-        True when every block the term reads holds something, and when
-        there is no Hessian to say otherwise.
-    """
-
-    if hessian is None:
-        return True
-
-    hessian = np.asarray(hessian)
-    pairs = [(key[index], key[index + 1]) for index in range(len(key) - 1)]
-
-    for first, second in pairs:
-        # the driver fills the pairs it is given, and a key is not stored
-        # in any particular order, so both orientations are looked at
-        block = hessian[3 * first:3 * first + 3, 3 * second:3 * second + 3]
-        mirror = hessian[3 * second:3 * second + 3, 3 * first:3 * first + 3]
-        if not np.any(block) and not np.any(mirror):
-            return False
-
-    return True
-
-
 def _print_check_atom_types(forcefield,
                             active_site,
                             metal_blind_typing=True,
@@ -3795,250 +3355,3 @@ def _print_check_atom_types(forcefield,
         report(elsewhere)
 
     ostream.flush()
-
-
-# ----------------------------------------------------------------------
-# persistence
-# ----------------------------------------------------------------------
-
-
-def _resolve_source(supplied, filename, label, folder=None, ostream=None):
-    """
-    Applies the precedence the three resolvers share: what the caller
-    handed in beats what an earlier run left in the working folder, and
-    neither means there is nothing to use.
-
-    Stated once here rather than three times, so the rule cannot come to
-    mean different things for a geometry, a Hessian and a set of charges.
-
-    Where a value came from is announced here for the same reason. This is
-    the only place that knows the answer, and a caller that guessed said
-    'given to build_forcefield' about a file a resumed run had left in the
-    folder -- misattributing the single most useful fact when a reused
-    folder produces a wrong fit.
-
-    :param supplied:
-        What the caller passed, or None.
-    :param filename:
-        The name the step writes its result under, one of the file name
-        constants.
-    :param label:
-        What the value is, for the announcement.
-    :param folder:
-        The working folder to fall back on.
-    :param ostream:
-        The output stream. Where the value came from is announced on it.
-
-    :return:
-        The tuple of the source and the flag that is True when it came
-        from the folder rather than from the caller. The source is None
-        when there is nothing to use.
-    """
-
-    ostream = printing.stream(ostream)
-
-    if supplied is not None:
-        ostream.print_info(f'Using the {label} supplied by the caller.')
-        ostream.flush()
-        return supplied, False
-
-    source = _folder_file(filename, folder=folder)
-
-    if source is None:
-        return None, False
-
-    ostream.print_info(f'Reusing {filename} from {folder}.')
-    ostream.flush()
-
-    return source, True
-
-
-def _resolve_optimized_geometry(active_site,
-                                folder=None,
-                                optimized_geometry=None,
-                                ostream=None):
-    """
-    Validates a geometry supplied through optimized_geometry, or left
-    behind in the working folder by an earlier run. The element sequence is checked against the extracted active site
-    :param active_site:
-        The active site, to validate against.
-
-    :return:
-        The molecule, or None if there is nothing to use.
-    """
-
-    ostream = printing.stream(ostream)
-
-    source, _ = _resolve_source(optimized_geometry,
-                                GEOMETRY_FILE,
-                                'geometry',
-                                folder=folder,
-                                ostream=ostream)
-
-    if source is None:
-        return None
-
-    if isinstance(source, Molecule):
-        molecule = Molecule(source)
-    else:
-        path = Path(source)
-        assert_msg_critical(
-            path.is_file(), '_resolve_optimized_geometry: the geometry file '
-            f'{path} not found')
-        molecule = Molecule.read_xyz_file(str(path))
-
-    active_site = active_site['molecule']
-
-    assert_msg_critical(
-        molecule.number_of_atoms() == active_site.number_of_atoms(),
-        '_resolve_optimized_geometry: the geometry has '
-        f'{molecule.number_of_atoms()} atoms but the extracted active site '
-        f'has {active_site.number_of_atoms()}')
-
-    assert_msg_critical(
-        list(molecule.get_labels()) == list(active_site.get_labels()),
-        '_resolve_optimized_geometry: the elements of '
-        'optimized_geometry do not match the extracted active site, so it '
-        'describes a different structure')
-
-    molecule.set_charge(active_site.get_charge())
-    molecule.set_multiplicity(active_site.get_multiplicity())
-
-    return molecule
-
-
-def _resolve_hessian(active_site, folder=None, hessian=None, ostream=None):
-    """
-    Validates a Hessian supplied through the hessian setting, or left
-    behind in the working folder by an earlier run.
-
-    :param active_site:
-        The active site, to validate the shape against.
-
-    :return:
-        The Hessian, or None if there is nothing to use.
-    """
-
-    ostream = printing.stream(ostream)
-
-    source, reused = _resolve_source(hessian,
-                                     HESSIAN_FILE,
-                                     'Hessian',
-                                     folder=folder,
-                                     ostream=ostream)
-
-    if source is None:
-        return None
-
-    assert_msg_critical(
-        not isinstance(source, (str, Path)) or Path(source).is_file(),
-        f'_resolve_hessian: hessian file {source} not found')
-
-    if isinstance(source, (str, Path)):
-        hessian = np.loadtxt(source)
-    else:
-        hessian = np.asarray(source)
-
-    n_atoms = active_site['molecule'].number_of_atoms()
-    expected = (3 * n_atoms, 3 * n_atoms)
-
-    assert_msg_critical(
-        hessian.shape == expected,
-        f'_resolve_hessian: hessian has shape {hessian.shape} '
-        f'but the extracted active site needs {expected}')
-
-    # The shape and the elements match any site of the same composition, so
-    # a file left behind by a run whose coordination differed passes both
-    # and then fits zeros. A block the metal terms read that was never
-    # filled is what says so, and is worth recomputing rather than warning
-    # about: an explicitly supplied Hessian is an instruction, a file lying
-    # in the folder is a guess.
-    if reused and not _hessian_covers_site(hessian, active_site):
-        ostream.print_warning(
-            f'{HESSIAN_FILE} in {folder} holds nothing for some of the '
-            'metal terms of this active site, so it was computed for a '
-            'different coordination. Ignoring it.')
-        ostream.flush()
-        return None
-
-    return hessian
-
-
-def _hessian_covers_site(hessian, active_site):
-    """
-    Says whether a Hessian holds data for every metal term of a site.
-
-    The blocks the metal terms read are the pairs extract_pairs walks out
-    of the connectivity as it stands. Deliberately not hessian_pairs: what
-    the terms need is what has to be there, while the donors
-    partial_hessian_cutoff was forgiving of are a surplus a file computed
-    under another setting is not worth rejecting over.
-
-    :param hessian:
-        The Hessian.
-    :param active_site:
-        The active site whose metal terms have to be covered.
-
-    :return:
-        True when every pair the terms read holds something.
-    """
-
-    pairs, _ = extract_pairs(active_site['connectivity_matrix'],
-                             active_site['metal_indices'],
-                             bond_count=2)
-
-    return all(_hessian_covers(hessian, pair) for pair in pairs)
-
-
-def _resolve_partial_charges(active_site,
-                             folder=None,
-                             partial_charges=None,
-                             ostream=None):
-    """
-    Validates charges supplied through the partial_charges setting, or
-    left behind in the working folder by an earlier run.
-
-    :param active_site:
-        The active site, to validate the count against.
-
-    :return:
-        The partial charges, or None if there is nothing to use.
-    """
-
-    ostream = printing.stream(ostream)
-
-    source, _ = _resolve_source(partial_charges,
-                                CHARGES_FILE,
-                                'partial charges',
-                                folder=folder,
-                                ostream=ostream)
-
-    if source is None:
-        return None
-
-    if isinstance(source, (str, Path)):
-        assert_msg_critical(
-            Path(source).is_file(),
-            '_resolve_partial_charges: the charges file '
-            f'{source} not found')
-        charges = np.loadtxt(source)
-    else:
-        charges = np.asarray(source)
-
-    n_atoms = active_site['molecule'].number_of_atoms()
-
-    assert_msg_critical(
-        charges.shape == (n_atoms, ),
-        f'_resolve_partial_charges: the charges have shape '
-        f'{charges.shape} but the extracted active site has {n_atoms} atoms')
-
-    total = float(np.sum(charges))
-    expected = int(active_site['molecule'].get_charge())
-
-    if abs(total - expected) > 1.0e-3:
-        ostream.print_warning(
-            f'The supplied partial charges sum to {total:+.3f}, but the '
-            f'active site charge is {expected:+d}')
-        ostream.flush()
-
-    return charges

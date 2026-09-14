@@ -40,6 +40,7 @@ from ..veloxchemlib import mpi_master
 from ..molecule import Molecule
 from ..outputstream import OutputStream
 from .metalsiteffbuilder import MetalSiteForceFieldBuilder
+from .qm import QmParameterizer
 from . import core
 from . import util
 from . import printing
@@ -240,6 +241,9 @@ class MetalForceFieldManager:
         # is exposed rather than wrapped. It never gets an active site of its
         # own -- that is _active_site_builder, below.
         self.builder = MetalSiteForceFieldBuilder(comm, ostream)
+
+        # the phase classes the manager calls itself
+        self._qm = QmParameterizer(self.comm, self.ostream)
 
         # the one active site the manager tracks, and the last comparison
         # made against it; see the active_site property and
@@ -958,11 +962,9 @@ class MetalForceFieldManager:
         forcefield = self._active_site_builder.adopt_forcefield(
             forcefield, active_site=builder_active_site)
 
-        printing.print_metal_parameters(
-            active_site,
-            forcefield,
-            util.get_metal_keys(forcefield, active_site),
-            ostream=self.ostream)
+        self._qm.print_metal_parameters(
+            active_site, forcefield, util.get_metal_keys(forcefield,
+                                                         active_site))
 
         return forcefield
 
@@ -1236,15 +1238,16 @@ class MetalForceFieldManager:
         builder = self.builder
         active_site = query['active_site']
 
-        fit_kwargs = builder.fit_settings()
+        seed_kwargs = builder.seed_settings()
         if self.mm_fallback_literature_bonds and (
-                fit_kwargs['metal_bond_equilibria'] is None):
-            fit_kwargs['metal_bond_equilibria'] = util.LITERATURE_METAL_BONDS
+                seed_kwargs['metal_bond_equilibria'] is None):
+            seed_kwargs['metal_bond_equilibria'] = util.LITERATURE_METAL_BONDS
 
         forcefield = core.build_forcefield(active_site,
+                                           util.d4_charges(active_site),
                                            comm=MPI.COMM_SELF,
                                            ostream=self.ostream,
-                                           **fit_kwargs)
+                                           **seed_kwargs)
 
         # this geometry is a way of comparing, not a result of a run, so
         # nothing about it is written to a folder
@@ -1435,10 +1438,10 @@ class MetalForceFieldManager:
         # Every rank builds its own: the work is cheap, and a communicator of
         # one keeps it clear of the collectives a shared one would invite.
         forcefield = core.build_forcefield(active_site,
-                                           partial_charges=charges,
+                                           charges,
                                            comm=MPI.COMM_SELF,
                                            ostream=self.ostream,
-                                           **self.builder.fit_settings())
+                                           **self.builder.seed_settings())
 
         bonds, angles = matching.metal_keys(template)
 

@@ -37,7 +37,7 @@ the metal terms are fitted and the whole protein is to carry them.
 import sys
 
 from ..errorhandler import assert_msg_critical
-from . import core
+from .qm import QmParameterizer
 from .util import (Shell, on_master, param, get_metal_keys,
                    get_metal_impropers, redistribute_cap_charges,
                    backbone_charge_shift, _bond_separation)
@@ -126,7 +126,8 @@ class EnzymeSystemBuilder(Shell):
         system = openmm_ff.createSystem(topology, nonbondedMethod=mmapp.NoCutoff)
 
         if partial_charges is None:
-            partial_charges = core.d4_charges(active_site, ostream=self.ostream)
+            partial_charges = QmParameterizer(
+                self.comm, self.ostream).d4_charges(active_site)
 
         self.redistribute_charges(system, topology, active_site,
                                   partial_charges)
@@ -278,7 +279,8 @@ class EnzymeSystemBuilder(Shell):
                             'create_enzyme_forcefield: openmm is required')
 
         if partial_charges is None:
-            partial_charges = core.d4_charges(active_site, ostream=self.ostream)
+            partial_charges = QmParameterizer(
+                self.comm, self.ostream).d4_charges(active_site)
 
         protein_ff_not_used, protein_parameters = protein_atom_parameters(
             topology, forcefield_files)

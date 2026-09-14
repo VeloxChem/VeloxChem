@@ -44,9 +44,9 @@ from ..errorhandler import assert_msg_critical
 from ..mmforcefieldgenerator import MMForceFieldGenerator
 from . import core
 from . import util
-from . import qm
 from . import openmmxml
 from . import printing
+from .qm import QmParameterizer
 from .enzyme import EnzymeSystemBuilder
 
 try:
@@ -227,14 +227,17 @@ class MetalSiteForceFieldBuilder:
             else:
                 ostream = OutputStream(None)
 
-        self.ostream = ostream
-
         self.comm = comm
         self.rank = self.comm.Get_rank()
         self.nodes = self.comm.Get_size()
 
-        # the phase classes: stateless, and MPI-safe by construction
-        self._enzyme = EnzymeSystemBuilder(self.comm, self.ostream)
+        # the phase classes: stateless, and MPI-safe by construction. They
+        # print through the builder's stream, which the ostream property
+        # keeps them on.
+        self._qm = QmParameterizer(comm, ostream)
+        self._enzyme = EnzymeSystemBuilder(comm, ostream)
+
+        self.ostream = ostream
 
         self.metal_bond_cutoff = util.METAL_BOND_CUTOFF
         self.report_cutoff_margin = util.REPORT_CUTOFF_MARGIN
@@ -305,6 +308,35 @@ class MetalSiteForceFieldBuilder:
         self._partial_charges = None
         self._enzyme_system = None
         self._enzyme_forcefield = None
+
+    @property
+    def ostream(self):
+        """
+        The output stream, shared with the phase classes the builder owns.
+
+        Assigning it reaches them as well, so that swapping the stream for
+        a silent one -- as the shoehorning does for its duration -- silences
+        everything the builder prints and not only its own lines.
+        """
+
+        return self._ostream
+
+    @ostream.setter
+    def ostream(self, ostream):
+
+        self._ostream = ostream
+        for shell in self._shells():
+            shell.ostream = ostream
+
+    def _shells(self):
+        """
+        The phase classes the builder owns.
+
+        :return:
+            The list of shells.
+        """
+
+        return [self._qm, self._enzyme]
 
     @property
     def _report_cutoff(self):
@@ -1196,10 +1228,11 @@ class MetalSiteForceFieldBuilder:
 
         if forcefield is None:
             forcefield = core.build_forcefield(active_site,
+                                               util.d4_charges(active_site),
                                                comm=MPI.COMM_SELF,
                                                ostream=self.ostream,
                                                bond_equilibria=bond_equilibria,
-                                               **self.fit_settings())
+                                               **self.seed_settings())
 
         relaxed = core.mm_optimize_active_site(active_site,
                                                forcefield,
@@ -1234,11 +1267,9 @@ class MetalSiteForceFieldBuilder:
         self._require('optimize_geometry', Stage.ACTIVE_SITE)
         active_site = self._active_site
 
-        optimized, opt_results = qm.optimize_active_site(
+        optimized, opt_results = self._qm.optimize_active_site(
             active_site,
             constrain_capping_hydrogens=self.constrain_capping_hydrogens,
-            comm=self.comm,
-            ostream=self.ostream,
             **self._qm_kwargs())
 
         self._save_intermediate(
@@ -1268,7 +1299,7 @@ class MetalSiteForceFieldBuilder:
         self._require('calculate_hessian', Stage.ACTIVE_SITE)
         active_site = self._active_site
 
-        atom_pairs, atoms = qm.hessian_pairs(
+        atom_pairs, atoms = self._qm.hessian_pairs(
             active_site,
             bond_count=2,
             partial_hessian_cutoff=self.partial_hessian_cutoff)
@@ -1288,11 +1319,9 @@ class MetalSiteForceFieldBuilder:
                 f'metal terms read {len(atom_pairs)} of its blocks.')
         self.ostream.flush()
 
-        hessian = qm.compute_hessian(
+        hessian = self._qm.compute_hessian(
             active_site,
             atom_pairs=atom_pairs if self.calculate_partial_hessian else None,
-            comm=self.comm,
-            ostream=self.ostream,
             **self._qm_kwargs())
 
         self._save_intermediate(util.HESSIAN_FILE,
@@ -1324,13 +1353,10 @@ class MetalSiteForceFieldBuilder:
         active_site = self._active_site
 
         if self.do_resp:
-            charges = qm.compute_resp_charges(active_site,
-                                              mute_scf=self.mute_scf,
-                                              comm=self.comm,
-                                              ostream=self.ostream)
+            charges = self._qm.compute_resp_charges(active_site,
+                                                    mute_scf=self.mute_scf)
         else:
-            charges = self._on_master(
-                lambda: core.d4_charges(active_site, ostream=self.ostream))
+            charges = self._qm.d4_charges(active_site)
 
         self._save_intermediate(util.CHARGES_FILE,
                                 lambda path: np.savetxt(path, charges))
@@ -1377,11 +1403,10 @@ class MetalSiteForceFieldBuilder:
 
         self._require('build_forcefield', Stage.ACTIVE_SITE)
 
-        geometry = self._on_master(lambda: core._resolve_optimized_geometry(
+        geometry = self._qm._resolve_optimized_geometry(
             self._active_site,
             folder=self.folder,
-            optimized_geometry=opt_geometry,
-            ostream=self.ostream))
+            optimized_geometry=opt_geometry)
 
         if geometry is not None:
             self._adopt_geometry(geometry)
@@ -1393,11 +1418,9 @@ class MetalSiteForceFieldBuilder:
                 'that build_active_site left on the builder.')
             self.ostream.flush()
 
-        hessian = self._on_master(
-            lambda: core._resolve_hessian(self._active_site,
-                                          folder=self.folder,
-                                          hessian=hessian,
-                                          ostream=self.ostream))
+        hessian = self._qm._resolve_hessian(self._active_site,
+                                            folder=self.folder,
+                                            hessian=hessian)
 
         if hessian is not None:
             self._hessian = hessian
@@ -1409,27 +1432,22 @@ class MetalSiteForceFieldBuilder:
                 'constants for the metal terms.')
             self.ostream.flush()
 
-        charges = self._on_master(lambda: core._resolve_partial_charges(
+        charges = self._qm._resolve_partial_charges(
             self._active_site,
             folder=self.folder,
-            partial_charges=partial_charges,
-            ostream=self.ostream))
+            partial_charges=partial_charges)
 
         if charges is not None:
             self._partial_charges = charges
         else:
             charges = self.calculate_partial_charges()
 
-        printing.print_partial_charges(
-            self._protonated_topology,
-            self._active_site,
-            charges,
-            util.redistribute_cap_charges(self._active_site, charges),
-            {
+        self._qm.print_partial_charges(
+            self._protonated_topology, self._active_site, charges,
+            util.redistribute_cap_charges(self._active_site, charges), {
                 residue.index: util.residue_label(residue)
                 for residue in self._protonated_topology.residues()
-            },
-            ostream=self.ostream)
+            })
 
         return self._fit_forcefield(hessian, charges)
 
@@ -1899,14 +1917,12 @@ class MetalSiteForceFieldBuilder:
 
     def _fit_forcefield(self, hessian, charges):
         """
-        Fits the metal terms on one rank and hands the force field to every
-        rank.
+        Builds the seeded force field and fits its metal terms.
 
-        The fit itself is cheap and is kept off the collectives inside the
-        generator, so it runs on the master alone and is broadcast like
-        every other cheap step. Shared by the first fit and by every refit
-        after a bond edit, so the two cannot come to write different
-        artifacts or print different tables.
+        Shared by the first fit and by every refit after a bond edit, so
+        the two cannot come to write different artifacts or print different
+        tables. With no Hessian the seeded force field is the result: the
+        metal terms keep their default force constants.
 
         :param hessian:
             The Hessian to fit from.
@@ -1917,25 +1933,31 @@ class MetalSiteForceFieldBuilder:
             The force field, on every rank.
         """
 
-        def work():
-            forcefield = core.build_forcefield(
-                self._active_site,
-                hessian=hessian,
-                partial_charges=charges,
-                comm=MPI.COMM_SELF,
-                ostream=self.ostream,
+        active_site = self._active_site
+
+        # the seeded force field the fit starts from, or, with no Hessian,
+        # the force field itself: default force constants on the metal terms
+        forcefield = self._on_master(lambda: core.build_forcefield(
+            active_site,
+            charges,
+            comm=MPI.COMM_SELF,
+            ostream=self.ostream,
+            **self.seed_settings()))
+
+        if hessian is not None:
+            forcefield = self._qm.fit_forcefield(
+                active_site,
+                forcefield,
+                hessian,
                 protected_bonds=self._protected_bonds(),
                 **self.fit_settings())
-            printing.print_metal_parameters(
-                self._active_site,
-                forcefield,
-                util.get_metal_keys(forcefield, self._active_site),
-                ostream=self.ostream)
-            self._write_run_artifacts(forcefield, hessian, charges)
 
-            return forcefield
+        self._qm.print_metal_parameters(
+            active_site, forcefield, util.get_metal_keys(forcefield,
+                                                         active_site))
+        self._write_run_artifacts(forcefield, hessian, charges)
 
-        self._forcefield = self._on_master(work)
+        self._forcefield = forcefield
         self._adopted_forcefield = False
 
         # The weak bridge pruning is the one step that can decide a metal
@@ -2122,11 +2144,11 @@ class MetalSiteForceFieldBuilder:
             'bond_change_warning': self.mm_bond_change_warning,
         }
 
-    def fit_settings(self):
+    def seed_settings(self):
         """
-        The settings the force field construction reads, as keyword
-        arguments, both for the fit and for the seeding a force field built
-        without a Hessian falls back on.
+        The settings the seeded force field construction reads, as keyword
+        arguments: the typing, the planarity impropers and the metal terms
+        as they stand before a Hessian.
 
         Public for the same reason as detection_settings: the manager builds
         force fields of its own, and reading them off the builder is what
@@ -2139,10 +2161,6 @@ class MetalSiteForceFieldBuilder:
         return {
             'metal_blind_typing': self.metal_blind_typing,
             'mute_generator': self.mute_forcefield_generator,
-            'average_metal_terms': self.average_metal_terms,
-            'metal_hessian_fitting_method': self.metal_hessian_fitting_method,
-            'prune_weak_bridge_bonds': self.prune_weak_bridge_bonds,
-            'weak_bridge_tolerance': self.weak_bridge_tolerance,
             'add_metal_planarity_impropers': self.add_metal_planarity_impropers,
             'metal_planarity_force_constant':
             self.metal_planarity_force_constant,
@@ -2153,4 +2171,21 @@ class MetalSiteForceFieldBuilder:
             self.default_metal_angle_force_constant,
             'metal_bond_equilibria': self.default_metal_bond_equilibria,
             'metal_angle_equilibria': self.default_metal_angle_equilibria,
+        }
+
+    def fit_settings(self):
+        """
+        The settings the Hessian fit of the metal terms reads, as keyword
+        arguments.
+
+        :return:
+            The keyword arguments.
+        """
+
+        return {
+            'average_metal_terms': self.average_metal_terms,
+            'metal_hessian_fitting_method': self.metal_hessian_fitting_method,
+            'prune_weak_bridge_bonds': self.prune_weak_bridge_bonds,
+            'weak_bridge_tolerance': self.weak_bridge_tolerance,
+            'reparameterize_metal_angles': self.reparameterize_metal_angles,
         }

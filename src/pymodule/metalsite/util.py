@@ -239,6 +239,11 @@ CAP_COMMENT = 'capping hydrogen'
 UNPARAMETERIZED_COMMENT = 'Guessed'
 UFF_TYPE_COMMENT = 'UFF'
 
+# Comment written on every metal bond and angle the Hessian fit sets, in
+# place of the seeding's; the generator would otherwise append to whatever
+# the seeded pass wrote.
+FITTED_COMMENT = 'fitted from the Hessian'
+
 # Literature equilibrium metal-ligand distances in nm. The crude pre-QM
 # pass measures its equilibrium values on the input geometry instead;
 # assign this to metal_bond_equilibria to impose these in their place.
@@ -1020,3 +1025,27 @@ def backbone_charge_shift(charge_of, topology, active_site, partial_charges):
         'total_after': total_after,
         'difference': difference,
     }
+
+
+def d4_charges(active_site):
+    """
+    Returns D4 partial charges for the active site.
+
+    The fallback wherever charges are wanted and none were fitted. They
+    are cheap - a fraction of a millisecond - and they sum to the charge
+    of the site exactly, but they are not RESP: on a binuclear zinc site
+    they put about 0.3 e less on each metal. Good enough to relax a
+    geometry on, and worth knowing about before they reach anything else,
+    which is why QmParameterizer.d4_charges announces them and this does
+    not.
+
+    :param active_site:
+        The active site.
+
+    :return:
+        The charges as an (N,) numpy array, capping hydrogens included.
+    """
+
+    molecule = active_site['molecule']
+
+    return np.array(molecule.get_partial_charges(molecule.get_charge()))
