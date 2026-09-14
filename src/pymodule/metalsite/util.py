@@ -493,6 +493,30 @@ def print_section(title, ostream):
     ostream.print_header(len(title) * '-')
 
 
+def ic_cell(ic_rmsd, name):
+    """
+    Formats one internal coordinate type for a table cell.
+
+    :param ic_rmsd:
+        The deviations, as get_ic_rmsd reports them.
+    :param name:
+        The type to format.
+
+    :return:
+        The cell.
+    """
+
+    if ic_rmsd is None:
+        return ''
+
+    found = ic_rmsd.get(name)
+
+    if found is None:
+        return ''
+
+    return f'{found["rms"]:.2f} / {found["max"]:.2f}'
+
+
 # ----------------------------------------------------------------------
 # plain helpers shared by more than one phase
 # ----------------------------------------------------------------------
