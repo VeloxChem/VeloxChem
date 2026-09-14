@@ -40,8 +40,8 @@ from ..veloxchemlib import mpi_master
 from ..molecule import Molecule
 from ..outputstream import OutputStream
 from .metalsiteffbuilder import MetalSiteForceFieldBuilder
+from .builder import ActiveSiteBuilder
 from .qm import QmParameterizer
-from . import core
 from . import util
 from . import printing
 from . import matching
@@ -101,10 +101,10 @@ class MetalForceFieldManager:
     Instance variables
         - templates: The loaded templates, keyed by name.
         - builder: A MetalSiteForceFieldBuilder held for its settings alone --
-          never given an active site of its own. The steps themselves are the
-          functions of the core module, which are called with the settings this
-          carries, so set them on it. Distinct from active_site, which is the
-          builder that holds the real, loaded site.
+          never given an active site of its own. The steps themselves are
+          methods of the phase classes, which are called with the settings
+          this carries, so set them on it. Distinct from active_site, which
+          is the builder that holds the real, loaded site.
         - metal_shell_bonds: How many bonds out from a metal the metal_shell
           region reaches.
         - selection_criteria: What a template has to be within before
@@ -243,6 +243,7 @@ class MetalForceFieldManager:
         self.builder = MetalSiteForceFieldBuilder(comm, ostream)
 
         # the phase classes the manager calls itself
+        self._sites = ActiveSiteBuilder(self.comm, self.ostream)
         self._qm = QmParameterizer(self.comm, self.ostream)
 
         # the one active site the manager tracks, and the last comparison
@@ -399,7 +400,7 @@ class MetalForceFieldManager:
         """
         Draws one loaded template, with its own explicit metal-ligand bonds.
 
-        core.show_active_site is not used here: it reads
+        ActiveSiteBuilder.show_active_site is not used here: it reads
         active_site['labels'] and active_site['connectivity_matrix'], and a
         template dictionary (built by templates.build) has neither -- it
         carries forcefield.bonds instead, which is the same source every
@@ -1243,18 +1244,14 @@ class MetalForceFieldManager:
                 seed_kwargs['metal_bond_equilibria'] is None):
             seed_kwargs['metal_bond_equilibria'] = util.LITERATURE_METAL_BONDS
 
-        forcefield = core.build_forcefield(active_site,
-                                           util.d4_charges(active_site),
-                                           comm=MPI.COMM_SELF,
-                                           ostream=self.ostream,
-                                           **seed_kwargs)
+        forcefield = self._sites.build_forcefield(active_site,
+                                                  util.d4_charges(active_site),
+                                                  **seed_kwargs)
 
         # this geometry is a way of comparing, not a result of a run, so
         # nothing about it is written to a folder
-        return core.mm_optimize_active_site(active_site,
-                                            forcefield,
-                                            ostream=self.ostream,
-                                            **builder.relax_settings())
+        return self._sites.mm_optimize_active_site(active_site, forcefield,
+                                                   **builder.relax_settings())
 
     # ------------------------------------------------------------------
     # transfer
@@ -1434,14 +1431,9 @@ class MetalForceFieldManager:
                 f'site charge is {expected:+d}')
 
         # build_forcefield writes the charges onto the atoms and redistributes
-        # the caps; the metal terms it seeds here are overwritten below.
-        # Every rank builds its own: the work is cheap, and a communicator of
-        # one keeps it clear of the collectives a shared one would invite.
-        forcefield = core.build_forcefield(active_site,
-                                           charges,
-                                           comm=MPI.COMM_SELF,
-                                           ostream=self.ostream,
-                                           **self.builder.seed_settings())
+        # the caps; the metal terms it seeds here are overwritten below
+        forcefield = self._sites.build_forcefield(
+            active_site, charges, **self.builder.seed_settings())
 
         bonds, angles = matching.metal_keys(template)
 

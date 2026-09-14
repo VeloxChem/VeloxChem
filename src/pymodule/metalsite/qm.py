@@ -48,8 +48,8 @@ from ..scfhessiandriver import ScfHessianDriver
 from ..optimizationdriver import OptimizationDriver
 from ..errorhandler import assert_msg_critical
 from ..molecule import Molecule
-from . import core
 from .util import (Shell, on_master, collective, param, get_metal_keys,
+                   constrained_indices, freeze_constraints,
                    extract_pairs, d4_charges, _folder_file, DONOR_ELEMENTS,
                    PARTIAL_HESSIAN_CUTOFF, WEAK_BRIDGE_TOLERANCE,
                    FITTED_COMMENT, GEOMETRY_FILE, HESSIAN_FILE, CHARGES_FILE)
@@ -184,14 +184,14 @@ class QmParameterizer(Shell):
         """
 
         if frozen_indices is None:
-            frozen_indices = core.constrained_indices(
+            frozen_indices = constrained_indices(
                 active_site,
                 constrain_capping_hydrogens=constrain_capping_hydrogens)
 
         molecule = active_site['molecule']
 
-        constraint = core.freeze_constraints(active_site,
-                                             frozen_indices=frozen_indices)
+        constraint = freeze_constraints(active_site,
+                                        frozen_indices=frozen_indices)
         constraints = None if constraint is None else [constraint]
 
         self._print_muted_notice(
@@ -413,7 +413,7 @@ class QmParameterizer(Shell):
         """
         Fits the metal terms of a force field against a Hessian.
 
-        Takes the force field core.build_forcefield seeded and replaces every
+        Takes the force field ActiveSiteBuilder.build_forcefield seeded and replaces every
         metal bond and angle in it with the Seminario fit, then prunes the
         weak arm of any bridging residue and reports the force constants the
         fit could not determine. Everything else in the force field -- the

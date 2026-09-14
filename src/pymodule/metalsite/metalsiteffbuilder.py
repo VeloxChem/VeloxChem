@@ -42,10 +42,9 @@ from ..veloxchemlib import mpi_master
 from ..outputstream import OutputStream
 from ..errorhandler import assert_msg_critical
 from ..mmforcefieldgenerator import MMForceFieldGenerator
-from . import core
 from . import util
 from . import openmmxml
-from . import printing
+from .builder import ActiveSiteBuilder
 from .qm import QmParameterizer
 from .enzyme import EnzymeSystemBuilder
 
@@ -120,13 +119,15 @@ class MetalSiteForceFieldBuilder:
     Between the second and the third step only bonds can be added or removed.
 
     The object holds the settings and the intermediates; the work itself is
-    done by the functions of the core module, which keep no state and take
-    everything they use. What a step produced is read back off a read-only
-    property rather than juggled by the caller.
+    done by the phase classes it owns -- ActiveSiteBuilder, QmParameterizer
+    and EnzymeSystemBuilder -- which keep no state and take everything they
+    use. What a step produced is read back off a read-only property rather
+    than juggled by the caller.
 
-    Under MPI everything cheap runs on the master rank and is broadcast, and
-    the three expensive QM steps are collective: every rank calls them, at the
-    same point, with the same molecule.
+    Under MPI every method of a phase class is either run on the master rank
+    and broadcast, or collective: every rank calls the three expensive QM
+    steps at the same point, with the same molecule. This class runs on
+    every rank and does nothing non-deterministic outside a shell call.
 
     :param comm:
         The MPI communicator.
@@ -234,6 +235,7 @@ class MetalSiteForceFieldBuilder:
         # the phase classes: stateless, and MPI-safe by construction. They
         # print through the builder's stream, which the ostream property
         # keeps them on.
+        self._sites = ActiveSiteBuilder(comm, ostream)
         self._qm = QmParameterizer(comm, ostream)
         self._enzyme = EnzymeSystemBuilder(comm, ostream)
 
@@ -336,7 +338,7 @@ class MetalSiteForceFieldBuilder:
             The list of shells.
         """
 
-        return [self._qm, self._enzyme]
+        return [self._sites, self._qm, self._enzyme]
 
     @property
     def _report_cutoff(self):
@@ -450,7 +452,7 @@ class MetalSiteForceFieldBuilder:
 
         self._require('show_active_site', Stage.ACTIVE_SITE)
 
-        return core.show_active_site(self._active_site, **kwargs)
+        return self._sites.show_active_site(self._active_site, **kwargs)
 
     def print_active_site(self):
         """
@@ -460,9 +462,8 @@ class MetalSiteForceFieldBuilder:
 
         self._require('print_active_site', Stage.ACTIVE_SITE)
 
-        printing.print_active_site(self._active_site,
-                                   self.binding_modes,
-                                   ostream=self.ostream)
+        self._sites.print_active_site(self._active_site,
+                                      self.binding_modes)
 
     @property
     def optimization_constraints(self):
@@ -478,7 +479,7 @@ class MetalSiteForceFieldBuilder:
         if self._active_site is None:
             return None
 
-        return core.freeze_constraints(
+        return util.freeze_constraints(
             self._active_site,
             constrain_capping_hydrogens=self.constrain_capping_hydrogens)
 
@@ -587,7 +588,7 @@ class MetalSiteForceFieldBuilder:
 
         if cif_path is not None:
             self._print_header(cif_path)
-            topology, positions = core.load_and_prepare_protein(
+            topology, positions = self._sites.load_and_prepare_protein(
                 cif_path, prepare=self.prepare_protein)
         else:
             assert_msg_critical(
@@ -602,14 +603,14 @@ class MetalSiteForceFieldBuilder:
             topology, positions, coordinating_residues=coordinating_residues)
 
         if cif_path is not None:
-            printing.print_binding_modes(binding_modes, ostream=self.ostream)
+            self._sites.print_binding_modes(binding_modes)
 
         # Protonate the topology based on the derived binding modes
         protonated_topology, protonated_positions, variants, notes = (
-            core.protonate(topology,
-                           positions,
-                           binding_modes,
-                           protonation_overrides=self._protonation_overrides))
+            self._sites.protonate(topology,
+                                  positions,
+                                  binding_modes,
+                                  protonation_overrides=self._protonation_overrides))
 
         # Derive the binding modes again. These should be the same,
         # but the indexing of the atoms has changed due to the protanation
@@ -624,15 +625,13 @@ class MetalSiteForceFieldBuilder:
                 existing.append(note)
 
         # Extract and truncate the active site
-        active_site = core.extract_active_site(
+        active_site = self._sites.extract_active_site(
             protonated_topology,
             protonated_positions,
             protonated_modes,
-            cap_bond_length=self.cap_bond_length,
-            ostream=self.ostream)
-        printing.print_active_site(active_site,
-                                   protonated_modes,
-                                   ostream=self.ostream)
+            cap_bond_length=self.cap_bond_length)
+        self._sites.print_active_site(active_site,
+                                      protonated_modes)
 
         self._save_intermediate(
             'protonated.pdb', lambda path: self._write_pdb(
@@ -641,8 +640,8 @@ class MetalSiteForceFieldBuilder:
         if mm_opt:
             active_site['molecule'] = self._crude_relax(
                 active_site,
-                core.manual_bond_equilibria(active_site, protonated_topology,
-                                            protonated_modes))
+                self._sites.manual_bond_equilibria(active_site, protonated_topology,
+                                                   protonated_modes))
 
         return {
             'request': self._request,
@@ -787,17 +786,16 @@ class MetalSiteForceFieldBuilder:
         self._require('add_metal_bond', Stage.ACTIVE_SITE)
 
         def edit(request, modes):
-            return core.add_metal_bond(request,
-                                       modes,
-                                       self._protonated_topology,
-                                       self._protonated_positions,
-                                       resid,
-                                       metal,
-                                       atom=atom,
-                                       chain=chain,
-                                       equilibrium=equilibrium,
-                                       ostream=self.ostream,
-                                       **self.detection_settings())
+            return self._sites.add_metal_bond(request,
+                                              modes,
+                                              self._protonated_topology,
+                                              self._protonated_positions,
+                                              resid,
+                                              metal,
+                                              atom=atom,
+                                              chain=chain,
+                                              equilibrium=equilibrium,
+                                              **self.detection_settings())
 
         self._edit_coordination(edit)
 
@@ -828,13 +826,12 @@ class MetalSiteForceFieldBuilder:
         self._require('remove_metal_bond', Stage.ACTIVE_SITE)
 
         def edit(request, modes):
-            return core.remove_metal_bond(request,
-                                          modes,
-                                          resid,
-                                          metal=metal,
-                                          atom=atom,
-                                          chain=chain,
-                                          ostream=self.ostream)
+            return self._sites.remove_metal_bond(request,
+                                                 modes,
+                                                 resid,
+                                                 metal=metal,
+                                                 atom=atom,
+                                                 chain=chain)
 
         self._edit_coordination(edit)
 
@@ -872,7 +869,7 @@ class MetalSiteForceFieldBuilder:
                       Stage.ACTIVE_SITE)
 
         def work():
-            residue = core._resolve_residue(self._topology, resid, chain)
+            residue = self._sites._resolve_residue(self._topology, resid, chain)
             util.check_variant(residue, variant)
 
             # keyed by the label rather than the index, because residue ids
@@ -920,8 +917,8 @@ class MetalSiteForceFieldBuilder:
         self._require('include_residue', Stage.ACTIVE_SITE, Stage.ACTIVE_SITE)
 
         def work():
-            residue = core._resolve_residue(self._topology, resid, chain)
-            core.check_truncatable(residue)
+            residue = self._sites._resolve_residue(self._topology, resid, chain)
+            self._sites.check_truncatable(residue)
 
             request = self._request
             label = util.residue_label(residue)
@@ -984,7 +981,7 @@ class MetalSiteForceFieldBuilder:
         self._require('remove_residue', Stage.ACTIVE_SITE, Stage.ACTIVE_SITE)
 
         def work():
-            residue = core._resolve_residue(self._topology, resid, chain)
+            residue = self._sites._resolve_residue(self._topology, resid, chain)
 
             request = self._request
             modes = self.binding_modes
@@ -1021,11 +1018,10 @@ class MetalSiteForceFieldBuilder:
                       for ligand in modes['ligands']):
                 bound = next(ligand for ligand in modes['ligands']
                              if ligand['res_index'] == residue.index)
-                request = core.remove_metal_bond(request,
-                                                 modes,
-                                                 label,
-                                                 metal=bound['metals'][0],
-                                                 ostream=self.ostream)
+                request = self._sites.remove_metal_bond(request,
+                                                        modes,
+                                                        label,
+                                                        metal=bound['metals'][0])
                 modes = self._derive_binding_modes(self._protonated_topology,
                                                    self._protonated_positions,
                                                    request=request)
@@ -1130,9 +1126,9 @@ class MetalSiteForceFieldBuilder:
             'reported below.')
         self.ostream.flush()
 
-        self._active_site = self._on_master(lambda: core.apply_metal_bonds(
+        self._active_site = self._sites.apply_metal_bonds(
             self._active_site,
-            self._site_coordination(self._active_site['molecule'])))
+            self._site_coordination(self._active_site['molecule']))
 
         # entering FITTED drops the enzyme system built from the old terms
         self._fit_forcefield(self._hessian, self._partial_charges)
@@ -1175,7 +1171,7 @@ class MetalSiteForceFieldBuilder:
         if self._protonated_topology is None:
             manual_equilibria = None
         else:
-            manual_equilibria = core.manual_bond_equilibria(
+            manual_equilibria = self._sites.manual_bond_equilibria(
                 self._active_site, self._protonated_topology,
                 self.binding_modes)
 
@@ -1227,17 +1223,14 @@ class MetalSiteForceFieldBuilder:
         """
 
         if forcefield is None:
-            forcefield = core.build_forcefield(active_site,
-                                               util.d4_charges(active_site),
-                                               comm=MPI.COMM_SELF,
-                                               ostream=self.ostream,
-                                               bond_equilibria=bond_equilibria,
-                                               **self.seed_settings())
+            forcefield = self._sites.build_forcefield(active_site,
+                                                      util.d4_charges(active_site),
+                                                      bond_equilibria=bond_equilibria,
+                                                      **self.seed_settings())
 
-        relaxed = core.mm_optimize_active_site(active_site,
-                                               forcefield,
-                                               ostream=self.ostream,
-                                               **self.relax_settings())
+        relaxed = self._sites.mm_optimize_active_site(active_site,
+                                                      forcefield,
+                                                      **self.relax_settings())
 
         self._save_intermediate(util.MM_GEOMETRY_FILE,
                                 lambda path: relaxed.write_xyz_file(str(path)))
@@ -1650,7 +1643,7 @@ class MetalSiteForceFieldBuilder:
         it failed.
 
         :param name:
-            The file name, one of the file name constants of the core module.
+            The file name, one of the file name constants of util.
         :param writer:
             A callable taking the path to write.
         """
@@ -1856,31 +1849,32 @@ class MetalSiteForceFieldBuilder:
             The binding modes.
         """
 
-        return core.derive_binding_modes(
+        return self._sites.derive_binding_modes(
             topology,
             positions,
             coordinating_residues=coordinating_residues,
             metal_elements=self.metal_elements,
             metal_formal_charges=self.metal_formal_charges,
-            ostream=self.ostream,
             request=self._request if request is None else request,
             **self.detection_settings())
 
     # ------------------------------------------------------------------
     # MPI
     #
-    # Cheap work runs on the master and is broadcast; the three expensive
-    # QM steps are collective. The shell owns that rule; the core does not.
+    # The phase classes are MPI-safe on their own; what is left here is the
+    # master-only section a chain of their calls runs in.
     # ------------------------------------------------------------------
 
     def _on_master(self, work):
         """
         Runs work on the master rank and hands the result to every rank.
 
-        Everything but the three QM steps is cheap enough that running it on
-        one rank and broadcasting the result costs nothing, and it keeps the
-        force field construction away from the collectives inside the drivers
-        it uses. A failure on the master is broadcast as well and raised
+        A master-only section, on the same depth counter as the on_master
+        decorator of the phase classes: the shell calls inside it run inline
+        on the master rather than each broadcasting on its own, and what the
+        section returns crosses once. That is what an edit or a rebuild
+        needs, since it chains several shell calls with the builder's own
+        bookkeeping between them. A failure on the master is raised
         everywhere, so a rank cannot be left waiting for a result that is
         never coming.
 
@@ -1891,29 +1885,7 @@ class MetalSiteForceFieldBuilder:
             What work returned, on every rank.
         """
 
-        outcome = None
-
-        if self.rank == mpi_master():
-            try:
-                outcome = ('value', work())
-            except Exception as error:
-                outcome = ('error', error)
-
-        # the master keeps what it computed: bcast hands the root an
-        # unpickled copy of its own value as well, and a copy is not the
-        # same thing -- a force field generator comes back with a silent
-        # stream, and a large topology is pickled twice for nothing
-        if self.nodes > 1:
-            received = self.comm.bcast(outcome, root=mpi_master())
-            if self.rank != mpi_master():
-                outcome = received
-
-        kind, payload = outcome
-
-        if kind == 'error':
-            raise payload
-
-        return payload
+        return util.run_on_master(self.comm, work)
 
     def _fit_forcefield(self, hessian, charges):
         """
@@ -1937,12 +1909,8 @@ class MetalSiteForceFieldBuilder:
 
         # the seeded force field the fit starts from, or, with no Hessian,
         # the force field itself: default force constants on the metal terms
-        forcefield = self._on_master(lambda: core.build_forcefield(
-            active_site,
-            charges,
-            comm=MPI.COMM_SELF,
-            ostream=self.ostream,
-            **self.seed_settings()))
+        forcefield = self._sites.build_forcefield(active_site, charges,
+                                                  **self.seed_settings())
 
         if hessian is not None:
             forcefield = self._qm.fit_forcefield(
@@ -1964,11 +1932,8 @@ class MetalSiteForceFieldBuilder:
         # contact is not a bond after all, and it decides it on the force
         # field. Lifting that back onto the site is what stops the two
         # disagreeing about what the cluster is bonded like -- see
-        # core.connectivity_from_forcefield. Done after the broadcast and on
-        # every rank rather than inside the master branch, so that every rank
-        # derives the same matrix from the same force field and no second
-        # broadcast is needed.
-        self._active_site = core.connectivity_from_forcefield(
+        # ActiveSiteBuilder.connectivity_from_forcefield.
+        self._active_site = self._sites.connectivity_from_forcefield(
             self._active_site, self._forcefield)
 
         # The fit folds the capping hydrogens' charge into the rest of the
@@ -2019,12 +1984,11 @@ class MetalSiteForceFieldBuilder:
         before = self._site_coordination(self._active_site['molecule'])
 
         self._active_site['molecule'] = molecule
-        _, active_site, _ = core.update_binding_modes(
+        _, active_site, _ = self._sites.update_binding_modes(
             self._protonated_topology,
             molecule,
             self._active_site,
             before,
-            ostream=self.ostream,
             **self.detection_settings())
 
         return active_site
@@ -2047,12 +2011,11 @@ class MetalSiteForceFieldBuilder:
 
         modes = self._derive_binding_modes(self._protonated_topology,
                                            self._protonated_positions)
-        ligands, notes = core.derive_site_coordination(
+        ligands, notes = self._sites.derive_site_coordination(
             self._protonated_topology,
             geometry,
             self._active_site,
             modes,
-            ostream=self.ostream,
             **self.detection_settings())
 
         modes = dict(modes)
@@ -2085,9 +2048,9 @@ class MetalSiteForceFieldBuilder:
         if self._protonated_topology is None:
             return set()
 
-        return core.manual_bond_keys(self._active_site,
-                                     self._protonated_topology,
-                                     self.binding_modes)
+        return self._sites.manual_bond_keys(self._active_site,
+                                            self._protonated_topology,
+                                            self.binding_modes)
 
     def detection_settings(self):
         """
@@ -2095,7 +2058,7 @@ class MetalSiteForceFieldBuilder:
 
         Public because MetalForceFieldManager measures a structure with the
         settings of the builder it carries, and splatting this into its own
-        core call is what stops the two drifting apart on what a cutoff
+        shell call is what stops the two drifting apart on what a cutoff
         means. Note that metal_elements and metal_formal_charges are not in
         here -- they are passed alongside it, since the detection takes them
         but the re-detection on a new geometry does not.

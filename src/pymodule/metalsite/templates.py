@@ -166,7 +166,7 @@ def build(name, forcefield, molecule, kind, folder, metal_elements=None, ostream
     """
 
     # the same check a run makes of its own force field, which is why it
-    # is the core's and not a second copy of it here. A template is an
+    # is util's and not a second copy of it here. A template is an
     # active site with no topology behind it, so {'molecule': ...} is all
     # the adapter it needs.
     util._check_forcefield(forcefield, {'molecule': molecule}, source=folder)
