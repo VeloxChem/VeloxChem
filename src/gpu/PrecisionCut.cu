@@ -39,8 +39,11 @@
 #include "GpuRuntime.hpp"
 #include "GpuWrapper.hpp"
 
-// Build cut_ij_tile at tile granularity, per ij-tile cuts.
+// Build per-ij-tile precision cuts at tile granularity.
 // General variant: ij side is tiled with ij_tile_dim, kl side with kl_tile_dim.
+// Requires Q_ij_local in descending Q (CScreeningData::_sortQ) and the
+// paired Q_kl/D_kl arrays in descending Q*|D| (CScreeningData::sortQD),
+// so the leading element of each tile is a valid tile screening bound.
 std::vector<uint32_t> build_cut_ij_tile(
     const std::vector<double>& Q_ij_local,
     const std::vector<double>& Q_kl,
@@ -54,7 +57,8 @@ std::vector<uint32_t> build_cut_ij_tile(
     const uint32_t nij_tiles =
     (ij_count_local + ij_tile_dim - 1) / ij_tile_dim;
 
-    // QD_tile_max along kl
+    // Screening bound per kl tile: leading element of each tile, since QD_kl
+    // is in descending order.
     // QD_kl = |Q_kl| * |D_kl|
     std::vector<double> QD_kl(kl_count);
     for (uint32_t kl = 0; kl < kl_count; ++kl) {

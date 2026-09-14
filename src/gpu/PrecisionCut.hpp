@@ -39,7 +39,6 @@
 #include "GpuRuntime.hpp"
 #include "GpuWrapper.hpp"
 
-// per ij-tile cut; single tile dimension for both ij and kl sides
 std::vector<uint32_t>
 build_cut_ij_tile(
     const std::vector<double>& Q_ij_local,
@@ -50,7 +49,6 @@ build_cut_ij_tile(
     int tile_dim,
     double tau);
 
-// per ij-tile cut with separate ij and kl tile dimensions
 std::vector<uint32_t>
 build_cut_ij_tile(
     const std::vector<double>& Q_ij_local,
@@ -63,10 +61,9 @@ build_cut_ij_tile(
     double tau);
 
 struct ExchangeCuts {
-    std::vector<uint32_t> prec_cut_flat;    // optional host-side flat cut array
-    std::vector<uint32_t> screen_cut_flat;  // optional host-side flat cut array
-    std::vector<uint32_t> displ_cuts;       // [n_ik] offset into flat arrays
-    // std::vector<uint32_t> cut_weights;   // unused: host-only m-tile weight per cut entry
+    std::vector<uint32_t> prec_cut_flat;    // unused
+    std::vector<uint32_t> screen_cut_flat;  // unused
+    std::vector<uint32_t> displ_cuts;       // [n_ik] offset into the flat cut arrays
     uint32_t total_cut_entries = 0;         // number of flat cut entries
 };
 

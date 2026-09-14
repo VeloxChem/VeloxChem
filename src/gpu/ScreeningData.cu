@@ -172,7 +172,7 @@ CScreeningData::_computeQMatricesOnGPU(const CMolecule& molecule, const CMolecul
     gpuStream_t stream;
     gpuSafe(gpuStreamCreate(&stream));
 
-    // GTOs blocks and number of AOs
+    // GTO blocks and number of primitive AOs
 
     const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
 
@@ -192,35 +192,6 @@ CScreeningData::_computeQMatricesOnGPU(const CMolecule& molecule, const CMolecul
         if (gto_ang == 0) s_prim_count += npgtos * ncgtos;
         if (gto_ang == 1) p_prim_count += npgtos * ncgtos;
         if (gto_ang == 2) d_prim_count += npgtos * ncgtos;
-    }
-
-    // Cartesian to spherical index mapping for P and D
-
-    std::unordered_map<int64_t, std::vector<std::pair<int64_t, double>>> cart_sph_p;
-    std::unordered_map<int64_t, std::vector<std::pair<int64_t, double>>> cart_sph_d;
-
-    for (const auto& gto_block : gto_blocks)
-    {
-        const auto gto_ang = gto_block.getAngularMomentum();
-
-        if (gto_ang == 1)
-        {
-            auto p_map = gto_block.getCartesianToSphericalMappingForP();
-
-            for (const auto& [cart_ind, sph_ind_coef] : p_map)
-            {
-                cart_sph_p[cart_ind] = sph_ind_coef;
-            }
-        }
-        else if (gto_ang == 2)
-        {
-            auto d_map = gto_block.getCartesianToSphericalMappingForD();
-
-            for (const auto& [cart_ind, sph_ind_coef] : d_map)
-            {
-                cart_sph_d[cart_ind] = sph_ind_coef;
-            }
-        }
     }
 
     // S, P, D gto block
@@ -714,7 +685,7 @@ CScreeningData::_sortQ() -> void
     std::vector<std::tuple<double, int64_t, int64_t>> sorted_pd_mat_Q;
     std::vector<std::tuple<double, int64_t, int64_t>> sorted_dd_mat_Q;
 
-    // S-S gto block pair and S-P gto block pair
+    // S-S gto block pair, S-P gto block pair and S-D gto block pair
 
     for (int64_t i = 0; i < s_prim_count; i++)
     {
@@ -1170,7 +1141,7 @@ CScreeningData::sortQD(const int64_t s_prim_count,
     // Coulomb: Q_bra*Q_ket*D_ket > ERI_threshold
     const double QD_threshold = eri_threshold / max_Q;
 
-    // S-S gto block pair and S-P gto block pair
+    // S-S gto block pair, S-P gto block pair and S-D gto block pair
 
     for (int64_t i = 0; i < s_prim_count; i++)
     {
@@ -1603,7 +1574,7 @@ CScreeningData::findMaxDensities(const int64_t s_prim_count,
     _pd_max_D = 0.0;
     _dd_max_D = 0.0;
 
-    // S-S gto block pair and S-P gto block pair
+    // S-S gto block pair, S-P gto block pair and S-D gto block pair
 
     for (int64_t i = 0; i < s_prim_count; i++)
     {
