@@ -7253,3 +7253,38 @@ is the measurement and not the machine: numpy's mask is widened to the whole nod
 that its pool can be built at all, and sixteen pools of thirty two threads then roam
 two nodes unplaced. The driver's own spread is 1.16 and is placed by OpenMP, which is
 why the build is trustworthy where the control beside it is not.
+
+### The direct way across two nodes, where the duplication finally shows its price
+
+The rows above which asked for more than forty eight threads a rank were on the
+module's BLAS and warned; with the rebuilt OpenBLAS preloaded they run clean.
+
+| direct, tagrisso def2-tzvp | nodes | cores | build, slowest | quickest | spread | whole |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| 1 x 256 | 1 | 256 | 1.420 s | 1.420 s | 1.00 | 35.45 s |
+| 2 x 256 | 2 | 512 | **1.004 s** | 0.772 s | **1.30** | 26.81 s |
+
+**The model of the last section predicted 0.85 seconds and the quickest rank reached
+0.772.** Taking `build(N) = T_int + T_other/N` with the integral sweep at 0.28 seconds
+and everything else at 1.14, two nodes should give 0.85; the rank which is not carrying
+the Coulomb pass gives 0.772, near enough that the model is the right one.
+
+**The 0.232 seconds between the two ranks is the single part.** The Coulomb pass is
+divided over the parts the auxiliary basis is swept in, the parts are cut to fit a
+memory budget, and a budget of hundreds of gigabytes gives one part -- so one rank
+sweeps the integrals a second time for the Coulomb matrix and the other waits. On one
+node this was invisible, because the duplicated exchange sweep was eight times larger
+than it and swamped it. On two ranks it is a fifth of the build.
+
+**So the direct way has two defects and they are now separable**, which they were not
+before:
+
+| | what it costs | |
+| --- | ---: | --- |
+| the integral sweep formed on every node | 0.28 s, fixed | caps the speedup at about five nodes' worth |
+| the Coulomb pass on one rank | 0.232 s, on one rank | a part count which knows how many ranks there are |
+
+The second is a small change -- the parts are cut by memory alone and could be cut by
+memory or by the rank count, whichever gives more -- and it is worth making before the
+first, which is a restructure. Neither is worth anything on a single node, where no
+division of this way can beat one rank.
