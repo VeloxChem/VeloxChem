@@ -7515,3 +7515,76 @@ differing by 3.4e-07 Eh -- the same difference in both, so a systematic property
 two inversions rather than noise. It costs 5.5 per cent of a direct calculation and
 6.8 of a held one, which answers the question of what multiplying by the root costs
 against solving the factor: not much.
+
+## Against pyscf, where the core Hamiltonian was the thing being wrong
+
+Everything above compares the SIMD RI-JK driver against VeloxChem's own conventional
+build. That comparison was worth very little above g, and this section is how that was
+found out.
+
+Water at the geometry below, `conv_thresh = 1e-8` here and `conv_tol = 1e-12` in pyscf.
+The AO map is built from the quantum numbers of the two labellings and **verified on
+the overlap before anything else is compared** -- a wrong map gives a confident wrong
+answer. It agrees to 3e-11 at every basis, so the map is not in question anywhere
+below.
+
+```
+O   0.000000   0.000000   0.117790
+H   0.000000   0.755453  -0.471161
+H   0.000000  -0.755453  -0.471161
+```
+
+### The one-electron integrals, before and after
+
+Largest absolute difference from pyscf, whole matrix:
+
+| basis | nao | overlap | kinetic, SIMD | kinetic, plain | nuclear, SIMD | nuclear, plain |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| cc-pVTZ | 58 | 2.8e-11 | 1.1e-10 | 1.1e-10 | 4.7e-10 | 4.7e-10 |
+| cc-pVQZ | 115 | 2.8e-11 | 1.7e-10 | 1.7e-10 | 5.3e-10 | 5.3e-10 |
+| cc-pV5Z | 201 | 3.1e-11 | 3.0e-10 | **1.5e+01** | 4.8e-10 | **8.4e+00** |
+
+The plain drivers are exact through g and return **zeros for h blocks**. The SCF took
+its core Hamiltonian from them, so a basis with h functions was built on a wrong
+Hamiltonian with no warning of any kind. Both are now taken from the SIMD drivers,
+which are right at h and i.
+
+### What that did not fix, which is the larger half
+
+With the core Hamiltonian correct, the conventional SCF at cc-pV5Z is **still** wrong:
+
+| basis | conventional | pyscf exact | difference |
+| --- | ---: | ---: | ---: |
+| def2-svp | -75.9609698336 | -75.9609698336 | +1.5e-12 |
+| cc-pVTZ | -76.0570982357 | -76.0570982357 | +2.3e-12 |
+| cc-pV5Z | -76.0724789681 | -76.0670116535 | **-5.5e-03** |
+
+The four-center driver has no h kernels at all -- the highest in
+`ElectronRepulsionFunc.hpp` is `...RecSSSG`. From an identical density, mapped from a
+converged pyscf calculation, its matrices relative to pyscf's:
+
+| basis | Coulomb | exchange |
+| --- | ---: | ---: |
+| cc-pVQZ | 1.4e-11 | 1.1e-11 |
+| cc-pV5Z | **4.3e-01** | **1.4e-02** |
+
+**Above g, RI-JK is the only correct route in this code.** Which also means the
+comparisons this file made against the conventional build above g were measuring the
+conventional build's gaps, not the driver's -- the trap of using a reference whose
+coverage is narrower than the thing being checked.
+
+### The driver, against a reference which does reach h
+
+pyscf `RHF().density_fit(auxbasis=...)`, def2-universal-jkfit on both sides, so the
+fitting error is common to the two and what remains is the implementation:
+
+| basis | SIMD RI-JK | pyscf DF | difference | pyscf exact | RI error |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| def2-svp | -75.9609138700 | -75.9609138700 | +1.8e-12 | -75.9609698336 | 5.6e-05 |
+| cc-pVTZ | -76.0570953623 | -76.0570953623 | +2.6e-12 | -76.0570982357 | 2.9e-06 |
+| cc-pVQZ | -76.0647542452 | -76.0647542452 | +2.4e-12 | -76.0647584041 | 4.2e-06 |
+| cc-pV5Z | -76.0670057742 | -76.0670057742 | +2.5e-12 | -76.0670116535 | 5.9e-06 |
+
+**Agreement is 2.5e-12 at every basis, h functions included.** The last column is the
+resolution of the identity itself, which is the approximation being made and is four
+to seven orders larger than the disagreement between the two implementations of it.
