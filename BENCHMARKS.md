@@ -7288,3 +7288,55 @@ The second is a small change -- the parts are cut by memory alone and could be c
 memory or by the rank count, whichever gives more -- and it is worth making before the
 first, which is a restructure. Neither is worth anything on a single node, where no
 division of this way can beat one rank.
+
+### Cutting the two passes of the direct way apart
+
+The Coulomb pass of the direct way is divided over the parts the auxiliary basis is
+swept in, and with one part it lands on one rank. Cutting more parts balances it --
+and the exchange pass sweeps every part on every rank, so cutting more parts also
+gives every rank another call of the transformation, which costs a square of the basis
+allocated and zeroed for every thread whatever the part holds. At 1345 functions on
+256 threads that square is 3.7 gigabytes a call.
+
+Tagrisso def2-tzvp, two nodes, one rank each, 512 cores:
+
+| | parts | build, slowest | quickest | spread | |
+| --- | --- | ---: | ---: | ---: | --- |
+| cut by memory alone | 1 | 1.004 s | 0.772 s | 1.30 | one rank carries the Coulomb pass |
+| cut for the ranks, both passes | 3 and 3 | 1.034 s | 1.017 s | 1.02 | balanced, and two extra sweeps |
+| **cut apart** | **3 and 1** | **0.947 s** | 0.915 s | 1.03 | balanced, one sweep |
+
+**Balancing the Coulomb pass by cutting the sweep cost more than it saved**, which is
+why the second row is the slowest of the three despite being the best balanced. The
+parts now come in two lists: the sweep is cut by memory, as it was, and the Coulomb
+pass is cut again and finer when more parts are asked for than the memory gave.
+
+The average work of a rank is 0.931 seconds against the 0.888 the model predicts for a
+perfect division, and the difference is the Coulomb pass paying for three patterns and
+three contractions where it paid for one. That is the right trade: its parts are swept
+once between the ranks, not once each.
+
+**A caution on the whole-calculation column.** Across four runs of this configuration
+the part outside the builds measured 7.15, 8.05, 8.22 and 8.76 seconds, a fifth of
+spread, while the build -- measured on every rank and averaged over seventeen
+iterations -- moved by a few per cent. The build is the number to read here; the totals
+are too noisy at this size to rank three configurations by.
+
+### Naming every BLAS in the process before timing anything
+
+Two of today's failures were a library quietly doing something other than what was
+asked: numpy's pool built on one core, and the module's OpenBLAS given 256 threads
+when it was compiled for 48, which warned once per thread and then died in its
+allocator. Both are visible in one place, and it now prints before the run:
+
+```
+# blas libopenblas_cooperlakep-r0.3.30.so: 256 threads, openblas
+# blas libgomp.so.1.0.0: 256 threads, openmp
+# blas libscipy_openblas64_-f48b354e.so: 64 threads, openblas  <-- BELOW THE THREADS THIS RANK WAS GIVEN
+```
+
+**A process holds several, they are given their threads by different mechanisms, and
+they do not agree.** The driver's takes them from OpenMP and is untouched by a launcher
+pinning the process; numpy's sizes a pool from the affinity mask and is ruined by it.
+Reporting one of them as though it described the process is how a run on two hundred
+and fifty six cores came to be labelled as four.
