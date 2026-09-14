@@ -1,10 +1,14 @@
 from mpi4py import MPI
 from pathlib import Path
+import numpy as np
+import pickle
 import pytest
+import sys
 
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.molecule import Molecule
 from veloxchem.mmforcefieldgenerator import MMForceFieldGenerator
+from veloxchem.outputstream import OutputStream
 from veloxchem.errorhandler import VeloxChemError
 
 skip_multi_rank_raises = pytest.mark.skipif(
@@ -364,6 +368,40 @@ class TestMMForceFieldGenerator:
         assert loaded_from_file.angles == ff_gen.angles
         assert loaded_from_file.dihedrals == ff_gen.dihedrals
         assert loaded_from_file.impropers == ff_gen.impropers
+
+    def test_ffgen_pickles_without_its_stream_and_communicator(self):
+
+        pytest.importorskip('openmm')
+
+        mol = self._ffgen_test_molecule()
+
+        # a stream around sys.stdout is what cannot be pickled, and a
+        # broadcast between MPI ranks pickles the generator
+        ff_gen = MMForceFieldGenerator(ostream=OutputStream(sys.stdout))
+        ff_gen.create_topology(mol, resp=False)
+
+        copy = pickle.loads(pickle.dumps(ff_gen))
+
+        # everything the JSON on disk leaves out crosses as well
+        assert copy.atoms == ff_gen.atoms
+        assert copy.bonds == ff_gen.bonds
+        assert copy.angles == ff_gen.angles
+        assert copy.dihedrals == ff_gen.dihedrals
+        assert copy.impropers == ff_gen.impropers
+        assert copy.pairs == ff_gen.pairs
+        assert np.array_equal(copy.connectivity_matrix,
+                              ff_gen.connectivity_matrix)
+        assert copy.atom_types == ff_gen.atom_types
+        assert copy.molecule.get_xyz_string() == mol.get_xyz_string()
+
+        # the copy lives on one rank and prints nothing
+        assert copy.comm == MPI.COMM_SELF
+        assert copy.rank == 0
+        assert copy.nodes == 1
+        assert copy.ostream.stream is None
+
+        # the original is untouched
+        assert ff_gen.ostream.stream is sys.stdout
 
     @skip_multi_rank_raises
     def test_ffgen_canonicalize_helpers_reject_invalid_indices(self):

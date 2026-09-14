@@ -1098,7 +1098,7 @@ class MetalSiteForceFieldBuilder:
             self._site_coordination(self._active_site['molecule'])))
 
         # entering FITTED drops the enzyme system built from the old terms
-        self._fit_and_broadcast(self._hessian, self._partial_charges)
+        self._fit_forcefield(self._hessian, self._partial_charges)
 
     # ------------------------------------------------------------------
     # steps
@@ -1426,7 +1426,7 @@ class MetalSiteForceFieldBuilder:
             },
             ostream=self.ostream)
 
-        return self._fit_and_broadcast(hessian, charges)
+        return self._fit_forcefield(hessian, charges)
 
     def adopt_forcefield(self, forcefield, active_site=None):
         """
@@ -1879,8 +1879,14 @@ class MetalSiteForceFieldBuilder:
             except Exception as error:
                 outcome = ('error', error)
 
+        # the master keeps what it computed: bcast hands the root an
+        # unpickled copy of its own value as well, and a copy is not the
+        # same thing -- a force field generator comes back with a silent
+        # stream, and a large topology is pickled twice for nothing
         if self.nodes > 1:
-            outcome = self.comm.bcast(outcome, root=mpi_master())
+            received = self.comm.bcast(outcome, root=mpi_master())
+            if self.rank != mpi_master():
+                outcome = received
 
         kind, payload = outcome
 
@@ -1889,51 +1895,16 @@ class MetalSiteForceFieldBuilder:
 
         return payload
 
-    def _broadcast_forcefield(self, forcefield):
-        """
-        Hands a force field generator from the master rank to every other one.
-
-        A generator cannot be pickled: it owns an output stream, and a stream
-        around sys.stdout does not survive the crossing. The stream is
-        therefore set aside for the trip and put back on both sides, which
-        keeps everything the JSON on disk leaves out - the pairs, the
-        connectivity matrix and the atom type tables.
-
-        :param forcefield:
-            The force field on the master rank, ignored elsewhere.
-
-        :return:
-            The force field, on every rank.
-        """
-
-        if self.nodes == 1:
-            return forcefield
-
-        stream = None
-        if self.rank == mpi_master():
-            stream = forcefield.ostream
-            forcefield.ostream = None
-
-        forcefield = self.comm.bcast(forcefield, root=mpi_master())
-
-        forcefield.ostream = stream if stream is not None else self.ostream
-
-        return forcefield
-
-    def _fit_and_broadcast(self, hessian, charges):
+    def _fit_forcefield(self, hessian, charges):
         """
         Fits the metal terms on one rank and hands the force field to every
         rank.
 
         The fit itself is cheap and is kept off the collectives inside the
-        generator, so it runs on the master alone. MMForceFieldGenerator does
-        not pickle on its own -- it owns an output stream -- which is why the
-        crossing goes through _broadcast_forcefield rather than a plain
-        bcast.
-
-        Shared by the first fit and by every refit after a bond edit, so the
-        two cannot come to write different artifacts or print different
-        tables.
+        generator, so it runs on the master alone and is broadcast like
+        every other cheap step. Shared by the first fit and by every refit
+        after a bond edit, so the two cannot come to write different
+        artifacts or print different tables.
 
         :param hessian:
             The Hessian to fit from.
@@ -1944,9 +1915,7 @@ class MetalSiteForceFieldBuilder:
             The force field, on every rank.
         """
 
-        forcefield = None
-
-        if self.rank == mpi_master():
+        def work():
             forcefield = core.build_forcefield(
                 self._active_site,
                 hessian=hessian,
@@ -1962,7 +1931,9 @@ class MetalSiteForceFieldBuilder:
                 ostream=self.ostream)
             self._write_run_artifacts(forcefield, hessian, charges)
 
-        self._forcefield = self._broadcast_forcefield(forcefield)
+            return forcefield
+
+        self._forcefield = self._on_master(work)
         self._adopted_forcefield = False
 
         # The weak bridge pruning is the one step that can decide a metal

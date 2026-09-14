@@ -188,6 +188,33 @@ class MMForceFieldGenerator:
         # Summary of fitting
         self.fitting_summary = None
 
+    def __getstate__(self):
+        """
+        Leaves the communicator and the output stream behind when the
+        generator is pickled, so that it can be broadcast between MPI ranks.
+        Neither survives the crossing: a stream around sys.stdout cannot be
+        pickled at all, and a communicator only when it is a predefined one.
+        """
+
+        state = dict(self.__dict__)
+        state.pop('comm', None)
+        state.pop('ostream', None)
+
+        return state
+
+    def __setstate__(self, state):
+        """
+        Restores a pickled generator on a communicator of its own with a
+        silent output stream: the copy lives on one rank and is a carrier
+        of parameters, not a driver to run.
+        """
+
+        self.__dict__.update(state)
+        self.comm = MPI.COMM_SELF
+        self.rank = self.comm.Get_rank()
+        self.nodes = self.comm.Get_size()
+        self.ostream = OutputStream(None)
+
     def update_settings(self, ffg_dict, resp_dict=None):
         """
         Updates settings in force field generator.
