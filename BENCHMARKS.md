@@ -7464,3 +7464,54 @@ metric and has no other option, so that run used it throughout. Whether the eige
 route -- which the conventional RI-JK driver uses, and which `ri_metric_route` now
 selects for the way which holds the B vectors -- also cures it at the default
 `ovl_thresh` is untested. The two are independent and both may be real.
+
+### And it was not a stall either
+
+The section above is right that the driver is not at fault and wrong about what is.
+It was written from one controlled comparison -- `ovl_thresh` varied within the direct
+way on a laptop -- against a failure recorded on 12 September with older code. The
+control was never run. Run now, with the same binary, and on a node:
+
+| machine | way | ovl_thresh | verdict | iterations | energy |
+| --- | --- | ---: | --- | ---: | ---: |
+| laptop | direct | 1e-6 | **not converged** | 50 | -2272.3450690097 |
+| node, 8 x 32 | direct | 1e-6 | converged | 25 | -2272.3450690097 |
+| node, 8 x 32 | held | 1e-6 | converged | 25 | -2272.3450690105 |
+| laptop | direct | 1e-5 | converged | 25 | -2272.3448501388 |
+| node, 8 x 32 | held | 1e-5 | converged | 25 | -2272.3448501395 |
+
+**The run which does not converge reaches the same energy as the runs which do**, to
+ten decimals. Its last ten iterations:
+
+```
+ 41  -2272.345069009752  grad 1e-08      46  -2272.345069009743  grad 1e-08
+ 42  -2272.345069009749  grad 1e-08      47  -2272.345069009752  grad 2e-08
+ 43  -2272.345069009758  grad 2e-08      48  -2272.345069009749  grad 1e-08
+ 44  -2272.345069009758  grad 1e-08      49  -2272.345069009734  grad 2e-08
+ 45  -2272.345069009749  grad 1e-08      50  -2272.345069009745  grad 1e-08
+```
+
+The energy is settled to 2.4e-11 and the gradient oscillates between 1e-8 and 2e-8.
+**It is not a stall: it is a noise floor which sits exactly on `conv_thresh`.** At
+1e-5 the floor lands just under the threshold and the test passes at iteration 25; at
+1e-6 it lands just over and fifty iterations report failure. The node, with OpenBLAS
+instead of Accelerate and eight ranks of thirty two threads instead of fourteen, lands
+just under at 1e-6 and converges in twenty five.
+
+**So c60 at def2-tzvp is a calculation whose achievable gradient is `conv_thresh`**,
+and whether it is called converged is settled by the arithmetic: the math library, the
+thread count, the rank count, the linear dependence threshold. None of them change the
+answer. `conv_thresh = 1e-7` is met at iteration 21 in every configuration.
+
+**Raising `ovl_thresh` is not a free fix.** 1e-5 drops 37 directions where 1e-6 drops
+three, and the energies differ by 2.19e-04 Eh accordingly -- it is a smaller
+variational space, not a better converged one. What it also does is lower the gradient
+noise slightly, which is why it crossed the threshold; that was the effect measured
+and mistaken for the cause.
+
+**And the metric route changes none of it.** On the node, cholesky against
+eigenvalues: converged in twenty five iterations either way, in both ways of building,
+differing by 3.4e-07 Eh -- the same difference in both, so a systematic property of the
+two inversions rather than noise. It costs 5.5 per cent of a direct calculation and
+6.8 of a held one, which answers the question of what multiplying by the root costs
+against solving the factor: not much.
