@@ -261,6 +261,25 @@ class CSimdRIJKFockDriver
                          const std::vector<int>    &parts,
                          CPackedMatrix             &matrix) -> void;
 
+    /// @brief Gets the work each atom of the auxiliary basis carries.
+    /// @param molecule The molecule to compute the Fock matrices of.
+    /// @param basis The molecular basis.
+    /// @param aux_basis The auxiliary molecular basis.
+    /// @param threshold The screening threshold.
+    /// @return The memory of the B vectors of each atom, in bytes, of one value per
+    /// atom of the molecule and zero for an atom the screening leaves nothing of.
+    /// @note This is what a communicator should divide by, and not the count of the
+    /// atoms. An auxiliary function on an atom in the middle of a molecule survives
+    /// screening against far more atom pairs than one on an atom at the edge, so
+    /// ranks given equal counts of atoms are given unequal counts of values, and it
+    /// is the values which cost. The weights sum to what required_memory answers for
+    /// the whole molecule, so a rank may take the memory of its share from them
+    /// rather than describing a second pattern.
+    auto aux_atom_weights(const CMolecule       &molecule,
+                          const CMolecularBasis &basis,
+                          const CMolecularBasis &aux_basis,
+                          const double           threshold) const -> std::vector<double>;
+
     /// @brief Gets the number of auxiliary basis functions this driver holds the B
     /// vectors of, which is the whole auxiliary basis unless the atoms were divided.
     /// @return The number of functions a build sweeps.

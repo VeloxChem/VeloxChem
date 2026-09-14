@@ -263,6 +263,14 @@ export_simdintegrals(py::module &m) -> void
              py::arg("gamma"),
              py::arg("parts"),
              py::arg("matrix"))
+        .def("aux_atom_weights",
+             &CSimdRIJKFockDriver::aux_atom_weights,
+             "Gets the memory of the B vectors each atom of the auxiliary basis carries, in bytes, "
+             "which is what a communicator should divide by rather than the count of the atoms.",
+             py::arg("molecule"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("threshold"))
         .def("number_of_aux_functions", &CSimdRIJKFockDriver::number_of_aux_functions,
              "Gets the number of auxiliary basis functions a build sweeps, which is what says whether a "
              "division over the ranks divided the work and not only the memory.")

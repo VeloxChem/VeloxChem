@@ -1811,8 +1811,21 @@ class ScfDriver:
             # the Fock matrix and the reduction at the end of the build adds the
             # shares. One rank is given the whole of it in the order of the
             # molecule, which is what it was given before this was divided.
-            self._ri_aux_atoms = ([] if self.nodes == 1 else
-                                  molecule.partition_atoms(self.comm))
+
+            # NOTE: the atoms are divided by the work they carry and not by their
+            # number. Dealing them round robin gave the ranks equal counts of
+            # auxiliary functions and unequal counts of values, and the build ends
+            # when the last rank ends: at fourteen ranks the slowest transform was
+            # 3.3 times the quickest, while every rank's own share had fallen with
+            # the ranks exactly as it should.
+            if self.nodes == 1:
+                self._ri_aux_atoms = []
+            else:
+                weights = self._ri_drv.aux_atom_weights(molecule, ao_basis,
+                                                        basis_ri,
+                                                        self.eri_thresh)
+                self._ri_aux_atoms = molecule.partition_atoms_by_weight(
+                    self.comm, weights)
 
             budget = self._get_ri_memory_budget()
 

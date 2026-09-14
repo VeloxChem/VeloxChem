@@ -6966,21 +6966,55 @@ sections above say they do. The build does not, because it ends when the last ra
 ends, and taking a single rank's report -- which is what every measurement of this
 session did -- shows the share and hides the wait.
 
-**The imbalance is in the partition and not in the arithmetic.**
-`Molecule.partition_atoms` sorts the atoms by their distance from the centre of mass
-and by element and deals them round robin, which balances the count of atoms and so
-roughly the count of auxiliary functions: 93 and 95 at fourteen ranks. It does not
-balance the work. An auxiliary function on an atom in the middle of a molecule
-survives screening against far more atom pairs than one on an atom at the edge, so
-equal counts of functions are unequal counts of values, and it is values which cost.
+### The spread is the machine, not the partition
 
-The weights to do it properly are already computed, in the driver and for another
-purpose: `_make_parts` sums the memory of each atom's integrals out of the sparsity
-pattern into `shares[atom]`, to cut the direct way into parts which fit a budget. A
-partition which dealt atoms to ranks by those weights rather than by their count is
-the obvious next thing, and it is a change to the Python layer alone.
+The obvious reading of the table above is that the atoms are badly divided, and it is
+wrong. The control is to give every rank provably identical work -- a square matrix
+product of six hundred, twelve times over, timed as the best of seven -- and ask the
+same machine what it does to that.
 
-**What this does not say.** Fourteen cores of a laptop is not a node, and a molecule
-of twenty four atoms is not what any of this is for. What it settles is the shape of
-the measurement: at a fixed machine, report the rank which finishes last, and never a
-single rank's profile.
+| ranks x 1 thread | identical work, spread | the transform, spread |
+| --- | ---: | ---: |
+| 2 | 1.00 | 1.01 |
+| 4 | 1.96 | 2.16 |
+| 8 | 3.01 | 2.35 |
+| 10 | 3.14 | 3.94 |
+| 14 | **4.93** | **4.00** |
+
+**The same curve, and the transform sits below it.** This laptop is an Apple M4 Max:
+`hw.perflevel0.logicalcpu` is 10 and `hw.perflevel1.logicalcpu` is 4, ten performance
+cores and four efficiency cores. A rank which lands on an efficiency core takes two
+to three times as long whatever it is doing, and the shape of the measured spread --
+a tight cluster and a tail of two or three slow ranks at every count -- is that and
+not a distribution of work.
+
+**So the partition was not what the table showed.** Measured on what it does divide,
+the round robin is uneven but nothing like three fold:
+
+| predicted work of the heaviest rank over the lightest | by count | by work |
+| --- | ---: | ---: |
+| caffeine def2-tzvp, 4 ranks | 1.211 | 1.056 |
+| caffeine def2-tzvp, 14 ranks | 1.268 | 1.233 |
+| tagrisso def2-svp, 4 ranks | 1.094 | 1.021 |
+| tagrisso def2-svp, 14 ranks | **1.293** | **1.078** |
+
+`Molecule.partition_atoms` sorts the atoms by distance from the centre of mass and by
+element and deals them round robin, which balances their count and so roughly the
+count of auxiliary functions -- 93 and 95 at fourteen ranks -- but not the work. An
+auxiliary function on an atom in the middle of a molecule survives screening against
+far more atom pairs than one at the edge, so equal counts of functions are unequal
+counts of values, and it is values which cost.
+
+`Molecule.partition_atoms_by_weight` deals them heaviest first, each to the rank
+carrying least so far, by weights the driver measures out of the sparsity pattern and
+now answers through `aux_atom_weights`. It takes the ratio at fourteen ranks from
+1.293 to 1.078 on tagrisso. **That is the whole of what it is worth**, and it is worth
+having; it is not a cure for a three fold spread, because there was no three fold
+spread to cure. Caffeine gains least because twenty four atoms over fourteen ranks is
+one or two atoms a rank and there is nothing left to balance.
+
+**What this does not say.** Fourteen cores of a laptop with two kinds of core is not a
+node, and a molecule of twenty four atoms is not what any of this is for. What it
+settles is the shape of the measurement: at a fixed machine, report the rank which
+finishes last, never a single rank's profile -- and run the control before blaming the
+code for what the machine did.

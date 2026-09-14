@@ -220,6 +220,33 @@ CSimdRIJKFockDriver::required_memory(const CMolecule        &molecule,
 
 namespace {
 
+/// @brief Measures what each atom of the auxiliary side of a pattern carries.
+/// @param pattern The sparsity pattern to measure.
+/// @param natoms The number of atoms of the molecule.
+/// @return The memory of the values of each atom, in bytes.
+/// @note A block holds as many values for one of its atoms on the auxiliary side as
+/// for any other, so its memory divides evenly over them and the memory of an atom is
+/// the sum of the shares of the blocks which carry it.
+static auto
+atom_shares(const CTripleSparsityPattern &pattern, const size_t natoms) -> std::vector<double>
+{
+    std::vector<double> shares(natoms, 0.0);
+
+    for (const auto &block : pattern.blocks())
+    {
+        const auto &c_atoms = block.c_atoms();
+
+        if (c_atoms.empty()) continue;
+
+        const auto share =
+            static_cast<double>(block.number_of_elements() * sizeof(double)) / static_cast<double>(c_atoms.size());
+
+        for (const auto atom : c_atoms) shares[static_cast<size_t>(atom)] += share;
+    }
+
+    return shares;
+}
+
 /// @brief Gets the dense indices of the auxiliary basis functions of given atoms.
 /// @param aux_basis The auxiliary molecular basis.
 /// @param atoms The atoms, as their indices in the molecule, or none of them for all
@@ -997,6 +1024,17 @@ CSimdRIJKFockDriver::compute_coulomb(const std::vector<double> &gamma,
 }
 
 auto
+CSimdRIJKFockDriver::aux_atom_weights(const CMolecule       &molecule,
+                                      const CMolecularBasis &basis,
+                                      const CMolecularBasis &aux_basis,
+                                      const double           threshold) const -> std::vector<double>
+{
+    const auto pattern = CSimdThreeCenterElectronRepulsionDriver().make_pattern(molecule, basis, aux_basis, threshold);
+
+    return atom_shares(pattern, static_cast<size_t>(molecule.number_of_atoms()));
+}
+
+auto
 CSimdRIJKFockDriver::number_of_aux_functions() const -> size_t
 {
     return _aux_functions.size();
@@ -1041,23 +1079,7 @@ CSimdRIJKFockDriver::_make_parts(const CMolecule              &molecule,
 {
     const auto natoms = static_cast<size_t>(molecule.number_of_atoms());
 
-    // NOTE: a block holds as many values for one of its atoms on the auxiliary side
-    // as for any other, so its memory divides evenly over them and the memory of an
-    // atom is the sum of the shares of the blocks which carry it.
-
-    std::vector<double> shares(natoms, 0.0);
-
-    for (const auto &block : pattern.blocks())
-    {
-        const auto &c_atoms = block.c_atoms();
-
-        if (c_atoms.empty()) continue;
-
-        const auto share = static_cast<double>(block.number_of_elements() * sizeof(double)) /
-                           static_cast<double>(c_atoms.size());
-
-        for (const auto atom : c_atoms) shares[static_cast<size_t>(atom)] += share;
-    }
+    const auto shares = atom_shares(pattern, natoms);
 
     // NOTE: the atoms are gathered in the order they are given until the integrals
     // of a part reach the budget. An atom whose own integrals are above it is a part
