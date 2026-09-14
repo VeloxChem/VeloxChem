@@ -9,6 +9,7 @@ from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.lreigensolver import LinearResponseEigenSolver
+from veloxchem.tddftorbitalresponse import TddftOrbitalResponse
 from veloxchem.errorhandler import VeloxChemError
 
 
@@ -181,20 +182,66 @@ class TestRPA:
             detachment = lr_results['detachment_charges']
             attachment = lr_results['attachment_charges']
             ref_detachment = np.array([
-                [-1.0001863412, 9.31706e-05, 9.31706e-05],
-                [-1.0004727906, 2.363953e-04, 2.363953e-04],
-                [-0.9115710485, -4.42144757e-02, -4.42144758e-02],
+                [-1.0029851374, -0.0000948340, -0.0000948341],
+                [-1.0027814588, -0.0002540890, -0.0002540890],
+                [-0.9143468349, -0.0447074693, -0.0447074695],
             ])
             ref_attachment = np.array([
-                [0.2873499273, 0.3563249945, 0.3563250781],
-                [0.3025686881, 0.3487157020, 0.3487156098],
-                [0.2760202908, 0.3619898252, 0.3619898840],
+                [0.2897746805, 0.3567000207, 0.3567001044],
+                [0.3056100033, 0.3488398628, 0.3488397706],
+                [0.2784322949, 0.3626647099, 0.3626647689],
             ])
 
             assert detachment.shape == (3, mol.number_of_atoms())
             assert attachment.shape == (3, mol.number_of_atoms())
             assert np.max(np.abs(detachment - ref_detachment)) < 1.0e-6
             assert np.max(np.abs(attachment - ref_attachment)) < 1.0e-6
+
+    def test_detach_attach_density_consistency(self):
+
+        # detach + attach must reproduce the unrelaxed difference density
+
+        xyz_string = """3
+        xyz
+        O   -0.1858140  -1.1749469   0.7662596
+        H   -0.1285513  -0.8984365   1.6808606
+        H   -0.0582782  -0.3702550   0.2638279
+        """
+        mol = Molecule.read_xyz_string(xyz_string)
+        bas = MolecularBasis.read(mol, '6-31g', ostream=None)
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ostream.mute()
+        scf_results = scf_drv.compute(mol, bas)
+
+        lr_drv = LinearResponseEigenSolver()
+        lr_drv.ostream.mute()
+        lr_drv.nstates = 1
+        lr_results = lr_drv.compute(mol, bas, scf_results)
+
+        orb_drv = TddftOrbitalResponse()
+        orb_drv.ostream.mute()
+        orb_drv.state_deriv_index = [1]
+        orb_drv.compute(mol, bas, scf_drv.scf_tensors, lr_results)
+
+        eigvec = lr_drv.get_full_solution_vector(
+            lr_results['eigenvectors_distributed'][0])
+
+        if lr_drv.rank == mpi_master():
+            nocc = mol.number_of_alpha_occupied_orbitals(bas)
+            mo_occ, mo_vir = lr_drv._get_mo_occ_and_mo_vir(scf_results, nocc)
+            z_mat, y_mat = lr_drv._get_z_mat_and_y_mat(eigvec, nocc)
+
+            dens_D, dens_A = lr_drv.get_detach_attach_densities(
+                z_mat, y_mat, mo_occ, mo_vir)
+            unrel_dens = orb_drv.cphf_results['unrelaxed_density_ao'][0]
+
+            assert np.max(np.abs(dens_D + dens_A - unrel_dens)) < 1.0e-12
+
+            dens_D_mo = np.linalg.multi_dot([mo_occ.T, dens_D, mo_occ])
+            dens_A_mo = np.linalg.multi_dot([mo_vir.T, dens_A, mo_vir])
+            assert np.max(np.linalg.eigvalsh(dens_D_mo)) < 1.0e-12
+            assert np.min(np.linalg.eigvalsh(dens_A_mo)) > -1.0e-12
 
     def test_esa_water_631g(self):
 

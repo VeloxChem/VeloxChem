@@ -4219,15 +4219,17 @@ class LinearSolver:
             The MO coefficients of virtual orbitals.
 
         :return:
-            The detachment and attachment densities.
+            The detachment and attachment densities. The detachment density
+            carries a negative sign and the difference density is the sum of
+            the two.
         """
 
         dens_D = -np.linalg.multi_dot([mo_occ, z_mat, z_mat.T, mo_occ.T])
         dens_A = np.linalg.multi_dot([mo_vir, z_mat.T, z_mat, mo_vir.T])
 
         if y_mat is not None:
-            dens_D += np.linalg.multi_dot([mo_occ, y_mat, y_mat.T, mo_occ.T])
-            dens_A -= np.linalg.multi_dot([mo_vir, y_mat.T, y_mat, mo_vir.T])
+            dens_D -= np.linalg.multi_dot([mo_occ, y_mat, y_mat.T, mo_occ.T])
+            dens_A += np.linalg.multi_dot([mo_vir, y_mat.T, y_mat, mo_vir.T])
 
         return dens_D, dens_A
 
