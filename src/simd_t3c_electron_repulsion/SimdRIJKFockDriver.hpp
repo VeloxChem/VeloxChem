@@ -297,11 +297,22 @@ class CSimdRIJKFockDriver
     /// -- so an energy cannot tell the two apart, and this can.
     auto number_of_aux_functions() const -> size_t;
 
-    /// @brief Gets the number of parts the direct mode sweeps the auxiliary basis
-    /// in.
+    /// @brief Gets the number of parts the Coulomb pass of the direct mode is
+    /// divided over.
     /// @return The number of parts, which is zero in the mode which holds the B
     /// vectors.
+    /// @note This is what compute_coulomb indexes into, and what a caller dividing
+    /// the Coulomb pass over the ranks of a communicator deals out.
     auto number_of_parts() const -> size_t;
+
+    /// @brief Gets the number of parts the exchange pass of the direct mode sweeps
+    /// the auxiliary basis in.
+    /// @return The number of parts, which is zero in the mode which holds the B
+    /// vectors.
+    /// @note Every rank sweeps every one of these, so they are cut by memory alone
+    /// and are not divided over anything. Reported so that a caller can see that
+    /// asking for more parts of the Coulomb pass has not added any here.
+    auto number_of_sweep_parts() const -> size_t;
 
     /// @brief Checks that the driver has been prepared.
     /// @return True if the driver is ready to form a Fock matrix.
@@ -349,6 +360,11 @@ class CSimdRIJKFockDriver
     /// @param pattern The sparsity pattern of the whole, to measure the parts from.
     /// @param min_parts The fewest parts to cut, whatever the memory allows.
     /// @return The pattern of each part.
+    /// @brief Gets the parts the Coulomb pass is divided over.
+    /// @return The parts of the Coulomb pass, which are the parts of the sweep unless
+    /// a finer division was asked for.
+    auto _coulomb_patterns() const -> const std::vector<CTripleSparsityPattern> &;
+
     auto _make_parts(const CMolecule              &molecule,
                      const CMolecularBasis        &basis,
                      const CMolecularBasis        &aux_basis,
@@ -412,6 +428,17 @@ class CSimdRIJKFockDriver
     /// @brief The molecule, which the direct mode forms the integrals of again on
     /// every call.
     CMolecule _molecule;
+
+    /// @brief The parts the Coulomb pass of the direct mode is divided over, which
+    /// is empty when that pass divides over the parts of the sweep itself.
+    /// @note The two passes want different numbers of parts. The Coulomb pass is
+    /// divided over them, so it wants at least one for every rank; the exchange pass
+    /// sweeps every one of them on every rank, and each is another call of the
+    /// transformation -- which costs a square of the basis allocated and zeroed for
+    /// every thread, whatever the part holds. Cutting the sweep finer to balance the
+    /// Coulomb pass cost more than the balance was worth at a thousand functions on
+    /// two hundred and fifty six threads, so the two are cut apart.
+    std::vector<CTripleSparsityPattern> _coulomb_parts;
 
     /// @brief The sparsity patterns the direct mode sweeps, one for each part of
     /// the auxiliary basis, described once.

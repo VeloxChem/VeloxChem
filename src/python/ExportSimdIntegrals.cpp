@@ -276,7 +276,11 @@ export_simdintegrals(py::module &m) -> void
              "Gets the number of auxiliary basis functions a build sweeps, which is what says whether a "
              "division over the ranks divided the work and not only the memory.")
         .def("number_of_parts", &CSimdRIJKFockDriver::number_of_parts,
-             "Gets the number of parts the direct way sweeps the auxiliary basis in.")
+             "Gets the number of parts the Coulomb pass of the direct way is divided over, which is what "
+             "compute_coulomb indexes into.")
+        .def("number_of_sweep_parts", &CSimdRIJKFockDriver::number_of_sweep_parts,
+             "Gets the number of parts the exchange pass sweeps the auxiliary basis in. Every rank sweeps "
+             "every one of them, so asking for more parts of the Coulomb pass must not add any here.")
         .def("is_prepared", &CSimdRIJKFockDriver::is_prepared, "Checks that the driver has been prepared.")
         .def("get_mode", &CSimdRIJKFockDriver::get_mode, "Gets the way the driver forms the Fock matrices.")
         .def("get_bq_vectors", &CSimdRIJKFockDriver::get_bq_vectors,

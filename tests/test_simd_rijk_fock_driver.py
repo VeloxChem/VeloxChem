@@ -616,6 +616,18 @@ class TestSimdRIJKFockDriver:
             assert driver.number_of_parts() >= asked, (
                 f"asked for {asked} parts and got {driver.number_of_parts()}")
 
+            # NOTE: and the sweep of the exchange pass must not have been cut with
+            # it. Every rank sweeps every one of those, and each is another call of
+            # the transformation, which costs a square of the basis for every thread
+            # whatever the part holds -- so balancing the Coulomb pass this way was a
+            # regression at a thousand basis functions on two hundred and fifty six
+            # threads until the two were cut apart.
+
+            assert driver.number_of_sweep_parts() == whole.number_of_sweep_parts(), (
+                f"asking for {asked} parts of the Coulomb pass cut the sweep from "
+                f"{whole.number_of_sweep_parts()} to "
+                f"{driver.number_of_sweep_parts()}")
+
             # cutting finer is a regrouping of the same atoms and must not move the
             # Fock matrix by more than the order of the arithmetic
 

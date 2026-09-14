@@ -480,7 +480,19 @@ CSimdRIJKFockDriver::prepare(const CMolecule       &molecule,
 
         const auto pattern = eri_drv.make_pattern(molecule, basis, aux_basis, threshold);
 
-        _parts = _make_parts(molecule, basis, aux_basis, threshold, pattern, min_parts);
+        // NOTE: the sweep of the exchange pass is cut by memory alone, as every rank
+        // sweeps every part of it and each part is another call of the
+        // transformation. The Coulomb pass is divided over the ranks, so it is cut
+        // again, finer, when more parts are asked for than the memory gave.
+
+        _parts = _make_parts(molecule, basis, aux_basis, threshold, pattern, 1);
+
+        _coulomb_parts.clear();
+
+        if (min_parts > _parts.size())
+        {
+            _coulomb_parts = _make_parts(molecule, basis, aux_basis, threshold, pattern, min_parts);
+        }
 
         profile.pattern += prof_since(mark_pattern);
 
@@ -507,6 +519,8 @@ CSimdRIJKFockDriver::prepare(const CMolecule       &molecule,
     _metric = std::move(formed);
 
     _parts.clear();
+
+    _coulomb_parts.clear();
 
     _aux_functions = aux_functions_of(aux_basis, aux_atoms);
 
@@ -973,13 +987,15 @@ CSimdRIJKFockDriver::compute_coulomb(const std::vector<double> &gamma,
 
     CSimdThreeCenterElectronRepulsionDriver eri_drv;
 
+    const auto &patterns = _coulomb_patterns();
+
     for (const auto index : parts)
     {
-        errors::assertMsgCritical((index >= 0) && (static_cast<size_t>(index) < _parts.size()),
+        errors::assertMsgCritical((index >= 0) && (static_cast<size_t>(index) < patterns.size()),
                                   std::string("RIJKFockDriver: The Coulomb matrix was asked for a part of the "
                                               "auxiliary basis which the driver does not sweep"));
 
-        const auto &pattern = _parts[static_cast<size_t>(index)];
+        const auto &pattern = patterns[static_cast<size_t>(index)];
 
         auto integrals = CSparseTensor(pattern);
 
@@ -1042,7 +1058,19 @@ CSimdRIJKFockDriver::number_of_aux_functions() const -> size_t
 }
 
 auto
+CSimdRIJKFockDriver::_coulomb_patterns() const -> const std::vector<CTripleSparsityPattern> &
+{
+    return _coulomb_parts.empty() ? _parts : _coulomb_parts;
+}
+
+auto
 CSimdRIJKFockDriver::number_of_parts() const -> size_t
+{
+    return _coulomb_patterns().size();
+}
+
+auto
+CSimdRIJKFockDriver::number_of_sweep_parts() const -> size_t
 {
     return _parts.size();
 }
@@ -1062,7 +1090,11 @@ CSimdRIJKFockDriver::_compute_direct(const CPackedMatrix &coefficients,
 
     gamma = solve_fitting(std::move(gamma));
 
-    std::vector<int> parts(_parts.size());
+    // NOTE: the parts of the Coulomb pass, which are not the parts of the sweep when
+    // a finer division was asked for. Sizing this from the sweep would hand the
+    // Coulomb pass the first of its parts and none of the rest.
+
+    std::vector<int> parts(number_of_parts());
 
     std::iota(parts.begin(), parts.end(), 0);
 
