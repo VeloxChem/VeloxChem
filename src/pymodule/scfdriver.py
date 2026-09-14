@@ -1886,9 +1886,15 @@ class ScfDriver:
             mode = self.comm.bcast(mode, root=mpi_master())
             metric = metric.broadcast(self.comm, root=mpi_master())
 
+            # NOTE: the direct way sweeps the auxiliary basis in parts, and its
+            # Coulomb pass is divided over them. They are cut to fit the memory of a
+            # build, so a machine with memory to spare gives one part and one rank
+            # sweeps the integrals a second time while the others wait -- a fifth of
+            # a build, measured on two nodes. At least one part per rank is asked for
+            # so there is something for each of them to take.
             self._ri_drv.prepare(molecule, ao_basis, basis_ri, self.eri_thresh,
                                  budget, self.ri_metric_threshold, False, mode,
-                                 self._ri_aux_atoms, metric)
+                                 self._ri_aux_atoms, metric, self.nodes)
 
             taken = ('held in memory'
                      if self._ri_drv.get_mode() == rimode.in_memory else

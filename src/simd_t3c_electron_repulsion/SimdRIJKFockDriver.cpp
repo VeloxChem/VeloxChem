@@ -419,7 +419,8 @@ CSimdRIJKFockDriver::prepare(const CMolecule       &molecule,
                              const bool             use_inverse_square_root,
                              const rimode           mode,
                              const std::vector<int> &aux_atoms,
-                             const CPackedMatrix   &metric) -> void
+                             const CPackedMatrix   &metric,
+                             const size_t           min_parts) -> void
 {
     CPrepareProfile profile;
 
@@ -479,7 +480,7 @@ CSimdRIJKFockDriver::prepare(const CMolecule       &molecule,
 
         const auto pattern = eri_drv.make_pattern(molecule, basis, aux_basis, threshold);
 
-        _parts = _make_parts(molecule, basis, aux_basis, threshold, pattern);
+        _parts = _make_parts(molecule, basis, aux_basis, threshold, pattern, min_parts);
 
         profile.pattern += prof_since(mark_pattern);
 
@@ -1075,11 +1076,28 @@ CSimdRIJKFockDriver::_make_parts(const CMolecule              &molecule,
                                  const CMolecularBasis        &basis,
                                  const CMolecularBasis        &aux_basis,
                                  const double                  threshold,
-                                 const CTripleSparsityPattern &pattern) const -> std::vector<CTripleSparsityPattern>
+                                 const CTripleSparsityPattern &pattern,
+                                 const size_t                  min_parts) const -> std::vector<CTripleSparsityPattern>
 {
     const auto natoms = static_cast<size_t>(molecule.number_of_atoms());
 
     const auto shares = atom_shares(pattern, natoms);
+
+    // NOTE: the parts are cut at whichever is the smaller of what the memory allows
+    // and an equal division into the number asked for. A machine with memory to spare
+    // gives one part, and the caller which divides the Coulomb pass over the ranks of
+    // a communicator then has one part for all of them: one rank sweeps the integrals
+    // a second time and the others wait. Cutting finer costs nothing, as the parts are
+    // a division of the same atoms and their integrals are the same integrals however
+    // they are grouped.
+
+    const auto total = std::accumulate(shares.begin(), shares.end(), 0.0);
+
+    const auto by_memory = static_cast<double>(_budget / 2);
+
+    const auto by_parts = total / static_cast<double>(std::max(min_parts, size_t{1}));
+
+    const auto cut = std::min(by_memory, by_parts);
 
     // NOTE: the atoms are gathered in the order they are given until the integrals
     // of a part reach the budget. An atom whose own integrals are above it is a part
@@ -1099,7 +1117,7 @@ CSimdRIJKFockDriver::_make_parts(const CMolecule              &molecule,
 
         if (share <= 0.0) continue;
 
-        if ((!atoms.empty()) && ((memory + share) > static_cast<double>(_budget / 2)))
+        if ((!atoms.empty()) && ((memory + share) > cut))
         {
             parts.push_back(eri_drv.make_pattern(molecule, basis, aux_basis, threshold, atoms));
 

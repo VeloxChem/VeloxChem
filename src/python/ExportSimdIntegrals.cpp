@@ -237,7 +237,8 @@ export_simdintegrals(py::module &m) -> void
              py::arg("use_inverse_square_root") = false,
              py::arg("mode") = rimode::automatic,
              py::arg("aux_atoms") = std::vector<int>{},
-             py::arg("metric") = CPackedMatrix())
+             py::arg("metric") = CPackedMatrix(),
+             py::arg("min_parts") = 1)
         .def("compute",
              &CSimdRIJKFockDriver::compute,
              "Computes the Fock matrix, twice the Coulomb less the scaled exchange.",

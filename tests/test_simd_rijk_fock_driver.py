@@ -582,3 +582,46 @@ class TestSimdRIJKFockDriver:
                        rimode.direct)
 
         assert driver.number_of_aux_functions() == aux_basis.get_dimensions_of_basis()
+
+    def test_the_parts_are_cut_for_the_ranks_as_well_as_the_memory(self, chain):
+        """The Coulomb pass of the direct way is divided over the parts it sweeps,
+        and the parts are cut to fit the memory of a build. A machine with memory to
+        spare gives one part, which is one rank's work and no one else's, so a caller
+        dividing over a communicator asks for at least as many parts as it has
+        ranks."""
+
+        basis, aux_basis = self.bases(tuple([1] * 10), tuple([0] * 10), 3)
+
+        nao = basis.get_dimensions_of_basis()
+
+        coeffs, density = self.orbitals(nao, 4, 61)
+
+        roomy = 1 << 30
+
+        whole = SimdRIJKFockDriver()
+        whole.prepare(chain, basis, aux_basis, 0.0, roomy, 1.0e-12, False,
+                      rimode.direct)
+
+        assert whole.number_of_parts() == 1, (
+            "a budget of a gigabyte should hold this molecule in one part")
+
+        expected = whole.compute(density, coeffs, 1.0).to_numpy(max_memory=8.0)
+
+        for asked in (2, 4, 8):
+
+            driver = SimdRIJKFockDriver()
+            driver.prepare(chain, basis, aux_basis, 0.0, roomy, 1.0e-12, False,
+                           rimode.direct, min_parts=asked)
+
+            assert driver.number_of_parts() >= asked, (
+                f"asked for {asked} parts and got {driver.number_of_parts()}")
+
+            # cutting finer is a regrouping of the same atoms and must not move the
+            # Fock matrix by more than the order of the arithmetic
+
+            computed = driver.compute(density, coeffs, 1.0).to_numpy(max_memory=8.0)
+
+            scale = float(np.max(np.abs(expected)))
+
+            assert scale > 0.0
+            assert np.max(np.abs(computed - expected)) / scale < 1.0e-12

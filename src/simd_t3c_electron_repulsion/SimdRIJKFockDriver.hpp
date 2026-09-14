@@ -172,6 +172,13 @@ class CSimdRIJKFockDriver
     /// over a communicator: each rank is given a share of the atoms and answers a
     /// share of the Fock matrix, which the ranks sum. The direct way refuses a
     /// division, as its triangular solve reaches across the whole auxiliary basis.
+    /// @param min_parts The fewest parts the direct way is to sweep the auxiliary
+    /// basis in. The parts are cut to fit the memory of a build, and a machine with
+    /// memory to spare gives one of them -- which one rank then sweeps for the
+    /// Coulomb matrix while every other rank waits. A caller dividing the work over a
+    /// communicator asks here for at least as many parts as it has ranks. It costs
+    /// nothing to ask: the parts are a division of the same atoms either way, so the
+    /// integrals of a sweep are the same integrals however they are grouped.
     /// @param metric The metric to build with, or an empty matrix to form it here.
     /// A metric given must be the one make_metric answers for the mode given, and
     /// the mode must then be named rather than automatic, as the fallbacks which
@@ -194,7 +201,8 @@ class CSimdRIJKFockDriver
                  const bool             use_inverse_square_root = false,
                  const rimode           mode                    = rimode::automatic,
                  const std::vector<int> &aux_atoms              = {},
-                 const CPackedMatrix    &metric                 = CPackedMatrix()) -> void;
+                 const CPackedMatrix    &metric                 = CPackedMatrix(),
+                 const size_t            min_parts              = 1) -> void;
 
     /// @brief Computes the Fock matrix of a density and a set of orbitals.
     /// @param density The density matrix, in the packed format, symmetric for a
@@ -339,12 +347,14 @@ class CSimdRIJKFockDriver
     /// @param aux_basis The auxiliary molecular basis.
     /// @param threshold The screening threshold.
     /// @param pattern The sparsity pattern of the whole, to measure the parts from.
+    /// @param min_parts The fewest parts to cut, whatever the memory allows.
     /// @return The pattern of each part.
     auto _make_parts(const CMolecule              &molecule,
                      const CMolecularBasis        &basis,
                      const CMolecularBasis        &aux_basis,
                      const double                  threshold,
-                     const CTripleSparsityPattern &pattern) const -> std::vector<CTripleSparsityPattern>;
+                     const CTripleSparsityPattern &pattern,
+                     const size_t                  min_parts) const -> std::vector<CTripleSparsityPattern>;
 
     /// @brief The fewest auxiliary functions a range of the W matrices holds.
     /// @note The range is what the transformation divides over the threads, and a
