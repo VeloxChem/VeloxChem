@@ -62,7 +62,7 @@ except ImportError:
 
 from ..outputstream import OutputStream
 from ..errorhandler import assert_msg_critical
-from . import core
+from . import util
 from . import matching
 from . import printing
 from .printing import stream
@@ -175,7 +175,7 @@ def described_site(builder):
 
     return matching.describe(
         active_site,
-        core.connectivity_bonds(active_site['connectivity_matrix']))
+        util.connectivity_bonds(active_site['connectivity_matrix']))
 
 
 def _shoehorn(builder,
@@ -244,9 +244,9 @@ def _print_shoehorn_summary(builder, name, ostream=None):
     # bound once: binding_modes derives a new object per access
     modes = builder.binding_modes
     residues = list(builder._protonated_topology.residues())
-    site = set(core.active_site_residues(modes))
+    site = set(util.active_site_residues(modes))
 
-    variants = [(core.residue_label(residues[res_index]), variant)
+    variants = [(util.residue_label(residues[res_index]), variant)
                 for res_index, variant in sorted(modes['variants'].items())
                 if res_index in site]
 
@@ -276,7 +276,7 @@ def _candidate_residues(builder, max_radius):
     positions = np.asarray(builder.enzyme_positions)
     modes = builder.binding_modes
 
-    members = set(core.active_site_residues(modes))
+    members = set(util.active_site_residues(modes))
     metals = {
         entry['res_index']: positions[entry['index']]
         for entry in modes['metals']
@@ -285,7 +285,7 @@ def _candidate_residues(builder, max_radius):
     candidates = []
 
     for residue in topology.residues():
-        if residue.name in core.UNTRUNCATABLE_RESIDUES:
+        if residue.name in util.UNTRUNCATABLE_RESIDUES:
             continue
 
         atoms = matching.sidechain_heavy_atoms(residue)
@@ -300,7 +300,7 @@ def _candidate_residues(builder, max_radius):
                          atom) for atom in atoms]
             reach[res_index] = min(distance for distance, _ in measured)
             donors = [(distance, atom) for distance, atom in measured
-                      if atom.element.symbol in core.DONOR_ELEMENTS]
+                      if atom.element.symbol in util.DONOR_ELEMENTS]
             if donors:
                 distance, atom = min(donors, key=lambda found: found[0])
                 donor[res_index] = (distance, atom.name)
@@ -313,7 +313,7 @@ def _candidate_residues(builder, max_radius):
             'resid': str(residue.id),
             'chain': str(residue.chain.id),
             'name': residue.name,
-            'label': core.residue_label(residue),
+            'label': util.residue_label(residue),
             'key': matching.residue_family_key(topology, residue),
             'reach': reach,
             'donor': donor,
@@ -428,7 +428,7 @@ def _slot_cost(slot, candidate, pairing, max_radius):
 
     metals = [pairing[metal] for metal in slot['metals']]
 
-    if len(metals) > 1 and candidate['name'] not in core.BRIDGING_RESIDUES:
+    if len(metals) > 1 and candidate['name'] not in util.BRIDGING_RESIDUES:
         # an imidazole nitrogen has one lone pair in the ring plane, so a
         # second metal on it is an artifact however the template reads
         return math.inf
@@ -752,7 +752,7 @@ def _include_assigned(builder, template, donors, ostream=None):
         The candidate of each assigned residue.
     """
 
-    members = set(core.active_site_residues(builder.binding_modes))
+    members = set(util.active_site_residues(builder.binding_modes))
     included = []
 
     for res_index, candidate in sorted(donors.items()):
@@ -899,11 +899,11 @@ def _drop_unassigned(builder, template, donors, ostream=None):
     dropped = []
 
     for res_index in sorted(
-            set(core.active_site_residues(builder.binding_modes)) -
+            set(util.active_site_residues(builder.binding_modes)) -
             set(donors)):
         residue = residues[res_index]
         builder.remove_residue(str(residue.id), chain=str(residue.chain.id))
-        dropped.append(core.residue_label(residue))
+        dropped.append(util.residue_label(residue))
 
     if dropped:
         ostream.print_info('Dropped ' + ', '.join(dropped) +
@@ -1161,7 +1161,7 @@ def _protonation_changes(builder,
         variant = _target_variant(residue, current, delta, wanted)
 
         if variant is None:
-            return (f'{core.residue_label(residue)} would have to be '
+            return (f'{util.residue_label(residue)} would have to be '
                     'protonated the way '
                     f'{template["name"]} has it, and there is no variant '
                     'of it that is')
@@ -1172,7 +1172,7 @@ def _protonation_changes(builder,
         changes.append({
             'resid': str(residue.id),
             'chain': str(residue.chain.id),
-            'label': core.residue_label(residue),
+            'label': util.residue_label(residue),
             'variant': variant,
         })
 
@@ -1237,8 +1237,8 @@ def _target_variant(residue, current, delta, wanted):
         The variant, or None when no variant of the residue is it.
     """
 
-    legal = core.known_variants(residue.name)
-    charge = core.VARIANT_CHARGES.get(current)
+    legal = util.known_variants(residue.name)
+    charge = util.VARIANT_CHARGES.get(current)
 
     if not legal:
         # OpenMM builds it one way only, so as long as it carries as many
@@ -1252,7 +1252,7 @@ def _target_variant(residue, current, delta, wanted):
 
     found = [
         variant for variant in legal
-        if core.VARIANT_CHARGES.get(variant) == charge + delta
+        if util.VARIANT_CHARGES.get(variant) == charge + delta
     ]
 
     if len(found) == 1:
@@ -1373,7 +1373,7 @@ def _denticity_changes(builder,
     }
     current = {
         frozenset((first, second))
-        for first, second in core.connectivity_bonds(
+        for first, second in util.connectivity_bonds(
             described['connectivity_matrix']) if metals & {first, second}
     }
 
@@ -1422,5 +1422,5 @@ def _bond_record(atoms, modes, described, pair):
         'chain': str(atom.residue.chain.id),
         'atom': atom.name,
         'metal': _metal_res_index(modes, described, metal),
-        'label': f'{core.residue_label(atom.residue)} {atom.name}',
+        'label': f'{util.residue_label(atom.residue)} {atom.name}',
     }

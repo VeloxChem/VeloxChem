@@ -43,6 +43,7 @@ from ..outputstream import OutputStream
 from ..errorhandler import assert_msg_critical
 from ..mmforcefieldgenerator import MMForceFieldGenerator
 from . import core
+from . import util
 from . import qm
 from . import openmmxml
 from . import printing
@@ -231,12 +232,12 @@ class MetalSiteForceFieldBuilder:
         self.rank = self.comm.Get_rank()
         self.nodes = self.comm.Get_size()
 
-        self.metal_bond_cutoff = core.METAL_BOND_CUTOFF
-        self.report_cutoff_margin = core.REPORT_CUTOFF_MARGIN
-        self.metal_elements = tuple(core.METAL_ELEMENTS)
-        self.metal_formal_charges = dict(core.METAL_FORMAL_CHARGES)
+        self.metal_bond_cutoff = util.METAL_BOND_CUTOFF
+        self.report_cutoff_margin = util.REPORT_CUTOFF_MARGIN
+        self.metal_elements = tuple(util.METAL_ELEMENTS)
+        self.metal_formal_charges = dict(util.METAL_FORMAL_CHARGES)
 
-        self.cap_bond_length = core.CAP_BOND_LENGTH
+        self.cap_bond_length = util.CAP_BOND_LENGTH
         self._protonation_overrides = None  # todo what exactly is this, it should be private
         self.prepare_protein = True
 
@@ -250,7 +251,7 @@ class MetalSiteForceFieldBuilder:
         self.do_hessian = True
         self.do_resp = True
         self.calculate_partial_hessian = True
-        self.partial_hessian_cutoff = core.PARTIAL_HESSIAN_CUTOFF
+        self.partial_hessian_cutoff = util.PARTIAL_HESSIAN_CUTOFF
         self.constrain_capping_hydrogens = False
         self.average_metal_terms = False
         self.metal_hessian_fitting_method = 'seminario'
@@ -259,16 +260,16 @@ class MetalSiteForceFieldBuilder:
         self.mute_forcefield_generator = True
 
         self.prune_weak_bridge_bonds = True
-        self.weak_bridge_tolerance = core.WEAK_BRIDGE_TOLERANCE
+        self.weak_bridge_tolerance = util.WEAK_BRIDGE_TOLERANCE
 
         self.add_metal_planarity_impropers = True
         self.metal_planarity_force_constant = (
-            core.DEFAULT_METAL_PLANARITY_FORCE_CONSTANT)
+            util.DEFAULT_METAL_PLANARITY_FORCE_CONSTANT)
 
         self.default_metal_bond_force_constant = (
-            core.DEFAULT_METAL_BOND_FORCE_CONSTANT)
+            util.DEFAULT_METAL_BOND_FORCE_CONSTANT)
         self.default_metal_angle_force_constant = (
-            core.DEFAULT_METAL_ANGLE_FORCE_CONSTANT)
+            util.DEFAULT_METAL_ANGLE_FORCE_CONSTANT)
         self.default_metal_bond_equilibria = None
         self.default_metal_angle_equilibria = None
         self.reparameterize_metal_angles = True
@@ -282,7 +283,7 @@ class MetalSiteForceFieldBuilder:
         self.folder = f'metal_site_{int(time.time())}'
 
         self._stage = Stage.EMPTY
-        self._request = core.empty_request()
+        self._request = util.empty_request()
         self._mm_opt = True
         self._topology = None
         self._positions = None
@@ -653,7 +654,7 @@ class MetalSiteForceFieldBuilder:
             The structure file being processed.
         """
 
-        param = printing.param
+        param = util.param
 
         self.ostream.print_blank()
         self.ostream.print_header('Metal Site Force Field Builder')
@@ -836,17 +837,17 @@ class MetalSiteForceFieldBuilder:
 
         def work():
             residue = core._resolve_residue(self._topology, resid, chain)
-            core.check_variant(residue, variant)
+            util.check_variant(residue, variant)
 
             # keyed by the label rather than the index, because residue ids
             # and residue indices overlap: a single chain numbered from one
             # has index i for id i+1, so an index written here would also
             # match its neighbour by id
             overrides = dict(self._protonation_overrides or {})
-            overrides[core.residue_label(residue)] = variant
+            overrides[util.residue_label(residue)] = variant
 
             self.ostream.print_info(
-                f'{core.residue_label(residue)} will be protonated as {variant}.'
+                f'{util.residue_label(residue)} will be protonated as {variant}.'
             )
             self.ostream.flush()
 
@@ -887,9 +888,9 @@ class MetalSiteForceFieldBuilder:
             core.check_truncatable(residue)
 
             request = self._request
-            label = core.residue_label(residue)
+            label = util.residue_label(residue)
 
-            already = residue.index in core.active_site_residues(
+            already = residue.index in util.active_site_residues(
                 self.binding_modes)
             excluded = residue.index in request.get('excluded_residues', [])
 
@@ -951,8 +952,8 @@ class MetalSiteForceFieldBuilder:
 
             request = self._request
             modes = self.binding_modes
-            label = core.residue_label(residue)
-            members = core.active_site_residues(modes)
+            label = util.residue_label(residue)
+            members = util.active_site_residues(modes)
 
             assert_msg_critical(
                 residue.index in members, 'remove_residue: '
@@ -1201,7 +1202,7 @@ class MetalSiteForceFieldBuilder:
                                                ostream=self.ostream,
                                                **self.relax_settings())
 
-        self._save_intermediate(core.MM_GEOMETRY_FILE,
+        self._save_intermediate(util.MM_GEOMETRY_FILE,
                                 lambda path: relaxed.write_xyz_file(str(path)))
 
         return relaxed
@@ -1237,7 +1238,7 @@ class MetalSiteForceFieldBuilder:
             **self._qm_kwargs())
 
         self._save_intermediate(
-            core.GEOMETRY_FILE,
+            util.GEOMETRY_FILE,
             lambda path: optimized.write_xyz_file(str(path)))
         self._adopt_geometry(optimized)
 
@@ -1290,7 +1291,7 @@ class MetalSiteForceFieldBuilder:
             ostream=self.ostream,
             **self._qm_kwargs())
 
-        self._save_intermediate(core.HESSIAN_FILE,
+        self._save_intermediate(util.HESSIAN_FILE,
                                 lambda path: np.savetxt(path, hessian))
 
         # a fit above this was made from a different Hessian
@@ -1327,7 +1328,7 @@ class MetalSiteForceFieldBuilder:
             charges = self._on_master(
                 lambda: core.d4_charges(active_site, ostream=self.ostream))
 
-        self._save_intermediate(core.CHARGES_FILE,
+        self._save_intermediate(util.CHARGES_FILE,
                                 lambda path: np.savetxt(path, charges))
 
         # a fit above this carries different charges
@@ -1421,7 +1422,7 @@ class MetalSiteForceFieldBuilder:
             charges,
             core.redistribute_cap_charges(self._active_site, charges),
             {
-                residue.index: core.residue_label(residue)
+                residue.index: util.residue_label(residue)
                 for residue in self._protonated_topology.residues()
             },
             ostream=self.ostream)
@@ -1590,10 +1591,10 @@ class MetalSiteForceFieldBuilder:
             ostream=self.ostream)
 
         self._save_intermediate(
-            core.ENZYME_SYSTEM_FILE,
+            util.ENZYME_SYSTEM_FILE,
             lambda path: path.write_text(mm.XmlSerializer.serialize(system)))
         self._save_intermediate(
-            core.FORCEFIELD_FILE,
+            util.FORCEFIELD_FILE,
             lambda path: MMForceFieldGenerator.save_forcefield_as_json(
                 self._forcefield, str(path)))
 
@@ -1673,16 +1674,16 @@ class MetalSiteForceFieldBuilder:
             corrected = charges
 
         self._save_intermediate(
-            core.GEOMETRY_FILE, lambda path: self._active_site['molecule'].
+            util.GEOMETRY_FILE, lambda path: self._active_site['molecule'].
             write_xyz_file(str(path)))
         if hessian is not None:
-            self._save_intermediate(core.HESSIAN_FILE,
+            self._save_intermediate(util.HESSIAN_FILE,
                                     lambda path: np.savetxt(path, hessian))
 
-        self._save_intermediate(core.CHARGES_FILE,
+        self._save_intermediate(util.CHARGES_FILE,
                                 lambda path: np.savetxt(path, corrected))
         self._save_intermediate(
-            core.FORCEFIELD_FILE,
+            util.FORCEFIELD_FILE,
             lambda path: MMForceFieldGenerator.save_forcefield_as_json(
                 forcefield, str(path)))
 
@@ -1927,7 +1928,7 @@ class MetalSiteForceFieldBuilder:
             printing.print_metal_parameters(
                 self._active_site,
                 forcefield,
-                core.get_metal_keys(forcefield, self._active_site),
+                util.get_metal_keys(forcefield, self._active_site),
                 ostream=self.ostream)
             self._write_run_artifacts(forcefield, hessian, charges)
 

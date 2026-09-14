@@ -41,6 +41,7 @@ from ..molecule import Molecule
 from ..outputstream import OutputStream
 from .metalsiteffbuilder import MetalSiteForceFieldBuilder
 from . import core
+from . import util
 from . import printing
 from . import matching
 from . import templates
@@ -348,14 +349,14 @@ class MetalForceFieldManager:
         if name is None:
             name = folder.resolve().name
 
-        ff_path = folder / core.FORCEFIELD_FILE
+        ff_path = folder / util.FORCEFIELD_FILE
         assert_msg_critical(
             ff_path.is_file(),
             f'MetalForceFieldManager: {ff_path} not found, so {folder} holds '
             'no force field to use as a template. It is written by '
             'MetalSiteForceFieldBuilder.build_forcefield.')
 
-        forcefield = core.load_forcefield(ff_path)
+        forcefield = util.load_forcefield(ff_path)
         geometry, kind = templates.load_geometry(folder, fallback)
         forcefield.molecule = geometry
 
@@ -960,7 +961,7 @@ class MetalForceFieldManager:
         printing.print_metal_parameters(
             active_site,
             forcefield,
-            core.get_metal_keys(forcefield, active_site),
+            util.get_metal_keys(forcefield, active_site),
             ostream=self.ostream)
 
         return forcefield
@@ -1238,7 +1239,7 @@ class MetalForceFieldManager:
         fit_kwargs = builder.fit_settings()
         if self.mm_fallback_literature_bonds and (
                 fit_kwargs['metal_bond_equilibria'] is None):
-            fit_kwargs['metal_bond_equilibria'] = core.LITERATURE_METAL_BONDS
+            fit_kwargs['metal_bond_equilibria'] = util.LITERATURE_METAL_BONDS
 
         forcefield = core.build_forcefield(active_site,
                                            comm=MPI.COMM_SELF,
@@ -1314,7 +1315,7 @@ class MetalForceFieldManager:
                 matrix[second, first] = 1
                 changes['added'].append((first, second))
 
-        for first, second in core.connectivity_bonds(matrix):
+        for first, second in util.connectivity_bonds(matrix):
             if not ({first, second} & metals):
                 continue
             if frozenset((first, second)) in wanted:
@@ -1332,7 +1333,7 @@ class MetalForceFieldManager:
         }
 
         return matching.describe(active_site,
-                                 core.connectivity_bonds(matrix)), changes
+                                 util.connectivity_bonds(matrix)), changes
 
     def _print_forced_bonds(self, template, active_site, changes):
         """

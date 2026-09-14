@@ -46,6 +46,7 @@ import numpy as np
 import math
 
 from ..outputstream import OutputStream
+from .util import param, print_param_list, print_section
 
 # ----------------------------------------------------------------------
 # the shared line shapes
@@ -68,87 +69,6 @@ def stream(ostream):
     """
 
     return OutputStream(None) if ostream is None else ostream
-
-
-def param(label, value, label_width=26, value_width=20):
-    """
-    Formats one parameter line with fixed label and value widths.
-
-    print_header centers text, so all lines need the same total length to
-    appear left-aligned relative to each other.
-
-    :param label:
-        The parameter name.
-    :param value:
-        The parameter value.
-    :param label_width:
-        The width of the label field.
-    :param value_width:
-        The width of the value field.
-
-    :return:
-        The formatted line.
-    """
-
-    return f'{label:<{label_width}} : {str(value):>{value_width}}'
-
-
-def print_param_list(label, items, value_width=20, ostream=None):
-    """
-    Prints a list of values as parameter lines of uniform width.
-
-    print_header centers each line, so a value that overflows the field
-    would make its line start further left than the others. Long lists are
-    therefore wrapped over several lines, with the label only on the
-    first.
-
-    :param label:
-        The parameter name.
-    :param items:
-        The values to list.
-    :param value_width:
-        The width of the value field.
-    :param ostream:
-        The output stream, or None to print nothing.
-    """
-
-    ostream = stream(ostream)
-
-    chunks = []
-    current = ''
-
-    for item in items:
-        candidate = item if not current else f'{current}, {item}'
-        if len(candidate) > value_width and current:
-            chunks.append(current + ',')
-            current = item
-        else:
-            current = candidate
-
-    if current:
-        chunks.append(current)
-
-    for i, chunk in enumerate(chunks):
-        ostream.print_header(param(label if i == 0 else '', chunk))
-
-
-def print_section(title, ostream=None):
-    """
-    Prints a title underlined to its own length.
-
-    Hand-counting that length is how an underline ends up one character
-    short of the title it sits under.
-
-    :param title:
-        The title.
-    :param ostream:
-        The output stream, or None to print nothing.
-    """
-
-    ostream = stream(ostream)
-
-    ostream.print_header(title)
-    ostream.print_header(len(title) * '-')
 
 
 # ----------------------------------------------------------------------

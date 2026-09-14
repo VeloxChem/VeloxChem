@@ -49,7 +49,7 @@ import numpy as np
 
 from ..molecule import Molecule
 from ..errorhandler import assert_msg_critical
-from . import core
+from . import util
 from . import matching
 from .printing import stream
 
@@ -73,8 +73,8 @@ def load_geometry(folder, fallback):
         The tuple of the molecule and its kind.
     """
 
-    opt_path = folder / core.GEOMETRY_FILE
-    mm_path = folder / core.MM_GEOMETRY_FILE
+    opt_path = folder / util.GEOMETRY_FILE
+    mm_path = folder / util.MM_GEOMETRY_FILE
 
     allowed = GEOMETRY_KINDS[:1 if fallback is None else 2]
 
@@ -169,7 +169,7 @@ def build(name, forcefield, molecule, kind, folder, metal_elements=None, ostream
     # is the core's and not a second copy of it here. A template is an
     # active site with no topology behind it, so {'molecule': ...} is all
     # the adapter it needs.
-    core._check_forcefield(forcefield, {'molecule': molecule}, source=folder)
+    util._check_forcefield(forcefield, {'molecule': molecule}, source=folder)
 
     labels = list(molecule.get_labels())
 
@@ -196,11 +196,11 @@ def build(name, forcefield, molecule, kind, folder, metal_elements=None, ostream
             index for index, atom in forcefield.atoms.items()
             if role in (atom.get('comment', '') or '')
         ]
-        for role in (core.BETA_CARBON_COMMENT, core.CAP_COMMENT)
+        for role in (util.BETA_CARBON_COMMENT, util.CAP_COMMENT)
     }
 
-    beta_carbon_indices = marked[core.BETA_CARBON_COMMENT]
-    cap_indices = marked[core.CAP_COMMENT]
+    beta_carbon_indices = marked[util.BETA_CARBON_COMMENT]
+    cap_indices = marked[util.CAP_COMMENT]
 
     assert_msg_critical(
         len(cap_indices) > 0,

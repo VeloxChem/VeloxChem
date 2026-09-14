@@ -82,6 +82,7 @@ import numpy as np
 
 from ..errorhandler import assert_msg_critical
 from . import core
+from . import util
 from .printing import stream
 
 try:
@@ -321,7 +322,7 @@ def metal_bond_keys(forcefield, active_site):
     """
 
     caps = set(active_site['cap_indices'])
-    bonds, _ = core.get_metal_keys(forcefield, active_site)
+    bonds, _ = util.get_metal_keys(forcefield, active_site)
 
     return [key for key in bonds if not caps & set(key)]
 
@@ -336,8 +337,8 @@ def metal_term_keys(forcefield, active_site):
     """
 
     caps = set(active_site['cap_indices'])
-    bonds, angles = core.get_metal_keys(forcefield, active_site)
-    impropers = core.get_metal_impropers(forcefield, active_site)
+    bonds, angles = util.get_metal_keys(forcefield, active_site)
+    impropers = util.get_metal_impropers(forcefield, active_site)
 
     return ([key for key in bonds if not caps & set(key)],
             [key for key in angles if not caps & set(key)],

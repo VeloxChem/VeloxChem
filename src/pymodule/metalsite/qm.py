@@ -53,6 +53,7 @@ from ..outputstream import OutputStream
 from ..errorhandler import assert_msg_critical
 from ..molecule import Molecule
 from . import core
+from . import util
 from . import printing
 
 
@@ -206,7 +207,7 @@ def optimize_active_site(active_site,
 
 def hessian_pairs(active_site,
                   bond_count=2,
-                  partial_hessian_cutoff=core.PARTIAL_HESSIAN_CUTOFF):
+                  partial_hessian_cutoff=util.PARTIAL_HESSIAN_CUTOFF):
     """
     Finds the atom pairs a partial Hessian has to hold blocks for.
 
@@ -248,7 +249,7 @@ def hessian_pairs(active_site,
 
         donors = [
             index for index, label in enumerate(labels)
-            if label in core.DONOR_ELEMENTS
+            if label in util.DONOR_ELEMENTS
         ]
 
         for metal in metals:
@@ -261,7 +262,7 @@ def hessian_pairs(active_site,
                     matrix[metal, donor] = True
                     matrix[donor, metal] = True
 
-    return core.extract_pairs(matrix, metals, bond_count=bond_count)
+    return util.extract_pairs(matrix, metals, bond_count=bond_count)
 
 
 def compute_hessian(active_site,

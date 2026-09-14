@@ -66,7 +66,7 @@ from ..molecule import Molecule
 from ..optimizationdriver import OptimizationDriver
 from ..superimpose import svd_superimpose
 from ..errorhandler import assert_msg_critical
-from . import core
+from . import util
 from .printing import stream
 
 # The manager's own defaults, repeated here so that a function of this
@@ -376,7 +376,7 @@ def sidechain_heavy_atoms(residue):
 
     return [
         atom for atom in residue.atoms()
-        if atom.name not in core.BACKBONE_ATOM_NAMES and atom.name != 'CA'
+        if atom.name not in util.BACKBONE_ATOM_NAMES and atom.name != 'CA'
         and atom.element is not None and atom.element.symbol != 'H'
     ]
 
@@ -989,5 +989,5 @@ def metal_keys(template):
 
     # get_metal_keys reads nothing of the active site but the metal
     # indices, and a template knows those from its elements
-    return core.get_metal_keys(template['forcefield'],
+    return util.get_metal_keys(template['forcefield'],
                                {'metal_indices': template['metal_indices']})
