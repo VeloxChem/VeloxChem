@@ -305,6 +305,63 @@ compute_pc(CSimdMatrix       &buffer,
     }
 }
 
+/// @brief Computes the displacement of the Gaussian product center of a pair of
+/// primitives from one of the point charges an anchored operator sums over.
+/// @param buffer The buffer of the combination of basis functions.
+/// @param coordinates The coordinates of the atom pairs, whose rows zero to two hold
+/// the atom on bra side and whose rows six to eight hold the vector between the atoms.
+/// @param target The first of the three rows of the buffer to write.
+/// @param points The coordinates of the charges, three to a charge and in order.
+/// @param icharge The charge, as its place among them.
+/// @param ncols The number of atom pairs the pair of primitives reaches.
+/// @param fc The displacement of the product center from the atom on bra side in
+/// units of the vector between the atoms, which is b / (a + b).
+/// @note The same displacement the three-center form computes, and the same body: a
+/// point charge is one point and the atom pairs are many, so its coordinates are read
+/// once and the loop runs over the pairs. What differs is only where the point comes
+/// from -- three numbers out of a flat list rather than a column of a matrix.
+/// @note The rows of the buffer and of the coordinates start at a cache line
+/// boundary, so the loop is vectorized with aligned loads and stores. The coordinates
+/// of the charge are scalars and are not part of the clause.
+inline auto
+compute_pc(CSimdMatrix               &buffer,
+           const CSimdMatrix         &coordinates,
+           const size_t               target,
+           const std::vector<double> &points,
+           const size_t               icharge,
+           const size_t               ncols,
+           const double               fc) -> void
+{
+    errors::assertMsgCritical(3 * icharge + 2 < points.size(),
+                              std::string("SimdPrimitives.compute_pc: Charge is out of range"));
+
+    auto *pc_x = buffer.data(target + 0);
+    auto *pc_y = buffer.data(target + 1);
+    auto *pc_z = buffer.data(target + 2);
+
+    const auto *a_x = coordinates.data(0);
+    const auto *a_y = coordinates.data(1);
+    const auto *a_z = coordinates.data(2);
+
+    const auto *ab_x = coordinates.data(6);
+    const auto *ab_y = coordinates.data(7);
+    const auto *ab_z = coordinates.data(8);
+
+    const auto c_x = points[3 * icharge + 0];
+    const auto c_y = points[3 * icharge + 1];
+    const auto c_z = points[3 * icharge + 2];
+
+#pragma omp simd aligned(pc_x, pc_y, pc_z, a_x, a_y, a_z, ab_x, ab_y, ab_z : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        pc_x[k] = (a_x[k] - c_x) - fc * ab_x[k];
+
+        pc_y[k] = (a_y[k] - c_y) - fc * ab_y[k];
+
+        pc_z[k] = (a_z[k] - c_z) - fc * ab_z[k];
+    }
+}
+
 }  // namespace simdfunc
 
 #endif /* SimdPrimitives_hpp */

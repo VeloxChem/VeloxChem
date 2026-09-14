@@ -275,19 +275,24 @@ compute_boys_function(CSimdMatrix                        &buffer,
     _scale_values(buffer, target, orders.size(), ncols, fj);
 }
 
-/// @brief Forms the arguments of a three-center Boys function from the displacement
-/// of the Gaussian product center from the atom on the ket side.
+/// @brief Forms the arguments of a Boys function from a displacement of the Gaussian
+/// product center, scaled by a factor the operator supplies.
 /// @param buffer The buffer holding that displacement in the three rows at pc.
 /// @param target The row to write the arguments to.
 /// @param pc The first of the three rows holding the displacement.
 /// @param ncols The number of atom pairs to form the arguments of.
-/// @param fq The factor the squared displacement is scaled by.
+/// @param factor The factor the squared displacement is scaled by.
+/// @note Two operators form their argument this way and differ only in the factor
+/// and in what the displacement is to: a three-center electron repulsion scales the
+/// displacement to the atom on the ket side by p gamma / q, and a nuclear attraction
+/// scales the displacement to a point charge by p.
 static auto
-_make_t3c_arguments(CSimdMatrix &buffer, const size_t target, const size_t pc, const size_t ncols, const double fq) -> void
+_make_scaled_arguments(CSimdMatrix  &buffer,
+                       const size_t  target,
+                       const size_t  pc,
+                       const size_t  ncols,
+                       const double  factor) -> void
 {
-    // NOTE: the argument is the squared displacement of the Gaussian product center
-    // from the atom on the ket side, scaled by the exponent of the pair of that
-    // center with the primitive on the ket side.
 
     auto *args = buffer.data(target);
 
@@ -298,12 +303,12 @@ _make_t3c_arguments(CSimdMatrix &buffer, const size_t target, const size_t pc, c
 #pragma omp simd aligned(args, pc_x, pc_y, pc_z : simd::cache_line_size())
     for (size_t k = 0; k < ncols; k++)
     {
-        args[k] = fq * (pc_x[k] * pc_x[k] + pc_y[k] * pc_y[k] + pc_z[k] * pc_z[k]);
+        args[k] = factor * (pc_x[k] * pc_x[k] + pc_y[k] * pc_y[k] + pc_z[k] * pc_z[k]);
     }
 }
 
-/// @brief Scales the values of a three-center Boys function by the prefactor of the
-/// integral and by the exponential the pair of primitives on bra side contributes.
+/// @brief Scales the values of a Boys function by the prefactor of the integral and
+/// by the exponential the pair of primitives on bra side contributes.
 /// @param buffer The buffer holding the values in the rows after target.
 /// @param coordinates The coordinates of the atom pairs, whose row nine holds the
 /// squared distance of the atom pair.
@@ -312,11 +317,13 @@ _make_t3c_arguments(CSimdMatrix &buffer, const size_t target, const size_t pc, c
 /// @param ncols The number of atom pairs to scale.
 /// @param fj The prefactor of the integral.
 /// @param mu The factor the squared distance of the atom pair is scaled by.
-/// @note The scaling is not one number here, as it is for the two-center form. The
-/// pair of primitives contributes exp(-mu R_AB^2), which varies with the atom pair,
-/// so the values are scaled column by column and not by fj alone.
+/// @note The scaling is not one number here, as it is for the two-center electron
+/// repulsion. The pair of primitives contributes exp(-mu R_AB^2), which varies with
+/// the atom pair, so the values are scaled column by column and not by fj alone. An
+/// operator which collapses the pair onto one center wants this: the three-center
+/// electron repulsion and the nuclear attraction both do.
 static auto
-_scale_t3c_values(CSimdMatrix       &buffer,
+_scale_pair_values(CSimdMatrix       &buffer,
                   const CSimdMatrix &coordinates,
                   const size_t       target,
                   const size_t       nrows,
@@ -349,11 +356,11 @@ compute_t3c_boys_function(CSimdMatrix                        &buffer,
                           const double                        mu,
                           const double                        fq) -> void
 {
-    _make_t3c_arguments(buffer, target, pc, ncols, fq);
+    _make_scaled_arguments(buffer, target, pc, ncols, fq);
 
     compute_boys_values(buffer, target, orders, ncols);
 
-    _scale_t3c_values(buffer, coordinates, target, orders.size(), ncols, fj, mu);
+    _scale_pair_values(buffer, coordinates, target, orders.size(), ncols, fj, mu);
 }
 
 auto
@@ -367,11 +374,47 @@ compute_full_t3c_boys_function(CSimdMatrix       &buffer,
                                const double       mu,
                                const double       fq) -> void
 {
-    _make_t3c_arguments(buffer, target, pc, ncols, fq);
+    _make_scaled_arguments(buffer, target, pc, ncols, fq);
 
     compute_boys_values(buffer, target, order, ncols);
 
-    _scale_t3c_values(buffer, coordinates, target, order + 1, ncols, fj, mu);
+    _scale_pair_values(buffer, coordinates, target, order + 1, ncols, fj, mu);
+}
+
+auto
+compute_npot_boys_function(CSimdMatrix                        &buffer,
+                           const CSimdMatrix                  &coordinates,
+                           const size_t                        target,
+                           const size_t                        pc,
+                           const std::initializer_list<size_t> orders,
+                           const size_t                        ncols,
+                           const double                        fz,
+                           const double                        mu,
+                           const double                        p) -> void
+{
+    _make_scaled_arguments(buffer, target, pc, ncols, p);
+
+    compute_boys_values(buffer, target, orders, ncols);
+
+    _scale_pair_values(buffer, coordinates, target, orders.size(), ncols, fz, mu);
+}
+
+auto
+compute_full_npot_boys_function(CSimdMatrix       &buffer,
+                                const CSimdMatrix &coordinates,
+                                const size_t       target,
+                                const size_t       pc,
+                                const size_t       order,
+                                const size_t       ncols,
+                                const double       fz,
+                                const double       mu,
+                                const double       p) -> void
+{
+    _make_scaled_arguments(buffer, target, pc, ncols, p);
+
+    compute_boys_values(buffer, target, order, ncols);
+
+    _scale_pair_values(buffer, coordinates, target, order + 1, ncols, fz, mu);
 }
 
 }  // namespace simdfunc

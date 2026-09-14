@@ -179,6 +179,52 @@ auto compute_full_t3c_boys_function(CSimdMatrix       &buffer,
                                     const double       mu,
                                     const double       fq) -> void;
 
+/// @brief Computes the values of Boys function of the requested orders alone for one
+/// pair of primitives and one point charge of a nuclear attraction integral.
+/// @param buffer The buffer of the combination of basis functions, holding the
+/// displacement of the Gaussian product center from the charge in the three rows at
+/// pc.
+/// @param coordinates The coordinates of the atom pairs, whose row nine holds the
+/// squared distance of the atom pair.
+/// @param target The row of the buffer to write the argument to, with the values
+/// following it, one row per requested order and in the order they are requested.
+/// @param pc The first of the three rows holding that displacement, as
+/// simdfunc::compute_pc wrote them.
+/// @param orders The orders of Boys function to compute.
+/// @param ncols The number of atom pairs the pair of primitives reaches.
+/// @param fz The prefactor of the integral, 2 pi / p times the normalisations and the
+/// charge, which every value is scaled by.
+/// @param mu The factor the squared distance of the atom pair is scaled by, whose
+/// exponential every value is scaled by as well.
+/// @param p The exponent sum of the pair, which the squared displacement is scaled by
+/// to give the argument.
+/// @note The argument is p PC^2 where the electron repulsion's is mu R_AB^2, which is
+/// the whole of the difference: the operator is anchored at the charge rather than
+/// carried between two distributions. The scaling is the same shape as the
+/// three-center form's, the pair having been collapsed onto one center either way.
+/// @note What this form saves against the full one is the rows of the buffer and not
+/// the arithmetic, as the orders below the highest requested one are computed whether
+/// they are asked for or not.
+auto compute_npot_boys_function(CSimdMatrix                        &buffer,
+                                const CSimdMatrix                  &coordinates,
+                                const size_t                        target,
+                                const size_t                        pc,
+                                const std::initializer_list<size_t> orders,
+                                const size_t                        ncols,
+                                const double                        fz,
+                                const double                        mu,
+                                const double                        p) -> void;
+
+auto compute_full_npot_boys_function(CSimdMatrix       &buffer,
+                                     const CSimdMatrix &coordinates,
+                                     const size_t       target,
+                                     const size_t       pc,
+                                     const size_t       order,
+                                     const size_t       ncols,
+                                     const double       fz,
+                                     const double       mu,
+                                     const double       p) -> void;
+
 }  // namespace simdfunc
 
 #endif /* SimdBoysFunc_hpp */
