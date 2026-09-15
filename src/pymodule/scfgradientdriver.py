@@ -40,6 +40,8 @@ from .veloxchemlib import FockGeom1000Driver
 from .veloxchemlib import XCMolecularGradient
 from .veloxchemlib import T4CScreener
 from .veloxchemlib import RIFockGradDriver
+from .veloxchemlib import SimdRIJKGradientDriver
+from .veloxchemlib import PackedMatrix
 from .veloxchemlib import mpi_master, mat_t
 from .veloxchemlib import make_matrix
 from .veloxchemlib import parse_xc_func
@@ -117,10 +119,27 @@ class ScfGradientDriver(GradientDriver):
             For backward compatibility.
         """
 
-        # TODO: enable RI-JK
+        # NOTE: only the simd RI-JK driver has a gradient. The conventional one
+        # forms its Fock matrices a different way and no derivative of it was
+        # written, so a calculation which used it has no gradient to give rather
+        # than one which is merely approximate.
         assert_msg_critical(
-            not self.scf_driver.ri_jk,
-            f'{type(self).__name__}.compute: RI-JK is not yet supported')
+            (not self.scf_driver.ri_jk) or self.scf_driver.ri_jk_simd,
+            f'{type(self).__name__}.compute: RI-JK is supported only with ' +
+            'ri_jk_simd')
+
+        # NOTE: the fitting is what forbids this under MPI. The Fock build
+        # survives a distributed set of B vectors because the factor of the
+        # metric is already folded into them and the Coulomb matrix is a sum over
+        # the auxiliary basis which factorises, so the ranks add their shares. The
+        # gradient contracts the derivatives of the integrals themselves, which
+        # needs the fitting coefficients in the basis of the integrals, and the
+        # transposed factor that carries them there reaches across the whole of
+        # the auxiliary basis. A rank holding a share of it cannot form them.
+        assert_msg_critical(
+            (not self.scf_driver.ri_jk) or (self.nodes == 1),
+            f'{type(self).__name__}.compute: the RI-JK gradient runs on one ' +
+            'rank, as the fitting couples the whole auxiliary basis')
 
         assert_msg_critical(
             self.scf_driver.electric_field is None,
@@ -605,6 +624,50 @@ class ScfGradientDriver(GradientDriver):
 
             grad_timing['Fock_grad'] += time.time() - t0
 
+        elif self.scf_driver.ri_jk and self.scf_driver.ri_jk_simd:
+
+            # NOTE: there are no erf attenuated derivative kernels, so the long
+            # range part of a range-separated functional has no gradient of this
+            # way. The exchange this driver scales is the plain one.
+            assert_msg_critical(
+                not need_omega,
+                f'{type(self).__name__}: RI-JK gradient is not implemented ' +
+                'for a range-separated functional')
+
+            self.ostream.print_info(
+                'Using the SIMD resolution of the identity (RI-JK) gradient.')
+            self.ostream.print_blank()
+            self.ostream.flush()
+
+            basis_ri_jk = MolecularBasis.read(
+                molecule, self.scf_driver.ri_auxiliary_basis)
+
+            nao = D.shape[0]
+
+            den_mat_for_ri = PackedMatrix(nao, nao, mat_t.symmetric)
+            den_mat_for_ri.from_numpy(np.ascontiguousarray(D))
+
+            orbitals_for_ri = PackedMatrix(nao, mo_occ.shape[1], mat_t.general)
+            orbitals_for_ri.from_numpy(np.ascontiguousarray(mo_occ))
+
+            ri_jk_grad_drv = SimdRIJKGradientDriver(self.scf_driver.eri_thresh)
+
+            t0 = time.time()
+
+            # NOTE: what comes back is the whole two-electron term of a closed
+            # shell, Gamma against the derivative of the three-center integrals
+            # less Omega against the derivative of the metric, with the factors of
+            # the closed shell already in it. It is added as it is.
+            atomgrad = ri_jk_grad_drv.compute(
+                molecule, basis, basis_ri_jk,
+                self.scf_driver._ri_drv.get_bq_vectors(),
+                self.scf_driver._ri_drv.get_metric(), den_mat_for_ri,
+                orbitals_for_ri, exchange_scaling_factor)
+
+            self.gradient += atomgrad.to_numpy()
+
+            grad_timing['Fock_grad'] += time.time() - t0
+
         else:
 
             for iatom in local_atoms:
@@ -691,6 +754,13 @@ class ScfGradientDriver(GradientDriver):
         :param scf_results:
             The dictionary containing converged SCF results.
         """
+
+        # NOTE: the simd RI-JK gradient driver is closed shell -- it takes one
+        # density and one set of occupied orbitals -- so an unrestricted
+        # calculation which used it has no gradient here.
+        assert_msg_critical(
+            not self.scf_driver.ri_jk,
+            f'{type(self).__name__}: RI-JK gradient is restricted only')
 
         grad_timing = self._init_grad_timing()
 

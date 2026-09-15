@@ -443,20 +443,6 @@ CSimdRIJKGradientDriver::compute(const CMolecule        &molecule,
 
     if (atoms.empty()) return gradient;
 
-    // TODO: the derivative integrals and their contraction. The kernels which
-    // form them are not written yet -- the plain tree has the derivative of the
-    // three-center integral with respect to the auxiliary center alone, and none
-    // of them are vectorised -- so this driver is a skeleton whose arguments are
-    // fixed and whose body is not.
-    //
-    // What it will do, once they are: form the fitting coefficients from the B
-    // vectors and the density, then for each atom of `atoms` accumulate the
-    // derivative of the three-center integrals against them for the Coulomb part
-    // and against the W matrices of the occupied orbitals for the exchange part,
-    // and the derivative of the metric against the coefficients on both sides.
-    //
-    // The unused arguments are named and not commented out so that the shape of
-    // the call does not change when the body arrives.
     auto wanted = std::vector<bool>(natoms, false);
 
     for (const auto iatom : atoms) wanted[static_cast<size_t>(iatom)] = true;
