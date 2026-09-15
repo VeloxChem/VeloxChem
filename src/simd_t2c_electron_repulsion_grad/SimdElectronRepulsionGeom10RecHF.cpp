@@ -44,7 +44,6 @@
 #include "SimdPrimitives.hpp"
 #include "SimdBoysFunc.hpp"
 
-#include "SimdElectronRepulsionGeom10VrrRecHF.hpp"
 #include "SimdElectronRepulsionVrrRecDD.hpp"
 #include "SimdElectronRepulsionVrrRecDF.hpp"
 #include "SimdElectronRepulsionVrrRecDP.hpp"
@@ -72,6 +71,7 @@
 #include "SimdElectronRepulsionVrrRecSD.hpp"
 #include "SimdElectronRepulsionVrrRecSF.hpp"
 #include "SimdElectronRepulsionVrrRecSP.hpp"
+#include "SimdGeometryH1.hpp"
 #include "SimdTransformF.hpp"
 #include "SimdTransformH.hpp"
 
@@ -446,14 +446,11 @@ compute_geom_10_hf_electron_repulsion(double               *values,
             compute_prim_if_electron_repulsion_0(buffer, 4125, 0, 3, 3465, 3615, 2245, 3915,
                                                  1159, 1243, 2497, ncols, alpha, beta, p);
 
-            compute_prim_geom_10_hf_electron_repulsion_0(buffer, 4405, 3465, 4125, ncols,
-                                                         alpha);
+            simdgeo::geom_h_x(buffer, 4405, 3465, 4125, 1, 10, ncols, alpha);
 
-            compute_prim_geom_10_hf_electron_repulsion_1(buffer, 4615, 3465, 4125, ncols,
-                                                         alpha);
+            simdgeo::geom_h_y(buffer, 4615, 3465, 4125, 1, 10, ncols, alpha);
 
-            compute_prim_geom_10_hf_electron_repulsion_2(buffer, 4825, 3465, 4125, ncols,
-                                                         alpha);
+            simdgeo::geom_h_z(buffer, 4825, 3465, 4125, 1, 10, ncols, alpha);
 
             simdfunc::contract_primitives(buffer, 5035, 4405, 630, ncols);
         }

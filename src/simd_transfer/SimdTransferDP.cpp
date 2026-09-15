@@ -165,6 +165,141 @@ compute_hrr_dp_out_of_first(CSimdMatrix &buffer, const CSimdMatrix &coordinates,
 }
 
 auto
+compute_hrr_dp_out_of_second(CSimdMatrix &buffer, const CSimdMatrix &coordinates,
+                             const size_t target, const size_t pp, const size_t pd,
+                             const size_t ncomps, const size_t nmax) -> void
+{
+    // NOTE: what the block carries below the pair reaches this step as a count.
+    // The coefficients are powers of the separation and name no index of it, so
+    // it is stepped over rather than known.
+
+    for (size_t c = 0; c < ncomps; c++)
+    {
+        auto *t_0 = buffer.data(target + 0 * ncomps + c);
+        auto *t_1 = buffer.data(target + 1 * ncomps + c);
+        auto *t_2 = buffer.data(target + 2 * ncomps + c);
+        auto *t_3 = buffer.data(target + 3 * ncomps + c);
+        auto *t_4 = buffer.data(target + 4 * ncomps + c);
+        auto *t_5 = buffer.data(target + 5 * ncomps + c);
+        auto *t_6 = buffer.data(target + 6 * ncomps + c);
+        auto *t_7 = buffer.data(target + 7 * ncomps + c);
+        auto *t_8 = buffer.data(target + 8 * ncomps + c);
+        auto *t_9 = buffer.data(target + 9 * ncomps + c);
+        auto *t_10 = buffer.data(target + 10 * ncomps + c);
+        auto *t_11 = buffer.data(target + 11 * ncomps + c);
+        auto *t_12 = buffer.data(target + 12 * ncomps + c);
+        auto *t_13 = buffer.data(target + 13 * ncomps + c);
+        auto *t_14 = buffer.data(target + 14 * ncomps + c);
+        auto *t_15 = buffer.data(target + 15 * ncomps + c);
+        auto *t_16 = buffer.data(target + 16 * ncomps + c);
+        auto *t_17 = buffer.data(target + 17 * ncomps + c);
+
+        const auto *ab_x = coordinates.data(6);
+        const auto *ab_y = coordinates.data(7);
+        const auto *ab_z = coordinates.data(8);
+
+        const auto *pp_0 = buffer.data(pp + 0 * ncomps + c);
+        const auto *pp_1 = buffer.data(pp + 1 * ncomps + c);
+        const auto *pp_2 = buffer.data(pp + 2 * ncomps + c);
+        const auto *pp_3 = buffer.data(pp + 3 * ncomps + c);
+        const auto *pp_4 = buffer.data(pp + 4 * ncomps + c);
+        const auto *pp_5 = buffer.data(pp + 5 * ncomps + c);
+        const auto *pp_6 = buffer.data(pp + 6 * ncomps + c);
+        const auto *pp_7 = buffer.data(pp + 7 * ncomps + c);
+        const auto *pp_8 = buffer.data(pp + 8 * ncomps + c);
+
+        const auto *pd_0 = buffer.data(pd + 0 * ncomps + c);
+        const auto *pd_1 = buffer.data(pd + 1 * ncomps + c);
+        const auto *pd_2 = buffer.data(pd + 2 * ncomps + c);
+        const auto *pd_6 = buffer.data(pd + 6 * ncomps + c);
+        const auto *pd_7 = buffer.data(pd + 7 * ncomps + c);
+        const auto *pd_8 = buffer.data(pd + 8 * ncomps + c);
+        const auto *pd_9 = buffer.data(pd + 9 * ncomps + c);
+        const auto *pd_10 = buffer.data(pd + 10 * ncomps + c);
+        const auto *pd_12 = buffer.data(pd + 12 * ncomps + c);
+        const auto *pd_13 = buffer.data(pd + 13 * ncomps + c);
+        const auto *pd_14 = buffer.data(pd + 14 * ncomps + c);
+        const auto *pd_15 = buffer.data(pd + 15 * ncomps + c);
+        const auto *pd_16 = buffer.data(pd + 16 * ncomps + c);
+        const auto *pd_17 = buffer.data(pd + 17 * ncomps + c);
+
+#pragma omp simd aligned(t_0, t_1, t_2, t_3, t_4, ab_x, pp_0, pp_1, pp_2, pp_3, pp_4, pd_0, \
+                         pd_1, pd_2, pd_6, pd_7 : simd::cache_line_size())
+        for (size_t k = 0; k < nmax; k++)
+        {
+            t_0[k] = -ab_x[k] * pp_0[k]
+                     + pd_0[k];
+
+            t_1[k] = -ab_x[k] * pp_1[k]
+                     + pd_1[k];
+
+            t_2[k] = -ab_x[k] * pp_2[k]
+                     + pd_2[k];
+
+            t_3[k] = -ab_x[k] * pp_3[k]
+                     + pd_6[k];
+
+            t_4[k] = -ab_x[k] * pp_4[k]
+                     + pd_7[k];
+        }
+
+#pragma omp simd aligned(t_5, t_6, t_7, t_8, ab_x, pp_5, pp_6, pp_7, pp_8, pd_8, pd_12, pd_13, \
+                         pd_14 : simd::cache_line_size())
+        for (size_t k = 0; k < nmax; k++)
+        {
+            t_5[k] = -ab_x[k] * pp_5[k]
+                     + pd_8[k];
+
+            t_6[k] = -ab_x[k] * pp_6[k]
+                     + pd_12[k];
+
+            t_7[k] = -ab_x[k] * pp_7[k]
+                     + pd_13[k];
+
+            t_8[k] = -ab_x[k] * pp_8[k]
+                     + pd_14[k];
+        }
+
+#pragma omp simd aligned(t_9, t_10, t_11, t_12, t_13, ab_y, pp_3, pp_4, pp_5, pp_6, pp_7, \
+                         pd_7, pd_9, pd_10, pd_13, pd_15 : simd::cache_line_size())
+        for (size_t k = 0; k < nmax; k++)
+        {
+            t_9[k] = -ab_y[k] * pp_3[k]
+                     + pd_7[k];
+
+            t_10[k] = -ab_y[k] * pp_4[k]
+                      + pd_9[k];
+
+            t_11[k] = -ab_y[k] * pp_5[k]
+                      + pd_10[k];
+
+            t_12[k] = -ab_y[k] * pp_6[k]
+                      + pd_13[k];
+
+            t_13[k] = -ab_y[k] * pp_7[k]
+                      + pd_15[k];
+        }
+
+#pragma omp simd aligned(t_14, t_15, t_16, t_17, ab_y, ab_z, pp_6, pp_7, pp_8, pd_14, pd_16, \
+                         pd_17 : simd::cache_line_size())
+        for (size_t k = 0; k < nmax; k++)
+        {
+            t_14[k] = -ab_y[k] * pp_8[k]
+                      + pd_16[k];
+
+            t_15[k] = -ab_z[k] * pp_6[k]
+                      + pd_14[k];
+
+            t_16[k] = -ab_z[k] * pp_7[k]
+                      + pd_16[k];
+
+            t_17[k] = -ab_z[k] * pp_8[k]
+                      + pd_17[k];
+        }
+    }
+}
+
+auto
 compute_hrr_dp(CSimdMatrix &buffer, const CSimdMatrix &coordinates, const size_t target,
                const size_t ds, const size_t fs, const size_t ncomps, const size_t nmax) -> void
 {

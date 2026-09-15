@@ -18,6 +18,8 @@
 #include "ErrorHandler.hpp"
 #include "SimdCoordinates.hpp"
 #include "SimdMatrix.hpp"
+#include "SimdThreeCenterElectronRepulsionGeom010Func.hpp"
+#include "SimdThreeCenterElectronRepulsionGradientRows.hpp"
 #include "SimdThreeCenterElectronRepulsionGeom100Func.hpp"
 #include "TensorComponents.hpp"
 
@@ -77,7 +79,7 @@ CSimdThreeCenterElectronRepulsionGradientDriver::compute(const CTripleSparsityPa
     // on bra side. The components are set before the values are allocated, as the
     // size of a block follows them.
 
-    tensor.set_number_of_components(simdt3cerigrad::number_of_components);
+    tensor.set_number_of_components(6);
 
     tensor.allocate();
 
@@ -103,10 +105,19 @@ CSimdThreeCenterElectronRepulsionGradientDriver::compute(const CTripleSparsityPa
 
         if ((block.number_of_pairs() == 0) || (block.number_of_c_atoms() == 0)) continue;
 
+        const auto la = basis.basis_set(block.a_index()).max_angular_momentum();
+
+        const auto lb = basis.basis_set(block.b_index()).max_angular_momentum();
+
+        const auto lc = aux_basis.basis_set(block.c_index()).max_angular_momentum();
+
+        // NOTE: the two sets have a table each and the arena serves both, so it
+        // takes the larger. They differ: differentiating the first center and the
+        // second raise a different shell by one.
+
         arena_rows = std::max(arena_rows,
-                              simdt3cerigrad::number_of_buffer_rows(basis.basis_set(block.a_index()).max_angular_momentum(),
-                                                                    basis.basis_set(block.b_index()).max_angular_momentum(),
-                                                                    aux_basis.basis_set(block.c_index()).max_angular_momentum()));
+                              std::max(simdt3cerigrad::geom_100_buffer_rows(la, lb, lc),
+                                       simdt3cerigrad::geom_010_buffer_rows(la, lb, lc)));
 
         arena_cols = std::max(arena_cols, block.number_of_pairs() * block.number_of_c_atoms());
     }
@@ -198,9 +209,29 @@ CSimdThreeCenterElectronRepulsionGradientDriver::compute(const CTripleSparsityPa
             // NOTE: the offsets of the tensor scale by the components, so this is
             // the start of the six runs of the combination.
 
+            const auto ncomps = static_cast<size_t>(tensor::number_of_spherical_components(std::array<int, 3>{la, lb, lc}));
+
+            // NOTE: six components an element, the first three of the first atom
+            // on bra side and the last three of the second. Each set writes three
+            // runs of the atoms on the auxiliary side by the atom pairs, so the
+            // second starts where the first leaves off.
+
             auto *values = tensor.values(task.iblock, la, ia, lb, jb, lc, kc);
 
+            const auto stride = 3 * ncomps * natoms * task.npairs;
+
             simdt3cerigrad::compute_electron_repulsion_geom_100(values,
+                                                               task.npairs,
+                                                               natoms,
+                                                               a_basis.functions()[task.i],
+                                                               b_basis.functions()[task.j],
+                                                               c_basis.functions()[task.k],
+                                                               coordinates[task.iblock],
+                                                               c_coordinates[task.iblock],
+                                                               buffer,
+                                                               pattern.get_threshold());
+
+            simdt3cerigrad::compute_electron_repulsion_geom_010(values + stride,
                                                                task.npairs,
                                                                natoms,
                                                                a_basis.functions()[task.i],

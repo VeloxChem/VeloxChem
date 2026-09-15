@@ -534,7 +534,12 @@ class CSparseTensor
     {
         size_t nvals = 0;
 
-        std::ranges::for_each(_blocks, [&](const auto &block) { nvals += block.number_of_elements(); });
+        // NOTE: through the accessor of a block, which scales by the components.
+        // Summing the blocks directly reported the elements of a tensor of six
+        // components as though it held one, and memory_size() below with it.
+
+        std::ranges::for_each(std::views::iota(size_t{0}, _blocks.size()),
+                              [&](const auto index) { nvals += number_of_elements(index); });
 
         return nvals;
     }
