@@ -103,7 +103,7 @@ compute_sss_three_center_electron_repulsion(double               *values,
         screenfunc::three_center_electron_repulsion_primitive_bound,
         threshold / static_cast<double>(nprims));
 
-    const auto nmax = simdfunc::prepare_buffer(buffer, 5, 0, 0, dimensions);
+    const auto nmax = simdfunc::prepare_buffer(buffer, 6, 0, 0, dimensions);
 
     if (nmax == 0) return;
 
@@ -132,6 +132,8 @@ compute_sss_three_center_electron_repulsion(double               *values,
 
                 simdfunc::compute_pc(buffer, coordinates, c_coordinates, 0, n, nmax, fc);
 
+                simdfunc::compute_pair_exponent(buffer, coordinates, 3, nmax, mu);
+
                 for (size_t k = 0; k < nprim_c; k++)
                 {
                     const auto ncols = dimensions[(i * nprim_b + j) * nprim_c + k];
@@ -147,11 +149,11 @@ compute_sss_three_center_electron_repulsion(double               *values,
                     const auto fj = 2.0 * fovl * c_norms[k] * pi * pi * std::sqrt(pi)
                                     / (p * gamma * std::sqrt(q));
 
-                    simdfunc::compute_full_t3c_boys_function(buffer, coordinates, 3, 0, 0, ncols,
-                                                             fj, mu, fq);
+                    simdfunc::compute_full_t3c_boys_function(buffer, coordinates, 4, 0, 0, ncols,
+                                                             fj, 3, fq);
 
                     compute_ctr_sss_three_center_electron_repulsion_0(values + n * npairs,
-                                                                      nvalues, buffer, 4,
+                                                                      nvalues, buffer, 5,
                                                                       ncols);
                 }
             }

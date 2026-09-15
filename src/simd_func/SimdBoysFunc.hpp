@@ -166,7 +166,7 @@ auto compute_t3c_boys_function(CSimdMatrix                        &buffer,
                                const std::initializer_list<size_t> orders,
                                const size_t                        ncols,
                                const double                        fj,
-                               const double                        mu,
+                               const size_t                        pair_exp,
                                const double                        fq) -> void;
 
 auto compute_full_t3c_boys_function(CSimdMatrix       &buffer,
@@ -176,7 +176,7 @@ auto compute_full_t3c_boys_function(CSimdMatrix       &buffer,
                                     const size_t       order,
                                     const size_t       ncols,
                                     const double       fj,
-                                    const double       mu,
+                                    const size_t       pair_exp,
                                     const double       fq) -> void;
 
 /// @brief Computes the values of Boys function of the requested orders alone for one

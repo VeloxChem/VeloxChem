@@ -154,7 +154,7 @@ compute_fig_three_center_electron_repulsion(double               *values,
         screenfunc::three_center_electron_repulsion_primitive_bound,
         threshold / static_cast<double>(nprims));
 
-    const auto nmax = simdfunc::prepare_buffer(buffer, 43897, 0, 0, dimensions);
+    const auto nmax = simdfunc::prepare_buffer(buffer, 43898, 0, 0, dimensions);
 
     if (nmax == 0)
     {
@@ -174,7 +174,7 @@ compute_fig_three_center_electron_repulsion(double               *values,
 
     for (size_t n = 0; n < natoms; n++)
     {
-        simdfunc::prepare_buffer(buffer, 43897, 29872, 3441, dimensions);
+        simdfunc::prepare_buffer(buffer, 43898, 29873, 3441, dimensions);
 
         for (size_t i = 0; i < nprim_a; i++)
         {
@@ -194,6 +194,8 @@ compute_fig_three_center_electron_repulsion(double               *values,
 
                 simdfunc::compute_pc(buffer, coordinates, c_coordinates, 3, n, nmax, fc);
 
+                simdfunc::compute_pair_exponent(buffer, coordinates, 6, nmax, mu);
+
                 for (size_t k = 0; k < nprim_c; k++)
                 {
                     const auto ncols = dimensions[(i * nprim_b + j) * nprim_c + k];
@@ -209,1445 +211,1445 @@ compute_fig_three_center_electron_repulsion(double               *values,
                     const auto fj = 2.0 * fovl * c_norms[k] * pi * pi * std::sqrt(pi)
                                     / (p * gamma * std::sqrt(q));
 
-                    simdfunc::compute_full_t3c_boys_function(buffer, coordinates, 6, 3, 13,
-                                                             ncols, fj, mu, fq);
+                    simdfunc::compute_full_t3c_boys_function(buffer, coordinates, 7, 3, 13,
+                                                             ncols, fj, 6, fq);
 
-                    compute_prim_sps_three_center_electron_repulsion_0(buffer, 21, 0, 3, 7, 8,
+                    compute_prim_sps_three_center_electron_repulsion_0(buffer, 22, 0, 3, 8, 9,
                                                                        ncols, gamma, q);
 
-                    compute_prim_sps_three_center_electron_repulsion_0(buffer, 24, 0, 3, 8, 9,
+                    compute_prim_sps_three_center_electron_repulsion_0(buffer, 25, 0, 3, 9, 10,
                                                                        ncols, gamma, q);
 
-                    compute_prim_sps_three_center_electron_repulsion_0(buffer, 27, 0, 3, 9, 10,
+                    compute_prim_sps_three_center_electron_repulsion_0(buffer, 28, 0, 3, 10, 11,
                                                                        ncols, gamma, q);
 
-                    compute_prim_sps_three_center_electron_repulsion_0(buffer, 30, 0, 3, 10, 11,
+                    compute_prim_sps_three_center_electron_repulsion_0(buffer, 31, 0, 3, 11, 12,
                                                                        ncols, gamma, q);
 
-                    compute_prim_sps_three_center_electron_repulsion_0(buffer, 33, 0, 3, 11, 12,
+                    compute_prim_sps_three_center_electron_repulsion_0(buffer, 34, 0, 3, 12, 13,
                                                                        ncols, gamma, q);
 
-                    compute_prim_sps_three_center_electron_repulsion_0(buffer, 36, 0, 3, 12, 13,
+                    compute_prim_sps_three_center_electron_repulsion_0(buffer, 37, 0, 3, 13, 14,
                                                                        ncols, gamma, q);
 
-                    compute_prim_sps_three_center_electron_repulsion_0(buffer, 39, 0, 3, 13, 14,
+                    compute_prim_sps_three_center_electron_repulsion_0(buffer, 40, 0, 3, 14, 15,
                                                                        ncols, gamma, q);
 
-                    compute_prim_sps_three_center_electron_repulsion_0(buffer, 42, 0, 3, 14, 15,
+                    compute_prim_sps_three_center_electron_repulsion_0(buffer, 43, 0, 3, 15, 16,
                                                                        ncols, gamma, q);
 
-                    compute_prim_sps_three_center_electron_repulsion_0(buffer, 45, 0, 3, 15, 16,
+                    compute_prim_sps_three_center_electron_repulsion_0(buffer, 46, 0, 3, 16, 17,
                                                                        ncols, gamma, q);
 
-                    compute_prim_sps_three_center_electron_repulsion_0(buffer, 48, 0, 3, 16, 17,
+                    compute_prim_sps_three_center_electron_repulsion_0(buffer, 49, 0, 3, 17, 18,
                                                                        ncols, gamma, q);
 
-                    compute_prim_sps_three_center_electron_repulsion_0(buffer, 51, 0, 3, 17, 18,
+                    compute_prim_sps_three_center_electron_repulsion_0(buffer, 52, 0, 3, 18, 19,
                                                                        ncols, gamma, q);
 
-                    compute_prim_sps_three_center_electron_repulsion_0(buffer, 54, 0, 3, 18, 19,
+                    compute_prim_sps_three_center_electron_repulsion_0(buffer, 55, 0, 3, 19, 20,
                                                                        ncols, gamma, q);
 
-                    compute_prim_sps_three_center_electron_repulsion_0(buffer, 57, 0, 3, 19, 20,
+                    compute_prim_sps_three_center_electron_repulsion_0(buffer, 58, 0, 3, 20, 21,
                                                                        ncols, gamma, q);
 
-                    compute_prim_sds_three_center_electron_repulsion_0(buffer, 60, 0, 3, 7, 8,
-                                                                       21, 24, ncols, gamma, p,
+                    compute_prim_sds_three_center_electron_repulsion_0(buffer, 61, 0, 3, 8, 9,
+                                                                       22, 25, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_sds_three_center_electron_repulsion_0(buffer, 66, 0, 3, 8, 9,
-                                                                       24, 27, ncols, gamma, p,
+                    compute_prim_sds_three_center_electron_repulsion_0(buffer, 67, 0, 3, 9, 10,
+                                                                       25, 28, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_sds_three_center_electron_repulsion_0(buffer, 72, 0, 3, 9, 10,
-                                                                       27, 30, ncols, gamma, p,
+                    compute_prim_sds_three_center_electron_repulsion_0(buffer, 73, 0, 3, 10, 11,
+                                                                       28, 31, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_sds_three_center_electron_repulsion_0(buffer, 78, 0, 3, 10, 11,
-                                                                       30, 33, ncols, gamma, p,
+                    compute_prim_sds_three_center_electron_repulsion_0(buffer, 79, 0, 3, 11, 12,
+                                                                       31, 34, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_sds_three_center_electron_repulsion_0(buffer, 84, 0, 3, 11, 12,
-                                                                       33, 36, ncols, gamma, p,
+                    compute_prim_sds_three_center_electron_repulsion_0(buffer, 85, 0, 3, 12, 13,
+                                                                       34, 37, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_sds_three_center_electron_repulsion_0(buffer, 90, 0, 3, 12, 13,
-                                                                       36, 39, ncols, gamma, p,
+                    compute_prim_sds_three_center_electron_repulsion_0(buffer, 91, 0, 3, 13, 14,
+                                                                       37, 40, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_sds_three_center_electron_repulsion_0(buffer, 96, 0, 3, 13, 14,
-                                                                       39, 42, ncols, gamma, p,
+                    compute_prim_sds_three_center_electron_repulsion_0(buffer, 97, 0, 3, 14, 15,
+                                                                       40, 43, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_sds_three_center_electron_repulsion_0(buffer, 102, 0, 3, 14, 15,
-                                                                       42, 45, ncols, gamma, p,
+                    compute_prim_sds_three_center_electron_repulsion_0(buffer, 103, 0, 3, 15, 16,
+                                                                       43, 46, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_sds_three_center_electron_repulsion_0(buffer, 108, 0, 3, 15, 16,
-                                                                       45, 48, ncols, gamma, p,
+                    compute_prim_sds_three_center_electron_repulsion_0(buffer, 109, 0, 3, 16, 17,
+                                                                       46, 49, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_sds_three_center_electron_repulsion_0(buffer, 114, 0, 3, 16, 17,
-                                                                       48, 51, ncols, gamma, p,
+                    compute_prim_sds_three_center_electron_repulsion_0(buffer, 115, 0, 3, 17, 18,
+                                                                       49, 52, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_sds_three_center_electron_repulsion_0(buffer, 120, 0, 3, 17, 18,
-                                                                       51, 54, ncols, gamma, p,
+                    compute_prim_sds_three_center_electron_repulsion_0(buffer, 121, 0, 3, 18, 19,
+                                                                       52, 55, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_sds_three_center_electron_repulsion_0(buffer, 126, 0, 3, 18, 19,
-                                                                       54, 57, ncols, gamma, p,
+                    compute_prim_sds_three_center_electron_repulsion_0(buffer, 127, 0, 3, 19, 20,
+                                                                       55, 58, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_sfs_three_center_electron_repulsion_0(buffer, 132, 0, 3, 21, 24,
-                                                                       60, 66, ncols, gamma, p,
+                    compute_prim_sfs_three_center_electron_repulsion_0(buffer, 133, 0, 3, 22, 25,
+                                                                       61, 67, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_sfs_three_center_electron_repulsion_0(buffer, 142, 0, 3, 24, 27,
-                                                                       66, 72, ncols, gamma, p,
+                    compute_prim_sfs_three_center_electron_repulsion_0(buffer, 143, 0, 3, 25, 28,
+                                                                       67, 73, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_sfs_three_center_electron_repulsion_0(buffer, 152, 0, 3, 27, 30,
-                                                                       72, 78, ncols, gamma, p,
+                    compute_prim_sfs_three_center_electron_repulsion_0(buffer, 153, 0, 3, 28, 31,
+                                                                       73, 79, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_sfs_three_center_electron_repulsion_0(buffer, 162, 0, 3, 30, 33,
-                                                                       78, 84, ncols, gamma, p,
+                    compute_prim_sfs_three_center_electron_repulsion_0(buffer, 163, 0, 3, 31, 34,
+                                                                       79, 85, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_sfs_three_center_electron_repulsion_0(buffer, 172, 0, 3, 33, 36,
-                                                                       84, 90, ncols, gamma, p,
+                    compute_prim_sfs_three_center_electron_repulsion_0(buffer, 173, 0, 3, 34, 37,
+                                                                       85, 91, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_sfs_three_center_electron_repulsion_0(buffer, 182, 0, 3, 36, 39,
-                                                                       90, 96, ncols, gamma, p,
+                    compute_prim_sfs_three_center_electron_repulsion_0(buffer, 183, 0, 3, 37, 40,
+                                                                       91, 97, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_sfs_three_center_electron_repulsion_0(buffer, 192, 0, 3, 39, 42,
-                                                                       96, 102, ncols, gamma, p,
+                    compute_prim_sfs_three_center_electron_repulsion_0(buffer, 193, 0, 3, 40, 43,
+                                                                       97, 103, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_sfs_three_center_electron_repulsion_0(buffer, 202, 0, 3, 42, 45,
-                                                                       102, 108, ncols, gamma, p,
+                    compute_prim_sfs_three_center_electron_repulsion_0(buffer, 203, 0, 3, 43, 46,
+                                                                       103, 109, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_sfs_three_center_electron_repulsion_0(buffer, 212, 0, 3, 45, 48,
-                                                                       108, 114, ncols, gamma, p,
+                    compute_prim_sfs_three_center_electron_repulsion_0(buffer, 213, 0, 3, 46, 49,
+                                                                       109, 115, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_sfs_three_center_electron_repulsion_0(buffer, 222, 0, 3, 48, 51,
-                                                                       114, 120, ncols, gamma, p,
+                    compute_prim_sfs_three_center_electron_repulsion_0(buffer, 223, 0, 3, 49, 52,
+                                                                       115, 121, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_sfs_three_center_electron_repulsion_0(buffer, 232, 0, 3, 51, 54,
-                                                                       120, 126, ncols, gamma, p,
+                    compute_prim_sfs_three_center_electron_repulsion_0(buffer, 233, 0, 3, 52, 55,
+                                                                       121, 127, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_sgs_three_center_electron_repulsion_0(buffer, 242, 0, 3, 60, 66,
-                                                                       132, 142, ncols, gamma, p,
+                    compute_prim_sgs_three_center_electron_repulsion_0(buffer, 243, 0, 3, 61, 67,
+                                                                       133, 143, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_sgs_three_center_electron_repulsion_0(buffer, 257, 0, 3, 66, 72,
-                                                                       142, 152, ncols, gamma, p,
+                    compute_prim_sgs_three_center_electron_repulsion_0(buffer, 258, 0, 3, 67, 73,
+                                                                       143, 153, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_sgs_three_center_electron_repulsion_0(buffer, 272, 0, 3, 72, 78,
-                                                                       152, 162, ncols, gamma, p,
+                    compute_prim_sgs_three_center_electron_repulsion_0(buffer, 273, 0, 3, 73, 79,
+                                                                       153, 163, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_sgs_three_center_electron_repulsion_0(buffer, 287, 0, 3, 78, 84,
-                                                                       162, 172, ncols, gamma, p,
+                    compute_prim_sgs_three_center_electron_repulsion_0(buffer, 288, 0, 3, 79, 85,
+                                                                       163, 173, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_sgs_three_center_electron_repulsion_0(buffer, 302, 0, 3, 84, 90,
-                                                                       172, 182, ncols, gamma, p,
+                    compute_prim_sgs_three_center_electron_repulsion_0(buffer, 303, 0, 3, 85, 91,
+                                                                       173, 183, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_sgs_three_center_electron_repulsion_0(buffer, 317, 0, 3, 90, 96,
-                                                                       182, 192, ncols, gamma, p,
+                    compute_prim_sgs_three_center_electron_repulsion_0(buffer, 318, 0, 3, 91, 97,
+                                                                       183, 193, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_sgs_three_center_electron_repulsion_0(buffer, 332, 0, 3, 96,
-                                                                       102, 192, 202, ncols,
+                    compute_prim_sgs_three_center_electron_repulsion_0(buffer, 333, 0, 3, 97,
+                                                                       103, 193, 203, ncols,
                                                                        gamma, p, q);
 
-                    compute_prim_sgs_three_center_electron_repulsion_0(buffer, 347, 0, 3, 102,
-                                                                       108, 202, 212, ncols,
+                    compute_prim_sgs_three_center_electron_repulsion_0(buffer, 348, 0, 3, 103,
+                                                                       109, 203, 213, ncols,
                                                                        gamma, p, q);
 
-                    compute_prim_sgs_three_center_electron_repulsion_0(buffer, 362, 0, 3, 108,
-                                                                       114, 212, 222, ncols,
+                    compute_prim_sgs_three_center_electron_repulsion_0(buffer, 363, 0, 3, 109,
+                                                                       115, 213, 223, ncols,
                                                                        gamma, p, q);
 
-                    compute_prim_sgs_three_center_electron_repulsion_0(buffer, 377, 0, 3, 114,
-                                                                       120, 222, 232, ncols,
+                    compute_prim_sgs_three_center_electron_repulsion_0(buffer, 378, 0, 3, 115,
+                                                                       121, 223, 233, ncols,
                                                                        gamma, p, q);
 
-                    compute_prim_shs_three_center_electron_repulsion_0(buffer, 392, 0, 3, 132,
-                                                                       142, 242, 257, ncols,
+                    compute_prim_shs_three_center_electron_repulsion_0(buffer, 393, 0, 3, 133,
+                                                                       143, 243, 258, ncols,
                                                                        gamma, p, q);
 
-                    compute_prim_shs_three_center_electron_repulsion_0(buffer, 413, 0, 3, 142,
-                                                                       152, 257, 272, ncols,
+                    compute_prim_shs_three_center_electron_repulsion_0(buffer, 414, 0, 3, 143,
+                                                                       153, 258, 273, ncols,
                                                                        gamma, p, q);
 
-                    compute_prim_shs_three_center_electron_repulsion_0(buffer, 434, 0, 3, 152,
-                                                                       162, 272, 287, ncols,
+                    compute_prim_shs_three_center_electron_repulsion_0(buffer, 435, 0, 3, 153,
+                                                                       163, 273, 288, ncols,
                                                                        gamma, p, q);
 
-                    compute_prim_shs_three_center_electron_repulsion_0(buffer, 455, 0, 3, 162,
-                                                                       172, 287, 302, ncols,
+                    compute_prim_shs_three_center_electron_repulsion_0(buffer, 456, 0, 3, 163,
+                                                                       173, 288, 303, ncols,
                                                                        gamma, p, q);
 
-                    compute_prim_shs_three_center_electron_repulsion_0(buffer, 476, 0, 3, 172,
-                                                                       182, 302, 317, ncols,
+                    compute_prim_shs_three_center_electron_repulsion_0(buffer, 477, 0, 3, 173,
+                                                                       183, 303, 318, ncols,
                                                                        gamma, p, q);
 
-                    compute_prim_shs_three_center_electron_repulsion_0(buffer, 497, 0, 3, 182,
-                                                                       192, 317, 332, ncols,
+                    compute_prim_shs_three_center_electron_repulsion_0(buffer, 498, 0, 3, 183,
+                                                                       193, 318, 333, ncols,
                                                                        gamma, p, q);
 
-                    compute_prim_shs_three_center_electron_repulsion_0(buffer, 518, 0, 3, 192,
-                                                                       202, 332, 347, ncols,
+                    compute_prim_shs_three_center_electron_repulsion_0(buffer, 519, 0, 3, 193,
+                                                                       203, 333, 348, ncols,
                                                                        gamma, p, q);
 
-                    compute_prim_shs_three_center_electron_repulsion_0(buffer, 539, 0, 3, 202,
-                                                                       212, 347, 362, ncols,
+                    compute_prim_shs_three_center_electron_repulsion_0(buffer, 540, 0, 3, 203,
+                                                                       213, 348, 363, ncols,
                                                                        gamma, p, q);
 
-                    compute_prim_shs_three_center_electron_repulsion_0(buffer, 560, 0, 3, 212,
-                                                                       222, 362, 377, ncols,
+                    compute_prim_shs_three_center_electron_repulsion_0(buffer, 561, 0, 3, 213,
+                                                                       223, 363, 378, ncols,
                                                                        gamma, p, q);
 
-                    compute_prim_sis_three_center_electron_repulsion_0(buffer, 581, 0, 3, 242,
-                                                                       257, 392, 413, ncols,
+                    compute_prim_sis_three_center_electron_repulsion_0(buffer, 582, 0, 3, 243,
+                                                                       258, 393, 414, ncols,
                                                                        gamma, p, q);
 
-                    compute_prim_sis_three_center_electron_repulsion_0(buffer, 609, 0, 3, 257,
-                                                                       272, 413, 434, ncols,
+                    compute_prim_sis_three_center_electron_repulsion_0(buffer, 610, 0, 3, 258,
+                                                                       273, 414, 435, ncols,
                                                                        gamma, p, q);
 
-                    compute_prim_sis_three_center_electron_repulsion_0(buffer, 637, 0, 3, 272,
-                                                                       287, 434, 455, ncols,
+                    compute_prim_sis_three_center_electron_repulsion_0(buffer, 638, 0, 3, 273,
+                                                                       288, 435, 456, ncols,
                                                                        gamma, p, q);
 
-                    compute_prim_sis_three_center_electron_repulsion_0(buffer, 665, 0, 3, 287,
-                                                                       302, 455, 476, ncols,
+                    compute_prim_sis_three_center_electron_repulsion_0(buffer, 666, 0, 3, 288,
+                                                                       303, 456, 477, ncols,
                                                                        gamma, p, q);
 
-                    compute_prim_sis_three_center_electron_repulsion_0(buffer, 693, 0, 3, 302,
-                                                                       317, 476, 497, ncols,
+                    compute_prim_sis_three_center_electron_repulsion_0(buffer, 694, 0, 3, 303,
+                                                                       318, 477, 498, ncols,
                                                                        gamma, p, q);
 
-                    compute_prim_sis_three_center_electron_repulsion_0(buffer, 721, 0, 3, 317,
-                                                                       332, 497, 518, ncols,
+                    compute_prim_sis_three_center_electron_repulsion_0(buffer, 722, 0, 3, 318,
+                                                                       333, 498, 519, ncols,
                                                                        gamma, p, q);
 
-                    compute_prim_sis_three_center_electron_repulsion_0(buffer, 749, 0, 3, 332,
-                                                                       347, 518, 539, ncols,
+                    compute_prim_sis_three_center_electron_repulsion_0(buffer, 750, 0, 3, 333,
+                                                                       348, 519, 540, ncols,
                                                                        gamma, p, q);
 
-                    compute_prim_sis_three_center_electron_repulsion_0(buffer, 777, 0, 3, 347,
-                                                                       362, 539, 560, ncols,
+                    compute_prim_sis_three_center_electron_repulsion_0(buffer, 778, 0, 3, 348,
+                                                                       363, 540, 561, ncols,
                                                                        gamma, p, q);
 
-                    compute_prim_sks_three_center_electron_repulsion_0(buffer, 805, 0, 3, 392,
-                                                                       413, 581, 609, ncols,
+                    compute_prim_sks_three_center_electron_repulsion_0(buffer, 806, 0, 3, 393,
+                                                                       414, 582, 610, ncols,
                                                                        gamma, p, q);
 
-                    compute_prim_sks_three_center_electron_repulsion_0(buffer, 841, 0, 3, 413,
-                                                                       434, 609, 637, ncols,
+                    compute_prim_sks_three_center_electron_repulsion_0(buffer, 842, 0, 3, 414,
+                                                                       435, 610, 638, ncols,
                                                                        gamma, p, q);
 
-                    compute_prim_sks_three_center_electron_repulsion_0(buffer, 877, 0, 3, 434,
-                                                                       455, 637, 665, ncols,
+                    compute_prim_sks_three_center_electron_repulsion_0(buffer, 878, 0, 3, 435,
+                                                                       456, 638, 666, ncols,
                                                                        gamma, p, q);
 
-                    compute_prim_sks_three_center_electron_repulsion_0(buffer, 913, 0, 3, 455,
-                                                                       476, 665, 693, ncols,
+                    compute_prim_sks_three_center_electron_repulsion_0(buffer, 914, 0, 3, 456,
+                                                                       477, 666, 694, ncols,
                                                                        gamma, p, q);
 
-                    compute_prim_sks_three_center_electron_repulsion_0(buffer, 949, 0, 3, 476,
-                                                                       497, 693, 721, ncols,
+                    compute_prim_sks_three_center_electron_repulsion_0(buffer, 950, 0, 3, 477,
+                                                                       498, 694, 722, ncols,
                                                                        gamma, p, q);
 
-                    compute_prim_sks_three_center_electron_repulsion_0(buffer, 985, 0, 3, 497,
-                                                                       518, 721, 749, ncols,
+                    compute_prim_sks_three_center_electron_repulsion_0(buffer, 986, 0, 3, 498,
+                                                                       519, 722, 750, ncols,
                                                                        gamma, p, q);
 
-                    compute_prim_sks_three_center_electron_repulsion_0(buffer, 1021, 0, 3, 518,
-                                                                       539, 749, 777, ncols,
+                    compute_prim_sks_three_center_electron_repulsion_0(buffer, 1022, 0, 3, 519,
+                                                                       540, 750, 778, ncols,
                                                                        gamma, p, q);
 
-                    compute_prim_sls_three_center_electron_repulsion_0(buffer, 1057, 0, 3, 581,
-                                                                       609, 805, 841, ncols,
+                    compute_prim_sls_three_center_electron_repulsion_0(buffer, 1058, 0, 3, 582,
+                                                                       610, 806, 842, ncols,
                                                                        gamma, p, q);
 
-                    compute_prim_sls_three_center_electron_repulsion_0(buffer, 1102, 0, 3, 609,
-                                                                       637, 841, 877, ncols,
+                    compute_prim_sls_three_center_electron_repulsion_0(buffer, 1103, 0, 3, 610,
+                                                                       638, 842, 878, ncols,
                                                                        gamma, p, q);
 
-                    compute_prim_sls_three_center_electron_repulsion_0(buffer, 1147, 0, 3, 637,
-                                                                       665, 877, 913, ncols,
+                    compute_prim_sls_three_center_electron_repulsion_0(buffer, 1148, 0, 3, 638,
+                                                                       666, 878, 914, ncols,
                                                                        gamma, p, q);
 
-                    compute_prim_sls_three_center_electron_repulsion_0(buffer, 1192, 0, 3, 665,
-                                                                       693, 913, 949, ncols,
+                    compute_prim_sls_three_center_electron_repulsion_0(buffer, 1193, 0, 3, 666,
+                                                                       694, 914, 950, ncols,
                                                                        gamma, p, q);
 
-                    compute_prim_sls_three_center_electron_repulsion_0(buffer, 1237, 0, 3, 693,
-                                                                       721, 949, 985, ncols,
+                    compute_prim_sls_three_center_electron_repulsion_0(buffer, 1238, 0, 3, 694,
+                                                                       722, 950, 986, ncols,
                                                                        gamma, p, q);
 
-                    compute_prim_sls_three_center_electron_repulsion_0(buffer, 1282, 0, 3, 721,
-                                                                       749, 985, 1021, ncols,
+                    compute_prim_sls_three_center_electron_repulsion_0(buffer, 1283, 0, 3, 722,
+                                                                       750, 986, 1022, ncols,
                                                                        gamma, p, q);
 
-                    compute_prim_sms_three_center_electron_repulsion_0(buffer, 1327, 0, 3, 805,
-                                                                       841, 1057, 1102, ncols,
+                    compute_prim_sms_three_center_electron_repulsion_0(buffer, 1328, 0, 3, 806,
+                                                                       842, 1058, 1103, ncols,
                                                                        gamma, p, q);
 
-                    compute_prim_sms_three_center_electron_repulsion_0(buffer, 1382, 0, 3, 841,
-                                                                       877, 1102, 1147, ncols,
+                    compute_prim_sms_three_center_electron_repulsion_0(buffer, 1383, 0, 3, 842,
+                                                                       878, 1103, 1148, ncols,
                                                                        gamma, p, q);
 
-                    compute_prim_sms_three_center_electron_repulsion_0(buffer, 1437, 0, 3, 877,
-                                                                       913, 1147, 1192, ncols,
+                    compute_prim_sms_three_center_electron_repulsion_0(buffer, 1438, 0, 3, 878,
+                                                                       914, 1148, 1193, ncols,
                                                                        gamma, p, q);
 
-                    compute_prim_sms_three_center_electron_repulsion_0(buffer, 1492, 0, 3, 913,
-                                                                       949, 1192, 1237, ncols,
+                    compute_prim_sms_three_center_electron_repulsion_0(buffer, 1493, 0, 3, 914,
+                                                                       950, 1193, 1238, ncols,
                                                                        gamma, p, q);
 
-                    compute_prim_sms_three_center_electron_repulsion_0(buffer, 1547, 0, 3, 949,
-                                                                       985, 1237, 1282, ncols,
+                    compute_prim_sms_three_center_electron_repulsion_0(buffer, 1548, 0, 3, 950,
+                                                                       986, 1238, 1283, ncols,
                                                                        gamma, p, q);
 
-                    compute_prim_ssp_three_center_electron_repulsion_0(buffer, 1602, 3, 9, ncols,
-                                                                       p, q);
+                    compute_prim_ssp_three_center_electron_repulsion_0(buffer, 1603, 3, 10,
+                                                                       ncols, p, q);
 
-                    compute_prim_ssp_three_center_electron_repulsion_0(buffer, 1605, 3, 10,
+                    compute_prim_ssp_three_center_electron_repulsion_0(buffer, 1606, 3, 11,
                                                                        ncols, p, q);
 
-                    compute_prim_ssp_three_center_electron_repulsion_0(buffer, 1608, 3, 11,
+                    compute_prim_ssp_three_center_electron_repulsion_0(buffer, 1609, 3, 12,
                                                                        ncols, p, q);
 
-                    compute_prim_ssp_three_center_electron_repulsion_0(buffer, 1611, 3, 12,
+                    compute_prim_ssp_three_center_electron_repulsion_0(buffer, 1612, 3, 13,
                                                                        ncols, p, q);
 
-                    compute_prim_ssp_three_center_electron_repulsion_0(buffer, 1614, 3, 13,
+                    compute_prim_ssp_three_center_electron_repulsion_0(buffer, 1615, 3, 14,
                                                                        ncols, p, q);
 
-                    compute_prim_ssp_three_center_electron_repulsion_0(buffer, 1617, 3, 14,
+                    compute_prim_ssp_three_center_electron_repulsion_0(buffer, 1618, 3, 15,
                                                                        ncols, p, q);
 
-                    compute_prim_ssp_three_center_electron_repulsion_0(buffer, 1620, 3, 15,
+                    compute_prim_ssp_three_center_electron_repulsion_0(buffer, 1621, 3, 16,
                                                                        ncols, p, q);
 
-                    compute_prim_ssp_three_center_electron_repulsion_0(buffer, 1623, 3, 16,
+                    compute_prim_ssp_three_center_electron_repulsion_0(buffer, 1624, 3, 17,
                                                                        ncols, p, q);
 
-                    compute_prim_ssp_three_center_electron_repulsion_0(buffer, 1626, 3, 17,
+                    compute_prim_ssp_three_center_electron_repulsion_0(buffer, 1627, 3, 18,
                                                                        ncols, p, q);
 
-                    compute_prim_ssp_three_center_electron_repulsion_0(buffer, 1629, 3, 18,
+                    compute_prim_ssp_three_center_electron_repulsion_0(buffer, 1630, 3, 19,
                                                                        ncols, p, q);
 
-                    compute_prim_ssp_three_center_electron_repulsion_0(buffer, 1632, 3, 19,
+                    compute_prim_ssp_three_center_electron_repulsion_0(buffer, 1633, 3, 20,
                                                                        ncols, p, q);
 
-                    compute_prim_ssp_three_center_electron_repulsion_0(buffer, 1635, 3, 20,
+                    compute_prim_ssp_three_center_electron_repulsion_0(buffer, 1636, 3, 21,
                                                                        ncols, p, q);
 
-                    compute_prim_spp_three_center_electron_repulsion_0(buffer, 1638, 3, 9, 27,
+                    compute_prim_spp_three_center_electron_repulsion_0(buffer, 1639, 3, 10, 28,
                                                                        ncols, p, q);
 
-                    compute_prim_spp_three_center_electron_repulsion_0(buffer, 1647, 3, 10, 30,
+                    compute_prim_spp_three_center_electron_repulsion_0(buffer, 1648, 3, 11, 31,
                                                                        ncols, p, q);
 
-                    compute_prim_spp_three_center_electron_repulsion_0(buffer, 1656, 3, 11, 33,
+                    compute_prim_spp_three_center_electron_repulsion_0(buffer, 1657, 3, 12, 34,
                                                                        ncols, p, q);
 
-                    compute_prim_spp_three_center_electron_repulsion_0(buffer, 1665, 3, 12, 36,
+                    compute_prim_spp_three_center_electron_repulsion_0(buffer, 1666, 3, 13, 37,
                                                                        ncols, p, q);
 
-                    compute_prim_spp_three_center_electron_repulsion_0(buffer, 1674, 3, 13, 39,
+                    compute_prim_spp_three_center_electron_repulsion_0(buffer, 1675, 3, 14, 40,
                                                                        ncols, p, q);
 
-                    compute_prim_spp_three_center_electron_repulsion_0(buffer, 1683, 3, 14, 42,
+                    compute_prim_spp_three_center_electron_repulsion_0(buffer, 1684, 3, 15, 43,
                                                                        ncols, p, q);
 
-                    compute_prim_spp_three_center_electron_repulsion_0(buffer, 1692, 3, 15, 45,
+                    compute_prim_spp_three_center_electron_repulsion_0(buffer, 1693, 3, 16, 46,
                                                                        ncols, p, q);
 
-                    compute_prim_spp_three_center_electron_repulsion_0(buffer, 1701, 3, 16, 48,
+                    compute_prim_spp_three_center_electron_repulsion_0(buffer, 1702, 3, 17, 49,
                                                                        ncols, p, q);
 
-                    compute_prim_spp_three_center_electron_repulsion_0(buffer, 1710, 3, 17, 51,
+                    compute_prim_spp_three_center_electron_repulsion_0(buffer, 1711, 3, 18, 52,
                                                                        ncols, p, q);
 
-                    compute_prim_spp_three_center_electron_repulsion_0(buffer, 1719, 3, 18, 54,
+                    compute_prim_spp_three_center_electron_repulsion_0(buffer, 1720, 3, 19, 55,
                                                                        ncols, p, q);
 
-                    compute_prim_spp_three_center_electron_repulsion_0(buffer, 1728, 3, 19, 57,
+                    compute_prim_spp_three_center_electron_repulsion_0(buffer, 1729, 3, 20, 58,
                                                                        ncols, p, q);
 
-                    compute_prim_sdp_three_center_electron_repulsion_0(buffer, 1737, 3, 27, 72,
+                    compute_prim_sdp_three_center_electron_repulsion_0(buffer, 1738, 3, 28, 73,
                                                                        ncols, p, q);
 
-                    compute_prim_sdp_three_center_electron_repulsion_0(buffer, 1755, 3, 30, 78,
+                    compute_prim_sdp_three_center_electron_repulsion_0(buffer, 1756, 3, 31, 79,
                                                                        ncols, p, q);
 
-                    compute_prim_sdp_three_center_electron_repulsion_0(buffer, 1773, 3, 33, 84,
+                    compute_prim_sdp_three_center_electron_repulsion_0(buffer, 1774, 3, 34, 85,
                                                                        ncols, p, q);
 
-                    compute_prim_sdp_three_center_electron_repulsion_0(buffer, 1791, 3, 36, 90,
+                    compute_prim_sdp_three_center_electron_repulsion_0(buffer, 1792, 3, 37, 91,
                                                                        ncols, p, q);
 
-                    compute_prim_sdp_three_center_electron_repulsion_0(buffer, 1809, 3, 39, 96,
+                    compute_prim_sdp_three_center_electron_repulsion_0(buffer, 1810, 3, 40, 97,
                                                                        ncols, p, q);
 
-                    compute_prim_sdp_three_center_electron_repulsion_0(buffer, 1827, 3, 42, 102,
+                    compute_prim_sdp_three_center_electron_repulsion_0(buffer, 1828, 3, 43, 103,
                                                                        ncols, p, q);
 
-                    compute_prim_sdp_three_center_electron_repulsion_0(buffer, 1845, 3, 45, 108,
+                    compute_prim_sdp_three_center_electron_repulsion_0(buffer, 1846, 3, 46, 109,
                                                                        ncols, p, q);
 
-                    compute_prim_sdp_three_center_electron_repulsion_0(buffer, 1863, 3, 48, 114,
+                    compute_prim_sdp_three_center_electron_repulsion_0(buffer, 1864, 3, 49, 115,
                                                                        ncols, p, q);
 
-                    compute_prim_sdp_three_center_electron_repulsion_0(buffer, 1881, 3, 51, 120,
+                    compute_prim_sdp_three_center_electron_repulsion_0(buffer, 1882, 3, 52, 121,
                                                                        ncols, p, q);
 
-                    compute_prim_sdp_three_center_electron_repulsion_0(buffer, 1899, 3, 54, 126,
+                    compute_prim_sdp_three_center_electron_repulsion_0(buffer, 1900, 3, 55, 127,
                                                                        ncols, p, q);
 
-                    compute_prim_sfp_three_center_electron_repulsion_0(buffer, 1917, 3, 72, 152,
+                    compute_prim_sfp_three_center_electron_repulsion_0(buffer, 1918, 3, 73, 153,
                                                                        ncols, p, q);
 
-                    compute_prim_sfp_three_center_electron_repulsion_0(buffer, 1947, 3, 78, 162,
+                    compute_prim_sfp_three_center_electron_repulsion_0(buffer, 1948, 3, 79, 163,
                                                                        ncols, p, q);
 
-                    compute_prim_sfp_three_center_electron_repulsion_0(buffer, 1977, 3, 84, 172,
+                    compute_prim_sfp_three_center_electron_repulsion_0(buffer, 1978, 3, 85, 173,
                                                                        ncols, p, q);
 
-                    compute_prim_sfp_three_center_electron_repulsion_0(buffer, 2007, 3, 90, 182,
+                    compute_prim_sfp_three_center_electron_repulsion_0(buffer, 2008, 3, 91, 183,
                                                                        ncols, p, q);
 
-                    compute_prim_sfp_three_center_electron_repulsion_0(buffer, 2037, 3, 96, 192,
+                    compute_prim_sfp_three_center_electron_repulsion_0(buffer, 2038, 3, 97, 193,
                                                                        ncols, p, q);
 
-                    compute_prim_sfp_three_center_electron_repulsion_0(buffer, 2067, 3, 102, 202,
+                    compute_prim_sfp_three_center_electron_repulsion_0(buffer, 2068, 3, 103, 203,
                                                                        ncols, p, q);
 
-                    compute_prim_sfp_three_center_electron_repulsion_0(buffer, 2097, 3, 108, 212,
+                    compute_prim_sfp_three_center_electron_repulsion_0(buffer, 2098, 3, 109, 213,
                                                                        ncols, p, q);
 
-                    compute_prim_sfp_three_center_electron_repulsion_0(buffer, 2127, 3, 114, 222,
+                    compute_prim_sfp_three_center_electron_repulsion_0(buffer, 2128, 3, 115, 223,
                                                                        ncols, p, q);
 
-                    compute_prim_sfp_three_center_electron_repulsion_0(buffer, 2157, 3, 120, 232,
+                    compute_prim_sfp_three_center_electron_repulsion_0(buffer, 2158, 3, 121, 233,
                                                                        ncols, p, q);
 
-                    compute_prim_sgp_three_center_electron_repulsion_0(buffer, 2187, 3, 152, 272,
+                    compute_prim_sgp_three_center_electron_repulsion_0(buffer, 2188, 3, 153, 273,
                                                                        ncols, p, q);
 
-                    compute_prim_sgp_three_center_electron_repulsion_0(buffer, 2232, 3, 162, 287,
+                    compute_prim_sgp_three_center_electron_repulsion_0(buffer, 2233, 3, 163, 288,
                                                                        ncols, p, q);
 
-                    compute_prim_sgp_three_center_electron_repulsion_0(buffer, 2277, 3, 172, 302,
+                    compute_prim_sgp_three_center_electron_repulsion_0(buffer, 2278, 3, 173, 303,
                                                                        ncols, p, q);
 
-                    compute_prim_sgp_three_center_electron_repulsion_0(buffer, 2322, 3, 182, 317,
+                    compute_prim_sgp_three_center_electron_repulsion_0(buffer, 2323, 3, 183, 318,
                                                                        ncols, p, q);
 
-                    compute_prim_sgp_three_center_electron_repulsion_0(buffer, 2367, 3, 192, 332,
+                    compute_prim_sgp_three_center_electron_repulsion_0(buffer, 2368, 3, 193, 333,
                                                                        ncols, p, q);
 
-                    compute_prim_sgp_three_center_electron_repulsion_0(buffer, 2412, 3, 202, 347,
+                    compute_prim_sgp_three_center_electron_repulsion_0(buffer, 2413, 3, 203, 348,
                                                                        ncols, p, q);
 
-                    compute_prim_sgp_three_center_electron_repulsion_0(buffer, 2457, 3, 212, 362,
+                    compute_prim_sgp_three_center_electron_repulsion_0(buffer, 2458, 3, 213, 363,
                                                                        ncols, p, q);
 
-                    compute_prim_sgp_three_center_electron_repulsion_0(buffer, 2502, 3, 222, 377,
+                    compute_prim_sgp_three_center_electron_repulsion_0(buffer, 2503, 3, 223, 378,
                                                                        ncols, p, q);
 
-                    compute_prim_shp_three_center_electron_repulsion_0(buffer, 2547, 3, 272, 434,
+                    compute_prim_shp_three_center_electron_repulsion_0(buffer, 2548, 3, 273, 435,
                                                                        ncols, p, q);
 
-                    compute_prim_shp_three_center_electron_repulsion_0(buffer, 2610, 3, 287, 455,
+                    compute_prim_shp_three_center_electron_repulsion_0(buffer, 2611, 3, 288, 456,
                                                                        ncols, p, q);
 
-                    compute_prim_shp_three_center_electron_repulsion_0(buffer, 2673, 3, 302, 476,
+                    compute_prim_shp_three_center_electron_repulsion_0(buffer, 2674, 3, 303, 477,
                                                                        ncols, p, q);
 
-                    compute_prim_shp_three_center_electron_repulsion_0(buffer, 2736, 3, 317, 497,
+                    compute_prim_shp_three_center_electron_repulsion_0(buffer, 2737, 3, 318, 498,
                                                                        ncols, p, q);
 
-                    compute_prim_shp_three_center_electron_repulsion_0(buffer, 2799, 3, 332, 518,
+                    compute_prim_shp_three_center_electron_repulsion_0(buffer, 2800, 3, 333, 519,
                                                                        ncols, p, q);
 
-                    compute_prim_shp_three_center_electron_repulsion_0(buffer, 2862, 3, 347, 539,
+                    compute_prim_shp_three_center_electron_repulsion_0(buffer, 2863, 3, 348, 540,
                                                                        ncols, p, q);
 
-                    compute_prim_shp_three_center_electron_repulsion_0(buffer, 2925, 3, 362, 560,
+                    compute_prim_shp_three_center_electron_repulsion_0(buffer, 2926, 3, 363, 561,
                                                                        ncols, p, q);
 
-                    compute_prim_sip_three_center_electron_repulsion_0(buffer, 2988, 3, 434, 637,
+                    compute_prim_sip_three_center_electron_repulsion_0(buffer, 2989, 3, 435, 638,
                                                                        ncols, p, q);
 
-                    compute_prim_sip_three_center_electron_repulsion_0(buffer, 3072, 3, 455, 665,
+                    compute_prim_sip_three_center_electron_repulsion_0(buffer, 3073, 3, 456, 666,
                                                                        ncols, p, q);
 
-                    compute_prim_sip_three_center_electron_repulsion_0(buffer, 3156, 3, 476, 693,
+                    compute_prim_sip_three_center_electron_repulsion_0(buffer, 3157, 3, 477, 694,
                                                                        ncols, p, q);
 
-                    compute_prim_sip_three_center_electron_repulsion_0(buffer, 3240, 3, 497, 721,
+                    compute_prim_sip_three_center_electron_repulsion_0(buffer, 3241, 3, 498, 722,
                                                                        ncols, p, q);
 
-                    compute_prim_sip_three_center_electron_repulsion_0(buffer, 3324, 3, 518, 749,
+                    compute_prim_sip_three_center_electron_repulsion_0(buffer, 3325, 3, 519, 750,
                                                                        ncols, p, q);
 
-                    compute_prim_sip_three_center_electron_repulsion_0(buffer, 3408, 3, 539, 777,
+                    compute_prim_sip_three_center_electron_repulsion_0(buffer, 3409, 3, 540, 778,
                                                                        ncols, p, q);
 
-                    compute_prim_skp_three_center_electron_repulsion_0(buffer, 3492, 3, 637, 877,
+                    compute_prim_skp_three_center_electron_repulsion_0(buffer, 3493, 3, 638, 878,
                                                                        ncols, p, q);
 
-                    compute_prim_skp_three_center_electron_repulsion_0(buffer, 3600, 3, 665, 913,
+                    compute_prim_skp_three_center_electron_repulsion_0(buffer, 3601, 3, 666, 914,
                                                                        ncols, p, q);
 
-                    compute_prim_skp_three_center_electron_repulsion_0(buffer, 3708, 3, 693, 949,
+                    compute_prim_skp_three_center_electron_repulsion_0(buffer, 3709, 3, 694, 950,
                                                                        ncols, p, q);
 
-                    compute_prim_skp_three_center_electron_repulsion_0(buffer, 3816, 3, 721, 985,
+                    compute_prim_skp_three_center_electron_repulsion_0(buffer, 3817, 3, 722, 986,
                                                                        ncols, p, q);
 
-                    compute_prim_skp_three_center_electron_repulsion_0(buffer, 3924, 3, 749,
-                                                                       1021, ncols, p, q);
+                    compute_prim_skp_three_center_electron_repulsion_0(buffer, 3925, 3, 750,
+                                                                       1022, ncols, p, q);
 
-                    compute_prim_slp_three_center_electron_repulsion_0(buffer, 4032, 3, 877,
-                                                                       1147, ncols, p, q);
+                    compute_prim_slp_three_center_electron_repulsion_0(buffer, 4033, 3, 878,
+                                                                       1148, ncols, p, q);
 
-                    compute_prim_slp_three_center_electron_repulsion_0(buffer, 4167, 3, 913,
-                                                                       1192, ncols, p, q);
+                    compute_prim_slp_three_center_electron_repulsion_0(buffer, 4168, 3, 914,
+                                                                       1193, ncols, p, q);
 
-                    compute_prim_slp_three_center_electron_repulsion_0(buffer, 4302, 3, 949,
-                                                                       1237, ncols, p, q);
+                    compute_prim_slp_three_center_electron_repulsion_0(buffer, 4303, 3, 950,
+                                                                       1238, ncols, p, q);
 
-                    compute_prim_slp_three_center_electron_repulsion_0(buffer, 4437, 3, 985,
-                                                                       1282, ncols, p, q);
+                    compute_prim_slp_three_center_electron_repulsion_0(buffer, 4438, 3, 986,
+                                                                       1283, ncols, p, q);
 
-                    compute_prim_smp_three_center_electron_repulsion_0(buffer, 4572, 3, 1147,
-                                                                       1437, ncols, p, q);
+                    compute_prim_smp_three_center_electron_repulsion_0(buffer, 4573, 3, 1148,
+                                                                       1438, ncols, p, q);
 
-                    compute_prim_smp_three_center_electron_repulsion_0(buffer, 4737, 3, 1192,
-                                                                       1492, ncols, p, q);
+                    compute_prim_smp_three_center_electron_repulsion_0(buffer, 4738, 3, 1193,
+                                                                       1493, ncols, p, q);
 
-                    compute_prim_smp_three_center_electron_repulsion_0(buffer, 4902, 3, 1237,
-                                                                       1547, ncols, p, q);
+                    compute_prim_smp_three_center_electron_repulsion_0(buffer, 4903, 3, 1238,
+                                                                       1548, ncols, p, q);
 
-                    compute_prim_ssd_three_center_electron_repulsion_0(buffer, 5067, 3, 7, 8,
-                                                                       1602, ncols, gamma, p,
+                    compute_prim_ssd_three_center_electron_repulsion_0(buffer, 5068, 3, 8, 9,
+                                                                       1603, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_ssd_three_center_electron_repulsion_0(buffer, 5073, 3, 8, 9,
-                                                                       1605, ncols, gamma, p,
+                    compute_prim_ssd_three_center_electron_repulsion_0(buffer, 5074, 3, 9, 10,
+                                                                       1606, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_ssd_three_center_electron_repulsion_0(buffer, 5079, 3, 9, 10,
-                                                                       1608, ncols, gamma, p,
+                    compute_prim_ssd_three_center_electron_repulsion_0(buffer, 5080, 3, 10, 11,
+                                                                       1609, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_ssd_three_center_electron_repulsion_0(buffer, 5085, 3, 10, 11,
-                                                                       1611, ncols, gamma, p,
+                    compute_prim_ssd_three_center_electron_repulsion_0(buffer, 5086, 3, 11, 12,
+                                                                       1612, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_ssd_three_center_electron_repulsion_0(buffer, 5091, 3, 11, 12,
-                                                                       1614, ncols, gamma, p,
+                    compute_prim_ssd_three_center_electron_repulsion_0(buffer, 5092, 3, 12, 13,
+                                                                       1615, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_ssd_three_center_electron_repulsion_0(buffer, 5097, 3, 12, 13,
-                                                                       1617, ncols, gamma, p,
+                    compute_prim_ssd_three_center_electron_repulsion_0(buffer, 5098, 3, 13, 14,
+                                                                       1618, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_ssd_three_center_electron_repulsion_0(buffer, 5103, 3, 13, 14,
-                                                                       1620, ncols, gamma, p,
+                    compute_prim_ssd_three_center_electron_repulsion_0(buffer, 5104, 3, 14, 15,
+                                                                       1621, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_ssd_three_center_electron_repulsion_0(buffer, 5109, 3, 14, 15,
-                                                                       1623, ncols, gamma, p,
+                    compute_prim_ssd_three_center_electron_repulsion_0(buffer, 5110, 3, 15, 16,
+                                                                       1624, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_ssd_three_center_electron_repulsion_0(buffer, 5115, 3, 15, 16,
-                                                                       1626, ncols, gamma, p,
+                    compute_prim_ssd_three_center_electron_repulsion_0(buffer, 5116, 3, 16, 17,
+                                                                       1627, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_ssd_three_center_electron_repulsion_0(buffer, 5121, 3, 16, 17,
-                                                                       1629, ncols, gamma, p,
+                    compute_prim_ssd_three_center_electron_repulsion_0(buffer, 5122, 3, 17, 18,
+                                                                       1630, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_ssd_three_center_electron_repulsion_0(buffer, 5127, 3, 17, 18,
-                                                                       1632, ncols, gamma, p,
+                    compute_prim_ssd_three_center_electron_repulsion_0(buffer, 5128, 3, 18, 19,
+                                                                       1633, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_ssd_three_center_electron_repulsion_0(buffer, 5133, 3, 18, 19,
-                                                                       1635, ncols, gamma, p,
+                    compute_prim_ssd_three_center_electron_repulsion_0(buffer, 5134, 3, 19, 20,
+                                                                       1636, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_spd_three_center_electron_repulsion_0(buffer, 5139, 0, 3, 5067,
-                                                                       1602, 5073, 1638, ncols,
+                    compute_prim_spd_three_center_electron_repulsion_0(buffer, 5140, 0, 3, 5068,
+                                                                       1603, 5074, 1639, ncols,
                                                                        gamma, p, q);
 
-                    compute_prim_spd_three_center_electron_repulsion_0(buffer, 5157, 0, 3, 5073,
-                                                                       1605, 5079, 1647, ncols,
+                    compute_prim_spd_three_center_electron_repulsion_0(buffer, 5158, 0, 3, 5074,
+                                                                       1606, 5080, 1648, ncols,
                                                                        gamma, p, q);
 
-                    compute_prim_spd_three_center_electron_repulsion_0(buffer, 5175, 0, 3, 5079,
-                                                                       1608, 5085, 1656, ncols,
+                    compute_prim_spd_three_center_electron_repulsion_0(buffer, 5176, 0, 3, 5080,
+                                                                       1609, 5086, 1657, ncols,
                                                                        gamma, p, q);
 
-                    compute_prim_spd_three_center_electron_repulsion_0(buffer, 5193, 0, 3, 5085,
-                                                                       1611, 5091, 1665, ncols,
+                    compute_prim_spd_three_center_electron_repulsion_0(buffer, 5194, 0, 3, 5086,
+                                                                       1612, 5092, 1666, ncols,
                                                                        gamma, p, q);
 
-                    compute_prim_spd_three_center_electron_repulsion_0(buffer, 5211, 0, 3, 5091,
-                                                                       1614, 5097, 1674, ncols,
+                    compute_prim_spd_three_center_electron_repulsion_0(buffer, 5212, 0, 3, 5092,
+                                                                       1615, 5098, 1675, ncols,
                                                                        gamma, p, q);
 
-                    compute_prim_spd_three_center_electron_repulsion_0(buffer, 5229, 0, 3, 5097,
-                                                                       1617, 5103, 1683, ncols,
+                    compute_prim_spd_three_center_electron_repulsion_0(buffer, 5230, 0, 3, 5098,
+                                                                       1618, 5104, 1684, ncols,
                                                                        gamma, p, q);
 
-                    compute_prim_spd_three_center_electron_repulsion_0(buffer, 5247, 0, 3, 5103,
-                                                                       1620, 5109, 1692, ncols,
+                    compute_prim_spd_three_center_electron_repulsion_0(buffer, 5248, 0, 3, 5104,
+                                                                       1621, 5110, 1693, ncols,
                                                                        gamma, p, q);
 
-                    compute_prim_spd_three_center_electron_repulsion_0(buffer, 5265, 0, 3, 5109,
-                                                                       1623, 5115, 1701, ncols,
+                    compute_prim_spd_three_center_electron_repulsion_0(buffer, 5266, 0, 3, 5110,
+                                                                       1624, 5116, 1702, ncols,
                                                                        gamma, p, q);
 
-                    compute_prim_spd_three_center_electron_repulsion_0(buffer, 5283, 0, 3, 5115,
-                                                                       1626, 5121, 1710, ncols,
+                    compute_prim_spd_three_center_electron_repulsion_0(buffer, 5284, 0, 3, 5116,
+                                                                       1627, 5122, 1711, ncols,
                                                                        gamma, p, q);
 
-                    compute_prim_spd_three_center_electron_repulsion_0(buffer, 5301, 0, 3, 5121,
-                                                                       1629, 5127, 1719, ncols,
+                    compute_prim_spd_three_center_electron_repulsion_0(buffer, 5302, 0, 3, 5122,
+                                                                       1630, 5128, 1720, ncols,
                                                                        gamma, p, q);
 
-                    compute_prim_spd_three_center_electron_repulsion_0(buffer, 5319, 0, 3, 5127,
-                                                                       1632, 5133, 1728, ncols,
+                    compute_prim_spd_three_center_electron_repulsion_0(buffer, 5320, 0, 3, 5128,
+                                                                       1633, 5134, 1729, ncols,
                                                                        gamma, p, q);
 
-                    compute_prim_sdd_three_center_electron_repulsion_0(buffer, 5337, 0, 3, 5139,
-                                                                       1638, 5157, 60, 66, 1737,
+                    compute_prim_sdd_three_center_electron_repulsion_0(buffer, 5338, 0, 3, 5140,
+                                                                       1639, 5158, 61, 67, 1738,
                                                                        ncols, gamma, p, q);
 
-                    compute_prim_sdd_three_center_electron_repulsion_0(buffer, 5373, 0, 3, 5157,
-                                                                       1647, 5175, 66, 72, 1755,
+                    compute_prim_sdd_three_center_electron_repulsion_0(buffer, 5374, 0, 3, 5158,
+                                                                       1648, 5176, 67, 73, 1756,
                                                                        ncols, gamma, p, q);
 
-                    compute_prim_sdd_three_center_electron_repulsion_0(buffer, 5409, 0, 3, 5175,
-                                                                       1656, 5193, 72, 78, 1773,
+                    compute_prim_sdd_three_center_electron_repulsion_0(buffer, 5410, 0, 3, 5176,
+                                                                       1657, 5194, 73, 79, 1774,
                                                                        ncols, gamma, p, q);
 
-                    compute_prim_sdd_three_center_electron_repulsion_0(buffer, 5445, 0, 3, 5193,
-                                                                       1665, 5211, 78, 84, 1791,
+                    compute_prim_sdd_three_center_electron_repulsion_0(buffer, 5446, 0, 3, 5194,
+                                                                       1666, 5212, 79, 85, 1792,
                                                                        ncols, gamma, p, q);
 
-                    compute_prim_sdd_three_center_electron_repulsion_0(buffer, 5481, 0, 3, 5211,
-                                                                       1674, 5229, 84, 90, 1809,
+                    compute_prim_sdd_three_center_electron_repulsion_0(buffer, 5482, 0, 3, 5212,
+                                                                       1675, 5230, 85, 91, 1810,
                                                                        ncols, gamma, p, q);
 
-                    compute_prim_sdd_three_center_electron_repulsion_0(buffer, 5517, 0, 3, 5229,
-                                                                       1683, 5247, 90, 96, 1827,
+                    compute_prim_sdd_three_center_electron_repulsion_0(buffer, 5518, 0, 3, 5230,
+                                                                       1684, 5248, 91, 97, 1828,
                                                                        ncols, gamma, p, q);
 
-                    compute_prim_sdd_three_center_electron_repulsion_0(buffer, 5553, 0, 3, 5247,
-                                                                       1692, 5265, 96, 102, 1845,
+                    compute_prim_sdd_three_center_electron_repulsion_0(buffer, 5554, 0, 3, 5248,
+                                                                       1693, 5266, 97, 103, 1846,
                                                                        ncols, gamma, p, q);
 
-                    compute_prim_sdd_three_center_electron_repulsion_0(buffer, 5589, 0, 3, 5265,
-                                                                       1701, 5283, 102, 108,
-                                                                       1863, ncols, gamma, p,
+                    compute_prim_sdd_three_center_electron_repulsion_0(buffer, 5590, 0, 3, 5266,
+                                                                       1702, 5284, 103, 109,
+                                                                       1864, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_sdd_three_center_electron_repulsion_0(buffer, 5625, 0, 3, 5283,
-                                                                       1710, 5301, 108, 114,
-                                                                       1881, ncols, gamma, p,
+                    compute_prim_sdd_three_center_electron_repulsion_0(buffer, 5626, 0, 3, 5284,
+                                                                       1711, 5302, 109, 115,
+                                                                       1882, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_sdd_three_center_electron_repulsion_0(buffer, 5661, 0, 3, 5301,
-                                                                       1719, 5319, 114, 120,
-                                                                       1899, ncols, gamma, p,
+                    compute_prim_sdd_three_center_electron_repulsion_0(buffer, 5662, 0, 3, 5302,
+                                                                       1720, 5320, 115, 121,
+                                                                       1900, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_sfd_three_center_electron_repulsion_0(buffer, 5697, 0, 3, 5337,
-                                                                       1737, 5373, 132, 142,
-                                                                       1917, ncols, gamma, p,
+                    compute_prim_sfd_three_center_electron_repulsion_0(buffer, 5698, 0, 3, 5338,
+                                                                       1738, 5374, 133, 143,
+                                                                       1918, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_sfd_three_center_electron_repulsion_0(buffer, 5757, 0, 3, 5373,
-                                                                       1755, 5409, 142, 152,
-                                                                       1947, ncols, gamma, p,
+                    compute_prim_sfd_three_center_electron_repulsion_0(buffer, 5758, 0, 3, 5374,
+                                                                       1756, 5410, 143, 153,
+                                                                       1948, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_sfd_three_center_electron_repulsion_0(buffer, 5817, 0, 3, 5409,
-                                                                       1773, 5445, 152, 162,
-                                                                       1977, ncols, gamma, p,
+                    compute_prim_sfd_three_center_electron_repulsion_0(buffer, 5818, 0, 3, 5410,
+                                                                       1774, 5446, 153, 163,
+                                                                       1978, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_sfd_three_center_electron_repulsion_0(buffer, 5877, 0, 3, 5445,
-                                                                       1791, 5481, 162, 172,
-                                                                       2007, ncols, gamma, p,
+                    compute_prim_sfd_three_center_electron_repulsion_0(buffer, 5878, 0, 3, 5446,
+                                                                       1792, 5482, 163, 173,
+                                                                       2008, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_sfd_three_center_electron_repulsion_0(buffer, 5937, 0, 3, 5481,
-                                                                       1809, 5517, 172, 182,
-                                                                       2037, ncols, gamma, p,
+                    compute_prim_sfd_three_center_electron_repulsion_0(buffer, 5938, 0, 3, 5482,
+                                                                       1810, 5518, 173, 183,
+                                                                       2038, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_sfd_three_center_electron_repulsion_0(buffer, 5997, 0, 3, 5517,
-                                                                       1827, 5553, 182, 192,
-                                                                       2067, ncols, gamma, p,
+                    compute_prim_sfd_three_center_electron_repulsion_0(buffer, 5998, 0, 3, 5518,
+                                                                       1828, 5554, 183, 193,
+                                                                       2068, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_sfd_three_center_electron_repulsion_0(buffer, 6057, 0, 3, 5553,
-                                                                       1845, 5589, 192, 202,
-                                                                       2097, ncols, gamma, p,
+                    compute_prim_sfd_three_center_electron_repulsion_0(buffer, 6058, 0, 3, 5554,
+                                                                       1846, 5590, 193, 203,
+                                                                       2098, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_sfd_three_center_electron_repulsion_0(buffer, 6117, 0, 3, 5589,
-                                                                       1863, 5625, 202, 212,
-                                                                       2127, ncols, gamma, p,
+                    compute_prim_sfd_three_center_electron_repulsion_0(buffer, 6118, 0, 3, 5590,
+                                                                       1864, 5626, 203, 213,
+                                                                       2128, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_sfd_three_center_electron_repulsion_0(buffer, 6177, 0, 3, 5625,
-                                                                       1881, 5661, 212, 222,
-                                                                       2157, ncols, gamma, p,
+                    compute_prim_sfd_three_center_electron_repulsion_0(buffer, 6178, 0, 3, 5626,
+                                                                       1882, 5662, 213, 223,
+                                                                       2158, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_sgd_three_center_electron_repulsion_0(buffer, 6237, 0, 3, 5697,
-                                                                       1917, 5757, 242, 257,
-                                                                       2187, ncols, gamma, p,
+                    compute_prim_sgd_three_center_electron_repulsion_0(buffer, 6238, 0, 3, 5698,
+                                                                       1918, 5758, 243, 258,
+                                                                       2188, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_sgd_three_center_electron_repulsion_0(buffer, 6327, 0, 3, 5757,
-                                                                       1947, 5817, 257, 272,
-                                                                       2232, ncols, gamma, p,
+                    compute_prim_sgd_three_center_electron_repulsion_0(buffer, 6328, 0, 3, 5758,
+                                                                       1948, 5818, 258, 273,
+                                                                       2233, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_sgd_three_center_electron_repulsion_0(buffer, 6417, 0, 3, 5817,
-                                                                       1977, 5877, 272, 287,
-                                                                       2277, ncols, gamma, p,
+                    compute_prim_sgd_three_center_electron_repulsion_0(buffer, 6418, 0, 3, 5818,
+                                                                       1978, 5878, 273, 288,
+                                                                       2278, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_sgd_three_center_electron_repulsion_0(buffer, 6507, 0, 3, 5877,
-                                                                       2007, 5937, 287, 302,
-                                                                       2322, ncols, gamma, p,
+                    compute_prim_sgd_three_center_electron_repulsion_0(buffer, 6508, 0, 3, 5878,
+                                                                       2008, 5938, 288, 303,
+                                                                       2323, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_sgd_three_center_electron_repulsion_0(buffer, 6597, 0, 3, 5937,
-                                                                       2037, 5997, 302, 317,
-                                                                       2367, ncols, gamma, p,
+                    compute_prim_sgd_three_center_electron_repulsion_0(buffer, 6598, 0, 3, 5938,
+                                                                       2038, 5998, 303, 318,
+                                                                       2368, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_sgd_three_center_electron_repulsion_0(buffer, 6687, 0, 3, 5997,
-                                                                       2067, 6057, 317, 332,
-                                                                       2412, ncols, gamma, p,
+                    compute_prim_sgd_three_center_electron_repulsion_0(buffer, 6688, 0, 3, 5998,
+                                                                       2068, 6058, 318, 333,
+                                                                       2413, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_sgd_three_center_electron_repulsion_0(buffer, 6777, 0, 3, 6057,
-                                                                       2097, 6117, 332, 347,
-                                                                       2457, ncols, gamma, p,
+                    compute_prim_sgd_three_center_electron_repulsion_0(buffer, 6778, 0, 3, 6058,
+                                                                       2098, 6118, 333, 348,
+                                                                       2458, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_sgd_three_center_electron_repulsion_0(buffer, 6867, 0, 3, 6117,
-                                                                       2127, 6177, 347, 362,
-                                                                       2502, ncols, gamma, p,
+                    compute_prim_sgd_three_center_electron_repulsion_0(buffer, 6868, 0, 3, 6118,
+                                                                       2128, 6178, 348, 363,
+                                                                       2503, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_shd_three_center_electron_repulsion_0(buffer, 6957, 0, 3, 6237,
-                                                                       2187, 6327, 392, 413,
-                                                                       2547, ncols, gamma, p,
+                    compute_prim_shd_three_center_electron_repulsion_0(buffer, 6958, 0, 3, 6238,
+                                                                       2188, 6328, 393, 414,
+                                                                       2548, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_shd_three_center_electron_repulsion_0(buffer, 7083, 0, 3, 6327,
-                                                                       2232, 6417, 413, 434,
-                                                                       2610, ncols, gamma, p,
+                    compute_prim_shd_three_center_electron_repulsion_0(buffer, 7084, 0, 3, 6328,
+                                                                       2233, 6418, 414, 435,
+                                                                       2611, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_shd_three_center_electron_repulsion_0(buffer, 7209, 0, 3, 6417,
-                                                                       2277, 6507, 434, 455,
-                                                                       2673, ncols, gamma, p,
+                    compute_prim_shd_three_center_electron_repulsion_0(buffer, 7210, 0, 3, 6418,
+                                                                       2278, 6508, 435, 456,
+                                                                       2674, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_shd_three_center_electron_repulsion_0(buffer, 7335, 0, 3, 6507,
-                                                                       2322, 6597, 455, 476,
-                                                                       2736, ncols, gamma, p,
+                    compute_prim_shd_three_center_electron_repulsion_0(buffer, 7336, 0, 3, 6508,
+                                                                       2323, 6598, 456, 477,
+                                                                       2737, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_shd_three_center_electron_repulsion_0(buffer, 7461, 0, 3, 6597,
-                                                                       2367, 6687, 476, 497,
-                                                                       2799, ncols, gamma, p,
+                    compute_prim_shd_three_center_electron_repulsion_0(buffer, 7462, 0, 3, 6598,
+                                                                       2368, 6688, 477, 498,
+                                                                       2800, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_shd_three_center_electron_repulsion_0(buffer, 7587, 0, 3, 6687,
-                                                                       2412, 6777, 497, 518,
-                                                                       2862, ncols, gamma, p,
+                    compute_prim_shd_three_center_electron_repulsion_0(buffer, 7588, 0, 3, 6688,
+                                                                       2413, 6778, 498, 519,
+                                                                       2863, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_shd_three_center_electron_repulsion_0(buffer, 7713, 0, 3, 6777,
-                                                                       2457, 6867, 518, 539,
-                                                                       2925, ncols, gamma, p,
+                    compute_prim_shd_three_center_electron_repulsion_0(buffer, 7714, 0, 3, 6778,
+                                                                       2458, 6868, 519, 540,
+                                                                       2926, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_sid_three_center_electron_repulsion_0(buffer, 7839, 0, 3, 6957,
-                                                                       2547, 7083, 581, 609,
-                                                                       2988, ncols, gamma, p,
+                    compute_prim_sid_three_center_electron_repulsion_0(buffer, 7840, 0, 3, 6958,
+                                                                       2548, 7084, 582, 610,
+                                                                       2989, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_sid_three_center_electron_repulsion_0(buffer, 8007, 0, 3, 7083,
-                                                                       2610, 7209, 609, 637,
-                                                                       3072, ncols, gamma, p,
+                    compute_prim_sid_three_center_electron_repulsion_0(buffer, 8008, 0, 3, 7084,
+                                                                       2611, 7210, 610, 638,
+                                                                       3073, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_sid_three_center_electron_repulsion_0(buffer, 8175, 0, 3, 7209,
-                                                                       2673, 7335, 637, 665,
-                                                                       3156, ncols, gamma, p,
+                    compute_prim_sid_three_center_electron_repulsion_0(buffer, 8176, 0, 3, 7210,
+                                                                       2674, 7336, 638, 666,
+                                                                       3157, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_sid_three_center_electron_repulsion_0(buffer, 8343, 0, 3, 7335,
-                                                                       2736, 7461, 665, 693,
-                                                                       3240, ncols, gamma, p,
+                    compute_prim_sid_three_center_electron_repulsion_0(buffer, 8344, 0, 3, 7336,
+                                                                       2737, 7462, 666, 694,
+                                                                       3241, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_sid_three_center_electron_repulsion_0(buffer, 8511, 0, 3, 7461,
-                                                                       2799, 7587, 693, 721,
-                                                                       3324, ncols, gamma, p,
+                    compute_prim_sid_three_center_electron_repulsion_0(buffer, 8512, 0, 3, 7462,
+                                                                       2800, 7588, 694, 722,
+                                                                       3325, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_sid_three_center_electron_repulsion_0(buffer, 8679, 0, 3, 7587,
-                                                                       2862, 7713, 721, 749,
-                                                                       3408, ncols, gamma, p,
+                    compute_prim_sid_three_center_electron_repulsion_0(buffer, 8680, 0, 3, 7588,
+                                                                       2863, 7714, 722, 750,
+                                                                       3409, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_skd_three_center_electron_repulsion_0(buffer, 8847, 0, 3, 7839,
-                                                                       2988, 8007, 805, 841,
-                                                                       3492, ncols, gamma, p,
+                    compute_prim_skd_three_center_electron_repulsion_0(buffer, 8848, 0, 3, 7840,
+                                                                       2989, 8008, 806, 842,
+                                                                       3493, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_skd_three_center_electron_repulsion_0(buffer, 9063, 0, 3, 8007,
-                                                                       3072, 8175, 841, 877,
-                                                                       3600, ncols, gamma, p,
+                    compute_prim_skd_three_center_electron_repulsion_0(buffer, 9064, 0, 3, 8008,
+                                                                       3073, 8176, 842, 878,
+                                                                       3601, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_skd_three_center_electron_repulsion_0(buffer, 9279, 0, 3, 8175,
-                                                                       3156, 8343, 877, 913,
-                                                                       3708, ncols, gamma, p,
+                    compute_prim_skd_three_center_electron_repulsion_0(buffer, 9280, 0, 3, 8176,
+                                                                       3157, 8344, 878, 914,
+                                                                       3709, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_skd_three_center_electron_repulsion_0(buffer, 9495, 0, 3, 8343,
-                                                                       3240, 8511, 913, 949,
-                                                                       3816, ncols, gamma, p,
+                    compute_prim_skd_three_center_electron_repulsion_0(buffer, 9496, 0, 3, 8344,
+                                                                       3241, 8512, 914, 950,
+                                                                       3817, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_skd_three_center_electron_repulsion_0(buffer, 9711, 0, 3, 8511,
-                                                                       3324, 8679, 949, 985,
-                                                                       3924, ncols, gamma, p,
+                    compute_prim_skd_three_center_electron_repulsion_0(buffer, 9712, 0, 3, 8512,
+                                                                       3325, 8680, 950, 986,
+                                                                       3925, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_sld_three_center_electron_repulsion_0(buffer, 9927, 0, 3, 8847,
-                                                                       3492, 9063, 1057, 1102,
-                                                                       4032, ncols, gamma, p,
+                    compute_prim_sld_three_center_electron_repulsion_0(buffer, 9928, 0, 3, 8848,
+                                                                       3493, 9064, 1058, 1103,
+                                                                       4033, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_sld_three_center_electron_repulsion_0(buffer, 10197, 0, 3, 9063,
-                                                                       3600, 9279, 1102, 1147,
-                                                                       4167, ncols, gamma, p,
+                    compute_prim_sld_three_center_electron_repulsion_0(buffer, 10198, 0, 3, 9064,
+                                                                       3601, 9280, 1103, 1148,
+                                                                       4168, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_sld_three_center_electron_repulsion_0(buffer, 10467, 0, 3, 9279,
-                                                                       3708, 9495, 1147, 1192,
-                                                                       4302, ncols, gamma, p,
+                    compute_prim_sld_three_center_electron_repulsion_0(buffer, 10468, 0, 3, 9280,
+                                                                       3709, 9496, 1148, 1193,
+                                                                       4303, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_sld_three_center_electron_repulsion_0(buffer, 10737, 0, 3, 9495,
-                                                                       3816, 9711, 1192, 1237,
-                                                                       4437, ncols, gamma, p,
+                    compute_prim_sld_three_center_electron_repulsion_0(buffer, 10738, 0, 3, 9496,
+                                                                       3817, 9712, 1193, 1238,
+                                                                       4438, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_smd_three_center_electron_repulsion_0(buffer, 11007, 0, 3, 9927,
-                                                                       4032, 10197, 1327, 1382,
-                                                                       4572, ncols, gamma, p,
+                    compute_prim_smd_three_center_electron_repulsion_0(buffer, 11008, 0, 3, 9928,
+                                                                       4033, 10198, 1328, 1383,
+                                                                       4573, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_smd_three_center_electron_repulsion_0(buffer, 11337, 0, 3,
-                                                                       10197, 4167, 10467, 1382,
-                                                                       1437, 4737, ncols, gamma,
+                    compute_prim_smd_three_center_electron_repulsion_0(buffer, 11338, 0, 3,
+                                                                       10198, 4168, 10468, 1383,
+                                                                       1438, 4738, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_smd_three_center_electron_repulsion_0(buffer, 11667, 0, 3,
-                                                                       10467, 4302, 10737, 1437,
-                                                                       1492, 4902, ncols, gamma,
+                    compute_prim_smd_three_center_electron_repulsion_0(buffer, 11668, 0, 3,
+                                                                       10468, 4303, 10738, 1438,
+                                                                       1493, 4903, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_ssf_three_center_electron_repulsion_0(buffer, 11997, 3, 1602,
-                                                                       1605, 5079, ncols, gamma,
+                    compute_prim_ssf_three_center_electron_repulsion_0(buffer, 11998, 3, 1603,
+                                                                       1606, 5080, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_ssf_three_center_electron_repulsion_0(buffer, 12007, 3, 1605,
-                                                                       1608, 5085, ncols, gamma,
+                    compute_prim_ssf_three_center_electron_repulsion_0(buffer, 12008, 3, 1606,
+                                                                       1609, 5086, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_ssf_three_center_electron_repulsion_0(buffer, 12017, 3, 1608,
-                                                                       1611, 5091, ncols, gamma,
+                    compute_prim_ssf_three_center_electron_repulsion_0(buffer, 12018, 3, 1609,
+                                                                       1612, 5092, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_ssf_three_center_electron_repulsion_0(buffer, 12027, 3, 1611,
-                                                                       1614, 5097, ncols, gamma,
+                    compute_prim_ssf_three_center_electron_repulsion_0(buffer, 12028, 3, 1612,
+                                                                       1615, 5098, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_ssf_three_center_electron_repulsion_0(buffer, 12037, 3, 1614,
-                                                                       1617, 5103, ncols, gamma,
+                    compute_prim_ssf_three_center_electron_repulsion_0(buffer, 12038, 3, 1615,
+                                                                       1618, 5104, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_ssf_three_center_electron_repulsion_0(buffer, 12047, 3, 1617,
-                                                                       1620, 5109, ncols, gamma,
+                    compute_prim_ssf_three_center_electron_repulsion_0(buffer, 12048, 3, 1618,
+                                                                       1621, 5110, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_ssf_three_center_electron_repulsion_0(buffer, 12057, 3, 1620,
-                                                                       1623, 5115, ncols, gamma,
+                    compute_prim_ssf_three_center_electron_repulsion_0(buffer, 12058, 3, 1621,
+                                                                       1624, 5116, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_ssf_three_center_electron_repulsion_0(buffer, 12067, 3, 1623,
-                                                                       1626, 5121, ncols, gamma,
+                    compute_prim_ssf_three_center_electron_repulsion_0(buffer, 12068, 3, 1624,
+                                                                       1627, 5122, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_ssf_three_center_electron_repulsion_0(buffer, 12077, 3, 1626,
-                                                                       1629, 5127, ncols, gamma,
+                    compute_prim_ssf_three_center_electron_repulsion_0(buffer, 12078, 3, 1627,
+                                                                       1630, 5128, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_ssf_three_center_electron_repulsion_0(buffer, 12087, 3, 1629,
-                                                                       1632, 5133, ncols, gamma,
+                    compute_prim_ssf_three_center_electron_repulsion_0(buffer, 12088, 3, 1630,
+                                                                       1633, 5134, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_spf_three_center_electron_repulsion_0(buffer, 12097, 0, 3,
-                                                                       11997, 5079, 12007, 5175,
+                    compute_prim_spf_three_center_electron_repulsion_0(buffer, 12098, 0, 3,
+                                                                       11998, 5080, 12008, 5176,
                                                                        ncols, gamma, p, q);
 
-                    compute_prim_spf_three_center_electron_repulsion_0(buffer, 12127, 0, 3,
-                                                                       12007, 5085, 12017, 5193,
+                    compute_prim_spf_three_center_electron_repulsion_0(buffer, 12128, 0, 3,
+                                                                       12008, 5086, 12018, 5194,
                                                                        ncols, gamma, p, q);
 
-                    compute_prim_spf_three_center_electron_repulsion_0(buffer, 12157, 0, 3,
-                                                                       12017, 5091, 12027, 5211,
+                    compute_prim_spf_three_center_electron_repulsion_0(buffer, 12158, 0, 3,
+                                                                       12018, 5092, 12028, 5212,
                                                                        ncols, gamma, p, q);
 
-                    compute_prim_spf_three_center_electron_repulsion_0(buffer, 12187, 0, 3,
-                                                                       12027, 5097, 12037, 5229,
+                    compute_prim_spf_three_center_electron_repulsion_0(buffer, 12188, 0, 3,
+                                                                       12028, 5098, 12038, 5230,
                                                                        ncols, gamma, p, q);
 
-                    compute_prim_spf_three_center_electron_repulsion_0(buffer, 12217, 0, 3,
-                                                                       12037, 5103, 12047, 5247,
+                    compute_prim_spf_three_center_electron_repulsion_0(buffer, 12218, 0, 3,
+                                                                       12038, 5104, 12048, 5248,
                                                                        ncols, gamma, p, q);
 
-                    compute_prim_spf_three_center_electron_repulsion_0(buffer, 12247, 0, 3,
-                                                                       12047, 5109, 12057, 5265,
+                    compute_prim_spf_three_center_electron_repulsion_0(buffer, 12248, 0, 3,
+                                                                       12048, 5110, 12058, 5266,
                                                                        ncols, gamma, p, q);
 
-                    compute_prim_spf_three_center_electron_repulsion_0(buffer, 12277, 0, 3,
-                                                                       12057, 5115, 12067, 5283,
+                    compute_prim_spf_three_center_electron_repulsion_0(buffer, 12278, 0, 3,
+                                                                       12058, 5116, 12068, 5284,
                                                                        ncols, gamma, p, q);
 
-                    compute_prim_spf_three_center_electron_repulsion_0(buffer, 12307, 0, 3,
-                                                                       12067, 5121, 12077, 5301,
+                    compute_prim_spf_three_center_electron_repulsion_0(buffer, 12308, 0, 3,
+                                                                       12068, 5122, 12078, 5302,
                                                                        ncols, gamma, p, q);
 
-                    compute_prim_spf_three_center_electron_repulsion_0(buffer, 12337, 0, 3,
-                                                                       12077, 5127, 12087, 5319,
+                    compute_prim_spf_three_center_electron_repulsion_0(buffer, 12338, 0, 3,
+                                                                       12078, 5128, 12088, 5320,
                                                                        ncols, gamma, p, q);
 
-                    compute_prim_sdf_three_center_electron_repulsion_0(buffer, 12367, 0, 3,
-                                                                       12097, 5175, 12127, 1737,
-                                                                       1755, 5409, ncols, gamma,
+                    compute_prim_sdf_three_center_electron_repulsion_0(buffer, 12368, 0, 3,
+                                                                       12098, 5176, 12128, 1738,
+                                                                       1756, 5410, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_sdf_three_center_electron_repulsion_0(buffer, 12427, 0, 3,
-                                                                       12127, 5193, 12157, 1755,
-                                                                       1773, 5445, ncols, gamma,
+                    compute_prim_sdf_three_center_electron_repulsion_0(buffer, 12428, 0, 3,
+                                                                       12128, 5194, 12158, 1756,
+                                                                       1774, 5446, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_sdf_three_center_electron_repulsion_0(buffer, 12487, 0, 3,
-                                                                       12157, 5211, 12187, 1773,
-                                                                       1791, 5481, ncols, gamma,
+                    compute_prim_sdf_three_center_electron_repulsion_0(buffer, 12488, 0, 3,
+                                                                       12158, 5212, 12188, 1774,
+                                                                       1792, 5482, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_sdf_three_center_electron_repulsion_0(buffer, 12547, 0, 3,
-                                                                       12187, 5229, 12217, 1791,
-                                                                       1809, 5517, ncols, gamma,
+                    compute_prim_sdf_three_center_electron_repulsion_0(buffer, 12548, 0, 3,
+                                                                       12188, 5230, 12218, 1792,
+                                                                       1810, 5518, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_sdf_three_center_electron_repulsion_0(buffer, 12607, 0, 3,
-                                                                       12217, 5247, 12247, 1809,
-                                                                       1827, 5553, ncols, gamma,
+                    compute_prim_sdf_three_center_electron_repulsion_0(buffer, 12608, 0, 3,
+                                                                       12218, 5248, 12248, 1810,
+                                                                       1828, 5554, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_sdf_three_center_electron_repulsion_0(buffer, 12667, 0, 3,
-                                                                       12247, 5265, 12277, 1827,
-                                                                       1845, 5589, ncols, gamma,
+                    compute_prim_sdf_three_center_electron_repulsion_0(buffer, 12668, 0, 3,
+                                                                       12248, 5266, 12278, 1828,
+                                                                       1846, 5590, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_sdf_three_center_electron_repulsion_0(buffer, 12727, 0, 3,
-                                                                       12277, 5283, 12307, 1845,
-                                                                       1863, 5625, ncols, gamma,
+                    compute_prim_sdf_three_center_electron_repulsion_0(buffer, 12728, 0, 3,
+                                                                       12278, 5284, 12308, 1846,
+                                                                       1864, 5626, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_sdf_three_center_electron_repulsion_0(buffer, 12787, 0, 3,
-                                                                       12307, 5301, 12337, 1863,
-                                                                       1881, 5661, ncols, gamma,
+                    compute_prim_sdf_three_center_electron_repulsion_0(buffer, 12788, 0, 3,
+                                                                       12308, 5302, 12338, 1864,
+                                                                       1882, 5662, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_sff_three_center_electron_repulsion_0(buffer, 12847, 0, 3,
-                                                                       12367, 5409, 12427, 1917,
-                                                                       1947, 5817, ncols, gamma,
+                    compute_prim_sff_three_center_electron_repulsion_0(buffer, 12848, 0, 3,
+                                                                       12368, 5410, 12428, 1918,
+                                                                       1948, 5818, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_sff_three_center_electron_repulsion_0(buffer, 12947, 0, 3,
-                                                                       12427, 5445, 12487, 1947,
-                                                                       1977, 5877, ncols, gamma,
+                    compute_prim_sff_three_center_electron_repulsion_0(buffer, 12948, 0, 3,
+                                                                       12428, 5446, 12488, 1948,
+                                                                       1978, 5878, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_sff_three_center_electron_repulsion_0(buffer, 13047, 0, 3,
-                                                                       12487, 5481, 12547, 1977,
-                                                                       2007, 5937, ncols, gamma,
+                    compute_prim_sff_three_center_electron_repulsion_0(buffer, 13048, 0, 3,
+                                                                       12488, 5482, 12548, 1978,
+                                                                       2008, 5938, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_sff_three_center_electron_repulsion_0(buffer, 13147, 0, 3,
-                                                                       12547, 5517, 12607, 2007,
-                                                                       2037, 5997, ncols, gamma,
+                    compute_prim_sff_three_center_electron_repulsion_0(buffer, 13148, 0, 3,
+                                                                       12548, 5518, 12608, 2008,
+                                                                       2038, 5998, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_sff_three_center_electron_repulsion_0(buffer, 13247, 0, 3,
-                                                                       12607, 5553, 12667, 2037,
-                                                                       2067, 6057, ncols, gamma,
+                    compute_prim_sff_three_center_electron_repulsion_0(buffer, 13248, 0, 3,
+                                                                       12608, 5554, 12668, 2038,
+                                                                       2068, 6058, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_sff_three_center_electron_repulsion_0(buffer, 13347, 0, 3,
-                                                                       12667, 5589, 12727, 2067,
-                                                                       2097, 6117, ncols, gamma,
+                    compute_prim_sff_three_center_electron_repulsion_0(buffer, 13348, 0, 3,
+                                                                       12668, 5590, 12728, 2068,
+                                                                       2098, 6118, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_sff_three_center_electron_repulsion_0(buffer, 13447, 0, 3,
-                                                                       12727, 5625, 12787, 2097,
-                                                                       2127, 6177, ncols, gamma,
+                    compute_prim_sff_three_center_electron_repulsion_0(buffer, 13448, 0, 3,
+                                                                       12728, 5626, 12788, 2098,
+                                                                       2128, 6178, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_sgf_three_center_electron_repulsion_0(buffer, 13547, 0, 3,
-                                                                       12847, 5817, 12947, 2187,
-                                                                       2232, 6417, ncols, gamma,
+                    compute_prim_sgf_three_center_electron_repulsion_0(buffer, 13548, 0, 3,
+                                                                       12848, 5818, 12948, 2188,
+                                                                       2233, 6418, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_sgf_three_center_electron_repulsion_0(buffer, 13697, 0, 3,
-                                                                       12947, 5877, 13047, 2232,
-                                                                       2277, 6507, ncols, gamma,
+                    compute_prim_sgf_three_center_electron_repulsion_0(buffer, 13698, 0, 3,
+                                                                       12948, 5878, 13048, 2233,
+                                                                       2278, 6508, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_sgf_three_center_electron_repulsion_0(buffer, 13847, 0, 3,
-                                                                       13047, 5937, 13147, 2277,
-                                                                       2322, 6597, ncols, gamma,
+                    compute_prim_sgf_three_center_electron_repulsion_0(buffer, 13848, 0, 3,
+                                                                       13048, 5938, 13148, 2278,
+                                                                       2323, 6598, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_sgf_three_center_electron_repulsion_0(buffer, 13997, 0, 3,
-                                                                       13147, 5997, 13247, 2322,
-                                                                       2367, 6687, ncols, gamma,
+                    compute_prim_sgf_three_center_electron_repulsion_0(buffer, 13998, 0, 3,
+                                                                       13148, 5998, 13248, 2323,
+                                                                       2368, 6688, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_sgf_three_center_electron_repulsion_0(buffer, 14147, 0, 3,
-                                                                       13247, 6057, 13347, 2367,
-                                                                       2412, 6777, ncols, gamma,
+                    compute_prim_sgf_three_center_electron_repulsion_0(buffer, 14148, 0, 3,
+                                                                       13248, 6058, 13348, 2368,
+                                                                       2413, 6778, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_sgf_three_center_electron_repulsion_0(buffer, 14297, 0, 3,
-                                                                       13347, 6117, 13447, 2412,
-                                                                       2457, 6867, ncols, gamma,
+                    compute_prim_sgf_three_center_electron_repulsion_0(buffer, 14298, 0, 3,
+                                                                       13348, 6118, 13448, 2413,
+                                                                       2458, 6868, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_shf_three_center_electron_repulsion_0(buffer, 14447, 0, 3,
-                                                                       13547, 6417, 13697, 2547,
-                                                                       2610, 7209, ncols, gamma,
+                    compute_prim_shf_three_center_electron_repulsion_0(buffer, 14448, 0, 3,
+                                                                       13548, 6418, 13698, 2548,
+                                                                       2611, 7210, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_shf_three_center_electron_repulsion_0(buffer, 14657, 0, 3,
-                                                                       13697, 6507, 13847, 2610,
-                                                                       2673, 7335, ncols, gamma,
+                    compute_prim_shf_three_center_electron_repulsion_0(buffer, 14658, 0, 3,
+                                                                       13698, 6508, 13848, 2611,
+                                                                       2674, 7336, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_shf_three_center_electron_repulsion_0(buffer, 14867, 0, 3,
-                                                                       13847, 6597, 13997, 2673,
-                                                                       2736, 7461, ncols, gamma,
+                    compute_prim_shf_three_center_electron_repulsion_0(buffer, 14868, 0, 3,
+                                                                       13848, 6598, 13998, 2674,
+                                                                       2737, 7462, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_shf_three_center_electron_repulsion_0(buffer, 15077, 0, 3,
-                                                                       13997, 6687, 14147, 2736,
-                                                                       2799, 7587, ncols, gamma,
+                    compute_prim_shf_three_center_electron_repulsion_0(buffer, 15078, 0, 3,
+                                                                       13998, 6688, 14148, 2737,
+                                                                       2800, 7588, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_shf_three_center_electron_repulsion_0(buffer, 15287, 0, 3,
-                                                                       14147, 6777, 14297, 2799,
-                                                                       2862, 7713, ncols, gamma,
+                    compute_prim_shf_three_center_electron_repulsion_0(buffer, 15288, 0, 3,
+                                                                       14148, 6778, 14298, 2800,
+                                                                       2863, 7714, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_sif_three_center_electron_repulsion_0(buffer, 15497, 0, 3,
-                                                                       14447, 7209, 14657, 2988,
-                                                                       3072, 8175, ncols, gamma,
+                    compute_prim_sif_three_center_electron_repulsion_0(buffer, 15498, 0, 3,
+                                                                       14448, 7210, 14658, 2989,
+                                                                       3073, 8176, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_sif_three_center_electron_repulsion_0(buffer, 15777, 0, 3,
-                                                                       14657, 7335, 14867, 3072,
-                                                                       3156, 8343, ncols, gamma,
+                    compute_prim_sif_three_center_electron_repulsion_0(buffer, 15778, 0, 3,
+                                                                       14658, 7336, 14868, 3073,
+                                                                       3157, 8344, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_sif_three_center_electron_repulsion_0(buffer, 16057, 0, 3,
-                                                                       14867, 7461, 15077, 3156,
-                                                                       3240, 8511, ncols, gamma,
+                    compute_prim_sif_three_center_electron_repulsion_0(buffer, 16058, 0, 3,
+                                                                       14868, 7462, 15078, 3157,
+                                                                       3241, 8512, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_sif_three_center_electron_repulsion_0(buffer, 16337, 0, 3,
-                                                                       15077, 7587, 15287, 3240,
-                                                                       3324, 8679, ncols, gamma,
+                    compute_prim_sif_three_center_electron_repulsion_0(buffer, 16338, 0, 3,
+                                                                       15078, 7588, 15288, 3241,
+                                                                       3325, 8680, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_skf_three_center_electron_repulsion_0(buffer, 16617, 0, 3,
-                                                                       15497, 8175, 15777, 3492,
-                                                                       3600, 9279, ncols, gamma,
+                    compute_prim_skf_three_center_electron_repulsion_0(buffer, 16618, 0, 3,
+                                                                       15498, 8176, 15778, 3493,
+                                                                       3601, 9280, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_skf_three_center_electron_repulsion_0(buffer, 16977, 0, 3,
-                                                                       15777, 8343, 16057, 3600,
-                                                                       3708, 9495, ncols, gamma,
+                    compute_prim_skf_three_center_electron_repulsion_0(buffer, 16978, 0, 3,
+                                                                       15778, 8344, 16058, 3601,
+                                                                       3709, 9496, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_skf_three_center_electron_repulsion_0(buffer, 17337, 0, 3,
-                                                                       16057, 8511, 16337, 3708,
-                                                                       3816, 9711, ncols, gamma,
+                    compute_prim_skf_three_center_electron_repulsion_0(buffer, 17338, 0, 3,
+                                                                       16058, 8512, 16338, 3709,
+                                                                       3817, 9712, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_slf_three_center_electron_repulsion_0(buffer, 17697, 0, 3,
-                                                                       16617, 9279, 16977, 4032,
-                                                                       4167, 10467, ncols, gamma,
+                    compute_prim_slf_three_center_electron_repulsion_0(buffer, 17698, 0, 3,
+                                                                       16618, 9280, 16978, 4033,
+                                                                       4168, 10468, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_slf_three_center_electron_repulsion_0(buffer, 18147, 0, 3,
-                                                                       16977, 9495, 17337, 4167,
-                                                                       4302, 10737, ncols, gamma,
+                    compute_prim_slf_three_center_electron_repulsion_0(buffer, 18148, 0, 3,
+                                                                       16978, 9496, 17338, 4168,
+                                                                       4303, 10738, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_smf_three_center_electron_repulsion_0(buffer, 18597, 0, 3,
-                                                                       17697, 10467, 18147, 4572,
-                                                                       4737, 11667, ncols, gamma,
+                    compute_prim_smf_three_center_electron_repulsion_0(buffer, 18598, 0, 3,
+                                                                       17698, 10468, 18148, 4573,
+                                                                       4738, 11668, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_ssg_three_center_electron_repulsion_0(buffer, 19147, 3, 5067,
-                                                                       5073, 11997, ncols, gamma,
+                    compute_prim_ssg_three_center_electron_repulsion_0(buffer, 19148, 3, 5068,
+                                                                       5074, 11998, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_ssg_three_center_electron_repulsion_0(buffer, 19162, 3, 5073,
-                                                                       5079, 12007, ncols, gamma,
+                    compute_prim_ssg_three_center_electron_repulsion_0(buffer, 19163, 3, 5074,
+                                                                       5080, 12008, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_ssg_three_center_electron_repulsion_0(buffer, 19177, 3, 5079,
-                                                                       5085, 12017, ncols, gamma,
+                    compute_prim_ssg_three_center_electron_repulsion_0(buffer, 19178, 3, 5080,
+                                                                       5086, 12018, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_ssg_three_center_electron_repulsion_0(buffer, 19192, 3, 5085,
-                                                                       5091, 12027, ncols, gamma,
+                    compute_prim_ssg_three_center_electron_repulsion_0(buffer, 19193, 3, 5086,
+                                                                       5092, 12028, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_ssg_three_center_electron_repulsion_0(buffer, 19207, 3, 5091,
-                                                                       5097, 12037, ncols, gamma,
+                    compute_prim_ssg_three_center_electron_repulsion_0(buffer, 19208, 3, 5092,
+                                                                       5098, 12038, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_ssg_three_center_electron_repulsion_0(buffer, 19222, 3, 5097,
-                                                                       5103, 12047, ncols, gamma,
+                    compute_prim_ssg_three_center_electron_repulsion_0(buffer, 19223, 3, 5098,
+                                                                       5104, 12048, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_ssg_three_center_electron_repulsion_0(buffer, 19237, 3, 5103,
-                                                                       5109, 12057, ncols, gamma,
+                    compute_prim_ssg_three_center_electron_repulsion_0(buffer, 19238, 3, 5104,
+                                                                       5110, 12058, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_ssg_three_center_electron_repulsion_0(buffer, 19252, 3, 5109,
-                                                                       5115, 12067, ncols, gamma,
+                    compute_prim_ssg_three_center_electron_repulsion_0(buffer, 19253, 3, 5110,
+                                                                       5116, 12068, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_ssg_three_center_electron_repulsion_0(buffer, 19267, 3, 5115,
-                                                                       5121, 12077, ncols, gamma,
+                    compute_prim_ssg_three_center_electron_repulsion_0(buffer, 19268, 3, 5116,
+                                                                       5122, 12078, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_ssg_three_center_electron_repulsion_0(buffer, 19282, 3, 5121,
-                                                                       5127, 12087, ncols, gamma,
+                    compute_prim_ssg_three_center_electron_repulsion_0(buffer, 19283, 3, 5122,
+                                                                       5128, 12088, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_spg_three_center_electron_repulsion_0(buffer, 19297, 0, 3,
-                                                                       19147, 11997, 19162, 5139,
-                                                                       5157, 12097, ncols, gamma,
+                    compute_prim_spg_three_center_electron_repulsion_0(buffer, 19298, 0, 3,
+                                                                       19148, 11998, 19163, 5140,
+                                                                       5158, 12098, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_spg_three_center_electron_repulsion_0(buffer, 19342, 0, 3,
-                                                                       19162, 12007, 19177, 5157,
-                                                                       5175, 12127, ncols, gamma,
+                    compute_prim_spg_three_center_electron_repulsion_0(buffer, 19343, 0, 3,
+                                                                       19163, 12008, 19178, 5158,
+                                                                       5176, 12128, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_spg_three_center_electron_repulsion_0(buffer, 19387, 0, 3,
-                                                                       19177, 12017, 19192, 5175,
-                                                                       5193, 12157, ncols, gamma,
+                    compute_prim_spg_three_center_electron_repulsion_0(buffer, 19388, 0, 3,
+                                                                       19178, 12018, 19193, 5176,
+                                                                       5194, 12158, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_spg_three_center_electron_repulsion_0(buffer, 19432, 0, 3,
-                                                                       19192, 12027, 19207, 5193,
-                                                                       5211, 12187, ncols, gamma,
+                    compute_prim_spg_three_center_electron_repulsion_0(buffer, 19433, 0, 3,
+                                                                       19193, 12028, 19208, 5194,
+                                                                       5212, 12188, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_spg_three_center_electron_repulsion_0(buffer, 19477, 0, 3,
-                                                                       19207, 12037, 19222, 5211,
-                                                                       5229, 12217, ncols, gamma,
+                    compute_prim_spg_three_center_electron_repulsion_0(buffer, 19478, 0, 3,
+                                                                       19208, 12038, 19223, 5212,
+                                                                       5230, 12218, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_spg_three_center_electron_repulsion_0(buffer, 19522, 0, 3,
-                                                                       19222, 12047, 19237, 5229,
-                                                                       5247, 12247, ncols, gamma,
+                    compute_prim_spg_three_center_electron_repulsion_0(buffer, 19523, 0, 3,
+                                                                       19223, 12048, 19238, 5230,
+                                                                       5248, 12248, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_spg_three_center_electron_repulsion_0(buffer, 19567, 0, 3,
-                                                                       19237, 12057, 19252, 5247,
-                                                                       5265, 12277, ncols, gamma,
+                    compute_prim_spg_three_center_electron_repulsion_0(buffer, 19568, 0, 3,
+                                                                       19238, 12058, 19253, 5248,
+                                                                       5266, 12278, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_spg_three_center_electron_repulsion_0(buffer, 19612, 0, 3,
-                                                                       19252, 12067, 19267, 5265,
-                                                                       5283, 12307, ncols, gamma,
+                    compute_prim_spg_three_center_electron_repulsion_0(buffer, 19613, 0, 3,
+                                                                       19253, 12068, 19268, 5266,
+                                                                       5284, 12308, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_spg_three_center_electron_repulsion_0(buffer, 19657, 0, 3,
-                                                                       19267, 12077, 19282, 5283,
-                                                                       5301, 12337, ncols, gamma,
+                    compute_prim_spg_three_center_electron_repulsion_0(buffer, 19658, 0, 3,
+                                                                       19268, 12078, 19283, 5284,
+                                                                       5302, 12338, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_sdg_three_center_electron_repulsion_0(buffer, 19702, 0, 3,
-                                                                       19297, 12097, 19342, 5337,
-                                                                       5373, 12367, ncols, gamma,
+                    compute_prim_sdg_three_center_electron_repulsion_0(buffer, 19703, 0, 3,
+                                                                       19298, 12098, 19343, 5338,
+                                                                       5374, 12368, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_sdg_three_center_electron_repulsion_0(buffer, 19792, 0, 3,
-                                                                       19342, 12127, 19387, 5373,
-                                                                       5409, 12427, ncols, gamma,
+                    compute_prim_sdg_three_center_electron_repulsion_0(buffer, 19793, 0, 3,
+                                                                       19343, 12128, 19388, 5374,
+                                                                       5410, 12428, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_sdg_three_center_electron_repulsion_0(buffer, 19882, 0, 3,
-                                                                       19387, 12157, 19432, 5409,
-                                                                       5445, 12487, ncols, gamma,
+                    compute_prim_sdg_three_center_electron_repulsion_0(buffer, 19883, 0, 3,
+                                                                       19388, 12158, 19433, 5410,
+                                                                       5446, 12488, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_sdg_three_center_electron_repulsion_0(buffer, 19972, 0, 3,
-                                                                       19432, 12187, 19477, 5445,
-                                                                       5481, 12547, ncols, gamma,
+                    compute_prim_sdg_three_center_electron_repulsion_0(buffer, 19973, 0, 3,
+                                                                       19433, 12188, 19478, 5446,
+                                                                       5482, 12548, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_sdg_three_center_electron_repulsion_0(buffer, 20062, 0, 3,
-                                                                       19477, 12217, 19522, 5481,
-                                                                       5517, 12607, ncols, gamma,
+                    compute_prim_sdg_three_center_electron_repulsion_0(buffer, 20063, 0, 3,
+                                                                       19478, 12218, 19523, 5482,
+                                                                       5518, 12608, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_sdg_three_center_electron_repulsion_0(buffer, 20152, 0, 3,
-                                                                       19522, 12247, 19567, 5517,
-                                                                       5553, 12667, ncols, gamma,
+                    compute_prim_sdg_three_center_electron_repulsion_0(buffer, 20153, 0, 3,
+                                                                       19523, 12248, 19568, 5518,
+                                                                       5554, 12668, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_sdg_three_center_electron_repulsion_0(buffer, 20242, 0, 3,
-                                                                       19567, 12277, 19612, 5553,
-                                                                       5589, 12727, ncols, gamma,
+                    compute_prim_sdg_three_center_electron_repulsion_0(buffer, 20243, 0, 3,
+                                                                       19568, 12278, 19613, 5554,
+                                                                       5590, 12728, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_sdg_three_center_electron_repulsion_0(buffer, 20332, 0, 3,
-                                                                       19612, 12307, 19657, 5589,
-                                                                       5625, 12787, ncols, gamma,
+                    compute_prim_sdg_three_center_electron_repulsion_0(buffer, 20333, 0, 3,
+                                                                       19613, 12308, 19658, 5590,
+                                                                       5626, 12788, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_sfg_three_center_electron_repulsion_0(buffer, 20422, 0, 3,
-                                                                       19702, 12367, 19792, 5697,
-                                                                       5757, 12847, ncols, gamma,
+                    compute_prim_sfg_three_center_electron_repulsion_0(buffer, 20423, 0, 3,
+                                                                       19703, 12368, 19793, 5698,
+                                                                       5758, 12848, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_sfg_three_center_electron_repulsion_0(buffer, 20572, 0, 3,
-                                                                       19792, 12427, 19882, 5757,
-                                                                       5817, 12947, ncols, gamma,
+                    compute_prim_sfg_three_center_electron_repulsion_0(buffer, 20573, 0, 3,
+                                                                       19793, 12428, 19883, 5758,
+                                                                       5818, 12948, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_sfg_three_center_electron_repulsion_0(buffer, 20722, 0, 3,
-                                                                       19882, 12487, 19972, 5817,
-                                                                       5877, 13047, ncols, gamma,
+                    compute_prim_sfg_three_center_electron_repulsion_0(buffer, 20723, 0, 3,
+                                                                       19883, 12488, 19973, 5818,
+                                                                       5878, 13048, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_sfg_three_center_electron_repulsion_0(buffer, 20872, 0, 3,
-                                                                       19972, 12547, 20062, 5877,
-                                                                       5937, 13147, ncols, gamma,
+                    compute_prim_sfg_three_center_electron_repulsion_0(buffer, 20873, 0, 3,
+                                                                       19973, 12548, 20063, 5878,
+                                                                       5938, 13148, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_sfg_three_center_electron_repulsion_0(buffer, 21022, 0, 3,
-                                                                       20062, 12607, 20152, 5937,
-                                                                       5997, 13247, ncols, gamma,
+                    compute_prim_sfg_three_center_electron_repulsion_0(buffer, 21023, 0, 3,
+                                                                       20063, 12608, 20153, 5938,
+                                                                       5998, 13248, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_sfg_three_center_electron_repulsion_0(buffer, 21172, 0, 3,
-                                                                       20152, 12667, 20242, 5997,
-                                                                       6057, 13347, ncols, gamma,
+                    compute_prim_sfg_three_center_electron_repulsion_0(buffer, 21173, 0, 3,
+                                                                       20153, 12668, 20243, 5998,
+                                                                       6058, 13348, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_sfg_three_center_electron_repulsion_0(buffer, 21322, 0, 3,
-                                                                       20242, 12727, 20332, 6057,
-                                                                       6117, 13447, ncols, gamma,
+                    compute_prim_sfg_three_center_electron_repulsion_0(buffer, 21323, 0, 3,
+                                                                       20243, 12728, 20333, 6058,
+                                                                       6118, 13448, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_sgg_three_center_electron_repulsion_0(buffer, 21472, 0, 3,
-                                                                       20422, 12847, 20572, 6237,
-                                                                       6327, 13547, ncols, gamma,
+                    compute_prim_sgg_three_center_electron_repulsion_0(buffer, 21473, 0, 3,
+                                                                       20423, 12848, 20573, 6238,
+                                                                       6328, 13548, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_sgg_three_center_electron_repulsion_0(buffer, 21697, 0, 3,
-                                                                       20572, 12947, 20722, 6327,
-                                                                       6417, 13697, ncols, gamma,
+                    compute_prim_sgg_three_center_electron_repulsion_0(buffer, 21698, 0, 3,
+                                                                       20573, 12948, 20723, 6328,
+                                                                       6418, 13698, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_sgg_three_center_electron_repulsion_0(buffer, 21922, 0, 3,
-                                                                       20722, 13047, 20872, 6417,
-                                                                       6507, 13847, ncols, gamma,
+                    compute_prim_sgg_three_center_electron_repulsion_0(buffer, 21923, 0, 3,
+                                                                       20723, 13048, 20873, 6418,
+                                                                       6508, 13848, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_sgg_three_center_electron_repulsion_0(buffer, 22147, 0, 3,
-                                                                       20872, 13147, 21022, 6507,
-                                                                       6597, 13997, ncols, gamma,
+                    compute_prim_sgg_three_center_electron_repulsion_0(buffer, 22148, 0, 3,
+                                                                       20873, 13148, 21023, 6508,
+                                                                       6598, 13998, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_sgg_three_center_electron_repulsion_0(buffer, 22372, 0, 3,
-                                                                       21022, 13247, 21172, 6597,
-                                                                       6687, 14147, ncols, gamma,
+                    compute_prim_sgg_three_center_electron_repulsion_0(buffer, 22373, 0, 3,
+                                                                       21023, 13248, 21173, 6598,
+                                                                       6688, 14148, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_sgg_three_center_electron_repulsion_0(buffer, 22597, 0, 3,
-                                                                       21172, 13347, 21322, 6687,
-                                                                       6777, 14297, ncols, gamma,
+                    compute_prim_sgg_three_center_electron_repulsion_0(buffer, 22598, 0, 3,
+                                                                       21173, 13348, 21323, 6688,
+                                                                       6778, 14298, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_shg_three_center_electron_repulsion_0(buffer, 22822, 0, 3,
-                                                                       21472, 13547, 21697, 6957,
-                                                                       7083, 14447, ncols, gamma,
+                    compute_prim_shg_three_center_electron_repulsion_0(buffer, 22823, 0, 3,
+                                                                       21473, 13548, 21698, 6958,
+                                                                       7084, 14448, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_shg_three_center_electron_repulsion_0(buffer, 23137, 0, 3,
-                                                                       21697, 13697, 21922, 7083,
-                                                                       7209, 14657, ncols, gamma,
+                    compute_prim_shg_three_center_electron_repulsion_0(buffer, 23138, 0, 3,
+                                                                       21698, 13698, 21923, 7084,
+                                                                       7210, 14658, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_shg_three_center_electron_repulsion_0(buffer, 23452, 0, 3,
-                                                                       21922, 13847, 22147, 7209,
-                                                                       7335, 14867, ncols, gamma,
+                    compute_prim_shg_three_center_electron_repulsion_0(buffer, 23453, 0, 3,
+                                                                       21923, 13848, 22148, 7210,
+                                                                       7336, 14868, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_shg_three_center_electron_repulsion_0(buffer, 23767, 0, 3,
-                                                                       22147, 13997, 22372, 7335,
-                                                                       7461, 15077, ncols, gamma,
+                    compute_prim_shg_three_center_electron_repulsion_0(buffer, 23768, 0, 3,
+                                                                       22148, 13998, 22373, 7336,
+                                                                       7462, 15078, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_shg_three_center_electron_repulsion_0(buffer, 24082, 0, 3,
-                                                                       22372, 14147, 22597, 7461,
-                                                                       7587, 15287, ncols, gamma,
+                    compute_prim_shg_three_center_electron_repulsion_0(buffer, 24083, 0, 3,
+                                                                       22373, 14148, 22598, 7462,
+                                                                       7588, 15288, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_sig_three_center_electron_repulsion_0(buffer, 24397, 0, 3,
-                                                                       22822, 14447, 23137, 7839,
-                                                                       8007, 15497, ncols, gamma,
+                    compute_prim_sig_three_center_electron_repulsion_0(buffer, 24398, 0, 3,
+                                                                       22823, 14448, 23138, 7840,
+                                                                       8008, 15498, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_sig_three_center_electron_repulsion_0(buffer, 24817, 0, 3,
-                                                                       23137, 14657, 23452, 8007,
-                                                                       8175, 15777, ncols, gamma,
+                    compute_prim_sig_three_center_electron_repulsion_0(buffer, 24818, 0, 3,
+                                                                       23138, 14658, 23453, 8008,
+                                                                       8176, 15778, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_sig_three_center_electron_repulsion_0(buffer, 25237, 0, 3,
-                                                                       23452, 14867, 23767, 8175,
-                                                                       8343, 16057, ncols, gamma,
+                    compute_prim_sig_three_center_electron_repulsion_0(buffer, 25238, 0, 3,
+                                                                       23453, 14868, 23768, 8176,
+                                                                       8344, 16058, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_sig_three_center_electron_repulsion_0(buffer, 25657, 0, 3,
-                                                                       23767, 15077, 24082, 8343,
-                                                                       8511, 16337, ncols, gamma,
+                    compute_prim_sig_three_center_electron_repulsion_0(buffer, 25658, 0, 3,
+                                                                       23768, 15078, 24083, 8344,
+                                                                       8512, 16338, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_skg_three_center_electron_repulsion_0(buffer, 26077, 0, 3,
-                                                                       24397, 15497, 24817, 8847,
-                                                                       9063, 16617, ncols, gamma,
+                    compute_prim_skg_three_center_electron_repulsion_0(buffer, 26078, 0, 3,
+                                                                       24398, 15498, 24818, 8848,
+                                                                       9064, 16618, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_skg_three_center_electron_repulsion_0(buffer, 26617, 0, 3,
-                                                                       24817, 15777, 25237, 9063,
-                                                                       9279, 16977, ncols, gamma,
+                    compute_prim_skg_three_center_electron_repulsion_0(buffer, 26618, 0, 3,
+                                                                       24818, 15778, 25238, 9064,
+                                                                       9280, 16978, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_skg_three_center_electron_repulsion_0(buffer, 27157, 0, 3,
-                                                                       25237, 16057, 25657, 9279,
-                                                                       9495, 17337, ncols, gamma,
+                    compute_prim_skg_three_center_electron_repulsion_0(buffer, 27158, 0, 3,
+                                                                       25238, 16058, 25658, 9280,
+                                                                       9496, 17338, ncols, gamma,
                                                                        p, q);
 
-                    compute_prim_slg_three_center_electron_repulsion_0(buffer, 27697, 0, 3,
-                                                                       26077, 16617, 26617, 9927,
-                                                                       10197, 17697, ncols,
+                    compute_prim_slg_three_center_electron_repulsion_0(buffer, 27698, 0, 3,
+                                                                       26078, 16618, 26618, 9928,
+                                                                       10198, 17698, ncols,
                                                                        gamma, p, q);
 
-                    compute_prim_slg_three_center_electron_repulsion_0(buffer, 28372, 0, 3,
-                                                                       26617, 16977, 27157,
-                                                                       10197, 10467, 18147,
+                    compute_prim_slg_three_center_electron_repulsion_0(buffer, 28373, 0, 3,
+                                                                       26618, 16978, 27158,
+                                                                       10198, 10468, 18148,
                                                                        ncols, gamma, p, q);
 
-                    compute_prim_smg_three_center_electron_repulsion_0(buffer, 29047, 0, 3,
-                                                                       27697, 17697, 28372,
-                                                                       11007, 11337, 18597,
+                    compute_prim_smg_three_center_electron_repulsion_0(buffer, 29048, 0, 3,
+                                                                       27698, 17698, 28373,
+                                                                       11008, 11338, 18598,
                                                                        ncols, gamma, p, q);
 
-                    simdfunc::contract_primitives(buffer, 29872, 24397, 420, ncols);
+                    simdfunc::contract_primitives(buffer, 29873, 24398, 420, ncols);
 
-                    simdfunc::contract_primitives(buffer, 30544, 26077, 540, ncols);
+                    simdfunc::contract_primitives(buffer, 30545, 26078, 540, ncols);
 
-                    simdfunc::contract_primitives(buffer, 31408, 27697, 675, ncols);
+                    simdfunc::contract_primitives(buffer, 31409, 27698, 675, ncols);
 
-                    simdfunc::contract_primitives(buffer, 32488, 29047, 825, ncols);
+                    simdfunc::contract_primitives(buffer, 32489, 29048, 825, ncols);
                 }
             }
         }
 
-        simdtrf::transform_g_inner(buffer, 30292, 29872, 28, 1, nmax);
+        simdtrf::transform_g_inner(buffer, 30293, 29873, 28, 1, nmax);
 
-        simdtrf::transform_g_inner(buffer, 31084, 30544, 36, 1, nmax);
+        simdtrf::transform_g_inner(buffer, 31085, 30545, 36, 1, nmax);
 
-        simdtrf::transform_g_inner(buffer, 32083, 31408, 45, 1, nmax);
+        simdtrf::transform_g_inner(buffer, 32084, 31409, 45, 1, nmax);
 
-        simdtrf::transform_g_inner(buffer, 33313, 32488, 55, 1, nmax);
+        simdtrf::transform_g_inner(buffer, 33314, 32489, 55, 1, nmax);
 
-        simdtrf::compute_hrr_pi(buffer, coordinates, 33808, 30292, 31084, 9, nmax);
+        simdtrf::compute_hrr_pi(buffer, coordinates, 33809, 30293, 31085, 9, nmax);
 
-        simdtrf::compute_hrr_pk(buffer, coordinates, 34564, 31084, 32083, 9, nmax);
+        simdtrf::compute_hrr_pk(buffer, coordinates, 34565, 31085, 32084, 9, nmax);
 
-        simdtrf::compute_hrr_pl(buffer, coordinates, 35536, 32083, 33313, 9, nmax);
+        simdtrf::compute_hrr_pl(buffer, coordinates, 35537, 32084, 33314, 9, nmax);
 
-        simdtrf::compute_hrr_di(buffer, coordinates, 36751, 33808, 34564, 9, nmax);
+        simdtrf::compute_hrr_di(buffer, coordinates, 36752, 33809, 34565, 9, nmax);
 
-        simdtrf::compute_hrr_dk(buffer, coordinates, 38263, 34564, 35536, 9, nmax);
+        simdtrf::compute_hrr_dk(buffer, coordinates, 38264, 34565, 35537, 9, nmax);
 
-        simdtrf::compute_hrr_fi(buffer, coordinates, 40207, 36751, 38263, 9, nmax);
+        simdtrf::compute_hrr_fi(buffer, coordinates, 40208, 36752, 38264, 9, nmax);
 
-        simdtrf::transform_i_inner(buffer, 42727, 40207, 10, 9, nmax);
+        simdtrf::transform_i_inner(buffer, 42728, 40208, 10, 9, nmax);
 
-        simdtrf::transform_f_outer(values + n * npairs, nvalues, buffer, 42727, 117, nmax);
+        simdtrf::transform_f_outer(values + n * npairs, nvalues, buffer, 42728, 117, nmax);
     }
 
     for (size_t m = 0; m < 819; m++)

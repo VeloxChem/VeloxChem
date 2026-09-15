@@ -4697,11 +4697,39 @@ exponential is now evaluated `ncols` times for a pair of primitives where it was
 evaluated `nrows` times `ncharges` times `ncols`, which on that case is four thousand
 evaluations down to one.
 
-The three-center path is untouched and measured 289.32 ms and 13.82 s against 289.74 ms
-and 13.49 s before. That second case wanders: 13.49, 13.79, 14.29 and 13.82 seconds over
-the session, on code nothing changed. It is one run of a fourteen second call, which is
-the caution against reading anything into its earlier 15.59 -- and the nuclear numbers
-beside it repeat to under one per cent.
+#### The three-center kernels, once they were measured properly
+
+The earlier reading of these was worthless: two cases, one run each, one of them a
+fourteen second call which wanders by six per cent between runs of code nothing changed.
+Measured again on four cases small enough to repeat, best of five with spreads under
+1.12, ablating the exponential the same way:
+
+| case | baseline | no exponential | its share |
+| --- | ---: | ---: | ---: |
+| tagrisso def2-svp | 286.62 ms | 247.52 ms | 13.6% |
+| c60 def2-svp | 784.92 ms | 678.78 ms | 13.5% |
+| taxol def2-svp | 999.54 ms | 861.77 ms | 13.8% |
+| tagrisso def2-tzvp | 1094.17 ms | 980.87 ms | 10.4% |
+
+So the same change was made, and the same generator gives these kernels the row:
+
+| case | before | after | x | of the ceiling |
+| --- | ---: | ---: | ---: | ---: |
+| tagrisso def2-svp | 286.62 ms | 262.15 ms | 1.093 | 63% |
+| c60 def2-svp | 784.92 ms | 713.70 ms | 1.100 | 67% |
+| taxol def2-svp | 999.54 ms | 910.47 ms | 1.098 | 65% |
+| tagrisso def2-tzvp | 1094.17 ms | 1015.36 ms | 1.078 | 70% |
+
+**Two thirds of it rather than all of it, and the loop nest says why.** The nuclear
+attraction has `mu` fixed above the loop it was repeating in, so one row killed the
+whole repetition. Here the nest is atoms on the c side, then the bra's two primitives,
+then the ket's: `mu` is the bra pair's and is fixed only *inside* the loop over the c
+atoms, so the row is filled once per pair of primitives per c atom. What the row removes
+is the repetition over the ket's primitives and over the orders; what is left is the
+repetition over the c atoms -- which is what the sampled profile called out years of
+sessions ago, `e_ab` "recomputed for every atom on c side though it depends only on the
+pair". Removing that means reordering the nest to put the c atoms innermost, which moves
+the accumulation and the transform with it, and is a different piece of work.
 
 **The three-center kernels deliberately keep the old form.** They call the same
 function and the same argument applies to them, but measured once each way the two

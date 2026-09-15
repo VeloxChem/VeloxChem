@@ -308,62 +308,26 @@ _make_scaled_arguments(CSimdMatrix  &buffer,
 }
 
 /// @brief Scales the values of a Boys function by the prefactor of the integral and
-/// by the exponential the pair of primitives on bra side contributes.
-/// @param buffer The buffer holding the values in the rows after target.
-/// @param coordinates The coordinates of the atom pairs, whose row nine holds the
-/// squared distance of the atom pair.
+/// by the exponential the pair of primitives contributes.
+/// @param buffer The buffer holding the values in the rows after target, and the
+/// exponential of the pair in the row at pair_exp.
 /// @param target The row holding the arguments, with the values following it.
 /// @param nrows The number of rows of values to scale.
 /// @param ncols The number of atom pairs to scale.
 /// @param fj The prefactor of the integral.
-/// @param mu The factor the squared distance of the atom pair is scaled by.
+/// @param pair_exp The row holding exp(-mu AB^2), one value per atom pair.
 /// @note The scaling is not one number here, as it is for the two-center electron
 /// repulsion. The pair of primitives contributes exp(-mu R_AB^2), which varies with
 /// the atom pair, so the values are scaled column by column and not by fj alone. An
 /// operator which collapses the pair onto one center wants this: the three-center
 /// electron repulsion and the nuclear attraction both do.
+/// @note That exponential is not formed here. It depends on the pair of primitives
+/// and on the atom pair and on neither the order nor the point the operator is
+/// anchored at, so compute_pair_exponent writes it into a row once for the pair and
+/// every call below reads that row. Evaluating it where it is read instead cost 17 to
+/// 26 per cent of a nuclear attraction call and 10 to 14 of a three-center one.
 static auto
-_scale_pair_values(CSimdMatrix       &buffer,
-                  const CSimdMatrix &coordinates,
-                  const size_t       target,
-                  const size_t       nrows,
-                  const size_t       ncols,
-                  const double       fj,
-                  const double       mu) -> void
-{
-    const auto *ab_2 = coordinates.data(9);
-
-    for (size_t j = 0; j < nrows; j++)
-    {
-        auto *row = buffer.data(target + 1 + j);
-
-#pragma omp simd aligned(row, ab_2 : simd::cache_line_size())
-        for (size_t k = 0; k < ncols; k++)
-        {
-            row[k] *= fj * std::exp(-mu * ab_2[k]);
-        }
-    }
-}
-
-/// @brief Scales the values of a Boys function as _scale_pair_values does, forming
-/// the exponential of the pair once for the call rather than once for every row.
-/// @note The exponential depends on the pair of primitives and on the atom pair and
-/// on nothing else. Carrying it in the inner loop cost 17 to 26 per cent of a nuclear
-/// attraction call, as it was evaluated for each of the rows and, the caller being
-/// inside the loop over the charges, for each of those as well. Hoisting it is worth
-/// 1.11 to 1.16 there, and the larger the molecule the more, the charge loop being
-/// the molecule.
-/// @note The exponential itself is not formed here: compute_pair_exponent writes it
-/// into a row of the buffer once for the pair of primitives, above the loop over the
-/// charges, and every order of every charge reads that row.
-/// @note The three-center electron repulsion has the same structure and deliberately
-/// does **not** use this. Measured once each way, its two cases disagreed --
-/// tagrisso/def2-svp 290 to 264 ms, taxol/def2-tzvp 13.49 to 15.59 s -- and a run
-/// there is long enough that both numbers are single samples. It trades an
-/// exponential for a stream of ncols doubles, which is a different trade for a kernel
-/// whose blocks are larger. Merging the two wants that measurement first.
-static auto
-_scale_pair_values_once(CSimdMatrix  &buffer,
+_scale_pair_values(CSimdMatrix  &buffer,
                         const size_t  target,
                         const size_t  nrows,
                         const size_t  ncols,
@@ -392,14 +356,14 @@ compute_t3c_boys_function(CSimdMatrix                        &buffer,
                           const std::initializer_list<size_t> orders,
                           const size_t                        ncols,
                           const double                        fj,
-                          const double                        mu,
+                          const size_t                        pair_exp,
                           const double                        fq) -> void
 {
     _make_scaled_arguments(buffer, target, pc, ncols, fq);
 
     compute_boys_values(buffer, target, orders, ncols);
 
-    _scale_pair_values(buffer, coordinates, target, orders.size(), ncols, fj, mu);
+    _scale_pair_values(buffer, target, orders.size(), ncols, fj, pair_exp);
 }
 
 auto
@@ -410,14 +374,14 @@ compute_full_t3c_boys_function(CSimdMatrix       &buffer,
                                const size_t       order,
                                const size_t       ncols,
                                const double       fj,
-                               const double       mu,
+                               const size_t       pair_exp,
                                const double       fq) -> void
 {
     _make_scaled_arguments(buffer, target, pc, ncols, fq);
 
     compute_boys_values(buffer, target, order, ncols);
 
-    _scale_pair_values(buffer, coordinates, target, order + 1, ncols, fj, mu);
+    _scale_pair_values(buffer, target, order + 1, ncols, fj, pair_exp);
 }
 
 auto
@@ -453,7 +417,7 @@ compute_npot_boys_function(CSimdMatrix                        &buffer,
 
     compute_boys_values(buffer, target, orders, ncols);
 
-    _scale_pair_values_once(buffer, target, orders.size(), ncols, fz, pair_exp);
+    _scale_pair_values(buffer, target, orders.size(), ncols, fz, pair_exp);
 }
 
 auto
@@ -471,7 +435,7 @@ compute_full_npot_boys_function(CSimdMatrix       &buffer,
 
     compute_boys_values(buffer, target, order, ncols);
 
-    _scale_pair_values_once(buffer, target, order + 1, ncols, fz, pair_exp);
+    _scale_pair_values(buffer, target, order + 1, ncols, fz, pair_exp);
 }
 
 }  // namespace simdfunc
