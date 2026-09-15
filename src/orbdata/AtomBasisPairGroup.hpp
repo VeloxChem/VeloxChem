@@ -214,6 +214,20 @@ class CAtomBasisPairGroup
     /// atom pair is kept for the atoms of its diagonal atom pairs.
     static auto divide(const std::vector<CAtomBasisPairGroup> &groups, const size_t block_size) -> std::vector<CAtomBasisPairGroup>;
 
+    /// @brief Keeps the atom pairs which have one of the given atoms on either
+    /// side, and drops the rest.
+    /// @param wanted True for each atom of the molecule whose pairs are wanted.
+    /// @return The group of the atom pairs kept, which may be empty.
+    /// @note For a gradient, which is asked for some of the atoms and computes
+    /// the derivative of a pair for both of its atoms at once. The pairs have to
+    /// be dropped before the blocks are formed and not while their values are
+    /// read: a kernel computes every atom pair of a block in one call, so a pair
+    /// skipped afterwards has been computed all the same.
+    /// @note The diagonal atoms are dropped whatever is asked for. A pair of
+    /// basis functions on one atom does not move when that atom does, so its
+    /// derivative is zero and there is nothing to keep.
+    auto select_atoms(const std::vector<bool> &wanted) const -> CAtomBasisPairGroup;
+
     /// @brief Gets the target number of atom pairs of a block from the number of
     /// the threads and the number of the atom pairs of the atom basis pair groups.
     /// @param groups The atom basis pair groups to divide.

@@ -485,6 +485,58 @@ CAtomBasisPairGroup::divide(const std::vector<CAtomBasisPairGroup> &groups, cons
 }
 
 auto
+CAtomBasisPairGroup::select_atoms(const std::vector<bool> &wanted) const -> CAtomBasisPairGroup
+{
+    std::vector<int> bra_atoms;
+
+    std::vector<int> ket_atoms;
+
+    std::vector<double> distances;
+
+    const auto npairs = _bra_atoms.size();
+
+    // NOTE: the distances are set by sort_by_distance and are empty until it has
+    // run. A group is selected from before it is sorted, so they are carried over
+    // only when they are there, and the selected group is sorted like any other.
+
+    const auto has_distances = (_distances.size() == npairs);
+
+    bra_atoms.reserve(npairs);
+
+    ket_atoms.reserve(npairs);
+
+    if (has_distances) distances.reserve(npairs);
+
+    for (size_t k = 0; k < npairs; k++)
+    {
+        const auto ibra = static_cast<size_t>(_bra_atoms[k]);
+
+        const auto iket = static_cast<size_t>(_ket_atoms[k]);
+
+        if ((ibra >= wanted.size()) || (iket >= wanted.size())) continue;
+
+        if (!wanted[ibra] && !wanted[iket]) continue;
+
+        bra_atoms.push_back(_bra_atoms[k]);
+
+        ket_atoms.push_back(_ket_atoms[k]);
+
+        if (has_distances) distances.push_back(_distances[k]);
+    }
+
+    return CAtomBasisPairGroup(_bra_basis.get(),
+                               _ket_basis.get(),
+                               std::move(bra_atoms),
+                               std::move(ket_atoms),
+                               std::vector<int>{},
+                               std::move(distances),
+                               _bra_index,
+                               _ket_index,
+                               _symmetric,
+                               _order);
+}
+
+auto
 CAtomBasisPairGroup::make_block_size(const std::vector<CAtomBasisPairGroup> &groups,
                                      const size_t                           blocks_per_thread,
                                      const size_t                           min_block_size,

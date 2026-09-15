@@ -49,6 +49,7 @@
 #include "SimdRIFockDriver.hpp"
 #include "SimdRIJKFockDriver.hpp"
 #include "SimdRIJKGradientDriver.hpp"
+#include "SimdTwoCenterElectronRepulsionGradientDriver.hpp"
 #include "SimdThreeCenterElectronRepulsionDriver.hpp"
 #include "SimdTwoCenterElectronRepulsionDriver.hpp"
 #include "SparseMatrix.hpp"
@@ -316,6 +317,34 @@ export_simdintegrals(py::module &m) -> void
              py::return_value_policy::reference_internal, "Gets the B vectors the driver holds.")
         .def("get_metric", &CSimdRIJKFockDriver::get_metric,
              py::return_value_policy::reference_internal, "Gets the inverted factor of the metric.");
+
+    // CSimdTwoCenterElectronRepulsionGradientDriver class
+
+    PyClass<CSimdTwoCenterElectronRepulsionGradientDriver>(m, "SimdTwoCenterElectronRepulsionGradientDriver")
+        .def(py::init<>())
+        .def(py::init<const size_t>(),
+             "Creates a gradient driver with given target block size.",
+             py::arg("block_size"))
+        .def("compute",
+             py::overload_cast<const CMolecule &, const CMolecularBasis &, const CPackedMatrix &,
+                               const std::vector<int> &>(
+                 &CSimdTwoCenterElectronRepulsionGradientDriver::compute, py::const_),
+             "Computes the gradient of the two-center electron repulsion integrals of an auxiliary basis "
+             "contracted with Omega, for the given atoms. No sign is applied: the term of an RI-JK "
+             "gradient is the negative of what is returned.",
+             py::arg("molecule"),
+             py::arg("basis"),
+             py::arg("omega"),
+             py::arg("atoms"))
+        .def("compute",
+             py::overload_cast<const CMolecule &, const CMolecularBasis &, const CPackedMatrix &>(
+                 &CSimdTwoCenterElectronRepulsionGradientDriver::compute, py::const_),
+             "Computes it for every atom of the molecule.",
+             py::arg("molecule"),
+             py::arg("basis"),
+             py::arg("omega"))
+        .def("get_block_size", &CSimdTwoCenterElectronRepulsionGradientDriver::get_block_size,
+             "Gets target number of atom pairs of a block.");
 
     // TFittedDensities, what the first phase of the gradient forms
 

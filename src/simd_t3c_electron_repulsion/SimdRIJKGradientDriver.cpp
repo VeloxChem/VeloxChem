@@ -409,7 +409,7 @@ CSimdRIJKGradientDriver::compute(const CMolecule        &molecule,
                                  const CPackedMatrix    &coefficients,
                                  const double            exchange_scaling_factor,
                                  const std::vector<int> &atoms,
-                                 const std::vector<int> &aux_atoms) const -> CDenseMatrix
+                                 const std::vector<int> &aux_atoms) const -> CPackedMatrix
 {
     const auto natoms = molecule.number_of_atoms();
 
@@ -432,7 +432,7 @@ CSimdRIJKGradientDriver::compute(const CMolecule        &molecule,
         density.get_type() == mat_t::symmetric,
         std::string("SimdRIJKGradientDriver.compute: The density matrix is expected to be symmetric"));
 
-    auto gradient = CDenseMatrix(natoms, 3);
+    auto gradient = CPackedMatrix(natoms, 3, mat_t::general);
 
     gradient.zero();
 
@@ -471,7 +471,7 @@ CSimdRIJKGradientDriver::compute(const CMolecule       &molecule,
                                  const CPackedMatrix   &metric,
                                  const CPackedMatrix   &density,
                                  const CPackedMatrix   &coefficients,
-                                 const double           exchange_scaling_factor) const -> CDenseMatrix
+                                 const double           exchange_scaling_factor) const -> CPackedMatrix
 {
     // NOTE: every atom of the molecule, which is what a gradient usually means.
     // The form which takes a list is for a caller holding a share of them.

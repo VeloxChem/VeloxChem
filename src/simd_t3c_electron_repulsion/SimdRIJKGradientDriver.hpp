@@ -14,7 +14,6 @@
 #include <cstddef>
 #include <vector>
 
-#include "DenseMatrix.hpp"
 #include "MolecularBasis.hpp"
 #include "Molecule.hpp"
 #include "PackedMatrix.hpp"
@@ -111,8 +110,8 @@ class CSimdRIJKGradientDriver
     /// @param atoms The atoms to compute the gradient of.
     /// @param aux_atoms The atoms of the auxiliary basis the B vectors span, or
     /// an empty list for all of them.
-    /// @return The gradient, one row of three components per atom of the
-    /// molecule, with the rows of the atoms not asked for left zero.
+    /// @return The gradient, a general matrix of one row of three components per
+    /// atom of the molecule, with the rows of the atoms not asked for left zero.
     /// @note The rows not asked for are zero rather than absent, so that a caller
     /// which asks for a share of the atoms can reduce what it is given without
     /// knowing which share the others took. A gradient of a subset does not sum
@@ -126,11 +125,11 @@ class CSimdRIJKGradientDriver
                  const CPackedMatrix    &coefficients,
                  const double            exchange_scaling_factor,
                  const std::vector<int> &atoms,
-                 const std::vector<int> &aux_atoms = {}) const -> CDenseMatrix;
+                 const std::vector<int> &aux_atoms = {}) const -> CPackedMatrix;
 
     /// @brief Computes the Coulomb and exchange contributions to the gradient of
     /// every atom of the molecule.
-    /// @return The gradient, one row of three components per atom.
+    /// @return The gradient, a general matrix of three components per atom.
     auto compute(const CMolecule       &molecule,
                  const CMolecularBasis &basis,
                  const CMolecularBasis &aux_basis,
@@ -138,7 +137,7 @@ class CSimdRIJKGradientDriver
                  const CPackedMatrix   &metric,
                  const CPackedMatrix   &density,
                  const CPackedMatrix   &coefficients,
-                 const double           exchange_scaling_factor) const -> CDenseMatrix;
+                 const double           exchange_scaling_factor) const -> CPackedMatrix;
 
     /// @brief Forms the fitted densities the derivative integrals are contracted
     /// against, which is the whole of what the gradient needs before any of them

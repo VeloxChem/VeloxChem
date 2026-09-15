@@ -44,6 +44,11 @@ auto
 transform_s_inner(CSimdMatrix &buffer, const size_t target, const size_t source,
                   const size_t nrows, const size_t ncomps, const size_t ncols) -> void;
 
+/// @brief Computes the integrals of one combination of basis functions.
+auto
+transform_s_outer(double *values, const size_t nvalues, CSimdMatrix &buffer, const size_t source,
+                  const size_t ncomps, const size_t nmax) -> void;
+
 }  // namespace simdtrf
 
 #endif /* SimdTransformS_hpp */
