@@ -7887,3 +7887,95 @@ fitting error is common to the two and what remains is the implementation:
 **Agreement is 2.5e-12 at every basis, h functions included.** The last column is the
 resolution of the identity itself, which is the approximation being made and is four
 to seven orders larger than the disagreement between the two implementations of it.
+
+## The molecular gradient, where the diffuse functions decide the ratio
+
+The RI-JK gradient is wired into `ScfGradientDriver` and this is its first
+measurement. Caffeine, 24 atoms, def2-universal-jkfit, one rank of 14 threads on the
+M4 Max, at `cd9cb941a`. Records in
+`benchmarks/data/gradient/2026-09-16_m4max_caffeine.json`; the suite is
+`benchmarks/scripts/grad_laptop.py`.
+
+Gradient wall time alone -- the SCF before it is timed separately, because an RI-JK
+calculation has already won on the energy before the gradient starts. Best of two,
+both ways in one process per case, so the comparison is never made across runs.
+
+| functional | basis | nao | method | gradient | speedup | SCF | vs four-centre |
+| --- | --- | ---: | --- | ---: | ---: | ---: | ---: |
+| HF | def2-svp | 246 | four-centre | 8.69 | 1.00 | 12.45 | |
+| | | | RI-JK simd, in memory | 2.19 | 3.97 | 1.12 | 7.7e-05 |
+| HF | def2-svpd | 366 | four-centre | 42.13 | 1.00 | 50.71 | |
+| | | | RI-JK simd, in memory | 2.94 | **14.31** | 2.43 | 7.7e-05 |
+| B3LYP | def2-svp | 246 | four-centre | 9.54 | 1.00 | 15.04 | |
+| | | | RI-JK simd, in memory | 2.83 | 3.37 | 4.04 | 1.6e-05 |
+| B3LYP | def2-svpd | 366 | four-centre | 43.79 | 1.00 | 56.72 | |
+| | | | RI-JK simd, in memory | 4.24 | **10.33** | 8.80 | 1.7e-05 |
+
+The repeats were tight throughout -- 42.13 against 42.18, 2.99 against 2.94 -- so none
+of this is a single bad sample.
+
+**The ratio is not a property of the driver, it is a property of the basis.** Adding
+the diffuse shell costs the four-center gradient 8.69 to 42.13 seconds, a factor of
+4.8 for a factor of 1.49 in the basis, which is the fourth power it is built on. It
+costs the resolution of the identity 2.19 to 2.94, a factor of 1.3. Quoting a speedup
+without the basis beside it says nothing: the same driver is 4.0 and 14.3 in the same
+table.
+
+### The functional dilutes the ratio, and does not slow anything down
+
+B3LYP looks worse than Hartree-Fock -- 3.4 and 10.3 against 4.0 and 14.3 -- and the
+reason is in the two columns rather than in either of them. Subtracting the
+Hartree-Fock row from the B3LYP row of each method gives what the quadrature costs:
+
+| basis | four-centre | RI-JK simd |
+| --- | ---: | ---: |
+| def2-svp | 0.85 | 0.64 |
+| def2-svpd | 1.66 | 1.30 |
+
+It is **very nearly the same work in both rows**, and it does not shrink when the
+two-electron part does. At def2-svp it is added to a numerator of 8.69 and a
+denominator of 2.19, and a near-constant added to both sides of a ratio pulls it
+toward one. The RI-JK gradient is not slower at B3LYP than at Hartree-Fock for
+anything it is responsible for -- it is carrying a fixed passenger that the
+four-centre path barely notices and it cannot hide.
+
+### What the gradient agrees with, and what it does not
+
+Against the four-center gradient the difference is 7.7e-05 at Hartree-Fock and 1.6e-05
+at B3LYP -- the fitting error, consistent with the 5.7e-04 the energies differ by, and
+smaller at B3LYP because only a fifth of the exchange is fitted at all.
+
+The sharper test is finite differences of the RI-JK energy itself, which has no
+fitting error in it because both sides make the same approximation. def2-svp, central
+differences at 1e-4 bohr, largest component:
+
+| molecule | Hartree-Fock | B3LYP |
+| --- | ---: | ---: |
+| water | 1.2e-09 | 1.4e-06 |
+| CH3NH.OH, 6 atoms, no symmetry | 6.8e-09 | 2.2e-06 |
+
+**The B3LYP row is not the gradient.** Run the same finite differences against the
+four-center path and it gives 1.389e-06 on water -- the same number to four figures,
+where four-center Hartree-Fock gives 1.2e-09 against the resolution of the identity's
+1.2e-09. The residual is the quadrature grid and the step, and it belongs to both
+paths equally.
+
+The same thing shows in translational invariance, which is a check that costs nothing
+and travels with every record. At Hartree-Fock the gradient sums over the atoms to
+1e-12. At B3LYP it sums to 1.7e-05 -- and the four-center path sums to 1.73939e-05
+where the resolution of the identity sums to 1.73893e-05. An atom-centered grid is not
+translationally invariant, and a check that looks like a failure of the driver is a
+property of the quadrature that both drivers inherit.
+
+### One rank, and why that is not a temporary omission
+
+These numbers are OpenMP on one rank, and the gradient refuses to run on more. The
+Fock build tolerates B vectors spread over the ranks because the factor of the metric
+is folded into them, so the Coulomb matrix is a sum over the auxiliary basis which
+factorizes and the ranks simply add their shares. The gradient contracts the
+derivatives of the integrals themselves, so it needs the fitting coefficients in the
+basis of those integrals, and the transposed factor which carries them there reaches
+across the whole auxiliary basis. A rank holding a share of it cannot form them. The
+right-hand side has to be complete before the solve -- the same coupling the direct
+Fock build already handles with an explicit reduction before `solve_fitting`, and the
+same thing a distributed gradient will have to do.
