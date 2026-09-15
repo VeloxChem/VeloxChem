@@ -4584,6 +4584,82 @@ the most where the screening is already doing the work -- the same axis as every
 else here. Since the reference has no threshold at all, the whole of it shows up in the
 ratio, which is why the 1e-12 mean is 2.27 against 2.13.
 
+### Where the time of the nuclear attraction driver goes
+
+Profiled on 2026-09-15, fourteen threads, best of five. Nothing here is a share read
+off a sampler: `sample` over-reports the allocator badly enough that two rounds of work
+were once planned off its percentages and both measured as noise. Every number below is
+a wall clock A/B, an experiment which removes a cost and re-times, taken against the
+same baseline in one session.
+
+#### The charge loop is the whole call
+
+This operator has a knob the others do not: the number of charges. Timing the same
+molecule and basis against k of them separates what is paid per charge from what is
+paid once, with no instrumentation at all.
+
+| case | fit | fixed, at k = N |
+| --- | --- | ---: |
+| tagrisso def2-svp, 70 atoms | 0.54 ms + 138 us x k | 5.3% |
+| taxol def2-tzvp, 110 atoms | 1.07 ms + 715 us x k | 1.3% |
+| crambin def2-tzvp, 642 atoms | 3.58 ms + 5419 us x k | 0.1% |
+
+T(k) is linear over three decades of k. So the sparsity pattern, the coordinates, the
+task list, the HRR transfer, the harmonic transform, the distributor and the dense fill
+are together between five per cent and one part in a thousand. **There is nothing to
+optimise outside the charge loop**, which is why no driver-level phase timers appear
+below: they would be measuring noise.
+
+#### Inside it
+
+The body evaluated per charge is `compute_pc`, `compute_full_npot_boys_function`, the
+VRR ladder, and `contract_primitives`. Each of the first three was ablated in turn --
+the Boys ladder replaced by a fill of the same rows, the pair exponential by the factor
+it multiplies, the accumulation by one column instead of ncols -- so that the writes and
+the dependencies stay and nothing is eliminated as dead:
+
+| case | baseline | Boys ladder | pair exp | contraction | remainder |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| tagrisso def2-svp | 10.25 ms | 47.6% | 17.1% | 1.2% | 34.1% |
+| taxol def2-tzvp | 79.53 ms | 39.3% | 21.9% | 3.6% | 35.2% |
+| crambin def2-tzvp | 3470 ms | 34.5% | 26.2% | 5.3% | 34.0% |
+
+Removing the Boys ladder and the pair exponential together gives 67.5, 60.9 and 61.1
+per cent against 64.7, 61.2 and 60.7 for the two measured separately -- **additive
+within three points**, which is the check that the attributions mean anything. The
+remainder is by subtraction: the VRR ladder, `compute_pc`, `_make_scaled_arguments`,
+the transform, and the once-paid part above.
+
+The Boys share falls as the angular momentum rises, 48 to 35 per cent, because the VRR
+ladder grows faster than the order of the Boys function does. The contraction is
+vectorised already and is small.
+
+#### The pair exponential is recomputed thousands of times
+
+`_scale_pair_values` carries `std::exp(-mu * ab_2[k])` in its inner loop:
+
+```
+    for (size_t j = 0; j < nrows; j++)
+    {
+        auto *row = buffer.data(target + 1 + j);
+
+        for (size_t k = 0; k < ncols; k++)
+        {
+            row[k] *= fj * std::exp(-mu * ab_2[k]);
+        }
+    }
+```
+
+`mu` is the pair of primitives and `ab_2` the atom pair. **Neither depends on the row or
+on the charge**, and the call sits inside the loop over charges. For crambin at
+def2-tzvp that is of order seven rows times six hundred and forty two charges -- some
+four thousand evaluations of an exponential where one would do -- and it is 26 per cent
+of the call. The share rises with the molecule for exactly that reason: the charge loop
+is the molecule.
+
+This is the same shape as the three-center kernel's `e_ab`, which recomputes its
+exponential for every atom on the c side and was 17 per cent there.
+
 ### The two-center Coulomb driver against the reference
 
 The bases are the fitting sets, which is what this operator is used with. A dash in the
