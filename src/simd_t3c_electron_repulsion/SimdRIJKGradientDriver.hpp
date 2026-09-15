@@ -18,7 +18,25 @@
 #include "MolecularBasis.hpp"
 #include "Molecule.hpp"
 #include "PackedMatrix.hpp"
+#include "SimdRIFockDriver.hpp"
 #include "SparseTensor.hpp"
+
+/// @brief The fitted densities the gradient contracts the derivative integrals
+/// against, which are formed once for the whole gradient.
+struct TFittedDensities
+{
+    /// @brief The fitting coefficients, c = V inverted times gamma, one per
+    /// auxiliary basis function.
+    std::vector<double> coefficients;
+
+    /// @brief The fitted densities of the occupied orbitals, d(q)_ij, one packed
+    /// symmetric matrix of the occupied orbitals for each auxiliary function.
+    std::vector<CPackedMatrix> orbital_densities;
+
+    /// @brief The two-index fitted density, one row and column per auxiliary
+    /// basis function.
+    CPackedMatrix omega;
+};
 
 /// @brief The Coulomb and exchange contributions to the molecular gradient,
 /// through the resolution of the identity, from B vectors which are already
@@ -77,6 +95,8 @@ class CSimdRIJKGradientDriver
     /// basis, as that driver holds it.
     /// @param density The density matrix.
     /// @param coefficients The occupied molecular orbitals.
+    /// @param exchange_scaling_factor The fraction of exact exchange: one for
+    /// Hartree-Fock, the fraction of a hybrid, zero for a pure functional.
     /// @param atoms The atoms to compute the gradient of.
     /// @param aux_atoms The atoms of the auxiliary basis the B vectors span, or
     /// an empty list for all of them.
@@ -93,6 +113,7 @@ class CSimdRIJKGradientDriver
                  const CPackedMatrix    &metric,
                  const CPackedMatrix    &density,
                  const CPackedMatrix    &coefficients,
+                 const double            exchange_scaling_factor,
                  const std::vector<int> &atoms,
                  const std::vector<int> &aux_atoms = {}) const -> CDenseMatrix;
 
@@ -105,9 +126,54 @@ class CSimdRIJKGradientDriver
                  const CSparseTensor   &bq_vectors,
                  const CPackedMatrix   &metric,
                  const CPackedMatrix   &density,
-                 const CPackedMatrix   &coefficients) const -> CDenseMatrix;
+                 const CPackedMatrix   &coefficients,
+                 const double           exchange_scaling_factor) const -> CDenseMatrix;
+
+    /// @brief Forms the fitted densities the derivative integrals are contracted
+    /// against, which is the whole of what the gradient needs before any of them
+    /// are computed.
+    /// @param bq_vectors The B vectors, as CSimdRIJKFockDriver formed them.
+    /// @param basis The molecular basis.
+    /// @param aux_basis The auxiliary molecular basis.
+    /// @param metric The inverted Cholesky factor of the metric.
+    /// @param density The density matrix.
+    /// @param coefficients The occupied molecular orbitals.
+    /// @param exchange_scaling_factor The fraction of exact exchange.
+    /// @return The fitting coefficients, the fitted densities of the orbitals and
+    /// the two-index fitted density.
+    /// @note This phase reads integrals of none: every quantity here is a
+    /// transformation of the B vectors the calculation already holds. The
+    /// transformation into the occupied orbitals is taken **before** the metric is
+    /// applied, which is the ordering rule of the note: applying the metric in the
+    /// basis of the atomic orbitals costs the ratio of their number squared to the
+    /// orbitals squared, which is a factor of fifty for a molecule of this size.
+    auto fitted_densities(const CSparseTensor   &bq_vectors,
+                          const CMolecularBasis &basis,
+                          const CMolecularBasis &aux_basis,
+                          const CPackedMatrix   &metric,
+                          const CPackedMatrix   &density,
+                          const CPackedMatrix   &coefficients,
+                          const double           exchange_scaling_factor) const -> TFittedDensities;
 
    private:
+    /// @brief Applies the transpose of the inverted Cholesky factor to columns.
+    auto _apply_transposed_factor(const CPackedMatrix &metric, double *values, const size_t ncols) const -> void;
+
+    /// @brief Applies it over the auxiliary index of a set of matrices.
+    auto _apply_transposed_factor(const CPackedMatrix &metric, std::vector<CPackedMatrix> &matrices) const -> void;
+
+    /// @brief Closes the second index of a half transformed B vector into the
+    /// occupied orbitals.
+    auto _close_orbitals(const CPackedMatrix &coefficients, const CPackedMatrix &half) const -> CPackedMatrix;
+
+    /// @brief Checks the metric is one this driver can use.
+    /// @param metric The metric handed over.
+    /// @param aux_basis The auxiliary molecular basis.
+    auto _check_metric(const CPackedMatrix &metric, const CMolecularBasis &aux_basis) const -> void;
+
+    /// @brief The driver which forms and transforms the B vectors.
+    CSimdRIFockDriver _drv;
+
     /// @brief The screening threshold of the integrals.
     double _threshold;
 

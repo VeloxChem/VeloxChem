@@ -317,6 +317,16 @@ export_simdintegrals(py::module &m) -> void
         .def("get_metric", &CSimdRIJKFockDriver::get_metric,
              py::return_value_policy::reference_internal, "Gets the inverted factor of the metric.");
 
+    // TFittedDensities, what the first phase of the gradient forms
+
+    py::class_<TFittedDensities>(m, "FittedDensities")
+        .def_readonly("coefficients", &TFittedDensities::coefficients,
+                      "The fitting coefficients, one per auxiliary basis function.")
+        .def_readonly("orbital_densities", &TFittedDensities::orbital_densities,
+                      "The fitted densities of the occupied orbitals, one matrix per auxiliary function.")
+        .def_readonly("omega", &TFittedDensities::omega,
+                      "The two-index fitted density the derivative of the metric is contracted against.");
+
     // CSimdRIJKGradientDriver class
 
     PyClass<CSimdRIJKGradientDriver>(m, "SimdRIJKGradientDriver")
@@ -333,6 +343,7 @@ export_simdintegrals(py::module &m) -> void
                                const CPackedMatrix &,
                                const CPackedMatrix &,
                                const CPackedMatrix &,
+                               const double,
                                const std::vector<int> &,
                                const std::vector<int> &>(&CSimdRIJKGradientDriver::compute, py::const_),
              "Computes the Coulomb and exchange contributions to the gradient of the given atoms, from the "
@@ -346,6 +357,7 @@ export_simdintegrals(py::module &m) -> void
              py::arg("metric"),
              py::arg("density"),
              py::arg("coefficients"),
+             py::arg("exchange_scaling_factor"),
              py::arg("atoms"),
              py::arg("aux_atoms") = std::vector<int>{})
         .def("compute",
@@ -355,7 +367,8 @@ export_simdintegrals(py::module &m) -> void
                                const CSparseTensor &,
                                const CPackedMatrix &,
                                const CPackedMatrix &,
-                               const CPackedMatrix &>(&CSimdRIJKGradientDriver::compute, py::const_),
+                               const CPackedMatrix &,
+                               const double>(&CSimdRIJKGradientDriver::compute, py::const_),
              "Computes the Coulomb and exchange contributions to the gradient of every atom of the molecule.",
              py::arg("molecule"),
              py::arg("basis"),
@@ -363,7 +376,20 @@ export_simdintegrals(py::module &m) -> void
              py::arg("bq_vectors"),
              py::arg("metric"),
              py::arg("density"),
-             py::arg("coefficients"))
+             py::arg("coefficients"),
+             py::arg("exchange_scaling_factor"))
+        .def("fitted_densities",
+             &CSimdRIJKGradientDriver::fitted_densities,
+             "Forms the fitted densities the derivative integrals are contracted against: the fitting "
+             "coefficients, the fitted densities of the occupied orbitals, and the two-index fitted "
+             "density. Reads no integrals, being a transformation of the B vectors alone.",
+             py::arg("bq_vectors"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("metric"),
+             py::arg("density"),
+             py::arg("coefficients"),
+             py::arg("exchange_scaling_factor"))
         .def("get_threshold", &CSimdRIJKGradientDriver::get_threshold,
              "Gets screening threshold of the integrals.")
         .def("get_block_size", &CSimdRIJKGradientDriver::get_block_size,
