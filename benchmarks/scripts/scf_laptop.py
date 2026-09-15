@@ -42,9 +42,19 @@ def main():
     parser.add_argument("--out", default=None)
     parser.add_argument("--quick", action="store_true",
                         help="the two smallest pairs only, to check the wiring")
+    parser.add_argument("--bases", default=None,
+                        help="a comma separated subset of the orbital bases; each "
+                             "keeps the fitting set it is paired with above")
     args = parser.parse_args()
 
     pairs = PAIRS[:1] + PAIRS[4:5] if args.quick else PAIRS
+
+    if args.bases:
+        wanted = [b.strip().lower() for b in args.bases.split(",")]
+        pairs = [p for p in pairs if p[0] in wanted]
+        missing = set(wanted) - {p[0] for p in pairs}
+        if missing:
+            raise SystemExit(f"no such pair: {', '.join(sorted(missing))}")
 
     threads = int(os.environ.get("OMP_NUM_THREADS", os.cpu_count()))
     info = scfbench.provenance(args.machine, ranks=1, threads=threads)
