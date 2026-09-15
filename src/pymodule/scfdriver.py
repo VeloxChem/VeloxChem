@@ -649,6 +649,15 @@ class ScfDriver:
 
         profiler = Profiler()
 
+        # NOTE: kept so that a caller can read the per-iteration timings after the
+        # calculation. The profiler fills timing_dict with FockERI and FockXC among
+        # its labels when timing is set, and it was a local until the benchmarks
+        # needed to separate the two-electron build from the quadrature.
+        self._profiler = profiler
+
+        # Zero unless the resolution of the identity is used, and set below.
+        self._ri_setup_time = 0.0
+
         # Reset per-calculation state. This makes repeated compute() calls
         # on the same driver safe when point charges or the static electric
         # field are removed between calculations, and prevents a skipped SCF
@@ -1786,6 +1795,12 @@ class ScfDriver:
 
         profiler.check_memory_usage('Initial guess')
 
+        # NOTE: what the resolution of the identity pays before the first Fock
+        # build -- the metric and the B vectors. It is one cost for the whole
+        # calculation rather than one per iteration, and it belongs neither to the
+        # builds nor to the rest of them, so it is timed on its own.
+        ri_setup_t0 = tm.time()
+
         if self.ri_coulomb:
             self._ri_drv = RIFockDriver(self.comm, self.ostream)
             self._ri_drv.prepare_buffers(molecule,
@@ -1945,6 +1960,8 @@ class ScfDriver:
                                                      self.ri_auxiliary_basis,
                                                      thresh_int,
                                                      verbose=False)
+
+        self._ri_setup_time = tm.time() - ri_setup_t0
 
         e_grad = None
 
