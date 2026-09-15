@@ -331,10 +331,15 @@ export_simdintegrals(py::module &m) -> void
 
     PyClass<CSimdRIJKGradientDriver>(m, "SimdRIJKGradientDriver")
         .def(py::init<>())
-        .def(py::init<const double, const size_t>(),
-             "Creates a gradient driver with given screening threshold and target block size.",
+        .def(py::init<const double, const size_t, const size_t>(),
+             "Creates a gradient driver with given screening threshold, target block size and memory "
+             "budget. The budget bounds the batch of auxiliary functions the transformation into the "
+             "occupied orbitals holds at a time, and nothing else.",
              py::arg("threshold"),
-             py::arg("block_size") = 0)
+             py::arg("block_size")    = 0,
+             py::arg("memory_budget") = size_t{4} * 1024 * 1024 * 1024)
+        .def("get_memory_budget", &CSimdRIJKGradientDriver::get_memory_budget,
+             "Gets the memory the driver may hold, in bytes.")
         .def("compute",
              py::overload_cast<const CMolecule &,
                                const CMolecularBasis &,

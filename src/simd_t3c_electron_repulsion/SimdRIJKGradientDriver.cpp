@@ -17,6 +17,12 @@
 
 #include "ErrorHandler.hpp"
 
+#ifdef VLX_USE_MATHLIB
+#include "MathLibrary.hpp"
+#else
+#include "Eigen/Dense"
+#endif
+
 auto
 CSimdRIJKGradientDriver::get_threshold() const -> double
 {
@@ -27,6 +33,56 @@ auto
 CSimdRIJKGradientDriver::get_block_size() const -> size_t
 {
     return _block_size;
+}
+
+/// @brief The product of two row major matrices, C = A B.
+/// @note The library is column major and the column major matrix of a row major
+/// array is its transpose, so the product of the row major arrays is the product
+/// of the two in the other order with the rows and the columns swapped. The same
+/// reading the Fock driver's multiply takes.
+static auto
+_multiply(const size_t  nrows,
+          const size_t  ncols,
+          const size_t  nsums,
+          const double *amat,
+          const double *bmat,
+          double       *cmat) -> void
+{
+#ifdef VLX_USE_MATHLIB
+
+    const char trans = 'N';
+
+    const double alpha = 1.0;
+
+    const double beta = 0.0;
+
+    auto m_arg = static_cast<lapack_int_t>(ncols);
+
+    auto n_arg = static_cast<lapack_int_t>(nrows);
+
+    auto k_arg = static_cast<lapack_int_t>(nsums);
+
+    auto ldb_arg = static_cast<lapack_int_t>(ncols);
+
+    auto lda_arg = static_cast<lapack_int_t>(nsums);
+
+    auto ldc_arg = static_cast<lapack_int_t>(ncols);
+
+    dgemm_(&trans, &trans, &m_arg, &n_arg, &k_arg, &alpha, bmat, &ldb_arg, amat, &lda_arg, &beta, cmat, &ldc_arg);
+
+#else
+
+    using RowMajorMatrix = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
+
+    Eigen::Map<const RowMajorMatrix> a(amat, static_cast<Eigen::Index>(nrows), static_cast<Eigen::Index>(nsums));
+
+    Eigen::Map<const RowMajorMatrix> b(bmat, static_cast<Eigen::Index>(nsums), static_cast<Eigen::Index>(ncols));
+
+    Eigen::Map<RowMajorMatrix> c(cmat, static_cast<Eigen::Index>(nrows), static_cast<Eigen::Index>(ncols));
+
+    c.noalias() = a * b;
+
+#endif
 }
 
 /// @brief Applies the transpose of the inverted Cholesky factor to a set of
@@ -112,40 +168,33 @@ CSimdRIJKGradientDriver::_apply_transposed_factor(const CPackedMatrix        &me
 }
 
 auto
-CSimdRIJKGradientDriver::_close_orbitals(const CPackedMatrix &coefficients, const CPackedMatrix &half) const
-    -> CPackedMatrix
+CSimdRIJKGradientDriver::_close_orbitals(const std::vector<double> &transposed,
+                                         const size_t               nao,
+                                         const size_t               norbs,
+                                         const CPackedMatrix       &half) const -> CPackedMatrix
 {
-    // NOTE: the second half of the transformation, which leaves a symmetric
-    // matrix of the occupied orbitals: d(q)_ij = sum over mu of C_mu,i W(q)_mu,j.
-
-    const auto nao = coefficients.number_of_rows();
-
-    const auto norbs = coefficients.number_of_columns();
-
-    auto dense_c = std::vector<double>(nao * norbs, 0.0);
+    // NOTE: the second half of the transformation, d(q)_ij = sum over mu of
+    // C_mu,i W(q)_mu,j, which is one product of the transposed coefficients with
+    // the half transformed matrix. The result is symmetric and only its lower
+    // triangle is kept, but the product forms the square: the symmetric product
+    // of the library would need the two factors to be the same matrix, and these
+    // are not.
 
     auto dense_w = std::vector<double>(nao * norbs, 0.0);
 
-    coefficients.to_dense(dense_c.data());
-
     half.to_dense(dense_w.data());
 
-    auto closed = CPackedMatrix(norbs, norbs, mat_t::symmetric);
+    auto square = std::vector<double>(norbs * norbs, 0.0);
 
-    closed.zero();
+    _multiply(norbs, norbs, nao, transposed.data(), dense_w.data(), square.data());
+
+    auto closed = CPackedMatrix(norbs, norbs, mat_t::symmetric);
 
     for (size_t i = 0; i < norbs; i++)
     {
         for (size_t j = 0; j <= i; j++)
         {
-            double sum = 0.0;
-
-            for (size_t mu = 0; mu < nao; mu++)
-            {
-                sum += dense_c[mu * norbs + i] * dense_w[mu * norbs + j];
-            }
-
-            closed.data()[closed.index(i, j)] = sum;
+            closed.data()[closed.index(i, j)] = square[i * norbs + j];
         }
     }
 
@@ -207,15 +256,92 @@ CSimdRIJKGradientDriver::fitted_densities(const CSparseTensor   &bq_vectors,
     // function; the metric is applied to those and never in the basis of the
     // atomic orbitals.
 
-    auto half = _drv.compute_w_vectors(bq_vectors, basis, aux_basis, coefficients, 0, naux);
-
     auto orbital_densities = std::vector<CPackedMatrix>();
 
     orbital_densities.reserve(naux);
 
     for (size_t q = 0; q < naux; q++)
     {
-        orbital_densities.push_back(_close_orbitals(coefficients, half[q]));
+        orbital_densities.push_back(CPackedMatrix(norbs, norbs, mat_t::symmetric));
+    }
+
+    // NOTE: the half transformed W matrices are the basis functions times the
+    // orbitals for every auxiliary function, which is the largest thing this
+    // phase could hold and the one thing it must not hold whole: at two thousand
+    // functions, two hundred orbitals and eight thousand auxiliary functions it
+    // is twenty six gigabytes, where the fitted densities it closes them into are
+    // one and a half. They are formed for a batch of the auxiliary basis, closed,
+    // and the storage reused for the next batch.
+
+    const auto nao = coefficients.number_of_rows();
+
+    // NOTE: the transpose of the coefficients, formed once for the whole phase.
+    // It is the basis functions times the orbitals, which is nothing beside the
+    // matrices it multiplies, and it saves a transposed product per auxiliary
+    // function and the reading of a transposed array in the inner loop.
+
+    auto dense_c = std::vector<double>(nao * norbs, 0.0);
+
+    coefficients.to_dense(dense_c.data());
+
+    auto transposed = std::vector<double>(norbs * nao, 0.0);
+
+    for (size_t mu = 0; mu < nao; mu++)
+    {
+        for (size_t i = 0; i < norbs; i++)
+        {
+            transposed[i * nao + mu] = dense_c[mu * norbs + i];
+        }
+    }
+
+    const auto per_function = nao * norbs * sizeof(double);
+
+    const auto by_memory = std::max(size_t{1}, _budget / std::max(per_function, size_t{1}));
+
+    const auto nbatch = std::min(naux, std::max(_min_batch, by_memory));
+
+    auto half = std::vector<CPackedMatrix>();
+
+    for (size_t at = 0; at < nbatch; at++)
+    {
+        half.push_back(CPackedMatrix(nao, norbs, mat_t::general));
+    }
+
+    for (size_t first = 0; first < naux; first += nbatch)
+    {
+        const auto last = std::min(first + nbatch, naux);
+
+        const auto count = last - first;
+
+        auto functions = std::vector<size_t>(count);
+
+        std::iota(functions.begin(), functions.end(), first);
+
+        // NOTE: the last batch is shorter than the others and the transformation
+        // fills what it is handed, so it is handed the front of the storage.
+
+        if (count == nbatch)
+        {
+            _drv.compute_w_vectors(bq_vectors, basis, aux_basis, coefficients, functions, half);
+        }
+        else
+        {
+            auto tail = std::vector<CPackedMatrix>(half.begin(), half.begin() + static_cast<long>(count));
+
+            _drv.compute_w_vectors(bq_vectors, basis, aux_basis, coefficients, functions, tail);
+
+            std::copy(tail.begin(), tail.end(), half.begin());
+        }
+
+        const auto nrange = static_cast<int>(count);
+
+#pragma omp parallel for schedule(static) if (nrange > 1)
+        for (int at = 0; at < nrange; at++)
+        {
+            const auto q = static_cast<size_t>(at);
+
+            orbital_densities[first + q] = _close_orbitals(transposed, nao, norbs, half[q]);
+        }
     }
 
     _apply_transposed_factor(metric, orbital_densities);
@@ -265,6 +391,12 @@ CSimdRIJKGradientDriver::fitted_densities(const CSparseTensor   &bq_vectors,
     }
 
     return {std::move(fitting), std::move(orbital_densities), std::move(omega)};
+}
+
+auto
+CSimdRIJKGradientDriver::get_memory_budget() const -> size_t
+{
+    return _budget;
 }
 
 auto

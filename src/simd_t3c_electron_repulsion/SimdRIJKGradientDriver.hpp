@@ -63,9 +63,16 @@ class CSimdRIJKGradientDriver
     /// @param threshold The screening threshold of the integrals.
     /// @param block_size The target number of atom pairs of a block, or zero to
     /// choose it from the number of the threads and the number of the atom pairs.
-    explicit CSimdRIJKGradientDriver(const double threshold = 1.0e-12, const size_t block_size = 0)
+    /// @param memory_budget The memory the driver may hold for the half
+    /// transformed B vectors, in bytes. It bounds the batch of auxiliary
+    /// functions and nothing else: the fitted densities of the orbitals are
+    /// M o squared over two whatever the batch, and are held whole.
+    explicit CSimdRIJKGradientDriver(const double threshold      = 1.0e-12,
+                                     const size_t block_size     = 0,
+                                     const size_t memory_budget  = _default_budget)
         : _threshold(threshold)
         , _block_size(block_size)
+        , _budget(memory_budget)
     {
     }
 
@@ -84,6 +91,10 @@ class CSimdRIJKGradientDriver
     /// @brief Gets the target number of atom pairs of a block.
     /// @return The target number of atom pairs.
     auto get_block_size() const -> size_t;
+
+    /// @brief Gets the memory the driver may hold, in bytes.
+    /// @return The memory budget.
+    auto get_memory_budget() const -> size_t;
 
     /// @brief Computes the Coulomb and exchange contributions to the gradient of
     /// the atoms it is asked for.
@@ -164,7 +175,10 @@ class CSimdRIJKGradientDriver
 
     /// @brief Closes the second index of a half transformed B vector into the
     /// occupied orbitals.
-    auto _close_orbitals(const CPackedMatrix &coefficients, const CPackedMatrix &half) const -> CPackedMatrix;
+    auto _close_orbitals(const std::vector<double> &transposed,
+                         const size_t               nao,
+                         const size_t               norbs,
+                         const CPackedMatrix       &half) const -> CPackedMatrix;
 
     /// @brief Checks the metric is one this driver can use.
     /// @param metric The metric handed over.
@@ -179,6 +193,21 @@ class CSimdRIJKGradientDriver
 
     /// @brief The target number of atom pairs of a block.
     size_t _block_size;
+
+    /// @brief The memory the driver may hold for the half transformed B vectors.
+    size_t _budget;
+
+    /// @brief The memory a driver may hold when none is named, in bytes.
+    /// @note Four gigabytes, which is a batch of the auxiliary basis and not the
+    /// fitted densities themselves. A caller which knows what the machine has, or
+    /// how many of it share the machine, should say so rather than take this.
+    static constexpr size_t _default_budget = size_t{4} * 1024 * 1024 * 1024;
+
+    /// @brief The smallest batch of auxiliary functions to transform at a time.
+    /// @note A batch below this is not worth the call, and one function at a time
+    /// is what the test which checks the batching does not change the answer asks
+    /// for, so the floor is not applied when the budget names something smaller.
+    static constexpr size_t _min_batch = 16;
 };
 
 #endif /* SimdRIJKGradientDriver_hpp */
