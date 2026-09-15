@@ -45,6 +45,7 @@ VLX_LIBS_DIR += simd_t2c_nuclear_potential
 VLX_LIBS_DIR += simd_t2c_electron_repulsion
 VLX_LIBS_DIR += simd_t2c_electron_repulsion_grad
 VLX_LIBS_DIR += simd_t3c_electron_repulsion
+VLX_LIBS_DIR += simd_t3c_electron_repulsion_grad
 VLX_LIBS_DIR += python
 VLX_LIBS_DIR += t2c_func
 VLX_LIBS_DIR += t2c_geometrical_derivatives

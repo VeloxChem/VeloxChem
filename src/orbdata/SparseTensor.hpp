@@ -83,12 +83,22 @@ class CSparseTensor
         , _type(mat_t::general)
 
         , _values_state(valstat::empty)
+
+        , _ncomponents(1)
     {
     }
 
     /// @brief The constructor with sparsity patterns of the blocks and tensor type.
     /// @param blocks The sparsity patterns of the blocks.
     /// @param mat_type The type of tensor.
+    /// @param ncomponents The number of values each element carries. One for an
+    /// integral, and more for a quantity with components of its own -- six for
+    /// the derivative of a three-center integral, which carries the three
+    /// Cartesian directions of each of the two centers on bra side.
+    /// @note The components multiply the elements: every offset inside a block
+    /// scales by the count, and the components of one combination are
+    /// consecutive. A caller reading one component of one combination therefore
+    /// reads a run, and nothing about the layout of the elements changes.
     CSparseTensor(const std::vector<CAtomBasisTripleSparsity> &blocks, const mat_t mat_type)
 
         : _blocks(blocks)
@@ -98,6 +108,8 @@ class CSparseTensor
         , _type(mat_type)
 
         , _values_state(valstat::empty)
+
+        , _ncomponents(1)
     {
     }
 
@@ -115,6 +127,8 @@ class CSparseTensor
         , _type(pattern.get_type())
 
         , _values_state(valstat::empty)
+
+        , _ncomponents(1)
     {
     }
 
@@ -189,6 +203,8 @@ class CSparseTensor
         , _type(other._type)
 
         , _values_state(other._values_state)
+
+        , _ncomponents(other._ncomponents)
     {
         if (_values_state == valstat::allocated) _copy_values(other);
     }
@@ -204,6 +220,8 @@ class CSparseTensor
         , _type(other._type)
 
         , _values_state(other._values_state)
+
+        , _ncomponents(other._ncomponents)
     {
         other._values.clear();
 
@@ -228,6 +246,8 @@ class CSparseTensor
 
             _blocks = other._blocks;
 
+            _ncomponents = other._ncomponents;
+
             _values.assign(other._values.size(), nullptr);
 
             _type = other._type;
@@ -251,6 +271,8 @@ class CSparseTensor
             _deallocate();
 
             _blocks = std::move(other._blocks);
+
+            _ncomponents = other._ncomponents;
 
             _values = std::move(other._values);
 
@@ -433,8 +455,12 @@ class CSparseTensor
            const int    c_angular_momentum,
            const size_t c_index) -> double *
     {
-        return values(index) + _blocks[index].element_offset(a_angular_momentum, a_index, b_angular_momentum, b_index,
-                                                             c_angular_momentum, c_index);
+        // NOTE: every offset inside a block scales by the components, as the
+        // components of a combination are consecutive. With one component, which
+        // is an integral, this is the offset itself.
+
+        return values(index) + _ncomponents * _blocks[index].element_offset(a_angular_momentum, a_index, b_angular_momentum,
+                                                                           b_index, c_angular_momentum, c_index);
     }
 
     /// @brief Gets values of specific combination of basis functions in the
@@ -456,8 +482,12 @@ class CSparseTensor
            const int    c_angular_momentum,
            const size_t c_index) const -> const double *
     {
-        return values(index) + _blocks[index].element_offset(a_angular_momentum, a_index, b_angular_momentum, b_index,
-                                                             c_angular_momentum, c_index);
+        // NOTE: every offset inside a block scales by the components, as the
+        // components of a combination are consecutive. With one component, which
+        // is an integral, this is the offset itself.
+
+        return values(index) + _ncomponents * _blocks[index].element_offset(a_angular_momentum, a_index, b_angular_momentum,
+                                                                           b_index, c_angular_momentum, c_index);
     }
 
     /// @brief Gets number of values required to store the integrals of specific
@@ -469,7 +499,32 @@ class CSparseTensor
     {
         errors::assertMsgCritical(index < _blocks.size(), std::string("SparseTensor.number_of_elements: Index of block is out of range"));
 
-        return _blocks[index].number_of_elements();
+        return _ncomponents * _blocks[index].number_of_elements();
+    }
+
+    /// @brief Gets the number of values each element of the tensor carries.
+    /// @return The number of components.
+    auto
+    number_of_components() const -> size_t
+    {
+        return _ncomponents;
+    }
+
+    /// @brief Sets the number of values each element carries.
+    /// @param ncomponents The number of components.
+    /// @note The values are freed if they were allocated, as their size changes
+    /// with the components and a block allocated for one count cannot hold
+    /// another. Set the components before allocating.
+    auto
+    set_number_of_components(const size_t ncomponents) -> void
+    {
+        errors::assertMsgCritical(ncomponents > 0, std::string("SparseTensor.set_number_of_components: Expecting components"));
+
+        if (_ncomponents == ncomponents) return;
+
+        deallocate();
+
+        _ncomponents = ncomponents;
     }
 
     /// @brief Gets number of values required to store the integrals of all blocks.
@@ -573,6 +628,11 @@ class CSparseTensor
 
     /// @brief The state of the values blocks of tensor.
     valstat _values_state;
+
+    /// @brief The number of values each element of the tensor carries.
+    /// @note One for an integral. A derivative of a three-center integral
+    /// carries six, three directions for each of the two centers on bra side.
+    size_t _ncomponents;
 };
 
 #endif /* SparseTensor_hpp */

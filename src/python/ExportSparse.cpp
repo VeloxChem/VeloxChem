@@ -375,6 +375,9 @@ export_sparse(py::module &m) -> void
     // CSparseTensor class
 
     PyClass<CSparseTensor>(m, "SparseTensor")
+        .def("number_of_components", &CSparseTensor::number_of_components,
+             "Gets the number of values each element carries. One for an integral, six for the "
+             "derivative of a three-center integral with respect to the two atoms on bra side.")
         .def(py::init<>())
         .def(py::init<const CMolecule &,
                       const CMolecularBasis &,

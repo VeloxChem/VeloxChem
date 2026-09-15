@@ -43,6 +43,7 @@
 #include "Molecule.hpp"
 #include "PackedMatrix.hpp"
 #include "SparseTensor.hpp"
+#include "TripleSparsityPattern.hpp"
 #include "SimdKineticEnergyDriver.hpp"
 #include "SimdNuclearPotentialDriver.hpp"
 #include "SimdOverlapDriver.hpp"
@@ -50,6 +51,7 @@
 #include "SimdRIJKFockDriver.hpp"
 #include "SimdRIJKGradientDriver.hpp"
 #include "SimdTwoCenterElectronRepulsionGradientDriver.hpp"
+#include "SimdThreeCenterElectronRepulsionGradientDriver.hpp"
 #include "SimdThreeCenterElectronRepulsionDriver.hpp"
 #include "SimdTwoCenterElectronRepulsionDriver.hpp"
 #include "SparseMatrix.hpp"
@@ -143,8 +145,37 @@ export_simdintegrals(py::module &m) -> void
 
     // CSimdThreeCenterElectronRepulsionDriver class
 
+    // CTripleSparsityPattern, which the gradient of the three-center integrals is
+    // asked for rather than forming: it must be the one the calculation already
+    // holds, so that the derivative indexes the same atom pairs as the B vectors.
+
+    PyClass<CTripleSparsityPattern>(m, "TripleSparsityPattern")
+        .def("number_of_blocks", &CTripleSparsityPattern::number_of_blocks,
+             "Gets the number of blocks of the pattern.")
+        .def("get_threshold", &CTripleSparsityPattern::get_threshold,
+             "Gets the screening threshold the pattern was described with.");
+
     PyClass<CSimdThreeCenterElectronRepulsionDriver>(m, "SimdThreeCenterElectronRepulsionDriver")
         .def(py::init<>())
+        .def("make_pattern",
+             static_cast<CTripleSparsityPattern (CSimdThreeCenterElectronRepulsionDriver::*)(
+                 const CMolecule &, const CMolecularBasis &, const CMolecularBasis &, const double) const>(
+                 &CSimdThreeCenterElectronRepulsionDriver::make_pattern),
+             "Creates the sparsity pattern the integrals are computed in.",
+             py::arg("molecule"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("threshold"))
+        .def("make_pattern",
+             static_cast<CTripleSparsityPattern (CSimdThreeCenterElectronRepulsionDriver::*)(
+                 const CMolecule &, const CMolecularBasis &, const CMolecularBasis &, const double,
+                 const std::vector<int> &) const>(&CSimdThreeCenterElectronRepulsionDriver::make_pattern),
+             "Creates it for the given atoms on the auxiliary side.",
+             py::arg("molecule"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("threshold"),
+             py::arg("atoms"))
         .def("compute",
              static_cast<CSparseTensor (CSimdThreeCenterElectronRepulsionDriver::*)(
                  const CMolecule &, const CMolecularBasis &, const CMolecularBasis &, const double) const>(
@@ -317,6 +348,25 @@ export_simdintegrals(py::module &m) -> void
              py::return_value_policy::reference_internal, "Gets the B vectors the driver holds.")
         .def("get_metric", &CSimdRIJKFockDriver::get_metric,
              py::return_value_policy::reference_internal, "Gets the inverted factor of the metric.");
+
+    // CSimdThreeCenterElectronRepulsionGradientDriver class
+
+    PyClass<CSimdThreeCenterElectronRepulsionGradientDriver>(m, "SimdThreeCenterElectronRepulsionGradientDriver")
+        .def(py::init<>())
+        .def(py::init<const size_t>(),
+             "Creates a driver with given target block size.",
+             py::arg("block_size"))
+        .def("compute",
+             &CSimdThreeCenterElectronRepulsionGradientDriver::compute,
+             "Computes the derivative of the three-center electron repulsion integrals with respect to "
+             "the two atoms on bra side, over a pattern the caller already holds. The tensor carries six "
+             "components an element; the derivative of the auxiliary center is the negative of the two.",
+             py::arg("pattern"),
+             py::arg("molecule"),
+             py::arg("basis"),
+             py::arg("aux_basis"))
+        .def("get_block_size", &CSimdThreeCenterElectronRepulsionGradientDriver::get_block_size,
+             "Gets target number of atom pairs of a block.");
 
     // CSimdTwoCenterElectronRepulsionGradientDriver class
 
