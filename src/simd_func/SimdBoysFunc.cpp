@@ -345,6 +345,57 @@ _scale_pair_values(CSimdMatrix       &buffer,
     }
 }
 
+/// @brief Scales the values of a Boys function as _scale_pair_values does, forming
+/// the exponential of the pair once for the call rather than once for every row.
+/// @note The exponential depends on the pair of primitives and on the atom pair and
+/// on nothing else. Carrying it in the inner loop cost 17 to 26 per cent of a nuclear
+/// attraction call, as it was evaluated for each of the rows and, the caller being
+/// inside the loop over the charges, for each of those as well. Hoisting it is worth
+/// 1.11 to 1.16 there, and the larger the molecule the more, the charge loop being
+/// the molecule.
+/// @note The three-center electron repulsion has the same structure and deliberately
+/// does **not** use this. Measured once each way, its two cases disagreed --
+/// tagrisso/def2-svp 290 to 264 ms, taxol/def2-tzvp 13.49 to 15.59 s -- and a run
+/// there is long enough that both numbers are single samples. It trades an
+/// exponential for a stream of ncols doubles, which is a different trade for a kernel
+/// whose blocks are larger. Merging the two wants that measurement first.
+/// @note The scratch is held per thread and grown rather than allocated per call,
+/// which is a hot path.
+static auto
+_scale_pair_values_once(CSimdMatrix       &buffer,
+                        const CSimdMatrix &coordinates,
+                        const size_t       target,
+                        const size_t       nrows,
+                        const size_t       ncols,
+                        const double       fj,
+                        const double       mu) -> void
+{
+    const auto *ab_2 = coordinates.data(9);
+
+    static thread_local std::vector<double> factors;
+
+    if (factors.size() < ncols) factors.resize(ncols);
+
+    auto *pair_exp = factors.data();
+
+#pragma omp simd
+    for (size_t k = 0; k < ncols; k++)
+    {
+        pair_exp[k] = fj * std::exp(-mu * ab_2[k]);
+    }
+
+    for (size_t j = 0; j < nrows; j++)
+    {
+        auto *row = buffer.data(target + 1 + j);
+
+#pragma omp simd aligned(row : simd::cache_line_size())
+        for (size_t k = 0; k < ncols; k++)
+        {
+            row[k] *= pair_exp[k];
+        }
+    }
+}
+
 auto
 compute_t3c_boys_function(CSimdMatrix                        &buffer,
                           const CSimdMatrix                  &coordinates,
@@ -396,7 +447,7 @@ compute_npot_boys_function(CSimdMatrix                        &buffer,
 
     compute_boys_values(buffer, target, orders, ncols);
 
-    _scale_pair_values(buffer, coordinates, target, orders.size(), ncols, fz, mu);
+    _scale_pair_values_once(buffer, coordinates, target, orders.size(), ncols, fz, mu);
 }
 
 auto
@@ -414,7 +465,7 @@ compute_full_npot_boys_function(CSimdMatrix       &buffer,
 
     compute_boys_values(buffer, target, order, ncols);
 
-    _scale_pair_values(buffer, coordinates, target, order + 1, ncols, fz, mu);
+    _scale_pair_values_once(buffer, coordinates, target, order + 1, ncols, fz, mu);
 }
 
 }  // namespace simdfunc

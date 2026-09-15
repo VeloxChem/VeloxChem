@@ -4660,6 +4660,32 @@ is the molecule.
 This is the same shape as the three-center kernel's `e_ab`, which recomputes its
 exponential for every atom on the c side and was 17 per cent there.
 
+#### Hoisting it out of the row loop
+
+Formed once for the call into a scratch held per thread, every row then scaled by it.
+The A/B is the same binary either way, both measured in one session:
+
+| case | before | after | x |
+| --- | ---: | ---: | ---: |
+| tagrisso def2-svp | 10.24 ms | 9.26 ms | 1.106 |
+| taxol def2-tzvp | 79.86 ms | 70.38 ms | 1.135 |
+| crambin def2-tzvp | 3465.40 ms | 2966.55 ms | **1.168** |
+
+The gain rises with the molecule because the charge loop is the molecule. What is left
+of the 26 per cent is one `ncols` of exponentials per charge, where the operator wants
+one per pair of primitives; removing that means keeping the values across the charge
+loop, which needs a row of the buffer to keep them in, and that is the generator's to
+give.
+
+**The three-center kernels deliberately keep the old form.** They call the same
+function and the same argument applies to them, but measured once each way the two
+cases disagreed -- tagrisso/def2-svp 290 to 264 ms, taxol/def2-tzvp 13.49 to 15.59 s --
+and at thirteen seconds a run both numbers are single samples. The change trades an
+exponential for a stream of `ncols` doubles, which is a different trade for a kernel
+whose blocks are larger, and 441 kernels is too many to move on a coin toss. With the
+three-center path left alone it measures 287 ms and 13.79 s against 290 ms and 13.49 s,
+which is where it was.
+
 ### The two-center Coulomb driver against the reference
 
 The bases are the fitting sets, which is what this operator is used with. A dash in the
