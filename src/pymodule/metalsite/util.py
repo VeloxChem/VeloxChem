@@ -314,64 +314,15 @@ class Shell:
 _master_depth = 0
 
 
-def run_on_master(comm, work):
+def on_master(method):
     """
-    Runs work on the master rank inside a master-only section and hands
-    what it returned -- or the exception it raised -- to every rank.
-
-    What on_master does for a method, for a callable: an interface class
-    chaining several shell calls with its own bookkeeping between them
-    runs the whole chain here, so that the shell calls inside run inline
-    and the result crosses once. A call from inside a master-only section
-    runs inline itself.
+    Runs the body on the master rank only and hands what it returned -- or
+    the exception it raised -- to every rank. Nested calls run inline.
 
     The master keeps what it computed: bcast hands the root an unpickled
     copy of its own value as well, and a copy is not the same thing -- a
     force field generator comes back with a silent stream, and a large
     topology is pickled twice for nothing.
-
-    :param comm:
-        The MPI communicator.
-    :param work:
-        A callable taking no arguments.
-
-    :return:
-        What work returned, on every rank.
-    """
-
-    global _master_depth
-
-    if _master_depth > 0:
-        return work()
-
-    _master_depth += 1
-    try:
-        outcome = None
-        if comm.Get_rank() == mpi_master():
-            try:
-                outcome = ('value', work())
-            except Exception as error:
-                outcome = ('error', error)
-        if comm.Get_size() > 1:
-            received = comm.bcast(outcome, root=mpi_master())
-            if comm.Get_rank() != mpi_master():
-                outcome = received
-    finally:
-        _master_depth -= 1
-
-    kind, payload = outcome
-
-    if kind == 'error':
-        raise payload
-
-    return payload
-
-
-def on_master(method):
-    """
-    Runs the body on the master rank only and hands what it returned -- or
-    the exception it raised -- to every rank. Nested calls run inline; see
-    run_on_master.
 
     :param method:
         The method to decorate.
@@ -382,7 +333,32 @@ def on_master(method):
 
     @functools.wraps(method)
     def wrapper(self, *args, **kwargs):
-        return run_on_master(self.comm, lambda: method(self, *args, **kwargs))
+        global _master_depth
+
+        if _master_depth > 0:
+            return method(self, *args, **kwargs)
+
+        _master_depth += 1
+        try:
+            outcome = None
+            if self.rank == mpi_master():
+                try:
+                    outcome = ('value', method(self, *args, **kwargs))
+                except Exception as error:
+                    outcome = ('error', error)
+            if self.nodes > 1:
+                received = self.comm.bcast(outcome, root=mpi_master())
+                if self.rank != mpi_master():
+                    outcome = received
+        finally:
+            _master_depth -= 1
+
+        kind, payload = outcome
+
+        if kind == 'error':
+            raise payload
+
+        return payload
 
     return wrapper
 

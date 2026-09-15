@@ -1280,6 +1280,176 @@ class ActiveSiteBuilder(Shell):
         return new_request
 
     @on_master
+    def include_residue(self, request, binding_modes, topology, resid,
+                        chain=None):
+        """
+        Puts a residue into the truncated active site.
+
+        The cluster is otherwise exactly the residues that coordinate a
+        metal. This adds one that does not have to -- a second-shell residue
+        that hydrogen bonds to a ligand, or one whose sidechain the QM should
+        see for any other reason. It is truncated and capped like every other
+        residue, and it keeps whatever protonation the pH gives it unless
+        update_protonation_state says otherwise.
+
+        :param request:
+            The record of what has been decided about the site. Not
+            modified.
+        :param binding_modes:
+            The coordination as it stands, for what the site already holds.
+        :param topology:
+            The topology the residue is looked up in.
+        :param resid:
+            The residue, as an id ('58' or 58) or as a label ('TYR58').
+        :param chain:
+            The chain id, when the residue id occurs in more than one chain.
+
+        :return:
+            The edited request, or None when the residue was already in the
+            site and there was nothing to do.
+        """
+
+        residue = self._resolve_residue(topology, resid, chain)
+        self.check_truncatable(residue)
+
+        label = residue_label(residue)
+        already = residue.index in active_site_residues(binding_modes)
+        excluded = residue.index in request.get('excluded_residues', [])
+
+        if already and not excluded:
+            self.ostream.print_warning(
+                f'{label} is already part of the active site; nothing to '
+                'include')
+            self.ostream.flush()
+            return None
+
+        request = deepcopy(request)
+        request['excluded_residues'] = [
+            index for index in request.get('excluded_residues', [])
+            if index != residue.index
+        ]
+        extra = set(request.get('extra_residues', []))
+        extra.add(residue.index)
+        request['extra_residues'] = sorted(extra)
+
+        self.ostream.print_info(f'Added {label} to the active site.')
+        self.ostream.flush()
+
+        return request
+
+    @on_master
+    def remove_residue(self,
+                       request,
+                       binding_modes,
+                       topology,
+                       positions,
+                       resid,
+                       chain=None,
+                       metal_elements=METAL_ELEMENTS,
+                       metal_formal_charges=None,
+                       bidentate_asymmetry=BIDENTATE_ASYMMETRY,
+                       metal_bond_cutoff=METAL_BOND_CUTOFF,
+                       report_cutoff=REPORT_CUTOFF):
+        """
+        Takes a residue out of the truncated active site.
+
+        Any metal bonds it makes go with it, recorded the way
+        remove_metal_bond records them, so that neither the residue nor its
+        coordination comes back when the site is detected again on a relaxed
+        geometry.
+
+        A metal that would be left with no ligand at all, and the last
+        residue of the site, are refused: what is left would not be an active
+        site.
+
+        :param request:
+            The record of what has been decided about the site. Not
+            modified.
+        :param binding_modes:
+            The coordination as it stands.
+        :param topology:
+            The topology the residue is looked up in, and the coordination
+            is derived on again after each bond goes.
+        :param positions:
+            Its positions in Angstrom.
+        :param resid:
+            The residue, as an id ('130' or 130) or as a label ('ASP130').
+        :param chain:
+            The chain id, when the residue id occurs in more than one chain.
+
+        :return:
+            The edited request.
+        """
+
+        residue = self._resolve_residue(topology, resid, chain)
+        modes = binding_modes
+        label = residue_label(residue)
+        members = active_site_residues(modes)
+
+        assert_msg_critical(
+            residue.index in members, 'remove_residue: '
+            f'{label} is not part of the active site, so there is '
+            'nothing to remove')
+        assert_msg_critical(
+            len(members) > 1, 'remove_residue: '
+            f'{label} is the only residue of the active site, and what '
+            'would be left is not one')
+
+        orphaned = sorted({
+            f'{metal["element"]} (index {metal["index"]})'
+            for metal in modes['metals']
+            if not any(metal['index'] in ligand['metals']
+                       for ligand in modes['ligands']
+                       if ligand['res_index'] != residue.index)
+        })
+        assert_msg_critical(
+            not orphaned, 'remove_residue: removing '
+            f'{label} would leave {", ".join(orphaned)} with no ligand '
+            'at all')
+
+        detection = {
+            'metal_elements': metal_elements,
+            'metal_formal_charges': metal_formal_charges,
+            'bidentate_asymmetry': bidentate_asymmetry,
+            'metal_bond_cutoff': metal_bond_cutoff,
+            'report_cutoff': report_cutoff,
+        }
+
+        # the bonds have to go through remove_metal_bond, so that the
+        # removals are recorded and a re-detection does not put back what
+        # the geometry still looks like
+        while any(ligand['res_index'] == residue.index
+                  for ligand in modes['ligands']):
+            bound = next(ligand for ligand in modes['ligands']
+                         if ligand['res_index'] == residue.index)
+            request = self.remove_metal_bond(request,
+                                             modes,
+                                             label,
+                                             metal=bound['metals'][0])
+            modes = self.derive_binding_modes(topology,
+                                              positions,
+                                              request=request,
+                                              **detection)
+
+        request = deepcopy(request)
+        request['extra_residues'] = [
+            index for index in request.get('extra_residues', [])
+            if index != residue.index
+        ]
+        request['coordinating_residues'] = [
+            index for index in request.get('coordinating_residues', [])
+            if index != residue.index
+        ]
+        excluded = set(request.get('excluded_residues', []))
+        excluded.add(residue.index)
+        request['excluded_residues'] = sorted(excluded)
+
+        self.ostream.print_info(f'Removed {label} from the active site.')
+        self.ostream.flush()
+
+        return request
+
+    @on_master
     def _resolve_residue(self, topology, resid, chain=None):
         """
         Finds the one residue a manual edit is about.
@@ -1691,6 +1861,50 @@ class ActiveSiteBuilder(Shell):
         new_positions = np.array(modeller.positions.value_in_unit(mmunit.angstrom))
 
         return new_topology, new_positions, variants_by_index, notes
+
+    @on_master
+    def update_protonation_state(self,
+                                 protonation_overrides,
+                                 topology,
+                                 resid,
+                                 variant,
+                                 chain=None):
+        """
+        Records the protonation variant a residue is to be built with.
+
+        Keyed by the residue's label rather than its index, because residue
+        ids and residue indices overlap: a single chain numbered from one has
+        index i for id i+1, so an index written here would also match its
+        neighbour by id. The variant is checked against what OpenMM can build
+        and what the charge table knows before it is recorded.
+
+        :param protonation_overrides:
+            The overrides as they stand, by residue label, or None. Not
+            modified.
+        :param topology:
+            The topology the residue is looked up in.
+        :param resid:
+            The residue, as an id ('130' or 130) or as a label ('ASP130').
+        :param variant:
+            The variant to set, as OpenMM names it.
+        :param chain:
+            The chain id, when the residue id occurs in more than one chain.
+
+        :return:
+            The overrides with the residue's variant recorded.
+        """
+
+        residue = self._resolve_residue(topology, resid, chain)
+        check_variant(residue, variant)
+
+        overrides = dict(protonation_overrides or {})
+        overrides[residue_label(residue)] = variant
+
+        self.ostream.print_info(
+            f'{residue_label(residue)} will be protonated as {variant}.')
+        self.ostream.flush()
+
+        return overrides
 
     # ------------------------------------------------------------------
     # extraction
@@ -2399,6 +2613,236 @@ class ActiveSiteBuilder(Shell):
         return ', '.join(
             f'{elements.get(index, "metal")}{index} {distance:.2f} A'
             for index, distance in zip(ligand['metals'], ligand['distances']))
+
+    # ------------------------------------------------------------------
+    # the structural pass
+    # ------------------------------------------------------------------
+
+    @on_master
+    def build_active_site(self,
+                          topology,
+                          positions,
+                          request,
+                          coordinating_residues=None,
+                          protonation_overrides=None,
+                          report_detection=True,
+                          cap_bond_length=CAP_BOND_LENGTH,
+                          metal_elements=METAL_ELEMENTS,
+                          metal_formal_charges=None,
+                          bidentate_asymmetry=BIDENTATE_ASYMMETRY,
+                          metal_bond_cutoff=METAL_BOND_CUTOFF,
+                          report_cutoff=REPORT_CUTOFF):
+        """
+        Runs the structural pass from a prepared structure to a truncated
+        active site: detects the coordination, protonates the structure to
+        match, detects again on what that returns and truncates the cluster.
+
+        The detection runs twice on purpose. protonate renumbers the atoms
+        and remaps nothing, so the coordination is simply derived again on
+        the protonated topology and every atom index belongs to the topology
+        it was derived on. That is safe because addHydrogens only adds
+        hydrogens, which are not donors, so the same contacts are found
+        either way.
+
+        :param topology:
+            The prepared topology.
+        :param positions:
+            Its positions in Angstrom.
+        :param request:
+            The record of what has been decided about the site. Not
+            modified; the one returned carries the variants the protonation
+            built and the residues coordinating_residues forced.
+        :param coordinating_residues:
+            Residues to make ligands whatever their distance, as ids or
+            labels. Recorded into the returned request, so every later
+            derivation honours them.
+        :param protonation_overrides:
+            Protonation variants by residue label, as
+            update_protonation_state records them.
+        :param report_detection:
+            Whether the coordination found on the structure is printed. The
+            truncated site always is.
+        :param cap_bond_length:
+            The C-H distance in Angstrom the capping hydrogens are placed at.
+
+        :return:
+            A dictionary holding the request ('request'), the protonated
+            topology and positions ('protonated_topology',
+            'protonated_positions'), the binding modes derived on them
+            ('binding_modes') and the active site ('active_site').
+        """
+
+        detection = {
+            'metal_elements': metal_elements,
+            'metal_formal_charges': metal_formal_charges,
+            'bidentate_asymmetry': bidentate_asymmetry,
+            'metal_bond_cutoff': metal_bond_cutoff,
+            'report_cutoff': report_cutoff,
+        }
+
+        binding_modes = self.derive_binding_modes(
+            topology,
+            positions,
+            coordinating_residues=coordinating_residues,
+            request=request,
+            **detection)
+
+        if report_detection:
+            self.print_binding_modes(binding_modes)
+
+        # what was forced is a decision, so it is recorded like every other
+        request = deepcopy(request)
+        request['coordinating_residues'] = list(
+            binding_modes['coordinating_residues'])
+
+        protonated_topology, protonated_positions, variants, notes = (
+            self.protonate(topology,
+                           positions,
+                           binding_modes,
+                           protonation_overrides=protonation_overrides))
+
+        request['variants'] = variants
+        protonated_modes = self.derive_binding_modes(protonated_topology,
+                                                     protonated_positions,
+                                                     request=request,
+                                                     **detection)
+
+        existing = protonated_modes.setdefault('notes', [])
+        for note in notes:
+            if note not in existing:
+                existing.append(note)
+
+        active_site = self.extract_active_site(protonated_topology,
+                                               protonated_positions,
+                                               protonated_modes,
+                                               cap_bond_length=cap_bond_length)
+        self.print_active_site(active_site, protonated_modes)
+
+        return {
+            'request': request,
+            'protonated_topology': protonated_topology,
+            'protonated_positions': protonated_positions,
+            'binding_modes': protonated_modes,
+            'active_site': active_site,
+        }
+
+    @on_master
+    def site_coordination(self,
+                          topology,
+                          positions,
+                          geometry,
+                          active_site,
+                          request,
+                          metal_elements=METAL_ELEMENTS,
+                          metal_formal_charges=None,
+                          bidentate_asymmetry=BIDENTATE_ASYMMETRY,
+                          metal_bond_cutoff=METAL_BOND_CUTOFF,
+                          report_cutoff=REPORT_CUTOFF):
+        """
+        The coordination of an extracted site under one of its geometries.
+
+        Restricted to the atoms the cluster holds, unlike derive_binding_modes
+        on the whole structure: once a force field is keyed to the site, a
+        protein atom drifting into range is not something the site can gain.
+
+        :param topology:
+            The protonated topology the site was extracted from.
+        :param positions:
+            Its positions in Angstrom.
+        :param geometry:
+            The geometry to read, ordered like the active site.
+        :param active_site:
+            The active site.
+        :param request:
+            The record of what has been decided about the site.
+
+        :return:
+            The binding modes of the site under that geometry.
+        """
+
+        detection = {
+            'bidentate_asymmetry': bidentate_asymmetry,
+            'metal_bond_cutoff': metal_bond_cutoff,
+            'report_cutoff': report_cutoff,
+        }
+
+        modes = self.derive_binding_modes(topology,
+                                          positions,
+                                          request=request,
+                                          metal_elements=metal_elements,
+                                          metal_formal_charges=metal_formal_charges,
+                                          **detection)
+        ligands, notes = self.derive_site_coordination(
+            topology, geometry, active_site, modes, **detection)
+
+        modes = dict(modes)
+        modes['ligands'] = ligands
+        modes['notes'] = notes
+
+        return modes
+
+    @on_master
+    def adopt_geometry(self,
+                       topology,
+                       positions,
+                       active_site,
+                       molecule,
+                       request,
+                       metal_elements=METAL_ELEMENTS,
+                       metal_formal_charges=None,
+                       bidentate_asymmetry=BIDENTATE_ASYMMETRY,
+                       metal_bond_cutoff=METAL_BOND_CUTOFF,
+                       report_cutoff=REPORT_CUTOFF):
+        """
+        Puts a new geometry on an active site and detects the coordination
+        again on it.
+
+        A contact can leave the cutoff or a carboxylate can open up during a
+        relaxation, and the connectivity the Hessian and the fit read comes
+        out of that detection. The coordination before the move is derived
+        rather than remembered, which is what the comparison needs.
+
+        :param topology:
+            The protonated topology the site was extracted from.
+        :param positions:
+            Its positions in Angstrom.
+        :param active_site:
+            The active site. Not modified.
+        :param molecule:
+            The new geometry of the active site.
+        :param request:
+            The record of what has been decided about the site.
+
+        :return:
+            The active site carrying the new geometry, with its connectivity
+            brought up to date.
+        """
+
+        detection = {
+            'metal_elements': metal_elements,
+            'metal_formal_charges': metal_formal_charges,
+            'bidentate_asymmetry': bidentate_asymmetry,
+            'metal_bond_cutoff': metal_bond_cutoff,
+            'report_cutoff': report_cutoff,
+        }
+
+        before = self.site_coordination(topology, positions,
+                                        active_site['molecule'], active_site,
+                                        request, **detection)
+
+        moved = dict(active_site)
+        moved['molecule'] = molecule
+
+        _, moved, _ = self.update_binding_modes(
+            topology,
+            molecule,
+            moved,
+            before,
+            bidentate_asymmetry=bidentate_asymmetry,
+            metal_bond_cutoff=metal_bond_cutoff,
+            report_cutoff=report_cutoff)
+
+        return moved
 
     # ------------------------------------------------------------------
     # geometry

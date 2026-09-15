@@ -32,7 +32,6 @@
 
 from mpi4py import MPI
 from pathlib import Path
-from copy import deepcopy
 from enum import IntEnum
 import numpy as np
 import time
@@ -564,28 +563,6 @@ class MetalSiteForceFieldBuilder:
         assert_msg_critical('openmm' in sys.modules,
                             'MetalSiteForceFieldBuilder: openmm is required')
 
-        state = self._on_master(lambda: self._build_active_site(
-            cif_path, mm_opt, coordinating_residues))
-
-        # an edit rebuilds the site the way this call built it, so what it
-        # was told has to outlive the call
-        self._mm_opt = mm_opt
-
-        self._adopt(state)
-
-        # everything downstream belonged to the site that was just replaced
-        self._enter(Stage.ACTIVE_SITE)
-
-        return self.active_site_molecule
-
-    def _build_active_site(self, cif_path, mm_opt, coordinating_residues):
-        """
-        The work of build_active_site, on one rank.
-
-        :return:
-            The state build_active_site adopts and broadcasts.
-        """
-
         if cif_path is not None:
             self._print_header(cif_path)
             topology, positions = self._sites.load_and_prepare_protein(
@@ -598,59 +575,76 @@ class MetalSiteForceFieldBuilder:
             topology = self._topology
             positions = self._positions
 
-        # Derive the binding modes from a unprotonated topology
-        binding_modes = self._derive_binding_modes(
-            topology, positions, coordinating_residues=coordinating_residues)
+        state = self._build_active_site(topology,
+                                        positions,
+                                        mm_opt,
+                                        coordinating_residues,
+                                        report_detection=cif_path is not None)
 
-        if cif_path is not None:
-            self._sites.print_binding_modes(binding_modes)
+        # an edit rebuilds the site the way this call built it, so what it
+        # was told has to outlive the call
+        self._mm_opt = mm_opt
 
-        # Protonate the topology based on the derived binding modes
-        protonated_topology, protonated_positions, variants, notes = (
-            self._sites.protonate(topology,
-                                  positions,
-                                  binding_modes,
-                                  protonation_overrides=self._protonation_overrides))
+        self._adopt(state)
 
-        # Derive the binding modes again. These should be the same,
-        # but the indexing of the atoms has changed due to the protanation
-        self._request['variants'] = variants
-        protonated_modes = self._derive_binding_modes(protonated_topology,
-                                                      protonated_positions)
+        # everything downstream belonged to the site that was just replaced
+        self._enter(Stage.ACTIVE_SITE)
 
-        # Merge the protonation notes into the binding_modes notes
-        existing = protonated_modes.setdefault('notes', [])
-        for note in notes:
-            if note not in existing:
-                existing.append(note)
+        return self.active_site_molecule
 
-        # Extract and truncate the active site
-        active_site = self._sites.extract_active_site(
-            protonated_topology,
-            protonated_positions,
-            protonated_modes,
-            cap_bond_length=self.cap_bond_length)
-        self._sites.print_active_site(active_site,
-                                      protonated_modes)
+    def _build_active_site(self,
+                           topology,
+                           positions,
+                           mm_opt,
+                           coordinating_residues=None,
+                           report_detection=True):
+        """
+        The structural pass on a prepared structure, written to the folder
+        and relaxed on the crude force field when asked.
+
+        :param topology:
+            The prepared topology.
+        :param positions:
+            Its positions in Angstrom.
+        :param mm_opt:
+            Whether to relax the extracted site on the crude force field.
+        :param coordinating_residues:
+            Residues to force as ligands, as build_active_site takes them.
+        :param report_detection:
+            Whether the coordination found on the structure is printed; a
+            rebuild after an edit does not print it again.
+
+        :return:
+            The state _adopt takes on.
+        """
+
+        state = self._sites.build_active_site(
+            topology,
+            positions,
+            self._request,
+            coordinating_residues=coordinating_residues,
+            protonation_overrides=self._protonation_overrides,
+            report_detection=report_detection,
+            cap_bond_length=self.cap_bond_length,
+            metal_elements=self.metal_elements,
+            metal_formal_charges=self.metal_formal_charges,
+            **self.detection_settings())
+        state['topology'] = topology
+        state['positions'] = positions
 
         self._save_intermediate(
             'protonated.pdb', lambda path: self._write_pdb(
-                path, protonated_topology, protonated_positions))
+                path, state['protonated_topology'], state[
+                    'protonated_positions']))
 
         if mm_opt:
-            active_site['molecule'] = self._crude_relax(
-                active_site,
-                self._sites.manual_bond_equilibria(active_site, protonated_topology,
-                                                   protonated_modes))
+            state['active_site']['molecule'] = self._crude_relax(
+                state['active_site'],
+                self._sites.manual_bond_equilibria(state['active_site'],
+                                                   state['protonated_topology'],
+                                                   state['binding_modes']))
 
-        return {
-            'request': self._request,
-            'topology': topology,
-            'positions': positions,
-            'protonated_topology': protonated_topology,
-            'protonated_positions': protonated_positions,
-            'active_site': active_site,
-        }
+        return state
 
     # ------------------------------------------------------------------
     # reporting
@@ -868,25 +862,8 @@ class MetalSiteForceFieldBuilder:
         self._require('update_protonation_state', Stage.ACTIVE_SITE,
                       Stage.ACTIVE_SITE)
 
-        def work():
-            residue = self._sites._resolve_residue(self._topology, resid, chain)
-            util.check_variant(residue, variant)
-
-            # keyed by the label rather than the index, because residue ids
-            # and residue indices overlap: a single chain numbered from one
-            # has index i for id i+1, so an index written here would also
-            # match its neighbour by id
-            overrides = dict(self._protonation_overrides or {})
-            overrides[util.residue_label(residue)] = variant
-
-            self.ostream.print_info(
-                f'{util.residue_label(residue)} will be protonated as {variant}.'
-            )
-            self.ostream.flush()
-
-            return overrides
-
-        self._protonation_overrides = self._on_master(work)
+        self._protonation_overrides = self._sites.update_protonation_state(
+            self._protonation_overrides, self._topology, resid, variant, chain)
         self._reapply()
 
     def include_residue(self, resid, chain=None):
@@ -916,40 +893,9 @@ class MetalSiteForceFieldBuilder:
 
         self._require('include_residue', Stage.ACTIVE_SITE, Stage.ACTIVE_SITE)
 
-        def work():
-            residue = self._sites._resolve_residue(self._topology, resid, chain)
-            self._sites.check_truncatable(residue)
-
-            request = self._request
-            label = util.residue_label(residue)
-
-            already = residue.index in util.active_site_residues(
-                self.binding_modes)
-            excluded = residue.index in request.get('excluded_residues', [])
-
-            if already and not excluded:
-                self.ostream.print_warning(
-                    f'{label} is already part of the active site; nothing to '
-                    'include')
-                self.ostream.flush()
-                return None
-
-            request = deepcopy(request)
-            request['excluded_residues'] = [
-                index for index in request.get('excluded_residues', [])
-                if index != residue.index
-            ]
-            extra = set(request.get('extra_residues', []))
-            extra.add(residue.index)
-            request['extra_residues'] = sorted(extra)
-
-            self.ostream.print_info(f'Added {label} to the active site.')
-            self.ostream.flush()
-
-            return request
-
-        request = self._on_master(work)
-
+        request = self._sites.include_residue(self._request,
+                                              self.binding_modes,
+                                              self._topology, resid, chain)
         if request is None:
             return
 
@@ -980,71 +926,16 @@ class MetalSiteForceFieldBuilder:
 
         self._require('remove_residue', Stage.ACTIVE_SITE, Stage.ACTIVE_SITE)
 
-        def work():
-            residue = self._sites._resolve_residue(self._topology, resid, chain)
-
-            request = self._request
-            modes = self.binding_modes
-            label = util.residue_label(residue)
-            members = util.active_site_residues(modes)
-
-            assert_msg_critical(
-                residue.index in members, 'remove_residue: '
-                f'{label} is not part of the active site, so there is '
-                'nothing to remove')
-
-            assert_msg_critical(
-                len(members) > 1, 'remove_residue: '
-                f'{label} is the only residue of the active site, and what '
-                'would be left is not one')
-
-            orphaned = sorted({
-                f'{metal["element"]} (index {metal["index"]})'
-                for metal in modes['metals']
-                if not any(metal['index'] in ligand['metals']
-                           for ligand in modes['ligands']
-                           if ligand['res_index'] != residue.index)
-            })
-
-            assert_msg_critical(
-                not orphaned, 'remove_residue: removing '
-                f'{label} would leave {", ".join(orphaned)} with no ligand '
-                'at all')
-
-            # the bonds have to go through remove_metal_bond, so that the
-            # removals are recorded and a re-detection does not put back what
-            # the geometry still looks like
-            while any(ligand['res_index'] == residue.index
-                      for ligand in modes['ligands']):
-                bound = next(ligand for ligand in modes['ligands']
-                             if ligand['res_index'] == residue.index)
-                request = self._sites.remove_metal_bond(request,
-                                                        modes,
-                                                        label,
-                                                        metal=bound['metals'][0])
-                modes = self._derive_binding_modes(self._protonated_topology,
-                                                   self._protonated_positions,
-                                                   request=request)
-
-            request = deepcopy(request)
-            request['extra_residues'] = [
-                index for index in request.get('extra_residues', [])
-                if index != residue.index
-            ]
-            request['coordinating_residues'] = [
-                index for index in request.get('coordinating_residues', [])
-                if index != residue.index
-            ]
-            excluded = set(request.get('excluded_residues', []))
-            excluded.add(residue.index)
-            request['excluded_residues'] = sorted(excluded)
-
-            self.ostream.print_info(f'Removed {label} from the active site.')
-            self.ostream.flush()
-
-            return request
-
-        self._request = self._on_master(work)
+        self._request = self._sites.remove_residue(
+            self._request,
+            self.binding_modes,
+            self._protonated_topology,
+            self._protonated_positions,
+            resid,
+            chain,
+            metal_elements=self.metal_elements,
+            metal_formal_charges=self.metal_formal_charges,
+            **self.detection_settings())
         self._reapply()
 
     # ------------------------------------------------------------------
@@ -1064,8 +955,7 @@ class MetalSiteForceFieldBuilder:
             made against, and returning the edited request.
         """
 
-        self._request = self._on_master(
-            lambda: edit(self._request, self.binding_modes))
+        self._request = edit(self._request, self.binding_modes)
 
         self._reapply()
 
@@ -1091,8 +981,10 @@ class MetalSiteForceFieldBuilder:
         not a new run.
         """
 
-        state = self._on_master(
-            lambda: self._build_active_site(None, self._mm_opt, None))
+        state = self._build_active_site(self._topology,
+                                        self._positions,
+                                        self._mm_opt,
+                                        report_detection=False)
 
         self._adopt(state)
 
@@ -1175,8 +1067,9 @@ class MetalSiteForceFieldBuilder:
                 self._active_site, self._protonated_topology,
                 self.binding_modes)
 
-        molecule = self._on_master(lambda: self._crude_relax(
-            self._active_site, manual_equilibria, forcefield=forcefield))
+        molecule = self._crude_relax(self._active_site,
+                                     manual_equilibria,
+                                     forcefield=forcefield)
         self._active_site['molecule'] = molecule
 
         if adopted:
@@ -1203,8 +1096,6 @@ class MetalSiteForceFieldBuilder:
         left open sits at its own minimum and cannot be moved. A fitted or
         transferred force field carries per-bond equilibria and force
         constants, and pulls the same contact in.
-
-        Runs on one rank; the caller broadcasts.
 
         :param active_site:
             The site to relax. Not modified.
@@ -1798,11 +1689,11 @@ class MetalSiteForceFieldBuilder:
 
     def _adopt(self, state):
         """
-        Takes on what a structural step produced, on every rank.
+        Takes on what the structural pass produced.
 
-        The step itself runs on the master and its result is broadcast, so
-        this is the one place the builder's structural state is written and
-        the two callers cannot come to write different sets of it.
+        The one place the builder's structural state is written, so that
+        build_active_site and a rebuild after an edit cannot come to write
+        different sets of it.
 
         The Hessian and the charges go with it: they were computed for the
         site being replaced, and this is the one place a site is replaced.
@@ -1857,35 +1748,6 @@ class MetalSiteForceFieldBuilder:
             metal_formal_charges=self.metal_formal_charges,
             request=self._request if request is None else request,
             **self.detection_settings())
-
-    # ------------------------------------------------------------------
-    # MPI
-    #
-    # The phase classes are MPI-safe on their own; what is left here is the
-    # master-only section a chain of their calls runs in.
-    # ------------------------------------------------------------------
-
-    def _on_master(self, work):
-        """
-        Runs work on the master rank and hands the result to every rank.
-
-        A master-only section, on the same depth counter as the on_master
-        decorator of the phase classes: the shell calls inside it run inline
-        on the master rather than each broadcasting on its own, and what the
-        section returns crosses once. That is what an edit or a rebuild
-        needs, since it chains several shell calls with the builder's own
-        bookkeeping between them. A failure on the master is raised
-        everywhere, so a rank cannot be left waiting for a result that is
-        never coming.
-
-        :param work:
-            A callable taking no arguments.
-
-        :return:
-            What work returned, on every rank.
-        """
-
-        return util.run_on_master(self.comm, work)
 
     def _fit_forcefield(self, hessian, charges):
         """
@@ -1966,41 +1828,23 @@ class MetalSiteForceFieldBuilder:
             The new geometry of the active site.
         """
 
-        self._active_site = self._on_master(
-            lambda: self._update_binding_modes(molecule))
+        self._active_site = self._sites.adopt_geometry(
+            self._protonated_topology,
+            self._protonated_positions,
+            self._active_site,
+            molecule,
+            self._request,
+            metal_elements=self.metal_elements,
+            metal_formal_charges=self.metal_formal_charges,
+            **self.detection_settings())
 
         # a force field fitted before this describes the geometry it replaced
         self._enter(Stage.ACTIVE_SITE)
 
-    def _update_binding_modes(self, molecule):
-        """
-        The work of _adopt_geometry, on one rank.
-
-        The coordination before the move is derived rather than remembered,
-        which is what the comparison needs and what nothing has to keep in
-        step.
-        """
-
-        before = self._site_coordination(self._active_site['molecule'])
-
-        self._active_site['molecule'] = molecule
-        _, active_site, _ = self._sites.update_binding_modes(
-            self._protonated_topology,
-            molecule,
-            self._active_site,
-            before,
-            **self.detection_settings())
-
-        return active_site
-
     def _site_coordination(self, geometry):
         """
-        The coordination of the extracted site under one of its geometries.
-
-        Restricted to the atoms the cluster holds, unlike the whole-structure
-        derivation behind the binding_modes property: once a force field is
-        keyed to the site, a protein atom drifting into range is not
-        something the site can gain.
+        The coordination of the extracted site under one of its geometries,
+        with the builder's settings; see ActiveSiteBuilder.site_coordination.
 
         :param geometry:
             The geometry to read, ordered like the active site.
@@ -2009,20 +1853,15 @@ class MetalSiteForceFieldBuilder:
             The binding modes of the site under that geometry.
         """
 
-        modes = self._derive_binding_modes(self._protonated_topology,
-                                           self._protonated_positions)
-        ligands, notes = self._sites.derive_site_coordination(
+        return self._sites.site_coordination(
             self._protonated_topology,
+            self._protonated_positions,
             geometry,
             self._active_site,
-            modes,
+            self._request,
+            metal_elements=self.metal_elements,
+            metal_formal_charges=self.metal_formal_charges,
             **self.detection_settings())
-
-        modes = dict(modes)
-        modes['ligands'] = ligands
-        modes['notes'] = notes
-
-        return modes
 
     # ------------------------------------------------------------------
     # settings assembly
