@@ -552,6 +552,17 @@ CSimdRIJKGradientDriver::_compute_three_center(CPackedMatrix           &gradient
 
     coefficients.to_dense(dense_c.data());
 
+    auto transposed = std::vector<double>(norbs * nao, 0.0);
+
+    for (size_t mu = 0; mu < nao; mu++)
+    {
+        for (size_t ii = 0; ii < norbs; ii++) transposed[ii * nao + mu] = dense_c[mu * norbs + ii];
+    }
+
+    const auto naux = aux_basis.dimensions_of_basis();
+
+    const auto aux_sets = aux_basis.basis_sets_indices();
+
     // every atom of the auxiliary basis, or the share the caller holds
 
     auto atoms = aux_atoms;
@@ -567,10 +578,6 @@ CSimdRIJKGradientDriver::_compute_three_center(CPackedMatrix           &gradient
 
     const auto grad_drv = CSimdThreeCenterElectronRepulsionGradientDriver(_block_size);
 
-    auto square = std::vector<double>(nao * norbs, 0.0);
-
-    auto exchange = std::vector<double>(nao * nao, 0.0);
-
     for (const auto iaux : atoms)
     {
         // NOTE: the pattern of this atom alone, described with the threshold the
@@ -580,6 +587,53 @@ CSimdRIJKGradientDriver::_compute_three_center(CPackedMatrix           &gradient
         const auto pattern = eri_drv.make_pattern(molecule, basis, aux_basis, _threshold, {iaux});
 
         const auto derivative = grad_drv.compute(pattern, molecule, basis, aux_basis);
+
+        // NOTE: the exchange part of Gamma, back transformed into the atomic
+        // orbitals for every auxiliary function of this atom and held while its
+        // derivative integrals are contracted. It was formed inside the loop over
+        // the atom pairs before, which is the same matrix built again for every
+        // pair of every block: two products of the basis functions squared by the
+        // orbitals, where the whole term is meant to cost two of them per
+        // auxiliary function.
+
+        auto slot_of = std::vector<size_t>(naux, naux);
+
+        auto exchanges = std::vector<std::vector<double>>();
+
+        if (exchange_scaling_factor != 0.0)
+        {
+            const auto &aux_set = aux_indices[static_cast<size_t>(aux_sets[static_cast<size_t>(iaux)])];
+
+            auto half = std::vector<double>(nao * norbs, 0.0);
+
+            auto dense_q = std::vector<double>(norbs * norbs, 0.0);
+
+            for (const auto [lq, kq] : aux_set)
+            {
+                const auto nq = static_cast<size_t>(tensor::number_of_spherical_components(std::array<int, 1>{lq}));
+
+                for (size_t mq = 0; mq < nq; mq++)
+                {
+                    const auto q = aux_starts[static_cast<size_t>(iaux) * aux_nmoms + lq] + kq + mq * aux_strides[lq];
+
+                    fitted.orbital_densities[q].to_dense(dense_q.data());
+
+                    // C_o d(q), then that against the transposed orbitals
+
+                    _multiply(nao, norbs, norbs, dense_c.data(), dense_q.data(), half.data());
+
+                    auto matrix = std::vector<double>(nao * nao, 0.0);
+
+                    _multiply(nao, nao, norbs, half.data(), transposed.data(), matrix.data());
+
+                    for (auto &value : matrix) value *= -2.0 * exchange_scaling_factor;
+
+                    slot_of[q] = exchanges.size();
+
+                    exchanges.push_back(std::move(matrix));
+                }
+            }
+        }
 
         const auto nblocks = static_cast<size_t>(pattern.number_of_blocks());
 
@@ -617,7 +671,15 @@ CSimdRIJKGradientDriver::_compute_three_center(CPackedMatrix           &gradient
 
                         const auto [lc, kc] = c_index[k];
 
-                        if (block.number_of_pairs(la, ia, lb, jb, lc, kc) == 0) continue;
+                        // NOTE: the atom pairs this combination reaches, which is
+                        // what the kernel wrote and is not the atom pairs of the
+                        // block: a combination which the screening cut short holds
+                        // fewer, and they are the leading ones. Sizing the run by
+                        // the block instead read past the end of its values.
+
+                        const auto reached = block.number_of_pairs(la, ia, lb, jb, lc, kc);
+
+                        if (reached == 0) continue;
 
                         const auto na = static_cast<size_t>(tensor::number_of_spherical_components(std::array<int, 1>{la}));
 
@@ -629,7 +691,7 @@ CSimdRIJKGradientDriver::_compute_three_center(CPackedMatrix           &gradient
 
                         const auto *values = derivative.values(iblk, la, ia, lb, jb, lc, kc);
 
-                        const auto run = natoms * npairs;
+                        const auto run = natoms * reached;
 
                         // NOTE: the components of a combination are the slowest
                         // index, the three of the first center then the three of
@@ -657,42 +719,10 @@ CSimdRIJKGradientDriver::_compute_three_center(CPackedMatrix           &gradient
 
                                         const auto cp = 4.0 * fitted.coefficients[q];
 
-                                        if (exchange_scaling_factor != 0.0)
-                                        {
-                                            const auto &dq = fitted.orbital_densities[q];
+                                        const double *exchange =
+                                            (exchange_scaling_factor != 0.0) ? exchanges[slot_of[q]].data() : nullptr;
 
-                                            for (size_t mu = 0; mu < nao; mu++)
-                                            {
-                                                for (size_t ii = 0; ii < norbs; ii++)
-                                                {
-                                                    double sum = 0.0;
-
-                                                    for (size_t jj = 0; jj < norbs; jj++)
-                                                    {
-                                                        sum += dense_c[mu * norbs + jj] * dq.at(jj, ii);
-                                                    }
-
-                                                    square[mu * norbs + ii] = sum;
-                                                }
-                                            }
-
-                                            for (size_t mu = 0; mu < nao; mu++)
-                                            {
-                                                for (size_t nu = 0; nu < nao; nu++)
-                                                {
-                                                    double sum = 0.0;
-
-                                                    for (size_t ii = 0; ii < norbs; ii++)
-                                                    {
-                                                        sum += square[mu * norbs + ii] * dense_c[nu * norbs + ii];
-                                                    }
-
-                                                    exchange[mu * nao + nu] = -2.0 * exchange_scaling_factor * sum;
-                                                }
-                                            }
-                                        }
-
-                                        for (size_t p = 0; p < npairs; p++)
+                                        for (size_t p = 0; p < reached; p++)
                                         {
                                             const auto aatom = static_cast<size_t>(a_atoms[p]);
 
@@ -704,7 +734,7 @@ CSimdRIJKGradientDriver::_compute_three_center(CPackedMatrix           &gradient
 
                                             auto gamma = cp * dense_d[mu * nao + nu];
 
-                                            if (exchange_scaling_factor != 0.0) gamma += exchange[mu * nao + nu];
+                                            if (exchange != nullptr) gamma += exchange[mu * nao + nu];
 
                                             // NOTE: the pattern holds each unordered
                                             // pair of atoms once, so a pair of two
@@ -718,9 +748,9 @@ CSimdRIJKGradientDriver::_compute_three_center(CPackedMatrix           &gradient
 
                                             for (size_t c = 0; c < 3; c++)
                                             {
-                                                const auto at = ((c * ncomps) + angular) * run + n * npairs + p;
+                                                const auto at = ((c * ncomps) + angular) * run + n * reached + p;
 
-                                                const auto bt = (((3 + c) * ncomps) + angular) * run + n * npairs + p;
+                                                const auto bt = (((3 + c) * ncomps) + angular) * run + n * reached + p;
 
                                                 const auto ta = gamma * values[at];
 
