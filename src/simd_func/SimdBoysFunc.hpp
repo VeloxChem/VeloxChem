@@ -38,6 +38,7 @@
 #include <cstddef>
 #include <initializer_list>
 
+#include "BasisFunction.hpp"
 #include "SimdMatrix.hpp"
 
 namespace simdfunc {  // simdfunc namespace
@@ -166,7 +167,7 @@ auto compute_t3c_boys_function(CSimdMatrix                        &buffer,
                                const std::initializer_list<size_t> orders,
                                const size_t                        ncols,
                                const double                        fj,
-                               const size_t                        pair_exp,
+                               const size_t                        pair,
                                const double                        fq) -> void;
 
 auto compute_full_t3c_boys_function(CSimdMatrix       &buffer,
@@ -176,7 +177,7 @@ auto compute_full_t3c_boys_function(CSimdMatrix       &buffer,
                                     const size_t       order,
                                     const size_t       ncols,
                                     const double       fj,
-                                    const size_t       pair_exp,
+                                    const size_t       pair,
                                     const double       fq) -> void;
 
 /// @brief Computes the values of Boys function of the requested orders alone for one
@@ -239,6 +240,27 @@ auto compute_full_npot_boys_function(CSimdMatrix       &buffer,
 /// Evaluating it where it was read instead cost 17 to 26 per cent of a nuclear
 /// attraction call, rising with the molecule, the loop over the charges being the
 /// molecule.
+/// @brief Forms the exponential every pair of primitives of the bra contributes,
+/// exp(-mu AB^2), for all of them at once.
+/// @param bra The basis function on bra side.
+/// @param ket The basis function on ket side.
+/// @param coordinates The coordinates of the atom pairs, whose row nine holds the
+/// squared distance of the atom pair.
+/// @param ncols The number of atom pairs the widest pair of primitives reaches,
+/// which is the stride of the scratch.
+/// @note For a three-center form, whose loop over the atoms on the ket side stands
+/// outside the pair of primitives. A row of the buffer would be refilled for every
+/// one of those atoms; this is filled once for the call, and the pair is named
+/// rather than the row. It costs nprim_a * nprim_b * ncols of scratch a thread,
+/// which is what buys the whole repetition over the atoms.
+/// @note The scratch is held per thread and grown rather than allocated per call.
+/// **compute_t3c_boys_function and its full form read it, so it has to be filled
+/// before them**; a kernel that does not is reading the last call's pairs.
+auto compute_pair_exponents(const CBasisFunction &bra,
+                            const CBasisFunction &ket,
+                            const CSimdMatrix    &coordinates,
+                            const size_t          ncols) -> void;
+
 auto compute_pair_exponent(CSimdMatrix       &buffer,
                            const CSimdMatrix &coordinates,
                            const size_t       target,

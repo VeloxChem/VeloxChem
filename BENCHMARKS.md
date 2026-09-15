@@ -4711,25 +4711,45 @@ Measured again on four cases small enough to repeat, best of five with spreads u
 | taxol def2-svp | 999.54 ms | 861.77 ms | 13.8% |
 | tagrisso def2-tzvp | 1094.17 ms | 980.87 ms | 10.4% |
 
-So the same change was made, and the same generator gives these kernels the row:
+The same change was tried first and reached only two thirds of that, because the loop
+nest is not the nuclear attraction's. There the charges stand inside the pair of
+primitives, so one row above them kills the whole repetition. Here the nest is atoms on
+the c side, then the bra's two primitives, then the ket's: `mu` is the bra pair's and is
+fixed only *inside* the loop over the atoms, so a row is refilled for every one of them.
+That version measured 1.078 to 1.100.
+
+**Reordering the nest is not the way to fix that.** With the atoms innermost every one
+of them needs its partial sum live at once, and the contracted rows are reused per atom
+today -- zeroed at the top, accumulated, transformed into that atom's slice. The section
+would become `contracted x natoms`: 6 rows to 3.9 thousand for `(ss|d)`, 609 to 391
+thousand for `(dd|g)`, 15176 to 9.7 million for `(ii|i)`. At a few thousand columns the
+middle one alone is hundreds of gigabytes.
+
+**The screening does not stand in the way of it, though**, which was worth checking
+before ruling it out: the primitive bound neglects the position of the atom on the ket
+side, so `dimensions` is indexed by the three primitives alone and a reorder would leave
+it untouched. The kernels say so in a NOTE.
+
+What works instead is to keep the nest and hold *every* pair's exponential at once, in a
+scratch of `nprim_a * nprim_b` runs of atom pairs, filled once for the call above the
+loop over the atoms and indexed by the pair. It costs no buffer row, no reorder and no
+change to the accumulation:
 
 | case | before | after | x | of the ceiling |
 | --- | ---: | ---: | ---: | ---: |
-| tagrisso def2-svp | 286.62 ms | 262.15 ms | 1.093 | 63% |
-| c60 def2-svp | 784.92 ms | 713.70 ms | 1.100 | 67% |
-| taxol def2-svp | 999.54 ms | 910.47 ms | 1.098 | 65% |
-| tagrisso def2-tzvp | 1094.17 ms | 1015.36 ms | 1.078 | 70% |
+| tagrisso def2-svp | 286.62 ms | 247.03 ms | 1.160 | 101% |
+| c60 def2-svp | 784.92 ms | 676.12 ms | 1.161 | 102% |
+| taxol def2-svp | 999.54 ms | 858.34 ms | 1.165 | 102% |
+| tagrisso def2-tzvp | 1094.17 ms | 983.24 ms | 1.113 | 98% |
 
-**Two thirds of it rather than all of it, and the loop nest says why.** The nuclear
-attraction has `mu` fixed above the loop it was repeating in, so one row killed the
-whole repetition. Here the nest is atoms on the c side, then the bra's two primitives,
-then the ket's: `mu` is the bra pair's and is fixed only *inside* the loop over the c
-atoms, so the row is filled once per pair of primitives per c atom. What the row removes
-is the repetition over the ket's primitives and over the orders; what is left is the
-repetition over the c atoms -- which is what the sampled profile called out years of
-sessions ago, `e_ab` "recomputed for every atom on c side though it depends only on the
-pair". Removing that means reordering the nest to put the c atoms innermost, which moves
-the accumulation and the transform with it, and is a different piece of work.
+**It reaches the ablation**, which is the whole of what was there to take: removing the
+exponential outright gave 247.52, 678.78, 861.77 and 980.87 ms, and forming every pair's
+once gives 247.03, 676.12, 858.34 and 983.24.
+
+The price is the scratch, and it is small: at most `nprim_a * nprim_b` runs of atom
+pairs a thread, which is 25 for these def2-svp cases and 36 for def2-tzvp, against
+buffers that are 22 rows for `(ss|d)` and 4998 for `(dd|g)`. Peak resident size is
+unmoved -- 13.8 GB for taxol at def2-svp, which is the tensor it returns.
 
 **The three-center kernels deliberately keep the old form.** They call the same
 function and the same argument applies to them, but measured once each way the two

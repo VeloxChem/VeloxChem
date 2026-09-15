@@ -307,6 +307,25 @@ _make_scaled_arguments(CSimdMatrix  &buffer,
     }
 }
 
+/// @brief The exponential of every pair of primitives of a bra, one run of atom
+/// pairs each, held per thread.
+/// @note A three-center kernel fills this once and reads it inside its loop over the
+/// atoms on the ket side. It is grown and never shrunk: it is sized by the pairs of
+/// primitives of a combination of basis functions and by the atom pairs of a block,
+/// and a thread walks combinations of every size.
+namespace {
+
+struct CPairExponents
+{
+    std::vector<double> values;
+
+    size_t stride{0};
+};
+
+thread_local CPairExponents pair_exponents;
+
+}  // namespace
+
 /// @brief Scales the values of a Boys function by the prefactor of the integral and
 /// by the exponential the pair of primitives contributes.
 /// @param buffer The buffer holding the values in the rows after target, and the
@@ -328,19 +347,17 @@ _make_scaled_arguments(CSimdMatrix  &buffer,
 /// 26 per cent of a nuclear attraction call and 10 to 14 of a three-center one.
 static auto
 _scale_pair_values(CSimdMatrix  &buffer,
-                        const size_t  target,
-                        const size_t  nrows,
-                        const size_t  ncols,
-                        const double  fj,
-                        const size_t  pair_exp) -> void
+                   const size_t  target,
+                   const size_t  nrows,
+                   const size_t  ncols,
+                   const double  fj,
+                   const double *factors) -> void
 {
-    const auto *factors = buffer.data(pair_exp);
-
     for (size_t j = 0; j < nrows; j++)
     {
         auto *row = buffer.data(target + 1 + j);
 
-#pragma omp simd aligned(row, factors : simd::cache_line_size())
+#pragma omp simd aligned(row : simd::cache_line_size())
         for (size_t k = 0; k < ncols; k++)
         {
             row[k] *= fj * factors[k];
@@ -356,14 +373,15 @@ compute_t3c_boys_function(CSimdMatrix                        &buffer,
                           const std::initializer_list<size_t> orders,
                           const size_t                        ncols,
                           const double                        fj,
-                          const size_t                        pair_exp,
+                          const size_t                        pair,
                           const double                        fq) -> void
 {
     _make_scaled_arguments(buffer, target, pc, ncols, fq);
 
     compute_boys_values(buffer, target, orders, ncols);
 
-    _scale_pair_values(buffer, target, orders.size(), ncols, fj, pair_exp);
+    _scale_pair_values(buffer, target, orders.size(), ncols, fj,
+                       pair_exponents.values.data() + pair * pair_exponents.stride);
 }
 
 auto
@@ -374,14 +392,58 @@ compute_full_t3c_boys_function(CSimdMatrix       &buffer,
                                const size_t       order,
                                const size_t       ncols,
                                const double       fj,
-                               const size_t       pair_exp,
+                               const size_t       pair,
                                const double       fq) -> void
 {
     _make_scaled_arguments(buffer, target, pc, ncols, fq);
 
     compute_boys_values(buffer, target, order, ncols);
 
-    _scale_pair_values(buffer, target, order + 1, ncols, fj, pair_exp);
+    _scale_pair_values(buffer, target, order + 1, ncols, fj,
+                       pair_exponents.values.data() + pair * pair_exponents.stride);
+}
+
+
+auto
+compute_pair_exponents(const CBasisFunction &bra,
+                       const CBasisFunction &ket,
+                       const CSimdMatrix    &coordinates,
+                       const size_t          ncols) -> void
+{
+    const auto &a_exps = bra.exponents();
+
+    const auto &b_exps = ket.exponents();
+
+    const auto nprim_a = a_exps.size();
+
+    const auto nprim_b = b_exps.size();
+
+    if (const auto wanted = nprim_a * nprim_b * ncols; pair_exponents.values.size() < wanted)
+    {
+        pair_exponents.values.resize(wanted);
+    }
+
+    pair_exponents.stride = ncols;
+
+    const auto *ab_2 = coordinates.data(9);
+
+    for (size_t i = 0; i < nprim_a; i++)
+    {
+        for (size_t j = 0; j < nprim_b; j++)
+        {
+            const auto p = a_exps[i] + b_exps[j];
+
+            const auto mu = a_exps[i] * b_exps[j] / p;
+
+            auto *row = pair_exponents.values.data() + (i * nprim_b + j) * ncols;
+
+#pragma omp simd
+            for (size_t k = 0; k < ncols; k++)
+            {
+                row[k] = std::exp(-mu * ab_2[k]);
+            }
+        }
+    }
 }
 
 auto
@@ -417,7 +479,7 @@ compute_npot_boys_function(CSimdMatrix                        &buffer,
 
     compute_boys_values(buffer, target, orders, ncols);
 
-    _scale_pair_values(buffer, target, orders.size(), ncols, fz, pair_exp);
+    _scale_pair_values(buffer, target, orders.size(), ncols, fz, buffer.data(pair_exp));
 }
 
 auto
@@ -435,7 +497,7 @@ compute_full_npot_boys_function(CSimdMatrix       &buffer,
 
     compute_boys_values(buffer, target, order, ncols);
 
-    _scale_pair_values(buffer, target, order + 1, ncols, fz, pair_exp);
+    _scale_pair_values(buffer, target, order + 1, ncols, fz, buffer.data(pair_exp));
 }
 
 }  // namespace simdfunc

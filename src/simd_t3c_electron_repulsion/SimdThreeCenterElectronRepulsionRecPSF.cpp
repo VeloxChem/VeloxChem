@@ -105,7 +105,7 @@ compute_psf_three_center_electron_repulsion(double               *values,
         screenfunc::three_center_electron_repulsion_primitive_bound,
         threshold / static_cast<double>(nprims));
 
-    const auto nmax = simdfunc::prepare_buffer(buffer, 191, 0, 0, dimensions);
+    const auto nmax = simdfunc::prepare_buffer(buffer, 190, 0, 0, dimensions);
 
     if (nmax == 0)
     {
@@ -123,17 +123,17 @@ compute_psf_three_center_electron_repulsion(double               *values,
 
     const auto nvalues = natoms * npairs;
 
+    simdfunc::compute_pair_exponents(a_function, b_function, coordinates, nmax);
+
     for (size_t n = 0; n < natoms; n++)
     {
-        simdfunc::prepare_buffer(buffer, 191, 140, 30, dimensions);
+        simdfunc::prepare_buffer(buffer, 190, 139, 30, dimensions);
 
         for (size_t i = 0; i < nprim_a; i++)
         {
             for (size_t j = 0; j < nprim_b; j++)
             {
                 const auto p = a_exps[i] + b_exps[j];
-
-                const auto mu = a_exps[i] * b_exps[j] / p;
 
                 const auto fovl = a_norms[i] * b_norms[j];
 
@@ -144,8 +144,6 @@ compute_psf_three_center_electron_repulsion(double               *values,
                 simdfunc::compute_pa(buffer, coordinates, 0, nmax, fa);
 
                 simdfunc::compute_pc(buffer, coordinates, c_coordinates, 3, n, nmax, fc);
-
-                simdfunc::compute_pair_exponent(buffer, coordinates, 6, nmax, mu);
 
                 for (size_t k = 0; k < nprim_c; k++)
                 {
@@ -162,67 +160,67 @@ compute_psf_three_center_electron_repulsion(double               *values,
                     const auto fj = 2.0 * fovl * c_norms[k] * pi * pi * std::sqrt(pi)
                                     / (p * gamma * std::sqrt(q));
 
-                    simdfunc::compute_t3c_boys_function(buffer, coordinates, 7, 3, {1, 2, 3, 4},
-                                                        ncols, fj, 6, fq);
+                    simdfunc::compute_t3c_boys_function(buffer, coordinates, 6, 3, {1, 2, 3, 4},
+                                                        ncols, fj, i * nprim_b + j, fq);
 
-                    compute_prim_pss_three_center_electron_repulsion_0(buffer, 12, 0, 3, 8, 9,
+                    compute_prim_pss_three_center_electron_repulsion_0(buffer, 11, 0, 3, 7, 8,
                                                                        ncols, gamma, q);
 
-                    compute_prim_pss_three_center_electron_repulsion_0(buffer, 15, 0, 3, 9, 10,
+                    compute_prim_pss_three_center_electron_repulsion_0(buffer, 14, 0, 3, 8, 9,
                                                                        ncols, gamma, q);
 
-                    compute_prim_pss_three_center_electron_repulsion_0(buffer, 18, 0, 3, 10, 11,
+                    compute_prim_pss_three_center_electron_repulsion_0(buffer, 17, 0, 3, 9, 10,
                                                                        ncols, gamma, q);
 
-                    compute_prim_ssp_three_center_electron_repulsion_0(buffer, 21, 3, 8, ncols,
+                    compute_prim_ssp_three_center_electron_repulsion_0(buffer, 20, 3, 7, ncols,
                                                                        p, q);
 
-                    compute_prim_ssp_three_center_electron_repulsion_0(buffer, 24, 3, 9, ncols,
+                    compute_prim_ssp_three_center_electron_repulsion_0(buffer, 23, 3, 8, ncols,
                                                                        p, q);
 
-                    compute_prim_ssp_three_center_electron_repulsion_0(buffer, 27, 3, 10, ncols,
+                    compute_prim_ssp_three_center_electron_repulsion_0(buffer, 26, 3, 9, ncols,
                                                                        p, q);
 
-                    compute_prim_ssp_three_center_electron_repulsion_0(buffer, 30, 3, 11, ncols,
+                    compute_prim_ssp_three_center_electron_repulsion_0(buffer, 29, 3, 10, ncols,
                                                                        p, q);
 
-                    compute_prim_psp_three_center_electron_repulsion_0(buffer, 33, 3, 8, 12,
+                    compute_prim_psp_three_center_electron_repulsion_0(buffer, 32, 3, 7, 11,
                                                                        ncols, p, q);
 
-                    compute_prim_psp_three_center_electron_repulsion_0(buffer, 42, 3, 9, 15,
+                    compute_prim_psp_three_center_electron_repulsion_0(buffer, 41, 3, 8, 14,
                                                                        ncols, p, q);
 
-                    compute_prim_psp_three_center_electron_repulsion_0(buffer, 51, 3, 10, 18,
+                    compute_prim_psp_three_center_electron_repulsion_0(buffer, 50, 3, 9, 17,
                                                                        ncols, p, q);
 
-                    compute_prim_ssd_three_center_electron_repulsion_0(buffer, 60, 3, 8, 9, 27,
+                    compute_prim_ssd_three_center_electron_repulsion_0(buffer, 59, 3, 7, 8, 26,
                                                                        ncols, gamma, p, q);
 
-                    compute_prim_ssd_three_center_electron_repulsion_0(buffer, 66, 3, 9, 10, 30,
+                    compute_prim_ssd_three_center_electron_repulsion_0(buffer, 65, 3, 8, 9, 29,
                                                                        ncols, gamma, p, q);
 
-                    compute_prim_psd_three_center_electron_repulsion_0(buffer, 72, 0, 3, 60, 27,
-                                                                       66, 51, ncols, gamma, p,
+                    compute_prim_psd_three_center_electron_repulsion_0(buffer, 71, 0, 3, 59, 26,
+                                                                       65, 50, ncols, gamma, p,
                                                                        q);
 
-                    compute_prim_ssf_three_center_electron_repulsion_0(buffer, 90, 3, 21, 24, 60,
+                    compute_prim_ssf_three_center_electron_repulsion_0(buffer, 89, 3, 20, 23, 59,
                                                                        ncols, gamma, p, q);
 
-                    compute_prim_ssf_three_center_electron_repulsion_0(buffer, 100, 3, 24, 27,
-                                                                       66, ncols, gamma, p, q);
+                    compute_prim_ssf_three_center_electron_repulsion_0(buffer, 99, 3, 23, 26, 65,
+                                                                       ncols, gamma, p, q);
 
-                    compute_prim_psf_three_center_electron_repulsion_0(buffer, 110, 0, 3, 90, 60,
-                                                                       100, 33, 42, 72, ncols,
+                    compute_prim_psf_three_center_electron_repulsion_0(buffer, 109, 0, 3, 89, 59,
+                                                                       99, 32, 41, 71, ncols,
                                                                        gamma, p, q);
 
-                    simdfunc::contract_primitives(buffer, 140, 110, 30, ncols);
+                    simdfunc::contract_primitives(buffer, 139, 109, 30, ncols);
                 }
             }
         }
 
-        simdtrf::transform_f_inner(buffer, 170, 140, 3, 1, nmax);
+        simdtrf::transform_f_inner(buffer, 169, 139, 3, 1, nmax);
 
-        simdtrf::transform_p_outer(values + n * npairs, nvalues, buffer, 170, 7, nmax);
+        simdtrf::transform_p_outer(values + n * npairs, nvalues, buffer, 169, 7, nmax);
     }
 
     for (size_t m = 0; m < 21; m++)
