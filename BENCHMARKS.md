@@ -4266,162 +4266,167 @@ it returns a dense matrix, and the cut is at 30000 functions, six gigabytes. The
 are those whose highest angular momentum is g, where the reference stops -- above that
 it returns zeros, which is not a reference.
 
-The geometric mean over the 170 comparable cases is **2.15**, and it is not one number:
-it rises with the molecule, 1.42 on tagrisso to 4.93 on ubiquitin.
+The geometric mean over the 170 comparable cases is **2.20**, and it is not one number:
+it rises with the molecule, 1.45 on tagrisso to 4.93 on ubiquitin.
 
 **This integral is the overlap times the number of nuclei.** Every kept pair is
-evaluated against every charge, so tagrisso at def2-qzvp is 90 ms here against 1.24 ms
-for the overlap, a factor of 75 on 70 atoms, and ubiquitin reaches 204 seconds. The
+evaluated against every charge, so tagrisso at def2-qzvp is 85 ms here against 1.24 ms
+for the overlap, a factor of 68 on 70 atoms, and ubiquitin reaches 182 seconds. The
 grid is otherwise the one the overlap and kinetic sections use.
+
+The tagrisso, c60, taxol and paracetamol cluster tables were measured again after the
+block size floor below; crambin and ubiquitin were not, because the floor cannot reach
+them -- they choose 3685 and 13541 atom pairs a block, far above either value -- and a
+spot check agrees, crambin at def2-tzvp giving 3459 ms against 3429 before.
 
 
 #### tagrisso, 70 atoms
 
 | basis | threshold | nao | ref ms | simd ms | x ref |
 | --- | --- | --- | --- | --- | --- |
-| def2-svp | 1e-14 | 683 | 11.08 | 11.40 | 1.0 |
-| def2-svp | 1e-12 | 683 | 11.08 | 10.78 | 1.0 |
-| def2-svpd | 1e-14 | 1010 | 17.83 | 19.93 | 0.9 |
-| def2-svpd | 1e-12 | 1010 | 17.83 | 19.44 | 0.9 |
-| def2-tzvp | 1e-14 | 1345 | 40.80 | 31.39 | 1.3 |
-| def2-tzvp | 1e-12 | 1345 | 40.80 | 29.77 | 1.4 |
-| def2-tzvpp | 1e-14 | 1609 | 45.93 | 35.11 | 1.3 |
-| def2-tzvpp | 1e-12 | 1609 | 45.93 | 33.91 | 1.4 |
-| def2-tzvpd | 1e-14 | 1672 | 40.44 | 45.46 | 0.9 |
-| def2-tzvpd | 1e-12 | 1672 | 40.44 | 44.67 | 0.9 |
-| def2-tzvppd | 1e-14 | 1936 | 46.04 | 50.63 | 0.9 |
-| def2-tzvppd | 1e-12 | 1936 | 46.04 | 48.90 | 0.9 |
-| def2-qzvp | 1e-14 | 3099 | 190.40 | 92.50 | 2.1 |
-| def2-qzvp | 1e-12 | 3099 | 190.40 | 89.49 | 2.1 |
-| def2-qzvpp | 1e-14 | 3099 | 191.24 | 92.68 | 2.1 |
-| def2-qzvpp | 1e-12 | 3099 | 191.24 | 89.83 | 2.1 |
-| def2-qzvpd | 1e-14 | 3426 | 191.68 | 118.26 | 1.6 |
-| def2-qzvpd | 1e-12 | 3426 | 191.68 | 114.60 | 1.7 |
-| def2-qzvppd | 1e-14 | 3426 | 185.65 | 118.08 | 1.6 |
-| def2-qzvppd | 1e-12 | 3426 | 185.65 | 114.90 | 1.6 |
-| cc-pvdz | 1e-14 | 683 | 36.36 | 23.93 | 1.5 |
-| cc-pvdz | 1e-12 | 683 | 36.36 | 23.43 | 1.6 |
-| cc-pvtz | 1e-14 | 1572 | 57.50 | 44.85 | 1.3 |
-| cc-pvtz | 1e-12 | 1572 | 57.50 | 42.93 | 1.3 |
-| cc-pvqz | 1e-14 | 3025 | 191.39 | 96.49 | 2.0 |
-| cc-pvqz | 1e-12 | 3025 | 191.39 | 92.79 | 2.1 |
-| aug-cc-pvdz | 1e-14 | 1148 | 44.33 | 41.73 | 1.1 |
-| aug-cc-pvdz | 1e-12 | 1148 | 44.33 | 41.25 | 1.1 |
-| aug-cc-pvtz | 1e-14 | 2461 | 127.81 | 89.25 | 1.4 |
-| aug-cc-pvtz | 1e-12 | 2461 | 127.81 | 87.27 | 1.5 |
-| aug-cc-pvqz | 1e-14 | 4478 | 524.22 | 206.25 | 2.5 |
-| aug-cc-pvqz | 1e-12 | 4478 | 524.22 | 201.56 | 2.6 |
+| def2-svp | 1e-14 | 683 | 8.69 | 10.54 | 0.8 |
+| def2-svp | 1e-12 | 683 | 8.69 | 10.09 | 0.9 |
+| def2-svpd | 1e-14 | 1010 | 17.85 | 18.84 | 0.9 |
+| def2-svpd | 1e-12 | 1010 | 17.85 | 18.35 | 1.0 |
+| def2-tzvp | 1e-14 | 1345 | 46.00 | 29.21 | 1.6 |
+| def2-tzvp | 1e-12 | 1345 | 46.00 | 28.43 | 1.6 |
+| def2-tzvpp | 1e-14 | 1609 | 46.05 | 33.17 | 1.4 |
+| def2-tzvpp | 1e-12 | 1609 | 46.05 | 31.64 | 1.5 |
+| def2-tzvpd | 1e-14 | 1672 | 43.31 | 43.66 | 1.0 |
+| def2-tzvpd | 1e-12 | 1672 | 43.31 | 42.38 | 1.0 |
+| def2-tzvppd | 1e-14 | 1936 | 43.72 | 48.66 | 0.9 |
+| def2-tzvppd | 1e-12 | 1936 | 43.72 | 46.64 | 0.9 |
+| def2-qzvp | 1e-14 | 3099 | 186.46 | 87.89 | 2.1 |
+| def2-qzvp | 1e-12 | 3099 | 186.46 | 84.68 | 2.2 |
+| def2-qzvpp | 1e-14 | 3099 | 183.76 | 88.23 | 2.1 |
+| def2-qzvpp | 1e-12 | 3099 | 183.76 | 84.44 | 2.2 |
+| def2-qzvpd | 1e-14 | 3426 | 184.57 | 113.32 | 1.6 |
+| def2-qzvpd | 1e-12 | 3426 | 184.57 | 109.68 | 1.7 |
+| def2-qzvppd | 1e-14 | 3426 | 187.54 | 114.07 | 1.6 |
+| def2-qzvppd | 1e-12 | 3426 | 187.54 | 110.23 | 1.7 |
+| cc-pvdz | 1e-14 | 683 | 34.74 | 21.96 | 1.6 |
+| cc-pvdz | 1e-12 | 683 | 34.74 | 21.44 | 1.6 |
+| cc-pvtz | 1e-14 | 1572 | 51.72 | 41.48 | 1.2 |
+| cc-pvtz | 1e-12 | 1572 | 51.72 | 40.19 | 1.3 |
+| cc-pvqz | 1e-14 | 3025 | 191.37 | 91.43 | 2.1 |
+| cc-pvqz | 1e-12 | 3025 | 191.37 | 87.45 | 2.2 |
+| aug-cc-pvdz | 1e-14 | 1148 | 45.05 | 39.41 | 1.1 |
+| aug-cc-pvdz | 1e-12 | 1148 | 45.05 | 38.31 | 1.2 |
+| aug-cc-pvtz | 1e-14 | 2461 | 128.13 | 85.86 | 1.5 |
+| aug-cc-pvtz | 1e-12 | 2461 | 128.13 | 83.46 | 1.5 |
+| aug-cc-pvqz | 1e-14 | 4478 | 509.61 | 200.65 | 2.5 |
+| aug-cc-pvqz | 1e-12 | 4478 | 509.61 | 193.55 | 2.6 |
 
 #### c60, 60 atoms
 
 | basis | threshold | nao | ref ms | simd ms | x ref |
 | --- | --- | --- | --- | --- | --- |
-| def2-svp | 1e-14 | 840 | 16.18 | 15.91 | 1.0 |
-| def2-svp | 1e-12 | 840 | 16.18 | 15.41 | 1.1 |
-| def2-svpd | 1e-14 | 1200 | 22.24 | 26.56 | 0.8 |
-| def2-svpd | 1e-12 | 1200 | 22.24 | 26.29 | 0.8 |
-| def2-tzvp | 1e-14 | 1860 | 91.70 | 52.79 | 1.7 |
-| def2-tzvp | 1e-12 | 1860 | 91.70 | 51.12 | 1.8 |
-| def2-tzvpp | 1e-14 | 1860 | 96.21 | 52.83 | 1.8 |
-| def2-tzvpp | 1e-12 | 1860 | 96.21 | 51.05 | 1.9 |
-| def2-tzvpd | 1e-14 | 2220 | 96.22 | 71.43 | 1.3 |
-| def2-tzvpd | 1e-12 | 2220 | 96.22 | 69.75 | 1.4 |
-| def2-tzvppd | 1e-14 | 2220 | 101.75 | 71.44 | 1.4 |
-| def2-tzvppd | 1e-12 | 2220 | 101.75 | 69.52 | 1.5 |
-| def2-qzvp | 1e-14 | 3420 | 399.93 | 136.02 | 2.9 |
-| def2-qzvp | 1e-12 | 3420 | 399.93 | 131.77 | 3.0 |
-| def2-qzvpp | 1e-14 | 3420 | 399.63 | 136.90 | 2.9 |
-| def2-qzvpp | 1e-12 | 3420 | 399.63 | 130.91 | 3.1 |
-| def2-qzvpd | 1e-14 | 3780 | 383.89 | 165.91 | 2.3 |
-| def2-qzvpd | 1e-12 | 3780 | 383.89 | 160.64 | 2.4 |
-| def2-qzvppd | 1e-14 | 3780 | 394.60 | 166.19 | 2.4 |
-| def2-qzvppd | 1e-12 | 3780 | 394.60 | 161.32 | 2.4 |
-| cc-pvdz | 1e-14 | 840 | 33.19 | 36.74 | 0.9 |
-| cc-pvdz | 1e-12 | 840 | 33.19 | 35.80 | 0.9 |
-| cc-pvtz | 1e-14 | 1800 | 91.16 | 68.83 | 1.3 |
-| cc-pvtz | 1e-12 | 1800 | 91.16 | 66.12 | 1.4 |
-| cc-pvqz | 1e-14 | 3300 | 396.01 | 144.84 | 2.7 |
-| cc-pvqz | 1e-12 | 3300 | 396.01 | 138.76 | 2.9 |
-| aug-cc-pvdz | 1e-14 | 1380 | 46.70 | 60.38 | 0.8 |
-| aug-cc-pvdz | 1e-12 | 1380 | 46.70 | 59.73 | 0.8 |
-| aug-cc-pvtz | 1e-14 | 2760 | 124.31 | 127.82 | 1.0 |
-| aug-cc-pvtz | 1e-12 | 2760 | 124.31 | 124.42 | 1.0 |
-| aug-cc-pvqz | 1e-14 | 4800 | 461.53 | 286.90 | 1.6 |
-| aug-cc-pvqz | 1e-12 | 4800 | 461.53 | 279.82 | 1.6 |
+| def2-svp | 1e-14 | 840 | 16.33 | 15.03 | 1.1 |
+| def2-svp | 1e-12 | 840 | 16.33 | 14.40 | 1.1 |
+| def2-svpd | 1e-14 | 1200 | 22.92 | 25.37 | 0.9 |
+| def2-svpd | 1e-12 | 1200 | 22.92 | 24.84 | 0.9 |
+| def2-tzvp | 1e-14 | 1860 | 96.92 | 50.07 | 1.9 |
+| def2-tzvp | 1e-12 | 1860 | 96.92 | 47.53 | 2.0 |
+| def2-tzvpp | 1e-14 | 1860 | 94.27 | 49.44 | 1.9 |
+| def2-tzvpp | 1e-12 | 1860 | 94.27 | 47.65 | 2.0 |
+| def2-tzvpd | 1e-14 | 2220 | 96.39 | 67.91 | 1.4 |
+| def2-tzvpd | 1e-12 | 2220 | 96.39 | 66.12 | 1.5 |
+| def2-tzvppd | 1e-14 | 2220 | 91.19 | 68.32 | 1.3 |
+| def2-tzvppd | 1e-12 | 2220 | 91.19 | 65.58 | 1.4 |
+| def2-qzvp | 1e-14 | 3420 | 389.30 | 130.37 | 3.0 |
+| def2-qzvp | 1e-12 | 3420 | 389.30 | 123.95 | 3.1 |
+| def2-qzvpp | 1e-14 | 3420 | 391.52 | 129.68 | 3.0 |
+| def2-qzvpp | 1e-12 | 3420 | 391.52 | 123.71 | 3.2 |
+| def2-qzvpd | 1e-14 | 3780 | 381.38 | 159.09 | 2.4 |
+| def2-qzvpd | 1e-12 | 3780 | 381.38 | 152.41 | 2.5 |
+| def2-qzvppd | 1e-14 | 3780 | 368.34 | 158.53 | 2.3 |
+| def2-qzvppd | 1e-12 | 3780 | 368.34 | 153.42 | 2.4 |
+| cc-pvdz | 1e-14 | 840 | 35.61 | 33.12 | 1.1 |
+| cc-pvdz | 1e-12 | 840 | 35.61 | 31.98 | 1.1 |
+| cc-pvtz | 1e-14 | 1800 | 91.20 | 63.43 | 1.4 |
+| cc-pvtz | 1e-12 | 1800 | 91.20 | 60.93 | 1.5 |
+| cc-pvqz | 1e-14 | 3300 | 376.02 | 134.58 | 2.8 |
+| cc-pvqz | 1e-12 | 3300 | 376.02 | 129.60 | 2.9 |
+| aug-cc-pvdz | 1e-14 | 1380 | 48.98 | 56.46 | 0.9 |
+| aug-cc-pvdz | 1e-12 | 1380 | 48.98 | 55.13 | 0.9 |
+| aug-cc-pvtz | 1e-14 | 2760 | 120.06 | 121.65 | 1.0 |
+| aug-cc-pvtz | 1e-12 | 2760 | 120.06 | 117.95 | 1.0 |
+| aug-cc-pvqz | 1e-14 | 4800 | 453.16 | 276.83 | 1.6 |
+| aug-cc-pvqz | 1e-12 | 4800 | 453.16 | 266.08 | 1.7 |
 
 #### taxol, 110 atoms
 
 | basis | threshold | nao | ref ms | simd ms | x ref |
 | --- | --- | --- | --- | --- | --- |
-| def2-svp | 1e-14 | 1099 | 31.86 | 31.49 | 1.0 |
-| def2-svp | 1e-12 | 1099 | 31.86 | 30.53 | 1.0 |
-| def2-svpd | 1e-14 | 1657 | 49.61 | 60.90 | 0.8 |
-| def2-svpd | 1e-12 | 1657 | 49.61 | 59.10 | 0.8 |
-| def2-tzvp | 1e-14 | 2185 | 176.94 | 89.32 | 2.0 |
-| def2-tzvp | 1e-12 | 2185 | 176.94 | 85.27 | 2.1 |
-| def2-tzvpp | 1e-14 | 2577 | 186.53 | 100.56 | 1.9 |
-| def2-tzvpp | 1e-12 | 2577 | 186.53 | 96.17 | 1.9 |
-| def2-tzvpd | 1e-14 | 2743 | 191.43 | 140.54 | 1.4 |
-| def2-tzvpd | 1e-12 | 2743 | 191.43 | 133.96 | 1.4 |
-| def2-tzvppd | 1e-14 | 3135 | 187.04 | 155.26 | 1.2 |
-| def2-tzvppd | 1e-12 | 3135 | 187.04 | 149.39 | 1.3 |
-| def2-qzvp | 1e-14 | 4947 | 773.86 | 269.46 | 2.9 |
-| def2-qzvp | 1e-12 | 4947 | 773.86 | 257.94 | 3.0 |
-| def2-qzvpp | 1e-14 | 4947 | 763.33 | 270.21 | 2.8 |
-| def2-qzvpp | 1e-12 | 4947 | 763.33 | 257.96 | 3.0 |
-| def2-qzvpd | 1e-14 | 5505 | 755.41 | 362.44 | 2.1 |
-| def2-qzvpd | 1e-12 | 5505 | 755.41 | 348.69 | 2.2 |
-| def2-qzvppd | 1e-14 | 5505 | 769.87 | 362.22 | 2.1 |
-| def2-qzvppd | 1e-12 | 5505 | 769.87 | 348.46 | 2.2 |
-| cc-pvdz | 1e-14 | 1099 | 72.20 | 64.43 | 1.1 |
-| cc-pvdz | 1e-12 | 1099 | 72.20 | 62.20 | 1.2 |
-| cc-pvtz | 1e-14 | 2516 | 186.64 | 124.91 | 1.5 |
-| cc-pvtz | 1e-12 | 2516 | 186.64 | 119.51 | 1.6 |
-| cc-pvqz | 1e-14 | 4825 | 769.44 | 276.81 | 2.8 |
-| cc-pvqz | 1e-12 | 4825 | 769.44 | 263.16 | 2.9 |
-| aug-cc-pvdz | 1e-14 | 1844 | 97.22 | 123.69 | 0.8 |
-| aug-cc-pvdz | 1e-12 | 1844 | 97.22 | 120.38 | 0.8 |
-| aug-cc-pvtz | 1e-14 | 3933 | 308.76 | 271.02 | 1.1 |
-| aug-cc-pvtz | 1e-12 | 3933 | 308.76 | 260.35 | 1.2 |
-| aug-cc-pvqz | 1e-14 | 7134 | 1377.96 | 637.29 | 2.2 |
-| aug-cc-pvqz | 1e-12 | 7134 | 1377.96 | 612.89 | 2.2 |
+| def2-svp | 1e-14 | 1099 | 36.31 | 29.33 | 1.2 |
+| def2-svp | 1e-12 | 1099 | 36.31 | 27.63 | 1.3 |
+| def2-svpd | 1e-14 | 1657 | 46.65 | 58.24 | 0.8 |
+| def2-svpd | 1e-12 | 1657 | 46.65 | 56.33 | 0.8 |
+| def2-tzvp | 1e-14 | 2185 | 186.86 | 84.13 | 2.2 |
+| def2-tzvp | 1e-12 | 2185 | 186.86 | 80.14 | 2.3 |
+| def2-tzvpp | 1e-14 | 2577 | 172.59 | 94.41 | 1.8 |
+| def2-tzvpp | 1e-12 | 2577 | 172.59 | 90.37 | 1.9 |
+| def2-tzvpd | 1e-14 | 2743 | 182.34 | 134.05 | 1.4 |
+| def2-tzvpd | 1e-12 | 2743 | 182.34 | 127.99 | 1.4 |
+| def2-tzvppd | 1e-14 | 3135 | 186.80 | 148.95 | 1.3 |
+| def2-tzvppd | 1e-12 | 3135 | 186.80 | 142.40 | 1.3 |
+| def2-qzvp | 1e-14 | 4947 | 766.25 | 255.82 | 3.0 |
+| def2-qzvp | 1e-12 | 4947 | 766.25 | 243.59 | 3.1 |
+| def2-qzvpp | 1e-14 | 4947 | 776.72 | 256.66 | 3.0 |
+| def2-qzvpp | 1e-12 | 4947 | 776.72 | 242.07 | 3.2 |
+| def2-qzvpd | 1e-14 | 5505 | 768.16 | 349.44 | 2.2 |
+| def2-qzvpd | 1e-12 | 5505 | 768.16 | 334.23 | 2.3 |
+| def2-qzvppd | 1e-14 | 5505 | 760.93 | 348.85 | 2.2 |
+| def2-qzvppd | 1e-12 | 5505 | 760.93 | 335.48 | 2.3 |
+| cc-pvdz | 1e-14 | 1099 | 69.31 | 58.92 | 1.2 |
+| cc-pvdz | 1e-12 | 1099 | 69.31 | 55.73 | 1.2 |
+| cc-pvtz | 1e-14 | 2516 | 185.38 | 116.98 | 1.6 |
+| cc-pvtz | 1e-12 | 2516 | 185.38 | 110.07 | 1.7 |
+| cc-pvqz | 1e-14 | 4825 | 779.12 | 260.54 | 3.0 |
+| cc-pvqz | 1e-12 | 4825 | 779.12 | 247.23 | 3.2 |
+| aug-cc-pvdz | 1e-14 | 1844 | 98.85 | 116.55 | 0.8 |
+| aug-cc-pvdz | 1e-12 | 1844 | 98.85 | 112.56 | 0.9 |
+| aug-cc-pvtz | 1e-14 | 3933 | 309.31 | 261.33 | 1.2 |
+| aug-cc-pvtz | 1e-12 | 3933 | 309.31 | 250.47 | 1.2 |
+| aug-cc-pvqz | 1e-14 | 7134 | 1379.48 | 617.56 | 2.2 |
+| aug-cc-pvqz | 1e-12 | 7134 | 1379.48 | 591.25 | 2.3 |
 
 #### paracetamol_cluster, 320 atoms
 
 | basis | threshold | nao | ref ms | simd ms | x ref |
 | --- | --- | --- | --- | --- | --- |
-| def2-svp | 1e-14 | 3184 | 512.42 | 312.92 | 1.6 |
-| def2-svp | 1e-12 | 3184 | 512.42 | 285.97 | 1.8 |
-| def2-svpd | 1e-14 | 4768 | 923.30 | 796.33 | 1.2 |
-| def2-svpd | 1e-12 | 4768 | 923.30 | 724.42 | 1.3 |
-| def2-tzvp | 1e-14 | 6320 | 2154.71 | 936.13 | 2.3 |
-| def2-tzvp | 1e-12 | 6320 | 2154.71 | 853.23 | 2.5 |
-| def2-tzvpp | 1e-14 | 7472 | 2708.10 | 1079.22 | 2.5 |
-| def2-tzvpp | 1e-12 | 7472 | 2708.10 | 977.38 | 2.8 |
-| def2-tzvpd | 1e-14 | 7904 | 2947.97 | 1822.58 | 1.6 |
-| def2-tzvpd | 1e-12 | 7904 | 2947.97 | 1682.04 | 1.8 |
-| def2-tzvppd | 1e-14 | 9056 | 3568.15 | 2043.41 | 1.7 |
-| def2-tzvppd | 1e-12 | 9056 | 3568.15 | 1873.96 | 1.9 |
-| def2-qzvp | 1e-14 | 14352 | 13568.74 | 2929.69 | 4.6 |
-| def2-qzvp | 1e-12 | 14352 | 13568.74 | 2664.76 | 5.1 |
-| def2-qzvpp | 1e-14 | 14352 | 13544.31 | 2919.02 | 4.6 |
-| def2-qzvpp | 1e-12 | 14352 | 13544.31 | 2664.89 | 5.1 |
-| def2-qzvpd | 1e-14 | 15936 | 15456.55 | 4666.67 | 3.3 |
-| def2-qzvpd | 1e-12 | 15936 | 15456.55 | 4302.04 | 3.6 |
-| def2-qzvppd | 1e-14 | 15936 | 15489.69 | 4672.90 | 3.3 |
-| def2-qzvppd | 1e-12 | 15936 | 15489.69 | 4306.16 | 3.6 |
-| cc-pvdz | 1e-14 | 3184 | 948.21 | 574.09 | 1.7 |
-| cc-pvdz | 1e-12 | 3184 | 948.21 | 532.34 | 1.8 |
-| cc-pvtz | 1e-14 | 7296 | 3063.48 | 1219.16 | 2.5 |
-| cc-pvtz | 1e-12 | 7296 | 3063.48 | 1114.96 | 2.7 |
-| cc-pvqz | 1e-14 | 14000 | 13610.98 | 2814.62 | 4.8 |
-| cc-pvqz | 1e-12 | 14000 | 13610.98 | 2564.56 | 5.3 |
-| aug-cc-pvdz | 1e-14 | 5344 | 1666.81 | 1636.65 | 1.0 |
-| aug-cc-pvdz | 1e-12 | 5344 | 1666.81 | 1531.90 | 1.1 |
-| aug-cc-pvtz | 1e-14 | 11408 | 6730.63 | 3730.49 | 1.8 |
-| aug-cc-pvtz | 1e-12 | 11408 | 6730.63 | 3462.80 | 1.9 |
-| aug-cc-pvqz | 1e-14 | 20704 | 31648.33 | 8792.22 | 3.6 |
-| aug-cc-pvqz | 1e-12 | 20704 | 31648.33 | 8134.50 | 3.9 |
+| def2-svp | 1e-14 | 3184 | 512.15 | 316.39 | 1.6 |
+| def2-svp | 1e-12 | 3184 | 512.15 | 287.20 | 1.8 |
+| def2-svpd | 1e-14 | 4768 | 923.26 | 801.14 | 1.2 |
+| def2-svpd | 1e-12 | 4768 | 923.26 | 728.53 | 1.3 |
+| def2-tzvp | 1e-14 | 6320 | 2149.43 | 942.27 | 2.3 |
+| def2-tzvp | 1e-12 | 6320 | 2149.43 | 857.68 | 2.5 |
+| def2-tzvpp | 1e-14 | 7472 | 2695.89 | 1081.83 | 2.5 |
+| def2-tzvpp | 1e-12 | 7472 | 2695.89 | 983.99 | 2.7 |
+| def2-tzvpd | 1e-14 | 7904 | 2941.29 | 1834.47 | 1.6 |
+| def2-tzvpd | 1e-12 | 7904 | 2941.29 | 1684.57 | 1.7 |
+| def2-tzvppd | 1e-14 | 9056 | 3586.70 | 2056.64 | 1.7 |
+| def2-tzvppd | 1e-12 | 9056 | 3586.70 | 1880.71 | 1.9 |
+| def2-qzvp | 1e-14 | 14352 | 13601.73 | 2930.58 | 4.6 |
+| def2-qzvp | 1e-12 | 14352 | 13601.73 | 2686.37 | 5.1 |
+| def2-qzvpp | 1e-14 | 14352 | 13714.12 | 2939.45 | 4.7 |
+| def2-qzvpp | 1e-12 | 14352 | 13714.12 | 2679.86 | 5.1 |
+| def2-qzvpd | 1e-14 | 15936 | 15498.40 | 4696.47 | 3.3 |
+| def2-qzvpd | 1e-12 | 15936 | 15498.40 | 4383.05 | 3.5 |
+| def2-qzvppd | 1e-14 | 15936 | 15569.90 | 4690.95 | 3.3 |
+| def2-qzvppd | 1e-12 | 15936 | 15569.90 | 4324.47 | 3.6 |
+| cc-pvdz | 1e-14 | 3184 | 940.98 | 579.41 | 1.6 |
+| cc-pvdz | 1e-12 | 3184 | 940.98 | 538.86 | 1.7 |
+| cc-pvtz | 1e-14 | 7296 | 3050.26 | 1226.12 | 2.5 |
+| cc-pvtz | 1e-12 | 7296 | 3050.26 | 1121.17 | 2.7 |
+| cc-pvqz | 1e-14 | 14000 | 13546.61 | 2815.16 | 4.8 |
+| cc-pvqz | 1e-12 | 14000 | 13546.61 | 2570.02 | 5.3 |
+| aug-cc-pvdz | 1e-14 | 5344 | 1641.70 | 1618.09 | 1.0 |
+| aug-cc-pvdz | 1e-12 | 5344 | 1641.70 | 1510.26 | 1.1 |
+| aug-cc-pvtz | 1e-14 | 11408 | 6620.42 | 3724.20 | 1.8 |
+| aug-cc-pvtz | 1e-12 | 11408 | 6620.42 | 3465.30 | 1.9 |
+| aug-cc-pvqz | 1e-14 | 20704 | 31557.92 | 8738.65 | 3.6 |
+| aug-cc-pvqz | 1e-12 | 20704 | 31557.92 | 8093.69 | 3.9 |
 
 #### crambin, 642 atoms
 
@@ -4497,25 +4502,72 @@ grid is otherwise the one the overlap and kinetic sections use.
 | aug-cc-pvqz | 1e-14 | 77098 | -- | 203911.70 | -- |
 | aug-cc-pvqz | 1e-12 | 77098 | -- | 181524.88 | -- |
 
+#### The block size, and a floor of its own
+
+`make_block_size` gives `npairs / (4 x nthreads)` and floors it at
+`sparsity::min_block_size`, which is 256. Swept at fourteen threads, every case has the
+same shape -- steep below 512 atom pairs a block, flat from there to 32768:
+
+| case | default | 64 | 256 | 512 | 1024 | 4096 | 8192 | 32768 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| c60 def2-svpd | 25.74 | 41.50 | 25.64 | **24.58** | 24.61 | 25.02 | 24.99 | 25.56 |
+| taxol def2-svpd | 58.41 | 85.24 | 57.76 | **55.17** | 55.22 | 57.14 | 56.42 | 56.84 |
+| tagrisso def2-tzvpd | 44.08 | 56.76 | 43.62 | 41.89 | 42.37 | **41.83** | 42.45 | 43.53 |
+| crambin def2-tzvp | 3429 | 9152 | 5342 | 4223 | 3651 | **3427** | 3475 | 3525 |
+| ubiquitin def2-svp | 4360 | 14022 | 9812 | 7142 | 5520 | 4400 | **4310** | 4449 |
+
+**It is a fixed cost per block and not the buffer.** The arena is the largest block's
+pairs times the buffer rows of its momenta, and over this sweep it runs from 0.1 to 56
+MB a thread with no structure in the timings at all -- crambin's best point is the 23 MB
+one. It is not a scheduling effect either: c60 at four threads has the same shape, 53.60
+at 256 against 52.29 at 512, and at one thread the same ordering with the gain down to
+0.6 per cent.
+
+**So the floor binds, and only for the small molecules.** crambin chooses 3685 and
+ubiquitin 13541, both on the plateau and within one per cent of the best point in the
+sweep -- there is nothing to win there. Everything under about 150 atoms falls to the
+floor instead, and 256 costs it 4 to 6 per cent.
+
+The nuclear potential driver therefore carries a floor of its own, 512, passed as
+`min_pairs` through `make_pattern`. `sparsity::min_block_size` stays at 256: it was
+*lowered* to that from 2048 on the evidence of the overlap driver, whose buffer is ten
+rows against this one's hundreds, and reaching into it would change drivers this was not
+measured on. What it bought, as a ratio of the committed numbers over the same grid:
+
+| molecule | chosen block size | speedup |
+| --- | ---: | ---: |
+| tagrisso | 256 -> 512 | 1.057 |
+| c60 | 256 -> 512 | 1.063 |
+| taxol | 256 -> 512 | 1.058 |
+| paracetamol cluster | 917, unchanged | 0.996 |
+
+The paracetamol cluster is the control: its chosen size already exceeds both floors, and
+it does not move. Three of the sixteen rows which lost to the reference now win.
+
+**This is a laptop number and the floor is the kind of constant which inverts.** At 512
+c60 holds four blocks where 256 gave it seven, and the small molecules are the ones with
+the fewest tasks to spread over a node. The plateau is broad enough that 512 is not a
+risky point, but it has not been measured above fourteen threads.
+
 #### What these numbers say
 
 **The advantage is screening, so it grows with the molecule and nothing else.** The
-geometric mean by molecule: tagrisso 1.42, c60 1.55, taxol 1.62, paracetamol cluster
-2.47, crambin 3.80, ubiquitin 4.93. The reference computes every atom pair; the driver
+geometric mean by molecule: tagrisso 1.45, c60 1.64, taxol 1.70, paracetamol cluster
+2.45, crambin 3.80, ubiquitin 4.93. The reference computes every atom pair; the driver
 computes the pairs which survive, and on seventy atoms almost all of them do. The best
-case in the grid is crambin at cc-pvqz, 9.6. At the other end **sixteen rows, eight
-basis and molecule combinations, are slower than the reference**: tagrisso in
-def2-svpd, def2-tzvpd and def2-tzvppd, c60 in def2-svpd, cc-pvdz and aug-cc-pvdz, and
-taxol in def2-svpd and aug-cc-pvdz, from 0.8 to 0.9. Every one is on the three smallest
-molecules, and seven of the eight carry diffuse functions -- the exception is c60 in
-cc-pvdz. Little to screen, and the fixed cost of a block is what is left.
+case in the grid is crambin at cc-pvqz, 9.6. At the other end **thirteen rows, seven
+basis and molecule combinations, are slower than the reference**: tagrisso in def2-svp,
+def2-svpd and def2-tzvppd, c60 in def2-svpd and aug-cc-pvdz, and taxol in def2-svpd and
+aug-cc-pvdz, from 0.8 to 0.9. Every one is on the three smallest molecules and every one
+is double or triple zeta. Little to screen, and the fixed cost of a block is what is
+left.
 
 **Diffuse functions are what defeats it, and they cost more the larger the molecule.**
 At 1e-12, going from cc-pvdz to aug-cc-pvdz:
 
 | molecule | nao | time | x ref |
 | --- | ---: | ---: | --- |
-| tagrisso | x1.68 | x1.76 | 1.6 -> 1.1 |
+| tagrisso | x1.68 | x1.79 | 1.6 -> 1.2 |
 | crambin | x1.68 | x3.54 | 3.3 -> 1.6 |
 | ubiquitin | x1.69 | x4.50 | 6.0 -> 2.4 |
 
@@ -4526,11 +4578,11 @@ the larger the molecule the more there was to give back. def2-svp to def2-svpd i
 same story at 1.5 functions and 3.1 time, def2-tzvp to def2-tzvpd at 1.26 and 2.40.
 
 **The threshold is worth between three and fourteen per cent, in that order.** 1e-12
-against 1e-14: tagrisso 1.032, c60 1.030, taxol 1.041, paracetamol cluster 1.089,
+against 1e-14: tagrisso 1.035, c60 1.038, taxol 1.048, paracetamol cluster 1.088,
 crambin 1.113, ubiquitin 1.137. It buys nothing where there is nothing to screen and
 the most where the screening is already doing the work -- the same axis as everything
 else here. Since the reference has no threshold at all, the whole of it shows up in the
-ratio, which is why the 1e-12 mean is 2.22 against 2.08.
+ratio, which is why the 1e-12 mean is 2.27 against 2.13.
 
 ### The two-center Coulomb driver against the reference
 

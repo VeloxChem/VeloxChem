@@ -255,14 +255,19 @@ check_pattern(const CSparsityPattern              &pattern,
 /// @param groups The atom basis pair groups to divide.
 /// @param block_size The target number of atom pairs of a block, or zero to choose
 /// it from the number of the threads and the number of the atom pairs.
+/// @param min_pairs The smallest target number of atom pairs a chosen block size is
+/// allowed to fall to. An operator whose fixed cost per block is larger than the
+/// overlap's raises it; see min_block_size.
 /// @return The vector of blocks.
 /// @note This is the half of the pattern which depends on the geometry and the
 /// bases alone, and not on the operator or the threshold. It is kept apart so that
 /// the screening below can be repeated on it, and so that it can be shared between
 /// operators without changing any caller when that becomes worth doing.
 inline auto
-make_blocks(const CMolecule &molecule, std::vector<CAtomBasisPairGroup> &groups, const size_t block_size)
-    -> std::vector<CAtomBasisPairGroup>
+make_blocks(const CMolecule                  &molecule,
+            std::vector<CAtomBasisPairGroup> &groups,
+            const size_t                      block_size,
+            const size_t                      min_pairs = min_block_size) -> std::vector<CAtomBasisPairGroup>
 {
     // NOTE: the atom basis pair groups are as many as the pairs of the unique atom
     // bases, so their number is set by the variety of the elements of the molecule
@@ -272,7 +277,7 @@ make_blocks(const CMolecule &molecule, std::vector<CAtomBasisPairGroup> &groups,
     // below divides for any number of threads.
 
     const auto nblock_pairs =
-        (block_size == 0) ? CAtomBasisPairGroup::make_block_size(groups, blocks_per_thread, min_block_size) : block_size;
+        (block_size == 0) ? CAtomBasisPairGroup::make_block_size(groups, blocks_per_thread, min_pairs) : block_size;
 
     auto blocks = (nblock_pairs == 0) ? std::move(groups) : CAtomBasisPairGroup::divide(groups, nblock_pairs);
 
@@ -347,6 +352,8 @@ describe(const std::vector<CAtomBasisPairGroup> &blocks,
 /// @param storage The storage layout of the diagonal blocks.
 /// @param block_size The target number of atom pairs of a block, or zero to choose
 /// it from the number of the threads and the number of the atom pairs.
+/// @param min_pairs The smallest target number of atom pairs a chosen block size is
+/// allowed to fall to.
 /// @return The sparsity pattern.
 template <typename B>
 inline auto
@@ -357,7 +364,8 @@ make_pattern(const CMolecule       &molecule,
              const double           threshold,
              const mat_t            mat_type,
              const diagstor         storage,
-             const size_t           block_size = 0) -> CSparsityPattern
+             const size_t           block_size = 0,
+             const size_t           min_pairs  = min_block_size) -> CSparsityPattern
 {
     // NOTE: a lower triangular quantity is stored by CPackedMatrix alone. A sparse
     // quantity reconstructs both halves of a matrix from the triangle it keeps,
@@ -374,7 +382,7 @@ make_pattern(const CMolecule       &molecule,
     auto groups = ((mat_type != mat_t::general) && (&bra_basis == &ket_basis)) ? bra_basis.basis_pair_groups()
                                                                               : bra_basis.basis_pair_groups(ket_basis);
 
-    auto blocks = make_blocks(molecule, groups, block_size);
+    auto blocks = make_blocks(molecule, groups, block_size, min_pairs);
 
     return describe(blocks, bound, threshold, storage, mat_type);
 }
@@ -390,23 +398,24 @@ make_pattern(const CMolecule       &molecule,
              const double           threshold,
              const mat_t            mat_type,
              const diagstor         storage,
-             const size_t           block_size = 0) -> CSparsityPattern
+             const size_t           block_size = 0,
+             const size_t           min_pairs  = min_block_size) -> CSparsityPattern
 {
     if (bound == screener::overlap)
     {
-        return make_pattern(molecule, bra_basis, ket_basis, screenfunc::two_center_overlap_bound, threshold, mat_type, storage, block_size);
+        return make_pattern(molecule, bra_basis, ket_basis, screenfunc::two_center_overlap_bound, threshold, mat_type, storage, block_size, min_pairs);
     }
 
     if (bound == screener::kinetic_energy)
     {
         return make_pattern(
-            molecule, bra_basis, ket_basis, screenfunc::two_center_kinetic_energy_bound, threshold, mat_type, storage, block_size);
+            molecule, bra_basis, ket_basis, screenfunc::two_center_kinetic_energy_bound, threshold, mat_type, storage, block_size, min_pairs);
     }
 
     if (bound == screener::nuclear_potential)
     {
         return make_pattern(
-            molecule, bra_basis, ket_basis, screenfunc::two_center_nuclear_potential_bound, threshold, mat_type, storage, block_size);
+            molecule, bra_basis, ket_basis, screenfunc::two_center_nuclear_potential_bound, threshold, mat_type, storage, block_size, min_pairs);
     }
 
     errors::assertMsgCritical(false, std::string("SparsityPattern.make_pattern: Integral bound is not a two-center bound"));

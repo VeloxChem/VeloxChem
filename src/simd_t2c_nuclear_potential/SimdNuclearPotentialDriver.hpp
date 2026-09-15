@@ -130,8 +130,15 @@ class CSimdNuclearPotentialDriver
     make_pattern(const CMolecule &molecule, const CMolecularBasis &bra_basis, const CMolecularBasis &ket_basis, const mat_t mat_type)
         const -> CSparsityPattern
     {
-        return sparsity::make_pattern(
-            molecule, bra_basis, ket_basis, screener::nuclear_potential, _threshold, mat_type, diagstor::full, _block_size);
+        return sparsity::make_pattern(molecule,
+                                      bra_basis,
+                                      ket_basis,
+                                      screener::nuclear_potential,
+                                      _threshold,
+                                      mat_type,
+                                      diagstor::full,
+                                      _block_size,
+                                      _min_block_pairs);
     }
 
     /// @brief Computes the nuclear potential integrals of a sparsity pattern and
@@ -238,6 +245,20 @@ class CSimdNuclearPotentialDriver
     /// @brief The target number of atom pairs of a block, zero to choose it from
     /// the number of the threads and the number of the atom pairs.
     size_t _block_size;
+
+    /// @brief The smallest target number of atom pairs of a block this driver lets
+    /// the chosen block size fall to, against the 256 of sparsity::min_block_size.
+    /// @note Measured on 2026-09-15 by sweeping the block size at one, four and
+    /// fourteen threads. Every case has the same shape: the time rises steeply below
+    /// 512 atom pairs and is flat from there to 32768, so the cost is a fixed one per
+    /// block and not the buffer, which runs from 0.1 to 56 MB over that range with no
+    /// structure in the timings. A nuclear potential kernel evaluates every pair
+    /// against every charge, which is what makes its work per block large enough for
+    /// the floor of the overlap to bind too early: 256 is what the chosen size falls
+    /// to for anything under about 150 atoms, and it costs those 4 to 6 per cent.
+    /// The molecules above that choose a block size far above either floor and are
+    /// untouched by this.
+    static constexpr size_t _min_block_pairs = 512;
 };
 
 template <class D>
