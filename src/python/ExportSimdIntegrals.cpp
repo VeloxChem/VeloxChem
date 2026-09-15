@@ -48,6 +48,7 @@
 #include "SimdOverlapDriver.hpp"
 #include "SimdRIFockDriver.hpp"
 #include "SimdRIJKFockDriver.hpp"
+#include "SimdRIJKGradientDriver.hpp"
 #include "SimdThreeCenterElectronRepulsionDriver.hpp"
 #include "SimdTwoCenterElectronRepulsionDriver.hpp"
 #include "SparseMatrix.hpp"
@@ -315,6 +316,58 @@ export_simdintegrals(py::module &m) -> void
              py::return_value_policy::reference_internal, "Gets the B vectors the driver holds.")
         .def("get_metric", &CSimdRIJKFockDriver::get_metric,
              py::return_value_policy::reference_internal, "Gets the inverted factor of the metric.");
+
+    // CSimdRIJKGradientDriver class
+
+    PyClass<CSimdRIJKGradientDriver>(m, "SimdRIJKGradientDriver")
+        .def(py::init<>())
+        .def(py::init<const double, const size_t>(),
+             "Creates a gradient driver with given screening threshold and target block size.",
+             py::arg("threshold"),
+             py::arg("block_size") = 0)
+        .def("compute",
+             py::overload_cast<const CMolecule &,
+                               const CMolecularBasis &,
+                               const CMolecularBasis &,
+                               const CSparseTensor &,
+                               const CPackedMatrix &,
+                               const CPackedMatrix &,
+                               const CPackedMatrix &,
+                               const std::vector<int> &,
+                               const std::vector<int> &>(&CSimdRIJKGradientDriver::compute, py::const_),
+             "Computes the Coulomb and exchange contributions to the gradient of the given atoms, from the "
+             "B vectors and the metric a Fock driver holds. The rows of the atoms not asked for are zero. "
+             "aux_atoms names the share of the auxiliary basis the B vectors span, which under MPI makes "
+             "the gradient a partial one for the ranks to reduce.",
+             py::arg("molecule"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("bq_vectors"),
+             py::arg("metric"),
+             py::arg("density"),
+             py::arg("coefficients"),
+             py::arg("atoms"),
+             py::arg("aux_atoms") = std::vector<int>{})
+        .def("compute",
+             py::overload_cast<const CMolecule &,
+                               const CMolecularBasis &,
+                               const CMolecularBasis &,
+                               const CSparseTensor &,
+                               const CPackedMatrix &,
+                               const CPackedMatrix &,
+                               const CPackedMatrix &>(&CSimdRIJKGradientDriver::compute, py::const_),
+             "Computes the Coulomb and exchange contributions to the gradient of every atom of the molecule.",
+             py::arg("molecule"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("bq_vectors"),
+             py::arg("metric"),
+             py::arg("density"),
+             py::arg("coefficients"))
+        .def("get_threshold", &CSimdRIJKGradientDriver::get_threshold,
+             "Gets screening threshold of the integrals.")
+        .def("get_block_size", &CSimdRIJKGradientDriver::get_block_size,
+             "Gets target number of atom pairs of a block.");
 }
 
 }  // namespace vlx_simdintegrals
