@@ -274,6 +274,44 @@ DEFAULT_METAL_PLANARITY_FORCE_CONSTANT = 4.184
 # ----------------------------------------------------------------------
 
 
+class MasterSection:
+    """
+    Where a process is with respect to master-only work: inside a section,
+    in which a shell method runs on the master rank alone and broadcasts
+    afterwards, or outside one.
+
+    One per process, held on Shell, since it is a fact about the process
+    and not about an object: a master-only method on one shell calling a
+    master-only method on another must not broadcast from inside the
+    master's body, and the guard on a collective must see it from any
+    shell. Sections nest; the outermost one is the one that broadcasts.
+    """
+
+    def __init__(self):
+
+        self.depth = 0
+
+    @property
+    def active(self):
+        """
+        Whether a master-only section is open.
+        """
+
+        return self.depth > 0
+
+    def __enter__(self):
+
+        self.depth += 1
+
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+
+        self.depth -= 1
+
+        return False
+
+
 class Shell:
     """
     The base of the stateless phase classes: a communicator and an output
@@ -286,6 +324,9 @@ class Shell:
     :param ostream:
         The output stream.
     """
+
+    # shared by every shell of the process; see MasterSection
+    master_section = MasterSection()
 
     def __init__(self, comm=None, ostream=None):
 
@@ -307,17 +348,11 @@ class Shell:
         self.nodes = self.comm.Get_size()
 
 
-# Per process, not per object: "am I inside a master-only section" is a
-# fact about the process. A master-only method on one shell calling a
-# master-only method on another must not broadcast from inside the
-# master's body, and a per-instance counter could not see across objects.
-_master_depth = 0
-
-
 def on_master(method):
     """
     Runs the body on the master rank only and hands what it returned -- or
-    the exception it raised -- to every rank. Nested calls run inline.
+    the exception it raised -- to every rank. A call from inside an open
+    master section runs inline, since the outermost section broadcasts.
 
     The master keeps what it computed: bcast hands the root an unpickled
     copy of its own value as well, and a copy is not the same thing -- a
@@ -333,13 +368,11 @@ def on_master(method):
 
     @functools.wraps(method)
     def wrapper(self, *args, **kwargs):
-        global _master_depth
 
-        if _master_depth > 0:
+        if self.master_section.active:
             return method(self, *args, **kwargs)
 
-        _master_depth += 1
-        try:
+        with self.master_section:
             outcome = None
             if self.rank == mpi_master():
                 try:
@@ -350,8 +383,6 @@ def on_master(method):
                 received = self.comm.bcast(outcome, root=mpi_master())
                 if self.rank != mpi_master():
                     outcome = received
-        finally:
-            _master_depth -= 1
 
         kind, payload = outcome
 
@@ -366,8 +397,8 @@ def on_master(method):
 def collective(method):
     """
     Marks a method every rank must enter, because it calls a VeloxChem
-    driver on self.comm. Refuses to be called from inside an on_master
-    body, which is the one way to deadlock under mpiexec.
+    driver on self.comm. Refuses to be called from inside a master section,
+    which is the one way to deadlock under mpiexec.
 
     :param method:
         The method to decorate.
@@ -379,8 +410,9 @@ def collective(method):
     @functools.wraps(method)
     def wrapper(self, *args, **kwargs):
         assert_msg_critical(
-            _master_depth == 0, f'{method.__name__} is a collective step '
-            'and was called from inside a master-only one')
+            not self.master_section.active,
+            f'{method.__name__} is a collective step and was called from '
+            'inside a master-only one')
 
         return method(self, *args, **kwargs)
 
