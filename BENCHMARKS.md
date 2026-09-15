@@ -4673,9 +4673,35 @@ The A/B is the same binary either way, both measured in one session:
 
 The gain rises with the molecule because the charge loop is the molecule. What is left
 of the 26 per cent is one `ncols` of exponentials per charge, where the operator wants
-one per pair of primitives; removing that means keeping the values across the charge
-loop, which needs a row of the buffer to keep them in, and that is the generator's to
-give.
+one per pair of primitives.
+
+#### And then out of the charge loop
+
+Removing that last part means keeping the values across the charge loop, which needs a
+row of the buffer to keep them in. The generator now gives one: `BufferLayout` carries a
+`pair_exp` section of a single row for an anchored operator, `compute_pair_exponent`
+fills it once for the pair of primitives above the loop over the charges, and the Boys
+wrapper takes that row where it used to take the reduced exponent. Every buffer row
+behind it moves by one and the table of buffer rows counts one more.
+
+| case | before | row loop | charge loop | whole |
+| --- | ---: | ---: | ---: | ---: |
+| tagrisso def2-svp | 10.24 ms | 9.26 ms | 8.07 ms | **1.269** |
+| taxol def2-tzvp | 79.86 ms | 70.38 ms | 61.61 ms | **1.296** |
+| crambin def2-tzvp | 3465.40 ms | 2966.55 ms | 2536.17 ms | **1.366** |
+
+**The ablation predicted the ceiling and the change reached it.** Removing the
+exponential entirely measured 26.2 per cent of crambin at def2-tzvp; forming it once a
+pair of primitives instead of once a row of every charge took 26.8 per cent off. The
+exponential is now evaluated `ncols` times for a pair of primitives where it was
+evaluated `nrows` times `ncharges` times `ncols`, which on that case is four thousand
+evaluations down to one.
+
+The three-center path is untouched and measured 289.32 ms and 13.82 s against 289.74 ms
+and 13.49 s before. That second case wanders: 13.49, 13.79, 14.29 and 13.82 seconds over
+the session, on code nothing changed. It is one run of a fourteen second call, which is
+the caution against reading anything into its earlier 15.59 -- and the nuclear numbers
+beside it repeat to under one per cent.
 
 **The three-center kernels deliberately keep the old form.** They call the same
 function and the same argument applies to them, but measured once each way the two

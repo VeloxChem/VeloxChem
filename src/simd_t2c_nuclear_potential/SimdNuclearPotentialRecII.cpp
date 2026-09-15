@@ -136,7 +136,7 @@ compute_ii_nuclear_potential(double                    *values,
     const auto dimensions = simdfunc::make_column_dimensions(
         bra, ket, nvalues, coordinates, screenfunc::two_center_nuclear_potential_primitive_bound, threshold / terms);
 
-    const auto nmax = simdfunc::prepare_buffer(buffer, 10297, 1827, 399, dimensions);
+    const auto nmax = simdfunc::prepare_buffer(buffer, 10298, 1828, 399, dimensions);
 
     if (nmax == 0)
     {
@@ -168,291 +168,293 @@ compute_ii_nuclear_potential(double                    *values,
 
             simdfunc::compute_pb(buffer, coordinates, 0, ncols, fb);
 
+            simdfunc::compute_pair_exponent(buffer, coordinates, 6, ncols, mu);
+
             for (size_t ic = 0; ic < charges.size(); ic++)
             {
                 const auto fz = fnpot * charges[ic];
 
                 simdfunc::compute_pc(buffer, coordinates, 3, points, ic, ncols, fc);
 
-                simdfunc::compute_full_npot_boys_function(buffer, coordinates, 6, 3, 12, ncols,
-                                                          fz, mu, p);
+                simdfunc::compute_full_npot_boys_function(buffer, coordinates, 7, 3, 12, ncols,
+                                                          fz, 6, p);
 
-                compute_prim_sp_nuclear_potential_0(buffer, 20, 0, 3, 7, 8, ncols);
+                compute_prim_sp_nuclear_potential_0(buffer, 21, 0, 3, 8, 9, ncols);
 
-                compute_prim_sp_nuclear_potential_0(buffer, 23, 0, 3, 8, 9, ncols);
+                compute_prim_sp_nuclear_potential_0(buffer, 24, 0, 3, 9, 10, ncols);
 
-                compute_prim_sp_nuclear_potential_0(buffer, 26, 0, 3, 9, 10, ncols);
+                compute_prim_sp_nuclear_potential_0(buffer, 27, 0, 3, 10, 11, ncols);
 
-                compute_prim_sp_nuclear_potential_0(buffer, 29, 0, 3, 10, 11, ncols);
+                compute_prim_sp_nuclear_potential_0(buffer, 30, 0, 3, 11, 12, ncols);
 
-                compute_prim_sp_nuclear_potential_0(buffer, 32, 0, 3, 11, 12, ncols);
+                compute_prim_sp_nuclear_potential_0(buffer, 33, 0, 3, 12, 13, ncols);
 
-                compute_prim_sp_nuclear_potential_0(buffer, 35, 0, 3, 12, 13, ncols);
+                compute_prim_sp_nuclear_potential_0(buffer, 36, 0, 3, 13, 14, ncols);
 
-                compute_prim_sp_nuclear_potential_0(buffer, 38, 0, 3, 13, 14, ncols);
+                compute_prim_sp_nuclear_potential_0(buffer, 39, 0, 3, 14, 15, ncols);
 
-                compute_prim_sp_nuclear_potential_0(buffer, 41, 0, 3, 14, 15, ncols);
+                compute_prim_sp_nuclear_potential_0(buffer, 42, 0, 3, 15, 16, ncols);
 
-                compute_prim_sp_nuclear_potential_0(buffer, 44, 0, 3, 15, 16, ncols);
+                compute_prim_sp_nuclear_potential_0(buffer, 45, 0, 3, 16, 17, ncols);
 
-                compute_prim_sp_nuclear_potential_0(buffer, 47, 0, 3, 16, 17, ncols);
+                compute_prim_sp_nuclear_potential_0(buffer, 48, 0, 3, 17, 18, ncols);
 
-                compute_prim_sp_nuclear_potential_0(buffer, 50, 0, 3, 17, 18, ncols);
+                compute_prim_sp_nuclear_potential_0(buffer, 51, 0, 3, 18, 19, ncols);
 
-                compute_prim_sp_nuclear_potential_0(buffer, 53, 0, 3, 18, 19, ncols);
+                compute_prim_sp_nuclear_potential_0(buffer, 54, 0, 3, 19, 20, ncols);
 
-                compute_prim_sd_nuclear_potential_0(buffer, 56, 0, 3, 7, 20, 8, 23, ncols, p);
+                compute_prim_sd_nuclear_potential_0(buffer, 57, 0, 3, 8, 21, 9, 24, ncols, p);
 
-                compute_prim_sd_nuclear_potential_0(buffer, 62, 0, 3, 8, 23, 9, 26, ncols, p);
+                compute_prim_sd_nuclear_potential_0(buffer, 63, 0, 3, 9, 24, 10, 27, ncols, p);
 
-                compute_prim_sd_nuclear_potential_0(buffer, 68, 0, 3, 9, 26, 10, 29, ncols, p);
+                compute_prim_sd_nuclear_potential_0(buffer, 69, 0, 3, 10, 27, 11, 30, ncols, p);
 
-                compute_prim_sd_nuclear_potential_0(buffer, 74, 0, 3, 10, 29, 11, 32, ncols, p);
+                compute_prim_sd_nuclear_potential_0(buffer, 75, 0, 3, 11, 30, 12, 33, ncols, p);
 
-                compute_prim_sd_nuclear_potential_0(buffer, 80, 0, 3, 11, 32, 12, 35, ncols, p);
+                compute_prim_sd_nuclear_potential_0(buffer, 81, 0, 3, 12, 33, 13, 36, ncols, p);
 
-                compute_prim_sd_nuclear_potential_0(buffer, 86, 0, 3, 12, 35, 13, 38, ncols, p);
+                compute_prim_sd_nuclear_potential_0(buffer, 87, 0, 3, 13, 36, 14, 39, ncols, p);
 
-                compute_prim_sd_nuclear_potential_0(buffer, 92, 0, 3, 13, 38, 14, 41, ncols, p);
+                compute_prim_sd_nuclear_potential_0(buffer, 93, 0, 3, 14, 39, 15, 42, ncols, p);
 
-                compute_prim_sd_nuclear_potential_0(buffer, 98, 0, 3, 14, 41, 15, 44, ncols, p);
+                compute_prim_sd_nuclear_potential_0(buffer, 99, 0, 3, 15, 42, 16, 45, ncols, p);
 
-                compute_prim_sd_nuclear_potential_0(buffer, 104, 0, 3, 15, 44, 16, 47, ncols,
+                compute_prim_sd_nuclear_potential_0(buffer, 105, 0, 3, 16, 45, 17, 48, ncols,
                                                     p);
 
-                compute_prim_sd_nuclear_potential_0(buffer, 110, 0, 3, 16, 47, 17, 50, ncols,
+                compute_prim_sd_nuclear_potential_0(buffer, 111, 0, 3, 17, 48, 18, 51, ncols,
                                                     p);
 
-                compute_prim_sd_nuclear_potential_0(buffer, 116, 0, 3, 17, 50, 18, 53, ncols,
+                compute_prim_sd_nuclear_potential_0(buffer, 117, 0, 3, 18, 51, 19, 54, ncols,
                                                     p);
 
-                compute_prim_sf_nuclear_potential_0(buffer, 122, 0, 3, 20, 56, 23, 62, ncols,
+                compute_prim_sf_nuclear_potential_0(buffer, 123, 0, 3, 21, 57, 24, 63, ncols,
                                                     p);
 
-                compute_prim_sf_nuclear_potential_0(buffer, 132, 0, 3, 23, 62, 26, 68, ncols,
+                compute_prim_sf_nuclear_potential_0(buffer, 133, 0, 3, 24, 63, 27, 69, ncols,
                                                     p);
 
-                compute_prim_sf_nuclear_potential_0(buffer, 142, 0, 3, 26, 68, 29, 74, ncols,
+                compute_prim_sf_nuclear_potential_0(buffer, 143, 0, 3, 27, 69, 30, 75, ncols,
                                                     p);
 
-                compute_prim_sf_nuclear_potential_0(buffer, 152, 0, 3, 29, 74, 32, 80, ncols,
+                compute_prim_sf_nuclear_potential_0(buffer, 153, 0, 3, 30, 75, 33, 81, ncols,
                                                     p);
 
-                compute_prim_sf_nuclear_potential_0(buffer, 162, 0, 3, 32, 80, 35, 86, ncols,
+                compute_prim_sf_nuclear_potential_0(buffer, 163, 0, 3, 33, 81, 36, 87, ncols,
                                                     p);
 
-                compute_prim_sf_nuclear_potential_0(buffer, 172, 0, 3, 35, 86, 38, 92, ncols,
+                compute_prim_sf_nuclear_potential_0(buffer, 173, 0, 3, 36, 87, 39, 93, ncols,
                                                     p);
 
-                compute_prim_sf_nuclear_potential_0(buffer, 182, 0, 3, 38, 92, 41, 98, ncols,
+                compute_prim_sf_nuclear_potential_0(buffer, 183, 0, 3, 39, 93, 42, 99, ncols,
                                                     p);
 
-                compute_prim_sf_nuclear_potential_0(buffer, 192, 0, 3, 41, 98, 44, 104, ncols,
+                compute_prim_sf_nuclear_potential_0(buffer, 193, 0, 3, 42, 99, 45, 105, ncols,
                                                     p);
 
-                compute_prim_sf_nuclear_potential_0(buffer, 202, 0, 3, 44, 104, 47, 110, ncols,
+                compute_prim_sf_nuclear_potential_0(buffer, 203, 0, 3, 45, 105, 48, 111, ncols,
                                                     p);
 
-                compute_prim_sf_nuclear_potential_0(buffer, 212, 0, 3, 47, 110, 50, 116, ncols,
+                compute_prim_sf_nuclear_potential_0(buffer, 213, 0, 3, 48, 111, 51, 117, ncols,
                                                     p);
 
-                compute_prim_sg_nuclear_potential_0(buffer, 222, 0, 3, 56, 122, 62, 132, ncols,
+                compute_prim_sg_nuclear_potential_0(buffer, 223, 0, 3, 57, 123, 63, 133, ncols,
                                                     p);
 
-                compute_prim_sg_nuclear_potential_0(buffer, 237, 0, 3, 62, 132, 68, 142, ncols,
+                compute_prim_sg_nuclear_potential_0(buffer, 238, 0, 3, 63, 133, 69, 143, ncols,
                                                     p);
 
-                compute_prim_sg_nuclear_potential_0(buffer, 252, 0, 3, 68, 142, 74, 152, ncols,
+                compute_prim_sg_nuclear_potential_0(buffer, 253, 0, 3, 69, 143, 75, 153, ncols,
                                                     p);
 
-                compute_prim_sg_nuclear_potential_0(buffer, 267, 0, 3, 74, 152, 80, 162, ncols,
+                compute_prim_sg_nuclear_potential_0(buffer, 268, 0, 3, 75, 153, 81, 163, ncols,
                                                     p);
 
-                compute_prim_sg_nuclear_potential_0(buffer, 282, 0, 3, 80, 162, 86, 172, ncols,
+                compute_prim_sg_nuclear_potential_0(buffer, 283, 0, 3, 81, 163, 87, 173, ncols,
                                                     p);
 
-                compute_prim_sg_nuclear_potential_0(buffer, 297, 0, 3, 86, 172, 92, 182, ncols,
+                compute_prim_sg_nuclear_potential_0(buffer, 298, 0, 3, 87, 173, 93, 183, ncols,
                                                     p);
 
-                compute_prim_sg_nuclear_potential_0(buffer, 312, 0, 3, 92, 182, 98, 192, ncols,
+                compute_prim_sg_nuclear_potential_0(buffer, 313, 0, 3, 93, 183, 99, 193, ncols,
                                                     p);
 
-                compute_prim_sg_nuclear_potential_0(buffer, 327, 0, 3, 98, 192, 104, 202, ncols,
+                compute_prim_sg_nuclear_potential_0(buffer, 328, 0, 3, 99, 193, 105, 203, ncols,
                                                     p);
 
-                compute_prim_sg_nuclear_potential_0(buffer, 342, 0, 3, 104, 202, 110, 212, ncols,
+                compute_prim_sg_nuclear_potential_0(buffer, 343, 0, 3, 105, 203, 111, 213, ncols,
                                                     p);
 
-                compute_prim_sh_nuclear_potential_0(buffer, 357, 0, 3, 122, 222, 132, 237, ncols,
+                compute_prim_sh_nuclear_potential_0(buffer, 358, 0, 3, 123, 223, 133, 238, ncols,
                                                     p);
 
-                compute_prim_sh_nuclear_potential_0(buffer, 378, 0, 3, 132, 237, 142, 252, ncols,
+                compute_prim_sh_nuclear_potential_0(buffer, 379, 0, 3, 133, 238, 143, 253, ncols,
                                                     p);
 
-                compute_prim_sh_nuclear_potential_0(buffer, 399, 0, 3, 142, 252, 152, 267, ncols,
+                compute_prim_sh_nuclear_potential_0(buffer, 400, 0, 3, 143, 253, 153, 268, ncols,
                                                     p);
 
-                compute_prim_sh_nuclear_potential_0(buffer, 420, 0, 3, 152, 267, 162, 282, ncols,
+                compute_prim_sh_nuclear_potential_0(buffer, 421, 0, 3, 153, 268, 163, 283, ncols,
                                                     p);
 
-                compute_prim_sh_nuclear_potential_0(buffer, 441, 0, 3, 162, 282, 172, 297, ncols,
+                compute_prim_sh_nuclear_potential_0(buffer, 442, 0, 3, 163, 283, 173, 298, ncols,
                                                     p);
 
-                compute_prim_sh_nuclear_potential_0(buffer, 462, 0, 3, 172, 297, 182, 312, ncols,
+                compute_prim_sh_nuclear_potential_0(buffer, 463, 0, 3, 173, 298, 183, 313, ncols,
                                                     p);
 
-                compute_prim_sh_nuclear_potential_0(buffer, 483, 0, 3, 182, 312, 192, 327, ncols,
+                compute_prim_sh_nuclear_potential_0(buffer, 484, 0, 3, 183, 313, 193, 328, ncols,
                                                     p);
 
-                compute_prim_sh_nuclear_potential_0(buffer, 504, 0, 3, 192, 327, 202, 342, ncols,
+                compute_prim_sh_nuclear_potential_0(buffer, 505, 0, 3, 193, 328, 203, 343, ncols,
                                                     p);
 
-                compute_prim_si_nuclear_potential_0(buffer, 525, 0, 3, 222, 357, 237, 378, ncols,
+                compute_prim_si_nuclear_potential_0(buffer, 526, 0, 3, 223, 358, 238, 379, ncols,
                                                     p);
 
-                compute_prim_si_nuclear_potential_0(buffer, 553, 0, 3, 237, 378, 252, 399, ncols,
+                compute_prim_si_nuclear_potential_0(buffer, 554, 0, 3, 238, 379, 253, 400, ncols,
                                                     p);
 
-                compute_prim_si_nuclear_potential_0(buffer, 581, 0, 3, 252, 399, 267, 420, ncols,
+                compute_prim_si_nuclear_potential_0(buffer, 582, 0, 3, 253, 400, 268, 421, ncols,
                                                     p);
 
-                compute_prim_si_nuclear_potential_0(buffer, 609, 0, 3, 267, 420, 282, 441, ncols,
+                compute_prim_si_nuclear_potential_0(buffer, 610, 0, 3, 268, 421, 283, 442, ncols,
                                                     p);
 
-                compute_prim_si_nuclear_potential_0(buffer, 637, 0, 3, 282, 441, 297, 462, ncols,
+                compute_prim_si_nuclear_potential_0(buffer, 638, 0, 3, 283, 442, 298, 463, ncols,
                                                     p);
 
-                compute_prim_si_nuclear_potential_0(buffer, 665, 0, 3, 297, 462, 312, 483, ncols,
+                compute_prim_si_nuclear_potential_0(buffer, 666, 0, 3, 298, 463, 313, 484, ncols,
                                                     p);
 
-                compute_prim_si_nuclear_potential_0(buffer, 693, 0, 3, 312, 483, 327, 504, ncols,
+                compute_prim_si_nuclear_potential_0(buffer, 694, 0, 3, 313, 484, 328, 505, ncols,
                                                     p);
 
-                compute_prim_sk_nuclear_potential_0(buffer, 721, 0, 3, 357, 525, 378, 553, ncols,
+                compute_prim_sk_nuclear_potential_0(buffer, 722, 0, 3, 358, 526, 379, 554, ncols,
                                                     p);
 
-                compute_prim_sk_nuclear_potential_0(buffer, 757, 0, 3, 378, 553, 399, 581, ncols,
+                compute_prim_sk_nuclear_potential_0(buffer, 758, 0, 3, 379, 554, 400, 582, ncols,
                                                     p);
 
-                compute_prim_sk_nuclear_potential_0(buffer, 793, 0, 3, 399, 581, 420, 609, ncols,
+                compute_prim_sk_nuclear_potential_0(buffer, 794, 0, 3, 400, 582, 421, 610, ncols,
                                                     p);
 
-                compute_prim_sk_nuclear_potential_0(buffer, 829, 0, 3, 420, 609, 441, 637, ncols,
+                compute_prim_sk_nuclear_potential_0(buffer, 830, 0, 3, 421, 610, 442, 638, ncols,
                                                     p);
 
-                compute_prim_sk_nuclear_potential_0(buffer, 865, 0, 3, 441, 637, 462, 665, ncols,
+                compute_prim_sk_nuclear_potential_0(buffer, 866, 0, 3, 442, 638, 463, 666, ncols,
                                                     p);
 
-                compute_prim_sk_nuclear_potential_0(buffer, 901, 0, 3, 462, 665, 483, 693, ncols,
+                compute_prim_sk_nuclear_potential_0(buffer, 902, 0, 3, 463, 666, 484, 694, ncols,
                                                     p);
 
-                compute_prim_sl_nuclear_potential_0(buffer, 937, 0, 3, 525, 721, 553, 757, ncols,
+                compute_prim_sl_nuclear_potential_0(buffer, 938, 0, 3, 526, 722, 554, 758, ncols,
                                                     p);
 
-                compute_prim_sl_nuclear_potential_0(buffer, 982, 0, 3, 553, 757, 581, 793, ncols,
+                compute_prim_sl_nuclear_potential_0(buffer, 983, 0, 3, 554, 758, 582, 794, ncols,
                                                     p);
 
-                compute_prim_sl_nuclear_potential_0(buffer, 1027, 0, 3, 581, 793, 609, 829,
+                compute_prim_sl_nuclear_potential_0(buffer, 1028, 0, 3, 582, 794, 610, 830,
                                                     ncols, p);
 
-                compute_prim_sl_nuclear_potential_0(buffer, 1072, 0, 3, 609, 829, 637, 865,
+                compute_prim_sl_nuclear_potential_0(buffer, 1073, 0, 3, 610, 830, 638, 866,
                                                     ncols, p);
 
-                compute_prim_sl_nuclear_potential_0(buffer, 1117, 0, 3, 637, 865, 665, 901,
+                compute_prim_sl_nuclear_potential_0(buffer, 1118, 0, 3, 638, 866, 666, 902,
                                                     ncols, p);
 
-                compute_prim_sm_nuclear_potential_0(buffer, 1162, 0, 3, 721, 937, 757, 982,
+                compute_prim_sm_nuclear_potential_0(buffer, 1163, 0, 3, 722, 938, 758, 983,
                                                     ncols, p);
 
-                compute_prim_sm_nuclear_potential_0(buffer, 1217, 0, 3, 757, 982, 793, 1027,
+                compute_prim_sm_nuclear_potential_0(buffer, 1218, 0, 3, 758, 983, 794, 1028,
                                                     ncols, p);
 
-                compute_prim_sm_nuclear_potential_0(buffer, 1272, 0, 3, 793, 1027, 829, 1072,
+                compute_prim_sm_nuclear_potential_0(buffer, 1273, 0, 3, 794, 1028, 830, 1073,
                                                     ncols, p);
 
-                compute_prim_sm_nuclear_potential_0(buffer, 1327, 0, 3, 829, 1072, 865, 1117,
+                compute_prim_sm_nuclear_potential_0(buffer, 1328, 0, 3, 830, 1073, 866, 1118,
                                                     ncols, p);
 
-                compute_prim_sn_nuclear_potential_0(buffer, 1382, 0, 3, 937, 1162, 982, 1217,
+                compute_prim_sn_nuclear_potential_0(buffer, 1383, 0, 3, 938, 1163, 983, 1218,
                                                     ncols, p);
 
-                compute_prim_sn_nuclear_potential_0(buffer, 1448, 0, 3, 982, 1217, 1027, 1272,
+                compute_prim_sn_nuclear_potential_0(buffer, 1449, 0, 3, 983, 1218, 1028, 1273,
                                                     ncols, p);
 
-                compute_prim_sn_nuclear_potential_0(buffer, 1514, 0, 3, 1027, 1272, 1072, 1327,
+                compute_prim_sn_nuclear_potential_0(buffer, 1515, 0, 3, 1028, 1273, 1073, 1328,
                                                     ncols, p);
 
-                compute_prim_so_nuclear_potential_0(buffer, 1580, 0, 3, 1162, 1382, 1217, 1448,
+                compute_prim_so_nuclear_potential_0(buffer, 1581, 0, 3, 1163, 1383, 1218, 1449,
                                                     ncols, p);
 
-                compute_prim_so_nuclear_potential_0(buffer, 1658, 0, 3, 1217, 1448, 1272, 1514,
+                compute_prim_so_nuclear_potential_0(buffer, 1659, 0, 3, 1218, 1449, 1273, 1515,
                                                     ncols, p);
 
-                compute_prim_sq_nuclear_potential_0(buffer, 1736, 0, 3, 1382, 1580, 1448, 1658,
+                compute_prim_sq_nuclear_potential_0(buffer, 1737, 0, 3, 1383, 1581, 1449, 1659,
                                                     ncols, p);
 
-                simdfunc::contract_primitives(buffer, 1827, 525, 28, ncols);
+                simdfunc::contract_primitives(buffer, 1828, 526, 28, ncols);
 
-                simdfunc::contract_primitives(buffer, 1855, 721, 36, ncols);
+                simdfunc::contract_primitives(buffer, 1856, 722, 36, ncols);
 
-                simdfunc::contract_primitives(buffer, 1891, 937, 45, ncols);
+                simdfunc::contract_primitives(buffer, 1892, 938, 45, ncols);
 
-                simdfunc::contract_primitives(buffer, 1936, 1162, 55, ncols);
+                simdfunc::contract_primitives(buffer, 1937, 1163, 55, ncols);
 
-                simdfunc::contract_primitives(buffer, 1991, 1382, 66, ncols);
+                simdfunc::contract_primitives(buffer, 1992, 1383, 66, ncols);
 
-                simdfunc::contract_primitives(buffer, 2057, 1580, 78, ncols);
+                simdfunc::contract_primitives(buffer, 2058, 1581, 78, ncols);
 
-                simdfunc::contract_primitives(buffer, 2135, 1736, 91, ncols);
+                simdfunc::contract_primitives(buffer, 2136, 1737, 91, ncols);
             }
         }
     }
 
-    simdtrf::compute_hrr_pi(buffer, coordinates, 2226, 1827, 1855, 1, nmax);
+    simdtrf::compute_hrr_pi(buffer, coordinates, 2227, 1828, 1856, 1, nmax);
 
-    simdtrf::compute_hrr_pk(buffer, coordinates, 2310, 1855, 1891, 1, nmax);
+    simdtrf::compute_hrr_pk(buffer, coordinates, 2311, 1856, 1892, 1, nmax);
 
-    simdtrf::compute_hrr_pl(buffer, coordinates, 2418, 1891, 1936, 1, nmax);
+    simdtrf::compute_hrr_pl(buffer, coordinates, 2419, 1892, 1937, 1, nmax);
 
-    simdtrf::compute_hrr_pm(buffer, coordinates, 2553, 1936, 1991, 1, nmax);
+    simdtrf::compute_hrr_pm(buffer, coordinates, 2554, 1937, 1992, 1, nmax);
 
-    simdtrf::compute_hrr_pn(buffer, coordinates, 2718, 1991, 2057, 1, nmax);
+    simdtrf::compute_hrr_pn(buffer, coordinates, 2719, 1992, 2058, 1, nmax);
 
-    simdtrf::compute_hrr_po(buffer, coordinates, 2916, 2057, 2135, 1, nmax);
+    simdtrf::compute_hrr_po(buffer, coordinates, 2917, 2058, 2136, 1, nmax);
 
-    simdtrf::compute_hrr_di(buffer, coordinates, 3150, 2226, 2310, 1, nmax);
+    simdtrf::compute_hrr_di(buffer, coordinates, 3151, 2227, 2311, 1, nmax);
 
-    simdtrf::compute_hrr_dk(buffer, coordinates, 3318, 2310, 2418, 1, nmax);
+    simdtrf::compute_hrr_dk(buffer, coordinates, 3319, 2311, 2419, 1, nmax);
 
-    simdtrf::compute_hrr_dl(buffer, coordinates, 3534, 2418, 2553, 1, nmax);
+    simdtrf::compute_hrr_dl(buffer, coordinates, 3535, 2419, 2554, 1, nmax);
 
-    simdtrf::compute_hrr_dm(buffer, coordinates, 3804, 2553, 2718, 1, nmax);
+    simdtrf::compute_hrr_dm(buffer, coordinates, 3805, 2554, 2719, 1, nmax);
 
-    simdtrf::compute_hrr_dn(buffer, coordinates, 4134, 2718, 2916, 1, nmax);
+    simdtrf::compute_hrr_dn(buffer, coordinates, 4135, 2719, 2917, 1, nmax);
 
-    simdtrf::compute_hrr_fi(buffer, coordinates, 4530, 3150, 3318, 1, nmax);
+    simdtrf::compute_hrr_fi(buffer, coordinates, 4531, 3151, 3319, 1, nmax);
 
-    simdtrf::compute_hrr_fk(buffer, coordinates, 4810, 3318, 3534, 1, nmax);
+    simdtrf::compute_hrr_fk(buffer, coordinates, 4811, 3319, 3535, 1, nmax);
 
-    simdtrf::compute_hrr_fl(buffer, coordinates, 5170, 3534, 3804, 1, nmax);
+    simdtrf::compute_hrr_fl(buffer, coordinates, 5171, 3535, 3805, 1, nmax);
 
-    simdtrf::compute_hrr_fm(buffer, coordinates, 5620, 3804, 4134, 1, nmax);
+    simdtrf::compute_hrr_fm(buffer, coordinates, 5621, 3805, 4135, 1, nmax);
 
-    simdtrf::compute_hrr_gi(buffer, coordinates, 6170, 4530, 4810, 1, nmax);
+    simdtrf::compute_hrr_gi(buffer, coordinates, 6171, 4531, 4811, 1, nmax);
 
-    simdtrf::compute_hrr_gk(buffer, coordinates, 6590, 4810, 5170, 1, nmax);
+    simdtrf::compute_hrr_gk(buffer, coordinates, 6591, 4811, 5171, 1, nmax);
 
-    simdtrf::compute_hrr_gl(buffer, coordinates, 7130, 5170, 5620, 1, nmax);
+    simdtrf::compute_hrr_gl(buffer, coordinates, 7131, 5171, 5621, 1, nmax);
 
-    simdtrf::compute_hrr_hi(buffer, coordinates, 7805, 6170, 6590, 1, nmax);
+    simdtrf::compute_hrr_hi(buffer, coordinates, 7806, 6171, 6591, 1, nmax);
 
-    simdtrf::compute_hrr_hk(buffer, coordinates, 8393, 6590, 7130, 1, nmax);
+    simdtrf::compute_hrr_hk(buffer, coordinates, 8394, 6591, 7131, 1, nmax);
 
-    simdtrf::compute_hrr_ii(buffer, coordinates, 9149, 7805, 8393, 1, nmax);
+    simdtrf::compute_hrr_ii(buffer, coordinates, 9150, 7806, 8394, 1, nmax);
 
-    simdtrf::transform_i_inner(buffer, 9933, 9149, 28, 1, nmax);
+    simdtrf::transform_i_inner(buffer, 9934, 9150, 28, 1, nmax);
 
-    simdtrf::transform_i_outer(values, nvalues, buffer, 9933, 13, nmax);
+    simdtrf::transform_i_outer(values, nvalues, buffer, 9934, 13, nmax);
 
     for (size_t m = 0; m < 169; m++)
     {

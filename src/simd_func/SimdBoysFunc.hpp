@@ -212,7 +212,7 @@ auto compute_npot_boys_function(CSimdMatrix                        &buffer,
                                 const std::initializer_list<size_t> orders,
                                 const size_t                        ncols,
                                 const double                        fz,
-                                const double                        mu,
+                                const size_t                        pair_exp,
                                 const double                        p) -> void;
 
 auto compute_full_npot_boys_function(CSimdMatrix       &buffer,
@@ -222,8 +222,28 @@ auto compute_full_npot_boys_function(CSimdMatrix       &buffer,
                                      const size_t       order,
                                      const size_t       ncols,
                                      const double       fz,
-                                     const double       mu,
+                                     const size_t       pair_exp,
                                      const double       p) -> void;
+
+/// @brief Writes the exponential the pair of primitives contributes,
+/// exp(-mu AB^2), into one row.
+/// @param buffer The buffer of the combination of basis functions.
+/// @param coordinates The coordinates of the atom pairs, whose row nine holds the
+/// squared distance of the atom pair.
+/// @param target The row to write it to.
+/// @param ncols The number of atom pairs the pair of primitives reaches.
+/// @param mu The factor the squared distance of the atom pair is scaled by.
+/// @note It depends on the pair of primitives and on the atom pair and on neither
+/// the order of the Boys function nor the charge, so an anchored operator forms it
+/// once above its loop over the charges and every call inside that loop reads it.
+/// Evaluating it where it was read instead cost 17 to 26 per cent of a nuclear
+/// attraction call, rising with the molecule, the loop over the charges being the
+/// molecule.
+auto compute_pair_exponent(CSimdMatrix       &buffer,
+                           const CSimdMatrix &coordinates,
+                           const size_t       target,
+                           const size_t       ncols,
+                           const double       mu) -> void;
 
 }  // namespace simdfunc
 

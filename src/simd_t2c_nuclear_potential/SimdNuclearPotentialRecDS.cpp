@@ -105,7 +105,7 @@ compute_ds_nuclear_potential(double                    *values,
     const auto dimensions = simdfunc::make_column_dimensions(
         bra, ket, nvalues, coordinates, screenfunc::two_center_nuclear_potential_primitive_bound, threshold / terms);
 
-    const auto nmax = simdfunc::prepare_buffer(buffer, 28, 22, 6, dimensions);
+    const auto nmax = simdfunc::prepare_buffer(buffer, 29, 23, 6, dimensions);
 
     if (nmax == 0)
     {
@@ -137,27 +137,29 @@ compute_ds_nuclear_potential(double                    *values,
 
             simdfunc::compute_pa(buffer, coordinates, 0, ncols, fa);
 
+            simdfunc::compute_pair_exponent(buffer, coordinates, 6, ncols, mu);
+
             for (size_t ic = 0; ic < charges.size(); ic++)
             {
                 const auto fz = fnpot * charges[ic];
 
                 simdfunc::compute_pc(buffer, coordinates, 3, points, ic, ncols, fc);
 
-                simdfunc::compute_full_npot_boys_function(buffer, coordinates, 6, 3, 2, ncols,
-                                                          fz, mu, p);
+                simdfunc::compute_full_npot_boys_function(buffer, coordinates, 7, 3, 2, ncols,
+                                                          fz, 6, p);
 
-                compute_prim_ps_nuclear_potential_0(buffer, 10, 0, 3, 7, 8, ncols);
+                compute_prim_ps_nuclear_potential_0(buffer, 11, 0, 3, 8, 9, ncols);
 
-                compute_prim_ps_nuclear_potential_0(buffer, 13, 0, 3, 8, 9, ncols);
+                compute_prim_ps_nuclear_potential_0(buffer, 14, 0, 3, 9, 10, ncols);
 
-                compute_prim_ds_nuclear_potential_0(buffer, 16, 0, 3, 7, 8, 10, 13, ncols, p);
+                compute_prim_ds_nuclear_potential_0(buffer, 17, 0, 3, 8, 9, 11, 14, ncols, p);
 
-                simdfunc::contract_primitives(buffer, 22, 16, 6, ncols);
+                simdfunc::contract_primitives(buffer, 23, 17, 6, ncols);
             }
         }
     }
 
-    simdtrf::transform_d_outer(values, nvalues, buffer, 22, 1, nmax);
+    simdtrf::transform_d_outer(values, nvalues, buffer, 23, 1, nmax);
 
     for (size_t m = 0; m < 5; m++)
     {

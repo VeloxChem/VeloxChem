@@ -353,45 +353,33 @@ _scale_pair_values(CSimdMatrix       &buffer,
 /// inside the loop over the charges, for each of those as well. Hoisting it is worth
 /// 1.11 to 1.16 there, and the larger the molecule the more, the charge loop being
 /// the molecule.
+/// @note The exponential itself is not formed here: compute_pair_exponent writes it
+/// into a row of the buffer once for the pair of primitives, above the loop over the
+/// charges, and every order of every charge reads that row.
 /// @note The three-center electron repulsion has the same structure and deliberately
 /// does **not** use this. Measured once each way, its two cases disagreed --
 /// tagrisso/def2-svp 290 to 264 ms, taxol/def2-tzvp 13.49 to 15.59 s -- and a run
 /// there is long enough that both numbers are single samples. It trades an
 /// exponential for a stream of ncols doubles, which is a different trade for a kernel
 /// whose blocks are larger. Merging the two wants that measurement first.
-/// @note The scratch is held per thread and grown rather than allocated per call,
-/// which is a hot path.
 static auto
-_scale_pair_values_once(CSimdMatrix       &buffer,
-                        const CSimdMatrix &coordinates,
-                        const size_t       target,
-                        const size_t       nrows,
-                        const size_t       ncols,
-                        const double       fj,
-                        const double       mu) -> void
+_scale_pair_values_once(CSimdMatrix  &buffer,
+                        const size_t  target,
+                        const size_t  nrows,
+                        const size_t  ncols,
+                        const double  fj,
+                        const size_t  pair_exp) -> void
 {
-    const auto *ab_2 = coordinates.data(9);
-
-    static thread_local std::vector<double> factors;
-
-    if (factors.size() < ncols) factors.resize(ncols);
-
-    auto *pair_exp = factors.data();
-
-#pragma omp simd
-    for (size_t k = 0; k < ncols; k++)
-    {
-        pair_exp[k] = fj * std::exp(-mu * ab_2[k]);
-    }
+    const auto *factors = buffer.data(pair_exp);
 
     for (size_t j = 0; j < nrows; j++)
     {
         auto *row = buffer.data(target + 1 + j);
 
-#pragma omp simd aligned(row : simd::cache_line_size())
+#pragma omp simd aligned(row, factors : simd::cache_line_size())
         for (size_t k = 0; k < ncols; k++)
         {
-            row[k] *= pair_exp[k];
+            row[k] *= fj * factors[k];
         }
     }
 }
@@ -433,6 +421,24 @@ compute_full_t3c_boys_function(CSimdMatrix       &buffer,
 }
 
 auto
+compute_pair_exponent(CSimdMatrix       &buffer,
+                      const CSimdMatrix &coordinates,
+                      const size_t       target,
+                      const size_t       ncols,
+                      const double       mu) -> void
+{
+    auto *row = buffer.data(target);
+
+    const auto *ab_2 = coordinates.data(9);
+
+#pragma omp simd aligned(row, ab_2 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        row[k] = std::exp(-mu * ab_2[k]);
+    }
+}
+
+auto
 compute_npot_boys_function(CSimdMatrix                        &buffer,
                            const CSimdMatrix                  &coordinates,
                            const size_t                        target,
@@ -440,14 +446,14 @@ compute_npot_boys_function(CSimdMatrix                        &buffer,
                            const std::initializer_list<size_t> orders,
                            const size_t                        ncols,
                            const double                        fz,
-                           const double                        mu,
+                           const size_t                        pair_exp,
                            const double                        p) -> void
 {
     _make_scaled_arguments(buffer, target, pc, ncols, p);
 
     compute_boys_values(buffer, target, orders, ncols);
 
-    _scale_pair_values_once(buffer, coordinates, target, orders.size(), ncols, fz, mu);
+    _scale_pair_values_once(buffer, target, orders.size(), ncols, fz, pair_exp);
 }
 
 auto
@@ -458,14 +464,14 @@ compute_full_npot_boys_function(CSimdMatrix       &buffer,
                                 const size_t       order,
                                 const size_t       ncols,
                                 const double       fz,
-                                const double       mu,
+                                const size_t       pair_exp,
                                 const double       p) -> void
 {
     _make_scaled_arguments(buffer, target, pc, ncols, p);
 
     compute_boys_values(buffer, target, order, ncols);
 
-    _scale_pair_values_once(buffer, coordinates, target, order + 1, ncols, fz, mu);
+    _scale_pair_values_once(buffer, target, order + 1, ncols, fz, pair_exp);
 }
 
 }  // namespace simdfunc

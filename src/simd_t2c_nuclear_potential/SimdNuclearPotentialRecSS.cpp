@@ -104,7 +104,7 @@ compute_ss_nuclear_potential(double                    *values,
     const auto dimensions = simdfunc::make_column_dimensions(
         bra, ket, nvalues, coordinates, screenfunc::two_center_nuclear_potential_primitive_bound, threshold / terms);
 
-    simdfunc::prepare_buffer(buffer, 5, 0, 0, dimensions);
+    simdfunc::prepare_buffer(buffer, 6, 0, 0, dimensions);
 
     if (buffer.number_of_columns() == 0) return;
 
@@ -127,16 +127,18 @@ compute_ss_nuclear_potential(double                    *values,
 
             const auto fc = b_exps[j] / p;
 
+            simdfunc::compute_pair_exponent(buffer, coordinates, 3, ncols, mu);
+
             for (size_t ic = 0; ic < charges.size(); ic++)
             {
                 const auto fz = fnpot * charges[ic];
 
                 simdfunc::compute_pc(buffer, coordinates, 0, points, ic, ncols, fc);
 
-                simdfunc::compute_full_npot_boys_function(buffer, coordinates, 3, 0, 0, ncols,
-                                                          fz, mu, p);
+                simdfunc::compute_full_npot_boys_function(buffer, coordinates, 4, 0, 0, ncols,
+                                                          fz, 3, p);
 
-                compute_ctr_ss_nuclear_potential_0(values, nvalues, buffer, 4, ncols);
+                compute_ctr_ss_nuclear_potential_0(values, nvalues, buffer, 5, ncols);
             }
         }
     }

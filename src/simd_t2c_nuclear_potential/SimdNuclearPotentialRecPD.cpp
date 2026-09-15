@@ -108,7 +108,7 @@ compute_pd_nuclear_potential(double                    *values,
     const auto dimensions = simdfunc::make_column_dimensions(
         bra, ket, nvalues, coordinates, screenfunc::two_center_nuclear_potential_primitive_bound, threshold / terms);
 
-    const auto nmax = simdfunc::prepare_buffer(buffer, 91, 42, 16, dimensions);
+    const auto nmax = simdfunc::prepare_buffer(buffer, 92, 43, 16, dimensions);
 
     if (nmax == 0)
     {
@@ -140,39 +140,41 @@ compute_pd_nuclear_potential(double                    *values,
 
             simdfunc::compute_pb(buffer, coordinates, 0, ncols, fb);
 
+            simdfunc::compute_pair_exponent(buffer, coordinates, 6, ncols, mu);
+
             for (size_t ic = 0; ic < charges.size(); ic++)
             {
                 const auto fz = fnpot * charges[ic];
 
                 simdfunc::compute_pc(buffer, coordinates, 3, points, ic, ncols, fc);
 
-                simdfunc::compute_full_npot_boys_function(buffer, coordinates, 6, 3, 3, ncols,
-                                                          fz, mu, p);
+                simdfunc::compute_full_npot_boys_function(buffer, coordinates, 7, 3, 3, ncols,
+                                                          fz, 6, p);
 
-                compute_prim_sp_nuclear_potential_0(buffer, 11, 0, 3, 7, 8, ncols);
+                compute_prim_sp_nuclear_potential_0(buffer, 12, 0, 3, 8, 9, ncols);
 
-                compute_prim_sp_nuclear_potential_0(buffer, 14, 0, 3, 8, 9, ncols);
+                compute_prim_sp_nuclear_potential_0(buffer, 15, 0, 3, 9, 10, ncols);
 
-                compute_prim_sp_nuclear_potential_0(buffer, 17, 0, 3, 9, 10, ncols);
+                compute_prim_sp_nuclear_potential_0(buffer, 18, 0, 3, 10, 11, ncols);
 
-                compute_prim_sd_nuclear_potential_0(buffer, 20, 0, 3, 7, 11, 8, 14, ncols, p);
+                compute_prim_sd_nuclear_potential_0(buffer, 21, 0, 3, 8, 12, 9, 15, ncols, p);
 
-                compute_prim_sd_nuclear_potential_0(buffer, 26, 0, 3, 8, 14, 9, 17, ncols, p);
+                compute_prim_sd_nuclear_potential_0(buffer, 27, 0, 3, 9, 15, 10, 18, ncols, p);
 
-                compute_prim_sf_nuclear_potential_0(buffer, 32, 0, 3, 11, 20, 14, 26, ncols, p);
+                compute_prim_sf_nuclear_potential_0(buffer, 33, 0, 3, 12, 21, 15, 27, ncols, p);
 
-                simdfunc::contract_primitives(buffer, 42, 20, 6, ncols);
+                simdfunc::contract_primitives(buffer, 43, 21, 6, ncols);
 
-                simdfunc::contract_primitives(buffer, 48, 32, 10, ncols);
+                simdfunc::contract_primitives(buffer, 49, 33, 10, ncols);
             }
         }
     }
 
-    simdtrf::compute_hrr_pd(buffer, coordinates, 58, 42, 48, 1, nmax);
+    simdtrf::compute_hrr_pd(buffer, coordinates, 59, 43, 49, 1, nmax);
 
-    simdtrf::transform_d_inner(buffer, 76, 58, 3, 1, nmax);
+    simdtrf::transform_d_inner(buffer, 77, 59, 3, 1, nmax);
 
-    simdtrf::transform_p_outer(values, nvalues, buffer, 76, 5, nmax);
+    simdtrf::transform_p_outer(values, nvalues, buffer, 77, 5, nmax);
 
     for (size_t m = 0; m < 15; m++)
     {
