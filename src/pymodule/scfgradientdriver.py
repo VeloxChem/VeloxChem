@@ -41,6 +41,7 @@ from .veloxchemlib import XCMolecularGradient
 from .veloxchemlib import T4CScreener
 from .veloxchemlib import RIFockGradDriver
 from .veloxchemlib import SimdRIJKGradientDriver
+from .veloxchemlib import SimdRIJKFockDriver
 from .veloxchemlib import PackedMatrix
 from .veloxchemlib import mpi_master, mat_t
 from .veloxchemlib import make_matrix
@@ -95,6 +96,96 @@ class ScfGradientDriver(GradientDriver):
         # D4 dispersion correction
         self.dispersion = scf_drv.dispersion
 
+        # NOTE: one driver serves a whole geometry optimization, so a line which
+        # says how the two-electron part is built is the same line at every step.
+        # What has been said once is remembered here and not said again.
+        self._announced = set()
+
+    def _announce_once(self, message):
+        """
+        Writes a line the first time it is asked for, and not again.
+
+        :param message:
+            The line to write.
+        """
+
+        if message in self._announced:
+            return
+
+        self._announced.add(message)
+
+        self.ostream.print_info(message)
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+    def _check_ri_gradient_mode(self, molecule, basis):
+        """
+        Checks that the way the SCF resolves the identity can give a gradient.
+
+        The direct mode holds no B vectors and forms no inverted factor of the
+        metric, which the gradient needs, so it has no gradient. The mode is
+        chosen from the memory when it is left automatic, which means a molecule
+        large enough to want the resolution of the identity is the molecule most
+        likely to be given the mode which cannot differentiate. Left to itself
+        that surfaces as an abort after a converged SCF has been paid for, and in
+        a geometry optimization after the first step of many, so it is predicted
+        here instead and refused before any of it is spent.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        """
+
+        if not (self.scf_driver.ri_jk and self.scf_driver.ri_jk_simd):
+            return
+
+        advice = ('Set ri_mode to in_memory, raise ri_memory_budget, or use a ' +
+                  'smaller auxiliary basis')
+
+        assert_msg_critical(
+            self.scf_driver.ri_mode != 'direct',
+            f'{type(self).__name__}: the direct RI-JK mode has no gradient. ' +
+            'Set ri_mode to in_memory')
+
+        if self.scf_driver.ri_mode != 'automatic':
+            return
+
+        # NOTE: the mode a calculation was actually given, when there has been
+        # one. A prediction is only needed before the first SCF, and reading it
+        # back cannot disagree with what was chosen.
+        ri_drv = getattr(self.scf_driver, '_ri_drv', None)
+
+        if isinstance(ri_drv, SimdRIJKFockDriver) and ri_drv.is_prepared():
+            assert_msg_critical(
+                'direct' not in str(ri_drv.get_mode()),
+                f'{type(self).__name__}: the SCF was given the direct RI-JK ' +
+                f'mode, which has no gradient. {advice}')
+            return
+
+        aux_basis = MolecularBasis.read(
+            molecule, self.scf_driver.ri_auxiliary_basis, ostream=None)
+
+        needed = SimdRIJKFockDriver().required_memory(
+            molecule, basis, aux_basis, self.scf_driver.eri_thresh, [])
+
+        budget = self.scf_driver._get_ri_memory_budget()
+
+        # NOTE: in the unit the number is actually in. A budget set small enough
+        # to force the direct mode is megabytes, and a message which rounds both
+        # sides to "0.00 GB" says nothing about why it refused.
+        def _size(nbytes):
+            for unit, scale in (('GB', 1024**3), ('MB', 1024**2), ('kB', 1024)):
+                if nbytes >= scale:
+                    return f'{nbytes / scale:.2f} {unit}'
+            return f'{nbytes} B'
+
+        assert_msg_critical(
+            needed <= budget,
+            f'{type(self).__name__}: the B vectors need {_size(needed)} of ' +
+            f'{_size(budget)} available, so the SCF would be given the ' +
+            f'direct RI-JK mode, which has no gradient. {advice}')
+
     def read_settings(self, checkpoint_file):
         """
         Reads opt settings from checkpoint file.
@@ -144,6 +235,8 @@ class ScfGradientDriver(GradientDriver):
         assert_msg_critical(
             self.scf_driver.electric_field is None,
             f'{type(self).__name__}.compute: electric_field is not supported')
+
+        self._check_ri_gradient_mode(molecule, basis)
 
         scf_results = self.scf_driver.scf_results
         if scf_results is None:
@@ -593,10 +686,8 @@ class ScfGradientDriver(GradientDriver):
                 basis.get_label().lower().startswith('def2-'),
                 'ScfGradientDriver: Invalid basis set for RI-J')
 
-            self.ostream.print_info(
+            self._announce_once(
                 'Using the resolution of the identity (RI) approximation.')
-            self.ostream.print_blank()
-            self.ostream.flush()
 
             if self.rank == mpi_master():
                 basis_ri_j = MolecularBasis.read(
@@ -634,10 +725,8 @@ class ScfGradientDriver(GradientDriver):
                 f'{type(self).__name__}: RI-JK gradient is not implemented ' +
                 'for a range-separated functional')
 
-            self.ostream.print_info(
+            self._announce_once(
                 'Using the SIMD resolution of the identity (RI-JK) gradient.')
-            self.ostream.print_blank()
-            self.ostream.flush()
 
             basis_ri_jk = MolecularBasis.read(
                 molecule, self.scf_driver.ri_auxiliary_basis)
@@ -846,10 +935,8 @@ class ScfGradientDriver(GradientDriver):
                 basis.get_label().lower().startswith('def2-'),
                 'ScfGradientDriver: Invalid basis set for RI-J')
 
-            self.ostream.print_info(
+            self._announce_once(
                 'Using the resolution of the identity (RI) approximation.')
-            self.ostream.print_blank()
-            self.ostream.flush()
 
             if self.rank == mpi_master():
                 basis_ri_j = MolecularBasis.read(
@@ -981,6 +1068,8 @@ class ScfGradientDriver(GradientDriver):
         :return:
             The energy.
         """
+
+        self._check_ri_gradient_mode(molecule, basis)
 
         if self.numerical:
             # disable restarting scf for numerical calculation
