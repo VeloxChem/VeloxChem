@@ -15,7 +15,12 @@
 #include <set>
 #include <string>
 
+#include "DenseIndexFunc.hpp"
 #include "ErrorHandler.hpp"
+#include "SimdThreeCenterElectronRepulsionDriver.hpp"
+#include "SimdThreeCenterElectronRepulsionGradientDriver.hpp"
+#include "SimdTwoCenterElectronRepulsionGradientDriver.hpp"
+#include "TensorComponents.hpp"
 
 #ifdef VLX_USE_MATHLIB
 #include "MathLibrary.hpp"
@@ -452,13 +457,35 @@ CSimdRIJKGradientDriver::compute(const CMolecule        &molecule,
     //
     // The unused arguments are named and not commented out so that the shape of
     // the call does not change when the body arrives.
-    // Phase one, which is written: the fitted densities. Everything below it
-    // waits on the derivative integrals.
+    auto wanted = std::vector<bool>(natoms, false);
+
+    for (const auto iatom : atoms) wanted[static_cast<size_t>(iatom)] = true;
+
+    // the fitted densities, which read no integrals
+
     const auto fitted = fitted_densities(bq_vectors, basis, aux_basis, metric, density, coefficients,
                                          exchange_scaling_factor);
 
-    (void)fitted;
-    (void)aux_atoms;
+    // the three-center term, plus in the gradient
+
+    _compute_three_center(gradient, molecule, basis, aux_basis, fitted, density, coefficients,
+                          exchange_scaling_factor, wanted, aux_atoms);
+
+    // and the two-center one, which the note carries with a minus. The driver of
+    // it returns the sum of Omega against the derivative with no sign applied, so
+    // the sign is taken here, where it is known which term is being asked for.
+
+    const auto two_center = CSimdTwoCenterElectronRepulsionGradientDriver(_block_size);
+
+    const auto metric_part = two_center.compute(molecule, aux_basis, fitted.omega, atoms);
+
+    for (size_t iatom = 0; iatom < natoms; iatom++)
+    {
+        for (size_t c = 0; c < 3; c++)
+        {
+            gradient.data()[gradient.index(iatom, c)] -= metric_part.at(iatom, c);
+        }
+    }
 
     return gradient;
 }
@@ -481,4 +508,243 @@ CSimdRIJKGradientDriver::compute(const CMolecule       &molecule,
 
     return compute(molecule, basis, aux_basis, bq_vectors, metric, density, coefficients,
                    exchange_scaling_factor, atoms, {});
+}
+
+auto
+CSimdRIJKGradientDriver::_compute_three_center(CPackedMatrix           &gradient,
+                                               const CMolecule         &molecule,
+                                               const CMolecularBasis   &basis,
+                                               const CMolecularBasis   &aux_basis,
+                                               const TFittedDensities  &fitted,
+                                               const CPackedMatrix     &density,
+                                               const CPackedMatrix     &coefficients,
+                                               const double             exchange_scaling_factor,
+                                               const std::vector<bool> &wanted,
+                                               const std::vector<int>  &aux_atoms) const -> void
+{
+    const auto nao = coefficients.number_of_rows();
+
+    const auto norbs = coefficients.number_of_columns();
+
+    const auto indices = denseidx::index_functions(basis);
+
+    const auto aux_indices = denseidx::index_functions(aux_basis);
+
+    const auto starts = denseidx::make_dense_starts(basis);
+
+    const auto strides = denseidx::make_dense_strides(basis);
+
+    const auto aux_starts = denseidx::make_dense_starts(aux_basis);
+
+    const auto aux_strides = denseidx::make_dense_strides(aux_basis);
+
+    const auto nmoms = strides.size();
+
+    const auto aux_nmoms = aux_strides.size();
+
+    // the density as a square, read once for every auxiliary atom below
+
+    auto dense_d = std::vector<double>(nao * nao, 0.0);
+
+    density.to_dense(dense_d.data());
+
+    auto dense_c = std::vector<double>(nao * norbs, 0.0);
+
+    coefficients.to_dense(dense_c.data());
+
+    // every atom of the auxiliary basis, or the share the caller holds
+
+    auto atoms = aux_atoms;
+
+    if (atoms.empty())
+    {
+        atoms.resize(molecule.number_of_atoms());
+
+        std::iota(atoms.begin(), atoms.end(), 0);
+    }
+
+    const auto eri_drv = CSimdThreeCenterElectronRepulsionDriver();
+
+    const auto grad_drv = CSimdThreeCenterElectronRepulsionGradientDriver(_block_size);
+
+    auto square = std::vector<double>(nao * norbs, 0.0);
+
+    auto exchange = std::vector<double>(nao * nao, 0.0);
+
+    for (const auto iaux : atoms)
+    {
+        // NOTE: the pattern of this atom alone, described with the threshold the
+        // calculation formed the B vectors with, so the derivative indexes the
+        // same atom pairs they were formed over.
+
+        const auto pattern = eri_drv.make_pattern(molecule, basis, aux_basis, _threshold, {iaux});
+
+        const auto derivative = grad_drv.compute(pattern, molecule, basis, aux_basis);
+
+        const auto nblocks = static_cast<size_t>(pattern.number_of_blocks());
+
+        for (size_t iblk = 0; iblk < nblocks; iblk++)
+        {
+            const auto &block = pattern.block(iblk);
+
+            const auto npairs = block.number_of_pairs();
+
+            const auto natoms = block.number_of_c_atoms();
+
+            if ((npairs == 0) || (natoms == 0)) continue;
+
+            const auto &a_atoms = block.a_atoms();
+
+            const auto &b_atoms = block.b_atoms();
+
+            const auto &c_atoms = block.c_atoms();
+
+            const auto &a_index = indices[static_cast<size_t>(block.a_index())];
+
+            const auto &b_index = indices[static_cast<size_t>(block.b_index())];
+
+            const auto &c_index = aux_indices[static_cast<size_t>(block.c_index())];
+
+            for (size_t i = 0; i < a_index.size(); i++)
+            {
+                for (size_t j = 0; j < b_index.size(); j++)
+                {
+                    for (size_t k = 0; k < c_index.size(); k++)
+                    {
+                        const auto [la, ia] = a_index[i];
+
+                        const auto [lb, jb] = b_index[j];
+
+                        const auto [lc, kc] = c_index[k];
+
+                        if (block.number_of_pairs(la, ia, lb, jb, lc, kc) == 0) continue;
+
+                        const auto na = static_cast<size_t>(tensor::number_of_spherical_components(std::array<int, 1>{la}));
+
+                        const auto nb = static_cast<size_t>(tensor::number_of_spherical_components(std::array<int, 1>{lb}));
+
+                        const auto nc = static_cast<size_t>(tensor::number_of_spherical_components(std::array<int, 1>{lc}));
+
+                        const auto ncomps = na * nb * nc;
+
+                        const auto *values = derivative.values(iblk, la, ia, lb, jb, lc, kc);
+
+                        const auto run = natoms * npairs;
+
+                        // NOTE: the components of a combination are the slowest
+                        // index, the three of the first center then the three of
+                        // the second, and the angular components sit inside them.
+
+                        for (size_t ma = 0; ma < na; ma++)
+                        {
+                            for (size_t mb = 0; mb < nb; mb++)
+                            {
+                                for (size_t mc = 0; mc < nc; mc++)
+                                {
+                                    const auto angular = (ma * nb + mb) * nc + mc;
+
+                                    for (size_t n = 0; n < natoms; n++)
+                                    {
+                                        const auto catom = static_cast<size_t>(c_atoms[n]);
+
+                                        const auto q = aux_starts[catom * aux_nmoms + lc] + kc + mc * aux_strides[lc];
+
+                                        // Gamma of this auxiliary function: the
+                                        // Coulomb part is a scalar times the
+                                        // density and is never stored, the
+                                        // exchange part is the back transform of
+                                        // the fitted density of the orbitals.
+
+                                        const auto cp = 4.0 * fitted.coefficients[q];
+
+                                        if (exchange_scaling_factor != 0.0)
+                                        {
+                                            const auto &dq = fitted.orbital_densities[q];
+
+                                            for (size_t mu = 0; mu < nao; mu++)
+                                            {
+                                                for (size_t ii = 0; ii < norbs; ii++)
+                                                {
+                                                    double sum = 0.0;
+
+                                                    for (size_t jj = 0; jj < norbs; jj++)
+                                                    {
+                                                        sum += dense_c[mu * norbs + jj] * dq.at(jj, ii);
+                                                    }
+
+                                                    square[mu * norbs + ii] = sum;
+                                                }
+                                            }
+
+                                            for (size_t mu = 0; mu < nao; mu++)
+                                            {
+                                                for (size_t nu = 0; nu < nao; nu++)
+                                                {
+                                                    double sum = 0.0;
+
+                                                    for (size_t ii = 0; ii < norbs; ii++)
+                                                    {
+                                                        sum += square[mu * norbs + ii] * dense_c[nu * norbs + ii];
+                                                    }
+
+                                                    exchange[mu * nao + nu] = -2.0 * exchange_scaling_factor * sum;
+                                                }
+                                            }
+                                        }
+
+                                        for (size_t p = 0; p < npairs; p++)
+                                        {
+                                            const auto aatom = static_cast<size_t>(a_atoms[p]);
+
+                                            const auto batom = static_cast<size_t>(b_atoms[p]);
+
+                                            const auto mu = starts[aatom * nmoms + la] + ia + ma * strides[la];
+
+                                            const auto nu = starts[batom * nmoms + lb] + jb + mb * strides[lb];
+
+                                            auto gamma = cp * dense_d[mu * nao + nu];
+
+                                            if (exchange_scaling_factor != 0.0) gamma += exchange[mu * nao + nu];
+
+                                            // NOTE: the pattern holds each unordered
+                                            // pair of atoms once, so a pair of two
+                                            // different atoms stands for the term of
+                                            // the sum with its two orbitals the other
+                                            // way round as well. A pair of one atom
+                                            // holds both orders already and is not
+                                            // counted twice.
+
+                                            if (aatom != batom) gamma *= 2.0;
+
+                                            for (size_t c = 0; c < 3; c++)
+                                            {
+                                                const auto at = ((c * ncomps) + angular) * run + n * npairs + p;
+
+                                                const auto bt = (((3 + c) * ncomps) + angular) * run + n * npairs + p;
+
+                                                const auto ta = gamma * values[at];
+
+                                                const auto tb = gamma * values[bt];
+
+                                                if (wanted[aatom]) gradient.data()[gradient.index(aatom, c)] += ta;
+
+                                                if (wanted[batom]) gradient.data()[gradient.index(batom, c)] += tb;
+
+                                                // NOTE: the three derivatives of
+                                                // an integral sum to zero, so the
+                                                // auxiliary center takes what the
+                                                // other two leave.
+
+                                                if (wanted[catom]) gradient.data()[gradient.index(catom, c)] -= ta + tb;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }

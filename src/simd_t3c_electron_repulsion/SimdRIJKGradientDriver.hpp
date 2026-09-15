@@ -18,6 +18,7 @@
 #include "Molecule.hpp"
 #include "PackedMatrix.hpp"
 #include "SimdRIFockDriver.hpp"
+#include "SimdThreeCenterElectronRepulsionGradientDriver.hpp"
 #include "SparseTensor.hpp"
 
 /// @brief The fitted densities the gradient contracts the derivative integrals
@@ -178,6 +179,25 @@ class CSimdRIJKGradientDriver
                          const size_t               nao,
                          const size_t               norbs,
                          const CPackedMatrix       &half) const -> CPackedMatrix;
+
+    /// @brief Adds the three-center term to the gradient, one atom of the
+    /// auxiliary basis at a time.
+    /// @note The derivative integrals of an auxiliary atom are formed, contracted
+    /// against Gamma and discarded before the next atom is asked for. The Gamma
+    /// of the atomic orbitals is never formed for the whole auxiliary basis: at
+    /// the functions squared times the auxiliary basis it is hundreds of
+    /// gigabytes, where one atom's share is the functions squared times the
+    /// functions of that atom.
+    auto _compute_three_center(CPackedMatrix           &gradient,
+                               const CMolecule         &molecule,
+                               const CMolecularBasis   &basis,
+                               const CMolecularBasis   &aux_basis,
+                               const TFittedDensities  &fitted,
+                               const CPackedMatrix     &density,
+                               const CPackedMatrix     &coefficients,
+                               const double             exchange_scaling_factor,
+                               const std::vector<bool> &wanted,
+                               const std::vector<int>  &aux_atoms) const -> void;
 
     /// @brief Checks the metric is one this driver can use.
     /// @param metric The metric handed over.
