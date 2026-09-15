@@ -69,6 +69,7 @@ from ..superimpose import svd_superimpose
 from ..errorhandler import assert_msg_critical
 from . import util
 from .util import Shell, on_master, param, print_section, ic_cell
+import math
 
 # The manager's own defaults, repeated here so that a function of this
 # module stands on its own; the manager always passes its settings in.
@@ -99,9 +100,14 @@ DEFAULT_IC_TYPES = {
 
 class SiteMatcher(Shell):
     """
-    Measures a structure's active site against a template: describes both
-    as a coarse graph of metals and residues, maps the one onto the other
-    atom by atom, and reads the geometric agreement off the mapping.
+    Measures a structure's active site against templates and decides
+    between them: describes both as a coarse graph of metals and residues,
+    maps the one onto the other atom by atom, reads the geometric
+    agreement off the mapping (compare), holds every template to a set of
+    criteria and ranks the passing ones (select_template), and prints the
+    comparison and the decision. The criteria, the regions and what the
+    ranking reads are the caller's: MetalForceFieldManager holds them as
+    settings and class constants.
 
     Every method runs on the master rank and its result is broadcast. A
     node_match closure handed to networkx's GraphMatcher must not capture
@@ -1206,3 +1212,506 @@ class SiteMatcher(Shell):
                                            spec=specs.get(name))
 
         self.print_comparison_summary(results, ranked_on, scores)
+
+    # ------------------------------------------------------------------
+    # the comparison and the decision
+    # ------------------------------------------------------------------
+
+    @on_master
+    def compare(self,
+                templates,
+                described,
+                molecule,
+                regions,
+                include_hydrogens=False,
+                max_mappings=DEFAULT_MAX_MAPPINGS,
+                rmsd_heavy_atoms_only=DEFAULT_RMSD_HEAVY_ATOMS_ONLY,
+                metal_shell_bonds=DEFAULT_METAL_SHELL_BONDS):
+        """
+        Measures a described site against every template, without an opinion.
+
+        Per template: the same atoms or not ('composition'), the same coarse
+        coordination or not ('spec'), and when both hold the best atom mapping
+        and the geometric agreement of every region under it.
+
+        :param templates:
+            The templates, by name.
+        :param described:
+            The site, as describe returns it.
+        :param molecule:
+            The geometry every number is measured on.
+        :param regions:
+            The regions to measure.
+        :param include_hydrogens:
+            Whether the hydrogens take part in the measurements.
+        :param max_mappings:
+            The limit on how many atom mappings are built per template.
+        :param rmsd_heavy_atoms_only:
+            Whether the RMSD is over the heavy atoms alone.
+        :param metal_shell_bonds:
+            How many bonds out from a metal the metal_shell region reaches.
+
+        :return:
+            One entry per template: 'status', 'mapping', 'n_coarse_mappings',
+            'n_mappings', 'metal_bonds' and 'regions'.
+        """
+
+        coordinates = molecule.get_coordinates_in_angstrom()
+        heavy_only = not include_hydrogens
+
+        findings = {}
+
+        for name, template in templates.items():
+            entry = {
+                'status': 'measured',
+                'mapping': None,
+                'n_coarse_mappings': 0,
+                'n_mappings': 0,
+                'metal_bonds': None,
+                'regions': {},
+            }
+
+            if template['composition'] != described['composition']:
+                # not the same atoms, so there is nothing to map onto
+                entry['status'] = 'composition'
+                findings[name] = entry
+                continue
+
+            # which residue coordinates which metal, with nothing said about
+            # how many atoms of it do the coordinating
+            coarse = self.coarse_mappings(template, described)
+            if not coarse:
+                entry['status'] = 'spec'
+                findings[name] = entry
+                continue
+
+            maps = []
+            for coarse_mapping in coarse:
+                maps.extend(
+                    self.heavy_atom_maps(template,
+                                         described,
+                                         coarse_mapping,
+                                         max_mappings=max_mappings))
+            if not maps:
+                entry['status'] = 'spec'
+                findings[name] = entry
+                continue
+
+            entry['n_coarse_mappings'] = len(coarse)
+            entry['n_mappings'] = len(maps)
+
+            heavy_map, rot, trans = self.best_heavy_map(template, maps,
+                                                        coordinates)
+            mapping = self.complete_hydrogens(template, described, heavy_map,
+                                              coordinates, rot, trans)
+            entry['mapping'] = mapping
+            entry['metal_bonds'] = self.metal_bond_summary(
+                template, described, mapping, coordinates)
+
+            for region in regions:
+                entry['regions'][region] = self.measure_region(
+                    template,
+                    mapping,
+                    coordinates,
+                    region,
+                    heavy_only,
+                    rmsd_heavy_atoms_only=rmsd_heavy_atoms_only,
+                    metal_shell_bonds=metal_shell_bonds)
+
+            findings[name] = entry
+
+        return findings
+
+    @on_master
+    def select_template(self, comparison,
+                        criteria,
+                        criteria_name,
+                        regions,
+                        ic_types,
+                        ranked_on,
+                        template=None):
+        """
+        Picks the template a force field should be built from, and says why.
+
+        Reads the last comparison made by compare_active_site. A template is
+        usable only if it maps onto every atom of the site. If none is
+        named, every template that maps completely is held to
+        selection_criteria and the passing ones are ranked, the best one
+        winning. If one is named, its verdict is reported but does not
+        decide whether it is picked here -- naming a template is a statement
+        that it is the right one, and build_ff_from_template is what turns an
+        outside-the-criteria verdict into a refusal.
+
+        :param template:
+            The name of the template to use, or None to choose one.
+
+        :return:
+            The decision, with the chosen name under 'name', None when
+            nothing passed, and what was made of every template under
+            'verdicts'.
+        """
+
+        decision = {
+            'name': None,
+            'entry': None,
+            'forced': template is not None,
+            'criteria': criteria,
+            'criteria_name': criteria_name,
+            'score': None,
+            'verdicts': {},
+            'scores': {},
+            'candidates': [],
+        }
+
+        for name, entry in comparison['templates'].items():
+            verdict = self.selection_verdict(comparison, entry, criteria,
+                                             regions, ic_types)
+            decision['verdicts'][name] = verdict
+            decision['scores'][name] = self.selection_score(entry, ranked_on)
+
+        if template is not None:
+            assert_msg_critical(
+                template in comparison['templates'],
+                'SiteMatcher.select_template: no template named '
+                f'{template} was compared. Loaded: '
+                f'{sorted(comparison["templates"])}')
+
+            entry = comparison['templates'][template]
+            verdict = decision['verdicts'][template]
+
+            assert_msg_critical(
+                self.maps_every_atom(comparison, entry),
+                f'SiteMatcher.select_template: template {template} '
+                f'does not map onto every atom of the site ({verdict}), so '
+                'its parameters cannot be transferred. Build this site with '
+                'MetalSiteForceFieldBuilder.')
+
+            decision['name'] = template
+            decision['entry'] = entry
+            decision['score'] = decision['scores'][template]
+
+        else:
+            passed = [
+                name for name, verdict in decision['verdicts'].items()
+                if verdict is None
+            ]
+            decision['candidates'] = sorted(
+                passed, key=lambda name: decision['scores'][name])
+
+            if decision['candidates']:
+                name = decision['candidates'][0]
+                decision['name'] = name
+                decision['entry'] = comparison['templates'][name]
+                decision['score'] = decision['scores'][name]
+
+        return decision
+
+    @on_master
+    def prefer_template(self, comparison, decision, name):
+        """
+        Takes the template the site was shoehorned into, over whatever the
+        criteria came to.
+
+        A shoehorning is the same statement naming a template is -- this
+        site is to be built the way that one is -- so an unnamed call after
+        one is not really unnamed, and what the criteria make of the field
+        does not get to overrule it. Both ways they can differ are wrong on
+        their own terms.
+
+        With nothing within them, the criteria are the least able to judge:
+        they measure a geometry whose coordination sphere is still open, and
+        what would close it is the very force field being asked for, so the
+        site cannot look like the template until after the transfer it is
+        being refused.
+
+        With something within them, the something is rarely alone. A
+        shoehorned site passes against the template it was walked onto and
+        against every sibling of that template's family too, and the ranking
+        then separates them on an active-site bond rms that differs in
+        thousandths of an Angstrom -- so the site gets walked onto one
+        template and built from another, which is a geometry from one and
+        parameters from the other and a description of neither. That is not
+        a tie to be broken better: the shoehorning already said which one it
+        is.
+
+        What is not waived is the mapping. Every atom of the site has to
+        land somewhere in the template or there is nothing to transfer onto
+        it, and _build_ff_from_template fails outright on the first key it
+        cannot map, so a template that maps incompletely is left refused and
+        the criteria keep the decision.
+
+        :param decision:
+            The decision _select_template came to.
+
+        :return:
+            A decision naming the shoehorned template, or the one given when
+            there is no shoehorning to take, when it is already what the
+            criteria took, or when it does not map the site completely.
+        """
+
+        if name is None or name not in comparison['templates']:
+            return decision
+
+        if name == decision['name']:
+            return decision
+
+        entry = comparison['templates'][name]
+
+        if not self.maps_every_atom(comparison, entry):
+            self.ostream.print_warning(
+                f'The site was shoehorned into {name}, but it does not map '
+                'onto every atom of the site, so nothing can be transferred '
+                'from it.')
+            self.ostream.flush()
+            return decision
+
+        verdict = decision['verdicts'][name] or 'within the criteria'
+        ranked = decision['name']
+
+        decision = dict(decision)
+        decision['name'] = name
+        decision['entry'] = entry
+        decision['forced'] = True
+        decision['score'] = decision['scores'][name]
+
+        if ranked is None:
+            self.ostream.print_warning(
+                f'No template is within the {decision["criteria_name"]} '
+                f'criteria, but the site was shoehorned into {name}, which '
+                'is the same statement as naming it. Building from it '
+                f'anyway: {verdict}.')
+            self.ostream.print_info(
+                'The criteria measure a geometry whose coordination sphere '
+                'the transferred parameters have not closed yet. Relax the '
+                'site on the force field this returns '
+                '(mm_optimize_active_site) and compare again to see whether '
+                'it then matches on its own.')
+        else:
+            self.ostream.print_warning(
+                f'The criteria ranked {ranked} first, but the site was '
+                f'shoehorned into {name}, which is the same statement as '
+                f'naming it. Building from {name} instead: {verdict}.')
+            self.ostream.print_info(
+                f'The site was walked onto {name}, so its parameters are the '
+                f'ones that describe it. Name {ranked} in the call to build '
+                'from that one instead.')
+
+        self.ostream.flush()
+
+        return decision
+
+    @on_master
+    def maps_every_atom(self, comparison, entry):
+        """
+        Says whether a template covers every atom of the site.
+
+        A template that holds other atoms, or coordinates them differently,
+        never gets as far as a mapping; this also catches a mapping that came
+        back incomplete, which would leave part of a site unparameterized.
+
+        :param comparison:
+            The last comparison, from compare_active_site.
+        :param entry:
+            What it measured for the template.
+
+        :return:
+            True when every atom of the site is mapped onto exactly once.
+        """
+
+        if entry['status'] != 'measured' or entry['mapping'] is None:
+            return False
+
+        atoms = comparison['active_site']['molecule'].number_of_atoms()
+        mapping = entry['mapping']
+
+        return (len(mapping) == atoms
+                and sorted(mapping.values()) == list(range(atoms)))
+
+    @on_master
+    def selection_verdict(self, comparison, entry, criteria, regions,
+                          ic_types):
+        """
+        Holds one template to the criteria, region by region.
+
+        :param comparison:
+            The last comparison, from compare_active_site.
+        :param entry:
+            What it measured for the template.
+        :param criteria:
+            The criteria, as _selection_criteria resolves them.
+
+        :return:
+            A description of what stands in the way, or None when nothing
+            does.
+        """
+
+        if entry['status'] == 'composition':
+            return 'different atoms'
+
+        if entry['status'] == 'spec':
+            return 'different coordination'
+
+        if not self.maps_every_atom(comparison, entry):
+            return 'incomplete mapping'
+
+        for region in regions:
+            thresholds = criteria.get(region)
+            if not thresholds:
+                continue
+
+            found = entry['regions'].get(region)
+            if found is None:
+                return f'{region} not measured'
+
+            # a criterion that could not be evaluated is not one that was
+            # passed, so the region is held to strictly here
+            violation = self.ic_violation(found['ic_rmsd'],
+                                          thresholds,
+                                          ic_types=ic_types)
+            if violation is not None:
+                return f'{region} {violation}'
+
+        return None
+
+    @on_master
+    def selection_score(self, entry, ranked_on):
+        """
+        Returns what several templates that all pass are ranked on.
+
+        :param entry:
+            What compare_active_site measured for the template.
+
+        :return:
+            The measure named by SELECTION_RANKED_ON, or infinity where it was
+            not measured.
+        """
+
+        region, ic_type, measure = ranked_on
+
+        found = entry['regions'].get(region)
+        if found is None or found['ic_rmsd'] is None:
+            return math.inf
+
+        found = found['ic_rmsd'].get(ic_type)
+        if found is None:
+            return math.inf
+
+        return found[measure]
+
+    # ------------------------------------------------------------------
+    # the decision, printed
+    # ------------------------------------------------------------------
+
+    @on_master
+    def print_selection(self, comparison, decision, regions, ic_types,
+                        ranked_on):
+        """
+        Prints how every template stands against the criteria, and which one was
+        taken.
+
+        The whole field is printed rather than the winner alone: whether the
+        others are near misses or a long way off is what says how much the chosen
+        one is worth.
+
+        :param decision:
+            The decision, as _select_template makes it.
+        """
+
+        regions = [
+            region for region in regions
+            if decision['criteria'].get(region)
+        ]
+
+        self.ostream.print_blank()
+        print_section(
+            f'Choosing a template on the {decision["criteria_name"]} criteria',
+            self.ostream)
+        self.ostream.print_blank()
+
+        for region in regions:
+            thresholds = decision['criteria'][region]
+            # only the measures the set actually holds, since either of them may
+            # be left out of one
+            measures = {
+                name:
+                ' / '.join(f'{measure} {limit:.2f}'
+                           for measure, limit in given.items() if limit is not None)
+                for name, given in thresholds.items() if given
+            }
+            limits = '; '.join(f'{name} {shown} {ic_types[name]}'
+                               for name, shown in measures.items())
+            self.ostream.print_header(param(region, limits, value_width=44))
+
+        self.ostream.print_blank()
+
+        # one column per region the criteria name, so a custom set of them prints
+        # as readably as the two that come with the class
+        row = ' | '.join(['{:>22}'] + ['{:>13}'] * len(regions) +
+                         ['{:>26}', '{:>5}'])
+        header = row.format('template', *[region[:13] for region in regions],
+                            'verdict', 'taken')
+        self.ostream.print_header(header)
+        self.ostream.print_header(len(header) * '-')
+
+        order = sorted(comparison['templates'],
+                       key=lambda name: (decision['verdicts'][name] is not None,
+                                         decision['scores'][name], name))
+
+        for name in order:
+            entry = comparison['templates'][name]
+            cells = []
+            for region in regions:
+                found = entry['regions'].get(region)
+                cells.append('' if found is
+                             None else ic_cell(found['ic_rmsd'], 'bonds'))
+
+            verdict = decision['verdicts'][name] or 'within the criteria'
+            self.ostream.print_header(
+                row.format(name[:22], *cells, verdict[:26],
+                           'yes' if name == decision['name'] else ''))
+
+        self.ostream.print_blank()
+
+        if decision['name'] is None:
+            self.ostream.print_info('No template was taken.')
+        elif decision['forced']:
+            self.ostream.print_info(
+                f'{decision["name"]} was named rather than chosen, so the '
+                'criteria were measured but did not decide.')
+        else:
+            ranked = ' '.join(ranked_on)
+            self.ostream.print_info(
+                f'{len(decision["candidates"])} of '
+                f'{len(comparison["templates"])} template(s) are within the '
+                f'criteria. Taking {decision["name"]}, whose {ranked} of '
+                f'{decision["score"]:.3f} is the lowest of them.')
+
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+    @on_master
+    def print_no_selection(self, decision):
+        """
+        Says which template came closest when none of them was good enough.
+
+        :param decision:
+            The decision, as _select_template makes it.
+        """
+        closest = min(decision['scores'],
+                      key=lambda name: decision['scores'][name],
+                      default=None)
+
+        if closest is not None and math.isfinite(decision['scores'][closest]):
+            self.ostream.print_info(
+                f'No template is within the {decision["criteria_name"]} '
+                f'criteria. The closest is {closest}: '
+                f'{decision["verdicts"][closest]}.')
+        else:
+            self.ostream.print_info(
+                'No template describes this site: none of them maps onto all '
+                'of its atoms.')
+
+        self.ostream.print_info(
+            "Set selection_criteria to 'loose' to widen what counts as a "
+            'match, or build this site with MetalSiteForceFieldBuilder.')
+        self.ostream.flush()

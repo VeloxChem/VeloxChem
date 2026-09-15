@@ -52,6 +52,7 @@ from ..errorhandler import assert_msg_critical
 from . import util
 from .util import Shell, on_master, param, print_section
 from .matching import SiteMatcher
+from .builder import ActiveSiteBuilder
 
 # The geometry a run leaves behind, in the order it is looked for. Which of
 # them a template is allowed to be built from is what the fallback argument
@@ -64,9 +65,12 @@ GEOMETRY_KINDS = ('qm_opt', 'mm_opt')
 
 class TemplateLoader(Shell):
     """
-    Makes a template out of what a run left in its folder: the force field
-    and the geometry, described the way a site is described, with the
-    residues that coordinate no metal discarded.
+    Makes a template out of what a run left in its folder -- the force
+    field and the geometry, described the way a site is described, with
+    the residues that coordinate no metal discarded -- and puts a
+    template's parameters onto a site that matched it: the metal bonds
+    wired the way the template wires them, then the fitted metal terms and
+    the charges transferred over the mapping.
 
     Every method runs on the master rank and its result is broadcast.
 
@@ -85,6 +89,16 @@ class TemplateLoader(Shell):
         """
 
         return SiteMatcher(self.comm, self.ostream)
+
+    def _sites(self):
+        """
+        The ActiveSiteBuilder a transferred force field is built with.
+
+        :return:
+            An ActiveSiteBuilder on this loader's communicator and stream.
+        """
+
+        return ActiveSiteBuilder(self.comm, self.ostream)
 
     @on_master
     def load_geometry(self, folder, fallback):
@@ -523,3 +537,267 @@ class TemplateLoader(Shell):
 
         self.ostream.print_blank()
         self.ostream.flush()
+
+    # ------------------------------------------------------------------
+    # the transfer
+    # ------------------------------------------------------------------
+
+    @on_master
+    def template_connectivity(self, template, mapping, active_site):
+        """
+        Wires a site's metal center exactly as the template wires its own.
+
+        How many atoms of a residue reach a metal is a distance cutoff on an
+        unrelaxed structure rather than chemistry, which is why the matching
+        refuses to have an opinion about it: a carboxylate gripping a metal
+        with one oxygen and one gripping it with two are the same residue on
+        the same metal. What matches on those terms, though, has to be built
+        on the template's terms as well. A template bond the site does not
+        make has no atoms to land on, and a bond the site makes alone has no
+        fitted parameters to land on it - it would keep the seeded guess and
+        say nothing about it.
+
+        So the template decides the coordination: its metal bonds are added
+        where the site lacks them and the site's own are dropped where the
+        template does not make them. Only bonds touching a metal are touched;
+        the residues are wired as the structure has them.
+
+        The active site is not modified; a new dictionary is returned, with
+        the topologies rebuilt so they agree with the connectivity. When the
+        two already agree the site is handed back as it came.
+
+        :param template:
+            The template that matched.
+        :param mapping:
+            The mapping from template index to active site index.
+        :param active_site:
+            The active site of the query.
+
+        :return:
+            The active site to build on, and what was added and removed.
+        """
+
+        metals = set(active_site['metal_indices'])
+
+        assert_msg_critical(
+            {mapping[index]
+             for index in template['metal_indices']} == metals,
+            'TemplateLoader: the template maps its metal centers onto '
+            'atoms of the site that are not metal centers')
+
+        bonds, _ = self._matcher().metal_keys(template)
+        wanted = {
+            frozenset((mapping[first], mapping[second]))
+            for first, second in bonds
+        }
+
+        matrix = np.array(active_site['connectivity_matrix'])
+        changes = {'added': [], 'removed': []}
+
+        for pair in wanted:
+            first, second = sorted(pair)
+            if not matrix[first, second]:
+                matrix[first, second] = 1
+                matrix[second, first] = 1
+                changes['added'].append((first, second))
+
+        for first, second in util.connectivity_bonds(matrix):
+            if not ({first, second} & metals):
+                continue
+            if frozenset((first, second)) in wanted:
+                continue
+            matrix[first, second] = 0
+            matrix[second, first] = 0
+            changes['removed'].append((first, second))
+
+        if not changes['added'] and not changes['removed']:
+            return active_site, changes
+
+        active_site = {
+            **active_site,
+            'connectivity_matrix': matrix,
+        }
+
+        described = self._matcher().describe(active_site,
+                                             util.connectivity_bonds(matrix))
+
+        return described, changes
+
+    @on_master
+    def print_forced_bonds(self, template, active_site, changes,
+                           metal_bond_cutoff):
+        """
+        Reports the metal bonds the template decided against the site.
+
+        A bond added over a long contact carries the template's equilibrium
+        and will pull the two atoms together at the first minimization, and a
+        short contact dropped is a pair left to the nonbonded terms alone.
+        Both are worth seeing here rather than in a geometry afterwards, so
+        anything on the wrong side of the coordination cutoff is a warning.
+
+        :param template:
+            The template that decided.
+        :param active_site:
+            The active site the distances are read off.
+        :param changes:
+            What _template_connectivity added and removed.
+        """
+
+        if not changes['added'] and not changes['removed']:
+            return
+
+        coordinates = active_site['molecule'].get_coordinates_in_angstrom()
+        labels = active_site['molecule'].get_labels()
+        cutoff = metal_bond_cutoff
+
+        self.ostream.print_info(
+            f'The coordination of the site differs from {template["name"]}; '
+            f'forcing it onto the template: {len(changes["added"])} metal '
+            f'bond(s) added, {len(changes["removed"])} removed.')
+
+        for kind, pairs in (('adding', changes['added']), ('removing',
+                                                           changes['removed'])):
+            for first, second in pairs:
+                distance = np.linalg.norm(coordinates[first] -
+                                          coordinates[second])
+                line = (f'  {kind} {labels[first]}{first}-'
+                        f'{labels[second]}{second}, {distance:.2f} A apart '
+                        'in the site')
+
+                far = (kind == 'adding' and distance > cutoff)
+                near = (kind == 'removing' and distance <= cutoff)
+
+                if far or near:
+                    self.ostream.print_warning(line.strip())
+                else:
+                    self.ostream.print_info(line)
+
+        self.ostream.flush()
+
+    @on_master
+    def build_forcefield_from_template(self, template, mapping, active_site,
+                                       metal_bond_cutoff, **seed_settings):
+        """
+        Builds a force field for an active site out of a template.
+
+        Only what a builder run pays QM for is taken from the template: the
+        fitted metal bonds and angles, and the charges. Everything else is
+        built for the site in front of us, so the atom types and the bonded
+        terms of the residues come from the structure rather than from
+        somewhere else.
+
+        The coordination itself is the template's, not the site's: the metal
+        bonds are forced onto the template's by _template_connectivity before
+        anything is built, so a residue the structure holds bidentate is built
+        monodentate where the template is monodentate and the other way
+        round. Everything the template was fitted for then has atoms to land
+        on, and nothing is left carrying a seeded guess.
+
+        :param template:
+            The template that matched.
+        :param mapping:
+            The mapping from template index to active site index.
+        :param active_site:
+            The active site of the query, whose connectivity the force field
+            is built on once the template has decided the metal bonds.
+
+        :return:
+            The force field generator, and the active site it was built on.
+        """
+
+        active_site, changes = self.template_connectivity(
+            template, mapping, active_site)
+        self.print_forced_bonds(template, active_site, changes,
+                                metal_bond_cutoff)
+
+        template_ff = template['forcefield']
+        charges = np.zeros(active_site['molecule'].number_of_atoms())
+
+        for template_index, site_index in mapping.items():
+            charges[site_index] = template['charges'][template_index]
+
+        total = float(np.sum(charges))
+        expected = int(active_site['molecule'].get_charge())
+        if abs(total - expected) > 1.0e-3:
+            self.ostream.print_warning(
+                f'The transferred charges sum to {total:+.3f}, but the active '
+                f'site charge is {expected:+d}')
+
+        # build_forcefield writes the charges onto the atoms and redistributes
+        # the caps; the metal terms it seeds here are overwritten below
+        forcefield = self._sites().build_forcefield(
+            active_site, charges, **seed_settings)
+
+        bonds, angles = self._matcher().metal_keys(template)
+
+        for key in bonds:
+            target = self._map_key(key, mapping, forcefield.bonds, 'bond')
+            forcefield.bonds[target] = self._transferred(
+                template_ff.bonds[key], template['name'])
+
+        for key in angles:
+            target = self._map_key(key, mapping, forcefield.angles, 'angle')
+            forcefield.angles[target] = self._transferred(
+                template_ff.angles[key], template['name'])
+
+        self.ostream.print_info(
+            f'Transferred {len(bonds)} metal bond(s), {len(angles)} metal '
+            f'angle(s) and {len(charges)} charge(s) from {template["name"]}.')
+        self.ostream.flush()
+
+        return forcefield, changes, active_site
+
+    @on_master
+    def _map_key(self, key, mapping, table, kind):
+        """
+        Maps a force field key onto the active site.
+
+        A bond and an angle read the same forwards and backwards, and the
+        generator stores only one of the two orders, so the reverse is tried
+        before giving up. Silently dropping a term that came out the wrong way
+        round would leave a metal site half parameterized.
+
+        :param key:
+            The key in the template.
+        :param mapping:
+            The mapping from template index to active site index.
+        :param table:
+            The bonds or angles of the force field being built.
+        :param kind:
+            The name of the term, for the error message.
+
+        :return:
+            The key in the force field being built.
+        """
+
+        mapped = tuple(mapping[index] for index in key)
+
+        if mapped in table:
+            return mapped
+
+        if mapped[::-1] in table:
+            return mapped[::-1]
+
+        assert_msg_critical(
+            False, f'TemplateLoader: the template {kind} {key} maps '
+            f'onto {mapped}, which the active site force field does not have')
+
+    @on_master
+    def _transferred(self, params, name):
+        """
+        Copies one set of parameters, recording where it came from.
+
+        :param params:
+            The parameters of the template.
+        :param name:
+            The name of the template.
+
+        :return:
+            The copied parameters.
+        """
+
+        params = dict(params)
+        comment = params.get('comment', '')
+        params['comment'] = f'{comment} (template {name})'.strip()
+
+        return params
