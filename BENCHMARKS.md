@@ -5461,91 +5461,14 @@ The chain is reachable from the input of a closed shell calculation, as the
 alternative path through the Fock build which ri_jk_simd selects. This is what it
 does to a whole calculation rather than to one matrix.
 
-### Caffeine, restricted Hartree-Fock
+### Caffeine and tagrisso, whole calculations
 
-Twenty four atoms, fifty one occupied orbitals, against def2-universal-jkfit with
-1242 auxiliary functions throughout. The convergence threshold is 1e-8 and the
-time is of the whole calculation.
-
-| basis | nao | method | time | speedup | iterations | energy | against full |
-| --- | ---: | --- | ---: | ---: | ---: | ---: | ---: |
-| def2-svp | 246 | full | 12.63 | 1.00 | 19 | -675.8010164955 | |
-| | | RI-JK conventional | 3.05 | 4.13 | 21 | -675.8004490084 | 5.67e-04 |
-| | | RI-JK simd | 2.64 | 4.78 | 21 | -675.8004490084 | 5.67e-04 |
-| def2-svpd | 366 | full | 51.35 | 1.00 | 19 | -675.8324037911 | |
-| | | RI-JK conventional | 8.31 | 6.18 | 22 | -675.8318417532 | 5.62e-04 |
-| | | RI-JK simd | 6.87 | 7.47 | 22 | -675.8318417532 | 5.62e-04 |
-| def2-tzvp | 494 | full | 177.50 | 1.00 | 19 | -676.5558320985 | |
-| | | RI-JK conventional | 19.17 | 9.26 | 22 | -676.5554233126 | 4.09e-04 |
-| | | RI-JK simd | 17.16 | 10.34 | 22 | -676.5554233126 | 4.09e-04 |
-| def2-tzvpd | 614 | full | 431.21 | 1.00 | 19 | -676.5579379117 | |
-| | | RI-JK conventional | 40.37 | 10.68 | 22 | -676.5575291942 | 4.09e-04 |
-| | | RI-JK simd | 34.68 | 12.43 | 22 | -676.5575291942 | 4.09e-04 |
-
-**The two routes converge to the same energy in every basis, to all ten of the
-digits printed, and in the same number of iterations.** That is what the table is
-for. The new path is the same approximation reached another way, in a single and
-in a triple zeta basis, with and without diffuse functions.
-
-The new path is twelve to twenty one per cent faster than the conventional one.
-Before the W matrices were formed by a matrix product it was three to fifteen per
-cent slower in every one of these four bases, and the entry of that table is kept
-in the history of this file. Caffeine gains the least of anything measured because
-its fifty one occupied orbitals make the exchange a smaller part of its run than
-of a larger molecule.
-
-### Tagrisso, restricted Hartree-Fock
-
-Seventy atoms and a hundred and thirty three occupied orbitals, in def2-svp
-against def2-universal-jkfit, whose 3387 auxiliary functions are close to three
-times the 1242 of caffeine.
-
-| method | time | speedup | iterations | energy | against full |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| full | 153.77 | 1.00 | 21 | -1609.0900864188 | |
-| RI-JK conventional | 99.20 | 1.55 | 23 | -1609.0890443496 | 1.04e-03 |
-| RI-JK simd | 46.01 | 3.34 | 23 | -1609.0890443498 | 1.04e-03 |
-
-**Twice the conventional route**, where caffeine gains a fifth. The advantage
-follows the auxiliary basis and the occupied orbitals, both of which are what the
-exchange is built from, and both of which are larger here.
-
-The energies of the two routes differ in the last of the ten digits printed, which
-is the different order the arithmetic is summed in over twenty three iterations
-rather than a difference of the approximation.
-
-**The approximation itself gains much less here than on caffeine**: 1.55 times the
-calculation without it for the conventional route, against four to eleven on
-caffeine. The four-center build screens well at seventy atoms while the work of
-the resolution of the identity follows the auxiliary basis, which is what has
-grown.
-
-### Tagrisso with the diffuse basis
-
-The same molecule and the same fitting set, in def2-svpd, whose 1010 orbital
-functions are half again the 683 of def2-svp.
-
-| method | time | speedup | iterations | energy | against full |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| full | 1199.89 | 1.00 | 21 | -1609.1565808182 | |
-| RI-JK conventional | 370.46 | 3.24 | 24 | -1609.1555344827 | 1.05e-03 |
-| RI-JK simd | 150.02 | 8.00 | 24 | -1609.1555344829 | 1.05e-03 |
-
-**Two and a half times the conventional route.** Taken together, the six
-calculations of these three tables:
-
-| molecule | auxiliary functions | orbital basis | simd against conventional |
-| --- | ---: | --- | ---: |
-| caffeine | 1242 | def2-svp to def2-tzvpd | 1.12 to 1.21 |
-| tagrisso | 3387 | def2-svp | 2.16 |
-| tagrisso | 3387 | def2-svpd | 2.47 |
-
-The advantage follows the auxiliary basis and the occupied orbitals, and the
-orbital basis multiplies whatever those have already given. The whole-calculation
-gains are well under the two and a half to five times the W matrices themselves
-gained, which is what a part of a calculation being made faster does to the whole
-of it: the W matrices were three quarters of a tagrisso run, so three times on
-them cannot give more than about twice on the run, and 2.16 is most of that.
+*Superseded. Both molecules at Hartree-Fock and B3LYP, four builds, with the B
+vectors timed apart from the builds:
+`benchmarks/data/scf/2026-09-15_m4max_caffeine.md` and
+`benchmarks/data/scf/2026-09-15_m4max_tagrisso.md`. The tables which stood here
+compared a full build against the two resolution of the identity routes over the
+def2 sets; they crossed two runs and are replaced by measurements which do not.*
 
 ### What the memory check did
 
@@ -5573,22 +5496,6 @@ including the diffuse ones, so the fallback to the inverted square root was neve
 taken and no warning was printed. The metrics of the universal fitting set are
 well enough conditioned for the cheaper factorization at these sizes. The fallback
 is therefore still covered by constructed matrices alone and not by a calculation.
-
-### A note on how these rows were taken
-
-**These three tables predate the change to the setup described in the section
-which follows.** That change takes the tagrisso def2-svpd run from 150.02 seconds
-to 138.75, which is 8.65 times the calculation without the approximation and 2.67
-times the conventional route rather than the 8.00 and 2.47 above. The other rows
-were not measured again, and the tables are left as the set they were taken as
-rather than with one row of a later state mixed into them.
-
-The full and the conventional columns of these three tables were measured once
-each, on an idle machine, before the W matrices were changed. They do not go
-through the changed code and were not measured again. The simd column was measured
-again afterwards, in a process of its own. The ratios therefore cross two runs,
-which is worth knowing though both were idle and the energies of the two agree to
-every digit printed.
 
 ## Forming the B vectors, and the depth of its products
 
@@ -5752,111 +5659,16 @@ fifths, and everything else, which is not the resolution of the identity at all,
 the other two fifths. For B3LYP the quadrature is three fifths of the run on its
 own.
 
-## Caffeine over the def2 basis sets, the two routes side by side
+## Caffeine, the routes side by side and against the build which makes none
 
-The tables of the earlier section were taken as sets, with the conventional column
-measured once and the simd column measured again later, so their ratios cross two
-runs. This one does not: both routes were run one after the other in the same
-process, at Hartree-Fock, against def2-universal-jkfit with 1242 auxiliary
-functions throughout. Caffeine has fifty one occupied orbitals whatever basis it
-is given.
-
-| basis | nao | conventional | simd | gain | iterations | energy, conventional | energy, simd |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| def2-svp | 246 | 3.14 | 1.66 | 1.89 | 21 | -675.8004490084 | -675.8004490084 |
-| def2-svpd | 366 | 8.25 | 3.39 | 2.44 | 22 | -675.8318417532 | -675.8318417532 |
-| def2-tzvp | 494 | 18.58 | 6.30 | 2.95 | 22 | -676.5554233126 | -676.5554233126 |
-| def2-tzvpd | 614 | 39.00 | 9.83 | 3.97 | 22 | -676.5575291942 | -676.5575291942 |
-| def2-qzvp | 1098 | 216.78 | 33.64 | 6.44 | 22 | -676.5876077721 | -676.5876077721 |
-| def2-qzvpd | 1218 | 357.17 | 43.70 | 8.17 | 23 | -676.5878809521 | -676.5878809522 |
-
-**The two routes reach the same energy** to all ten digits in five of the six, and
-to nine in the sixth, in the same number of iterations throughout.
-
-**The gain rises as the basis grows**, from 1.89 at a single zeta to 8.17 at a
-quadruple one.
-
-An earlier reading of this table had it falling, from 1.57 to 1.15, and drew a
-conclusion from that: the exchange is as thin as the occupied orbitals make it,
-fifty one is thin, and a larger basis was said to add work the new path could not
-help with. **That was not what the numbers meant.** Both routes were paying for one
-build of the four center integrals before either of them could start -- the exchange
-is formed from the occupied orbitals, and at the first iteration there are none, so
-the driver fell back to the build which needs none. That build grows with the basis
-far faster than anything else in the calculation. At def2-qzvpd it was about 290 of
-the 311 seconds the simd route took.
-
-Taking the orbitals of the first exchange from the density instead removed it from
-this route, and the trend reversed. The section on it is below. **The conventional
-route still pays it**, so part of every gain in this table is that fix rather than
-the driver, and a like for like comparison would be narrower.
-
-### Against the numbers recorded earlier
-
-The conventional column here is 3.19, 8.27, 18.98 and 39.22 against the 3.05, 8.31,
-19.17 and 40.37 of the earlier section, which is a few per cent either way on a
-route that has not changed. That is the run to run variation of this machine, and
-it is worth knowing as the scale below which none of the ratios in this file should
-be read.
-
-The simd column is 2.13, 5.67, 14.57 and 30.93 against 2.64, 6.87, 17.16 and 34.68.
-That difference is the gather of the auxiliary groups, worth 1.12 to 1.24 times
-here, which is the setup being a smaller part of a caffeine run than of the
-tagrisso one where it was worth 1.08 on the whole calculation.
-
-## Caffeine against the build which makes no approximation
-
-The table above this one sets the two resolution of the identity routes against each
-other. This one adds the build which makes none, so that what the approximation is
-worth can be read beside what the driver is worth. Caffeine, Hartree-Fock, against
-def2-universal-jkfit with 1242 auxiliary functions in every row, all four builds one
-after another in the same process, on sixteen cores.
-
-| basis | nao | four center | RI-JK veloxchem | simd, in memory | simd, direct |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| def2-svp | 246 | 12.32 | 3.15 | **1.27** | 3.22 |
-| def2-svpd | 366 | 50.42 | 7.71 | **2.69** | 6.04 |
-| def2-tzvp | 494 | 173.48 | 18.49 | **4.81** | 10.87 |
-| def2-tzvpd | 614 | 422.89 | 38.50 | **7.80** | 15.97 |
-
-and the same as ratios against the exact build:
-
-| basis | nao | RI-JK veloxchem | simd, in memory | simd, direct |
-| --- | ---: | ---: | ---: | ---: |
-| def2-svp | 246 | 3.91 | **9.73** | 3.82 |
-| def2-svpd | 366 | 6.54 | **18.74** | 8.35 |
-| def2-tzvp | 494 | 9.38 | **36.08** | 15.96 |
-| def2-tzvpd | 614 | 10.98 | **54.20** | 26.47 |
-
-The three routes of the approximation agree to the ninth decimal and take the same
-number of iterations. The exact build takes nineteen where they take twenty one or
-twenty two, and lands a thousandth of a hartree lower, which is the approximation
-and not an error.
-
-**The advantage climbs steeply with the basis, from ten times to fifty four.** The
-fitting set is 1242 functions in every row while the orbital set nearly triples, so
-the work the driver saves grows while the work it must do grows much more slowly.
-This is the same thing the sections on the node describe from the other side, where
-the Fock build was seen to grow as the square of the basis and the fitting set not
-at all.
-
-**The way which holds the B vectors beats the direct way by two and a half times
-here, at every basis.** On a node with a hundred and twenty eight cores it leads by
-between 14 and 30 per cent. It used to lose there by two to three times, and the
-sections on the node say what it was paying and what was done about it. **The
-machines no longer disagree about which mode to use, only about the margin.**
-
-These were measured again after that work. The way which holds the B vectors gained
-16 to 20 per cent of these rows from it, all of it from making one call of the half
-transformation for each build where it made twenty; the first touch which the node
-gained so much from buys nothing on a machine with one memory domain. The other
-three builds moved by under a per cent, which is what says the machine was quiet.
-
+*Superseded. Caffeine at Hartree-Fock and B3LYP, four builds, eight orbital and fitting pairs, with the B vectors timed apart from the builds:
+`benchmarks/data/scf/2026-09-15_m4max_caffeine.md`.*
 
 ## The larger molecules, the two routes side by side
 
 c60 and taxol at Hartree-Fock in def2-svp against def2-universal-jkfit, both routes
-one after the other in the same process, as for caffeine above.
+one after the other in the same process. Not measured again since; the caffeine and
+tagrisso tables they were taken beside have been.
 
 | molecule | nao | naux | occupied | conventional | simd | gain | iterations | energy, conventional | energy, simd |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -5868,7 +5680,8 @@ agree to the ninth decimal. The last digit or two differ, which is the order the
 arithmetic is summed in over twenty odd iterations.
 
 **These are the largest gains of any calculation in this file.** Taken with the
-tables above:
+tables above, and with the caffeine and tagrisso rows as they stood when this was
+written rather than as `benchmarks/data/scf` now has them:
 
 | molecule | auxiliary functions | occupied orbitals | simd against conventional |
 | --- | ---: | ---: | ---: |
@@ -6031,33 +5844,8 @@ follows the size of the number they are computing.
 
 ## The four ways of building a Fock matrix
 
-Tagrisso at Hartree-Fock against def2-universal-jkfit, all eight calculations one
-after another in the same process: the four center build which makes no
-approximation, the resolution of the identity as VeloxChem had it, and the two ways
-the new driver has of doing the same thing.
-
-| basis | nao | mode | time | against full | iterations | energy |
-| --- | ---: | --- | ---: | ---: | ---: | ---: |
-| def2-svp | 683 | full four-center | 150.59 | 1.00 | 21 | -1609.0900864188 |
-| | | RI-JK veloxchem | 96.76 | 1.56 | 23 | -1609.0890443496 |
-| | | RI-JK simd, in memory | **31.38** | **4.80** | 23 | -1609.0890443498 |
-| | | RI-JK simd, direct | 78.14 | 1.93 | 23 | -1609.0890443496 |
-| def2-svpd | 1010 | full four-center | 1177.14 | 1.00 | 21 | -1609.1565808182 |
-| | | RI-JK veloxchem | 357.00 | 3.30 | 24 | -1609.1555344827 |
-| | | RI-JK simd, in memory | **74.26** | **15.85** | 24 | -1609.1555344829 |
-| | | RI-JK simd, direct | 158.72 | 7.42 | 24 | -1609.1555344827 |
-
-**The three routes of the approximation agree to the ninth decimal**, and differ
-from the four center build by the error of the approximation alone, a thousandth of
-a hartree.
-
-Measured again after the work the sections on the node describe. The way which holds
-the B vectors gained 9 and 10 per cent of these two rows, less than the 16 to 20 of
-caffeine above, as it made fifty three calls of the half transformation for each
-build here and twenty there -- and now makes two and one. The other three builds
-moved by under a per cent, except the four center one at def2-svp which came in five
-per cent quicker without having been touched, and is the one figure here outside the
-spread of the machine.
+*Superseded. Tagrisso at Hartree-Fock and B3LYP, four builds, def2-svp and def2-svpd, with the B vectors timed apart from the builds:
+`benchmarks/data/scf/2026-09-15_m4max_tagrisso.md`.*
 
 ### The direct way costs less than counting its passes suggests
 
@@ -6068,9 +5856,13 @@ holds them sweeps them once for the whole calculation.
 
 | | def2-svp | def2-svpd |
 | --- | ---: | ---: |
-| against the way which holds them | 2.28 slower | 1.91 slower |
-| against the route VeloxChem had | **1.21 faster** | **2.27 faster** |
-| against the four center build | **2.01 faster** | **7.48 faster** |
+| against the way which holds them | 2.57 slower | 2.06 slower |
+| against the route VeloxChem had | **1.26 faster** | **2.37 faster** |
+| against the four center build | **1.97 faster** | **7.84 faster** |
+
+Those are the Hartree-Fock rows of
+`benchmarks/data/scf/2026-09-15_m4max_tagrisso.md`, recomputed from it rather than
+carried over from the table which used to stand above.
 
 A factor of two for holding nothing, not the five or ten a count of the passes
 would suggest. The reason is in the section on the setup: **the three-center
@@ -6081,7 +5873,7 @@ work around them.
 That makes the direct way more than a fallback. It is faster than the route
 VeloxChem had in both basis sets while holding a small fraction of the memory, on a
 molecule which fits either way. The gap to the way which holds the B vectors also
-narrows as the basis grows, 2.09 to 1.73, which is the direction that suits it:
+narrows as the basis grows, 2.57 to 2.06, which is the direction that suits it:
 the calculations which need it are the large ones.
 
 These are the numbers as the driver stands, measured again after all of the work of
