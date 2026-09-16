@@ -8516,8 +8516,38 @@ per batch and divided among the densities: half the time at one density, a few p
 cent at twenty, and flat from ten onward. That is the one thing the response driver
 does which the field's driver has no reason to.
 
-What is **not** measured here is the split inside the exchange between transforming
-the B vectors and accumulating the products. That wants instrumentation in the
-driver, which is how the gradient's ninety-two per cent was found, and is not
-something to estimate from counting operations -- this file has already recorded one
-breakdown inferred that way which direct measurement contradicted.
+### Inside the exchange, as far as it can be seen from outside
+
+The driver's loop replicated through the bindings it calls, so that the two halves
+are timed where they stand and nothing in the C++ is instrumented:
+
+| batch | the exchange | the transforms | the rest, by remainder |
+| ---: | ---: | ---: | ---: |
+| 5 | 6.00 s | 3.07 s | 2.93 s |
+| 20 | 21.32 s | 10.20 s | 11.12 s |
+
+The totals reproduce the table above to within one per cent, so the replication is
+the same work. **The transform side is nevertheless too large**, and by a knowable
+amount: compute_w_vectors returns its matrices by value and pybind copies each of
+them into a python object, which at a batch of twenty is some four gigabytes across
+the boundary for every batch of the auxiliary basis and about fifty over the run --
+seconds of memcpy which the driver calling itself never pays.
+
+So what can be said is that **the transform is between a third and a half of the
+exchange and the accumulation is the rest, and neither of them dominates**. That is
+the useful part. There is no single routine here holding nine tenths of the time,
+which is what the gradient turned out to have and what makes a profile worth
+running: the two halves are both already products of matrices, and both are doing
+work the cost model asks for.
+
+The consequence is a negative result worth writing down. **There is no cheap win
+left in this code.** The one redundancy -- the left factor is the ground state
+occupied orbitals and is transformed again at every iteration of the Davidson,
+though it never changes -- is worth one part in one plus the batch, a few per cent
+where the batch is twenty, and would cost two and a half gigabytes to hold. What
+remains is algorithmic: a smaller fitting set, or something which screens the
+transformed vectors, neither of which is a change to this routine.
+
+Pinning the split closer wants timing inside the driver. The technique which
+answered the gradient in twenty minutes runs into the binding here, which is worth
+knowing about the technique.
