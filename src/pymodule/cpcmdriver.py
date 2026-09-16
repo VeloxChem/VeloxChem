@@ -707,7 +707,7 @@ class CpcmDriver:
 
         return V_es
 
-    def visualize_cpcm_grid(self, molecule, grid):
+    def visualize_cpcm_grid(self, molecule):
         """
         Visualizes grid for surface discretization.
 
@@ -721,6 +721,8 @@ class CpcmDriver:
             import py3Dmol as p3d
         except ImportError:
             raise ImportError('Unable to import py3Dmol.')
+
+        grid = self._cpcm_grid
 
         assert_msg_critical(grid.shape[1] == 6,
                             'CpcmDriver.visualize_grid: Invalid grid size')
