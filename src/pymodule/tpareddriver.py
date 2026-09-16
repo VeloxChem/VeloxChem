@@ -310,12 +310,14 @@ class TpaReducedDriver(TpaDriverBase):
                 dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis, 'real',
                                                  eri_dict, dft_dict,
                                                  density_list1, density_list2,
-                                                 None, 'redtpa_i', profiler)
+                                                 None, 'redtpa_i', profiler,
+                                                 self._ri_jk_factors)
             else:
                 dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis, 'real',
                                                  eri_dict, None, None,
                                                  density_list2, None,
-                                                 'redtpa_i', profiler)
+                                                 'redtpa_i', profiler,
+                                                 self._ri_jk_factors)
 
             self._print_fock_time(time.time() - time_start_fock)
 
@@ -386,7 +388,7 @@ class TpaReducedDriver(TpaDriverBase):
             'max_iter', 'eri_thresh', 'timing', 'memory_profiling',
             'batch_size', 'restart', 'xcfun', 'grid_level', 'potfile',
             'electric_field', 'program_end_time', '_debug', '_block_size_factor',
-            'ri_coulomb'
+            'ri_coulomb', 'ri_jk', 'ri_jk_simd', 'ri_auxiliary_basis'
         }
 
         for key in cpp_keywords:
@@ -781,12 +783,14 @@ class TpaReducedDriver(TpaDriverBase):
                                                  'real_and_imag', eri_dict,
                                                  dft_dict, density_list1,
                                                  density_list2, None,
-                                                 'redtpa_ii', profiler)
+                                                 'redtpa_ii', profiler,
+                                                 self._ri_jk_factors)
             else:
                 dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
                                                  'real_and_imag', eri_dict,
                                                  None, None, density_list2,
-                                                 None, 'redtpa_ii', profiler)
+                                                 None, 'redtpa_ii', profiler,
+                                                 self._ri_jk_factors)
 
             self._print_fock_time(time.time() - time_start_fock)
 
