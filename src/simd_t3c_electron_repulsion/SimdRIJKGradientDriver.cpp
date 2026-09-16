@@ -168,30 +168,58 @@ CSimdRIJKGradientDriver::_apply_transposed_factor(const CPackedMatrix        &me
 
     const auto nelements = matrices.front().number_of_elements();
 
-    // NOTE: expanded once for the whole loop rather than once per element. This
-    // is the same array every time and is the square of the auxiliary basis, so
-    // forming it inside the loop was the dominant cost of the phase and not the
-    // multiply it exists for.
+    // NOTE: the transpose of the factor, written out once. The element of the
+    // result at p reads the rows at and below p, which is the transpose of a
+    // lower triangular matrix read as it stands, and a general multiply wants it
+    // that way round. The expansion it is built from is released before the
+    // arrays which are the size of the whole phase are taken.
 
-    auto factor = std::vector<double>(naux * naux, 0.0);
+    auto transposed = std::vector<double>(naux * naux, 0.0);
 
-    metric.to_dense(factor.data());
-
-    auto column = std::vector<double>(naux, 0.0);
-
-    for (size_t at = 0; at < nelements; at++)
     {
-        for (size_t q = 0; q < naux; q++)
-        {
-            column[q] = matrices[q].data()[at];
-        }
+        auto factor = std::vector<double>(naux * naux, 0.0);
 
-        _multiply_transposed(factor.data(), naux, column.data(), 1);
+        metric.to_dense(factor.data());
 
-        for (size_t q = 0; q < naux; q++)
+        for (size_t p = 0; p < naux; p++)
         {
-            matrices[q].data()[at] = column[q];
+            for (size_t q = p; q < naux; q++)
+            {
+                transposed[p * naux + q] = factor[q * naux + p];
+            }
         }
+    }
+
+    // NOTE: the auxiliary index is the one the factor is applied over, and it is
+    // the index of the vector rather than an index inside a matrix. Gathering the
+    // matrices into one array indexed by the auxiliary function and then by the
+    // element makes that index the one a single product contracts, so the whole
+    // phase is one multiply of the library's instead of one of ours for every
+    // element of a matrix -- eight thousand calls on a molecule of any size, each
+    // of them a multiply of a matrix by a single column.
+
+    auto gathered = std::vector<double>(naux * nelements, 0.0);
+
+    const auto nrange = static_cast<int>(naux);
+
+#pragma omp parallel for schedule(static)
+    for (int at = 0; at < nrange; at++)
+    {
+        const auto q = static_cast<size_t>(at);
+
+        std::copy_n(matrices[q].data(), nelements, gathered.data() + q * nelements);
+    }
+
+    auto result = std::vector<double>(naux * nelements, 0.0);
+
+    _multiply(naux, nelements, naux, transposed.data(), gathered.data(), result.data());
+
+#pragma omp parallel for schedule(static)
+    for (int at = 0; at < nrange; at++)
+    {
+        const auto q = static_cast<size_t>(at);
+
+        std::copy_n(result.data() + q * nelements, nelements, matrices[q].data());
     }
 }
 
