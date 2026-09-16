@@ -8709,3 +8709,94 @@ It is kept, and the comment beside it now says why rather than implying complex
 vectors are a live case. A driver which takes doubles should not be handed complex
 data by a caller which has quietly changed underneath it, and the cost of the test
 is one call per batch of trial vectors.
+
+## Higher order response, where the density changes shape with the order
+
+A response density is not one thing. Which blocks of it are nonzero alternates with
+the order of the perturbation, and the pattern decides what the resolution of the
+identity can do with it. Written out in the molecular orbitals, and checked by
+building each one and looking rather than by trusting the algebra:
+
+| density | nonzero blocks | rank |
+| --- | --- | ---: |
+| first order, a trial vector | ov, vo | twice the occupied |
+| second order, a commutator of two first-order things | **oo, vv** | occupied, twice the occupied |
+| third order | ov, vo | twice the occupied |
+
+The first and the third have the occupied orbitals on one side of each term, which is
+the shape the linear response driver already took. **The second does not**: it is
+block diagonal, and its virtual block is carried by the virtual orbitals, of which
+there are four times as many.
+
+### The measurement which made the plan smaller
+
+The virtual block factorises two ways, and which is cheaper is not obvious. Its
+rank is twice the occupied orbitals, so a factorisation of that rank with both
+factors different for every density has the fewest operations; taking the virtual
+orbitals themselves as a shared left factor has rank nvir, four times more. Counting
+operations says the first should win about two to one.
+
+Measured on caffeine in def2-svp, with densities of the right shape and rank:
+
+| densities | four-centre build | the occupied block | the virtual block, per density | the virtual block, shared |
+| ---: | ---: | ---: | ---: | ---: |
+| 4 | 2.73 s | 0.13 s | 0.43 s | **0.34 s** |
+| 10 | 6.84 s | 0.25 s | 1.08 s | **0.88 s** |
+| 20 | 13.66 s | 0.42 s | 2.17 s | **1.70 s** |
+
+**The count of operations had it backwards.** Sharing wins at every size, by about a
+quarter, because a shared factor is one wide product of matrices where per-density
+factors are many narrow ones, and the profile of the exchange had already said the
+transformation is half of it. The same lesson as the gradient, in a different place:
+the arithmetic is not the cost.
+
+That made the plan smaller than it was going to be. With the virtual orbitals as a
+shared factor the block diagonal density is **two calls of the interface which
+already existed, added** -- the Fock matrix being linear in the density -- and no new
+kernel, no new interface, and no per-density factors were needed at all.
+
+### What it bought
+
+Caffeine, def2-svp, one rank of 14 threads. Every number here is a whole calculation
+against the same calculation built the four-center way.
+
+| | four-centre | RI-JK simd | speedup | largest relative difference |
+| --- | ---: | ---: | ---: | ---: |
+| quadratic response, first hyperpolarizability | 27.81 | 4.06 | **6.84** | 2.6e-04 |
+| second harmonic generation, reduced | 99.26 | 10.07 | **9.86** | 9.5e-04 |
+| second harmonic generation, full | 103.33 | 10.83 | **9.54** | 9.5e-04 |
+| two-photon absorption, reduced | 164.61 | 16.32 | **10.09** | 1.5e-03 |
+
+Three drivers, one form. The second harmonic driver sends six real columns one way
+and twelve real and imaginary ones the other, and the reduced two-photon driver sends
+six real columns in its first pass and six real and imaginary in its second, so the
+factors are built from the same branch which chooses the columns and never from a
+rule of their own.
+
+The disagreements are larger than the linear response ones, which are two parts in a
+hundred thousand. That is the fitting error compounding: a hyperpolarizability is
+built from products of first-order vectors, and a two-photon amplitude from products
+of those, so each order carries the error of the one below it and adds its own.
+
+### A setting which is not passed down is a setting which does nothing
+
+The first quadratic response measurement was **1.03**, against six on the two-electron
+build measured directly. The Fock build was not the problem. A response driver of
+this kind drives linear solvers of its own, and the settings it hands them are a list
+written out by name -- which had `ri_coulomb` in it and not `ri_jk`. So the linear
+solves, which are most of the calculation, ran the four-center way in both columns
+and the ratio measured almost nothing.
+
+Adding three names to the list turned 1.03 into 6.84.
+
+**The same list appears in nine other drivers**, and in each of them a user setting
+ri_jk today would get a calculation which honours it in some places and not others,
+with no warning of any kind and a ratio near one to show for it. Two of them are
+fixed because their turn came. The rest are a trap for whoever measures them next,
+which is why it is written here and not only in the commit.
+
+The two-photon transition driver is the case which shows the difference cleanly. With
+its linear solves accelerated and its own Fock builds still on the dense path it
+reaches **5.63** on caffeine, against the reduced driver's **10.09** with both. Wiring
+the outer loop is worth nearly a factor of two, and the inner solves alone are worth
+more than half.
