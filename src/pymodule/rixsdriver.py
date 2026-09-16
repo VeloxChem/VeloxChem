@@ -90,6 +90,7 @@ class RixsDriver(LinearSolver):
 
         self.tamm_dancoff = False
 
+        self.old_tdms = True
         # method settings
         self.photon_energy = None
         self.core_resonances = None
@@ -897,7 +898,7 @@ class RixsDriver(LinearSolver):
                                                  num_vir_orbitals, self.tamm_dancoff)
                 for n in range(num_intermediate_states):
                     z_core, y_core = core_mats[n]
-                    gs2core, core2val = self.get_tdms(mo_occ, mo_vir, z_val, y_val, z_core, y_core)
+                    gs2core, core2val = self.get_tdms(mo_occ, mo_vir, z_val, y_val, z_core, y_core, old=self.old_tdms)
 
                     F_inelastic += self.scattering_amplitude_tensor(
                         omega, core_eigvals[n], valence_eigvals[f], gs2core, core2val, dipole_integrals
@@ -1296,7 +1297,7 @@ class RixsDriver(LinearSolver):
             The excitation matrix.
         :param y_mat:
             The deexcitation matrix.
-        :pad_occ:
+        :param pad_occ:
             The number of missing orbitals.
 
         :return:
@@ -1325,31 +1326,39 @@ class RixsDriver(LinearSolver):
         return pp_core_eigvecs
     
     @staticmethod
-    def get_tdms(mo_occ, mo_vir, z_val, y_val, z_core, y_core, gs2core=True):
+    def get_tdms(mo_occ, mo_vir, z_val, y_val, z_core, y_core, gs2core=True, old=True):
         """
         Get the transition density matrices, both from ground-state
-        to excited state, and between two excited states (here between)
-        core-excited and valence-excited states.
+        to excited state, and between two excited states (here between
+        core- and valence-excited states).
 
         :param mo_occ:
             The occupied molecular orbitals.
         :param mo_vir:
             The unoccupied/virtual molecular orbitals.
-        :z_val:
+        :param z_val:
             The excitation matrix (valence-excited state).
-        :y_val:
-            The dexcitation matrix (valence-excited state).
-        :z_core:
+        :param y_val:
+            The deexcitation matrix (valence-excited state).
+        :param z_core:
             The excitation matrix (core-excited state).
-        :y_core:
-            The dexcitation matrix (core-excited state).
+        :param y_core:
+            The deexcitation matrix (core-excited state).
         """
-        core_to_val = (
-            np.linalg.multi_dot([mo_vir, z_val.T, z_core, mo_vir.T]) -
-            np.linalg.multi_dot([mo_occ, z_val, z_core.T, mo_occ.T]) +
-            np.linalg.multi_dot([mo_occ, y_val, y_core.T, mo_occ.T]) -
-            np.linalg.multi_dot([mo_vir, y_val.T, y_core, mo_vir.T])
-        )
+        if old:
+            core_to_val = (
+                np.linalg.multi_dot([mo_vir, z_val.T, z_core, mo_vir.T]) -
+                np.linalg.multi_dot([mo_occ, z_val, z_core.T, mo_occ.T]) +
+                np.linalg.multi_dot([mo_occ, y_val, y_core.T, mo_occ.T]) -
+                np.linalg.multi_dot([mo_vir, y_val.T, y_core, mo_vir.T])
+            )
+        else:
+            core_to_val = (
+                np.linalg.multi_dot([mo_vir, z_val.T, z_core, mo_vir.T]) +
+                np.linalg.multi_dot([mo_vir, y_val.T, y_core, mo_vir.T]) -
+                np.linalg.multi_dot([mo_occ, z_val, z_core.T, mo_occ.T]) -
+                np.linalg.multi_dot([mo_occ, y_val, y_core.T, mo_occ.T])
+            )
 
         if gs2core:
             gs_to_core = np.linalg.multi_dot([mo_occ, z_core - y_core, mo_vir.T])
