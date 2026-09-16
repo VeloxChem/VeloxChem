@@ -50,6 +50,7 @@
 #include "SimdRIFockDriver.hpp"
 #include "SimdRIJKFockDriver.hpp"
 #include "SimdRIJKGradientDriver.hpp"
+#include "SimdRIJKResponseDriver.hpp"
 #include "SimdTwoCenterElectronRepulsionGradientDriver.hpp"
 #include "SimdThreeCenterElectronRepulsionGradientDriver.hpp"
 #include "SimdThreeCenterElectronRepulsionDriver.hpp"
@@ -478,6 +479,32 @@ export_simdintegrals(py::module &m) -> void
              "Gets screening threshold of the integrals.")
         .def("get_block_size", &CSimdRIJKGradientDriver::get_block_size,
              "Gets target number of atom pairs of a block.");
+
+    // CSimdRIJKResponseDriver class
+
+    PyClass<CSimdRIJKResponseDriver>(m, "SimdRIJKResponseDriver")
+        .def(py::init<>())
+        .def(py::init<const double, const size_t, const size_t>(),
+             "Creates a response driver with given threshold, block size and memory budget.",
+             py::arg("threshold"),
+             py::arg("block_size")    = 0,
+             py::arg("memory_budget") = size_t{4} * 1024 * 1024 * 1024)
+        .def("compute_exchange",
+             &CSimdRIJKResponseDriver::compute_exchange,
+             "Computes the exchange matrices of densities given as their factors, the density of one "
+             "of them being the left factor times the transpose of its right factor. The matrices are "
+             "general and carry no scaling by the fraction of exact exchange.",
+             py::arg("bq_vectors"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("left"),
+             py::arg("rights"))
+        .def("get_threshold", &CSimdRIJKResponseDriver::get_threshold,
+             "Gets screening threshold of the integrals.")
+        .def("get_block_size", &CSimdRIJKResponseDriver::get_block_size,
+             "Gets target number of atom pairs of a block.")
+        .def("get_memory_budget", &CSimdRIJKResponseDriver::get_memory_budget,
+             "Gets the memory the driver may hold, in bytes.");
 }
 
 }  // namespace vlx_simdintegrals
