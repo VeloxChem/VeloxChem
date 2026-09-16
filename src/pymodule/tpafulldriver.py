@@ -37,6 +37,7 @@ import time
 import sys
 
 from .veloxchemlib import mpi_master
+from . import rijkresponse
 from .outputstream import OutputStream
 from .distributedarray import DistributedArray
 from .cppsolver import ComplexResponseSolver
@@ -676,6 +677,8 @@ class TpaFullDriver(TpaDriverBase):
 
         for key in cpp_keywords:
             setattr(N_total_drv, key, getattr(self, key))
+
+        rijkresponse.share(self, N_total_drv)
 
         if self.checkpoint_file is not None:
             fpath = Path(self.checkpoint_file)

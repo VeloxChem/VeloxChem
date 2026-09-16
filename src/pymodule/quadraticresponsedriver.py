@@ -50,6 +50,7 @@ from .distributedarray import DistributedArray
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            ri_sanity_check, dft_sanity_check)
 from .errorhandler import assert_msg_critical
+from . import rijkresponse
 from .checkpoint import (check_distributed_focks, read_distributed_focks,
                          write_distributed_focks)
 
@@ -350,6 +351,13 @@ class QuadraticResponseDriver(NonlinearSolver):
             self.comp = None
 
         # Computing the first-order response vectors (3 per frequency)
+        # NOTE: the B vectors are formed before the solvers this driver drives
+        # are made, so that each of them is handed the same ones rather than
+        # forming its own. Forming them again where the integrals are set up
+        # costs nothing, the driver holding them already.
+        if self.ri_jk:
+            rijkresponse.initialize(self, molecule, ao_basis)
+
         N_drv = ComplexResponseSolver(self.comm, self.ostream)
 
         cpp_keywords = {
@@ -362,6 +370,8 @@ class QuadraticResponseDriver(NonlinearSolver):
 
         for key in cpp_keywords:
             setattr(N_drv, key, getattr(self, key))
+
+        rijkresponse.share(self, N_drv)
 
         if self.checkpoint_file is not None:
             fpath = Path(self.checkpoint_file)

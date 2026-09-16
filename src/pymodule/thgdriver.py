@@ -35,6 +35,7 @@ import numpy as np
 import time
 
 from .oneeints import compute_electric_dipole_integrals
+from . import rijkresponse
 from .veloxchemlib import mpi_master, hartree_in_wavenumber
 from .profiler import Profiler
 from .cppsolver import ComplexResponseSolver
@@ -236,6 +237,8 @@ class ThgDriver(NonlinearSolver):
 
         for key in cpp_keywords:
             setattr(Nb_drv, key, getattr(self, key))
+
+        rijkresponse.share(self, Nb_drv)
 
         if self.checkpoint_file is not None:
             fpath = Path(self.checkpoint_file)
@@ -1064,6 +1067,8 @@ class ThgDriver(NonlinearSolver):
 
         for key in cpp_keywords:
             setattr(N_total_drv, key, getattr(self, key))
+
+        rijkresponse.share(self, N_total_drv)
 
         if self.checkpoint_file is not None:
             fpath = Path(self.checkpoint_file)

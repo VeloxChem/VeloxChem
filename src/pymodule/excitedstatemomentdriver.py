@@ -38,6 +38,7 @@ import time
 import sys
 
 from .oneeints import compute_electric_dipole_integrals
+from . import rijkresponse
 from .veloxchemlib import mpi_master
 from .profiler import Profiler
 from .outputstream import OutputStream
@@ -246,6 +247,13 @@ class ExcitedStateMomentDriver(NonlinearSolver):
         self.nstates = max(self.state, min(3, max_nstates))
 
         # run RPA
+        # NOTE: the B vectors are formed before the solvers this driver drives
+        # are made, so that each of them is handed the same ones rather than
+        # forming its own. Forming them again where the integrals are set up
+        # costs nothing, the driver holding them already.
+        if self.ri_jk:
+            rijkresponse.initialize(self, molecule, ao_basis)
+
         rpa_drv = LinearResponseEigenSolver(self.comm, self.ostream)
         rpa_drv.nonlinear = True
 
@@ -260,6 +268,8 @@ class ExcitedStateMomentDriver(NonlinearSolver):
 
         for key in rpa_keywords:
             setattr(rpa_drv, key, getattr(self, key))
+
+        rijkresponse.share(self, rpa_drv)
 
         if self.checkpoint_file is not None:
             fpath = Path(self.checkpoint_file)
@@ -320,6 +330,8 @@ class ExcitedStateMomentDriver(NonlinearSolver):
 
         for key in cpp_keywords:
             setattr(N_drv, key, getattr(self, key))
+
+        rijkresponse.share(self, N_drv)
 
         if self.checkpoint_file is not None:
             fpath = Path(self.checkpoint_file)
