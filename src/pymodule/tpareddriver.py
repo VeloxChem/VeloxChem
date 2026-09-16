@@ -557,6 +557,15 @@ class TpaReducedDriver(TpaDriverBase):
         distributed_density_1 = None
         distributed_density_2 = None
 
+        # NOTE: the factors of the densities of the second pass, which are block
+        # diagonal in the orbitals as the sigma densities of the first pass are,
+        # and are taken the same way. The first pass has had its Fock matrices
+        # built by the time this runs, so the two passes share the attribute.
+        self._ri_jk_factors = None
+
+        if self.rank == mpi_master() and self.ri_jk and self.ri_jk_simd:
+            self._ri_jk_factors = (mo[:, :nocc], [], mo[:, nocc:], [])
+
         for w in wi:
 
             nx = ComplexResponseSolver.get_full_solution_vector(Nx[('x', w)])
@@ -634,6 +643,23 @@ class TpaReducedDriver(TpaDriverBase):
 
                 Dz += self.commut(kz_, D_sig_zz)
                 Dz += self.commut(k_sig_zz, Dc_z_)
+
+                # NOTE: the factors, taken before the transformation to the
+                # atomic orbitals. This pass sends the real and the imaginary
+                # part of each of the three densities, six columns for three
+                # matrices, so both parts of each block are taken and in that
+                # order: the factors line up with the densities one for one.
+                if self._ri_jk_factors is not None:
+                    mo_occ = mo[:, :nocc]
+                    mo_vir = mo[:, nocc:]
+                    for dmat in (Dx, Dy, Dz):
+                        block_oo = dmat[:nocc, :nocc]
+                        block_vv = dmat[nocc:, nocc:]
+                        for part in (np.real, np.imag):
+                            self._ri_jk_factors[1].append(
+                                np.matmul(mo_occ, part(block_oo).T))
+                            self._ri_jk_factors[3].append(
+                                np.matmul(mo_vir, part(block_vv).T))
 
                 # density transformation from MO to AO basis
 
