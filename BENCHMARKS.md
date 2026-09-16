@@ -8994,3 +8994,106 @@ drivers nest profilers and the second one refuses to start:
 The cubic calculation above went from 10.51 to 9.94 seconds by it, and the forming
 from 0.735 to 0.238. Small here and not small on a molecule where the transformation
 is eight seconds.
+
+## The remaining six drivers, and a check which is not a benchmark
+
+Cubic response was the hard one. After it, six drivers were left whose Fock builds
+still went through the four-centre integrals, and every one of them turned out to be
+the same two shapes already written: the `second`/`third` dictionary for a three-time
+perturbed pass, the four-factor tuple for a two-time one. **No new code was needed in
+the solver or in the shared module** -- `_comp_two_el_int` already took both shapes
+and both batch layouts, and `rijkresponse` was not touched. What each driver needed
+was the factors collected where its densities are made and handed to its Fock call.
+
+| driver | mode | two-time | three-time |
+| --- | --- | ---: | ---: |
+| two-photon absorption, full | `tpa` / `tpa_ii` | 24 / 6 | 6 |
+| third harmonic generation | `thg` / `thg_ii` | 12 / 6 | 6 |
+| third harmonic generation, reduced | `thgred` / `thgred_ii` | 6 / 3 | 3 |
+| three-photon absorption | `3pa` / `3pa_ii` | 9 / 6 | 6 |
+| two-photon transitions | `tpa_quad` | 4 | -- |
+| excited state moments | `qrf` | 2 | -- |
+
+Densities per frequency which become Fock matrices; the first-order ones beside them
+are there for the quadrature alone.
+
+### Two shapes which differ from the eight before
+
+**Four of them are real.** The reduced third harmonic, three-photon absorption and
+the two-photon transition driver build with `fock_flag='real'` and store only real
+columns, so each density is one factor and not the two a complex one is carried by.
+Read off the column counts rather than assumed.
+
+**One of them transformed in place.** The six two-time densities of the three-photon
+quadratic pass were formed straight into the atomic orbitals inside the `multi_dot`
+call, with no name in the molecular orbitals to take factors from. They are now named
+first and both the factors and the transformation read the one name, rather than the
+expression being written twice where two copies could drift apart.
+
+### What was checked, and how it was made to prove something
+
+Water, def2-svp, 24 basis functions, one frequency, one excited state where the
+driver needs one. Every value the driver returns, compared against the same
+calculation through the four-centre integrals.
+
+An agreement figure alone proves nothing here: a path which silently fell back to the
+four-centre integrals would agree perfectly. So each run also reports what actually
+happened inside, in two ways -- the densities in every batch the resolution of the
+identity built, and a probe on the Fock build itself which says the mode and whether
+the factors arrived.
+
+| | densities per batch, predicted | observed | HF | B3LYP |
+| --- | --- | --- | ---: | ---: |
+| two-photon, full | 30 joined, or 24 then 6 | as predicted, plus 6 | 2.803e-04 | 2.906e-04 |
+| third harmonic | 18 joined, or 12 then 6 | as predicted, plus 6 | 2.778e-04 | 2.867e-04 |
+| third harmonic, reduced | 9 joined, or 6 then 3 | as predicted, plus 3 | 2.778e-04 | 2.867e-04 |
+| three-photon | 15 joined, or 9 then 6 | as predicted, plus 6 | 2.324e-03 | 3.645e-03 |
+| two-photon transitions | 4 | 4 | 3.741e-04 | 1.711e-04 |
+| excited state moments | 2 | 2 | 3.741e-04 | 1.711e-04 |
+
+"Joined" is the Hartree-Fock layout, "then" the one with a functional; the trailing
+number is the two-time pass. For the last two the probe is the plainer evidence: the
+four-centre run reports `('tpa_quad', False)` and `('qrf', False)`, the other one
+`True`.
+
+Two of those numbers need qualifying rather than reading straight.
+
+**Three-photon absorption looks ten times worse and is not.** Its worst component is
+the `xxx` transition moment, 1.0066 at Hartree-Fock and 0.479 at B3LYP where the
+largest component of the same tensor is 46 and 61. The absolute difference is 2.3e-03
+and 1.7e-03; the components which are actually determined agree to 1.5e-04. A
+relative error on a near-zero number is a statement about the number, not the path.
+
+**Every three-photon value came back sign-flipped.** The phase of an excited state
+vector is arbitrary and the two runs pick it differently, so anything odd in that
+vector changes sign and means the same thing. The check compares magnitudes. The same
+appears in the two-photon transition driver, which reports three flips out of nine.
+
+### What this is not
+
+**There is no timing here on purpose.** Twenty-four basis functions is a correctness
+size, not a benchmark size; the wall clocks came out between 0.97 and 1.65 and that
+range is scheduling noise, not a result. Nothing in this section should be read as a
+speedup, and the tables above deliberately have no such column. What these drivers
+cost on a real molecule is not yet measured.
+
+The two-photon transition benchmark which was started and abandoned earlier is now
+worth running: **its outer loop was the gap**, the `tpa_quad` build, and that is what
+made the earlier attempt meaningless rather than merely slow.
+
+### Where the response path now stands
+
+Every `_comp_nlr_fock` call in `src/pymodule` is handed the factors of its densities
+-- checked by walking the call sites, not by memory. Ten nonlinear drivers and every
+linear solver.
+
+What is still outside it, unchanged and not a temporary omission in any of these
+cases:
+
+| | |
+| --- | --- |
+| unrestricted references | not covered anywhere in response |
+| range-separated functionals | asserted against, so a run stops rather than falling back quietly |
+| more than one rank | refused, so the multi-rank half-size path never runs with it on |
+| core excitations, restricted subspaces | fall back to the dense route, excluded in the solver's guard |
+| complex trial vectors | fall back; the guard is a no-op today, since damped response carries them as real blocks |
