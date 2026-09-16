@@ -18,7 +18,7 @@ from scfbench import provenance, write
 
 MOLECULE = "caffeine"
 AUX = "def2-universal-jkfit"
-BASES = ["def2-svp", "def2-svpd"]
+BASES = ["def2-svp", "def2-svpd", "def2-tzvp", "def2-tzvpd"]
 FUNCTIONALS = ["HF", "B3LYP"]
 METHODS = ["full", "ri_jk_simd"]
 
@@ -31,10 +31,10 @@ for functional in FUNCTIONALS:
             print(f'  {functional:6s} {basis:10s} {method:12s}'
                   f'  scf {row["scf_wall"]:8.2f}  grad {row["grad_wall"]:8.2f}'
                   f'  {row["grad_walls"]}', flush=True)
+            out = (Path(__file__).resolve().parent.parent / "data" / "gradient" /
+                   f'{date.today():%Y-%m-%d}_m4max_{MOLECULE}.json')
+            write(out, "gradient", provenance("m4max", 1, None), rows)
 
-out = (Path(__file__).resolve().parent.parent / "data" / "gradient" /
-       f'{date.today():%Y-%m-%d}_m4max_{MOLECULE}.json')
-write(out, "gradient", provenance("m4max", 1, None), rows)
 print(f'\nwrote {out}', flush=True)
 
 # the table
