@@ -181,7 +181,9 @@ class TestScfGradientDriverMiscellaneous:
 
         grad_drv = ScfGradientDriver(scf_drv)
 
-        with pytest.raises(VeloxChemError, match='RI-JK is not yet supported'):
+        with pytest.raises(
+                VeloxChemError,
+                match='RI-JK is supported only with ri_jk_simd'):
             grad_drv.compute(molecule, basis, scf_results)
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
@@ -194,7 +196,9 @@ class TestScfGradientDriverMiscellaneous:
 
         grad_drv = ScfGradientDriver(scf_drv)
 
-        with pytest.raises(VeloxChemError, match='RI-JK is not yet supported'):
+        with pytest.raises(
+                VeloxChemError,
+                match='RI-JK is supported only with ri_jk_simd'):
             grad_drv.compute(molecule, basis, scf_results)
 
     def test_restricted_gradient_timing_output_path(self):
