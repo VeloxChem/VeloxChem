@@ -8656,6 +8656,10 @@ for the damped solver a damping of 0.004556.
 | damped | water | B3LYP | 0.11 | 0.11 | 1.03 | 2.2e-04 |
 | damped | caffeine | HF | 59.19 | 4.85 | **12.21** | 3.1e-03 |
 | damped | caffeine | B3LYP | 57.36 | 14.29 | 4.01 | 6.0e-03 |
+| C6 | water | HF | 0.14 | 0.11 | 1.19 | 5.1e-04 |
+| C6 | water | B3LYP | 0.21 | 0.19 | 1.08 | -- |
+| C6 | caffeine | HF | 94.00 | 8.52 | **11.03** | -- |
+| C6 | caffeine | B3LYP | 100.04 | 24.58 | 4.07 | -- |
 
 All eighteen components of each tensor, three directions by two frequencies, and for
 the damped solver the imaginary parts with them: -0.006699 against -0.006697 and
@@ -8672,6 +8676,27 @@ agreement would have proved nothing.
 Water's speedup of about one is not a failure either. Twenty-four basis functions is
 far below where resolving the identity pays for itself, and the whole calculation is
 six hundredths of a second.
+
+### The C6 coefficients, which are the strictest of the four
+
+A C6 coefficient is a Gauss-Legendre quadrature over polarizabilities at imaginary
+frequencies: five points by three directions is fifteen independent response solves,
+each of them feeding a numerical integration. **An error with a sign to it would
+accumulate through that rather than cancel**, which is what makes the coefficient a
+better test than the components it is made of.
+
+| | four-centre | RI-JK simd | difference | relative |
+| --- | ---: | ---: | ---: | ---: |
+| water, HF | 16.74651323 | 16.74405803 | -2.46e-03 | 1.47e-04 |
+| water, B3LYP | 17.33060726 | 17.33133502 | +7.28e-04 | 4.20e-05 |
+| caffeine, HF | 5255.33816139 | 5255.25395011 | -8.42e-02 | **1.60e-05** |
+| caffeine, B3LYP | 5680.62292412 | 5680.85962728 | +2.37e-01 | 4.17e-05 |
+
+Caffeine at sixteen parts in a million is the closest agreement of any property
+measured today, and closer than the response components the quadrature is built
+from. The differences also change sign between the rows -- minus, plus, minus, plus
+-- which is what an error without a bias looks like and is the reason the quadrature
+does not make things worse.
 
 ### A guard which does nothing, deliberately
 
