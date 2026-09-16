@@ -8466,6 +8466,58 @@ this, and that is the natural reading.
 **It is a reading and not a measurement**, for the same reason the caffeine section
 sets out: nineteen iterations against thirteen means the two runs do not carry the
 same trial vectors per iteration, so a second per iteration is not the same unit in
-the two of them and the functionals cannot be subtracted. The question of what an
-RI-JK iteration of a hybrid is actually made of remains open across both molecules,
-and remains a profile's to answer.
+the two of them and the functionals cannot be subtracted. So it was profiled, and
+the next section is the answer.
+
+### What the iteration is actually made of
+
+The solver's own profiler, on the two runs above. No subtraction of anything from
+anything:
+
+| | Hartree-Fock, 19 iter | B3LYP, 13 iter |
+| --- | ---: | ---: |
+| the two-electron build | 128.40 s, **93.7%** | 91.64 s, **54.6%** |
+| the quadrature | -- | 66.84 s, **39.8%** |
+| forming the B vectors, once | 7.77 s, 5.7% | 7.78 s, 4.6% |
+| everything else | under 1 s | under 2 s |
+
+**The quadrature is two fifths of a hybrid's iteration.** The guess this file was
+about to record, from the invalid subtraction, was four fifths. It was wrong by
+half, and wrong in the direction that would have sent the next piece of work at the
+wrong target.
+
+What makes the split believable is a number which appears twice: the two-electron
+build costs 6.76 seconds an iteration at Hartree-Fock and 7.05 at B3LYP. **Those
+should be equal** -- the exchange is formed whole and then scaled, so a fifth of it
+costs exactly what all of it costs -- and two runs which share no timing apparatus
+agree on it to four per cent. A quantity measured twice by accident is worth more
+than one measured once on purpose.
+
+### Inside the two-electron build
+
+Timing the driver's two entry points against a batch of trial vectors of the size
+the solver actually forms:
+
+| batch | the whole build | the exchange | the Coulomb and the assembly | per density |
+| ---: | ---: | ---: | ---: | ---: |
+| 1 | 2.14 s | 1.99 s | 0.15 s | 2.14 s |
+| 5 | 6.19 s | 6.01 s | 0.18 s | 1.24 s |
+| 10 | 11.26 s | 10.85 s | 0.41 s | 1.13 s |
+| 20 | 21.98 s | 21.15 s | 0.84 s | 1.10 s |
+
+**The exchange is ninety-three to ninety-six per cent of the build**, and the build
+is ninety-four per cent of a Hartree-Fock calculation, so nine parts in ten of the
+whole thing is one routine. The Coulomb, which the resolution of the identity is
+usually introduced for, is under a tenth of it.
+
+The last column is the batching working. The left factor is the ground state
+occupied orbitals and is transformed once for the whole batch, so its cost is fixed
+per batch and divided among the densities: half the time at one density, a few per
+cent at twenty, and flat from ten onward. That is the one thing the response driver
+does which the field's driver has no reason to.
+
+What is **not** measured here is the split inside the exchange between transforming
+the B vectors and accumulating the products. That wants instrumentation in the
+driver, which is how the gradient's ninety-two per cent was found, and is not
+something to estimate from counting operations -- this file has already recorded one
+breakdown inferred that way which direct measurement contradicted.
