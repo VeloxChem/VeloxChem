@@ -892,12 +892,18 @@ class NonlinearSolver:
             # NOTE: the resolution of the identity takes the whole batch at once,
             # as the shared factor is transformed once for all of it, so it
             # replaces the loop rather than sitting inside it.
-            # NOTE: only the two-time perturbed densities are taken this way so
-            # far. The three-time ones are cut from a different array with a
-            # batch of its own, so their factors would be cut differently, and
-            # that is left until they are wired.
+            # NOTE: two shapes of factors are taken. A two-time perturbed
+            # calculation hands the factors of its densities directly, as a
+            # tuple. A three-time one hands a dictionary of two sets, because its
+            # batch holds the two-time densities followed by the three-time ones,
+            # cut from two arrays with strides of their own and carrying two
+            # different block structures between them.
+            factors_are_split = isinstance(dens_factors, dict)
+
             use_ri_jk = (self.ri_jk and self.ri_jk_simd and
-                         dens_factors is not None and mode_is_quadratic)
+                         dens_factors is not None and
+                         (mode_is_quadratic or
+                          (mode_is_cubic and factors_are_split)))
 
             if use_ri_jk:
                 assert_msg_critical(
@@ -907,10 +913,51 @@ class NonlinearSolver:
 
                 # NOTE: the factors of this batch and not of the whole set. The
                 # densities above were cut from the same columns.
-                fock_arrays = rijkresponse.fock_matrices(
-                    self, ao_basis,
-                    rijkresponse.slice_factors(dens_factors, batch_start,
-                                               batch_end), fock_k_factor)
+                if not factors_are_split:
+                    fock_arrays = rijkresponse.fock_matrices(
+                        self, ao_basis,
+                        rijkresponse.slice_factors(dens_factors, batch_start,
+                                                   batch_end), fock_k_factor)
+                else:
+                    # NOTE: the two groups in the order dts_for_fock puts them,
+                    # the two-time densities first. They are built apart because
+                    # they are block diagonal where the three-time ones live
+                    # between the occupied orbitals and the virtual ones, and a
+                    # Fock matrix does not depend on the densities beside it, so
+                    # two batches laid end to end are the batch.
+                    fock_arrays = []
+
+                    second = dens_factors.get('second')
+
+                    if second is not None:
+                        # NOTE: the two-time densities are in the batch of a
+                        # three-time calculation only when there is a functional
+                        # to integrate, and the stride they are cut with is formed
+                        # only there. Factors for them without it is a caller
+                        # which has got the two cases the wrong way round, and is
+                        # said so rather than left to fail inside the arithmetic.
+                        assert_msg_critical(
+                            batch_size_second_order is not None,
+                            f'{type(self).__name__}: factors for the two-time ' +
+                            'densities were given where the batch holds none')
+
+                        # NOTE: the stride of the two-time array, formed the same
+                        # way the densities above were cut from it.
+                        first_two = batch_size_second_order * batch_ind
+                        last_two = min(first_two + batch_size_second_order,
+                                       second_order_dens.shape(1))
+
+                        fock_arrays += rijkresponse.fock_matrices(
+                            self, ao_basis,
+                            rijkresponse.slice_factors(second, first_two,
+                                                       last_two),
+                            fock_k_factor)
+
+                    fock_arrays += rijkresponse.fock_matrices(
+                        self, ao_basis,
+                        rijkresponse.slice_factors(dens_factors['third'],
+                                                   batch_start, batch_end),
+                        fock_k_factor)
 
             for idx in range(0 if use_ri_jk else len(dts_for_fock)):
                 if self.ri_coulomb:

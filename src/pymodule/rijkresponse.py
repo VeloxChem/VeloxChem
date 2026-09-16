@@ -24,10 +24,16 @@ A density is given as the factors it was made from, and three shapes are taken:
                                        D = left_a rights_a[k]^T + left_b rights_b[k]^T
 
 The first is a trial vector of the Tamm-Dancoff approximation, the second one of
-linear response, and the third a density of second order in the perturbation, which
-is block diagonal in the orbitals: the occupied block carries the occupied orbitals
-on both sides and the virtual block the virtual ones. The third is two calls of the
-first added together, the Fock matrix being linear in the density.
+linear response or a density of third order in the perturbation, and the third a
+density of second order, which is block diagonal in the orbitals: the occupied block
+carries the occupied orbitals on both sides and the virtual block the virtual ones.
+The third is two calls of the first added together, the Fock matrix being linear in
+the density.
+
+A three-time perturbed calculation has densities of both the second and the third
+order in one batch, cut from two arrays with strides of their own. That is not a
+shape of factors but two of them, and the caller holds them apart and calls this
+twice rather than this module learning about batches it cannot see.
 """
 
 import numpy as np
