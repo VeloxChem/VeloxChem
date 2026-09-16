@@ -236,3 +236,77 @@ CSimdRIJKResponseDriver::compute_exchange(const CSparseTensor              &bq_v
 
     return exchanges;
 }
+
+auto
+CSimdRIJKResponseDriver::compute(const CSparseTensor              &bq_vectors,
+                                 const CMolecularBasis            &basis,
+                                 const CMolecularBasis            &aux_basis,
+                                 const CPackedMatrix              &left,
+                                 const std::vector<CPackedMatrix> &rights,
+                                 const double                      exchange_scaling_factor) const
+    -> std::vector<CPackedMatrix>
+{
+    auto focks = std::vector<CPackedMatrix>();
+
+    if (rights.empty()) return focks;
+
+    _check_factors(basis, left, rights);
+
+    const auto nao = basis.dimensions_of_basis();
+
+    const auto nvec = left.number_of_columns();
+
+    const auto ndens = rights.size();
+
+    // NOTE: the exchange of the whole batch first, so the left factor is
+    // transformed once for all of it. A pure functional asks for none of it.
+
+    auto exchanges = std::vector<CPackedMatrix>();
+
+    if (exchange_scaling_factor != 0.0)
+    {
+        exchanges = compute_exchange(bq_vectors, basis, aux_basis, left, rights);
+    }
+
+    auto expanded = std::vector<double>(nao * nao, 0.0);
+
+    for (size_t idens = 0; idens < ndens; idens++)
+    {
+        // the density this pair of factors stands for, which the Coulomb closes
+        // whole. compute_y_vector reads the type and contracts a general density
+        // as a general one.
+
+        auto density = CPackedMatrix(nao, nao, mat_t::general);
+
+        density.zero();
+
+        _add_multiply_by_transpose(
+            nao, nao, nvec, left.data(), nvec, rights[idens].data(), nvec, density.data(), nao);
+
+        const auto yvector = _drv.compute_y_vector(bq_vectors, basis, aux_basis, density);
+
+        const auto coulomb = _drv.compute_fock_matrix(bq_vectors, basis, aux_basis, yvector);
+
+        // NOTE: the Coulomb comes back symmetric and packed and the exchange is
+        // general, so the sum is taken over the expanded Coulomb. The matrix which
+        // is returned is general: the density was not symmetric and neither is
+        // what it gives.
+
+        coulomb.to_dense(expanded.data());
+
+        focks.push_back(CPackedMatrix(nao, nao, mat_t::general));
+
+        auto *values = focks.back().data();
+
+        const auto *kvalues = exchanges.empty() ? nullptr : exchanges[idens].data();
+
+        for (size_t at = 0; at < nao * nao; at++)
+        {
+            values[at] = 2.0 * expanded[at];
+
+            if (kvalues != nullptr) values[at] -= exchange_scaling_factor * kvalues[at];
+        }
+    }
+
+    return focks;
+}

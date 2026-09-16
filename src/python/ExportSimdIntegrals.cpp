@@ -499,6 +499,16 @@ export_simdintegrals(py::module &m) -> void
              py::arg("aux_basis"),
              py::arg("left"),
              py::arg("rights"))
+        .def("compute",
+             &CSimdRIJKResponseDriver::compute,
+             "Computes the Fock matrices of densities given as their factors, twice the Coulomb less "
+             "the scaled exchange, general and not symmetric.",
+             py::arg("bq_vectors"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("left"),
+             py::arg("rights"),
+             py::arg("exchange_scaling_factor"))
         .def("get_threshold", &CSimdRIJKResponseDriver::get_threshold,
              "Gets screening threshold of the integrals.")
         .def("get_block_size", &CSimdRIJKResponseDriver::get_block_size,

@@ -101,6 +101,32 @@ class CSimdRIJKResponseDriver
                           const CPackedMatrix              &left,
                           const std::vector<CPackedMatrix> &rights) const -> std::vector<CPackedMatrix>;
 
+    /// @brief Computes the Fock matrices of densities given as their factors.
+    /// @param bq_vectors The B vectors, as CSimdRIJKFockDriver formed them.
+    /// @param basis The molecular basis.
+    /// @param aux_basis The auxiliary molecular basis the identity is resolved in.
+    /// @param left The left factor, which every density of the batch shares.
+    /// @param rights The right factors, one for each density of the batch.
+    /// @param exchange_scaling_factor The fraction of exact exchange: one for
+    /// Hartree-Fock, the fraction of a hybrid, zero for a pure functional.
+    /// @return One Fock matrix for each right factor, twice the Coulomb less the
+    /// scaled exchange, general and not symmetric.
+    /// @note The matrix returned is what the response builders call 2jk and 2jkx,
+    /// assembled here rather than by the caller. A pure functional asks for a
+    /// scaling of zero and is given twice the Coulomb, which is what that path
+    /// forms for itself by doubling what it is handed.
+    /// @note The Coulomb closes the whole density and not its factors, so the
+    /// density is formed from them here. It is the basis squared by the rank for
+    /// each density, which is nothing beside the transformation of the B vectors,
+    /// and the alternative is to ask the caller for a matrix it would have to
+    /// build from the same two factors.
+    auto compute(const CSparseTensor              &bq_vectors,
+                 const CMolecularBasis            &basis,
+                 const CMolecularBasis            &aux_basis,
+                 const CPackedMatrix              &left,
+                 const std::vector<CPackedMatrix> &rights,
+                 const double                      exchange_scaling_factor) const -> std::vector<CPackedMatrix>;
+
    private:
     /// @brief Checks the factors are of one basis and of one rank.
     auto _check_factors(const CMolecularBasis            &basis,
