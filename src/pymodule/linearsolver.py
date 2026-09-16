@@ -48,6 +48,11 @@ from .matrix import Matrix
 from .distributedarray import DistributedArray
 from .subcommunicators import SubCommunicators
 from .rifockdriver import RIFockDriver
+from .veloxchemlib import SimdRIJKFockDriver
+from .veloxchemlib import SimdRIJKResponseDriver
+from .veloxchemlib import PackedMatrix
+from .veloxchemlib import rimode
+from .molecularbasis import MolecularBasis
 from .fockdriver import FockDriver
 from .griddriver import GridDriver
 from .molecularorbitals import MolecularOrbitals, molorb
@@ -130,9 +135,18 @@ class LinearSolver:
         # RI-J
         self.ri_coulomb = False
         self.ri_jk = False
+        self.ri_jk_simd = False
         self.ri_auxiliary_basis = 'def2-universal-jfit'
         self.ri_metric_threshold = 1.0e-12
         self._ri_drv = None
+
+        # NOTE: the resolution of the identity for response needs a fitting basis
+        # for the exchange as well as the Coulomb. The default above fits the
+        # Coulomb alone, so a calculation which turns on ri_jk has to name a jkfit
+        # basis and is refused if it does not.
+        self._ri_jk_drv = None
+        self._ri_jk_response_drv = None
+        self._ri_jk_aux_basis = None
 
         # dft
         self.xcfun = None
@@ -253,7 +267,9 @@ class LinearSolver:
             },
             'method_settings': {
                 'ri_coulomb': ('bool', 'use RI-J approximation'),
-                'ri_auxiliary_basis': ('str', 'RI-J auxiliary basis set'),
+                'ri_jk': ('bool', 'use RI-JK approximation'),
+                'ri_jk_simd': ('bool', 'use the simd RI-JK driver'),
+                'ri_auxiliary_basis': ('str', 'RI auxiliary basis set'),
                 'xcfun': ('str_upper', 'exchange-correlation functional'),
                 'grid_level': ('int', 'accuracy level of DFT grid'),
                 'potfile': ('str', 'potential file for polarizable embedding'),
@@ -537,9 +553,17 @@ class LinearSolver:
         """
 
         # TODO: enable RI-JK
+        # NOTE: only the simd driver has a response path, and only on one rank.
+        # The Coulomb and the exchange both divide over the auxiliary basis, so
+        # nothing here forbids the ranks holding shares of it, but the B vectors
+        # are prepared whole below and dividing them is separate work.
         assert_msg_critical(
-            not self.ri_jk,
-            f'{type(self).__name__}.compute: RI-JK is not yet supported')
+            (not self.ri_jk) or self.ri_jk_simd,
+            f'{type(self).__name__}: RI-JK is supported only with ri_jk_simd')
+
+        assert_msg_critical(
+            (not self.ri_jk) or (self.nodes == 1),
+            f'{type(self).__name__}: the RI-JK response path runs on one rank')
 
         if self.rank == mpi_master():
             screening = T4CScreener()
@@ -555,9 +579,85 @@ class LinearSolver:
                                          self.ri_auxiliary_basis,
                                          verbose=True)
 
+        if self.ri_jk:
+            self._init_simd_ri_jk(molecule, basis)
+
         return {
             'screening': screening,
         }
+
+    def _init_simd_ri_jk(self, molecule, basis):
+        """
+        Forms the B vectors the simd RI-JK response driver contracts.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        """
+
+        assert_msg_critical(
+            'jkfit' in self.ri_auxiliary_basis.lower(),
+            f'{type(self).__name__}: RI-JK needs a jkfit auxiliary basis, and ' +
+            f'{self.ri_auxiliary_basis} fits the Coulomb alone')
+
+        self._ri_jk_aux_basis = MolecularBasis.read(molecule,
+                                                    self.ri_auxiliary_basis,
+                                                    ostream=None)
+
+        self._ri_jk_drv = SimdRIJKFockDriver()
+
+        needed = self._ri_jk_drv.required_memory(molecule, basis,
+                                                 self._ri_jk_aux_basis,
+                                                 self.eri_thresh, [])
+
+        # NOTE: the response driver contracts the B vectors and cannot form them
+        # again, so the mode which holds them is the only one it can use. The
+        # memory is checked here rather than left to the allocator.
+        budget = self._get_ri_jk_memory_budget()
+
+        assert_msg_critical(
+            needed <= budget,
+            f'{type(self).__name__}: the B vectors need ' +
+            f'{needed / 1024**3:.2f} GB of {budget / 1024**3:.2f} GB available')
+
+        metric, mode = self._ri_jk_drv.make_metric(molecule,
+                                                   self._ri_jk_aux_basis,
+                                                   self.ri_metric_threshold,
+                                                   False, rimode.in_memory)
+
+        self._ri_jk_drv.prepare(molecule, basis, self._ri_jk_aux_basis,
+                                self.eri_thresh, budget,
+                                self.ri_metric_threshold, False, mode, [],
+                                metric, 1)
+
+        self._ri_jk_response_drv = SimdRIJKResponseDriver(self.eri_thresh)
+
+        self.ostream.print_info(
+            'Using the SIMD resolution of the identity (RI-JK) for response.')
+        self.ostream.print_info(
+            f'B vectors need {needed / 1024**3:.2f} GB of ' +
+            f'{budget / 1024**3:.2f} GB available.')
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+    def _get_ri_jk_memory_budget(self):
+        """
+        Gets the memory the simd RI-JK driver may hold, in bytes.
+
+        :return:
+            The memory budget in bytes.
+        """
+
+        try:
+            import psutil
+            available = psutil.virtual_memory().available
+        except ImportError:
+            available = 8 * 1024**3
+
+        reserve = 4 * 1024**3
+
+        return int(max(available - reserve, 0.25 * available))
 
     def _init_dft(self, molecule, scf_results, silent=False):
         """
@@ -1922,7 +2022,8 @@ class LinearSolver:
                       dft_dict,
                       pe_dict,
                       profiler=None,
-                      comm=None):
+                      comm=None,
+                      dens_factors=None):
         """
         Computes Fock/Fxc matrix (2e part) for linear response calculation.
 
@@ -1940,6 +2041,14 @@ class LinearSolver:
             The dictionary containing PE information.
         :param profiler:
             The profiler.
+        :param dens_factors:
+            The densities as the factors they were made from: a left factor which
+            the batch shares and one right factor for each density, so that
+            dens[i] is left times rights[i] transposed. Only the resolution of the
+            identity uses them, and only because the exchange of a factorised
+            density costs the basis squared where the exchange of the same density
+            as a matrix costs the basis cubed. None where the caller has not
+            formed them, and the dense path is taken.
 
         :return:
             The Fock matrix (2e part).
@@ -2001,7 +2110,21 @@ class LinearSolver:
 
         fock_arrays = []
 
-        for idx in range(num_densities):
+        # NOTE: the resolution of the identity takes the whole batch at once, as
+        # the left factor is transformed once for all of it, so it replaces the
+        # loop rather than sitting inside it.
+        use_ri_jk = (self.ri_jk and self.ri_jk_simd and dens_factors is not None)
+
+        if use_ri_jk:
+            assert_msg_critical(
+                not need_omega,
+                f'{type(self).__name__}: RI-JK is not implemented for a ' +
+                'range-separated functional')
+
+            fock_arrays = self._comp_ri_jk_fock(basis, dens_factors,
+                                                exchange_scaling_factor)
+
+        for idx in range(0 if use_ri_jk else num_densities):
             if self.ri_coulomb:
                 assert_msg_critical(
                     fock_type == 'j',
@@ -2092,6 +2215,42 @@ class LinearSolver:
             return fock_arrays
         else:
             return None
+
+    def _comp_ri_jk_fock(self, basis, dens_factors, exchange_scaling_factor):
+        """
+        Computes the two-electron part for a batch of factorised densities.
+
+        :param basis:
+            The AO basis set.
+        :param dens_factors:
+            The left factor the batch shares and the right factor of each density.
+        :param exchange_scaling_factor:
+            The fraction of exact exchange.
+
+        :return:
+            The Fock matrices as numpy arrays, one for each density.
+        """
+
+        left, rights = dens_factors
+
+        nao = basis.get_dimensions_of_basis()
+
+        def _packed(array):
+            array = np.ascontiguousarray(array)
+            matrix = PackedMatrix(array.shape[0], array.shape[1], mat_t.general)
+            matrix.from_numpy(array)
+            return matrix
+
+        # NOTE: what comes back is twice the Coulomb less the scaled exchange
+        # already, which is what this builder is asked for, so nothing is scaled
+        # here. A pure functional asks for a scaling of zero and is given twice
+        # the Coulomb, where the dense path forms the Coulomb and doubles it.
+        focks = self._ri_jk_response_drv.compute(
+            self._ri_jk_drv.get_bq_vectors(), basis, self._ri_jk_aux_basis,
+            _packed(left), [_packed(right) for right in rights],
+            exchange_scaling_factor)
+
+        return [fock.to_numpy() for fock in focks]
 
     def _comp_lr_fock_unrestricted(self,
                                    dens,
