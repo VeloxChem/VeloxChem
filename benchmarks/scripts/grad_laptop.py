@@ -18,9 +18,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from gradbench import run
 from scfbench import provenance, write
 
-MOLECULE = "caffeine"
+# NOTE: the caffeine grid by default, which is the table this suite has always
+# measured. A molecule and a comma separated list of bases may be named instead,
+# so a second molecule does not need a second copy of this file.
+MOLECULE = sys.argv[1] if len(sys.argv) > 1 else "caffeine"
 AUX = "def2-universal-jkfit"
-BASES = ["def2-svp", "def2-svpd", "def2-tzvp", "def2-tzvpd"]
+BASES = (sys.argv[2].split(",") if len(sys.argv) > 2
+         else ["def2-svp", "def2-svpd", "def2-tzvp", "def2-tzvpd"])
 FUNCTIONALS = ["HF", "B3LYP"]
 METHODS = ["full", "ri_jk_simd"]
 

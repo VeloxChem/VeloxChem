@@ -8058,3 +8058,116 @@ The fitting error, at each method's own minimum rather than at a common geometry
 It is an order of magnitude smaller at B3LYP, where only a fifth of the exchange is
 fitted at all, and it changes sign there: the fitted B3LYP minima lie **below** the
 four-centre ones, which the Hartree-Fock rows do not.
+
+## Four bases of the gradient, and the exponent each way is really running at
+
+The gradient section above measured def2-svp and def2-svpd and concluded that the
+basis decides the ratio. This extends the same table to the triple zeta pair, which
+is enough points to fit an exponent instead of reasoning from two. Caffeine,
+def2-universal-jkfit, one rank of 14 threads on the M4 Max, best of two, both ways
+in one process per case, at `15b33b62e`. The records are in
+`benchmarks/data/gradient/2026-09-16_m4max_caffeine.json` and the table and its
+scaling page are rendered from them by `benchmarks/scripts/render_runs.py`.
+
+The def2-svp and def2-svpd rows were re-measured rather than carried over, and they
+reproduce the earlier run to within one or two per cent, so the two halves of this
+table are comparable.
+
+| functional | basis | nao | four-centre | RI-JK simd | speedup | vs four-centre |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| HF | def2-svp | 246 | 8.61 | 2.22 | 3.87 | 7.7e-05 |
+| HF | def2-svpd | 366 | 41.68 | 2.91 | 14.33 | 7.7e-05 |
+| HF | def2-tzvp | 494 | 136.34 | 4.13 | 33.00 | 7.1e-05 |
+| HF | def2-tzvpd | 614 | 352.64 | 5.46 | **64.61** | 7.3e-05 |
+| B3LYP | def2-svp | 246 | 9.26 | 2.78 | 3.33 | 1.6e-05 |
+| B3LYP | def2-svpd | 366 | 42.80 | 4.09 | 10.47 | 1.7e-05 |
+| B3LYP | def2-tzvp | 494 | 138.23 | 5.75 | 24.06 | 6.2e-05 |
+| B3LYP | def2-tzvpd | 614 | 356.52 | 7.92 | **45.04** | 6.3e-05 |
+
+Cost fitted as proportional to nao to the p, over all four bases:
+
+| functional | method | p |
+| --- | --- | ---: |
+| HF | four-centre | 4.04 |
+| HF | RI-JK simd | **0.98** |
+| B3LYP | four-centre | 3.97 |
+| B3LYP | RI-JK simd | **1.13** |
+
+**The four-center gradient is at its textbook exponent and the resolution of the
+identity is linear.** Four point oh four and three point nine seven are what a sum
+over four indices costs, with no screening benefit visible across this range. Nought
+point nine eight is the other side of it: over a factor of two and a half in the
+basis the gradient of the resolution of the identity went from 2.22 seconds to 5.46.
+The B3LYP exponent is higher at 1.13 because the quadrature is in that column and
+does grow, which is the same effect that lowers its speedups.
+
+### The exponent is in one dimension only, and the table says so
+
+One fitting set serves every row: naux is 1242 in all eight of them while nao runs
+246 to 614. **So the exponent measured for the resolution of the identity is in the
+orbital dimension alone, and it is not the scaling of the method with the problem.**
+The ratio between the columns widens from 3.9 to 64.6 partly because the denominator
+is being held still, and a reader who takes 64.6 as a trend and extrapolates it will
+be wrong. The naux column is in the rendered table for exactly this reason: the
+constant is visible beside the thing that is growing.
+
+What the numbers do support is narrower and still worth having. For a fixed fitting
+set, which is how these calculations are actually run, enlarging the orbital basis
+costs the four-center gradient a fourth power and costs this driver a first power.
+
+### And they do not survive the molecule growing either
+
+The exponents above are scaling **with the basis at a fixed geometry**. They are not
+scaling with the size of the molecule, and the run which tested that broke both of
+them at once. Tagrisso, 70 atoms against caffeine's 24, in the same def2-svp and with
+the same fitting set, so nao goes 246 to 683 and naux 1242 to 3387:
+
+| | caffeine | tagrisso | observed | the exponent predicts |
+| --- | ---: | ---: | ---: | ---: |
+| four-centre | 8.61 | 114.17 | 13.3x | 61.9x |
+| RI-JK simd | 2.22 | 92.92 | **41.9x** | 2.7x |
+
+**Both predictions are wrong, in opposite directions, for different reasons.** The
+four-center gradient came in nearly five times cheaper than a fourth power says,
+because seventy atoms spread out is a geometry where screening finally has something
+to discard and a compact molecule with a bigger basis is not. The resolution of the
+identity came in fifteen times dearer than a first power says, because that exponent
+was fitted with naux held still and here it nearly tripled.
+
+So the speedup goes with it. The gradient is 3.87 on caffeine in def2-svp and **1.23
+on tagrisso in the same basis**, 3.33 and 1.22 at B3LYP. The advantage measured in
+the table above belongs to a compact molecule with a large basis, which is the shape
+this file has been measuring all along, and it does not carry to a large molecule
+with a small one.
+
+Two things do carry. The gradient is still right -- it agrees with the four-center
+one to 6.0e-05 at Hartree-Fock and 1.7e-05 at B3LYP, the same fitting error as
+caffeine, at 3387 auxiliary functions and 3.83 GB of B vectors. And the energy still
+wins outright, 151 seconds against 30, so a single point and its gradient together
+are 2.16 times quicker at Hartree-Fock and 1.88 at B3LYP. **It is the gradient
+specifically, and at this shape of problem specifically, that has lost its lead** --
+which is a statement about where to look next, not a retraction of the table above.
+
+### One column that does not behave, and is not yet explained
+
+The last column is the largest disagreement with the four-center gradient. At
+Hartree-Fock it is flat across the whole range -- 7.7, 7.7, 7.1, 7.3, all e-05 --
+which is what a fitting error should do. At B3LYP it is not:
+
+| | def2-svp | def2-svpd | def2-tzvp | def2-tzvpd |
+| --- | ---: | ---: | ---: | ---: |
+| B3LYP, observed | 1.6e-05 | 1.7e-05 | 6.2e-05 | 6.3e-05 |
+| a fifth of the Hartree-Fock row | 1.5e-05 | 1.5e-05 | 1.4e-05 | 1.5e-05 |
+
+At double zeta B3LYP sits where a functional which fits a fifth of its exchange
+should sit. At triple zeta it is four times that, and it steps rather than drifts:
+flat, then a jump at the double to triple zeta boundary, then flat again. A fitting
+error which is a fifth of another fitting error should not do that.
+
+The likely candidate is the quadrature rather than the fit -- the two paths converge
+to slightly different densities, so their exchange-correlation gradients are not
+quite the same number, and that difference is not scaled by the fraction of exact
+exchange -- but **this has not been checked and is written here as a question, not a
+finding.** It is 6e-05 on a gradient whose largest component is order 0.1, so it
+changes nothing about the numbers above; it is recorded because a column which steps
+where nothing else does is worth returning to.

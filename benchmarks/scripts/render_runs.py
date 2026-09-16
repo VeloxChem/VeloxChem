@@ -134,7 +134,10 @@ def render(path):
              "| " + " | ".join("---" for _ in header) + " |"]
     lines += ["| " + " | ".join(c for c in row) + " |" for row in cells_of(doc)]
 
-    if doc["suite"] == "gradient":
+    # NOTE: an exponent needs two sizes to fit. A run of one basis is a
+    # measurement and not a scaling, and says so by leaving the section out
+    # rather than by printing an empty table.
+    if doc["suite"] == "gradient" and scaling(doc):
         lines += ["", "### Scaling, cost proportional to nao to the p", "",
                   "| functional | method | p |", "| --- | --- | ---: |"]
         for (f, m), (_, _, p) in scaling(doc).items():
@@ -196,7 +199,7 @@ def render_pdf(path, out):
         pdf.savefig(fig, bbox_inches="tight", pad_inches=0.3)
         plt.close(fig)
 
-        if doc["suite"] == "gradient":
+        if doc["suite"] == "gradient" and scaling(doc):
             _scaling_page(pdf, doc, title, line)
 
     return out
