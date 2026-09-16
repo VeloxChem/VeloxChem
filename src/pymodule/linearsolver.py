@@ -53,6 +53,7 @@ from .veloxchemlib import SimdRIJKResponseDriver
 from .veloxchemlib import PackedMatrix
 from .veloxchemlib import rimode
 from .molecularbasis import MolecularBasis
+from . import rijkresponse
 from .fockdriver import FockDriver
 from .griddriver import GridDriver
 from .molecularorbitals import MolecularOrbitals, molorb
@@ -596,68 +597,7 @@ class LinearSolver:
             The AO basis set.
         """
 
-        assert_msg_critical(
-            'jkfit' in self.ri_auxiliary_basis.lower(),
-            f'{type(self).__name__}: RI-JK needs a jkfit auxiliary basis, and ' +
-            f'{self.ri_auxiliary_basis} fits the Coulomb alone')
-
-        self._ri_jk_aux_basis = MolecularBasis.read(molecule,
-                                                    self.ri_auxiliary_basis,
-                                                    ostream=None)
-
-        self._ri_jk_drv = SimdRIJKFockDriver()
-
-        needed = self._ri_jk_drv.required_memory(molecule, basis,
-                                                 self._ri_jk_aux_basis,
-                                                 self.eri_thresh, [])
-
-        # NOTE: the response driver contracts the B vectors and cannot form them
-        # again, so the mode which holds them is the only one it can use. The
-        # memory is checked here rather than left to the allocator.
-        budget = self._get_ri_jk_memory_budget()
-
-        assert_msg_critical(
-            needed <= budget,
-            f'{type(self).__name__}: the B vectors need ' +
-            f'{needed / 1024**3:.2f} GB of {budget / 1024**3:.2f} GB available')
-
-        metric, mode = self._ri_jk_drv.make_metric(molecule,
-                                                   self._ri_jk_aux_basis,
-                                                   self.ri_metric_threshold,
-                                                   False, rimode.in_memory)
-
-        self._ri_jk_drv.prepare(molecule, basis, self._ri_jk_aux_basis,
-                                self.eri_thresh, budget,
-                                self.ri_metric_threshold, False, mode, [],
-                                metric, 1)
-
-        self._ri_jk_response_drv = SimdRIJKResponseDriver(self.eri_thresh)
-
-        self.ostream.print_info(
-            'Using the SIMD resolution of the identity (RI-JK) for response.')
-        self.ostream.print_info(
-            f'B vectors need {needed / 1024**3:.2f} GB of ' +
-            f'{budget / 1024**3:.2f} GB available.')
-        self.ostream.print_blank()
-        self.ostream.flush()
-
-    def _get_ri_jk_memory_budget(self):
-        """
-        Gets the memory the simd RI-JK driver may hold, in bytes.
-
-        :return:
-            The memory budget in bytes.
-        """
-
-        try:
-            import psutil
-            available = psutil.virtual_memory().available
-        except ImportError:
-            available = 8 * 1024**3
-
-        reserve = 4 * 1024**3
-
-        return int(max(available - reserve, 0.25 * available))
+        rijkresponse.initialize(self, molecule, basis)
 
     def _init_dft(self, molecule, scf_results, silent=False):
         """
@@ -2266,37 +2206,8 @@ class LinearSolver:
             The Fock matrices as numpy arrays, one for each density.
         """
 
-        # NOTE: two shapes are accepted. A pair is a density of one term, which is
-        # what the Tamm-Dancoff approximation makes; a triple carries a second term
-        # whose shared factor stands on the other side, which is what a linear
-        # response trial vector makes.
-        if len(dens_factors) == 2:
-            left, rights = dens_factors
-            transposed_rights = None
-        else:
-            left, rights, transposed_rights = dens_factors
-
-        nao = basis.get_dimensions_of_basis()
-
-        def _packed(array):
-            array = np.ascontiguousarray(array)
-            matrix = PackedMatrix(array.shape[0], array.shape[1], mat_t.general)
-            matrix.from_numpy(array)
-            return matrix
-
-        # NOTE: what comes back is twice the Coulomb less the scaled exchange
-        # already, which is what this builder is asked for, so nothing is scaled
-        # here. A pure functional asks for a scaling of zero and is given twice
-        # the Coulomb, where the dense path forms the Coulomb and doubles it.
-        args = [self._ri_jk_drv.get_bq_vectors(), basis, self._ri_jk_aux_basis,
-                _packed(left), [_packed(right) for right in rights]]
-
-        if transposed_rights is not None:
-            args.append([_packed(right) for right in transposed_rights])
-
-        focks = self._ri_jk_response_drv.compute(*args, exchange_scaling_factor)
-
-        return [fock.to_numpy() for fock in focks]
+        return rijkresponse.fock_matrices(self, basis, dens_factors,
+                                          exchange_scaling_factor)
 
     def _comp_lr_fock_unrestricted(self,
                                    dens,

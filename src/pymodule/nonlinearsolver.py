@@ -48,6 +48,7 @@ from .linearsolver import LinearSolver
 from .distributedarray import DistributedArray
 from .sanitychecks import dft_sanity_check, ri_sanity_check
 from .errorhandler import assert_msg_critical
+from . import rijkresponse
 from .inputparser import parse_input, print_keywords, print_attributes
 from .dftutils import get_default_grid_level
 from .batchsize import get_batch_size
@@ -103,7 +104,11 @@ class NonlinearSolver:
         # RI-J
         self.ri_coulomb = False
         self.ri_jk = False
+        self.ri_jk_simd = False
         self.ri_auxiliary_basis = 'def2-universal-jfit'
+        self._ri_jk_drv = None
+        self._ri_jk_response_drv = None
+        self._ri_jk_aux_basis = None
         self.ri_metric_threshold = 1.0e-12
         self._ri_drv = None
 
@@ -175,7 +180,9 @@ class NonlinearSolver:
             },
             'method_settings': {
                 'ri_coulomb': ('bool', 'use RI-J approximation'),
-                'ri_auxiliary_basis': ('str', 'RI-J auxiliary basis set'),
+                'ri_jk': ('bool', 'use RI-JK approximation'),
+                'ri_jk_simd': ('bool', 'use the simd RI-JK driver'),
+                'ri_auxiliary_basis': ('str', 'RI auxiliary basis set'),
                 'xcfun': ('str_upper', 'exchange-correlation functional'),
                 'grid_level': ('int', 'accuracy level of DFT grid'),
             },
@@ -305,10 +312,14 @@ class NonlinearSolver:
             The dictionary of ERI information.
         """
 
-        # TODO: enable RI-JK
+        # NOTE: only the simd driver has a response path, and only on one rank.
         assert_msg_critical(
-            not self.ri_jk,
-            f'{type(self).__name__}.compute: RI-JK is not yet supported')
+            (not self.ri_jk) or self.ri_jk_simd,
+            f'{type(self).__name__}: RI-JK is supported only with ri_jk_simd')
+
+        assert_msg_critical(
+            (not self.ri_jk) or (self.nodes == 1),
+            f'{type(self).__name__}: the RI-JK response path runs on one rank')
 
         if self.rank == mpi_master():
             screening = T4CScreener()
@@ -323,6 +334,9 @@ class NonlinearSolver:
                                          basis,
                                          self.ri_auxiliary_basis,
                                          verbose=False)
+
+        if self.ri_jk:
+            rijkresponse.initialize(self, molecule, basis)
 
         return {
             'screening': screening,
@@ -396,7 +410,8 @@ class NonlinearSolver:
                        second_order_dens,
                        third_oder_dens,
                        mode,
-                       profiler=None):
+                       profiler=None,
+                       dens_factors=None):
         """
         Computes and returns a list of Fock matrices.
 
@@ -430,7 +445,7 @@ class NonlinearSolver:
         f_total = self._comp_two_el_int(mo, molecule, ao_basis, eri_dict,
                                         dft_dict, first_order_dens,
                                         second_order_dens, third_oder_dens,
-                                        mode, profiler)
+                                        mode, profiler, dens_factors)
         nrows = f_total.data.shape[0]
         half_ncols = f_total.data.shape[1] // 2
         ff_data = np.zeros((nrows, half_ncols), dtype='complex128')
@@ -454,7 +469,8 @@ class NonlinearSolver:
                          second_order_dens,
                          third_order_dens,
                          mode,
-                         profiler=None):
+                         profiler=None,
+                         dens_factors=None):
         """
         Computes the two-electron (HF) and Vxc part of the two and three-time
         perturbed Fock matrices.
@@ -873,7 +889,22 @@ class NonlinearSolver:
 
             fock_arrays = []
 
-            for idx in range(len(dts_for_fock)):
+            # NOTE: the resolution of the identity takes the whole batch at once,
+            # as the shared factor is transformed once for all of it, so it
+            # replaces the loop rather than sitting inside it.
+            use_ri_jk = (self.ri_jk and self.ri_jk_simd and
+                         dens_factors is not None)
+
+            if use_ri_jk:
+                assert_msg_critical(
+                    not need_omega,
+                    f'{type(self).__name__}: RI-JK is not implemented for a ' +
+                    'range-separated functional')
+
+                fock_arrays = rijkresponse.fock_matrices(
+                    self, ao_basis, dens_factors, fock_k_factor)
+
+            for idx in range(0 if use_ri_jk else len(dts_for_fock)):
                 if self.ri_coulomb:
                     assert_msg_critical(
                         fock_type == 'j',
