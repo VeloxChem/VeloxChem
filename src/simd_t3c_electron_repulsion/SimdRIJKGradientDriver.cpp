@@ -11,6 +11,7 @@
 #include "SimdRIJKGradientDriver.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <numeric>
 #include <set>
 #include <string>
@@ -86,6 +87,59 @@ _multiply(const size_t  nrows,
     Eigen::Map<RowMajorMatrix> c(cmat, static_cast<Eigen::Index>(nrows), static_cast<Eigen::Index>(ncols));
 
     c.noalias() = a * b;
+
+#endif
+}
+
+/// @brief The product of a row major matrix by the transpose of another, with the
+/// result added to what is there: C += A B^T, for A of nrows by nsums and B of
+/// ncols by nsums.
+/// @note The same reading of the library's ordering as the product above. The two
+/// arrays may be the same one, which is how a Gram product is taken without a
+/// second copy of the matrix transposed.
+static auto
+_add_multiply_by_transpose(const size_t  nrows,
+                           const size_t  ncols,
+                           const size_t  nsums,
+                           const double *amat,
+                           const double *bmat,
+                           double       *cmat) -> void
+{
+#ifdef VLX_USE_MATHLIB
+
+    const char trans_t = 'T';
+
+    const char trans_n = 'N';
+
+    const double alpha = 1.0;
+
+    const double beta = 1.0;
+
+    auto m_arg = static_cast<lapack_int_t>(ncols);
+
+    auto n_arg = static_cast<lapack_int_t>(nrows);
+
+    auto k_arg = static_cast<lapack_int_t>(nsums);
+
+    auto lda_arg = static_cast<lapack_int_t>(nsums);
+
+    auto ldb_arg = static_cast<lapack_int_t>(nsums);
+
+    auto ldc_arg = static_cast<lapack_int_t>(ncols);
+
+    dgemm_(&trans_t, &trans_n, &m_arg, &n_arg, &k_arg, &alpha, bmat, &lda_arg, amat, &ldb_arg, &beta, cmat, &ldc_arg);
+
+#else
+
+    using RowMajorMatrix = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
+
+    Eigen::Map<const RowMajorMatrix> a(amat, static_cast<Eigen::Index>(nrows), static_cast<Eigen::Index>(nsums));
+
+    Eigen::Map<const RowMajorMatrix> b(bmat, static_cast<Eigen::Index>(ncols), static_cast<Eigen::Index>(nsums));
+
+    Eigen::Map<RowMajorMatrix> c(cmat, static_cast<Eigen::Index>(nrows), static_cast<Eigen::Index>(ncols));
+
+    c.noalias() += a * b.transpose();
 
 #endif
 }
@@ -438,35 +492,86 @@ CSimdRIJKGradientDriver::fitted_densities(const CSparseTensor   &bq_vectors,
 
     omega.zero();
 
+    // NOTE: the exchange part is the Gram product of the fitted densities over
+    // every pair of auxiliary functions, which as a sum written out is the square
+    // of the auxiliary basis times the square of the orbitals and was the whole
+    // of this phase on a molecule of any size, on one thread. It is a product of
+    // one matrix by its own transpose, so it is taken as one.
+    //
+    // The packed matrices hold the lower triangle, so an element off the diagonal
+    // stands for two of the sum over the pairs of orbitals. Scaling each element
+    // by the root of what it counts for puts that weight into the product: the
+    // root multiplies twice, once from each side, and returns the two.
+
+    auto gram = std::vector<double>();
+
+    if (exchange_scaling_factor != 0.0)
+    {
+        // the elements of one packed matrix of the orbitals, which is what the
+        // Gram product sums over
+
+        const auto nelements = orbital_densities.front().number_of_elements();
+
+        gram.assign(naux * naux, 0.0);
+
+        auto weight = std::vector<double>(nelements, 0.0);
+
+        for (size_t i = 0; i < norbs; i++)
+        {
+            for (size_t j = 0; j <= i; j++)
+            {
+                weight[i * (i + 1) / 2 + j] = (i == j) ? 1.0 : std::sqrt(2.0);
+            }
+        }
+
+        // NOTE: the elements in panels, as the factor above is, so the weighted
+        // copy is bounded by the budget. The result it adds into is the square of
+        // the auxiliary basis and cannot be divided, so it is taken off first.
+
+        const auto fixed = naux * naux * sizeof(double);
+
+        const auto spare = (_budget > fixed) ? _budget - fixed : size_t{0};
+
+        const auto per_element = naux * sizeof(double);
+
+        const auto by_memory = spare / std::max(per_element, size_t{1});
+
+        const auto npanel = std::min(nelements, std::max(_min_batch, by_memory));
+
+        auto scaled = std::vector<double>(naux * npanel, 0.0);
+
+        const auto nrange = static_cast<int>(naux);
+
+        for (size_t first = 0; first < nelements; first += npanel)
+        {
+            const auto count = std::min(npanel, nelements - first);
+
+#pragma omp parallel for schedule(static)
+            for (int at = 0; at < nrange; at++)
+            {
+                const auto q = static_cast<size_t>(at);
+
+                const auto *values = orbital_densities[q].data() + first;
+
+                for (size_t c = 0; c < count; c++)
+                {
+                    scaled[q * count + c] = weight[first + c] * values[c];
+                }
+            }
+
+            _add_multiply_by_transpose(naux, naux, count, scaled.data(), scaled.data(), gram.data());
+        }
+    }
+
     for (size_t p = 0; p < naux; p++)
     {
         for (size_t q = 0; q <= p; q++)
         {
             auto value = 2.0 * fitting[p] * fitting[q];
 
-            if (exchange_scaling_factor != 0.0)
+            if (!gram.empty())
             {
-                const auto *dp = orbital_densities[p].data();
-
-                const auto *dq = orbital_densities[q].data();
-
-                double sum = 0.0;
-
-                // NOTE: the packed matrices hold the lower triangle, so the
-                // elements off the diagonal stand for two of the sum over the
-                // pairs of orbitals and are counted twice.
-
-                for (size_t i = 0; i < norbs; i++)
-                {
-                    for (size_t j = 0; j < i; j++)
-                    {
-                        sum += 2.0 * dp[i * (i + 1) / 2 + j] * dq[i * (i + 1) / 2 + j];
-                    }
-
-                    sum += dp[i * (i + 1) / 2 + i] * dq[i * (i + 1) / 2 + i];
-                }
-
-                value -= exchange_scaling_factor * sum;
+                value -= exchange_scaling_factor * gram[p * naux + q];
             }
 
             omega.data()[omega.index(p, q)] = value;
