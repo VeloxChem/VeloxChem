@@ -389,6 +389,14 @@ class CubicResponseDriver(NonlinearSolver):
             X = None
             self.comp = None
 
+        # NOTE: the B vectors are formed before the solvers this driver drives are
+        # made, so that each of them is handed the same ones rather than forming
+        # its own. The screening and the rest of the integral setup stay where
+        # they were, in the method which uses them; forming these again there
+        # costs nothing, the driver holding them already.
+        if self.ri_jk:
+            rijkresponse.initialize(self, molecule, ao_basis)
+
         # Computing the first-order response vectors (3 per frequency)
         N_drv = ComplexResponseSolver(self.comm, self.ostream)
 
@@ -403,6 +411,8 @@ class CubicResponseDriver(NonlinearSolver):
 
         for key in cpp_keywords:
             setattr(N_drv, key, getattr(self, key))
+
+        rijkresponse.share(self, N_drv)
 
         if self.checkpoint_file is not None:
             fpath = Path(self.checkpoint_file)
@@ -1629,6 +1639,8 @@ class CubicResponseDriver(NonlinearSolver):
 
         for key in cpp_keywords:
             setattr(Nxy_drv, key, getattr(self, key))
+
+        rijkresponse.share(self, Nxy_drv)
 
         if self.checkpoint_file is not None:
             fpath = Path(self.checkpoint_file)

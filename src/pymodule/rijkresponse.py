@@ -91,6 +91,14 @@ def initialize(solver, molecule, basis):
         The AO basis set.
     """
 
+    # NOTE: the B vectors are the dearest thing this path forms and they depend on
+    # the molecule, the basis and the fitting set alone. A driver which drives
+    # solvers of its own hands them down with share below, and each of those
+    # solvers initializes itself in turn, so this is reached again with the work
+    # already done. Doing it again would cost what it cost the first time.
+    if is_prepared(solver):
+        return
+
     assert_msg_critical(
         'jkfit' in solver.ri_auxiliary_basis.lower(),
         f'{type(solver).__name__}: RI-JK needs a jkfit auxiliary basis, and ' +
@@ -172,6 +180,47 @@ def general_factors(mo, nocc, mo_density):
                np.matmul(mo_vir, mo_density[nocc:, nocc:].T))
 
     return right_a, right_b
+
+
+def is_prepared(solver):
+    """Whether the solver already holds B vectors it can contract.
+
+    :param solver:
+        The solver.
+
+    :return:
+        True where the B vectors are formed and ready.
+    """
+
+    drv = getattr(solver, '_ri_jk_drv', None)
+
+    return (drv is not None and drv.is_prepared() and
+            getattr(solver, '_ri_jk_response_drv', None) is not None and
+            getattr(solver, '_ri_jk_aux_basis', None) is not None)
+
+
+def share(source, target):
+    """Hands the B vectors of one solver to another.
+
+    A response driver drives linear solvers of its own, and every one of them
+    needs the same B vectors of the same molecule in the same basis. Formed once
+    and handed down they cost one transformation of the integrals; left to each
+    solver they cost one for each, which on a molecule of seventy atoms was eight
+    seconds apiece.
+
+    :param source:
+        The solver which holds them, or which does not, in which case nothing is
+        handed over and the target forms its own.
+    :param target:
+        The solver which is given them.
+    """
+
+    if not is_prepared(source):
+        return
+
+    target._ri_jk_drv = source._ri_jk_drv
+    target._ri_jk_response_drv = source._ri_jk_response_drv
+    target._ri_jk_aux_basis = source._ri_jk_aux_basis
 
 
 def slice_factors(dens_factors, start, end):
