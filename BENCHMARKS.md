@@ -7979,3 +7979,82 @@ across the whole auxiliary basis. A rank holding a share of it cannot form them.
 right-hand side has to be complete before the solve -- the same coupling the direct
 Fock build already handles with an explicit reduction before `solve_fitting`, and the
 same thing a distributed gradient will have to do.
+
+## Geometry optimization, where the step count is half the ratio
+
+The gradient is wired into `ScfGradientDriver`, so a geometry optimization can be
+carried with the resolution of the identity end to end. Caffeine from the geometry
+in `benchmarks/geometries`, def2-universal-jkfit, one rank of 14 threads on the M4
+Max, run to convergence with no cap on the iterations, at `ac2b22a5f`. The working
+tree was dirty for the run: what was uncommitted were the benchmark scripts
+themselves, which are now in `benchmarks/scripts/opt_laptop.py`, with the records in
+`benchmarks/data/optimization/2026-09-16_m4max_caffeine.json`. Two hours and five
+minutes of machine for the eight optimizations.
+
+| functional | basis | nao | method | total | speedup | steps | s/step | energy |
+| --- | --- | ---: | --- | ---: | ---: | ---: | ---: | ---: |
+| HF | def2-svp | 246 | four-centre | 619.8 | 1.00 | 33 | 18.78 | -675.83732476 |
+| | | | RI-JK simd, in memory | 90.2 | 6.87 | 27 | 3.34 | -675.83673457 |
+| HF | def2-svpd | 366 | four-centre | 2961.8 | 1.00 | 35 | 84.62 | -675.86719050 |
+| | | | RI-JK simd, in memory | 174.2 | **17.01** | 35 | 4.98 | -675.86660602 |
+| B3LYP | def2-svp | 246 | four-centre | 628.5 | 1.00 | 29 | 21.67 | -679.88509552 |
+| | | | RI-JK simd, in memory | 185.6 | 3.39 | 29 | 6.40 | -679.88514659 |
+| B3LYP | def2-svpd | 366 | four-centre | 2471.5 | 1.00 | 27 | 91.53 | -679.92921001 |
+| | | | RI-JK simd, in memory | 322.4 | **7.67** | 27 | 11.94 | -679.92926228 |
+
+### Why the record keeps the steps
+
+An optimization is not one measurement, it is a step count times a cost per step,
+and **only one of those two is the driver's doing**. Three of the four pairs
+converged in the same number of steps as each other, and for those the total
+speedup and the per-step speedup are the same number to three figures: 17.01 and
+16.99, 3.39 and 3.39, 7.67 and 7.67. Those are clean.
+
+The fourth is not. Hartree-Fock in def2-svp took the four-centre path 33 steps and
+the resolution of the identity 27, so its 6.87 is a per-step speedup of **5.62**
+multiplied by the optimizer happening to take a shorter route over a slightly
+different surface. That is luck and not merit, and it could as easily have gone the
+other way. A table which carried only the total would have reported the largest
+Hartree-Fock def2-svp speedup in this file and been wrong about where it came from.
+
+The shape of the rest is what the single-point gradients already said: the diffuse
+shell decides the ratio, 6.9 to 17.0 at Hartree-Fock, and B3LYP is lower only
+because the quadrature is a fixed cost in both columns.
+
+### An outlier which was a methyl group
+
+That same Hartree-Fock def2-svp row put an atom 4.57e-02 bohr away from where the
+four-centre optimization put it -- sixty-six times the displacement of any other
+row, and suspicious in exactly the row whose step count already disagreed.
+
+It is not a structural disagreement. The four atoms which moved are H17, H15, H16
+and H21, which is one methyl group, and the heavy atom framework agrees to 7.46e-05
+bohr, indistinguishable from every other row:
+
+| | four largest movers | heavy-atom bonds agree to |
+| --- | --- | ---: |
+| HF, def2-svp | H17, H15, H16, H21 | 7.46e-05 |
+| HF, def2-svpd | H17, H16, H22, H14 | 7.97e-05 |
+| B3LYP, def2-svp | H18, H20, H19, O11 | 3.86e-05 |
+| B3LYP, def2-svpd | H15, H17, C9, H16 | 3.40e-05 |
+
+Caffeine has three methyl groups and a methyl rotation costs almost nothing, so the
+two surfaces put the rotor at slightly different angles for no energy worth
+measuring -- and the optimizer spent its six extra steps chasing that flat
+direction. **A displacement is not a disagreement until it is a heavy atom.** The
+check is one line and it turns the alarming number in the table into the
+uninteresting one it actually is.
+
+### What the two surfaces differ by
+
+| | four-centre | RI-JK simd | difference |
+| --- | ---: | ---: | ---: |
+| HF, def2-svp | -675.83732476 | -675.83673457 | +5.90e-04 |
+| HF, def2-svpd | -675.86719050 | -675.86660602 | +5.84e-04 |
+| B3LYP, def2-svp | -679.88509552 | -679.88514659 | -5.11e-05 |
+| B3LYP, def2-svpd | -679.92921001 | -679.92926228 | -5.23e-05 |
+
+The fitting error, at each method's own minimum rather than at a common geometry.
+It is an order of magnitude smaller at B3LYP, where only a fifth of the exchange is
+fitted at all, and it changes sign there: the fitted B3LYP minima lie **below** the
+four-centre ones, which the Hartree-Fock rows do not.
