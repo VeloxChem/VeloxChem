@@ -1223,6 +1223,14 @@ class ThgDriver(NonlinearSolver):
 
         mo = self.comm.bcast(mo, root=mpi_master())
 
+        # NOTE: the factors of the densities which reach the Fock build. Only the
+        # two-time perturbed ones are built from here, so this is the one set of
+        # the general shape and not the two of the pass before.
+        self._ri_jk_factors = None
+
+        if self.rank == mpi_master() and self.ri_jk and self.ri_jk_simd:
+            self._ri_jk_factors = (mo[:, :nocc], [], mo[:, nocc:], [])
+
         for task_id, rank in task_rank_pairs:
             # only go through the tasks that are associated with self.rank
             if self.rank == rank:
@@ -1325,6 +1333,18 @@ class ThgDriver(NonlinearSolver):
                 # Dz += self.commut(k_lamtau_yz, Db_y)
                 # Dz += self.commut(kz, D_lamtau_zz)
                 # Dz += self.commut(k_lamtau_zz, Db_z)
+
+                # NOTE: the factors, taken before the transformation to the
+                # atomic orbitals and in the order the columns are laid out
+                # below. The first-order densities beside them are there for the
+                # quadrature alone and no Fock matrix is asked of them.
+                if self._ri_jk_factors is not None:
+                    for mat in (Dx, Dy, Dz):
+                        for part in (np.real, np.imag):
+                            ra, rb = rijkresponse.general_factors(
+                                mo, nocc, part(mat))
+                            self._ri_jk_factors[1].append(ra)
+                            self._ri_jk_factors[3].append(rb)
 
                 # density transformation from MO to AO basis
 
@@ -1581,16 +1601,15 @@ class ThgDriver(NonlinearSolver):
             time_start_fock = time.time()
 
             if self._dft:
-                dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
-                                                 'real_and_imag', eri_dict,
-                                                 dft_dict, density_list1,
-                                                 density_list2, None, 'thg_ii',
-                                                 profiler)
+                dist_focks = self._comp_nlr_fock(
+                    mo, molecule, ao_basis, 'real_and_imag', eri_dict, dft_dict,
+                    density_list1, density_list2, None, 'thg_ii', profiler,
+                    dens_factors=self._ri_jk_factors)
             else:
-                dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
-                                                 'real_and_imag', eri_dict,
-                                                 None, None, density_list2,
-                                                 None, 'thg_ii', profiler)
+                dist_focks = self._comp_nlr_fock(
+                    mo, molecule, ao_basis, 'real_and_imag', eri_dict, None,
+                    None, density_list2, None, 'thg_ii', profiler,
+                    dens_factors=self._ri_jk_factors)
 
             self._print_fock_time(time.time() - time_start_fock)
 
