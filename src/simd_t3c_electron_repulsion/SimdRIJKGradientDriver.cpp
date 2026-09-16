@@ -95,15 +95,17 @@ _multiply(const size_t  nrows,
 /// @note The factor is held as the inverted lower triangular matrix, so its
 /// transpose is upper triangular and no second matrix is stored for it: the
 /// transposed multiply is the same array read the other way.
+/// @brief The same, over a factor which the caller has already expanded.
+///
+/// @note The expansion is the square of the auxiliary basis and is the same array
+/// every time. Forming it inside this routine costs nothing when the routine is
+/// called once, and everything when it is called once per element of a matrix:
+/// ninety-two megabytes written eight thousand times over on a molecule of this
+/// size, which is memory traffic of a wholly different order to the arithmetic it
+/// serves. The caller which loops expands it once and hands it in.
 static auto
-_multiply_transposed(const CPackedMatrix &metric, double *values, const size_t ncols) -> void
+_multiply_transposed(const double *factor, const size_t naux, double *values, const size_t ncols) -> void
 {
-    const auto naux = metric.number_of_rows();
-
-    auto factor = std::vector<double>(naux * naux, 0.0);
-
-    metric.to_dense(factor.data());
-
     auto column = std::vector<double>(naux, 0.0);
 
     for (size_t icol = 0; icol < ncols; icol++)
@@ -131,6 +133,18 @@ _multiply_transposed(const CPackedMatrix &metric, double *values, const size_t n
     }
 }
 
+static auto
+_multiply_transposed(const CPackedMatrix &metric, double *values, const size_t ncols) -> void
+{
+    const auto naux = metric.number_of_rows();
+
+    auto factor = std::vector<double>(naux * naux, 0.0);
+
+    metric.to_dense(factor.data());
+
+    _multiply_transposed(factor.data(), naux, values, ncols);
+}
+
 auto
 CSimdRIJKGradientDriver::_apply_transposed_factor(const CPackedMatrix &metric,
                                                   double              *values,
@@ -154,6 +168,15 @@ CSimdRIJKGradientDriver::_apply_transposed_factor(const CPackedMatrix        &me
 
     const auto nelements = matrices.front().number_of_elements();
 
+    // NOTE: expanded once for the whole loop rather than once per element. This
+    // is the same array every time and is the square of the auxiliary basis, so
+    // forming it inside the loop was the dominant cost of the phase and not the
+    // multiply it exists for.
+
+    auto factor = std::vector<double>(naux * naux, 0.0);
+
+    metric.to_dense(factor.data());
+
     auto column = std::vector<double>(naux, 0.0);
 
     for (size_t at = 0; at < nelements; at++)
@@ -163,7 +186,7 @@ CSimdRIJKGradientDriver::_apply_transposed_factor(const CPackedMatrix        &me
             column[q] = matrices[q].data()[at];
         }
 
-        _multiply_transposed(metric, column.data(), 1);
+        _multiply_transposed(factor.data(), naux, column.data(), 1);
 
         for (size_t q = 0; q < naux; q++)
         {
