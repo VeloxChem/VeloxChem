@@ -357,7 +357,7 @@ class QuadraticResponseDriver(NonlinearSolver):
             'max_iter', 'eri_thresh', 'timing', 'memory_profiling',
             'batch_size', 'restart', 'xcfun', 'grid_level', 'potfile',
             'electric_field', 'program_end_time', '_debug', '_block_size_factor',
-            'ri_coulomb'
+            'ri_coulomb', 'ri_jk', 'ri_jk_simd', 'ri_auxiliary_basis'
         }
 
         for key in cpp_keywords:
@@ -436,7 +436,7 @@ class QuadraticResponseDriver(NonlinearSolver):
         dft_dict = self._init_dft(molecule, scf_results)
 
         # computing all compounded first-order densities
-        first_order_dens, second_order_dens = self.get_densities(
+        first_order_dens, second_order_dens, ri_jk_factors = self.get_densities(
             freqpairs, Nx, mo, nocc, norb)
 
         profiler.check_memory_usage('Densities')
@@ -444,7 +444,8 @@ class QuadraticResponseDriver(NonlinearSolver):
         #  computing the compounded first-order Fock matrices
         fock_dict = self.get_fock_dict(freqpairs, first_order_dens,
                                        second_order_dens, F0, mo, molecule,
-                                       ao_basis, eri_dict, dft_dict)
+                                       ao_basis, eri_dict, dft_dict,
+                                       ri_jk_factors)
 
         profiler.check_memory_usage('Focks')
 
@@ -579,6 +580,14 @@ class QuadraticResponseDriver(NonlinearSolver):
         distributed_density_1 = None
         distributed_density_2 = None
 
+        # NOTE: the factors of the second-order densities, collected beside them.
+        # None where this way of building cannot be taken, and then nothing looks
+        # for them.
+        ri_jk_factors = None
+
+        if self.rank == mpi_master() and self.ri_jk and self.ri_jk_simd:
+            ri_jk_factors = (mo[:, :nocc], [], mo[:, nocc:], [])
+
         for (wb, wc) in freqpairs:
 
             Nb = ComplexResponseSolver.get_full_solution_vector(Nx[('B', wb)])
@@ -597,6 +606,25 @@ class QuadraticResponseDriver(NonlinearSolver):
                 # create the first order two indexed densities #
 
                 Dbc = self.commut(kb, Dc) + self.commut(kc, Db)
+
+                # NOTE: a density of second order is block diagonal in the
+                # orbitals, the occupied block carrying the occupied orbitals on
+                # both sides and the virtual block the virtual ones. The blocks
+                # are taken here, before the transformation to the atomic
+                # orbitals throws the structure away, so that the resolution of
+                # the identity contracts the factors rather than the matrix. The
+                # orbitals are real and only the block is complex, so the real
+                # and the imaginary density are the real and the imaginary block
+                # with the same orbitals on either side of them.
+                if ri_jk_factors is not None:
+                    block_oo = Dbc[:nocc, :nocc]
+                    block_vv = Dbc[nocc:, nocc:]
+                    mo_occ = mo[:, :nocc]
+                    mo_vir = mo[:, nocc:]
+                    for block in (block_oo.real, block_oo.imag):
+                        ri_jk_factors[1].append(np.matmul(mo_occ, block.T))
+                    for block in (block_vv.real, block_vv.imag):
+                        ri_jk_factors[3].append(np.matmul(mo_vir, block.T))
 
                 # density transformation from MO to AO basis
 
@@ -637,7 +665,7 @@ class QuadraticResponseDriver(NonlinearSolver):
             else:
                 distributed_density_2.append(dist_den_2_freq, axis=1)
 
-        return distributed_density_1, distributed_density_2
+        return distributed_density_1, distributed_density_2, ri_jk_factors
 
     def get_fock_dict(self,
                       wi,
@@ -648,7 +676,8 @@ class QuadraticResponseDriver(NonlinearSolver):
                       molecule,
                       ao_basis,
                       eri_dict,
-                      dft_dict=None):
+                      dft_dict=None,
+                      ri_jk_factors=None):
         """
         Computes the Fock matrices for a quadratic response function
 
@@ -710,7 +739,8 @@ class QuadraticResponseDriver(NonlinearSolver):
             dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
                                              'real_and_imag', eri_dict,
                                              dft_dict, first_order_dens,
-                                             second_order_dens, None, 'qrf')
+                                             second_order_dens, None, 'qrf',
+                                             dens_factors=ri_jk_factors)
 
             self._print_fock_time(time.time() - time_start_fock)
 

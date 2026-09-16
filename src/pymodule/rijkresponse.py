@@ -118,6 +118,39 @@ def initialize(solver, molecule, basis):
     solver.ostream.flush()
 
 
+def slice_factors(dens_factors, start, end):
+    """The factors of the densities of one batch.
+
+    The Fock build takes the densities in batches, so the factors are cut the same
+    way. The shared left factors are the same for every batch and only the lists of
+    right factors are cut.
+
+    :param dens_factors:
+        The factors of the whole set.
+    :param start:
+        The first density of the batch.
+    :param end:
+        The density past the last of the batch.
+
+    :return:
+        The factors of that batch, in the shape they were given in.
+    """
+
+    if dens_factors is None:
+        return None
+
+    if len(dens_factors) == 4:
+        left_a, rights_a, left_b, rights_b = dens_factors
+        return (left_a, rights_a[start:end], left_b, rights_b[start:end])
+
+    if len(dens_factors) == 2:
+        left, rights = dens_factors
+        return (left, rights[start:end])
+
+    left, rights, transposed_rights = dens_factors
+    return (left, rights[start:end], transposed_rights[start:end])
+
+
 def _packed(array):
     """The array as a general packed matrix."""
 

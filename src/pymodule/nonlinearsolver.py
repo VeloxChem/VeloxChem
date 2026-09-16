@@ -892,8 +892,12 @@ class NonlinearSolver:
             # NOTE: the resolution of the identity takes the whole batch at once,
             # as the shared factor is transformed once for all of it, so it
             # replaces the loop rather than sitting inside it.
+            # NOTE: only the two-time perturbed densities are taken this way so
+            # far. The three-time ones are cut from a different array with a
+            # batch of its own, so their factors would be cut differently, and
+            # that is left until they are wired.
             use_ri_jk = (self.ri_jk and self.ri_jk_simd and
-                         dens_factors is not None)
+                         dens_factors is not None and mode_is_quadratic)
 
             if use_ri_jk:
                 assert_msg_critical(
@@ -901,8 +905,12 @@ class NonlinearSolver:
                     f'{type(self).__name__}: RI-JK is not implemented for a ' +
                     'range-separated functional')
 
+                # NOTE: the factors of this batch and not of the whole set. The
+                # densities above were cut from the same columns.
                 fock_arrays = rijkresponse.fock_matrices(
-                    self, ao_basis, dens_factors, fock_k_factor)
+                    self, ao_basis,
+                    rijkresponse.slice_factors(dens_factors, batch_start,
+                                               batch_end), fock_k_factor)
 
             for idx in range(0 if use_ri_jk else len(dts_for_fock)):
                 if self.ri_coulomb:
