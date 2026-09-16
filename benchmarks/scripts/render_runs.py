@@ -58,6 +58,23 @@ def method_name(row):
     return f"{name}, {mode}" if mode else name
 
 
+def _label(doc):
+    """What the run solved for, which the suite alone does not say.
+
+    The excited state suite runs two solvers into records of one shape, so the
+    column which carries the time is named from the rows and not from the suite.
+    A record written before the solver was recorded is the Tamm-Dancoff one.
+    """
+    if doc["suite"] != "tda":
+        return doc["suite"].upper()
+    return doc["rows"][0].get("solver", "tda").upper()
+
+
+def _headed(doc, header):
+    """The header with the time column named for the solver."""
+    return [h.replace("TDA (s)", f"{_label(doc)} (s)") for h in header]
+
+
 def _cost(row, suite):
     if suite == "gradient":
         return row["grad_wall"]
@@ -160,8 +177,8 @@ def _select(doc, basis):
 
 def render(path, basis=None):
     doc = _select(json.loads(Path(path).read_text()), basis)
-    header, _ = SPECS[doc["suite"]]
-    lines = [f'## {doc["suite"]}: {doc["rows"][0]["molecule"]}', "",
+    header = _headed(doc, SPECS[doc["suite"]][0])
+    lines = [f'## {_label(doc).lower()}: {doc["rows"][0]["molecule"]}', "",
              provenance_line(doc["run"]), "",
              "| " + " | ".join(header) + " |",
              "| " + " | ".join("---" for _ in header) + " |"]
@@ -187,9 +204,10 @@ def render_pdf(path, out, basis=None):
 
     doc = _select(json.loads(Path(path).read_text()), basis)
     header, widths = SPECS[doc["suite"]]
+    header = _headed(doc, header)
     cells = cells_of(doc)
     line = provenance_line(doc["run"]).replace("`", "")
-    title = f'{doc["suite"].upper()}: {doc["rows"][0]["molecule"]}'
+    title = f'{_label(doc)}: {doc["rows"][0]["molecule"]}'
 
     with PdfPages(out) as pdf:
         height = 1.6 + 0.22 * len(cells)

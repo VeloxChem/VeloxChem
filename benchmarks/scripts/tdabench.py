@@ -1,4 +1,4 @@
-"""One TDA calculation, one record.
+"""One excited state calculation, one record.
 
 The record is the calculation, its provenance, the wall time of the excited state
 part alone, and the excitation energies it found. The ground state is timed too but
@@ -17,8 +17,17 @@ import veloxchem as vlx
 from veloxchem.outputstream import OutputStream
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.tdaeigensolver import TdaEigenSolver
+from veloxchem.lreigensolver import LinearResponseEigenSolver
 
 from scfbench import GEOMETRIES
+
+# NOTE: the two ways of solving for the same states. The Tamm-Dancoff
+# approximation drops the de-excitation block, so its trial vector gives a density
+# of one term where a full linear response vector gives two.
+SOLVERS = {
+    "tda": TdaEigenSolver,
+    "rpa": LinearResponseEigenSolver,
+}
 
 # method -> (ri_jk, ri_jk_simd, ri_mode)
 METHODS = {
@@ -28,7 +37,7 @@ METHODS = {
 
 
 def run(molecule_name, basis_name, aux_name, method, functional, nstates=5,
-        conv_thresh=1.0e-8, tda_thresh=1.0e-5):
+        conv_thresh=1.0e-8, tda_thresh=1.0e-5, solver="tda"):
     """Runs one ground state and its TDA, and returns the record."""
     molecule = vlx.Molecule.read_xyz_file(str(GEOMETRIES / f"{molecule_name}.xyz"))
     basis = vlx.MolecularBasis.read(molecule, basis_name.upper(), ostream=None)
@@ -50,7 +59,7 @@ def run(molecule_name, basis_name, aux_name, method, functional, nstates=5,
     scf.compute(molecule, basis)
     scf_wall = time.time() - t0
 
-    tda = TdaEigenSolver(ostream=OutputStream(None))
+    tda = SOLVERS[solver](ostream=OutputStream(None))
     tda.nstates = nstates
     tda.conv_thresh = tda_thresh
     if functional.upper() != "HF":
@@ -70,6 +79,7 @@ def run(molecule_name, basis_name, aux_name, method, functional, nstates=5,
 
     return {
         "molecule": molecule_name,
+        "solver": solver,
         "atoms": molecule.number_of_atoms(),
         "basis": basis_name,
         "nao": basis.get_dimensions_of_basis(),
