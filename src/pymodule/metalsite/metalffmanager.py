@@ -572,58 +572,29 @@ class MetalForceFieldManager:
         }
 
         self._comparison = results
-        self._print_comparison(results)
+
+        # The tables are drawn from the scores and the residue nodes, worked
+        # out here rather than in the printer, which computes nothing. A spec
+        # is printed for the structure, and for any template that
+        # coordinates a different set of residues than it does.
+        def spec_of(site):
+            return (site,
+                    self._matcher.bridging_nodes(site['coarse_topology']))
+
+        specs = {None: spec_of(described)}
+        for name, entry in findings.items():
+            if entry['status'] == 'spec':
+                specs[name] = spec_of(self.templates[name])
+        scores = {
+            name: self._matcher.selection_score(entry, self.SELECTION_RANKED_ON)
+            for name, entry in findings.items()
+        }
+        self._matcher.print_comparison(results, specs,
+                                       self.SELECTION_RANKED_ON, scores)
 
         # the table this decision would print is printed by the one caller
         # that acts on it, build_ff_from_template
         return self._select_template(None)['name'] is not None
-
-    def _print_comparison(self, results):
-        """
-        Gathers what the comparison tables are drawn from and prints them.
-
-        The scores and the residue nodes are worked out here rather than in
-        the printer, which computes nothing.
-
-        :param results:
-            The last comparison, from compare_active_site.
-        """
-
-        # a spec is printed for the structure, and for any template that
-        # coordinates a different set of residues than it does
-        specs = {None: self._spec_of(results['active_site'])}
-        for name, entry in results['templates'].items():
-            if entry['status'] == 'spec':
-                specs[name] = self._spec_of(self.templates[name])
-
-        scores = {
-            name: self._selection_score(entry)
-            for name, entry in results['templates'].items()
-        }
-
-        self._matcher.print_comparison(results,
-                                       specs,
-                                       self.SELECTION_RANKED_ON,
-                                       scores)
-
-    def _spec_of(self, described):
-        """
-        Returns a described site paired with the residues that bridge it,
-        which is what SiteMatcher.print_spec is drawn from.
-
-        :param described:
-            A described active site or a template.
-
-        :return:
-            The pair.
-        """
-
-        return (described,
-                self._matcher.bridging_nodes(described['coarse_topology']))
-
-    # ------------------------------------------------------------------
-    # selection
-    # ------------------------------------------------------------------
 
     def build_ff_from_template(self, template=None):
         """
@@ -955,21 +926,3 @@ class MetalForceFieldManager:
                                              self.IC_TYPES,
                                              self.SELECTION_RANKED_ON,
                                              template)
-
-    def _selection_score(self, entry):
-        """
-        What several templates that all pass are ranked on; see
-        SiteMatcher.selection_score.
-
-        :param entry:
-            What compare_active_site measured for the template.
-
-        :return:
-            The measure named by SELECTION_RANKED_ON.
-        """
-
-        return self._matcher.selection_score(entry, self.SELECTION_RANKED_ON)
-
-    # ------------------------------------------------------------------
-    # transfer
-    # ------------------------------------------------------------------

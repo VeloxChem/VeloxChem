@@ -141,18 +141,29 @@ class Shoehorner(Shell):
         builder._mm_opt = False
 
         try:
-            reason = self._shoehorn(builder, template,
-                                    float(max_include_radius), max_mappings)
+            # the three stages, in order: the composition first, then the
+            # protonation, since the mapping the denticity is forced through
+            # cannot be solved while the hydrogens still differ
+            reason = self._shoehorn_composition(builder, template,
+                                                float(max_include_radius))
+            if reason is None:
+                reason = self._shoehorn_protonation(builder, template,
+                                                    max_mappings)
+            if reason is None:
+                reason = self._shoehorn_denticity(builder, template,
+                                                  max_mappings)
         except Exception:
             builder._mm_opt = relaxing
-            self._restore(builder, snapshot)
+            builder._request = deepcopy(snapshot)
+            builder.build_active_site()
             builder.ostream = builder_stream
             raise
 
         builder._mm_opt = relaxing
 
         if reason is not None:
-            self._restore(builder, snapshot)
+            builder._request = deepcopy(snapshot)
+            builder.build_active_site()
             builder.ostream = builder_stream
             self.ostream.print_warning(
                 f'Could not shoehorn the site into {template["name"]}: {reason}. '
@@ -191,51 +202,6 @@ class Shoehorner(Shell):
         return self._matcher().describe(
             active_site,
             util.connectivity_bonds(active_site['connectivity_matrix']))
-
-    def _shoehorn(self, builder, template, max_include_radius, max_mappings):
-        """
-        The three stages of a shoehorning, in order.
-
-        :param builder:
-            The builder holding the site to edit.
-        :param template:
-            The template to edit it onto.
-        :param max_include_radius:
-            How far out from a metal center a residue may be picked up from.
-        :param max_mappings:
-            The limit on how many atom mappings are built.
-
-        :return:
-            What stood in the way, or None when nothing did.
-        """
-
-        reason = self._shoehorn_composition(builder,
-                                            template,
-                                            max_include_radius)
-        if reason is not None:
-            return reason
-
-        # the protonation first: the mapping the denticity is forced through
-        # cannot be solved while the hydrogens still differ
-        for stage in (self._shoehorn_protonation, self._shoehorn_denticity):
-            reason = stage(builder, template, max_mappings)
-            if reason is not None:
-                return reason
-
-        return None
-
-    def _restore(self, builder, request):
-        """
-        Puts an active site back the way it was before a shoehorning.
-
-        :param builder:
-            The builder holding the site.
-        :param request:
-            The record of its edits, as it stood beforehand.
-        """
-
-        builder._request = deepcopy(request)
-        builder.build_active_site()
 
     @on_master
     def _print_outcome(self, builder, name):
@@ -1131,11 +1097,16 @@ class Shoehorner(Shell):
                 name: self._hydrogen_count(template, first)
                 for first, name in pairs
             }
-            delta = sum(wanted.values()) - sum(
-                self._hydrogen_count(described, heavy_map[first]) for first, _ in pairs)
+            have = {
+                name: self._hydrogen_count(described, heavy_map[first])
+                for first, name in pairs
+            }
+            delta = sum(wanted.values()) - sum(have.values())
 
-            if delta == 0 and not self._tautomer_differs(
-                    template, described, heavy_map, pairs):
+            # the same number of hydrogens on the same atoms is the same
+            # variant; the same number on other atoms is a tautomer -- HID
+            # and HIE hold one each and differ only in which ring nitrogen
+            if delta == 0 and wanted == have:
                 continue
 
             variant = self._target_variant(residue, current, delta, wanted)
@@ -1157,32 +1128,6 @@ class Shoehorner(Shell):
             })
 
         return changes
-
-    @on_master
-    def _tautomer_differs(self, template, described, heavy_map, pairs):
-        """
-        Whether a residue carries its hydrogens on other atoms than the
-        template does, with the same number of them.
-
-        The histidines are what this is about: HID and HIE hold one hydrogen
-        each and differ only in which ring nitrogen holds it.
-
-        :param template:
-            The template to match.
-        :param described:
-            The described active site.
-        :param heavy_map:
-            The mapping from template index to site index.
-        :param pairs:
-            The atoms of the residue, as template index and site atom name.
-
-        :return:
-            True when some atom of it disagrees.
-        """
-
-        return any(
-            self._hydrogen_count(template, first) != self._hydrogen_count(
-                described, heavy_map[first]) for first, _ in pairs)
 
     @on_master
     def _target_variant(self, residue, current, delta, wanted):

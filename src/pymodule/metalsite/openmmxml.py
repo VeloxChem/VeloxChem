@@ -216,7 +216,7 @@ def restructure_topology(topology, positions, active_site, forcefield):
         new_topology.addBond(new_atoms[pair[0]], new_atoms[pair[1]])
         bonded.add(frozenset(pair))
 
-    metal_bonds = metal_bond_keys(forcefield, active_site)
+    metal_bonds, _, _ = metal_term_keys(forcefield, active_site)
     for key in metal_bonds:
         pair = (site_atom_index[key[0]], site_atom_index[key[1]])
         if frozenset(pair) not in bonded:
@@ -293,24 +293,6 @@ def _free_chain_id(topology):
             return candidate
 
     return 'MS'
-
-
-def metal_bond_keys(forcefield, active_site):
-    """
-    The metal bonds that become bonds of the restructured topology.
-
-    A term that names a capping hydrogen is left out the way
-    create_enzyme_system leaves it out: the cap stands for an alpha carbon
-    the protein force field parameterizes itself.
-
-    :return:
-        The bond keys, as active site index pairs.
-    """
-
-    caps = set(active_site['cap_indices'])
-    bonds, _ = util.get_metal_keys(forcefield, active_site)
-
-    return [key for key in bonds if not caps & set(key)]
 
 
 def metal_term_keys(forcefield, active_site):

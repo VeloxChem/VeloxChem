@@ -333,18 +333,8 @@ class MetalSiteForceFieldBuilder:
     def ostream(self, ostream):
 
         self._ostream = ostream
-        for shell in self._shells():
+        for shell in (self._sites, self._qm, self._enzyme):
             shell.ostream = ostream
-
-    def _shells(self):
-        """
-        The phase classes the builder owns.
-
-        :return:
-            The list of shells.
-        """
-
-        return [self._sites, self._qm, self._enzyme]
 
     @property
     def _report_cutoff(self):
@@ -642,10 +632,14 @@ class MetalSiteForceFieldBuilder:
         state['topology'] = topology
         state['positions'] = positions
 
+        # PDBFile.writeFile wants a quantity: handed bare numbers it writes
+        # nanometers as Angstrom and produces a structure shrunk tenfold
         self._save_intermediate(
-            'protonated.pdb', lambda path: self._write_pdb(
-                path, state['protonated_topology'], state[
-                    'protonated_positions']))
+            'protonated.pdb', lambda path: mmapp.PDBFile.writeFile(
+                state['protonated_topology'],
+                np.asarray(state['protonated_positions']) * mmunit.angstrom,
+                str(path),
+                keepIds=True))
 
         if mm_opt:
             state['active_site']['molecule'] = self._crude_relax(
@@ -789,20 +783,19 @@ class MetalSiteForceFieldBuilder:
 
         self._require('add_metal_bond', Stage.ACTIVE_SITE)
 
-        def edit(request, modes):
-            return self._sites.add_metal_bond(request,
-                                              modes,
-                                              self._protonated_topology,
-                                              self._protonated_positions,
-                                              resid,
-                                              metal,
-                                              self.metal_bond_cutoff,
-                                              self._report_cutoff,
-                                              atom=atom,
-                                              chain=chain,
-                                              equilibrium=equilibrium)
-
-        self._edit_coordination(edit)
+        # an edit is a decision, so it goes into the request and nowhere else
+        self._request = self._sites.add_metal_bond(self._request,
+                                                   self.binding_modes,
+                                                   self._protonated_topology,
+                                                   self._protonated_positions,
+                                                   resid,
+                                                   metal,
+                                                   self.metal_bond_cutoff,
+                                                   self._report_cutoff,
+                                                   atom=atom,
+                                                   chain=chain,
+                                                   equilibrium=equilibrium)
+        self._reapply()
 
     def remove_metal_bond(self, resid, metal=None, atom=None, chain=None):
         """
@@ -830,15 +823,13 @@ class MetalSiteForceFieldBuilder:
 
         self._require('remove_metal_bond', Stage.ACTIVE_SITE)
 
-        def edit(request, modes):
-            return self._sites.remove_metal_bond(request,
-                                                 modes,
-                                                 resid,
-                                                 metal=metal,
-                                                 atom=atom,
-                                                 chain=chain)
-
-        self._edit_coordination(edit)
+        self._request = self._sites.remove_metal_bond(self._request,
+                                                      self.binding_modes,
+                                                      resid,
+                                                      metal=metal,
+                                                      atom=atom,
+                                                      chain=chain)
+        self._reapply()
 
     def update_protonation_state(self, resid, variant, chain=None):
         """
@@ -948,73 +939,37 @@ class MetalSiteForceFieldBuilder:
     # applying an edit
     # ------------------------------------------------------------------
 
-    def _edit_coordination(self, edit):
-        """
-        Applies one coordination edit and brings the builder up to date.
-
-        An edit is a decision, so it goes into the request and nowhere else.
-        There is only one numbering, and the request survives every
-        derivation, so the same edit means the same thing at either stage.
-
-        :param edit:
-            A callable taking the request and the coordination it is being
-            made against, and returning the edited request.
-        """
-
-        self._request = edit(self._request, self.binding_modes)
-
-        self._reapply()
-
     def _reapply(self):
         """
         Brings everything downstream of an edit up to date, whichever way
         this builder's stage says that is done. The one place that branch is
         written, and every edit method's last act.
+
+        Before a fit the site is protonated and truncated again from the
+        request as it stands, the way build_active_site did it without a
+        path, so an edit does not silently change whether the crude pass
+        happens. After a fit nothing expensive runs: the geometry, the
+        Hessian and the charges all still describe this cluster, and only
+        which atoms the metals are bonded to has changed, so the force field
+        is built again from them with the new connectivity. Rebuilding it
+        rather than patching it is what keeps the angles, torsions and
+        impropers that cross an edited bond right, since the generator
+        derives every one of them from the connectivity matrix. A term the
+        Hessian holds nothing for is fitted to zero and reported by
+        _check_force_constants; the bond is kept, and the warning says to
+        recompute the Hessian rather than that the edit was refused.
         """
 
         if self._stage < Stage.FITTED:
-            self._rebuild_active_site()
-        else:
-            self._refit_forcefield()
-
-    def _rebuild_active_site(self):
-        """
-        Protonates and truncates again from the binding modes as they stand.
-
-        The same work build_active_site does without a path, and run the same
-        way it was run then, so that an edit does not silently change whether
-        the crude pass happens. The run header is not printed again: this is
-        not a new run.
-        """
-
-        state = self._build_active_site(self._topology, self._positions,
-                                        self._mm_opt, False)
-
-        self._adopt(state)
-
-        # the site they were computed for has just been replaced; a file in
-        # the folder that still fits this one is picked back up by
-        # build_forcefield, which validates it before it uses it
-        self._enter(Stage.ACTIVE_SITE)
-
-    def _refit_forcefield(self):
-        """
-        Fits the metal terms again after the coordination was edited.
-
-        Nothing expensive runs. The geometry, the Hessian and the charges all
-        still describe this cluster, and only which atoms the metals are
-        bonded to has changed, so the force field is built again from them
-        with the new connectivity. Rebuilding it rather than patching it is
-        what keeps the angles, torsions and impropers that cross an edited
-        bond right: the generator derives every one of them from the
-        connectivity matrix.
-
-        A term the Hessian holds nothing for is fitted to zero and reported by
-        _check_force_constants, which is what a bond added by hand looks like
-        when the Hessian was computed for a coordination without it. The bond
-        is kept: the warning says to recompute the Hessian, not that the edit
-        was refused.
-        """
+            # not a new run, so the header is not printed again
+            state = self._build_active_site(self._topology, self._positions,
+                                            self._mm_opt, False)
+            self._adopt(state)
+            # the Hessian and the charges were computed for the site that was
+            # just replaced; a file in the folder that still fits this one
+            # is picked back up by build_forcefield, which validates it first
+            self._enter(Stage.ACTIVE_SITE)
+            return
 
         self.ostream.print_info(
             'Fitting the metal terms again on the edited coordination. '
@@ -1022,9 +977,13 @@ class MetalSiteForceFieldBuilder:
             'reported below.')
         self.ostream.flush()
 
+        coordination = self._sites.site_coordination(
+            self._protonated_topology, self._protonated_positions,
+            self._active_site['molecule'], self._active_site, self._request,
+            self.metal_elements, self.metal_formal_charges,
+            self.metal_bond_cutoff, self._report_cutoff)
         self._active_site = self._sites.apply_metal_bonds(
-            self._active_site,
-            self._site_coordination(self._active_site['molecule']))
+            self._active_site, coordination)
 
         # entering FITTED drops the enzyme system built from the old terms
         self._fit_forcefield(self._hessian, self._partial_charges)
@@ -1385,12 +1344,27 @@ class MetalSiteForceFieldBuilder:
         build_forcefield.
 
         :return:
-            The tuple of the OpenMM system, the topology and the positions it was built for.
+            The tuple of the OpenMM system and the topology it was built for.
         """
 
         self._require('create_enzyme_system', Stage.FITTED)
 
-        self._enzyme_system = self._create_enzyme_system()
+        system, _ = self._enzyme.create_enzyme_system(
+            self._protonated_topology, self._active_site, self._forcefield,
+            self._partial_charges, self.protein_forcefield_files)
+
+        self._save_intermediate(
+            util.ENZYME_SYSTEM_FILE,
+            lambda path: path.write_text(mm.XmlSerializer.serialize(system)))
+        # written again beside the system, unchanged, so that the last step
+        # to touch the folder leaves it complete whichever way the run got
+        # here
+        self._save_intermediate(
+            util.FORCEFIELD_FILE,
+            lambda path: MMForceFieldGenerator.save_forcefield_as_json(
+                self._forcefield, str(path)))
+
+        self._enzyme_system = system
         self._enter(Stage.ENZYME)
 
         return self._enzyme_system, self._protonated_topology
@@ -1423,27 +1397,16 @@ class MetalSiteForceFieldBuilder:
 
         self._require('create_enzyme_forcefield', Stage.FITTED)
 
-        self._enzyme_forcefield = self._create_enzyme_forcefield()
-        self._enter(Stage.ENZYME)
-
-        return self._enzyme_forcefield
-
-    def _create_enzyme_forcefield(self):
-        """
-        The work of create_enzyme_forcefield.
-
-        The XML and the topology it is for are written together, since
-        neither says anything without the other: the templates are keyed
-        on the chain and residue id of a topology whose active site has
-        been moved into one residue.
-        """
-
         result = self._enzyme.create_enzyme_forcefield(
             self._protonated_topology, self._protonated_positions,
             self._active_site, self._forcefield, self._partial_charges,
             self.protein_forcefield_files,
             self.drop_torsions_across_metal_bonds)
 
+        # the XML and the topology it is for are written together, since
+        # neither says anything without the other: the templates are keyed
+        # on the chain and residue id of a topology whose active site has
+        # been moved into one residue
         self._save_intermediate(openmmxml.SITE_XML_FILE,
                                 lambda path: path.write_text(result['xml']))
         self._save_intermediate(
@@ -1460,59 +1423,19 @@ class MetalSiteForceFieldBuilder:
                 # topology back
                 keepIds=True))
 
-        return {
-            'xml': result['xml'],
-            'topology': result['topology'],
-            'positions': result['positions'],
-            'templates': result['templates'],
-            'backbone_shift': result['backbone_shift'],
+        # what restructure_topology returned is the phase's own business
+        self._enzyme_forcefield = {
+            key: result[key]
+            for key in ('xml', 'topology', 'positions', 'templates',
+                        'backbone_shift')
         }
+        self._enter(Stage.ENZYME)
 
-    def _create_enzyme_system(self):
-        """
-        The work of create_enzyme_system.
-
-        The force field is written out again alongside the system. Building
-        the enzyme reads it rather than changing it, so the file it replaces
-        holds the same parameters -- but writing it here means the last step
-        to touch the folder leaves it complete, whichever way the run
-        reached this point.
-        """
-
-        system, _ = self._enzyme.create_enzyme_system(
-            self._protonated_topology, self._active_site, self._forcefield,
-            self._partial_charges, self.protein_forcefield_files)
-
-        self._save_intermediate(
-            util.ENZYME_SYSTEM_FILE,
-            lambda path: path.write_text(mm.XmlSerializer.serialize(system)))
-        self._save_intermediate(
-            util.FORCEFIELD_FILE,
-            lambda path: MMForceFieldGenerator.save_forcefield_as_json(
-                self._forcefield, str(path)))
-
-        return system
+        return self._enzyme_forcefield
 
     # ------------------------------------------------------------------
     # the working folder
     # ------------------------------------------------------------------
-
-    def _working_folder(self):
-        """
-        Returns the working folder, creating it if it does not exist.
-
-        Called from _save_intermediate alone, which has already returned on
-        every rank but the master, so there is no rank guard here: guarding
-        in two places is how the two guards drift apart.
-
-        :return:
-            The folder as a Path.
-        """
-
-        folder = Path(self.folder)
-        folder.mkdir(parents=True, exist_ok=True)
-
-        return folder
 
     def _save_intermediate(self, name, writer):
         """
@@ -1532,76 +1455,12 @@ class MetalSiteForceFieldBuilder:
         if self.rank != mpi_master():
             return
 
-        path = self._working_folder() / name
-        writer(path)
+        folder = Path(self.folder)
+        folder.mkdir(parents=True, exist_ok=True)
+        writer(folder / name)
 
         self.ostream.print_info(f'Wrote {name} to {self.folder}')
         self.ostream.flush()
-
-    def _write_run_artifacts(self, forcefield, hessian, charges):
-        """
-        Writes everything the fit was made of and everything it produced.
-
-        The geometry, the Hessian and the charges are written again here even
-        when they were handed in or read back, so that the folder holds the
-        run rather than only the parts of it that happened to be computed.
-        The force field goes out as JSON, which is what a template reads.
-
-        The charges written are the ones the force field ended up carrying,
-        not the ones handed in: build_forcefield folds the capping hydrogens'
-        charge into the rest of the site, and writing the raw fit beside a
-        force field carrying the corrected one left two files disagreeing
-        about what "the charges" are. Reading the file back and correcting it
-        again is harmless, since redistribute_cap_charges is idempotent.
-
-        :param forcefield:
-            The fitted force field.
-        :param hessian:
-            The Hessian it was fitted from.
-        :param charges:
-            The charges it was given, before the cap correction.
-        """
-
-        corrected = forcefield.partial_charges
-        if corrected is None:
-            corrected = charges
-
-        self._save_intermediate(
-            util.GEOMETRY_FILE, lambda path: self._active_site['molecule'].
-            write_xyz_file(str(path)))
-        if hessian is not None:
-            self._save_intermediate(util.HESSIAN_FILE,
-                                    lambda path: np.savetxt(path, hessian))
-
-        self._save_intermediate(util.CHARGES_FILE,
-                                lambda path: np.savetxt(path, corrected))
-        self._save_intermediate(
-            util.FORCEFIELD_FILE,
-            lambda path: MMForceFieldGenerator.save_forcefield_as_json(
-                forcefield, str(path)))
-
-    @staticmethod
-    def _write_pdb(path, topology, positions):
-        """
-        Writes a topology and its positions as a PDB file.
-
-        PDBFile.writeFile wants a quantity rather than bare numbers, and
-        handing it a bare list writes nanometers as Angstrom and produces a
-        structure shrunk tenfold.
-
-        :param path:
-            The file to write.
-        :param topology:
-            The OpenMM topology.
-        :param positions:
-            The positions in Angstrom.
-        """
-
-        with Path(path).open('w') as handle:
-            mmapp.PDBFile.writeFile(topology,
-                                    np.asarray(positions) * mmunit.angstrom,
-                                    handle,
-                                    keepIds=True)
 
     # ------------------------------------------------------------------
     # stage machinery
@@ -1730,6 +1589,17 @@ class MetalSiteForceFieldBuilder:
                                                   **self.seed_settings())
 
         if hessian is not None:
+            # A bond asked for by hand is a decision, and the two things the
+            # weak bridge pruning reads -- a zero force constant and a long
+            # distance -- are exactly what such a bond looks like when the
+            # Hessian does not cover it, so the pruning is told to leave it.
+            if self._protonated_topology is None:
+                protected = set()
+            else:
+                protected = self._sites.manual_bond_keys(
+                    active_site, self._protonated_topology,
+                    self.binding_modes)
+
             forcefield = self._qm.fit_forcefield(
                 active_site,
                 forcefield,
@@ -1739,12 +1609,36 @@ class MetalSiteForceFieldBuilder:
                 self.prune_weak_bridge_bonds,
                 self.reparameterize_metal_angles,
                 self.weak_bridge_tolerance,
-                protected_bonds=self._protected_bonds())
+                protected_bonds=protected)
 
         self._qm.print_metal_parameters(
             active_site, forcefield, util.get_metal_keys(forcefield,
                                                          active_site))
-        self._write_run_artifacts(forcefield, hessian, charges)
+
+        # Everything the fit was made of and everything it produced, written
+        # even when it was handed in or read back, so that the folder holds
+        # the run rather than only the parts that happened to be computed.
+        # The charges written are the ones the force field ended up carrying:
+        # build_forcefield folds the capping hydrogens' charge into the rest
+        # of the site, and writing the raw fit beside a force field carrying
+        # the corrected one left two files disagreeing about what "the
+        # charges" are. The force field goes out as JSON, which is what a
+        # template reads.
+        corrected = forcefield.partial_charges
+        if corrected is None:
+            corrected = charges
+        self._save_intermediate(
+            util.GEOMETRY_FILE,
+            lambda path: active_site['molecule'].write_xyz_file(str(path)))
+        if hessian is not None:
+            self._save_intermediate(util.HESSIAN_FILE,
+                                    lambda path: np.savetxt(path, hessian))
+        self._save_intermediate(util.CHARGES_FILE,
+                                lambda path: np.savetxt(path, corrected))
+        self._save_intermediate(
+            util.FORCEFIELD_FILE,
+            lambda path: MMForceFieldGenerator.save_forcefield_as_json(
+                forcefield, str(path)))
 
         self._forcefield = forcefield
         self._adopted_forcefield = False
@@ -1792,24 +1686,6 @@ class MetalSiteForceFieldBuilder:
         # a force field fitted before this describes the geometry it replaced
         self._enter(Stage.ACTIVE_SITE)
 
-    def _site_coordination(self, geometry):
-        """
-        The coordination of the extracted site under one of its geometries,
-        with the builder's settings; see ActiveSiteBuilder.site_coordination.
-
-        :param geometry:
-            The geometry to read, ordered like the active site.
-
-        :return:
-            The binding modes of the site under that geometry.
-        """
-
-        return self._sites.site_coordination(
-            self._protonated_topology, self._protonated_positions, geometry,
-            self._active_site, self._request, self.metal_elements,
-            self.metal_formal_charges, self.metal_bond_cutoff,
-            self._report_cutoff)
-
     # ------------------------------------------------------------------
     # settings assembly
     #
@@ -1819,26 +1695,6 @@ class MetalSiteForceFieldBuilder:
     # own: splatting the same dictionary into a run and into a comparison is
     # what stops the two drifting on what a setting means.
     # ------------------------------------------------------------------
-
-    def _protected_bonds(self):
-        """
-        The metal bonds the weak bridge pruning must leave alone.
-
-        A bond that was asked for by hand is a decision, and the two things
-        the pruning reads -- a zero force constant and a long distance -- are
-        exactly what such a bond looks like when the Hessian does not cover
-        it. Without this the fit would take it straight back out.
-
-        :return:
-            The bond keys, as a set.
-        """
-
-        if self._protonated_topology is None:
-            return set()
-
-        return self._sites.manual_bond_keys(self._active_site,
-                                            self._protonated_topology,
-                                            self.binding_modes)
 
     def relax_settings(self):
         """

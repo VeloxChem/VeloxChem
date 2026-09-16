@@ -162,7 +162,14 @@ class SiteMatcher(Shell):
         labels = active_site['molecule'].get_labels()
         metal_indices = list(active_site['metal_indices'])
 
-        fine = self._graph(labels, edges, active_site['cap_indices'])
+        # the graph an isomorphism is solved on: an element and a cap flag
+        # per atom, the bonds as edges
+        caps = set(active_site['cap_indices'])
+        fine = nx.Graph()
+        for index, label in enumerate(labels):
+            fine.add_node(index, elem=label, is_cap=index in caps)
+        for i, j in edges:
+            fine.add_edge(i, j)
 
         sidechains = fine.copy()
         sidechains.remove_nodes_from(metal_indices)
@@ -176,9 +183,13 @@ class SiteMatcher(Shell):
             nodes = sorted(component)
             node = ('residue', index)
             heavy = self._heavy_subgraph(labels, fine, nodes)
+            # the key is hashed over the whole fragment, hydrogens included,
+            # so a protonated carboxylate and a deprotonated one are not the
+            # same residue; the family, over the heavy atoms alone, is
             coarse.add_node(node,
                             kind='residue',
-                            key=self._fragment_key(fine, nodes),
+                            key=nx.weisfeiler_lehman_graph_hash(
+                                fine.subgraph(nodes), node_attr='elem'),
                             formula=self._formula(labels, nodes),
                             atoms=nodes,
                             heavy=heavy,
@@ -194,33 +205,6 @@ class SiteMatcher(Shell):
             'coarse_topology': coarse,
             'composition': sorted(labels),
         }
-
-    @on_master
-    def _graph(self, labels, edges, cap_indices):
-        """
-        Builds the graph an isomorphism is solved on.
-
-        :param labels:
-            The element of every atom.
-        :param edges:
-            The bonds, as index pairs.
-        :param cap_indices:
-            The indices of the capping hydrogens.
-
-        :return:
-            The graph, with an elem and an is_cap attribute per node.
-        """
-
-        caps = set(cap_indices)
-        graph = nx.Graph()
-
-        for index, label in enumerate(labels):
-            graph.add_node(index, elem=label, is_cap=index in caps)
-
-        for i, j in edges:
-            graph.add_edge(i, j)
-
-        return graph
 
     @on_master
     def residue_nodes(self, coarse):
@@ -263,27 +247,6 @@ class SiteMatcher(Shell):
         return ''.join(
             f'{element}{counts[element]}' if counts[element] > 1 else element
             for element in order)
-
-    @on_master
-    def _fragment_key(self, graph, nodes):
-        """
-        Returns a canonical key for one residue.
-
-        The hash is taken over the whole fragment, hydrogens included, so that
-        a protonated carboxylate and a deprotonated one are not the same
-        residue.
-
-        :param graph:
-            The graph of the site.
-        :param nodes:
-            The atoms of the fragment.
-
-        :return:
-            The key.
-        """
-
-        return nx.weisfeiler_lehman_graph_hash(graph.subgraph(nodes),
-                                               node_attr='elem')
 
     @on_master
     def _heavy_subgraph(self, labels, graph, nodes):

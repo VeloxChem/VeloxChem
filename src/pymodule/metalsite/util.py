@@ -551,28 +551,6 @@ def ic_cell(ic_rmsd, name):
 # ----------------------------------------------------------------------
 
 
-def _folder_file(name, folder):
-    """
-    Returns the path of an intermediate in the working folder, or None
-    when it is not there.
-
-    :param name:
-        The file name, one of the file name constants.
-    :param folder:
-        The working folder, or None for no folder to look in.
-
-    :return:
-        The path, or None.
-    """
-
-    if folder is None:
-        return None
-
-    path = Path(folder) / name
-
-    return path if path.is_file() else None
-
-
 def residue_label(residue):
     """
     Returns the ASP130-style label a residue is named by.

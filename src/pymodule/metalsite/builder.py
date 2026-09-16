@@ -247,8 +247,12 @@ class ActiveSiteBuilder(Shell):
         records = request.get('manual_bonds', [])
         if records:
             self._apply_manual_bonds(ligands, records, metals, atoms, position_of, notes)
-            self._assign_binding_modes(ligands, notes,
-                                       self._manual_protected(records))
+            # a contact asked for by hand is not one the classification
+            # rules may take away again
+            self._assign_binding_modes(
+                ligands, notes, {(record['res_index'], record['atom'])
+                                 for record in records
+                                 if record['action'] == 'add'})
 
         binding_modes = {
             'metals': metals,
@@ -791,21 +795,6 @@ class ActiveSiteBuilder(Shell):
             new_record['equilibrium'] = equilibrium
 
         records.append(new_record)
-
-    @on_master
-    def _manual_protected(self, records):
-        """
-        The contacts that the classification rules must not take away again.
-
-        :param records:
-            The manual bond records.
-
-        :return:
-            The set of (residue index, atom name) pairs that were asked for.
-        """
-
-        return {(record['res_index'], record['atom'])
-                for record in records if record['action'] == 'add'}
 
     @on_master
     def _apply_manual_bonds(self, ligands, records, metals, atoms, position_of, notes):
@@ -1514,24 +1503,6 @@ class ActiveSiteBuilder(Shell):
         return int(text) if text.isdigit() else None
 
     @on_master
-    def _sidechain_donors(self, residue):
-        """
-        The atoms of a residue that could donate to a metal.
-
-        :param residue:
-            The residue.
-
-        :return:
-            The donor atoms, backbone excluded.
-        """
-
-        return [
-            atom for atom in residue.atoms()
-            if atom.element is not None and atom.element.symbol in DONOR_ELEMENTS
-            and atom.name not in BACKBONE_ATOM_NAMES
-        ]
-
-    @on_master
     def _resolve_ligand_atom(self, residue, atom, metal_entry, positions, ligands):
         """
         Finds the donor atom of a residue that a manual bond is about.
@@ -1562,7 +1533,12 @@ class ActiveSiteBuilder(Shell):
         """
 
         atoms = list(residue.atoms())
-        donors = self._sidechain_donors(residue)
+        # what could donate to a metal, backbone excluded
+        donors = [
+            atom for atom in atoms
+            if atom.element is not None and atom.element.symbol in DONOR_ELEMENTS
+            and atom.name not in BACKBONE_ATOM_NAMES
+        ]
         label = residue_label(residue)
         names = [donor.name for donor in donors]
 
@@ -2349,8 +2325,10 @@ class ActiveSiteBuilder(Shell):
         if records:
             self._apply_manual_bonds(ligands, records, binding_modes['metals'],
                                      candidates, position_of, notes)
-            self._assign_binding_modes(ligands, notes,
-                                       self._manual_protected(records))
+            self._assign_binding_modes(
+                ligands, notes, {(record['res_index'], record['atom'])
+                                 for record in records
+                                 if record['action'] == 'add'})
 
         return ligands, notes
 
@@ -3385,31 +3363,6 @@ class ActiveSiteBuilder(Shell):
                                             if part)
 
     @on_master
-    def _lookup_equilibrium(self, table, elements):
-        """
-        Looks an element combination up in an equilibrium table.
-
-        A bond and an angle read the same forwards and backwards, so a table
-        only has to carry one of the two orders.
-
-        :param table:
-            The table, or None.
-        :param elements:
-            The element symbols of the term, in key order.
-
-        :return:
-            The equilibrium value, or None when the table does not hold it.
-        """
-
-        if not table:
-            return None
-
-        if elements in table:
-            return table[elements]
-
-        return table.get(elements[::-1])
-
-    @on_master
     def _seed_metal_terms(self, forcefield, active_site, bonds, angles,
                           default_metal_angle_force_constant,
                           default_metal_bond_force_constant,
@@ -3452,13 +3405,22 @@ class ActiveSiteBuilder(Shell):
         if bond_equilibria is None:
             bond_equilibria = {}
 
+        # a bond and an angle read the same forwards and backwards, so a
+        # table only has to carry one of the two orders
+        def lookup(table, elements):
+            if not table:
+                return None
+            if elements in table:
+                return table[elements]
+            return table.get(elements[::-1])
+
         for key in bonds:
             elements = tuple(labels[index] for index in key)
             equilibrium = bond_equilibria.get(tuple(sorted(key)))
             comment = SEEDED_FROM_REQUEST
 
             if equilibrium is None:
-                equilibrium = self._lookup_equilibrium(metal_bond_equilibria, elements)
+                equilibrium = lookup(metal_bond_equilibria, elements)
                 comment = SEEDED_FROM_TABLE
 
             if equilibrium is None:
@@ -3474,7 +3436,7 @@ class ActiveSiteBuilder(Shell):
 
         for key in angles:
             elements = tuple(labels[index] for index in key)
-            equilibrium = self._lookup_equilibrium(metal_angle_equilibria, elements)
+            equilibrium = lookup(metal_angle_equilibria, elements)
             if equilibrium is None:
                 equilibrium = molecule.get_angle_in_degrees(
                     [index + 1 for index in key])

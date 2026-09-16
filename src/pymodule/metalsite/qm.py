@@ -50,7 +50,7 @@ from ..errorhandler import assert_msg_critical
 from ..molecule import Molecule
 from .util import (Shell, on_master, collective, param, get_metal_keys,
                    constrained_indices, freeze_constraints, extract_pairs,
-                   d4_charges, _folder_file, DONOR_ELEMENTS,
+                   d4_charges, DONOR_ELEMENTS,
                    HESSIAN_BOND_COUNT, FITTED_COMMENT, GEOMETRY_FILE,
                    HESSIAN_FILE, CHARGES_FILE)
 
@@ -862,9 +862,11 @@ class QmParameterizer(Shell):
             self.ostream.flush()
             return supplied, False
 
-        source = _folder_file(filename, folder)
+        if folder is None:
+            return None, False
 
-        if source is None:
+        source = Path(folder) / filename
+        if not source.is_file():
             return None, False
 
         self.ostream.print_info(f'Reusing {filename} from {folder}.')
@@ -968,8 +970,16 @@ class QmParameterizer(Shell):
         # and then fits zeros. A block the metal terms read that was never
         # filled is what says so, and is worth recomputing rather than warning
         # about: an explicitly supplied Hessian is an instruction, a file lying
-        # in the folder is a guess.
-        if reused and not self._hessian_covers_site(hessian, active_site):
+        # in the folder is a guess. The blocks checked are the pairs
+        # extract_pairs walks out of the connectivity as it stands --
+        # deliberately not hessian_pairs, whose forgiving donors are a
+        # surplus a file computed under another setting is not worth
+        # rejecting over.
+        pairs, _ = extract_pairs(active_site['connectivity_matrix'],
+                                 active_site['metal_indices'],
+                                 HESSIAN_BOND_COUNT)
+        if reused and not all(
+                self._hessian_covers(hessian, pair) for pair in pairs):
             self.ostream.print_warning(
                 f'{HESSIAN_FILE} in {folder} holds nothing for some of the '
                 'metal terms of this active site, so it was computed for a '
@@ -978,32 +988,6 @@ class QmParameterizer(Shell):
             return None
 
         return hessian
-
-    @on_master
-    def _hessian_covers_site(self, hessian, active_site):
-        """
-        Says whether a Hessian holds data for every metal term of a site.
-
-        The blocks the metal terms read are the pairs extract_pairs walks out
-        of the connectivity as it stands. Deliberately not hessian_pairs: what
-        the terms need is what has to be there, while the donors
-        partial_hessian_cutoff was forgiving of are a surplus a file computed
-        under another setting is not worth rejecting over.
-
-        :param hessian:
-            The Hessian.
-        :param active_site:
-            The active site whose metal terms have to be covered.
-
-        :return:
-            True when every pair the terms read holds something.
-        """
-
-        pairs, _ = extract_pairs(active_site['connectivity_matrix'],
-                                 active_site['metal_indices'],
-                                 HESSIAN_BOND_COUNT)
-
-        return all(self._hessian_covers(hessian, pair) for pair in pairs)
 
     @on_master
     def _resolve_partial_charges(self, active_site, folder, partial_charges):

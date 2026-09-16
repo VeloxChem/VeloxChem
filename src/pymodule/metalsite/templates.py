@@ -123,12 +123,20 @@ class TemplateLoader(Shell):
         if opt_path.is_file():
             geometry = Molecule.read_xyz_file(str(opt_path))
 
-            if mm_path.is_file() and self._same_geometry(
-                    geometry, Molecule.read_xyz_file(str(mm_path))):
-                # build_forcefield writes whatever the active site ended
-                # up as under the name of the optimized geometry, so an
-                # untouched copy of the MM geometry means the QM optimization
-                # never ran
+            # build_forcefield writes whatever the active site ended up as
+            # under the name of the optimized geometry, so an untouched copy
+            # of the MM geometry -- the same coordinates to the precision of
+            # an xyz file -- means the QM optimization never ran
+            unoptimized = False
+            if mm_path.is_file():
+                relaxed = Molecule.read_xyz_file(str(mm_path))
+                unoptimized = (
+                    relaxed.number_of_atoms() == geometry.number_of_atoms()
+                    and np.allclose(geometry.get_coordinates_in_angstrom(),
+                                    relaxed.get_coordinates_in_angstrom(),
+                                    atol=1.0e-6))
+
+            if unoptimized:
                 kind = 'mm_opt'
                 assert_msg_critical(
                     kind in allowed,
@@ -154,27 +162,6 @@ class TemplateLoader(Shell):
             'fallback="mm_opt" to use it anyway.')
 
         return Molecule.read_xyz_file(str(mm_path)), 'mm_opt'
-
-    @on_master
-    def _same_geometry(self, first, second):
-        """
-        Whether two molecules hold the same coordinates.
-
-        :param first:
-            The first molecule.
-        :param second:
-            The second molecule.
-
-        :return:
-            True when they match to within the precision of an xyz file.
-        """
-
-        if first.number_of_atoms() != second.number_of_atoms():
-            return False
-
-        return np.allclose(first.get_coordinates_in_angstrom(),
-                           second.get_coordinates_in_angstrom(),
-                           atol=1.0e-6)
 
     @on_master
     def build(self, name, forcefield, molecule, kind, folder, metal_elements):
@@ -732,15 +719,20 @@ class TemplateLoader(Shell):
 
         bonds, angles = self._matcher().metal_keys(template)
 
+        # each term is copied with a note of where it came from
+        def transferred(params):
+            params = dict(params)
+            comment = params.get('comment', '')
+            params['comment'] = f'{comment} (template {template["name"]})'.strip()
+            return params
+
         for key in bonds:
             target = self._map_key(key, mapping, forcefield.bonds, 'bond')
-            forcefield.bonds[target] = self._transferred(
-                template_ff.bonds[key], template['name'])
+            forcefield.bonds[target] = transferred(template_ff.bonds[key])
 
         for key in angles:
             target = self._map_key(key, mapping, forcefield.angles, 'angle')
-            forcefield.angles[target] = self._transferred(
-                template_ff.angles[key], template['name'])
+            forcefield.angles[target] = transferred(template_ff.angles[key])
 
         self.ostream.print_info(
             f'Transferred {len(bonds)} metal bond(s), {len(angles)} metal '
@@ -783,23 +775,3 @@ class TemplateLoader(Shell):
         assert_msg_critical(
             False, f'TemplateLoader: the template {kind} {key} maps '
             f'onto {mapped}, which the active site force field does not have')
-
-    @on_master
-    def _transferred(self, params, name):
-        """
-        Copies one set of parameters, recording where it came from.
-
-        :param params:
-            The parameters of the template.
-        :param name:
-            The name of the template.
-
-        :return:
-            The copied parameters.
-        """
-
-        params = dict(params)
-        comment = params.get('comment', '')
-        params['comment'] = f'{comment} (template {name})'.strip()
-
-        return params
