@@ -8551,3 +8551,86 @@ transformed vectors, neither of which is a change to this routine.
 Pinning the split closer wants timing inside the driver. The technique which
 answered the gradient in twenty minutes runs into the binding here, which is worth
 knowing about the technique.
+
+## Linear response, and what the second term of a density costs
+
+The Tamm-Dancoff approximation drops the de-excitation block, so its trial vector
+gives a density of one term. A full linear response vector gives two, and they are
+not each other's transpose:
+
+    D = C(occupied) (-Z) C(virtual) transposed + C(virtual) Y transposed C(occupied) transposed
+
+The second has the virtual orbitals on the left, which is the expensive side to
+transform. It need not be: the exchange of a transposed density is the transposed
+exchange of it, so the second term is taken as the transpose of one which carries
+the occupied orbitals on the left, and the virtual orbitals are never transformed.
+Both terms then share one transformation of the occupied orbitals. **And the Coulomb
+is taken once for the two of them**, because it sees only the symmetric part of a
+density and the two terms together have the same symmetric part as the single term
+whose right factor is the sum of theirs.
+
+Caffeine, five states, def2-universal-jkfit, one rank of 14 threads, at `29419eceb`.
+Records in `benchmarks/data/tda/2026-09-16_m4max_caffeine_rpa.json`.
+
+| functional | basis | nao | four-centre | RI-JK simd | speedup | iter |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| HF | def2-svp | 246 | 58.19 | 5.32 | 10.94 | 17 |
+| HF | def2-svpd | 366 | 281.97 | 11.75 | 24.00 | 19 |
+| HF | def2-tzvp | 494 | 935.20 | 20.89 | 44.76 | 19 |
+| HF | def2-tzvpd | 614 | 2666.00 | 39.17 | **68.06** | 22 |
+| B3LYP | def2-svp | 246 | 49.25 | 12.94 | 3.81 | 11 |
+| B3LYP | def2-svpd | 366 | 205.82 | 31.90 | 6.45 | 11 |
+| B3LYP | def2-tzvp | 494 | 656.47 | 46.16 | 14.22 | 12 |
+| B3LYP | def2-tzvpd | 614 | 1639.05 | 80.01 | **20.49** | 11 |
+
+Every pair converged in the same number of iterations as its partner. The excitation
+energies agree with the four-center ones to between 4.5e-06 and 2.3e-05 hartree, and
+improve with the basis as the Tamm-Dancoff ones do.
+
+### Measuring the second term without comparing two runs
+
+The obvious way to price the second term is to divide the linear response time by
+the Tamm-Dancoff one. **That comparison is not available**: the two runs converge in
+different numbers of iterations -- seventeen against fifteen in the first row alone
+-- so they do not carry the same trial vectors and their times are not of the same
+thing. This file has already recorded one quantity ruined that way.
+
+What is available is the **ratio of two ratios**. A speedup is measured inside one
+run between two methods which took the same iterations, so it is clean; and to the
+four-center path a density is a density, its cost not depending on whether it was
+made of one term or two. So the speedup falls by exactly what the second term costs
+the resolution of the identity, and nothing else:
+
+| functional | basis | Tamm-Dancoff | linear response | what the term cost |
+| --- | --- | ---: | ---: | ---: |
+| HF | def2-svp | 17.34 | 10.94 | 1.59 |
+| HF | def2-svpd | 37.13 | 24.00 | 1.55 |
+| HF | def2-tzvp | 69.52 | 44.76 | 1.55 |
+| HF | def2-tzvpd | 110.03 | 68.06 | 1.62 |
+| B3LYP | def2-svp | 4.22 | 3.81 | 1.11 |
+| B3LYP | def2-svpd | 7.18 | 6.45 | 1.11 |
+| B3LYP | def2-tzvp | 16.06 | 14.22 | 1.13 |
+| B3LYP | def2-tzvpd | 23.46 | 20.49 | 1.15 |
+
+**A second term costs about three fifths of a first one, and not a whole one.** Two
+exchanges are formed where one was, so the naive price is two; the measured price is
+1.55 to 1.62 across a factor of two and a half in the basis. The difference is the
+sharing: one Coulomb for both terms and one transformation of the occupied orbitals
+for the whole batch.
+
+At B3LYP it costs 1.11 to 1.15, which is the quadrature again. It does not care how
+many terms a density has, so where it is a large part of the iteration the second
+term is nearly free. **The same structure that caps the speedup at B3LYP also makes
+B3LYP the place where linear response is cheapest over Tamm-Dancoff.** One fact,
+cutting both ways.
+
+### The scaling does not move
+
+| | four-centre | RI-JK simd |
+| --- | ---: | ---: |
+| HF | 3.90 | 1.89 |
+| B3LYP | 3.78 | 1.88 |
+
+Against 3.93 and 1.91, and 3.78 and 1.84, for the Tamm-Dancoff approximation. Adding
+a term to the density changes the constant in front and not the power, which is what
+it should do and is worth having measured rather than assumed.
