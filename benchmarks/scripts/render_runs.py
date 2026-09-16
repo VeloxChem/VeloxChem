@@ -44,6 +44,11 @@ SPECS = {
          "steps", "s/step", "energy (a.u.)"],
         [7, 9, 4, 5, 15, 8, 7, 5, 7, 13],
     ),
+    "redtpa": (
+        ["functional", "basis", "nao", "naux", "method", "TPA (s)", "speedup",
+         "SCF (s)", "Re gamma", "Im gamma", "max rel"],
+        [7, 9, 4, 5, 15, 8, 7, 7, 10, 10, 8],
+    ),
     "tda": (
         ["functional", "basis", "nao", "naux", "method", "TDA (s)", "speedup",
          "iter", "s/iter", "SCF (s)", "max dE (a.u.)"],
@@ -80,6 +85,8 @@ def _cost(row, suite):
         return row["grad_wall"]
     if suite == "tda":
         return row["tda_wall"]
+    if suite == "redtpa":
+        return row["tpa_wall"]
     return row["wall"]
 
 
@@ -115,6 +122,23 @@ def cells_of(doc):
                         agree = f'{np.abs(d).max():.1e}'
                     out.append(head + [method_name(r), f'{r["grad_wall"]:.2f}',
                                        speed, f'{r["scf_wall"]:.2f}', agree])
+                elif suite == "redtpa":
+                    # NOTE: gamma at the middle of the sweep, which is the one
+                    # value a table can carry; the whole sweep is on the page
+                    # after it and in the records.
+                    mid = len(r["frequencies"]) // 2
+                    if r["method"] == "full" or ref is None:
+                        agree = "--"
+                    else:
+                        a = (np.array(ref["gamma_real"]) +
+                             1j * np.array(ref["gamma_imag"]))
+                        b = (np.array(r["gamma_real"]) +
+                             1j * np.array(r["gamma_imag"]))
+                        agree = f'{np.abs((b - a) / a).max():.1e}'
+                    out.append(head + [method_name(r), f'{r["tpa_wall"]:.2f}',
+                                       speed, f'{r["scf_wall"]:.2f}',
+                                       f'{r["gamma_real"][mid]:.1f}',
+                                       f'{r["gamma_imag"][mid]:.1f}', agree])
                 elif suite == "tda":
                     if r["method"] == "full" or ref is None:
                         agree = "--"
@@ -253,7 +277,71 @@ def render_pdf(path, out, basis=None):
         if doc["suite"] == "gradient" and scaling(doc):
             _scaling_page(pdf, doc, title, line)
 
+        if doc["suite"] == "redtpa":
+            _sweep_page(pdf, doc, title, line)
+
     return out
+
+
+def _sweep_page(pdf, doc, title, line):
+    """Gamma against the frequency, the two ways over one another.
+
+    A table can carry one frequency of a sweep. The point of the sweep is that the
+    two ways agree at every one of them, including where the response function
+    passes through zero and a relative error would be at its worst, so it is drawn.
+    """
+    import matplotlib.pyplot as plt
+
+    cells = []
+    for functional in dict.fromkeys(r["functional"] for r in doc["rows"]):
+        for basis in dict.fromkeys(r["basis"] for r in doc["rows"]):
+            picked = [r for r in doc["rows"]
+                      if r["functional"] == functional and r["basis"] == basis]
+            if len(picked) == 2:
+                cells.append((functional, basis, picked))
+
+    ncols = 2
+    nrows = max(1, -(-len(cells) // ncols))
+
+    # NOTE: the header is given its space in inches and not in fractions of the
+    # figure. A fraction which clears the title on a tall figure puts the
+    # provenance line through it on a short one, which is how these two came to
+    # be written over each other.
+    height = 3.4 * nrows + 1.1
+
+    fig, axes = plt.subplots(nrows, ncols, figsize=(12.5, height), squeeze=False)
+
+    fig.suptitle(f'{title} -- gamma over the frequencies', fontsize=13,
+                 fontweight="bold", x=0.09, y=1.0 - 0.32 / height, ha="left")
+    fig.text(0.09, 1.0 - 0.62 / height, line, fontsize=7.5, color="#475569",
+             ha="left")
+
+    for ax, (functional, basis, picked) in zip(axes.ravel(), cells):
+        ref = next(r for r in picked if r["method"] == "full")
+        ri = next(r for r in picked if r["method"] != "full")
+        w = np.array(ref["frequencies"])
+        ax.axhline(0.0, color="#cbd5e1", linewidth=0.8)
+        ax.plot(w, ref["gamma_real"], "-", color="#b91c1c", linewidth=1.4,
+                label="four-centre, real")
+        ax.plot(w, ref["gamma_imag"], "-", color="#f97316", linewidth=1.4,
+                label="four-centre, imaginary")
+        ax.plot(w, ri["gamma_real"], "o", color="#1d4ed8", markersize=4.5,
+                fillstyle="none", label="RI-JK simd, real")
+        ax.plot(w, ri["gamma_imag"], "s", color="#0891b2", markersize=4.5,
+                fillstyle="none", label="RI-JK simd, imaginary")
+        ax.set_title(f'{functional}, {basis}', fontsize=9)
+        ax.set_xlabel("frequency (a.u.)", fontsize=8)
+        ax.set_ylabel("gamma (a.u.)", fontsize=8)
+        ax.tick_params(labelsize=7)
+        ax.grid(True, linewidth=0.3, color="#e2e8f0")
+
+    for ax in axes.ravel()[len(cells):]:
+        ax.axis("off")
+
+    axes.ravel()[0].legend(fontsize=7, frameon=False)
+    fig.tight_layout(rect=[0, 0, 1, 1.0 - 0.85 / height])
+    pdf.savefig(fig, bbox_inches="tight", pad_inches=0.3)
+    plt.close(fig)
 
 
 def _scaling_page(pdf, doc, title, line):
