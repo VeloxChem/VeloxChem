@@ -636,6 +636,14 @@ class ExcitedStateMomentDriver(NonlinearSolver):
         distributed_density_1 = None
         distributed_density_2 = None
 
+        # NOTE: the factors of the densities which reach the Fock build. Only the
+        # two-time perturbed one is built from here, and it is carried as a real
+        # and an imaginary column, so the factors go the same way.
+        self._ri_jk_factors = None
+
+        if self.rank == mpi_master() and self.ri_jk and self.ri_jk_simd:
+            self._ri_jk_factors = (mo[:, :nocc], [], mo[:, nocc:], [])
+
         Nf = LinearResponseEigenSolver.get_full_solution_vector(
             Xf[self._initial_state - 1])
         Ng = LinearResponseEigenSolver.get_full_solution_vector(
@@ -654,6 +662,16 @@ class ExcitedStateMomentDriver(NonlinearSolver):
             # create the first order two indexed densities #
 
             Dfg_ = self.commut(kg_, Df) + self.commut(kf, Dg_)
+
+            # NOTE: the factors, taken before the transformation to the atomic
+            # orbitals and in the order the columns are laid out below. The
+            # first-order densities beside them are there for the quadrature
+            # alone and no Fock matrix is asked of them.
+            if self._ri_jk_factors is not None:
+                for part in (np.real, np.imag):
+                    ra, rb = rijkresponse.general_factors(mo, nocc, part(Dfg_))
+                    self._ri_jk_factors[1].append(ra)
+                    self._ri_jk_factors[3].append(rb)
 
             # Density transformation from MO to AO basis
 
@@ -770,7 +788,8 @@ class ExcitedStateMomentDriver(NonlinearSolver):
                                              'real_and_imag', eri_dict,
                                              dft_dict, first_order_dens,
                                              second_order_dens, None, 'qrf',
-                                             profiler)
+                                             profiler,
+                                             dens_factors=self._ri_jk_factors)
 
             self._print_fock_time(time.time() - time_start_fock)
 

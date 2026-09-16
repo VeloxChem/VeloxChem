@@ -718,6 +718,14 @@ class TpaTransitionDriver(NonlinearSolver):
         distributed_density_1 = None
         distributed_density_2 = None
 
+        # NOTE: the factors of the densities which reach the Fock build. Only the
+        # two-time perturbed ones are built from here, and they are real, so each
+        # of them is one factor and not the two a complex one is carried by.
+        self._ri_jk_factors = None
+
+        if self.rank == mpi_master() and self.ri_jk and self.ri_jk_simd:
+            self._ri_jk_factors = (mo[:, :nocc], [], mo[:, nocc:], [])
+
         for w_ind, w in enumerate(freqs):
 
             nx = ComplexResponseSolver.get_full_solution_vector(Nx[('x', w)])
@@ -750,6 +758,17 @@ class TpaTransitionDriver(NonlinearSolver):
                 Dbcy = self.commut(kby, Dc) + self.commut(kc, Dby)
                 Dbcz = self.commut(kbz, Dc) + self.commut(kc, Dbz)
                 Dcc_ = self.commut(kc_, Dc) + self.commut(kc, Dc_)
+
+                # NOTE: the factors, taken before the transformation to the
+                # atomic orbitals and in the order the columns are laid out
+                # below. The first-order densities beside them are there for the
+                # quadrature alone and no Fock matrix is asked of them.
+                if self._ri_jk_factors is not None:
+                    for mat in (Dbcx, Dbcy, Dbcz, Dcc_):
+                        ra, rb = rijkresponse.general_factors(
+                            mo, nocc, np.real(mat))
+                        self._ri_jk_factors[1].append(ra)
+                        self._ri_jk_factors[3].append(rb)
 
                 # Density transformation from MO to AO basis
 
@@ -880,7 +899,8 @@ class TpaTransitionDriver(NonlinearSolver):
                                              eri_dict, dft_dict,
                                              first_order_dens,
                                              second_order_dens, None,
-                                             'tpa_quad', profiler)
+                                             'tpa_quad', profiler,
+                                             dens_factors=self._ri_jk_factors)
 
             self._print_fock_time(time.time() - time_start_fock)
 
