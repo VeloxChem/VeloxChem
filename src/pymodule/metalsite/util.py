@@ -269,6 +269,27 @@ DEFAULT_METAL_ANGLE_FORCE_CONSTANT = 200.0
 # favours, not a restraint the fit is meant to enforce.
 DEFAULT_METAL_PLANARITY_FORCE_CONSTANT = 4.184
 
+# How far a metal bond may move during the crude pre-QM relaxation, in
+# Angstrom, before the relaxation table flags it.
+MM_BOND_CHANGE_WARNING = 0.25
+
+# The QM level the constrained optimization and the Hessian run at. RESP
+# runs its own HF/6-31G* and does not read them.
+XCFUN = 'PBE0'
+BASIS_SET_LABEL = 'def2-svp'
+
+# How the metal force constants are read off the Hessian; the only method
+# the generator's reparameterize knows.
+METAL_HESSIAN_FITTING_METHOD = 'seminario'
+
+# How many bonds out from a metal center extract_pairs walks when picking
+# the atom pairs of the partial Hessian.
+HESSIAN_BOND_COUNT = 2
+
+# The OpenMM force field files the enzyme system and the enzyme force
+# field XML are built beside.
+PROTEIN_FORCEFIELD_FILES = ('amber14-all.xml', 'amber14/tip3pfb.xml')
+
 # ----------------------------------------------------------------------
 # the shell and its decorators
 # ----------------------------------------------------------------------
@@ -530,13 +551,15 @@ def ic_cell(ic_rmsd, name):
 # ----------------------------------------------------------------------
 
 
-def _folder_file(name, folder=None):
+def _folder_file(name, folder):
     """
     Returns the path of an intermediate in the working folder, or None
     when it is not there.
 
     :param name:
-        The file name, one of the class-level file name attributes.
+        The file name, one of the file name constants.
+    :param folder:
+        The working folder, or None for no folder to look in.
 
     :return:
         The path, or None.
@@ -850,7 +873,7 @@ def _forcefield_elements(forcefield):
     return elements
 
 
-def _check_forcefield(forcefield, active_site, source=None):
+def _check_forcefield(forcefield, active_site, source):
     """
     Checks that a force field describes the extracted active site.
 
@@ -863,25 +886,22 @@ def _check_forcefield(forcefield, active_site, source=None):
     :param active_site:
         The active site, to validate against.
     :param source:
-        Where the pair came from, for the message. A caller loading one of
-        many folders needs to be told which of them is the bad one; a caller
-        with only the site in hand leaves it out.
+        Where the force field came from, for the message: a caller loading
+        one of many folders needs to be told which of them is the bad one.
     """
 
     labels = list(active_site['molecule'].get_labels())
     elements = _forcefield_elements(forcefield)
-    named = f' of {source}' if source is not None else ''
-    site = 'geometry' if source is not None else 'extracted active site'
 
     assert_msg_critical(
         len(elements) == len(labels),
-        f'_check_forcefield: the force field{named} has {len(elements)} '
-        f'atoms but the {site} has {len(labels)}')
+        f'_check_forcefield: the force field of {source} has {len(elements)} '
+        f'atoms but the geometry has {len(labels)}')
 
     assert_msg_critical(
         elements == labels,
-        f'_check_forcefield: the elements of the force field{named} do '
-        f'not match the {site}, so it describes a different structure')
+        f'_check_forcefield: the elements of the force field of {source} do '
+        'not match the geometry, so it describes a different structure')
 
 
 def save_forcefield(filename, forcefield):
@@ -933,9 +953,18 @@ def load_forcefield(filename):
     return forcefield
 
 
-def _bond_separation(bonded, first, second, limit=3):
+def _bond_separation(bonded, first, second, limit):
     """
     How many bonds apart two atoms are, up to a limit.
+
+    :param bonded:
+        The neighbours of every atom index, as a dictionary of sets.
+    :param first:
+        One atom index.
+    :param second:
+        The other.
+    :param limit:
+        How many bonds out to look.
 
     :return:
         The number of bonds on the shortest path, or limit + 1 when there
@@ -1107,15 +1136,19 @@ def d4_charges(active_site):
     return np.array(molecule.get_partial_charges(molecule.get_charge()))
 
 
-def constrained_indices(active_site, constrain_capping_hydrogens=False):
+def constrained_indices(active_site, constrain_capping_hydrogens):
     """
     Returns the active site indices held fixed during optimization.
 
-    The beta carbons are constrained by default: that is where the
-    backbone actually holds the sidechain in place. The capping hydrogens
-    merely stand in for the alpha carbons, and constraining them as well
-    makes the truncated fragment rigid, which is available through
-    constrain_capping_hydrogens.
+    The beta carbons are always constrained: that is where the backbone
+    actually holds the sidechain in place. The capping hydrogens merely
+    stand in for the alpha carbons, and constraining them as well makes the
+    truncated fragment rigid.
+
+    :param active_site:
+        The extracted active site.
+    :param constrain_capping_hydrogens:
+        Whether the capping hydrogens are frozen along with the beta carbons.
 
     :return:
         The sorted list of active site indices.
@@ -1129,9 +1162,7 @@ def constrained_indices(active_site, constrain_capping_hydrogens=False):
     return sorted(indices)
 
 
-def freeze_constraints(active_site,
-                       frozen_indices=None,
-                       constrain_capping_hydrogens=False):
+def freeze_constraints(frozen_indices):
     """
     Returns the geomeTRIC constraint the optimization is run under.
 
@@ -1139,23 +1170,13 @@ def freeze_constraints(active_site,
     worth being able to read it before paying for the optimization that uses
     it.
 
-    :param active_site:
-        The extracted active site.
     :param frozen_indices:
-        The zero-based active site indices to freeze. Defaults to
-        constrained_indices().
-    :param constrain_capping_hydrogens:
-        Whether the capping hydrogens are frozen along with the beta carbons,
-        when frozen_indices is left to the default.
+        The zero-based active site indices to freeze, as constrained_indices
+        returns them.
 
     :return:
         The constraint as geomeTRIC reads it, or None when nothing is frozen.
     """
-
-    if frozen_indices is None:
-        frozen_indices = constrained_indices(
-            active_site,
-            constrain_capping_hydrogens=constrain_capping_hydrogens)
 
     if len(frozen_indices) == 0:
         return None

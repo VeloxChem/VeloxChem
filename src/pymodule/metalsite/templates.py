@@ -177,7 +177,7 @@ class TemplateLoader(Shell):
                            atol=1.0e-6)
 
     @on_master
-    def build(self, name, forcefield, molecule, kind, folder, metal_elements=None):
+    def build(self, name, forcefield, molecule, kind, folder, metal_elements):
         """
         Assembles a template from a loaded force field and geometry.
 
@@ -202,6 +202,8 @@ class TemplateLoader(Shell):
             The geometry kind.
         :param folder:
             The folder the template came from.
+        :param metal_elements:
+            The elements treated as metal centers.
 
         :return:
             The template dictionary.
@@ -211,7 +213,7 @@ class TemplateLoader(Shell):
         # is util's and not a second copy of it here. A template is an
         # active site with no topology behind it, so {'molecule': ...} is all
         # the adapter it needs.
-        util._check_forcefield(forcefield, {'molecule': molecule}, source=folder)
+        util._check_forcefield(forcefield, {'molecule': molecule}, folder)
 
         labels = list(molecule.get_labels())
 

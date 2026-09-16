@@ -64,7 +64,7 @@ from ..outputstream import OutputStream
 from ..errorhandler import assert_msg_critical
 from . import util
 from .util import Shell, on_master, param, print_section
-from .matching import SiteMatcher, DEFAULT_MAX_MAPPINGS
+from .matching import SiteMatcher
 
 
 class Shoehorner(Shell):
@@ -95,11 +95,7 @@ class Shoehorner(Shell):
 
         return SiteMatcher(self.comm, self.ostream)
 
-    def run(self,
-            builder,
-            template,
-            max_include_radius,
-            max_mappings=DEFAULT_MAX_MAPPINGS):
+    def run(self, builder, template, max_include_radius, max_mappings):
         """
         Edits a builder's active site until it is built the way a template is.
 
@@ -145,10 +141,8 @@ class Shoehorner(Shell):
         builder._mm_opt = False
 
         try:
-            reason = self._shoehorn(builder,
-                                    template,
-                                    float(max_include_radius),
-                                    max_mappings=max_mappings)
+            reason = self._shoehorn(builder, template,
+                                    float(max_include_radius), max_mappings)
         except Exception:
             builder._mm_opt = relaxing
             self._restore(builder, snapshot)
@@ -198,11 +192,7 @@ class Shoehorner(Shell):
             active_site,
             util.connectivity_bonds(active_site['connectivity_matrix']))
 
-    def _shoehorn(self,
-                  builder,
-                  template,
-                  max_include_radius,
-                  max_mappings=DEFAULT_MAX_MAPPINGS):
+    def _shoehorn(self, builder, template, max_include_radius, max_mappings):
         """
         The three stages of a shoehorning, in order.
 
@@ -212,6 +202,8 @@ class Shoehorner(Shell):
             The template to edit it onto.
         :param max_include_radius:
             How far out from a metal center a residue may be picked up from.
+        :param max_mappings:
+            The limit on how many atom mappings are built.
 
         :return:
             What stood in the way, or None when nothing did.
@@ -226,7 +218,7 @@ class Shoehorner(Shell):
         # the protonation first: the mapping the denticity is forced through
         # cannot be solved while the hydrogens still differ
         for stage in (self._shoehorn_protonation, self._shoehorn_denticity):
-            reason = stage(builder, template, max_mappings=max_mappings)
+            reason = stage(builder, template, max_mappings)
             if reason is not None:
                 return reason
 
@@ -983,11 +975,8 @@ class Shoehorner(Shell):
         return entries[res_index]
 
     @on_master
-    def _best_heavy_mapping(self,
-                            template,
-                            described,
-                            match_h_count=True,
-                            max_mappings=DEFAULT_MAX_MAPPINGS):
+    def _best_heavy_mapping(self, template, described, max_mappings,
+                            match_h_count=True):
         """
         Solves which of the site's atoms is which of the template's.
 
@@ -1000,6 +989,8 @@ class Shoehorner(Shell):
             The template to match.
         :param described:
             The described active site.
+        :param max_mappings:
+            The limit on how many atom mappings are built.
         :param match_h_count:
             Whether an atom has to carry as many hydrogens as the one it maps
             onto, at both levels. Off for the pass that runs before the
@@ -1015,11 +1006,9 @@ class Shoehorner(Shell):
         for coarse_mapping in self._matcher().coarse_mappings(
                 template, described, match_protonation=match_h_count):
             maps.extend(
-                self._matcher().heavy_atom_maps(template,
-                                                described,
-                                                coarse_mapping,
-                                                match_h_count=match_h_count,
-                                                max_mappings=max_mappings))
+                self._matcher().heavy_atom_maps(template, described,
+                                                coarse_mapping, max_mappings,
+                                                match_h_count=match_h_count))
 
         if not maps:
             return None
@@ -1051,10 +1040,7 @@ class Shoehorner(Shell):
         return sum(1 for other in described['fine_topology'].neighbors(index)
                    if labels[other] == 'H')
 
-    def _shoehorn_protonation(self,
-                              builder,
-                              template,
-                              max_mappings=DEFAULT_MAX_MAPPINGS):
+    def _shoehorn_protonation(self, builder, template, max_mappings):
         """
         Protonates every residue of the site the way the template has it.
 
@@ -1066,26 +1052,23 @@ class Shoehorner(Shell):
             The builder holding the site.
         :param template:
             The template to match.
+        :param max_mappings:
+            The limit on how many atom mappings are built.
 
         :return:
             What stood in the way, or None when nothing did.
         """
 
         described = self.described_site(builder)
-        heavy_map = self._best_heavy_mapping(template,
-                                             described,
-                                             match_h_count=False,
-                                             max_mappings=max_mappings)
+        heavy_map = self._best_heavy_mapping(template, described,
+                                             max_mappings, match_h_count=False)
 
         if heavy_map is None:
             return ('the atoms of the site do not map onto those of '
                     f'{template["name"]}')
 
-        changes = self._protonation_changes(builder,
-                                            template,
-                                            described,
-                                            heavy_map,
-                                            max_mappings=max_mappings)
+        changes = self._protonation_changes(builder, template, described,
+                                            heavy_map)
 
         if isinstance(changes, str):
             return changes
@@ -1105,12 +1088,7 @@ class Shoehorner(Shell):
         return None
 
     @on_master
-    def _protonation_changes(self,
-                             builder,
-                             template,
-                             described,
-                             heavy_map,
-                             max_mappings=DEFAULT_MAX_MAPPINGS):
+    def _protonation_changes(self, builder, template, described, heavy_map):
         """
         Works out which residues are protonated unlike the template.
 
@@ -1157,8 +1135,7 @@ class Shoehorner(Shell):
                 self._hydrogen_count(described, heavy_map[first]) for first, _ in pairs)
 
             if delta == 0 and not self._tautomer_differs(
-                    template, described, heavy_map, pairs,
-                    max_mappings=max_mappings):
+                    template, described, heavy_map, pairs):
                 continue
 
             variant = self._target_variant(residue, current, delta, wanted)
@@ -1182,12 +1159,7 @@ class Shoehorner(Shell):
         return changes
 
     @on_master
-    def _tautomer_differs(self,
-                          template,
-                          described,
-                          heavy_map,
-                          pairs,
-                          max_mappings=DEFAULT_MAX_MAPPINGS):
+    def _tautomer_differs(self, template, described, heavy_map, pairs):
         """
         Whether a residue carries its hydrogens on other atoms than the
         template does, with the same number of them.
@@ -1275,10 +1247,7 @@ class Shoehorner(Shell):
 
         return named.pop() if len(named) == 1 else None
 
-    def _shoehorn_denticity(self,
-                            builder,
-                            template,
-                            max_mappings=DEFAULT_MAX_MAPPINGS):
+    def _shoehorn_denticity(self, builder, template, max_mappings):
         """
         Bonds every metal center to exactly the atoms the template bonds it
         to.
@@ -1294,25 +1263,23 @@ class Shoehorner(Shell):
             The builder holding the site.
         :param template:
             The template to match.
+        :param max_mappings:
+            The limit on how many atom mappings are built.
 
         :return:
             What stood in the way, or None when nothing did.
         """
 
         described = self.described_site(builder)
-        heavy_map = self._best_heavy_mapping(template,
-                                             described,
-                                             max_mappings=max_mappings)
+        heavy_map = self._best_heavy_mapping(template, described,
+                                             max_mappings)
 
         if heavy_map is None:
             return ('the atoms of the site do not map onto those of '
                     f'{template["name"]} even once it is protonated like it')
 
-        changes = self._denticity_changes(builder,
-                                          template,
-                                          described,
-                                          heavy_map,
-                                          max_mappings=max_mappings)
+        changes = self._denticity_changes(builder, template, described,
+                                          heavy_map)
 
         for change in changes['added']:
             entry = self._metal_entry(builder, change['metal'])
@@ -1338,12 +1305,7 @@ class Shoehorner(Shell):
         return None
 
     @on_master
-    def _denticity_changes(self,
-                           builder,
-                           template,
-                           described,
-                           heavy_map,
-                           max_mappings=DEFAULT_MAX_MAPPINGS):
+    def _denticity_changes(self, builder, template, described, heavy_map):
         """
         Works out which metal-ligand bonds the site makes and the template
         does not, and the other way round.

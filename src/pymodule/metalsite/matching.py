@@ -71,8 +71,9 @@ from . import util
 from .util import Shell, on_master, param, print_section, ic_cell
 import math
 
-# The manager's own defaults, repeated here so that a function of this
-# module stands on its own; the manager always passes its settings in.
+# The defaults of the manager's matching settings, which reads them from
+# here; the methods of this module take every setting they read as an
+# argument and carry no default of their own.
 DEFAULT_MAX_MAPPINGS = 10000
 DEFAULT_METAL_SHELL_BONDS = 2
 DEFAULT_RMSD_HEAVY_ATOMS_ONLY = True
@@ -499,12 +500,8 @@ class SiteMatcher(Shell):
         return list(matcher.isomorphisms_iter())
 
     @on_master
-    def heavy_atom_maps(self,
-                        template,
-                        query,
-                        coarse_mapping,
-                        match_h_count=True,
-                        max_mappings=DEFAULT_MAX_MAPPINGS):
+    def heavy_atom_maps(self, template, query, coarse_mapping, max_mappings,
+                        match_h_count=True):
         """
         Builds the heavy atom mappings that one coarse mapping allows.
 
@@ -692,12 +689,7 @@ class SiteMatcher(Shell):
         return atom_map
 
     @on_master
-    def rmsd_indices(self,
-                     template,
-                     region,
-                     heavy_only=None,
-                     rmsd_heavy_atoms_only=DEFAULT_RMSD_HEAVY_ATOMS_ONLY,
-                     metal_shell_bonds=DEFAULT_METAL_SHELL_BONDS):
+    def rmsd_indices(self, template, region, heavy_only, metal_shell_bonds):
         """
         Returns the template indices every RMSD is measured over, which is the
         region less the hydrogens when they are being left out.
@@ -707,19 +699,15 @@ class SiteMatcher(Shell):
         :param region:
             The region to take.
         :param heavy_only:
-            Whether to leave the hydrogens out, or None for
-            rmsd_heavy_atoms_only.
+            Whether to leave the hydrogens out.
+        :param metal_shell_bonds:
+            How many bonds out from a metal the metal_shell region reaches.
 
         :return:
             The indices, in order.
         """
 
-        if heavy_only is None:
-            heavy_only = rmsd_heavy_atoms_only
-
-        indices = self.region_indices(template,
-                                      region,
-                                      metal_shell_bonds=metal_shell_bonds)
+        indices = self.region_indices(template, region, metal_shell_bonds)
 
         if not heavy_only:
             return indices
@@ -729,7 +717,7 @@ class SiteMatcher(Shell):
         return [index for index in indices if labels[index] != 'H']
 
     @on_master
-    def region_indices(self, template, region, metal_shell_bonds=DEFAULT_METAL_SHELL_BONDS):
+    def region_indices(self, template, region, metal_shell_bonds):
         """
         Returns the template indices of the region an RMSD is measured over.
 
@@ -737,6 +725,8 @@ class SiteMatcher(Shell):
             The template.
         :param region:
             The region to take.
+        :param metal_shell_bonds:
+            How many bonds out from a metal the metal_shell region reaches.
 
         :return:
             The indices, in order.
@@ -775,14 +765,8 @@ class SiteMatcher(Shell):
         return sorted(shell)
 
     @on_master
-    def measure_region(self,
-                       template,
-                       mapping,
-                       coordinates,
-                       region,
-                       heavy_only=None,
-                       rmsd_heavy_atoms_only=DEFAULT_RMSD_HEAVY_ATOMS_ONLY,
-                       metal_shell_bonds=DEFAULT_METAL_SHELL_BONDS):
+    def measure_region(self, template, mapping, coordinates, region,
+                       heavy_only, metal_shell_bonds):
         """
         Measures one region of an active site against a template.
 
@@ -795,21 +779,17 @@ class SiteMatcher(Shell):
         :param region:
             The region to measure over.
         :param heavy_only:
-            Whether to leave the hydrogens out, or None for
-            rmsd_heavy_atoms_only.
+            Whether to leave the hydrogens out.
+        :param metal_shell_bonds:
+            How many bonds out from a metal the metal_shell region reaches.
 
         :return:
             The atom count, the cartesian RMSDs over the whole region and
             over its heavy atoms, and the internal coordinate deviations.
         """
 
-        if heavy_only is None:
-            heavy_only = rmsd_heavy_atoms_only
-
         reference = template['molecule'].get_coordinates_in_angstrom()
-        indices = self.region_indices(template,
-                                      region,
-                                      metal_shell_bonds=metal_shell_bonds)
+        indices = self.region_indices(template, region, metal_shell_bonds)
         labels = template['molecule'].get_labels()
         heavy = [index for index in indices if labels[index] != 'H']
 
@@ -819,13 +799,8 @@ class SiteMatcher(Shell):
         rmsd, _, _ = svd_superimpose(moved[indices], reference[indices])
         heavy_rmsd, _, _ = svd_superimpose(moved[heavy], reference[heavy])
 
-        ic_rmsd = self.measure_ic_rmsd(template,
-                                       mapping,
-                                       coordinates,
-                                       region,
-                                       heavy_only,
-                                       rmsd_heavy_atoms_only=rmsd_heavy_atoms_only,
-                                       metal_shell_bonds=metal_shell_bonds)
+        ic_rmsd = self.measure_ic_rmsd(template, mapping, coordinates, region,
+                                       heavy_only, metal_shell_bonds)
 
         return {
             # _rmsd_indices is the region less the hydrogens when they are
@@ -837,14 +812,8 @@ class SiteMatcher(Shell):
         }
 
     @on_master
-    def measure_ic_rmsd(self,
-                        template,
-                        mapping,
-                        coordinates,
-                        region,
-                        heavy_only=None,
-                        rmsd_heavy_atoms_only=DEFAULT_RMSD_HEAVY_ATOMS_ONLY,
-                        metal_shell_bonds=DEFAULT_METAL_SHELL_BONDS):
+    def measure_ic_rmsd(self, template, mapping, coordinates, region,
+                        heavy_only, metal_shell_bonds):
         """
         Measures the internal coordinate deviations from a template.
 
@@ -864,19 +833,17 @@ class SiteMatcher(Shell):
         :param region:
             The region to measure over.
         :param heavy_only:
-            Whether to leave the hydrogens out, or None for
-            rmsd_heavy_atoms_only.
+            Whether to leave the hydrogens out.
+        :param metal_shell_bonds:
+            How many bonds out from a metal the metal_shell region reaches.
 
         :return:
             The deviations, as get_ic_rmsd reports them, or None when they
             could not be measured.
         """
 
-        indices = self.rmsd_indices(template,
-                                    region,
-                                    heavy_only,
-                                    rmsd_heavy_atoms_only=rmsd_heavy_atoms_only,
-                                    metal_shell_bonds=metal_shell_bonds)
+        indices = self.rmsd_indices(template, region, heavy_only,
+                                    metal_shell_bonds)
         elements = template['molecule'].get_labels()
         labels = [elements[index] for index in indices]
 
@@ -899,7 +866,7 @@ class SiteMatcher(Shell):
         return ic_rmsd
 
     @on_master
-    def ic_violation(self, ic_rmsd, thresholds, ic_types=DEFAULT_IC_TYPES):
+    def ic_violation(self, ic_rmsd, thresholds, ic_types):
         """
         Checks internal coordinate deviations against a set of thresholds.
 
@@ -912,6 +879,8 @@ class SiteMatcher(Shell):
             The deviations, as get_ic_rmsd reports them.
         :param thresholds:
             The thresholds to check against, as {type: {'rms': , 'max': }}.
+        :param ic_types:
+            The internal coordinate types to check, with their units.
 
         :return:
             A description of the first threshold that was exceeded, or None
@@ -1218,15 +1187,8 @@ class SiteMatcher(Shell):
     # ------------------------------------------------------------------
 
     @on_master
-    def compare(self,
-                templates,
-                described,
-                molecule,
-                regions,
-                include_hydrogens=False,
-                max_mappings=DEFAULT_MAX_MAPPINGS,
-                rmsd_heavy_atoms_only=DEFAULT_RMSD_HEAVY_ATOMS_ONLY,
-                metal_shell_bonds=DEFAULT_METAL_SHELL_BONDS):
+    def compare(self, templates, described, molecule, regions,
+                include_hydrogens, max_mappings, metal_shell_bonds):
         """
         Measures a described site against every template, without an opinion.
 
@@ -1246,8 +1208,6 @@ class SiteMatcher(Shell):
             Whether the hydrogens take part in the measurements.
         :param max_mappings:
             The limit on how many atom mappings are built per template.
-        :param rmsd_heavy_atoms_only:
-            Whether the RMSD is over the heavy atoms alone.
         :param metal_shell_bonds:
             How many bonds out from a metal the metal_shell region reaches.
 
@@ -1288,10 +1248,8 @@ class SiteMatcher(Shell):
             maps = []
             for coarse_mapping in coarse:
                 maps.extend(
-                    self.heavy_atom_maps(template,
-                                         described,
-                                         coarse_mapping,
-                                         max_mappings=max_mappings))
+                    self.heavy_atom_maps(template, described, coarse_mapping,
+                                         max_mappings))
             if not maps:
                 entry['status'] = 'spec'
                 findings[name] = entry
@@ -1310,13 +1268,8 @@ class SiteMatcher(Shell):
 
             for region in regions:
                 entry['regions'][region] = self.measure_region(
-                    template,
-                    mapping,
-                    coordinates,
-                    region,
-                    heavy_only,
-                    rmsd_heavy_atoms_only=rmsd_heavy_atoms_only,
-                    metal_shell_bonds=metal_shell_bonds)
+                    template, mapping, coordinates, region, heavy_only,
+                    metal_shell_bonds)
 
             findings[name] = entry
 
@@ -1329,7 +1282,7 @@ class SiteMatcher(Shell):
                         regions,
                         ic_types,
                         ranked_on,
-                        template=None):
+                        template):
         """
         Picks the template a force field should be built from, and says why.
 
@@ -1565,9 +1518,8 @@ class SiteMatcher(Shell):
 
             # a criterion that could not be evaluated is not one that was
             # passed, so the region is held to strictly here
-            violation = self.ic_violation(found['ic_rmsd'],
-                                          thresholds,
-                                          ic_types=ic_types)
+            violation = self.ic_violation(found['ic_rmsd'], thresholds,
+                                          ic_types)
             if violation is not None:
                 return f'{region} {violation}'
 

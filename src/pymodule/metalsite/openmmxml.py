@@ -112,11 +112,7 @@ SLOT_LETTERS = string.ascii_uppercase
 # ----------------------------------------------------------------------
 
 
-def restructure_topology(topology,
-                         positions,
-                         active_site,
-                         forcefield,
-                         site_residue_name=SITE_RESIDUE_NAME):
+def restructure_topology(topology, positions, active_site, forcefield):
     """
     Moves the active site into a residue of its own and bonds the metals.
 
@@ -201,7 +197,7 @@ def restructure_topology(topology,
                     atom.name, atom.element, new_residue, atom.id).index
 
     site_chain = new_topology.addChain(_free_chain_id(topology))
-    site_residue = new_topology.addResidue(site_residue_name, site_chain,
+    site_residue = new_topology.addResidue(SITE_RESIDUE_NAME, site_chain,
                                            SITE_RESIDUE_ID)
 
     site_atom_index = {}
@@ -640,12 +636,8 @@ TERM_SCRIPT = '\n'.join([
 ])
 
 
-def forcefield_xml(active_site,
-                   forcefield,
-                   restructured,
-                   templates,
-                   forcefield_files=(),
-                   drop_torsions_across_metal_bonds=True):
+def forcefield_xml(active_site, forcefield, restructured, templates,
+                   forcefield_files, drop_torsions_across_metal_bonds):
     """
     Writes the force field XML for the restructured topology.
 
@@ -675,9 +667,8 @@ def forcefield_xml(active_site,
     # every atom keeps the type the protein force field gave it, so the
     # file says nothing on its own and has to be loaded beside the same
     # files it was written against
-    if forcefield_files:
-        root.append(
-            ET.Comment(' Load beside: ' + ', '.join(forcefield_files) + ' '))
+    root.append(
+        ET.Comment(' Load beside: ' + ', '.join(forcefield_files) + ' '))
 
     residues = ET.SubElement(root, 'Residues')
     for template in templates:

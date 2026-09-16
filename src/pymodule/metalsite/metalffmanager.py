@@ -40,7 +40,9 @@ from ..outputstream import OutputStream
 from .metalsiteffbuilder import MetalSiteForceFieldBuilder
 from .builder import ActiveSiteBuilder
 from .qm import QmParameterizer
-from .matching import SiteMatcher
+from .matching import (SiteMatcher, DEFAULT_MAX_MAPPINGS,
+                       DEFAULT_METAL_SHELL_BONDS,
+                       DEFAULT_RMSD_HEAVY_ATOMS_ONLY, DEFAULT_IC_TYPES)
 from .templates import TemplateLoader, GEOMETRY_KINDS
 from .shoehorn import Shoehorner
 from . import util
@@ -147,11 +149,7 @@ class MetalForceFieldManager:
     RMSD_REGIONS = ('active_site', 'metal_shell', 'metal_beta_carbons')
 
     # The internal coordinate types get_ic_rmsd reports, with their units.
-    IC_TYPES = {
-        'bonds': 'A',
-        'angles': 'deg',
-        'dihedrals': 'deg',
-    }
+    IC_TYPES = DEFAULT_IC_TYPES
 
     # What a template has to be within, region by region, before its
     # parameters are put on a new site. The bonds are what is checked: they
@@ -263,7 +261,7 @@ class MetalForceFieldManager:
         self._built_from = None
 
         # matching
-        self.metal_shell_bonds = 2
+        self.metal_shell_bonds = DEFAULT_METAL_SHELL_BONDS
 
         # What a template has to be within before its parameters are put on a
         # site. A name in SELECTION_CRITERIA or a set of thresholds of the
@@ -272,8 +270,8 @@ class MetalForceFieldManager:
         self.selection_criteria = self.SELECTION_CRITERIA['tight']
         # the hydrogens carry the noise of Modeller.addHydrogens rather than
         # anything about the site; see the class docstring
-        self.rmsd_heavy_atoms_only = True
-        self.max_mappings = 10000
+        self.rmsd_heavy_atoms_only = DEFAULT_RMSD_HEAVY_ATOMS_ONLY
+        self.max_mappings = DEFAULT_MAX_MAPPINGS
 
         # what to run on the query structure
         self.mm_fallback_literature_bonds = True
@@ -385,12 +383,8 @@ class MetalForceFieldManager:
         geometry, kind = self._loader.load_geometry(folder, fallback)
         forcefield.molecule = geometry
 
-        template = self._loader.build(name,
-                                      forcefield,
-                                      geometry,
-                                      kind,
-                                      folder,
-                                      metal_elements=self.builder.metal_elements)
+        template = self._loader.build(name, forcefield, geometry, kind, folder,
+                                      self.builder.metal_elements)
 
         if name in self.templates:
             self.ostream.print_warning(
@@ -483,7 +477,7 @@ class MetalForceFieldManager:
     def compare_active_site(self,
                             active_site=None,
                             mm_opt=True,
-                            include_hydrogens=False):
+                            include_hydrogens=None):
         """
         Compares the current active site against every loaded template,
         prints the full comparison, and reports whether an unforced match
@@ -498,10 +492,10 @@ class MetalForceFieldManager:
         with no argument, which describes it again from scratch and so picks
         up any edit made since the last call.
 
-        The hydrogens are left out of every measurement by default, since
-        protonate does not place them reproducibly; include_hydrogens puts
-        them back for this call whatever rmsd_heavy_atoms_only says. One
-        geometry is measured per call, so call it twice to see both.
+        The hydrogens are left out of every measurement while
+        rmsd_heavy_atoms_only is set, since protonate does not place them
+        reproducibly; include_hydrogens overrides that for one call either
+        way. One geometry is measured per call, so call it twice to see both.
 
         :param active_site:
             A MetalSiteForceFieldBuilder with a built active site, to become
@@ -511,7 +505,7 @@ class MetalForceFieldManager:
             which is what takes the slack out of an unrelaxed structure.
         :param include_hydrogens:
             Whether the hydrogens count toward the RMSDs and the internal
-            coordinates.
+            coordinates; None follows rmsd_heavy_atoms_only.
 
         :return:
             True when at least one template is within selection_criteria,
@@ -548,6 +542,9 @@ class MetalForceFieldManager:
             'loaded. Call compare_active_site with a '
             'MetalSiteForceFieldBuilder first.')
 
+        if include_hydrogens is None:
+            include_hydrogens = not self.rmsd_heavy_atoms_only
+
         builder = self._active_site_builder
         described = self._shoehorner.described_site(builder)
 
@@ -558,15 +555,10 @@ class MetalForceFieldManager:
             molecule = described['molecule']
             geometry = 'input'
 
-        findings = self._matcher.compare(
-            self.templates,
-            described,
-            molecule,
-            self.RMSD_REGIONS,
-            include_hydrogens=include_hydrogens,
-            max_mappings=self.max_mappings,
-            rmsd_heavy_atoms_only=self.rmsd_heavy_atoms_only,
-            metal_shell_bonds=self.metal_shell_bonds)
+        findings = self._matcher.compare(self.templates, described, molecule,
+                                         self.RMSD_REGIONS, include_hydrogens,
+                                         self.max_mappings,
+                                         self.metal_shell_bonds)
 
         results = {
             'source': str(builder.folder),
@@ -831,8 +823,7 @@ class MetalForceFieldManager:
 
         walked = self._shoehorner.run(self._active_site_builder,
                                       self.templates[template],
-                                      max_include_radius,
-                                      max_mappings=self.max_mappings)
+                                      max_include_radius, self.max_mappings)
 
         if not walked:
             return False
@@ -939,7 +930,7 @@ class MetalForceFieldManager:
         return self._sites.mm_optimize_active_site(active_site, forcefield,
                                                    **builder.relax_settings())
 
-    def _select_template(self, template=None):
+    def _select_template(self, template):
         """
         Picks the template a force field should be built from, and says why;
         see SiteMatcher.select_template. Reads the last comparison.
@@ -959,13 +950,11 @@ class MetalForceFieldManager:
 
         criteria_name, criteria = self._selection_criteria()
 
-        return self._matcher.select_template(self._comparison,
-                                             criteria,
-                                             criteria_name,
-                                             self.RMSD_REGIONS,
+        return self._matcher.select_template(self._comparison, criteria,
+                                             criteria_name, self.RMSD_REGIONS,
                                              self.IC_TYPES,
                                              self.SELECTION_RANKED_ON,
-                                             template=template)
+                                             template)
 
     def _selection_score(self, entry):
         """

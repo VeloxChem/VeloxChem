@@ -47,19 +47,14 @@ from ..outputstream import OutputStream
 from ..mmforcefieldgenerator import MMForceFieldGenerator
 from ..errorhandler import assert_msg_critical
 from .util import (
-    Shell, on_master, param, print_param_list,
-    METAL_ELEMENTS, SUPPORTED_METAL_ELEMENTS, METAL_FORMAL_CHARGES,
-    DONOR_ELEMENTS, BIDENTATE_ASYMMETRY, METAL_BOND_CUTOFF,
-    REPORT_CUTOFF_MARGIN, REPORT_CUTOFF, CAP_BOND_LENGTH,
-    SEEDED_FROM_REQUEST, SEEDED_FROM_TABLE, SEEDED_FROM_GEOMETRY,
-    SEEDED_EQUILIBRIUM_LABELS, BRIDGING_RESIDUES, CARBOXYLATE_RESIDUES,
-    BACKBONE_ATOM_NAMES, UNTRUNCATABLE_RESIDUES, VARIANT_CHARGES,
-    BETA_CARBON_COMMENT, CAP_COMMENT, UNPARAMETERIZED_COMMENT,
-    UFF_TYPE_COMMENT, DEFAULT_METAL_BOND_FORCE_CONSTANT,
-    DEFAULT_METAL_ANGLE_FORCE_CONSTANT,
-    DEFAULT_METAL_PLANARITY_FORCE_CONSTANT, residue_label, _site_index_map,
-    empty_request, connectivity_bonds, get_metal_keys, active_site_residues,
-    check_variant, redistribute_cap_charges, constrained_indices)
+    Shell, on_master, param, print_param_list, SUPPORTED_METAL_ELEMENTS,
+    DONOR_ELEMENTS, BIDENTATE_ASYMMETRY, SEEDED_FROM_REQUEST,
+    SEEDED_FROM_TABLE, SEEDED_FROM_GEOMETRY, SEEDED_EQUILIBRIUM_LABELS,
+    BRIDGING_RESIDUES, CARBOXYLATE_RESIDUES, BACKBONE_ATOM_NAMES,
+    UNTRUNCATABLE_RESIDUES, VARIANT_CHARGES, BETA_CARBON_COMMENT, CAP_COMMENT,
+    UNPARAMETERIZED_COMMENT, UFF_TYPE_COMMENT, residue_label, _site_index_map,
+    connectivity_bonds, get_metal_keys, active_site_residues, check_variant,
+    redistribute_cap_charges, constrained_indices)
 
 try:
     import openmm as mm
@@ -98,19 +93,19 @@ class ActiveSiteBuilder(Shell):
     # ------------------------------------------------------------------
 
     @on_master
-    def load_and_prepare_protein(self, structure, prepare=True):
+    def load_and_prepare_protein(self, structure, prepare):
         """
         Reads a structure and prepares it for a protein force field.
 
-        Preparation adds missing heavy atoms so that a protein force field can match
-        templates.  Missing residues are deliberately not built.
-        Necessary for building full enzymatic systemms.
-        Can be skipped if the provided topology file is already  correct.
+        Preparation adds missing heavy atoms so that a protein force field
+        can match templates. Missing residues are deliberately not built.
+        Necessary for building full enzymatic systems; can be skipped if the
+        provided topology file is already correct.
 
         :param structure:
             The path to a .pdb, .cif or .pdbx file.
         :param prepare:
-            Whether to run the preparation
+            Whether to run the preparation.
 
         :return:
             The tuple of the OpenMM topology and the positions as an (N, 3)
@@ -168,13 +163,12 @@ class ActiveSiteBuilder(Shell):
     def derive_binding_modes(self,
                              topology,
                              positions,
-                             coordinating_residues=None,
-                             metal_elements=METAL_ELEMENTS,
-                             metal_formal_charges=None,
-                             bidentate_asymmetry=BIDENTATE_ASYMMETRY,
-                             metal_bond_cutoff=METAL_BOND_CUTOFF,
-                             report_cutoff=REPORT_CUTOFF,
-                             request=None):
+                             request,
+                             metal_elements,
+                             metal_formal_charges,
+                             metal_bond_cutoff,
+                             report_cutoff,
+                             coordinating_residues=None):
         """
         Derives the coordination topology of the metal centers from geometry.
 
@@ -183,31 +177,30 @@ class ActiveSiteBuilder(Shell):
             The OpenMM topology.
         :param positions:
             The positions as an (N, 3) numpy array in Angstrom.
-        :param coordinating_residues:
-            Residues that must be ligands whatever their distance, each given
-            as a residue id ('130' or 130) or as a residue label ('ASP130').
-            Merged into the request's own list.
+        :param request:
+            The stored request -- manual metal bonds, protonation variants and
+            the residue membership overrides. Replayed onto the detection.
         :param metal_elements:
             The elements treated as metal centers. Note that detecting one the
             builder is not validated for is a hard failure, so a zinc structure
             that also holds a calcium or magnesium ion has to narrow this to
             ('Zn',) by hand.
         :param metal_formal_charges:
-            The formal charges assumed for the metal ions. Defaults to
-            METAL_FORMAL_CHARGES.
-        :param request:
-            The stored request -- manual metal bonds, protonation variants and
-            the residue membership overrides. Replayed onto the detection.
+            The formal charges assumed for the metal ions, by element.
+        :param metal_bond_cutoff:
+            The distance in Angstrom within which a donor atom is bonded to a
+            metal.
+        :param report_cutoff:
+            The distance in Angstrom out to which a contact is reported
+            without being made a bond.
+        :param coordinating_residues:
+            Residues that must be ligands whatever their distance, each given
+            as a residue id ('130' or 130) or as a residue label ('ASP130').
+            Merged into the request's own list.
 
         :return:
             The binding modes dictionary, freshly derived.
         """
-
-        if metal_formal_charges is None:
-            metal_formal_charges = METAL_FORMAL_CHARGES
-
-        if request is None:
-            request = empty_request()
 
         positions = np.asarray(positions)
 
@@ -244,14 +237,9 @@ class ActiveSiteBuilder(Shell):
 
         notes = []
         # Collect all close-lying ligands
-        ligands = self._collect_ligands(atoms,
-                                        position_of,
-                                        metals,
-                                        notes,
-                                        forced,
-                                        bidentate_asymmetry=bidentate_asymmetry,
-                                        metal_bond_cutoff=metal_bond_cutoff,
-                                        report_cutoff=report_cutoff)
+        ligands = self._collect_ligands(atoms, position_of, metals, notes,
+                                        forced, metal_bond_cutoff,
+                                        report_cutoff)
 
         # A bond decided by hand is not something the distances can be asked
         # about again, so the records are replayed onto every derivation. This
@@ -259,10 +247,8 @@ class ActiveSiteBuilder(Shell):
         records = request.get('manual_bonds', [])
         if records:
             self._apply_manual_bonds(ligands, records, metals, atoms, position_of, notes)
-            self._assign_binding_modes(ligands,
-                                       notes,
-                                       bidentate_asymmetry=bidentate_asymmetry,
-                                       protected=self._manual_protected(records))
+            self._assign_binding_modes(ligands, notes,
+                                       self._manual_protected(records))
 
         binding_modes = {
             'metals': metals,
@@ -278,15 +264,8 @@ class ActiveSiteBuilder(Shell):
         return binding_modes
 
     @on_master
-    def _collect_ligands(self,
-                         atoms,
-                         position_of,
-                         metals,
-                         notes,
-                         forced=None,
-                         bidentate_asymmetry=BIDENTATE_ASYMMETRY,
-                         metal_bond_cutoff=METAL_BOND_CUTOFF,
-                         report_cutoff=REPORT_CUTOFF):
+    def _collect_ligands(self, atoms, position_of, metals, notes, forced,
+                         metal_bond_cutoff, report_cutoff):
         """
         Builds the classified ligand contact list of a set of candidate atoms.
 
@@ -307,16 +286,20 @@ class ActiveSiteBuilder(Shell):
             The list of review notes. Appended to in place.
         :param forced:
             The residue indices that are ligands whatever their distance.
+        :param metal_bond_cutoff:
+            The distance in Angstrom within which a donor atom is bonded to a
+            metal.
+        :param report_cutoff:
+            The distance in Angstrom out to which a contact is reported
+            without being made a bond. A scan that stopped before the bonding
+            cutoff would drop contacts that are bonds, so it is held to at
+            least metal_bond_cutoff.
 
         :return:
             The list of ligand contacts, each carrying its mode.
         """
 
-        if report_cutoff is None:
-            report_cutoff = metal_bond_cutoff + REPORT_CUTOFF_MARGIN
-
-        else:
-            report_cutoff = max(float(report_cutoff), float(metal_bond_cutoff))
+        report_cutoff = max(float(report_cutoff), float(metal_bond_cutoff))
 
         metal_indices = [metal['index'] for metal in metals]
         atoms = list(atoms)
@@ -377,20 +360,12 @@ class ActiveSiteBuilder(Shell):
                     f'({report_cutoff}) cutoffs; review whether it '
                     'should be a ligand')
 
-        self._force_ligands(atoms,
-                            position_of,
-                            metal_indices,
-                            contacts,
-                            notes,
-                            forced,
-                            metal_bond_cutoff=metal_bond_cutoff,
-                            report_cutoff=report_cutoff)
+        self._force_ligands(atoms, position_of, metal_indices, contacts,
+                            notes, forced, metal_bond_cutoff, report_cutoff)
 
         ligands = [contact for contact in contacts if contact['metals']]
 
-        self._assign_binding_modes(ligands,
-                                   notes,
-                                   bidentate_asymmetry=bidentate_asymmetry)
+        self._assign_binding_modes(ligands, notes)
 
         for metal in metals:
             n_ligands = sum(1 for ligand in ligands
@@ -456,15 +431,8 @@ class ActiveSiteBuilder(Shell):
         return forced
 
     @on_master
-    def _force_ligands(self,
-                       atoms,
-                       position_of,
-                       metal_indices,
-                       contacts,
-                       notes,
-                       forced,
-                       metal_bond_cutoff=METAL_BOND_CUTOFF,
-                       report_cutoff=REPORT_CUTOFF):
+    def _force_ligands(self, atoms, position_of, metal_indices, contacts,
+                       notes, forced, metal_bond_cutoff, report_cutoff):
         """
         Makes the residues asked for ligands of their nearest metal.
 
@@ -556,11 +524,7 @@ class ActiveSiteBuilder(Shell):
             })
 
     @on_master
-    def _assign_binding_modes(self,
-                              ligands,
-                              notes,
-                              bidentate_asymmetry=None,
-                              protected=None):
+    def _assign_binding_modes(self, ligands, notes, protected=None):
         """
         Classifies each ligand contact using the residue context.
 
@@ -584,10 +548,6 @@ class ActiveSiteBuilder(Shell):
             contact the rules discard removed from the list.
         :param notes:
             The list of review notes. Appended to in place.
-        :param bidentate_asymmetry:
-            How much closer one carboxylate oxygen has to be than the other
-            before the pair is read as monodentate. Defaults to
-            BIDENTATE_ASYMMETRY.
         :param protected:
             The (residue index, atom name) pairs that a manual edit put there.
             The distance-driven demotions are heuristics reading an unrelaxed
@@ -599,9 +559,6 @@ class ActiveSiteBuilder(Shell):
 
         if protected is None:
             protected = set()
-
-        if bidentate_asymmetry is None:
-            bidentate_asymmetry = BIDENTATE_ASYMMETRY
 
         by_residue = {}
         for ligand in ligands:
@@ -698,7 +655,7 @@ class ActiveSiteBuilder(Shell):
                 asked_for = any((ligand['res_index'], ligand['atom']) in protected
                                 for ligand in group)
 
-                if separation > bidentate_asymmetry and asked_for:
+                if separation > BIDENTATE_ASYMMETRY and asked_for:
                     notes.append(
                         f'{group[0]["residue"]} has {near["atom"]} at '
                         f'{near["distances"][0]:.2f} A and {far["atom"]} at '
@@ -706,7 +663,7 @@ class ActiveSiteBuilder(Shell):
                         f'{separation:.2f} A, which would normally read as '
                         f'monodentate through {near["atom"]}; both are kept '
                         'because a manual edit asked for them')
-                elif separation > bidentate_asymmetry:
+                elif separation > BIDENTATE_ASYMMETRY:
                     notes.append(
                         f'{group[0]["residue"]} has {near["atom"]} at '
                         f'{near["distances"][0]:.2f} A and {far["atom"]} at '
@@ -960,11 +917,10 @@ class ActiveSiteBuilder(Shell):
                        positions,
                        resid,
                        metal,
+                       metal_bond_cutoff,
+                       report_cutoff,
                        atom=None,
                        chain=None,
-                       bidentate_asymmetry=BIDENTATE_ASYMMETRY,
-                       metal_bond_cutoff=METAL_BOND_CUTOFF,
-                       report_cutoff=REPORT_CUTOFF,
                        equilibrium=None):
         """
         Bonds a residue to a metal center that the distances did not connect.
@@ -993,6 +949,12 @@ class ActiveSiteBuilder(Shell):
             The residue, as an id ('130' or 130) or as a label ('ASP130').
         :param metal:
             The atom index of the metal center to bond to.
+        :param metal_bond_cutoff:
+            The bonding cutoff in Angstrom, which the distance of the new bond
+            is reported against.
+        :param report_cutoff:
+            The reporting cutoff in Angstrom, beyond which the new bond is
+            warned about as a long one.
         :param atom:
             The donor atom of the residue, as an atom name ('OE1') or as an
             atom index. Resolved automatically when left out, which is only
@@ -1344,12 +1306,11 @@ class ActiveSiteBuilder(Shell):
                        topology,
                        positions,
                        resid,
-                       chain=None,
-                       metal_elements=METAL_ELEMENTS,
-                       metal_formal_charges=None,
-                       bidentate_asymmetry=BIDENTATE_ASYMMETRY,
-                       metal_bond_cutoff=METAL_BOND_CUTOFF,
-                       report_cutoff=REPORT_CUTOFF):
+                       chain,
+                       metal_elements,
+                       metal_formal_charges,
+                       metal_bond_cutoff,
+                       report_cutoff):
         """
         Takes a residue out of the truncated active site.
 
@@ -1375,7 +1336,16 @@ class ActiveSiteBuilder(Shell):
         :param resid:
             The residue, as an id ('130' or 130) or as a label ('ASP130').
         :param chain:
-            The chain id, when the residue id occurs in more than one chain.
+            The chain id, when the residue id occurs in more than one chain,
+            else None.
+        :param metal_elements:
+            The elements treated as metal centers.
+        :param metal_formal_charges:
+            The formal charges assumed for the metal ions, by element.
+        :param metal_bond_cutoff:
+            The bonding cutoff in Angstrom of the re-detection.
+        :param report_cutoff:
+            The reporting cutoff in Angstrom of the re-detection.
 
         :return:
             The edited request.
@@ -1410,7 +1380,6 @@ class ActiveSiteBuilder(Shell):
         detection = {
             'metal_elements': metal_elements,
             'metal_formal_charges': metal_formal_charges,
-            'bidentate_asymmetry': bidentate_asymmetry,
             'metal_bond_cutoff': metal_bond_cutoff,
             'report_cutoff': report_cutoff,
         }
@@ -1426,9 +1395,7 @@ class ActiveSiteBuilder(Shell):
                                              modes,
                                              label,
                                              metal=bound['metals'][0])
-            modes = self.derive_binding_modes(topology,
-                                              positions,
-                                              request=request,
+            modes = self.derive_binding_modes(topology, positions, request,
                                               **detection)
 
         request = deepcopy(request)
@@ -1450,7 +1417,7 @@ class ActiveSiteBuilder(Shell):
         return request
 
     @on_master
-    def _resolve_residue(self, topology, resid, chain=None):
+    def _resolve_residue(self, topology, resid, chain):
         """
         Finds the one residue a manual edit is about.
 
@@ -1718,11 +1685,8 @@ class ActiveSiteBuilder(Shell):
         return variant, note
 
     @on_master
-    def suggest_variants(self,
-                         topology,
-                         positions,
-                         binding_modes,
-                         protonation_overrides=None):
+    def suggest_variants(self, topology, positions, binding_modes,
+                         protonation_overrides):
         """
         Chooses a protonation variant for each coordinating residue.
 
@@ -1745,6 +1709,9 @@ class ActiveSiteBuilder(Shell):
         :param binding_modes:
             The binding modes. Not modified; anything worth recording is
             returned as a note.
+        :param protonation_overrides:
+            The variants asked for by hand, keyed on residue label, id or
+            index; None for none.
 
         :return:
             The tuple of the residue index to variant mapping and a list of
@@ -1812,11 +1779,11 @@ class ActiveSiteBuilder(Shell):
         return variants, notes
 
     @on_master
-    def protonate(self, topology, positions, binding_modes, protonation_overrides=None):
+    def protonate(self, topology, positions, binding_modes,
+                  protonation_overrides):
         """
         Adds hydrogens with the protonation variants that the metal site
         requires.
-
 
         :param topology:
             The OpenMM topology.
@@ -1824,6 +1791,9 @@ class ActiveSiteBuilder(Shell):
             The positions as an (N, 3) numpy array in Angstrom.
         :param binding_modes:
             The coordination, read for the variant rules. Not modified.
+        :param protonation_overrides:
+            The variants asked for by hand, keyed on residue label, id or
+            index; None for none.
 
         :return:
             The tuple of the protonated topology, the positions in Angstrom,
@@ -1837,10 +1807,7 @@ class ActiveSiteBuilder(Shell):
         # Figure out the correct residue variants
         # based on the positions and the binding modes
         variants_by_index, notes = self.suggest_variants(
-            topology,
-            positions,
-            binding_modes,
-            protonation_overrides=protonation_overrides)
+            topology, positions, binding_modes, protonation_overrides)
 
         variant_list = [None] * topology.getNumResidues()
         for res_index, variant in variants_by_index.items():
@@ -1934,11 +1901,8 @@ class ActiveSiteBuilder(Shell):
             'active site')
 
     @on_master
-    def extract_active_site(self,
-                            topology,
-                            positions,
-                            binding_modes,
-                            cap_bond_length=CAP_BOND_LENGTH):
+    def extract_active_site(self, topology, positions, binding_modes,
+                            cap_bond_length):
         """
         Builds the truncated QM active site.
 
@@ -1967,6 +1931,10 @@ class ActiveSiteBuilder(Shell):
             The protonated OpenMM topology.
         :param positions:
             The positions as an (N, 3) numpy array in Angstrom.
+        :param binding_modes:
+            The coordination, which says which residues the site holds.
+        :param cap_bond_length:
+            The C-H bond length in Angstrom of the capping hydrogens.
 
         :return:
             The active site dictionary. It records the active site indices of
@@ -2109,11 +2077,7 @@ class ActiveSiteBuilder(Shell):
         return active_site['molecule'].show(**kwargs)
 
     @on_master
-    def _build_connectivity(self,
-                            topology,
-                            active_site,
-                            binding_modes,
-                            warn_above=2.0):
+    def _build_connectivity(self, topology, active_site, binding_modes):
         """
         Builds the connectivity matrix of the active site without perceiving any
         bonds.
@@ -2128,8 +2092,11 @@ class ActiveSiteBuilder(Shell):
 
         :param topology:
             The protonated OpenMM topology.
-        :param warn_above:
-            The length in Angstrom above which a non-metal bond is reported.
+        :param active_site:
+            The active site being extracted, for the atom map and the
+            geometry.
+        :param binding_modes:
+            The coordination, for the metal-ligand bonds.
 
         :return:
             The connectivity matrix.
@@ -2172,8 +2139,10 @@ class ActiveSiteBuilder(Shell):
                     continue
                 if i in metals or j in metals:
                     continue
+                # a covalent bond of a standard residue is never this long;
+                # one that is says the structure is broken
                 distance = np.linalg.norm(coords[i] - coords[j])
-                if distance > warn_above:
+                if distance > 2.0:
                     self.ostream.print_warning(
                         f'Non-metal bond {i}-{j} ({labels[i]}-{labels[j]}) '
                         f'is {distance:.2f} A long')
@@ -2312,14 +2281,9 @@ class ActiveSiteBuilder(Shell):
         return new_active_site
 
     @on_master
-    def derive_site_coordination(self,
-                                 topology,
-                                 geometry,
-                                 active_site,
-                                 binding_modes,
-                                 bidentate_asymmetry=BIDENTATE_ASYMMETRY,
-                                 metal_bond_cutoff=METAL_BOND_CUTOFF,
-                                 report_cutoff=REPORT_CUTOFF):
+    def derive_site_coordination(self, topology, geometry, active_site,
+                                 binding_modes, metal_bond_cutoff,
+                                 report_cutoff):
         """
         Works out the coordination of an extracted active site from its own
         geometry.
@@ -2342,6 +2306,10 @@ class ActiveSiteBuilder(Shell):
             The active site the geometry belongs to. Not modified.
         :param binding_modes:
             The modes to take the metals and the recorded decisions from.
+        :param metal_bond_cutoff:
+            The bonding cutoff in Angstrom.
+        :param report_cutoff:
+            The reporting cutoff in Angstrom.
 
         :return:
             The tuple of the ligand contacts and the notes deriving them
@@ -2370,16 +2338,10 @@ class ActiveSiteBuilder(Shell):
             return coordinates[site_of[index]]
 
         notes = []
-        ligands = self._collect_ligands(candidates,
-                                        position_of,
-                                        binding_modes['metals'],
-                                        notes,
-                                        set(
-                                            binding_modes.get('coordinating_residues',
-                                                              [])),
-                                        bidentate_asymmetry=bidentate_asymmetry,
-                                        metal_bond_cutoff=metal_bond_cutoff,
-                                        report_cutoff=report_cutoff)
+        ligands = self._collect_ligands(
+            candidates, position_of, binding_modes['metals'], notes,
+            set(binding_modes.get('coordinating_residues', [])),
+            metal_bond_cutoff, report_cutoff)
 
         # a bond put there by hand is not something the distances can be
         # asked about again, so it is replayed onto every derivation
@@ -2387,22 +2349,14 @@ class ActiveSiteBuilder(Shell):
         if records:
             self._apply_manual_bonds(ligands, records, binding_modes['metals'],
                                      candidates, position_of, notes)
-            self._assign_binding_modes(ligands,
-                                       notes,
-                                       bidentate_asymmetry=bidentate_asymmetry,
-                                       protected=self._manual_protected(records))
+            self._assign_binding_modes(ligands, notes,
+                                       self._manual_protected(records))
 
         return ligands, notes
 
     @on_master
-    def update_binding_modes(self,
-                             topology,
-                             geometry,
-                             active_site,
-                             binding_modes,
-                             bidentate_asymmetry=BIDENTATE_ASYMMETRY,
-                             metal_bond_cutoff=METAL_BOND_CUTOFF,
-                             report_cutoff=REPORT_CUTOFF):
+    def update_binding_modes(self, topology, geometry, active_site,
+                             binding_modes, metal_bond_cutoff, report_cutoff):
         """
         Re-detects the coordination sphere on a new active site geometry.
 
@@ -2428,6 +2382,10 @@ class ActiveSiteBuilder(Shell):
             what gets checked. Not modified.
         :param binding_modes:
             The binding modes to check. Not modified.
+        :param metal_bond_cutoff:
+            The bonding cutoff in Angstrom.
+        :param report_cutoff:
+            The reporting cutoff in Angstrom.
 
         :return:
             The tuple of the binding modes, the active site and the flag that
@@ -2448,13 +2406,8 @@ class ActiveSiteBuilder(Shell):
         records = binding_modes.get('manual_bonds', [])
 
         new_ligands, notes = self.derive_site_coordination(
-            topology,
-            coordinates,
-            active_site,
-            binding_modes,
-            bidentate_asymmetry=bidentate_asymmetry,
-            metal_bond_cutoff=metal_bond_cutoff,
-            report_cutoff=report_cutoff)
+            topology, coordinates, active_site, binding_modes,
+            metal_bond_cutoff, report_cutoff)
 
         def coordination(ligands):
             return {
@@ -2489,7 +2442,7 @@ class ActiveSiteBuilder(Shell):
         largest_shift = max(shifts) if shifts else 0.0
 
         if new_coordination == old_coordination:
-            self.print_binding_mode_update([], largest_shift)
+            self.print_binding_mode_update([], largest_shift, [])
             return binding_modes, active_site, False
 
         changes = []
@@ -2623,15 +2576,14 @@ class ActiveSiteBuilder(Shell):
                           topology,
                           positions,
                           request,
-                          coordinating_residues=None,
-                          protonation_overrides=None,
-                          report_detection=True,
-                          cap_bond_length=CAP_BOND_LENGTH,
-                          metal_elements=METAL_ELEMENTS,
-                          metal_formal_charges=None,
-                          bidentate_asymmetry=BIDENTATE_ASYMMETRY,
-                          metal_bond_cutoff=METAL_BOND_CUTOFF,
-                          report_cutoff=REPORT_CUTOFF):
+                          protonation_overrides,
+                          report_detection,
+                          cap_bond_length,
+                          metal_elements,
+                          metal_formal_charges,
+                          metal_bond_cutoff,
+                          report_cutoff,
+                          coordinating_residues=None):
         """
         Runs the structural pass from a prepared structure to a truncated
         active site: detects the coordination, protonates the structure to
@@ -2652,18 +2604,26 @@ class ActiveSiteBuilder(Shell):
             The record of what has been decided about the site. Not
             modified; the one returned carries the variants the protonation
             built and the residues coordinating_residues forced.
-        :param coordinating_residues:
-            Residues to make ligands whatever their distance, as ids or
-            labels. Recorded into the returned request, so every later
-            derivation honours them.
         :param protonation_overrides:
             Protonation variants by residue label, as
-            update_protonation_state records them.
+            update_protonation_state records them; None for none.
         :param report_detection:
             Whether the coordination found on the structure is printed. The
             truncated site always is.
         :param cap_bond_length:
             The C-H distance in Angstrom the capping hydrogens are placed at.
+        :param metal_elements:
+            The elements treated as metal centers.
+        :param metal_formal_charges:
+            The formal charges assumed for the metal ions, by element.
+        :param metal_bond_cutoff:
+            The bonding cutoff in Angstrom of the detection.
+        :param report_cutoff:
+            The reporting cutoff in Angstrom of the detection.
+        :param coordinating_residues:
+            Residues to make ligands whatever their distance, as ids or
+            labels. Recorded into the returned request, so every later
+            derivation honours them.
 
         :return:
             A dictionary holding the request ('request'), the protonated
@@ -2675,7 +2635,6 @@ class ActiveSiteBuilder(Shell):
         detection = {
             'metal_elements': metal_elements,
             'metal_formal_charges': metal_formal_charges,
-            'bidentate_asymmetry': bidentate_asymmetry,
             'metal_bond_cutoff': metal_bond_cutoff,
             'report_cutoff': report_cutoff,
         }
@@ -2683,8 +2642,8 @@ class ActiveSiteBuilder(Shell):
         binding_modes = self.derive_binding_modes(
             topology,
             positions,
+            request,
             coordinating_residues=coordinating_residues,
-            request=request,
             **detection)
 
         if report_detection:
@@ -2696,16 +2655,13 @@ class ActiveSiteBuilder(Shell):
             binding_modes['coordinating_residues'])
 
         protonated_topology, protonated_positions, variants, notes = (
-            self.protonate(topology,
-                           positions,
-                           binding_modes,
-                           protonation_overrides=protonation_overrides))
+            self.protonate(topology, positions, binding_modes,
+                           protonation_overrides))
 
         request['variants'] = variants
         protonated_modes = self.derive_binding_modes(protonated_topology,
                                                      protonated_positions,
-                                                     request=request,
-                                                     **detection)
+                                                     request, **detection)
 
         existing = protonated_modes.setdefault('notes', [])
         for note in notes:
@@ -2715,7 +2671,7 @@ class ActiveSiteBuilder(Shell):
         active_site = self.extract_active_site(protonated_topology,
                                                protonated_positions,
                                                protonated_modes,
-                                               cap_bond_length=cap_bond_length)
+                                               cap_bond_length)
         self.print_active_site(active_site, protonated_modes)
 
         return {
@@ -2727,17 +2683,9 @@ class ActiveSiteBuilder(Shell):
         }
 
     @on_master
-    def site_coordination(self,
-                          topology,
-                          positions,
-                          geometry,
-                          active_site,
-                          request,
-                          metal_elements=METAL_ELEMENTS,
-                          metal_formal_charges=None,
-                          bidentate_asymmetry=BIDENTATE_ASYMMETRY,
-                          metal_bond_cutoff=METAL_BOND_CUTOFF,
-                          report_cutoff=REPORT_CUTOFF):
+    def site_coordination(self, topology, positions, geometry, active_site,
+                          request, metal_elements, metal_formal_charges,
+                          metal_bond_cutoff, report_cutoff):
         """
         The coordination of an extracted site under one of its geometries.
 
@@ -2755,25 +2703,25 @@ class ActiveSiteBuilder(Shell):
             The active site.
         :param request:
             The record of what has been decided about the site.
+        :param metal_elements:
+            The elements treated as metal centers.
+        :param metal_formal_charges:
+            The formal charges assumed for the metal ions, by element.
+        :param metal_bond_cutoff:
+            The bonding cutoff in Angstrom.
+        :param report_cutoff:
+            The reporting cutoff in Angstrom.
 
         :return:
             The binding modes of the site under that geometry.
         """
 
-        detection = {
-            'bidentate_asymmetry': bidentate_asymmetry,
-            'metal_bond_cutoff': metal_bond_cutoff,
-            'report_cutoff': report_cutoff,
-        }
-
-        modes = self.derive_binding_modes(topology,
-                                          positions,
-                                          request=request,
-                                          metal_elements=metal_elements,
-                                          metal_formal_charges=metal_formal_charges,
-                                          **detection)
+        modes = self.derive_binding_modes(topology, positions, request,
+                                          metal_elements, metal_formal_charges,
+                                          metal_bond_cutoff, report_cutoff)
         ligands, notes = self.derive_site_coordination(
-            topology, geometry, active_site, modes, **detection)
+            topology, geometry, active_site, modes, metal_bond_cutoff,
+            report_cutoff)
 
         modes = dict(modes)
         modes['ligands'] = ligands
@@ -2782,25 +2730,12 @@ class ActiveSiteBuilder(Shell):
         return modes
 
     @on_master
-    def adopt_geometry(self,
-                       topology,
-                       positions,
-                       active_site,
-                       molecule,
-                       request,
-                       metal_elements=METAL_ELEMENTS,
-                       metal_formal_charges=None,
-                       bidentate_asymmetry=BIDENTATE_ASYMMETRY,
-                       metal_bond_cutoff=METAL_BOND_CUTOFF,
-                       report_cutoff=REPORT_CUTOFF):
+    def adopt_geometry(self, topology, positions, active_site, molecule,
+                       request, metal_elements, metal_formal_charges,
+                       metal_bond_cutoff, report_cutoff):
         """
         Puts a new geometry on an active site and detects the coordination
         again on it.
-
-        A contact can leave the cutoff or a carboxylate can open up during a
-        relaxation, and the connectivity the Hessian and the fit read comes
-        out of that detection. The coordination before the move is derived
-        rather than remembered, which is what the comparison needs.
 
         :param topology:
             The protonated topology the site was extracted from.
@@ -2812,35 +2747,32 @@ class ActiveSiteBuilder(Shell):
             The new geometry of the active site.
         :param request:
             The record of what has been decided about the site.
+        :param metal_elements:
+            The elements treated as metal centers.
+        :param metal_formal_charges:
+            The formal charges assumed for the metal ions, by element.
+        :param metal_bond_cutoff:
+            The bonding cutoff in Angstrom of the re-detection.
+        :param report_cutoff:
+            The reporting cutoff in Angstrom of the re-detection.
 
         :return:
             The active site carrying the new geometry, with its connectivity
             brought up to date.
         """
 
-        detection = {
-            'metal_elements': metal_elements,
-            'metal_formal_charges': metal_formal_charges,
-            'bidentate_asymmetry': bidentate_asymmetry,
-            'metal_bond_cutoff': metal_bond_cutoff,
-            'report_cutoff': report_cutoff,
-        }
-
         before = self.site_coordination(topology, positions,
                                         active_site['molecule'], active_site,
-                                        request, **detection)
+                                        request, metal_elements,
+                                        metal_formal_charges,
+                                        metal_bond_cutoff, report_cutoff)
 
         moved = dict(active_site)
         moved['molecule'] = molecule
 
-        _, moved, _ = self.update_binding_modes(
-            topology,
-            molecule,
-            moved,
-            before,
-            bidentate_asymmetry=bidentate_asymmetry,
-            metal_bond_cutoff=metal_bond_cutoff,
-            report_cutoff=report_cutoff)
+        _, moved, _ = self.update_binding_modes(topology, molecule, moved,
+                                                before, metal_bond_cutoff,
+                                                report_cutoff)
 
         return moved
 
@@ -2914,23 +2846,24 @@ class ActiveSiteBuilder(Shell):
         return added
 
     @on_master
-    def minimize_active_site(self,
-                             active_site,
-                             forcefield,
-                             frozen_indices=None,
-                             constrain_capping_hydrogens=False):
+    def minimize_active_site(self, active_site, forcefield, frozen_indices):
         """
         Minimizes the active site with its own force field.
 
-        The beta carbons are frozen by default. They are where the backbone
-        holds the sidechains in place, so a free minimization of an isolated
-        active site lets the truncated fragments drift apart and says nothing
-        about the metal site. Note that the force field only carries
-        electrostatics if build_forcefield was given partial charges.
+        The caller says what is frozen, normally the beta carbons through
+        constrained_indices. They are where the backbone holds the sidechains
+        in place, so a free minimization of an isolated active site lets the
+        truncated fragments drift apart and says nothing about the metal
+        site. Note that the force field only carries electrostatics if
+        build_forcefield was given partial charges.
 
+        :param active_site:
+            The extracted active site.
+        :param forcefield:
+            The force field to minimize on.
         :param frozen_indices:
-            The active site indices to hold fixed. Defaults to
-            constrained_indices(); an empty list minimizes freely.
+            The active site indices to hold fixed; an empty list minimizes
+            freely.
 
         :return:
             The minimized coordinates as an (N, 3) numpy array in Angstrom.
@@ -2941,11 +2874,6 @@ class ActiveSiteBuilder(Shell):
         assert_msg_critical('openmm' in sys.modules,
                             'minimize_active_site: openmm is '
                             'required')
-
-        if frozen_indices is None:
-            frozen_indices = constrained_indices(
-                active_site,
-                constrain_capping_hydrogens=constrain_capping_hydrogens)
 
         with tempfile.TemporaryDirectory() as temp_dir:
             stem = str(Path(temp_dir) / 'active_site')
@@ -2975,13 +2903,9 @@ class ActiveSiteBuilder(Shell):
         return coords
 
     @on_master
-    def mm_optimize_active_site(self,
-                                active_site,
-                                forcefield,
-                                frozen_indices=None,
-                                constrain_metals=False,
-                                constrain_capping_hydrogens=False,
-                                bond_change_warning=0.25):
+    def mm_optimize_active_site(self, active_site, forcefield,
+                                constrain_metals, constrain_capping_hydrogens,
+                                bond_change_warning):
         """
         Relaxes the active site on a crude force field of its own.
 
@@ -3005,17 +2929,14 @@ class ActiveSiteBuilder(Shell):
         :param forcefield:
             The force field to relax on, as built by build_forcefield without a
             Hessian.
-        :param frozen_indices:
-            The active site indices to hold fixed. Defaults to
-            constrained_indices().
         :param constrain_metals:
-            Whether to hold the metal centers as well, added to whatever
-            frozen_indices amounts to.
+            Whether to hold the metal centers as well as the beta carbons.
         :param constrain_capping_hydrogens:
             Whether the capping hydrogens are frozen along with the beta
-            carbons, when frozen_indices is left to the default.
+            carbons.
         :param bond_change_warning:
-            How far a metal-ligand bond may move before it is reported.
+            How far a metal-ligand bond may move, in Angstrom, before it is
+            reported.
 
         :return:
             The relaxed molecule. The caller decides whether to put it back
@@ -3024,20 +2945,15 @@ class ActiveSiteBuilder(Shell):
 
         molecule = active_site['molecule']
 
-        if frozen_indices is None:
-            frozen_indices = constrained_indices(
-                active_site,
-                constrain_capping_hydrogens=constrain_capping_hydrogens)
+        frozen_indices = constrained_indices(active_site,
+                                             constrain_capping_hydrogens)
 
         if constrain_metals:
             frozen_indices = sorted(
                 set(frozen_indices) | set(active_site['metal_indices']))
 
-        coordinates = self.minimize_active_site(
-            active_site,
-            forcefield,
-            frozen_indices=frozen_indices,
-        )
+        coordinates = self.minimize_active_site(active_site, forcefield,
+                                                frozen_indices)
 
         relaxed = Molecule(molecule.get_labels(), coordinates, 'angstrom')
         relaxed.set_charge(molecule.get_charge())
@@ -3049,7 +2965,7 @@ class ActiveSiteBuilder(Shell):
                                    frozen_indices,
                                    get_metal_keys(forcefield, active_site),
                                    SEEDED_EQUILIBRIUM_LABELS,
-                                   bond_change_warning=bond_change_warning)
+                                   bond_change_warning)
 
         return relaxed
 
@@ -3172,11 +3088,8 @@ class ActiveSiteBuilder(Shell):
         }
 
     @on_master
-    def _add_metal_planarity_impropers(
-            self,
-            forcefield,
-            active_site,
-            force_constant=DEFAULT_METAL_PLANARITY_FORCE_CONSTANT):
+    def _add_metal_planarity_impropers(self, forcefield, active_site,
+                                       force_constant):
         """
         Adds a weak improper nudging each metal into the plane of a
         coordinating histidine ring or a bidentate carboxylate.
@@ -3288,20 +3201,19 @@ class ActiveSiteBuilder(Shell):
         return added
 
     @on_master
-    def build_forcefield(
-            self,
-            active_site,
-            partial_charges,
-            metal_blind_typing=True,
-            reparameterize_metal_angles=True,
-            default_metal_angle_force_constant=DEFAULT_METAL_ANGLE_FORCE_CONSTANT,
-            default_metal_bond_force_constant=DEFAULT_METAL_BOND_FORCE_CONSTANT,
-            metal_angle_equilibria=None,
-            metal_bond_equilibria=None,
-            bond_equilibria=None,
-            add_metal_planarity_impropers=True,
-            metal_planarity_force_constant=DEFAULT_METAL_PLANARITY_FORCE_CONSTANT,
-            mute_generator=True):
+    def build_forcefield(self,
+                         active_site,
+                         partial_charges,
+                         metal_blind_typing,
+                         reparameterize_metal_angles,
+                         default_metal_angle_force_constant,
+                         default_metal_bond_force_constant,
+                         metal_angle_equilibria,
+                         metal_bond_equilibria,
+                         add_metal_planarity_impropers,
+                         metal_planarity_force_constant,
+                         mute_generator,
+                         bond_equilibria=None):
         """
         Builds the active site force field with seeded metal terms.
 
@@ -3313,20 +3225,33 @@ class ActiveSiteBuilder(Shell):
         QmParameterizer.fit_forcefield fits the metal terms of once there is a
         Hessian.
 
+        :param active_site:
+            The extracted active site.
         :param partial_charges:
             The partial charges of the active site. The charge of the capping
             hydrogens is redistributed over the remaining atoms before they are
             applied, since the caps do not exist in the protein. util.d4_charges
             is the cheap choice when none were fitted.
-        :param bond_equilibria:
-            Equilibrium distances in nanometers for individual metal bonds,
-            from manual_bond_equilibria.
         :param metal_blind_typing:
             Whether the generator perceives the atom types as if the metal
             bonds were not there, so that a coordinating residue is typed as
-            the amino acid it is. On by default, since the covalent terms of
-            the residues are what this would otherwise lose; a site whose
-            ligands are genuinely not amino acids may want it off.
+            the amino acid it is. The covalent terms of the residues are what
+            switching it off loses; a site whose ligands are genuinely not
+            amino acids may want that.
+        :param reparameterize_metal_angles:
+            Whether the metal angles are seeded at all, or left at what the
+            generator guessed.
+        :param default_metal_angle_force_constant:
+            The flat stiffness of every seeded metal angle, in kJ/mol/rad^2.
+        :param default_metal_bond_force_constant:
+            The flat stiffness of every seeded metal bond, in kJ/mol/nm^2.
+        :param metal_angle_equilibria:
+            Equilibrium angles by element triple, overriding the measured
+            ones; None for none.
+        :param metal_bond_equilibria:
+            Equilibrium distances in nanometers by element pair, overriding
+            the measured ones; None for none. LITERATURE_METAL_BONDS is ready
+            to be assigned here.
         :param add_metal_planarity_impropers:
             Whether to add a weak improper nudging each metal into the plane
             of a coordinating histidine ring or a bidentate carboxylate; see
@@ -3334,12 +3259,14 @@ class ActiveSiteBuilder(Shell):
         :param metal_planarity_force_constant:
             The barrier of that improper, in kJ/mol.
         :param mute_generator:
-            Whether the generator reports its own work. It names every
+            Whether the generator's own reporting is silenced. It names every
             parameter it looks up and every bond and angle it re-measures,
             which buries what this module has to say about the site -- and a
             shoehorning, which rebuilds the site after every edit, prints it
-            all again each time. Off by default; set it False to see what GAFF
-            did.
+            all again each time. Set it False to see what GAFF did.
+        :param bond_equilibria:
+            Equilibrium distances in nanometers for individual metal bonds,
+            from manual_bond_equilibria. Read by the crude pass alone.
 
         :return:
             The force field generator.
@@ -3396,30 +3323,22 @@ class ActiveSiteBuilder(Shell):
         if not reparameterize_metal_angles:
             angles = []
 
-        self._seed_metal_terms(
-            forcefield,
-            active_site,
-            bonds,
-            angles,
-            default_metal_angle_force_constant=default_metal_angle_force_constant,
-            default_metal_bond_force_constant=default_metal_bond_force_constant,
-            metal_angle_equilibria=metal_angle_equilibria,
-            metal_bond_equilibria=metal_bond_equilibria,
-            bond_equilibria=bond_equilibria)
+        self._seed_metal_terms(forcefield, active_site, bonds, angles,
+                               default_metal_angle_force_constant,
+                               default_metal_bond_force_constant,
+                               metal_angle_equilibria, metal_bond_equilibria,
+                               bond_equilibria)
 
         # A fit that later prunes a weak bridge arm takes every improper across
         # the dropped bond with it, so one added here cannot outlive its bond.
         if add_metal_planarity_impropers:
             self._add_metal_planarity_impropers(
-                forcefield,
-                active_site,
-                force_constant=metal_planarity_force_constant)
+                forcefield, active_site, metal_planarity_force_constant)
 
         # the typing that puts a term here is done by create_topology, and a
         # fit of the metal terms changes none of it
-        self._print_check_atom_types(forcefield,
-                                     active_site,
-                                     metal_blind_typing=metal_blind_typing)
+        self._print_check_atom_types(forcefield, active_site,
+                                     metal_blind_typing)
 
         return forcefield
 
@@ -3491,17 +3410,11 @@ class ActiveSiteBuilder(Shell):
         return table.get(elements[::-1])
 
     @on_master
-    def _seed_metal_terms(
-            self,
-            forcefield,
-            active_site,
-            bonds,
-            angles,
-            default_metal_angle_force_constant=DEFAULT_METAL_ANGLE_FORCE_CONSTANT,
-            default_metal_bond_force_constant=DEFAULT_METAL_BOND_FORCE_CONSTANT,
-            metal_angle_equilibria=None,
-            metal_bond_equilibria=None,
-            bond_equilibria=None):
+    def _seed_metal_terms(self, forcefield, active_site, bonds, angles,
+                          default_metal_angle_force_constant,
+                          default_metal_bond_force_constant,
+                          metal_angle_equilibria, metal_bond_equilibria,
+                          bond_equilibria):
         """
         Seeds the metal terms for the crude MM pass.
 
@@ -3518,6 +3431,14 @@ class ActiveSiteBuilder(Shell):
         :param angles:
             The metal angle keys. Empty when reparameterize_metal_angles is
             switched off.
+        :param default_metal_angle_force_constant:
+            The flat stiffness of every metal angle, in kJ/mol/rad^2.
+        :param default_metal_bond_force_constant:
+            The flat stiffness of every metal bond, in kJ/mol/nm^2.
+        :param metal_angle_equilibria:
+            Equilibrium angles by element triple, or None.
+        :param metal_bond_equilibria:
+            Equilibrium distances in nanometers by element pair, or None.
         :param bond_equilibria:
             Equilibrium distances in nanometers for individual bond keys. These
             beat both the measurement and the element table, since they name one
@@ -3568,10 +3489,8 @@ class ActiveSiteBuilder(Shell):
         self.ostream.flush()
 
     @on_master
-    def _print_check_atom_types(self,
-                                forcefield,
-                                active_site,
-                                metal_blind_typing=True):
+    def _print_check_atom_types(self, forcefield, active_site,
+                                metal_blind_typing):
         """
         Warns about covalent terms left without parameters.
 
@@ -3765,10 +3684,8 @@ class ActiveSiteBuilder(Shell):
         self.ostream.flush()
 
     @on_master
-    def print_binding_mode_update(self,
-                                  changes,
-                                  largest_shift,
-                                  dropped_residues=None):
+    def print_binding_mode_update(self, changes, largest_shift,
+                                  dropped_residues):
         """
         Prints what re-detecting the coordination on a new geometry did.
 
@@ -3816,7 +3733,7 @@ class ActiveSiteBuilder(Shell):
             'the new geometry. Overwrite the ones you hold, or the fit will '
             'use a coordination the geometry no longer has.')
 
-        for residue in dropped_residues or []:
+        for residue in dropped_residues:
             self.ostream.print_warning(
                 f'{residue} no longer coordinates a metal, but it is still '
                 'part of the truncated active site; extract the active site '
@@ -3860,7 +3777,7 @@ class ActiveSiteBuilder(Shell):
                               frozen_indices,
                               metal_keys,
                               equilibrium_labels,
-                              bond_change_warning=0.25):
+                              bond_change_warning):
         """
         Prints what the crude MM relaxation did to the coordination sphere.
 

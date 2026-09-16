@@ -203,6 +203,11 @@ class MetalSiteForceFieldBuilder:
           element triple in either order, replacing the measured values.
         - protein_forcefield_files: The OpenMM force field files the enzyme
           system is built from.
+        - drop_torsions_across_metal_bonds: The flag for zeroing, in the
+          enzyme force field XML, the wildcard proper torsions the protein
+          force field writes across a metal bond once it is a real one; the
+          fitted improper on the coordinating atom already holds the metal
+          in the ring plane.
         - folder: The folder every step writes its result to as soon as
           it has it, and reads back on a later run. Named after the creation
           time by default, so runs do not collide.
@@ -250,8 +255,8 @@ class MetalSiteForceFieldBuilder:
         self.prepare_protein = True
 
         self.scf_drv = None
-        self.xcfun = 'PBE0'
-        self.basis_set_label = 'def2-svp'
+        self.xcfun = util.XCFUN
+        self.basis_set_label = util.BASIS_SET_LABEL
         self.mute_scf = True
 
         # workflow
@@ -262,7 +267,7 @@ class MetalSiteForceFieldBuilder:
         self.partial_hessian_cutoff = util.PARTIAL_HESSIAN_CUTOFF
         self.constrain_capping_hydrogens = False
         self.average_metal_terms = False
-        self.metal_hessian_fitting_method = 'seminario'
+        self.metal_hessian_fitting_method = util.METAL_HESSIAN_FITTING_METHOD
 
         self.metal_blind_typing = True
         self.mute_forcefield_generator = True
@@ -281,12 +286,14 @@ class MetalSiteForceFieldBuilder:
         self.default_metal_bond_equilibria = None
         self.default_metal_angle_equilibria = None
         self.reparameterize_metal_angles = True
-        self.mm_bond_change_warning = 0.25
+        self.mm_bond_change_warning = util.MM_BOND_CHANGE_WARNING
         self.mm_constrain_metals = False
 
         # the protein force field the fitted metal terms are added to
-        self.protein_forcefield_files = ('amber14-all.xml',
-                                         'amber14/tip3pfb.xml')
+        self.protein_forcefield_files = util.PROTEIN_FORCEFIELD_FILES
+        # whether the enzyme force field XML zeroes the wildcard torsions
+        # the protein force field writes across a metal bond
+        self.drop_torsions_across_metal_bonds = True
 
         self.folder = f'metal_site_{int(time.time())}'
 
@@ -479,8 +486,8 @@ class MetalSiteForceFieldBuilder:
             return None
 
         return util.freeze_constraints(
-            self._active_site,
-            constrain_capping_hydrogens=self.constrain_capping_hydrogens)
+            util.constrained_indices(self._active_site,
+                                     self.constrain_capping_hydrogens))
 
     @property
     def binding_modes(self):
@@ -497,8 +504,10 @@ class MetalSiteForceFieldBuilder:
         if self._protonated_topology is None:
             return None
 
-        return self._derive_binding_modes(self._protonated_topology,
-                                          self._protonated_positions)
+        return self._sites.derive_binding_modes(
+            self._protonated_topology, self._protonated_positions,
+            self._request, self.metal_elements, self.metal_formal_charges,
+            self.metal_bond_cutoff, self._report_cutoff)
 
     @property
     def hessian(self):
@@ -566,7 +575,7 @@ class MetalSiteForceFieldBuilder:
         if cif_path is not None:
             self._print_header(cif_path)
             topology, positions = self._sites.load_and_prepare_protein(
-                cif_path, prepare=self.prepare_protein)
+                cif_path, self.prepare_protein)
         else:
             assert_msg_critical(
                 self._topology is not None,
@@ -578,8 +587,8 @@ class MetalSiteForceFieldBuilder:
         state = self._build_active_site(topology,
                                         positions,
                                         mm_opt,
-                                        coordinating_residues,
-                                        report_detection=cif_path is not None)
+                                        cif_path is not None,
+                                        coordinating_residues)
 
         # an edit rebuilds the site the way this call built it, so what it
         # was told has to outlive the call
@@ -596,8 +605,8 @@ class MetalSiteForceFieldBuilder:
                            topology,
                            positions,
                            mm_opt,
-                           coordinating_residues=None,
-                           report_detection=True):
+                           report_detection,
+                           coordinating_residues=None):
         """
         The structural pass on a prepared structure, written to the folder
         and relaxed on the crude force field when asked.
@@ -608,11 +617,11 @@ class MetalSiteForceFieldBuilder:
             Its positions in Angstrom.
         :param mm_opt:
             Whether to relax the extracted site on the crude force field.
-        :param coordinating_residues:
-            Residues to force as ligands, as build_active_site takes them.
         :param report_detection:
             Whether the coordination found on the structure is printed; a
             rebuild after an edit does not print it again.
+        :param coordinating_residues:
+            Residues to force as ligands, as build_active_site takes them.
 
         :return:
             The state _adopt takes on.
@@ -622,13 +631,14 @@ class MetalSiteForceFieldBuilder:
             topology,
             positions,
             self._request,
-            coordinating_residues=coordinating_residues,
-            protonation_overrides=self._protonation_overrides,
-            report_detection=report_detection,
-            cap_bond_length=self.cap_bond_length,
-            metal_elements=self.metal_elements,
-            metal_formal_charges=self.metal_formal_charges,
-            **self.detection_settings())
+            self._protonation_overrides,
+            report_detection,
+            self.cap_bond_length,
+            self.metal_elements,
+            self.metal_formal_charges,
+            self.metal_bond_cutoff,
+            self._report_cutoff,
+            coordinating_residues=coordinating_residues)
         state['topology'] = topology
         state['positions'] = positions
 
@@ -786,10 +796,11 @@ class MetalSiteForceFieldBuilder:
                                               self._protonated_positions,
                                               resid,
                                               metal,
+                                              self.metal_bond_cutoff,
+                                              self._report_cutoff,
                                               atom=atom,
                                               chain=chain,
-                                              equilibrium=equilibrium,
-                                              **self.detection_settings())
+                                              equilibrium=equilibrium)
 
         self._edit_coordination(edit)
 
@@ -927,15 +938,10 @@ class MetalSiteForceFieldBuilder:
         self._require('remove_residue', Stage.ACTIVE_SITE, Stage.ACTIVE_SITE)
 
         self._request = self._sites.remove_residue(
-            self._request,
-            self.binding_modes,
-            self._protonated_topology,
-            self._protonated_positions,
-            resid,
-            chain,
-            metal_elements=self.metal_elements,
-            metal_formal_charges=self.metal_formal_charges,
-            **self.detection_settings())
+            self._request, self.binding_modes, self._protonated_topology,
+            self._protonated_positions, resid, chain, self.metal_elements,
+            self.metal_formal_charges, self.metal_bond_cutoff,
+            self._report_cutoff)
         self._reapply()
 
     # ------------------------------------------------------------------
@@ -981,10 +987,8 @@ class MetalSiteForceFieldBuilder:
         not a new run.
         """
 
-        state = self._build_active_site(self._topology,
-                                        self._positions,
-                                        self._mm_opt,
-                                        report_detection=False)
+        state = self._build_active_site(self._topology, self._positions,
+                                        self._mm_opt, False)
 
         self._adopt(state)
 
@@ -1081,7 +1085,7 @@ class MetalSiteForceFieldBuilder:
 
         return molecule
 
-    def _crude_relax(self, active_site, bond_equilibria=None, forcefield=None):
+    def _crude_relax(self, active_site, bond_equilibria, forcefield=None):
         """
         Relaxes a site on a force field, and writes the result.
 
@@ -1152,9 +1156,8 @@ class MetalSiteForceFieldBuilder:
         active_site = self._active_site
 
         optimized, opt_results = self._qm.optimize_active_site(
-            active_site,
-            constrain_capping_hydrogens=self.constrain_capping_hydrogens,
-            **self._qm_kwargs())
+            active_site, self.constrain_capping_hydrogens, self.scf_drv,
+            self.xcfun, self.basis_set_label, self.mute_scf)
 
         self._save_intermediate(
             util.GEOMETRY_FILE,
@@ -1184,9 +1187,7 @@ class MetalSiteForceFieldBuilder:
         active_site = self._active_site
 
         atom_pairs, atoms = self._qm.hessian_pairs(
-            active_site,
-            bond_count=2,
-            partial_hessian_cutoff=self.partial_hessian_cutoff)
+            active_site, self.partial_hessian_cutoff)
         n_atoms = active_site['molecule'].number_of_atoms()
 
         if self.calculate_partial_hessian:
@@ -1205,8 +1206,8 @@ class MetalSiteForceFieldBuilder:
 
         hessian = self._qm.compute_hessian(
             active_site,
-            atom_pairs=atom_pairs if self.calculate_partial_hessian else None,
-            **self._qm_kwargs())
+            atom_pairs if self.calculate_partial_hessian else None,
+            self.scf_drv, self.xcfun, self.basis_set_label, self.mute_scf)
 
         self._save_intermediate(util.HESSIAN_FILE,
                                 lambda path: np.savetxt(path, hessian))
@@ -1238,7 +1239,7 @@ class MetalSiteForceFieldBuilder:
 
         if self.do_resp:
             charges = self._qm.compute_resp_charges(active_site,
-                                                    mute_scf=self.mute_scf)
+                                                    self.mute_scf)
         else:
             charges = self._qm.d4_charges(active_site)
 
@@ -1288,9 +1289,7 @@ class MetalSiteForceFieldBuilder:
         self._require('build_forcefield', Stage.ACTIVE_SITE)
 
         geometry = self._qm._resolve_optimized_geometry(
-            self._active_site,
-            folder=self.folder,
-            optimized_geometry=opt_geometry)
+            self._active_site['molecule'], self.folder, opt_geometry)
 
         if geometry is not None:
             self._adopt_geometry(geometry)
@@ -1302,9 +1301,8 @@ class MetalSiteForceFieldBuilder:
                 'that build_active_site left on the builder.')
             self.ostream.flush()
 
-        hessian = self._qm._resolve_hessian(self._active_site,
-                                            folder=self.folder,
-                                            hessian=hessian)
+        hessian = self._qm._resolve_hessian(self._active_site, self.folder,
+                                            hessian)
 
         if hessian is not None:
             self._hessian = hessian
@@ -1317,9 +1315,7 @@ class MetalSiteForceFieldBuilder:
             self.ostream.flush()
 
         charges = self._qm._resolve_partial_charges(
-            self._active_site,
-            folder=self.folder,
-            partial_charges=partial_charges)
+            self._active_site, self.folder, partial_charges)
 
         if charges is not None:
             self._partial_charges = charges
@@ -1344,9 +1340,8 @@ class MetalSiteForceFieldBuilder:
         field transferred from a matching template -- metal terms and charges
         an earlier run already paid for -- so that create_enzyme_system can be
         called here afterwards. The manager's one way into the Stage
-        machinery, public for the same reason detection_settings and
-        fit_settings are, and so that it never reaches into _forcefield or
-        _stage by hand.
+        machinery, public for the same reason seed_settings is, and so that
+        it never reaches into _forcefield or _stage by hand.
 
         :param forcefield:
             The force field to adopt, already carrying the fitted metal
@@ -1444,12 +1439,10 @@ class MetalSiteForceFieldBuilder:
         """
 
         result = self._enzyme.create_enzyme_forcefield(
-            self._protonated_topology,
-            self._protonated_positions,
-            self._active_site,
-            self._forcefield,
-            partial_charges=self._partial_charges,
-            forcefield_files=self.protein_forcefield_files)
+            self._protonated_topology, self._protonated_positions,
+            self._active_site, self._forcefield, self._partial_charges,
+            self.protein_forcefield_files,
+            self.drop_torsions_across_metal_bonds)
 
         self._save_intermediate(openmmxml.SITE_XML_FILE,
                                 lambda path: path.write_text(result['xml']))
@@ -1487,11 +1480,8 @@ class MetalSiteForceFieldBuilder:
         """
 
         system, _ = self._enzyme.create_enzyme_system(
-            self._protonated_topology,
-            self._active_site,
-            self._forcefield,
-            partial_charges=self._partial_charges,
-            forcefield_files=self.protein_forcefield_files)
+            self._protonated_topology, self._active_site, self._forcefield,
+            self._partial_charges, self.protein_forcefield_files)
 
         self._save_intermediate(
             util.ENZYME_SYSTEM_FILE,
@@ -1714,41 +1704,6 @@ class MetalSiteForceFieldBuilder:
         self._hessian = None
         self._partial_charges = None
 
-    def _derive_binding_modes(self,
-                              topology,
-                              positions,
-                              coordinating_residues=None,
-                              request=None):
-        """
-        Works out the coordination of a structure from its geometry and the
-        request.
-
-        The one place the detection is called from, so that every derivation
-        reads the same settings and replays the same decisions.
-
-        :param topology:
-            The topology to derive on.
-        :param positions:
-            Its positions in Angstrom.
-        :param coordinating_residues:
-            Residues to force as ligands, merged into the request's own list.
-        :param request:
-            The request to derive under. Defaults to the builder's own, and
-            is given explicitly only while an edit is being worked out.
-
-        :return:
-            The binding modes.
-        """
-
-        return self._sites.derive_binding_modes(
-            topology,
-            positions,
-            coordinating_residues=coordinating_residues,
-            metal_elements=self.metal_elements,
-            metal_formal_charges=self.metal_formal_charges,
-            request=self._request if request is None else request,
-            **self.detection_settings())
-
     def _fit_forcefield(self, hessian, charges):
         """
         Builds the seeded force field and fits its metal terms.
@@ -1779,8 +1734,12 @@ class MetalSiteForceFieldBuilder:
                 active_site,
                 forcefield,
                 hessian,
-                protected_bonds=self._protected_bonds(),
-                **self.fit_settings())
+                self.average_metal_terms,
+                self.metal_hessian_fitting_method,
+                self.prune_weak_bridge_bonds,
+                self.reparameterize_metal_angles,
+                self.weak_bridge_tolerance,
+                protected_bonds=self._protected_bonds())
 
         self._qm.print_metal_parameters(
             active_site, forcefield, util.get_metal_keys(forcefield,
@@ -1820,23 +1779,15 @@ class MetalSiteForceFieldBuilder:
         Puts a new geometry on the active site and detects the coordination
         again on it.
 
-        A contact can leave the cutoff or a carboxylate can open up during a
-        relaxation, and the connectivity the Hessian and the fit read comes
-        out of that detection.
-
         :param molecule:
             The new geometry of the active site.
         """
 
         self._active_site = self._sites.adopt_geometry(
-            self._protonated_topology,
-            self._protonated_positions,
-            self._active_site,
-            molecule,
-            self._request,
-            metal_elements=self.metal_elements,
-            metal_formal_charges=self.metal_formal_charges,
-            **self.detection_settings())
+            self._protonated_topology, self._protonated_positions,
+            self._active_site, molecule, self._request, self.metal_elements,
+            self.metal_formal_charges, self.metal_bond_cutoff,
+            self._report_cutoff)
 
         # a force field fitted before this describes the geometry it replaced
         self._enter(Stage.ACTIVE_SITE)
@@ -1854,21 +1805,19 @@ class MetalSiteForceFieldBuilder:
         """
 
         return self._sites.site_coordination(
-            self._protonated_topology,
-            self._protonated_positions,
-            geometry,
-            self._active_site,
-            self._request,
-            metal_elements=self.metal_elements,
-            metal_formal_charges=self.metal_formal_charges,
-            **self.detection_settings())
+            self._protonated_topology, self._protonated_positions, geometry,
+            self._active_site, self._request, self.metal_elements,
+            self.metal_formal_charges, self.metal_bond_cutoff,
+            self._report_cutoff)
 
     # ------------------------------------------------------------------
     # settings assembly
     #
-    # detection_settings and fit_settings are public because the manager
-    # reads them: splatting the same dictionary into both a run and a
-    # comparison is what stops the two drifting on what a cutoff means.
+    # A phase method takes every setting it reads as a required argument,
+    # and the interface passes its fields straight in. The two dictionaries
+    # here exist because the manager builds and relaxes force fields of its
+    # own: splatting the same dictionary into a run and into a comparison is
+    # what stops the two drifting on what a setting means.
     # ------------------------------------------------------------------
 
     def _protected_bonds(self):
@@ -1891,50 +1840,15 @@ class MetalSiteForceFieldBuilder:
                                             self._protonated_topology,
                                             self.binding_modes)
 
-    def detection_settings(self):
-        """
-        The settings the coordination detection reads, as keyword arguments.
-
-        Public because MetalForceFieldManager measures a structure with the
-        settings of the builder it carries, and splatting this into its own
-        shell call is what stops the two drifting apart on what a cutoff
-        means. Note that metal_elements and metal_formal_charges are not in
-        here -- they are passed alongside it, since the detection takes them
-        but the re-detection on a new geometry does not.
-
-        :return:
-            The keyword arguments.
-        """
-
-        return {
-            'metal_bond_cutoff': self.metal_bond_cutoff,
-            'report_cutoff': self._report_cutoff,
-        }
-
-    def _qm_kwargs(self):
-        """
-        The settings the QM drivers read.
-
-        :return:
-            The keyword arguments.
-        """
-
-        return {
-            'scf_drv': self.scf_drv,
-            'xcfun': self.xcfun,
-            'basis_set_label': self.basis_set_label,
-            'mute_scf': self.mute_scf,
-        }
-
     def relax_settings(self):
         """
         The settings the crude relaxation reads, as keyword arguments.
 
-        Public for the same reason as detection_settings and fit_settings.
-        Without it these four were hand-copied into the manager's comparison
-        relaxation, so a new mm_ setting would have reached a run and not the
-        comparison -- and the comparison would then have measured a geometry
-        relaxed under different rules than the run it was measuring against.
+        Public because the manager relaxes a site for its comparison. Without
+        it these were hand-copied into that relaxation, so a new mm_ setting
+        would have reached a run and not the comparison -- and the comparison
+        would then have measured a geometry relaxed under different rules
+        than the run it was measuring against.
 
         :return:
             The keyword arguments.
@@ -1952,9 +1866,9 @@ class MetalSiteForceFieldBuilder:
         arguments: the typing, the planarity impropers and the metal terms
         as they stand before a Hessian.
 
-        Public for the same reason as detection_settings: the manager builds
-        force fields of its own, and reading them off the builder is what
-        keeps a transferred force field and a fitted one made the same way.
+        Public because the manager builds force fields of its own, and
+        reading them off the builder is what keeps a transferred force field
+        and a fitted one made the same way.
 
         :return:
             The keyword arguments.
@@ -1973,21 +1887,4 @@ class MetalSiteForceFieldBuilder:
             self.default_metal_angle_force_constant,
             'metal_bond_equilibria': self.default_metal_bond_equilibria,
             'metal_angle_equilibria': self.default_metal_angle_equilibria,
-        }
-
-    def fit_settings(self):
-        """
-        The settings the Hessian fit of the metal terms reads, as keyword
-        arguments.
-
-        :return:
-            The keyword arguments.
-        """
-
-        return {
-            'average_metal_terms': self.average_metal_terms,
-            'metal_hessian_fitting_method': self.metal_hessian_fitting_method,
-            'prune_weak_bridge_bonds': self.prune_weak_bridge_bonds,
-            'weak_bridge_tolerance': self.weak_bridge_tolerance,
-            'reparameterize_metal_angles': self.reparameterize_metal_angles,
         }

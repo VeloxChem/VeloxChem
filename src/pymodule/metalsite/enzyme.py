@@ -37,7 +37,6 @@ the metal terms are fitted and the whole protein is to carry them.
 import sys
 
 from ..errorhandler import assert_msg_critical
-from .qm import QmParameterizer
 from .util import (Shell, on_master, param, get_metal_keys,
                    get_metal_impropers, redistribute_cap_charges,
                    backbone_charge_shift, _bond_separation)
@@ -73,13 +72,8 @@ class EnzymeSystemBuilder(Shell):
     """
 
     @on_master
-    def create_enzyme_system(self,
-                             topology,
-                             active_site,
-                             forcefield,
-                             partial_charges=None,
-                             forcefield_files=('amber14-all.xml',
-                                               'amber14/tip3pfb.xml')):
+    def create_enzyme_system(self, topology, active_site, forcefield,
+                             partial_charges, forcefield_files):
         """
         Injects the fitted metal terms into a force field system for the whole
         enzyme.
@@ -107,10 +101,9 @@ class EnzymeSystemBuilder(Shell):
             The force field generator carrying the fitted metal parameters.
         :param partial_charges:
             The charges fitted on the active site, which replace the charges
-            of the coordination sphere through redistribute_charges. D4
-            charges are used when none are given, so that the system carries
-            the same charges as the force field built beside it rather than
-            the protein force field's own.
+            of the coordination sphere through redistribute_charges; the
+            ones the force field carries, so that the system and the force
+            field built beside it agree.
         :param forcefield_files:
             The OpenMM force field files for the protein.
 
@@ -124,10 +117,6 @@ class EnzymeSystemBuilder(Shell):
 
         openmm_ff = mmapp.ForceField(*forcefield_files)
         system = openmm_ff.createSystem(topology, nonbondedMethod=mmapp.NoCutoff)
-
-        if partial_charges is None:
-            partial_charges = QmParameterizer(
-                self.comm, self.ostream).d4_charges(active_site)
 
         self.redistribute_charges(system, topology, active_site,
                                   partial_charges)
@@ -222,16 +211,9 @@ class EnzymeSystemBuilder(Shell):
         return system, added
 
     @on_master
-    def create_enzyme_forcefield(self,
-                                 topology,
-                                 positions,
-                                 active_site,
-                                 forcefield,
-                                 partial_charges=None,
-                                 forcefield_files=('amber14-all.xml',
-                                                   'amber14/tip3pfb.xml'),
-                                 site_residue_name=SITE_RESIDUE_NAME,
-                                 drop_torsions_across_metal_bonds=True):
+    def create_enzyme_forcefield(self, topology, positions, active_site,
+                                 forcefield, partial_charges, forcefield_files,
+                                 drop_torsions_across_metal_bonds):
         """
         Writes the fitted metal site as an OpenMM force field XML.
 
@@ -255,16 +237,13 @@ class EnzymeSystemBuilder(Shell):
         :param forcefield:
             The force field generator carrying the fitted metal parameters.
         :param partial_charges:
-            The charges fitted on the active site. D4 charges are used when
-            none are given, the way create_enzyme_system falls back, so that
-            the file carries the same charges as the force field built beside
-            it rather than the protein force field's own.
+            The charges fitted on the active site, the ones the force field
+            carries, so that the file and the force field built beside it
+            agree.
         :param forcefield_files:
             The OpenMM force field files for the protein. Every atom keeps the
             type these give it, so the file that comes back has to be loaded
             beside the same ones.
-        :param site_residue_name:
-            The name of the residue the site is moved into.
         :param drop_torsions_across_metal_bonds:
             Whether to zero the wildcard proper torsions the protein force
             field writes across a metal bond once it is a real one.
@@ -278,22 +257,15 @@ class EnzymeSystemBuilder(Shell):
         assert_msg_critical('openmm.app' in sys.modules,
                             'create_enzyme_forcefield: openmm is required')
 
-        if partial_charges is None:
-            partial_charges = QmParameterizer(
-                self.comm, self.ostream).d4_charges(active_site)
-
         protein_ff_not_used, protein_parameters = protein_atom_parameters(
             topology, forcefield_files)
 
-        restructured = restructure_topology(topology,
-                                            positions,
-                                            active_site,
-                                            forcefield,
-                                            site_residue_name=site_residue_name)
+        restructured = restructure_topology(topology, positions, active_site,
+                                            forcefield)
         self.ostream.print_info(
             f'Moved {len(restructured["site_indices"])} atoms out of '
             f'{len(restructured["stub_residues"])} residues into residue '
-            f'{site_residue_name}, and bonded '
+            f'{SITE_RESIDUE_NAME}, and bonded '
             f'{len(restructured["metal_bonds"])} metal-ligand contacts.')
         self.ostream.flush()
 
@@ -307,13 +279,9 @@ class EnzymeSystemBuilder(Shell):
             f'the active site does not cover {shift:+.4f} e.')
         self.ostream.flush()
 
-        xml = forcefield_xml(
-            active_site,
-            forcefield,
-            restructured,
-            templates,
-            forcefield_files=forcefield_files,
-            drop_torsions_across_metal_bonds=drop_torsions_across_metal_bonds)
+        xml = forcefield_xml(active_site, forcefield, restructured, templates,
+                             forcefield_files,
+                             drop_torsions_across_metal_bonds)
         bonds, angles, impropers = metal_term_keys(forcefield, active_site)
         self.ostream.print_info(
             f'Wrote {len(templates)} residue templates, {len(bonds)} metal '
@@ -506,7 +474,8 @@ class EnzymeSystemBuilder(Shell):
         for index in range(nonbonded.getNumExceptions()):
             first, second, charge_product, sigma, epsilon = (
                 nonbonded.getExceptionParameters(index))
-            if _bond_separation(bonded, first, second) != 3:
+            # a 1-4 pair is three bonds apart
+            if _bond_separation(bonded, first, second, 3) != 3:
                 continue
             updated = coulomb14scale * charge_of(first) * charge_of(second)
             if abs(updated -
