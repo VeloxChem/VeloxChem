@@ -1778,9 +1778,16 @@ class LinearSolver:
             else:
                 dks = None
             # NOTE: the factors of the densities, collected beside them. None where
-            # this way of building cannot be taken, and then nothing looks for them:
-            # the two modes which restrict the orbital space carry a different set
-            # of orbitals, and a complex trial vector is not one the driver takes.
+            # this way of building cannot be taken, and then nothing looks for them.
+            #
+            # The two modes which restrict the orbital space carry a different set
+            # of orbitals and are left out for that reason. The test for a complex
+            # trial vector is not about anything this code does today: every solver
+            # which reaches here works in real arithmetic, the complex vectors of
+            # the damped response being carried as real blocks, so the test always
+            # passes. It is here so that the day the complex path is developed
+            # these solvers fall back to the dense route rather than hand complex
+            # data to a driver which takes doubles.
             ri_jk_factors = None
 
             if (self.rank == mpi_master() and self.ri_jk and self.ri_jk_simd and

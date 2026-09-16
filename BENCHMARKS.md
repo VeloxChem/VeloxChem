@@ -8634,3 +8634,53 @@ cutting both ways.
 Against 3.93 and 1.91, and 3.78 and 1.84, for the Tamm-Dancoff approximation. Adding
 a term to the density changes the constant in front and not the power, which is what
 it should do and is worth having measured rather than assumed.
+
+## Three more solvers, which needed no code
+
+The linear response wiring was put into `_e2n_half_size_single_comm`, and that
+method is not the eigensolver's alone: the polarizability solver, the damped one
+and the C6 driver all reach the Fock build through it. Wiring it for excitation
+energies wired it for all of them. This section is the check that this is true and
+not merely plausible.
+
+Caffeine and water, def2-svp, one rank of 14 threads. Frequencies zero and 0.1, and
+for the damped solver a damping of 0.004556.
+
+| solver | molecule | functional | four-centre | RI-JK simd | speedup | largest difference |
+| --- | --- | --- | ---: | ---: | ---: | ---: |
+| polarizability | water | HF | 0.06 | 0.06 | 1.08 | 5.2e-04 |
+| polarizability | water | B3LYP | 0.11 | 0.10 | 1.07 | 2.2e-04 |
+| polarizability | caffeine | HF | 43.98 | 3.74 | **11.76** | 3.1e-03 |
+| polarizability | caffeine | B3LYP | 45.74 | 11.59 | 3.95 | 6.0e-03 |
+| damped | water | HF | 0.07 | 0.07 | 1.03 | 5.2e-04 |
+| damped | water | B3LYP | 0.11 | 0.11 | 1.03 | 2.2e-04 |
+| damped | caffeine | HF | 59.19 | 4.85 | **12.21** | 3.1e-03 |
+| damped | caffeine | B3LYP | 57.36 | 14.29 | 4.01 | 6.0e-03 |
+
+All eighteen components of each tensor, three directions by two frequencies, and for
+the damped solver the imaginary parts with them: -0.006699 against -0.006697 and
+-0.014854 against -0.014854 on water. The speedups sit where the excitation energies
+of the same molecule and basis put them, 10.94 and 3.81, which is what a calculation
+solving the same equations at fixed frequencies should give.
+
+**The difference is the evidence, not a worry.** Caffeine's components are about 130
+atomic units, so three thousandths is two parts in a hundred thousand -- the fitting
+error, and smaller in relative terms than water's. Had the guard quietly sent these
+solvers down the dense path the two columns would have agreed to 1e-14, and the
+agreement would have proved nothing.
+
+Water's speedup of about one is not a failure either. Twenty-four basis functions is
+far below where resolving the identity pays for itself, and the whole calculation is
+six hundredths of a second.
+
+### A guard which does nothing, deliberately
+
+The factors are formed only for real trial vectors. **That test passes every time it
+is reached**: every solver which gets here works in real arithmetic, the complex
+vectors of the damped response being carried as real blocks, and the complex path is
+left for future development. So the test is dead code today.
+
+It is kept, and the comment beside it now says why rather than implying complex
+vectors are a live case. A driver which takes doubles should not be handed complex
+data by a caller which has quietly changed underneath it, and the cost of the test
+is one call per batch of trial vectors.
