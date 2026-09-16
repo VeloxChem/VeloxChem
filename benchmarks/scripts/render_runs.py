@@ -44,6 +44,11 @@ SPECS = {
          "steps", "s/step", "energy (a.u.)"],
         [7, 9, 4, 5, 15, 8, 7, 5, 7, 13],
     ),
+    "tda": (
+        ["functional", "basis", "nao", "naux", "method", "TDA (s)", "speedup",
+         "iter", "s/iter", "SCF (s)", "max dE (a.u.)"],
+        [7, 9, 4, 5, 15, 8, 7, 5, 7, 7, 10],
+    ),
 }
 
 
@@ -54,7 +59,11 @@ def method_name(row):
 
 
 def _cost(row, suite):
-    return row["grad_wall"] if suite == "gradient" else row["wall"]
+    if suite == "gradient":
+        return row["grad_wall"]
+    if suite == "tda":
+        return row["tda_wall"]
+    return row["wall"]
 
 
 def cells_of(doc):
@@ -89,6 +98,20 @@ def cells_of(doc):
                         agree = f'{np.abs(d).max():.1e}'
                     out.append(head + [method_name(r), f'{r["grad_wall"]:.2f}',
                                        speed, f'{r["scf_wall"]:.2f}', agree])
+                elif suite == "tda":
+                    if r["method"] == "full" or ref is None:
+                        agree = "--"
+                    else:
+                        d = (np.array(r["excitation_energies"]) -
+                             np.array(ref["excitation_energies"]))
+                        agree = f'{np.abs(d).max():.1e}'
+                    # NOTE: the time per iteration beside the total. Two runs which
+                    # converge in different numbers of iterations are not compared
+                    # on speed by their totals alone.
+                    out.append(head + [method_name(r), f'{r["tda_wall"]:.2f}',
+                                       speed, str(r["iterations"]),
+                                       f'{r["tda_wall"] / max(r["iterations"], 1):.2f}',
+                                       f'{r["scf_wall"]:.2f}', agree])
                 else:
                     out.append(head + [method_name(r), f'{r["wall"]:.1f}', speed,
                                        str(r["steps"]),
@@ -125,8 +148,18 @@ def scaling(doc):
     return series
 
 
-def render(path):
-    doc = json.loads(Path(path).read_text())
+def _select(doc, basis):
+    """The run with only the rows of one basis, so a table can be made of it."""
+    if basis is None:
+        return doc
+    rows = [r for r in doc["rows"] if r["basis"] == basis]
+    if not rows:
+        raise SystemExit(f"no rows of basis {basis} in this run")
+    return {**doc, "rows": rows}
+
+
+def render(path, basis=None):
+    doc = _select(json.loads(Path(path).read_text()), basis)
     header, _ = SPECS[doc["suite"]]
     lines = [f'## {doc["suite"]}: {doc["rows"][0]["molecule"]}', "",
              provenance_line(doc["run"]), "",
@@ -146,13 +179,13 @@ def render(path):
     return "\n".join(lines)
 
 
-def render_pdf(path, out):
+def render_pdf(path, out, basis=None):
     import matplotlib
     matplotlib.use("pdf")
     import matplotlib.pyplot as plt
     from matplotlib.backends.backend_pdf import PdfPages
 
-    doc = json.loads(Path(path).read_text())
+    doc = _select(json.loads(Path(path).read_text()), basis)
     header, widths = SPECS[doc["suite"]]
     cells = cells_of(doc)
     line = provenance_line(doc["run"]).replace("`", "")
@@ -262,15 +295,24 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("path")
     parser.add_argument("--out", default=None)
+    parser.add_argument("--basis", default=None,
+                        help="render only the rows of this basis")
     parser.add_argument("--no-pdf", action="store_true")
     args = parser.parse_args()
 
-    out = Path(args.out) if args.out else Path(args.path).with_suffix(".md")
-    out.write_text(render(args.path) + "\n")
+    if args.out:
+        out = Path(args.out)
+    elif args.basis:
+        stem = Path(args.path).with_suffix("")
+        out = Path(f"{stem}_{args.basis}.md")
+    else:
+        out = Path(args.path).with_suffix(".md")
+
+    out.write_text(render(args.path, args.basis) + "\n")
     print(f"written to {out}")
 
     if not args.no_pdf:
-        print(f"written to {render_pdf(args.path, out.with_suffix('.pdf'))}")
+        print(f"written to {render_pdf(args.path, out.with_suffix('.pdf'), args.basis)}")
 
 
 if __name__ == "__main__":
