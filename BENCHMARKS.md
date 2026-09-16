@@ -8308,3 +8308,99 @@ attribution was not. Every number in those sections is reproducible and none of
 them has been withdrawn. What was wrong was reading a curve without asking which
 of its terms was moving -- which a profile answers in twenty minutes and four
 tables of timings do not answer at all.
+
+## The excited states, where the ratio reaches a hundred
+
+The resolution of the identity is wired into the Tamm-Dancoff approximation, by way
+of a driver which is not the one the self consistent field uses. The two are asked
+for different things: the field has one density per build, symmetric and idempotent,
+and forms its exchange from the occupied orbitals alone, where a response
+calculation has a batch of densities per build, none of them symmetric and each of
+them living between the occupied orbitals and the virtual ones.
+
+What makes it cheap is that such a density arrives already factorised. A trial
+vector gives C(occupied) Z C(virtual) transposed, and with B(q) symmetric the
+exchange of a density left times right transposed is
+
+    K = sum over q of (B(q) left) (B(q) right) transposed
+
+so both halves are the transformation the field already had, with different
+coefficients. The virtual space never appears -- C(virtual) Z transposed is the
+basis by the occupied orbitals -- and the left factor is the ground state occupied
+orbitals for every trial vector of the batch, transformed once for all of them.
+
+Caffeine, five states, def2-universal-jkfit, one rank of 14 threads on the M4 Max,
+at `dfc9f00c6`. Records in `benchmarks/data/tda/2026-09-16_m4max_caffeine.json`.
+Two hours and twenty minutes for the sixteen rows.
+
+| functional | basis | nao | four-centre | RI-JK simd | speedup | iter | s/iter |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | --- |
+| HF | def2-svp | 246 | 58.50 | 3.37 | 17.34 | 15 | 3.90 to 0.22 |
+| HF | def2-svpd | 366 | 289.93 | 7.81 | 37.13 | 17 | 17.05 to 0.46 |
+| HF | def2-tzvp | 494 | 914.97 | 13.16 | 69.52 | 16 | 57.19 to 0.82 |
+| HF | def2-tzvpd | 614 | 2554.92 | 23.22 | **110.03** | 18 | 141.94 to 1.29 |
+| B3LYP | def2-svp | 246 | 51.64 | 12.24 | 4.22 | 10 | 5.16 to 1.22 |
+| B3LYP | def2-svpd | 366 | 211.23 | 29.41 | 7.18 | 10 | 21.12 to 2.94 |
+| B3LYP | def2-tzvp | 494 | 646.65 | 40.26 | 16.06 | 10 | 64.66 to 4.03 |
+| B3LYP | def2-tzvpd | 614 | 1509.78 | 64.36 | **23.46** | 9 | 167.75 to 7.15 |
+
+**Every pair converged in the same number of iterations as its partner**, which is
+what makes each ratio a comparison of speed and not of luck. The iteration column is
+in the table for that reason and is worth reading before the speedup column: it is
+the thing which, when it differs, quietly turns a ratio into something else.
+
+### The exponents, and a check across two calculations
+
+Cost per iteration fitted against the orbital basis:
+
+| | four-centre | RI-JK simd |
+| --- | ---: | ---: |
+| HF | 3.93 | **1.91** |
+| B3LYP | 3.78 | **1.84** |
+
+The gradient, measured the same day and through entirely separate code, gives 4.01
+and 1.82 at Hartree-Fock. **Two calculations which share nothing but the driver
+underneath agree on what that driver costs**, which is worth more than either number
+alone. The iteration counts vary from fifteen to eighteen across the Hartree-Fock
+series, so the per-iteration unit carries some noise from the batch of trial vectors
+changing size; fitting the totals instead gives 4.08 and 2.06, the same picture.
+
+### The fitting error falls as the basis grows
+
+| | def2-svp | def2-svpd | def2-tzvp | def2-tzvpd |
+| --- | ---: | ---: | ---: | ---: |
+| HF | 2.2e-05 | 1.7e-05 | 1.3e-05 | 7.4e-06 |
+| B3LYP | 6.0e-06 | 5.9e-06 | 5.6e-06 | 4.1e-06 |
+
+The largest disagreement in an excitation energy, in hartree, which is four
+hundredths of a millielectronvolt at its worst. It **improves** with the orbital
+basis, and for the reason the gradient section gives in reverse: one fitting set
+serves every row, and it is a better fit to a larger orbital basis than to a small
+one.
+
+### Why B3LYP is lower, which these numbers do not establish
+
+B3LYP reaches 23 where Hartree-Fock reaches 110, and the natural reading is the
+exchange-correlation quadrature: it is the same work in both columns, it does not
+shrink when the two-electron part does, and a constant added to both sides of a
+ratio pulls it toward one -- which is what the gradient section found for the same
+functional.
+
+**The reading is probably right and these numbers do not show it.** The obvious way
+to extract the quadrature is to subtract the Hartree-Fock cost per iteration from
+the B3LYP one at the same basis, and that gives two answers which disagree:
+
+| | from the RI-JK column | from the four-centre column |
+| --- | ---: | ---: |
+| def2-svp | 1.00 s | 1.26 s |
+| def2-svpd | 2.48 s | 4.07 s |
+| def2-tzvp | 3.20 s | 7.48 s |
+| def2-tzvpd | **5.86 s** | **25.81 s** |
+
+A factor of four and a half apart at the largest basis. The subtraction is not
+valid: Hartree-Fock converges in eighteen iterations there and B3LYP in nine, so the
+two runs do not carry the same number of trial vectors per iteration and a second
+per iteration is not the same unit in the two of them. **A quantity which can be
+estimated two ways and gives two answers has been estimated zero ways.** What the
+quadrature actually costs wants a profile, which is how the gradient's ninety-two
+per cent was found and not something a table of totals can answer.
