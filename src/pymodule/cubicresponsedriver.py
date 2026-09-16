@@ -1041,6 +1041,14 @@ class CubicResponseDriver(NonlinearSolver):
         distributed_density_1 = None
         distributed_density_2 = None
 
+        # NOTE: the factors of the densities of the second pass. They are one per
+        # frequency triple, real and imaginary, and go through the Fock build as
+        # two-time perturbed densities do.
+        self._ri_jk_factors = None
+
+        if self.rank == mpi_master() and self.ri_jk and self.ri_jk_simd:
+            self._ri_jk_factors = (mo[:, :nocc], [], mo[:, nocc:], [])
+
         for (wb, wc, wd) in freqtriples:
 
             Nb = ComplexResponseSolver.get_full_solution_vector(Nx[('B', wb)])
@@ -1083,6 +1091,18 @@ class CubicResponseDriver(NonlinearSolver):
 
                 Dd_bc = self.commut(kd, Dbc)
                 Dbc_d = self.commut(kbc, Dd)
+
+                # NOTE: the factors, before the transformation to the atomic
+                # orbitals. The real and the imaginary part of the one density go
+                # to the Fock build in that order, and the factors follow it.
+                if self._ri_jk_factors is not None:
+                    total_mo = (Db_cd + Dcd_b + Dc_bd + Dbd_c + Dd_bc + Dbc_d)
+
+                    for part in (np.real, np.imag):
+                        ra, rb = rijkresponse.general_factors(
+                            mo, nocc, part(total_mo))
+                        self._ri_jk_factors[1].append(ra)
+                        self._ri_jk_factors[3].append(rb)
 
                 # density transformation from MO to AO basis
 
@@ -1328,12 +1348,14 @@ class CubicResponseDriver(NonlinearSolver):
                 dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
                                                  'real_and_imag', eri_dict,
                                                  dft_dict, density_list1,
-                                                 density_list2, None, 'crf_ii')
+                                                 density_list2, None, 'crf_ii',
+                                                 dens_factors=self._ri_jk_factors)
             else:
                 dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
                                                  'real_and_imag', eri_dict,
                                                  None, None, density_list2,
-                                                 None, 'crf_ii')
+                                                 None, 'crf_ii',
+                                                 dens_factors=self._ri_jk_factors)
 
             self._print_fock_time(time.time() - time_start_fock)
 
