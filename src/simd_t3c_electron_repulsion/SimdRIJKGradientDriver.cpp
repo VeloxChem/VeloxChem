@@ -198,28 +198,55 @@ CSimdRIJKGradientDriver::_apply_transposed_factor(const CPackedMatrix        &me
     // element of a matrix -- eight thousand calls on a molecule of any size, each
     // of them a multiply of a matrix by a single column.
 
-    auto gathered = std::vector<double>(naux * nelements, 0.0);
+    // NOTE: the elements in panels, so the two arrays which are the auxiliary
+    // basis times the elements are bounded by the budget rather than by the
+    // problem. The factor is the square of the auxiliary basis and cannot be
+    // divided, so it is taken off the budget before the panel is sized. At the
+    // default budget a molecule of any size this driver holds B vectors for is
+    // one panel, and the division costs nothing; it is there for the case the
+    // note above describes, where the elements alone are gigabytes.
+
+    const auto fixed = naux * naux * sizeof(double);
+
+    const auto spare = (_budget > fixed) ? _budget - fixed : size_t{0};
+
+    const auto per_element = 2 * naux * sizeof(double);
+
+    const auto by_memory = spare / std::max(per_element, size_t{1});
+
+    const auto npanel = std::min(nelements, std::max(_min_batch, by_memory));
+
+    auto gathered = std::vector<double>(naux * npanel, 0.0);
+
+    auto result = std::vector<double>(naux * npanel, 0.0);
 
     const auto nrange = static_cast<int>(naux);
 
-#pragma omp parallel for schedule(static)
-    for (int at = 0; at < nrange; at++)
+    for (size_t first = 0; first < nelements; first += npanel)
     {
-        const auto q = static_cast<size_t>(at);
+        const auto count = std::min(npanel, nelements - first);
 
-        std::copy_n(matrices[q].data(), nelements, gathered.data() + q * nelements);
-    }
-
-    auto result = std::vector<double>(naux * nelements, 0.0);
-
-    _multiply(naux, nelements, naux, transposed.data(), gathered.data(), result.data());
+        // NOTE: the panel is packed with the width it actually has and not with
+        // the width of the storage, so the last and shorter one is a matrix the
+        // multiply reads as it stands rather than one with a stride of its own.
 
 #pragma omp parallel for schedule(static)
-    for (int at = 0; at < nrange; at++)
-    {
-        const auto q = static_cast<size_t>(at);
+        for (int at = 0; at < nrange; at++)
+        {
+            const auto q = static_cast<size_t>(at);
 
-        std::copy_n(result.data() + q * nelements, nelements, matrices[q].data());
+            std::copy_n(matrices[q].data() + first, count, gathered.data() + q * count);
+        }
+
+        _multiply(naux, count, naux, transposed.data(), gathered.data(), result.data());
+
+#pragma omp parallel for schedule(static)
+        for (int at = 0; at < nrange; at++)
+        {
+            const auto q = static_cast<size_t>(at);
+
+            std::copy_n(result.data() + q * count, count, matrices[q].data() + first);
+        }
     }
 }
 
