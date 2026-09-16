@@ -23,6 +23,19 @@ A density is given as the factors it was made from, and three shapes are taken:
     (left_a, rights_a, left_b, rights_b)
                                        D = left_a rights_a[k]^T + left_b rights_b[k]^T
 
+The last of them carries **any** density and not only a block diagonal one. Split the
+left index of the molecular orbital density into its occupied and virtual halves and
+
+    r_a = C(occ) M(oo)^T + C(vir) M(ov)^T
+    r_b = C(occ) M(vo)^T + C(vir) M(vv)^T
+
+give it exactly, whatever blocks of M are nonzero. A batch which mixes the orders,
+as a three-time perturbed calculation does, therefore needs no telling apart of its
+densities: one set of factors with C(occ) and C(vir) as the shared halves carries all
+of them. It costs the basis times the orbitals where a density which is only between
+the occupied orbitals and the virtual ones would cost the basis times twice the
+occupied, so it is the general form and not the cheapest one.
+
 The first is a trial vector of the Tamm-Dancoff approximation, the second one of
 linear response or a density of third order in the perturbation, and the third a
 density of second order, which is block diagonal in the orbitals: the occupied block
@@ -122,6 +135,43 @@ def initialize(solver, molecule, basis):
         f'{budget / 1024**3:.2f} GB available.')
     solver.ostream.print_blank()
     solver.ostream.flush()
+
+
+def general_factors(mo, nocc, mo_density):
+    """The two right factors any density is carried by.
+
+    Splitting the left index of a density in the molecular orbitals into its
+    occupied and its virtual half gives
+
+        D = C(occ) r_a^T + C(vir) r_b^T
+
+    with r_a and r_b as below, whatever blocks of the density are nonzero. It is
+    the general form: a density which lives only between the occupied orbitals and
+    the virtual ones is carried more cheaply by the two-term shape, and a block
+    diagonal one by its own blocks, but a batch which mixes them needs one shape
+    for all of them and this is it.
+
+    :param mo:
+        The molecular orbital coefficients.
+    :param nocc:
+        The number of occupied orbitals.
+    :param mo_density:
+        The density in the molecular orbitals, real.
+
+    :return:
+        The right factor of the occupied half and of the virtual half.
+    """
+
+    mo_occ = mo[:, :nocc]
+    mo_vir = mo[:, nocc:]
+
+    right_a = (np.matmul(mo_occ, mo_density[:nocc, :nocc].T) +
+               np.matmul(mo_vir, mo_density[:nocc, nocc:].T))
+
+    right_b = (np.matmul(mo_occ, mo_density[nocc:, :nocc].T) +
+               np.matmul(mo_vir, mo_density[nocc:, nocc:].T))
+
+    return right_a, right_b
 
 
 def slice_factors(dens_factors, start, end):

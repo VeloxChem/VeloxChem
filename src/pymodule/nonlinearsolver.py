@@ -900,10 +900,14 @@ class NonlinearSolver:
             # different block structures between them.
             factors_are_split = isinstance(dens_factors, dict)
 
+            # NOTE: a three-time calculation without a functional concatenates
+            # its two-time and three-time densities into one array and cuts them
+            # with one stride, so its factors are one set and not two. With a
+            # functional they are two arrays with strides of their own and the
+            # factors are the dictionary. Both are taken.
             use_ri_jk = (self.ri_jk and self.ri_jk_simd and
                          dens_factors is not None and
-                         (mode_is_quadratic or
-                          (mode_is_cubic and factors_are_split)))
+                         (mode_is_quadratic or mode_is_cubic))
 
             if use_ri_jk:
                 assert_msg_critical(

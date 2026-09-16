@@ -50,6 +50,7 @@ from .distributedarray import DistributedArray
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            ri_sanity_check, dft_sanity_check)
 from .errorhandler import assert_msg_critical
+from . import rijkresponse
 from .checkpoint import (check_distributed_focks, read_distributed_focks,
                          write_distributed_focks)
 
@@ -873,6 +874,21 @@ class CubicResponseDriver(NonlinearSolver):
         distributed_density_2 = None
         distributed_density_3 = None
 
+        # NOTE: the factors of the two orders which reach the Fock build, kept
+        # apart as lists of the occupied and the virtual right factor.
+        self._ri_jk_factors = None
+
+        if self.rank == mpi_master() and self.ri_jk and self.ri_jk_simd:
+            # NOTE: the shared halves are kept with the right factors rather than
+            # formed again where they are used, so the two cannot be built from
+            # different orbitals.
+            self._ri_jk_factors = {
+                'left_occ': mo[:, :nocc],
+                'left_vir': mo[:, nocc:],
+                'second': ([], []),
+                'third': ([], []),
+            }
+
         for (wb, wc, wd) in freqtriples:
 
             # convert response matrix to ao basis #
@@ -914,6 +930,23 @@ class CubicResponseDriver(NonlinearSolver):
 
                 Ddbc = self.commut(kd, Dbc)
                 Ddcb = self.commut(kd, Dcb)
+
+                # NOTE: the factors, taken before the transformation to the
+                # atomic orbitals. The two orders are collected apart because the
+                # array of each is cut with a stride of its own where there is a
+                # functional, and laid end to end where there is not, which is the
+                # order they are joined in at the call.
+                if self._ri_jk_factors is not None:
+                    for name, mat in (('second', Dbc + Dcb),
+                                      ('second', Dbd + Ddb),
+                                      ('second', Ddc + Dcd),
+                                      ('third', Dbcd + Dbdc + Dcbd + Dcdb +
+                                       Ddbc + Ddcb)):
+                        for part in (np.real, np.imag):
+                            ra, rb = rijkresponse.general_factors(
+                                mo, nocc, part(mat))
+                            self._ri_jk_factors[name][0].append(ra)
+                            self._ri_jk_factors[name][1].append(rb)
 
                 # density transformation from MO to AO basis
 
@@ -1171,21 +1204,47 @@ class CubicResponseDriver(NonlinearSolver):
         else:
             time_start_fock = time.time()
 
+            factors = self._ri_jk_factors
+
             if self._dft:
+                # NOTE: two arrays, each cut with a stride of its own, so the
+                # factors go as the two sets they were collected as.
+                split = None
+
+                if factors is not None:
+                    split = {
+                        'second': (factors['left_occ'], factors['second'][0],
+                                   factors['left_vir'], factors['second'][1]),
+                        'third': (factors['left_occ'], factors['third'][0],
+                                  factors['left_vir'], factors['third'][1]),
+                    }
+
                 dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
                                                  'real_and_imag', eri_dict,
                                                  dft_dict, density_list1,
                                                  density_list2, density_list3,
-                                                 'crf')
+                                                 'crf', dens_factors=split)
             else:
                 density_list_23 = DistributedArray(density_list2.data,
                                                    self.comm,
                                                    distribute=False)
                 density_list_23.append(density_list3, axis=1)
+
+                # NOTE: one array of the two orders laid end to end, cut with one
+                # stride, so the factors are one set joined in the same order.
+                joined = None
+
+                if factors is not None:
+                    joined = (factors['left_occ'],
+                              factors['second'][0] + factors['third'][0],
+                              factors['left_vir'],
+                              factors['second'][1] + factors['third'][1])
+
                 dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
                                                  'real_and_imag', eri_dict,
                                                  None, None, None,
-                                                 density_list_23, 'crf')
+                                                 density_list_23, 'crf',
+                                                 dens_factors=joined)
 
             self._print_fock_time(time.time() - time_start_fock)
 
