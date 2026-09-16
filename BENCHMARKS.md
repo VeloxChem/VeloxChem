@@ -8936,7 +8936,45 @@ column and does not shrink. Here **the four-center calculation itself is sixty-s
 per cent dearer at B3LYP** -- 112 seconds against 67 -- which none of the other
 properties showed.
 
-That makes 2.64 hard to read. It may be the quadrature of a three-time perturbed
-calculation being a larger thing than it is elsewhere, or it may be something else
-entirely. **This is written down as not understood**, which is what it is, and it
-wants the profiler rather than another table.
+That made 2.64 hard to read, so it was profiled. It is two things and not one.
+
+| | Hartree-Fock | B3LYP |
+| --- | ---: | ---: |
+| the whole calculation | 66.80 s | 111.95 s |
+| the four-center build | 65.80 s over 96 calls | 82.37 s over 118 calls |
+| **each of those calls** | **0.685 s** | **0.698 s** |
+| the quadrature | -- | **24.05 s** |
+| sigma builds of the inner solves | **71** | **94** |
+
+**A Fock matrix costs the same at either functional** -- 0.685 against 0.698 seconds
+-- so none of the difference is the build being dearer. Of the forty-five seconds
+between them, twenty-four are the quadrature, which Hartree-Fock does not pay at all,
+and fifteen are twenty-two more Fock matrices: the inner linear solves needed
+ninety-four sigma builds at B3LYP against seventy-one, a third more, because the
+calculation converged more slowly. The remainder is the quadrature of the nonlinear
+part and the setting up.
+
+So half of it is the functional's integration and half is the functional's
+convergence, and **neither is visible in a table of totals**, which is why this was
+left unexplained rather than guessed at.
+
+### What is left after the two-electron part goes away
+
+The same two calculations with the resolution of the identity:
+
+| | Hartree-Fock, 10.51 s | B3LYP, 42.39 s |
+| --- | ---: | ---: |
+| the quadrature | -- | **24.67 s, 58%** |
+| the two-electron build | 8.79 s, **84%** | 11.42 s, 27% |
+| forming the B vectors | 0.73 s | 0.74 s |
+
+**A cubic response calculation at B3LYP is a quadrature calculation now.** Fifty-eight
+per cent of it is integrating the functional and a quarter is the thing the
+resolution of the identity was brought in for, which is the whole of why the speedup
+is 2.64 and not 6.49. The excitation sections guessed at this and could not measure
+it; here it reads off one profile.
+
+The B vectors are formed **three times** in both of them, 0.74 seconds here. That is
+the driver and the solvers it drives each building their own, which is nothing at
+this size and was 7.8 seconds on tagrisso. It is waste, and it is written here so
+that it is not discovered twice.
