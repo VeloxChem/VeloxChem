@@ -8404,3 +8404,68 @@ per iteration is not the same unit in the two of them. **A quantity which can be
 estimated two ways and gives two answers has been estimated zero ways.** What the
 quadrature actually costs wants a profile, which is how the gradient's ninety-two
 per cent was found and not something a table of totals can answer.
+
+### The same calculation on a molecule three times the size
+
+Tagrisso, 70 atoms against caffeine's 24, in the same def2-svp and with the same
+fitting set, so nao goes 246 to 683, the auxiliary basis 1242 to 3387 and the
+occupied orbitals 51 to 133. Five states, at `633e3a8ef`, records in
+`benchmarks/data/tda/2026-09-16_m4max_tagrisso.json`.
+
+| functional | four-centre | RI-JK simd | speedup | iter | s/iter | max dE |
+| --- | ---: | ---: | ---: | ---: | --- | ---: |
+| HF | 866.14 | 138.38 | **6.26** | 19 | 45.59 to 7.28 | 7.4e-06 |
+| B3LYP | 693.42 | 167.62 | **4.14** | 13 | 53.34 to 12.89 | 5.0e-06 |
+
+**It is right at this size**, which was the open question and not the speedup: the
+response driver had never been asked for seventy atoms or three thousand auxiliary
+functions before this run. The excitation energies agree with the four-center ones
+to 7.4e-06 and 5.0e-06 hartree, which is **tighter** than the same molecule's
+caffeine rows, for the reason the caffeine section gives -- one fitting set is a
+better fit to a larger orbital basis. Both pairs converged in the same number of
+iterations as their partners.
+
+### Why the ratio falls, and why that is not the gradient's story
+
+Hartree-Fock goes from 17.36 on caffeine to 6.26 here. The gradient section above
+records a collapse of exactly this shape, from 3.87 to 1.23, and it turned out to be
+an unthreaded loop which should not have been there. **This one is not that.** The
+exchange of a factorised density is the auxiliary basis times the square of the
+orbital basis times the occupied orbitals, and all three of those grow with the
+molecule:
+
+| | caffeine | tagrisso | factor |
+| --- | ---: | ---: | ---: |
+| naux times nao squared times nocc | 3.83e+09 | 2.10e+11 | **54.8x** |
+| observed, per iteration | 0.22 s | 7.28 s | 32.4x |
+| four-centre, per iteration | 3.90 s | 45.59 s | 11.7x |
+
+The resolution of the identity grew by **less** than its own cost model says, so the
+batching of the trial vectors is earning something. The four-center path grew by far
+less than a fourth power, because seventy atoms spread out is where screening
+finally has distant pairs to discard. Two methods with honest costs, moving apart.
+The lesson of the gradient was to ask which term is growing before believing a
+curve; asking it here gives an answer that exonerates the implementation instead of
+indicting it.
+
+End to end, a ground state and its five excited states is 6.05 times quicker at
+Hartree-Fock and 3.94 at B3LYP.
+
+### The two functionals converge, which is worth noticing and not yet explaining
+
+| | caffeine | tagrisso |
+| --- | ---: | ---: |
+| HF | 17.36 | 6.26 |
+| B3LYP | 4.22 | 4.14 |
+
+Hartree-Fock falls by nearly three and B3LYP barely moves, so what was a fourfold
+gap between the functionals on caffeine is under fifty per cent here. A fixed
+quadrature cost mattering less as the two-electron work grows would produce exactly
+this, and that is the natural reading.
+
+**It is a reading and not a measurement**, for the same reason the caffeine section
+sets out: nineteen iterations against thirteen means the two runs do not carry the
+same trial vectors per iteration, so a second per iteration is not the same unit in
+the two of them and the functionals cannot be subtracted. The question of what an
+RI-JK iteration of a hybrid is actually made of remains open across both molecules,
+and remains a profile's to answer.
