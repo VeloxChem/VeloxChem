@@ -515,6 +515,21 @@ class ThgDriver(NonlinearSolver):
 
         mo = self.comm.bcast(mo, root=mpi_master())
 
+        # NOTE: the factors of the two orders which reach the Fock build, kept
+        # apart as lists of the occupied and the virtual right factor. The tasks
+        # below are spread over the ranks, but the resolution of the identity
+        # refuses more than one of them, so the columns are filled in task order
+        # on the one rank there is.
+        self._ri_jk_factors = None
+
+        if self.rank == mpi_master() and self.ri_jk and self.ri_jk_simd:
+            self._ri_jk_factors = {
+                'left_occ': mo[:, :nocc],
+                'left_vir': mo[:, nocc:],
+                'second': ([], []),
+                'third': ([], []),
+            }
+
         for task_id, rank in task_rank_pairs:
             # only go through the tasks that are associated with self.rank
             if self.rank == rank:
@@ -588,6 +603,25 @@ class ThgDriver(NonlinearSolver):
                 D_lam_sig_tau_z += (self.commut(kx, one_third * D_lamtau_xz) +
                                     self.commut(ky, one_third * D_lamtau_yz) +
                                     self.commut(kz, one_third * D_lamtau_zz))
+
+                # NOTE: the factors, taken before the transformation to the
+                # atomic orbitals and in the order the columns are laid out
+                # below. The two orders are collected apart because the array of
+                # each is cut with a stride of its own where there is a
+                # functional, and laid end to end where there is not, which is
+                # the order they are joined in at the call.
+                if self._ri_jk_factors is not None:
+                    for name, mat in (('second', D_sig_xx), ('second', D_sig_yy),
+                                      ('second', D_sig_zz), ('second', D_sig_xy),
+                                      ('second', D_sig_xz), ('second', D_sig_yz),
+                                      ('third', D_lam_sig_tau_x),
+                                      ('third', D_lam_sig_tau_y),
+                                      ('third', D_lam_sig_tau_z)):
+                        for part in (np.real, np.imag):
+                            ra, rb = rijkresponse.general_factors(
+                                mo, nocc, part(mat))
+                            self._ri_jk_factors[name][0].append(ra)
+                            self._ri_jk_factors[name][1].append(rb)
 
                 # density transformation from MO to AO basis
 
@@ -744,22 +778,48 @@ class ThgDriver(NonlinearSolver):
         else:
             time_start_fock = time.time()
 
+            factors = self._ri_jk_factors
+
             if self._dft:
+                # NOTE: two arrays, each cut with a stride of its own, so the
+                # factors go as the two sets they were collected as.
+                split = None
+
+                if factors is not None:
+                    split = {
+                        'second': (factors['left_occ'], factors['second'][0],
+                                   factors['left_vir'], factors['second'][1]),
+                        'third': (factors['left_occ'], factors['third'][0],
+                                  factors['left_vir'], factors['third'][1]),
+                    }
+
                 dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
                                                  'real_and_imag', eri_dict,
                                                  dft_dict, density_list1,
                                                  density_list2, density_list3,
-                                                 'thg', profiler)
+                                                 'thg', profiler,
+                                                 dens_factors=split)
             else:
                 density_list_23 = DistributedArray(density_list2.data,
                                                    self.comm,
                                                    distribute=False)
                 density_list_23.append(density_list3, axis=1)
+
+                # NOTE: one array of the two orders laid end to end, cut with one
+                # stride, so the factors are one set joined in the same order.
+                joined = None
+
+                if factors is not None:
+                    joined = (factors['left_occ'],
+                              factors['second'][0] + factors['third'][0],
+                              factors['left_vir'],
+                              factors['second'][1] + factors['third'][1])
+
                 dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
                                                  'real_and_imag', eri_dict,
                                                  None, None, None,
                                                  density_list_23, 'thg',
-                                                 profiler)
+                                                 profiler, dens_factors=joined)
 
             self._print_fock_time(time.time() - time_start_fock)
 
