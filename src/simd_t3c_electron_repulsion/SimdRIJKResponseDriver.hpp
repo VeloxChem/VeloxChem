@@ -127,6 +127,31 @@ class CSimdRIJKResponseDriver
                  const std::vector<CPackedMatrix> &rights,
                  const double                      exchange_scaling_factor) const -> std::vector<CPackedMatrix>;
 
+    /// @brief Computes them for densities of two terms, the second with the
+    /// shared factor on the other side.
+    /// @param rights The right factor of the first term of each density.
+    /// @param transposed_rights The left factor of the second term of each
+    /// density, which stands to the left of the shared factor transposed. Empty
+    /// where the densities have one term, and then this is the form above.
+    /// @note The density of one pair is left times rights transposed, plus
+    /// transposed_rights times left transposed. That is the density a linear
+    /// response trial vector makes: the excitation part carries the occupied
+    /// orbitals on the left and the de-excitation part carries them on the right,
+    /// and neither of them is the transpose of the other.
+    /// @note Both terms are formed from one transformation of the shared factor.
+    /// The exchange of the second is the exchange of its transpose transposed,
+    /// which is why the virtual orbitals are never transformed; and the Coulomb
+    /// sees only the symmetric part of a density, which the two terms share with
+    /// the single term whose right factor is the sum of the two, so it is taken
+    /// once and not twice.
+    auto compute(const CSparseTensor              &bq_vectors,
+                 const CMolecularBasis            &basis,
+                 const CMolecularBasis            &aux_basis,
+                 const CPackedMatrix              &left,
+                 const std::vector<CPackedMatrix> &rights,
+                 const std::vector<CPackedMatrix> &transposed_rights,
+                 const double                      exchange_scaling_factor) const -> std::vector<CPackedMatrix>;
+
    private:
     /// @brief Checks the factors are of one basis and of one rank.
     auto _check_factors(const CMolecularBasis            &basis,

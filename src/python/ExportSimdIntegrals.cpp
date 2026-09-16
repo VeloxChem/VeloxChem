@@ -500,7 +500,10 @@ export_simdintegrals(py::module &m) -> void
              py::arg("left"),
              py::arg("rights"))
         .def("compute",
-             &CSimdRIJKResponseDriver::compute,
+             static_cast<std::vector<CPackedMatrix> (CSimdRIJKResponseDriver::*)(
+                 const CSparseTensor &, const CMolecularBasis &, const CMolecularBasis &,
+                 const CPackedMatrix &, const std::vector<CPackedMatrix> &, const double) const>(
+                 &CSimdRIJKResponseDriver::compute),
              "Computes the Fock matrices of densities given as their factors, twice the Coulomb less "
              "the scaled exchange, general and not symmetric.",
              py::arg("bq_vectors"),
@@ -508,6 +511,22 @@ export_simdintegrals(py::module &m) -> void
              py::arg("aux_basis"),
              py::arg("left"),
              py::arg("rights"),
+             py::arg("exchange_scaling_factor"))
+        .def("compute",
+             static_cast<std::vector<CPackedMatrix> (CSimdRIJKResponseDriver::*)(
+                 const CSparseTensor &, const CMolecularBasis &, const CMolecularBasis &,
+                 const CPackedMatrix &, const std::vector<CPackedMatrix> &,
+                 const std::vector<CPackedMatrix> &, const double) const>(
+                 &CSimdRIJKResponseDriver::compute),
+             "Computes them for densities of two terms, the density of a pair being the left factor "
+             "times the right one transposed, plus the transposed right one times the left factor "
+             "transposed.",
+             py::arg("bq_vectors"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("left"),
+             py::arg("rights"),
+             py::arg("transposed_rights"),
              py::arg("exchange_scaling_factor"))
         .def("get_threshold", &CSimdRIJKResponseDriver::get_threshold,
              "Gets screening threshold of the integrals.")

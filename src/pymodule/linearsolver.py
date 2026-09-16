@@ -1777,6 +1777,17 @@ class LinearSolver:
                 kns = []
             else:
                 dks = None
+            # NOTE: the factors of the densities, collected beside them. None where
+            # this way of building cannot be taken, and then nothing looks for them:
+            # the two modes which restrict the orbital space carry a different set
+            # of orbitals, and a complex trial vector is not one the driver takes.
+            ri_jk_factors = None
+
+            if (self.rank == mpi_master() and self.ri_jk and self.ri_jk_simd and
+                    not getattr(self, 'core_excitation', False) and
+                    not getattr(self, 'restricted_subspace', False) and
+                    not np.iscomplexobj(vecs_ger.data)):
+                ri_jk_factors = (mo[:, :nocc], [], [])
 
             prep_t0 = tm.time()
 
@@ -1849,6 +1860,22 @@ class LinearSolver:
                         dak = self.commut_mo_density(kn, nocc)
                         dak = np.linalg.multi_dot([mo, dak, mo.T])
 
+                        # NOTE: the same density as the factors it is made of,
+                        # which the resolution of the identity wants and the dense
+                        # path does not. The commutator leaves the occupied
+                        # orbitals on the left of the excitation part and on the
+                        # right of the de-excitation part, so the density is
+                        # C(occupied) times the first factor transposed plus the
+                        # second factor times C(occupied) transposed, and one
+                        # transformation of the occupied orbitals serves both.
+                        if ri_jk_factors is not None:
+                            n_ov = nocc * (norb - nocc)
+                            mo_vir = mo[:, nocc:]
+                            zmat = vec[:n_ov].reshape(nocc, norb - nocc)
+                            ymat = vec[n_ov:].reshape(nocc, norb - nocc)
+                            ri_jk_factors[1].append(-np.matmul(mo_vir, zmat.T))
+                            ri_jk_factors[2].append(np.matmul(mo_vir, ymat.T))
+
                     dks.append(dak)
                     kns.append(kn)
 
@@ -1858,7 +1885,8 @@ class LinearSolver:
             # form Fock matrices
 
             fock = self._comp_lr_fock(dks, molecule, basis, eri_dict, dft_dict,
-                                      pe_dict, profiler)
+                                      pe_dict, profiler,
+                                      dens_factors=ri_jk_factors)
 
             if profiler is not None:
                 # only increment FockCount on master rank
@@ -2231,7 +2259,15 @@ class LinearSolver:
             The Fock matrices as numpy arrays, one for each density.
         """
 
-        left, rights = dens_factors
+        # NOTE: two shapes are accepted. A pair is a density of one term, which is
+        # what the Tamm-Dancoff approximation makes; a triple carries a second term
+        # whose shared factor stands on the other side, which is what a linear
+        # response trial vector makes.
+        if len(dens_factors) == 2:
+            left, rights = dens_factors
+            transposed_rights = None
+        else:
+            left, rights, transposed_rights = dens_factors
 
         nao = basis.get_dimensions_of_basis()
 
@@ -2245,10 +2281,13 @@ class LinearSolver:
         # already, which is what this builder is asked for, so nothing is scaled
         # here. A pure functional asks for a scaling of zero and is given twice
         # the Coulomb, where the dense path forms the Coulomb and doubles it.
-        focks = self._ri_jk_response_drv.compute(
-            self._ri_jk_drv.get_bq_vectors(), basis, self._ri_jk_aux_basis,
-            _packed(left), [_packed(right) for right in rights],
-            exchange_scaling_factor)
+        args = [self._ri_jk_drv.get_bq_vectors(), basis, self._ri_jk_aux_basis,
+                _packed(left), [_packed(right) for right in rights]]
+
+        if transposed_rights is not None:
+            args.append([_packed(right) for right in transposed_rights])
+
+        focks = self._ri_jk_response_drv.compute(*args, exchange_scaling_factor)
 
         return [fock.to_numpy() for fock in focks]
 

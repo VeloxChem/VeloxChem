@@ -246,11 +246,35 @@ CSimdRIJKResponseDriver::compute(const CSparseTensor              &bq_vectors,
                                  const double                      exchange_scaling_factor) const
     -> std::vector<CPackedMatrix>
 {
+    return compute(bq_vectors, basis, aux_basis, left, rights, {}, exchange_scaling_factor);
+}
+
+auto
+CSimdRIJKResponseDriver::compute(const CSparseTensor              &bq_vectors,
+                                 const CMolecularBasis            &basis,
+                                 const CMolecularBasis            &aux_basis,
+                                 const CPackedMatrix              &left,
+                                 const std::vector<CPackedMatrix> &rights,
+                                 const std::vector<CPackedMatrix> &transposed_rights,
+                                 const double                      exchange_scaling_factor) const
+    -> std::vector<CPackedMatrix>
+{
     auto focks = std::vector<CPackedMatrix>();
 
     if (rights.empty()) return focks;
 
     _check_factors(basis, left, rights);
+
+    const auto two_termed = !transposed_rights.empty();
+
+    if (two_termed)
+    {
+        errors::assertMsgCritical(
+            transposed_rights.size() == rights.size(),
+            std::string("SimdRIJKResponseDriver: The two terms of the densities are not of one count"));
+
+        _check_factors(basis, left, transposed_rights);
+    }
 
     const auto nao = basis.dimensions_of_basis();
 
@@ -265,8 +289,45 @@ CSimdRIJKResponseDriver::compute(const CSparseTensor              &bq_vectors,
 
     if (exchange_scaling_factor != 0.0)
     {
-        exchanges = compute_exchange(bq_vectors, basis, aux_basis, left, rights);
+        // NOTE: the two terms side by side in one batch, so the shared factor is
+        // transformed once for both of them and not once for each.
+
+        auto wanted = rights;
+
+        if (two_termed)
+        {
+            wanted.insert(wanted.end(), transposed_rights.begin(), transposed_rights.end());
+        }
+
+        exchanges = compute_exchange(bq_vectors, basis, aux_basis, left, wanted);
     }
+
+    // NOTE: the right factor the Coulomb is taken with. The two terms of a
+    // density have the same symmetric part as the single term whose right factor
+    // is the sum of theirs, and the Coulomb sees nothing else of a density, so it
+    // is one closure of the B vectors rather than two.
+
+    auto summed = std::vector<CPackedMatrix>();
+
+    if (two_termed)
+    {
+        for (size_t idens = 0; idens < ndens; idens++)
+        {
+            auto total = CPackedMatrix(nao, nvec, mat_t::general);
+
+            const auto *first = rights[idens].data();
+
+            const auto *second = transposed_rights[idens].data();
+
+            auto *values = total.data();
+
+            for (size_t at = 0; at < nao * nvec; at++) values[at] = first[at] + second[at];
+
+            summed.push_back(std::move(total));
+        }
+    }
+
+    const auto &coulomb_rights = two_termed ? summed : rights;
 
     auto expanded = std::vector<double>(nao * nao, 0.0);
 
@@ -281,7 +342,7 @@ CSimdRIJKResponseDriver::compute(const CSparseTensor              &bq_vectors,
         density.zero();
 
         _add_multiply_by_transpose(
-            nao, nao, nvec, left.data(), nvec, rights[idens].data(), nvec, density.data(), nao);
+            nao, nao, nvec, left.data(), nvec, coulomb_rights[idens].data(), nvec, density.data(), nao);
 
         const auto yvector = _drv.compute_y_vector(bq_vectors, basis, aux_basis, density);
 
@@ -300,11 +361,29 @@ CSimdRIJKResponseDriver::compute(const CSparseTensor              &bq_vectors,
 
         const auto *kvalues = exchanges.empty() ? nullptr : exchanges[idens].data();
 
-        for (size_t at = 0; at < nao * nao; at++)
-        {
-            values[at] = 2.0 * expanded[at];
+        // NOTE: the exchange of the second term is the exchange of its transpose,
+        // transposed, which is what the batch above holds after the first count of
+        // them. It is read the other way round as it is subtracted.
 
-            if (kvalues != nullptr) values[at] -= exchange_scaling_factor * kvalues[at];
+        const auto *tvalues = (two_termed && (kvalues != nullptr))
+                                  ? exchanges[ndens + idens].data()
+                                  : nullptr;
+
+        for (size_t row = 0; row < nao; row++)
+        {
+            for (size_t col = 0; col < nao; col++)
+            {
+                const auto at = row * nao + col;
+
+                values[at] = 2.0 * expanded[at];
+
+                if (kvalues != nullptr) values[at] -= exchange_scaling_factor * kvalues[at];
+
+                if (tvalues != nullptr)
+                {
+                    values[at] -= exchange_scaling_factor * tvalues[col * nao + row];
+                }
+            }
         }
     }
 

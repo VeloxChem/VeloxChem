@@ -771,7 +771,7 @@ class TdaEigenSolver(TdaEigenSolverBase):
                 mat = trial_mat[:, k].reshape(nocc, nvir)
             rights.append(np.matmul(mo_vir, mat.T))
 
-        return (mo_occ, rights)
+        return (mo_occ, rights)  # one term: the density is mo_occ times rights transposed
 
     def _get_sigmas(self, fock, scf_results, molecule, basis, trial_mat):
         """
