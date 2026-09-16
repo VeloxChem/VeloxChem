@@ -8849,3 +8849,94 @@ quadrature costs across five frequencies of Fock builds, read off two columns of
 table with nothing inferred. That is the number the two-photon and excitation
 sections could not get, and it took a case where the reference happened to cost the
 same either way.
+
+## Cubic response, and a form which carries any density at all
+
+The three-time perturbed calculations were left until last because their batch holds
+two orders of density at once. Working out how to hand that to the driver turned out
+to be the whole of the problem, and the answer made the problem disappear.
+
+### One form for every density
+
+A density in the molecular orbitals, transformed to the atomic ones, is
+
+    D = C(occ) M(oo) C(occ)^T + C(occ) M(ov) C(vir)^T
+      + C(vir) M(vo) C(occ)^T + C(vir) M(vv) C(vir)^T
+
+Gather the two terms which carry the occupied orbitals on the left, and the two which
+carry the virtual ones, and it is
+
+    D = C(occ) r_a^T + C(vir) r_b^T
+    r_a = C(occ) M(oo)^T + C(vir) M(ov)^T
+    r_b = C(occ) M(vo)^T + C(vir) M(vv)^T
+
+which is the four-factor shape the second-order densities already used, with the same
+two shared halves -- **and it holds whatever blocks of M are nonzero**. Checked to
+1e-14 against a density which is block diagonal and against one which is not.
+
+So a batch which mixes the orders needs no telling apart of its densities. It costs
+the basis times the orbitals where a density living only between the occupied
+orbitals and the virtual ones would cost the basis times twice the occupied, so it is
+the general form and not the cheapest one; for this driver two columns in eight pay
+that, which is the right trade for one code path.
+
+### The two batches are laid out differently
+
+| | densities in the batch | cut with |
+| --- | --- | --- |
+| no functional | the two-time and the three-time ones **in one array** | one stride |
+| a functional | two arrays | two strides of their own |
+
+The first of those was misread when this was planned -- the Hartree-Fock path was
+taken to send the three-time densities alone, and it concatenates both orders and
+sends them as one. The correction is what made the general form necessary, since a
+batch boundary can fall anywhere in a concatenated array, including between the
+orders.
+
+### What it bought
+
+Caffeine, def2-svp, one frequency triple, one rank of 14 threads.
+
+| | four-centre | RI-JK simd | speedup | gamma |
+| --- | ---: | ---: | ---: | --- |
+| Hartree-Fock | 67.39 | 10.39 | **6.49** | -4090.71 to -4093.39 |
+| B3LYP | 111.88 | 42.38 | **2.64** | 47628.6 to 47672.4 |
+
+Gamma agrees to 9.2e-04, and water to 4.5e-04 at Hartree-Fock and 1.1e-03 at B3LYP.
+The second pass of the driver, which is two-time perturbed and was wired after the
+first, is worth 5.92 to 6.49 and 2.59 to 2.64 -- nine per cent and two. It carries
+one density per frequency triple where the first pass carries four, and the ratio
+follows the count.
+
+### Two small terms, and why they read as four per cent
+
+The largest relative disagreement of any quantity the driver returns is 4.3e-02, on
+the X3 term. That is not the error of anything worth having:
+
+| term | four-centre | RI-JK simd | difference | relative |
+| --- | ---: | ---: | ---: | ---: |
+| X2 | 60678.4 | 60724.8 | 46.4 | 7.6e-04 |
+| gamma | 47628.6 | 47672.4 | 43.8 | 9.2e-04 |
+| E3 | -11157.4 | -11148.6 | 8.8 | 7.9e-04 |
+| A2 | -2501.83 | -2502.53 | 0.7 | 2.8e-04 |
+| A3 | 404.497 | 404.561 | 0.06 | 1.6e-04 |
+| **X3** | **397.019** | **380.077** | **16.9** | **4.3e-02** |
+| **T4** | **-192.161** | **-185.882** | **6.3** | **3.3e-02** |
+
+X3 and T4 are the two smallest terms of a sum whose largest is sixty thousand, and
+their differences are of the same size as everyone else's. **A relative error is a
+statement about the denominator as much as the numerator**, and a term which is a
+hundred and fiftieth of the sum it belongs to will always read badly by it.
+
+### One thing which does not fit the pattern
+
+Everywhere else in this file, B3LYP costs about what Hartree-Fock costs on the
+four-center side, and the ratio falls only because the quadrature sits in the other
+column and does not shrink. Here **the four-center calculation itself is sixty-six
+per cent dearer at B3LYP** -- 112 seconds against 67 -- which none of the other
+properties showed.
+
+That makes 2.64 hard to read. It may be the quadrature of a three-time perturbed
+calculation being a larger thing than it is elsewhere, or it may be something else
+entirely. **This is written down as not understood**, which is what it is, and it
+wants the profiler rather than another table.
