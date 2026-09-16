@@ -7890,6 +7890,11 @@ to seven orders larger than the disagreement between the two implementations of 
 
 ## The molecular gradient, where the diffuse functions decide the ratio
 
+*Superseded for the timings of the resolution of the identity, which are about ten
+times what the same calculation costs now. The shape of the argument, and every
+four-center number, still holds: "Ninety-two per cent of the gradient was not the
+integrals", at the end of this file.*
+
 The RI-JK gradient is wired into `ScfGradientDriver` and this is its first
 measurement. Caffeine, 24 atoms, def2-universal-jkfit, one rank of 14 threads on the
 M4 Max, at `cd9cb941a`. Records in
@@ -8061,6 +8066,11 @@ four-centre ones, which the Hartree-Fock rows do not.
 
 ## Four bases of the gradient, and the exponent each way is really running at
 
+*Superseded. The exponents fitted here for the resolution of the identity are
+distorted by a constant which was later removed, and its timings are nine-tenths
+overhead. The four-center numbers stand: "Ninety-two per cent of the gradient was
+not the integrals", at the end of this file.*
+
 The gradient section above measured def2-svp and def2-svpd and concluded that the
 basis decides the ratio. This extends the same table to the triple zeta pair, which
 is enough points to fit an exponent instead of reasoning from two. Caffeine,
@@ -8117,6 +8127,10 @@ costs the four-center gradient a fourth power and costs this driver a first powe
 
 ### And they do not survive the molecule growing either
 
+*Superseded. The collapse to 1.23 recorded here was one unthreaded loop and not a
+property of the method; it is 11.51 now and the two grow alike: "Ninety-two per
+cent of the gradient was not the integrals", at the end of this file.*
+
 The exponents above are scaling **with the basis at a fixed geometry**. They are not
 scaling with the size of the molecule, and the run which tested that broke both of
 them at once. Tagrisso, 70 atoms against caffeine's 24, in the same def2-svp and with
@@ -8171,3 +8185,126 @@ exchange -- but **this has not been checked and is written here as a question, n
 finding.** It is 6e-05 on a gradient whose largest component is order 0.1, so it
 changes nothing about the numbers above; it is recorded because a column which steps
 where nothing else does is worth returning to.
+
+## Ninety-two per cent of the gradient was not the integrals
+
+Everything above about the gradient measured a driver in which the derivative
+integrals were under two per cent of the time. This section is the profile that
+found that out, what was changed, and the numbers the two sections above have to
+be read against now.
+
+### The profile
+
+Tagrisso, def2-svp, 70 atoms, 683 orbital and 3387 auxiliary functions. The phases
+timed through the bindings the driver already exposes, replicating its own loop
+rather than instrumenting it:
+
+| phase | time | share |
+| --- | ---: | ---: |
+| forming the fitted densities | 84.4 s | **92%** |
+| contraction, by remainder | 5.1 s | 5.6% |
+| the three-center derivative integrals | 1.75 s | 1.9% |
+| the per-atom sparsity patterns | 0.02 s | -- |
+| the two-center (P\|Q) term | 0.01 s | -- |
+
+**The SIMD derivative integrals, which is what the kernels were written for, were
+one part in fifty of the gradient.** Everything this file has measured about them
+was measuring a thing that was not the cost.
+
+Inside that phase were two steps, each of them the square of the auxiliary basis
+times the square of the orbitals, and neither of them threaded. The processor trace
+says it plainly on fourteen cores: two hundred and seventy-seven per cent falling
+to a hundred and ninety, and then a tail at ninety-nine. One core, for the last
+third of it.
+
+### What was changed
+
+Four commits, no kernel touched:
+
+| | fitted densities |
+| --- | ---: |
+| before | 84.4 s |
+| expanding the metric once per phase and not once per element | 69.3 s |
+| applying the transposed factor in one multiply over all elements | 27.6 s |
+| taking the Gram product of the fitted densities as one multiply | **1.2 s** |
+
+The first was a dense expansion of the metric, ninety-two megabytes, formed inside
+a loop that ran once per element of a matrix. The second and third were a matrix
+times a matrix written as a sum: one call to the library in place of eight thousand
+calls of ours, and a Gram product in place of a quadruple loop. The elements are
+taken in panels so the arrays are bounded by the budget and not by the problem,
+which costs nothing -- one panel and five hundred and fifty-seven panels differ by
+under two per cent and agree to 1e-12.
+
+Every gradient is unchanged. They reproduce the measurements above to 1.2e-12 and
+1.7e-12, the agreement with the four-center gradient does not move in any row, and
+water against finite differences is back to 1.157e-09, the figure it had before any
+of this.
+
+### The corrected tables
+
+Caffeine, gradient wall time, best of two, every four-center row re-measured in the
+same session as a control and every one of them reproducing to between 0.05 and 2.7
+per cent:
+
+| functional | basis | four-centre | RI-JK simd | speedup | was |
+| --- | --- | ---: | ---: | ---: | ---: |
+| HF | def2-svp | 8.84 | 0.74 | 11.95 | 3.87 |
+| HF | def2-svpd | 42.11 | 1.36 | 30.96 | 14.33 |
+| HF | def2-tzvp | 136.48 | 2.52 | 54.16 | 33.00 |
+| HF | def2-tzvpd | 352.46 | 3.84 | **91.79** | 64.61 |
+| B3LYP | def2-svp | 9.17 | 1.25 | 7.34 | 3.33 |
+| B3LYP | def2-svpd | 42.79 | 2.53 | 16.91 | 10.47 |
+| B3LYP | def2-tzvp | 138.15 | 4.01 | 34.45 | 24.06 |
+| B3LYP | def2-tzvpd | 353.66 | 6.64 | **53.26** | 45.04 |
+
+And tagrisso, which is the row that mattered:
+
+| functional | four-centre | RI-JK simd | speedup | was |
+| --- | ---: | ---: | ---: | ---: |
+| HF | 114.50 | 9.95 | **11.51** | 1.23 |
+| B3LYP | 117.10 | 13.01 | **9.00** | 1.22 |
+
+### Two conclusions above are now wrong, and this is how
+
+**The exponent.** The section above records the gradient of the resolution of the
+identity scaling as nao to the 0.98, and calls it linear. It is not:
+
+| | recorded | now |
+| --- | ---: | ---: |
+| HF, four-centre | 4.04 | 4.01 |
+| HF, RI-JK simd | **0.98** | **1.82** |
+| B3LYP, four-centre | 3.97 | 3.97 |
+| B3LYP, RI-JK simd | **1.13** | **1.78** |
+
+The four-center exponents do not move, as they cannot. The other two nearly doubled,
+and the reason is instructive rather than embarrassing: across the four bases of
+caffeine, naux is 1242 and the occupied orbitals are 51 in every one of them, and
+only nao grows. The term which cost the square of each was therefore **a constant
+of about one and a half seconds added to every row**, and a constant added to a
+power law flattens it. Take 1.5 off the recorded series and it reads 0.72, 1.41,
+2.63, 3.96, which is the new series. **A fitted exponent is only the exponent of
+the thing that varies; a large constant in the same column reads as a smaller
+power.**
+
+**The molecule.** The section above concludes that the advantage "does not carry to
+a large molecule with a small one", on the evidence that caffeine's 3.87 became
+tagrisso's 1.23. That conclusion was measuring the same constant, which is not
+constant between molecules: naux and the orbitals both grow with the molecule, so
+the term grew fifty-fold where everything else grew thirteen-fold. With it gone the
+two methods grow at the same rate from caffeine to tagrisso in def2-svp:
+
+| | caffeine | tagrisso | factor |
+| --- | ---: | ---: | ---: |
+| four-centre | 8.84 | 114.50 | 12.95x |
+| RI-JK simd | 0.74 | 9.95 | 13.45x |
+
+Thirteen and thirteen, where it was thirteen and forty-two. The divergence was the
+Gram product and nothing about the method. End to end a single point and its
+gradient on tagrisso is now 6.69 times quicker, where that section recorded 2.16.
+
+**What both mistakes have in common** is that the measurement was sound and the
+attribution was not. Every number in those sections is reproducible and none of
+them has been withdrawn. What was wrong was reading a curve without asking which
+of its terms was moving -- which a profile answers in twenty minutes and four
+tables of timings do not answer at all.
