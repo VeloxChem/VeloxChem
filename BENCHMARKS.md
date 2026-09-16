@@ -8974,7 +8974,23 @@ resolution of the identity was brought in for, which is the whole of why the spe
 is 2.64 and not 6.49. The excitation sections guessed at this and could not measure
 it; here it reads off one profile.
 
-The B vectors are formed **three times** in both of them, 0.74 seconds here. That is
-the driver and the solvers it drives each building their own, which is nothing at
-this size and was 7.8 seconds on tagrisso. It is waste, and it is written here so
-that it is not discovered twice.
+The B vectors were formed **three times** in both of them, 0.74 seconds here. That
+was the driver and the solvers it drives each building their own, which is nothing at
+this size and was 7.8 seconds a time on tagrisso.
+
+**That is fixed.** The forming is now skipped where the vectors are already held, a
+driver hands its own to the solvers it drives, and the drivers which made a solver
+before setting up their integrals now form them first so there is something to hand
+over. Counting the builds rather than reading a profile, because the two-photon
+drivers nest profilers and the second one refuses to start:
+
+| | times the forming was entered | times it built anything |
+| --- | ---: | ---: |
+| quadratic response | 3 | **1** |
+| second harmonic generation | 3 | **1** |
+| two-photon absorption, reduced | 3 | **1** |
+| cubic response | 4 | **1** |
+
+The cubic calculation above went from 10.51 to 9.94 seconds by it, and the forming
+from 0.735 to 0.238. Small here and not small on a molecule where the transformation
+is eight seconds.
