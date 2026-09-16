@@ -8800,3 +8800,52 @@ its linear solves accelerated and its own Fock builds still on the dense path it
 reaches **5.63** on caffeine, against the reduced driver's **10.09** with both. Wiring
 the outer loop is worth nearly a factor of two, and the inner solves alone are worth
 more than half.
+
+## A frequency sweep of a third order property
+
+The reduced two-photon driver is wired, so the whole calculation goes through the
+resolution of the identity and not only the linear solves inside it. Caffeine, five
+frequencies from 0.050 to 0.150 in steps of 0.025, one rank of 14 threads. The gamma
+of every frequency is in the records, in
+`benchmarks/data/redtpa/2026-09-16_m4max_caffeine.json`, and drawn on the second
+page of the table beside it.
+
+| functional | basis | four-centre | RI-JK simd | speedup | gamma at 0.100 | largest relative difference |
+| --- | --- | ---: | ---: | ---: | --- | ---: |
+| HF | def2-svp | 521.42 | 54.72 | 9.53 | 13978.0 + 2441.8i | 8.9e-04 |
+| HF | def2-svpd | 2465.55 | 118.25 | **20.85** | 19061.8 + 7474.3i | 6.5e-04 |
+| B3LYP | def2-svp | 515.02 | 136.57 | 3.77 | 32374.7 + 20396.0i | 5.3e-04 |
+| B3LYP | def2-svpd | 2281.42 | 358.93 | **6.36** | 56171.7 + 26439.5i | 6.4e-04 |
+
+The agreement holds across the whole sweep and not only at the frequency the table
+can carry. **It holds where the real part passes through zero**, which it does
+between 0.125 and 0.150 in three of the four cells: a relative error is at its worst
+where the quantity is smallest, and a disagreement of structure rather than of
+fitting would show there first. It does not.
+
+### The sweep is cheaper than five calculations
+
+Five frequencies cost **3.17** times one, not five, on the four-center side, and 3.35
+on the other. The two scale alike, so the speedup barely moves from the single
+frequency measurement -- 9.53 against 10.09 -- and the run cost two hours where three
+were budgeted. Worth knowing before costing the next sweep: the frequencies of one
+calculation share more than they look like they do.
+
+### The quadrature, measured without subtracting anything
+
+This file has twice recorded a quantity spoiled by subtracting one run from another.
+Here the same question answers itself, because **the four-center columns are nearly
+the same for the two functionals** -- 521 against 515 seconds, and 2466 against 2281
+-- so the whole of the difference in the ratio sits on the other side:
+
+| | Hartree-Fock | B3LYP | B3LYP over Hartree-Fock |
+| --- | ---: | ---: | ---: |
+| RI-JK, def2-svp | 54.72 | 136.57 | **2.50** |
+| RI-JK, def2-svpd | 118.25 | 358.93 | **3.04** |
+
+The two-electron work is identical in the two rows, the exchange being formed whole
+and then scaled. So two and a half to three times is what the exchange-correlation
+quadrature costs across five frequencies of Fock builds, read off two columns of one
+table with nothing inferred. That is the number the two-photon and excitation
+sections could not get, and it took a case where the reference happened to cost the
+same either way.
