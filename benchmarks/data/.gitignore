@@ -1,2 +1,3 @@
-# Rendered from the json beside it by scripts/render.py, so not tracked.
+# Rendered from the json beside it by scripts/render.py, for the scf suite, and by
+# scripts/render_runs.py for the gradient and optimization ones, so not tracked.
 *.pdf

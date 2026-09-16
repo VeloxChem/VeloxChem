@@ -10,6 +10,8 @@ import sys
 from datetime import date
 from pathlib import Path
 
+import os
+
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -23,6 +25,10 @@ BASES = ["def2-svp", "def2-svpd"]
 FUNCTIONALS = ["HF", "B3LYP"]
 METHODS = ["full", "ri_jk_simd"]
 
+# NOTE: what the run actually used, so the table does not have to say
+# "None threads" where the thread count belongs.
+THREADS = int(os.environ.get("OMP_NUM_THREADS", os.cpu_count()))
+
 rows = []
 for functional in FUNCTIONALS:
     for basis in BASES:
@@ -35,7 +41,7 @@ for functional in FUNCTIONALS:
                   f'  E {row["energy"]:.8f}', flush=True)
             out = (Path(__file__).resolve().parent.parent / "data" /
                    "optimization" / f'{date.today():%Y-%m-%d}_m4max_{MOLECULE}.json')
-            write(out, "optimization", provenance("m4max", 1, None), rows)
+            write(out, "optimization", provenance("m4max", 1, THREADS), rows)
 
 print(f'\nwrote {out}', flush=True)
 
