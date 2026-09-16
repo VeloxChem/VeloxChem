@@ -124,6 +124,18 @@ class TpaReducedDriver(TpaDriverBase):
         distributed_density_1 = None
         distributed_density_2 = None
 
+        # NOTE: the factors of the sigma densities, collected beside them and
+        # carried on the driver rather than returned: what this returns is three
+        # densities and the base class unpacks exactly that.
+        #
+        # A sigma density is block diagonal in the orbitals, the occupied block
+        # carrying the occupied orbitals on both sides and the virtual block the
+        # virtual ones, which is the shape the driver takes as four factors.
+        self._ri_jk_factors = None
+
+        if self.rank == mpi_master() and self.ri_jk and self.ri_jk_simd:
+            self._ri_jk_factors = (mo[:, :nocc], [], mo[:, nocc:], [])
+
         for w in wi:
 
             nx = ComplexResponseSolver.get_full_solution_vector(Nx[('x', w)])
@@ -157,6 +169,21 @@ class TpaReducedDriver(TpaDriverBase):
                 D_sig_xy = 6 * (self.commut(ky, Dx) + self.commut(kx, Dy))
                 D_sig_xz = 6 * (self.commut(kx, Dz) + self.commut(kz, Dx))
                 D_sig_yz = 6 * (self.commut(ky, Dz) + self.commut(kz, Dy))
+
+                # NOTE: the factors, taken before the transformation to the
+                # atomic orbitals throws the block structure away. Only the real
+                # part of each sigma density is sent to the Fock build below, so
+                # only the real part of each block is taken and the count of the
+                # factors is the count of the densities.
+                if self._ri_jk_factors is not None:
+                    mo_occ = mo[:, :nocc]
+                    mo_vir = mo[:, nocc:]
+                    for sigma in (D_sig_xx, D_sig_yy, D_sig_zz, D_sig_xy,
+                                  D_sig_xz, D_sig_yz):
+                        self._ri_jk_factors[1].append(
+                            np.matmul(mo_occ, np.real(sigma[:nocc, :nocc]).T))
+                        self._ri_jk_factors[3].append(
+                            np.matmul(mo_vir, np.real(sigma[nocc:, nocc:]).T))
 
                 # density transformation from MO to AO basis
 
