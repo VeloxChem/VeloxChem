@@ -20,9 +20,10 @@ import numpy as np
 import veloxchem as vlx
 from veloxchem.outputstream import OutputStream
 from veloxchem.scfrestdriver import ScfRestrictedDriver
+from veloxchem.scfunrestdriver import ScfUnrestrictedDriver
 from veloxchem.scfgradientdriver import ScfGradientDriver
 
-from scfbench import GEOMETRIES, provenance, write
+from scfbench import GEOMETRIES, geometry, provenance, write
 
 # method -> (ri_jk, ri_jk_simd, ri_mode)
 METHODS = {
@@ -32,15 +33,35 @@ METHODS = {
 
 
 def run(molecule_name, basis_name, aux_name, method, functional,
-        repeats=2, conv_thresh=1.0e-8):
-    """Runs one SCF and times its gradient, and returns the record."""
-    molecule = vlx.Molecule.read_xyz_file(str(GEOMETRIES / f"{molecule_name}.xyz"))
+        repeats=2, conv_thresh=1.0e-8, charge=0, multiplicity=1,
+        max_iter=100):
+    """Runs one SCF and times its gradient, and returns the record.
+
+    :param charge:
+        The charge of the molecule.
+    :param multiplicity:
+        The spin multiplicity. Anything but one is run unrestricted, whose
+        gradient contracts an exchange for each spin where a closed shell
+        contracts one and doubles it.
+    :param max_iter:
+        The iterations the SCF is allowed. A hundred and not the driver's fifty:
+        a radical cation of caffeine takes 45 by the four centre way and 51 by
+        either resolution of the identity, and a gradient of a calculation which
+        did not converge is not a gradient.
+    """
+    molecule = vlx.Molecule.read_xyz_file(str(geometry(molecule_name)))
+    molecule.set_charge(charge)
+    molecule.set_multiplicity(multiplicity)
+
     basis = vlx.MolecularBasis.read(molecule, basis_name.upper(), ostream=None)
 
     ri_jk, simd, ri_mode = METHODS[method]
 
-    driver = ScfRestrictedDriver(ostream=OutputStream(None))
+    scf_class = ScfRestrictedDriver if multiplicity == 1 else ScfUnrestrictedDriver
+
+    driver = scf_class(ostream=OutputStream(None))
     driver.conv_thresh = conv_thresh
+    driver.max_iter = max_iter
     if functional.upper() != "HF":
         driver.xcfun = functional
     if ri_jk:
@@ -53,6 +74,14 @@ def run(molecule_name, basis_name, aux_name, method, functional,
     t0 = time.time()
     results = driver.compute(molecule, basis)
     scf_wall = time.time() - t0
+
+    # NOTE: a run which did not converge leaves no results behind, and the
+    # gradient driver indexes them and raises a KeyError from the middle of
+    # itself. What went wrong is said here instead.
+    if not driver.scf_results:
+        raise SystemExit(
+            f"{molecule_name} {basis_name} {functional} {method}: the SCF did "
+            f"not converge in {max_iter} iterations, so it has no gradient")
 
     grad_driver = ScfGradientDriver(driver)
     grad_driver.ostream = OutputStream(None)
@@ -88,6 +117,9 @@ def run(molecule_name, basis_name, aux_name, method, functional,
         "energy": results["scf_energy"],
         "iterations": driver.num_iter,
         "scf_wall": round(scf_wall, 3),
+        "charge": int(charge),
+        "multiplicity": int(multiplicity),
+        "scf_type": "restricted" if multiplicity == 1 else "unrestricted",
         "grad_wall": round(min(walls), 3),
         "grad_walls": [round(w, 3) for w in walls],
         "grad_max": round(float(np.abs(gradient).max()), 9),
