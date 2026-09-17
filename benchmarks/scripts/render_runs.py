@@ -59,6 +59,11 @@ SPECS = {
          "SCF (s)", "circular strengths (a.u.)", "max rel"],
         [7, 9, 4, 5, 15, 8, 7, 7, 16, 8],
     ),
+    "3pa": (
+        ["functional", "basis", "nao", "naux", "method", "3PA (s)", "speedup",
+         "SCF (s)", "circular strengths (a.u.)", "max rel"],
+        [7, 9, 4, 5, 15, 8, 7, 7, 16, 8],
+    ),
 }
 
 
@@ -92,6 +97,8 @@ def _cost(row, suite):
         return row["tda_wall"]
     if suite in ("redtpa", "tpa"):
         return row["tpa_wall"]
+    if suite == "3pa":
+        return row["rsp_wall"]
     return row["wall"]
 
 
@@ -163,6 +170,24 @@ def cells_of(doc):
                     strengths = r["tpa_strengths_circular"] or []
                     shown = ', '.join(f'{v:.2f}' for v in strengths[:2])
                     out.append(head + [method_name(r), f'{r["tpa_wall"]:.2f}',
+                                       speed, f'{r["scf_wall"]:.2f}', shown,
+                                       agree])
+                elif suite == "3pa":
+                    # NOTE: everything compared is invariant to the phase of an
+                    # excited state vector. The transition moments are not, and
+                    # are recorded rather than compared.
+                    if r["method"] == "full" or ref is None:
+                        agree = "--"
+                    else:
+                        agree = '%.1e' % max(
+                            np.abs((np.array(r[k]) - np.array(ref[k])) /
+                                   np.array(ref[k])).max()
+                            for k in ("strengths_circular", "strengths_linear",
+                                      "oscillator_strengths",
+                                      "photon_energies"))
+                    strengths = r["strengths_circular"] or []
+                    shown = ', '.join(f'{v:.2f}' for v in strengths[:2])
+                    out.append(head + [method_name(r), f'{r["rsp_wall"]:.2f}',
                                        speed, f'{r["scf_wall"]:.2f}', shown,
                                        agree])
                 elif suite == "tda":
