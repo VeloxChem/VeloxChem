@@ -130,7 +130,15 @@ def blocks(doc, functional=None):
                     else "--",
                     f"{row['fock_2e_total']:.2f}",
                     f"{row['fock_xc_total']:.2f}", f"{row['remainder']:.2f}",
-                    f"{row['iterations']}", f"{row['energy']:.8f}",
+                    f"{row['iterations']}",
+                    # NOTE: a run which did not converge has no energy. It is said
+                    # so rather than left blank, because a blank cell reads as a
+                    # value which was not recorded and this one is a result which
+                    # was not reached. The timings of such a row are still a
+                    # comparison, and a sound one where every method ran the same
+                    # number of iterations, which is what the iters column is for.
+                    ("did not converge" if row["energy"] is None
+                     else f"{row['energy']:.8f}"),
                     build_x, whole_x])
 
         yield want, cells
