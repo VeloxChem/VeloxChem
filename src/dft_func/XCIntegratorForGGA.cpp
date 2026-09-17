@@ -120,7 +120,7 @@ integrateVxcFockForGgaClosedShell(const CMolecule&                  molecule,
     // by a cache-sized budget) instead of the shared critical section. Copies
     // are enabled only for small boxes, where the serialized scatter is
     // exposed. Env: VLX_XC_MODE=copy|critical, VLX_XC_COPY_BUDGET_MIB (default
-    // 16), VLX_XC_DEBUG=1.
+    // 0.5 MiB per thread, floor 16 MiB, cap 256 MiB), VLX_XC_DEBUG=1.
 
     const auto matrix_bytes = static_cast<size_t>(naos) * static_cast<size_t>(naos) * sizeof(double);
 
@@ -130,7 +130,10 @@ integrateVxcFockForGgaClosedShell(const CMolecule&                  molecule,
 
     const auto mode = (mode_env != nullptr) ? std::string(mode_env) : std::string();
 
-    auto budget_mib = static_cast<size_t>(16);
+    // 0.5 MiB per thread, clamped to [16, 256] MiB.
+    const auto budget_by_threads = static_cast<size_t>(0.5 * static_cast<double>(nthreads));
+
+    auto budget_mib = std::min(std::max(static_cast<size_t>(16), budget_by_threads), static_cast<size_t>(256));
 
     if (const char* budget_env = std::getenv("VLX_XC_COPY_BUDGET_MIB"))
     {
