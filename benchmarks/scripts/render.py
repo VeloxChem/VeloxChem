@@ -55,6 +55,37 @@ def provenance_line(run):
             f"veloxchem {run['veloxchem']}, {run['date'][:10]}.")
 
 
+def subject(doc):
+    """What was calculated, which the suite and the functional do not say.
+
+    A record can now be open shell, and an open shell row is not comparable with a
+    closed shell one however alike the two read -- an unrestricted iteration builds
+    two Fock matrices where a restricted one builds a single exchange and doubles
+    the Coulomb. A heading which says only the suite and the functional leaves two
+    such files indistinguishable.
+    """
+    rows = [r for r in doc["rows"] if r]
+
+    if not rows:
+        return ""
+
+    first = rows[0]
+    name = first.get("molecule", "")
+
+    charge = first.get("charge", 0) or 0
+    multiplicity = first.get("multiplicity", 1) or 1
+
+    if charge > 0:
+        name += " cation" if charge == 1 else f" {charge}+"
+    elif charge < 0:
+        name += " anion" if charge == -1 else f" {-charge}-"
+
+    if multiplicity != 1:
+        name += f", multiplicity {multiplicity}"
+
+    return name
+
+
 HEADER = ["basis", "nao", "fitting set", "naux", "method", "wall", "B vectors",
           "2e build", "XC", "rest", "iters", "energy", "build x", "whole x"]
 
@@ -108,7 +139,10 @@ def blocks(doc, functional=None):
 def render(path, functional=None):
     doc = json.loads(Path(path).read_text())
 
-    out = [provenance_line(doc["run"]), ""]
+    subject_line = subject(doc)
+
+    out = [f"## {doc['suite'].upper()}: {subject_line}", "",
+           provenance_line(doc["run"]), ""]
 
     for want, cells in blocks(doc, functional):
         out += [f"#### {want}", "",
@@ -136,7 +170,12 @@ def render_pdf(path, out):
             fig, ax = plt.subplots(figsize=(13.5, height))
             ax.axis("off")
 
-            ax.text(0.0, 1.0, f"{doc['suite'].upper()}: {want}",
+            heading = f"{doc['suite'].upper()}: {want}"
+
+            if subject(doc):
+                heading += f" -- {subject(doc)}"
+
+            ax.text(0.0, 1.0, heading,
                     transform=ax.transAxes, fontsize=13, fontweight="bold")
             ax.text(0.0, 1.0 - 0.9 / height, line, transform=ax.transAxes,
                     fontsize=7.5, color="#475569")

@@ -1,3 +1,5 @@
+## SCF: caffeine cation, multiplicity 2
+
 Measured at `3a2e0920c`, working tree dirty on m4max (Apple M4 Max, 14 cores), 1 rank of 14 threads, veloxchem 1.0rc4, 2026-09-17.
 
 #### HF
