@@ -80,6 +80,10 @@ something else:
 OpenBLAS in the process reads it, the driver's included, and setting it above a
 library's compiled ceiling is what causes the crash above.
 
+`scripts/test_node.py` covers that branch with a stub, because the machine the code
+is written on has no threadpoolctl and the machine it matters on does. Run it
+directly or under pytest; the repository's own pytest run does not collect it.
+
 Then render it, which writes the markdown and the pdf beside the data:
 
 ```sh
