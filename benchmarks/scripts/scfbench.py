@@ -20,6 +20,7 @@ import veloxchem as vlx
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.outputstream import OutputStream
 from veloxchem.scfrestdriver import ScfRestrictedDriver
+from veloxchem.scfunrestdriver import ScfUnrestrictedDriver
 
 GEOMETRIES = Path(__file__).resolve().parent.parent / "geometries"
 
@@ -145,8 +146,16 @@ def _fock_timings(driver):
 
 
 def run(molecule_name, basis_name, aux_name, method, functional,
-        conv_thresh=1.0e-8, max_iter=50, ostream_path=None, comm=None):
+        conv_thresh=1.0e-8, max_iter=50, ostream_path=None, comm=None,
+        charge=0, multiplicity=1):
     """Runs one calculation and returns its record.
+
+    :param charge:
+        The charge of the molecule.
+    :param multiplicity:
+        The spin multiplicity. Anything but one is run unrestricted, which is two
+        Fock matrices an iteration and not one, so a row of an open shell run is
+        not comparable with a row of a closed shell one however alike they read.
 
     :param ostream_path:
         Where to keep VeloxChem's own output. The iteration table and the timing
@@ -156,9 +165,14 @@ def run(molecule_name, basis_name, aux_name, method, functional,
         The communicator, needed to open an output which only master writes.
     """
     molecule = vlx.Molecule.read_xyz_file(str(geometry(molecule_name)))
+    molecule.set_charge(charge)
+    molecule.set_multiplicity(multiplicity)
+
     basis = vlx.MolecularBasis.read(molecule, basis_name.upper(), ostream=None)
 
     ri_jk, simd, ri_mode = METHODS[method]
+
+    scf_class = ScfRestrictedDriver if multiplicity == 1 else ScfUnrestrictedDriver
 
     if ostream_path is None:
         ostream = OutputStream(None)
@@ -169,7 +183,7 @@ def run(molecule_name, basis_name, aux_name, method, functional,
         # race each other writing one file.
         ostream = OutputStream.create_mpi_ostream(comm, str(ostream_path))
 
-    driver = ScfRestrictedDriver(comm=comm, ostream=ostream)
+    driver = scf_class(comm=comm, ostream=ostream)
     driver.timing = True
     driver.conv_thresh = conv_thresh
     driver.max_iter = max_iter
@@ -213,6 +227,10 @@ def run(molecule_name, basis_name, aux_name, method, functional,
         "aux_basis": aux_name if ri_jk else None,
         "naux": aux.get_dimensions_of_basis() if aux is not None else None,
         "occupied": molecule.number_of_alpha_electrons(),
+        "beta_occupied": molecule.number_of_beta_electrons(),
+        "charge": int(charge),
+        "multiplicity": int(multiplicity),
+        "scf_type": "restricted" if multiplicity == 1 else "unrestricted",
         "method": method,
         "ri_mode": mode,
         "functional": functional,
