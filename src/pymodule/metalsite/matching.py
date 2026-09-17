@@ -71,33 +71,6 @@ from . import util
 from .util import Shell, on_master, param, print_section, ic_cell
 import math
 
-# The defaults of the manager's matching settings, which reads them from
-# here; the methods of this module take every setting they read as an
-# argument and carry no default of their own.
-DEFAULT_MAX_MAPPINGS = 10000
-DEFAULT_METAL_SHELL_BONDS = 2
-DEFAULT_RMSD_HEAVY_ATOMS_ONLY = True
-DEFAULT_IC_TYPES = {
-    'bonds': 'A',
-    'angles': 'deg',
-    'dihedrals': 'deg',
-}
-
-
-# ----------------------------------------------------------------------
-# describing a site
-# ----------------------------------------------------------------------
-
-
-# ----------------------------------------------------------------------
-# matching two sites
-# ----------------------------------------------------------------------
-
-
-# ----------------------------------------------------------------------
-# measuring one against the other
-# ----------------------------------------------------------------------
-
 
 class SiteMatcher(Shell):
     """
@@ -106,9 +79,9 @@ class SiteMatcher(Shell):
     maps the one onto the other atom by atom, reads the geometric
     agreement off the mapping (compare), holds every template to a set of
     criteria and ranks the passing ones (select_template), and prints the
-    comparison and the decision. The criteria, the regions and what the
-    ranking reads are the caller's: MetalForceFieldManager holds them as
-    settings and class constants.
+    comparison and the decision. The criteria are the caller's:
+    MetalForceFieldManager holds them as a setting. What is measured, and
+    what the ranking reads, are the class constants here.
 
     Every method runs on the master rank and its result is broadcast. A
     node_match closure handed to networkx's GraphMatcher must not capture
@@ -121,6 +94,36 @@ class SiteMatcher(Shell):
     :param ostream:
         The output stream.
     """
+
+    # The limit on how many atom mappings are built per template. The
+    # symmetry that survives the coarse level is a sidechain's, so the count
+    # is small; the limit is there for a site that defeats that.
+    MAX_MAPPINGS = 10000
+
+    # How many bonds out from a metal the metal_shell region reaches.
+    METAL_SHELL_BONDS = 2
+
+    # Which atoms an RMSD is measured over. The whole active site answers
+    # whether two sites are the same site; the metals with everything within
+    # METAL_SHELL_BONDS bonds of them answers whether the coordination sphere
+    # is the same, which is what the transferred parameters describe and all
+    # they describe; the metals with the beta carbons answers whether the
+    # residues are anchored in the same places, which is the frame of the site
+    # with every sidechain conformation left out of it.
+    RMSD_REGIONS = ('active_site', 'metal_shell', 'metal_beta_carbons')
+
+    # The internal coordinate types get_ic_rmsd reports, with their units.
+    IC_TYPES = {
+        'bonds': 'A',
+        'angles': 'deg',
+        'dihedrals': 'deg',
+    }
+
+    # Which region decides between several templates that all pass. The
+    # cartesian RMSD is not what is ranked on: the whole site is what a
+    # transferred force field describes, and its bonds are what it is written
+    # in, so the site that is built the most like the template wins.
+    SELECTION_RANKED_ON = ('active_site', 'bonds', 'rms')
 
     @on_master
     def describe(self, active_site, edges):
@@ -463,7 +466,7 @@ class SiteMatcher(Shell):
         return list(matcher.isomorphisms_iter())
 
     @on_master
-    def heavy_atom_maps(self, template, query, coarse_mapping, max_mappings,
+    def heavy_atom_maps(self, template, query, coarse_mapping,
                         match_h_count=True):
         """
         Builds the heavy atom mappings that one coarse mapping allows.
@@ -526,9 +529,9 @@ class SiteMatcher(Shell):
                 atom_map.update(residue_map)
             maps.append(atom_map)
 
-            if len(maps) >= max_mappings:
+            if len(maps) >= self.MAX_MAPPINGS:
                 self.ostream.print_warning(
-                    f'Reached the limit of {max_mappings} atom mappings; '
+                    f'Reached the limit of {self.MAX_MAPPINGS} atom mappings; '
                     'the best of the ones built is used, which need not be '
                     'the best there is')
                 self.ostream.flush()
@@ -652,7 +655,7 @@ class SiteMatcher(Shell):
         return atom_map
 
     @on_master
-    def rmsd_indices(self, template, region, heavy_only, metal_shell_bonds):
+    def rmsd_indices(self, template, region, heavy_only):
         """
         Returns the template indices every RMSD is measured over, which is the
         region less the hydrogens when they are being left out.
@@ -663,14 +666,12 @@ class SiteMatcher(Shell):
             The region to take.
         :param heavy_only:
             Whether to leave the hydrogens out.
-        :param metal_shell_bonds:
-            How many bonds out from a metal the metal_shell region reaches.
 
         :return:
             The indices, in order.
         """
 
-        indices = self.region_indices(template, region, metal_shell_bonds)
+        indices = self.region_indices(template, region)
 
         if not heavy_only:
             return indices
@@ -680,7 +681,7 @@ class SiteMatcher(Shell):
         return [index for index in indices if labels[index] != 'H']
 
     @on_master
-    def region_indices(self, template, region, metal_shell_bonds):
+    def region_indices(self, template, region):
         """
         Returns the template indices of the region an RMSD is measured over.
 
@@ -688,8 +689,6 @@ class SiteMatcher(Shell):
             The template.
         :param region:
             The region to take.
-        :param metal_shell_bonds:
-            How many bonds out from a metal the metal_shell region reaches.
 
         :return:
             The indices, in order.
@@ -717,19 +716,19 @@ class SiteMatcher(Shell):
         for metal in template['metal_indices']:
             shell.update(
                 nx.single_source_shortest_path_length(
-                    graph, metal, cutoff=metal_shell_bonds))
+                    graph, metal, cutoff=self.METAL_SHELL_BONDS))
 
         assert_msg_critical(
             len(shell) > len(template['metal_indices']),
             'MetalForceFieldManager: the metal centers of template '
             f'{template["name"]} have nothing bonded to them within '
-            f'{metal_shell_bonds} bond(s)')
+            f'{self.METAL_SHELL_BONDS} bond(s)')
 
         return sorted(shell)
 
     @on_master
     def measure_region(self, template, mapping, coordinates, region,
-                       heavy_only, metal_shell_bonds):
+                       heavy_only):
         """
         Measures one region of an active site against a template.
 
@@ -743,8 +742,6 @@ class SiteMatcher(Shell):
             The region to measure over.
         :param heavy_only:
             Whether to leave the hydrogens out.
-        :param metal_shell_bonds:
-            How many bonds out from a metal the metal_shell region reaches.
 
         :return:
             The atom count, the cartesian RMSDs over the whole region and
@@ -752,7 +749,7 @@ class SiteMatcher(Shell):
         """
 
         reference = template['molecule'].get_coordinates_in_angstrom()
-        indices = self.region_indices(template, region, metal_shell_bonds)
+        indices = self.region_indices(template, region)
         labels = template['molecule'].get_labels()
         heavy = [index for index in indices if labels[index] != 'H']
 
@@ -763,7 +760,7 @@ class SiteMatcher(Shell):
         heavy_rmsd, _, _ = svd_superimpose(moved[heavy], reference[heavy])
 
         ic_rmsd = self.measure_ic_rmsd(template, mapping, coordinates, region,
-                                       heavy_only, metal_shell_bonds)
+                                       heavy_only)
 
         return {
             # _rmsd_indices is the region less the hydrogens when they are
@@ -776,7 +773,7 @@ class SiteMatcher(Shell):
 
     @on_master
     def measure_ic_rmsd(self, template, mapping, coordinates, region,
-                        heavy_only, metal_shell_bonds):
+                        heavy_only):
         """
         Measures the internal coordinate deviations from a template.
 
@@ -797,16 +794,13 @@ class SiteMatcher(Shell):
             The region to measure over.
         :param heavy_only:
             Whether to leave the hydrogens out.
-        :param metal_shell_bonds:
-            How many bonds out from a metal the metal_shell region reaches.
 
         :return:
             The deviations, as get_ic_rmsd reports them, or None when they
             could not be measured.
         """
 
-        indices = self.rmsd_indices(template, region, heavy_only,
-                                    metal_shell_bonds)
+        indices = self.rmsd_indices(template, region, heavy_only)
         elements = template['molecule'].get_labels()
         labels = [elements[index] for index in indices]
 
@@ -829,7 +823,7 @@ class SiteMatcher(Shell):
         return ic_rmsd
 
     @on_master
-    def ic_violation(self, ic_rmsd, thresholds, ic_types):
+    def ic_violation(self, ic_rmsd, thresholds):
         """
         Checks internal coordinate deviations against a set of thresholds.
 
@@ -842,8 +836,6 @@ class SiteMatcher(Shell):
             The deviations, as get_ic_rmsd reports them.
         :param thresholds:
             The thresholds to check against, as {type: {'rms': , 'max': }}.
-        :param ic_types:
-            The internal coordinate types to check, with their units.
 
         :return:
             A description of the first threshold that was exceeded, or None
@@ -853,7 +845,7 @@ class SiteMatcher(Shell):
         if ic_rmsd is None:
             return 'no internal coords'
 
-        for name, unit in ic_types.items():
+        for name, unit in self.IC_TYPES.items():
             limits = thresholds.get(name)
             if not limits:
                 continue
@@ -1051,19 +1043,18 @@ class SiteMatcher(Shell):
         self.ostream.flush()
 
     @on_master
-    def print_comparison_summary(self, results, ranked_on, scores):
+    def print_comparison_summary(self, results, scores):
         """
         Ranks the templates on what a selection is decided by.
 
         :param results:
             The last comparison, from compare_active_site.
-        :param ranked_on:
-            The (region, ic type, measure) a selection is ranked on.
         :param scores:
-            That measure per template, computed by the caller.
+            The SELECTION_RANKED_ON measure per template, from
+            selection_score.
         """
 
-        region, ic_type, measure = ranked_on
+        region, ic_type, measure = self.SELECTION_RANKED_ON
         heavy = not results['include_hydrogens']
 
         def rmsd(entry):
@@ -1099,7 +1090,7 @@ class SiteMatcher(Shell):
         self.ostream.flush()
 
     @on_master
-    def print_comparison(self, results, specs, ranked_on, scores):
+    def print_comparison(self, results, specs, scores):
         """
         Prints everything compare_active_site measured.
 
@@ -1112,10 +1103,9 @@ class SiteMatcher(Shell):
         :param specs:
             The (described, residue nodes) pair per site whose spec is printed:
             the structure under the key None, and a template under its name.
-        :param ranked_on:
-            The (region, ic type, measure) a selection is ranked on.
         :param scores:
-            That measure per template, computed by the caller.
+            The SELECTION_RANKED_ON measure per template, from
+            selection_score.
         """
 
         active_site = results['active_site']
@@ -1143,21 +1133,21 @@ class SiteMatcher(Shell):
                                            entry,
                                            spec=specs.get(name))
 
-        self.print_comparison_summary(results, ranked_on, scores)
+        self.print_comparison_summary(results, scores)
 
     # ------------------------------------------------------------------
     # the comparison and the decision
     # ------------------------------------------------------------------
 
     @on_master
-    def compare(self, templates, described, molecule, regions,
-                include_hydrogens, max_mappings, metal_shell_bonds):
+    def compare(self, templates, described, molecule, include_hydrogens):
         """
         Measures a described site against every template, without an opinion.
 
         Per template: the same atoms or not ('composition'), the same coarse
         coordination or not ('spec'), and when both hold the best atom mapping
-        and the geometric agreement of every region under it.
+        and the geometric agreement of every region of RMSD_REGIONS under
+        it.
 
         :param templates:
             The templates, by name.
@@ -1165,14 +1155,8 @@ class SiteMatcher(Shell):
             The site, as describe returns it.
         :param molecule:
             The geometry every number is measured on.
-        :param regions:
-            The regions to measure.
         :param include_hydrogens:
             Whether the hydrogens take part in the measurements.
-        :param max_mappings:
-            The limit on how many atom mappings are built per template.
-        :param metal_shell_bonds:
-            How many bonds out from a metal the metal_shell region reaches.
 
         :return:
             One entry per template: 'status', 'mapping', 'n_coarse_mappings',
@@ -1211,8 +1195,7 @@ class SiteMatcher(Shell):
             maps = []
             for coarse_mapping in coarse:
                 maps.extend(
-                    self.heavy_atom_maps(template, described, coarse_mapping,
-                                         max_mappings))
+                    self.heavy_atom_maps(template, described, coarse_mapping))
             if not maps:
                 entry['status'] = 'spec'
                 findings[name] = entry
@@ -1229,23 +1212,16 @@ class SiteMatcher(Shell):
             entry['metal_bonds'] = self.metal_bond_summary(
                 template, described, mapping, coordinates)
 
-            for region in regions:
+            for region in self.RMSD_REGIONS:
                 entry['regions'][region] = self.measure_region(
-                    template, mapping, coordinates, region, heavy_only,
-                    metal_shell_bonds)
+                    template, mapping, coordinates, region, heavy_only)
 
             findings[name] = entry
 
         return findings
 
     @on_master
-    def select_template(self, comparison,
-                        criteria,
-                        criteria_name,
-                        regions,
-                        ic_types,
-                        ranked_on,
-                        template):
+    def select_template(self, comparison, criteria, criteria_name, template):
         """
         Picks the template a force field should be built from, and says why.
 
@@ -1280,10 +1256,9 @@ class SiteMatcher(Shell):
         }
 
         for name, entry in comparison['templates'].items():
-            verdict = self.selection_verdict(comparison, entry, criteria,
-                                             regions, ic_types)
+            verdict = self.selection_verdict(comparison, entry, criteria)
             decision['verdicts'][name] = verdict
-            decision['scores'][name] = self.selection_score(entry, ranked_on)
+            decision['scores'][name] = self.selection_score(entry)
 
         if template is not None:
             assert_msg_critical(
@@ -1444,8 +1419,7 @@ class SiteMatcher(Shell):
                 and sorted(mapping.values()) == list(range(atoms)))
 
     @on_master
-    def selection_verdict(self, comparison, entry, criteria, regions,
-                          ic_types):
+    def selection_verdict(self, comparison, entry, criteria):
         """
         Holds one template to the criteria, region by region.
 
@@ -1470,7 +1444,7 @@ class SiteMatcher(Shell):
         if not self.maps_every_atom(comparison, entry):
             return 'incomplete mapping'
 
-        for region in regions:
+        for region in self.RMSD_REGIONS:
             thresholds = criteria.get(region)
             if not thresholds:
                 continue
@@ -1481,15 +1455,14 @@ class SiteMatcher(Shell):
 
             # a criterion that could not be evaluated is not one that was
             # passed, so the region is held to strictly here
-            violation = self.ic_violation(found['ic_rmsd'], thresholds,
-                                          ic_types)
+            violation = self.ic_violation(found['ic_rmsd'], thresholds)
             if violation is not None:
                 return f'{region} {violation}'
 
         return None
 
     @on_master
-    def selection_score(self, entry, ranked_on):
+    def selection_score(self, entry):
         """
         Returns what several templates that all pass are ranked on.
 
@@ -1501,7 +1474,7 @@ class SiteMatcher(Shell):
             not measured.
         """
 
-        region, ic_type, measure = ranked_on
+        region, ic_type, measure = self.SELECTION_RANKED_ON
 
         found = entry['regions'].get(region)
         if found is None or found['ic_rmsd'] is None:
@@ -1518,8 +1491,7 @@ class SiteMatcher(Shell):
     # ------------------------------------------------------------------
 
     @on_master
-    def print_selection(self, comparison, decision, regions, ic_types,
-                        ranked_on):
+    def print_selection(self, comparison, decision):
         """
         Prints how every template stands against the criteria, and which one was
         taken.
@@ -1533,7 +1505,7 @@ class SiteMatcher(Shell):
         """
 
         regions = [
-            region for region in regions
+            region for region in self.RMSD_REGIONS
             if decision['criteria'].get(region)
         ]
 
@@ -1553,7 +1525,7 @@ class SiteMatcher(Shell):
                            for measure, limit in given.items() if limit is not None)
                 for name, given in thresholds.items() if given
             }
-            limits = '; '.join(f'{name} {shown} {ic_types[name]}'
+            limits = '; '.join(f'{name} {shown} {self.IC_TYPES[name]}'
                                for name, shown in measures.items())
             self.ostream.print_header(param(region, limits, value_width=44))
 
@@ -1594,7 +1566,7 @@ class SiteMatcher(Shell):
                 f'{decision["name"]} was named rather than chosen, so the '
                 'criteria were measured but did not decide.')
         else:
-            ranked = ' '.join(ranked_on)
+            ranked = ' '.join(self.SELECTION_RANKED_ON)
             self.ostream.print_info(
                 f'{len(decision["candidates"])} of '
                 f'{len(comparison["templates"])} template(s) are within the '

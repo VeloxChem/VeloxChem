@@ -52,7 +52,6 @@ from ..errorhandler import assert_msg_critical
 from . import util
 from .util import Shell, on_master, param, print_section
 from .matching import SiteMatcher
-from .builder import ActiveSiteBuilder
 
 # The geometry a run leaves behind, in the order it is looked for. Which of
 # them a template is allowed to be built from is what the fallback argument
@@ -89,16 +88,6 @@ class TemplateLoader(Shell):
         """
 
         return SiteMatcher(self.comm, self.ostream)
-
-    def _sites(self):
-        """
-        The ActiveSiteBuilder a transferred force field is built with.
-
-        :return:
-            An ActiveSiteBuilder on this loader's communicator and stream.
-        """
-
-        return ActiveSiteBuilder(self.comm, self.ostream)
 
     @on_master
     def load_geometry(self, folder, fallback):
@@ -164,7 +153,7 @@ class TemplateLoader(Shell):
         return Molecule.read_xyz_file(str(mm_path)), 'mm_opt'
 
     @on_master
-    def build(self, name, forcefield, molecule, kind, folder, metal_elements):
+    def build(self, name, forcefield, molecule, kind, folder):
         """
         Assembles a template from a loaded force field and geometry.
 
@@ -189,8 +178,6 @@ class TemplateLoader(Shell):
             The geometry kind.
         :param folder:
             The folder the template came from.
-        :param metal_elements:
-            The elements treated as metal centers.
 
         :return:
             The template dictionary.
@@ -206,13 +193,13 @@ class TemplateLoader(Shell):
 
         metal_indices = [
             index for index, label in enumerate(labels)
-            if label in metal_elements
+            if label in util.METAL_ELEMENTS
         ]
 
         assert_msg_critical(
             len(metal_indices) > 0,
             f'MetalForceFieldManager: the template of {folder} holds no metal '
-            f'center. Recognized elements: {metal_elements}')
+            f'center. Recognized elements: {util.METAL_ELEMENTS}')
 
         charges = np.array(
             [atom['charge'] for atom in forcefield.atoms.values()])
@@ -630,6 +617,8 @@ class TemplateLoader(Shell):
             The active site the distances are read off.
         :param changes:
             What _template_connectivity added and removed.
+        :param metal_bond_cutoff:
+            The bonding cutoff in Angstrom a forced bond is warned against.
         """
 
         if not changes['added'] and not changes['removed']:
@@ -665,7 +654,7 @@ class TemplateLoader(Shell):
 
     @on_master
     def build_forcefield_from_template(self, template, mapping, active_site,
-                                       metal_bond_cutoff, **seed_settings):
+                                       sites):
         """
         Builds a force field for an active site out of a template.
 
@@ -689,6 +678,10 @@ class TemplateLoader(Shell):
         :param active_site:
             The active site of the query, whose connectivity the force field
             is built on once the template has decided the metal bonds.
+        :param sites:
+            The ActiveSiteBuilder the seeded force field is built with --
+            the one the run would use, so that a transferred force field and
+            a fitted one are made the same way.
 
         :return:
             The force field generator, and the active site it was built on.
@@ -697,7 +690,7 @@ class TemplateLoader(Shell):
         active_site, changes = self.template_connectivity(
             template, mapping, active_site)
         self.print_forced_bonds(template, active_site, changes,
-                                metal_bond_cutoff)
+                                sites.metal_bond_cutoff)
 
         template_ff = template['forcefield']
         charges = np.zeros(active_site['molecule'].number_of_atoms())
@@ -714,8 +707,7 @@ class TemplateLoader(Shell):
 
         # build_forcefield writes the charges onto the atoms and redistributes
         # the caps; the metal terms it seeds here are overwritten below
-        forcefield = self._sites().build_forcefield(
-            active_site, charges, **seed_settings)
+        forcefield = sites.build_forcefield(active_site, charges)
 
         bonds, angles = self._matcher().metal_keys(template)
 

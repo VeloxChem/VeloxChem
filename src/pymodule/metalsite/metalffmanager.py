@@ -38,11 +38,7 @@ from ..veloxchemlib import mpi_master
 from ..molecule import Molecule
 from ..outputstream import OutputStream
 from .metalsiteffbuilder import MetalSiteForceFieldBuilder
-from .builder import ActiveSiteBuilder
-from .qm import QmParameterizer
-from .matching import (SiteMatcher, DEFAULT_MAX_MAPPINGS,
-                       DEFAULT_METAL_SHELL_BONDS,
-                       DEFAULT_RMSD_HEAVY_ATOMS_ONLY, DEFAULT_IC_TYPES)
+from .matching import SiteMatcher
 from .templates import TemplateLoader, GEOMETRY_KINDS
 from .shoehorn import Shoehorner
 from . import util
@@ -100,12 +96,10 @@ class MetalForceFieldManager:
     Instance variables
         - templates: The loaded templates, keyed by name.
         - builder: A MetalSiteForceFieldBuilder held for its settings alone --
-          never given an active site of its own. The steps themselves are
-          methods of the phase classes, which are called with the settings
-          this carries, so set them on it. Distinct from active_site, which
-          is the builder that holds the real, loaded site.
-        - metal_shell_bonds: How many bonds out from a metal the metal_shell
-          region reaches.
+          never given an active site of its own. The structural steps the
+          manager runs itself are made on the phase classes it builds from
+          those settings, so set them on it. Distinct from active_site,
+          which is the builder that holds the real, loaded site.
         - selection_criteria: What a template has to be within before
           build_ff_from_template puts its parameters on a site: 'tight',
           'loose', or a set of thresholds of the same shape as those in
@@ -116,8 +110,6 @@ class MetalForceFieldManager:
           do it reproducibly, so two runs over one structure differ by around
           0.3 A over all atoms and by nothing at all over the heavy ones. Both
           cartesian numbers are printed either way.
-        - max_mappings: The limit on the number of isomorphisms evaluated for
-          one template.
         - mm_fallback_literature_bonds: The flag for pulling the metal bonds
           of the crude relaxation toward LITERATURE_METAL_BONDS, which
           normalizes the query toward the geometry a template was optimized
@@ -138,18 +130,6 @@ class MetalForceFieldManager:
     # argument of load_template_from_folder decides. Defined in templates.py,
     # beside the loading that reads it.
     GEOMETRY_KINDS = GEOMETRY_KINDS
-
-    # Which atoms an RMSD is measured over. The whole active site answers
-    # whether two sites are the same site; the metals with everything within
-    # metal_shell_bonds bonds of them answers whether the coordination sphere
-    # is the same, which is what the transferred parameters describe and all
-    # they describe; the metals with the beta carbons answers whether the
-    # residues are anchored in the same places, which is the frame of the site
-    # with every sidechain conformation left out of it.
-    RMSD_REGIONS = ('active_site', 'metal_shell', 'metal_beta_carbons')
-
-    # The internal coordinate types get_ic_rmsd reports, with their units.
-    IC_TYPES = DEFAULT_IC_TYPES
 
     # What a template has to be within, region by region, before its
     # parameters are put on a new site. The bonds are what is checked: they
@@ -202,12 +182,6 @@ class MetalForceFieldManager:
         },
     }
 
-    # Which region decides between several templates that all pass. The
-    # cartesian RMSD is not what is ranked on: the whole site is what a
-    # transferred force field describes, and its bonds are what it is written
-    # in, so the site that is built the most like the template wins.
-    SELECTION_RANKED_ON = ('active_site', 'bonds', 'rms')
-
     def __init__(self, comm=None, ostream=None):
         """
         Initializes the metal force field manager.
@@ -234,10 +208,11 @@ class MetalForceFieldManager:
         # own -- that is _active_site_builder, below.
         self.builder = MetalSiteForceFieldBuilder(comm, ostream)
 
-        # the phase classes the manager calls itself; they print through
-        # the manager's stream, which the ostream property keeps them on
-        self._sites = ActiveSiteBuilder(comm, ostream)
-        self._qm = QmParameterizer(comm, ostream)
+        # the phase classes the manager calls itself. They carry no setting,
+        # so they are built once; they print through the manager's stream,
+        # which the ostream property keeps them on. The structural steps --
+        # seeding and relaxing a query, the transfer -- run on the builder's
+        # ActiveSiteBuilder, so a comparison and a run are made the same way.
         self._matcher = SiteMatcher(comm, ostream)
         self._loader = TemplateLoader(comm, ostream)
         self._shoehorner = Shoehorner(comm, ostream)
@@ -260,9 +235,6 @@ class MetalForceFieldManager:
         # always the one the criteria rank first -- see built_from
         self._built_from = None
 
-        # matching
-        self.metal_shell_bonds = DEFAULT_METAL_SHELL_BONDS
-
         # What a template has to be within before its parameters are put on a
         # site. A name in SELECTION_CRITERIA or a set of thresholds of the
         # same shape; the dictionary is handed out rather than the name so
@@ -270,8 +242,7 @@ class MetalForceFieldManager:
         self.selection_criteria = self.SELECTION_CRITERIA['tight']
         # the hydrogens carry the noise of Modeller.addHydrogens rather than
         # anything about the site; see the class docstring
-        self.rmsd_heavy_atoms_only = DEFAULT_RMSD_HEAVY_ATOMS_ONLY
-        self.max_mappings = DEFAULT_MAX_MAPPINGS
+        self.rmsd_heavy_atoms_only = True
 
         # what to run on the query structure
         self.mm_fallback_literature_bonds = True
@@ -291,8 +262,7 @@ class MetalForceFieldManager:
     def ostream(self, ostream):
 
         self._ostream = ostream
-        for shell in (self._sites, self._qm, self._matcher, self._loader,
-                      self._shoehorner):
+        for shell in (self._matcher, self._loader, self._shoehorner):
             shell.ostream = ostream
 
     @property
@@ -383,8 +353,7 @@ class MetalForceFieldManager:
         geometry, kind = self._loader.load_geometry(folder, fallback)
         forcefield.molecule = geometry
 
-        template = self._loader.build(name, forcefield, geometry, kind, folder,
-                                      self.builder.metal_elements)
+        template = self._loader.build(name, forcefield, geometry, kind, folder)
 
         if name in self.templates:
             self.ostream.print_warning(
@@ -556,9 +525,7 @@ class MetalForceFieldManager:
             geometry = 'input'
 
         findings = self._matcher.compare(self.templates, described, molecule,
-                                         self.RMSD_REGIONS, include_hydrogens,
-                                         self.max_mappings,
-                                         self.metal_shell_bonds)
+                                         include_hydrogens)
 
         results = {
             'source': str(builder.folder),
@@ -586,11 +553,10 @@ class MetalForceFieldManager:
             if entry['status'] == 'spec':
                 specs[name] = spec_of(self.templates[name])
         scores = {
-            name: self._matcher.selection_score(entry, self.SELECTION_RANKED_ON)
+            name: self._matcher.selection_score(entry)
             for name, entry in findings.items()
         }
-        self._matcher.print_comparison(results, specs,
-                                       self.SELECTION_RANKED_ON, scores)
+        self._matcher.print_comparison(results, specs, scores)
 
         # the table this decision would print is printed by the one caller
         # that acts on it, build_ff_from_template
@@ -655,9 +621,7 @@ class MetalForceFieldManager:
                                                      decision,
                                                      self._shoehorned)
 
-        self._matcher.print_selection(self._comparison, decision,
-                                      self.RMSD_REGIONS, self.IC_TYPES,
-                                      self.SELECTION_RANKED_ON)
+        self._matcher.print_selection(self._comparison, decision)
 
         if decision['name'] is None:
             self._matcher.print_no_selection(decision)
@@ -694,8 +658,7 @@ class MetalForceFieldManager:
                 template_obj,
                 entry['mapping'],
                 active_site,
-                self.builder.metal_bond_cutoff,
-                **self.builder.seed_settings()))
+                self.builder._sites()))
 
         # strip the manager-only description keys before handing the site
         # back to the builder, which never produces them
@@ -708,7 +671,7 @@ class MetalForceFieldManager:
         forcefield = self._active_site_builder.adopt_forcefield(
             forcefield, active_site=builder_active_site)
 
-        self._qm.print_metal_parameters(
+        self.builder._qm().print_metal_parameters(
             active_site, forcefield, util.get_metal_keys(forcefield,
                                                          active_site))
 
@@ -794,7 +757,7 @@ class MetalForceFieldManager:
 
         walked = self._shoehorner.run(self._active_site_builder,
                                       self.templates[template],
-                                      max_include_radius, self.max_mappings)
+                                      max_include_radius)
 
         if not walked:
             return False
@@ -846,15 +809,16 @@ class MetalForceFieldManager:
 
         for region, thresholds in criteria.items():
             assert_msg_critical(
-                region in self.RMSD_REGIONS,
+                region in SiteMatcher.RMSD_REGIONS,
                 f'MetalForceFieldManager: {region} is not a region the '
-                f'criteria can name; expected one of {list(self.RMSD_REGIONS)}')
+                'criteria can name; expected one of '
+                f'{list(SiteMatcher.RMSD_REGIONS)}')
             for name, limits in (thresholds or {}).items():
                 assert_msg_critical(
-                    name in self.IC_TYPES,
+                    name in SiteMatcher.IC_TYPES,
                     f'MetalForceFieldManager: {name} is not an internal '
                     'coordinate type the criteria can name; expected one of '
-                    f'{list(self.IC_TYPES)}')
+                    f'{list(SiteMatcher.IC_TYPES)}')
                 for measure in (limits or {}):
                     assert_msg_critical(
                         measure in ('rms', 'max'),
@@ -884,22 +848,22 @@ class MetalForceFieldManager:
             The relaxed molecule.
         """
 
-        builder = self.builder
+        sites = self.builder._sites()
         active_site = query['active_site']
 
-        seed_kwargs = builder.seed_settings()
-        if self.mm_fallback_literature_bonds and (
-                seed_kwargs['metal_bond_equilibria'] is None):
-            seed_kwargs['metal_bond_equilibria'] = util.LITERATURE_METAL_BONDS
+        metal_bond_equilibria = None
+        if (self.mm_fallback_literature_bonds
+                and sites.default_metal_bond_equilibria is None):
+            metal_bond_equilibria = util.LITERATURE_METAL_BONDS
 
-        forcefield = self._sites.build_forcefield(active_site,
-                                                  util.d4_charges(active_site),
-                                                  **seed_kwargs)
+        forcefield = sites.build_forcefield(
+            active_site,
+            util.d4_charges(active_site),
+            metal_bond_equilibria=metal_bond_equilibria)
 
         # this geometry is a way of comparing, not a result of a run, so
         # nothing about it is written to a folder
-        return self._sites.mm_optimize_active_site(active_site, forcefield,
-                                                   **builder.relax_settings())
+        return sites.mm_optimize_active_site(active_site, forcefield)
 
     def _select_template(self, template):
         """
@@ -922,7 +886,4 @@ class MetalForceFieldManager:
         criteria_name, criteria = self._selection_criteria()
 
         return self._matcher.select_template(self._comparison, criteria,
-                                             criteria_name, self.RMSD_REGIONS,
-                                             self.IC_TYPES,
-                                             self.SELECTION_RANKED_ON,
-                                             template)
+                                             criteria_name, template)

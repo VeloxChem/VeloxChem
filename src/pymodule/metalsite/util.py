@@ -89,32 +89,14 @@ DONOR_ELEMENTS = ('N', 'O', 'S', 'Se')
 # becomes a monodentate contact of the near oxygen alone.
 BIDENTATE_ASYMMETRY = 0.75
 
-# Distance, in Angstrom, within which a donor atom is taken to be bonded to
-# a metal center. It is generous on purpose: the scan reads an unrelaxed
-# structure, where a stretched bridging contact is still a bond.
-METAL_BOND_CUTOFF = 3.0
-
-# How much further than the bonding cutoff, in Angstrom, a contact is
-# reported without being made a bond, so that a near miss is visible in the
-# coordination table. It is a margin rather than a distance of its own
-# because the two are not independent: a scan that stops before the bonding
-# cutoff would drop contacts that are bonds, so raising metal_bond_cutoff
-# past a fixed report_cutoff used to have no effect at all.
+# How much further than the bonding cutoff (the metal_bond_cutoff setting),
+# in Angstrom, a contact is reported without being made a bond, so that a
+# near miss is visible in the coordination table. It is a margin rather
+# than a distance of its own because the two are not independent: a scan
+# that stops before the bonding cutoff would drop contacts that are bonds,
+# so raising metal_bond_cutoff past a fixed report cutoff used to have no
+# effect at all.
 REPORT_CUTOFF_MARGIN = 0.5
-
-# Distance, in Angstrom, out to which a contact is reported without being
-# made a bond. Only the default pairing of the two; what a scan uses is
-# resolved from the bonding cutoff it is given, in _collect_ligands.
-REPORT_CUTOFF = METAL_BOND_CUTOFF + REPORT_CUTOFF_MARGIN
-
-# Distance, in Angstrom, within which a donor atom is given Hessian blocks
-# with a metal center whether or not it is bonded to one. The perception is
-# a distance cutoff read on a single geometry, and the contact that falls
-# just outside it is exactly the one a user adds by hand afterwards. Filling
-# a block that was never computed costs the whole Hessian again, so what the
-# partial Hessian covers is deliberately more forgiving than the bonding it
-# is fitted to. It widens what is computed, never what is fitted.
-PARTIAL_HESSIAN_CUTOFF = 3.5
 
 # Length, in Angstrom, of the C-H bond of the hydrogen that caps a
 # sidechain where the CA-CB bond was cut.
@@ -273,22 +255,9 @@ DEFAULT_METAL_PLANARITY_FORCE_CONSTANT = 4.184
 # Angstrom, before the relaxation table flags it.
 MM_BOND_CHANGE_WARNING = 0.25
 
-# The QM level the constrained optimization and the Hessian run at. RESP
-# runs its own HF/6-31G* and does not read them.
-XCFUN = 'PBE0'
-BASIS_SET_LABEL = 'def2-svp'
-
-# How the metal force constants are read off the Hessian; the only method
-# the generator's reparameterize knows.
-METAL_HESSIAN_FITTING_METHOD = 'seminario'
-
 # How many bonds out from a metal center extract_pairs walks when picking
 # the atom pairs of the partial Hessian.
 HESSIAN_BOND_COUNT = 2
-
-# The OpenMM force field files the enzyme system and the enzyme force
-# field XML are built beside.
-PROTEIN_FORCEFIELD_FILES = ('amber14-all.xml', 'amber14/tip3pfb.xml')
 
 # ----------------------------------------------------------------------
 # the shell and its decorators
@@ -335,10 +304,11 @@ class MasterSection:
 
 class Shell:
     """
-    The base of the stateless phase classes: a communicator and an output
-    stream, and nothing else. Settings arrive as keyword arguments and
-    intermediates are returned, so a method takes what it uses and returns
-    what it produces.
+    The base of the phase classes: a communicator, an output stream and the
+    settings a subclass takes at construction, and nothing else. A phase
+    class holds no intermediate: a method takes what it works on and
+    returns what it produces, so an interface builds one afresh from its
+    settings whenever a phase runs.
 
     :param comm:
         The MPI communicator.

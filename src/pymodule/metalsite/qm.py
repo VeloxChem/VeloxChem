@@ -50,7 +50,7 @@ from ..errorhandler import assert_msg_critical
 from ..molecule import Molecule
 from .util import (Shell, on_master, collective, param, get_metal_keys,
                    constrained_indices, freeze_constraints, extract_pairs,
-                   d4_charges, DONOR_ELEMENTS,
+                   d4_charges, DONOR_ELEMENTS, WEAK_BRIDGE_TOLERANCE,
                    HESSIAN_BOND_COUNT, FITTED_COMMENT, GEOMETRY_FILE,
                    HESSIAN_FILE, CHARGES_FILE)
 
@@ -88,20 +88,70 @@ class QmParameterizer(Shell):
     same molecule, and the drivers parallelize inside. Everything else --
     the pairs a partial Hessian is restricted to, the fit, the pruning,
     the resolution of what an earlier run left in a folder -- runs on the
-    master rank and is broadcast.
+    master rank and is broadcast. The settings are taken once, at
+    construction; the interface that owns the parameterizer is where their
+    defaults are, and it builds a new one from them whenever a phase runs.
 
     :param comm:
         The MPI communicator.
     :param ostream:
         The output stream.
+    :param scf_drv:
+        The SCF driver the optimization and the Hessian run on, used exactly
+        as given so that it carries every QM setting beyond the functional
+        and the basis set; None builds one from the multiplicity.
+    :param xcfun:
+        The exchange-correlation functional of a driver built here.
+    :param basis_set_label:
+        The basis set. RESP runs its own HF/6-31G* and does not read it.
+    :param mute_scf:
+        Whether the drivers run muted.
+    :param constrain_capping_hydrogens:
+        Whether the optimization freezes the capping hydrogens along with
+        the beta carbons.
+    :param partial_hessian_cutoff:
+        The distance in Angstrom within which a donor atom is given Hessian
+        blocks with a metal center whether or not it is bonded to one; see
+        hessian_pairs. None walks the connectivity as it stands.
+    :param average_metal_terms:
+        Whether equivalent metal terms are averaged in the fit, as
+        MMForceFieldGenerator.reparameterize takes it.
+    :param metal_hessian_fitting_method:
+        The method MMForceFieldGenerator.reparameterize fits the metal bonds
+        and angles with: 'seminario', 'improved-seminario' or 'phf'/'phf(k)'.
+    :param prune_weak_bridge_bonds:
+        Whether the weak arm of a bridging residue is dropped after the fit;
+        see _prune_weak_bridges.
+    :param reparameterize_metal_angles:
+        Whether the metal angles are fitted as well as the bonds. Off, they
+        stay at whatever the generator guessed. The seeding reads the same
+        setting.
     """
+
+    def __init__(self, comm, ostream, *, scf_drv, xcfun, basis_set_label,
+                 mute_scf, constrain_capping_hydrogens, partial_hessian_cutoff,
+                 average_metal_terms, metal_hessian_fitting_method,
+                 prune_weak_bridge_bonds, reparameterize_metal_angles):
+
+        super().__init__(comm, ostream)
+
+        self.scf_drv = scf_drv
+        self.xcfun = xcfun
+        self.basis_set_label = basis_set_label
+        self.mute_scf = mute_scf
+        self.constrain_capping_hydrogens = constrain_capping_hydrogens
+        self.partial_hessian_cutoff = partial_hessian_cutoff
+        self.average_metal_terms = average_metal_terms
+        self.metal_hessian_fitting_method = metal_hessian_fitting_method
+        self.prune_weak_bridge_bonds = prune_weak_bridge_bonds
+        self.reparameterize_metal_angles = reparameterize_metal_angles
 
     # ------------------------------------------------------------------
     # the QM steps: collective, every rank enters them
     # ------------------------------------------------------------------
 
     @collective
-    def _get_scf_driver(self, molecule, scf_drv, xcfun, basis_set_label):
+    def _get_scf_driver(self, molecule):
         """
         Returns the SCF driver and basis set for the active site
 
@@ -110,32 +160,26 @@ class QmParameterizer(Shell):
 
         :param molecule:
             The active site molecule.
-        :param scf_drv:
-            The SCF driver to use as given, or None to build one from the
-            multiplicity.
-        :param xcfun:
-            The exchange-correlation functional of a driver built here.
-        :param basis_set_label:
-            The basis set.
 
         :return:
             The tuple of the SCF driver and the basis set.
         """
 
+        scf_drv = self.scf_drv
         if scf_drv is None:
             if molecule.get_multiplicity() != 1:
                 scf_drv = ScfUnrestrictedDriver(self.comm, self.ostream)
             else:
                 scf_drv = ScfRestrictedDriver(self.comm, self.ostream)
-            if xcfun is not None:
-                scf_drv.xcfun = xcfun
+            if self.xcfun is not None:
+                scf_drv.xcfun = self.xcfun
 
-        basis = MolecularBasis.read(molecule, basis_set_label)
+        basis = MolecularBasis.read(molecule, self.basis_set_label)
 
         return scf_drv, basis
 
     @collective
-    def _run_scf(self, scf_drv, molecule, basis, mute_scf):
+    def _run_scf(self, scf_drv, molecule, basis):
         """
         Runs the SCF for a geometry, whatever the driver already holds.
 
@@ -151,16 +195,13 @@ class QmParameterizer(Shell):
             The active site molecule.
         :param basis:
             The basis set.
-        :param mute_scf:
-            Whether to mute the driver while it runs.
         """
 
-        with _muted(scf_drv, mute_scf):
+        with _muted(scf_drv, self.mute_scf):
             scf_drv.compute(molecule, basis)
 
     @collective
-    def optimize_active_site(self, active_site, constrain_capping_hydrogens,
-                             scf_drv, xcfun, basis_set_label, mute_scf):
+    def optimize_active_site(self, active_site):
         """
         Optimizes the active site with the beta carbons frozen.
 
@@ -172,17 +213,6 @@ class QmParameterizer(Shell):
 
         :param active_site:
             The active site.
-        :param constrain_capping_hydrogens:
-            Whether the capping hydrogens are frozen along with the beta
-            carbons.
-        :param scf_drv:
-            The SCF driver, or None to build one.
-        :param xcfun:
-            The exchange-correlation functional of a driver built here.
-        :param basis_set_label:
-            The basis set.
-        :param mute_scf:
-            Whether the drivers run muted.
 
         :return:
             The tuple of the optimized molecule and the results of the
@@ -191,7 +221,7 @@ class QmParameterizer(Shell):
         """
 
         frozen_indices = constrained_indices(active_site,
-                                             constrain_capping_hydrogens)
+                                             self.constrain_capping_hydrogens)
 
         molecule = active_site['molecule']
 
@@ -200,15 +230,14 @@ class QmParameterizer(Shell):
 
         self._print_muted_notice(
             f'the constrained optimization with {len(frozen_indices)} '
-            'atom(s) frozen', mute_scf)
+            'atom(s) frozen')
 
-        scf_drv, basis = self._get_scf_driver(molecule, scf_drv, xcfun,
-                                              basis_set_label)
+        scf_drv, basis = self._get_scf_driver(molecule)
 
         opt_drv = OptimizationDriver(scf_drv)
         opt_drv.constraints = constraints
 
-        with _muted(opt_drv, mute_scf):
+        with _muted(opt_drv, self.mute_scf):
             opt_results = opt_drv.compute(molecule, basis)
 
         optimized = Molecule.read_xyz_string(opt_results['final_geometry'])
@@ -218,8 +247,7 @@ class QmParameterizer(Shell):
         return optimized, opt_results
 
     @collective
-    def compute_hessian(self, active_site, atom_pairs, scf_drv, xcfun,
-                        basis_set_label, mute_scf):
+    def compute_hessian(self, active_site, atom_pairs):
         """
         Computes the nuclear Hessian of the active site.
 
@@ -238,14 +266,6 @@ class QmParameterizer(Shell):
         :param atom_pairs:
             The list of zero-based (i, j) tuples, typically from
             hessian_pairs. None computes the full Hessian.
-        :param scf_drv:
-            The SCF driver, or None to build one.
-        :param xcfun:
-            The exchange-correlation functional of a driver built here.
-        :param basis_set_label:
-            The basis set.
-        :param mute_scf:
-            Whether the drivers run muted.
 
         :return:
             The Hessian as a (3N, 3N) numpy array in Hartree per Bohr squared.
@@ -253,8 +273,7 @@ class QmParameterizer(Shell):
 
         molecule = active_site['molecule']
 
-        scf_drv, basis = self._get_scf_driver(molecule, scf_drv, xcfun,
-                                              basis_set_label)
+        scf_drv, basis = self._get_scf_driver(molecule)
 
         assert_msg_critical(
             scf_drv.solvation_model is None, 'compute_hessian: ScfHessianDriver '
@@ -264,10 +283,10 @@ class QmParameterizer(Shell):
         # which geometry they belong to, so the SCF is run here for the
         # current one. This costs nothing: the driver would otherwise run the
         # same SCF itself.
-        self._print_muted_notice('the SCF for the Hessian', mute_scf)
-        self._run_scf(scf_drv, molecule, basis, mute_scf)
+        self._print_muted_notice('the SCF for the Hessian')
+        self._run_scf(scf_drv, molecule, basis)
 
-        self._print_muted_notice('the Hessian', mute_scf)
+        self._print_muted_notice('the Hessian')
 
         hessian_drv = ScfHessianDriver(scf_drv)
         # the numerical path ignores atom_pairs entirely and would silently
@@ -278,7 +297,7 @@ class QmParameterizer(Shell):
         else:
             hessian_drv.atom_pairs = [tuple(pair) for pair in atom_pairs]
 
-        with _muted(hessian_drv, mute_scf):
+        with _muted(hessian_drv, self.mute_scf):
             hessian_drv.compute(molecule, basis)
 
         hessian = np.copy(hessian_drv.hessian)
@@ -286,14 +305,12 @@ class QmParameterizer(Shell):
         return hessian
 
     @collective
-    def compute_resp_charges(self, active_site, mute_scf):
+    def compute_resp_charges(self, active_site):
         """
         Computes RESP charges for the active site.
 
         :param active_site:
             The active site.
-        :param mute_scf:
-            Whether the driver runs muted.
 
         :return:
             The partial charges as an (N,) numpy array.
@@ -301,8 +318,7 @@ class QmParameterizer(Shell):
 
         molecule = active_site['molecule']
 
-        self._print_muted_notice('the RESP charge fit at Hartree-Fock/6-31G*',
-                                 mute_scf)
+        self._print_muted_notice('the RESP charge fit at Hartree-Fock/6-31G*')
 
         resp_drv = RespChargesDriver(self.comm, self.ostream)
 
@@ -311,7 +327,7 @@ class QmParameterizer(Shell):
         # be fitted to, and runs its own SCF. Handing it the active site's own
         # functional and basis would silently fit the charges at a level the
         # RESP parameters were never derived for.
-        with _muted(resp_drv, mute_scf):
+        with _muted(resp_drv, self.mute_scf):
             charges = resp_drv.compute(molecule)
 
         charges = self.comm.bcast(charges, root=mpi_master())
@@ -324,7 +340,7 @@ class QmParameterizer(Shell):
     # ------------------------------------------------------------------
 
     @on_master
-    def hessian_pairs(self, active_site, partial_hessian_cutoff):
+    def hessian_pairs(self, active_site):
         """
         Finds the atom pairs a partial Hessian has to hold blocks for.
 
@@ -345,10 +361,6 @@ class QmParameterizer(Shell):
 
         :param active_site:
             The active site whose Hessian is being computed. Not modified.
-        :param partial_hessian_cutoff:
-            The distance in Angstrom within which an unbonded donor atom is
-            covered along with the metal anyway. None walks the connectivity as
-            it stands.
 
         :return:
             The tuple of the sorted pair list and the sorted atom list.
@@ -357,7 +369,7 @@ class QmParameterizer(Shell):
         matrix = np.array(active_site['connectivity_matrix'], dtype=bool)
         metals = list(active_site['metal_indices'])
 
-        if partial_hessian_cutoff is not None:
+        if self.partial_hessian_cutoff is not None:
             molecule = active_site['molecule']
             coordinates = molecule.get_coordinates_in_angstrom()
             labels = molecule.get_labels()
@@ -373,7 +385,7 @@ class QmParameterizer(Shell):
                         continue
                     distance = np.linalg.norm(coordinates[donor] -
                                               coordinates[metal])
-                    if distance <= partial_hessian_cutoff:
+                    if distance <= self.partial_hessian_cutoff:
                         matrix[metal, donor] = True
                         matrix[donor, metal] = True
 
@@ -408,11 +420,6 @@ class QmParameterizer(Shell):
                        active_site,
                        forcefield,
                        hessian,
-                       average_metal_terms,
-                       metal_hessian_fitting_method,
-                       prune_weak_bridge_bonds,
-                       reparameterize_metal_angles,
-                       weak_bridge_tolerance,
                        protected_bonds=None):
         """
         Fits the metal terms of a force field against a Hessian.
@@ -431,22 +438,6 @@ class QmParameterizer(Shell):
             The seeded force field generator. Fitted in place and returned.
         :param hessian:
             The Hessian as a (3N, 3N) numpy array.
-        :param average_metal_terms:
-            Whether equivalent metal terms are averaged, as
-            MMForceFieldGenerator.reparameterize takes it.
-        :param metal_hessian_fitting_method:
-            The method MMForceFieldGenerator.reparameterize fits the metal
-            bonds and angles with: 'seminario', 'improved-seminario' or
-            'phf'/'phf(k)'.
-        :param prune_weak_bridge_bonds:
-            Whether the weak arm of a bridging residue is dropped after the
-            fit; see _prune_weak_bridges.
-        :param reparameterize_metal_angles:
-            Whether the metal angles are fitted as well as the bonds. Off,
-            they stay at whatever the generator guessed.
-        :param weak_bridge_tolerance:
-            The distance in Angstrom a bridge arm has to be longer than its
-            residue's shortest metal bond by before it can be dropped.
         :param protected_bonds:
             The metal bond keys the weak bridge pruning must leave alone,
             which is what a bond added by hand needs: manual_bond_keys turns
@@ -468,13 +459,13 @@ class QmParameterizer(Shell):
             f'{hessian.shape} does not match {(3 * n_atoms, 3 * n_atoms)}')
 
         bonds, angles = get_metal_keys(forcefield, active_site)
-        if not reparameterize_metal_angles:
+        if not self.reparameterize_metal_angles:
             angles = []
 
         forcefield.reparameterize(hessian,
                                   reparameterize_keys=bonds + angles,
-                                  average_metal_terms=average_metal_terms,
-                                  method=metal_hessian_fitting_method)
+                                  average_metal_terms=self.average_metal_terms,
+                                  method=self.metal_hessian_fitting_method)
 
         # the generator appends to the comment the seeding wrote
         for key in bonds:
@@ -482,10 +473,9 @@ class QmParameterizer(Shell):
         for key in angles:
             forcefield.angles[key]['comment'] = FITTED_COMMENT
 
-        if prune_weak_bridge_bonds:
+        if self.prune_weak_bridge_bonds:
             bonds, angles = self._prune_weak_bridges(
-                forcefield, active_site, bonds, angles, weak_bridge_tolerance,
-                protected_bonds)
+                forcefield, active_site, bonds, angles, protected_bonds)
 
         self._check_force_constants(forcefield, active_site, bonds, angles,
                                     hessian)
@@ -494,7 +484,7 @@ class QmParameterizer(Shell):
 
     @on_master
     def _prune_weak_bridges(self, forcefield, active_site, bonds, angles,
-                            weak_bridge_tolerance, protected):
+                            protected):
         """
         Drops the long arm of a bridging residue that the fit gave no force
         constant.
@@ -508,7 +498,7 @@ class QmParameterizer(Shell):
 
         Two independent things have to agree before an arm is dropped: the
         Hessian, by giving it no force constant at all, and the geometry, by
-        holding it at least weak_bridge_tolerance further out than the
+        holding it at least WEAK_BRIDGE_TOLERANCE further out than the
         shortest metal bond of that same residue. A zero on its own says
         nothing here - it can equally mean a geometry that is not stationary,
         or a Hessian that never covered the pair - which is why the distance
@@ -586,7 +576,7 @@ class QmParameterizer(Shell):
                     continue
                 if forcefield.bonds[key]['force_constant'] != 0.0:
                     continue
-                if lengths[key] - shortest < weak_bridge_tolerance:
+                if lengths[key] - shortest < WEAK_BRIDGE_TOLERANCE:
                     continue
                 removed.append((key, lengths[key], shortest))
 
@@ -1180,17 +1170,15 @@ class QmParameterizer(Shell):
         self.ostream.flush()
 
     @on_master
-    def _print_muted_notice(self, step, mute_scf):
+    def _print_muted_notice(self, step):
         """
         Announces a long calculation whose output is being suppressed.
 
         :param step:
             A description of the step about to run.
-        :param mute_scf:
-            Whether it is.
         """
 
-        if mute_scf:
+        if self.mute_scf:
             self.ostream.print_info(
                 f'Running {step} with muted QM output. Set mute_scf to False '
                 'to follow it.')

@@ -552,7 +552,6 @@ MATCHER_SCRIPT = '\n'.join([
 TERM_SCRIPT = '\n'.join([
     '_ms_site = {site}',
     '_ms_expected = {expected}',
-    '_ms_drop_torsions = {drop_torsions}',
     '_ms_bonds = {bonds}',
     '_ms_angles = {angles}',
     '_ms_impropers = {impropers}',
@@ -588,7 +587,7 @@ TERM_SCRIPT = '\n'.join([
     '    _ms_pairs.add(frozenset((_ms_index[_ms_names[0]],',
     '                             _ms_index[_ms_names[1]])))',
     '',
-    'if _ms_drop_torsions and "PeriodicTorsionForce" in _ms_forces:',
+    'if "PeriodicTorsionForce" in _ms_forces:',
     '    _ms_force = _ms_forces["PeriodicTorsionForce"]',
     '    for _ms_i in range(_ms_force.getNumTorsions()):',
     '        _ms_p = _ms_force.getTorsionParameters(_ms_i)',
@@ -619,7 +618,7 @@ TERM_SCRIPT = '\n'.join([
 
 
 def forcefield_xml(active_site, forcefield, restructured, templates,
-                   forcefield_files, drop_torsions_across_metal_bonds):
+                   forcefield_files):
     """
     Writes the force field XML for the restructured topology.
 
@@ -635,10 +634,6 @@ def forcefield_xml(active_site, forcefield, restructured, templates,
         The protein force field files the templates name atom types of,
         recorded in a comment so that a reader knows what the file has to
         be loaded beside.
-    :param drop_torsions_across_metal_bonds:
-        Whether to zero the wildcard proper torsions the protein force
-        field writes across a metal bond once it is a real one. See the
-        comment on TERM_SCRIPT for why they should go.
 
     :return:
         The XML as a string.
@@ -699,7 +694,6 @@ def forcefield_xml(active_site, forcefield, restructured, templates,
     script.text = '\n' + TERM_SCRIPT.format(
         site=repr((site_residue.chain.id, site_residue.id)),
         expected=len(restructured['site_indices']),
-        drop_torsions=repr(bool(drop_torsions_across_metal_bonds)),
         bonds=repr(bond_terms),
         angles=repr(angle_terms),
         impropers=repr(improper_terms))

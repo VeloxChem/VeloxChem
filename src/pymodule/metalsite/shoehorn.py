@@ -95,7 +95,7 @@ class Shoehorner(Shell):
 
         return SiteMatcher(self.comm, self.ostream)
 
-    def run(self, builder, template, max_include_radius, max_mappings):
+    def run(self, builder, template, max_include_radius):
         """
         Edits a builder's active site until it is built the way a template is.
 
@@ -107,8 +107,6 @@ class Shoehorner(Shell):
         :param max_include_radius:
             How far out from a metal center, in Angstrom, a residue may be
             picked up from.
-        :param max_mappings:
-            The limit on how many atom mappings are built.
 
         :return:
             True when the site was walked onto the template, False when
@@ -147,11 +145,9 @@ class Shoehorner(Shell):
             reason = self._shoehorn_composition(builder, template,
                                                 float(max_include_radius))
             if reason is None:
-                reason = self._shoehorn_protonation(builder, template,
-                                                    max_mappings)
+                reason = self._shoehorn_protonation(builder, template)
             if reason is None:
-                reason = self._shoehorn_denticity(builder, template,
-                                                  max_mappings)
+                reason = self._shoehorn_denticity(builder, template)
         except Exception:
             builder._mm_opt = relaxing
             builder._request = deepcopy(snapshot)
@@ -941,8 +937,7 @@ class Shoehorner(Shell):
         return entries[res_index]
 
     @on_master
-    def _best_heavy_mapping(self, template, described, max_mappings,
-                            match_h_count=True):
+    def _best_heavy_mapping(self, template, described, match_h_count=True):
         """
         Solves which of the site's atoms is which of the template's.
 
@@ -955,8 +950,6 @@ class Shoehorner(Shell):
             The template to match.
         :param described:
             The described active site.
-        :param max_mappings:
-            The limit on how many atom mappings are built.
         :param match_h_count:
             Whether an atom has to carry as many hydrogens as the one it maps
             onto, at both levels. Off for the pass that runs before the
@@ -973,7 +966,7 @@ class Shoehorner(Shell):
                 template, described, match_protonation=match_h_count):
             maps.extend(
                 self._matcher().heavy_atom_maps(template, described,
-                                                coarse_mapping, max_mappings,
+                                                coarse_mapping,
                                                 match_h_count=match_h_count))
 
         if not maps:
@@ -1006,7 +999,7 @@ class Shoehorner(Shell):
         return sum(1 for other in described['fine_topology'].neighbors(index)
                    if labels[other] == 'H')
 
-    def _shoehorn_protonation(self, builder, template, max_mappings):
+    def _shoehorn_protonation(self, builder, template):
         """
         Protonates every residue of the site the way the template has it.
 
@@ -1018,8 +1011,6 @@ class Shoehorner(Shell):
             The builder holding the site.
         :param template:
             The template to match.
-        :param max_mappings:
-            The limit on how many atom mappings are built.
 
         :return:
             What stood in the way, or None when nothing did.
@@ -1027,7 +1018,7 @@ class Shoehorner(Shell):
 
         described = self.described_site(builder)
         heavy_map = self._best_heavy_mapping(template, described,
-                                             max_mappings, match_h_count=False)
+                                             match_h_count=False)
 
         if heavy_map is None:
             return ('the atoms of the site do not map onto those of '
@@ -1192,7 +1183,7 @@ class Shoehorner(Shell):
 
         return named.pop() if len(named) == 1 else None
 
-    def _shoehorn_denticity(self, builder, template, max_mappings):
+    def _shoehorn_denticity(self, builder, template):
         """
         Bonds every metal center to exactly the atoms the template bonds it
         to.
@@ -1208,16 +1199,13 @@ class Shoehorner(Shell):
             The builder holding the site.
         :param template:
             The template to match.
-        :param max_mappings:
-            The limit on how many atom mappings are built.
 
         :return:
             What stood in the way, or None when nothing did.
         """
 
         described = self.described_site(builder)
-        heavy_map = self._best_heavy_mapping(template, described,
-                                             max_mappings)
+        heavy_map = self._best_heavy_mapping(template, described)
 
         if heavy_map is None:
             return ('the atoms of the site do not map onto those of '

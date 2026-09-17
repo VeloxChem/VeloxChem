@@ -69,11 +69,20 @@ class EnzymeSystemBuilder(Shell):
         The MPI communicator.
     :param ostream:
         The output stream.
+    :param protein_forcefield_files:
+        The OpenMM force field files for the protein, which the system is
+        built from and the force field XML is written to be loaded beside.
     """
+
+    def __init__(self, comm, ostream, *, protein_forcefield_files):
+
+        super().__init__(comm, ostream)
+
+        self.protein_forcefield_files = protein_forcefield_files
 
     @on_master
     def create_enzyme_system(self, topology, active_site, forcefield,
-                             partial_charges, forcefield_files):
+                             partial_charges):
         """
         Injects the fitted metal terms into a force field system for the whole
         enzyme.
@@ -104,8 +113,6 @@ class EnzymeSystemBuilder(Shell):
             of the coordination sphere through redistribute_charges; the
             ones the force field carries, so that the system and the force
             field built beside it agree.
-        :param forcefield_files:
-            The OpenMM force field files for the protein.
 
         :return:
             The tuple of the OpenMM system and the list of added terms.
@@ -115,7 +122,7 @@ class EnzymeSystemBuilder(Shell):
                             'create_enzyme_system: openmm is '
                             'required')
 
-        openmm_ff = mmapp.ForceField(*forcefield_files)
+        openmm_ff = mmapp.ForceField(*self.protein_forcefield_files)
         system = openmm_ff.createSystem(topology, nonbondedMethod=mmapp.NoCutoff)
 
         self.redistribute_charges(system, topology, active_site,
@@ -212,8 +219,7 @@ class EnzymeSystemBuilder(Shell):
 
     @on_master
     def create_enzyme_forcefield(self, topology, positions, active_site,
-                                 forcefield, partial_charges, forcefield_files,
-                                 drop_torsions_across_metal_bonds):
+                                 forcefield, partial_charges):
         """
         Writes the fitted metal site as an OpenMM force field XML.
 
@@ -227,6 +233,10 @@ class EnzymeSystemBuilder(Shell):
         so the system built from it carries the 1-2 and 1-3 exclusions and the
         1-4 scaling a bonded metal model should have. The injected system has
         none of those, and that is the one place the two are meant to differ.
+        Every atom keeps the type the protein force field files give it, so
+        the file that comes back has to be loaded beside the same ones; the
+        wildcard proper torsions those write across a metal bond once it is
+        a real one are zeroed, see openmmxml.TERM_SCRIPT.
 
         :param topology:
             The protonated OpenMM topology of the whole enzyme.
@@ -240,13 +250,6 @@ class EnzymeSystemBuilder(Shell):
             The charges fitted on the active site, the ones the force field
             carries, so that the file and the force field built beside it
             agree.
-        :param forcefield_files:
-            The OpenMM force field files for the protein. Every atom keeps the
-            type these give it, so the file that comes back has to be loaded
-            beside the same ones.
-        :param drop_torsions_across_metal_bonds:
-            Whether to zero the wildcard proper torsions the protein force
-            field writes across a metal bond once it is a real one.
 
         :return:
             A dictionary holding the XML, the restructured topology and its
@@ -258,7 +261,7 @@ class EnzymeSystemBuilder(Shell):
                             'create_enzyme_forcefield: openmm is required')
 
         protein_ff_not_used, protein_parameters = protein_atom_parameters(
-            topology, forcefield_files)
+            topology, self.protein_forcefield_files)
 
         restructured = restructure_topology(topology, positions, active_site,
                                             forcefield)
@@ -280,8 +283,7 @@ class EnzymeSystemBuilder(Shell):
         self.ostream.flush()
 
         xml = forcefield_xml(active_site, forcefield, restructured, templates,
-                             forcefield_files,
-                             drop_torsions_across_metal_bonds)
+                             self.protein_forcefield_files)
         bonds, angles, impropers = metal_term_keys(forcefield, active_site)
         self.ostream.print_info(
             f'Wrote {len(templates)} residue templates, {len(bonds)} metal '
