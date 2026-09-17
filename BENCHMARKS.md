@@ -9280,3 +9280,153 @@ saying so, which is also what removed the `AttributeError` above.
 
 **Range separated functionals** remain refused for RI-JK, open shell included, by
 the assertion which was already there.
+
+## The gradient of an open shell, and the largest ratio in this file
+
+The gradient driver was closed shell in the same way the Fock driver had been: one
+density, one set of occupied orbitals, one exchange. Unlike the Fock case it
+refused cleanly rather than dying in a binding, so an unrestricted calculation
+stopped with a sentence -- it simply had no gradient to give.
+
+### One routine, and where the factors come from
+
+A separate routine and not an overload, because the two differ in **which density
+the Coulomb half is of** and a caller passing the wrong one would get a gradient
+which is merely wrong rather than an error:
+
+    compute_open_shell(molecule, basis, aux_basis, bq_vectors, metric,
+                       density, coefficients_alpha, coefficients_beta, a_x, ...)
+
+The three-centre term underneath is not a second copy of its two hundred line
+kernel loop. It takes a list of spins, one for a closed shell and two for an open
+one, each carrying the orbitals it occupies and the fitted densities formed from
+them. The factors follow from writing the closed shell expressions in spin summed
+form, the closed shell ones being those expressions specialised to two identical
+spins:
+
+| | closed shell | open shell |
+| --- | --- | --- |
+| three-centre Coulomb | 4 c_P D(one spin) | c_P D(total) |
+| three-centre exchange | -2 a_x, one spin | -a_x, each spin |
+| two-centre Coulomb | 2 c_P c_Q | (1/2) c_P c_Q |
+| two-centre exchange | -a_x, one Gram | -(a_x/2), each spin's Gram |
+
+### Two defects the checks caught, both of which give a wrong gradient silently
+
+**The multiply overwrites.** `_multiply` passes `beta = 0.0` to the library, so the
+second spin's exchange was replacing the first rather than adding to it. The first
+check below failed at 9.8e-02 relative, and the failure scaled with the fraction of
+exact exchange, which placed it in the exchange half within one run. An accumulating
+form was added beside the one the Gram product already used.
+
+**A spin can occupy nothing.** The hydrogen atom is one alpha orbital and no beta.
+The transformation asked the library for a product of no columns and it refused.
+Guarded at the source rather than at each of the three places which consume it.
+
+### What it agrees with
+
+Three checks, in increasing independence. def2-svp throughout.
+
+**Identical spins must return the closed shell answer.** Feed the two spins the same
+orbitals and half the density each; the open shell routine has to reproduce the
+restricted gradient exactly. This pins every factor in the table above with no
+second implementation involved, and is the check which caught the multiply.
+
+| | agreement |
+| --- | ---: |
+| Hartree-Fock, a_x = 1 | **4.4e-16** |
+| B3LYP, a_x = 0.2 | **1.3e-15** |
+
+**Against the four centre gradient, and against finite differences.**
+
+| | four centre vs RI-JK | RI-JK vs numerical |
+| --- | ---: | ---: |
+| CH3 doublet, UHF | 9.047e-06 | **2.208e-07** |
+| CH3 doublet, UB3LYP | 1.577e-05 | 1.710e-05 |
+| O2 triplet, UHF | 1.214e-04 | **5.716e-07** |
+| O2 triplet, UB3LYP | 3.750e-05 | 1.906e-05 |
+| H doublet, UHF | 1.759e-34 | 5.551e-14 |
+| H doublet, UB3LYP | 3.556e-17 | 1.110e-13 |
+
+The right column is the one which tests this code: the analytic gradient against
+finite differences of **its own** energy, to 2e-07 at Hartree-Fock. The left column
+is the fitting error and is a property of the fitting set. The B3LYP rows of the
+right column are larger because a numerical gradient of a functional carries the
+quadrature grid's sensitivity to displacement; their Hartree-Fock counterparts at
+the same geometry are two orders better, which is what says the difference is the
+grid and not the term.
+
+Three of the rows are branches rather than chemistry: **H has a spin which occupies
+nothing**, **O2 has spins differing by two**, and both are in because the arithmetic
+of a second spin is where this could go wrong quietly.
+
+### What it bought
+
+The caffeine cation, doublet, against the neutral's table row for row. One rank of
+14 threads, `def2-universal-jkfit` throughout, the gradient timed twice and the
+better kept.
+
+| | four centre | RI-JK simd | speedup | the neutral's |
+| --- | ---: | ---: | ---: | ---: |
+| HF def2-svp | 21.17 | 0.84 | 25.3 | 11.9 |
+| HF def2-svpd | 94.75 | 1.59 | 59.6 | 31.0 |
+| HF def2-tzvp | 333.08 | 2.89 | 115.3 | 54.2 |
+| HF def2-tzvpd | 834.48 | **4.41** | **189.2** | 91.8 |
+| B3LYP def2-svp | 22.19 | 1.88 | 11.8 | 6.4 |
+| B3LYP def2-svpd | 96.79 | 3.88 | 25.0 | 14.6 |
+| B3LYP def2-tzvp | 335.82 | 5.84 | 57.5 | 34.5 |
+| B3LYP def2-tzvpd | 842.87 | **9.37** | **89.9** | 47.8 |
+
+**Fourteen minutes becomes four and a half seconds**, and 189 is the largest ratio
+anywhere in this file.
+
+### Why the open shell is *better* served than the closed one
+
+Every row is about twice its neutral counterpart, which is the opposite of what the
+self consistent field did, where the cation's extra iterations diluted the ratio.
+The gradient has no iterations to dilute it, and the two ways pay differently for
+the second spin:
+
+| what the second spin costs | def2-svp | def2-svpd | def2-tzvp | def2-tzvpd |
+| --- | ---: | ---: | ---: | ---: |
+| four centre, HF | 2.39 | 2.25 | 2.44 | 2.37 |
+| RI-JK simd, HF | **1.14** | **1.17** | **1.15** | **1.15** |
+| four centre, B3LYP | 2.42 | 2.26 | 2.43 | 2.38 |
+| RI-JK simd, B3LYP | **1.50** | **1.53** | **1.46** | **1.41** |
+
+The four centre way builds a second exchange from scratch and pays about 2.4 for it.
+The resolution of the identity forms the B vectors once, for both spins, and the
+second spin costs only the contraction against them -- 15 per cent at Hartree-Fock.
+**The dearest thing the method forms does not depend on spin**, which is the whole
+of why the ratio doubles.
+
+B3LYP pays more for the second spin than Hartree-Fock does, 1.46 against 1.15, and
+the reason is the quadrature: it is spin resolved, so the functional's integration
+genuinely doubles where the exchange contraction is the only part which grows in the
+Hartree-Fock rows.
+
+### The exponents do not move
+
+Fitted over the four bases, cost proportional to nao to the p:
+
+| | cation | neutral |
+| --- | ---: | ---: |
+| four centre, HF | 4.02 | 4.01 |
+| RI-JK simd, HF | 1.82 | 1.82 |
+| four centre, B3LYP | 3.98 | 3.97 |
+| RI-JK simd, B3LYP | 1.71 | 1.78 |
+
+An open shell is a constant times the work and not a different scaling, which is
+what the arithmetic says it should be and is worth having measured rather than
+assumed. The same caveat as every other table here: one fitting set serves all four
+orbital bases, so the second column of each pair is an exponent in the orbital
+dimension alone and not the scaling of the method.
+
+### Unchanged
+
+The l = 4 ceiling on the orbital centres is in the 175 generated derivative
+kernels and not in this driver. The single rank restriction is the same coupling of
+the fitting across the whole auxiliary basis. Range separated functionals are
+refused, open shell included. The conventional resolution of the identity has no
+open shell gradient at all, so `ri_jk` without `ri_jk_simd` is refused rather than
+measured.
