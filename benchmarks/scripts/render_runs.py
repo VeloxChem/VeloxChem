@@ -54,6 +54,11 @@ SPECS = {
          "iter", "s/iter", "SCF (s)", "max dE (a.u.)"],
         [7, 9, 4, 5, 15, 8, 7, 5, 7, 7, 10],
     ),
+    "tpa": (
+        ["functional", "basis", "nao", "naux", "method", "TPA (s)", "speedup",
+         "SCF (s)", "circular strengths (a.u.)", "max rel"],
+        [7, 9, 4, 5, 15, 8, 7, 7, 16, 8],
+    ),
 }
 
 
@@ -85,7 +90,7 @@ def _cost(row, suite):
         return row["grad_wall"]
     if suite == "tda":
         return row["tda_wall"]
-    if suite == "redtpa":
+    if suite in ("redtpa", "tpa"):
         return row["tpa_wall"]
     return row["wall"]
 
@@ -139,6 +144,27 @@ def cells_of(doc):
                                        speed, f'{r["scf_wall"]:.2f}',
                                        f'{r["gamma_real"][mid]:.1f}',
                                        f'{r["gamma_imag"][mid]:.1f}', agree])
+                elif suite == "tpa":
+                    # NOTE: the worst of everything the driver reports and not of
+                    # the strengths alone, so a column which agrees cannot hide
+                    # one which does not. The first run of this suite carried an
+                    # empty column because it asked for a cross section, which
+                    # belongs to the full two-photon driver and not to this one.
+                    if r["method"] == "full" or ref is None:
+                        agree = "--"
+                    else:
+                        agree = '%.1e' % max(
+                            np.abs((np.array(r[k]) - np.array(ref[k])) /
+                                   np.array(ref[k])).max()
+                            for k in ("tpa_strengths_circular",
+                                      "tpa_strengths_linear",
+                                      "oscillator_strengths",
+                                      "photon_energies"))
+                    strengths = r["tpa_strengths_circular"] or []
+                    shown = ', '.join(f'{v:.2f}' for v in strengths[:2])
+                    out.append(head + [method_name(r), f'{r["tpa_wall"]:.2f}',
+                                       speed, f'{r["scf_wall"]:.2f}', shown,
+                                       agree])
                 elif suite == "tda":
                     if r["method"] == "full" or ref is None:
                         agree = "--"

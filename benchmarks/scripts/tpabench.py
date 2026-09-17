@@ -93,7 +93,10 @@ def run(molecule_name, basis_name, aux_name, method, functional, nstates=5,
         "tpa_wall": round(tpa_wall, 3),
         # NOTE: the spectrum itself, kept so the table can be checked against the
         # numbers it was made from rather than only against another table.
-        "cross_sections": _listed(results.get("cross_sections")),
+        # NOTE: this driver reports strengths and not cross sections -- a cross
+        # section belongs to the full two-photon driver. Asking for one here
+        # returned None in every row of the first run and left the table with an
+        # empty column, which is the whole reason the strengths are named below.
         "photon_energies": _listed(results.get("photon_energies")),
         "oscillator_strengths": _listed(results.get("oscillator_strengths")),
         "tpa_strengths_linear": _listed(strengths.get("linear")),

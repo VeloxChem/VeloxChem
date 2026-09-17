@@ -26,6 +26,13 @@ METHODS = ["full", "ri_jk_simd"]
 
 THREADS = int(os.environ.get("OMP_NUM_THREADS", os.cpu_count()))
 
+# NOTE: the path is formed once. Formed inside the loop it follows the calendar,
+# and a run which crosses midnight writes its last rows to a second file and
+# leaves the first as a stale prefix of itself, which is what happened the first
+# time this was run.
+OUT = (Path(__file__).resolve().parent.parent / "data" / "tpa" /
+       f'{date.today():%Y-%m-%d}_m4max_{MOLECULE}.json')
+
 rows = []
 for functional in FUNCTIONALS:
     for basis in BASES:
@@ -35,14 +42,12 @@ for functional in FUNCTIONALS:
             print(f'  {functional:6s} {basis:10s} {method:12s}'
                   f'  scf {row["scf_wall"]:8.2f}  tpa {row["tpa_wall"]:9.2f}',
                   flush=True)
-            out = (Path(__file__).resolve().parent.parent / "data" / "tpa" /
-                   f'{date.today():%Y-%m-%d}_m4max_{MOLECULE}.json')
-            write(out, "tpa", provenance("m4max", 1, THREADS), rows)
+            write(OUT, "tpa", provenance("m4max", 1, THREADS), rows)
 
-print(f'\nwrote {out}', flush=True)
+print(f'\nwrote {OUT}', flush=True)
 
 print('\n| functional | basis | nao | method | TPA (s) | speedup | SCF (s)'
-      ' | cross sections (a.u.) | max rel |')
+      ' | circular strengths (a.u.) | max rel |')
 print('| --- | --- | ---: | --- | ---: | ---: | ---: | --- | ---: |')
 for functional in FUNCTIONALS:
     for basis in BASES:
@@ -55,13 +60,20 @@ for functional in FUNCTIONALS:
             name = ('four-centre' if r["method"] == "full"
                     else f'RI-JK simd, {r["ri_mode"].replace("_", " ")}')
             speed = ref["tpa_wall"] / r["tpa_wall"]
-            xs = r["cross_sections"] or []
+            xs = r["tpa_strengths_circular"] or []
             shown = ', '.join(f'{v:.4e}' for v in xs[:2])
             if r["method"] == "full" or not xs:
                 agree = ""
             else:
-                a = np.array(ref["cross_sections"]); b = np.array(xs)
-                agree = f'{np.abs((b - a) / a).max():.1e}'
+                # NOTE: the worst of everything the driver reports and not of the
+                # strengths alone, so a column which agrees cannot hide one which
+                # does not.
+                agree = max(
+                    np.abs((np.array(r[k]) - np.array(ref[k])) /
+                           np.array(ref[k])).max()
+                    for k in ("tpa_strengths_circular", "tpa_strengths_linear",
+                              "oscillator_strengths", "photon_energies"))
+                agree = f'{agree:.1e}'
             head = (f'| {functional} | {basis} | {r["nao"]} '
                     if r["method"] == "full" else '| | | ')
             print(f'{head}| {name} | {r["tpa_wall"]:.2f} | {speed:.2f} | '
