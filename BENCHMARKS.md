@@ -9196,3 +9196,87 @@ this run and not by reading:
 - **The output path was rebuilt every iteration**, so it followed the calendar. This
   run crossed midnight, the last two rows went to a second file, and the first was
   left as a stale prefix of itself. The path is formed once now.
+
+## The open shell, where the driver had been closed shell only
+
+The simd RI-JK driver built one Fock matrix from one density and one set of
+orbitals. An unrestricted calculation asking for it did not fall back and did not
+refuse: `_prepare_for_ri_fock_build` swapped in the simd driver, the open shell
+branch then called a method only the conventional driver has, and the calculation
+died part way with `AttributeError: 'SimdRIJKFockDriver' object has no attribute
+'compute_screened_j_fock'`. A restricted open shell run did the same, sharing the
+path. The **conventional** RI-JK driver had served both all along.
+
+The closed shell assumption was two lines, not a design:
+
+```cpp
+auto fock = _drv.compute_fock_matrix(_bq_vectors, _basis, _aux_basis, density);
+fock.scale(2.0);      // the density is one spin's, so the Coulomb enters twice
+```
+
+and one set of coefficients giving one exchange. What an open shell wants is the
+Coulomb of the **total** density undoubled, and an exchange from each spin's own
+occupied orbitals.
+
+### What was added
+
+One routine, taking the total density and a set of coefficients for each spin and
+returning both matrices:
+
+    compute(density, coefficients_alpha, coefficients_beta, exchange_scaling_factor)
+        -> (F_alpha, F_beta)
+
+Both spins run inside **one** pass over the ranges of the auxiliary basis, so a
+range's B vectors are read once and serve both rather than being swept twice. Two
+things follow from the spins occupying different numbers of orbitals: the W matrices
+need two storages rather than one reused, which would otherwise be formed again at
+every range of every build; and a function of a range costs the two spins together,
+so the same memory buys about half the range. That halving is what holding two
+spins' W matrices costs and is not a penalty of doing them in one pass.
+
+### What it agrees with
+
+def2-svp with the universal jkfit throughout, converged to 1e-8. The energy of the
+four centre path, then what each of the two resolutions of the identity differs from
+it by, and then -- the column that matters -- what the two of them differ from
+**each other** by:
+
+| | nao | naux | alpha/beta | four centre | conv vs 4c | simd vs 4c | **simd vs conv** |
+| --- | ---: | ---: | --- | ---: | ---: | ---: | ---: |
+| CH3 doublet, UHF | 29 | 129 | 5/4 | -39.5329552732 | 4.63e-06 | 4.63e-06 | **9.24e-14** |
+| CH3 doublet, UB3LYP | 29 | 129 | 5/4 | -39.8091355099 | 1.90e-05 | 1.90e-05 | **8.53e-14** |
+| O2 triplet, UHF | 28 | 154 | 9/7 | -149.4904009308 | 1.97e-04 | 1.97e-04 | **5.40e-13** |
+| H doublet, UHF | 5 | 18 | 1/0 | -0.4992784057 | 0.00e+00 | 1.67e-16 | **1.67e-16** |
+| CH3 doublet, ROHF | 29 | 129 | 5/4 | -39.5288782290 | 4.57e-06 | 4.57e-06 | **5.68e-14** |
+
+The middle two columns being equal row by row is the signature to look for: the two
+resolutions of the identity are the same approximation and should miss the four
+centre answer by the same fitting error, which is 4.6e-06 here and 2.0e-04 on O2 --
+a property of the fitting set and the molecule, not of either implementation. The
+last column is the implementation, and at **5.4e-13 and below** it is convergence
+noise.
+
+Three of the rows are there for branches rather than for chemistry. **H has one
+alpha orbital and no beta**, which is the spin with nothing to transform; **O2 has
+spins differing by two**, where a single W storage reused between them would be
+formed again at every range; and **ROHF** shares the open shell path and would have
+been missed by testing the unrestricted driver alone.
+
+### What is not here
+
+**No timing.** Twenty-nine basis functions is a correctness size and nothing above
+is a benchmark -- there is no speedup column on purpose, and what an open shell
+build costs against the four centre way on a real molecule is not yet measured. The
+structural expectation, which is a statement about the code and not a measurement,
+is that an open shell build is two exchanges where a closed shell one is a single
+exchange doubled, over B vectors formed once for both.
+
+**The direct way is not served.** It accumulates the right hand side of its fitting
+from the integrals during the same sweep which builds the exchange, and splits a
+build into three calls so a rank can gather that fitting between the first and the
+last. Two spins there means two exchanges and one fitting summed over both inside
+that sweep, which those three calls have no shape for. It refuses with a sentence
+saying so, which is also what removed the `AttributeError` above.
+
+**Range separated functionals** remain refused for RI-JK, open shell included, by
+the assertion which was already there.
