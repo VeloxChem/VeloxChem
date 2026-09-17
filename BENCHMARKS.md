@@ -9097,3 +9097,102 @@ cases:
 | more than one rank | refused, so the multi-rank half-size path never runs with it on |
 | core excitations, restricted subspaces | fall back to the dense route, excluded in the solver's guard |
 | complex trial vectors | fall back; the guard is a no-op today, since damped response carries them as real blocks |
+
+## Two-photon transitions, the calculation which was not worth measuring before
+
+This is the benchmark which was started and abandoned, on the grounds that the
+resolution of the identity was not reaching the outer loop. It was not: the
+`tpa_quad` build, the two-time perturbed Fock matrices the driver forms once its
+solvers have finished, went through the four-centre integrals in both columns. The
+solvers were fast and the thing they fed was not, so the ratio measured a fraction of
+the calculation and called it the calculation. It is wired now, and this is the run.
+
+Caffeine, five excited states, one rank of 14 threads, `def2-universal-jkfit` for all
+three orbital bases.
+
+| | basis | nao | four-centre | RI-JK simd | speedup | SCF |
+| --- | --- | ---: | ---: | ---: | ---: | --- |
+| Hartree-Fock | def2-svp | 246 | 154.08 s | 15.68 s | **9.83** | 12.41 -> 1.12 |
+| | def2-svpd | 366 | 713.21 s | 34.74 s | **20.53** | 50.38 -> 2.42 |
+| | def2-tzvp | 494 | 2362.74 s | 65.06 s | **36.32** | 173.57 -> 4.45 |
+| B3LYP | def2-svp | 246 | 150.87 s | 41.38 s | **3.65** | 14.89 -> 4.04 |
+| | def2-svpd | 366 | 626.89 s | 101.27 s | **6.19** | 56.22 -> 8.66 |
+| | def2-tzvp | 494 | 1946.67 s | 150.07 s | **12.97** | 180.24 -> 13.33 |
+
+**Forty minutes becomes a minute** at Hartree-Fock in def2-tzvp, and half an hour
+becomes two and a half minutes at B3LYP. The whole grid took 1 h 50 min where the
+four-centre half alone was 1 h 40 of it.
+
+### The exponent, and what it is an exponent in
+
+Fitted over the three bases of each row, cost proportional to nao to the p:
+
+| | four-centre | RI-JK simd |
+| --- | ---: | ---: |
+| Hartree-Fock | 3.91 | **2.04** |
+| B3LYP | 3.66 | **1.87** |
+
+The ground state underneath them fits 3.77 and 1.97 at Hartree-Fock, 3.56 and 1.72 at
+B3LYP -- the excited state part scales the way the ground state does, which is what
+should happen when both are made of the same Fock builds.
+
+**The second column is not the scaling of the method.** One fitting set serves all
+three orbital bases here, 1242 functions throughout, so the auxiliary dimension is
+held fixed while the orbital one grows and the exponent is in the orbital dimension
+alone. The same caveat was written into the gradient tables and it has not changed.
+
+### B3LYP gives up two thirds of the ratio, again
+
+| basis | HF | B3LYP | HF / B3LYP |
+| --- | ---: | ---: | ---: |
+| def2-svp | 9.83 | 3.65 | 2.69 |
+| def2-svpd | 20.53 | 6.19 | 3.32 |
+| def2-tzvp | 36.32 | 12.97 | 2.80 |
+
+Nothing new in it: what is left after the two-electron part goes away is the
+quadrature, and the cubic response profile measured that directly -- 58 per cent of a
+B3LYP calculation was integrating the functional. The ratio here is consistent with
+that and does not independently establish it.
+
+### The ground state is now a rounding error
+
+Of the whole RI-JK run, ground state and excited state together, the ground state is
+**6.4 to 6.7 per cent** at Hartree-Fock and **7.9 to 8.9** at B3LYP, and the fraction
+does not grow with the basis. Four-centre it is a fifth to a quarter. There is nothing
+left to win there.
+
+### What the two columns agree on
+
+The comparison is over everything the driver reports for all five states -- circular
+and linear two-photon strengths, oscillator strengths, photon energies -- and the
+column in the table is the worst of them, so a quantity which agrees cannot hide one
+which does not.
+
+| | def2-svp | def2-svpd | def2-tzvp |
+| --- | ---: | ---: | ---: |
+| Hartree-Fock | 1.9e-03 | 1.3e-03 | 8.9e-04 |
+| B3LYP | 6.7e-04 | 1.2e-03 | 2.1e-03 |
+
+It is a strength which sets the worst figure in five rows of six and an oscillator
+strength in the other two; **the photon energies agree an order of magnitude better
+throughout**, 8.99e-05 down to 2.84e-05. That ordering is the expected one -- an
+energy is an eigenvalue of the linear problem and a strength is a product of response
+vectors and a quadratic Fock matrix, so the fitting error enters it more times.
+
+The two rows move in opposite directions with basis size, Hartree-Fock improving and
+B3LYP worsening. Six points across two functionals is not enough to call that a
+trend, and no explanation is offered here.
+
+### What was fixed to get this table out
+
+Two defects in the benchmark suite, neither of them in the physics, both found by
+this run and not by reading:
+
+- **The record asked for a cross section.** `TpaTransitionDriver` reports strengths;
+  a cross section belongs to the full two-photon driver. Every row of the first run
+  stored `None` and the table printed an empty column. The strengths were being
+  saved all along, so the table above was rendered from that same data with nothing
+  recomputed.
+- **The output path was rebuilt every iteration**, so it followed the calendar. This
+  run crossed midnight, the last two rows went to a second file, and the first was
+  left as a stale prefix of itself. The path is formed once now.
