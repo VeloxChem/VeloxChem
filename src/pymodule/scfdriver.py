@@ -74,7 +74,8 @@ from .dispersionmodel import DispersionModel
 from .inputparser import (parse_input, print_keywords, print_attributes,
                           unparse_input, write_unparsed_input_to_hdf5,
                           read_unparsed_input_from_hdf5)
-from .dftutils import get_default_grid_level, print_xc_reference
+from .dftutils import (get_default_grid_level, get_optimal_grid_box_size,
+                       print_xc_reference)
 from .sanitychecks import (molecule_sanity_check, dft_sanity_check,
                            ri_sanity_check, pe_sanity_check,
                            solvation_model_sanity_check, gostshyp_sanity_check,
@@ -378,7 +379,6 @@ class ScfDriver:
                     ('raw', 'QM vdW parameter file path or array'),
                 '_debug': ('bool', 'print debug info'),
                 '_block_size_factor': ('int', 'block size factor for ERI'),
-                '_xcfun_ldstaging': ('int', 'max batch size for DFT grid'),
                 'trim_mos': ('bool', 'trim molecular orbitals'),
             },
             'method_settings': {
@@ -685,6 +685,11 @@ class ScfDriver:
             The dictionary is populated only on the master rank; other ranks
             receive an empty dictionary.
         """
+
+        # Choose the maximum batch size for the DFT grid from the number of
+        # basis functions.
+        self._xcfun_ldstaging = get_optimal_grid_box_size(
+            basis.get_dimensions_of_basis())
 
         profiler = Profiler()
 

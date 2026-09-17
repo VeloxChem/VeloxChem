@@ -378,7 +378,11 @@ class TestScfDriverMiscellaneous:
         for key in scf_keywords:
             assert getattr(second_drv, key) == getattr(scf_drv, key)
         for key in method_keywords:
-            assert getattr(second_drv, key) == getattr(scf_drv, key)
+            if key == 'xcfun':
+                assert (second_drv.xcfun.get_func_label() ==
+                        scf_drv.xcfun.get_func_label())
+            else:
+                assert getattr(second_drv, key) == getattr(scf_drv, key)
 
         # test read_settings
 
@@ -461,7 +465,8 @@ class TestScfDriverMiscellaneous:
                                                    "do_not_override_scf.h5")
         assert imported_drv.max_iter == scf_drv.max_iter
         assert imported_drv.density_damping == scf_drv.density_damping
-        assert imported_drv.xcfun == scf_drv.xcfun
+        assert (imported_drv.xcfun.get_func_label() ==
+                scf_drv.xcfun.get_func_label())
         assert imported_drv.ri_coulomb == scf_drv.ri_coulomb
         assert imported_drv.ri_auxiliary_basis == scf_drv.ri_auxiliary_basis
         assert imported_drv.ri_metric_threshold == scf_drv.ri_metric_threshold

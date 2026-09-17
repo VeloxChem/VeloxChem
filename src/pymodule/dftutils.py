@@ -110,6 +110,28 @@ def get_default_grid_level(xc_func):
             False, 'get_default_grid_level: Invalid XC functional type')
 
 
+def get_optimal_grid_box_size(nbf):
+    """
+    Gets the optimal DFT grid box size for a given number of basis functions,
+    according to an empirically determined nbf-only rule.
+
+    :param nbf:
+        The number of basis functions.
+
+    :return:
+        The optimal grid box size.
+    """
+
+    if nbf < 430:
+        return 128
+    elif nbf < 1500:
+        return 256
+    elif nbf < 2900:
+        return 512
+    else:
+        return 1024
+
+
 def print_xc_reference(xcfun, ostream):
     """
     Prints libxc reference.

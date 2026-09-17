@@ -50,7 +50,7 @@ from .sanitychecks import dft_sanity_check, ri_sanity_check
 from .sanitychecks import nonlinear_response_environment_sanity_check
 from .errorhandler import assert_msg_critical
 from .inputparser import parse_input, print_keywords, print_attributes
-from .dftutils import get_default_grid_level
+from .dftutils import get_default_grid_level, get_optimal_grid_box_size
 from .batchsize import get_batch_size
 from .batchsize import get_number_of_batches
 
@@ -178,7 +178,6 @@ class NonlinearSolver:
                 'memory_tracing': ('bool', 'trace memory allocation'),
                 '_debug': ('bool', 'print debug info'),
                 '_block_size_factor': ('int', 'block size factor for ERI'),
-                '_xcfun_ldstaging': ('int', 'max batch size for DFT grid'),
             },
             'method_settings': {
                 'ri_coulomb': ('bool', 'use RI-J approximation'),
@@ -344,6 +343,15 @@ class NonlinearSolver:
             grid_level = (get_default_grid_level(self.xcfun)
                           if self.grid_level is None else self.grid_level)
             grid_drv.set_level(grid_level)
+
+            if self.rank == mpi_master():
+                nbf = scf_results['C_alpha'].shape[0]
+            else:
+                nbf = None
+            nbf = self.comm.bcast(nbf, root=mpi_master())
+            self._xcfun_ldstaging = get_optimal_grid_box_size(nbf)
+            # update leading dimension (max batch size for DFT grid)
+            self.xcfun._set_leading_dimension(self._xcfun_ldstaging)
 
             molgrid = grid_drv.generate(molecule, self._xcfun_ldstaging)
 

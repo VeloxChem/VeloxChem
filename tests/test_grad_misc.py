@@ -374,8 +374,10 @@ class TestScfGradientDriverMiscellaneous:
         new_grad_drv.read_settings(checkpoint_file)
 
         # these should be updated by read_settings
-        assert new_grad_drv.scf_driver.xcfun == scf_drv.xcfun
-        assert new_grad_drv.xcfun == scf_drv.xcfun
+        assert (new_grad_drv.scf_driver.xcfun.get_func_label() ==
+                scf_drv.xcfun.get_func_label())
+        assert (new_grad_drv.xcfun.get_func_label() ==
+                scf_drv.xcfun.get_func_label())
 
         # these should not be updated by read_settings
         assert new_grad_drv.scf_driver.filename is None

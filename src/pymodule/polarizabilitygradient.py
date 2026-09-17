@@ -122,7 +122,7 @@ class PolarizabilityGradient:
         self._dft = False
         self.grid_level = None
         self.xcfun = None
-        self._xcfun_ldstaging = 1024
+        self._xcfun_ldstaging = scf_drv._xcfun_ldstaging
 
         self.flag = 'Polarizability Gradient Driver'
         self.frequencies = (0,)
