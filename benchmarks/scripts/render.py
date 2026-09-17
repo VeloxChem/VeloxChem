@@ -39,9 +39,19 @@ def provenance_line(run):
     machine = run["machine"]
     config = run["config"]
     dirty = ", working tree dirty" if run.get("dirty") else ""
+
+    ranks = config["mpi_ranks"]
+    plural = "rank" if ranks == 1 else "ranks"
+
+    # NOTE: the machines a job was spread over, when it was spread over more than
+    # one. A two node run and a one node run of the same ranks are different
+    # measurements and a table which does not say which it was cannot be trusted.
+    nodes = ((config.get("runtime") or {}).get("topology") or {}).get("nodes")
+    over = f" over {nodes} nodes" if nodes and nodes > 1 else ""
+
     return (f"Measured at `{run['commit']}`{dirty} on {machine['name']} "
             f"({machine['cpu']}, {machine['cores']} cores), "
-            f"{config['mpi_ranks']} rank of {config['omp_threads']} threads, "
+            f"{ranks} {plural} of {config['omp_threads']} threads{over}, "
             f"veloxchem {run['veloxchem']}, {run['date'][:10]}.")
 
 

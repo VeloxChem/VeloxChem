@@ -1,3 +1,8 @@
 # Rendered from the json beside it by scripts/render.py, for the scf suite, and by
 # scripts/render_runs.py for the gradient and optimization ones, so not tracked.
 *.pdf
+
+# VeloxChem output kept beside a node run, on the machine it ran on. A run of four
+# methods is four large files and they cannot be regenerated, so they are kept local
+# rather than tracked.
+*_out/

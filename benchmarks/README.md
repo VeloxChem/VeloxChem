@@ -42,6 +42,44 @@ OMP_NUM_THREADS=14 python benchmarks/scripts/scf_laptop.py --machine m4max
 smallest for checking the wiring. The json is rewritten after every row, so a run
 stopped early leaves a file which is still valid.
 
+## Running on a node
+
+`scf_node.py` measures one molecule in one basis by the four methods, because on a
+node a grid of eight bases is a day. The ranks and the threads are whatever the
+launcher gave and are recorded rather than chosen.
+
+```sh
+srun --mpi=pmix -N 2 --ntasks-per-node 8 --cpus-per-task 32 \
+     --export=ALL,OMP_NUM_THREADS=32,OMP_PROC_BIND=spread,OMP_PLACES=cores,\
+LD_PRELOAD=<...>/openblas/lib/libopenblas.so \
+     python benchmarks/scripts/scf_node.py --machine epyc9755 \
+            --molecule tagrisso --basis def2-tzvp
+```
+
+`--molecule` takes a name in `geometries/` or a path to an xyz, so a molecule on the
+cluster needs no copy into the repo. `--basis` picks the fitting set by the pairing
+rule unless `--aux` overrides it. B3LYP is the default functional; `--functional HF`
+for Hartree-Fock. One rank per NUMA domain is the design point: 8 x 32 on one node,
+16 x 32 on two.
+
+**VeloxChem's own output is kept**, one file per calculation under `--outdir`, with
+`timing` on. The iteration table and the per-iteration breakdown are in there and
+nowhere else. They stay on the machine the job ran on and are not tracked: they are
+large and cannot be regenerated.
+
+Three things the script refuses or complains about, because each fails looking like
+something else:
+
+| | |
+| --- | --- |
+| the launcher asked for more tasks than the communicator has | srun without `--mpi=pmix` starts one singleton per task instead of failing, and the job measures a fraction of what it was asked to |
+| a BLAS serves fewer threads than the rank was given | it does not refuse them; it warns once per thread and dies later somewhere unrelated. The module's OpenBLAS is `MAX_THREADS=48` |
+| threadpoolctl is missing | not fatal, but then no BLAS is recorded **and numpy's pool is not resized**, which on the node is the difference between 105 and 3500 Gflop/s |
+
+`--force` measures anyway. Never cap numpy with `OPENBLAS_NUM_THREADS`: every
+OpenBLAS in the process reads it, the driver's included, and setting it above a
+library's compiled ceiling is what causes the crash above.
+
 Then render it, which writes the markdown and the pdf beside the data:
 
 ```sh

@@ -14,12 +14,46 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+from mpi4py import MPI
+
 import veloxchem as vlx
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.outputstream import OutputStream
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 
 GEOMETRIES = Path(__file__).resolve().parent.parent / "geometries"
+
+
+def geometry(name):
+    """The xyz of a molecule, named in the repo or given as a path.
+
+    A run on a cluster should not have to copy its molecule into the repo to be
+    measured, so a path is taken as well as a name.
+    """
+    candidate = Path(name)
+    if candidate.suffix and candidate.is_file():
+        return candidate
+    return GEOMETRIES / f"{name}.xyz"
+
+
+def fitting_set(basis_name):
+    """The fitting set a basis is meant to be used with.
+
+    The def2 sets take the universal jkfit; the correlation consistent ones take
+    their own RIFIT. Kept here rather than in a runner so that two runners cannot
+    come to disagree about which pair was measured.
+    """
+    name = basis_name.lower()
+
+    if name.startswith("def2-"):
+        return "def2-universal-jkfit"
+    if name.endswith("-rifit") or name.endswith("-jkfit"):
+        return basis_name
+    if "cc-pv" in name:
+        return f"{basis_name}-rifit"
+
+    return None
+
 
 # method -> (ri_jk, ri_jk_simd, ri_mode)
 METHODS = {
@@ -64,8 +98,14 @@ def _blas():
         return []
 
 
-def provenance(name, ranks, threads):
-    """What the numbers came from, which is half of what a benchmark is."""
+def provenance(name, ranks, threads, runtime=None):
+    """What the numbers came from, which is half of what a benchmark is.
+
+    :param runtime:
+        What node.runtime() gathered -- the topology, the launcher, the pool numpy
+        ended up with, and every BLAS in the process. Omitted on the laptop, where
+        there is one rank and nothing to place.
+    """
     return {
         "date": datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds"),
         "commit": _git("rev-parse", "--short", "HEAD"),
@@ -77,7 +117,9 @@ def provenance(name, ranks, threads):
             "cores": __import__("os").cpu_count(),
             "os": f"{platform.system()} {platform.release()}",
         },
-        "config": {"mpi_ranks": ranks, "omp_threads": threads, "blas": _blas()},
+        "config": {"mpi_ranks": ranks, "omp_threads": threads,
+                   "blas": (runtime or {}).get("blas") or _blas(),
+                   **({"runtime": runtime} if runtime else {})},
     }
 
 
@@ -103,14 +145,31 @@ def _fock_timings(driver):
 
 
 def run(molecule_name, basis_name, aux_name, method, functional,
-        conv_thresh=1.0e-8, max_iter=50):
-    """Runs one calculation and returns its record."""
-    molecule = vlx.Molecule.read_xyz_file(str(GEOMETRIES / f"{molecule_name}.xyz"))
+        conv_thresh=1.0e-8, max_iter=50, ostream_path=None, comm=None):
+    """Runs one calculation and returns its record.
+
+    :param ostream_path:
+        Where to keep VeloxChem's own output. The iteration table and the timing
+        breakdown are in there and nowhere else, so a run which is to be looked at
+        afterwards wants it. None discards it, which is what the laptop suites do.
+    :param comm:
+        The communicator, needed to open an output which only master writes.
+    """
+    molecule = vlx.Molecule.read_xyz_file(str(geometry(molecule_name)))
     basis = vlx.MolecularBasis.read(molecule, basis_name.upper(), ostream=None)
 
     ri_jk, simd, ri_mode = METHODS[method]
 
-    driver = ScfRestrictedDriver(ostream=OutputStream(None))
+    if ostream_path is None:
+        ostream = OutputStream(None)
+    elif comm is None:
+        ostream = OutputStream(str(ostream_path))
+    else:
+        # NOTE: active on master and silent elsewhere, so the ranks of a job do not
+        # race each other writing one file.
+        ostream = OutputStream.create_mpi_ostream(comm, str(ostream_path))
+
+    driver = ScfRestrictedDriver(comm=comm, ostream=ostream)
     driver.timing = True
     driver.conv_thresh = conv_thresh
     driver.max_iter = max_iter
@@ -126,6 +185,12 @@ def run(molecule_name, basis_name, aux_name, method, functional,
     t0 = time.time()
     results = driver.compute(molecule, basis)
     wall = time.time() - t0
+
+    # NOTE: flushed and closed before the record is returned, so the file is whole
+    # even if the next calculation in the sweep takes the process down with it.
+    ostream.flush()
+    if ostream_path is not None:
+        ostream.close()
 
     if driver.rank != mpi_master():
         return None
@@ -168,7 +233,16 @@ def run(molecule_name, basis_name, aux_name, method, functional,
 
 
 def write(path, suite, run_info, rows):
-    """Writes one run to one file, which is never appended to."""
+    """Writes one run to one file, which is never appended to.
+
+    Only master writes. Every rank reaches here -- the suites loop over the whole
+    grid on all of them, because compute() is collective -- and left unguarded the
+    ranks of a node race each other over one path, each writing rows which are None
+    off master.
+    """
+    if MPI.COMM_WORLD.Get_rank() != mpi_master():
+        return None
+
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(
