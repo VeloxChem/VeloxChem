@@ -302,10 +302,21 @@ export_simdintegrals(py::module &m) -> void
              py::arg("metric") = CPackedMatrix(),
              py::arg("min_parts") = 1)
         .def("compute",
-             &CSimdRIJKFockDriver::compute,
+             py::overload_cast<const CPackedMatrix &, const CPackedMatrix &, const double>(
+                 &CSimdRIJKFockDriver::compute),
              "Computes the Fock matrix, twice the Coulomb less the scaled exchange.",
              py::arg("density"),
              py::arg("coefficients"),
+             py::arg("exchange_scaling_factor"))
+        .def("compute",
+             py::overload_cast<const CPackedMatrix &, const CPackedMatrix &, const CPackedMatrix &, const double>(
+                 &CSimdRIJKFockDriver::compute),
+             "Computes the Fock matrices of the two spins of an open shell, the Coulomb of the total density "
+             "less each spin's scaled exchange. The way which forms the integrals again on every call does not "
+             "serve this.",
+             py::arg("density"),
+             py::arg("coefficients_alpha"),
+             py::arg("coefficients_beta"),
              py::arg("exchange_scaling_factor"))
         .def("compute_exchange",
              &CSimdRIJKFockDriver::compute_exchange,

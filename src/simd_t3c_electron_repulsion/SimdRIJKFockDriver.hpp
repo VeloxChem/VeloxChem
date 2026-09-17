@@ -223,6 +223,38 @@ class CSimdRIJKFockDriver
                  const CPackedMatrix &coefficients,
                  const double         exchange_scaling_factor) -> CPackedMatrix;
 
+    /// @brief Computes the Fock matrices of the two spins of an open shell.
+    /// @param density The total density, which is that of both spins added, in the
+    /// packed format as a symmetric matrix.
+    /// @param coefficients_alpha The coefficients of the occupied orbitals of the
+    /// alpha spin, as a general matrix of one row per basis function and one
+    /// column per orbital.
+    /// @param coefficients_beta The same for the beta spin, which has a number of
+    /// columns of its own: the two spins of an open shell do not occupy the same
+    /// number of orbitals.
+    /// @param exchange_scaling_factor The factor the exchange is scaled by, which
+    /// is one for a field calculation and the fraction of exact exchange of a
+    /// hybrid functional. Neither exchange is formed at all when it is zero.
+    /// @return The Fock matrix of the alpha spin and that of the beta spin, in the
+    /// packed format as symmetric matrices.
+    /// @note The Coulomb matrix is formed once from the total density and is **not**
+    /// doubled, where the closed shell call above doubles the Coulomb of one spin's
+    /// density. Each spin's exchange is then subtracted from its own matrix.
+    /// @note The two spins are done inside one pass over the ranges of the
+    /// auxiliary basis rather than in two passes, so a range's B vectors are
+    /// touched once and serve both. The storage of the W matrices is therefore
+    /// two, one per spin, as the two have different numbers of columns, and a
+    /// range holds a matrix of the basis by the occupied orbitals of each spin.
+    /// @note The way which forms the integrals again on every call is not served
+    /// here. Its fitting is accumulated from the integrals during the sweep which
+    /// builds the exchange, and two spins there means two exchanges and one
+    /// fitting summed over both inside that sweep, which is a different piece of
+    /// work from this one and is refused rather than approximated.
+    auto compute(const CPackedMatrix &density,
+                 const CPackedMatrix &coefficients_alpha,
+                 const CPackedMatrix &coefficients_beta,
+                 const double         exchange_scaling_factor) -> std::pair<CPackedMatrix, CPackedMatrix>;
+
     /// @brief Computes the exchange of a range of the orbitals, and the right hand
     /// side of the fitting it closes on the way.
     /// @param coefficients The molecular orbital coefficients of all the occupied
@@ -494,6 +526,13 @@ class CSimdRIJKFockDriver
 
     /// @brief The W matrices of one range of the auxiliary basis.
     std::vector<CPackedMatrix> _w_vectors;
+
+    /// @brief The W matrices of the second spin of an open shell.
+    /// @note A second storage rather than the one above reused, because the two
+    /// spins of an open shell occupy different numbers of orbitals and the matrices
+    /// of a range differ in their columns between them. Reusing one would form the
+    /// storage again at every range of every build.
+    std::vector<CPackedMatrix> _w_vectors_beta;
 
     /// @brief The driver of the B vectors and of the matrices formed from them.
     CSimdRIFockDriver _drv;

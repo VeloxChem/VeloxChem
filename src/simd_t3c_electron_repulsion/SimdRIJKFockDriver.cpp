@@ -704,6 +704,168 @@ CSimdRIJKFockDriver::compute(const CPackedMatrix &density,
 }
 
 auto
+CSimdRIJKFockDriver::compute(const CPackedMatrix &density,
+                             const CPackedMatrix &coefficients_alpha,
+                             const CPackedMatrix &coefficients_beta,
+                             const double         exchange_scaling_factor) -> std::pair<CPackedMatrix, CPackedMatrix>
+{
+    errors::assertMsgCritical(_prepared, std::string("RIJKFockDriver: The driver has not been prepared"));
+
+    // NOTE: the direct way accumulates the right hand side of its fitting from the
+    // integrals during the same sweep which builds the exchange, and its build is
+    // split into three calls so that a rank can gather that fitting between the
+    // first and the last. Two spins there means two exchanges and one fitting
+    // summed over both inside that sweep, which those three calls have no shape
+    // for. It is refused rather than served wrongly.
+    errors::assertMsgCritical(_mode != rimode::direct,
+                              std::string("RIJKFockDriver: The open shell Fock matrices are formed only by the way "
+                                          "which holds the B vectors"));
+
+    CInMemoryProfile profile;
+
+    const auto profile_start = prof_clock::now();
+
+    // NOTE: the density is that of both spins added, so the Coulomb matrix enters
+    // once and is not doubled, where the closed shell call is handed one spin's
+    // density and doubles it.
+
+    const auto mark_coulomb = prof_clock::now();
+
+    auto fock_alpha = _drv.compute_fock_matrix(_bq_vectors, _basis, _aux_basis, density);
+
+    auto fock_beta = fock_alpha;
+
+    profile.coulomb += prof_since(mark_coulomb);
+
+    const auto nao = _basis.dimensions_of_basis();
+
+    const auto norb_alpha = coefficients_alpha.number_of_columns();
+
+    const auto norb_beta = coefficients_beta.number_of_columns();
+
+    errors::assertMsgCritical((coefficients_alpha.get_type() == mat_t::general) &&
+                                  (coefficients_alpha.number_of_rows() == nao),
+                              std::string("RIJKFockDriver: The alpha orbital coefficients do not match the molecular basis"));
+
+    errors::assertMsgCritical((coefficients_beta.get_type() == mat_t::general) &&
+                                  (coefficients_beta.number_of_rows() == nao),
+                              std::string("RIJKFockDriver: The beta orbital coefficients do not match the molecular basis"));
+
+    if ((exchange_scaling_factor == 0.0) || ((norb_alpha == 0) && (norb_beta == 0)))
+    {
+        profile.total = prof_since(profile_start);
+
+        if (prof_wanted()) profile.report();
+
+        return {std::move(fock_alpha), std::move(fock_beta)};
+    }
+
+    // NOTE: the range holds a matrix of the basis by the occupied orbitals of each
+    // spin, so a function of it costs the two together. The same memory therefore
+    // buys about half the range it buys for one spin, which is what holding two
+    // spins' worth of W matrices costs and is not a penalty of doing them together.
+
+    const auto per_function = nao * (norb_alpha + norb_beta) * sizeof(double);
+
+    const auto allowance = std::min(_w_batch_memory, std::max(_budget / _w_batch_divisor, size_t{1}));
+
+    const auto by_memory = std::max(size_t{1}, allowance / std::max(per_function, size_t{1}));
+
+    const auto nheld = _aux_functions.size();
+
+    const auto nbatch = std::min(nheld, std::max(_w_batch, by_memory));
+
+    const auto mark_allocate = prof_clock::now();
+
+    // NOTE: formed again only when the shape changes, as the closed shell call
+    // does. A spin with no occupied orbitals is given no storage and no pass.
+
+    auto fit = [&](std::vector<CPackedMatrix> &storage, const size_t norbitals) {
+        if (norbitals == 0) return;
+
+        if ((storage.size() != nbatch) || (storage.front().number_of_columns() != norbitals) ||
+            (storage.front().number_of_rows() != nao))
+        {
+            storage.clear();
+
+            storage.reserve(nbatch);
+
+            for (size_t i = 0; i < nbatch; i++)
+            {
+                storage.emplace_back(nao, norbitals, mat_t::general);
+            }
+        }
+    };
+
+    fit(_w_vectors, norb_alpha);
+
+    fit(_w_vectors_beta, norb_beta);
+
+    profile.allocate += prof_since(mark_allocate);
+
+    // NOTE: one pass over the ranges with both spins inside it, so a range's B
+    // vectors are read once and serve both rather than being swept twice.
+
+    auto add_exchange = [&](std::vector<CPackedMatrix> &storage,
+                            const CPackedMatrix        &coefficients,
+                            const size_t                norbitals,
+                            CPackedMatrix              &fock,
+                            const std::vector<size_t>  &batch) {
+        if (norbitals == 0) return;
+
+        const auto mark_transform = prof_clock::now();
+
+        if (batch.size() == storage.size())
+        {
+            _drv.compute_w_vectors(_bq_vectors, _basis, _aux_basis, coefficients, batch, storage);
+
+            profile.transform += prof_since(mark_transform);
+
+            const auto mark_exchange = prof_clock::now();
+
+            _drv.compute_exchange_matrix(storage, fock, -exchange_scaling_factor);
+
+            profile.exchange += prof_since(mark_exchange);
+        }
+        else
+        {
+            // NOTE: the last range is shorter than the others, and the storage is
+            // handed to the transformation as the range it is asked to fill.
+            auto tail = std::vector<CPackedMatrix>(storage.begin(),
+                                                   storage.begin() + static_cast<long>(batch.size()));
+
+            _drv.compute_w_vectors(_bq_vectors, _basis, _aux_basis, coefficients, batch, tail);
+
+            profile.transform += prof_since(mark_transform);
+
+            const auto mark_exchange = prof_clock::now();
+
+            _drv.compute_exchange_matrix(tail, fock, -exchange_scaling_factor);
+
+            profile.exchange += prof_since(mark_exchange);
+        }
+    };
+
+    for (size_t first = 0; first < nheld; first += nbatch)
+    {
+        const auto last = std::min(first + nbatch, nheld);
+
+        const auto batch = std::vector<size_t>(_aux_functions.begin() + static_cast<long>(first),
+                                               _aux_functions.begin() + static_cast<long>(last));
+
+        add_exchange(_w_vectors, coefficients_alpha, norb_alpha, fock_alpha, batch);
+
+        add_exchange(_w_vectors_beta, coefficients_beta, norb_beta, fock_beta, batch);
+    }
+
+    profile.total = prof_since(profile_start);
+
+    if (prof_wanted()) profile.report();
+
+    return {std::move(fock_alpha), std::move(fock_beta)};
+}
+
+auto
 CSimdRIJKFockDriver::is_prepared() const -> bool
 {
     return _prepared;

@@ -2668,6 +2668,39 @@ class ScfDriver:
 
         # the occupied orbitals, which the exchange is formed from
 
+        orbitals = self._simd_ri_jk_occupied(density, 'alpha')
+
+        coeffs = PackedMatrix(nao, orbitals.shape[1], mat_t.general)
+        coeffs.from_numpy(orbitals)
+
+        packed_density = PackedMatrix(nao, nao, mat_t.symmetric)
+        packed_density.from_numpy(np.ascontiguousarray(density))
+
+        if (self.nodes > 1) and (self._ri_drv.get_mode() == rimode.direct):
+            fock = self._simd_ri_jk_direct_share(coeffs, exchange_scaling_factor)
+        else:
+            fock = self._ri_drv.compute(packed_density, coeffs,
+                                        exchange_scaling_factor)
+
+        # NOTE: the limit is of the Fock matrix being expanded, which is the square
+        # of the basis and is modest, and not the budget of the B vectors, which
+        # bounds something else entirely and may be set small on purpose.
+
+        return fock.to_numpy(max_memory=2.0 * nao * nao * 8 / 1024**3 + 1.0)
+
+    def _simd_ri_jk_occupied(self, density, spin):
+        """
+        The occupied orbitals one spin's exchange is formed from.
+
+        :param density:
+            That spin's density matrix as a numpy array.
+        :param spin:
+            'alpha' or 'beta'.
+
+        :return:
+            The coefficients as a numpy array of one row per basis function.
+        """
+
         if self.molecular_orbitals.is_empty():
             # NOTE: the first build has no orbitals yet, as they come from the
             # matrix it is about to make. Any C with C C^T equal to the density
@@ -2695,30 +2728,73 @@ class ScfDriver:
             else:
                 orbitals = None
 
-            orbitals = self.comm.bcast(orbitals, root=mpi_master())
-        else:
+            return self.comm.bcast(orbitals, root=mpi_master())
+
+        if spin == 'alpha':
             nocc = int(np.sum(self.molecular_orbitals.occa_to_numpy()))
 
-            orbitals = np.ascontiguousarray(
+            return np.ascontiguousarray(
                 self.molecular_orbitals.alpha_to_numpy()[:, :nocc])
 
-        coeffs = PackedMatrix(nao, orbitals.shape[1], mat_t.general)
-        coeffs.from_numpy(orbitals)
+        nocc = int(np.sum(self.molecular_orbitals.occb_to_numpy()))
+
+        return np.ascontiguousarray(
+            self.molecular_orbitals.beta_to_numpy()[:, :nocc])
+
+    def _simd_ri_jk_fock_unrestricted(self, den_alpha, den_beta,
+                                      exchange_scaling_factor):
+        """
+        Computes the open shell Fock matrices with the SIMD RI-JK driver.
+
+        :param den_alpha:
+            The alpha density matrix as a numpy array.
+        :param den_beta:
+            The beta density matrix as a numpy array.
+        :param exchange_scaling_factor:
+            The fraction of exact exchange.
+
+        :return:
+            The alpha and the beta Fock matrices as numpy arrays.
+        """
+
+        nao = den_alpha.shape[0]
+
+        # NOTE: the two spins occupy different numbers of orbitals, so the two sets
+        # of coefficients have different numbers of columns and the driver is told
+        # both rather than one and a count.
+
+        orbitals_a = self._simd_ri_jk_occupied(den_alpha, 'alpha')
+        orbitals_b = self._simd_ri_jk_occupied(den_beta, 'beta')
+
+        coeffs_a = PackedMatrix(nao, orbitals_a.shape[1], mat_t.general)
+        coeffs_a.from_numpy(orbitals_a)
+
+        coeffs_b = PackedMatrix(nao, orbitals_b.shape[1], mat_t.general)
+        coeffs_b.from_numpy(orbitals_b)
+
+        # NOTE: the Coulomb is of the total density and is formed once, where the
+        # closed shell build is handed one spin's density and doubles it.
 
         packed_density = PackedMatrix(nao, nao, mat_t.symmetric)
-        packed_density.from_numpy(np.ascontiguousarray(density))
+        packed_density.from_numpy(np.ascontiguousarray(den_alpha + den_beta))
 
-        if (self.nodes > 1) and (self._ri_drv.get_mode() == rimode.direct):
-            fock = self._simd_ri_jk_direct_share(coeffs, exchange_scaling_factor)
-        else:
-            fock = self._ri_drv.compute(packed_density, coeffs,
-                                        exchange_scaling_factor)
+        assert_msg_critical(
+            self._ri_drv.get_mode() != rimode.direct,
+            'ScfDriver: the open shell RI-JK build is served only by ' +
+            'ri_mode in_memory, and this calculation got direct')
+
+        fock_a, fock_b = self._ri_drv.compute(packed_density, coeffs_a,
+                                              coeffs_b,
+                                              exchange_scaling_factor)
 
         # NOTE: the limit is of the Fock matrix being expanded, which is the square
         # of the basis and is modest, and not the budget of the B vectors, which
         # bounds something else entirely and may be set small on purpose.
 
-        return fock.to_numpy(max_memory=2.0 * nao * nao * 8 / 1024**3 + 1.0)
+        limit = 2.0 * nao * nao * 8 / 1024**3 + 1.0
+
+        return fock_a.to_numpy(max_memory=limit), fock_b.to_numpy(
+            max_memory=limit)
 
     def _simd_ri_jk_direct_share(self, coeffs, exchange_scaling_factor):
         """
@@ -3001,7 +3077,19 @@ class ScfDriver:
             fock_mat_b_np = J_ab_np.copy()
 
         else:
-            if self.ri_jk and (not self.molecular_orbitals.is_empty()):
+            if self.ri_jk and self.ri_jk_simd:
+                # NOTE: the Coulomb of the total density and both exchanges in one
+                # call, which is handed a set of coefficients for each spin. There
+                # is no test of whether the orbitals exist yet, as the branch below
+                # has: where there are none the build is handed coefficients which
+                # reproduce the density of the guess, so it serves the first
+                # iteration too and does not fall back to the four centre way for
+                # it.
+                fock_mat_a_np, fock_mat_b_np = (
+                    self._simd_ri_jk_fock_unrestricted(
+                        den_mat[0], den_mat[1], exchange_scaling_factor))
+
+            elif self.ri_jk and (not self.molecular_orbitals.is_empty()):
                 fock_mat = self._ri_drv.compute_screened_j_fock(den_mat_for_Jab,
                                                                 'j',
                                                                 verbose=False)
@@ -3046,8 +3134,13 @@ class ScfDriver:
                 J_ab_np = fock_mat.to_numpy()
                 fock_mat = Matrix()
 
-            fock_mat_a_np = J_ab_np - K_a_np
-            fock_mat_b_np = J_ab_np - K_b_np
+            # NOTE: the two branches above answer with the Coulomb and the two
+            # exchanges apart, and are composed here. The simd branch answers with
+            # the two matrices already composed, which is what its driver forms,
+            # so it is left alone rather than taken apart and put back together.
+            if not (self.ri_jk and self.ri_jk_simd):
+                fock_mat_a_np = J_ab_np - K_a_np
+                fock_mat_b_np = J_ab_np - K_b_np
 
         if need_omega:
             assert_msg_critical(
