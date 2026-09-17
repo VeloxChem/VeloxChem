@@ -33,9 +33,22 @@ struct TFittedDensities
     /// symmetric matrix of the occupied orbitals for each auxiliary function.
     std::vector<CPackedMatrix> orbital_densities;
 
+    /// @brief The fitted densities of the second spin, empty for a closed shell.
+    std::vector<CPackedMatrix> orbital_densities_beta;
+
     /// @brief The two-index fitted density, one row and column per auxiliary
     /// basis function.
     CPackedMatrix omega;
+};
+
+/// @brief One spin's half of the exchange: the orbitals it occupies and the
+/// fitted densities formed from them.
+/// @note A closed shell is one of these and an open shell two. The exchange of an
+/// auxiliary function is their sum, which is why they travel together.
+struct TExchangeSpin
+{
+    const CPackedMatrix              *coefficients;
+    const std::vector<CPackedMatrix> *orbital_densities;
 };
 
 /// @brief The Coulomb and exchange contributions to the molecular gradient,
@@ -140,6 +153,87 @@ class CSimdRIJKGradientDriver
                  const CPackedMatrix   &coefficients,
                  const double           exchange_scaling_factor) const -> CPackedMatrix;
 
+    /// @brief The fitted densities of the occupied orbitals of one spin.
+    /// @param bq_vectors The B vectors.
+    /// @param basis The molecular basis.
+    /// @param aux_basis The auxiliary molecular basis.
+    /// @param metric The inverted Cholesky factor of the metric.
+    /// @param coefficients The occupied orbitals of the spin.
+    /// @return d(q)_ij with the metric applied, one packed matrix per auxiliary
+    /// function.
+    /// @note One spin's worth, so that an open shell forms two sets from one
+    /// routine rather than two copies of a loop which must agree.
+    auto _orbital_densities(const CSparseTensor   &bq_vectors,
+                            const CMolecularBasis &basis,
+                            const CMolecularBasis &aux_basis,
+                            const CPackedMatrix   &metric,
+                            const CPackedMatrix   &coefficients) const -> std::vector<CPackedMatrix>;
+
+    /// @brief The Gram product of the fitted densities over the pairs of
+    /// auxiliary functions, summed over the orbitals.
+    /// @param orbital_densities The fitted densities of one spin.
+    /// @param naux The number of auxiliary functions.
+    /// @param norbs The number of occupied orbitals of that spin.
+    /// @return The square of the auxiliary basis, row major.
+    auto _gram(const std::vector<CPackedMatrix> &orbital_densities,
+               const size_t                      naux,
+               const size_t                      norbs) const -> std::vector<double>;
+
+    /// @brief Computes the gradient of an open shell, the two spins occupying
+    /// different orbitals.
+    /// @param density The **total** density, of both spins added, which is what
+    /// the Coulomb half is of. The closed shell call above takes one spin's and
+    /// carries the factors of two which follow from that.
+    /// @param coefficients_alpha The occupied orbitals of the alpha spin.
+    /// @param coefficients_beta The occupied orbitals of the beta spin, which has
+    /// a number of its own.
+    /// @param exchange_scaling_factor The fraction of exact exchange.
+    /// @param atoms The atoms to compute the gradient of.
+    /// @param aux_atoms The atoms of the auxiliary basis the B vectors span.
+    /// @return The gradient, one row per atom.
+    /// @note A separate routine and not an overload of the one above: the two
+    /// differ in which density the Coulomb half is of, and a caller which passed
+    /// the wrong one would get a gradient that is merely wrong. The name says
+    /// which is meant.
+    auto compute_open_shell(const CMolecule        &molecule,
+                            const CMolecularBasis  &basis,
+                            const CMolecularBasis  &aux_basis,
+                            const CSparseTensor    &bq_vectors,
+                            const CPackedMatrix    &metric,
+                            const CPackedMatrix    &density,
+                            const CPackedMatrix    &coefficients_alpha,
+                            const CPackedMatrix    &coefficients_beta,
+                            const double            exchange_scaling_factor,
+                            const std::vector<int> &atoms,
+                            const std::vector<int> &aux_atoms) const -> CPackedMatrix;
+
+    /// @brief Computes the gradient of an open shell over every atom.
+    auto compute_open_shell(const CMolecule       &molecule,
+                            const CMolecularBasis &basis,
+                            const CMolecularBasis &aux_basis,
+                            const CSparseTensor   &bq_vectors,
+                            const CPackedMatrix   &metric,
+                            const CPackedMatrix   &density,
+                            const CPackedMatrix   &coefficients_alpha,
+                            const CPackedMatrix   &coefficients_beta,
+                            const double           exchange_scaling_factor) const -> CPackedMatrix;
+
+    /// @brief Forms the fitted densities of an open shell, both spins.
+    /// @param density The total density, which the fitting coefficients are of.
+    /// @param coefficients_alpha The occupied orbitals of the alpha spin.
+    /// @param coefficients_beta The occupied orbitals of the beta spin.
+    /// @param exchange_scaling_factor The fraction of exact exchange.
+    /// @return The fitting coefficients, a set of fitted densities for each spin,
+    /// and the two index fitted density of both.
+    auto fitted_densities_open_shell(const CSparseTensor   &bq_vectors,
+                                     const CMolecularBasis &basis,
+                                     const CMolecularBasis &aux_basis,
+                                     const CPackedMatrix   &metric,
+                                     const CPackedMatrix   &density,
+                                     const CPackedMatrix   &coefficients_alpha,
+                                     const CPackedMatrix   &coefficients_beta,
+                                     const double           exchange_scaling_factor) const -> TFittedDensities;
+
     /// @brief Forms the fitted densities the derivative integrals are contracted
     /// against, which is the whole of what the gradient needs before any of them
     /// are computed.
@@ -188,16 +282,17 @@ class CSimdRIJKGradientDriver
     /// the functions squared times the auxiliary basis it is hundreds of
     /// gigabytes, where one atom's share is the functions squared times the
     /// functions of that atom.
-    auto _compute_three_center(CPackedMatrix           &gradient,
-                               const CMolecule         &molecule,
-                               const CMolecularBasis   &basis,
-                               const CMolecularBasis   &aux_basis,
-                               const TFittedDensities  &fitted,
-                               const CPackedMatrix     &density,
-                               const CPackedMatrix     &coefficients,
-                               const double             exchange_scaling_factor,
-                               const std::vector<bool> &wanted,
-                               const std::vector<int>  &aux_atoms) const -> void;
+    auto _compute_three_center(CPackedMatrix                    &gradient,
+                               const CMolecule                  &molecule,
+                               const CMolecularBasis            &basis,
+                               const CMolecularBasis            &aux_basis,
+                               const std::vector<double>        &fitting,
+                               const CPackedMatrix              &density,
+                               const std::vector<TExchangeSpin> &spins,
+                               const double                      coulomb_factor,
+                               const double                      exchange_factor,
+                               const std::vector<bool>          &wanted,
+                               const std::vector<int>           &aux_atoms) const -> void;
 
     /// @brief Checks the metric is one this driver can use.
     /// @param metric The metric handed over.

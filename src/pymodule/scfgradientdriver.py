@@ -844,12 +844,13 @@ class ScfGradientDriver(GradientDriver):
             The dictionary containing converged SCF results.
         """
 
-        # NOTE: the simd RI-JK gradient driver is closed shell -- it takes one
-        # density and one set of occupied orbitals -- so an unrestricted
-        # calculation which used it has no gradient here.
+        # NOTE: the conventional RI-JK driver has no open shell gradient. The simd
+        # one does, below, and is the only RI-JK way an unrestricted calculation
+        # has here.
         assert_msg_critical(
-            not self.scf_driver.ri_jk,
-            f'{type(self).__name__}: RI-JK gradient is restricted only')
+            (not self.scf_driver.ri_jk) or self.scf_driver.ri_jk_simd,
+            f'{type(self).__name__}: the open shell RI-JK gradient needs ' +
+            'ri_jk_simd')
 
         grad_timing = self._init_grad_timing()
 
@@ -930,7 +931,54 @@ class ScfGradientDriver(GradientDriver):
 
         thresh_int = int(-math.log10(self.eri_thresh))
 
-        if self.scf_driver.ri_coulomb:
+        if self.scf_driver.ri_jk and self.scf_driver.ri_jk_simd:
+
+            # NOTE: there are no erf attenuated derivative kernels, so the long
+            # range part of a range-separated functional has no gradient of this
+            # way. The exchange this driver scales is the plain one.
+            assert_msg_critical(
+                not need_omega,
+                f'{type(self).__name__}: RI-JK gradient is not implemented ' +
+                'for a range-separated functional')
+
+            self._announce_once(
+                'Using the SIMD resolution of the identity (RI-JK) gradient.')
+
+            basis_ri_jk = MolecularBasis.read(
+                molecule, self.scf_driver.ri_auxiliary_basis)
+
+            nao = Da.shape[0]
+
+            # NOTE: the total density, which is what the Coulomb half is of. The
+            # closed shell call is handed one spin's and carries the factors of two
+            # which follow from that; this one is not and does not.
+            den_mat_for_ri = PackedMatrix(nao, nao, mat_t.symmetric)
+            den_mat_for_ri.from_numpy(np.ascontiguousarray(Da + Db))
+
+            orbitals_a = PackedMatrix(nao, mo_occ_a.shape[1], mat_t.general)
+            orbitals_a.from_numpy(np.ascontiguousarray(mo_occ_a))
+
+            orbitals_b = PackedMatrix(nao, mo_occ_b.shape[1], mat_t.general)
+            orbitals_b.from_numpy(np.ascontiguousarray(mo_occ_b))
+
+            ri_jk_grad_drv = SimdRIJKGradientDriver(self.scf_driver.eri_thresh)
+
+            t0 = time.time()
+
+            # NOTE: the whole two-electron term of an open shell, Gamma against the
+            # derivative of the three-center integrals less Omega against the
+            # derivative of the metric, with both spins inside it. Added as it is.
+            atomgrad = ri_jk_grad_drv.compute_open_shell(
+                molecule, basis, basis_ri_jk,
+                self.scf_driver._ri_drv.get_bq_vectors(),
+                self.scf_driver._ri_drv.get_metric(), den_mat_for_ri,
+                orbitals_a, orbitals_b, exchange_scaling_factor)
+
+            self.gradient += atomgrad.to_numpy()
+
+            grad_timing['Fock_grad'] += time.time() - t0
+
+        elif self.scf_driver.ri_coulomb:
             assert_msg_critical(
                 basis.get_label().lower().startswith('def2-'),
                 'ScfGradientDriver: Invalid basis set for RI-J')

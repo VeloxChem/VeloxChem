@@ -91,6 +91,56 @@ _multiply(const size_t  nrows,
 #endif
 }
 
+/// @brief The product of two row major matrices added to what is there,
+/// C += A B.
+/// @note The same reading of the library's ordering as the product above, with the
+/// one difference that it accumulates. An open shell adds a term per spin into one
+/// matrix, and the overwriting form silently kept only the last of them.
+static auto
+_add_multiply(const size_t  nrows,
+              const size_t  ncols,
+              const size_t  nsums,
+              const double *amat,
+              const double *bmat,
+              double       *cmat) -> void
+{
+#ifdef VLX_USE_MATHLIB
+
+    const char trans = 'N';
+
+    const double alpha = 1.0;
+
+    const double beta = 1.0;
+
+    auto m_arg = static_cast<lapack_int_t>(ncols);
+
+    auto n_arg = static_cast<lapack_int_t>(nrows);
+
+    auto k_arg = static_cast<lapack_int_t>(nsums);
+
+    auto ldb_arg = static_cast<lapack_int_t>(ncols);
+
+    auto lda_arg = static_cast<lapack_int_t>(nsums);
+
+    auto ldc_arg = static_cast<lapack_int_t>(ncols);
+
+    dgemm_(&trans, &trans, &m_arg, &n_arg, &k_arg, &alpha, bmat, &ldb_arg, amat, &lda_arg, &beta, cmat, &ldc_arg);
+
+#else
+
+    using RowMajorMatrix = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
+
+    Eigen::Map<const RowMajorMatrix> a(amat, static_cast<Eigen::Index>(nrows), static_cast<Eigen::Index>(nsums));
+
+    Eigen::Map<const RowMajorMatrix> b(bmat, static_cast<Eigen::Index>(nsums), static_cast<Eigen::Index>(ncols));
+
+    Eigen::Map<RowMajorMatrix> c(cmat, static_cast<Eigen::Index>(nrows), static_cast<Eigen::Index>(ncols));
+
+    c.noalias() += a * b;
+
+#endif
+}
+
 /// @brief The product of a row major matrix by the transpose of another, with the
 /// result added to what is there: C += A B^T, for A of nrows by nsums and B of
 /// ncols by nsums.
@@ -364,34 +414,88 @@ CSimdRIJKGradientDriver::_check_metric(const CPackedMatrix &metric, const CMolec
 }
 
 auto
-CSimdRIJKGradientDriver::fitted_densities(const CSparseTensor   &bq_vectors,
-                                          const CMolecularBasis &basis,
-                                          const CMolecularBasis &aux_basis,
-                                          const CPackedMatrix   &metric,
-                                          const CPackedMatrix   &density,
-                                          const CPackedMatrix   &coefficients,
-                                          const double           exchange_scaling_factor) const
-    -> TFittedDensities
+CSimdRIJKGradientDriver::_gram(const std::vector<CPackedMatrix> &orbital_densities,
+                               const size_t                      naux,
+                               const size_t                      norbs) const -> std::vector<double>
 {
-    _check_metric(metric, aux_basis);
+    auto gram = std::vector<double>();
 
+        // the elements of one packed matrix of the orbitals, which is what the
+        // Gram product sums over
+
+        const auto nelements = orbital_densities.front().number_of_elements();
+
+        gram.assign(naux * naux, 0.0);
+
+        auto weight = std::vector<double>(nelements, 0.0);
+
+        for (size_t i = 0; i < norbs; i++)
+        {
+            for (size_t j = 0; j <= i; j++)
+            {
+                weight[i * (i + 1) / 2 + j] = (i == j) ? 1.0 : std::sqrt(2.0);
+            }
+        }
+
+        // NOTE: the elements in panels, as the factor above is, so the weighted
+        // copy is bounded by the budget. The result it adds into is the square of
+        // the auxiliary basis and cannot be divided, so it is taken off first.
+
+        const auto fixed = naux * naux * sizeof(double);
+
+        const auto spare = (_budget > fixed) ? _budget - fixed : size_t{0};
+
+        const auto per_element = naux * sizeof(double);
+
+        const auto by_memory = spare / std::max(per_element, size_t{1});
+
+        const auto npanel = std::min(nelements, std::max(_min_batch, by_memory));
+
+        auto scaled = std::vector<double>(naux * npanel, 0.0);
+
+        const auto nrange = static_cast<int>(naux);
+
+        for (size_t first = 0; first < nelements; first += npanel)
+        {
+            const auto count = std::min(npanel, nelements - first);
+
+#pragma omp parallel for schedule(static)
+            for (int at = 0; at < nrange; at++)
+            {
+                const auto q = static_cast<size_t>(at);
+
+                const auto *values = orbital_densities[q].data() + first;
+
+                for (size_t c = 0; c < count; c++)
+                {
+                    scaled[q * count + c] = weight[first + c] * values[c];
+                }
+            }
+
+            _add_multiply_by_transpose(naux, naux, count, scaled.data(), scaled.data(), gram.data());
+        }
+
+    return gram;
+}
+
+auto
+CSimdRIJKGradientDriver::_orbital_densities(const CSparseTensor   &bq_vectors,
+                                            const CMolecularBasis &basis,
+                                            const CMolecularBasis &aux_basis,
+                                            const CPackedMatrix   &metric,
+                                            const CPackedMatrix   &coefficients) const
+    -> std::vector<CPackedMatrix>
+{
     const auto naux = aux_basis.dimensions_of_basis();
 
     const auto norbs = coefficients.number_of_columns();
 
-    // the fitting coefficients. compute_y_vector closes the sum over the basis
-    // functions of the B vectors against the density, which is the factor already
-    // applied once; the transpose of it applied to that is the inverse.
+    const auto nao = coefficients.number_of_rows();
 
-    auto fitting = _drv.compute_y_vector(bq_vectors, basis, aux_basis, density);
-
-    _apply_transposed_factor(metric, fitting.data(), 1);
-
-    // the fitted densities of the occupied orbitals. The first index is
-    // transformed by the driver which holds the B vectors and the second here,
-    // which leaves a symmetric matrix of the orbitals for each auxiliary
-    // function; the metric is applied to those and never in the basis of the
-    // atomic orbitals.
+    // NOTE: a spin which occupies nothing has no fitted densities and no exchange.
+    // The hydrogen atom is one: one alpha orbital and no beta. Left to run, the
+    // transformation asks the library for a product of no columns and it refuses.
+    if (norbs == 0) return {};
 
     auto orbital_densities = std::vector<CPackedMatrix>();
 
@@ -409,8 +513,6 @@ CSimdRIJKGradientDriver::fitted_densities(const CSparseTensor   &bq_vectors,
     // is twenty six gigabytes, where the fitted densities it closes them into are
     // one and a half. They are formed for a batch of the auxiliary basis, closed,
     // and the storage reused for the next batch.
-
-    const auto nao = coefficients.number_of_rows();
 
     // NOTE: the transpose of the coefficients, formed once for the whole phase.
     // It is the basis functions times the orbitals, which is nothing beside the
@@ -483,6 +585,41 @@ CSimdRIJKGradientDriver::fitted_densities(const CSparseTensor   &bq_vectors,
 
     _apply_transposed_factor(metric, orbital_densities);
 
+    return orbital_densities;
+}
+
+auto
+CSimdRIJKGradientDriver::fitted_densities(const CSparseTensor   &bq_vectors,
+                                          const CMolecularBasis &basis,
+                                          const CMolecularBasis &aux_basis,
+                                          const CPackedMatrix   &metric,
+                                          const CPackedMatrix   &density,
+                                          const CPackedMatrix   &coefficients,
+                                          const double           exchange_scaling_factor) const
+    -> TFittedDensities
+{
+    _check_metric(metric, aux_basis);
+
+    const auto naux = aux_basis.dimensions_of_basis();
+
+    const auto norbs = coefficients.number_of_columns();
+
+    // the fitting coefficients. compute_y_vector closes the sum over the basis
+    // functions of the B vectors against the density, which is the factor already
+    // applied once; the transpose of it applied to that is the inverse.
+
+    auto fitting = _drv.compute_y_vector(bq_vectors, basis, aux_basis, density);
+
+    _apply_transposed_factor(metric, fitting.data(), 1);
+
+    // the fitted densities of the occupied orbitals. The first index is
+    // transformed by the driver which holds the B vectors and the second here,
+    // which leaves a symmetric matrix of the orbitals for each auxiliary
+    // function; the metric is applied to those and never in the basis of the
+    // atomic orbitals.
+
+    auto orbital_densities = _orbital_densities(bq_vectors, basis, aux_basis, metric, coefficients);
+
     // and the two index fitted density, which the derivative of the metric is
     // contracted against. The exchange part is the Gram product of the fitted
     // densities of the orbitals and the Coulomb part is the outer product of the
@@ -507,60 +644,7 @@ CSimdRIJKGradientDriver::fitted_densities(const CSparseTensor   &bq_vectors,
 
     if (exchange_scaling_factor != 0.0)
     {
-        // the elements of one packed matrix of the orbitals, which is what the
-        // Gram product sums over
-
-        const auto nelements = orbital_densities.front().number_of_elements();
-
-        gram.assign(naux * naux, 0.0);
-
-        auto weight = std::vector<double>(nelements, 0.0);
-
-        for (size_t i = 0; i < norbs; i++)
-        {
-            for (size_t j = 0; j <= i; j++)
-            {
-                weight[i * (i + 1) / 2 + j] = (i == j) ? 1.0 : std::sqrt(2.0);
-            }
-        }
-
-        // NOTE: the elements in panels, as the factor above is, so the weighted
-        // copy is bounded by the budget. The result it adds into is the square of
-        // the auxiliary basis and cannot be divided, so it is taken off first.
-
-        const auto fixed = naux * naux * sizeof(double);
-
-        const auto spare = (_budget > fixed) ? _budget - fixed : size_t{0};
-
-        const auto per_element = naux * sizeof(double);
-
-        const auto by_memory = spare / std::max(per_element, size_t{1});
-
-        const auto npanel = std::min(nelements, std::max(_min_batch, by_memory));
-
-        auto scaled = std::vector<double>(naux * npanel, 0.0);
-
-        const auto nrange = static_cast<int>(naux);
-
-        for (size_t first = 0; first < nelements; first += npanel)
-        {
-            const auto count = std::min(npanel, nelements - first);
-
-#pragma omp parallel for schedule(static)
-            for (int at = 0; at < nrange; at++)
-            {
-                const auto q = static_cast<size_t>(at);
-
-                const auto *values = orbital_densities[q].data() + first;
-
-                for (size_t c = 0; c < count; c++)
-                {
-                    scaled[q * count + c] = weight[first + c] * values[c];
-                }
-            }
-
-            _add_multiply_by_transpose(naux, naux, count, scaled.data(), scaled.data(), gram.data());
-        }
+        gram = _gram(orbital_densities, naux, norbs);
     }
 
     for (size_t p = 0; p < naux; p++)
@@ -578,7 +662,185 @@ CSimdRIJKGradientDriver::fitted_densities(const CSparseTensor   &bq_vectors,
         }
     }
 
-    return {std::move(fitting), std::move(orbital_densities), std::move(omega)};
+    return {std::move(fitting), std::move(orbital_densities), {}, std::move(omega)};
+}
+
+auto
+CSimdRIJKGradientDriver::fitted_densities_open_shell(const CSparseTensor   &bq_vectors,
+                                                     const CMolecularBasis &basis,
+                                                     const CMolecularBasis &aux_basis,
+                                                     const CPackedMatrix   &metric,
+                                                     const CPackedMatrix   &density,
+                                                     const CPackedMatrix   &coefficients_alpha,
+                                                     const CPackedMatrix   &coefficients_beta,
+                                                     const double           exchange_scaling_factor) const
+    -> TFittedDensities
+{
+    _check_metric(metric, aux_basis);
+
+    const auto naux = aux_basis.dimensions_of_basis();
+
+    // NOTE: the density handed in is the total one, of both spins, so the fitting
+    // coefficients are of the total density. The closed shell routine is handed
+    // one spin's and carries the factors of two which follow from that; here they
+    // are absent and the factors below are the plain ones.
+
+    auto fitting = _drv.compute_y_vector(bq_vectors, basis, aux_basis, density);
+
+    _apply_transposed_factor(metric, fitting.data(), 1);
+
+    // the fitted densities of each spin's occupied orbitals
+
+    auto alpha = _orbital_densities(bq_vectors, basis, aux_basis, metric, coefficients_alpha);
+
+    auto beta = _orbital_densities(bq_vectors, basis, aux_basis, metric, coefficients_beta);
+
+    auto omega = CPackedMatrix(naux, naux, mat_t::symmetric);
+
+    omega.zero();
+
+    // NOTE: the Gram product of each spin, added. A spin which occupies nothing
+    // contributes none, which is the hydrogen atom and is not a special case here:
+    // its list of fitted densities is empty and the product is skipped.
+
+    auto gram = std::vector<double>();
+
+    if (exchange_scaling_factor != 0.0)
+    {
+        const auto norbs_alpha = coefficients_alpha.number_of_columns();
+
+        const auto norbs_beta = coefficients_beta.number_of_columns();
+
+        if (norbs_alpha > 0) gram = _gram(alpha, naux, norbs_alpha);
+
+        if (norbs_beta > 0)
+        {
+            auto other = _gram(beta, naux, norbs_beta);
+
+            if (gram.empty())
+            {
+                gram = std::move(other);
+            }
+            else
+            {
+                for (size_t i = 0; i < gram.size(); i++) gram[i] += other[i];
+            }
+        }
+    }
+
+    // NOTE: the two centre term of an open shell. Writing the closed shell one in
+    // terms of the total density and a sum over the spins gives a half on the
+    // Coulomb, where the closed shell has two against a one spin density, and a
+    // half on the exchange, where it has one against a single spin's Gram. Setting
+    // the two spins equal returns the closed shell expression exactly, which is
+    // what the first of the checks on this exercises.
+
+    for (size_t p = 0; p < naux; p++)
+    {
+        for (size_t q = 0; q <= p; q++)
+        {
+            auto value = 0.5 * fitting[p] * fitting[q];
+
+            if (!gram.empty())
+            {
+                value -= 0.5 * exchange_scaling_factor * gram[p * naux + q];
+            }
+
+            omega.data()[omega.index(p, q)] = value;
+        }
+    }
+
+    return {std::move(fitting), std::move(alpha), std::move(beta), std::move(omega)};
+}
+
+auto
+CSimdRIJKGradientDriver::compute_open_shell(const CMolecule        &molecule,
+                                            const CMolecularBasis  &basis,
+                                            const CMolecularBasis  &aux_basis,
+                                            const CSparseTensor    &bq_vectors,
+                                            const CPackedMatrix    &metric,
+                                            const CPackedMatrix    &density,
+                                            const CPackedMatrix    &coefficients_alpha,
+                                            const CPackedMatrix    &coefficients_beta,
+                                            const double            exchange_scaling_factor,
+                                            const std::vector<int> &atoms,
+                                            const std::vector<int> &aux_atoms) const -> CPackedMatrix
+{
+    const auto natoms = static_cast<size_t>(molecule.number_of_atoms());
+
+    for (const auto iatom : atoms)
+    {
+        errors::assertMsgCritical(
+            (iatom >= 0) && (static_cast<size_t>(iatom) < natoms),
+            std::string("SimdRIJKGradientDriver.compute_open_shell: Atom is not an atom of the molecule"));
+    }
+
+    errors::assertMsgCritical(
+        std::set<int>(atoms.begin(), atoms.end()).size() == atoms.size(),
+        std::string("SimdRIJKGradientDriver.compute_open_shell: An atom is named more than once"));
+
+    errors::assertMsgCritical(
+        density.get_type() == mat_t::symmetric,
+        std::string("SimdRIJKGradientDriver.compute_open_shell: The density matrix is expected to be symmetric"));
+
+    auto gradient = CPackedMatrix(natoms, 3, mat_t::general);
+
+    gradient.zero();
+
+    if (atoms.empty()) return gradient;
+
+    auto wanted = std::vector<bool>(natoms, false);
+
+    for (const auto iatom : atoms) wanted[static_cast<size_t>(iatom)] = true;
+
+    const auto fitted = fitted_densities_open_shell(bq_vectors, basis, aux_basis, metric, density,
+                                                    coefficients_alpha, coefficients_beta,
+                                                    exchange_scaling_factor);
+
+    // NOTE: two spins, and the factors of an open shell. The density is the total
+    // one and the fitting coefficients are of it, so the Coulomb carries one where
+    // the closed shell carries four, and each spin's exchange carries the fraction
+    // of exact exchange once where the closed shell carries it twice for both.
+
+    const auto spins = std::vector<TExchangeSpin>{{&coefficients_alpha, &fitted.orbital_densities},
+                                                  {&coefficients_beta, &fitted.orbital_densities_beta}};
+
+    _compute_three_center(gradient, molecule, basis, aux_basis, fitted.coefficients, density, spins,
+                          1.0, -exchange_scaling_factor, wanted, aux_atoms);
+
+    const auto two_center = CSimdTwoCenterElectronRepulsionGradientDriver(_block_size);
+
+    const auto metric_part = two_center.compute(molecule, aux_basis, fitted.omega, atoms);
+
+    for (size_t iatom = 0; iatom < natoms; iatom++)
+    {
+        for (size_t c = 0; c < 3; c++)
+        {
+            gradient.data()[gradient.index(iatom, c)] -= metric_part.at(iatom, c);
+        }
+    }
+
+    return gradient;
+}
+
+auto
+CSimdRIJKGradientDriver::compute_open_shell(const CMolecule       &molecule,
+                                            const CMolecularBasis &basis,
+                                            const CMolecularBasis &aux_basis,
+                                            const CSparseTensor   &bq_vectors,
+                                            const CPackedMatrix   &metric,
+                                            const CPackedMatrix   &density,
+                                            const CPackedMatrix   &coefficients_alpha,
+                                            const CPackedMatrix   &coefficients_beta,
+                                            const double           exchange_scaling_factor) const -> CPackedMatrix
+{
+    auto atoms = std::vector<int>(molecule.number_of_atoms());
+
+    std::iota(atoms.begin(), atoms.end(), 0);
+
+    return compute_open_shell(molecule, basis, aux_basis, bq_vectors, metric, density,
+                              coefficients_alpha, coefficients_beta, exchange_scaling_factor,
+                              atoms, {});
 }
 
 auto
@@ -637,8 +899,13 @@ CSimdRIJKGradientDriver::compute(const CMolecule        &molecule,
 
     // the three-center term, plus in the gradient
 
-    _compute_three_center(gradient, molecule, basis, aux_basis, fitted, density, coefficients,
-                          exchange_scaling_factor, wanted, aux_atoms);
+    // NOTE: one spin, and the factors of a closed shell: the density handed in is
+    // one spin's and the fitting coefficients are of that density, so the Coulomb
+    // carries four and the exchange twice the fraction of exact exchange.
+    const auto spins = std::vector<TExchangeSpin>{{&coefficients, &fitted.orbital_densities}};
+
+    _compute_three_center(gradient, molecule, basis, aux_basis, fitted.coefficients, density, spins,
+                          4.0, -2.0 * exchange_scaling_factor, wanted, aux_atoms);
 
     // and the two-center one, which the note carries with a minus. The driver of
     // it returns the sum of Omega against the derivative with no sign applied, so
@@ -680,20 +947,19 @@ CSimdRIJKGradientDriver::compute(const CMolecule       &molecule,
 }
 
 auto
-CSimdRIJKGradientDriver::_compute_three_center(CPackedMatrix           &gradient,
-                                               const CMolecule         &molecule,
-                                               const CMolecularBasis   &basis,
-                                               const CMolecularBasis   &aux_basis,
-                                               const TFittedDensities  &fitted,
-                                               const CPackedMatrix     &density,
-                                               const CPackedMatrix     &coefficients,
-                                               const double             exchange_scaling_factor,
-                                               const std::vector<bool> &wanted,
-                                               const std::vector<int>  &aux_atoms) const -> void
+CSimdRIJKGradientDriver::_compute_three_center(CPackedMatrix                    &gradient,
+                                               const CMolecule                  &molecule,
+                                               const CMolecularBasis            &basis,
+                                               const CMolecularBasis            &aux_basis,
+                                               const std::vector<double>        &fitting,
+                                               const CPackedMatrix              &density,
+                                               const std::vector<TExchangeSpin> &spins,
+                                               const double                      coulomb_factor,
+                                               const double                      exchange_factor,
+                                               const std::vector<bool>          &wanted,
+                                               const std::vector<int>           &aux_atoms) const -> void
 {
-    const auto nao = coefficients.number_of_rows();
-
-    const auto norbs = coefficients.number_of_columns();
+    const auto nao = basis.dimensions_of_basis();
 
     const auto indices = denseidx::index_functions(basis);
 
@@ -717,15 +983,35 @@ CSimdRIJKGradientDriver::_compute_three_center(CPackedMatrix           &gradient
 
     density.to_dense(dense_d.data());
 
-    auto dense_c = std::vector<double>(nao * norbs, 0.0);
+    // NOTE: one of these per spin. An open shell has two, with a number of
+    // orbitals of its own in each, and the exchange of a given auxiliary function
+    // is their sum. A closed shell has one and reads exactly as it did.
 
-    coefficients.to_dense(dense_c.data());
-
-    auto transposed = std::vector<double>(norbs * nao, 0.0);
-
-    for (size_t mu = 0; mu < nao; mu++)
+    struct TDenseSpin
     {
-        for (size_t ii = 0; ii < norbs; ii++) transposed[ii * nao + mu] = dense_c[mu * norbs + ii];
+        size_t              norbs;
+        std::vector<double> dense_c;
+        std::vector<double> transposed;
+    };
+
+    auto dense_spins = std::vector<TDenseSpin>();
+
+    for (const auto &spin : spins)
+    {
+        const auto norbs = spin.coefficients->number_of_columns();
+
+        auto dense_c = std::vector<double>(nao * norbs, 0.0);
+
+        spin.coefficients->to_dense(dense_c.data());
+
+        auto transposed = std::vector<double>(norbs * nao, 0.0);
+
+        for (size_t mu = 0; mu < nao; mu++)
+        {
+            for (size_t ii = 0; ii < norbs; ii++) transposed[ii * nao + mu] = dense_c[mu * norbs + ii];
+        }
+
+        dense_spins.push_back({norbs, std::move(dense_c), std::move(transposed)});
     }
 
     const auto naux = aux_basis.dimensions_of_basis();
@@ -769,13 +1055,9 @@ CSimdRIJKGradientDriver::_compute_three_center(CPackedMatrix           &gradient
 
         auto exchanges = std::vector<std::vector<double>>();
 
-        if (exchange_scaling_factor != 0.0)
+        if (exchange_factor != 0.0)
         {
             const auto &aux_set = aux_indices[static_cast<size_t>(aux_sets[static_cast<size_t>(iaux)])];
-
-            auto half = std::vector<double>(nao * norbs, 0.0);
-
-            auto dense_q = std::vector<double>(norbs * norbs, 0.0);
 
             for (const auto [lq, kq] : aux_set)
             {
@@ -785,17 +1067,36 @@ CSimdRIJKGradientDriver::_compute_three_center(CPackedMatrix           &gradient
                 {
                     const auto q = aux_starts[static_cast<size_t>(iaux) * aux_nmoms + lq] + kq + mq * aux_strides[lq];
 
-                    fitted.orbital_densities[q].to_dense(dense_q.data());
-
-                    // C_o d(q), then that against the transposed orbitals
-
-                    _multiply(nao, norbs, norbs, dense_c.data(), dense_q.data(), half.data());
-
                     auto matrix = std::vector<double>(nao * nao, 0.0);
 
-                    _multiply(nao, nao, norbs, half.data(), transposed.data(), matrix.data());
+                    // NOTE: the spins add into one matrix. For a closed shell the
+                    // list is one long and this is the term it always was.
 
-                    for (auto &value : matrix) value *= -2.0 * exchange_scaling_factor;
+                    for (size_t is = 0; is < spins.size(); is++)
+                    {
+                        const auto &dense = dense_spins[is];
+
+                        const auto norbs = dense.norbs;
+
+                        if (norbs == 0) continue;
+
+                        auto dense_q = std::vector<double>(norbs * norbs, 0.0);
+
+                        (*spins[is].orbital_densities)[q].to_dense(dense_q.data());
+
+                        // C_o d(q), then that against the transposed orbitals
+
+                        auto half = std::vector<double>(nao * norbs, 0.0);
+
+                        _multiply(nao, norbs, norbs, dense.dense_c.data(), dense_q.data(), half.data());
+
+                        // NOTE: added and not assigned. The spins accumulate into
+                        // one matrix, and the overwriting product kept only the
+                        // last of them.
+                        _add_multiply(nao, nao, norbs, half.data(), dense.transposed.data(), matrix.data());
+                    }
+
+                    for (auto &value : matrix) value *= exchange_factor;
 
                     slot_of[q] = exchanges.size();
 
@@ -886,10 +1187,10 @@ CSimdRIJKGradientDriver::_compute_three_center(CPackedMatrix           &gradient
                                         // exchange part is the back transform of
                                         // the fitted density of the orbitals.
 
-                                        const auto cp = 4.0 * fitted.coefficients[q];
+                                        const auto cp = coulomb_factor * fitting[q];
 
                                         const double *exchange =
-                                            (exchange_scaling_factor != 0.0) ? exchanges[slot_of[q]].data() : nullptr;
+                                            (exchange_factor != 0.0) ? exchanges[slot_of[q]].data() : nullptr;
 
                                         for (size_t p = 0; p < reached; p++)
                                         {
