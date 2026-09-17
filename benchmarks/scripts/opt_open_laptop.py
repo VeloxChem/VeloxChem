@@ -43,10 +43,22 @@ THREADS = int(os.environ.get("OMP_NUM_THREADS", os.cpu_count()))
 ION = ("cation" if CHARGE > 0 else "anion" if CHARGE < 0
        else f"mult{MULTIPLICITY}")
 
-# NOTE: formed once, so a run which crosses midnight does not write its last rows
-# to a second file and leave the first a stale prefix of itself.
+# NOTE: the bases are in the name. Without them a second run of the same molecule
+# on the same day writes to the same path and **replaces** the first run's record,
+# which is what happened the first time this file was used: def2-svpd overwrote
+# def2-svp and only the commit saved it.
+STEM = f'{date.today():%Y-%m-%d}_m4max_{MOLECULE}_{ION}_{"_".join(BASES)}'
+
 OUT = (Path(__file__).resolve().parent.parent / "data" / "optimization" /
-       f'{date.today():%Y-%m-%d}_m4max_{MOLECULE}_{ION}.json')
+       f'{STEM}.json')
+
+# NOTE: and a run never overwrites another. One file per run is what makes every
+# ratio inside a file comparable, and a record which is silently replaced is worse
+# than one which is appended to.
+if OUT.exists():
+    raise SystemExit(
+        f'{OUT} exists: a run of this molecule, spin state and bases was already '
+        f'recorded today. Move it aside or name different bases.')
 
 rows = []
 for functional in FUNCTIONALS:

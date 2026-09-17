@@ -9430,3 +9430,76 @@ the fitting across the whole auxiliary basis. Range separated functionals are
 refused, open shell included. The conventional resolution of the identity has no
 open shell gradient at all, so `ri_jk` without `ri_jk_simd` is refused rather than
 measured.
+
+## Optimizing a radical, where the two ways agree on the path
+
+The open shell gradient made an unrestricted geometry optimization work without a
+line being written for it: the optimizer builds its gradient driver from whatever
+self consistent field driver it was handed, so the gradient was the only thing
+missing. What was checked rather than assumed is that the arrangements made for the
+closed shell case still hold -- the banner is said once over an optimization and not
+once a step, and a mode which cannot differentiate is refused before the first step
+rather than after it.
+
+The molecule is a nitronyl nitroxide core radical, C7H13N2O2, 24 atoms, a doublet
+with 43 alpha and 42 beta electrons. One rank of 14 threads,
+`def2-universal-jkfit` throughout, run to convergence with no cap on the steps.
+
+| | nao | four centre | RI-JK simd | speedup | steps |
+| --- | ---: | ---: | ---: | ---: | --- |
+| HF def2-svp | 219 | 347.0 s | **15.2 s** | **22.8** | 8 and 8 |
+| B3LYP def2-svp | 219 | 411.2 s | **60.2 s** | **6.8** | 9 and 9 |
+| HF def2-svpd | 330 | 1198.6 s | **26.9 s** | **44.5** | 7 and 7 |
+| B3LYP def2-svpd | 330 | 1521.9 s | **135.7 s** | **11.2** | 9 and 9 |
+
+The optimized energies agree to 3.9e-04 at Hartree-Fock and 8e-05 at B3LYP, which is
+the fitting error and not a difference in where the two paths stopped.
+
+### The cleanest ratio in this file, and why
+
+**Both ways take the same number of steps in all four rows.** That makes the whole
+run ratio and the per step ratio the same number, to two decimals. Nothing here is
+a total divided by a total over different amounts of work.
+
+It is worth saying why that matters, because the closed shell table does not have
+it. There, caffeine at def2-svp took 33 steps by the four centre way and 27 by the
+resolution of the identity, so its 6.87 is a ratio of two different journeys and the
+per step figure is 5.62. A speedup which moves when the optimizer takes a different
+path is a weaker measurement than one which does not, and this suite happens to give
+the stronger kind.
+
+### Against the closed shell table
+
+| | nitroxide, a radical | caffeine, closed shell |
+| --- | ---: | ---: |
+| HF def2-svp | **22.8** | 6.87 |
+| B3LYP def2-svp | **6.8** | 3.39 |
+| HF def2-svpd | **44.5** | 17.01 |
+| B3LYP def2-svpd | **11.2** | 7.67 |
+
+Two to three times better for the open shell, the same way round as the gradient
+table and for the same reason: the four centre way builds a second exchange from
+nothing while the resolution of the identity forms its B vectors once for both
+spins. The molecules differ -- 219 and 330 functions against 246 and 366 -- so this
+is not a controlled comparison of the two spin cases, and the gradient section,
+where the same molecule is measured both ways, is the one which establishes the
+effect. This table is consistent with it.
+
+### The estimate, and two defects in the suite
+
+**The first estimate was 1 to 1.5 hours and the run took 15 minutes.** The cause is
+worth recording because the information was in the file: the geometry's own comment
+line says "Optimized", so it converges in eight steps where the caffeine table's
+thirty was the number used to predict it. A step count taken from a different
+molecule's table is not an estimate.
+
+**The runner overwrote its own record.** The output path carried the date, the
+machine, the molecule and the spin state but not the basis, so running def2-svpd
+after def2-svp on the same day replaced the first file rather than writing beside
+it. The def2-svp numbers above survive because they had been committed. The path
+now carries the bases, and a run which would overwrite an existing record refuses
+to start instead: one file per run is what makes every ratio inside a file
+comparable, and a record replaced in silence is worse than one appended to.
+
+The optimizer also drops its checkpoints beside whatever ran it, which nearly went
+into a commit. They are ignored now.
