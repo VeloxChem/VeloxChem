@@ -36,10 +36,7 @@
 
 #include <algorithm>
 #include <cmath>
-#include <cstdio>
-#include <cstdlib>
 #include <cstring>
-#include <map>
 #include <iomanip>
 #include <sstream>
 
@@ -56,18 +53,6 @@
 #include "StringFormat.hpp"
 
 namespace xcintgga {  // xcintgga namespace
-
-/// @brief The memory the copies of the Kohn-Sham matrix may take together.
-/// @note One for every thread, so that the boxes of the grid add into them without
-/// taking turns. A basis whose square does not fit this for every thread keeps the
-/// critical section, which is correct and only slow -- and slow by a factor of
-/// three, as the queue cost sixty five per cent of the integration on a hundred and
-/// twenty eight threads. This bounds the basis rather than the memory of the
-/// machine: sixteen gigabytes carries four thousand functions at that width and
-/// twenty nine hundred at twice it, where two gigabytes stopped at fourteen
-/// hundred, which tagrisso in def2-tzvp very nearly reached. The copies are zeroed
-/// on every call, which is about three per cent of one at any size within this.
-static constexpr size_t _vxc_copies = size_t{16} * 1024 * 1024 * 1024;
 
 auto
 integrateVxcFockForGgaClosedShell(const CMolecule&                  molecule,
@@ -101,26 +86,6 @@ integrateVxcFockForGgaClosedShell(const CMolecule&                  molecule,
 
     double nele = 0.0, xcene = 0.0;
 
-    // NOTE: every box adds its partial matrix into the Kohn-Sham matrix through
-    // indices of its own, so two boxes may touch the same element and the boxes
-    // took turns at it inside a critical section. On fourteen cores that cost one
-    // per cent of the integration; on a hundred and twenty eight it cost sixty
-    // five, the threads standing in the queue. Each thread is given one of its own
-    // here and they are added together at the end, as the exchange of the RI-JK
-    // driver does with its triangles. The memory is the square of the basis for
-    // every thread, so a basis too large for that keeps the old way rather than
-    // half of the new one.
-
-    const auto square_bytes = static_cast<size_t>(naos) * static_cast<size_t>(naos) * sizeof(double);
-
-    const auto ncopies = (square_bytes * static_cast<size_t>(nthreads) <= _vxc_copies)
-                             ? static_cast<size_t>(nthreads)
-                             : size_t{0};
-
-    std::vector<std::vector<double>> partial_ksmat(ncopies);
-
-    std::vector<double> partial_nele(ncopies, 0.0), partial_xcene(ncopies, 0.0);
-
     // coordinates and weights of grid points
 
     auto xcoords = molecularGrid.getCoordinatesX();
@@ -151,13 +116,6 @@ integrateVxcFockForGgaClosedShell(const CMolecule&                  molecule,
                             ptr_gto_blocks, gsDensityPointers, ptr_xcFunctional, \
                             n_boxes, n_gto_blocks, naos, nele, xcene, mat_Vxc)
     {
-
-    // NOTE: the copy of a thread is zeroed by that thread, so its pages are first
-    // touched where they will be written.
-
-    if (ncopies > 0) partial_ksmat[static_cast<size_t>(omp_get_thread_num())].assign(naos * naos, 0.0);
-
-#pragma omp barrier
 
 #pragma omp single nowait
     {
@@ -363,18 +321,6 @@ integrateVxcFockForGgaClosedShell(const CMolecule&                  molecule,
                 local_xcene += local_weights[g] * exc[g] * rho_total;
             }
 
-            if (ncopies > 0)
-            {
-                const auto mine = static_cast<size_t>(thread_id);
-
-                partial_nele[mine] += local_nele;
-
-                partial_xcene[mine] += local_xcene;
-
-                dftsubmat::distributeSubMatrixToKohnSham(partial_ksmat[mine].data(), naos, partial_mat_Vxc, aoinds);
-            }
-            else
-            {
             #pragma omp critical
             {
                 nele += local_nele;
@@ -382,7 +328,6 @@ integrateVxcFockForGgaClosedShell(const CMolecule&                  molecule,
                 xcene += local_xcene;
 
                 dftsubmat::distributeSubMatrixToKohnSham(mat_Vxc, partial_mat_Vxc, aoinds);
-            }
             }
 
             omptimers[thread_id].stop("Vxc dist.");
@@ -392,90 +337,21 @@ integrateVxcFockForGgaClosedShell(const CMolecule&                  molecule,
     }
     }
 
-    if (ncopies > 0)
-    {
-        // NOTE: the rows are divided over the threads and each of them reads the
-        // same row of every copy, so no two threads write the same element.
-
-        auto ksvalues = mat_Vxc.alphaValues();
-
-#pragma omp parallel for schedule(static)
-        for (int row = 0; row < naos; row++)
-        {
-            auto *into = ksvalues + static_cast<size_t>(row) * static_cast<size_t>(naos);
-
-            for (size_t copy = 0; copy < ncopies; copy++)
-            {
-                const auto *from = partial_ksmat[copy].data() + static_cast<size_t>(row) * static_cast<size_t>(naos);
-
-                for (int col = 0; col < naos; col++) into[col] += from[col];
-            }
-        }
-
-        for (size_t copy = 0; copy < ncopies; copy++)
-        {
-            nele += partial_nele[copy];
-
-            xcene += partial_xcene[copy];
-        }
-    }
-
     mat_Vxc.setNumberOfElectrons(nele);
 
     mat_Vxc.setExchangeCorrelationEnergy(xcene);
 
     timer.stop("Total timing");
 
-    // NOTE: the phases are timed on every thread, and the boxes of the grid are
-    // handed to the threads as tasks, so the phases of one thread are only its
-    // share. They are added over the threads and divided by the threads here,
-    // which is the time each phase would take if the threads were kept busy --
-    // and the count of the boxes is written beside them, as a grid with fewer
-    // boxes than there are threads cannot keep them busy and the sum of the
-    // phases will then fall short of the total.
-
-    if (std::getenv("VLX_XC_PROFILE") != nullptr)
-    {
-        std::map<std::string, double> phases;
-
-        std::vector<std::string> order;
-
-        for (int thread_id = 0; thread_id < nthreads; thread_id++)
-        {
-            for (const auto& [label, seconds] : omptimers[thread_id].getTimings())
-            {
-                if (phases.find(label) == phases.end()) order.push_back(label);
-
-                phases[label] += seconds;
-            }
-        }
-
-        double total = 0.0, accounted = 0.0;
-
-        for (const auto& [label, seconds] : timer.getTimings())
-        {
-            if (label == "Total timing") total = seconds;
-        }
-
-        const auto share = static_cast<double>(nthreads);
-
-        for (const auto& label : order) accounted += phases[label] / share;
-
-        std::printf("XC gga closed shell on %d threads, %zu boxes, %.3f s\n", nthreads, n_boxes, total);
-
-        for (const auto& label : order)
-        {
-            const auto seconds = phases[label] / share;
-
-            std::printf("XC   %-24s %9.3f s %6.1f %%\n", label.c_str(), seconds,
-                        (total > 0.0) ? 100.0 * seconds / total : 0.0);
-        }
-
-        std::printf("XC   %-24s %9.3f s %6.1f %%\n", "rest", total - accounted,
-                    (total > 0.0) ? 100.0 * (total - accounted) / total : 0.0);
-
-        std::fflush(stdout);
-    }
+    // std::cout << "Timing of new integrator" << std::endl;
+    // std::cout << "------------------------" << std::endl;
+    // std::cout << timer.getSummary() << std::endl;
+    // std::cout << "OpenMP timing" << std::endl;
+    // for (int thread_id = 0; thread_id < nthreads; thread_id++)
+    // {
+    //     std::cout << "Thread " << thread_id << std::endl;
+    //     std::cout << omptimers[thread_id].getSummary() << std::endl;
+    // }
 
     return mat_Vxc;
 }
