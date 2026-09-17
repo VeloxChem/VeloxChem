@@ -85,6 +85,35 @@ def _label(doc):
     return doc["rows"][0].get("solver", "tda").upper()
 
 
+def subject(doc):
+    """What was calculated, which the suite and the molecule's name do not say.
+
+    A record can be open shell, and an open shell row is not comparable with a
+    closed shell one however alike the two read. A heading which says only the
+    molecule leaves two such files indistinguishable in one directory.
+    """
+    rows = [r for r in doc["rows"] if r]
+
+    if not rows:
+        return ""
+
+    first = rows[0]
+    name = first.get("molecule", "")
+
+    charge = first.get("charge", 0) or 0
+    multiplicity = first.get("multiplicity", 1) or 1
+
+    if charge > 0:
+        name += " cation" if charge == 1 else f" {charge}+"
+    elif charge < 0:
+        name += " anion" if charge == -1 else f" {-charge}-"
+
+    if multiplicity != 1:
+        name += f", multiplicity {multiplicity}"
+
+    return name
+
+
 def _headed(doc, header):
     """The header with the time column named for the solver."""
     return [h.replace("TDA (s)", f"{_label(doc)} (s)") for h in header]
@@ -253,7 +282,7 @@ def _select(doc, basis):
 def render(path, basis=None):
     doc = _select(json.loads(Path(path).read_text()), basis)
     header = _headed(doc, SPECS[doc["suite"]][0])
-    lines = [f'## {_label(doc).lower()}: {doc["rows"][0]["molecule"]}', "",
+    lines = [f'## {_label(doc).lower()}: {subject(doc)}', "",
              provenance_line(doc["run"]), "",
              "| " + " | ".join(header) + " |",
              "| " + " | ".join("---" for _ in header) + " |"]
@@ -282,7 +311,7 @@ def render_pdf(path, out, basis=None):
     header = _headed(doc, header)
     cells = cells_of(doc)
     line = provenance_line(doc["run"]).replace("`", "")
-    title = f'{_label(doc)}: {doc["rows"][0]["molecule"]}'
+    title = f'{_label(doc)}: {subject(doc)}'
 
     with PdfPages(out) as pdf:
         height = 1.6 + 0.22 * len(cells)

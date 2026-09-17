@@ -16,9 +16,10 @@ import numpy as np
 import veloxchem as vlx
 from veloxchem.outputstream import OutputStream
 from veloxchem.scfrestdriver import ScfRestrictedDriver
+from veloxchem.scfunrestdriver import ScfUnrestrictedDriver
 from veloxchem.optimizationdriver import OptimizationDriver
 
-from scfbench import GEOMETRIES
+from scfbench import GEOMETRIES, geometry
 
 # method -> (ri_jk, ri_jk_simd, ri_mode)
 METHODS = {
@@ -28,15 +29,25 @@ METHODS = {
 
 
 def run(molecule_name, basis_name, aux_name, method, functional,
-        conv_thresh=1.0e-8):
+        conv_thresh=1.0e-8, charge=0, multiplicity=1, max_iter=100):
     """Runs one geometry optimization and returns its record."""
-    molecule = vlx.Molecule.read_xyz_file(str(GEOMETRIES / f"{molecule_name}.xyz"))
+    molecule = vlx.Molecule.read_xyz_file(str(geometry(molecule_name)))
+    molecule.set_charge(charge)
+    molecule.set_multiplicity(multiplicity)
+
+    scf_class = ScfRestrictedDriver if multiplicity == 1 else ScfUnrestrictedDriver
     basis = vlx.MolecularBasis.read(molecule, basis_name.upper(), ostream=None)
 
     ri_jk, simd, ri_mode = METHODS[method]
 
-    driver = ScfRestrictedDriver(ostream=OutputStream(None))
+    driver = scf_class(ostream=OutputStream(None))
     driver.conv_thresh = conv_thresh
+
+    # NOTE: a hundred and not the driver's fifty. A radical takes more iterations
+    # than the closed shell of the same size -- the caffeine cation needed 51 by
+    # either resolution of the identity against 21 for the neutral -- and an
+    # optimization which runs out of them part way has no gradient for that step.
+    driver.max_iter = max_iter
     if functional.upper() != "HF":
         driver.xcfun = functional
     if ri_jk:
@@ -73,6 +84,9 @@ def run(molecule_name, basis_name, aux_name, method, functional,
         "ri_mode": ri_mode if ri_jk else None,
         "functional": functional,
         "conv_thresh": conv_thresh,
+        "charge": int(charge),
+        "multiplicity": int(multiplicity),
+        "scf_type": "restricted" if multiplicity == 1 else "unrestricted",
         "energy": energies[-1],
         "steps": steps,
         "wall": round(wall, 3),
