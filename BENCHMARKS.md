@@ -9503,3 +9503,86 @@ comparable, and a record replaced in silence is worse than one appended to.
 
 The optimizer also drops its checkpoints beside whatever ran it, which nearly went
 into a commit. They are ignored now.
+
+## The size of a block, when the buffer doubles
+
+The range separated three-center driver inherited its three sizing constants from
+the unattenuated one without measurement: a budget of 256 MB for the buffer a
+thread holds, at most 256 atom pairs to a block and at least 8. That inheritance is
+not obviously safe, because the buffer of a combination here is the larger of the
+two -- it carries two chains of Boys values, one for each operator -- so the same
+number of atom pairs costs twice the working set. The question is whether 256 still
+sits inside the flat part of the curve at that size.
+
+The table of rows is **1.86 to 1.99 times** the unattenuated one across its whole
+range, which is the doubling and the shared prefactors. What that does to the block
+size the budget computes:
+
+| | l bra / aux | rows plain | rows rs | block plain | block rs | MB a thread, rs |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| caffeine, def2-TZVP + jfit | 3 / 4 | 15103 | 29570 | 256 | 256 | 60.6 |
+| tagrisso, def2-SVP + jkfit | 2 / 4 | 4997 | 9718 | 256 | 256 | 19.9 |
+| c60, cc-pVDZ + RIFIT | 2 / 3 | 3012 | 5808 | 256 | 256 | 11.9 |
+| `(gg\|i)` | 4 / 6 | 80964 | 160167 | 256 | **209** | 267.8 |
+| `(ii\|l)` | 6 / 8 | 580552 | 1154910 | 57 | **29** | 267.9 |
+
+**The budget is not binding for any basis these drivers are used with.** It first
+bites at `(gg\|i)`, and everything to `(ff\|g)` reaches the ceiling of 256 in both
+drivers long before the 256 MB is spent. So the only constant the doubling can
+reach is the ceiling, and the ceiling is what was swept.
+
+### The doubled buffer does not move the optimum
+
+Milliseconds, fourteen threads, best of three, threshold 1e-12, omega 0.3. Each
+case runs in its own process. The two columns of a case were taken in one session,
+so they are an A/B and not two logs read against each other.
+
+| atom pairs | caffeine plain | caffeine rs | tagrisso plain | tagrisso rs | c60 plain | c60 rs |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| 8 | 130.2 | 260.2 | 662.6 | 1370.8 | 1633.9 | 3453.5 |
+| 32 | 86.4 | 175.8 | 362.5 | 747.7 | 941.1 | 2001.4 |
+| 128 | 84.1 | 169.1 | 270.3 | 559.3 | 700.3 | 1434.5 |
+| 256 | 84.0 | **168.3** | 250.1 | **531.2** | 687.0 | **1403.7** |
+| 512 | 84.8 | 167.7 | 248.9 | 528.4 | 682.3 | 1419.5 |
+
+The range separated curve has the same shape as the plain one on all three cases --
+steep below 128, flat from 256 -- so the inherited ceiling sits in the flat range
+for both and needs no change.
+
+The ratio is the sharper reading, because it is free of everything the two drivers
+share:
+
+| block size | 8 | 32 | 128 | 256 | 512 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| caffeine, def2-TZVP + jfit | 2.00 | 2.04 | 2.01 | 2.00 | 1.98 |
+| tagrisso, def2-SVP + jkfit | 2.07 | 2.06 | 2.07 | 2.12 | 2.12 |
+| c60, cc-pVDZ + RIFIT | 2.11 | 2.13 | 2.05 | 2.04 | 2.08 |
+
+**It does not drift with the block size.** The second operator costs what its second
+Boys chain costs, at every size, and nothing further through the working set. Were
+60 MB a thread hurting the caches where 30 did not, this ratio would grow towards
+the large sizes; it is flat to within the scatter of a best of three.
+
+### Caffeine cannot answer the question, and c60 can
+
+Caffeine's block count is 40 at 128, at 256 and at 512 alike. It has four distinct
+atom bases, so ten pairs of them, and the atom pairs of its groups run out before
+the ceiling does -- its flat tail is a property of the molecule and not evidence
+about the ceiling. Tagrisso goes 100, 64, 48 blocks over those three sizes and c60
+goes 14, 7, 4, so those two are the cases which actually probe it, and both are flat
+there too. A sweep on caffeine alone would have concluded nothing while appearing
+to.
+
+### How it was measured, and why the plain column was re-measured
+
+The ceiling is a `static constexpr`, so a sweep means a rebuild for each value. Both
+drivers were patched to read it from the environment instead, which makes it one
+rebuild and five free points; the patch was reverted afterwards and the library
+rebuilt, and the revert was checked by confirming that the variable no longer moves
+the block count.
+
+The plain column above is **not** the one in "The size of a block" earlier in this
+file, which reads 92.2, 310.8 and 837.6 at 256 against the 84.0, 250.1 and 687.0
+here. The driver has changed since that table was taken and the two are not
+comparable, which is the whole reason for measuring plain again beside the range
+separated driver rather than reading the new numbers against the old ones.
