@@ -9967,3 +9967,112 @@ numbers the ground state and the restricted excited states gave. The two range
 separated functionals agree with each other to within three per cent in every row,
 here as everywhere: what the split costs follows the number of passes and not the
 coefficients.
+
+## The range separated gradient, where the split costs less than it does in the build
+
+The gradient of a hybrid range separated functional carries a second exchange, and
+both ways pay for it. The four-centre way makes a whole further pass of its own
+derivative kernels, `kx_rs` on top of `2jkx`, once per atom. The resolution of the
+identity contracts a second set of B vectors against a second derivative tensor which
+the same kernel wrote, on one sparsity pattern and in one sweep of the auxiliary
+basis.
+
+Caffeine, `def2-universal-jkfit`, CAM-B3LYP, one rank of 14 threads on the M4 Max,
+best of two, one SCF and then the gradients in one process per case, at `255140804`.
+The records are `benchmarks/data/gradient/2026-09-18_m4max_caffeine_rs.json` and
+`..._b3lyp_control.json`, and the runner is `benchmarks/scripts/grad_rs_laptop.py`.
+
+| functional | basis | nao | four-centre | RI-JK simd | speedup | vs four-centre |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| CAM-B3LYP | def2-svp | 246 | 16.72 | 1.97 | 8.49 | 1.5e-05 |
+| | def2-svpd | 366 | 77.01 | 4.07 | 18.92 | 1.7e-05 |
+| | def2-tzvp | 494 | 257.77 | 6.90 | 37.36 | 6.1e-05 |
+| | def2-tzvpd | 614 | 655.69 | 11.01 | **59.55** | 6.2e-05 |
+
+### The control, and why one was run at all
+
+**What the split costs is an absolute wall time divided by an absolute wall time**,
+and that division only means something when both halves were measured in one sitting
+on one tree. The B3LYP rows already in this file are from a different day and a
+different tree, and dividing by them was how a 1.21 once became a 1.42. So B3LYP was
+re-measured here, immediately after the range separated run exited, from the same
+file:
+
+| functional | basis | nao | four-centre | RI-JK simd | speedup | vs four-centre |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| B3LYP | def2-svp | 246 | 9.29 | 1.29 | 7.20 | 1.6e-05 |
+| | def2-svpd | 366 | 43.67 | 2.68 | 16.29 | 1.7e-05 |
+| | def2-tzvp | 494 | 139.76 | 4.29 | 32.58 | 6.2e-05 |
+| | def2-tzvpd | 614 | 359.18 | 6.99 | 51.38 | 6.3e-05 |
+
+It also answers a question nobody asked. Against the corrected B3LYP table earlier in
+this file, the **four-centre column reproduces to between 1.2 and 2.1 per cent**,
+which is the usual spread. The **RI-JK simd column is 3.2 to 7.0 per cent slower**
+than it was. That is outside the spread of the four-centre column measured beside it,
+so it is more likely real than noise: the range separated work restructured
+`_compute_three_center` to loop over a vector of derivative tensors where it had one,
+and the plain path now goes through the same general body. Seven per cent of four and
+a quarter seconds is not worth undoing, but it should not be discovered later and
+mistaken for a regression of something else.
+
+### What the split costs each way
+
+| basis | four-centre | RI-JK simd | speedup, CAM over B3LYP |
+| --- | ---: | ---: | ---: |
+| def2-svp | 1.80 | 1.53 | 1.18 |
+| def2-svpd | 1.76 | 1.52 | 1.16 |
+| def2-tzvp | 1.84 | 1.61 | 1.15 |
+| def2-tzvpd | 1.83 | 1.58 | 1.16 |
+
+**The gradient gets off more lightly than the build does.** In the SCF the four-centre
+way pays 2.07 for the split and the fitted way about 1.2; here it is 1.80 to 1.84 and
+1.52 to 1.61. The two columns move toward each other because the gradient is not only
+integrals: quadrature, the one-electron terms and the fitted densities are in both
+totals and none of them doubles, so the pass which does double is a smaller share of a
+larger whole on each side.
+
+What survives is the ratio of the ratios. **The range separated gradient is served 15
+to 18 per cent better by the resolution of the identity than a plain hybrid is**,
+which is the same fifteen to twenty per cent the ground state and the excited states
+reported, arrived at by a different route.
+
+### Splitting the exchange adds nothing to the fitting error
+
+The last column of the two tables is the same column twice: 1.5e-05, 1.7e-05, 6.1e-05,
+6.2e-05 for CAM-B3LYP against 1.6e-05, 1.7e-05, 6.2e-05, 6.3e-05 for B3LYP. The
+attenuated half is fitted in a metric of its own, and **that metric is singular by
+construction** -- the Fourier transform of the attenuated operator carries
+`exp(-k^2/4 omega^2)`, so its smallest eigenvalues run to 1e-15. None of that reaches
+the gradient, for the same reason it never reached the Fock matrix: the attenuated
+integrals are zero in the directions the metric is blind in. This is the first time
+that has been visible in a derivative rather than argued from the operator.
+
+### The caution the earlier table states applies here unchanged
+
+One fitting set serves every row: naux is 1242 while nao runs 246 to 614. So the
+speedup widening from 8.5 to 59.6 is partly the denominator being held still, and a
+reader who takes 59.6 as a trend and extrapolates it will be wrong.
+
+### What the gradient was checked against
+
+The agreement column above is bounded by the fitting error and cannot settle a
+coefficient: the two codes converge different densities, and a factor wrong by a few
+per cent would sit under 1e-05. What settles it is differencing the SCF energy of the
+**same** method, where nothing of the fitting cancels.
+`benchmarks/scripts/rs_scf_gradient_check.py` does that for water and a hydroxyl
+radical in def2-svp, B3LYP as a control:
+
+| case | shell | functional | analytic vs four-centre | analytic vs finite difference | four-centre vs its own |
+| --- | --- | --- | ---: | ---: | ---: |
+| water | closed | B3LYP | 1.84e-05 | 2.09e-06 | |
+| water | closed | CAM-B3LYP | 1.86e-05 | **2.35e-06** | 2.36e-06 |
+| water | closed | wB97X-D4 | 1.87e-05 | 2.70e-06 | |
+| hydroxyl | open | B3LYP | 1.47e-05 | 4.36e-06 | |
+| hydroxyl | open | CAM-B3LYP | 1.55e-05 | **4.16e-06** | 4.11e-06 |
+| hydroxyl | open | wB97X-D4 | 1.48e-05 | 4.31e-06 | |
+
+The range separated rows land on the four-centre noise floor to two digits, closed
+shell and open, and the control sits at the same level. Two things that check needs:
+`conv_thresh` of 1e-9 and not tighter, because plain B3LYP water does not converge at
+1e-10 in two hundred iterations; and an off-equilibrium geometry, or the whole
+gradient is 1e-02 and its terms cancel.
