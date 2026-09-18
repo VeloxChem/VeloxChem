@@ -680,6 +680,40 @@ export_simdintegrals(py::module &m) -> void
              py::arg("density"),
              py::arg("coefficients"),
              py::arg("exchange_scaling_factor"))
+        .def("compute_rs",
+             py::overload_cast<const CMolecule &, const CMolecularBasis &, const CMolecularBasis &,
+                               const CSparseTensor &, const CSparseTensor &, const CPackedMatrix &,
+                               const CPackedMatrix &, const CPackedMatrix &, const CPackedMatrix &,
+                               const double, const double, const double, const std::vector<int> &,
+                               const std::vector<int> &>(
+                 &CSimdRIJKGradientDriver::compute_rs, py::const_),
+             "Computes the gradient of a hybrid range separated functional, the restricted form, for "
+             "the given atoms. Only the exchange is split: the Coulomb term is fitted in the plain "
+             "metric and appears once.",
+             py::arg("molecule"), py::arg("basis"), py::arg("aux_basis"), py::arg("bq_vectors"),
+             py::arg("bq_vectors_erf"), py::arg("metric"), py::arg("metric_erf"), py::arg("density"),
+             py::arg("coefficients"), py::arg("exchange_scaling_factor"),
+             py::arg("erf_exchange_scaling_factor"), py::arg("omega"), py::arg("atoms"),
+             py::arg("aux_atoms") = std::vector<int>{})
+        .def("compute_rs",
+             py::overload_cast<const CMolecule &, const CMolecularBasis &, const CMolecularBasis &,
+                               const CSparseTensor &, const CSparseTensor &, const CPackedMatrix &,
+                               const CPackedMatrix &, const CPackedMatrix &, const CPackedMatrix &,
+                               const double, const double, const double>(
+                 &CSimdRIJKGradientDriver::compute_rs, py::const_),
+             "Computes it for every atom of the molecule.",
+             py::arg("molecule"), py::arg("basis"), py::arg("aux_basis"), py::arg("bq_vectors"),
+             py::arg("bq_vectors_erf"), py::arg("metric"), py::arg("metric_erf"), py::arg("density"),
+             py::arg("coefficients"), py::arg("exchange_scaling_factor"),
+             py::arg("erf_exchange_scaling_factor"), py::arg("omega"))
+        .def("compute_open_shell_rs",
+             &CSimdRIJKGradientDriver::compute_open_shell_rs,
+             "Computes the gradient of a hybrid range separated functional, the unrestricted form.",
+             py::arg("molecule"), py::arg("basis"), py::arg("aux_basis"), py::arg("bq_vectors"),
+             py::arg("bq_vectors_erf"), py::arg("metric"), py::arg("metric_erf"), py::arg("density"),
+             py::arg("coefficients_alpha"), py::arg("coefficients_beta"),
+             py::arg("exchange_scaling_factor"), py::arg("erf_exchange_scaling_factor"),
+             py::arg("omega"), py::arg("atoms"), py::arg("aux_atoms") = std::vector<int>{})
         .def("fitted_densities_rs",
              &CSimdRIJKGradientDriver::fitted_densities_rs,
              "Forms the fitted densities of the attenuated operator. The fitting coefficients come "

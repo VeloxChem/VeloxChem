@@ -22,6 +22,7 @@
 #include "SimdThreeCenterElectronRepulsionGradientDriver.hpp"
 #include "SimdThreeCenterElectronRepulsionGradientRsDriver.hpp"
 #include "SimdTwoCenterElectronRepulsionGradientDriver.hpp"
+#include "SimdTwoCenterElectronRepulsionGradientRsDriver.hpp"
 #include "TensorComponents.hpp"
 
 #ifdef VLX_USE_MATHLIB
@@ -687,6 +688,209 @@ CSimdRIJKGradientDriver::fitted_densities(const CSparseTensor   &bq_vectors,
     }
 
     return {std::move(fitting), std::move(orbital_densities), {}, std::move(omega)};
+}
+
+auto
+CSimdRIJKGradientDriver::compute_rs(const CMolecule        &molecule,
+                                    const CMolecularBasis  &basis,
+                                    const CMolecularBasis  &aux_basis,
+                                    const CSparseTensor    &bq_vectors,
+                                    const CSparseTensor    &bq_vectors_erf,
+                                    const CPackedMatrix    &metric,
+                                    const CPackedMatrix    &metric_erf,
+                                    const CPackedMatrix    &density,
+                                    const CPackedMatrix    &coefficients,
+                                    const double            exchange_scaling_factor,
+                                    const double            erf_exchange_scaling_factor,
+                                    const double            omega,
+                                    const std::vector<int> &atoms,
+                                    const std::vector<int> &aux_atoms) const -> CPackedMatrix
+{
+    const auto natoms = molecule.number_of_atoms();
+
+    for (const auto iatom : atoms)
+    {
+        errors::assertMsgCritical(
+            (iatom >= 0) && (static_cast<size_t>(iatom) < natoms),
+            std::string("SimdRIJKGradientDriver.compute_rs: Atom is not an atom of the molecule"));
+    }
+
+    errors::assertMsgCritical(
+        std::set<int>(atoms.begin(), atoms.end()).size() == atoms.size(),
+        std::string("SimdRIJKGradientDriver.compute_rs: An atom is named more than once"));
+
+    errors::assertMsgCritical(
+        density.get_type() == mat_t::symmetric,
+        std::string("SimdRIJKGradientDriver.compute_rs: The density matrix is expected to be symmetric"));
+
+    errors::assertMsgCritical(
+        omega > 0.0,
+        std::string("SimdRIJKGradientDriver.compute_rs: The range separation parameter must be positive. A "
+                    "functional which is not range separated is served by compute"));
+
+    auto gradient = CPackedMatrix(natoms, 3, mat_t::general);
+
+    gradient.zero();
+
+    if (atoms.empty()) return gradient;
+
+    auto wanted = std::vector<bool>(natoms, false);
+
+    for (const auto iatom : atoms) wanted[static_cast<size_t>(iatom)] = true;
+
+    // NOTE: two sets of fitted densities. The plain one carries the Coulomb term
+    // and the plain exchange; the attenuated one carries its exchange alone, is
+    // fitted in its own metric, and comes back with an empty fitting.
+
+    const auto fitted = fitted_densities(bq_vectors, basis, aux_basis, metric, density, coefficients,
+                                         exchange_scaling_factor);
+
+    const auto fitted_erf = fitted_densities_rs(bq_vectors_erf, basis, aux_basis, metric_erf, coefficients,
+                                                erf_exchange_scaling_factor);
+
+    // NOTE: the factors of a closed shell, as in compute above: the density handed
+    // in is one spin's, so the Coulomb carries four and each exchange twice its
+    // coefficient.
+
+    const auto spins = std::vector<TExchangeSpin>{{&coefficients, &fitted.orbital_densities}};
+
+    const auto spins_erf = std::vector<TExchangeSpin>{{&coefficients, &fitted_erf.orbital_densities}};
+
+    _compute_three_center(gradient, molecule, basis, aux_basis, fitted.coefficients, density, spins,
+                          4.0, -2.0 * exchange_scaling_factor, wanted, aux_atoms, spins_erf,
+                          -2.0 * erf_exchange_scaling_factor, omega);
+
+    // NOTE: both metric terms, from one call of the two-center range separated
+    // driver. Each operator's derivative is contracted with its own weighted
+    // density; crossing them would be a gradient of nothing.
+
+    const auto two_center = CSimdTwoCenterElectronRepulsionGradientRsDriver(_block_size);
+
+    const auto [metric_part, metric_part_erf] =
+        two_center.compute(molecule, aux_basis, fitted.omega, fitted_erf.omega, omega, atoms);
+
+    for (size_t iatom = 0; iatom < natoms; iatom++)
+    {
+        for (size_t c = 0; c < 3; c++)
+        {
+            gradient.data()[gradient.index(iatom, c)] -= metric_part.at(iatom, c);
+
+            gradient.data()[gradient.index(iatom, c)] -= metric_part_erf.at(iatom, c);
+        }
+    }
+
+    return gradient;
+}
+
+auto
+CSimdRIJKGradientDriver::compute_rs(const CMolecule       &molecule,
+                                    const CMolecularBasis &basis,
+                                    const CMolecularBasis &aux_basis,
+                                    const CSparseTensor   &bq_vectors,
+                                    const CSparseTensor   &bq_vectors_erf,
+                                    const CPackedMatrix   &metric,
+                                    const CPackedMatrix   &metric_erf,
+                                    const CPackedMatrix   &density,
+                                    const CPackedMatrix   &coefficients,
+                                    const double           exchange_scaling_factor,
+                                    const double           erf_exchange_scaling_factor,
+                                    const double           omega) const -> CPackedMatrix
+{
+    auto atoms = std::vector<int>(molecule.number_of_atoms());
+
+    std::iota(atoms.begin(), atoms.end(), 0);
+
+    return compute_rs(molecule, basis, aux_basis, bq_vectors, bq_vectors_erf, metric, metric_erf, density,
+                      coefficients, exchange_scaling_factor, erf_exchange_scaling_factor, omega, atoms, {});
+}
+
+auto
+CSimdRIJKGradientDriver::compute_open_shell_rs(const CMolecule        &molecule,
+                                               const CMolecularBasis  &basis,
+                                               const CMolecularBasis  &aux_basis,
+                                               const CSparseTensor    &bq_vectors,
+                                               const CSparseTensor    &bq_vectors_erf,
+                                               const CPackedMatrix    &metric,
+                                               const CPackedMatrix    &metric_erf,
+                                               const CPackedMatrix    &density,
+                                               const CPackedMatrix    &coefficients_alpha,
+                                               const CPackedMatrix    &coefficients_beta,
+                                               const double            exchange_scaling_factor,
+                                               const double            erf_exchange_scaling_factor,
+                                               const double            omega,
+                                               const std::vector<int> &atoms,
+                                               const std::vector<int> &aux_atoms) const -> CPackedMatrix
+{
+    const auto natoms = static_cast<size_t>(molecule.number_of_atoms());
+
+    for (const auto iatom : atoms)
+    {
+        errors::assertMsgCritical(
+            (iatom >= 0) && (static_cast<size_t>(iatom) < natoms),
+            std::string("SimdRIJKGradientDriver.compute_open_shell_rs: Atom is not an atom of the molecule"));
+    }
+
+    errors::assertMsgCritical(
+        std::set<int>(atoms.begin(), atoms.end()).size() == atoms.size(),
+        std::string("SimdRIJKGradientDriver.compute_open_shell_rs: An atom is named more than once"));
+
+    errors::assertMsgCritical(
+        density.get_type() == mat_t::symmetric,
+        std::string("SimdRIJKGradientDriver.compute_open_shell_rs: The density matrix is expected to be symmetric"));
+
+    errors::assertMsgCritical(
+        omega > 0.0,
+        std::string("SimdRIJKGradientDriver.compute_open_shell_rs: The range separation parameter must be "
+                    "positive. A functional which is not range separated is served by compute_open_shell"));
+
+    auto gradient = CPackedMatrix(natoms, 3, mat_t::general);
+
+    gradient.zero();
+
+    if (atoms.empty()) return gradient;
+
+    auto wanted = std::vector<bool>(natoms, false);
+
+    for (const auto iatom : atoms) wanted[static_cast<size_t>(iatom)] = true;
+
+    const auto fitted = fitted_densities_open_shell(bq_vectors, basis, aux_basis, metric, density,
+                                                    coefficients_alpha, coefficients_beta,
+                                                    exchange_scaling_factor);
+
+    const auto fitted_erf = fitted_densities_open_shell_rs(bq_vectors_erf, basis, aux_basis, metric_erf,
+                                                           coefficients_alpha, coefficients_beta,
+                                                           erf_exchange_scaling_factor);
+
+    // NOTE: the factors of an open shell, as in compute_open_shell above: the
+    // density is the total one, so the Coulomb carries one and each spin's
+    // exchange carries its coefficient once.
+
+    const auto spins = std::vector<TExchangeSpin>{{&coefficients_alpha, &fitted.orbital_densities},
+                                                  {&coefficients_beta, &fitted.orbital_densities_beta}};
+
+    const auto spins_erf = std::vector<TExchangeSpin>{{&coefficients_alpha, &fitted_erf.orbital_densities},
+                                                      {&coefficients_beta, &fitted_erf.orbital_densities_beta}};
+
+    _compute_three_center(gradient, molecule, basis, aux_basis, fitted.coefficients, density, spins,
+                          1.0, -exchange_scaling_factor, wanted, aux_atoms, spins_erf,
+                          -erf_exchange_scaling_factor, omega);
+
+    const auto two_center = CSimdTwoCenterElectronRepulsionGradientRsDriver(_block_size);
+
+    const auto [metric_part, metric_part_erf] =
+        two_center.compute(molecule, aux_basis, fitted.omega, fitted_erf.omega, omega, atoms);
+
+    for (size_t iatom = 0; iatom < natoms; iatom++)
+    {
+        for (size_t c = 0; c < 3; c++)
+        {
+            gradient.data()[gradient.index(iatom, c)] -= metric_part.at(iatom, c);
+
+            gradient.data()[gradient.index(iatom, c)] -= metric_part_erf.at(iatom, c);
+        }
+    }
+
+    return gradient;
 }
 
 auto

@@ -252,6 +252,76 @@ class CSimdRIJKGradientDriver
     /// applied, which is the ordering rule of the note: applying the metric in the
     /// basis of the atomic orbitals costs the ratio of their number squared to the
     /// orbitals squared, which is a factor of fifty for a molecule of this size.
+    /// @brief Computes the gradient of a hybrid range separated functional, the
+    /// restricted form.
+    /// @param bq_vectors The B vectors of the Coulomb operator.
+    /// @param bq_vectors_erf The B vectors of the attenuated operator.
+    /// @param metric The inverted metric of the Coulomb operator.
+    /// @param metric_erf The inverted metric of the attenuated operator, which is
+    /// a different matrix and not interchangeable with it.
+    /// @param exchange_scaling_factor The coefficient of the plain exchange, which
+    /// is alpha plus beta.
+    /// @param erf_exchange_scaling_factor The coefficient of the attenuated
+    /// exchange, which is the erf coefficient of the functional.
+    /// @param omega The range separation parameter, which must be positive.
+    /// @note A separate entry rather than a flag on compute, so that a calculation
+    /// which is not range separated cannot reach this code and a reader of either
+    /// can see which case they are in. The Coulomb term appears once and is fitted
+    /// in the plain metric: only the exchange is split.
+    auto compute_rs(const CMolecule        &molecule,
+                    const CMolecularBasis  &basis,
+                    const CMolecularBasis  &aux_basis,
+                    const CSparseTensor    &bq_vectors,
+                    const CSparseTensor    &bq_vectors_erf,
+                    const CPackedMatrix    &metric,
+                    const CPackedMatrix    &metric_erf,
+                    const CPackedMatrix    &density,
+                    const CPackedMatrix    &coefficients,
+                    const double            exchange_scaling_factor,
+                    const double            erf_exchange_scaling_factor,
+                    const double            omega,
+                    const std::vector<int> &atoms,
+                    const std::vector<int> &aux_atoms = {}) const -> CPackedMatrix;
+
+    /// @brief Computes it for every atom of the molecule.
+    auto compute_rs(const CMolecule       &molecule,
+                    const CMolecularBasis &basis,
+                    const CMolecularBasis &aux_basis,
+                    const CSparseTensor   &bq_vectors,
+                    const CSparseTensor   &bq_vectors_erf,
+                    const CPackedMatrix   &metric,
+                    const CPackedMatrix   &metric_erf,
+                    const CPackedMatrix   &density,
+                    const CPackedMatrix   &coefficients,
+                    const double           exchange_scaling_factor,
+                    const double           erf_exchange_scaling_factor,
+                    const double           omega) const -> CPackedMatrix;
+
+    /// @brief Computes the gradient of a hybrid range separated functional, the
+    /// unrestricted form.
+    /// @param density The total density, which is that of both spins added.
+    /// @param coefficients_alpha The occupied orbitals of the alpha spin.
+    /// @param coefficients_beta The same for the beta spin, which has a number of
+    /// columns of its own.
+    /// @note The factors are those of compute_open_shell: the Coulomb carries one
+    /// where the closed shell carries four, and each spin's exchange carries its
+    /// coefficient once where the closed shell carries it twice.
+    auto compute_open_shell_rs(const CMolecule        &molecule,
+                               const CMolecularBasis  &basis,
+                               const CMolecularBasis  &aux_basis,
+                               const CSparseTensor    &bq_vectors,
+                               const CSparseTensor    &bq_vectors_erf,
+                               const CPackedMatrix    &metric,
+                               const CPackedMatrix    &metric_erf,
+                               const CPackedMatrix    &density,
+                               const CPackedMatrix    &coefficients_alpha,
+                               const CPackedMatrix    &coefficients_beta,
+                               const double            exchange_scaling_factor,
+                               const double            erf_exchange_scaling_factor,
+                               const double            omega,
+                               const std::vector<int> &atoms,
+                               const std::vector<int> &aux_atoms = {}) const -> CPackedMatrix;
+
     /// @brief The fitted densities of the attenuated operator, for a hybrid range
     /// separated functional.
     /// @param bq_vectors_erf The B vectors of the attenuated operator.
