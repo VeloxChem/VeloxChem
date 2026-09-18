@@ -443,6 +443,12 @@ export_simdintegrals(py::module &m) -> void
         .def("get_mode", &CSimdRIJKFockDriver::get_mode, "Gets the way the driver forms the Fock matrices.")
         .def("get_bq_vectors", &CSimdRIJKFockDriver::get_bq_vectors,
              py::return_value_policy::reference_internal, "Gets the B vectors the driver holds.")
+        .def("get_bq_vectors_erf", &CSimdRIJKFockDriver::get_bq_vectors_erf,
+             py::return_value_policy::reference_internal,
+             "Gets the B vectors of the attenuated operator, which are empty unless the driver was "
+             "prepared for a hybrid range separated functional.")
+        .def("get_omega", &CSimdRIJKFockDriver::get_omega,
+             "Gets the range separation parameter the driver was prepared at, or zero.")
         .def("get_metric", &CSimdRIJKFockDriver::get_metric,
              py::return_value_policy::reference_internal, "Gets the inverted factor of the metric.");
 
@@ -632,7 +638,10 @@ export_simdintegrals(py::module &m) -> void
              py::arg("block_size")    = 0,
              py::arg("memory_budget") = size_t{4} * 1024 * 1024 * 1024)
         .def("compute_exchange",
-             &CSimdRIJKResponseDriver::compute_exchange,
+             static_cast<std::vector<CPackedMatrix> (CSimdRIJKResponseDriver::*)(
+                 const CSparseTensor &, const CMolecularBasis &, const CMolecularBasis &,
+                 const CPackedMatrix &, const std::vector<CPackedMatrix> &) const>(
+                 &CSimdRIJKResponseDriver::compute_exchange),
              "Computes the exchange matrices of densities given as their factors, the density of one "
              "of them being the left factor times the transpose of its right factor. The matrices are "
              "general and carry no scaling by the fraction of exact exchange.",
@@ -641,25 +650,44 @@ export_simdintegrals(py::module &m) -> void
              py::arg("aux_basis"),
              py::arg("left"),
              py::arg("rights"))
+        .def("compute_exchange",
+             static_cast<std::vector<CPackedMatrix> (CSimdRIJKResponseDriver::*)(
+                 const CSparseTensor &, const CSparseTensor &, const CMolecularBasis &,
+                 const CMolecularBasis &, const CPackedMatrix &, const std::vector<CPackedMatrix> &,
+                 const double, const double) const>(&CSimdRIJKResponseDriver::compute_exchange),
+             "Computes the exchange of the Coulomb operator and of the attenuated one together, each "
+             "scaled and added, in one pass over the auxiliary basis. Unlike the form above, what is "
+             "returned carries its scaling.",
+             py::arg("bq_vectors"),
+             py::arg("bq_vectors_erf"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("left"),
+             py::arg("rights"),
+             py::arg("exchange_scaling_factor"),
+             py::arg("erf_exchange_scaling_factor"))
         .def("compute",
              static_cast<std::vector<CPackedMatrix> (CSimdRIJKResponseDriver::*)(
                  const CSparseTensor &, const CMolecularBasis &, const CMolecularBasis &,
-                 const CPackedMatrix &, const std::vector<CPackedMatrix> &, const double) const>(
-                 &CSimdRIJKResponseDriver::compute),
+                 const CPackedMatrix &, const std::vector<CPackedMatrix> &, const double,
+                 const CSparseTensor *, const double) const>(&CSimdRIJKResponseDriver::compute),
              "Computes the Fock matrices of densities given as their factors, twice the Coulomb less "
-             "the scaled exchange, general and not symmetric.",
+             "the scaled exchange, general and not symmetric. A hybrid range separated functional "
+             "hands over the attenuated B vectors and their coefficient as well.",
              py::arg("bq_vectors"),
              py::arg("basis"),
              py::arg("aux_basis"),
              py::arg("left"),
              py::arg("rights"),
-             py::arg("exchange_scaling_factor"))
+             py::arg("exchange_scaling_factor"),
+             py::arg("bq_vectors_erf").none(true) = static_cast<const CSparseTensor *>(nullptr),
+             py::arg("erf_exchange_scaling_factor") = 0.0)
         .def("compute",
              static_cast<std::vector<CPackedMatrix> (CSimdRIJKResponseDriver::*)(
                  const CSparseTensor &, const CMolecularBasis &, const CMolecularBasis &,
                  const CPackedMatrix &, const std::vector<CPackedMatrix> &,
-                 const std::vector<CPackedMatrix> &, const double) const>(
-                 &CSimdRIJKResponseDriver::compute),
+                 const std::vector<CPackedMatrix> &, const double, const CSparseTensor *,
+                 const double) const>(&CSimdRIJKResponseDriver::compute),
              "Computes them for densities of two terms, the density of a pair being the left factor "
              "times the right one transposed, plus the transposed right one times the left factor "
              "transposed.",
@@ -669,7 +697,9 @@ export_simdintegrals(py::module &m) -> void
              py::arg("left"),
              py::arg("rights"),
              py::arg("transposed_rights"),
-             py::arg("exchange_scaling_factor"))
+             py::arg("exchange_scaling_factor"),
+             py::arg("bq_vectors_erf").none(true) = static_cast<const CSparseTensor *>(nullptr),
+             py::arg("erf_exchange_scaling_factor") = 0.0)
         .def("get_threshold", &CSimdRIJKResponseDriver::get_threshold,
              "Gets screening threshold of the integrals.")
         .def("get_block_size", &CSimdRIJKResponseDriver::get_block_size,

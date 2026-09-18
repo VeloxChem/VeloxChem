@@ -21,8 +21,9 @@
 #include "Eigen/Dense"
 #endif
 
-/// @brief The product of a row major matrix by the transpose of another, added to
-/// what is there: C += A B^T, for A of nrows by nsums and B of ncols by nsums.
+/// @brief The product of a row major matrix by the transpose of another, scaled
+/// and added to what is there: C += scale A B^T, for A of nrows by nsums and B of
+/// ncols by nsums.
 /// @note The rows of the three are given as they are laid out and not as they are
 /// used, so a block of a wider array is multiplied where it stands. The right
 /// factors of a batch are transformed as one wide matrix, and each density's share
@@ -36,7 +37,8 @@ _add_multiply_by_transpose(const size_t  nrows,
                            const double *bmat,
                            const size_t  brow,
                            double       *cmat,
-                           const size_t  crow) -> void
+                           const size_t  crow,
+                           const double  scale = 1.0) -> void
 {
 #ifdef VLX_USE_MATHLIB
 
@@ -44,7 +46,7 @@ _add_multiply_by_transpose(const size_t  nrows,
 
     const char trans_n = 'N';
 
-    const double alpha = 1.0;
+    const double alpha = scale;
 
     const double beta = 1.0;
 
@@ -77,7 +79,7 @@ _add_multiply_by_transpose(const size_t  nrows,
     Eigen::Map<RowMajorMatrix, 0, Stride> c(
         cmat, static_cast<Eigen::Index>(nrows), static_cast<Eigen::Index>(ncols), Stride(static_cast<Eigen::Index>(crow), 1));
 
-    c.noalias() += a * b.transpose();
+    c.noalias() += scale * (a * b.transpose());
 
 #endif
 }
@@ -137,6 +139,34 @@ CSimdRIJKResponseDriver::compute_exchange(const CSparseTensor              &bq_v
                                           const CPackedMatrix              &left,
                                           const std::vector<CPackedMatrix> &rights) const -> std::vector<CPackedMatrix>
 {
+    return _exchange({{&bq_vectors, 1.0}}, basis, aux_basis, left, rights);
+}
+
+auto
+CSimdRIJKResponseDriver::compute_exchange(const CSparseTensor              &bq_vectors,
+                                          const CSparseTensor              &bq_vectors_erf,
+                                          const CMolecularBasis            &basis,
+                                          const CMolecularBasis            &aux_basis,
+                                          const CPackedMatrix              &left,
+                                          const std::vector<CPackedMatrix> &rights,
+                                          const double                      exchange_scaling_factor,
+                                          const double                      erf_exchange_scaling_factor) const
+    -> std::vector<CPackedMatrix>
+{
+    return _exchange({{&bq_vectors, exchange_scaling_factor}, {&bq_vectors_erf, erf_exchange_scaling_factor}},
+                     basis,
+                     aux_basis,
+                     left,
+                     rights);
+}
+
+auto
+CSimdRIJKResponseDriver::_exchange(const std::vector<std::pair<const CSparseTensor *, double>> &operators,
+                                   const CMolecularBasis                                      &basis,
+                                   const CMolecularBasis                                      &aux_basis,
+                                   const CPackedMatrix                                        &left,
+                                   const std::vector<CPackedMatrix> &rights) const -> std::vector<CPackedMatrix>
+{
     auto exchanges = std::vector<CPackedMatrix>();
 
     if (rights.empty()) return exchanges;
@@ -195,41 +225,60 @@ CSimdRIJKResponseDriver::compute_exchange(const CSparseTensor              &bq_v
 
     const auto nbatch = std::min(naux, std::max(_min_batch, by_memory));
 
+    // NOTE: one operator or two, inside one pass over the auxiliary basis and into
+    // one set of exchange matrices. Two calls of this would form two sets and add
+    // them, which for a batch of twenty trial vectors of five hundred functions is
+    // eighty megabytes allocated to be summed and thrown away. Each operator has
+    // its own B vectors and so its own transformation of the factors -- that part
+    // cannot be shared -- but the batching, the stacking and the output are.
+
     for (size_t first = 0; first < naux; first += nbatch)
     {
         const auto last = std::min(first + nbatch, naux);
 
-        const auto uvecs = _drv.compute_w_vectors(bq_vectors, basis, aux_basis, left, first, last);
-
-        const auto pvecs = _drv.compute_w_vectors(bq_vectors, basis, aux_basis, stacked, first, last);
-
         const auto count = static_cast<int>(last - first);
+
+        for (const auto &op : operators)
+        {
+            // NOTE: named rather than taken by a structured binding, which a
+            // parallel region below cannot capture.
+            const auto *tensor = op.first;
+
+            const auto scale = op.second;
+
+            if (scale == 0.0) continue;
+
+            const auto uvecs = _drv.compute_w_vectors(*tensor, basis, aux_basis, left, first, last);
+
+            const auto pvecs = _drv.compute_w_vectors(*tensor, basis, aux_basis, stacked, first, last);
 
         // NOTE: the densities and not the auxiliary functions are what the threads
         // divide, so that each of them writes into an exchange matrix of its own
         // and no two of them accumulate into the same one. A batch of trial vectors
         // is what a response calculation always has.
 
-        const auto nrange = static_cast<int>(ndens);
+            const auto nrange = static_cast<int>(ndens);
 
 #pragma omp parallel for schedule(static) if (nrange > 1)
-        for (int at = 0; at < nrange; at++)
-        {
-            const auto idens = static_cast<size_t>(at);
-
-            for (int q = 0; q < count; q++)
+            for (int at = 0; at < nrange; at++)
             {
-                const auto iq = static_cast<size_t>(q);
+                const auto idens = static_cast<size_t>(at);
 
-                _add_multiply_by_transpose(nao,
-                                           nao,
-                                           nvec,
-                                           uvecs[iq].data(),
-                                           nvec,
-                                           pvecs[iq].data() + idens * nvec,
-                                           nwide,
-                                           exchanges[idens].data(),
-                                           nao);
+                for (int q = 0; q < count; q++)
+                {
+                    const auto iq = static_cast<size_t>(q);
+
+                    _add_multiply_by_transpose(nao,
+                                               nao,
+                                               nvec,
+                                               uvecs[iq].data(),
+                                               nvec,
+                                               pvecs[iq].data() + idens * nvec,
+                                               nwide,
+                                               exchanges[idens].data(),
+                                               nao,
+                                               scale);
+                }
             }
         }
     }
@@ -243,10 +292,20 @@ CSimdRIJKResponseDriver::compute(const CSparseTensor              &bq_vectors,
                                  const CMolecularBasis            &aux_basis,
                                  const CPackedMatrix              &left,
                                  const std::vector<CPackedMatrix> &rights,
-                                 const double                      exchange_scaling_factor) const
+                                 const double                      exchange_scaling_factor,
+                                 const CSparseTensor              *bq_vectors_erf,
+                                 const double                      erf_exchange_scaling_factor) const
     -> std::vector<CPackedMatrix>
 {
-    return compute(bq_vectors, basis, aux_basis, left, rights, {}, exchange_scaling_factor);
+    return compute(bq_vectors,
+                   basis,
+                   aux_basis,
+                   left,
+                   rights,
+                   {},
+                   exchange_scaling_factor,
+                   bq_vectors_erf,
+                   erf_exchange_scaling_factor);
 }
 
 auto
@@ -256,9 +315,19 @@ CSimdRIJKResponseDriver::compute(const CSparseTensor              &bq_vectors,
                                  const CPackedMatrix              &left,
                                  const std::vector<CPackedMatrix> &rights,
                                  const std::vector<CPackedMatrix> &transposed_rights,
-                                 const double                      exchange_scaling_factor) const
+                                 const double                      exchange_scaling_factor,
+                                 const CSparseTensor              *bq_vectors_erf,
+                                 const double                      erf_exchange_scaling_factor) const
     -> std::vector<CPackedMatrix>
 {
+    // NOTE: a caller which asks for the exchange of the attenuated operator has to
+    // hand over the B vectors of it. Leaving the long-range term out in silence is
+    // what this refuses; a response calculation which did would converge to the
+    // wrong excitation energies with nothing to say so.
+    errors::assertMsgCritical((erf_exchange_scaling_factor == 0.0) || (bq_vectors_erf != nullptr),
+                              std::string("SimdRIJKResponseDriver: The exchange of the attenuated operator was asked "
+                                          "for and no attenuated B vectors were given"));
+
     auto focks = std::vector<CPackedMatrix>();
 
     if (rights.empty()) return focks;
@@ -285,9 +354,17 @@ CSimdRIJKResponseDriver::compute(const CSparseTensor              &bq_vectors,
     // NOTE: the exchange of the whole batch first, so the left factor is
     // transformed once for all of it. A pure functional asks for none of it.
 
+    // NOTE: what comes back here is already scaled and, for a hybrid range
+    // separated functional, already the sum of the two operators. The assembly
+    // below therefore subtracts it as it stands. Scaling at the end instead would
+    // need the two operators kept apart all the way down, which is a second set of
+    // matrices of the basis squared for every density of the batch.
+
     auto exchanges = std::vector<CPackedMatrix>();
 
-    if (exchange_scaling_factor != 0.0)
+    const auto attenuated = (erf_exchange_scaling_factor != 0.0);
+
+    if ((exchange_scaling_factor != 0.0) || attenuated)
     {
         // NOTE: the two terms side by side in one batch, so the shared factor is
         // transformed once for both of them and not once for each.
@@ -299,7 +376,19 @@ CSimdRIJKResponseDriver::compute(const CSparseTensor              &bq_vectors,
             wanted.insert(wanted.end(), transposed_rights.begin(), transposed_rights.end());
         }
 
-        exchanges = compute_exchange(bq_vectors, basis, aux_basis, left, wanted);
+        exchanges = attenuated ? compute_exchange(bq_vectors,
+                                                  *bq_vectors_erf,
+                                                  basis,
+                                                  aux_basis,
+                                                  left,
+                                                  wanted,
+                                                  exchange_scaling_factor,
+                                                  erf_exchange_scaling_factor)
+                               : _exchange({{&bq_vectors, exchange_scaling_factor}},
+                                           basis,
+                                           aux_basis,
+                                           left,
+                                           wanted);
     }
 
     // NOTE: the right factor the Coulomb is taken with. The two terms of a
@@ -377,11 +466,11 @@ CSimdRIJKResponseDriver::compute(const CSparseTensor              &bq_vectors,
 
                 values[at] = 2.0 * expanded[at];
 
-                if (kvalues != nullptr) values[at] -= exchange_scaling_factor * kvalues[at];
+                if (kvalues != nullptr) values[at] -= kvalues[at];
 
                 if (tvalues != nullptr)
                 {
-                    values[at] -= exchange_scaling_factor * tvalues[col * nao + row];
+                    values[at] -= tvalues[col * nao + row];
                 }
             }
         }

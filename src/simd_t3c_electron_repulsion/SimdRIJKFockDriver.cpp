@@ -1114,6 +1114,18 @@ CSimdRIJKFockDriver::get_metric() const -> const CPackedMatrix &
 }
 
 auto
+CSimdRIJKFockDriver::get_bq_vectors_erf() const -> const CSparseTensor &
+{
+    return _bq_vectors_erf;
+}
+
+auto
+CSimdRIJKFockDriver::get_omega() const -> double
+{
+    return _omega;
+}
+
+auto
 CSimdRIJKFockDriver::compute_exchange(const CPackedMatrix &coefficients,
                                       const double         exchange_scaling_factor,
                                       const size_t         ofirst,

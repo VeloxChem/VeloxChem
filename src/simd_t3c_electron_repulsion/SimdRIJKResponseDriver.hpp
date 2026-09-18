@@ -12,6 +12,7 @@
 #define SimdRIJKResponseDriver_hpp
 
 #include <cstddef>
+#include <utility>
 #include <vector>
 
 #include "MolecularBasis.hpp"
@@ -101,6 +102,30 @@ class CSimdRIJKResponseDriver
                           const CPackedMatrix              &left,
                           const std::vector<CPackedMatrix> &rights) const -> std::vector<CPackedMatrix>;
 
+    /// @brief Computes the exchange of the Coulomb operator and of the attenuated
+    /// one together, each scaled, for a hybrid range separated functional.
+    /// @param bq_vectors The B vectors of the Coulomb operator.
+    /// @param bq_vectors_erf The B vectors of the attenuated operator, on the same
+    /// sparsity pattern, as CSimdRIJKFockDriver formed them together.
+    /// @param exchange_scaling_factor What the plain exchange is scaled by.
+    /// @param erf_exchange_scaling_factor What the attenuated exchange is scaled by.
+    /// @return One matrix for each right factor, holding the two exchanges already
+    /// scaled and added. **Unlike the form above, what is returned carries its
+    /// scaling**, because keeping the operators apart would mean a second matrix of
+    /// the basis squared for every density of the batch, to be added and dropped.
+    /// @note Both operators are swept inside one pass over the auxiliary basis and
+    /// accumulate into one set of matrices. Each of them has its own B vectors and
+    /// so its own transformation of the factors, which cannot be shared; the
+    /// batching, the stacking of the right factors and the output are.
+    auto compute_exchange(const CSparseTensor              &bq_vectors,
+                          const CSparseTensor              &bq_vectors_erf,
+                          const CMolecularBasis            &basis,
+                          const CMolecularBasis            &aux_basis,
+                          const CPackedMatrix              &left,
+                          const std::vector<CPackedMatrix> &rights,
+                          const double                      exchange_scaling_factor,
+                          const double erf_exchange_scaling_factor) const -> std::vector<CPackedMatrix>;
+
     /// @brief Computes the Fock matrices of densities given as their factors.
     /// @param bq_vectors The B vectors, as CSimdRIJKFockDriver formed them.
     /// @param basis The molecular basis.
@@ -125,7 +150,10 @@ class CSimdRIJKResponseDriver
                  const CMolecularBasis            &aux_basis,
                  const CPackedMatrix              &left,
                  const std::vector<CPackedMatrix> &rights,
-                 const double                      exchange_scaling_factor) const -> std::vector<CPackedMatrix>;
+                 const double                      exchange_scaling_factor,
+                 const CSparseTensor              *bq_vectors_erf              = nullptr,
+                 const double                      erf_exchange_scaling_factor = 0.0) const
+        -> std::vector<CPackedMatrix>;
 
     /// @brief Computes them for densities of two terms, the second with the
     /// shared factor on the other side.
@@ -150,9 +178,30 @@ class CSimdRIJKResponseDriver
                  const CPackedMatrix              &left,
                  const std::vector<CPackedMatrix> &rights,
                  const std::vector<CPackedMatrix> &transposed_rights,
-                 const double                      exchange_scaling_factor) const -> std::vector<CPackedMatrix>;
+                 const double                      exchange_scaling_factor,
+                 const CSparseTensor              *bq_vectors_erf              = nullptr,
+                 const double                      erf_exchange_scaling_factor = 0.0) const
+        -> std::vector<CPackedMatrix>;
 
    private:
+    /// @brief Computes the exchange of one operator or of several, each scaled,
+    /// into one set of matrices.
+    /// @param operators The B vectors of each operator and what its exchange is
+    /// scaled by. An operator whose scaling is zero is not swept at all.
+    /// @param basis The molecular basis.
+    /// @param aux_basis The auxiliary molecular basis.
+    /// @param left The left factor, which every density of the batch shares.
+    /// @param rights The right factors, one for each density of the batch.
+    /// @return One matrix for each right factor.
+    /// @note Both public forms above are written in terms of this, so the one
+    /// operator case is the same code as the two operator one rather than a copy of
+    /// it which drifts.
+    auto _exchange(const std::vector<std::pair<const CSparseTensor *, double>> &operators,
+                   const CMolecularBasis                                      &basis,
+                   const CMolecularBasis                                      &aux_basis,
+                   const CPackedMatrix                                        &left,
+                   const std::vector<CPackedMatrix> &rights) const -> std::vector<CPackedMatrix>;
+
     /// @brief Checks the factors are of one basis and of one rank.
     auto _check_factors(const CMolecularBasis            &basis,
                         const CPackedMatrix              &left,

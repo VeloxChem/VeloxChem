@@ -405,6 +405,17 @@ class CSimdRIJKFockDriver
     /// @return The B vectors.
     auto get_bq_vectors() const -> const CSparseTensor &;
 
+    /// @brief Gets the B vectors of the attenuated operator.
+    /// @return The B vectors, which are empty unless the driver was prepared for a
+    /// hybrid range separated functional.
+    auto get_bq_vectors_erf() const -> const CSparseTensor &;
+
+    /// @brief Gets the range separation parameter the driver was prepared at.
+    /// @return The parameter, or zero where there is no attenuated set. A caller
+    /// which holds a driver someone else prepared asks this to know whether it can
+    /// serve the functional it has, rather than finding out in the build.
+    auto get_omega() const -> double;
+
     /// @brief Gets the inverted Cholesky factor of the metric the driver holds.
     /// @return The inverted factor.
     auto get_metric() const -> const CPackedMatrix &;
