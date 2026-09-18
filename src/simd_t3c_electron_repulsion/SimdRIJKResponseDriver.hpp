@@ -183,6 +183,70 @@ class CSimdRIJKResponseDriver
                  const double                      erf_exchange_scaling_factor = 0.0) const
         -> std::vector<CPackedMatrix>;
 
+    /// @brief Computes the Fock matrices of the two spins of an unrestricted
+    /// reference, from densities given as the factors of each spin.
+    /// @param bq_vectors The B vectors.
+    /// @param basis The molecular basis.
+    /// @param aux_basis The auxiliary molecular basis.
+    /// @param left_alpha The left factor the alpha densities share, which is the
+    /// occupied orbitals of that spin.
+    /// @param rights_alpha The right factor of the first term of each alpha
+    /// density.
+    /// @param transposed_rights_alpha The left factor of the second term of each
+    /// alpha density, empty where the densities have one term.
+    /// @param left_beta The same for the beta spin, which has a number of columns
+    /// of its own: the two spins of an open shell do not occupy the same number of
+    /// orbitals.
+    /// @param rights_beta As above, for the beta spin.
+    /// @param transposed_rights_beta As above, for the beta spin.
+    /// @param exchange_scaling_factor The fraction of exact exchange.
+    /// @return The Fock matrices of the alpha spin and those of the beta spin, one
+    /// of each per density.
+    /// @note The Coulomb matrix is of the two spins' densities added and is **not**
+    /// doubled, where the restricted entries above are handed one spin's density
+    /// and double it. It is formed once for a pair and serves both, which is what
+    /// makes this cheaper than two restricted builds.
+    /// @note The exchange of each spin is formed from its own left factor. The two
+    /// spins share no transformation: their left factors are the occupied orbitals
+    /// of each of them and differ both in what they are and in how many there are.
+    /// That is what an unrestricted batch costs over a restricted one.
+    auto compute_unrestricted(const CSparseTensor              &bq_vectors,
+                              const CMolecularBasis            &basis,
+                              const CMolecularBasis            &aux_basis,
+                              const CPackedMatrix              &left_alpha,
+                              const std::vector<CPackedMatrix> &rights_alpha,
+                              const std::vector<CPackedMatrix> &transposed_rights_alpha,
+                              const CPackedMatrix              &left_beta,
+                              const std::vector<CPackedMatrix> &rights_beta,
+                              const std::vector<CPackedMatrix> &transposed_rights_beta,
+                              const double                      exchange_scaling_factor) const
+        -> std::pair<std::vector<CPackedMatrix>, std::vector<CPackedMatrix>>;
+
+    /// @brief The same for a hybrid range separated functional, whose exchange is
+    /// split between the plain operator and the attenuated one.
+    /// @param bq_vectors_erf The B vectors of the attenuated operator, on the same
+    /// sparsity pattern as the plain ones.
+    /// @param erf_exchange_scaling_factor What the attenuated exchange is scaled
+    /// by, which is the erf coefficient of the functional.
+    /// @note A separate entry rather than a defaulted argument on the one above,
+    /// so that a calculation which is not range separated cannot reach this code at
+    /// all and a reader of either can see which case it is in.
+    /// @note The Coulomb is formed from the plain B vectors here as everywhere: the
+    /// splitting is of the exchange alone.
+    auto compute_unrestricted_rs(const CSparseTensor              &bq_vectors,
+                                 const CSparseTensor              &bq_vectors_erf,
+                                 const CMolecularBasis            &basis,
+                                 const CMolecularBasis            &aux_basis,
+                                 const CPackedMatrix              &left_alpha,
+                                 const std::vector<CPackedMatrix> &rights_alpha,
+                                 const std::vector<CPackedMatrix> &transposed_rights_alpha,
+                                 const CPackedMatrix              &left_beta,
+                                 const std::vector<CPackedMatrix> &rights_beta,
+                                 const std::vector<CPackedMatrix> &transposed_rights_beta,
+                                 const double                      exchange_scaling_factor,
+                                 const double                      erf_exchange_scaling_factor) const
+        -> std::pair<std::vector<CPackedMatrix>, std::vector<CPackedMatrix>>;
+
    private:
     /// @brief Computes the exchange of one operator or of several, each scaled,
     /// into one set of matrices.
@@ -201,6 +265,27 @@ class CSimdRIJKResponseDriver
                    const CMolecularBasis                                      &aux_basis,
                    const CPackedMatrix                                        &left,
                    const std::vector<CPackedMatrix> &rights) const -> std::vector<CPackedMatrix>;
+
+    /// @brief Computes the Fock matrices of the two spins, for one operator or
+    /// several.
+    /// @param operators The B vectors of each operator of the exchange and what it
+    /// is scaled by.
+    /// @param coulomb_vectors The B vectors the Coulomb is closed with, which are
+    /// the plain ones whatever the exchange is made of.
+    /// @note Both unrestricted entries above are written in terms of this, so the
+    /// plain case is the same code as the range separated one rather than a copy of
+    /// it which drifts.
+    auto _unrestricted(const std::vector<std::pair<const CSparseTensor *, double>> &operators,
+                       const CSparseTensor                                        &coulomb_vectors,
+                       const CMolecularBasis                                      &basis,
+                       const CMolecularBasis                                      &aux_basis,
+                       const CPackedMatrix                                        &left_alpha,
+                       const std::vector<CPackedMatrix>                           &rights_alpha,
+                       const std::vector<CPackedMatrix>                           &transposed_rights_alpha,
+                       const CPackedMatrix                                        &left_beta,
+                       const std::vector<CPackedMatrix>                           &rights_beta,
+                       const std::vector<CPackedMatrix>                           &transposed_rights_beta) const
+        -> std::pair<std::vector<CPackedMatrix>, std::vector<CPackedMatrix>>;
 
     /// @brief Checks the factors are of one basis and of one rank.
     auto _check_factors(const CMolecularBasis            &basis,

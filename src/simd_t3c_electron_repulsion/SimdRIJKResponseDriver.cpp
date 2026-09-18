@@ -161,6 +161,273 @@ CSimdRIJKResponseDriver::compute_exchange(const CSparseTensor              &bq_v
 }
 
 auto
+CSimdRIJKResponseDriver::compute_unrestricted(const CSparseTensor              &bq_vectors,
+                                              const CMolecularBasis            &basis,
+                                              const CMolecularBasis            &aux_basis,
+                                              const CPackedMatrix              &left_alpha,
+                                              const std::vector<CPackedMatrix> &rights_alpha,
+                                              const std::vector<CPackedMatrix> &transposed_rights_alpha,
+                                              const CPackedMatrix              &left_beta,
+                                              const std::vector<CPackedMatrix> &rights_beta,
+                                              const std::vector<CPackedMatrix> &transposed_rights_beta,
+                                              const double                      exchange_scaling_factor) const
+    -> std::pair<std::vector<CPackedMatrix>, std::vector<CPackedMatrix>>
+{
+    return _unrestricted({{&bq_vectors, exchange_scaling_factor}},
+                         bq_vectors,
+                         basis,
+                         aux_basis,
+                         left_alpha,
+                         rights_alpha,
+                         transposed_rights_alpha,
+                         left_beta,
+                         rights_beta,
+                         transposed_rights_beta);
+}
+
+auto
+CSimdRIJKResponseDriver::compute_unrestricted_rs(const CSparseTensor              &bq_vectors,
+                                                 const CSparseTensor              &bq_vectors_erf,
+                                                 const CMolecularBasis            &basis,
+                                                 const CMolecularBasis            &aux_basis,
+                                                 const CPackedMatrix              &left_alpha,
+                                                 const std::vector<CPackedMatrix> &rights_alpha,
+                                                 const std::vector<CPackedMatrix> &transposed_rights_alpha,
+                                                 const CPackedMatrix              &left_beta,
+                                                 const std::vector<CPackedMatrix> &rights_beta,
+                                                 const std::vector<CPackedMatrix> &transposed_rights_beta,
+                                                 const double                      exchange_scaling_factor,
+                                                 const double erf_exchange_scaling_factor) const
+    -> std::pair<std::vector<CPackedMatrix>, std::vector<CPackedMatrix>>
+{
+    // NOTE: the Coulomb term is formed from the plain B vectors whatever the
+    // functional. Only the exchange is split between the two operators; the
+    // Coulomb of a range separated functional is the whole of 1 / r.
+    return _unrestricted({{&bq_vectors, exchange_scaling_factor}, {&bq_vectors_erf, erf_exchange_scaling_factor}},
+                         bq_vectors,
+                         basis,
+                         aux_basis,
+                         left_alpha,
+                         rights_alpha,
+                         transposed_rights_alpha,
+                         left_beta,
+                         rights_beta,
+                         transposed_rights_beta);
+}
+
+auto
+CSimdRIJKResponseDriver::_unrestricted(const std::vector<std::pair<const CSparseTensor *, double>> &operators,
+                                       const CSparseTensor              &coulomb_vectors,
+                                       const CMolecularBasis            &basis,
+                                       const CMolecularBasis            &aux_basis,
+                                       const CPackedMatrix              &left_alpha,
+                                       const std::vector<CPackedMatrix> &rights_alpha,
+                                       const std::vector<CPackedMatrix> &transposed_rights_alpha,
+                                       const CPackedMatrix              &left_beta,
+                                       const std::vector<CPackedMatrix> &rights_beta,
+                                       const std::vector<CPackedMatrix> &transposed_rights_beta) const
+    -> std::pair<std::vector<CPackedMatrix>, std::vector<CPackedMatrix>>
+{
+    auto focks_alpha = std::vector<CPackedMatrix>();
+
+    auto focks_beta = std::vector<CPackedMatrix>();
+
+    if (rights_alpha.empty()) return {std::move(focks_alpha), std::move(focks_beta)};
+
+    errors::assertMsgCritical(rights_alpha.size() == rights_beta.size(),
+                              std::string("SimdRIJKResponseDriver: The two spins do not carry the same number of "
+                                          "densities"));
+
+    _check_factors(basis, left_alpha, rights_alpha);
+
+    _check_factors(basis, left_beta, rights_beta);
+
+    const auto two_termed_alpha = !transposed_rights_alpha.empty();
+
+    const auto two_termed_beta = !transposed_rights_beta.empty();
+
+    if (two_termed_alpha)
+    {
+        errors::assertMsgCritical(transposed_rights_alpha.size() == rights_alpha.size(),
+                                  std::string("SimdRIJKResponseDriver: The two terms of the alpha densities are not "
+                                              "of one count"));
+
+        _check_factors(basis, left_alpha, transposed_rights_alpha);
+    }
+
+    if (two_termed_beta)
+    {
+        errors::assertMsgCritical(transposed_rights_beta.size() == rights_beta.size(),
+                                  std::string("SimdRIJKResponseDriver: The two terms of the beta densities are not of "
+                                              "one count"));
+
+        _check_factors(basis, left_beta, transposed_rights_beta);
+    }
+
+    const auto nao = basis.dimensions_of_basis();
+
+    const auto ndens = rights_alpha.size();
+
+    // NOTE: the two spins do not share a transformation. Their left factors are
+    // the occupied orbitals of each of them, which differ both in what they are
+    // and in how many there are, so the exchange of each spin is formed from its
+    // own. That is what an unrestricted batch costs over a restricted one, and it
+    // is the operators and not the spins which are swept together.
+
+    auto exchange_of = [&](const CPackedMatrix              &left,
+                           const std::vector<CPackedMatrix> &rights,
+                           const std::vector<CPackedMatrix> &transposed_rights,
+                           const bool                        two_termed) {
+        auto wanted = rights;
+
+        if (two_termed)
+        {
+            wanted.insert(wanted.end(), transposed_rights.begin(), transposed_rights.end());
+        }
+
+        return _exchange(operators, basis, aux_basis, left, wanted);
+    };
+
+    auto any_exchange = false;
+
+    for (const auto &op : operators)
+    {
+        if (op.second != 0.0) any_exchange = true;
+    }
+
+    auto exchanges_alpha = std::vector<CPackedMatrix>();
+
+    auto exchanges_beta = std::vector<CPackedMatrix>();
+
+    if (any_exchange)
+    {
+        exchanges_alpha = exchange_of(left_alpha, rights_alpha, transposed_rights_alpha, two_termed_alpha);
+
+        exchanges_beta = exchange_of(left_beta, rights_beta, transposed_rights_beta, two_termed_beta);
+    }
+
+    // NOTE: the right factor the Coulomb of a spin is taken with, which for a
+    // density of two terms is the sum of theirs: the two terms have the same
+    // symmetric part as the single term whose right factor is that sum, and the
+    // Coulomb sees nothing else of a density.
+
+    auto summed_of = [&](const std::vector<CPackedMatrix> &rights,
+                         const std::vector<CPackedMatrix> &transposed_rights,
+                         const bool                        two_termed) {
+        auto summed = std::vector<CPackedMatrix>();
+
+        if (!two_termed) return summed;
+
+        const auto nvec = rights.front().number_of_columns();
+
+        for (size_t idens = 0; idens < rights.size(); idens++)
+        {
+            auto total = CPackedMatrix(nao, nvec, mat_t::general);
+
+            const auto *first = rights[idens].data();
+
+            const auto *second = transposed_rights[idens].data();
+
+            auto *values = total.data();
+
+            for (size_t at = 0; at < nao * nvec; at++) values[at] = first[at] + second[at];
+
+            summed.push_back(std::move(total));
+        }
+
+        return summed;
+    };
+
+    const auto summed_alpha = summed_of(rights_alpha, transposed_rights_alpha, two_termed_alpha);
+
+    const auto summed_beta = summed_of(rights_beta, transposed_rights_beta, two_termed_beta);
+
+    const auto &coulomb_rights_alpha = two_termed_alpha ? summed_alpha : rights_alpha;
+
+    const auto &coulomb_rights_beta = two_termed_beta ? summed_beta : rights_beta;
+
+    const auto nvec_alpha = left_alpha.number_of_columns();
+
+    const auto nvec_beta = left_beta.number_of_columns();
+
+    auto expanded = std::vector<double>(nao * nao, 0.0);
+
+    for (size_t idens = 0; idens < ndens; idens++)
+    {
+        // NOTE: the Coulomb is of the density of both spins added, and is formed
+        // once for the pair rather than once for each of them. Both spins see the
+        // same Coulomb matrix, which is what makes an unrestricted build cheaper
+        // than two restricted ones.
+
+        auto density = CPackedMatrix(nao, nao, mat_t::general);
+
+        density.zero();
+
+        _add_multiply_by_transpose(nao,
+                                   nao,
+                                   nvec_alpha,
+                                   left_alpha.data(),
+                                   nvec_alpha,
+                                   coulomb_rights_alpha[idens].data(),
+                                   nvec_alpha,
+                                   density.data(),
+                                   nao);
+
+        _add_multiply_by_transpose(nao,
+                                   nao,
+                                   nvec_beta,
+                                   left_beta.data(),
+                                   nvec_beta,
+                                   coulomb_rights_beta[idens].data(),
+                                   nvec_beta,
+                                   density.data(),
+                                   nao);
+
+        const auto yvector = _drv.compute_y_vector(coulomb_vectors, basis, aux_basis, density);
+
+        const auto coulomb = _drv.compute_fock_matrix(coulomb_vectors, basis, aux_basis, yvector);
+
+        coulomb.to_dense(expanded.data());
+
+        // NOTE: the Coulomb enters **once** and is not doubled, where the
+        // restricted entry above is handed one spin's density and doubles it.
+
+        auto assemble = [&](std::vector<CPackedMatrix>       &focks,
+                            const std::vector<CPackedMatrix> &exchanges,
+                            const bool                        two_termed) {
+            focks.push_back(CPackedMatrix(nao, nao, mat_t::general));
+
+            auto *values = focks.back().data();
+
+            const auto *kvalues = exchanges.empty() ? nullptr : exchanges[idens].data();
+
+            const auto *tvalues =
+                (two_termed && (kvalues != nullptr)) ? exchanges[ndens + idens].data() : nullptr;
+
+            for (size_t row = 0; row < nao; row++)
+            {
+                for (size_t col = 0; col < nao; col++)
+                {
+                    const auto at = row * nao + col;
+
+                    values[at] = expanded[at];
+
+                    if (kvalues != nullptr) values[at] -= kvalues[at];
+
+                    if (tvalues != nullptr) values[at] -= tvalues[col * nao + row];
+                }
+            }
+        };
+
+        assemble(focks_alpha, exchanges_alpha, two_termed_alpha);
+
+        assemble(focks_beta, exchanges_beta, two_termed_beta);
+    }
+
+    return {std::move(focks_alpha), std::move(focks_beta)};
+}
+
+auto
 CSimdRIJKResponseDriver::_exchange(const std::vector<std::pair<const CSparseTensor *, double>> &operators,
                                    const CMolecularBasis                                      &basis,
                                    const CMolecularBasis                                      &aux_basis,

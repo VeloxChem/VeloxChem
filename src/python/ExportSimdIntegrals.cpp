@@ -700,6 +700,36 @@ export_simdintegrals(py::module &m) -> void
              py::arg("exchange_scaling_factor"),
              py::arg("bq_vectors_erf").none(true) = static_cast<const CSparseTensor *>(nullptr),
              py::arg("erf_exchange_scaling_factor") = 0.0)
+        .def("compute_unrestricted",
+             &CSimdRIJKResponseDriver::compute_unrestricted,
+             "Computes the Fock matrices of the two spins of an unrestricted reference, from the "
+             "factors of each spin. The Coulomb is of both densities added and is not doubled.",
+             py::arg("bq_vectors"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("left_alpha"),
+             py::arg("rights_alpha"),
+             py::arg("transposed_rights_alpha"),
+             py::arg("left_beta"),
+             py::arg("rights_beta"),
+             py::arg("transposed_rights_beta"),
+             py::arg("exchange_scaling_factor"))
+        .def("compute_unrestricted_rs",
+             &CSimdRIJKResponseDriver::compute_unrestricted_rs,
+             "The same for a hybrid range separated functional, whose exchange is split between the "
+             "plain operator and the attenuated one.",
+             py::arg("bq_vectors"),
+             py::arg("bq_vectors_erf"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("left_alpha"),
+             py::arg("rights_alpha"),
+             py::arg("transposed_rights_alpha"),
+             py::arg("left_beta"),
+             py::arg("rights_beta"),
+             py::arg("transposed_rights_beta"),
+             py::arg("exchange_scaling_factor"),
+             py::arg("erf_exchange_scaling_factor"))
         .def("get_threshold", &CSimdRIJKResponseDriver::get_threshold,
              "Gets screening threshold of the integrals.")
         .def("get_block_size", &CSimdRIJKResponseDriver::get_block_size,
