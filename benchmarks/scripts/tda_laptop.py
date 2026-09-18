@@ -1,9 +1,13 @@
 """Caffeine TDA on the laptop: four-centre against RI-JK simd.
 
-    python tda_laptop.py [molecule] [basis,basis] [tda|rpa]
+    python tda_laptop.py [molecule] [basis,basis] [tda|rpa] [functional,functional]
 
-Five states, HF and B3LYP, both ways in one process per case. Writes one record
-per calculation to ../data/tda/ and prints the table.
+Five states, both ways in one process per case. The functionals default to HF and
+B3LYP; naming range separated ones instead measures the path which splits the
+exchange between the plain operator and the attenuated one, and the record goes to
+a file of its own so the two are not mixed in one table.
+
+Writes one record per calculation to ../data/tda/ and prints the table.
 """
 import os
 import sys
@@ -11,6 +15,7 @@ from datetime import date
 from pathlib import Path
 
 import numpy as np
+from veloxchem.veloxchemlib import parse_xc_func
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -21,8 +26,19 @@ MOLECULE = sys.argv[1] if len(sys.argv) > 1 else "caffeine"
 AUX = "def2-universal-jkfit"
 BASES = sys.argv[2].split(",") if len(sys.argv) > 2 else ["def2-svp"]
 SOLVER = sys.argv[3] if len(sys.argv) > 3 else "tda"
-FUNCTIONALS = ["HF", "B3LYP"]
+FUNCTIONALS = sys.argv[4].split(",") if len(sys.argv) > 4 else ["HF", "B3LYP"]
 METHODS = ["full", "ri_jk_simd"]
+
+# NOTE: a range separated grid is kept apart from the plain one. They measure
+# different Fock matrices, not the same one built differently, and a reader of one
+# table should not have to tell its rows apart by the name of the functional.
+# Whether a functional is one is asked of veloxchem rather than read off its name,
+# which would have to be kept in step with the library by hand.
+RANGE_SEPARATED = any(
+    f.upper() != "HF" and parse_xc_func(f.upper()).is_range_separated()
+    for f in FUNCTIONALS)
+
+TAG = "_rs" if RANGE_SEPARATED else ""
 
 THREADS = int(os.environ.get("OMP_NUM_THREADS", os.cpu_count()))
 
@@ -38,7 +54,7 @@ for functional in FUNCTIONALS:
                   f'  {row["iterations"]:3d} iter'
                   f'  converged {row["converged"]}', flush=True)
             out = (Path(__file__).resolve().parent.parent / "data" / "tda" /
-                   f'{date.today():%Y-%m-%d}_m4max_{MOLECULE}'
+                   f'{date.today():%Y-%m-%d}_m4max_{MOLECULE}{TAG}'
                    f'{"" if SOLVER == "tda" else "_" + SOLVER}.json')
             write(out, "tda", provenance("m4max", 1, THREADS), rows)
 

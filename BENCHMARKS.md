@@ -9716,3 +9716,87 @@ is 1.84 at def2-svp, rising to 2.02 at def2-tzvpd as the fixed costs shrink besi
 the integrals. Re-estimating from one measured pair was within 10 per cent per row,
 which is the third time in these notes that the analogy was wrong and the first
 measurement was right.
+
+## The range separated hybrids in TDA and TD-DFT
+
+The excited state solvers reach the resolution of the identity through the factorised
+Fock build, which takes a batch of trial vectors as the factors they were made from
+and transforms the shared left factor once for all of them. A hybrid range separated
+functional adds a second set of B vectors there as it does in the ground state, and
+its exchange is accumulated into the same matrices inside the same pass over the
+auxiliary basis.
+
+Five states, caffeine, `def2-universal-jkfit`, `OMP_NUM_THREADS=14`, one rank. The
+records are `benchmarks/data/tda/2026-09-18_m4max_caffeine_rs.json` and
+`..._rs_rpa.json`, with the B3LYP controls in `..._caffeine.json` and
+`..._caffeine_rpa.json` of the same date. The runner is
+`benchmarks/scripts/tda_laptop.py`, which now takes the functionals as an argument
+and writes a range separated grid to a file of its own.
+
+**This is def2-svp alone.** The four basis grid the plain tables carry was estimated
+at eight hours after this row was measured, and was not run. What is here establishes
+the ratio; how it grows with the basis is not measured for these functionals.
+
+| solver | functional | four-centre | RI-JK simd | speedup | vs control |
+| --- | --- | ---: | ---: | ---: | ---: |
+| TDA | B3LYP | 57.88 (10 it) | 12.80 (10 it) | 4.52 | control |
+| | CAM-B3LYP | 113.72 (12 it) | 17.73 (12 it) | **6.41** | 1.42 |
+| | wB97X-D4 | 122.72 (13 it) | 19.06 (13 it) | **6.44** | 1.42 |
+| TD-DFT | B3LYP | 56.36 (11 it) | 14.25 (11 it) | 3.95 | control |
+| | CAM-B3LYP | 110.60 (14 it) | 21.41 (14 it) | **5.17** | 1.31 |
+| | wB97X-D4 | 118.56 (14 it) | 22.73 (14 it) | **5.22** | 1.32 |
+
+Seconds for the excited state part; the ground state beneath each is 29.8 four-centre
+and 5.6 by the resolution of the identity for the range separated rows, and 17.4 and
+4.3 for the controls.
+
+**Every row took the same number of iterations both ways**, so each speedup is a
+ratio of two equal amounts of work and not of two different journeys.
+
+### The controls were measured again for this table
+
+The B3LYP rows of the plain TDA and RPA tables earlier in this file were taken on
+2026-09-16. Measured again on the day the range separated rows were, four-centre TDA
+came out at **57.88 seconds against 51.64**, twelve per cent slower on the same
+machine and the same code.
+
+That drift is larger than the effect the control is there to measure the ratio
+against, and reading the new rows against the old ones would have reported the
+advantage as 1.52 where it is **1.42**. The rows above are therefore all of one
+session. The older table keeps its own numbers, which describe the run that produced
+them.
+
+### What the split costs each way
+
+Per iteration, against the B3LYP control of the same solver:
+
+| | four-centre | RI-JK simd |
+| --- | ---: | ---: |
+| TDA, CAM-B3LYP | 1.64x | 1.15x |
+| TDA, wB97X-D4 | 1.63x | 1.15x |
+| TD-DFT, CAM-B3LYP | 1.54x | 1.18x |
+| TD-DFT, wB97X-D4 | 1.65x | 1.25x |
+
+The same shape as the ground state, and for the same reason set out there: the two
+ways pay similar multiples on the build itself, and what differs is how much of the
+run the build is. It is a smaller effect here than in the ground state -- 1.42 and
+1.31 against 1.4 to 1.6 -- because an excited state calculation carries more that is
+neither Coulomb nor exchange.
+
+### The iterations are not the same, and that is the functional's doing
+
+The range separated runs take **12 and 13 iterations where B3LYP takes 10** in the
+Tamm-Dancoff approximation, and 14 against 11 in linear response. Neither path causes
+it: the four-centre and the simd rows of a given functional agree on the count
+exactly. It is worth recording because it is what made the estimate of the four basis
+grid grow: a twenty to twenty seven per cent longer journey multiplies whatever the
+per iteration cost is, and an estimate built from per iteration multipliers alone
+would have been that much low.
+
+### Against the four-centre answer
+
+The excitation energies of the two paths agree to **8.1e-06 to 9.2e-06 hartree** on
+every row, which is the largest difference over the five states. That is the fitting
+error of the auxiliary basis and it is far smaller than the error in the Fock matrices
+it comes from -- those are 1e-03 relative for a transition density -- because the
+fitting error is common to the states and largely cancels in an eigenvalue.

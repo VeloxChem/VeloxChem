@@ -1,0 +1,131 @@
+{
+  "schema": 1,
+  "suite": "tda",
+  "run": {
+    "date": "2026-09-18T12:40:33+02:00",
+    "commit": "df4b99a27",
+    "dirty": true,
+    "veloxchem": "1.0rc4",
+    "machine": {
+      "name": "m4max",
+      "cpu": "Apple M4 Max",
+      "cores": 14,
+      "os": "Darwin 25.6.0"
+    },
+    "config": {
+      "mpi_ranks": 1,
+      "omp_threads": 14,
+      "blas": []
+    }
+  },
+  "rows": [
+    {
+      "molecule": "caffeine",
+      "solver": "tda",
+      "atoms": 24,
+      "basis": "def2-svp",
+      "nao": 246,
+      "aux_basis": null,
+      "naux": null,
+      "occupied": 51,
+      "method": "full",
+      "ri_mode": null,
+      "functional": "CAM-B3LYP",
+      "nstates": 5,
+      "conv_thresh": 1e-08,
+      "tda_thresh": 1e-05,
+      "scf_wall": 29.862,
+      "tda_wall": 113.719,
+      "iterations": 12,
+      "converged": true,
+      "excitation_energies": [
+        0.18882540644712031,
+        0.18932999626058894,
+        0.22030340177989027,
+        0.22101042250113873,
+        0.22683807267126116
+      ]
+    },
+    {
+      "molecule": "caffeine",
+      "solver": "tda",
+      "atoms": 24,
+      "basis": "def2-svp",
+      "nao": 246,
+      "aux_basis": "def2-universal-jkfit",
+      "naux": 1242,
+      "occupied": 51,
+      "method": "ri_jk_simd",
+      "ri_mode": "in_memory",
+      "functional": "CAM-B3LYP",
+      "nstates": 5,
+      "conv_thresh": 1e-08,
+      "tda_thresh": 1e-05,
+      "scf_wall": 5.638,
+      "tda_wall": 17.733,
+      "iterations": 12,
+      "converged": true,
+      "excitation_energies": [
+        0.18881931233757152,
+        0.18932314554116028,
+        0.22029667298622652,
+        0.2210041808943911,
+        0.22682898054329004
+      ]
+    },
+    {
+      "molecule": "caffeine",
+      "solver": "tda",
+      "atoms": 24,
+      "basis": "def2-svp",
+      "nao": 246,
+      "aux_basis": null,
+      "naux": null,
+      "occupied": 51,
+      "method": "full",
+      "ri_mode": null,
+      "functional": "WB97X-D4",
+      "nstates": 5,
+      "conv_thresh": 1e-08,
+      "tda_thresh": 1e-05,
+      "scf_wall": 29.763,
+      "tda_wall": 122.721,
+      "iterations": 13,
+      "converged": true,
+      "excitation_energies": [
+        0.1957106660257252,
+        0.19598312280089075,
+        0.2279995612835195,
+        0.22965813364546805,
+        0.23241682563499813
+      ]
+    },
+    {
+      "molecule": "caffeine",
+      "solver": "tda",
+      "atoms": 24,
+      "basis": "def2-svp",
+      "nao": 246,
+      "aux_basis": "def2-universal-jkfit",
+      "naux": 1242,
+      "occupied": 51,
+      "method": "ri_jk_simd",
+      "ri_mode": "in_memory",
+      "functional": "WB97X-D4",
+      "nstates": 5,
+      "conv_thresh": 1e-08,
+      "tda_thresh": 1e-05,
+      "scf_wall": 5.573,
+      "tda_wall": 19.056,
+      "iterations": 13,
+      "converged": true,
+      "excitation_energies": [
+        0.19570361348682075,
+        0.1959770762547412,
+        0.2279916148901421,
+        0.22965206880873887,
+        0.23240873151978714
+      ]
+    }
+  ]
+}
