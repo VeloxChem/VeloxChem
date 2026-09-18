@@ -2,8 +2,8 @@
   "schema": 1,
   "suite": "tda",
   "run": {
-    "date": "2026-09-18T12:40:33+02:00",
-    "commit": "df4b99a27",
+    "date": "2026-09-18T13:03:51+02:00",
+    "commit": "cf796efd6",
     "dirty": true,
     "veloxchem": "1.0rc4",
     "machine": {
@@ -30,20 +30,74 @@
       "occupied": 51,
       "method": "full",
       "ri_mode": null,
+      "functional": "B3LYP",
+      "nstates": 5,
+      "conv_thresh": 1e-08,
+      "tda_thresh": 1e-05,
+      "scf_wall": 15.322,
+      "tda_wall": 51.124,
+      "iterations": 10,
+      "converged": true,
+      "excitation_energies": [
+        0.1734477098067969,
+        0.17477872454863164,
+        0.20140143988647227,
+        0.20343218197204332,
+        0.2153451464884485
+      ]
+    },
+    {
+      "molecule": "caffeine",
+      "solver": "tda",
+      "atoms": 24,
+      "basis": "def2-svp",
+      "nao": 246,
+      "aux_basis": "def2-universal-jkfit",
+      "naux": 1242,
+      "occupied": 51,
+      "method": "ri_jk_simd",
+      "ri_mode": "in_memory",
+      "functional": "B3LYP",
+      "nstates": 5,
+      "conv_thresh": 1e-08,
+      "tda_thresh": 1e-05,
+      "scf_wall": 4.095,
+      "tda_wall": 12.176,
+      "iterations": 10,
+      "converged": true,
+      "excitation_energies": [
+        0.1734420334170244,
+        0.1747727715040226,
+        0.20139610360229124,
+        0.2034266090108578,
+        0.2153392412273449
+      ]
+    },
+    {
+      "molecule": "caffeine",
+      "solver": "tda",
+      "atoms": 24,
+      "basis": "def2-svp",
+      "nao": 246,
+      "aux_basis": null,
+      "naux": null,
+      "occupied": 51,
+      "method": "full",
+      "ri_mode": null,
       "functional": "CAM-B3LYP",
       "nstates": 5,
       "conv_thresh": 1e-08,
       "tda_thresh": 1e-05,
-      "scf_wall": 29.862,
-      "tda_wall": 113.719,
+      "scf_wall": 27.635,
+      "tda_wall": 102.318,
       "iterations": 12,
       "converged": true,
       "excitation_energies": [
-        0.18882540644712031,
-        0.18932999626058894,
-        0.22030340177989027,
-        0.22101042250113873,
-        0.22683807267126116
+        0.18882540644712842,
+        0.18932999626060032,
+        0.22030340177989421,
+        0.22101042250114183,
+        0.22683807267126296
       ]
     },
     {
@@ -61,16 +115,16 @@
       "nstates": 5,
       "conv_thresh": 1e-08,
       "tda_thresh": 1e-05,
-      "scf_wall": 5.638,
-      "tda_wall": 17.733,
+      "scf_wall": 5.275,
+      "tda_wall": 17.074,
       "iterations": 12,
       "converged": true,
       "excitation_energies": [
-        0.18881931233757152,
-        0.18932314554116028,
-        0.22029667298622652,
-        0.2210041808943911,
-        0.22682898054329004
+        0.18881931233757113,
+        0.18932314554116095,
+        0.22029667298622718,
+        0.22100418089439183,
+        0.22682898054328948
       ]
     },
     {
@@ -88,16 +142,16 @@
       "nstates": 5,
       "conv_thresh": 1e-08,
       "tda_thresh": 1e-05,
-      "scf_wall": 29.763,
-      "tda_wall": 122.721,
+      "scf_wall": 27.309,
+      "tda_wall": 108.941,
       "iterations": 13,
       "converged": true,
       "excitation_energies": [
-        0.1957106660257252,
-        0.19598312280089075,
-        0.2279995612835195,
-        0.22965813364546805,
-        0.23241682563499813
+        0.1957106660257398,
+        0.1959831228008923,
+        0.2279995612835239,
+        0.2296581336454799,
+        0.232416825635001
       ]
     },
     {
@@ -115,16 +169,16 @@
       "nstates": 5,
       "conv_thresh": 1e-08,
       "tda_thresh": 1e-05,
-      "scf_wall": 5.573,
-      "tda_wall": 19.056,
+      "scf_wall": 5.183,
+      "tda_wall": 18.116,
       "iterations": 13,
       "converged": true,
       "excitation_energies": [
-        0.19570361348682075,
-        0.1959770762547412,
-        0.2279916148901421,
-        0.22965206880873887,
-        0.23240873151978714
+        0.19570361348681597,
+        0.1959770762547382,
+        0.22799161489014066,
+        0.22965206880873368,
+        0.23240873151978447
       ]
     }
   ]

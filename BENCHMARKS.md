@@ -9728,68 +9728,29 @@ auxiliary basis.
 
 Five states, caffeine, `def2-universal-jkfit`, `OMP_NUM_THREADS=14`, one rank. The
 records are `benchmarks/data/tda/2026-09-18_m4max_caffeine_rs.json` and
-`..._rs_rpa.json`, with the B3LYP controls in `..._caffeine.json` and
-`..._caffeine_rpa.json` of the same date. The runner is
-`benchmarks/scripts/tda_laptop.py`, which now takes the functionals as an argument
-and writes a range separated grid to a file of its own.
+`..._rs_rpa.json`, and the runner is `benchmarks/scripts/tda_laptop.py`, which now
+takes the functionals as an argument and writes a range separated grid to a file of
+its own. **B3LYP is measured in the same file and the same run as the rows it is the
+control for**, rather than being read out of the plain tables earlier in this file.
 
 **This is def2-svp alone.** The four basis grid the plain tables carry was estimated
-at eight hours after this row was measured, and was not run. What is here establishes
-the ratio; how it grows with the basis is not measured for these functionals.
+at eight hours once this row had been measured, and was not run. What is here
+establishes the ratio; how it grows with the basis is not measured for these
+functionals.
 
-**And it was measured on a busy machine.** One core was held by another process
-throughout, which the section at the end sets out. The ratios stand; the seconds are
-high.
+Seconds for the excited state part, with the ground state beneath it.
 
-| solver | functional | four-centre | RI-JK simd | speedup | vs control |
-| --- | --- | ---: | ---: | ---: | ---: |
-| TDA | B3LYP | 57.88 (10 it) | 12.80 (10 it) | 4.52 | control |
-| | CAM-B3LYP | 113.72 (12 it) | 17.73 (12 it) | **6.41** | 1.42 |
-| | wB97X-D4 | 122.72 (13 it) | 19.06 (13 it) | **6.44** | 1.42 |
-| TD-DFT | B3LYP | 56.36 (11 it) | 14.25 (11 it) | 3.95 | control |
-| | CAM-B3LYP | 110.60 (14 it) | 21.41 (14 it) | **5.17** | 1.31 |
-| | wB97X-D4 | 118.56 (14 it) | 22.73 (14 it) | **5.22** | 1.32 |
-
-Seconds for the excited state part; the ground state beneath each is 29.8 four-centre
-and 5.6 by the resolution of the identity for the range separated rows, and 17.4 and
-4.3 for the controls.
+| solver | functional | four-centre | RI-JK simd | speedup | vs control | SCF |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| TDA | B3LYP | 51.12 (10 it) | 12.18 (10 it) | 4.20 | control | 15.3 / 4.1 |
+| | CAM-B3LYP | 102.32 (12 it) | 17.07 (12 it) | **5.99** | 1.43 | 27.6 / 5.3 |
+| | wB97X-D4 | 108.94 (13 it) | 18.12 (13 it) | **6.01** | 1.43 | 27.3 / 5.2 |
+| TD-DFT | B3LYP | 49.65 (11 it) | 13.63 (11 it) | 3.64 | control | 15.2 / 4.1 |
+| | CAM-B3LYP | 99.30 (14 it) | 20.55 (14 it) | **4.83** | 1.33 | 27.3 / 5.2 |
+| | wB97X-D4 | 105.51 (14 it) | 21.66 (14 it) | **4.87** | 1.34 | 27.0 / 5.2 |
 
 **Every row took the same number of iterations both ways**, so each speedup is a
 ratio of two equal amounts of work and not of two different journeys.
-
-### One core was taken by something else, and what that does and does not spoil
-
-**Every row of this section was measured while another process held one core.** A
-generator run was occupying a core at a hundred per cent throughout, so these six
-rows had thirteen of the fourteen threads they asked for. The absolute seconds above
-are therefore high, and they are not comparable with the plain TDA and RPA tables
-earlier in this file, which were measured on 2026-09-16 with the machine to
-themselves.
-
-The size of it is visible because the B3LYP controls were measured twice: four-centre
-TDA is **57.88 seconds here against 51.64 on 2026-09-16**, twelve per cent slower for
-the same code on the same machine. That was first written down here as machine drift,
-which it is not.
-
-What it spoils and what it does not is worth separating.
-
-The **speedups within a row** are the soundest thing here: both of their runs were
-short the same core. They are not exactly what an undisturbed machine would give --
-the four-centre run is the more thread bound of the two and loses more from losing a
-core, which inflates the ratio -- but the effect is second order, and the same
-inflation sits on the control.
-
-The **comparison against the control** is what the controls were re-measured for, and
-it survives: 1.42 and 1.31 are ratios of two numbers taken minutes apart under the
-same load. Had the new rows been read against the 2026-09-16 controls instead, the
-advantage would have come out as 1.52, and that figure would have been the missing
-core and not the functional.
-
-The **absolute times** should be taken as an upper bound and the four basis grid, if
-it is ever run, should not be read against these rows.
-
-Nothing else in this file is affected: the range separated ground state tables above
-were finished before the generator started.
 
 ### What the split costs each way
 
@@ -9797,15 +9758,15 @@ Per iteration, against the B3LYP control of the same solver:
 
 | | four-centre | RI-JK simd |
 | --- | ---: | ---: |
-| TDA, CAM-B3LYP | 1.64x | 1.15x |
-| TDA, wB97X-D4 | 1.63x | 1.15x |
-| TD-DFT, CAM-B3LYP | 1.54x | 1.18x |
-| TD-DFT, wB97X-D4 | 1.65x | 1.25x |
+| TDA, CAM-B3LYP | 1.67x | 1.17x |
+| TDA, wB97X-D4 | 1.64x | 1.14x |
+| TD-DFT, CAM-B3LYP | 1.57x | 1.18x |
+| TD-DFT, wB97X-D4 | 1.67x | 1.25x |
 
-The same shape as the ground state, and for the same reason set out there: the two
+The same shape as the ground state and for the same reason set out there: the two
 ways pay similar multiples on the build itself, and what differs is how much of the
-run the build is. It is a smaller effect here than in the ground state -- 1.42 and
-1.31 against 1.4 to 1.6 -- because an excited state calculation carries more that is
+run the build is. It is a smaller effect here -- 1.43 and 1.33 against the 1.4 to 1.6
+of the ground state -- because an excited state calculation carries more that is
 neither Coulomb nor exchange.
 
 ### The iterations are not the same, and that is the functional's doing
@@ -9815,13 +9776,28 @@ Tamm-Dancoff approximation, and 14 against 11 in linear response. Neither path c
 it: the four-centre and the simd rows of a given functional agree on the count
 exactly. It is worth recording because it is what made the estimate of the four basis
 grid grow: a twenty to twenty seven per cent longer journey multiplies whatever the
-per iteration cost is, and an estimate built from per iteration multipliers alone
-would have been that much low.
+per iteration cost is, and an estimate built from per iteration multipliers alone is
+that much low.
 
-### Against the four-centre answer
+### These rows were measured twice, and the first set was thrown away
 
-The excitation energies of the two paths agree to **8.1e-06 to 9.2e-06 hartree** on
-every row, which is the largest difference over the five states. That is the fitting
-error of the auxiliary basis and it is far smaller than the error in the Fock matrices
-it comes from -- those are 1e-03 relative for a transition density -- because the
-fitting error is common to the states and largely cancels in an eigenvalue.
+The first measurement of this table ran while a code generator held one core at a
+hundred per cent for its whole duration, so it had thirteen of the fourteen threads
+it asked for. The rows above are the second measurement, taken after that finished,
+with the machine otherwise idle.
+
+It is worth recording what that cost and what it did not, because the numbers happen
+to say it cleanly. The contended four-centre rows were **11 to 13 per cent** slow and
+the contended simd rows **4 to 5**, which is the thread bound path losing more from
+losing a thread. So the **speedups were inflated**: 6.41 where it is 5.99 for
+CAM-B3LYP in the Tamm-Dancoff approximation. The **ratio against the control was
+not**: 1.42 contended against 1.43 clean, because the control was measured under the
+same load, minutes apart.
+
+The first reading of this was wrong in a way worth naming. The contended B3LYP row
+came out at 57.88 seconds against the 51.64 of the plain table taken two days before,
+and that was written down here as the machine drifting between runs. It was not
+drift: measured again on a quiet machine the same row is **51.12**, within one per
+cent of the two day old number. There was nothing to drift. **A benchmark which
+disagrees with an older one by ten per cent is a reason to look at what else is
+running, not a reason to write a sentence about drift.**
