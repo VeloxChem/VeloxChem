@@ -9737,6 +9737,10 @@ and writes a range separated grid to a file of its own.
 at eight hours after this row was measured, and was not run. What is here establishes
 the ratio; how it grows with the basis is not measured for these functionals.
 
+**And it was measured on a busy machine.** One core was held by another process
+throughout, which the section at the end sets out. The ratios stand; the seconds are
+high.
+
 | solver | functional | four-centre | RI-JK simd | speedup | vs control |
 | --- | --- | ---: | ---: | ---: | ---: |
 | TDA | B3LYP | 57.88 (10 it) | 12.80 (10 it) | 4.52 | control |
@@ -9753,18 +9757,39 @@ and 5.6 by the resolution of the identity for the range separated rows, and 17.4
 **Every row took the same number of iterations both ways**, so each speedup is a
 ratio of two equal amounts of work and not of two different journeys.
 
-### The controls were measured again for this table
+### One core was taken by something else, and what that does and does not spoil
 
-The B3LYP rows of the plain TDA and RPA tables earlier in this file were taken on
-2026-09-16. Measured again on the day the range separated rows were, four-centre TDA
-came out at **57.88 seconds against 51.64**, twelve per cent slower on the same
-machine and the same code.
+**Every row of this section was measured while another process held one core.** A
+generator run was occupying a core at a hundred per cent throughout, so these six
+rows had thirteen of the fourteen threads they asked for. The absolute seconds above
+are therefore high, and they are not comparable with the plain TDA and RPA tables
+earlier in this file, which were measured on 2026-09-16 with the machine to
+themselves.
 
-That drift is larger than the effect the control is there to measure the ratio
-against, and reading the new rows against the old ones would have reported the
-advantage as 1.52 where it is **1.42**. The rows above are therefore all of one
-session. The older table keeps its own numbers, which describe the run that produced
-them.
+The size of it is visible because the B3LYP controls were measured twice: four-centre
+TDA is **57.88 seconds here against 51.64 on 2026-09-16**, twelve per cent slower for
+the same code on the same machine. That was first written down here as machine drift,
+which it is not.
+
+What it spoils and what it does not is worth separating.
+
+The **speedups within a row** are the soundest thing here: both of their runs were
+short the same core. They are not exactly what an undisturbed machine would give --
+the four-centre run is the more thread bound of the two and loses more from losing a
+core, which inflates the ratio -- but the effect is second order, and the same
+inflation sits on the control.
+
+The **comparison against the control** is what the controls were re-measured for, and
+it survives: 1.42 and 1.31 are ratios of two numbers taken minutes apart under the
+same load. Had the new rows been read against the 2026-09-16 controls instead, the
+advantage would have come out as 1.52, and that figure would have been the missing
+core and not the functional.
+
+The **absolute times** should be taken as an upper bound and the four basis grid, if
+it is ever run, should not be read against these rows.
+
+Nothing else in this file is affected: the range separated ground state tables above
+were finished before the generator started.
 
 ### What the split costs each way
 
