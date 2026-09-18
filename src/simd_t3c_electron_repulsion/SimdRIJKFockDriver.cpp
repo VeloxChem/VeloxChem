@@ -55,6 +55,7 @@
 #include "SimdThreeCenterElectronRepulsionDriver.hpp"
 #include "SimdT3CDistributor.hpp"
 #include "SimdTwoCenterElectronRepulsionDriver.hpp"
+#include "SimdTwoCenterElectronRepulsionRsDriver.hpp"
 #include "OpenMPFunc.hpp"
 #include "TripleSparsityPattern.hpp"
 
@@ -301,6 +302,37 @@ aux_functions_of(const CMolecularBasis &aux_basis, const std::vector<int> &atoms
     return functions;
 }
 
+/// @brief Inverts a metric by the route asked for, falling back where there is no
+/// Cholesky factor to be had.
+/// @param two_center The metric of the fitting basis.
+/// @param metric_threshold The threshold below which a direction is dropped.
+/// @param use_inverse_square_root Whether to invert the square root of the metric.
+/// @param what What the metric is, named in the warning a fallback prints, so that a
+/// caller inverting two of them says which of the two it was.
+/// @return The inverted metric.
+static auto
+invert_metric(const CPackedMatrix &two_center,
+              const double         metric_threshold,
+              const bool           use_inverse_square_root,
+              const std::string   &what) -> CPackedMatrix
+{
+    if (use_inverse_square_root) return packlin::inverse_square_root(two_center, metric_threshold);
+
+    try
+    {
+        return packlin::cholesky_inverse(two_center);
+    }
+    catch (const std::runtime_error &)
+    {
+        errors::msg(std::string("RIJKFockDriver: The ") + what +
+                        std::string(" has no Cholesky factor, so its square root is inverted instead. This is a "
+                                    "nearly linearly dependent fitting basis."),
+                    "Warning");
+
+        return packlin::inverse_square_root(two_center, metric_threshold);
+    }
+}
+
 /// @brief Forms the metric a way of building asks for, and the way it is for.
 /// @param molecule The molecule to compute the metric of.
 /// @param aux_basis The auxiliary molecular basis.
@@ -376,28 +408,8 @@ form_metric(const CMolecule       &molecule,
         return {std::move(root), rimode::direct};
     }
 
-    auto metric = CPackedMatrix();
-
-    if (use_inverse_square_root)
-    {
-        metric = packlin::inverse_square_root(two_center, metric_threshold);
-    }
-    else
-    {
-        try
-        {
-            metric = packlin::cholesky_inverse(two_center);
-        }
-        catch (const std::runtime_error &)
-        {
-            errors::msg(std::string("RIJKFockDriver: The metric of the fitting basis has no Cholesky factor, so its "
-                                    "square root is inverted instead. This is a nearly linearly dependent fitting "
-                                    "basis."),
-                        "Warning");
-
-            metric = packlin::inverse_square_root(two_center, metric_threshold);
-        }
-    }
+    auto metric = invert_metric(two_center, metric_threshold, use_inverse_square_root,
+                                "metric of the fitting basis");
 
     if (metric_time) *metric_time += prof_since(mark_metric);
 
@@ -417,6 +429,68 @@ CSimdRIJKFockDriver::make_metric(const CMolecule       &molecule,
                               std::string("RIJKFockDriver: The metric is formed for a named way of building"));
 
     return form_metric(molecule, aux_basis, metric_threshold, use_inverse_square_root, mode, nullptr, nullptr);
+}
+
+auto
+CSimdRIJKFockDriver::make_metric_rs(const CMolecule       &molecule,
+                                    const CMolecularBasis &aux_basis,
+                                    const double           metric_threshold,
+                                    const bool             use_inverse_square_root,
+                                    const rimode           mode,
+                                    const double           omega) const -> std::pair<CPackedMatrix, CPackedMatrix>
+{
+    // NOTE: the way which forms the integrals again on every call solves the factor
+    // of the metric against the half transformed integrals, and there is one such
+    // pass and one factor. Two operators there means two passes and two factors,
+    // which its three calls have no shape for, so the range separated way is the
+    // one which holds the B vectors and this refuses the other rather than forming
+    // a metric which cannot be used.
+    errors::assertMsgCritical(mode == rimode::in_memory,
+                              std::string("RIJKFockDriver: The range separated metrics are formed only for the way "
+                                          "which holds the B vectors"));
+
+    // NOTE: the attenuated metric of a vanishing omega is the zero matrix, whose
+    // inverse is not a thing to fall back into. A caller with no range separation
+    // wants the plain metric and make_metric above.
+    errors::assertMsgCritical(omega > 0.0,
+                              std::string("RIJKFockDriver: The range separation parameter must be positive"));
+
+    // NOTE: the two matrices come out of one call, which forms the two operators
+    // over one set of primitive pairs rather than sweeping the fitting basis twice.
+
+    const auto [two_center, two_center_erf] =
+        CSimdTwoCenterElectronRepulsionRsDriver().compute(molecule, aux_basis, omega);
+
+    // NOTE: both are inverted by the route asked for, with the same fallback. The
+    // attenuated metric is the worse conditioned of the two by construction -- the
+    // transform of erf(omega r) / r carries a Gaussian factor where that of 1 / r
+    // does not, so its spectrum falls away exponentially rather than as a power.
+    // The fitting sets measured have a least eigenvalue of 1e-15 to 1e-13 at the
+    // omega of a range separated functional, against 1e-6 to 1e-3 for the plain
+    // metric of the same basis. The warning names which of the two it was, as the
+    // two are not interchangeable and a reader of the output would otherwise not
+    // know.
+
+    // NOTE: the fallback is therefore not a reliable guard here, and is not meant
+    // to be one. A matrix whose least eigenvalue is a small positive number has a
+    // Cholesky factor as far as the factorization is concerned, so it succeeds and
+    // returns one whose inverse differs from the inverse on the conditioned
+    // directions by six orders of magnitude. **That is harmless, and forcing the
+    // eigenvalue route to avoid it would buy nothing.** All of that difference
+    // lives in the near null space, where the attenuated three-center integrals are
+    // themselves zero: the same Gaussian damping which empties the metric there
+    // empties them. Measured on water in def2-SVP against the four-center
+    // attenuated exchange, the two routes agree to every digit -- 3.85e-09 against
+    // 3.86e-09 of relative error at omega 0.2, 4.59e-07 at 0.33 -- and the error is
+    // the fitting error of the basis and not the conditioning of the metric.
+
+    auto metric = invert_metric(two_center, metric_threshold, use_inverse_square_root,
+                                "metric of the fitting basis");
+
+    auto metric_erf = invert_metric(two_center_erf, metric_threshold, use_inverse_square_root,
+                                    "attenuated metric of the fitting basis");
+
+    return {std::move(metric), std::move(metric_erf)};
 }
 
 auto

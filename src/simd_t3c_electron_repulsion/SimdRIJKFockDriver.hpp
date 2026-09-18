@@ -151,6 +151,31 @@ class CSimdRIJKFockDriver
                      const bool             use_inverse_square_root,
                      const rimode           mode) const -> std::pair<CPackedMatrix, rimode>;
 
+    /// @brief Forms the metric of the Coulomb operator and that of the attenuated
+    /// one, both inverted, for a hybrid range separated functional.
+    /// @param molecule The molecule to compute the metrics of.
+    /// @param aux_basis The auxiliary molecular basis.
+    /// @param metric_threshold The eigenvalues of a metric at or below which a
+    /// direction is dropped, when it is inverted through its square root.
+    /// @param use_inverse_square_root True to invert the square roots rather than
+    /// the Cholesky factors.
+    /// @param mode The way of building the metrics are for, which must be the one
+    /// which holds the B vectors.
+    /// @param omega The range separation parameter, which must be positive.
+    /// @return The inverted metric of the Coulomb operator and that of the
+    /// attenuated one.
+    /// @note The two operators are formed in one call of the two-center range
+    /// separated driver rather than in two sweeps of the fitting basis, and each
+    /// matrix is inverted by the route asked for with the same fallback. The way
+    /// which answers is not returned, as unlike make_metric above there is only one
+    /// it can be: the range separated way holds its B vectors.
+    auto make_metric_rs(const CMolecule       &molecule,
+                        const CMolecularBasis &aux_basis,
+                        const double           metric_threshold,
+                        const bool             use_inverse_square_root,
+                        const rimode           mode,
+                        const double           omega) const -> std::pair<CPackedMatrix, CPackedMatrix>;
+
     /// @brief Forms the inverted factor of the metric and the B vectors.
     /// @param molecule The molecule to compute the Fock matrices of.
     /// @param basis The molecular basis.

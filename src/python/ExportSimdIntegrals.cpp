@@ -345,6 +345,16 @@ export_simdintegrals(py::module &m) -> void
              py::arg("metric_threshold") = 1.0e-12,
              py::arg("use_inverse_square_root") = false,
              py::arg("mode") = rimode::in_memory)
+        .def("make_metric_rs",
+             &CSimdRIJKFockDriver::make_metric_rs,
+             "Forms the inverted metric of the Coulomb operator and that of the attenuated one, "
+             "for the way which holds the B vectors.",
+             py::arg("molecule"),
+             py::arg("aux_basis"),
+             py::arg("metric_threshold"),
+             py::arg("use_inverse_square_root"),
+             py::arg("mode"),
+             py::arg("omega"))
         .def("prepare",
              &CSimdRIJKFockDriver::prepare,
              "Forms the inverted factor of the metric and the B vectors.",
