@@ -18,6 +18,9 @@ from veloxchem.outputstream import OutputStream
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.tdaeigensolver import TdaEigenSolver
 from veloxchem.lreigensolver import LinearResponseEigenSolver
+from veloxchem.lreigensolverunrest import LinearResponseUnrestrictedEigenSolver
+from veloxchem.scfunrestdriver import ScfUnrestrictedDriver
+from veloxchem.tdaeigensolverunrest import TdaUnrestrictedEigenSolver
 
 from scfbench import GEOMETRIES
 
@@ -29,6 +32,16 @@ SOLVERS = {
     "rpa": LinearResponseEigenSolver,
 }
 
+# NOTE: the same two solvers for an unrestricted reference, which are separate
+# classes and not a setting on the ones above. A row of an unrestricted run is not
+# comparable with a row of a restricted one however alike the two read: the trial
+# space carries both spins and a four-centre build forms the Coulomb and two
+# exchanges where a restricted one forms a single matrix.
+UNRESTRICTED_SOLVERS = {
+    "tda": TdaUnrestrictedEigenSolver,
+    "rpa": LinearResponseUnrestrictedEigenSolver,
+}
+
 # method -> (ri_jk, ri_jk_simd, ri_mode)
 METHODS = {
     "full": (False, False, None),
@@ -37,14 +50,29 @@ METHODS = {
 
 
 def run(molecule_name, basis_name, aux_name, method, functional, nstates=5,
-        conv_thresh=1.0e-8, tda_thresh=1.0e-5, solver="tda"):
-    """Runs one ground state and its TDA, and returns the record."""
+        conv_thresh=1.0e-8, tda_thresh=1.0e-5, solver="tda", charge=0,
+        multiplicity=1, max_iter=150):
+    """Runs one ground state and its excited states, and returns the record.
+
+    :param charge:
+        The charge of the molecule.
+    :param multiplicity:
+        The spin multiplicity. Anything but one is run unrestricted, in both the
+        ground state and the excited states.
+    """
     molecule = vlx.Molecule.read_xyz_file(str(GEOMETRIES / f"{molecule_name}.xyz"))
+    molecule.set_charge(charge)
+    molecule.set_multiplicity(multiplicity)
     basis = vlx.MolecularBasis.read(molecule, basis_name.upper(), ostream=None)
 
     ri_jk, simd, ri_mode = METHODS[method]
 
-    scf = ScfRestrictedDriver(ostream=OutputStream(None))
+    restricted = (multiplicity == 1)
+
+    scf_class = ScfRestrictedDriver if restricted else ScfUnrestrictedDriver
+
+    scf = scf_class(ostream=OutputStream(None))
+    scf.max_iter = max_iter
     scf.conv_thresh = conv_thresh
     if functional.upper() != "HF":
         scf.xcfun = functional
@@ -59,7 +87,9 @@ def run(molecule_name, basis_name, aux_name, method, functional, nstates=5,
     scf.compute(molecule, basis)
     scf_wall = time.time() - t0
 
-    tda = SOLVERS[solver](ostream=OutputStream(None))
+    solvers = SOLVERS if restricted else UNRESTRICTED_SOLVERS
+
+    tda = solvers[solver](ostream=OutputStream(None))
     tda.nstates = nstates
     tda.conv_thresh = tda_thresh
     if functional.upper() != "HF":
@@ -86,6 +116,10 @@ def run(molecule_name, basis_name, aux_name, method, functional, nstates=5,
         "aux_basis": aux_name if ri_jk else None,
         "naux": aux.get_dimensions_of_basis() if aux is not None else None,
         "occupied": molecule.number_of_alpha_electrons(),
+        "beta_occupied": molecule.number_of_beta_electrons(),
+        "charge": int(charge),
+        "multiplicity": int(multiplicity),
+        "scf_type": "restricted" if restricted else "unrestricted",
         "method": method,
         "ri_mode": ri_mode if ri_jk else None,
         "functional": functional,

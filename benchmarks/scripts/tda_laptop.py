@@ -1,6 +1,7 @@
 """Caffeine TDA on the laptop: four-centre against RI-JK simd.
 
-    python tda_laptop.py [molecule] [basis,basis] [tda|rpa] [functional,functional]
+    python tda_laptop.py [molecule] [basis,basis] [tda|rpa] [functional,functional] \
+                         [charge] [multiplicity]
 
 Five states, both ways in one process per case. The functionals default to HF and
 B3LYP; naming range separated ones instead measures the path which splits the
@@ -27,6 +28,8 @@ AUX = "def2-universal-jkfit"
 BASES = sys.argv[2].split(",") if len(sys.argv) > 2 else ["def2-svp"]
 SOLVER = sys.argv[3] if len(sys.argv) > 3 else "tda"
 FUNCTIONALS = sys.argv[4].split(",") if len(sys.argv) > 4 else ["HF", "B3LYP"]
+CHARGE = int(sys.argv[5]) if len(sys.argv) > 5 else 0
+MULTIPLICITY = int(sys.argv[6]) if len(sys.argv) > 6 else 1
 METHODS = ["full", "ri_jk_simd"]
 
 # NOTE: a range separated grid is kept apart from the plain one. They measure
@@ -40,6 +43,12 @@ RANGE_SEPARATED = any(
 
 TAG = "_rs" if RANGE_SEPARATED else ""
 
+# NOTE: an unrestricted grid goes to a file of its own. It measures a different
+# calculation and not the same one done differently, so its rows have no business
+# in a table beside the restricted ones.
+if MULTIPLICITY != 1:
+    TAG += f"_m{MULTIPLICITY}"
+
 THREADS = int(os.environ.get("OMP_NUM_THREADS", os.cpu_count()))
 
 rows = []
@@ -47,7 +56,8 @@ for functional in FUNCTIONALS:
     for basis in BASES:
         for method in METHODS:
             row = run(MOLECULE, basis, AUX, method, functional,
-                      solver=SOLVER)
+                      solver=SOLVER, charge=CHARGE,
+                      multiplicity=MULTIPLICITY)
             rows.append(row)
             print(f'  {functional:6s} {basis:10s} {method:12s}'
                   f'  scf {row["scf_wall"]:8.2f}  {SOLVER} {row["tda_wall"]:9.2f}'

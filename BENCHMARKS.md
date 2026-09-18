@@ -9893,3 +9893,77 @@ it would be differentiating converges.
 The **unrestricted response path** and the **exciton driver** are untouched, the first
 because it has no factorised build to extend and the second because it refuses range
 separation for reasons of its own.
+
+## The unrestricted excited states, where the open shell helps rather than hurts
+
+The response path had no resolution of the identity for an unrestricted reference at
+all -- not a range separated gap but an absent path, and one which did not refuse
+either: a calculation which asked for RI-JK formed the B vectors, paid for them, and
+built every Fock matrix from four-centre integrals. The factorised build now serves
+both spins.
+
+What it forms, per density, is the Coulomb of the two spins' densities added and
+**undoubled**, less each spin's own exchange. The two spins share that Coulomb and
+share nothing else: their left factors are the occupied orbitals of each of them and
+differ both in what they are and in how many there are, so each exchange is formed
+from its own transformation.
+
+Nitroxide, the doublet radical of the optimization tables, def2-SVP,
+`def2-universal-jkfit`, five states, `OMP_NUM_THREADS=14`, one rank. Twelve runs in
+27 minutes. The records are
+`benchmarks/data/tda/2026-09-18_m4max_nitroxide_rs_m2.json` and `..._rpa.json`, and
+B3LYP is measured in the same file and the same run as the rows it is the control
+for.
+
+**restricted** is the same functional and solver on caffeine from the section above,
+and is there for the comparison the next subsection makes. It is a different
+molecule -- 219 functions against 246 -- so it is not a controlled comparison.
+
+| solver | functional | four-centre | RI-JK simd | speedup | vs control | restricted |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| TDA | B3LYP | 151.40 (13 it) | 30.43 (13 it) | 4.98 | control | 4.20 |
+| | CAM-B3LYP | 213.84 (11 it) | 31.04 (11 it) | **6.89** | 1.38 | 5.99 |
+| | wB97X-D4 | 199.21 (10 it) | 28.82 (10 it) | **6.91** | 1.39 | 6.01 |
+| TD-DFT | B3LYP | 127.08 (12 it) | 28.39 (12 it) | 4.48 | control | 3.64 |
+| | CAM-B3LYP | 206.47 (12 it) | 35.36 (12 it) | **5.84** | 1.30 | 4.83 |
+| | wB97X-D4 | 205.92 (12 it) | 35.27 (12 it) | **5.84** | 1.30 | 4.87 |
+
+Every row took the same number of iterations both ways. The excitation energies of
+the two paths agree to **7.1e-06 to 7.9e-06 hartree** over the five states.
+
+### A prediction which was wrong, and why
+
+Before this was measured it was written down that the unrestricted speedup would come
+out **clearly lower** than the restricted one, because the two spins cannot share the
+transformation of the left factor and an unrestricted batch therefore costs two where
+a restricted one costs one.
+
+**All six rows came out higher**, by fifteen to twenty per cent.
+
+The reasoning was half an argument. The part which is true is that the resolution of
+the identity pays two transformations instead of one. The part which was left out is
+that the four-centre way pays worse: it forms the Coulomb and two exchanges where a
+restricted build forms a single `2jkx` matrix, while the fitted path still shares one
+Coulomb between the spins. The open shell is harder on the dense way than on the
+fitted one, so the ratio rises. What was costed was one side of a ratio and what was
+stated was a conclusion about the ratio.
+
+The same effect is in the ground state tables, where the open shell speedups also run
+ahead of the closed shell ones, and the gradient section states the mechanism
+correctly -- the four-centre way builds a second exchange from nothing while the
+resolution of the identity forms its B vectors once for both spins. It was not
+carried across to the excited states, where the arithmetic is the same.
+
+**How far it goes is not established here.** Nitroxide and caffeine are different
+molecules, so the six pairs above agree on the direction and say nothing reliable
+about the size. The measurement which would settle it is one molecule in both spin
+states, as the gradient section did for the ground state, and it has not been made.
+
+### What the split costs, unchanged from everywhere else
+
+Per iteration, against the B3LYP control of the same solver: **1.63 to 1.67 times**
+for the four-centre way and about **1.2** for the simd one, which are the same two
+numbers the ground state and the restricted excited states gave. The two range
+separated functionals agree with each other to within three per cent in every row,
+here as everywhere: what the split costs follows the number of passes and not the
+coefficients.
