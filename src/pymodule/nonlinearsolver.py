@@ -909,19 +909,25 @@ class NonlinearSolver:
                          dens_factors is not None and
                          (mode_is_quadratic or mode_is_cubic))
 
-            if use_ri_jk:
-                assert_msg_critical(
-                    not need_omega,
-                    f'{type(self).__name__}: RI-JK is not implemented for a ' +
-                    'range-separated functional')
+            # NOTE: a hybrid range-separated functional has its attenuated
+            # exchange subtracted inside the same call, in the same pass over the
+            # auxiliary basis. The four-centre correction further down is not
+            # reached for this path at all: it sits inside the loop over the
+            # densities, and that loop runs zero times here. The coefficient is
+            # passed to every one of the calls below, as a batch which took it in
+            # one group and not another would be missing the long-range term of
+            # half its densities and say nothing about it.
+            erf_k_factor = erf_k_coef if need_omega else 0.0
 
+            if use_ri_jk:
                 # NOTE: the factors of this batch and not of the whole set. The
                 # densities above were cut from the same columns.
                 if not factors_are_split:
                     fock_arrays = rijkresponse.fock_matrices(
                         self, ao_basis,
                         rijkresponse.slice_factors(dens_factors, batch_start,
-                                                   batch_end), fock_k_factor)
+                                                   batch_end), fock_k_factor,
+                        erf_k_factor)
                 else:
                     # NOTE: the two groups in the order dts_for_fock puts them,
                     # the two-time densities first. They are built apart because
@@ -955,13 +961,13 @@ class NonlinearSolver:
                             self, ao_basis,
                             rijkresponse.slice_factors(second, first_two,
                                                        last_two),
-                            fock_k_factor)
+                            fock_k_factor, erf_k_factor)
 
                     fock_arrays += rijkresponse.fock_matrices(
                         self, ao_basis,
                         rijkresponse.slice_factors(dens_factors['third'],
                                                    batch_start, batch_end),
-                        fock_k_factor)
+                        fock_k_factor, erf_k_factor)
 
             for idx in range(0 if use_ri_jk else len(dts_for_fock)):
                 if self.ri_coulomb:
