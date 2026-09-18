@@ -2228,7 +2228,8 @@ class LinearSolver:
                                    dft_dict,
                                    pe_dict,
                                    profiler=None,
-                                   comm=None):
+                                   comm=None,
+                                   dens_factors=None):
         """
         Computes Fock/Fxc matrix (2e part) for linear response calculation.
 
@@ -2246,6 +2247,12 @@ class LinearSolver:
             The dictionary containing PE information.
         :param profiler:
             The profiler.
+        :param dens_factors:
+            The factors of each spin's densities, as a pair of them, or None where
+            the caller has only the densities themselves. The resolution of the
+            identity takes the whole batch at once from these; a caller which does
+            not have them -- the orbital response solvers hand this raw densities --
+            is served by the four-centre way below as it always was.
 
         :return:
             The Fock matrix (2e part).
@@ -2311,7 +2318,25 @@ class LinearSolver:
 
         fock_arrays = []
 
-        for idx in range(num_densities):
+        # NOTE: the resolution of the identity takes the whole batch at once, as
+        # each spin's left factor is transformed once for all of it, so it replaces
+        # the loop rather than sitting inside it. The two spins share the Coulomb
+        # of their densities added and share nothing else, their occupied orbitals
+        # being neither the same orbitals nor the same number of them.
+        use_ri_jk = (self.ri_jk and self.ri_jk_simd and dens_factors is not None)
+
+        if use_ri_jk:
+            # NOTE: a range-separated functional has its attenuated exchange
+            # subtracted inside the same call. The four-centre correction further
+            # down is not reached for this path: it sits inside the loop over the
+            # densities, and that loop runs zero times here.
+            factors_a, factors_b = dens_factors
+
+            fock_arrays = rijkresponse.fock_matrices_unrestricted(
+                self, basis, factors_a, factors_b, exchange_scaling_factor,
+                erf_k_coef if need_omega else 0.0)
+
+        for idx in range(0 if use_ri_jk else num_densities):
             if self.ri_coulomb:
                 assert_msg_critical(
                     fock_type == 'j',
@@ -2590,6 +2615,19 @@ class LinearSolver:
                 dks_b = None
                 kns_b = None
 
+            # NOTE: the factors of each spin, gathered beside its densities. The
+            # left factor of a spin is its own occupied orbitals, so the two spins
+            # carry a set each rather than sharing one. Formed only where the
+            # resolution of the identity will use them, and only outside the core
+            # excitation case, whose orbitals are a subset the factors below do not
+            # describe.
+            ri_jk_factors = None
+
+            if (self.rank == mpi_master() and self.ri_jk and self.ri_jk_simd and
+                    not getattr(self, 'core_excitation', False)):
+                ri_jk_factors = ((mo_a[:, :nocc_a], [], []),
+                                 (mo_b[:, :nocc_b], [], []))
+
             prep_t0 = tm.time()
 
             for col in range(batch_start, batch_end):
@@ -2675,6 +2713,24 @@ class LinearSolver:
                         dak = np.linalg.multi_dot([mo_a, dak, mo_a.T])
                         dbk = np.linalg.multi_dot([mo_b, dbk, mo_b.T])
 
+                        # NOTE: the same densities as the factors they are made of,
+                        # spin by spin. The commutator leaves that spin's occupied
+                        # orbitals on the left of the excitation part and on the
+                        # right of the de-excitation part, exactly as in the
+                        # restricted case, so each density is C(occupied) times the
+                        # first factor transposed plus the second factor times
+                        # C(occupied) transposed.
+                        if ri_jk_factors is not None:
+                            for factors, vec, mo, nocc in (
+                                    (ri_jk_factors[0], vec_a, mo_a, nocc_a),
+                                    (ri_jk_factors[1], vec_b, mo_b, nocc_b)):
+                                n_ov = nocc * (norb - nocc)
+                                mo_vir = mo[:, nocc:]
+                                zmat = vec[:n_ov].reshape(nocc, norb - nocc)
+                                ymat = vec[n_ov:].reshape(nocc, norb - nocc)
+                                factors[1].append(-np.matmul(mo_vir, zmat.T))
+                                factors[2].append(np.matmul(mo_vir, ymat.T))
+
                     dks_a.append(dak)
                     dks_b.append(dbk)
                     kns_a.append(kn_a)
@@ -2687,7 +2743,7 @@ class LinearSolver:
 
             fock = self._comp_lr_fock_unrestricted(
                 (dks_a, dks_b), molecule, basis, eri_dict, dft_dict, pe_dict,
-                profiler)
+                profiler, dens_factors=ri_jk_factors)
 
             if profiler is not None:
                 # only increment FockCount on master rank

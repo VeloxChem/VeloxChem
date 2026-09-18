@@ -284,9 +284,11 @@ class TdaUnrestrictedEigenSolver(TdaEigenSolverBase):
                                                         molecule,
                                                         basis,
                                                         spin='beta')
+                    tfactors = self._get_trans_density_factors(
+                        trial_mat, scf_results, molecule, basis)
                     fock = self._comp_lr_fock_unrestricted(
                         (tdens_a, tdens_b), molecule, basis, eri_dict, dft_dict,
-                        pe_dict, profiler)
+                        pe_dict, profiler, dens_factors=tfactors)
                     if self.rank == mpi_master():
                         sig_mat = self._get_sigmas(fock, scf_results, molecule,
                                                    basis, trial_mat)
@@ -324,9 +326,12 @@ class TdaUnrestrictedEigenSolver(TdaEigenSolverBase):
                                                 molecule,
                                                 basis,
                                                 spin='beta')
+            tfactors = self._get_trans_density_factors(trial_mat, scf_results,
+                                                       molecule, basis)
             fock = self._comp_lr_fock_unrestricted((tdens_a, tdens_b), molecule,
                                                    basis, eri_dict, dft_dict,
-                                                   pe_dict, profiler)
+                                                   pe_dict, profiler,
+                                                   dens_factors=tfactors)
 
             profiler.start_timer('ReducedSpace')
 
@@ -740,6 +745,55 @@ class TdaUnrestrictedEigenSolver(TdaEigenSolverBase):
             return diag_mat, trial_mat
 
         return None, None
+
+    def _get_trans_density_factors(self, trial_mat, scf_results, molecule, basis):
+        """
+        Computes the factors the transition densities of both spins are made of.
+
+        :param trial_mat:
+            The matrix containing the Z vectors as columns.
+        :param scf_results:
+            The dictionary of results from converged SCF wavefunction.
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+
+        :return:
+            A pair of factor sets, one for each spin, or None away from the master
+            rank or where the resolution of the identity will not use them.
+
+        .. note::
+            The left factor of a spin is that spin's occupied orbitals, so the two
+            spins carry a set each and share nothing. Each density has one term, as
+            in the restricted Tamm-Dancoff case: it is C(occupied) times the right
+            factor transposed.
+        """
+
+        if self.rank != mpi_master():
+            return None
+
+        nocc_a = molecule.number_of_alpha_occupied_orbitals(basis)
+        nocc_b = molecule.number_of_beta_occupied_orbitals(basis)
+
+        (mo_occ_a, mo_occ_b), (mo_vir_a,
+                               mo_vir_b) = self._get_mo_occ_and_mo_vir_unrestricted(
+                                   scf_results, nocc_a, nocc_b)
+
+        n_ov_a = mo_occ_a.shape[1] * mo_vir_a.shape[1]
+
+        rights_a, rights_b = [], []
+
+        for k in range(trial_mat.shape[1]):
+            mat_a = trial_mat[:n_ov_a, k].reshape(mo_occ_a.shape[1],
+                                                  mo_vir_a.shape[1])
+            mat_b = trial_mat[n_ov_a:, k].reshape(mo_occ_b.shape[1],
+                                                  mo_vir_b.shape[1])
+
+            rights_a.append(np.matmul(mo_vir_a, mat_a.T))
+            rights_b.append(np.matmul(mo_vir_b, mat_b.T))
+
+        return ((mo_occ_a, rights_a), (mo_occ_b, rights_b))
 
     def _get_trans_densities(self,
                              trial_mat,
