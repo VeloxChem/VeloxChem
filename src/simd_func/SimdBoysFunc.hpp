@@ -120,6 +120,59 @@ auto compute_boys_function(CSimdMatrix                        &buffer,
                            const double                        fj,
                            const double                        mu) -> void;
 
+/// @brief Computes the values of the attenuated Boys function of every order up to
+/// the requested one for one pair of primitives of a two-center electron repulsion
+/// integral of the operator erf(omega r) / r.
+/// @param buffer The buffer of the combination of basis functions.
+/// @param coordinates The coordinates of the atom pairs, whose row nine holds the
+/// squared distance of the atom pair.
+/// @param target The row of the buffer to write the argument to, with the values
+/// following it.
+/// @param order The highest order to compute.
+/// @param ncols The number of atom pairs the pair of primitives reaches.
+/// @param fj The prefactor of the integral.
+/// @param mu The factor the squared distance is scaled by for the plain operator.
+/// @param omega The range separation parameter.
+/// @note The attenuated function is the plain one with its argument scaled by
+/// theta squared and its value of order m scaled by theta to the 2m + 1, where
+/// theta squared is omega squared over omega squared plus mu. It is therefore the
+/// same expansion and the same accuracy; what the attenuation changes is where the
+/// expansion is evaluated and what each order is weighted by.
+/// @note Sending omega to infinity returns the plain function exactly, and sending
+/// it to zero returns zeros, which is what erf(0 r) / r is. Both are checked.
+auto compute_full_erf_boys_function(CSimdMatrix       &buffer,
+                                    const CSimdMatrix &coordinates,
+                                    const size_t       target,
+                                    const size_t       order,
+                                    const size_t       ncols,
+                                    const double       fj,
+                                    const double       mu,
+                                    const double       omega) -> void;
+
+/// @brief Computes the values of the attenuated Boys function of the requested
+/// orders alone for one pair of primitives of a two-center electron repulsion
+/// integral of the operator erf(omega r) / r.
+/// @param buffer The buffer of the combination of basis functions.
+/// @param coordinates The coordinates of the atom pairs, whose row nine holds the
+/// squared distance of the atom pair.
+/// @param target The row of the buffer to write the argument to, with the values
+/// following it.
+/// @param orders The orders to compute.
+/// @param ncols The number of atom pairs the pair of primitives reaches.
+/// @param fj The prefactor of the integral.
+/// @param mu The factor the squared distance is scaled by for the plain operator.
+/// @param omega The range separation parameter.
+/// @note The rows are packed consecutively while the orders they stand for need not
+/// be, so each row is weighted by the order it stands for and not by where it sits.
+auto compute_erf_boys_function(CSimdMatrix                        &buffer,
+                               const CSimdMatrix                  &coordinates,
+                               const size_t                        target,
+                               const std::initializer_list<size_t> orders,
+                               const size_t                        ncols,
+                               const double                        fj,
+                               const double                        mu,
+                               const double                        omega) -> void;
+
 /// @brief Computes the values of Boys function of every order up to the requested
 /// one for one triple of primitives of a three-center electron repulsion integral.
 /// @param buffer The buffer of the combination of basis functions, holding the

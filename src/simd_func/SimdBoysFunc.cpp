@@ -36,6 +36,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <numeric>
 #include <string>
 #include <vector>
 
@@ -241,6 +242,101 @@ _scale_values(CSimdMatrix &buffer, const size_t target, const size_t nrows, cons
             row[k] *= fj;
         }
     }
+}
+
+/// @brief Scales the rows of values of the attenuated operator, order by order.
+/// @param buffer The buffer holding the values.
+/// @param target The row holding the arguments, the values following it.
+/// @param orders The order each row stands for, in the order the rows are packed.
+/// @param ncols The number of atom pairs to scale.
+/// @param fj The prefactor of the integral.
+/// @param theta The root of omega squared over omega squared plus mu.
+/// @note One factor per row and not one for all of them, which is the whole
+/// difference from the plain scaling: the attenuated function of order m carries
+/// theta to the 2m + 1, so a row's weight follows the order it stands for. In the
+/// form which asks for some orders alone the rows are packed consecutively while the
+/// orders they stand for are not, so the exponent comes from the order and never
+/// from the position of the row.
+static auto
+_scale_attenuated_values(CSimdMatrix                &buffer,
+                         const size_t                target,
+                         const std::vector<size_t>  &orders,
+                         const size_t                ncols,
+                         const double                fj,
+                         const double                theta) -> void
+{
+    for (size_t j = 0; j < orders.size(); j++)
+    {
+        const auto weight = fj * std::pow(theta, static_cast<double>(2 * orders[j] + 1));
+
+        auto *row = buffer.data(target + 1 + j);
+
+#pragma omp simd aligned(row : simd::cache_line_size())
+        for (size_t k = 0; k < ncols; k++)
+        {
+            row[k] *= weight;
+        }
+    }
+}
+
+/// @brief The root of the factor which carries the attenuation into the argument.
+/// @param mu The factor the squared distance is scaled by for the plain operator.
+/// @param omega The range separation parameter.
+/// @note The attenuated operator is the plain one with its argument scaled by theta
+/// squared and its value of order m scaled by theta to the 2m + 1. Sending omega to
+/// infinity sends theta to one and returns the plain function exactly; sending it to
+/// zero sends theta to zero, and every value with it, which is what
+/// erf(0 r) / r is.
+static auto
+_attenuation(const double mu, const double omega) -> double
+{
+    const auto omega_sq = omega * omega;
+
+    return std::sqrt(omega_sq / (omega_sq + mu));
+}
+
+auto
+compute_full_erf_boys_function(CSimdMatrix       &buffer,
+                               const CSimdMatrix &coordinates,
+                               const size_t       target,
+                               const size_t       order,
+                               const size_t       ncols,
+                               const double       fj,
+                               const double       mu,
+                               const double       omega) -> void
+{
+    const auto theta = _attenuation(mu, omega);
+
+    // NOTE: the argument is scaled by theta squared, which is the same as forming it
+    // from the reduced exponent the attenuation leaves behind.
+    _make_arguments(buffer, coordinates, target, ncols, mu * theta * theta);
+
+    compute_boys_values(buffer, target, order, ncols);
+
+    auto orders = std::vector<size_t>(order + 1);
+
+    std::iota(orders.begin(), orders.end(), size_t{0});
+
+    _scale_attenuated_values(buffer, target, orders, ncols, fj, theta);
+}
+
+auto
+compute_erf_boys_function(CSimdMatrix                        &buffer,
+                          const CSimdMatrix                  &coordinates,
+                          const size_t                        target,
+                          const std::initializer_list<size_t> orders,
+                          const size_t                        ncols,
+                          const double                        fj,
+                          const double                        mu,
+                          const double                        omega) -> void
+{
+    const auto theta = _attenuation(mu, omega);
+
+    _make_arguments(buffer, coordinates, target, ncols, mu * theta * theta);
+
+    compute_boys_values(buffer, target, orders, ncols);
+
+    _scale_attenuated_values(buffer, target, std::vector<size_t>(orders), ncols, fj, theta);
 }
 
 auto
