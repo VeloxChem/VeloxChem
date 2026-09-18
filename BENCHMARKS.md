@@ -9586,3 +9586,133 @@ file, which reads 92.2, 310.8 and 837.6 at 256 against the 84.0, 250.1 and 687.0
 here. The driver has changed since that table was taken and the two are not
 comparable, which is the whole reason for measuring plain again beside the range
 separated driver rather than reading the new numbers against the old ones.
+
+## The range separated hybrids, where the split costs one way twice and the other a quarter
+
+A hybrid range separated functional splits its exchange between the plain operator
+and the attenuated one, and the two ways of building pay for that split very
+differently. The four-centre way makes a second full sweep of its own kernels on
+every iteration, `kx_rs` on top of `2jkx`. The simd resolution of the identity holds
+a second set of B vectors, formed once, and adds a second exchange inside the same
+pass over the auxiliary basis it was already making.
+
+The conventional RI-JK driver is not a column here. It has no attenuated B vectors
+and refuses a range separated functional, so it would be a column of refusals.
+
+`OMP_NUM_THREADS=14`, one rank, `def2-universal-jkfit` throughout, convergence 1e-8.
+The records are `benchmarks/data/scf/2026-09-18_m4max_caffeine_rs_closed.json` and
+`..._nitroxide_rs_m2.json`, and the runner is `benchmarks/scripts/scf_rs_laptop.py`.
+The provenance says the tree was dirty: the only thing uncommitted was that runner,
+which was written for this measurement and is committed with it.
+
+### Caffeine, closed shell
+
+**plain** is the speedup of B3LYP on the same molecule and basis, from the table
+earlier in this file, and is what the range separated column is to be read against.
+
+| functional | basis | nao | four-centre | RI-JK simd | speedup | build only | plain |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| CAM-B3LYP | def2-svp | 246 | 27.54 | 5.20 | 5.30 | 18.0 | 3.75 |
+| | def2-svpd | 366 | 107.72 | 11.63 | 9.26 | 35.1 | 6.48 |
+| | def2-tzvp | 494 | 361.56 | 16.95 | 21.34 | 68.4 | 13.47 |
+| | def2-tzvpd | 614 | 868.74 | 28.31 | **30.69** | 99.0 | 19.20 |
+| wB97X-D4 | def2-svp | 246 | 27.18 | 5.12 | 5.31 | 17.7 | 3.75 |
+| | def2-svpd | 366 | 106.92 | 11.46 | 9.33 | 34.9 | 6.48 |
+| | def2-tzvp | 494 | 360.31 | 17.54 | 20.54 | 64.9 | 13.47 |
+| | def2-tzvpd | 614 | 868.04 | 29.23 | **29.70** | 95.0 | 19.20 |
+
+### Nitroxide, a doublet radical, unrestricted
+
+C7H13N2O2, 24 atoms, 43 alpha and 42 beta electrons. There is no plain column: the
+nitroxide tables elsewhere in this file are optimizations and not self consistent
+field runs, and a speedup taken from a different kind of calculation is not a
+comparison.
+
+| functional | basis | nao | four-centre | RI-JK simd | speedup | build only |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| CAM-B3LYP | def2-svp | 219 | 55.49 | 7.72 | 7.18 | 26.7 |
+| | def2-svpd | 330 | 207.22 | 16.45 | 12.59 | 51.2 |
+| | def2-tzvp | 419 | 647.43 | 23.37 | 27.71 | 99.8 |
+| | def2-tzvpd | 530 | 1464.14 | 39.65 | **36.93** | 135.5 |
+| wB97X-D4 | def2-svp | 219 | 55.48 | 7.67 | 7.23 | 26.9 |
+| | def2-svpd | 330 | 197.45 | 17.22 | 11.47 | 46.6 |
+| | def2-tzvp | 419 | 621.66 | 24.38 | 25.50 | 91.7 |
+| | def2-tzvpd | 530 | 1403.55 | 41.06 | **34.18** | 124.8 |
+
+### The split is served better than the plain hybrid, by half again
+
+Caffeine's range separated rows run **1.4 to 1.6 times** the speedup of B3LYP on the
+same molecule and the same basis: 5.30 against 3.75, 9.26 against 6.48, 21.34 against
+13.47, 30.69 against 19.20. That is the whole point of the arrangement and it is
+worth saying why it is not a paradox that a harder Fock matrix is built relatively
+faster.
+
+The obvious explanation is wrong and worth writing down, because it is the one
+anybody would reach for: it is **not** that the attenuated operator is cheap for the
+resolution of the identity and dear for the four-centre way. The two-electron time
+roughly doubles on both sides. At def2-tzvpd on caffeine, going from B3LYP to
+CAM-B3LYP takes the four-centre build from 410.2 seconds to 847.8, a factor of 2.07,
+and the simd build from 4.8 to 8.6, a factor of 1.78. Those are close enough to each
+other that they cannot be where a half again comes from.
+
+Where it comes from is **what fraction of the run the build is**. The two-electron
+part is 95 to 98 per cent of a four-centre run at these bases and 17 to 30 per cent
+of a simd one:
+
+| basis | 2e share, four-centre | 2e share, simd |
+| --- | ---: | ---: |
+| def2-svp | 74.9% -> 85.1% | 17.9% -> 25.1% |
+| def2-svpd | 86.0% -> 92.1% | 17.0% -> 24.3% |
+| def2-tzvp | 93.2% -> 96.4% | 21.9% -> 30.1% |
+| def2-tzvpd | 95.4% -> 97.6% | 21.4% -> 30.3% |
+
+Doubling something which is 95 per cent of the wall doubles the wall; doubling
+something which is a fifth of it adds a quarter. The four-centre run goes 430.1 to
+868.7 seconds, 2.02 times, and the simd run 22.4 to 28.3, 1.26 times. **That is the
+whole of the effect**, and it says the gain belongs to the resolution of the identity
+having made the build small in the first place rather than to anything the attenuated
+path does especially well.
+
+There is a second, smaller effect underneath it which is the attenuated path's own:
+1.78 against 2.07 on the builds, so the ratio of the builds alone improves from 85.4
+for B3LYP to 99.0 for CAM-B3LYP at def2-tzvpd. Forming both operators over one set of
+primitive pairs and transforming B vectors which are already resident is worth about
+fifteen per cent of the build. It is real and it is not what the table above is
+mostly showing.
+
+### The two functionals are one measurement
+
+Every pair of rows agrees within a few per cent although the functionals do not:
+CAM-B3LYP is 0.190 of exact exchange at short range and 0.650 at long, wB97X-D4 is
+0.167 and 1.000. The cost follows the number of passes and not the coefficients,
+which is what both implementations say it should, and a pair which disagreed would
+have meant one of them was doing arithmetic that depended on the numbers.
+
+### Every ratio here is like for like
+
+All thirty two runs converged, in 20 to 23 iterations. No speedup in either table is
+a short journey divided by a long one, which the closed shell optimization table
+earlier in this file cannot say of all of its rows.
+
+The radical was the better behaved of the two molecules, which was not the
+expectation: a doublet with long-range corrected functionals looked like the
+convergence risk of the pair, and the tagrisso cation and triplet had failed to
+converge in a hundred iterations by every path. Nitroxide took 21 or 22 everywhere,
+against caffeine's 20 to 22 and the caffeine cation's 30 to 45.
+
+### What now bounds the simd path is the quadrature
+
+The exchange-correlation grid is **54 to 62 per cent** of every simd run on caffeine
+and **65 to 70 per cent** on nitroxide. At def2-tzvpd on nitroxide it is 26.0 seconds
+of a 39.7 second run against 10.5 seconds of two-electron work. The Fock build is no
+longer the thing to work on for these calculations; the grid is.
+
+### The estimate, and the third time the analogy lost to the first measurement
+
+Quoted at 3 to 3.5 hours, re-estimated at 2 hours 36 after the first measured pair,
+and it took **2 hours 8**. The first figure was about 60 per cent high because the
+cost of the second four-centre pass was guessed at 2 to 2.5 times a plain hybrid and
+is 1.84 at def2-svp, rising to 2.02 at def2-tzvpd as the fixed costs shrink beside
+the integrals. Re-estimating from one measured pair was within 10 per cent per row,
+which is the third time in these notes that the analogy was wrong and the first
+measurement was right.
