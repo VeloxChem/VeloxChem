@@ -2091,13 +2091,14 @@ class LinearSolver:
         use_ri_jk = (self.ri_jk and self.ri_jk_simd and dens_factors is not None)
 
         if use_ri_jk:
-            assert_msg_critical(
-                not need_omega,
-                f'{type(self).__name__}: RI-JK is not implemented for a ' +
-                'range-separated functional')
-
-            fock_arrays = self._comp_ri_jk_fock(basis, dens_factors,
-                                                exchange_scaling_factor)
+            # NOTE: a hybrid range-separated functional has its attenuated
+            # exchange subtracted inside the same call, in the same pass over the
+            # auxiliary basis. The four-centre correction further down is not
+            # reached for this path at all: it sits inside the loop over the
+            # densities, and that loop runs zero times here.
+            fock_arrays = self._comp_ri_jk_fock(
+                basis, dens_factors, exchange_scaling_factor,
+                erf_k_coef if need_omega else 0.0)
 
         for idx in range(0 if use_ri_jk else num_densities):
             if self.ri_coulomb:
@@ -2191,7 +2192,11 @@ class LinearSolver:
         else:
             return None
 
-    def _comp_ri_jk_fock(self, basis, dens_factors, exchange_scaling_factor):
+    def _comp_ri_jk_fock(self,
+                         basis,
+                         dens_factors,
+                         exchange_scaling_factor,
+                         erf_exchange_scaling_factor=0.0):
         """
         Computes the two-electron part for a batch of factorised densities.
 
@@ -2201,13 +2206,19 @@ class LinearSolver:
             The left factor the batch shares and the right factor of each density.
         :param exchange_scaling_factor:
             The fraction of exact exchange.
+        :param erf_exchange_scaling_factor:
+            The coefficient of the exchange of the attenuated operator, which is
+            the erf coefficient of a hybrid range-separated functional and zero for
+            every other calculation. It is subtracted as the plain exchange is, so
+            this is the same number the four-centre way is passed.
 
         :return:
             The Fock matrices as numpy arrays, one for each density.
         """
 
         return rijkresponse.fock_matrices(self, basis, dens_factors,
-                                          exchange_scaling_factor)
+                                          exchange_scaling_factor,
+                                          erf_exchange_scaling_factor)
 
     def _comp_lr_fock_unrestricted(self,
                                    dens,
