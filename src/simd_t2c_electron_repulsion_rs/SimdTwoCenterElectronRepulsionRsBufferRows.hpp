@@ -42,6 +42,13 @@
 
 namespace simdt2ceri {  // simdt2ceri namespace
 
+// NOTE: the name differs from the table of the unattenuated kernels on purpose.
+// Both tables live in this namespace and both are inline, so a shared name is one
+// definition of two different things: a translation unit which includes both does
+// not compile, and one which includes either takes whichever the linker kept. The
+// range separated buffer is about twice the unattenuated one, so taking the wrong
+// table is a buffer overrun and not a wrong answer.
+
 /// @brief Gets the number of rows of the buffer a combination of basis functions
 /// needs.
 /// @param bra_angular_momentum The angular momentum of basis function on bra side.
@@ -55,7 +62,7 @@ namespace simdt2ceri {  // simdt2ceri namespace
 /// kernels without regenerating it leaves a buffer which is too small, which the
 /// assertions of simdfunc::prepare_buffer report rather than let pass.
 inline auto
-number_of_buffer_rows(const int bra_angular_momentum, const int ket_angular_momentum) -> size_t
+number_of_rs_buffer_rows(const int bra_angular_momentum, const int ket_angular_momentum) -> size_t
 {
     constexpr std::array<std::array<size_t, 9>, 9> rows{{
         {       4,      19,      41,      81,     149,     255,     413,     637,     945},
@@ -71,7 +78,7 @@ number_of_buffer_rows(const int bra_angular_momentum, const int ket_angular_mome
 
     errors::assertMsgCritical((bra_angular_momentum >= 0) && (bra_angular_momentum < 9) &&
                                   (ket_angular_momentum >= 0) && (ket_angular_momentum < 9),
-                              std::string("SimdTwoCenterElectronRepulsionRsBufferRows.number_of_buffer_rows: Angular momentum is out of range"));
+                              std::string("SimdTwoCenterElectronRepulsionRsBufferRows.number_of_rs_buffer_rows: Angular momentum is out of range"));
 
     return rows[static_cast<size_t>(bra_angular_momentum)][static_cast<size_t>(ket_angular_momentum)];
 }

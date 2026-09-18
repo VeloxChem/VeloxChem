@@ -55,6 +55,7 @@
 #include "SimdThreeCenterElectronRepulsionGradientDriver.hpp"
 #include "SimdThreeCenterElectronRepulsionDriver.hpp"
 #include "SimdTwoCenterElectronRepulsionDriver.hpp"
+#include "SimdTwoCenterElectronRepulsionRsDriver.hpp"
 #include "SparseMatrix.hpp"
 
 namespace vlx_simdintegrals {  // vlx_simdintegrals namespace
@@ -142,6 +143,24 @@ export_simdintegrals(py::module &m) -> void
              py::arg("basis"))
         .def("get_block_size",
              &CSimdTwoCenterElectronRepulsionDriver::get_block_size,
+             "Gets target number of atom pairs of a block.");
+
+    // CSimdTwoCenterElectronRepulsionRsDriver class
+
+    PyClass<CSimdTwoCenterElectronRepulsionRsDriver>(m, "SimdTwoCenterElectronRepulsionRsDriver")
+        .def(py::init<>())
+        .def(py::init<const size_t>(),
+             "Creates a range separated two-center electron repulsion driver with given target block size.",
+             py::arg("block_size"))
+        .def("compute",
+             &CSimdTwoCenterElectronRepulsionRsDriver::compute,
+             "Computes the packed two-center matrices of the Coulomb operator and of the range separated "
+             "Coulomb operator for given molecule and basis, in that order.",
+             py::arg("molecule"),
+             py::arg("basis"),
+             py::arg("omega"))
+        .def("get_block_size",
+             &CSimdTwoCenterElectronRepulsionRsDriver::get_block_size,
              "Gets target number of atom pairs of a block.");
 
     // CSimdThreeCenterElectronRepulsionDriver class
