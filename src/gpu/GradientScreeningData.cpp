@@ -36,6 +36,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 #include <string>
 #include <sstream>
 
@@ -3840,5 +3841,104 @@ auto CGradientScreeningData::form_pair_inds_for_K(const int64_t s_prim_count,
                 _local_D_ik_for_K_dd[gpu_id][idx] = D_ik;
             }
         }
+    }
+}
+
+auto CGradientScreeningData::update_kl_vectors(const uint32_t               natoms,
+                                               const uint32_t               kl_prim_pair_count,
+                                               const std::vector<uint32_t>& kl_first_inds,
+                                               const std::vector<uint32_t>& kl_second_inds,
+                                               const uint32_t               k_prim_count,
+                                               const uint32_t               l_prim_count,
+                                               const std::string&           k_prim_type,
+                                               const std::string&           l_prim_type,
+                                               const std::vector<uint32_t>& k_prim_aoinds,
+                                               const std::vector<uint32_t>& l_prim_aoinds,
+                                               const std::vector<uint32_t>& cart_ao_to_atom_inds,
+                                               std::vector<uint32_t>&       kl_inds_for_atom_k,
+                                               std::vector<uint32_t>&       kl_inds_for_atom_l,
+                                               std::vector<uint32_t>&       kl_counts_for_atom_k,
+                                               std::vector<uint32_t>&       kl_counts_for_atom_l,
+                                               std::vector<uint32_t>&       kl_displs_for_atom_k,
+                                               std::vector<uint32_t>&       kl_displs_for_atom_l) -> void
+{
+    std::vector<std::vector<uint32_t>> atom_k_pair_kl(natoms);
+    std::vector<std::vector<uint32_t>> atom_l_pair_kl(natoms);
+
+    for (uint32_t kl = 0; kl < kl_prim_pair_count; kl++)
+    {
+        const auto k = kl_first_inds[kl];
+        const auto l = kl_second_inds[kl];
+
+        uint32_t k_cgto, l_cgto;
+
+        if (k_prim_type == std::string("s"))
+        {
+            k_cgto = k_prim_aoinds[k];
+        }
+        else if (k_prim_type == std::string("p"))
+        {
+            k_cgto = k_prim_aoinds[(k / 3) + k_prim_count * (k % 3)];
+        }
+        else if (k_prim_type == std::string("d"))
+        {
+            k_cgto = k_prim_aoinds[(k / 6) + k_prim_count * (k % 6)];
+        }
+        else
+        {
+            errors::assertMsgCritical(false, std::string(__func__) + std::string(": Invalid k_prim_type"));
+
+            // to suppress compiler warning "may be used uninitialized"
+            k_cgto = 0;
+        }
+
+        if (l_prim_type == std::string("s"))
+        {
+            l_cgto = l_prim_aoinds[l];
+        }
+        else if (l_prim_type == std::string("p"))
+        {
+            l_cgto = l_prim_aoinds[(l / 3) + l_prim_count * (l % 3)];
+        }
+        else if (l_prim_type == std::string("d"))
+        {
+            l_cgto = l_prim_aoinds[(l / 6) + l_prim_count * (l % 6)];
+        }
+        else
+        {
+            errors::assertMsgCritical(false, std::string(__func__) + std::string(": Invalid l_prim_type"));
+
+            // to suppress compiler warning "may be used uninitialized"
+            l_cgto = 0;
+        }
+
+        const auto atom_k = cart_ao_to_atom_inds[k_cgto];
+        const auto atom_l = cart_ao_to_atom_inds[l_cgto];
+
+        atom_k_pair_kl[atom_k].push_back(kl);
+        atom_l_pair_kl[atom_l].push_back(kl);
+    }
+
+    // update these vectors
+    // kl_inds_for_atom_k (max_prim_pair_count)
+    // kl_inds_for_atom_l (max_prim_pair_count)
+    // kl_counts_for_atom_k (natoms)
+    // kl_counts_for_atom_l (natoms)
+    // kl_displs_for_atom_k (natoms)
+    // kl_displs_for_atom_l (natoms)
+
+    for (uint32_t a = 0, displ_k = 0, displ_l = 0; a < natoms; a++)
+    {
+        kl_displs_for_atom_k[a] = displ_k;
+        kl_displs_for_atom_l[a] = displ_l;
+
+        kl_counts_for_atom_k[a] = static_cast<uint32_t>(atom_k_pair_kl[a].size());
+        kl_counts_for_atom_l[a] = static_cast<uint32_t>(atom_l_pair_kl[a].size());
+
+        std::memcpy(kl_inds_for_atom_k.data() + displ_k, atom_k_pair_kl[a].data(), atom_k_pair_kl[a].size() * sizeof(uint32_t));
+        std::memcpy(kl_inds_for_atom_l.data() + displ_l, atom_l_pair_kl[a].data(), atom_l_pair_kl[a].size() * sizeof(uint32_t));
+
+        displ_k += static_cast<uint32_t>(atom_k_pair_kl[a].size());
+        displ_l += static_cast<uint32_t>(atom_l_pair_kl[a].size());
     }
 }

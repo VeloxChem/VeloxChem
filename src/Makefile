@@ -40,6 +40,7 @@ VLX_BAS := ../basis
 VLX_TARGET := veloxchemlib.so
 VLX_SCRIPT := pymodule/vlxscript.py
 VLX_MODULE := $(filter-out pymodule/vlxscript.py, $(wildcard pymodule/*.py))
+VLX_COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
 
 LIB_LIST += -shared $(PYTHON_LD) $(OPENMP_LD)
 
@@ -89,6 +90,8 @@ debug: $(VLX_LIBS)
 	$(CP) -r $(VLX_BAS) $(CURDIR)/../build/python/veloxchem
 	$(CP) $(VLX_SCRIPT) $(CURDIR)/../build/bin/vlx
 	chmod +x $(CURDIR)/../build/bin/vlx
+	@echo ""                               >> $(CURDIR)/../build/python/veloxchem/__init__.py
+	@echo "__commit__ = \"$(VLX_COMMIT)\"" >> $(CURDIR)/../build/python/veloxchem/__init__.py
 
 # Release
 release: $(VLX_LIBS)
@@ -103,6 +106,8 @@ release: $(VLX_LIBS)
 	$(CP) -r $(VLX_BAS) $(CURDIR)/../build/python/veloxchem
 	$(CP) $(VLX_SCRIPT) $(CURDIR)/../build/bin/vlx
 	chmod +x $(CURDIR)/../build/bin/vlx
+	@echo ""                               >> $(CURDIR)/../build/python/veloxchem/__init__.py
+	@echo "__commit__ = \"$(VLX_COMMIT)\"" >> $(CURDIR)/../build/python/veloxchem/__init__.py
 
 # Clean up
 clean:

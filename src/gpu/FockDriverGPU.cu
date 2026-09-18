@@ -4849,8 +4849,6 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         gpu::zeroData<<<num_blocks, threads_per_block, 0, stream>>>(d_mat_J, static_cast<uint32_t>(ss_prim_pair_count_local));
 
-        // Note: this sync is needed since threads_per_block and num_blocks are
-        //       changed afterwards
         gpuSafe(gpuStreamSynchronize(stream));
 
         // set up thread blocks for J
