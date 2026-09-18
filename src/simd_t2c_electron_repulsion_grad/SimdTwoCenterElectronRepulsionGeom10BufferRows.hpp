@@ -54,8 +54,16 @@ namespace simdt2ceri {  // simdt2ceri namespace
 /// @note This table is written with the kernels and describes them. Regenerating the
 /// kernels without regenerating it leaves a buffer which is too small, which the
 /// assertions of simdfunc::prepare_buffer report rather than let pass.
+
+// NOTE: the name is qualified by which kernels the table describes. Every set in
+// this namespace declares its own table as an inline function, so a shared name is
+// one definition of several different things: the program is ill formed, the linker
+// keeps whichever it saw first, and the tables differ both in their numbers and in
+// their shape. A gradient set given the plain set's table would size its buffer
+// several times too small and overrun it. The generator still emits the bare name;
+// until it does not, a regenerated set has to be renamed again.
 inline auto
-number_of_buffer_rows(const int bra_angular_momentum, const int ket_angular_momentum) -> size_t
+number_of_geom_10_buffer_rows(const int bra_angular_momentum, const int ket_angular_momentum) -> size_t
 {
     constexpr std::array<std::array<size_t, 9>, 9> rows{{
         {      14,      39,      88,     162,     272,     427,     637,     913,    1267},
@@ -71,7 +79,7 @@ number_of_buffer_rows(const int bra_angular_momentum, const int ket_angular_mome
 
     errors::assertMsgCritical((bra_angular_momentum >= 0) && (bra_angular_momentum < 9) &&
                                   (ket_angular_momentum >= 0) && (ket_angular_momentum < 9),
-                              std::string("SimdTwoCenterElectronRepulsionGeom10BufferRows.number_of_buffer_rows: Angular momentum is out of range"));
+                              std::string("SimdTwoCenterElectronRepulsionGeom10BufferRows.number_of_geom_10_buffer_rows: Angular momentum is out of range"));
 
     return rows[static_cast<size_t>(bra_angular_momentum)][static_cast<size_t>(ket_angular_momentum)];
 }

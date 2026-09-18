@@ -59,8 +59,16 @@ namespace simdt3ceri {  // simdt3ceri namespace
 /// written for it yet. Its entry is what the largest combination below it needs,
 /// so that an arena sized from it holds every combination of the block that does
 /// have one.
+
+// NOTE: the name is qualified by which kernels the table describes. Every set in
+// this namespace declares its own table as an inline function, so a shared name is
+// one definition of several different things: the program is ill formed, the linker
+// keeps whichever it saw first, and the tables differ both in their numbers and in
+// their shape. A gradient set given the plain set's table would size its buffer
+// several times too small and overrun it. The generator still emits the bare name;
+// until it does not, a regenerated set has to be renamed again.
 inline auto
-number_of_buffer_rows(const int a_angular_momentum, const int b_angular_momentum,
+number_of_geom_010_buffer_rows(const int a_angular_momentum, const int b_angular_momentum,
                       const int c_angular_momentum) -> size_t
 {
     constexpr std::array<std::array<std::array<size_t, 7>, 7>, 7> rows{{
@@ -132,7 +140,7 @@ number_of_buffer_rows(const int a_angular_momentum, const int b_angular_momentum
     errors::assertMsgCritical((a_angular_momentum >= 0) && (a_angular_momentum < 7) &&
                                   (b_angular_momentum >= 0) && (b_angular_momentum < 7) &&
                                   (c_angular_momentum >= 0) && (c_angular_momentum < 7),
-                              std::string("SimdThreeCenterElectronRepulsionGeom010BufferRows.number_of_buffer_rows: Angular momentum is out of range"));
+                              std::string("SimdThreeCenterElectronRepulsionGeom010BufferRows.number_of_geom_010_buffer_rows: Angular momentum is out of range"));
 
     return rows[static_cast<size_t>(a_angular_momentum)][static_cast<size_t>(b_angular_momentum)][static_cast<size_t>(c_angular_momentum)];
 }

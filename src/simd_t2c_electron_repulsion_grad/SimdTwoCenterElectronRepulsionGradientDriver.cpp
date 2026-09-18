@@ -151,7 +151,7 @@ CSimdTwoCenterElectronRepulsionGradientDriver::_compute_pair_blocks(CPackedMatri
         const auto &block = blocks[static_cast<size_t>(iblk)];
 
         arena_rows = std::max(arena_rows,
-                              simdt2ceri::number_of_buffer_rows(basis.basis_set(block.bra_index()).max_angular_momentum(),
+                              simdt2ceri::number_of_geom_10_buffer_rows(basis.basis_set(block.bra_index()).max_angular_momentum(),
                                                                     basis.basis_set(block.ket_index()).max_angular_momentum()));
 
         arena_cols = std::max(arena_cols, block.number_of_pairs());
