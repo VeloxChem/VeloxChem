@@ -441,4 +441,5 @@ target_sources(vlxobjs
     SimdThreeCenterElectronRepulsionRsRecSSL.cpp
     SimdThreeCenterElectronRepulsionRsRecSSP.cpp
     SimdThreeCenterElectronRepulsionRsRecSSS.cpp
+    SimdThreeCenterElectronRepulsionRsFunc.cpp
   )
