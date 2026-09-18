@@ -252,6 +252,44 @@ class CSimdRIJKGradientDriver
     /// applied, which is the ordering rule of the note: applying the metric in the
     /// basis of the atomic orbitals costs the ratio of their number squared to the
     /// orbitals squared, which is a factor of fifty for a molecule of this size.
+    /// @brief The fitted densities of the attenuated operator, for a hybrid range
+    /// separated functional.
+    /// @param bq_vectors_erf The B vectors of the attenuated operator.
+    /// @param basis The molecular basis.
+    /// @param aux_basis The auxiliary molecular basis.
+    /// @param metric_erf The inverted factor of the attenuated metric. The two
+    /// operators are fitted in metrics of their own and crossing them fits
+    /// neither.
+    /// @param coefficients The occupied molecular orbitals.
+    /// @param erf_exchange_scaling_factor The coefficient of the attenuated
+    /// exchange, which is the erf coefficient of the functional.
+    /// @return The fitted densities of the orbitals and the two-index fitted
+    /// density of the exchange. **The fitting coefficients come back empty**: the
+    /// attenuated operator enters the Fock matrix only through the exchange, so it
+    /// has no Coulomb term and nothing to fit the density against. A caller which
+    /// hands these to the three-center term must pass a Coulomb factor of zero.
+    auto fitted_densities_rs(const CSparseTensor   &bq_vectors_erf,
+                             const CMolecularBasis &basis,
+                             const CMolecularBasis &aux_basis,
+                             const CPackedMatrix   &metric_erf,
+                             const CPackedMatrix   &coefficients,
+                             const double           erf_exchange_scaling_factor) const -> TFittedDensities;
+
+    /// @brief The same for the two spins of an open shell.
+    /// @param coefficients_alpha The occupied orbitals of the alpha spin.
+    /// @param coefficients_beta The same for the beta spin, which has a number of
+    /// columns of its own.
+    /// @note The exchange carries a half here as it does in the unattenuated open
+    /// shell routine, so that setting the two spins equal returns the closed shell
+    /// expression exactly.
+    auto fitted_densities_open_shell_rs(const CSparseTensor   &bq_vectors_erf,
+                                        const CMolecularBasis &basis,
+                                        const CMolecularBasis &aux_basis,
+                                        const CPackedMatrix   &metric_erf,
+                                        const CPackedMatrix   &coefficients_alpha,
+                                        const CPackedMatrix   &coefficients_beta,
+                                        const double erf_exchange_scaling_factor) const -> TFittedDensities;
+
     auto fitted_densities(const CSparseTensor   &bq_vectors,
                           const CMolecularBasis &basis,
                           const CMolecularBasis &aux_basis,

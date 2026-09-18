@@ -680,6 +680,27 @@ export_simdintegrals(py::module &m) -> void
              py::arg("density"),
              py::arg("coefficients"),
              py::arg("exchange_scaling_factor"))
+        .def("fitted_densities_rs",
+             &CSimdRIJKGradientDriver::fitted_densities_rs,
+             "Forms the fitted densities of the attenuated operator. The fitting coefficients come "
+             "back empty: the attenuated operator enters only through the exchange and has no Coulomb "
+             "term to fit a density against.",
+             py::arg("bq_vectors_erf"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("metric_erf"),
+             py::arg("coefficients"),
+             py::arg("erf_exchange_scaling_factor"))
+        .def("fitted_densities_open_shell_rs",
+             &CSimdRIJKGradientDriver::fitted_densities_open_shell_rs,
+             "The same for the two spins of an open shell.",
+             py::arg("bq_vectors_erf"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("metric_erf"),
+             py::arg("coefficients_alpha"),
+             py::arg("coefficients_beta"),
+             py::arg("erf_exchange_scaling_factor"))
         .def("get_threshold", &CSimdRIJKGradientDriver::get_threshold,
              "Gets screening threshold of the integrals.")
         .def("get_block_size", &CSimdRIJKGradientDriver::get_block_size,

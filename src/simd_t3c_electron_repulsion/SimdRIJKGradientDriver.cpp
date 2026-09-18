@@ -194,11 +194,20 @@ _add_multiply_by_transpose(const size_t  nrows,
 #endif
 }
 
-/// @brief Applies the transpose of the inverted Cholesky factor to a set of
-/// columns held one after another.
-/// @note The factor is held as the inverted lower triangular matrix, so its
-/// transpose is upper triangular and no second matrix is stored for it: the
-/// transposed multiply is the same array read the other way.
+/// @brief Applies the transpose of the inverted metric to a set of columns held
+/// one after another.
+/// @param triangular True where the factor is the inverted Cholesky factor, which
+/// is lower triangular, and false where it is the inverted square root, which is
+/// symmetric.
+/// @note Both close the same sum -- M transposed times M is the inverse of the
+/// metric for either of them, which is why the energy takes either. What differs is
+/// the storage: a triangular factor lets the element p of the result read the rows
+/// at and below p alone, and a symmetric root does not. Reading a root that way
+/// drops every term below the diagonal and answers something which is not a
+/// gradient of anything.
+/// @note A range separated gradient cannot choose. The attenuated metric is
+/// numerically singular and its Cholesky factorization fails on some fitting sets
+/// and succeeds on others, so both kinds arrive and both have to work.
 /// @brief The same, over a factor which the caller has already expanded.
 ///
 /// @note The expansion is the square of the auxiliary basis and is the same array
@@ -208,7 +217,11 @@ _add_multiply_by_transpose(const size_t  nrows,
 /// size, which is memory traffic of a wholly different order to the arithmetic it
 /// serves. The caller which loops expands it once and hands it in.
 static auto
-_multiply_transposed(const double *factor, const size_t naux, double *values, const size_t ncols) -> void
+_multiply_transposed(const double *factor,
+                     const size_t  naux,
+                     double       *values,
+                     const size_t  ncols,
+                     const bool    triangular) -> void
 {
     auto column = std::vector<double>(naux, 0.0);
 
@@ -218,14 +231,15 @@ _multiply_transposed(const double *factor, const size_t naux, double *values, co
 
         std::fill(column.begin(), column.end(), 0.0);
 
-        // NOTE: the transpose of a lower triangular matrix, so the element p of
-        // the result reads the rows at and below p of the column it multiplies.
-
         for (size_t p = 0; p < naux; p++)
         {
             double sum = 0.0;
 
-            for (size_t q = p; q < naux; q++)
+            // NOTE: a lower triangular factor has nothing above its diagonal, so
+            // the element p of the result reads the rows at and below p alone. A
+            // symmetric root has to be read whole.
+
+            for (size_t q = (triangular ? p : 0); q < naux; q++)
             {
                 sum += factor[q * naux + p] * target[q];
             }
@@ -246,7 +260,7 @@ _multiply_transposed(const CPackedMatrix &metric, double *values, const size_t n
 
     metric.to_dense(factor.data());
 
-    _multiply_transposed(factor.data(), naux, values, ncols);
+    _multiply_transposed(factor.data(), naux, values, ncols, metric.get_type() != mat_t::symmetric);
 }
 
 auto
@@ -272,11 +286,15 @@ CSimdRIJKGradientDriver::_apply_transposed_factor(const CPackedMatrix        &me
 
     const auto nelements = matrices.front().number_of_elements();
 
-    // NOTE: the transpose of the factor, written out once. The element of the
-    // result at p reads the rows at and below p, which is the transpose of a
-    // lower triangular matrix read as it stands, and a general multiply wants it
-    // that way round. The expansion it is built from is released before the
-    // arrays which are the size of the whole phase are taken.
+    // NOTE: the transpose of the factor, written out once. For the inverted
+    // Cholesky factor the element of the result at p reads the rows at and below p,
+    // which is the transpose of a lower triangular matrix read as it stands. For the
+    // inverted square root there is nothing to skip: it is symmetric, so its
+    // transpose is itself and the whole of it is written. The expansion it is built
+    // from is released before the arrays which are the size of the whole phase are
+    // taken.
+
+    const auto triangular = (metric.get_type() != mat_t::symmetric);
 
     auto transposed = std::vector<double>(naux * naux, 0.0);
 
@@ -287,7 +305,7 @@ CSimdRIJKGradientDriver::_apply_transposed_factor(const CPackedMatrix        &me
 
         for (size_t p = 0; p < naux; p++)
         {
-            for (size_t q = p; q < naux; q++)
+            for (size_t q = (triangular ? p : 0); q < naux; q++)
             {
                 transposed[p * naux + q] = factor[q * naux + p];
             }
@@ -392,21 +410,26 @@ auto
 CSimdRIJKGradientDriver::_check_metric(const CPackedMatrix &metric, const CMolecularBasis &aux_basis) const -> void
 {
     // NOTE: the gradient needs the inverse of the metric applied twice, once as
-    // the factor and once as its transpose, which the inverted Cholesky factor
-    // gives and the inverted square root does not: the two close the same sum for
-    // the energy and are not the same matrix. Which of them it was handed is read
-    // from the type -- a factor is lower triangular and a root is symmetric --
-    // rather than from a flag beside it, the way the Fock driver reads it.
+    // the factor and once as its transpose. **Either inversion gives that**: M
+    // transposed times M is the inverse of the metric for the inverted Cholesky
+    // factor and for the inverted square root alike, which is why the energy takes
+    // either. This driver once refused the root, and said it was because the two do
+    // not close the same sum; they do. What the refusal was really protecting was a
+    // multiply which skipped everything below the diagonal, and that now reads the
+    // type and takes the whole matrix where it has to.
+    //
+    // Which of them it was handed is read from the type -- a factor is lower
+    // triangular and a root is symmetric -- rather than from a flag beside it, the
+    // way the Fock driver reads it.
+    //
+    // A range separated gradient has no choice in the matter: the attenuated metric
+    // is numerically singular and its factorization fails on some fitting sets and
+    // succeeds on others, so both kinds arrive.
 
     errors::assertMsgCritical(
         metric.number_of_rows() > 0,
         std::string("SimdRIJKGradientDriver: The metric is empty. The direct mode forms no inverted "
                     "factor, and this driver needs the one the mode which holds the B vectors forms"));
-
-    errors::assertMsgCritical(
-        metric.get_type() != mat_t::symmetric,
-        std::string("SimdRIJKGradientDriver: The metric is the inverted square root, which this driver "
-                    "does not support. Set ri_metric_route to cholesky for a gradient"));
 
     errors::assertMsgCritical(
         metric.number_of_rows() == aux_basis.dimensions_of_basis(),
@@ -663,6 +686,121 @@ CSimdRIJKGradientDriver::fitted_densities(const CSparseTensor   &bq_vectors,
     }
 
     return {std::move(fitting), std::move(orbital_densities), {}, std::move(omega)};
+}
+
+auto
+CSimdRIJKGradientDriver::fitted_densities_rs(const CSparseTensor   &bq_vectors_erf,
+                                             const CMolecularBasis &basis,
+                                             const CMolecularBasis &aux_basis,
+                                             const CPackedMatrix   &metric_erf,
+                                             const CPackedMatrix   &coefficients,
+                                             const double           erf_exchange_scaling_factor) const
+    -> TFittedDensities
+{
+    _check_metric(metric_erf, aux_basis);
+
+    const auto naux = aux_basis.dimensions_of_basis();
+
+    const auto norbs = coefficients.number_of_columns();
+
+    // NOTE: no fitting coefficients and no Coulomb part of Omega. The attenuated
+    // operator appears in the Fock matrix only through the exchange; the Coulomb
+    // term of a range separated functional is the whole of 1 / r and is fitted in
+    // the plain metric by the routine above. Fitting the density in the attenuated
+    // metric would be a well formed calculation of a quantity nothing wants.
+
+    auto orbital_densities = _orbital_densities(bq_vectors_erf, basis, aux_basis, metric_erf, coefficients);
+
+    auto omega = CPackedMatrix(naux, naux, mat_t::symmetric);
+
+    omega.zero();
+
+    if ((erf_exchange_scaling_factor != 0.0) && (norbs > 0))
+    {
+        const auto gram = _gram(orbital_densities, naux, norbs);
+
+        for (size_t p = 0; p < naux; p++)
+        {
+            for (size_t q = 0; q <= p; q++)
+            {
+                omega.data()[omega.index(p, q)] = -erf_exchange_scaling_factor * gram[p * naux + q];
+            }
+        }
+    }
+
+    // NOTE: the fitting is returned empty rather than as zeros, so that a caller
+    // which passes it to the three-center term with a Coulomb factor which is not
+    // zero is stopped rather than quietly given nothing.
+
+    return {std::vector<double>(), std::move(orbital_densities), {}, std::move(omega)};
+}
+
+auto
+CSimdRIJKGradientDriver::fitted_densities_open_shell_rs(const CSparseTensor   &bq_vectors_erf,
+                                                        const CMolecularBasis &basis,
+                                                        const CMolecularBasis &aux_basis,
+                                                        const CPackedMatrix   &metric_erf,
+                                                        const CPackedMatrix   &coefficients_alpha,
+                                                        const CPackedMatrix   &coefficients_beta,
+                                                        const double           erf_exchange_scaling_factor) const
+    -> TFittedDensities
+{
+    _check_metric(metric_erf, aux_basis);
+
+    const auto naux = aux_basis.dimensions_of_basis();
+
+    const auto norbs_alpha = coefficients_alpha.number_of_columns();
+
+    const auto norbs_beta = coefficients_beta.number_of_columns();
+
+    auto alpha = _orbital_densities(bq_vectors_erf, basis, aux_basis, metric_erf, coefficients_alpha);
+
+    auto beta = _orbital_densities(bq_vectors_erf, basis, aux_basis, metric_erf, coefficients_beta);
+
+    auto omega = CPackedMatrix(naux, naux, mat_t::symmetric);
+
+    omega.zero();
+
+    if (erf_exchange_scaling_factor != 0.0)
+    {
+        auto gram = std::vector<double>();
+
+        if (norbs_alpha > 0) gram = _gram(alpha, naux, norbs_alpha);
+
+        if (norbs_beta > 0)
+        {
+            auto other = _gram(beta, naux, norbs_beta);
+
+            if (gram.empty())
+            {
+                gram = std::move(other);
+            }
+            else
+            {
+                for (size_t i = 0; i < gram.size(); i++) gram[i] += other[i];
+            }
+        }
+
+        // NOTE: the half which the open shell carries, as in the routine above:
+        // writing the closed shell expression in terms of a sum over the spins puts
+        // a half on the exchange. Setting the two spins equal returns the closed
+        // shell Omega of the attenuated operator exactly, which is the first check
+        // to make on this.
+
+        if (!gram.empty())
+        {
+            for (size_t p = 0; p < naux; p++)
+            {
+                for (size_t q = 0; q <= p; q++)
+                {
+                    omega.data()[omega.index(p, q)] =
+                        -0.5 * erf_exchange_scaling_factor * gram[p * naux + q];
+                }
+            }
+        }
+    }
+
+    return {std::vector<double>(), std::move(alpha), std::move(beta), std::move(omega)};
 }
 
 auto
