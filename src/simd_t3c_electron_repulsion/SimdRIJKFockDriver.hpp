@@ -420,6 +420,14 @@ class CSimdRIJKFockDriver
     /// @return The inverted factor.
     auto get_metric() const -> const CPackedMatrix &;
 
+    /// @brief Gets the inverted metric of the attenuated operator.
+    /// @return The inverted metric, which is empty unless the driver was prepared
+    /// for a hybrid range separated functional.
+    /// @note It is a different matrix from the plain one and the two are not
+    /// interchangeable: a quantity fitted in one operator's metric and contracted
+    /// in the other's is a fitting of neither.
+    auto get_metric_erf() const -> const CPackedMatrix &;
+
    private:
     /// @brief Computes the Fock matrix by forming the integrals again on every
     /// call, holding no B vectors.

@@ -452,7 +452,11 @@ export_simdintegrals(py::module &m) -> void
         .def("get_omega", &CSimdRIJKFockDriver::get_omega,
              "Gets the range separation parameter the driver was prepared at, or zero.")
         .def("get_metric", &CSimdRIJKFockDriver::get_metric,
-             py::return_value_policy::reference_internal, "Gets the inverted factor of the metric.");
+             py::return_value_policy::reference_internal, "Gets the inverted factor of the metric.")
+        .def("get_metric_erf", &CSimdRIJKFockDriver::get_metric_erf,
+             py::return_value_policy::reference_internal,
+             "Gets the inverted metric of the attenuated operator, which is empty unless the driver "
+             "was prepared for a hybrid range separated functional.");
 
     // CSimdThreeCenterElectronRepulsionGradientDriver class
 

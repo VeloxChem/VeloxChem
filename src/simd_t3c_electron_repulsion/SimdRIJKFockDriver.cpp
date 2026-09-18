@@ -1120,6 +1120,12 @@ CSimdRIJKFockDriver::get_bq_vectors_erf() const -> const CSparseTensor &
 }
 
 auto
+CSimdRIJKFockDriver::get_metric_erf() const -> const CPackedMatrix &
+{
+    return _metric_erf;
+}
+
+auto
 CSimdRIJKFockDriver::get_omega() const -> double
 {
     return _omega;

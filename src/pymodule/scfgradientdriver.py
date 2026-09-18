@@ -717,14 +717,6 @@ class ScfGradientDriver(GradientDriver):
 
         elif self.scf_driver.ri_jk and self.scf_driver.ri_jk_simd:
 
-            # NOTE: there are no erf attenuated derivative kernels, so the long
-            # range part of a range-separated functional has no gradient of this
-            # way. The exchange this driver scales is the plain one.
-            assert_msg_critical(
-                not need_omega,
-                f'{type(self).__name__}: RI-JK gradient is not implemented ' +
-                'for a range-separated functional')
-
             self._announce_once(
                 'Using the SIMD resolution of the identity (RI-JK) gradient.')
 
@@ -747,11 +739,30 @@ class ScfGradientDriver(GradientDriver):
             # shell, Gamma against the derivative of the three-center integrals
             # less Omega against the derivative of the metric, with the factors of
             # the closed shell already in it. It is added as it is.
-            atomgrad = ri_jk_grad_drv.compute(
-                molecule, basis, basis_ri_jk,
-                self.scf_driver._ri_drv.get_bq_vectors(),
-                self.scf_driver._ri_drv.get_metric(), den_mat_for_ri,
-                orbitals_for_ri, exchange_scaling_factor)
+            if need_omega:
+                # NOTE: the range-separated gradient is a separate entry rather
+                # than a flag, matching the Fock build: it takes both sets of B
+                # vectors and both metrics, the attenuated exchange being fitted
+                # in a metric of its own. Only the exchange is split; the Coulomb
+                # term appears once, fitted in the plain metric.
+                assert_msg_critical(
+                    self.scf_driver._ri_drv.get_omega() == omega,
+                    f'{type(self).__name__}: the RI-JK driver holds B vectors ' +
+                    'of a different range-separation parameter')
+
+                atomgrad = ri_jk_grad_drv.compute_rs(
+                    molecule, basis, basis_ri_jk,
+                    self.scf_driver._ri_drv.get_bq_vectors(),
+                    self.scf_driver._ri_drv.get_bq_vectors_erf(),
+                    self.scf_driver._ri_drv.get_metric(),
+                    self.scf_driver._ri_drv.get_metric_erf(), den_mat_for_ri,
+                    orbitals_for_ri, exchange_scaling_factor, erf_k_coef, omega)
+            else:
+                atomgrad = ri_jk_grad_drv.compute(
+                    molecule, basis, basis_ri_jk,
+                    self.scf_driver._ri_drv.get_bq_vectors(),
+                    self.scf_driver._ri_drv.get_metric(), den_mat_for_ri,
+                    orbitals_for_ri, exchange_scaling_factor)
 
             self.gradient += atomgrad.to_numpy()
 
@@ -933,14 +944,6 @@ class ScfGradientDriver(GradientDriver):
 
         if self.scf_driver.ri_jk and self.scf_driver.ri_jk_simd:
 
-            # NOTE: there are no erf attenuated derivative kernels, so the long
-            # range part of a range-separated functional has no gradient of this
-            # way. The exchange this driver scales is the plain one.
-            assert_msg_critical(
-                not need_omega,
-                f'{type(self).__name__}: RI-JK gradient is not implemented ' +
-                'for a range-separated functional')
-
             self._announce_once(
                 'Using the SIMD resolution of the identity (RI-JK) gradient.')
 
@@ -968,11 +971,28 @@ class ScfGradientDriver(GradientDriver):
             # NOTE: the whole two-electron term of an open shell, Gamma against the
             # derivative of the three-center integrals less Omega against the
             # derivative of the metric, with both spins inside it. Added as it is.
-            atomgrad = ri_jk_grad_drv.compute_open_shell(
-                molecule, basis, basis_ri_jk,
-                self.scf_driver._ri_drv.get_bq_vectors(),
-                self.scf_driver._ri_drv.get_metric(), den_mat_for_ri,
-                orbitals_a, orbitals_b, exchange_scaling_factor)
+            if need_omega:
+                assert_msg_critical(
+                    self.scf_driver._ri_drv.get_omega() == omega,
+                    f'{type(self).__name__}: the RI-JK driver holds B vectors ' +
+                    'of a different range-separation parameter')
+
+                # NOTE: the open shell range-separated entry has no overload over
+                # the whole molecule, so the atoms are named here.
+                atomgrad = ri_jk_grad_drv.compute_open_shell_rs(
+                    molecule, basis, basis_ri_jk,
+                    self.scf_driver._ri_drv.get_bq_vectors(),
+                    self.scf_driver._ri_drv.get_bq_vectors_erf(),
+                    self.scf_driver._ri_drv.get_metric(),
+                    self.scf_driver._ri_drv.get_metric_erf(), den_mat_for_ri,
+                    orbitals_a, orbitals_b, exchange_scaling_factor, erf_k_coef,
+                    omega, list(range(molecule.number_of_atoms())))
+            else:
+                atomgrad = ri_jk_grad_drv.compute_open_shell(
+                    molecule, basis, basis_ri_jk,
+                    self.scf_driver._ri_drv.get_bq_vectors(),
+                    self.scf_driver._ri_drv.get_metric(), den_mat_for_ri,
+                    orbitals_a, orbitals_b, exchange_scaling_factor)
 
             self.gradient += atomgrad.to_numpy()
 
