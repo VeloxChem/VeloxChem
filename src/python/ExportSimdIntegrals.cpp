@@ -52,6 +52,7 @@
 #include "SimdRIJKGradientDriver.hpp"
 #include "SimdRIJKResponseDriver.hpp"
 #include "SimdTwoCenterElectronRepulsionGradientDriver.hpp"
+#include "SimdTwoCenterElectronRepulsionGradientRsDriver.hpp"
 #include "SimdThreeCenterElectronRepulsionGradientDriver.hpp"
 #include "SimdThreeCenterElectronRepulsionDriver.hpp"
 #include "SimdThreeCenterElectronRepulsionRsDriver.hpp"
@@ -497,6 +498,39 @@ export_simdintegrals(py::module &m) -> void
              py::arg("basis"),
              py::arg("omega"))
         .def("get_block_size", &CSimdTwoCenterElectronRepulsionGradientDriver::get_block_size,
+             "Gets target number of atom pairs of a block.");
+
+    // CSimdTwoCenterElectronRepulsionGradientRsDriver class
+
+    PyClass<CSimdTwoCenterElectronRepulsionGradientRsDriver>(m, "SimdTwoCenterElectronRepulsionGradientRsDriver")
+        .def(py::init<>())
+        .def(py::init<const size_t>(),
+             "Creates a gradient driver with given target block size.",
+             py::arg("block_size"))
+        .def("compute",
+             py::overload_cast<const CMolecule &, const CMolecularBasis &, const CPackedMatrix &,
+                               const CPackedMatrix &, const double, const std::vector<int> &>(
+                 &CSimdTwoCenterElectronRepulsionGradientRsDriver::compute, py::const_),
+             "Computes the gradients of the two-center integrals of the Coulomb operator and of the "
+             "attenuated one, each contracted with its own Omega, for the given atoms. They come back "
+             "apart because the two carry different coefficients in a range separated functional.",
+             py::arg("molecule"),
+             py::arg("basis"),
+             py::arg("omega_coulomb"),
+             py::arg("omega_attenuated"),
+             py::arg("omega"),
+             py::arg("atoms"))
+        .def("compute",
+             py::overload_cast<const CMolecule &, const CMolecularBasis &, const CPackedMatrix &,
+                               const CPackedMatrix &, const double>(
+                 &CSimdTwoCenterElectronRepulsionGradientRsDriver::compute, py::const_),
+             "Computes them for every atom of the molecule.",
+             py::arg("molecule"),
+             py::arg("basis"),
+             py::arg("omega_coulomb"),
+             py::arg("omega_attenuated"),
+             py::arg("omega"))
+        .def("get_block_size", &CSimdTwoCenterElectronRepulsionGradientRsDriver::get_block_size,
              "Gets target number of atom pairs of a block.");
 
     // TFittedDensities, what the first phase of the gradient forms
