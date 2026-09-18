@@ -195,6 +195,100 @@ def initialize(solver, molecule, basis):
     solver.ostream.flush()
 
 
+def _spin_factors(dens_factors, spin):
+    """The left factor and the one or two right factors of one spin.
+
+    Two shapes are taken, as in the restricted case: a trial vector of the
+    Tamm-Dancoff approximation carries one right factor, and one of linear response
+    carries two, the second standing to the left of the shared factor transposed.
+    """
+    if len(dens_factors) == 2:
+        left, rights = dens_factors
+        transposed_rights = []
+    elif len(dens_factors) == 3:
+        left, rights, transposed_rights = dens_factors
+    else:
+        assert_msg_critical(
+            False, 'rijkresponse: the factors of the ' + spin + ' spin are of a ' +
+            'shape an unrestricted build does not take')
+
+    return left, rights, transposed_rights
+
+
+def fock_matrices_unrestricted(solver,
+                               basis,
+                               dens_factors_alpha,
+                               dens_factors_beta,
+                               exchange_scaling_factor,
+                               erf_exchange_scaling_factor=0.0):
+    """
+    Computes the two-electron part for a batch of factorised densities of an
+    unrestricted reference.
+
+    :param solver:
+        The solver holding the B vectors and the response driver.
+    :param basis:
+        The AO basis set.
+    :param dens_factors_alpha:
+        The factors of the alpha densities: the left factor the batch shares, which
+        is that spin's occupied orbitals, and the right factor of each density.
+    :param dens_factors_beta:
+        The same for the beta spin, whose left factor has a number of columns of its
+        own.
+    :param exchange_scaling_factor:
+        The fraction of exact exchange.
+    :param erf_exchange_scaling_factor:
+        The coefficient of the exchange of the attenuated operator, zero for a
+        functional which is not range separated.
+
+    :return:
+        The Fock matrices as numpy arrays, **interleaved alpha and beta**, which is
+        the order the dense path appends them in and the order the callers unpack.
+
+    .. note::
+        The driver has one routine for a range separated functional and another for
+        the rest, and this picks between them. They are separate there so that a
+        plain calculation cannot reach the attenuated code at all.
+    """
+    drv = solver._ri_jk_response_drv
+    bq = solver._ri_jk_drv.get_bq_vectors()
+    aux = solver._ri_jk_aux_basis
+
+    left_a, rights_a, transposed_a = _spin_factors(dens_factors_alpha, 'alpha')
+    left_b, rights_b, transposed_b = _spin_factors(dens_factors_beta, 'beta')
+
+    assert_msg_critical(
+        len(rights_a) == len(rights_b),
+        'rijkresponse: the two spins do not carry the same number of densities')
+
+    if not rights_a:
+        return []
+
+    shared = (basis, aux, _packed(left_a), [_packed(r) for r in rights_a],
+              [_packed(r) for r in transposed_a], _packed(left_b),
+              [_packed(r) for r in rights_b], [_packed(r) for r in transposed_b])
+
+    if erf_exchange_scaling_factor != 0.0:
+        bq_erf = solver._ri_jk_drv.get_bq_vectors_erf()
+
+        focks_a, focks_b = drv.compute_unrestricted_rs(
+            bq, bq_erf, *shared, exchange_scaling_factor,
+            erf_exchange_scaling_factor)
+    else:
+        focks_a, focks_b = drv.compute_unrestricted(bq, *shared,
+                                                    exchange_scaling_factor)
+
+    # NOTE: alpha and beta of one density side by side, which is what the four
+    # centre path appends and what every caller of it unpacks.
+    fock_arrays = []
+
+    for fock_a, fock_b in zip(focks_a, focks_b):
+        fock_arrays.append(fock_a.to_numpy())
+        fock_arrays.append(fock_b.to_numpy())
+
+    return fock_arrays
+
+
 def general_factors(mo, nocc, mo_density):
     """The two right factors any density is carried by.
 
