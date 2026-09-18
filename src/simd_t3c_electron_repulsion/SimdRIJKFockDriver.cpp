@@ -193,7 +193,8 @@ CSimdRIJKFockDriver::required_memory(const CMolecule        &molecule,
                                      const CMolecularBasis  &basis,
                                      const CMolecularBasis  &aux_basis,
                                      const double            threshold,
-                                     const std::vector<int> &aux_atoms) const -> size_t
+                                     const std::vector<int> &aux_atoms,
+                                     const bool              range_separated) const -> size_t
 {
     // NOTE: the pattern of the B vectors is the pattern of the three-center
     // integrals, as the metric is dense and the transformation of the auxiliary
@@ -216,7 +217,13 @@ CSimdRIJKFockDriver::required_memory(const CMolecule        &molecule,
         nvalues += pattern.block(i).number_of_elements();
     }
 
-    return nvalues * sizeof(double);
+    // NOTE: a hybrid range separated functional holds the attenuated B vectors
+    // beside the plain ones, on the same pattern, so it holds twice this. The
+    // doubling is here rather than at the call so that the budget check, the
+    // automatic choice of the way and the figure the output prints are all the
+    // memory the calculation will actually hold.
+
+    return (range_separated ? 2 : 1) * nvalues * sizeof(double);
 }
 
 namespace {
@@ -504,13 +511,24 @@ CSimdRIJKFockDriver::prepare(const CMolecule       &molecule,
                              const rimode           mode,
                              const std::vector<int> &aux_atoms,
                              const CPackedMatrix   &metric,
-                             const size_t           min_parts) -> void
+                             const size_t           min_parts,
+                             const double           omega,
+                             const CPackedMatrix   &metric_erf) -> void
 {
     CPrepareProfile profile;
 
     const auto profile_start = prof_clock::now();
 
-    const auto memory = required_memory(molecule, basis, aux_basis, threshold, aux_atoms);
+    errors::assertMsgCritical(omega >= 0.0,
+                              std::string("RIJKFockDriver: The range separation parameter must not be negative"));
+
+    // NOTE: a positive omega is what makes this a range separated build. It carries
+    // a second set of B vectors, so the memory it asks for is twice the plain one
+    // and the choice of the way is taken from that rather than from half of it.
+
+    const auto range_separated = (omega > 0.0);
+
+    const auto memory = required_memory(molecule, basis, aux_basis, threshold, aux_atoms, range_separated);
 
     _budget = memory_budget;
 
@@ -519,6 +537,20 @@ CSimdRIJKFockDriver::prepare(const CMolecule       &molecule,
     // way at once rather than after the work of forming them.
 
     _mode = (mode == rimode::automatic) ? ((memory > memory_budget) ? rimode::direct : rimode::in_memory) : mode;
+
+    // NOTE: the way which forms the integrals again on every call accumulates the
+    // right hand side of its fitting from them during the sweep which builds the
+    // exchange, and that sweep and that fitting are one apiece. Two operators there
+    // would be two sweeps and two fittings inside three calls which have no shape
+    // for them, so it is refused. The message names both ways of arriving here: the
+    // direct way asked for outright, and the automatic choice falling to it because
+    // two sets of B vectors do not fit where one would have.
+
+    errors::assertMsgCritical(!(range_separated && (_mode == rimode::direct)),
+                              std::string("RIJKFockDriver: A hybrid range separated functional is served only by the "
+                                          "way which holds the B vectors, and this calculation is on the direct way "
+                                          "-- either because it was asked for, or because the two sets of B vectors "
+                                          "do not fit in the budget"));
 
     _molecule = molecule;
 
@@ -535,12 +567,57 @@ CSimdRIJKFockDriver::prepare(const CMolecule       &molecule,
 
     const auto given = (metric.number_of_elements() > 0);
 
+    const auto given_erf = (metric_erf.number_of_elements() > 0);
+
     errors::assertMsgCritical(!(given && (_mode == rimode::automatic)),
                               std::string("RIJKFockDriver: A metric given to the driver is for a named way of building"));
 
-    auto [formed, formed_mode] =
-        given ? std::pair<CPackedMatrix, rimode>{metric, _mode}
-              : form_metric(molecule, aux_basis, metric_threshold, use_inverse_square_root, _mode, &profile.two_center, &profile.metric);
+    errors::assertMsgCritical(range_separated || !given_erf,
+                              std::string("RIJKFockDriver: An attenuated metric was given without a range separation "
+                                          "parameter to have formed it at"));
+
+    errors::assertMsgCritical(!range_separated || (given == given_erf),
+                              std::string("RIJKFockDriver: A range separated build takes both metrics from the caller "
+                                          "or forms both here, and not one of each"));
+
+    auto formed = CPackedMatrix();
+
+    auto formed_erf = CPackedMatrix();
+
+    auto formed_mode = _mode;
+
+    if (range_separated)
+    {
+        // NOTE: the two are formed together where they are not given, which is one
+        // sweep of the fitting basis rather than two. The whole of it is charged to
+        // the inversion, as the two-center call answers both operators at once and
+        // there is no separate integral time to report.
+
+        const auto mark_metric = prof_clock::now();
+
+        if (given)
+        {
+            formed = metric;
+
+            formed_erf = metric_erf;
+        }
+        else
+        {
+            std::tie(formed, formed_erf) =
+                make_metric_rs(molecule, aux_basis, metric_threshold, use_inverse_square_root, rimode::in_memory, omega);
+        }
+
+        profile.metric += prof_since(mark_metric);
+
+        formed_mode = rimode::in_memory;
+    }
+    else
+    {
+        std::tie(formed, formed_mode) =
+            given ? std::pair<CPackedMatrix, rimode>{metric, _mode}
+                  : form_metric(molecule, aux_basis, metric_threshold, use_inverse_square_root, _mode,
+                                &profile.two_center, &profile.metric);
+    }
 
     _mode = formed_mode;
 
@@ -589,6 +666,12 @@ CSimdRIJKFockDriver::prepare(const CMolecule       &molecule,
 
         _bq_vectors = CSparseTensor();
 
+        _bq_vectors_erf = CSparseTensor();
+
+        _metric_erf = CPackedMatrix();
+
+        _omega = 0.0;
+
         _w_vectors.clear();
 
         _prepared = true;
@@ -602,6 +685,10 @@ CSimdRIJKFockDriver::prepare(const CMolecule       &molecule,
 
     _metric = std::move(formed);
 
+    _metric_erf = std::move(formed_erf);
+
+    _omega = omega;
+
     _parts.clear();
 
     _coulomb_parts.clear();
@@ -610,7 +697,17 @@ CSimdRIJKFockDriver::prepare(const CMolecule       &molecule,
 
     const auto mark_bq_vectors = prof_clock::now();
 
-    _bq_vectors = _drv.compute_bq_vectors(molecule, basis, aux_basis, _metric, threshold, aux_atoms);
+    if (range_separated)
+    {
+        std::tie(_bq_vectors, _bq_vectors_erf) = _drv.compute_bq_vectors_rs(
+            molecule, basis, aux_basis, _metric, _metric_erf, threshold, omega, aux_atoms);
+    }
+    else
+    {
+        _bq_vectors = _drv.compute_bq_vectors(molecule, basis, aux_basis, _metric, threshold, aux_atoms);
+
+        _bq_vectors_erf = CSparseTensor();
+    }
 
     profile.bq_vectors += prof_since(mark_bq_vectors);
 
@@ -628,11 +725,26 @@ CSimdRIJKFockDriver::prepare(const CMolecule       &molecule,
 auto
 CSimdRIJKFockDriver::compute(const CPackedMatrix &density,
                              const CPackedMatrix &coefficients,
-                             const double         exchange_scaling_factor) -> CPackedMatrix
+                             const double         exchange_scaling_factor,
+                             const double         erf_exchange_scaling_factor) -> CPackedMatrix
 {
     errors::assertMsgCritical(_prepared, std::string("RIJKFockDriver: The driver has not been prepared"));
 
-    if (_mode == rimode::direct) return _compute_direct(coefficients, exchange_scaling_factor);
+    // NOTE: a driver which holds no attenuated B vectors cannot answer for an
+    // attenuated exchange, and a build which quietly left the long range term out
+    // would converge to a wrong energy without saying anything. It is refused.
+
+    errors::assertMsgCritical((erf_exchange_scaling_factor == 0.0) || (_omega > 0.0),
+                              std::string("RIJKFockDriver: The exchange of the attenuated operator was asked for and "
+                                          "the driver holds no attenuated B vectors"));
+
+    if (_mode == rimode::direct)
+    {
+        errors::assertMsgCritical(erf_exchange_scaling_factor == 0.0,
+                                  std::string("RIJKFockDriver: The direct way does not form the attenuated exchange"));
+
+        return _compute_direct(coefficients, exchange_scaling_factor);
+    }
 
     CInMemoryProfile profile;
 
@@ -650,7 +762,11 @@ CSimdRIJKFockDriver::compute(const CPackedMatrix &density,
 
     profile.coulomb += prof_since(mark_coulomb);
 
-    if (exchange_scaling_factor == 0.0)
+    // NOTE: the Coulomb matrix is of the plain operator alone. Only the exchange of
+    // a range separated functional is split between the two operators; its Coulomb
+    // term is the whole of 1/r and is formed from the plain B vectors as ever.
+
+    if ((exchange_scaling_factor == 0.0) && (erf_exchange_scaling_factor == 0.0))
     {
         profile.total = prof_since(profile_start);
 
@@ -722,11 +838,53 @@ CSimdRIJKFockDriver::compute(const CPackedMatrix &density,
 
     profile.allocate += prof_since(mark_allocate);
 
+    // NOTE: one operator or two, into the same storage and inside one pass over the
+    // ranges. The plain exchange of a range is added before the attenuated W
+    // matrices of that range are formed, so nothing of the first is still needed
+    // when the second overwrites it and the two operators cost one range's storage
+    // and not two.
+
+    auto add_exchange = [&](const CSparseTensor &bq_vectors, const double factor,
+                            const std::vector<size_t> &batch) {
+        if (factor == 0.0) return;
+
+        const auto mark_transform = prof_clock::now();
+
+        // NOTE: the last range is shorter than the others, and the storage is
+        // handed to the transformation as the range it is asked to fill.
+
+        if (batch.size() == _w_vectors.size())
+        {
+            _drv.compute_w_vectors(bq_vectors, _basis, _aux_basis, coefficients, batch, _w_vectors);
+
+            profile.transform += prof_since(mark_transform);
+
+            const auto mark_exchange = prof_clock::now();
+
+            _drv.compute_exchange_matrix(_w_vectors, fock, -factor);
+
+            profile.exchange += prof_since(mark_exchange);
+        }
+        else
+        {
+            auto tail =
+                std::vector<CPackedMatrix>(_w_vectors.begin(), _w_vectors.begin() + static_cast<long>(batch.size()));
+
+            _drv.compute_w_vectors(bq_vectors, _basis, _aux_basis, coefficients, batch, tail);
+
+            profile.transform += prof_since(mark_transform);
+
+            const auto mark_exchange = prof_clock::now();
+
+            _drv.compute_exchange_matrix(tail, fock, -factor);
+
+            profile.exchange += prof_since(mark_exchange);
+        }
+    };
+
     for (size_t first = 0; first < nheld; first += nbatch)
     {
         const auto last = std::min(first + nbatch, nheld);
-
-        const auto count = last - first;
 
         // NOTE: the functions of this range of the set this driver holds, which is
         // what the transformation is asked for. A rank which holds a share of the
@@ -737,37 +895,9 @@ CSimdRIJKFockDriver::compute(const CPackedMatrix &density,
         const auto batch = std::vector<size_t>(_aux_functions.begin() + static_cast<long>(first),
                                                _aux_functions.begin() + static_cast<long>(last));
 
-        // NOTE: the last range is shorter than the others, and the storage is
-        // handed to the transformation as the range it is asked to fill.
+        add_exchange(_bq_vectors, exchange_scaling_factor, batch);
 
-        const auto mark_transform = prof_clock::now();
-
-        if (count == nbatch)
-        {
-            _drv.compute_w_vectors(_bq_vectors, _basis, _aux_basis, coefficients, batch, _w_vectors);
-
-            profile.transform += prof_since(mark_transform);
-
-            const auto mark_exchange = prof_clock::now();
-
-            _drv.compute_exchange_matrix(_w_vectors, fock, -exchange_scaling_factor);
-
-            profile.exchange += prof_since(mark_exchange);
-        }
-        else
-        {
-            auto tail = std::vector<CPackedMatrix>(_w_vectors.begin(), _w_vectors.begin() + static_cast<long>(count));
-
-            _drv.compute_w_vectors(_bq_vectors, _basis, _aux_basis, coefficients, batch, tail);
-
-            profile.transform += prof_since(mark_transform);
-
-            const auto mark_exchange = prof_clock::now();
-
-            _drv.compute_exchange_matrix(tail, fock, -exchange_scaling_factor);
-
-            profile.exchange += prof_since(mark_exchange);
-        }
+        add_exchange(_bq_vectors_erf, erf_exchange_scaling_factor, batch);
     }
 
     profile.total = prof_since(profile_start);
@@ -781,9 +911,14 @@ auto
 CSimdRIJKFockDriver::compute(const CPackedMatrix &density,
                              const CPackedMatrix &coefficients_alpha,
                              const CPackedMatrix &coefficients_beta,
-                             const double         exchange_scaling_factor) -> std::pair<CPackedMatrix, CPackedMatrix>
+                             const double         exchange_scaling_factor,
+                             const double         erf_exchange_scaling_factor) -> std::pair<CPackedMatrix, CPackedMatrix>
 {
     errors::assertMsgCritical(_prepared, std::string("RIJKFockDriver: The driver has not been prepared"));
+
+    errors::assertMsgCritical((erf_exchange_scaling_factor == 0.0) || (_omega > 0.0),
+                              std::string("RIJKFockDriver: The exchange of the attenuated operator was asked for and "
+                                          "the driver holds no attenuated B vectors"));
 
     // NOTE: the direct way accumulates the right hand side of its fitting from the
     // integrals during the same sweep which builds the exchange, and its build is
@@ -825,7 +960,8 @@ CSimdRIJKFockDriver::compute(const CPackedMatrix &density,
                                   (coefficients_beta.number_of_rows() == nao),
                               std::string("RIJKFockDriver: The beta orbital coefficients do not match the molecular basis"));
 
-    if ((exchange_scaling_factor == 0.0) || ((norb_alpha == 0) && (norb_beta == 0)))
+    if (((exchange_scaling_factor == 0.0) && (erf_exchange_scaling_factor == 0.0)) ||
+        ((norb_alpha == 0) && (norb_beta == 0)))
     {
         profile.total = prof_since(profile_start);
 
@@ -880,24 +1016,26 @@ CSimdRIJKFockDriver::compute(const CPackedMatrix &density,
     // NOTE: one pass over the ranges with both spins inside it, so a range's B
     // vectors are read once and serve both rather than being swept twice.
 
-    auto add_exchange = [&](std::vector<CPackedMatrix> &storage,
-                            const CPackedMatrix        &coefficients,
-                            const size_t                norbitals,
-                            CPackedMatrix              &fock,
-                            const std::vector<size_t>  &batch) {
-        if (norbitals == 0) return;
+    auto add_exchange = [&](const CSparseTensor         &bq_vectors,
+                            const double                 factor,
+                            std::vector<CPackedMatrix>  &storage,
+                            const CPackedMatrix         &coefficients,
+                            const size_t                 norbitals,
+                            CPackedMatrix               &fock,
+                            const std::vector<size_t>   &batch) {
+        if ((norbitals == 0) || (factor == 0.0)) return;
 
         const auto mark_transform = prof_clock::now();
 
         if (batch.size() == storage.size())
         {
-            _drv.compute_w_vectors(_bq_vectors, _basis, _aux_basis, coefficients, batch, storage);
+            _drv.compute_w_vectors(bq_vectors, _basis, _aux_basis, coefficients, batch, storage);
 
             profile.transform += prof_since(mark_transform);
 
             const auto mark_exchange = prof_clock::now();
 
-            _drv.compute_exchange_matrix(storage, fock, -exchange_scaling_factor);
+            _drv.compute_exchange_matrix(storage, fock, -factor);
 
             profile.exchange += prof_since(mark_exchange);
         }
@@ -908,13 +1046,13 @@ CSimdRIJKFockDriver::compute(const CPackedMatrix &density,
             auto tail = std::vector<CPackedMatrix>(storage.begin(),
                                                    storage.begin() + static_cast<long>(batch.size()));
 
-            _drv.compute_w_vectors(_bq_vectors, _basis, _aux_basis, coefficients, batch, tail);
+            _drv.compute_w_vectors(bq_vectors, _basis, _aux_basis, coefficients, batch, tail);
 
             profile.transform += prof_since(mark_transform);
 
             const auto mark_exchange = prof_clock::now();
 
-            _drv.compute_exchange_matrix(tail, fock, -exchange_scaling_factor);
+            _drv.compute_exchange_matrix(tail, fock, -factor);
 
             profile.exchange += prof_since(mark_exchange);
         }
@@ -927,9 +1065,21 @@ CSimdRIJKFockDriver::compute(const CPackedMatrix &density,
         const auto batch = std::vector<size_t>(_aux_functions.begin() + static_cast<long>(first),
                                                _aux_functions.begin() + static_cast<long>(last));
 
-        add_exchange(_w_vectors, coefficients_alpha, norb_alpha, fock_alpha, batch);
+        // NOTE: grouped by operator and not by spin, so that a range of the plain B
+        // vectors is read for both spins before the attenuated ones are touched at
+        // all. The other order reads each tensor twice for every range.
 
-        add_exchange(_w_vectors_beta, coefficients_beta, norb_beta, fock_beta, batch);
+        add_exchange(_bq_vectors, exchange_scaling_factor, _w_vectors, coefficients_alpha, norb_alpha, fock_alpha,
+                     batch);
+
+        add_exchange(_bq_vectors, exchange_scaling_factor, _w_vectors_beta, coefficients_beta, norb_beta, fock_beta,
+                     batch);
+
+        add_exchange(_bq_vectors_erf, erf_exchange_scaling_factor, _w_vectors, coefficients_alpha, norb_alpha,
+                     fock_alpha, batch);
+
+        add_exchange(_bq_vectors_erf, erf_exchange_scaling_factor, _w_vectors_beta, coefficients_beta, norb_beta,
+                     fock_beta, batch);
     }
 
     profile.total = prof_since(profile_start);

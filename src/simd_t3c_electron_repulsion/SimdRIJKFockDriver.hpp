@@ -121,11 +121,15 @@ class CSimdRIJKFockDriver
     /// them, so the answer is the memory they will take rather than an estimate of
     /// it. The W matrices are not counted, as one range of them is held at a time
     /// and is small beside the B vectors.
+    /// @param range_separated True for a hybrid range separated functional, whose
+    /// build holds a second set of B vectors of the attenuated operator. The two
+    /// sets are on one sparsity pattern, so the memory is twice the one set.
     auto required_memory(const CMolecule        &molecule,
                          const CMolecularBasis  &basis,
                          const CMolecularBasis  &aux_basis,
                          const double            threshold,
-                         const std::vector<int> &aux_atoms = {}) const -> size_t;
+                         const std::vector<int> &aux_atoms       = {},
+                         const bool              range_separated = false) const -> size_t;
 
     /// @brief Forms the metric a way of building asks for, and the way it is for.
     /// @param molecule The molecule to compute the metric of.
@@ -228,7 +232,9 @@ class CSimdRIJKFockDriver
                  const rimode           mode                    = rimode::automatic,
                  const std::vector<int> &aux_atoms              = {},
                  const CPackedMatrix    &metric                 = CPackedMatrix(),
-                 const size_t            min_parts              = 1) -> void;
+                 const size_t            min_parts              = 1,
+                 const double            omega                  = 0.0,
+                 const CPackedMatrix    &metric_erf             = CPackedMatrix()) -> void;
 
     /// @brief Computes the Fock matrix of a density and a set of orbitals.
     /// @param density The density matrix, in the packed format, symmetric for a
@@ -244,9 +250,20 @@ class CSimdRIJKFockDriver
     /// @note The matrix is twice the Coulomb matrix less the scaled exchange,
     /// which is the convention of a closed shell calculation, whose density is
     /// that of one spin.
+    /// @param erf_exchange_scaling_factor The factor the exchange of the attenuated
+    /// operator is scaled by, which is the erf coefficient of a hybrid range
+    /// separated functional and zero for every other calculation. It is subtracted
+    /// as the plain exchange is, so the caller passes what the four-center way is
+    /// passed and the sign is the same.
+    /// @note The two exchanges are added inside one pass over the ranges of the
+    /// auxiliary basis, and the storage of the W matrices is filled again from the
+    /// attenuated B vectors rather than doubled: a range's plain exchange is added
+    /// before its attenuated W matrices are formed, so nothing of the first is
+    /// needed when the second is being built.
     auto compute(const CPackedMatrix &density,
                  const CPackedMatrix &coefficients,
-                 const double         exchange_scaling_factor) -> CPackedMatrix;
+                 const double         exchange_scaling_factor,
+                 const double         erf_exchange_scaling_factor = 0.0) -> CPackedMatrix;
 
     /// @brief Computes the Fock matrices of the two spins of an open shell.
     /// @param density The total density, which is that of both spins added, in the
@@ -275,10 +292,14 @@ class CSimdRIJKFockDriver
     /// builds the exchange, and two spins there means two exchanges and one
     /// fitting summed over both inside that sweep, which is a different piece of
     /// work from this one and is refused rather than approximated.
+    /// @param erf_exchange_scaling_factor The factor the exchange of the attenuated
+    /// operator is scaled by, as above. Each spin's attenuated exchange goes into
+    /// its own matrix, as its plain exchange does.
     auto compute(const CPackedMatrix &density,
                  const CPackedMatrix &coefficients_alpha,
                  const CPackedMatrix &coefficients_beta,
-                 const double         exchange_scaling_factor) -> std::pair<CPackedMatrix, CPackedMatrix>;
+                 const double         exchange_scaling_factor,
+                 const double         erf_exchange_scaling_factor = 0.0) -> std::pair<CPackedMatrix, CPackedMatrix>;
 
     /// @brief Computes the exchange of a range of the orbitals, and the right hand
     /// side of the fitting it closes on the way.
@@ -548,6 +569,21 @@ class CSimdRIJKFockDriver
 
     /// @brief The B vectors.
     CSparseTensor _bq_vectors;
+
+    /// @brief The B vectors of the attenuated operator, held only for a hybrid range
+    /// separated functional and empty otherwise.
+    /// @note They are on the same sparsity pattern as the plain ones, so an element
+    /// of either is at the same place in the other.
+    CSparseTensor _bq_vectors_erf;
+
+    /// @brief The inverted metric of the attenuated operator, held with its B
+    /// vectors and empty otherwise.
+    CPackedMatrix _metric_erf;
+
+    /// @brief The range separation parameter the attenuated set was formed at, or
+    /// zero when there is no attenuated set. This is what a build asks to know
+    /// whether it may add an attenuated exchange.
+    double _omega = 0.0;
 
     /// @brief The W matrices of one range of the auxiliary basis.
     std::vector<CPackedMatrix> _w_vectors;

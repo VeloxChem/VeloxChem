@@ -346,7 +346,8 @@ export_simdintegrals(py::module &m) -> void
              py::arg("basis"),
              py::arg("aux_basis"),
              py::arg("threshold"),
-             py::arg("aux_atoms") = std::vector<int>{})
+             py::arg("aux_atoms") = std::vector<int>{},
+             py::arg("range_separated") = false)
         .def("make_metric",
              &CSimdRIJKFockDriver::make_metric,
              "Forms the metric a way of building asks for, and answers the way it is for, "
@@ -379,24 +380,29 @@ export_simdintegrals(py::module &m) -> void
              py::arg("mode") = rimode::automatic,
              py::arg("aux_atoms") = std::vector<int>{},
              py::arg("metric") = CPackedMatrix(),
-             py::arg("min_parts") = 1)
+             py::arg("min_parts") = 1,
+             py::arg("omega") = 0.0,
+             py::arg("metric_erf") = CPackedMatrix())
         .def("compute",
-             py::overload_cast<const CPackedMatrix &, const CPackedMatrix &, const double>(
+             py::overload_cast<const CPackedMatrix &, const CPackedMatrix &, const double, const double>(
                  &CSimdRIJKFockDriver::compute),
-             "Computes the Fock matrix, twice the Coulomb less the scaled exchange.",
+             "Computes the Fock matrix, twice the Coulomb less the scaled exchange, and less the scaled "
+             "exchange of the attenuated operator where one is asked for.",
              py::arg("density"),
              py::arg("coefficients"),
-             py::arg("exchange_scaling_factor"))
+             py::arg("exchange_scaling_factor"),
+             py::arg("erf_exchange_scaling_factor") = 0.0)
         .def("compute",
-             py::overload_cast<const CPackedMatrix &, const CPackedMatrix &, const CPackedMatrix &, const double>(
-                 &CSimdRIJKFockDriver::compute),
+             py::overload_cast<const CPackedMatrix &, const CPackedMatrix &, const CPackedMatrix &, const double,
+                               const double>(&CSimdRIJKFockDriver::compute),
              "Computes the Fock matrices of the two spins of an open shell, the Coulomb of the total density "
-             "less each spin's scaled exchange. The way which forms the integrals again on every call does not "
-             "serve this.",
+             "less each spin's scaled exchange, and less each spin's attenuated exchange where one is asked "
+             "for. The way which forms the integrals again on every call does not serve this.",
              py::arg("density"),
              py::arg("coefficients_alpha"),
              py::arg("coefficients_beta"),
-             py::arg("exchange_scaling_factor"))
+             py::arg("exchange_scaling_factor"),
+             py::arg("erf_exchange_scaling_factor") = 0.0)
         .def("compute_exchange",
              &CSimdRIJKFockDriver::compute_exchange,
              "Computes the exchange of a range of the orbitals, and the right hand side of the fitting it "
