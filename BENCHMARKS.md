@@ -9093,7 +9093,7 @@ cases:
 | | |
 | --- | --- |
 | unrestricted references | not covered anywhere in response |
-| range-separated functionals | asserted against, so a run stops rather than falling back quietly |
+| range-separated functionals | **now covered; see the section on them below.** This row read "asserted against" until the attenuated B vectors were added |
 | more than one rank | refused, so the multi-rank half-size path never runs with it on |
 | core excitations, restricted subspaces | fall back to the dense route, excluded in the solver's guard |
 | complex trial vectors | fall back; the guard is a no-op today, since damped response carries them as real blocks |
@@ -9801,3 +9801,95 @@ drift: measured again on a quiet machine the same row is **51.12**, within one p
 cent of the two day old number. There was nothing to drift. **A benchmark which
 disagrees with an older one by ten per cent is a reason to look at what else is
 running, not a reason to write a sentence about drift.**
+
+## What the range separated path now covers, and how each part was checked
+
+The attenuated operator reaches every Fock build the resolution of the identity
+serves, ground state and response. This section is the record of what that is and of
+what established it, so a reader does not have to infer coverage from which sections
+happen to carry timings.
+
+Everything below is the restricted reference. The unrestricted reference is covered
+in the ground state and nowhere in response, for the reason the table above gives:
+the unrestricted response path has no factorised Fock build at all, so there is
+nothing there to add an operator to.
+
+| what | wired in | checked against | agreement |
+| --- | --- | --- | ---: |
+| SCF, closed shell | `scfdriver` | four-centre Fock matrices | 0.86 to 1.14 x control |
+| | | converged energies | 0.99 to 1.31 x control |
+| SCF, open shell | `scfdriver` | the same, two spins | as above, within six per cent |
+| TDA | `linearsolver` | excitation energies, five states | 8.1e-06 to 9.2e-06 a.u. |
+| TD-DFT | `linearsolver` | as above | 8.1e-06 to 9.2e-06 a.u. |
+| linear response, CPP | `linearsolver` | polarizabilities at two frequencies | 1.00 x control |
+| ten nonlinear drivers | `nonlinearsolver` | the results each driver returns | 0.98 to 1.12 x control |
+
+**Every comparison is against the plain hybrid of the same molecule and basis**, run
+in the same session, and not against a fixed tolerance. A fitting set carries an
+error of its own and a fixed number would measure that rather than the code. The
+question which has an answer is whether fitting the attenuated operator is as good as
+fitting the plain one, and across every row of every one of those checks it is.
+
+### The nonlinear drivers, one builder and sixteen modes
+
+`nonlinearsolver._comp_two_el_int` is the only place the factorised build is chosen
+for a nonlinear calculation, and the sixteen mode strings which reach it are covered
+exactly by the two sets it dispatches on -- five cubic, eleven quadratic, none left
+over. So wiring is a property of that one function and not of the drivers.
+
+Checked driver by driver even so, water in def2-SVP, CAM-B3LYP against a B3LYP
+control, four-centre against the simd path:
+
+| driver | control | CAM-B3LYP |
+| --- | ---: | ---: |
+| quadratic response | 4.57e-04 | 4.65e-04 (1.02) |
+| cubic response | 6.92e-05 | 7.05e-05 (1.02) |
+| two-photon absorption, full | 1.09e-04 | 1.13e-04 (1.04) |
+| two-photon absorption, reduced | 9.08e-05 | 9.32e-05 (1.03) |
+| two-photon transitions | 3.03e-05 | 2.98e-05 (0.98) |
+| three-photon transitions | 7.12e-05 | 7.20e-05 (1.01) |
+| third harmonic generation | 1.24e-04 | 1.24e-04 (1.00) |
+| third harmonic, reduced | 1.24e-04 | 1.24e-04 (1.00) |
+| second harmonic generation | 1.49e-04 | 1.50e-04 (1.01) |
+| second harmonic, reduced | 1.49e-04 | 1.50e-04 (1.01) |
+
+### Three ways this check passed while proving nothing
+
+Worth writing down, because each of them produced green rows.
+
+**The settings were dropped in silence.** The resolution of the identity keys of a
+nonlinear driver live in its **method** settings, where the linear solver keeps them
+in its **response** settings. Passed in the wrong dictionary they are discarded
+without a word, `ri_jk` comes back false, the auxiliary basis reverts to the default,
+and both columns of the comparison run four centres. Six rows then agreed to
+**2.4e-15** and reported success. The tell was that the agreement was far too good:
+the fit carries an error near 1e-4 here, so machine precision is impossible if one
+side used it. The check now asserts that the driver holds B vectors at the omega its
+functional asks for, and that the two columns differ by more than 1e-10.
+
+**A phase read as a catastrophe.** The transition drivers reported a relative
+difference of exactly **2.00**, which is what a sign flip gives at the largest
+element. A transition moment is defined up to the phase of an eigenvector and the two
+ways of building can land on either. Nothing was wrong: the three-photon strengths
+were 1688.54 and 1688.38. Those drivers are compared as magnitudes now; the others
+keep signed comparison, their response functions having a sign which means something.
+
+**A flattener which never reached the answer.** It walked the top level of a result
+and stopped, so the strengths of a transition driver, nested two dictionaries deep,
+were never compared at all -- while the excitation energies and dipoles beside them
+were, and passed.
+
+None of the three was a defect in the code under test. All three were defects in the
+thing measuring it, and two of them presented as success.
+
+### What is still outside
+
+The **gradient** refuses a range separated functional and should keep refusing: there
+are no attenuated derivative kernels, so the long-range term has no derivative on this
+path and a run which proceeded would differentiate the wrong energy expression in
+silence. That assert matters more now than it did, because the self consistent field
+it would be differentiating converges.
+
+The **unrestricted response path** and the **exciton driver** are untouched, the first
+because it has no factorised build to extend and the second because it refuses range
+separation for reasons of its own.
