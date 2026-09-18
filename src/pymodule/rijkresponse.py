@@ -79,6 +79,33 @@ def memory_budget():
     return int(max(available - reserve, 0.25 * available))
 
 
+def range_separation(solver):
+    """The range separation parameter the solver's functional asks for.
+
+    :param solver:
+        The solver.
+
+    :return:
+        The parameter, or zero where the functional is not range separated and the
+        plain B vectors are the whole of what is needed.
+
+    .. note::
+        This is read from the functional and not from the parameters of a build.
+        Those are settled per call and say what that call wants; what the B vectors
+        are is settled once, before any of them.
+    """
+
+    if not getattr(solver, '_dft', False):
+        return 0.0
+
+    xcfun = getattr(solver, 'xcfun', None)
+
+    if xcfun is None or not xcfun.is_range_separated():
+        return 0.0
+
+    return xcfun.get_rs_omega()
+
+
 def initialize(solver, molecule, basis):
     """
     Forms the B vectors the response driver contracts, on the solver.
@@ -110,9 +137,15 @@ def initialize(solver, molecule, basis):
 
     solver._ri_jk_drv = SimdRIJKFockDriver()
 
+    # NOTE: a hybrid range-separated functional needs the B vectors of the
+    # attenuated operator beside the plain ones, each fitted in its own metric, so
+    # it holds twice this and the check below is made against twice this.
+    omega = range_separation(solver)
+
     needed = solver._ri_jk_drv.required_memory(molecule, basis,
                                                solver._ri_jk_aux_basis,
-                                               solver.eri_thresh, [])
+                                               solver.eri_thresh, [],
+                                               omega > 0.0)
 
     # NOTE: the response driver contracts the B vectors and cannot form them
     # again, so the mode which holds them is the only one it can use. The memory
@@ -124,20 +157,37 @@ def initialize(solver, molecule, basis):
         f'{type(solver).__name__}: the B vectors need ' +
         f'{needed / 1024**3:.2f} GB of {budget / 1024**3:.2f} GB available')
 
-    metric, mode = solver._ri_jk_drv.make_metric(molecule,
-                                                 solver._ri_jk_aux_basis,
-                                                 solver.ri_metric_threshold,
-                                                 False, rimode.in_memory)
+    metric_erf = PackedMatrix()
+
+    if omega > 0.0:
+        # NOTE: the two come out of one call, which forms both operators over one
+        # set of primitive pairs. There is no way to answer here as make_metric
+        # answers one: the way which holds the B vectors is the only way a range
+        # separated build has, and the response path has no other way either.
+        metric, metric_erf = solver._ri_jk_drv.make_metric_rs(
+            molecule, solver._ri_jk_aux_basis, solver.ri_metric_threshold, False,
+            rimode.in_memory, omega)
+        mode = rimode.in_memory
+    else:
+        metric, mode = solver._ri_jk_drv.make_metric(molecule,
+                                                     solver._ri_jk_aux_basis,
+                                                     solver.ri_metric_threshold,
+                                                     False, rimode.in_memory)
 
     solver._ri_jk_drv.prepare(molecule, basis, solver._ri_jk_aux_basis,
                               solver.eri_thresh, budget,
                               solver.ri_metric_threshold, False, mode, [],
-                              metric, 1)
+                              metric, 1, omega, metric_erf)
 
     solver._ri_jk_response_drv = SimdRIJKResponseDriver(solver.eri_thresh)
 
     solver.ostream.print_info(
         'Using the SIMD resolution of the identity (RI-JK) for response.')
+    if omega > 0.0:
+        solver.ostream.print_info(
+            'Range-separated functional: two sets of B vectors at ' +
+            f'omega = {omega:.3f}.')
+
     solver.ostream.print_info(
         f'B vectors need {needed / 1024**3:.2f} GB of ' +
         f'{budget / 1024**3:.2f} GB available.')
@@ -194,9 +244,17 @@ def is_prepared(solver):
 
     drv = getattr(solver, '_ri_jk_drv', None)
 
-    return (drv is not None and drv.is_prepared() and
-            getattr(solver, '_ri_jk_response_drv', None) is not None and
-            getattr(solver, '_ri_jk_aux_basis', None) is not None)
+    if (drv is None or not drv.is_prepared() or
+            getattr(solver, '_ri_jk_response_drv', None) is None or
+            getattr(solver, '_ri_jk_aux_basis', None) is None):
+        return False
+
+    # NOTE: and prepared for the functional this solver has. A driver handed down
+    # by another one carries the operators that solver needed, which is the same
+    # set in every case that arises today -- a driver drives solvers of its own
+    # functional -- but a plain set answering a range separated build would drop
+    # the long-range term, and one which asks here is told no and forms its own.
+    return drv.get_omega() == range_separation(solver)
 
 
 def share(source, target):
@@ -215,6 +273,11 @@ def share(source, target):
         The solver which is given them.
     """
 
+    # NOTE: is_prepared asks whether the source holds vectors for its own
+    # functional. A source and a target of different functionals is not a case
+    # which arises -- a driver drives solvers of its own -- and if it ever did, the
+    # target's own is_prepared would reject what it was handed and it would form
+    # the set it needs.
     if not is_prepared(source):
         return
 
@@ -265,7 +328,8 @@ def _packed(array):
     return matrix
 
 
-def fock_matrices(solver, basis, dens_factors, exchange_scaling_factor):
+def fock_matrices(solver, basis, dens_factors, exchange_scaling_factor,
+                  erf_exchange_scaling_factor=0.0):
     """
     Computes the two-electron part for a batch of factorised densities.
 
@@ -277,6 +341,11 @@ def fock_matrices(solver, basis, dens_factors, exchange_scaling_factor):
         The factors, in one of the three shapes this module describes.
     :param exchange_scaling_factor:
         The fraction of exact exchange.
+    :param erf_exchange_scaling_factor:
+        The coefficient of the exchange of the attenuated operator, which is the
+        erf coefficient of a hybrid range-separated functional and zero for every
+        other calculation. It is subtracted as the plain exchange is, so this is
+        the same number the four-centre way is passed.
 
     :return:
         The Fock matrices as numpy arrays, one for each density.
@@ -285,6 +354,12 @@ def fock_matrices(solver, basis, dens_factors, exchange_scaling_factor):
     drv = solver._ri_jk_response_drv
     bq = solver._ri_jk_drv.get_bq_vectors()
     aux = solver._ri_jk_aux_basis
+
+    # NOTE: the attenuated B vectors, or nothing where the functional does not ask
+    # for them. The driver refuses a coefficient without them rather than leaving
+    # the long-range term out in silence.
+    bq_erf = (solver._ri_jk_drv.get_bq_vectors_erf()
+              if erf_exchange_scaling_factor != 0.0 else None)
 
     # NOTE: what comes back is twice the Coulomb less the scaled exchange
     # already, which is what the builders are asked for, so nothing is scaled
@@ -300,11 +375,13 @@ def fock_matrices(solver, basis, dens_factors, exchange_scaling_factor):
 
         first = drv.compute(bq, basis, aux, _packed(left_a),
                             [_packed(r) for r in rights_a],
-                            exchange_scaling_factor)
+                            exchange_scaling_factor, bq_erf,
+                            erf_exchange_scaling_factor)
 
         second = drv.compute(bq, basis, aux, _packed(left_b),
                              [_packed(r) for r in rights_b],
-                             exchange_scaling_factor)
+                             exchange_scaling_factor, bq_erf,
+                             erf_exchange_scaling_factor)
 
         return [a.to_numpy() + b.to_numpy() for a, b in zip(first, second)]
 
@@ -319,6 +396,7 @@ def fock_matrices(solver, basis, dens_factors, exchange_scaling_factor):
     if transposed_rights is not None:
         args.append([_packed(r) for r in transposed_rights])
 
-    focks = drv.compute(*args, exchange_scaling_factor)
+    focks = drv.compute(*args, exchange_scaling_factor, bq_erf,
+                        erf_exchange_scaling_factor)
 
     return [fock.to_numpy() for fock in focks]
