@@ -9980,7 +9980,11 @@ basis.
 Caffeine, `def2-universal-jkfit`, CAM-B3LYP, one rank of 14 threads on the M4 Max,
 best of two, one SCF and then the gradients in one process per case, at `255140804`.
 The records are `benchmarks/data/gradient/2026-09-18_m4max_caffeine_rs.json` and
-`..._b3lyp_control.json`, and the runner is `benchmarks/scripts/grad_rs_laptop.py`.
+`..._b3lyp_control.json`, rendered beside them as `.md` and `.pdf` by
+`benchmarks/scripts/render_runs.py`, and the runner is
+`benchmarks/scripts/grad_rs_laptop.py`. The provenance of both says the tree was
+dirty: the only thing uncommitted was that runner, which was written for this
+measurement and is committed with it.
 
 | functional | basis | nao | four-centre | RI-JK simd | speedup | vs four-centre |
 | --- | --- | ---: | ---: | ---: | ---: | ---: |
@@ -10046,6 +10050,23 @@ construction** -- the Fourier transform of the attenuated operator carries
 the gradient, for the same reason it never reached the Fock matrix: the attenuated
 integrals are zero in the directions the metric is blind in. This is the first time
 that has been visible in a derivative rather than argued from the operator.
+
+### The exponent does not move when the exchange splits
+
+Fitted over the four bases by the renderer:
+
+| functional | method | p |
+| --- | --- | ---: |
+| CAM-B3LYP | four-centre | 4.00 |
+| CAM-B3LYP | RI-JK simd | 1.86 |
+| B3LYP | four-centre | 3.97 |
+| B3LYP | RI-JK simd | 1.81 |
+
+Four oh oh against three nine seven, and one eight six against one eight one. **The
+second exchange is a constant on both sides and not a power**, which is what the pass
+structure says it should be: the four-centre way repeats a pass it already makes and
+the fitted way contracts a second tensor over the same pattern. Neither adds an index.
+The fitted exponent near 1.8 rather than 1 is the naux caution below, not the split.
 
 ### The caution the earlier table states applies here unchanged
 
