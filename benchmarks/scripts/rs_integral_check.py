@@ -117,10 +117,23 @@ def _magnitudes(tensor, want):
     parts = []
     for iblock in range(tensor.number_of_blocks()):
         block = tensor.block(iblock)
+        npairs = block.number_of_pairs()
         values = np.abs(np.asarray(tensor.block_to_numpy(iblock)))
-        parts.append(values)
-        if block.a_index() != block.b_index():
-            parts.append(values)
+
+        # NOTE: the pattern keeps the upper triangle of the **atom pairs**, which is
+        # not the upper triangle of the atom basis pairs. A block whose two sides are
+        # the same atom basis can still hold pairs of two different atoms: water's
+        # hydrogens give one block with H1-H1, H2-H2 and H1-H2 in it, and only the
+        # last of those stands for two. Repeating whole blocks is right for a
+        # molecule of distinct elements, which is all this file measures, and wrong
+        # for anything else. The atom pairs are the fastest varying index, so the
+        # columns can be repeated individually.
+        columns = values.reshape(-1, npairs)
+
+        for k, (a, b) in enumerate(zip(block.a_atoms(), block.b_atoms())):
+            parts.append(columns[:, k].ravel())
+            if a != b:
+                parts.append(columns[:, k].ravel())
 
     values = np.concatenate(parts)
 

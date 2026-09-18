@@ -54,6 +54,7 @@
 #include "SimdTwoCenterElectronRepulsionGradientDriver.hpp"
 #include "SimdTwoCenterElectronRepulsionGradientRsDriver.hpp"
 #include "SimdThreeCenterElectronRepulsionGradientDriver.hpp"
+#include "SimdThreeCenterElectronRepulsionGradientRsDriver.hpp"
 #include "SimdThreeCenterElectronRepulsionDriver.hpp"
 #include "SimdThreeCenterElectronRepulsionRsDriver.hpp"
 #include "SimdTwoCenterElectronRepulsionDriver.hpp"
@@ -470,6 +471,28 @@ export_simdintegrals(py::module &m) -> void
              py::arg("basis"),
              py::arg("aux_basis"))
         .def("get_block_size", &CSimdThreeCenterElectronRepulsionGradientDriver::get_block_size,
+             "Gets target number of atom pairs of a block.");
+
+    // CSimdThreeCenterElectronRepulsionGradientRsDriver class
+
+    PyClass<CSimdThreeCenterElectronRepulsionGradientRsDriver>(
+        m, "SimdThreeCenterElectronRepulsionGradientRsDriver")
+        .def(py::init<>())
+        .def(py::init<const size_t>(),
+             "Creates a driver with given target block size.",
+             py::arg("block_size"))
+        .def("compute",
+             &CSimdThreeCenterElectronRepulsionGradientRsDriver::compute,
+             "Computes the derivatives of the three-center integrals of the Coulomb operator and of the "
+             "attenuated one with respect to the two atoms on bra side, as two tensors on one pattern "
+             "with six components an element. The derivative of the auxiliary center is the negative of "
+             "the two.",
+             py::arg("pattern"),
+             py::arg("molecule"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("omega"))
+        .def("get_block_size", &CSimdThreeCenterElectronRepulsionGradientRsDriver::get_block_size,
              "Gets target number of atom pairs of a block.");
 
     // CSimdTwoCenterElectronRepulsionGradientDriver class
