@@ -330,7 +330,10 @@ class CSimdRIJKGradientDriver
                                const double                      coulomb_factor,
                                const double                      exchange_factor,
                                const std::vector<bool>          &wanted,
-                               const std::vector<int>           &aux_atoms) const -> void;
+                               const std::vector<int>           &aux_atoms,
+                               const std::vector<TExchangeSpin> &spins_erf = {},
+                               const double                      erf_exchange_factor = 0.0,
+                               const double                      omega = 0.0) const -> void;
 
     /// @brief Checks the metric is one this driver can use.
     /// @param metric The metric handed over.

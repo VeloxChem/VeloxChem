@@ -20,6 +20,7 @@
 #include "ErrorHandler.hpp"
 #include "SimdThreeCenterElectronRepulsionDriver.hpp"
 #include "SimdThreeCenterElectronRepulsionGradientDriver.hpp"
+#include "SimdThreeCenterElectronRepulsionGradientRsDriver.hpp"
 #include "SimdTwoCenterElectronRepulsionGradientDriver.hpp"
 #include "TensorComponents.hpp"
 
@@ -1095,7 +1096,10 @@ CSimdRIJKGradientDriver::_compute_three_center(CPackedMatrix                    
                                                const double                      coulomb_factor,
                                                const double                      exchange_factor,
                                                const std::vector<bool>          &wanted,
-                                               const std::vector<int>           &aux_atoms) const -> void
+                                               const std::vector<int>           &aux_atoms,
+                                               const std::vector<TExchangeSpin> &spins_erf,
+                                               const double                      erf_exchange_factor,
+                                               const double                      omega) const -> void
 {
     const auto nao = basis.dimensions_of_basis();
 
@@ -1132,6 +1136,17 @@ CSimdRIJKGradientDriver::_compute_three_center(CPackedMatrix                    
         std::vector<double> transposed;
     };
 
+    // NOTE: a positive omega is what makes this a range separated gradient. It
+    // carries a second set of B vectors, a second set of fitted densities and a
+    // second derivative tensor; what it does not carry is a second Coulomb term,
+    // the attenuated operator entering the Fock matrix through the exchange alone.
+
+    const auto range_separated = (omega > 0.0);
+
+    errors::assertMsgCritical(range_separated || spins_erf.empty(),
+                              std::string("SimdRIJKGradientDriver: Attenuated spins were given without a range "
+                                          "separation parameter"));
+
     auto dense_spins = std::vector<TDenseSpin>();
 
     for (const auto &spin : spins)
@@ -1150,6 +1165,31 @@ CSimdRIJKGradientDriver::_compute_three_center(CPackedMatrix                    
         }
 
         dense_spins.push_back({norbs, std::move(dense_c), std::move(transposed)});
+    }
+
+    // NOTE: the attenuated operator's spins carry the same orbitals -- a spin
+    // occupies what it occupies whatever operator is being fitted -- so these are
+    // the same dense arrays. They are built again rather than shared because the
+    // list may be empty, and a reference into an empty list is worse than a copy.
+
+    auto dense_spins_erf = std::vector<TDenseSpin>();
+
+    for (const auto &spin : spins_erf)
+    {
+        const auto norbs = spin.coefficients->number_of_columns();
+
+        auto dense_c = std::vector<double>(nao * norbs, 0.0);
+
+        spin.coefficients->to_dense(dense_c.data());
+
+        auto transposed = std::vector<double>(norbs * nao, 0.0);
+
+        for (size_t mu = 0; mu < nao; mu++)
+        {
+            for (size_t ii = 0; ii < norbs; ii++) transposed[ii * nao + mu] = dense_c[mu * norbs + ii];
+        }
+
+        dense_spins_erf.push_back({norbs, std::move(dense_c), std::move(transposed)});
     }
 
     const auto naux = aux_basis.dimensions_of_basis();
@@ -1171,6 +1211,8 @@ CSimdRIJKGradientDriver::_compute_three_center(CPackedMatrix                    
 
     const auto grad_drv = CSimdThreeCenterElectronRepulsionGradientDriver(_block_size);
 
+    const auto grad_rs_drv = CSimdThreeCenterElectronRepulsionGradientRsDriver(_block_size);
+
     for (const auto iaux : atoms)
     {
         // NOTE: the pattern of this atom alone, described with the threshold the
@@ -1179,7 +1221,23 @@ CSimdRIJKGradientDriver::_compute_three_center(CPackedMatrix                    
 
         const auto pattern = eri_drv.make_pattern(molecule, basis, aux_basis, _threshold, {iaux});
 
-        const auto derivative = grad_drv.compute(pattern, molecule, basis, aux_basis);
+        // NOTE: the two operators come out of one call, so the attenuated term
+        // costs a second contraction and not a second pass over the integrals.
+
+        auto derivatives = std::vector<CSparseTensor>();
+
+        if (range_separated)
+        {
+            auto pair = grad_rs_drv.compute(pattern, molecule, basis, aux_basis, omega);
+
+            derivatives.push_back(std::move(pair.first));
+
+            derivatives.push_back(std::move(pair.second));
+        }
+        else
+        {
+            derivatives.push_back(grad_drv.compute(pattern, molecule, basis, aux_basis));
+        }
 
         // NOTE: the exchange part of Gamma, back transformed into the atomic
         // orbitals for every auxiliary function of this atom and held while its
@@ -1189,12 +1247,17 @@ CSimdRIJKGradientDriver::_compute_three_center(CPackedMatrix                    
         // orbitals, where the whole term is meant to cost two of them per
         // auxiliary function.
 
-        auto slot_of = std::vector<size_t>(naux, naux);
+        auto build_exchanges = [&](const std::vector<TExchangeSpin> &which,
+                                   const std::vector<TDenseSpin>    &dense_which,
+                                   const double                      factor,
+                                   std::vector<size_t>              &slot_of,
+                                   std::vector<std::vector<double>> &exchanges) {
+            slot_of.assign(naux, naux);
 
-        auto exchanges = std::vector<std::vector<double>>();
+            exchanges.clear();
 
-        if (exchange_factor != 0.0)
-        {
+            if (factor == 0.0) return;
+
             const auto &aux_set = aux_indices[static_cast<size_t>(aux_sets[static_cast<size_t>(iaux)])];
 
             for (const auto [lq, kq] : aux_set)
@@ -1210,9 +1273,9 @@ CSimdRIJKGradientDriver::_compute_three_center(CPackedMatrix                    
                     // NOTE: the spins add into one matrix. For a closed shell the
                     // list is one long and this is the term it always was.
 
-                    for (size_t is = 0; is < spins.size(); is++)
+                    for (size_t is = 0; is < which.size(); is++)
                     {
-                        const auto &dense = dense_spins[is];
+                        const auto &dense = dense_which[is];
 
                         const auto norbs = dense.norbs;
 
@@ -1220,7 +1283,7 @@ CSimdRIJKGradientDriver::_compute_three_center(CPackedMatrix                    
 
                         auto dense_q = std::vector<double>(norbs * norbs, 0.0);
 
-                        (*spins[is].orbital_densities)[q].to_dense(dense_q.data());
+                        (*which[is].orbital_densities)[q].to_dense(dense_q.data());
 
                         // C_o d(q), then that against the transposed orbitals
 
@@ -1234,15 +1297,40 @@ CSimdRIJKGradientDriver::_compute_three_center(CPackedMatrix                    
                         _add_multiply(nao, nao, norbs, half.data(), dense.transposed.data(), matrix.data());
                     }
 
-                    for (auto &value : matrix) value *= exchange_factor;
+                    for (auto &value : matrix) value *= factor;
 
                     slot_of[q] = exchanges.size();
 
                     exchanges.push_back(std::move(matrix));
                 }
             }
+        };
+
+        auto slot_of = std::vector<size_t>();
+
+        auto exchanges = std::vector<std::vector<double>>();
+
+        auto slot_of_erf = std::vector<size_t>();
+
+        auto exchanges_erf = std::vector<std::vector<double>>();
+
+        build_exchanges(spins, dense_spins, exchange_factor, slot_of, exchanges);
+
+        if (range_separated)
+        {
+            build_exchanges(spins_erf, dense_spins_erf, erf_exchange_factor, slot_of_erf, exchanges_erf);
         }
 
+        // NOTE: one operator at a time, and the same body for both of them. What
+        // differs between the two calls is the derivative tensor, the weighted
+        // densities it is contracted with, and whether there is a Coulomb term:
+        // the attenuated operator has none.
+
+        auto contract = [&](const CSparseTensor                    &derivative,
+                            const double                            coulomb_factor,
+                            const double                            exchange_factor,
+                            const std::vector<std::vector<double>> &exchanges,
+                            const std::vector<size_t>              &slot_of) {
         const auto nblocks = static_cast<size_t>(pattern.number_of_blocks());
 
         for (size_t iblk = 0; iblk < nblocks; iblk++)
@@ -1383,6 +1471,19 @@ CSimdRIJKGradientDriver::_compute_three_center(CPackedMatrix                    
                     }
                 }
             }
+        }
+        };
+
+        contract(derivatives[0], coulomb_factor, exchange_factor, exchanges, slot_of);
+
+        if (range_separated)
+        {
+            // NOTE: a Coulomb factor of zero, and the fitting of the attenuated
+            // operator is empty for the same reason: it has no Coulomb term. Passing
+            // anything else here would read a vector which was deliberately left
+            // unfilled.
+
+            contract(derivatives[1], 0.0, erf_exchange_factor, exchanges_erf, slot_of_erf);
         }
     }
 }
