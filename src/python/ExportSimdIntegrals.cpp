@@ -268,6 +268,17 @@ export_simdintegrals(py::module &m) -> void
              py::arg("inverse_metric"),
              py::arg("threshold"),
              py::arg("aux_atoms") = std::vector<int>{})
+        .def("compute_bq_vectors_rs",
+             &CSimdRIFockDriver::compute_bq_vectors_rs,
+             "Computes the B vectors of the Coulomb operator and of the attenuated one, on one pattern.",
+             py::arg("molecule"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("inverse_metric"),
+             py::arg("inverse_metric_erf"),
+             py::arg("threshold"),
+             py::arg("omega"),
+             py::arg("aux_atoms") = std::vector<int>{})
         .def("compute_y_vector",
              &CSimdRIFockDriver::compute_y_vector,
              "Contracts the B vectors with a density matrix.",
