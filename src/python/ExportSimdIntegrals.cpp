@@ -54,6 +54,7 @@
 #include "SimdTwoCenterElectronRepulsionGradientDriver.hpp"
 #include "SimdThreeCenterElectronRepulsionGradientDriver.hpp"
 #include "SimdThreeCenterElectronRepulsionDriver.hpp"
+#include "SimdThreeCenterElectronRepulsionRsDriver.hpp"
 #include "SimdTwoCenterElectronRepulsionDriver.hpp"
 #include "SimdTwoCenterElectronRepulsionRsDriver.hpp"
 #include "SparseMatrix.hpp"
@@ -162,6 +163,44 @@ export_simdintegrals(py::module &m) -> void
         .def("get_block_size",
              &CSimdTwoCenterElectronRepulsionRsDriver::get_block_size,
              "Gets target number of atom pairs of a block.");
+
+    // CSimdThreeCenterElectronRepulsionRsDriver class
+
+    PyClass<CSimdThreeCenterElectronRepulsionRsDriver>(m, "SimdThreeCenterElectronRepulsionRsDriver")
+        .def(py::init<>())
+        .def("make_pattern",
+             static_cast<CTripleSparsityPattern (CSimdThreeCenterElectronRepulsionRsDriver::*)(
+                 const CMolecule &, const CMolecularBasis &, const CMolecularBasis &, const double) const>(
+                 &CSimdThreeCenterElectronRepulsionRsDriver::make_pattern),
+             "Creates the sparsity pattern the integrals are computed in, from the Coulomb bound, which "
+             "both tensors are built on.",
+             py::arg("molecule"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("threshold"))
+        .def("compute",
+             static_cast<std::pair<CSparseTensor, CSparseTensor> (CSimdThreeCenterElectronRepulsionRsDriver::*)(
+                 const CMolecule &, const CMolecularBasis &, const CMolecularBasis &, const double,
+                 const double) const>(&CSimdThreeCenterElectronRepulsionRsDriver::compute),
+             "Computes the sparse tensors of the Coulomb and of the range separated Coulomb three-center "
+             "integrals, in that order, both on the one pattern.",
+             py::arg("molecule"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("threshold"),
+             py::arg("omega"))
+        .def("compute",
+             static_cast<std::pair<CSparseTensor, CSparseTensor> (CSimdThreeCenterElectronRepulsionRsDriver::*)(
+                 const CMolecule &, const CMolecularBasis &, const CMolecularBasis &, const double,
+                 const double, const std::vector<int> &) const>(
+                 &CSimdThreeCenterElectronRepulsionRsDriver::compute),
+             "Computes them for the given atoms on the auxiliary side.",
+             py::arg("molecule"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("threshold"),
+             py::arg("omega"),
+             py::arg("atoms"));
 
     // CSimdThreeCenterElectronRepulsionDriver class
 
