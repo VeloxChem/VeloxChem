@@ -81,4 +81,5 @@ target_sources(vlxobjs
     SimdElectronRepulsionRsRecSL.cpp
     SimdElectronRepulsionRsRecSP.cpp
     SimdElectronRepulsionRsRecSS.cpp
+    SimdTwoCenterElectronRepulsionRsFunc.cpp
   )
