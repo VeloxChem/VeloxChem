@@ -233,6 +233,44 @@ auto compute_full_t3c_boys_function(CSimdMatrix       &buffer,
                                     const size_t       pair,
                                     const double       fq) -> void;
 
+/// @brief Computes the values of the attenuated Boys function of every order up to
+/// the requested one for one triple of primitives of a three-center electron
+/// repulsion integral of the operator erf(omega r) / r.
+/// @param fq The reduced exponent of the pair and the auxiliary primitive, which the
+/// argument is formed from and which the attenuation is taken against.
+/// @param omega The range separation parameter.
+/// @note The attenuation is the same as in the two-center case: the argument is
+/// scaled by theta squared and the value of order m by theta to the 2m + 1, with
+/// theta squared being omega squared over omega squared plus fq. What differs is
+/// only that the argument is the scaled displacement of the product center and that
+/// the values carry the exponential of the pair as well.
+auto compute_full_t3c_erf_boys_function(CSimdMatrix       &buffer,
+                                        const CSimdMatrix &coordinates,
+                                        const size_t       target,
+                                        const size_t       pc,
+                                        const size_t       order,
+                                        const size_t       ncols,
+                                        const double       fj,
+                                        const size_t       pair,
+                                        const double       fq,
+                                        const double       omega) -> void;
+
+/// @brief Computes the values of the attenuated Boys function of the requested
+/// orders alone for one triple of primitives of a three-center electron repulsion
+/// integral of the operator erf(omega r) / r.
+/// @note The rows are packed consecutively while the orders they stand for need not
+/// be, so each row is weighted by the order it stands for and not by where it sits.
+auto compute_t3c_erf_boys_function(CSimdMatrix                        &buffer,
+                                   const CSimdMatrix                  &coordinates,
+                                   const size_t                        target,
+                                   const size_t                        pc,
+                                   const std::initializer_list<size_t> orders,
+                                   const size_t                        ncols,
+                                   const double                        fj,
+                                   const size_t                        pair,
+                                   const double                        fq,
+                                   const double                        omega) -> void;
+
 /// @brief Computes the values of Boys function of the requested orders alone for one
 /// pair of primitives and one point charge of a nuclear attraction integral.
 /// @param buffer The buffer of the combination of basis functions, holding the

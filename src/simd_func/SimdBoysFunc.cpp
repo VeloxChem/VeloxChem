@@ -461,6 +461,87 @@ _scale_pair_values(CSimdMatrix  &buffer,
     }
 }
 
+/// @brief Scales the rows of values of the attenuated operator for a pair which the
+/// operator collapses onto one center, order by order.
+/// @note The plain form applies one factor to every row. The attenuated one carries
+/// theta to the 2m + 1 on the row of order m as well, so the weight follows the order
+/// the row stands for and never its position: in the form which asks for some orders
+/// alone the rows are packed consecutively while the orders they stand for are not.
+static auto
+_scale_attenuated_pair_values(CSimdMatrix               &buffer,
+                              const size_t               target,
+                              const std::vector<size_t> &orders,
+                              const size_t               ncols,
+                              const double               fj,
+                              const double              *factors,
+                              const double               theta) -> void
+{
+    for (size_t j = 0; j < orders.size(); j++)
+    {
+        const auto weight = fj * std::pow(theta, static_cast<double>(2 * orders[j] + 1));
+
+        auto *row = buffer.data(target + 1 + j);
+
+#pragma omp simd aligned(row : simd::cache_line_size())
+        for (size_t k = 0; k < ncols; k++)
+        {
+            row[k] *= weight * factors[k];
+        }
+    }
+}
+
+auto
+compute_full_t3c_erf_boys_function(CSimdMatrix       &buffer,
+                                   const CSimdMatrix &coordinates,
+                                   const size_t       target,
+                                   const size_t       pc,
+                                   const size_t       order,
+                                   const size_t       ncols,
+                                   const double       fj,
+                                   const size_t       pair,
+                                   const double       fq,
+                                   const double       omega) -> void
+{
+    // NOTE: fq is the reduced exponent of the pair and the auxiliary primitive,
+    // which is what the attenuation is taken against. The argument is scaled by
+    // theta squared and the value of order m by theta to the 2m + 1, exactly as in
+    // the two-center case; only the argument and the per-pair exponential differ.
+    const auto theta = _attenuation(fq, omega);
+
+    _make_scaled_arguments(buffer, target, pc, ncols, fq * theta * theta);
+
+    compute_boys_values(buffer, target, order, ncols);
+
+    auto orders = std::vector<size_t>(order + 1);
+
+    std::iota(orders.begin(), orders.end(), size_t{0});
+
+    _scale_attenuated_pair_values(buffer, target, orders, ncols, fj,
+                                  pair_exponents.values.data() + pair * pair_exponents.stride, theta);
+}
+
+auto
+compute_t3c_erf_boys_function(CSimdMatrix                        &buffer,
+                              const CSimdMatrix                  &coordinates,
+                              const size_t                        target,
+                              const size_t                        pc,
+                              const std::initializer_list<size_t> orders,
+                              const size_t                        ncols,
+                              const double                        fj,
+                              const size_t                        pair,
+                              const double                        fq,
+                              const double                        omega) -> void
+{
+    const auto theta = _attenuation(fq, omega);
+
+    _make_scaled_arguments(buffer, target, pc, ncols, fq * theta * theta);
+
+    compute_boys_values(buffer, target, orders, ncols);
+
+    _scale_attenuated_pair_values(buffer, target, std::vector<size_t>(orders), ncols, fj,
+                                  pair_exponents.values.data() + pair * pair_exponents.stride, theta);
+}
+
 auto
 compute_t3c_boys_function(CSimdMatrix                        &buffer,
                           const CSimdMatrix                  &coordinates,

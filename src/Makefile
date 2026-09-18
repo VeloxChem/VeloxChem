@@ -47,6 +47,7 @@ VLX_LIBS_DIR += simd_t2c_electron_repulsion_rs
 VLX_LIBS_DIR += simd_geometry
 VLX_LIBS_DIR += simd_t2c_electron_repulsion_grad
 VLX_LIBS_DIR += simd_t3c_electron_repulsion
+VLX_LIBS_DIR += simd_t3c_electron_repulsion_rs
 VLX_LIBS_DIR += simd_t3c_electron_repulsion_grad
 VLX_LIBS_DIR += simd_t3c_electron_repulsion_geom_100
 VLX_LIBS_DIR += simd_t3c_electron_repulsion_geom_010
