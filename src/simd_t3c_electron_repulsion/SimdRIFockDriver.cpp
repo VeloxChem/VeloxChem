@@ -363,6 +363,7 @@ struct CBqProfile
     size_t nproducts = 0;
     size_t ngathered = 0;
     size_t nread = 0;
+    size_t nkept = 0;
     size_t nblocks = 0;
     size_t nbatches = 0;
     size_t ntasks = 0;
@@ -393,6 +394,18 @@ struct CBqProfile
 
         std::printf("RIJK   %zu products, %.2f GB gathered, %.2f GB read back from it\n", nproducts, gb(ngathered),
                     gb(nread));
+
+        // NOTE: a chunk is gathered to its full width and multiplied whole, while a
+        // group of the auxiliary side may keep fewer atom pairs than the widest of
+        // them. The difference is multiplied against zeros which are known to be
+        // zero. The share is reported because the contraction is 94% of forming the
+        // B vectors and runs at 84% of what the library gives on a dense product:
+        // there is no arithmetic to win back by running it better, only by not
+        // doing it, and this is the only place where some of it is provably idle.
+        std::printf("RIJK   %.2f GB of values in that, %.1f %% padding\n", gb(nkept * sizeof(double)),
+                    (ngathered > 0) ? 100.0 * (1.0 - static_cast<double>(nkept * sizeof(double)) /
+                                                         static_cast<double>(ngathered))
+                                    : 0.0);
 
         std::printf("RIJK   %zu blocks in %zu batches, %zu tasks, on %d threads, chunk %zu\n", nblocks, nbatches,
                     ntasks, omp::get_number_of_threads(), nchunk);
@@ -638,7 +651,7 @@ CSimdRIFockDriver::_compute_bq_vectors(const CMolecule                          
 
     size_t first = 0;
 
-    size_t nproducts = 0, ngathered = 0, nread = 0;
+    size_t nproducts = 0, ngathered = 0, nread = 0, nkept = 0;
 
     // NOTE: the gathered integrals and the product of the metric with them are both
     // the whole auxiliary basis deep, so a column of the pair costs the rows and
@@ -781,7 +794,7 @@ CSimdRIFockDriver::_compute_bq_vectors(const CMolecule                          
 
         const auto mark_contract = prof_clock::now();
 
-#pragma omp parallel reduction(+ : nproducts, ngathered, nread)
+#pragma omp parallel reduction(+ : nproducts, ngathered, nread, nkept)
         {
             std::vector<double> gathered(nops * ncols * nchunk);
 
@@ -835,6 +848,12 @@ CSimdRIFockDriver::_compute_bq_vectors(const CMolecule                          
                         const auto kept = std::min(npairs_in, width);
 
                         const auto taken = (kept > cfirst) ? std::min(kept - cfirst, count) : size_t{0};
+
+                        // NOTE: what the copy below actually brings, against the
+                        // in_function.count * count the product will read. One
+                        // operator's worth, counted once and scaled by nops to
+                        // match ngathered, the operators sharing the pattern.
+                        nkept += nops * in_function.count * taken;
 
                         for (size_t k = 0; k < nops; k++)
                         {
@@ -940,6 +959,8 @@ CSimdRIFockDriver::_compute_bq_vectors(const CMolecule                          
     profile.ngathered = ngathered;
 
     profile.nread = nread;
+
+    profile.nkept = nkept;
 
     profile.total = prof_since(profile_start);
 
