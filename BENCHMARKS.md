@@ -10097,3 +10097,244 @@ shell and open, and the control sits at the same level. Two things that check ne
 `conv_thresh` of 1e-9 and not tighter, because plain B3LYP water does not converge at
 1e-10 in two hundred iterations; and an off-equilibrium geometry, or the whole
 gradient is 1e-02 and its terms cancel.
+
+## Water clusters, where the fitted path is the slower one
+
+Every molecule measured above this point is compact: caffeine, tagrisso, taxol, c60.
+This section is the first extended, sparse system in the file, and it reverses the
+result. **On water clusters the resolution of the identity is overtaken by the
+four-centre build**, at 47 waters in def2-svp and at 76 in def2-tzvp, and the margin
+widens from there.
+
+B3LYP, `def2-universal-jkfit`, convergence 1e-6, one node of the EPYC, 8 ranks of 32
+threads, `in_memory` throughout. The runner is `node_b3lyp.py`, which is **not in this
+repository** -- it lives beside the geometries on the node -- and the rows below are
+from its stdout rather than from a records file, so unlike every other table here they
+cannot be re-rendered. That is a gap, not a choice.
+
+### def2-svp, where naux is 4.71 times nao
+
+| waters | nao | naux | RI-JK Fock | 4c Fock | RI-JK whole | 4c whole | who wins |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| 5 | 120 | 565 | 1.08 | 1.66 | 1.87 | 2.57 | RI 1.37x |
+| 10 | 240 | 1130 | 1.14 | 1.45 | 2.58 | 2.80 | RI 1.09x |
+| 20 | 480 | 2260 | 2.01 | 2.38 | 4.93 | 5.13 | RI 1.04x |
+| 32 | 768 | 3616 | 4.35 | 5.94 | 10.35 | 11.16 | RI 1.08x |
+| 47 | 1128 | 5311 | 13.99 | 13.83 | 26.65 | 23.08 | **4c 1.15x** |
+| 76 | 1824 | 8588 | 60.10 | 42.74 | 104.64 | 63.62 | **4c 1.64x** |
+| 100 | 2400 | 11300 | 159.43 | 83.81 | 262.15 | 120.50 | **4c 2.18x** |
+| 139 | 3336 | 15707 | 521.70 | 191.41 | 832.28 | 255.35 | **4c 3.26x** |
+| 190 | 4560 | 21470 | 1581.51 | -- | 2559.56 | -- | |
+
+### def2-tzvp, where it is 2.63 times nao
+
+| waters | nao | naux | RI-JK Fock | 4c Fock | RI-JK whole | 4c whole | who wins |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| 5 | 215 | 565 | 1.27 | 1.68 | 2.44 | 2.68 | RI 1.10x |
+| 10 | 430 | 1130 | 1.47 | 2.47 | 3.13 | 4.30 | RI 1.37x |
+| 20 | 860 | 2260 | 3.79 | 11.99 | 9.61 | 19.21 | **RI 2.00x** |
+| 32 | 1376 | 3616 | 13.98 | 33.37 | 27.69 | 45.13 | RI 1.63x |
+| 47 | 2021 | 5311 | 49.30 | 84.00 | 82.70 | 106.10 | RI 1.28x |
+| 76 | 3268 | 8588 | 207.72 | 260.66 | 338.90 | 310.22 | **4c 1.09x** |
+
+### The advantage peaks and then decays, in both bases
+
+Read the last column of either table downward. It is not a ratio which is simply small;
+it is a ratio which **rises, turns and goes through one**. The larger basis moves the
+turn later -- the peak from 5 waters to 20, the crossing from 47 to 76 -- and changes
+nothing about its shape.
+
+The reason is in the exponents, fitted between the last two clusters of each series:
+
+| | four-centre | RI-JK | gap |
+| --- | ---: | ---: | ---: |
+| def2-svp, Fock | 2.51 | 3.60 | 1.09 |
+| def2-svp, whole | 2.28 | 3.51 | 1.23 |
+| def2-tzvp, Fock | 2.36 | 2.99 | 0.63 |
+| def2-tzvp, whole | **2.23** | **2.93** | **0.70** |
+
+**The four-centre exponent is 2.2 in both bases.** It is a property of the screening on
+a hydrogen-bonded cluster and not of the basis, and it is nothing like the 3.97 to 4.04
+the compact molecules gave: on a sparse system the dense build is most of two powers
+better than its textbook form.
+
+**The fitted exponent fell from 3.5 to 2.9 when naux/nao fell from 4.71 to 2.63.** So a
+larger orbital basis improves the power and not merely the prefactor, which is the one
+encouraging number here. It is still 0.70 above the dense path, and a positive gap
+postpones a crossing without ever removing it.
+
+### What is losing it is not the integrals
+
+At 76 waters in def2-tzvp the **Fock build is still 1.25 times faster fitted** and the
+whole calculation is 1.09 times slower. Two things in between:
+
+| | four-centre | RI-JK |
+| --- | ---: | ---: |
+| iterations, every def2-tzvp row | 12 | **14** |
+| `outside` as a share of the wall, 76 waters | 12.4% | **34.9%** |
+
+`outside` is the whole calculation less the Fock builds, and for the fitted path it
+holds the metric and the B vectors along with the ordinary one-electron work. Its
+exponent at def2-svp climbs the whole way -- 2.86, 3.24, 3.47, **3.74** at the largest
+pair -- and by 190 waters it is 959 seconds of a 2560 second calculation. **At the top
+of the def2-svp series the setup is growing faster than the Fock build it exists to
+serve.** Its internal split has never been measured; the script times `compute` and the
+builds, and everything else is one number by subtraction.
+
+### What the runs cost in accuracy, and what they say about the node
+
+The fitting error is flat per water and does not drift with cluster size:
+
+| basis | hartree per water |
+| --- | ---: |
+| def2-svp, 20 waters and up | 6.5 to 6.7e-06 |
+| def2-tzvp, 32 waters and up | **1.91e-05**, to three digits in three clusters |
+
+Three times larger in the bigger basis, which is the same auxiliary set fitting a 1.79
+times larger orbital basis.
+
+One cluster was run twice by accident and is worth more than that suggests: 32 waters,
+def2-tzvp, fitted path, on n260 and on n353. **Identical energy to every digit, 26.52
+seconds against 27.69 -- 4.4 per cent apart.** That is the only direct measure of
+node-to-node variation in this file, and it bounds the cross-node pairs below.
+
+### Which rows are cross-node
+
+The series was measured over four nodes as allocations came free. Pairs at 32 waters and
+above in def2-tzvp are same-node; in def2-svp everything above 47 waters is not.
+
+| rows | node |
+| --- | --- |
+| def2-svp: 4c 5-47 waters, RI 10-47 | n322 |
+| def2-svp: RI 5 waters, 76-190 | n248 |
+| def2-svp: 4c 76-139. def2-tzvp: both ways 5-20 | n260 |
+| def2-tzvp: both ways 32-76 | n353 |
+
+The curve shows no discontinuity at any join, and the 4.4 per cent above says what the
+join is worth. It is still a consistency argument and not a control.
+
+### What this does and does not say
+
+It says that on an extended, sparse, hydrogen-bonded system the fitted path has a
+bounded advantage which is spent by the time the calculation is large enough to care
+about, and that the bound moves with the basis but the shape does not.
+
+It does not say the resolution of the identity is slower in general, and the rest of
+this file is the counter-example: caffeine gives 3.75 at def2-svp and 19.20 at
+def2-tzvpd, gradients up to 59.6, because a compact molecule gives the dense build
+nothing to screen. **Water clusters are the adversarial case for this method and were
+chosen as one.** The def2-tzvpd and def2-qzvp columns, where naux/nao falls to 1.95 and
+0.97, have not been measured and are where the gap should be narrowest.
+
+### A prediction which was wrong three times, in the same direction
+
+Every four-centre extrapolation made while this series was running came in high: about
+10x for a def2-svp to def2-tzvp step which measured 5.04x, and 56 seconds for the 32
+water four-centre run which measured 45.13. The error each time was reaching for the
+p near 4.0 that the compact molecules gave, on a system whose screening puts it at 2.2
+to 2.4. The fitted path's extrapolations were accurate to 2 per cent over the same
+range. See "Benchmark runtime estimates": the failure is analogy across molecule types,
+and the fix is to fit the exponent on the series being measured.
+
+### The dense control, and the factor of eight that separates the two
+
+c60 was run at the same sizes on the same node as the clusters above, n353, both ways
+and both bases. It is the opposite system: sixty heavy atoms in a shell, nothing at a
+distance from anything, the least screenable molecule in this file.
+
+| | nao | naux | iterations | Fock | whole | `outside` |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| c60 def2-svp, RI-JK | 840 | 4500 | 17 | 9.13 | 19.96 | 5.88 |
+| c60 def2-svp, four-centre | 840 | -- | 15 | 35.08 | 44.03 | 4.69 |
+| c60 def2-tzvp, RI-JK | 1860 | 4500 | 18 | 37.92 | 79.42 | 22.49 |
+| c60 def2-tzvp, four-centre | 1860 | -- | 15 | **907.37** | **935.83** | 14.53 |
+
+| at comparable size | nao | naux | Fock | whole |
+| --- | ---: | ---: | ---: | ---: |
+| **c60, def2-tzvp** | 1860 | 4500 | **RI 23.93x** | **RI 11.78x** |
+| water 32-mer, def2-tzvp | 1376 | 3616 | RI 2.39x | RI 1.63x |
+| water 47-mer, def2-tzvp | 2021 | 5311 | RI 1.70x | RI 1.28x |
+| **c60, def2-svp** | 840 | 4500 | **RI 3.84x** | **RI 2.21x** |
+| water 32-mer, def2-svp | 768 | 3616 | RI 1.37x | RI 1.08x |
+| water 47-mer, def2-svp | 1128 | 5311 | 0.99x | 4c 1.15x |
+
+**At the same nao and the same naux, the dense molecule gives the fitted path eight to
+nine times more than the sparse one does.** Nothing else differs. The c60 def2-tzvp
+four-centre run is the most integral bound calculation in this file: 907 seconds of
+Fock build in a 936 second calculation, ninety-seven per cent.
+
+### The mechanism, in one number
+
+The step from def2-svp to def2-tzvp holds naux fixed at 4500 while nao goes 840 to
+1860, which is the one experiment the cluster series cannot do -- there nao and naux
+always move together.
+
+| p in nao, at fixed naux | four-centre | RI-JK |
+| --- | ---: | ---: |
+| c60, dense | **4.09** | 1.79 |
+| water clusters, sparse | 2.77 | 1.09 |
+
+**4.09 is the textbook fourth power.** On c60 the dense build gets nothing from
+screening and runs at its formal cost, which is also what every compact molecule in
+this file gave: 3.97 to 4.04. On water it runs at 2.77. That difference of one and a
+third powers is the screening, and it is the entire water cluster result. The fitted
+path moves by 0.7 of a power between the two systems, which is small by comparison:
+**this is a story about what the denominator can do, not about what the numerator
+cannot.**
+
+### The preparation, separated at last
+
+`outside` for the fitted path less `outside` for the dense one leaves the RI
+preparation, everything else in there being common work:
+
+| case | naux | prepare | share of the fitted wall |
+| --- | ---: | ---: | ---: |
+| water 32-mer, def2-svp | 3616 | 0.75 s | 7.2% |
+| c60, def2-svp | 4500 | 1.19 s | 6.0% |
+| water 47-mer, def2-svp | 5311 | 3.29 s | 12.3% |
+| c60, def2-tzvp | 4500 | 7.96 s | 10.0% |
+| water 47-mer, def2-tzvp | 5311 | 10.53 s | 12.7% |
+| water 76-mer, def2-tzvp | 8588 | 79.57 s | 23.5% |
+| water 139-mer, def2-svp | 15707 | **246.73 s** | **29.6%** |
+
+**It tracks naux and not the system.** Six to thirteen per cent while naux is under six
+thousand, on either kind of molecule, and a third of the calculation once naux reaches
+five figures -- which is what a large sparse system in a small basis produces. So the
+`outside` share reported for the clusters above is not a property of water; it is a
+property of having twenty thousand auxiliary functions.
+
+Two cautions. The subtraction is an upper bound: the fitted path runs two to three more
+iterations and `outside` holds per-iteration work as well, which for the small rows is
+most of the difference. And at fixed naux the preparation still grows with nao -- c60
+pays 6.7 times more for 2.2 times the orbital basis -- so it is not metric-bound
+either, the metric depending on naux alone. What fits is the B vectors.
+
+### The iteration count is general, and nobody has explained it
+
+| | four-centre | RI-JK |
+| --- | ---: | ---: |
+| c60, both bases | 15 | 17 to 18 |
+| water clusters, every def2-tzvp row | 12 | 14 |
+
+**Two to three more iterations everywhere**, on the densest molecule here and on the
+sparsest, at both bases. Convergence is 1e-6 in all of them and the guess is the same.
+That is a flat penalty of roughly fifteen per cent which is not integrals, not
+screening and not scaling, and it is the one cost in this section that is paid by every
+calculation in the file rather than by the adversarial ones. It has not been
+investigated.
+
+### What the two systems together say
+
+The fitted path has two separate problems and they belong to different calculations.
+
+**The exchange exponent is a sparse-system problem.** On c60 the build is 23.93 times
+ahead and there is nothing to fix. It only bites where the dense build screens down to
+2.2, which is where the ratio of exponents, not the ratio of times, decides the race.
+
+**The preparation is a large-naux problem**, reached by big systems in small bases on
+either kind of molecule.
+
+**The iterations are everybody's problem** and the cheapest of the three to look at.
+
+The fitting error, for the record: 7.0e-06 hartree per atom for c60 in def2-svp and
+5.3e-06 in def2-tzvp.
