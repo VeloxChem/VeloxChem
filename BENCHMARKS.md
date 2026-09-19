@@ -10158,6 +10158,20 @@ a hydrogen-bonded cluster and not of the basis, and it is nothing like the 3.97 
 the compact molecules gave: on a sparse system the dense build is most of two powers
 better than its textbook form.
 
+**The two halves do not screen alike, and the comparison inherits that.** The
+four-centre build screens with Cauchy-Schwarz, `sqrt((mn|mn)) sqrt((ls|ls))`, built
+from computed integral magnitudes and tight by construction. The three-center driver
+screens with an analytic primitive bound (`orbdata/ScreeningFunc.hpp:209`) built from
+the **smallest exponent** of each contracted function, which is the most diffuse
+primitive and therefore pessimistic. Measured by
+`benchmarks/scripts/t3c_screening_check.py`, the share of the values it keeps which
+reach the threshold it was given is **67.8, 60.3 and 53.7 per cent** at 10, 20 and 32
+waters at 1e-10: it is loose, and **it gets looser as the molecule grows**. Part of the
+gap below is therefore the bound and not the method, and how much has not been
+established -- the granularity the screening acts at is per combination of basis
+functions and atom pair, which cannot be reached from outside the driver, so 46 per
+cent is an upper bound on what a tighter bound could remove and not a promise.
+
 **The fitted exponent fell from 3.5 to 2.9 when naux/nao fell from 4.71 to 2.63.** So a
 larger orbital basis improves the power and not merely the prefactor, which is the one
 encouraging number here. It is still 0.70 above the dense path, and a positive gap
@@ -10343,8 +10357,11 @@ fall either way.
 
 The fitted path has two separate problems and they belong to different calculations.
 
-**The exchange exponent is a sparse-system problem.** On c60 the build is 23.93 times
-ahead and there is nothing to fix. It only bites where the dense build screens down to
+**The exchange exponent is a sparse-system problem, and it is not yet a like for like
+comparison.** On c60 the build is 23.93 times ahead and there is nothing to fix. On the
+clusters the two paths screen with bounds of different tightness, so the exponents are
+of two implementations and not of two methods -- see the note in the water cluster
+section above. It only bites where the dense build screens down to
 2.2, which is where the ratio of exponents, not the ratio of times, decides the race.
 
 **The preparation is a large-naux problem**, reached by big systems in small bases on
@@ -10629,4 +10646,8 @@ than it was.
 
 Neither is likely to matter as much as the exponent. `prepare` is a fifth of the wall;
 the exchange scaling is what decides whether the fitted path is usable on an extended
-system at all, and none of this touches it.
+system at all, and none of this touches it. The first thing to try there is not a
+better contraction but a **tighter bound**: the three-center screening keeps a growing
+share of values below its own threshold -- 46 per cent at 32 waters -- and a bound of
+Cauchy-Schwarz quality would shrink the tensor itself, so the B vectors, the padding
+and the contraction would all fall together rather than one of them being rearranged.

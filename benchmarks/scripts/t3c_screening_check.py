@@ -35,13 +35,45 @@ DEFAULT_THRESHOLDS = [1.0e-10, 1.0e-12, 1.0e-14]
 
 
 def magnitudes(tensor):
-    """Every stored magnitude, as one array."""
-    parts = []
+    """Every stored magnitude, and the values in wholly negligible atom pairs.
+
+    Two numbers bracket what a tighter bound could remove, because the screening
+    acts at a granularity between them.
+
+    **Values below the threshold** is the optimistic end. Screening decides per
+    combination of basis functions and atom pair, so a block worth keeping carries
+    small values with it which no bound of that granularity can drop.
+
+    **Values in a block whose every value is below the threshold** is the pessimistic
+    end. A block spans every combination and every atom pair it holds, which is far
+    coarser than the screening acts at, so a bound could drop these and a great deal
+    more besides.
+
+    It is the block and not the atom pair because a triple block's storage is
+    **ragged**: each combination of basis functions keeps its own number of atom
+    pairs -- which is the staircase the padding counters measure -- so what
+    `block_to_numpy` returns cannot be cut into columns from here. Doing it at the
+    granularity the screening actually uses needs the per combination counts, which
+    live in the driver.
+    """
+    parts, peaks, heights = [], [], []
 
     for iblock in range(tensor.number_of_blocks()):
-        parts.append(np.abs(np.asarray(tensor.block_to_numpy(iblock))).ravel())
+        values = np.abs(np.asarray(tensor.block_to_numpy(iblock))).ravel()
 
-    return np.concatenate(parts) if parts else np.zeros(0)
+        if values.size == 0:
+            continue
+
+        parts.append(values)
+
+        peaks.append(values.max())
+
+        heights.append(values.size)
+
+    if not parts:
+        return np.zeros(0), np.zeros(0), np.zeros(0)
+
+    return np.concatenate(parts), np.array(peaks), np.array(heights)
 
 
 def main():
@@ -65,7 +97,7 @@ def main():
           f"naux {aux_basis.get_dimensions_of_basis()}")
     print()
     print(f"{'threshold':>10s} {'values kept':>13s} {'above it':>9s} {'above /10':>10s} "
-          f"{'above /100':>11s} {'median':>10s}")
+          f"{'above /100':>11s} {'median':>10s} {'dead blocks':>13s}")
 
     drv = SimdThreeCenterElectronRepulsionDriver()
 
@@ -74,7 +106,7 @@ def main():
     for threshold in thresholds:
         tensor = drv.compute(molecule, basis, aux_basis, threshold)
 
-        values = magnitudes(tensor)
+        values, peaks, heights = magnitudes(tensor)
 
         if values.size == 0:
             print(f"{threshold:10.1e}  nothing kept")
@@ -85,9 +117,12 @@ def main():
         # asked how much of its own output it need not have produced.
         share = lambda cut: 100.0 * float((values >= cut).sum()) / values.size
 
+        # the values carried by blocks which are negligible from end to end
+        idle = float(heights[peaks < threshold].sum())
+
         print(f"{threshold:10.1e} {values.size:13d} {share(threshold):8.1f} % "
               f"{share(threshold / 10):9.1f} % {share(threshold / 100):10.1f} % "
-              f"{np.median(values):10.1e}")
+              f"{np.median(values):10.1e} {100.0 * idle / values.size:12.1f} %")
 
         previous = (threshold, values.size)
 
@@ -97,12 +132,12 @@ def main():
     print("nothing: it is the looseness of the bound, and it is the same fraction the")
     print("B vectors, the padding and the contraction all carry.")
 
-    if previous is not None:
-        print()
-        print("NOTE: the screening decides per combination of basis functions and atom")
-        print("pair, not per value, so a block which is worth keeping carries small")
-        print("values with it. This is therefore an upper bound on what a tighter")
-        print("bound of the same granularity could remove, not a promise.")
+    print()
+    print("'dead blocks' is the share of the stored values in a block whose every")
+    print("value is below the threshold. A bound far coarser than the screening's")
+    print("could drop those, so the two columns bracket what is reachable: 'above it'")
+    print("says what a perfect bound of unlimited granularity would leave, and 'dead")
+    print("blocks' what the bluntest possible one would already take.")
 
 
 if __name__ == '__main__':
