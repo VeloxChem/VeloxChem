@@ -347,6 +347,28 @@ prof_since(const prof_clock::time_point &mark) -> double
 /// iteration. What the phases are worth measuring against is the direct mode, which
 /// sweeps the same integrals on every build: the sweep here is the same work, so a
 /// phase of this which is many times that one is not the price of holding them.
+/// @brief One chunk of the atom pairs of one task, which is the unit the gather
+/// brings and the unit the scatter takes away.
+struct TBqItem
+{
+    size_t task;
+
+    size_t cfirst;
+
+    size_t count;
+};
+
+/// @brief A run of chunks gathered side by side into one buffer and handed to one
+/// product, holding at most the columns the buffer was allocated for.
+struct TBqGroup
+{
+    size_t first;
+
+    size_t last;
+
+    size_t columns;
+};
+
 struct CBqProfile
 {
     double metric = 0.0;
@@ -365,6 +387,11 @@ struct CBqProfile
     size_t nread = 0;
     size_t nkept = 0;
     size_t nabsent = 0;
+
+    /// @brief How far an auxiliary entry reaches into its chunk, in tenths, weighted
+    /// by the rows the entry carries. The last bin is the entries which reach the
+    /// whole width and set it.
+    std::array<size_t, 10> reach_bins = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     std::array<size_t, 4> nfixed = {0, 0, 0, 0};
     std::array<size_t, 4> nsorted = {0, 0, 0, 0};
     size_t nblocks = 0;
@@ -424,6 +451,26 @@ struct CBqProfile
         // `fixed` figure is what a single global ordering recovers and the `sorted`
         // one what a per block ordering would; the second is an upper bound nobody
         // can reach without gathering the metric block by block.
+        size_t total_rows = 0;
+
+        for (const auto bin : reach_bins) total_rows += bin;
+
+        if (total_rows > 0)
+        {
+            std::printf("RIJK   how far a row reaches, by tenths of the chunk:\n");
+
+            size_t widest = 1;
+
+            for (const auto bin : reach_bins) widest = std::max(widest, bin);
+
+            for (size_t k = 0; k < 10; k++)
+            {
+                std::printf("RIJK     %3zu-%3zu %%  %5.1f %%  %s\n", k * 10, (k + 1) * 10,
+                            100.0 * static_cast<double>(reach_bins[k]) / static_cast<double>(total_rows),
+                            std::string(static_cast<size_t>(40.0 * reach_bins[k] / widest), '#').c_str());
+            }
+        }
+
         const auto rectangle = static_cast<double>(ngathered / sizeof(double));
 
         if (rectangle > 0.0)
@@ -685,6 +732,12 @@ CSimdRIFockDriver::_compute_bq_vectors(const CMolecule                          
 
     size_t nproducts = 0, ngathered = 0, nread = 0, nkept = 0, nabsent = 0;
 
+    // NOTE: the shape of the staircase and not only its area. Whether the entries
+    // run out at a few places or at all of them decides whether the padding can be
+    // reached by cutting the product into a handful of pieces, which keeps the
+    // library's own kernel, or only one column at a time, which does not.
+    size_t bins[10] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+
     // NOTE: what a banded product would touch, if the chunk were cut across the
     // pairs into BANDS pieces and each piece multiplied against only the auxiliary
     // rows which reach it. `sorted` orders the rows by how far they reach, which
@@ -818,6 +871,10 @@ CSimdRIFockDriver::_compute_bq_vectors(const CMolecule                          
 
         std::vector<TBqTask> tasks;
 
+    std::vector<TBqItem> items;
+
+    std::vector<TBqGroup> groups;
+
         for (size_t b = 0; b < last - first; b++)
         {
             const auto iab = first + b;
@@ -841,12 +898,56 @@ CSimdRIFockDriver::_compute_bq_vectors(const CMolecule                          
 
         ntasks += tasks.size();
 
-        const auto nwork = static_cast<int>(tasks.size());
+        // NOTE: a task is one combination of basis functions of one pair block, and
+        // the pairs of a block are swept in chunks of at most nchunk. **The buffer
+        // is allocated for nchunk columns and a chunk holds thirty of them**: the
+        // widest block sets the allocation and the average block is far from it.
+        // So the chunks of several tasks are gathered side by side into the one
+        // buffer and handed to a single product, which costs no memory that was not
+        // already reserved and hands the library a shape it can work with -- thirty
+        // columns is a matrix multiply in name only.
+        items.clear();
+
+        for (size_t t = 0; t < tasks.size(); t++)
+        {
+            const auto jab = first + tasks[t].block;
+
+            const auto span = ab_blocks[jab].number_of_diagonal_atoms() + ab_blocks[jab].number_of_pairs();
+
+            for (size_t cfirst = 0; cfirst < span; cfirst += nchunk)
+            {
+                items.push_back(TBqItem{t, cfirst, std::min(nchunk, span - cfirst)});
+            }
+        }
+
+        groups.clear();
+
+        {
+            size_t gfirst = 0, gcols = 0;
+
+            for (size_t i = 0; i < items.size(); i++)
+            {
+                if ((gcols > 0) && (gcols + items[i].count > nchunk))
+                {
+                    groups.push_back(TBqGroup{gfirst, i, gcols});
+
+                    gfirst = i;
+
+                    gcols = 0;
+                }
+
+                gcols += items[i].count;
+            }
+
+            if (gcols > 0) groups.push_back(TBqGroup{gfirst, items.size(), gcols});
+        }
+
+        const auto nwork = static_cast<int>(groups.size());
 
         const auto mark_contract = prof_clock::now();
 
 #pragma omp parallel reduction(+ : nproducts, ngathered, nread, nkept, nabsent) \
-    reduction(+ : nfixed[ : 4], nsorted[ : 4])
+    reduction(+ : nfixed[ : 4], nsorted[ : 4], bins[ : 10])
         {
             std::vector<double> gathered(nops * ncols * nchunk);
 
@@ -855,22 +956,35 @@ CSimdRIFockDriver::_compute_bq_vectors(const CMolecule                          
             std::vector<std::pair<size_t, size_t>> reaches;
 
 #pragma omp for schedule(dynamic)
-            for (int t = 0; t < nwork; t++)
+            for (int g = 0; g < nwork; g++)
             {
-                const auto &task = tasks[static_cast<size_t>(t)];
+                const auto &group = groups[static_cast<size_t>(g)];
 
-                const auto iab = first + task.block;
+                // NOTE: the columns of the whole group. It is the leading dimension
+                // of the gathered buffer and of the product for every item of the
+                // group, where a chunk on its own used its own count.
+                const auto total = group.columns;
 
-                const auto la = task.la, lb = task.lb;
+                size_t column = 0;
 
-                const auto ia = task.ia, jb = task.jb, m = task.component;
-
-                const auto width =
-                    ab_blocks[iab].number_of_diagonal_atoms() + ab_blocks[iab].number_of_pairs();
-
-                for (size_t cfirst = 0; cfirst < width; cfirst += nchunk)
+                for (size_t it = group.first; it < group.last; it++)
                 {
-                    const auto count = std::min(nchunk, width - cfirst);
+                    const auto &item = items[it];
+
+                    const auto &task = tasks[item.task];
+
+                    const auto iab = first + task.block;
+
+                    const auto la = task.la, lb = task.lb;
+
+                    const auto ia = task.ia, jb = task.jb, m = task.component;
+
+                    const auto width =
+                        ab_blocks[iab].number_of_diagonal_atoms() + ab_blocks[iab].number_of_pairs();
+
+                    const auto cfirst = item.cfirst;
+
+                    const auto count = item.count;
 
                     // NOTE: a group whose block is absent, and the atom pairs a
                     // group keeps fewer of than the widest, leave zeros. The pairs
@@ -928,7 +1042,18 @@ CSimdRIFockDriver::_compute_bq_vectors(const CMolecule                          
                         // outright, they run out at different places.
                         if (taken == 0) nabsent += nops * in_function.count * count;
 
-                        if (profiled) reaches.push_back({in_function.count, taken});
+                        if (profiled)
+                        {
+                            reaches.push_back({in_function.count, taken});
+
+                            // NOTE: weighted by the rows the entry carries, because
+                            // the product pays for rows and not for entries. An
+                            // entry which reaches the whole width lands in the last
+                            // bin and is the one which set the width.
+                            const auto bin = (count > 0) ? std::min<size_t>(9, taken * 10 / count) : 0;
+
+                            bins[bin] += in_function.count;
+                        }
 
                         for (size_t k = 0; k < nops; k++)
                         {
@@ -939,7 +1064,7 @@ CSimdRIFockDriver::_compute_bq_vectors(const CMolecule                          
                             // Taking count for both is right for the first operator
                             // and for a full chunk, and wrong everywhere else, which
                             // is a wrong answer that hides behind a correct one.
-                            auto *rows = gathered.data() + k * ncols * nchunk + in_function.offset * count;
+                            auto *rows = gathered.data() + k * ncols * nchunk + in_function.offset * total + column;
 
                             const double *in_values =
                                 (npairs_in > 0) ? integrals[k].values(iblock, la, ia, lb, jb, in_function.momentum,
@@ -949,7 +1074,7 @@ CSimdRIFockDriver::_compute_bq_vectors(const CMolecule                          
 
                             for (size_t r = 0; r < in_function.count; r++)
                             {
-                                auto *row = rows + r * count;
+                                auto *row = rows + r * total;
 
                                 if (taken > 0)
                                 {
@@ -1009,16 +1134,40 @@ CSimdRIFockDriver::_compute_bq_vectors(const CMolecule                          
                         }
                     }
 
-                    nproducts += nops;
+                    column += count;
+                }
 
-                    nread += nops * ncols * count * sizeof(double);
+                nproducts += nops;
 
-                    for (size_t k = 0; k < nops; k++)
-                    {
-                        _matrix_product(nrows, count, ncols, 1.0, metric.get() + k * nrows * ncols, ncols,
-                                        gathered.data() + k * ncols * nchunk, count, 0.0,
-                                        product.data() + k * nrows * nchunk, count);
-                    }
+                nread += nops * ncols * total * sizeof(double);
+
+                for (size_t k = 0; k < nops; k++)
+                {
+                    _matrix_product(nrows, total, ncols, 1.0, metric.get() + k * nrows * ncols, ncols,
+                                    gathered.data() + k * ncols * nchunk, total, 0.0,
+                                    product.data() + k * nrows * nchunk, total);
+                }
+
+                column = 0;
+
+                for (size_t it = group.first; it < group.last; it++)
+                {
+                    const auto &item = items[it];
+
+                    const auto &task = tasks[item.task];
+
+                    const auto iab = first + task.block;
+
+                    const auto la = task.la, lb = task.lb;
+
+                    const auto ia = task.ia, jb = task.jb, m = task.component;
+
+                    const auto width =
+                        ab_blocks[iab].number_of_diagonal_atoms() + ab_blocks[iab].number_of_pairs();
+
+                    const auto cfirst = item.cfirst;
+
+                    const auto count = item.count;
 
                     for (const auto &out_function : out_functions)
                     {
@@ -1050,7 +1199,7 @@ CSimdRIFockDriver::_compute_bq_vectors(const CMolecule                          
                             for (size_t r = 0; r < out_function.count; r++)
                             {
                                 const auto *from = product.data() + k * nrows * nchunk +
-                                                   (out_function.offset + r) * count;
+                                                   (out_function.offset + r) * total + column;
 
                                 auto *into = out_values + r * npairs_out + cfirst;
 
@@ -1058,6 +1207,8 @@ CSimdRIFockDriver::_compute_bq_vectors(const CMolecule                          
                             }
                         }
                     }
+
+                    column += count;
                 }
             }
         }
@@ -1084,6 +1235,8 @@ CSimdRIFockDriver::_compute_bq_vectors(const CMolecule                          
     profile.nkept = nkept;
 
     profile.nabsent = nabsent;
+
+    for (size_t k = 0; k < 10; k++) profile.reach_bins[k] = bins[k];
 
     for (size_t k = 0; k < 4; k++)
     {
