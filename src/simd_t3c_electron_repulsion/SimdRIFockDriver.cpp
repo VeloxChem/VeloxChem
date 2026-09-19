@@ -182,11 +182,17 @@ _matrix_product(const size_t  nrows,
 auto
 _bq_density(const CSparseTensor   &bq_vectors,
             const CMolecularBasis &basis,
-            const CMolecularBasis &aux_basis) -> double
+            const CMolecularBasis &aux_basis,
+            const size_t           held) -> double
 {
     const auto nao = basis.dimensions_of_basis();
 
-    const auto naux = aux_basis.dimensions_of_basis();
+    // NOTE: the auxiliary functions this tensor actually holds, which on more than
+    // one rank is a share of the basis and not the whole of it. Dividing by the
+    // whole reported a density smaller by the number of the ranks -- 0.0410 where
+    // the single rank trend gave 0.33 -- which reads as an extremely sparse tensor
+    // rather than as a tensor of which this rank holds an eighth.
+    const auto naux = (held > 0) ? held : aux_basis.dimensions_of_basis();
 
     if ((nao == 0) || (naux == 0)) return 0.0;
 
@@ -347,6 +353,21 @@ prof_since(const prof_clock::time_point &mark) -> double
 /// iteration. What the phases are worth measuring against is the direct mode, which
 /// sweeps the same integrals on every build: the sweep here is the same work, so a
 /// phase of this which is many times that one is not the price of holding them.
+/// @brief How far one auxiliary entry of one item reaches, for the profile.
+/// @note The entry is named rather than its height carried, because a group holds
+/// several items and one entry may be reached by more than one of them. Counting
+/// the rows twice would say a band needs more of them than it does.
+struct TBqReach
+{
+    size_t entry;
+
+    size_t column;
+
+    size_t span;
+
+    size_t taken;
+};
+
 /// @brief One chunk of the atom pairs of one task, which is the unit the gather
 /// brings and the unit the scatter takes away.
 struct TBqItem
@@ -953,7 +974,9 @@ CSimdRIFockDriver::_compute_bq_vectors(const CMolecule                          
 
             std::vector<double> product(nops * nrows * nchunk);
 
-            std::vector<std::pair<size_t, size_t>> reaches;
+            std::vector<TBqReach> reaches;
+
+            std::vector<char> used;
 
 #pragma omp for schedule(dynamic)
             for (int g = 0; g < nwork; g++)
@@ -966,6 +989,11 @@ CSimdRIFockDriver::_compute_bq_vectors(const CMolecule                          
                 const auto total = group.columns;
 
                 size_t column = 0;
+
+                // NOTE: the staircase now spans the whole group, so the bands are
+                // cut across every item of it and the reaches are collected for all
+                // of them before any of it is counted.
+                if (profiled) reaches.clear();
 
                 for (size_t it = group.first; it < group.last; it++)
                 {
@@ -1004,10 +1032,11 @@ CSimdRIFockDriver::_compute_bq_vectors(const CMolecule                          
                     // kept only while the profile is asked for. The vector lives
                     // outside the loop over the entries and is cleared here, so the
                     // allocation is paid once a thread and not once a chunk.
-                    if (profiled) reaches.clear();
 
-                    for (const auto &in_function : in_functions)
+                    for (size_t entry = 0; entry < in_functions.size(); entry++)
                     {
+                        const auto &in_function = in_functions[entry];
+
                         const auto iblock = batch_map[task.block * nin_groups + in_function.group];
 
                         size_t npairs_in = 0;
@@ -1044,7 +1073,7 @@ CSimdRIFockDriver::_compute_bq_vectors(const CMolecule                          
 
                         if (profiled)
                         {
-                            reaches.push_back({in_function.count, taken});
+                            reaches.push_back(TBqReach{entry, column, count, taken});
 
                             // NOTE: weighted by the rows the entry carries, because
                             // the product pays for rows and not for entries. An
@@ -1088,53 +1117,62 @@ CSimdRIFockDriver::_compute_bq_vectors(const CMolecule                          
                         }
                     }
 
-                    if (profiled)
+                    column += count;
+                }
+
+                if (profiled)
+                {
+                    used.assign(in_functions.size(), 0);
+
+                    for (size_t k = 0; k < 4; k++)
                     {
-                        // the rows of the chunk in the order the metric holds them,
-                        // and the same rows ordered by how far they reach
-                        std::vector<std::pair<size_t, size_t>> ordered(reaches);
+                        const auto bands = BANDS[k];
 
-                        std::sort(ordered.begin(), ordered.end(),
-                                  [](const auto &l, const auto &r) { return l.second > r.second; });
+                        for (size_t b = 0; b < bands; b++)
+                        {
+                            const auto band_first = b * total / bands;
 
-                        const auto banded = [count](const std::vector<std::pair<size_t, size_t>> &rows,
-                                                    const size_t bands) {
-                            size_t work = 0;
+                            const auto band_last = (b + 1) * total / bands;
 
-                            for (size_t b = 0; b < bands; b++)
+                            if (band_last <= band_first) continue;
+
+                            std::fill(used.begin(), used.end(), static_cast<char>(0));
+
+                            for (const auto &reach : reaches)
                             {
-                                const auto first = b * count / bands;
-
-                                const auto last = (b + 1) * count / bands;
-
-                                if (last <= first) continue;
-
-                                // the rows a band needs are a prefix: everything up
-                                // to the last one which reaches past its first column
-                                size_t needed = 0, seen = 0;
-
-                                for (const auto &[height, reach] : rows)
+                                // does this item overlap the band at all, and does
+                                // the entry reach into the part of it that does
+                                if ((reach.column >= band_last) || (reach.column + reach.span <= band_first))
                                 {
-                                    seen += height;
-
-                                    if (reach > first) needed = seen;
+                                    continue;
                                 }
 
-                                work += needed * (last - first);
+                                const auto local =
+                                    (band_first > reach.column) ? band_first - reach.column : size_t{0};
+
+                                if (reach.taken > local) used[reach.entry] = 1;
                             }
 
-                            return work;
-                        };
+                            // NOTE: the metric's own order can only take a prefix,
+                            // so it pays down to the last row any band needs; an
+                            // order chosen per group would take exactly the rows
+                            // which are needed and nothing between them.
+                            size_t prefix = 0, exact = 0;
 
-                        for (size_t k = 0; k < 4; k++)
-                        {
-                            nfixed[k] += nops * banded(reaches, BANDS[k]);
+                            for (size_t e = 0; e < in_functions.size(); e++)
+                            {
+                                if (used[e] == 0) continue;
 
-                            nsorted[k] += nops * banded(ordered, BANDS[k]);
+                                prefix = std::max(prefix, in_functions[e].offset + in_functions[e].count);
+
+                                exact += in_functions[e].count;
+                            }
+
+                            nfixed[k] += nops * prefix * (band_last - band_first);
+
+                            nsorted[k] += nops * exact * (band_last - band_first);
                         }
                     }
-
-                    column += count;
                 }
 
                 nproducts += nops;
@@ -1951,7 +1989,10 @@ CSimdRIFockDriver::compute_w_vectors(const CSparseTensor        &bq_vectors,
 
     if ((_dense_threshold > 0.0) && (_dense_threshold <= 1.0))
     {
-        use_dense = (_bq_density(bq_vectors, basis, aux_basis) >= _dense_threshold);
+        // NOTE: the rows of this transformation are the auxiliary functions this
+        // driver was given, which is what `nrows` counts, so the density is taken
+        // against those and not against the whole basis.
+        use_dense = (_bq_density(bq_vectors, basis, aux_basis, functions.size()) >= _dense_threshold);
     }
 
     if (use_dense)
@@ -2437,9 +2478,10 @@ CSimdRIFockDriver::compute_exchange_matrix(const std::vector<CPackedMatrix> &w_v
 auto
 CSimdRIFockDriver::bq_density(const CSparseTensor   &bq_vectors,
                               const CMolecularBasis &basis,
-                              const CMolecularBasis &aux_basis) const -> double
+                              const CMolecularBasis &aux_basis,
+                              const size_t           held) const -> double
 {
-    return _bq_density(bq_vectors, basis, aux_basis);
+    return _bq_density(bq_vectors, basis, aux_basis, held);
 }
 
 auto

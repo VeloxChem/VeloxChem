@@ -325,7 +325,7 @@ export_simdintegrals(py::module &m) -> void
              "Gets the density at which the transformation expands the B vectors.")
         .def("bq_density", &CSimdRIFockDriver::bq_density,
              "The fraction of the B vectors which is actually filled.",
-             py::arg("bq_vectors"), py::arg("basis"), py::arg("aux_basis"))
+             py::arg("bq_vectors"), py::arg("basis"), py::arg("aux_basis"), py::arg("held") = 0)
         .def("compute_exchange_matrix",
              &CSimdRIFockDriver::compute_exchange_matrix,
              "Adds the exchange contribution of a range of the auxiliary basis to a matrix.",

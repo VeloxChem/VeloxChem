@@ -275,9 +275,12 @@ class CSimdRIFockDriver
     /// @note This is the quantity the transformation compares against the threshold,
     /// and it is the same walk, so what is reported is what would be decided on. It
     /// is not free: it costs a pass over the combinations of every block.
+    /// @param held The auxiliary functions the tensor holds, which on more than one
+    /// rank is a share of the basis; zero takes the whole of it.
     auto bq_density(const CSparseTensor   &bq_vectors,
                     const CMolecularBasis &basis,
-                    const CMolecularBasis &aux_basis) const -> double;
+                    const CMolecularBasis &aux_basis,
+                    const size_t           held = 0) const -> double;
 
     /// @brief Gets the density of the B vectors at which the transformation
     /// expands them.
