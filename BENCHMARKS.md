@@ -10476,10 +10476,14 @@ It was exposed as `ScfDriver.ri_dense_threshold` and run:
 | 10 waters | 0.8053 |
 | 20 waters | 0.6750 |
 | 32 waters | **0.5468** |
+| 76 waters, 8 ranks | **0.3274** |
 | c60 | **0.8679** |
 
-**The B vectors are half full on the sparsest system and seven eighths full on a
-compact one.** The walk saves at most one over the density in arithmetic, under
+**The B vectors are a third full on the sparsest system measured and seven eighths
+full on a compact one.** The multi-rank figure is taken against the auxiliary
+functions a rank holds and not the whole basis: dividing by the basis reported 0.0410
+on eight ranks, which reads as an extremely sparse tensor rather than as one of which
+this rank holds an eighth. The walk saves at most one over the density in arithmetic, under
 three times, and gives up the matrix unit to do it. Measured at 76 waters on the
 node the two are a tie: 57.24 s against 56.35 for the Fock builds, with the energies
 identical to every digit -- the first time that code path had executed at all.
@@ -10577,7 +10581,11 @@ measured elsewhere in this file, and it is why the table above is the laptop's.
 
 The counter which says what cutting the chunk into bands would save was rewritten to
 ask the question of a group rather than of a chunk. Against a batched group it answers
-**zero, at every band count, in both orderings**.
+**essentially zero**: 0.0 per cent at every band count on one rank, and 0.3, 0.4, 0.7
+and 4.3 per cent at 2, 4, 8 and 16 bands on eight. The last of those is the only one
+which is not noise -- at 392 columns, sixteen bands is twenty-four columns each, which
+is narrow enough that a band sometimes falls inside one task and can use that task's
+own staircase. It is still a loss, sixteen bands running at 47 per cent efficiency.
 
 The reason is the pooling itself. A band of a batched group spans several tasks, and
 their staircases do not line up: for any band, some task in it still has an entry
