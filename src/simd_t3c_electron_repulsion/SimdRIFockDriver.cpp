@@ -364,6 +364,7 @@ struct CBqProfile
     size_t ngathered = 0;
     size_t nread = 0;
     size_t nkept = 0;
+    size_t nabsent = 0;
     size_t nblocks = 0;
     size_t nbatches = 0;
     size_t ntasks = 0;
@@ -402,10 +403,19 @@ struct CBqProfile
         // B vectors and runs at 84% of what the library gives on a dense product:
         // there is no arithmetic to win back by running it better, only by not
         // doing it, and this is the only place where some of it is provably idle.
-        std::printf("RIJK   %.2f GB of values in that, %.1f %% padding\n", gb(nkept * sizeof(double)),
-                    (ngathered > 0) ? 100.0 * (1.0 - static_cast<double>(nkept * sizeof(double)) /
-                                                         static_cast<double>(ngathered))
-                                    : 0.0);
+        const auto kept_bytes = nkept * sizeof(double);
+
+        const auto absent_bytes = nabsent * sizeof(double);
+
+        const auto share = [ngathered = ngathered](const size_t bytes) {
+            return (ngathered > 0) ? 100.0 * static_cast<double>(bytes) / static_cast<double>(ngathered) : 0.0;
+        };
+
+        std::printf("RIJK   %.2f GB of values in that, %.1f %% padding\n", gb(kept_bytes),
+                    100.0 - share(kept_bytes));
+
+        std::printf("RIJK   padding is %.1f %% groups which reach no pair of the chunk, %.1f %% tails\n",
+                    share(absent_bytes), 100.0 - share(kept_bytes) - share(absent_bytes));
 
         std::printf("RIJK   %zu blocks in %zu batches, %zu tasks, on %d threads, chunk %zu\n", nblocks, nbatches,
                     ntasks, omp::get_number_of_threads(), nchunk);
@@ -651,7 +661,7 @@ CSimdRIFockDriver::_compute_bq_vectors(const CMolecule                          
 
     size_t first = 0;
 
-    size_t nproducts = 0, ngathered = 0, nread = 0, nkept = 0;
+    size_t nproducts = 0, ngathered = 0, nread = 0, nkept = 0, nabsent = 0;
 
     // NOTE: the gathered integrals and the product of the metric with them are both
     // the whole auxiliary basis deep, so a column of the pair costs the rows and
@@ -794,7 +804,7 @@ CSimdRIFockDriver::_compute_bq_vectors(const CMolecule                          
 
         const auto mark_contract = prof_clock::now();
 
-#pragma omp parallel reduction(+ : nproducts, ngathered, nread, nkept)
+#pragma omp parallel reduction(+ : nproducts, ngathered, nread, nkept, nabsent)
         {
             std::vector<double> gathered(nops * ncols * nchunk);
 
@@ -854,6 +864,19 @@ CSimdRIFockDriver::_compute_bq_vectors(const CMolecule                          
                         // operator's worth, counted once and scaled by nops to
                         // match ngathered, the operators sharing the pattern.
                         nkept += nops * in_function.count * taken;
+
+                        // NOTE: the padding is two different things and they want
+                        // two different answers. A group which reaches none of this
+                        // chunk's pairs contributes nothing but zeros to it, and its
+                        // rows need not be in the product at all -- the pairs a group
+                        // keeps are the leading ones of one ordered list, so a group
+                        // which ran out before this chunk began stays out for every
+                        // chunk after it. A group which reaches part of the chunk
+                        // leaves a tail of zeros, which is a packing question and is
+                        // worth less. `npairs_in == 0` was the first thing counted
+                        // here and it is always zero: no group is ever absent
+                        // outright, they run out at different places.
+                        if (taken == 0) nabsent += nops * in_function.count * count;
 
                         for (size_t k = 0; k < nops; k++)
                         {
@@ -961,6 +984,8 @@ CSimdRIFockDriver::_compute_bq_vectors(const CMolecule                          
     profile.nread = nread;
 
     profile.nkept = nkept;
+
+    profile.nabsent = nabsent;
 
     profile.total = prof_since(profile_start);
 
