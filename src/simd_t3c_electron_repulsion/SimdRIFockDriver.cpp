@@ -365,6 +365,8 @@ struct CBqProfile
     size_t nread = 0;
     size_t nkept = 0;
     size_t nabsent = 0;
+    std::array<size_t, 4> nfixed = {0, 0, 0, 0};
+    std::array<size_t, 4> nsorted = {0, 0, 0, 0};
     size_t nblocks = 0;
     size_t nbatches = 0;
     size_t ntasks = 0;
@@ -416,6 +418,26 @@ struct CBqProfile
 
         std::printf("RIJK   padding is %.1f %% groups which reach no pair of the chunk, %.1f %% tails\n",
                     share(absent_bytes), 100.0 - share(kept_bytes) - share(absent_bytes));
+
+        // NOTE: what banding the product across the pairs would leave, against the
+        // whole rectangle. The metric's order is fixed once for every block, so the
+        // `fixed` figure is what a single global ordering recovers and the `sorted`
+        // one what a per block ordering would; the second is an upper bound nobody
+        // can reach without gathering the metric block by block.
+        const auto rectangle = static_cast<double>(ngathered / sizeof(double));
+
+        if (rectangle > 0.0)
+        {
+            constexpr std::array<size_t, 4> bands = {2, 4, 8, 16};
+
+            for (size_t k = 0; k < bands.size(); k++)
+            {
+                std::printf("RIJK   in %2zu bands: %5.1f %% saved on the metric's order, %5.1f %% on a per block "
+                            "one\n",
+                            bands[k], 100.0 * (1.0 - static_cast<double>(nfixed[k]) / rectangle),
+                            100.0 * (1.0 - static_cast<double>(nsorted[k]) / rectangle));
+            }
+        }
 
         std::printf("RIJK   %zu blocks in %zu batches, %zu tasks, on %d threads, chunk %zu\n", nblocks, nbatches,
                     ntasks, omp::get_number_of_threads(), nchunk);
@@ -663,6 +685,25 @@ CSimdRIFockDriver::_compute_bq_vectors(const CMolecule                          
 
     size_t nproducts = 0, ngathered = 0, nread = 0, nkept = 0, nabsent = 0;
 
+    // NOTE: what a banded product would touch, if the chunk were cut across the
+    // pairs into BANDS pieces and each piece multiplied against only the auxiliary
+    // rows which reach it. `sorted` orders the rows by how far they reach, which
+    // makes the rows of a band a prefix and recovers the whole staircase; `fixed`
+    // keeps the order the metric is permuted into once for every block, so a band
+    // must take every row up to the last one that reaches it. The gap between them
+    // is what a per block ordering would buy over a single global one, which is
+    // the cost that decides whether banding is worth doing.
+    // NOTE: swept rather than fixed. Fewer bands recover less of the staircase and
+    // leave the products wider, and which wins is a property of the library and not
+    // of the pattern, so the choice is made against a measurement of both curves
+    // rather than here.
+    constexpr std::array<size_t, 4> BANDS = {2, 4, 8, 16};
+
+    // NOTE: plain arrays and not std::array. An OpenMP array section reduction
+    // wants something it can subscript as a pointer, and a std::array is not that
+    // -- "subscripted value is not an array or pointer", from the reduction clause.
+    size_t nfixed[4] = {0, 0, 0, 0}, nsorted[4] = {0, 0, 0, 0};
+
     // NOTE: the gathered integrals and the product of the metric with them are both
     // the whole auxiliary basis deep, so a column of the pair costs the rows and
     // the columns together, and the memory one thread may hold bounds the chunk
@@ -804,11 +845,14 @@ CSimdRIFockDriver::_compute_bq_vectors(const CMolecule                          
 
         const auto mark_contract = prof_clock::now();
 
-#pragma omp parallel reduction(+ : nproducts, ngathered, nread, nkept, nabsent)
+#pragma omp parallel reduction(+ : nproducts, ngathered, nread, nkept, nabsent) \
+    reduction(+ : nfixed[ : 4], nsorted[ : 4])
         {
             std::vector<double> gathered(nops * ncols * nchunk);
 
             std::vector<double> product(nops * nrows * nchunk);
+
+            std::vector<std::pair<size_t, size_t>> reaches;
 
 #pragma omp for schedule(dynamic)
             for (int t = 0; t < nwork; t++)
@@ -841,6 +885,12 @@ CSimdRIFockDriver::_compute_bq_vectors(const CMolecule                          
                     // pairs it keeps and how much of the chunk it reaches are the
                     // same for both and are worked out once. Only the values differ,
                     // and only the copy is repeated.
+
+                    // NOTE: (rows, reach) of every auxiliary entry of this chunk,
+                    // kept only while the profile is asked for. The vector lives
+                    // outside the loop over the entries and is cleared here, so the
+                    // allocation is paid once a thread and not once a chunk.
+                    if (profiled) reaches.clear();
 
                     for (const auto &in_function : in_functions)
                     {
@@ -878,6 +928,8 @@ CSimdRIFockDriver::_compute_bq_vectors(const CMolecule                          
                         // outright, they run out at different places.
                         if (taken == 0) nabsent += nops * in_function.count * count;
 
+                        if (profiled) reaches.push_back({in_function.count, taken});
+
                         for (size_t k = 0; k < nops; k++)
                         {
                             // NOTE: the buffer holds one operator after another, each
@@ -908,6 +960,52 @@ CSimdRIFockDriver::_compute_bq_vectors(const CMolecule                          
 
                                 std::fill(row + taken, row + count, 0.0);
                             }
+                        }
+                    }
+
+                    if (profiled)
+                    {
+                        // the rows of the chunk in the order the metric holds them,
+                        // and the same rows ordered by how far they reach
+                        std::vector<std::pair<size_t, size_t>> ordered(reaches);
+
+                        std::sort(ordered.begin(), ordered.end(),
+                                  [](const auto &l, const auto &r) { return l.second > r.second; });
+
+                        const auto banded = [count](const std::vector<std::pair<size_t, size_t>> &rows,
+                                                    const size_t bands) {
+                            size_t work = 0;
+
+                            for (size_t b = 0; b < bands; b++)
+                            {
+                                const auto first = b * count / bands;
+
+                                const auto last = (b + 1) * count / bands;
+
+                                if (last <= first) continue;
+
+                                // the rows a band needs are a prefix: everything up
+                                // to the last one which reaches past its first column
+                                size_t needed = 0, seen = 0;
+
+                                for (const auto &[height, reach] : rows)
+                                {
+                                    seen += height;
+
+                                    if (reach > first) needed = seen;
+                                }
+
+                                work += needed * (last - first);
+                            }
+
+                            return work;
+                        };
+
+                        for (size_t k = 0; k < 4; k++)
+                        {
+                            nfixed[k] += nops * banded(reaches, BANDS[k]);
+
+                            nsorted[k] += nops * banded(ordered, BANDS[k]);
                         }
                     }
 
@@ -986,6 +1084,13 @@ CSimdRIFockDriver::_compute_bq_vectors(const CMolecule                          
     profile.nkept = nkept;
 
     profile.nabsent = nabsent;
+
+    for (size_t k = 0; k < 4; k++)
+    {
+        profile.nfixed[k] = nfixed[k];
+
+        profile.nsorted[k] = nsorted[k];
+    }
 
     profile.total = prof_since(profile_start);
 
