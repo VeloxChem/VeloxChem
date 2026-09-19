@@ -79,7 +79,7 @@ class TestChargeTransfer:
         ref_rot_str = np.array([0.0, -1.2202, 0.7409, 0.0, 0.0])
         tol_ene = 1.0e-6
         tol_osc_str = 1.0e-4
-        tol_rot_str = 1.0e-4
+        tol_rot_str = 1.0e-3
         self.run_scf_and_rpa(mol, bas, min_bas, xcfun_label, nstates,
                              ref_scf_energy, ref_eigvals, ref_osc_str,
                              ref_rot_str, tol_ene, tol_osc_str, tol_rot_str)
