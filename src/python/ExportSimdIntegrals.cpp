@@ -456,7 +456,13 @@ export_simdintegrals(py::module &m) -> void
         .def("get_metric_erf", &CSimdRIJKFockDriver::get_metric_erf,
              py::return_value_policy::reference_internal,
              "Gets the inverted metric of the attenuated operator, which is empty unless the driver "
-             "was prepared for a hybrid range separated functional.");
+             "was prepared for a hybrid range separated functional.")
+        .def("set_dense_threshold", &CSimdRIJKFockDriver::set_dense_threshold,
+             "Sets the density of the B vectors at which the exchange half transformation expands "
+             "them into a square. Zero or less expands always, above one walks the values always.",
+             py::arg("threshold"))
+        .def("get_dense_threshold", &CSimdRIJKFockDriver::get_dense_threshold,
+             "Gets the density at which the exchange half transformation expands the B vectors.");
 
     // CSimdThreeCenterElectronRepulsionGradientDriver class
 

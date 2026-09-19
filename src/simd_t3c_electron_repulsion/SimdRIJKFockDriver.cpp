@@ -1126,6 +1126,18 @@ CSimdRIJKFockDriver::get_metric_erf() const -> const CPackedMatrix &
 }
 
 auto
+CSimdRIJKFockDriver::set_dense_threshold(const double threshold) -> void
+{
+    _drv.set_dense_threshold(threshold);
+}
+
+auto
+CSimdRIJKFockDriver::get_dense_threshold() const -> double
+{
+    return _drv.get_dense_threshold();
+}
+
+auto
 CSimdRIJKFockDriver::get_omega() const -> double
 {
     return _omega;

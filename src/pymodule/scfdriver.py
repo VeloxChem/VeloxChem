@@ -234,6 +234,7 @@ class ScfDriver:
         self.ri_auxiliary_basis = 'def2-universal-jfit'
         self.ri_metric_threshold = 1.0e-12
         self.ri_metric_route = 'cholesky'
+        self.ri_dense_threshold = 0.0
         self.ri_jk_simd = False
         self.ri_memory_budget = None
         self._ri_aux_atoms = []
@@ -366,6 +367,9 @@ class ScfDriver:
                      'eigenvalues'),
                 'ri_metric_threshold':
                     ('float', 'linear dependence threshold for RI-JK metric'),
+                'ri_dense_threshold':
+                    ('float', 'density of the B vectors at which the SIMD RI-JK '
+                     'exchange expands them; 0 expands always, above 1 never'),
                 'ri_jk_simd':
                     ('bool', 'use the SIMD RI-JK driver instead of the conventional one'),
                 'ri_memory_budget':
@@ -1815,6 +1819,14 @@ class ScfDriver:
                 basis_ri = MolecularBasis(self.ri_auxiliary_basis)
 
             self._ri_drv = SimdRIJKFockDriver()
+
+            # NOTE: the exchange half transformation either walks the values of the
+            # B vectors or expands them into a square and hands that to a matrix
+            # product. The second does more arithmetic on a unit which runs it
+            # faster, and which wins follows from how dense the B vectors are. The
+            # default of zero expands always, which is what every calculation has
+            # done: the walk is reached only by asking for it.
+            self._ri_drv.set_dense_threshold(self.ri_dense_threshold)
 
             # NOTE: a hybrid range separated functional is built from two sets of B
             # vectors, the plain operator's and the attenuated one's, each fitted in

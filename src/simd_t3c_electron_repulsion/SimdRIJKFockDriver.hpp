@@ -420,6 +420,22 @@ class CSimdRIJKFockDriver
     /// @return The inverted factor.
     auto get_metric() const -> const CPackedMatrix &;
 
+    /// @brief Sets the density of the B vectors at which the exchange half
+    /// transformation expands them into a square.
+    /// @param threshold The density. A threshold of zero or less expands always,
+    /// which is the default and what every calculation has done; one above one
+    /// walks the values always; between the two the driver counts the values of
+    /// each range and chooses.
+    /// @note Forwarded to the driver of the B vectors, which is where the choice
+    /// is made. It is exposed here because that driver is held privately and a
+    /// calculation reaches only this one.
+    auto set_dense_threshold(const double threshold) -> void;
+
+    /// @brief Gets the density at which the exchange half transformation expands
+    /// the B vectors.
+    /// @return The density.
+    auto get_dense_threshold() const -> double;
+
     /// @brief Gets the inverted metric of the attenuated operator.
     /// @return The inverted metric, which is empty unless the driver was prepared
     /// for a hybrid range separated functional.
