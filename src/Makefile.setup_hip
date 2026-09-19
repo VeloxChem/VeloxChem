@@ -31,8 +31,11 @@
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 USE_HIP := true
+USE_MAGMA := false
 
 LIBXC_HOME := /path/to/libxc
+# if MAGMA is used
+MAGMA_HOME := /path/to/magma
 
 CXX    := /opt/rocm/llvm/bin/clang++ ${shell CC --cray-print-opts=cflags} ${shell CC --cray-print-opts=libs}
 PYTHON := python3
@@ -43,6 +46,10 @@ CXX_DEB_FLG := -fopenmp -std=c++17 -O3 -Wall -g
 
 MATH_INC := 
 MATH_LIB := 
+ifeq ($(USE_MAGMA),true)
+  MATH_INC += -I$(MAGMA_HOME)/include
+  MATH_LIB += -L$(MAGMA_HOME)/lib -lmagma
+endif
 
 PYTHON_INC += $(shell $(PYTHON) -m pybind11 --includes)
 
@@ -73,6 +80,10 @@ ifeq ($(USE_CUDA),true)
 else ifeq ($(USE_HIP),true)
   CPP_REL_FLG += -DUSE_HIP
   CPP_DEB_FLG += -DUSE_HIP
+  ifeq ($(USE_MAGMA),true)
+    CPP_REL_FLG += -DUSE_MAGMA
+    CPP_DEB_FLG += -DUSE_MAGMA
+  endif
 endif
 
 # Math and XC library
