@@ -41,7 +41,6 @@
 
 #include <hip/hip_runtime.h>
 #include <hipblas/hipblas.h>
-//#include <hipsolver/hipsolver.h>
 
 #endif
 
