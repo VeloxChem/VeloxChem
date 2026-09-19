@@ -10178,8 +10178,11 @@ holds the metric and the B vectors along with the ordinary one-electron work. It
 exponent at def2-svp climbs the whole way -- 2.86, 3.24, 3.47, **3.74** at the largest
 pair -- and by 190 waters it is 959 seconds of a 2560 second calculation. **At the top
 of the def2-svp series the setup is growing faster than the Fock build it exists to
-serve.** Its internal split has never been measured; the script times `compute` and the
-builds, and everything else is one number by subtraction.
+serve.** Its internal split is taken apart in "Ninety-four per cent of the B vectors was not
+the integrals either", at the end of this file: the metric is one to two per cent of
+it, the three-center integrals five to eight, and everything else is one matrix
+product applying the metric -- of which two thirds is multiplying structural zeros
+at this size.
 
 ### What the runs cost in accuracy, and what they say about the node
 
@@ -10307,7 +10310,8 @@ Two cautions. The subtraction is an upper bound: the fitted path runs two to thr
 iterations and `outside` holds per-iteration work as well, which for the small rows is
 most of the difference. And at fixed naux the preparation still grows with nao -- c60
 pays 6.7 times more for 2.2 times the orbital basis -- so it is not metric-bound
-either, the metric depending on naux alone. What fits is the B vectors.
+either, the metric depending on naux alone. What fits is the B vectors, which the profile at the end of this file confirms
+directly.
 
 ### The iteration count is general, and nobody has explained it
 
@@ -10338,3 +10342,178 @@ either kind of molecule.
 
 The fitting error, for the record: 7.0e-06 hartree per atom for c60 in def2-svp and
 5.3e-06 in def2-tzvp.
+
+## Ninety-four per cent of the B vectors was not the integrals either
+
+The water clusters above put a third of the fitted calculation in `outside`, the
+part which is not a Fock build, and named the setup as the likely cause. This is the
+profile which took that apart. It reaches the same shape of answer as "Ninety-two
+per cent of the gradient was not the integrals", one phase over, and this time the
+phase it lands on cannot be fixed.
+
+Everything here is switched on by `VLX_RIJK_PROFILE` in the environment, which was
+already in the driver and had never been run on a system this size.
+
+### The setup is the B vectors, and the metric is nothing
+
+| | ranks | naux | metric | B vectors | setup as a share of the wall |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 20 waters, def2-svp | 1 | 2260 | **0.02 s** | 1.71 s | 13.0% |
+| 32 waters, def2-svp | 1 | 3616 | **0.08 s** | 10.90 s | 21.9% |
+| 76 waters, def2-svp | 8 | 8588 | **0.32 s** | 24.47 s | 24.3% |
+
+The metric is formed and inverted **on the master rank alone** and broadcast
+(`scfdriver.py:1945`), with every other rank idle through it, and the two-center
+integrals behind it are unscreened by design -- the Coulomb operator does not fall
+off, so no pair of auxiliary atoms is negligible. It was the obvious suspect and it
+was named as such twice. It is **one to two per cent of the setup** at every size
+measured, on one rank and on eight. Nothing about it is worth changing.
+
+### Inside the B vectors
+
+| | integrals | contract | rest |
+| --- | ---: | ---: | ---: |
+| 20 waters, 1 rank | 0.160 s, 8.8% | 1.615 s, **89.3%** | 1.9% |
+| 32 waters, 1 rank | 0.554 s, 5.1% | 10.203 s, **93.9%** | 1.0% |
+| 76 waters, 8 ranks | 2.02 s, 8.2% | 21.83 s, **90.4%** | 1.4% |
+
+**The SIMD three-center integrals are five to eight per cent of forming the B
+vectors**, and the whole of the rest is one matrix product applying the metric to
+them. The kernels this file spends hundreds of lines on are not the cost of the
+setup any more than they were the cost of the gradient.
+
+### The contraction is not badly written
+
+At 32 waters it moves 8.05 GB of gathered values against 3616 metric rows, which is
+7.27e12 flops, in 10.20 seconds: **713 Gflop/s where Accelerate's `dgemm` peaks at
+846 on those eight threads, 84 per cent.** It is threaded, it is on the right
+routine, and it is close to what the machine can do.
+
+So there is no arithmetic to win back by running it better. Only by not doing it.
+
+### Two thirds of it is multiplying zeros
+
+A chunk is gathered to the width of the widest auxiliary group and multiplied whole,
+while each group fills only the atom pairs it keeps. The rest is zeroed and
+multiplied:
+
+| | naux | padding | of which absent groups | of which tails |
+| --- | ---: | ---: | ---: | ---: |
+| 10 waters | 1130 | 18.7% | 0.0% | 18.7% |
+| 20 waters | 2260 | 31.8% | 0.0% | 31.8% |
+| 32 waters | 3616 | 44.7% | 0.0% | 44.7% |
+| 76 waters | 8588 | **66.9%** | -- | -- |
+| 139 waters | 15707 | **78.7%** | -- | -- |
+
+**All of it is tails and none of it is absent groups.** No auxiliary group is ever
+missing outright; they run out at different places, so the filled region is a
+staircase and the product multiplies its bounding rectangle. The share grows with
+the system, which is why the setup's exponent outruns the Fock build's at the top of
+the def2-svp series.
+
+### What cutting the chunk would save, and why it cannot be had
+
+Cutting the chunk across the pairs into bands, each multiplied against only the rows
+which reach it, would recover most of that. The driver counts what each choice would
+save, in the order the metric is already permuted into and in a per block order which
+would need the metric gathered block by block:
+
+| bands | 32 waters | 76 waters | 139 waters | per block, 139 waters |
+| ---: | ---: | ---: | ---: | ---: |
+| 2 | 22.7% | 37.7% | 46.8% | 49.3% |
+| 4 | 31.2% | 52.4% | 64.1% | 66.9% |
+| 8 | 36.2% | 58.5% | 71.1% | 74.1% |
+| 16 | 39.0% | 61.5% | 74.3% | 77.3% |
+
+The global order captures 93 to 96 per cent of the per block one, so the expensive
+half of the idea is unnecessary.
+
+**It was implemented and it is slower.** At 32 waters the contraction goes 10.299 s
+at one band to 10.077 at two, **13.618 at four and 25.083 at eight** -- against a
+predicted 1.28x at four. The change was reverted.
+
+**The reason is in the counters and was there all along.** The profile prints
+`chunk 579`, which is `nchunk`, the largest a chunk may be. What the products
+actually get is `ngathered / (8 x ncols x nproducts)`:
+
+| | ngathered | ncols | products | average count |
+| --- | ---: | ---: | ---: | ---: |
+| 32 waters, laptop | 8.05 GB | 3616 | 9191 | **30.3** |
+| 76 waters, node | 107 GB | 8588 | 51885 | **30.1** |
+
+**The average product is 3616 x 30 x 3616.** Thirty columns do not divide into four
+bands, let alone eight. Every BLAS measurement taken to choose a band count was made
+at 579 columns, a shape which essentially never occurs in this loop, and every one of
+them was therefore answering a question about a different computation.
+
+### The BLAS measurements, which are sound and do not apply
+
+They are kept because they say something about the library which will matter again.
+`blas_trmm_check.py`, one rank, the shapes named rather than the shapes that occur:
+
+| naux | library | `dtrmm` | 2 bands | 4 bands | 8 bands | 16 bands |
+| ---: | --- | ---: | ---: | ---: | ---: | ---: |
+| 3616 | Accelerate, 8 threads | 98% | 94% | 88% | 74% | 53% |
+| 8588 | OpenBLAS, 32 threads | **12%** | 86% | 79% | 67% | 47% |
+| 15707 | OpenBLAS, 32 threads | **11%** | 84% | 62% | 39% | 21% |
+
+**`dtrmm` is barely threaded in the node's OpenBLAS** -- 338 Gflop/s against
+`dgemm`'s 2776, flat across every size, which is about four cores' worth. Applying a
+triangular factor with the routine written for it would be two and a half to four
+times slower than the general one. On Accelerate it is 96 to 99 per cent, so the
+laptop would have given a clean and entirely misleading green light.
+
+### The exchange build has no sparsity to exploit either
+
+The same profile answered a separate question. `CSimdRIFockDriver` carries a sparse
+alternative to the dense half transformation, chosen by `_dense_threshold`, which
+defaults to zero -- "expand always" -- and which nothing in `pymodule` had ever set.
+It was exposed as `ScfDriver.ri_dense_threshold` and run:
+
+| | B vector density |
+| --- | ---: |
+| 5 waters | 0.9142 |
+| 10 waters | 0.8053 |
+| 20 waters | 0.6750 |
+| 32 waters | **0.5468** |
+| c60 | **0.8679** |
+
+**The B vectors are half full on the sparsest system and seven eighths full on a
+compact one.** The walk saves at most one over the density in arithmetic, under
+three times, and gives up the matrix unit to do it. Measured at 76 waters on the
+node the two are a tie: 57.24 s against 56.35 for the Fock builds, with the energies
+identical to every digit -- the first time that code path had executed at all.
+
+So the dense default was right, and it now has a number behind it rather than an
+inference from laptop sized problems.
+
+### Three routes closed, and what is left
+
+| route | why not |
+| --- | --- |
+| apply the triangular metric with `dtrmm` | 11 to 12% efficiency on the node's OpenBLAS |
+| exploit the triangle by row panels of `dgemm` | needs the metric un-permuted, and only 1.18x even then |
+| band the chunk across the pairs | the chunks are thirty columns wide |
+| the sparse exchange half transformation | the B vectors are 55 to 87% dense |
+
+What remains is not an optimisation. The contraction applies a **dense** metric, of a
+dimension 4.7 times the orbital basis at def2-svp, to every surviving pair; that is
+the naux squared per pair which sets the exponent, and no arrangement of the same
+arithmetic removes it. Either the products are made wider first -- batching tasks
+which share a pattern, which would improve the `n = 30` shape and create columns
+worth banding -- or the metric is made sparse, which means local or robust fitting
+and is a different method rather than a faster one.
+
+### Two mistakes worth keeping
+
+**A benchmark of the wrong shape passed every check.** `blas_trmm_check.py` verified
+its own arithmetic, reported plausible speedups, and was measured on the node rather
+than by analogy. It was still wrong, because the shape it was given came from a
+number in the profile which does not mean what it looks like. The counter which would
+have caught it -- the average `count` -- was in the same output the whole time.
+
+**A stale build reported a plausible wrong answer.** After the revert the per block
+column read equal to the global one, which the source cannot produce. `make` had not
+rebuilt: the object was older than the restored source. It was caught only because
+those two numbers had been measured before and a wrong one was recognisable. See
+"Detecting make failures".
