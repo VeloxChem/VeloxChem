@@ -10517,3 +10517,95 @@ column read equal to the global one, which the source cannot produce. `make` had
 rebuilt: the object was older than the restored source. It was caught only because
 those two numbers had been measured before and a wrong one was recognisable. See
 "Detecting make failures".
+
+## One product of five hundred columns instead of seventeen of thirty
+
+The profile above leaves the contraction which forms the B vectors as the largest
+phase of a fitted calculation, 90 to 94 per cent of a setup which is a quarter of the
+wall, running at a good fraction of what the library gives and doing two thirds of its
+arithmetic against structural zeros. Four ways at those zeros were measured and all
+four failed. **The change which did work is not about the zeros at all.**
+
+### What was wrong with the shape
+
+A task is one combination of basis functions of one pair block, and the pairs of a
+block are swept in chunks of at most `nchunk`. The gathered buffer is allocated for
+`nchunk` columns -- 579 at 32 waters, 434 on the node -- because the widest block
+needs that many. **The average block has thirty atom pairs.** The buffer was
+ninety-five per cent empty on every call, and the library was being handed a matrix
+product of thirty columns, which is a matrix product in name only:
+
+    ngathered / (8 x ncols x nproducts)
+
+| | before | after |
+| --- | ---: | ---: |
+| 20 waters, laptop | 30.4 | **836** |
+| 32 waters, laptop | 30.3 | **528** |
+| 76 waters, node | 30.1 | **392** |
+
+The chunks of several tasks are now gathered side by side into the one buffer and
+handed to a single product. Every task of a batch shares the metric and the number of
+rows, so their chunks are column slices of one matrix and always were; nothing else
+had to change to put them there. It costs no memory which was not already reserved.
+
+### What it buys
+
+Both builds run back to back on one machine in one session, the unbatched one made by
+capping a group at one item:
+
+| | products | one per group | batched | |
+| --- | ---: | ---: | ---: | ---: |
+| 20 waters, laptop | 3551 -> 131 | 1.527 s | 1.294 s | **1.18x** |
+| 32 waters, laptop | 9191 -> 527 | 10.267 s | 8.165 s | **1.26x** |
+| 76 waters, node | 51885 -> 3978 | 22.03 s | 17.195 s | **1.28x** |
+
+It grows with the system, which is what it should do: a larger molecule has more tasks
+to gather together and more to gain from the wider shape.
+
+**The arithmetic is identical and the counters prove it.** The gathered volume is
+unchanged to the hundredth of a gigabyte -- 1.98, 8.05 and 107.04 GB before and after
+-- the padding is unchanged at 31.8, 44.7 and 66.9 per cent, the energies of four
+clusters agree to 1.3e-11 or better, and every iteration count is the same. The same
+work, reshaped.
+
+On the node the setup fell from 24.47 s to 20.37. The wall clock did not move, because
+the Fock build came out ten per cent slower on a different node in the same run, which
+batching does not touch; that is node to node variation larger than the 4.4 per cent
+measured elsewhere in this file, and it is why the table above is the laptop's.
+
+### Batching and banding are alternatives, not a sequence
+
+The counter which says what cutting the chunk into bands would save was rewritten to
+ask the question of a group rather than of a chunk. Against a batched group it answers
+**zero, at every band count, in both orderings**.
+
+The reason is the pooling itself. A band of a batched group spans several tasks, and
+their staircases do not line up: for any band, some task in it still has an entry
+reaching, so the band needs every row. What made banding look attractive was a
+structure which batching destroys.
+
+That also settles which of the two to have. The 1.66x once quoted for banding
+multiplied savings measured at thirty columns by an efficiency measured at a hundred
+and eight -- two numbers from different computations. Banding at the shape which
+actually occurs was implemented and measured at **0.76x**, and batching at **1.28x**.
+
+### Five routes to the padding, and where it stands
+
+| route | result |
+| --- | --- |
+| `dtrmm` on the triangular metric | 11 to 12% efficiency on the node's OpenBLAS |
+| row panels of `dgemm` | needs the metric un-permuted, 1.18x at best |
+| bands across the pairs, unbatched | 0.76x: thirty columns do not divide |
+| bands across the pairs, batched | no saving available at all |
+| the sparse exchange half transformation | the B vectors are 55 to 87% dense |
+
+**The padding is untouched and remains 45 to 79 per cent of the contraction.** What
+was won is the shape, not the sparsity. Reaching the sparsity needs either the pooled
+columns sorted by how deep they reach, which would restore a staircase across the
+group and has not been measured, or a kernel of our own, which must beat 553 Gflop/s
+-- a fifth of the node's `dgemm` peak -- now that the baseline is 1.28 times faster
+than it was.
+
+Neither is likely to matter as much as the exponent. `prepare` is a fifth of the wall;
+the exchange scaling is what decides whether the fitted path is usable on an extended
+system at all, and none of this touches it.
