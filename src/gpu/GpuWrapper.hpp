@@ -37,12 +37,12 @@
 #if defined(USE_HIP) && defined(__has_include)
     #if __has_include(<rocm-core/rocm_version.h>)
         #include <rocm-core/rocm_version.h>
-        #define HAVE_ROCM_VERSION_HEADER 1
+        #define VLX_HAVE_ROCM_VERSION_HEADER 1
     #else
-        #define HAVE_ROCM_VERSION_HEADER 0
+        #define VLX_HAVE_ROCM_VERSION_HEADER 0
     #endif
 #else
-    #define HAVE_ROCM_VERSION_HEADER 0
+    #define VLX_HAVE_ROCM_VERSION_HEADER 0
 #endif
 
 #if defined(USE_CUDA)
@@ -95,7 +95,7 @@
     #define gpuMalloc(ptr, size)                hipMalloc(ptr, size)
     #define gpuMallocAsync(ptr, size, s)        hipMallocAsync(ptr, size, s)
     #define gpuFree(ptr)                        hipFree(ptr)
-    #if HAVE_ROCM_VERSION_HEADER && (ROCM_VERSION_MAJOR < 7)
+    #if VLX_HAVE_ROCM_VERSION_HEADER && (ROCM_VERSION_MAJOR < 7)
         #define gpuFreeAsync(ptr, s)                hipFree(ptr)
     #else
         #define gpuFreeAsync(ptr, s)                hipFreeAsync(ptr, s)

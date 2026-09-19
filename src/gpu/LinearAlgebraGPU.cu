@@ -44,6 +44,15 @@
 #include <hipsolver/hipsolver.h>
 #if defined(USE_MAGMA)
 #include <magma_v2.h>
+#define magmaSafe(e)                                                                                                   \
+    {                                                                                                                  \
+        magma_int_t err = (e);                                                                                         \
+        if (err != MAGMA_SUCCESS) {                                                                                    \
+            std::cerr << "MAGMA error in " << __FILE__ << ":" << __LINE__ << ": " << magma_strerror(err) << std::endl; \
+            std::exit(EXIT_FAILURE);                                                                                   \
+        }                                                                                                              \
+    }
+static_assert(sizeof(magma_int_t) == 4, "MAGMA must be built with 32-bit magma_int_t");
 #endif
 
 #endif
@@ -524,14 +533,11 @@ diagonalizeMatrix(double* A, double* D, const int64_t n_int64) -> void
 
     // TODO: check info
 
-    // TODO: gpu wrapper for cusolver
     cusolverSafe(cusolverDnDestroy(handle));
 
-#elif defined(USE_HIP) and defined(USE_MAGMA)
+#elif defined(USE_HIP) && defined(USE_MAGMA)
 
-    magma_init();
-
-    errors::assertMsgCritical(sizeof(magma_int_t) == 4, std::string("MAGMA must be 32-bit"));
+    magmaSafe(magma_init());
 
     // d_work is not used by MAGMA; this is only to match a later Free.
     gpuSafe(gpuMallocAsync(&d_work, static_cast<size_t>(1) * sizeof(double), stream));
@@ -577,7 +583,7 @@ diagonalizeMatrix(double* A, double* D, const int64_t n_int64) -> void
 
     hipSafe(hipDeviceSynchronize());
 
-    magma_finalize();
+    magmaSafe(magma_finalize());
 
 #elif defined(USE_HIP)
 
@@ -589,7 +595,6 @@ diagonalizeMatrix(double* A, double* D, const int64_t n_int64) -> void
 
     hipsolverSafe(hipsolverDsyevd_bufferSize(handle, HIPSOLVER_EIG_MODE_VECTOR, HIPSOLVER_FILL_MODE_UPPER, n, d_A, n, d_D, &lwork));
 
-    //gpuSafe(gpuMallocAsync(&d_work, static_cast<size_t>(lwork), stream));
     gpuSafe(gpuMallocAsync(&d_work, static_cast<size_t>(lwork) * sizeof(double), stream));
 
     hipsolverSafe(hipsolverDsyevd(handle, HIPSOLVER_EIG_MODE_VECTOR, HIPSOLVER_FILL_MODE_UPPER, n, d_A, n, d_D, d_work, lwork, d_info));
@@ -602,7 +607,6 @@ diagonalizeMatrix(double* A, double* D, const int64_t n_int64) -> void
 
     // TODO check h_info
 
-    // TODO: gpu wrapper for hipsolver
     hipsolverSafe(hipsolverDestroy(handle));
 
 #endif
