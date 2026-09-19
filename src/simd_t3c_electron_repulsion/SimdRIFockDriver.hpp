@@ -267,6 +267,18 @@ class CSimdRIFockDriver
     /// compared against one another.
     auto set_dense_threshold(const double threshold) -> void;
 
+    /// @brief The fraction of the B vectors which is actually held.
+    /// @param bq_vectors The B vectors.
+    /// @param basis The molecular basis.
+    /// @param aux_basis The auxiliary molecular basis.
+    /// @return The number of values held over the number a dense tensor would hold.
+    /// @note This is the quantity the transformation compares against the threshold,
+    /// and it is the same walk, so what is reported is what would be decided on. It
+    /// is not free: it costs a pass over the combinations of every block.
+    auto bq_density(const CSparseTensor   &bq_vectors,
+                    const CMolecularBasis &basis,
+                    const CMolecularBasis &aux_basis) const -> double;
+
     /// @brief Gets the density of the B vectors at which the transformation
     /// expands them.
     /// @return The density.

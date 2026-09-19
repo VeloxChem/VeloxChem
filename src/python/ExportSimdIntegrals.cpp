@@ -323,6 +323,9 @@ export_simdintegrals(py::module &m) -> void
              py::arg("threshold"))
         .def("get_dense_threshold", &CSimdRIFockDriver::get_dense_threshold,
              "Gets the density at which the transformation expands the B vectors.")
+        .def("bq_density", &CSimdRIFockDriver::bq_density,
+             "The fraction of the B vectors which is actually filled.",
+             py::arg("bq_vectors"), py::arg("basis"), py::arg("aux_basis"))
         .def("compute_exchange_matrix",
              &CSimdRIFockDriver::compute_exchange_matrix,
              "Adds the exchange contribution of a range of the auxiliary basis to a matrix.",
@@ -462,7 +465,10 @@ export_simdintegrals(py::module &m) -> void
              "them into a square. Zero or less expands always, above one walks the values always.",
              py::arg("threshold"))
         .def("get_dense_threshold", &CSimdRIJKFockDriver::get_dense_threshold,
-             "Gets the density at which the exchange half transformation expands the B vectors.");
+             "Gets the density at which the exchange half transformation expands the B vectors.")
+        .def("bq_density", &CSimdRIJKFockDriver::bq_density,
+             "The fraction of the B vectors the driver holds which is actually filled. This is the "
+             "quantity the exchange half transformation compares against the threshold.");
 
     // CSimdThreeCenterElectronRepulsionGradientDriver class
 

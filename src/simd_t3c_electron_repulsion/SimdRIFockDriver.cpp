@@ -168,6 +168,74 @@ _matrix_product(const size_t  nrows,
 #endif /* VLX_USE_MATHLIB */
 }
 
+/// @brief The fraction of the B vectors which is actually held.
+/// @param bq_vectors The B vectors.
+/// @param basis The molecular basis.
+/// @param aux_basis The auxiliary molecular basis.
+/// @return The number of values held over the number a dense tensor would hold.
+/// @note An off-diagonal pair of atoms is held once and fills two places of the
+/// square, and a diagonal pair is held with the basis functions of both sides and
+/// fills one. Counting the values twice over would put the density above one,
+/// which a fraction cannot be.
+/// @note It costs a walk over the combinations of every block, which is why the
+/// transformation asks for it only when the threshold makes it a question.
+auto
+_bq_density(const CSparseTensor   &bq_vectors,
+            const CMolecularBasis &basis,
+            const CMolecularBasis &aux_basis) -> double
+{
+    const auto nao = basis.dimensions_of_basis();
+
+    const auto naux = aux_basis.dimensions_of_basis();
+
+    if ((nao == 0) || (naux == 0)) return 0.0;
+
+    const auto indices = denseidx::index_functions(basis);
+
+    const auto aux_indices = denseidx::index_functions(aux_basis);
+
+    size_t filled = 0;
+
+    for (size_t ib = 0; ib < bq_vectors.number_of_blocks(); ib++)
+    {
+        const auto &block = bq_vectors.block(ib);
+
+        const auto &a_atoms = block.a_atoms();
+
+        const auto &b_atoms = block.b_atoms();
+
+        const auto natoms = block.c_atoms().size();
+
+        if ((a_atoms.empty()) || (natoms == 0)) continue;
+
+        size_t ndiag = 0;
+
+        while ((ndiag < a_atoms.size()) && (a_atoms[ndiag] == b_atoms[ndiag])) ndiag++;
+
+        for (const auto [la, ia] : indices[static_cast<size_t>(block.a_index())])
+        {
+            for (const auto [lb, jb] : indices[static_cast<size_t>(block.b_index())])
+            {
+                for (const auto [lc, kc] : aux_indices[static_cast<size_t>(block.c_index())])
+                {
+                    const auto npairs = block.number_of_pairs(la, ia, lb, jb, lc, kc);
+
+                    if (npairs == 0) continue;
+
+                    const auto ncomps = static_cast<size_t>((2 * la + 1) * (2 * lb + 1) * (2 * lc + 1));
+
+                    const auto diagonal = std::min(ndiag, npairs);
+
+                    filled += (2 * npairs - diagonal) * natoms * ncomps;
+                }
+            }
+        }
+    }
+
+    return static_cast<double>(filled) /
+           (static_cast<double>(naux) * static_cast<double>(nao) * static_cast<double>(nao));
+}
+
 /// @brief Describes the basis functions of the atom basis groups on the auxiliary
 /// side and the place they occupy in the permuted metric.
 /// @param groups The atom basis groups on the auxiliary side.
@@ -1579,55 +1647,7 @@ CSimdRIFockDriver::compute_w_vectors(const CSparseTensor        &bq_vectors,
 
     if ((_dense_threshold > 0.0) && (_dense_threshold <= 1.0))
     {
-        // NOTE: an off-diagonal pair of atoms is held once and fills two places of
-        // the square, and a diagonal pair is held with the basis functions of both
-        // sides and fills one. Counting the values twice over would put the density
-        // above one, which a fraction cannot be.
-
-        size_t filled = 0;
-
-        for (size_t ib = 0; ib < bq_vectors.number_of_blocks(); ib++)
-        {
-            const auto &block = bq_vectors.block(ib);
-
-            const auto &a_atoms = block.a_atoms();
-
-            const auto &b_atoms = block.b_atoms();
-
-            const auto natoms = block.c_atoms().size();
-
-            if ((a_atoms.empty()) || (natoms == 0)) continue;
-
-            size_t ndiag = 0;
-
-            while ((ndiag < a_atoms.size()) && (a_atoms[ndiag] == b_atoms[ndiag])) ndiag++;
-
-            for (const auto [la, ia] : indices[static_cast<size_t>(block.a_index())])
-            {
-                for (const auto [lb, jb] : indices[static_cast<size_t>(block.b_index())])
-                {
-                    for (const auto [lc, kc] : aux_indices[static_cast<size_t>(block.c_index())])
-                    {
-                        const auto npairs = block.number_of_pairs(la, ia, lb, jb, lc, kc);
-
-                        if (npairs == 0) continue;
-
-                        const auto ncomps = static_cast<size_t>((2 * la + 1) * (2 * lb + 1) * (2 * lc + 1));
-
-                        const auto diagonal = std::min(ndiag, npairs);
-
-                        filled += (2 * npairs - diagonal) * natoms * ncomps;
-                    }
-                }
-            }
-        }
-
-        const auto density = (naux > 0) ? static_cast<double>(filled) / (static_cast<double>(naux) *
-                                                                        static_cast<double>(nao) *
-                                                                        static_cast<double>(nao))
-                                        : 0.0;
-
-        use_dense = (density >= _dense_threshold);
+        use_dense = (_bq_density(bq_vectors, basis, aux_basis) >= _dense_threshold);
     }
 
     if (use_dense)
@@ -2108,6 +2128,14 @@ CSimdRIFockDriver::compute_exchange_matrix(const std::vector<CPackedMatrix> &w_v
 
         std::fflush(stdout);
     }
+}
+
+auto
+CSimdRIFockDriver::bq_density(const CSparseTensor   &bq_vectors,
+                              const CMolecularBasis &basis,
+                              const CMolecularBasis &aux_basis) const -> double
+{
+    return _bq_density(bq_vectors, basis, aux_basis);
 }
 
 auto

@@ -1138,6 +1138,14 @@ CSimdRIJKFockDriver::get_dense_threshold() const -> double
 }
 
 auto
+CSimdRIJKFockDriver::bq_density() const -> double
+{
+    if (_bq_vectors.number_of_blocks() == 0) return 0.0;
+
+    return _drv.bq_density(_bq_vectors, _basis, _aux_basis);
+}
+
+auto
 CSimdRIJKFockDriver::get_omega() const -> double
 {
     return _omega;

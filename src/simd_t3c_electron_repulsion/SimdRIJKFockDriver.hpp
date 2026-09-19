@@ -436,6 +436,14 @@ class CSimdRIJKFockDriver
     /// @return The density.
     auto get_dense_threshold() const -> double;
 
+    /// @brief The fraction of the B vectors this driver holds which is actually
+    /// filled, against what a dense tensor of the same dimensions would hold.
+    /// @return The density, or zero where the driver holds no B vectors.
+    /// @note This is the quantity the exchange half transformation compares against
+    /// the threshold. Reported rather than only decided on, so a calculation can say
+    /// how sparse its tensor was instead of leaving it to be inferred from a timing.
+    auto bq_density() const -> double;
+
     /// @brief Gets the inverted metric of the attenuated operator.
     /// @return The inverted metric, which is empty unless the driver was prepared
     /// for a hybrid range separated functional.
