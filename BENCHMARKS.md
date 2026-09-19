@@ -10313,7 +10313,7 @@ pays 6.7 times more for 2.2 times the orbital basis -- so it is not metric-bound
 either, the metric depending on naux alone. What fits is the B vectors, which the profile at the end of this file confirms
 directly.
 
-### The iteration count is general, and nobody has explained it
+### The iteration count is general, and is the approximation rather than a defect
 
 | | four-centre | RI-JK |
 | --- | ---: | ---: |
@@ -10323,9 +10323,21 @@ directly.
 **Two to three more iterations everywhere**, on the densest molecule here and on the
 sparsest, at both bases. Convergence is 1e-6 in all of them and the guess is the same.
 That is a flat penalty of roughly fifteen per cent which is not integrals, not
-screening and not scaling, and it is the one cost in this section that is paid by every
-calculation in the file rather than by the adversarial ones. It has not been
-investigated.
+screening and not scaling, and it is paid by every calculation in the file rather than
+by the adversarial ones.
+
+**It is not somewhere to optimise.** Fitting the integrals gives a slightly different
+energy surface with respect to the rotations of the orbitals, so the iterations take a
+different route to a different stationary point, and arrive in a different number of
+steps. The extra steps are a property of the approximation and not a fault in this
+implementation of it. They are worth knowing when a speedup per iteration is read as a
+speedup: the ratios in these tables are of whole calculations and already carry this,
+while a `fock / iter` column does not.
+
+The one thing the explanation does not account for on its own is the **sign**, which
+is the same in every row measured -- three systems, two bases, never negative, and
+plus six on the hardest system to converge. A different surface could in principle
+fall either way.
 
 ### What the two systems together say
 
@@ -10338,7 +10350,8 @@ ahead and there is nothing to fix. It only bites where the dense build screens d
 **The preparation is a large-naux problem**, reached by big systems in small bases on
 either kind of molecule.
 
-**The iterations are everybody's problem** and the cheapest of the three to look at.
+**The iterations are nobody's problem to fix**: they are what fitting the integrals
+costs in the path taken to convergence, not a defect.
 
 The fitting error, for the record: 7.0e-06 hartree per atom for c60 in def2-svp and
 5.3e-06 in def2-tzvp.
