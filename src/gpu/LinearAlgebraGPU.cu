@@ -42,6 +42,9 @@
 #include <hip/hip_runtime.h>
 #include <hipblas/hipblas.h>
 #include <hipsolver/hipsolver.h>
+#if defined(USE_MAGMA)
+#include <magma_v2.h>
+#endif
 
 #endif
 
@@ -523,6 +526,58 @@ diagonalizeMatrix(double* A, double* D, const int64_t n_int64) -> void
 
     // TODO: gpu wrapper for cusolver
     cusolverSafe(cusolverDnDestroy(handle));
+
+#elif defined(USE_HIP) and defined(USE_MAGMA)
+
+    magma_init();
+
+    errors::assertMsgCritical(sizeof(magma_int_t) == 4, std::string("MAGMA must be 32-bit"));
+
+    // d_work is not used by MAGMA; this is only to match a later Free.
+    gpuSafe(gpuMallocAsync(&d_work, static_cast<size_t>(1) * sizeof(double), stream));
+
+    auto nb = magma_get_dsytrd_nb(n);
+    auto lwork = static_cast<magma_int_t>(std::max(2*n + n*nb, 1 + 6*n + 2*n*n));
+    auto liwork = static_cast<magma_int_t>(3 + 5*n);
+
+    double *wA, *work;
+    magma_int_t *iwork;
+
+    hipSafe(hipHostMalloc(&wA, n_size * n_size * sizeof(double)));
+    hipSafe(hipHostMalloc(&work, static_cast<size_t>(lwork) * sizeof(double)));
+    hipSafe(hipHostMalloc(&iwork, static_cast<size_t>(liwork) * sizeof(magma_int_t)));
+
+    // MAGMA dsyevd_gpu uses its own stream.
+    // Make sure stream work has completed before MAGMA touches d_A.
+    hipSafe(hipStreamSynchronize(stream));
+
+    magma_int_t info;
+    magma_dsyevd_gpu(MagmaVec, MagmaUpper,
+                     static_cast<magma_int_t>(n), d_A,
+                     static_cast<magma_int_t>(n), D, wA,
+                     static_cast<magma_int_t>(n), work, lwork, iwork, liwork, &info);
+
+    if (info != 0)
+    {
+        std::stringstream ss;
+        ss << "gpu::diagonalizeMatrix: (magma error) " << magma_strerror(info);
+        errors::assertMsgCritical(false, ss.str());
+    }
+
+    // Conservative correctness barrier
+    hipSafe(hipDeviceSynchronize());
+
+    gpuSafe(gpuMemcpyStaged(A, d_A, n_size * n_size * sizeof(double), gpuMemcpyDeviceToHost, stream));
+
+    hipSafe(hipStreamSynchronize(stream));
+
+    hipSafe(hipHostFree(wA));
+    hipSafe(hipHostFree(work));
+    hipSafe(hipHostFree(iwork));
+
+    hipSafe(hipDeviceSynchronize());
+
+    magma_finalize();
 
 #elif defined(USE_HIP)
 
