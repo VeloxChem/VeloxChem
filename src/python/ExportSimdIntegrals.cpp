@@ -50,6 +50,7 @@
 #include "SimdRIFockDriver.hpp"
 #include "SimdRIJFockDriver.hpp"
 #include "SimdRIJKFockDriver.hpp"
+#include "SimdRIJGradientDriver.hpp"
 #include "SimdRIJKGradientDriver.hpp"
 #include "SimdRIJKResponseDriver.hpp"
 #include "SimdTwoCenterElectronRepulsionGradientDriver.hpp"
@@ -622,6 +623,52 @@ export_simdintegrals(py::module &m) -> void
                       "The fitted densities of the occupied orbitals, one matrix per auxiliary function.")
         .def_readonly("omega", &TFittedDensities::omega,
                       "The two-index fitted density the derivative of the metric is contracted against.");
+
+    // CSimdRIJGradientDriver class
+
+    PyClass<CSimdRIJGradientDriver>(m, "SimdRIJGradientDriver")
+        .def(py::init<>())
+        .def(py::init<const double, const size_t>(),
+             "Creates a Coulomb only gradient driver with given screening threshold and target block size. "
+             "The threshold must be the one the calculation fitted with, so that the derivative runs over "
+             "the atom pairs the energy did.",
+             py::arg("threshold"),
+             py::arg("block_size") = 0)
+        .def("get_threshold", &CSimdRIJGradientDriver::get_threshold, "Gets the screening threshold of the integrals.")
+        .def("get_block_size", &CSimdRIJGradientDriver::get_block_size, "Gets the target number of atom pairs of a block.")
+        .def("compute",
+             py::overload_cast<const CMolecule &,
+                               const CMolecularBasis &,
+                               const CMolecularBasis &,
+                               const std::vector<double> &,
+                               const CPackedMatrix &,
+                               const std::vector<int> &,
+                               const std::vector<int> &,
+                               const bool>(&CSimdRIJGradientDriver::compute, py::const_),
+             "Computes the Coulomb contribution to the gradient of the given atoms, from the fitting "
+             "coefficients a Coulomb only Fock driver solved for. The rows of the atoms not asked for are "
+             "zero. aux_atoms names the share of the auxiliary basis this rank holds, which makes the "
+             "gradient a partial one the ranks reduce.",
+             py::arg("molecule"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("fitting"),
+             py::arg("density"),
+             py::arg("atoms"),
+             py::arg("aux_atoms")   = std::vector<int>{},
+             py::arg("with_metric") = true)
+        .def("compute",
+             py::overload_cast<const CMolecule &,
+                               const CMolecularBasis &,
+                               const CMolecularBasis &,
+                               const std::vector<double> &,
+                               const CPackedMatrix &>(&CSimdRIJGradientDriver::compute, py::const_),
+             "Computes the Coulomb contribution to the gradient of every atom of the molecule.",
+             py::arg("molecule"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("fitting"),
+             py::arg("density"));
 
     // CSimdRIJKGradientDriver class
 

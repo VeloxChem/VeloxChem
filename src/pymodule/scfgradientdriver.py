@@ -40,6 +40,7 @@ from .veloxchemlib import FockGeom1000Driver
 from .veloxchemlib import XCMolecularGradient
 from .veloxchemlib import T4CScreener
 from .veloxchemlib import RIFockGradDriver
+from .veloxchemlib import SimdRIJGradientDriver
 from .veloxchemlib import SimdRIJKGradientDriver
 from .veloxchemlib import SimdRIJKFockDriver
 from .veloxchemlib import PackedMatrix
@@ -681,16 +682,63 @@ class ScfGradientDriver(GradientDriver):
 
         thresh_int = int(-math.log10(self.eri_thresh))
 
-        if self.scf_driver.ri_coulomb:
-            # NOTE: the SIMD Coulomb only driver holds no B vectors and has no
-            # compute_bq_vector: what the gradient wants of it is the three-center
-            # derivative contracted against the coefficients of the fitting, which
-            # is not written. Refused here rather than reached, where it raised an
-            # AttributeError in the middle of a gradient and after a converged SCF.
-            assert_msg_critical(
-                not self.scf_driver.ri_coulomb_simd,
-                f'{type(self).__name__}: the gradient of the SIMD RI-J driver ' +
-                'is not implemented. Use ri_coulomb_simd = False for a gradient.')
+        if self.scf_driver.ri_coulomb and self.scf_driver.ri_coulomb_simd:
+
+            self._announce_once(
+                'Using the SIMD resolution of the identity (RI-J) gradient.')
+
+            basis_ri_j = MolecularBasis.read(
+                molecule, self.scf_driver.ri_auxiliary_basis)
+
+            t0 = time.time()
+
+            # NOTE: the fitting coefficients of the converged density, formed the
+            # way a Fock build forms them: every rank sums the right hand side over
+            # the parts it holds, the ranks add those, and each of them solves. The
+            # gradient wants the same gamma the last Fock matrix was built from, so
+            # it is taken from the driver which holds the integrals rather than
+            # formed again from a second set of them.
+            nao = D.shape[0]
+
+            packed_density = PackedMatrix(nao, nao, mat_t.symmetric)
+            packed_density.from_numpy(np.ascontiguousarray(D))
+
+            mine = self.scf_driver._ri_drv.owned_parts()
+
+            local = np.array(self.scf_driver._ri_drv.compute_gamma(
+                packed_density, mine),
+                             dtype=np.float64)
+
+            total = np.zeros_like(local)
+            self.comm.Allreduce(local, total, op=MPI.SUM)
+
+            gamma = self.scf_driver._ri_drv.solve_fitting(total)
+
+            ri_j_grad_drv = SimdRIJGradientDriver(self.scf_driver.eri_thresh)
+
+            # NOTE: the ranks divide the atoms of the **auxiliary** basis and each
+            # forms every row of a partial gradient, which the reduce at the end of
+            # this routine adds. That is the opposite of how the four-centre path
+            # divides -- there a rank owns rows -- and it is the division the
+            # three-centre term actually has: a rank which owned rows would still
+            # have to sweep the whole auxiliary basis to fill them.
+            #
+            # NOTE: the two-centre term is asked of one rank alone. Unlike the B
+            # vectors of an exchange the fitting coefficients are not divided, so
+            # every rank holds all of them and would otherwise add that term once
+            # per rank.
+            all_atoms = list(range(natoms))
+
+            atomgrad = ri_j_grad_drv.compute(molecule, basis, basis_ri_j, gamma,
+                                             packed_density, all_atoms,
+                                             list(local_atoms),
+                                             self.rank == mpi_master())
+
+            self.gradient += atomgrad.to_numpy()
+
+            grad_timing['Fock_grad'] += time.time() - t0
+
+        elif self.scf_driver.ri_coulomb:
 
             assert_msg_critical(
                 basis.get_label().lower().startswith('def2-'),
@@ -1009,15 +1057,17 @@ class ScfGradientDriver(GradientDriver):
             grad_timing['Fock_grad'] += time.time() - t0
 
         elif self.scf_driver.ri_coulomb:
-            # NOTE: the SIMD Coulomb only driver holds no B vectors and has no
-            # compute_bq_vector: what the gradient wants of it is the three-center
-            # derivative contracted against the coefficients of the fitting, which
-            # is not written. Refused here rather than reached, where it raised an
-            # AttributeError in the middle of a gradient and after a converged SCF.
+            # NOTE: the closed shell above has the SIMD Coulomb only gradient and
+            # the open shell does not yet. The factors differ between them -- the
+            # density an open shell fits is the total one, where the closed shell
+            # fits one spin's -- so it is a separate piece of work rather than the
+            # same call, and it is refused here rather than reached with the wrong
+            # factor in it.
             assert_msg_critical(
                 not self.scf_driver.ri_coulomb_simd,
                 f'{type(self).__name__}: the gradient of the SIMD RI-J driver ' +
-                'is not implemented. Use ri_coulomb_simd = False for a gradient.')
+                'is not implemented for an open shell. Use ' +
+                'ri_coulomb_simd = False for an open shell gradient.')
 
             assert_msg_critical(
                 basis.get_label().lower().startswith('def2-'),
