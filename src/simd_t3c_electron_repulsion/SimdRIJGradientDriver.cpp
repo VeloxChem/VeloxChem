@@ -35,7 +35,7 @@ CSimdRIJGradientDriver::get_block_size() const -> size_t
 }
 
 auto
-CSimdRIJGradientDriver::_omega(const std::vector<double> &fitting) const -> CPackedMatrix
+CSimdRIJGradientDriver::_omega(const std::vector<double> &fitting, const double factor) const -> CPackedMatrix
 {
     const auto naux = fitting.size();
 
@@ -43,16 +43,16 @@ CSimdRIJGradientDriver::_omega(const std::vector<double> &fitting) const -> CPac
 
     omega.zero();
 
-    // NOTE: two and not one. The energy carries the metric term with a half
-    // against a Coulomb term with a whole, and the closed shell doubles both; what
-    // is left on this side is a factor of two, and the sign is taken by the caller
-    // of the two-center driver rather than here.
+    // NOTE: two for a closed shell and a half for an open one. The energy carries
+    // the metric term with a half against a Coulomb term with a whole; what the
+    // factor carries on top of that is which density was fitted. The sign is taken
+    // by the caller of the two-center driver rather than here.
 
     for (size_t p = 0; p < naux; p++)
     {
         for (size_t q = 0; q <= p; q++)
         {
-            omega.data()[omega.index(p, q)] = 2.0 * fitting[p] * fitting[q];
+            omega.data()[omega.index(p, q)] = factor * fitting[p] * fitting[q];
         }
     }
 
@@ -60,14 +60,16 @@ CSimdRIJGradientDriver::_omega(const std::vector<double> &fitting) const -> CPac
 }
 
 auto
-CSimdRIJGradientDriver::compute(const CMolecule           &molecule,
-                                const CMolecularBasis     &basis,
-                                const CMolecularBasis     &aux_basis,
-                                const std::vector<double> &fitting,
-                                const CPackedMatrix       &density,
-                                const std::vector<int>    &atoms,
-                                const std::vector<int>    &aux_atoms,
-                                const bool                 with_metric) const -> CPackedMatrix
+CSimdRIJGradientDriver::_compute(const CMolecule           &molecule,
+                                 const CMolecularBasis     &basis,
+                                 const CMolecularBasis     &aux_basis,
+                                 const std::vector<double> &fitting,
+                                 const CPackedMatrix       &density,
+                                 const double               coulomb_factor,
+                                 const double               metric_factor,
+                                 const std::vector<int>    &atoms,
+                                 const std::vector<int>    &aux_atoms,
+                                 const bool                 with_metric) const -> CPackedMatrix
 {
     const auto natoms = molecule.number_of_atoms();
 
@@ -96,7 +98,7 @@ CSimdRIJGradientDriver::compute(const CMolecule           &molecule,
         wanted[static_cast<size_t>(iatom)] = true;
     }
 
-    _three_center(gradient, molecule, basis, aux_basis, fitting, density, wanted, aux_atoms);
+    _three_center(gradient, molecule, basis, aux_basis, fitting, density, coulomb_factor, wanted, aux_atoms);
 
     // and the two-center one. The driver of it returns the sum of Omega against
     // the derivative with no sign applied, so the sign is taken here, where it is
@@ -112,7 +114,7 @@ CSimdRIJGradientDriver::compute(const CMolecule           &molecule,
     {
         const auto two_center = CSimdTwoCenterElectronRepulsionGradientDriver(_block_size);
 
-        const auto metric_part = two_center.compute(molecule, aux_basis, _omega(fitting), atoms);
+        const auto metric_part = two_center.compute(molecule, aux_basis, _omega(fitting, metric_factor), atoms);
 
         for (size_t iatom = 0; iatom < natoms; iatom++)
         {
@@ -131,6 +133,25 @@ CSimdRIJGradientDriver::compute(const CMolecule           &molecule,
                                 const CMolecularBasis     &basis,
                                 const CMolecularBasis     &aux_basis,
                                 const std::vector<double> &fitting,
+                                const CPackedMatrix       &density,
+                                const std::vector<int>    &atoms,
+                                const std::vector<int>    &aux_atoms,
+                                const bool                 with_metric) const -> CPackedMatrix
+{
+    // NOTE: the factors of a closed shell. The density handed in is one spin's and
+    // the fitting coefficients are of that density, so the Coulomb term carries
+    // four: two from the energy being of the total density, which is twice this
+    // one on each side, and two from the derivative of a product of two things
+    // which are both the density.
+
+    return _compute(molecule, basis, aux_basis, fitting, density, 4.0, 2.0, atoms, aux_atoms, with_metric);
+}
+
+auto
+CSimdRIJGradientDriver::compute(const CMolecule           &molecule,
+                                const CMolecularBasis     &basis,
+                                const CMolecularBasis     &aux_basis,
+                                const std::vector<double> &fitting,
                                 const CPackedMatrix       &density) const -> CPackedMatrix
 {
     auto atoms = std::vector<int>(molecule.number_of_atoms());
@@ -141,12 +162,45 @@ CSimdRIJGradientDriver::compute(const CMolecule           &molecule,
 }
 
 auto
+CSimdRIJGradientDriver::compute_open_shell(const CMolecule           &molecule,
+                                           const CMolecularBasis     &basis,
+                                           const CMolecularBasis     &aux_basis,
+                                           const std::vector<double> &fitting,
+                                           const CPackedMatrix       &density,
+                                           const std::vector<int>    &atoms,
+                                           const std::vector<int>    &aux_atoms,
+                                           const bool                 with_metric) const -> CPackedMatrix
+{
+    // NOTE: the factors of an open shell. The density is the total one and the
+    // coefficients are of it, so neither of the twos the closed shell picks up
+    // from halving that density is here, and what is left is the plain one and the
+    // half the energy carries on the metric term.
+
+    return _compute(molecule, basis, aux_basis, fitting, density, 1.0, 0.5, atoms, aux_atoms, with_metric);
+}
+
+auto
+CSimdRIJGradientDriver::compute_open_shell(const CMolecule           &molecule,
+                                           const CMolecularBasis     &basis,
+                                           const CMolecularBasis     &aux_basis,
+                                           const std::vector<double> &fitting,
+                                           const CPackedMatrix       &density) const -> CPackedMatrix
+{
+    auto atoms = std::vector<int>(molecule.number_of_atoms());
+
+    std::iota(atoms.begin(), atoms.end(), 0);
+
+    return compute_open_shell(molecule, basis, aux_basis, fitting, density, atoms, {}, true);
+}
+
+auto
 CSimdRIJGradientDriver::_three_center(CPackedMatrix             &gradient,
                                       const CMolecule           &molecule,
                                       const CMolecularBasis     &basis,
                                       const CMolecularBasis     &aux_basis,
                                       const std::vector<double> &fitting,
                                       const CPackedMatrix       &density,
+                                      const double               coulomb_factor,
                                       const std::vector<bool>   &wanted,
                                       const std::vector<int>    &aux_atoms) const -> void
 {
@@ -173,14 +227,6 @@ CSimdRIJGradientDriver::_three_center(CPackedMatrix             &gradient,
     auto dense_d = std::vector<double>(nao * nao, 0.0);
 
     density.to_dense(dense_d.data());
-
-    // NOTE: the factors of a closed shell. The density handed in is one spin's and
-    // the fitting coefficients are of that density, so the Coulomb term carries
-    // four: two from the energy being of the total density, which is twice this
-    // one on each side, and two from the derivative of a product of two things
-    // which are both the density.
-
-    constexpr double coulomb_factor = 4.0;
 
     // every atom of the auxiliary basis, or the share the caller holds
 

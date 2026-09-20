@@ -36,8 +36,14 @@
 ///
 /// the first a derivative of the three-center integrals contracted against the
 /// density and the coefficients, the second the derivative of the metric against
-/// their outer product. The factors are those of a closed shell, where the density
+/// their outer product. Those factors are the closed shell's, where the density
 /// handed in is one spin's and the coefficients are of that density.
+///
+/// @note An open shell fits the **total** density and carries one and a half in
+/// place of the four and the two, which `compute_open_shell` applies. Setting the
+/// two spins equal returns the closed shell expression exactly: the total density
+/// is twice one spin's and so are its coefficients, and 4 times a half times a
+/// half is one, as 2 times a quarter is a half.
 ///
 /// @note Threads and not ranks. The work divides over the atoms of the auxiliary
 /// basis and over the blocks of the sparsity pattern. `aux_atoms` carries the share
@@ -117,6 +123,35 @@ class CSimdRIJGradientDriver
                  const std::vector<double> &fitting,
                  const CPackedMatrix       &density) const -> CPackedMatrix;
 
+    /// @brief Computes the Coulomb contribution to the gradient of an open shell.
+    /// @param density The **total** density, of both spins added, which is the
+    /// density an open shell fits and the one its coefficients are of.
+    /// @param fitting The fitting coefficients of that total density.
+    /// @param atoms The atoms to compute the gradient of.
+    /// @param aux_atoms The atoms of the auxiliary basis this rank holds.
+    /// @param with_metric Whether to add the two-center term.
+    /// @return The gradient, one row per atom.
+    /// @note A separate routine and not a flag on the one above. The two differ in
+    /// which density they are handed as much as in the factors they carry, and a
+    /// caller which passed one spin's density here would be told nothing: the
+    /// answer would simply be a quarter of the right one.
+    auto compute_open_shell(const CMolecule           &molecule,
+                            const CMolecularBasis     &basis,
+                            const CMolecularBasis     &aux_basis,
+                            const std::vector<double> &fitting,
+                            const CPackedMatrix       &density,
+                            const std::vector<int>    &atoms,
+                            const std::vector<int>    &aux_atoms  = {},
+                            const bool                 with_metric = true) const -> CPackedMatrix;
+
+    /// @brief Computes the Coulomb contribution to an open shell's gradient over
+    /// every atom of the molecule.
+    auto compute_open_shell(const CMolecule           &molecule,
+                            const CMolecularBasis     &basis,
+                            const CMolecularBasis     &aux_basis,
+                            const std::vector<double> &fitting,
+                            const CPackedMatrix       &density) const -> CPackedMatrix;
+
    private:
     /// @brief Adds the three-center term to the gradient, one atom of the
     /// auxiliary basis at a time.
@@ -125,20 +160,35 @@ class CSimdRIJGradientDriver
     /// auxiliary basis at once is the basis functions squared times the auxiliary
     /// basis times six, which is hundreds of gigabytes on anything of a size worth
     /// fitting.
+    /// @param coulomb_factor Four for a closed shell and one for an open one.
     auto _three_center(CPackedMatrix             &gradient,
                        const CMolecule           &molecule,
                        const CMolecularBasis     &basis,
                        const CMolecularBasis     &aux_basis,
                        const std::vector<double> &fitting,
                        const CPackedMatrix       &density,
+                       const double               coulomb_factor,
                        const std::vector<bool>   &wanted,
                        const std::vector<int>    &aux_atoms) const -> void;
 
     /// @brief The two-index fitted density, the outer product of the fitting
     /// coefficients which the derivative of the metric is contracted against.
     /// @param fitting The fitting coefficients.
+    /// @param factor Two for a closed shell and a half for an open one.
     /// @return Omega, symmetric and of the dimensions of the auxiliary basis.
-    auto _omega(const std::vector<double> &fitting) const -> CPackedMatrix;
+    auto _omega(const std::vector<double> &fitting, const double factor) const -> CPackedMatrix;
+
+    /// @brief The body both spin cases share, which differ only in their factors.
+    auto _compute(const CMolecule           &molecule,
+                  const CMolecularBasis     &basis,
+                  const CMolecularBasis     &aux_basis,
+                  const std::vector<double> &fitting,
+                  const CPackedMatrix       &density,
+                  const double               coulomb_factor,
+                  const double               metric_factor,
+                  const std::vector<int>    &atoms,
+                  const std::vector<int>    &aux_atoms,
+                  const bool                 with_metric) const -> CPackedMatrix;
 
     /// @brief The screening threshold of the integrals.
     double _threshold;

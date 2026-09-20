@@ -668,6 +668,37 @@ export_simdintegrals(py::module &m) -> void
              py::arg("basis"),
              py::arg("aux_basis"),
              py::arg("fitting"),
+             py::arg("density"))
+        .def("compute_open_shell",
+             py::overload_cast<const CMolecule &,
+                               const CMolecularBasis &,
+                               const CMolecularBasis &,
+                               const std::vector<double> &,
+                               const CPackedMatrix &,
+                               const std::vector<int> &,
+                               const std::vector<int> &,
+                               const bool>(&CSimdRIJGradientDriver::compute_open_shell, py::const_),
+             "Computes the Coulomb contribution to an open shell's gradient. The density is the total one, "
+             "of both spins added, and the fitting coefficients are of that density.",
+             py::arg("molecule"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("fitting"),
+             py::arg("density"),
+             py::arg("atoms"),
+             py::arg("aux_atoms")   = std::vector<int>{},
+             py::arg("with_metric") = true)
+        .def("compute_open_shell",
+             py::overload_cast<const CMolecule &,
+                               const CMolecularBasis &,
+                               const CMolecularBasis &,
+                               const std::vector<double> &,
+                               const CPackedMatrix &>(&CSimdRIJGradientDriver::compute_open_shell, py::const_),
+             "Computes the Coulomb contribution to an open shell's gradient over every atom.",
+             py::arg("molecule"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("fitting"),
              py::arg("density"));
 
     // CSimdRIJKGradientDriver class

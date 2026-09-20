@@ -1056,18 +1056,51 @@ class ScfGradientDriver(GradientDriver):
 
             grad_timing['Fock_grad'] += time.time() - t0
 
+        elif self.scf_driver.ri_coulomb and self.scf_driver.ri_coulomb_simd:
+
+            self._announce_once(
+                'Using the SIMD resolution of the identity (RI-J) gradient.')
+
+            basis_ri_j = MolecularBasis.read(
+                molecule, self.scf_driver.ri_auxiliary_basis)
+
+            t0 = time.time()
+
+            # NOTE: the total density, of both spins added, which is what an open
+            # shell fits: the Coulomb matrix of the total density is what each spin
+            # sees, and the fitting is solved once rather than once a spin.
+            nao = Da.shape[0]
+
+            packed_density = PackedMatrix(nao, nao, mat_t.symmetric)
+            packed_density.from_numpy(np.ascontiguousarray(Da + Db))
+
+            mine = self.scf_driver._ri_drv.owned_parts()
+
+            local = np.array(self.scf_driver._ri_drv.compute_gamma(
+                packed_density, mine),
+                             dtype=np.float64)
+
+            total = np.zeros_like(local)
+            self.comm.Allreduce(local, total, op=MPI.SUM)
+
+            gamma = self.scf_driver._ri_drv.solve_fitting(total)
+
+            ri_j_grad_drv = SimdRIJGradientDriver(self.scf_driver.eri_thresh)
+
+            # NOTE: the ranks divide the auxiliary atoms and each forms every row
+            # of a partial gradient, and the two-centre term is asked of one rank
+            # alone, for the reasons the closed shell branch above gives.
+            all_atoms = list(range(molecule.number_of_atoms()))
+
+            atomgrad = ri_j_grad_drv.compute_open_shell(
+                molecule, basis, basis_ri_j, gamma, packed_density, all_atoms,
+                list(local_atoms), self.rank == mpi_master())
+
+            self.gradient += atomgrad.to_numpy()
+
+            grad_timing['Fock_grad'] += time.time() - t0
+
         elif self.scf_driver.ri_coulomb:
-            # NOTE: the closed shell above has the SIMD Coulomb only gradient and
-            # the open shell does not yet. The factors differ between them -- the
-            # density an open shell fits is the total one, where the closed shell
-            # fits one spin's -- so it is a separate piece of work rather than the
-            # same call, and it is refused here rather than reached with the wrong
-            # factor in it.
-            assert_msg_critical(
-                not self.scf_driver.ri_coulomb_simd,
-                f'{type(self).__name__}: the gradient of the SIMD RI-J driver ' +
-                'is not implemented for an open shell. Use ' +
-                'ri_coulomb_simd = False for an open shell gradient.')
 
             assert_msg_critical(
                 basis.get_label().lower().startswith('def2-'),
