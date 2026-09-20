@@ -313,6 +313,7 @@ class ScfDriver:
         self._debug = False
         self._block_size_factor = 8
         self._xcfun_ldstaging = 256
+        self.xc_screening_threshold = None
         self.trim_mos = True
 
         # may be used in rare cases when user wants to skip the writing of h5
@@ -358,6 +359,9 @@ class ScfDriver:
                 '_debug': ('bool', 'print debug info'),
                 '_block_size_factor': ('int', 'block size factor for ERI'),
                 '_xcfun_ldstaging': ('int', 'max batch size for DFT grid'),
+                'xc_screening_threshold':
+                    ('float', 'value a basis function must reach over a grid box '
+                     'to be kept for it'),
                 'trim_mos': ('bool', 'trim molecular orbitals'),
             },
             'method_settings': {
@@ -3448,6 +3452,14 @@ class ScfDriver:
                     xcfun_enum.lda, xcfun_enum.gga, xcfun_enum.mgga
             ]:
                 xc_drv = XCIntegrator()
+
+                # NOTE: what this keeps is what the matrix phases of the quadrature
+                # are quadratic in, and those are most of its time. None leaves the
+                # integrator's own default, which is what a calculation should use;
+                # it is settable so that the default can be measured against
+                # something rather than assumed.
+                if self.xc_screening_threshold is not None:
+                    xc_drv.set_screening_threshold(self.xc_screening_threshold)
                 # Note: vxc_mat will remain distributed across MPI processes.
                 # XC energy and Vxc matrix will be reduced in _comp_energy
                 # and _comp_full_fock
