@@ -9587,14 +9587,17 @@ here. The driver has changed since that table was taken and the two are not
 comparable, which is the whole reason for measuring plain again beside the range
 separated driver rather than reading the new numbers against the old ones.
 
-## The range separated hybrids, where the split costs one way twice and the other a quarter
+## The range separated hybrids, where both ways pay about twice for the split
 
 A hybrid range separated functional splits its exchange between the plain operator
-and the attenuated one, and the two ways of building pay for that split very
-differently. The four-centre way makes a second full sweep of its own kernels on
-every iteration, `kx_rs` on top of `2jkx`. The simd resolution of the identity holds
-a second set of B vectors, formed once, and adds a second exchange inside the same
-pass over the auxiliary basis it was already making.
+and the attenuated one. The four-centre way makes a second full sweep of its own
+kernels on every iteration, `kx_rs` on top of `2jkx`. The simd resolution of the
+identity holds a second set of B vectors, formed once, and adds a second exchange
+inside the same pass over the auxiliary basis it was already making. That sounds like
+it ought to cost the two ways very differently, and **it does not**: measured against
+a plain functional in the same session, the split costs the fitted way 1.77 times and
+the four-centre way 1.69 to 1.94. The section which measures it is at the end of this
+one.
 
 The conventional RI-JK driver is not a column here. It has no attenuated B vectors
 and refuses a range separated functional, so it would be a column of refusals.
@@ -9685,25 +9688,51 @@ rows do not, and the step is between the double and triple zeta pairs rather tha
 with the diffuse functions, which says it follows the orbital basis the fitting set
 has to span and not the diffuseness.
 
-### What this section does not measure
+### What the split actually costs, against a plain functional
 
-**The heading's claim is not tested by these records.** Saying the split costs the
-four centre way twice and the fitted way a quarter needs a plain functional measured
-beside the range separated one, in the same session on the same tree, and these
-records hold only CAM-B3LYP and WB97X-D4. The plain caffeine numbers elsewhere in
-this file are a gradient table at a different commit, so reading the two against each
-other is the cross run comparison this file has already been caught by twice. The
-claim is a structural expectation -- `kx_rs` is a second full sweep of the four centre
-kernels, while the fitted way adds a second exchange inside a pass it was already
-making -- and it stays an expectation until a plain row is measured beside these.
+This heading used to say the split cost one way twice and the other a quarter, on no
+measurement: the records above hold only range separated functionals, so there was
+nothing in them to divide by. B3LYP was therefore run beside CAM-B3LYP, both
+functionals in one process per molecule so that the pair is one session on one tree,
+three bases, both ways. The records are
+`benchmarks/data/scf/2026-09-20_m4max_caffeine_rs_closed.json` and
+`..._nitroxide_rs_m2.json`.
 
-**Nor is the open shell cost separable here.** Nitroxide's ratios are larger than
-caffeine's at every basis, and its four centre build per iteration is about twice
-caffeine's at a smaller basis while its fitted build is only about a third larger,
-which would say the second spin costs the four centre way far more than the fitted
-way. But nitroxide is a different molecule with a different number of functions, so
-that reading confounds the spin with the system. It needs the same molecule run both
-ways to be worth stating.
+Milliseconds a build, so that unequal iteration counts do not enter, and the ratio is
+CAM-B3LYP over B3LYP:
+
+| | nao | four-centre plain | four-centre RS | ratio | fitted plain | fitted RS | ratio | B vectors |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| caffeine def2-svp | 246 | 565.5 | 1099.2 | 1.94x | 33.6 | 58.5 | 1.74x | 2.24x |
+| caffeine def2-svpd | 366 | 2433.8 | 4673.3 | 1.92x | 71.3 | 126.6 | 1.78x | 2.16x |
+| caffeine def2-tzvp | 494 | 8464.4 | 16411.3 | 1.94x | 130.6 | 229.0 | 1.75x | 2.11x |
+| nitroxide def2-svp | 219 | 1264.2 | 2155.3 | 1.70x | 44.1 | 78.1 | 1.77x | 2.14x |
+| nitroxide def2-svpd | 330 | 4831.3 | 8212.1 | 1.70x | 94.4 | 168.1 | 1.78x | 2.08x |
+| nitroxide def2-tzvp | 419 | 15914.1 | 26914.0 | 1.69x | 152.7 | 272.0 | 1.78x | 2.05x |
+
+**Both ways pay about twice, and the fitted way is the steadier of the two.** It is
+1.74 to 1.78 times in every row -- two molecules, two spin states, three bases -- while
+the four centre way is 1.92 to 1.94 closed shell and 1.69 to 1.70 open. Forming the
+second set of B vectors doubles the setup, 2.05 to 2.24 times, which is what a second
+set should cost and is small against what it saves.
+
+**Why the file said a quarter.** Read off the wall rather than the build, the fitted
+way does look nearly free: 2.53 against 3.42 seconds at caffeine def2-svp, 4.80
+against 6.96, 7.38 against 10.25, which is 1.35 to 1.45 times. The quadrature is
+identical between two functionals which differ only in their exchange, so it sits in
+both walls and dilutes the build. At the quadrature this file had when that heading
+was written -- before the 256 point boxes and before its matrix products went to the
+math library, so about twice today's cost -- the same wall ratio works out near 1.25.
+That is the quarter. It was a wall ratio quoted as a build ratio, and the number it
+quoted has since moved because the quadrature got cheaper underneath it.
+
+**The open shell difference is measured now but not explained.** The four centre way
+pays 1.93 for the split on the closed shell molecule and 1.70 on the open shell one,
+and the fitted way pays 1.77 on both. That the fitted way does not care about the spin
+state is what a single set of B vectors serving both spins would predict. Why the four
+centre way pays *less* on the open shell is not something these six rows answer, and
+the obvious arithmetic -- counting J once and K twice -- gives the wrong sign. It wants
+the kernels counted rather than guessed at.
 
 ## The Coulomb only suite, where the fitting never has to be closed for an orbital
 
