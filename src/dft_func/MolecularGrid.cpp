@@ -48,7 +48,7 @@ CMolecularGrid::CMolecularGrid()
 
     , _isPartitioned(false)
 
-    , _maxNumberOfGridPointsPerBox(1024)
+    , _maxNumberOfGridPointsPerBox(256)
 {
 }
 
@@ -70,7 +70,7 @@ CMolecularGrid::CMolecularGrid(const CDenseMatrix& gridPoints)
 
     , _isPartitioned(false)
 
-    , _maxNumberOfGridPointsPerBox(1024)
+    , _maxNumberOfGridPointsPerBox(256)
 {
 }
 

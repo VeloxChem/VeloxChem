@@ -231,7 +231,7 @@ class LinearSolver:
 
         self._debug = False
         self._block_size_factor = 8
-        self._xcfun_ldstaging = 1024
+        self._xcfun_ldstaging = 256
 
         # serial ratio as in Amdahl's law for estimating parallel efficiency
         self.serial_ratio = 0.05

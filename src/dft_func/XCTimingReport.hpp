@@ -57,6 +57,28 @@ auto report(const std::string    &what,
             const std::vector<CMultiTimer> &omptimers,
             const size_t          boxes) -> void;
 
+/// @brief Writes what the prescreening left, and what it saved.
+/// @param naos The basis functions of the molecule.
+/// @param boxes The boxes of the grid.
+/// @param points The grid points, summed over the boxes.
+/// @param ao_sum The surviving functions, summed over the boxes.
+/// @param ao_max The most any one box kept.
+/// @param point_ao The surviving functions weighted by the points of their box.
+/// @param point_ao_sq The same weighted by the square, which is the work the two
+/// matrix phases really do.
+/// @note The screening exists to hold the surviving count steady as the molecule
+/// grows, which would make the quadrature linear in it. Whether it does is the
+/// question these numbers answer: the work is points times the square of what
+/// survives, so the points weighted figures are the ones to read and the plain
+/// average is there only to show how far apart the two are.
+auto report_blocks(const size_t naos,
+                   const size_t boxes,
+                   const size_t points,
+                   const size_t ao_sum,
+                   const size_t ao_max,
+                   const size_t point_ao,
+                   const size_t point_ao_sq) -> void;
+
 }  // namespace xcprof
 
 #endif /* XCTimingReport_hpp */

@@ -156,7 +156,7 @@ class NonlinearSolver:
 
         self._debug = False
         self._block_size_factor = 8
-        self._xcfun_ldstaging = 1024
+        self._xcfun_ldstaging = 256
 
         # input keywords
         self._input_keywords = {

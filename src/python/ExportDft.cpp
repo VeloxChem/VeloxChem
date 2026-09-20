@@ -632,6 +632,14 @@ export_dft(py::module& m)
     PyClass<CXCIntegrator>(m, "XCIntegrator")
         .def(py::init<>())
         .def(
+            "set_screening_threshold", &CXCIntegrator::setScreeningThresholdForGTOValues,
+            "Sets the value a basis function has to reach over a box of the grid to be kept for it. "
+            "What this keeps is what the matrix phases of the quadrature are quadratic in.",
+            "threshold"_a)
+        .def(
+            "get_screening_threshold", &CXCIntegrator::getScreeningThresholdForGTOValues,
+            "Gets the value a basis function has to reach to be kept.")
+        .def(
             "integrate_vxc_fock",
             [](const CXCIntegrator&                    self,
                const CMolecule&                        molecule,

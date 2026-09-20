@@ -312,7 +312,7 @@ class ScfDriver:
 
         self._debug = False
         self._block_size_factor = 8
-        self._xcfun_ldstaging = 1024
+        self._xcfun_ldstaging = 256
         self.trim_mos = True
 
         # may be used in rare cases when user wants to skip the writing of h5

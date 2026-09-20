@@ -74,4 +74,36 @@ report(const std::string             &what,
     std::fflush(stdout);
 }
 
+auto
+report_blocks(const size_t naos,
+              const size_t boxes,
+              const size_t points,
+              const size_t ao_sum,
+              const size_t ao_max,
+              const size_t point_ao,
+              const size_t point_ao_sq) -> void
+{
+    if ((boxes == 0) || (points == 0) || (naos == 0)) return;
+
+    const auto plain = static_cast<double>(ao_sum) / static_cast<double>(boxes);
+
+    const auto weighted = static_cast<double>(point_ao) / static_cast<double>(points);
+
+    // NOTE: against what a calculation with no screening at all would do, which is
+    // every point against every function twice over. One over this is how many times
+    // more work a dense quadrature would be, and it is the number which has to stay
+    // put as the molecule grows for the quadrature to be linear in it.
+    const auto dense = static_cast<double>(points) * static_cast<double>(naos) * static_cast<double>(naos);
+
+    const auto share = static_cast<double>(point_ao_sq) / dense;
+
+    std::printf("XC   blocks: %zu of %zu functions kept on average, %.1f weighted by points, %zu at most\n",
+                static_cast<size_t>(plain), naos, weighted, ao_max);
+
+    std::printf("XC   blocks: %.1f %% of the functions, and %.2f %% of the work a dense quadrature would do\n",
+                100.0 * weighted / static_cast<double>(naos), 100.0 * share);
+
+    std::fflush(stdout);
+}
+
 }  // namespace xcprof
