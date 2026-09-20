@@ -10651,3 +10651,110 @@ better contraction but a **tighter bound**: the three-center screening keeps a g
 share of values below its own threshold -- 46 per cent at 32 waters -- and a bound of
 Cauchy-Schwarz quality would shrink the tensor itself, so the B vectors, the padding
 and the contraction would all fall together rather than one of them being rearranged.
+
+## The diffuse functions, where the dense path loses its screening
+
+The water clusters at def2-svp and def2-tzvp put the fitted path behind, and the
+reading offered there was that the crossover moves right with the basis: from nao 1128
+to nao 3268 for one step, so a third step should move it further still and the def2-svp
+result would be the adversarial corner. **That reading was half right and the half
+which is wrong matters more.**
+
+def2-tzvpd, the same clusters, the same node, 8 ranks of 32 threads,
+`def2-universal-jkfit`, `naux/nao` at 1.95.
+
+### The head to head
+
+| waters | nao | naux | four-centre | RI-JK | who wins | Fock only |
+| ---: | ---: | ---: | ---: | ---: | --- | --- |
+| 32 | 1856 | 3616 | 325.09 | 53.90 | **RI 6.03x** | RI 12.51x |
+| 47 | 2726 | 5311 | 1086.77 | 156.84 | **RI 6.93x** | RI 12.13x |
+| 76 | 4408 | 8588 | -- | 648.42 | | |
+| 100 | 5800 | 11300 | -- | **out of memory** | | |
+
+Against the same clusters at def2-tzvp, where the fitted path led by 1.63 and 1.28 and
+was overtaken at 76 waters. **At def2-tzvpd it leads by six to seven times and the lead
+is growing.**
+
+### Not more functions -- less screening
+
+The basis step from def2-tzvp costs the two paths differently by a factor of three in
+the exponent:
+
+| nao x1.349 | 32 waters | 47 waters |
+| --- | ---: | ---: |
+| four-centre, whole | p = **6.60** | p = **7.77** |
+| four-centre, Fock | p = **7.35** | p = **8.39** |
+| RI-JK, whole | p = 2.23 | p = 2.14 |
+
+A basis exponent of eight is not the cost of more functions -- the textbook figure is
+four, and the compact molecules of this file give 3.97 to 4.09. It is the cost of
+**losing the screening**, which on these clusters was the whole of the dense path's
+advantage. Per build at 32 waters it went from 1.76 s to 15.84; the fitted path went
+from 0.93 to 1.60.
+
+The tensor says the same thing from the other side. The B vectors are **denser** with
+diffuse functions, not sparser:
+
+| | def2-svp | def2-tzvpd |
+| --- | ---: | ---: |
+| 32 waters | 0.5468 | **0.7151** |
+| 76 waters | 0.3274 | **0.5717** |
+
+So the extra spatial extent costs more screening than the larger `nao` squared
+dilutes, and it costs the dense path far more than the fitted one, which screens one
+index where the other screens two.
+
+### The exponent along the series changes sides
+
+Over 32 to 47 waters, the same pair of clusters in two bases:
+
+| | four-centre | RI-JK |
+| --- | ---: | ---: |
+| def2-tzvp, whole | 2.22 | 2.85 |
+| def2-tzvpd, whole | **3.14** | **2.78** |
+
+The fitted path barely moves. The dense path goes from 2.22 to 3.14 because the 2.22
+was screening and the screening is gone. **This is the one place in this file where the
+exponents favour the fitted path**, and the margin therefore widens with the system
+rather than closing.
+
+**One caution against reading the asymptote from it.** On the Fock build alone the two
+are nearly equal -- 3.21 against 3.29 -- so what is established is that the dense path
+is twelve times behind over this range and not catching up, not that it never would.
+Two clusters are two clusters.
+
+### And the fitted path runs out of memory first
+
+100 waters at def2-tzvpd, nao 5800 and naux 11300, was **OOM killed**: the B vectors
+are of the order of twenty to thirty gigabytes a rank, a couple of hundred across the
+node, and `node_b3lyp.py` names `in_memory` outright so the driver honours it rather
+than falling back. The dense path has no equivalent -- it forms integrals and discards
+them.
+
+So on the axis where the fitted path wins by seven times it also stops fitting first.
+`direct` mode would complete and re-form the integrals on every build, and nothing here
+measures it at this size.
+
+### What this does to the conclusion of the water cluster study
+
+It narrows it rather than overturning it. The fitted path is at a disadvantage on
+**extended, screenable systems in compact bases** -- where the dense path collects the
+screening benefit on both of its charge distributions and `naux/nao` is at its worst,
+4.71 at def2-svp. Add diffuse functions and a water cluster is no longer a screenable
+system as far as four centres are concerned, `naux/nao` falls to 1.95, and the ordering
+reverses by a factor of seven.
+
+Both halves are the same mechanism seen from two sides, and neither is an implementation
+to fix.
+
+### The estimates, which were wrong in both directions
+
+Sizing these runs used the fitted path's basis-step exponent of 1.09, measured on
+def2-svp to def2-tzvp. The step to def2-tzvpd measures 2.14 to 2.23, because that step
+adds compact functions and this one adds diffuse ones, so the fitted half came in at
+53.90 s against 40 predicted and 648 against 480. The four-centre half was then sized
+with p near 2.8 and came in at **325 s against 104 predicted, three times low** -- the
+opposite direction from the three times the same kind of extrapolation ran high earlier
+in this file. See "Benchmark runtime estimates": the failure each time is carrying an
+exponent across a change which alters the screening.
