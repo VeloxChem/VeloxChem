@@ -682,6 +682,16 @@ class ScfGradientDriver(GradientDriver):
         thresh_int = int(-math.log10(self.eri_thresh))
 
         if self.scf_driver.ri_coulomb:
+            # NOTE: the SIMD Coulomb only driver holds no B vectors and has no
+            # compute_bq_vector: what the gradient wants of it is the three-center
+            # derivative contracted against the coefficients of the fitting, which
+            # is not written. Refused here rather than reached, where it raised an
+            # AttributeError in the middle of a gradient and after a converged SCF.
+            assert_msg_critical(
+                not self.scf_driver.ri_coulomb_simd,
+                f'{type(self).__name__}: the gradient of the SIMD RI-J driver ' +
+                'is not implemented. Use ri_coulomb_simd = False for a gradient.')
+
             assert_msg_critical(
                 basis.get_label().lower().startswith('def2-'),
                 'ScfGradientDriver: Invalid basis set for RI-J')
@@ -999,6 +1009,16 @@ class ScfGradientDriver(GradientDriver):
             grad_timing['Fock_grad'] += time.time() - t0
 
         elif self.scf_driver.ri_coulomb:
+            # NOTE: the SIMD Coulomb only driver holds no B vectors and has no
+            # compute_bq_vector: what the gradient wants of it is the three-center
+            # derivative contracted against the coefficients of the fitting, which
+            # is not written. Refused here rather than reached, where it raised an
+            # AttributeError in the middle of a gradient and after a converged SCF.
+            assert_msg_critical(
+                not self.scf_driver.ri_coulomb_simd,
+                f'{type(self).__name__}: the gradient of the SIMD RI-J driver ' +
+                'is not implemented. Use ri_coulomb_simd = False for a gradient.')
+
             assert_msg_critical(
                 basis.get_label().lower().startswith('def2-'),
                 'ScfGradientDriver: Invalid basis set for RI-J')
