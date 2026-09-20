@@ -134,16 +134,13 @@ CSimdRIJFockDriver::_check_part(const int index) const -> void
 }
 
 auto
-CSimdRIJFockDriver::_part_integrals(const size_t index) -> CSparseTensor
+CSimdRIJFockDriver::_part_integrals(const size_t index, CSparseTensor &formed) -> const CSparseTensor *
 {
-    // NOTE: the way which holds them hands back a copy rather than a reference. The
-    // sweeps do not write to the integrals, so a reference would do and would save
-    // the copy; it is a copy here so that the two ways have one signature between
-    // them and the sweeps below read the same.
+    if (_mode == rimode::in_memory) return &_integrals[index];
 
-    if (_mode == rimode::in_memory) return _integrals[index];
+    formed = simdri::integrals_of_part(_parts[index], _molecule, _basis, _aux_basis);
 
-    return simdri::integrals_of_part(_parts[index], _molecule, _basis, _aux_basis);
+    return &formed;
 }
 
 auto
@@ -162,13 +159,15 @@ CSimdRIJFockDriver::compute_gamma(const CPackedMatrix &density, const std::vecto
     {
         _check_part(index);
 
-        const auto integrals = _part_integrals(static_cast<size_t>(index));
+        CSparseTensor formed;
+
+        const auto *integrals = _part_integrals(static_cast<size_t>(index), formed);
 
         // NOTE: a part carries the auxiliary functions of its own atoms and nothing
         // else, so what comes back is zero everywhere but there and the parts add
         // into one vector without any of them overwriting another.
 
-        const auto partial = _drv.compute_y_vector(integrals, _basis, _aux_basis, density);
+        const auto partial = _drv.compute_y_vector(*integrals, _basis, _aux_basis, density);
 
         errors::assertMsgCritical(partial.size() == gamma.size(),
                                   std::string("RIJFockDriver: A part answered a right hand side which is not one "
@@ -236,12 +235,14 @@ CSimdRIJFockDriver::compute_coulomb(const std::vector<double> &gamma,
     {
         _check_part(index);
 
-        const auto integrals = _part_integrals(static_cast<size_t>(index));
+        CSparseTensor formed;
+
+        const auto *integrals = _part_integrals(static_cast<size_t>(index), formed);
 
         // NOTE: the blocks of atom pairs of one part write elements no other part
         // writes, so the parts are added and nothing is counted twice.
 
-        const auto part_fock = _drv.compute_fock_matrix(integrals, _basis, _aux_basis, gamma);
+        const auto part_fock = _drv.compute_fock_matrix(*integrals, _basis, _aux_basis, gamma);
 
         auto *values = matrix.data();
 

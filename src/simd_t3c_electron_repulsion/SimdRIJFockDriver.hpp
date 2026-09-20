@@ -141,8 +141,16 @@ class CSimdRIJFockDriver
     auto compute_coulomb(const std::vector<double> &gamma, const std::vector<int> &parts, CPackedMatrix &matrix) -> void;
 
    private:
-    /// @brief The integrals of one part, formed now or taken from what is held.
-    auto _part_integrals(const size_t index) -> CSparseTensor;
+    /// @brief Points at the integrals of one part, forming them if they are not held.
+    /// @param index The part.
+    /// @param formed Where to form them when they are not held, which the caller owns
+    /// and which is left alone when they are.
+    /// @return A pointer to the integrals, either the held ones or the formed ones.
+    /// @note A pointer and not a value. Handing back a copy would give the two ways
+    /// one signature, and it would copy the whole of a part on every sweep of every
+    /// iteration: at 32 waters that was most of the gap between this driver and the
+    /// conventional one, which holds its integrals and reads them where they are.
+    auto _part_integrals(const size_t index, CSparseTensor &formed) -> const CSparseTensor *;
 
     /// @brief Checks that an index names a part this driver sweeps.
     auto _check_part(const int index) const -> void;
