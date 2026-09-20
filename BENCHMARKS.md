@@ -9605,6 +9605,26 @@ The records are `benchmarks/data/scf/2026-09-18_m4max_caffeine_rs_closed.json` a
 The provenance says the tree was dirty: the only thing uncommitted was that runner,
 which was written for this measurement and is committed with it.
 
+**The tables of this section were never transcribed into this file.** They are in the
+rendered records beside the data -- `2026-09-18_m4max_caffeine_rs_closed.md` and
+`..._nitroxide_rs_m2.md`, CAM-B3LYP and WB97X-D4, four centre against RI-JK simd --
+and the section below is a different measurement with a different fitting set, which
+for a while sat under this heading and read as though it belonged to it.
+
+## The Coulomb only suite, where the fitting never has to be closed for an orbital
+
+A pure functional has no exact exchange, so the Coulomb matrix is the whole of the two
+electron build and the fitting set never has to describe the products of orbitals an
+exchange needs. **The fitting set is `def2-universal-jfit`**, a third the size of the
+jkfit the RI-JK tables use. What the suite measures is not only the ratio but **where
+the time goes afterwards**: once the Coulomb build is a hundred times faster it stops
+being the cost, and the quadrature is what remains.
+
+`OMP_NUM_THREADS=14`, one rank, BLYP, convergence 1e-8. The runner is
+`benchmarks/scripts/rij_laptop.py` over `rijbench.py`, and the record is
+`benchmarks/data/scf/2026-09-20_m4max_rij.json`. Nitroxide is a doublet radical and is
+run unrestricted, which is two Fock matrices an iteration.
+
 ### Caffeine, closed shell
 
 | basis | nao | four-centre J | RI-J J | J faster by | wall, 4c -> RI-J | whole faster by |
@@ -9710,9 +9730,8 @@ The first measurement of this suite was made before the quadrature's defaults we
 looked at, with grid boxes of 1024 points and a screening threshold of 1e-12. The
 second was at 256 and 1e-8. Every row here is the third, taken after the quadrature's
 matrix products were handed to the math library, from one code path -- `rijbench.py`
-throughout, driven by `rij_laptop.py` and timed by the driver's own profiler rather
-than by a wrapper around it. `OMP_NUM_THREADS=14`, one rank, `def2-universal-jfit`,
-and the record is `benchmarks/data/scf/2026-09-20_m4max_rij.json`.
+throughout, timed by the driver's own profiler rather than by a wrapper around it. The
+settings and the record are named at the head of this section.
 
 The Coulomb columns are unchanged across all three, as they should be: neither the
 quadrature nor its linear algebra touches them. Across the ten cases the four centre
