@@ -26,9 +26,15 @@ from veloxchem.scfgradientdriver import ScfGradientDriver
 from scfbench import GEOMETRIES, geometry, provenance, write
 
 # method -> (ri_jk, ri_jk_simd, ri_mode)
+# NOTE: (ri_jk, simd, ri_mode, ri_coulomb). The Coulomb only ways fit no exchange
+# and are the ways a pure functional is run; asking for one with a hybrid would
+# fit the Coulomb and build the exchange by the four centre way, which is a
+# calculation nobody wants and is refused by the caller rather than here.
 METHODS = {
-    "full": (False, False, None),
-    "ri_jk_simd": (True, True, "in_memory"),
+    "full": (False, False, None, False),
+    "ri_jk_simd": (True, True, "in_memory", False),
+    "ri_j_conventional": (False, False, None, True),
+    "ri_j_simd": (False, True, "in_memory", True),
 }
 
 
@@ -55,7 +61,7 @@ def run(molecule_name, basis_name, aux_name, method, functional,
 
     basis = vlx.MolecularBasis.read(molecule, basis_name.upper(), ostream=None)
 
-    ri_jk, simd, ri_mode = METHODS[method]
+    ri_jk, simd, ri_mode, ri_coulomb = METHODS[method]
 
     scf_class = ScfRestrictedDriver if multiplicity == 1 else ScfUnrestrictedDriver
 
@@ -69,6 +75,13 @@ def run(molecule_name, basis_name, aux_name, method, functional,
         driver.ri_jk_simd = simd
         driver.ri_auxiliary_basis = aux_name.upper()
         if ri_mode is not None:
+            driver.ri_mode = ri_mode
+
+    if ri_coulomb:
+        driver.ri_coulomb = True
+        driver.ri_coulomb_simd = simd
+        driver.ri_auxiliary_basis = aux_name.upper()
+        if simd and ri_mode is not None:
             driver.ri_mode = ri_mode
 
     t0 = time.time()
@@ -95,7 +108,7 @@ def run(molecule_name, basis_name, aux_name, method, functional,
     gradient = grad_driver.gradient.copy()
 
     aux = None
-    if ri_jk:
+    if ri_jk or ri_coulomb:
         aux = vlx.MolecularBasis.read(molecule, aux_name.upper(), ostream=None)
 
     mode = None
@@ -107,7 +120,7 @@ def run(molecule_name, basis_name, aux_name, method, functional,
         "atoms": molecule.number_of_atoms(),
         "basis": basis_name,
         "nao": basis.get_dimensions_of_basis(),
-        "aux_basis": aux_name if ri_jk else None,
+        "aux_basis": aux_name if (ri_jk or ri_coulomb) else None,
         "naux": aux.get_dimensions_of_basis() if aux is not None else None,
         "occupied": molecule.number_of_alpha_electrons(),
         "method": method,
