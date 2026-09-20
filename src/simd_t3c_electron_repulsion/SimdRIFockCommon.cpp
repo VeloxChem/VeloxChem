@@ -364,16 +364,14 @@ invert_metric_full(const CPackedMatrix &two_center, const double metric_threshol
     // there is nothing to be gained from a factor and one multiply is the whole of it.
     // The driver which applies the metric to a tensor wants a factor, and asks for one.
 
-    // NOTE: packlin::invert factorizes through Cholesky and falls back to
-    // Bunch-Kaufman with a warning where the metric is not positive definite, which a
-    // nearly linearly dependent fitting basis can give. The threshold is not used
-    // there: what it would buy is a **truncated** inverse, which the square root
-    // route gives and which no fitting basis measured here has needed. It is taken as
-    // an argument so that the choice is visible at the call rather than implied.
+    // NOTE: the directions the fitting basis does not really span are dropped rather
+    // than inverted, on the same threshold and by the same construction the inverted
+    // square root uses. A plain factorization would invert them: a metric of
+    // def2-universal-jkfit on thirty-two waters has thirty-three eigenvalues under
+    // 1e-8 of its largest, and dividing by those multiplies numerical noise into
+    // every fitting coefficient the driver forms.
 
-    (void)metric_threshold;
-
-    return packlin::invert(two_center);
+    return packlin::pseudo_inverse(two_center, metric_threshold);
 }
 
 }  // namespace simdri
