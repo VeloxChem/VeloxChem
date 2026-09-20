@@ -9726,13 +9726,48 @@ math library, so about twice today's cost -- the same wall ratio works out near 
 That is the quarter. It was a wall ratio quoted as a build ratio, and the number it
 quoted has since moved because the quadrature got cheaper underneath it.
 
-**The open shell difference is measured now but not explained.** The four centre way
-pays 1.93 for the split on the closed shell molecule and 1.70 on the open shell one,
-and the fitted way pays 1.77 on both. That the fitted way does not care about the spin
-state is what a single set of B vectors serving both spins would predict. Why the four
-centre way pays *less* on the open shell is not something these six rows answer, and
-the obvious arithmetic -- counting J once and K twice -- gives the wrong sign. It wants
-the kernels counted rather than guessed at.
+### The open shell pays less because its plain build is already three passes
+
+The four centre way pays 1.93 for the split closed shell and 1.70 open, and the ratio
+is **a count of sweeps over the integrals**, nothing more.
+`_comp_restricted_2e_fock` in `src/pymodule/scfdriver.py` builds its Fock matrix in
+one call, with the Coulomb and the exchange fused into a single pass, and
+`_comp_open_shell_2e_fock` beside it builds its two in three:
+
+| | plain | range separated |
+| --- | --- | --- |
+| restricted | `2jkx` -- one pass, J and K together | + `kx_rs` -- **two** |
+| unrestricted | `kx` alpha, `kx` beta, `j` -- **three** | + `kx_rs` alpha, `kx_rs` beta -- **five** |
+
+So the split adds one pass to one, and two passes to three. Two over one is 2.00
+against 1.93 measured, and five over three is 1.67 against 1.70. Dividing each build
+by its number of passes says the same thing from the other side -- the cost of a pass
+is flat within a molecule whichever kernel makes it:
+
+| | ms a pass, plain | ms a pass, range separated |
+| --- | ---: | ---: |
+| caffeine def2-svp | 565.5 | 549.6 |
+| caffeine def2-svpd | 2433.8 | 2336.7 |
+| caffeine def2-tzvp | 8464.4 | 8205.6 |
+| nitroxide def2-svp | 421.4 | 431.1 |
+| nitroxide def2-svpd | 1610.4 | 1642.4 |
+| nitroxide def2-tzvp | 5304.7 | 5382.8 |
+
+Within three per cent, everywhere. An attenuated exchange pass costs what a plain one
+costs, and the whole of the difference between 1.93 and 1.70 is that the open shell
+divides by three rather than by one.
+
+**Which is a statement about the plain open shell build, not about the split.** Its
+three passes recompute the same integrals three times over, where the restricted build
+gets its Coulomb and exchange from one. Nitroxide's plain build is 1264 ms against
+caffeine's 565 at *fewer* functions, 219 against 246, for that reason. A fused
+unrestricted kernel -- one pass answering J, K alpha and K beta, as `2jkx` already does
+for one spin -- is the obvious thing this measurement points at, and it would make the
+open shell's split ratio worse while making the calculation faster. The ratio is not
+the figure of merit.
+
+**The fitted way is indifferent to all of this**, 1.77 on both spin states, because a
+single set of B vectors serves both and is formed once.
 
 ## The Coulomb only suite, where the fitting never has to be closed for an orbital
 
