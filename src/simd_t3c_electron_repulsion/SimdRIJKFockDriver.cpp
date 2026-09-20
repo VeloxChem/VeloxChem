@@ -197,34 +197,13 @@ CSimdRIJKFockDriver::required_memory(const CMolecule        &molecule,
                                      const std::vector<int> &aux_atoms,
                                      const bool              range_separated) const -> size_t
 {
-    // NOTE: the pattern of the B vectors is the pattern of the three-center
-    // integrals, as the metric is dense and the transformation of the auxiliary
-    // side keeps every atom which survives.
-
-    // NOTE: the memory answered is the memory of the atoms asked for, which is the
-    // memory of this rank when the auxiliary basis is divided over a communicator.
-    // Answering the memory of the whole molecule there would put every rank on the
-    // direct way for a calculation each of them holds a fitting share of.
-
-    const CSimdThreeCenterElectronRepulsionDriver eri_drv;
-
-    const auto pattern = aux_atoms.empty() ? eri_drv.make_pattern(molecule, basis, aux_basis, threshold)
-                                           : eri_drv.make_pattern(molecule, basis, aux_basis, threshold, aux_atoms);
-
-    size_t nvalues = 0;
-
-    for (size_t i = 0; i < static_cast<size_t>(pattern.number_of_blocks()); i++)
-    {
-        nvalues += pattern.block(i).number_of_elements();
-    }
-
     // NOTE: a hybrid range separated functional holds the attenuated B vectors
     // beside the plain ones, on the same pattern, so it holds twice this. The
-    // doubling is here rather than at the call so that the budget check, the
+    // doubling is here rather than in the shared count so that the budget check, the
     // automatic choice of the way and the figure the output prints are all the
-    // memory the calculation will actually hold.
+    // memory this driver will actually hold.
 
-    return (range_separated ? 2 : 1) * nvalues * sizeof(double);
+    return (range_separated ? 2 : 1) * simdri::pattern_memory(molecule, basis, aux_basis, threshold, aux_atoms);
 }
 
 
@@ -1011,8 +990,6 @@ CSimdRIJKFockDriver::compute_exchange(const CPackedMatrix &coefficients,
 
     const auto *cvalues = coefficients.data();
 
-    CSimdThreeCenterElectronRepulsionDriver eri_drv;
-
     // one sweep of the integrals for every batch of the orbitals asked for
 
     for (size_t first = ofirst; first < olast; first += nbatch)
@@ -1058,15 +1035,9 @@ CSimdRIJKFockDriver::compute_exchange(const CPackedMatrix &coefficients,
 
         for (const auto &pattern : _parts)
         {
-            auto integrals = CSparseTensor(pattern);
-
-            integrals.allocate();
-
-            auto distributor = CSimdT3CDistributor<CSparseTensor>(&integrals);
-
             const auto mark_integrals = prof_clock::now();
 
-            eri_drv.compute(pattern, _molecule, _basis, _aux_basis, distributor);
+            auto integrals = simdri::integrals_of_part(pattern, _molecule, _basis, _aux_basis);
 
             _direct_times.integrals_a += prof_since(mark_integrals);
 
@@ -1222,8 +1193,6 @@ CSimdRIJKFockDriver::compute_coulomb(const std::vector<double> &gamma,
 
     const auto profile_start = prof_clock::now();
 
-    CSimdThreeCenterElectronRepulsionDriver eri_drv;
-
     const auto &patterns = _coulomb_patterns();
 
     for (const auto index : parts)
@@ -1234,15 +1203,9 @@ CSimdRIJKFockDriver::compute_coulomb(const std::vector<double> &gamma,
 
         const auto &pattern = patterns[static_cast<size_t>(index)];
 
-        auto integrals = CSparseTensor(pattern);
-
-        integrals.allocate();
-
-        auto distributor = CSimdT3CDistributor<CSparseTensor>(&integrals);
-
         const auto mark_integrals = prof_clock::now();
 
-        eri_drv.compute(pattern, _molecule, _basis, _aux_basis, distributor);
+        auto integrals = simdri::integrals_of_part(pattern, _molecule, _basis, _aux_basis);
 
         _direct_times.integrals_b += prof_since(mark_integrals);
 
@@ -1283,9 +1246,7 @@ CSimdRIJKFockDriver::aux_atom_weights(const CMolecule       &molecule,
                                       const CMolecularBasis &aux_basis,
                                       const double           threshold) const -> std::vector<double>
 {
-    const auto pattern = CSimdThreeCenterElectronRepulsionDriver().make_pattern(molecule, basis, aux_basis, threshold);
-
-    return simdri::atom_shares(pattern, static_cast<size_t>(molecule.number_of_atoms()));
+    return simdri::aux_atom_weights(molecule, basis, aux_basis, threshold);
 }
 
 auto

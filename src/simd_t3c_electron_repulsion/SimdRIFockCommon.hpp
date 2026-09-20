@@ -19,6 +19,7 @@
 #include "MolecularBasis.hpp"
 #include "Molecule.hpp"
 #include "PackedMatrix.hpp"
+#include "SparseTensor.hpp"
 #include "TripleSparsityPattern.hpp"
 
 /// @brief How a driver of the resolution of the identity forms its matrices.
@@ -65,6 +66,49 @@ auto aux_functions_of(const CMolecularBasis &aux_basis, const std::vector<int> &
 /// @param use_inverse_square_root Whether to invert the square root of the metric.
 /// @param what What the metric is, named in the warning a fallback prints.
 /// @return The inverted metric.
+/// @brief The memory the values of a pattern of the three-center integrals take.
+/// @param molecule The molecule.
+/// @param basis The molecular basis.
+/// @param aux_basis The auxiliary molecular basis.
+/// @param threshold The screening threshold.
+/// @param aux_atoms The atoms of the auxiliary side to count, or none of them for
+/// the whole molecule.
+/// @return The memory of one tensor of that pattern, in bytes.
+/// @note One tensor. A driver which holds more than one of them -- a hybrid range
+/// separated functional holds two, on the same pattern -- multiplies this itself, so
+/// that what it answers is the memory it will really hold.
+/// @note The memory answered is that of the atoms asked for, which is this rank's
+/// when the auxiliary basis is divided over a communicator. Answering the whole
+/// molecule's would put every rank on the direct way for a calculation each of them
+/// holds a fitting share of.
+auto pattern_memory(const CMolecule        &molecule,
+                    const CMolecularBasis  &basis,
+                    const CMolecularBasis  &aux_basis,
+                    const double            threshold,
+                    const std::vector<int> &aux_atoms) -> size_t;
+
+/// @brief Measures what each atom of the auxiliary basis carries, for dividing them.
+/// @return The memory of the values of each atom, in bytes.
+auto aux_atom_weights(const CMolecule       &molecule,
+                      const CMolecularBasis &basis,
+                      const CMolecularBasis &aux_basis,
+                      const double           threshold) -> std::vector<double>;
+
+/// @brief The three-center integrals of one part of the auxiliary basis.
+/// @param pattern The sparsity pattern of the part.
+/// @param molecule The molecule.
+/// @param basis The molecular basis on a and b sides.
+/// @param aux_basis The auxiliary molecular basis.
+/// @return The integrals, allocated and computed.
+/// @note Both sweeps of the direct way need this and neither needs anything else of
+/// the other: the first contracts what comes back against a density and the second
+/// against the coefficients of the fitting. Which of the two a driver does, and with
+/// what factor, stays with the driver.
+auto integrals_of_part(const CTripleSparsityPattern &pattern,
+                       const CMolecule              &molecule,
+                       const CMolecularBasis        &basis,
+                       const CMolecularBasis        &aux_basis) -> CSparseTensor;
+
 auto invert_metric(const CPackedMatrix &two_center,
                    const double         metric_threshold,
                    const bool           use_inverse_square_root,

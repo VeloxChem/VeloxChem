@@ -20,6 +20,8 @@
 #include "Eigen/Dense"
 #include "MathLibrary.hpp"
 #include "PackedLinearAlgebra.hpp"
+#include "SimdT3CDistributor.hpp"
+#include "SimdThreeCenterElectronRepulsionDriver.hpp"
 #include "SimdTwoCenterElectronRepulsionDriver.hpp"
 #include "StringFormat.hpp"
 
@@ -231,6 +233,60 @@ form_metric(const CMolecule       &molecule,
     if (metric_time) *metric_time += prof_since(mark_metric);
 
     return {std::move(metric), rimode::in_memory};
+}
+
+auto
+pattern_memory(const CMolecule        &molecule,
+               const CMolecularBasis  &basis,
+               const CMolecularBasis  &aux_basis,
+               const double            threshold,
+               const std::vector<int> &aux_atoms) -> size_t
+{
+    // NOTE: the pattern of what a sweep leaves is the pattern of the three-center
+    // integrals. The metric is dense and the transformation of the auxiliary side
+    // keeps every atom which survives, so neither of them makes it sparser.
+
+    const CSimdThreeCenterElectronRepulsionDriver eri_drv;
+
+    const auto pattern = aux_atoms.empty() ? eri_drv.make_pattern(molecule, basis, aux_basis, threshold)
+                                           : eri_drv.make_pattern(molecule, basis, aux_basis, threshold, aux_atoms);
+
+    size_t nvalues = 0;
+
+    for (size_t i = 0; i < static_cast<size_t>(pattern.number_of_blocks()); i++)
+    {
+        nvalues += pattern.block(i).number_of_elements();
+    }
+
+    return nvalues * sizeof(double);
+}
+
+auto
+aux_atom_weights(const CMolecule       &molecule,
+                 const CMolecularBasis &basis,
+                 const CMolecularBasis &aux_basis,
+                 const double           threshold) -> std::vector<double>
+{
+    const auto pattern = CSimdThreeCenterElectronRepulsionDriver().make_pattern(molecule, basis, aux_basis, threshold);
+
+    return atom_shares(pattern, static_cast<size_t>(molecule.number_of_atoms()));
+}
+
+auto
+integrals_of_part(const CTripleSparsityPattern &pattern,
+                  const CMolecule              &molecule,
+                  const CMolecularBasis        &basis,
+                  const CMolecularBasis        &aux_basis) -> CSparseTensor
+{
+    auto integrals = CSparseTensor(pattern);
+
+    integrals.allocate();
+
+    auto distributor = CSimdT3CDistributor<CSparseTensor>(&integrals);
+
+    CSimdThreeCenterElectronRepulsionDriver().compute(pattern, molecule, basis, aux_basis, distributor);
+
+    return integrals;
 }
 
 }  // namespace simdri
