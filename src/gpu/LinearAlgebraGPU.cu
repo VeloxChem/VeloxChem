@@ -41,7 +41,6 @@
 
 #include <hip/hip_runtime.h>
 #include <hipblas/hipblas.h>
-#include <hipsolver/hipsolver.h>
 #if defined(USE_MAGMA)
 #include <magma_v2.h>
 #define magmaSafe(e)                                                                                                   \
@@ -53,6 +52,8 @@
         }                                                                                                              \
     }
 static_assert(sizeof(magma_int_t) == 4, "MAGMA must be built with 32-bit magma_int_t");
+#else
+#include <hipsolver/hipsolver.h>
 #endif
 
 #endif

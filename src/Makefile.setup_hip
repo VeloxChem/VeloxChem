@@ -31,11 +31,11 @@
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 USE_HIP := true
-USE_MAGMA := false
 
 LIBXC_HOME := /path/to/libxc
-# if MAGMA is used
-MAGMA_HOME := /path/to/magma
+
+# if MAGMA is used, point this to MAGMA folder
+MAGMA_HOME :=
 
 CXX    := /opt/rocm/llvm/bin/clang++ ${shell CC --cray-print-opts=cflags} ${shell CC --cray-print-opts=libs}
 PYTHON := python3
@@ -46,7 +46,7 @@ CXX_DEB_FLG := -fopenmp -std=c++17 -O3 -Wall -g
 
 MATH_INC := 
 MATH_LIB := 
-ifeq ($(USE_MAGMA),true)
+ifneq ($(strip $(MAGMA_HOME)),)
   MATH_INC += -I$(MAGMA_HOME)/include
   MATH_LIB += -L$(MAGMA_HOME)/lib -lmagma
 endif
@@ -61,7 +61,11 @@ CXX_DEB_FLG += -fPIC $(PYTHON_INC) $(XC_INC)
 
 DEVCC_REL_FLG := -fPIC -fopenmp -std=c++17 -O3 $(XC_INC)
 DEVCC_DEB_FLG := -fPIC -fopenmp -std=c++17 -O3 $(XC_INC) -g
-DEVICE_LIB := -lhipblas -lhipsolver
+ifneq ($(strip $(MAGMA_HOME)),)
+  DEVICE_LIB := -lhipblas
+else
+  DEVICE_LIB := -lhipblas -lhipsolver
+endif
 
 MACLIBS :=
 
@@ -80,7 +84,7 @@ ifeq ($(USE_CUDA),true)
 else ifeq ($(USE_HIP),true)
   CPP_REL_FLG += -DUSE_HIP
   CPP_DEB_FLG += -DUSE_HIP
-  ifeq ($(USE_MAGMA),true)
+  ifneq ($(strip $(MAGMA_HOME)),)
     CPP_REL_FLG += -DUSE_MAGMA
     CPP_DEB_FLG += -DUSE_MAGMA
   endif
