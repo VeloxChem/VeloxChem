@@ -487,13 +487,16 @@ export_simdintegrals(py::module &m) -> void
              "Prepares the driver for a molecule and its bases.",
              py::arg("molecule"), py::arg("basis"), py::arg("aux_basis"), py::arg("threshold"),
              py::arg("memory_budget"), py::arg("metric_threshold"), py::arg("mode"), py::arg("metric"),
-             py::arg("nodes"))
+             py::arg("rank"), py::arg("nodes"))
         .def("is_prepared", &CSimdRIJFockDriver::is_prepared, "Checks that the driver has been prepared.")
         .def("get_mode", &CSimdRIJFockDriver::get_mode, "Gets the way the driver builds.")
         .def("get_metric", &CSimdRIJFockDriver::get_metric, py::return_value_policy::reference_internal,
              "Gets the inverted metric the driver holds.")
         .def("number_of_parts", &CSimdRIJFockDriver::number_of_parts,
              "Gets the number of parts of the auxiliary basis the sweeps take.")
+        .def("owned_parts", &CSimdRIJFockDriver::owned_parts,
+             "Gets the parts this rank owns, which are the ones it is to sweep. Asked of the driver "
+             "rather than worked out again by the caller, which held these and no others.")
         .def("compute", &CSimdRIJFockDriver::compute,
              "Computes the Coulomb matrix of a density, once and not twice: the caller of a restricted "
              "calculation hands one spin's density and doubles what comes back.",

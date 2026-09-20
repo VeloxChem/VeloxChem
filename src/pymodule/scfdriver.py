@@ -1846,7 +1846,7 @@ class ScfDriver:
             self._ri_drv.prepare(molecule, ao_basis, basis_ri, self.eri_thresh,
                                  self._get_ri_memory_budget(),
                                  self.ri_metric_threshold, modes[self.ri_mode],
-                                 metric, self.nodes)
+                                 metric, self.rank, self.nodes)
 
             taken = ('held in memory'
                      if self._ri_drv.get_mode() == rimode.in_memory else
@@ -2802,9 +2802,11 @@ class ScfDriver:
         # That sum is the one thing the ranks exchange, and it is one value per
         # auxiliary basis function.
 
-        parts = list(range(self._ri_drv.number_of_parts()))
-
-        mine = parts[self.rank::self.nodes]
+        # NOTE: the driver's own division and not one worked out again here. It
+        # held the integrals of these parts and of no others, so a rank asked for a
+        # part of someone else's would form them again and be right at the price of
+        # the memory holding them was meant to save.
+        mine = self._ri_drv.owned_parts()
 
         local = np.array(self._ri_drv.compute_gamma(packed_density, mine),
                          dtype=np.float64)

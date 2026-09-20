@@ -46,6 +46,7 @@ CSimdRIJFockDriver::prepare(const CMolecule       &molecule,
                             const double           metric_threshold,
                             const rimode           mode,
                             const CPackedMatrix   &metric,
+                            const size_t           rank,
                             const size_t           nodes) -> void
 {
     _molecule = molecule;
@@ -72,29 +73,57 @@ CSimdRIJFockDriver::prepare(const CMolecule       &molecule,
     _parts = simdri::make_parts(molecule, basis, aux_basis, threshold, pattern, std::max(nodes, size_t{1}),
                                 memory_budget);
 
+    // NOTE: the parts this rank sweeps, dealt round robin as the caller of a
+    // communicator would deal them. The driver deals them rather than the caller so
+    // that there is one answer and not two which have to agree: a rank asked for a
+    // part it did not hold would form the integrals again and be right, silently,
+    // at the price of the memory it was meant to save.
+
+    _owned.clear();
+
+    const auto stride = std::max(nodes, size_t{1});
+
+    for (size_t i = rank; i < _parts.size(); i += stride) _owned.push_back(static_cast<int>(i));
+
     // NOTE: holding the integrals is a choice about memory and nothing else. Either
     // way the same sweeps run over the same parts; the way which holds them forms
     // them once and the way which does not forms them on every build. There is no
     // transformation between the two, which is why the choice is so much less
     // consequential here than it is for a driver which also forms the exchange.
 
+    // NOTE: **what this rank would hold and not what the molecule would.** The parts
+    // of a rank are its share, so measuring the whole of them would send every rank
+    // to the direct way for a calculation each of them holds an eighth of -- and the
+    // direct way is five to nine times slower, which is a poor thing to choose by
+    // accident.
+
+    size_t owned_memory = 0;
+
+    for (const auto index : _owned)
+    {
+        owned_memory += simdri::pattern_memory(_parts[static_cast<size_t>(index)]);
+    }
+
     _mode = mode;
 
     if (_mode == rimode::automatic)
     {
-        _mode = (simdri::pattern_memory(molecule, basis, aux_basis, threshold, {}) > memory_budget) ? rimode::direct
-                                                                                                   : rimode::in_memory;
+        _mode = (owned_memory > memory_budget) ? rimode::direct : rimode::in_memory;
     }
 
     _integrals.clear();
 
     if (_mode == rimode::in_memory)
     {
-        _integrals.reserve(_parts.size());
+        // NOTE: as long as the parts, so an index means the same thing in both. The
+        // parts this rank does not own stay empty and cost nothing.
+        _integrals.resize(_parts.size());
 
-        for (const auto &part : _parts)
+        for (const auto index : _owned)
         {
-            _integrals.push_back(simdri::integrals_of_part(part, _molecule, _basis, _aux_basis));
+            const auto i = static_cast<size_t>(index);
+
+            _integrals[i] = simdri::integrals_of_part(_parts[i], _molecule, _basis, _aux_basis);
         }
     }
 
@@ -126,11 +155,26 @@ CSimdRIJFockDriver::number_of_parts() const -> size_t
 }
 
 auto
+CSimdRIJFockDriver::owned_parts() const -> std::vector<int>
+{
+    return _owned;
+}
+
+auto
 CSimdRIJFockDriver::_check_part(const int index) const -> void
 {
     errors::assertMsgCritical((index >= 0) && (static_cast<size_t>(index) < _parts.size()),
                               std::string("RIJFockDriver: A part of the auxiliary basis was asked for which the "
                                           "driver does not sweep"));
+
+    // NOTE: a part this rank does not own has no integrals held for it, and the way
+    // which holds them would answer with an empty tensor rather than with nothing.
+    // It is refused here instead: a caller which divided the parts its own way is
+    // asking a rank for work which belongs to another, and a silent zero would be a
+    // Coulomb matrix missing a share of itself.
+    errors::assertMsgCritical(std::find(_owned.begin(), _owned.end(), index) != _owned.end(),
+                              std::string("RIJFockDriver: A part of the auxiliary basis was asked for which this "
+                                          "rank does not own. Take the parts from owned_parts."));
 }
 
 auto
@@ -263,11 +307,7 @@ CSimdRIJFockDriver::compute(const CPackedMatrix &density) -> CPackedMatrix
 {
     errors::assertMsgCritical(_prepared, std::string("RIJFockDriver: The driver has not been prepared"));
 
-    auto parts = std::vector<int>(_parts.size());
-
-    for (size_t i = 0; i < parts.size(); i++) parts[i] = static_cast<int>(i);
-
-    const auto gamma = solve_fitting(compute_gamma(density, parts));
+    const auto gamma = solve_fitting(compute_gamma(density, _owned));
 
     const auto nao = _basis.dimensions_of_basis();
 
@@ -275,7 +315,7 @@ CSimdRIJFockDriver::compute(const CPackedMatrix &density) -> CPackedMatrix
 
     matrix.zero();
 
-    compute_coulomb(gamma, parts, matrix);
+    compute_coulomb(gamma, _owned, matrix);
 
     return matrix;
 }

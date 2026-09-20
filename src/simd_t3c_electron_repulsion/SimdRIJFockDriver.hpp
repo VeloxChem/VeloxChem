@@ -83,8 +83,14 @@ class CSimdRIJFockDriver
     /// @param memory_budget The memory a part's integrals may take, in bytes.
     /// @param mode The way to build. Automatic chooses from the memory.
     /// @param metric The inverted metric, or an empty matrix to form it here.
-    /// @param nodes The ranks which will divide the parts, so that there are at
-    /// least as many parts as there are of them.
+    /// @param rank This rank, which decides which parts it owns.
+    /// @param nodes The ranks which divide the parts, so that there are at least as
+    /// many parts as there are of them.
+    /// @note **A rank holds only the parts it sweeps.** The two sweeps are divided
+    /// over the parts, so a rank never reads another's; holding them all would cost
+    /// the memory of the whole molecule on every one of them, and would send the
+    /// automatic choice to the direct way for a calculation each rank holds a
+    /// fitting share of.
     auto prepare(const CMolecule       &molecule,
                  const CMolecularBasis &basis,
                  const CMolecularBasis &aux_basis,
@@ -93,6 +99,7 @@ class CSimdRIJFockDriver
                  const double           metric_threshold,
                  const rimode           mode,
                  const CPackedMatrix   &metric,
+                 const size_t           rank,
                  const size_t           nodes) -> void;
 
     /// @brief Checks that the driver has been prepared.
@@ -107,6 +114,13 @@ class CSimdRIJFockDriver
     /// @brief Gets the parts of the auxiliary basis the sweeps take.
     /// @return The number of parts, which bounds the indices the sweeps accept.
     auto number_of_parts() const -> size_t;
+
+    /// @brief Gets the parts this rank owns, which are the ones it is to sweep.
+    /// @return The indices, as the sweeps take them.
+    /// @note Asked of the driver rather than worked out again by the caller. The
+    /// driver held these parts and no others, so a caller which divided them its own
+    /// way would ask a rank for a part whose integrals it does not have.
+    auto owned_parts() const -> std::vector<int>;
 
     /// @brief Computes the Coulomb matrix of a density, on one rank.
     /// @param density The density matrix.
@@ -171,8 +185,13 @@ class CSimdRIJFockDriver
     /// @brief The sparsity pattern of each part of the auxiliary basis.
     std::vector<CTripleSparsityPattern> _parts;
 
-    /// @brief The integrals of each part, held only by the way which holds them.
+    /// @brief The integrals of each part, held only by the way which holds them and
+    /// only for the parts this rank owns. The entries of the others stay empty, so
+    /// that an index means the same thing here as it does in the parts.
     std::vector<CSparseTensor> _integrals;
+
+    /// @brief The parts this rank owns.
+    std::vector<int> _owned;
 
     /// @brief The driver of the sweeps, which the two ways share.
     CSimdRIFockDriver _drv;

@@ -81,6 +81,13 @@ auto aux_functions_of(const CMolecularBasis &aux_basis, const std::vector<int> &
 /// when the auxiliary basis is divided over a communicator. Answering the whole
 /// molecule's would put every rank on the direct way for a calculation each of them
 /// holds a fitting share of.
+/// @brief The memory the values of a pattern take.
+/// @param pattern The sparsity pattern.
+/// @return The memory of one tensor of it, in bytes.
+/// @note For a pattern already in hand, where the other form builds one first. A
+/// driver sizing the parts it holds has them and should not make them again.
+auto pattern_memory(const CTripleSparsityPattern &pattern) -> size_t;
+
 auto pattern_memory(const CMolecule        &molecule,
                     const CMolecularBasis  &basis,
                     const CMolecularBasis  &aux_basis,

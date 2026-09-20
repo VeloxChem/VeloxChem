@@ -236,6 +236,19 @@ form_metric(const CMolecule       &molecule,
 }
 
 auto
+pattern_memory(const CTripleSparsityPattern &pattern) -> size_t
+{
+    size_t nvalues = 0;
+
+    for (size_t i = 0; i < static_cast<size_t>(pattern.number_of_blocks()); i++)
+    {
+        nvalues += pattern.block(i).number_of_elements();
+    }
+
+    return nvalues * sizeof(double);
+}
+
+auto
 pattern_memory(const CMolecule        &molecule,
                const CMolecularBasis  &basis,
                const CMolecularBasis  &aux_basis,
@@ -251,14 +264,7 @@ pattern_memory(const CMolecule        &molecule,
     const auto pattern = aux_atoms.empty() ? eri_drv.make_pattern(molecule, basis, aux_basis, threshold)
                                            : eri_drv.make_pattern(molecule, basis, aux_basis, threshold, aux_atoms);
 
-    size_t nvalues = 0;
-
-    for (size_t i = 0; i < static_cast<size_t>(pattern.number_of_blocks()); i++)
-    {
-        nvalues += pattern.block(i).number_of_elements();
-    }
-
-    return nvalues * sizeof(double);
+    return pattern_memory(pattern);
 }
 
 auto
