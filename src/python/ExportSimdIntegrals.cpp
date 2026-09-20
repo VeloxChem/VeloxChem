@@ -48,6 +48,7 @@
 #include "SimdNuclearPotentialDriver.hpp"
 #include "SimdOverlapDriver.hpp"
 #include "SimdRIFockDriver.hpp"
+#include "SimdRIJFockDriver.hpp"
 #include "SimdRIJKFockDriver.hpp"
 #include "SimdRIJKGradientDriver.hpp"
 #include "SimdRIJKResponseDriver.hpp"
@@ -469,6 +470,43 @@ export_simdintegrals(py::module &m) -> void
         .def("bq_density", &CSimdRIJKFockDriver::bq_density,
              "The fraction of the B vectors the driver holds which is actually filled. This is the "
              "quantity the exchange half transformation compares against the threshold.");
+
+    // CSimdRIJFockDriver class
+
+    PyClass<CSimdRIJFockDriver>(m, "SimdRIJFockDriver")
+        .def(py::init<>())
+        .def("required_memory", &CSimdRIJFockDriver::required_memory,
+             "Gets the memory the driver would hold, in bytes. One tensor and nothing else: there is "
+             "no transformation of the integrals to keep.",
+             py::arg("molecule"), py::arg("basis"), py::arg("aux_basis"), py::arg("threshold"),
+             py::arg("aux_atoms") = std::vector<int>{})
+        .def("make_metric", &CSimdRIJFockDriver::make_metric,
+             "Forms the metric of the auxiliary basis, inverted outright.",
+             py::arg("molecule"), py::arg("aux_basis"), py::arg("metric_threshold"))
+        .def("prepare", &CSimdRIJFockDriver::prepare,
+             "Prepares the driver for a molecule and its bases.",
+             py::arg("molecule"), py::arg("basis"), py::arg("aux_basis"), py::arg("threshold"),
+             py::arg("memory_budget"), py::arg("metric_threshold"), py::arg("mode"), py::arg("metric"),
+             py::arg("nodes"))
+        .def("is_prepared", &CSimdRIJFockDriver::is_prepared, "Checks that the driver has been prepared.")
+        .def("get_mode", &CSimdRIJFockDriver::get_mode, "Gets the way the driver builds.")
+        .def("get_metric", &CSimdRIJFockDriver::get_metric, py::return_value_policy::reference_internal,
+             "Gets the inverted metric the driver holds.")
+        .def("number_of_parts", &CSimdRIJFockDriver::number_of_parts,
+             "Gets the number of parts of the auxiliary basis the sweeps take.")
+        .def("compute", &CSimdRIJFockDriver::compute,
+             "Computes the Coulomb matrix of a density, once and not twice: the caller of a restricted "
+             "calculation hands one spin's density and doubles what comes back.",
+             py::arg("density"))
+        .def("compute_gamma", &CSimdRIJFockDriver::compute_gamma,
+             "Sweeps the given parts and sums the right hand side of the fitting over them.",
+             py::arg("density"), py::arg("parts"))
+        .def("solve_fitting", &CSimdRIJFockDriver::solve_fitting,
+             "Applies the inverted metric to the right hand side of the fitting.",
+             py::arg("gamma"))
+        .def("compute_coulomb", &CSimdRIJFockDriver::compute_coulomb,
+             "Adds the Coulomb matrix of the given parts to a matrix.",
+             py::arg("gamma"), py::arg("parts"), py::arg("matrix"));
 
     // CSimdThreeCenterElectronRepulsionGradientDriver class
 

@@ -109,6 +109,35 @@ auto integrals_of_part(const CTripleSparsityPattern &pattern,
                        const CMolecularBasis        &basis,
                        const CMolecularBasis        &aux_basis) -> CSparseTensor;
 
+/// @brief Divides the auxiliary basis into the parts a sweep takes one at a time.
+/// @param pattern The sparsity pattern of the whole auxiliary basis.
+/// @param min_parts The fewest parts to make, so that the ranks of a communicator
+/// have one each at least.
+/// @param budget The memory a part's integrals may take, in bytes.
+/// @return The sparsity pattern of each part.
+/// @note The parts are cut at whichever is the smaller of what the memory allows and
+/// an equal division into the number asked for. Cutting finer costs nothing: the
+/// parts are a division of the same atoms and their integrals are the same integrals
+/// however they are grouped.
+auto make_parts(const CMolecule              &molecule,
+                const CMolecularBasis        &basis,
+                const CMolecularBasis        &aux_basis,
+                const double                  threshold,
+                const CTripleSparsityPattern &pattern,
+                const size_t                  min_parts,
+                const size_t                  budget) -> std::vector<CTripleSparsityPattern>;
+
+/// @brief Inverts the metric of the auxiliary basis outright.
+/// @param two_center The two-center integrals of the auxiliary basis.
+/// @param metric_threshold The threshold of the linear dependence.
+/// @return The inverse, as a symmetric matrix.
+/// @note This is what a Coulomb only fitting wants. It applies the metric to a
+/// vector of one value per auxiliary function, twice a build, so the inverse itself
+/// is the cheap thing to hold and one multiply is the cheap thing to do. A driver
+/// which applies the metric to a **tensor** wants a factor of it instead, which is
+/// what invert_metric answers, because a factor halves the work of that.
+auto invert_metric_full(const CPackedMatrix &two_center, const double metric_threshold) -> CPackedMatrix;
+
 auto invert_metric(const CPackedMatrix &two_center,
                    const double         metric_threshold,
                    const bool           use_inverse_square_root,

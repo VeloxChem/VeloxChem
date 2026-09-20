@@ -289,4 +289,91 @@ integrals_of_part(const CTripleSparsityPattern &pattern,
     return integrals;
 }
 
+auto
+make_parts(const CMolecule              &molecule,
+           const CMolecularBasis        &basis,
+           const CMolecularBasis        &aux_basis,
+           const double                  threshold,
+           const CTripleSparsityPattern &pattern,
+           const size_t                  min_parts,
+           const size_t                  budget) -> std::vector<CTripleSparsityPattern>
+{
+    const auto natoms = static_cast<size_t>(molecule.number_of_atoms());
+
+    const auto shares = simdri::atom_shares(pattern, natoms);
+
+    // NOTE: the parts are cut at whichever is the smaller of what the memory allows
+    // and an equal division into the number asked for. A machine with memory to spare
+    // gives one part, and the caller which divides the Coulomb pass over the ranks of
+    // a communicator then has one part for all of them: one rank sweeps the integrals
+    // a second time and the others wait. Cutting finer costs nothing, as the parts are
+    // a division of the same atoms and their integrals are the same integrals however
+    // they are grouped.
+
+    const auto total = std::accumulate(shares.begin(), shares.end(), 0.0);
+
+    const auto by_memory = static_cast<double>(budget / 2);
+
+    const auto by_parts = total / static_cast<double>(std::max(min_parts, size_t{1}));
+
+    const auto cut = std::min(by_memory, by_parts);
+
+    // NOTE: the atoms are gathered in the order they are given until the integrals
+    // of a part reach the budget. An atom whose own integrals are above it is a part
+    // of its own, as there is nothing smaller to divide.
+
+    const CSimdThreeCenterElectronRepulsionDriver eri_drv;
+
+    std::vector<CTripleSparsityPattern> parts;
+
+    std::vector<int> atoms;
+
+    double memory = 0.0;
+
+    for (size_t atom = 0; atom < natoms; atom++)
+    {
+        const auto share = shares[atom];
+
+        if (share <= 0.0) continue;
+
+        if ((!atoms.empty()) && ((memory + share) > cut))
+        {
+            parts.push_back(eri_drv.make_pattern(molecule, basis, aux_basis, threshold, atoms));
+
+            atoms.clear();
+
+            memory = 0.0;
+        }
+
+        atoms.push_back(static_cast<int>(atom));
+
+        memory += share;
+    }
+
+    if (!atoms.empty()) parts.push_back(eri_drv.make_pattern(molecule, basis, aux_basis, threshold, atoms));
+
+    return parts;
+}
+
+
+auto
+invert_metric_full(const CPackedMatrix &two_center, const double metric_threshold) -> CPackedMatrix
+{
+    // NOTE: the inverse itself and not a factor of it. A Coulomb only fitting applies
+    // the metric to a vector of one value per auxiliary function, twice a build, so
+    // there is nothing to be gained from a factor and one multiply is the whole of it.
+    // The driver which applies the metric to a tensor wants a factor, and asks for one.
+
+    // NOTE: packlin::invert factorizes through Cholesky and falls back to
+    // Bunch-Kaufman with a warning where the metric is not positive definite, which a
+    // nearly linearly dependent fitting basis can give. The threshold is not used
+    // there: what it would buy is a **truncated** inverse, which the square root
+    // route gives and which no fitting basis measured here has needed. It is taken as
+    // an argument so that the choice is visible at the call rather than implied.
+
+    (void)metric_threshold;
+
+    return packlin::invert(two_center);
+}
+
 }  // namespace simdri
