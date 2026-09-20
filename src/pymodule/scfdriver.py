@@ -3280,13 +3280,20 @@ class ScfDriver:
         if fock_type == 'j':
             # for pure functional
             # den_mat_for_Jab is D_total
-            if self.ri_coulomb:
-                fock_mat = self._ri_drv.compute(den_mat_for_Jab, 'j')
+            if self.ri_coulomb and self.ri_coulomb_simd:
+                # NOTE: the total density and no factor. A restricted build hands
+                # the density of one spin and doubles what comes back; here the two
+                # spins are already added, and the Coulomb matrix of the total
+                # density is what each of them sees.
+                J_ab_np = self._simd_ri_j_fock(den_mat[0] + den_mat[1])
             else:
-                fock_mat = fock_drv.compute(screener, den_mat_for_Jab, 'j', 0.0,
-                                            0.0, thresh_int)
-            J_ab_np = fock_mat.to_numpy()
-            fock_mat = Matrix()
+                if self.ri_coulomb:
+                    fock_mat = self._ri_drv.compute(den_mat_for_Jab, 'j')
+                else:
+                    fock_mat = fock_drv.compute(screener, den_mat_for_Jab, 'j',
+                                                0.0, 0.0, thresh_int)
+                J_ab_np = fock_mat.to_numpy()
+                fock_mat = Matrix()
 
             fock_mat_a_np = J_ab_np
             fock_mat_b_np = J_ab_np.copy()
