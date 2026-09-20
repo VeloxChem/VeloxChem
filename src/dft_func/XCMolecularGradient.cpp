@@ -48,7 +48,7 @@
 
 CXCMolecularGradient::CXCMolecularGradient()
 
-    : _screeningThresholdForGTOValues(1.0e-12)
+    : _screeningThresholdForGTOValues(1.0e-8)
 {
 }
 
