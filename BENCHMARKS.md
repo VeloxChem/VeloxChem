@@ -9907,6 +9907,113 @@ right hand ratio is a wall against a wall, so those rows understate the fitted w
 rather than flatter it.
 
 
+## The Coulomb only gradient, where the ratio worth quoting is the smaller one
+
+A pure functional's gradient has no exchange to differentiate, so its two-electron
+part is the Coulomb term of the resolution of the identity and nothing else. The
+simd driver of it is new; what it replaces is the conventional driver of the same
+approximation, and both are measured here beside the four-centre way.
+
+The gradient wants one thing of a calculation which the Fock build already has: the
+fitting coefficients gamma of the converged density. There are no B vectors to hand
+over, no metric and no occupied orbitals -- a Coulomb fitting is closed over the
+basis functions and never over an orbital -- so the driver is handed a vector and a
+density and nothing else.
+
+BLYP, `def2-universal-jfit`, convergence 1e-8, one rank of 14 threads on the M4 Max,
+each gradient timed twice and the faster taken. The runner is
+`benchmarks/scripts/rij_grad_laptop.py` over `gradbench.py` and the record is
+`benchmarks/data/gradient/2026-09-20_m4max_rij_grad.json`. The provenance says the
+tree was dirty: what was uncommitted is that runner and the Coulomb only ways added
+to `gradbench.py`, both written for this measurement and committed with it.
+
+### Caffeine, the closed shell gradient
+
+Seconds a gradient:
+
+| basis | nao | four-centre | conventional RI-J | simd RI-J | simd over conventional | over four-centre |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| def2-svp | 246 | 7.35 | 0.96 | 0.90 | 1.07x | 8.2x |
+| def2-svpd | 366 | 30.11 | 2.22 | 1.97 | 1.13x | 15.3x |
+| def2-tzvp | 494 | 108.73 | 3.51 | 2.95 | 1.19x | 36.8x |
+| def2-tzvpd | 614 | 253.42 | 5.49 | 4.75 | **1.16x** | **53.4x** |
+
+### Nitroxide, the open shell gradient
+
+| basis | nao | four-centre | conventional RI-J | simd RI-J | simd over conventional | over four-centre |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| def2-svp | 219 | 6.41 | 1.25 | 1.32 | **0.95x** | 4.9x |
+| def2-svpd | 330 | 22.67 | 2.62 | 2.64 | 0.99x | 8.6x |
+| def2-tzvp | 419 | 72.36 | 3.43 | 3.31 | 1.04x | 21.9x |
+| def2-tzvpd | 530 | 163.98 | 6.30 | 5.53 | **1.14x** | 29.6x |
+
+### The small column is the honest one
+
+Against a dense build the fitted gradient is **eight to fifty-three times** faster
+closed shell and five to thirty open, and the ratio climbs steeply with the basis
+for the reason the energy tables give. That is the number which sells the
+approximation, and it was already true of the conventional driver.
+
+**Against the driver this one replaces it is 1.07 to 1.19 closed shell and 0.95 to
+1.14 open**, and the open shell's smallest basis is *below one*. That is the number
+which says what was gained by writing it, and it is far short of the 1.4 to 1.7 the
+Fock build got from the same kind of work. A gradient spends its time in the
+derivative integrals and in the quadrature, not in the linear algebra which the math
+library sped up.
+
+### Why the open shell trails the closed by about a basis step
+
+Not the fitting. The phases of a simd RI-J gradient, seconds:
+
+| | total | Coulomb | quadrature | one-electron | quadrature's share |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| caffeine def2-svp | 0.91 | 0.26 | 0.54 | 0.09 | 60% |
+| nitroxide def2-svp | 1.13 | 0.20 | 0.82 | 0.09 | **73%** |
+| caffeine def2-tzvpd | 4.57 | 1.55 | 2.57 | 0.37 | 56% |
+| nitroxide def2-tzvpd | 5.61 | 1.11 | 4.21 | 0.22 | **75%** |
+
+**The quadrature is three quarters of an open shell's gradient and the Coulomb term
+is a fifth.** The exchange correlation gradient runs over two spin densities where
+the Coulomb one still runs over a single total density -- nitroxide's Coulomb term is
+*smaller* than caffeine's, 1.11 against 1.55 seconds, at fewer functions. So the
+part this driver improves is a fifth of the wall it is measured on, and an
+improvement of half again there arrives as a tenth on the total. The open shell is
+diluted, not slower.
+
+It is the same sentence as the Fock tables end on, one phase further along: **the
+quadrature is the majority of a fitted gradient too**, 56 to 75 per cent of it.
+
+### What the rows check as well as time
+
+Three things travel with every row rather than being claimed once:
+
+**The two fitted ways agree to between 5e-10 and 2e-09** in every one of the eight
+cases, which is the floor this code reproduces itself at and not a difference.
+
+**The fitting error is identical for both of them**, 2.6e-05 to 7.9e-05 against the
+four-centre gradient, rising with the basis. It has to be: they fit the same thing
+in the same set, and a row where the two fitted ways differed from four-centre by
+different amounts would mean one of them was fitting something else.
+
+**The sum over the atoms is 7e-06 to 2.7e-05** and is the same for the four-centre
+way as for either fitted one. A gradient of every atom of a molecule in no field
+sums to zero, so that residual is the quadrature's, and the fitting neither adds to
+it nor removes it.
+
+### What is not measured
+
+**No finite difference is in this table.** The drivers were checked against one
+while they were written -- water and a methyl radical, both off equilibrium, both
+agreeing to about 6e-05 on components of 5e-02, which is the finite difference's own
+floor -- but that is a check on the coefficients and not a benchmark, and it is not
+what these rows are.
+
+**And no node.** Every number here is one rank of fourteen threads. The three-centre
+term divides over the atoms of the auxiliary basis and the two-centre term is asked
+of one rank alone, because the fitting coefficients are not divided the way the B
+vectors of an exchange are; neither of those divisions has been run on more than one
+rank.
+
 ## The quadrature, where the functional is one per cent of it
 
 The Coulomb only tables above ended, when this was written, by saying that the
