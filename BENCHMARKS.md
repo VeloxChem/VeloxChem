@@ -10758,3 +10758,123 @@ with p near 2.8 and came in at **325 s against 104 predicted, three times low** 
 opposite direction from the three times the same kind of extrapolation ran high earlier
 in this file. See "Benchmark runtime estimates": the failure each time is carrying an
 exponent across a change which alters the screening.
+
+## The Coulomb only fitting, where the quadrature becomes the calculation
+
+Everything above about the resolution of the identity is about a hybrid, which needs
+the exchange and therefore needs the fitting closed for every orbital. A **pure**
+functional needs no exchange at all, and the difference that makes is not that one
+term is missing. It is that the metric never multiplies the tensor:
+
+    g(P)     = sum over mn of (mn|P) D(mn)
+    gamma    = J inverse g
+    J(mn)    = sum over P of (mn|P) gamma(P)
+
+The metric multiplies a vector of one value per auxiliary function, twice a build.
+The driver which also forms the exchange folds a factor of the metric into the
+integrals instead, and **that transformation is ninety per cent of what its setup
+costs**, as the profile earlier in this file records. None of it is here.
+
+`CSimdRIJFockDriver`, both ways, restricted and unrestricted. BLYP, convergence
+1e-8, one rank of 14 threads on the M4 Max. The fitting set is
+**`def2-universal-jfit`**, a third the size of the jkfit the RI-JK tables use: a
+Coulomb only fitting does not have to describe the products of orbitals an exchange
+needs, so a row here is not comparable with a row of those tables. The comparison
+within a row, against four centres, is the one that means anything.
+
+The runner is `benchmarks/scripts/rij_laptop.py` over `rijbench.py`, and the
+nitroxide records are `benchmarks/data/scf/2026-09-20_m4max_rij.json`.
+
+### Caffeine, closed shell
+
+| basis | nao | four-centre J | RI-J J | J faster by | wall, 4c -> RI-J | whole faster by |
+| --- | ---: | ---: | ---: | ---: | --- | ---: |
+| def2-svp | 246 | 11.41 | 0.14 | 81x | 14.58 -> 3.57 | 4.1x |
+| def2-svpd | 366 | 46.97 | 0.30 | 157x | 54.61 -> 8.26 | 6.6x |
+| def2-tzvp | 494 | 164.10 | 0.54 | 304x | 173.76 -> 10.96 | 15.9x |
+| def2-tzvpd | 614 | 387.40 | 0.86 | **450x** | 404.07 -> 19.59 | **20.6x** |
+
+### Tagrisso, closed shell
+
+| basis | nao | four-centre J | RI-J J | J faster by | wall, 4c -> RI-J | whole faster by |
+| --- | ---: | ---: | ---: | ---: | --- | ---: |
+| def2-svp | 683 | 131.71 | 1.45 | 91x | 150.97 -> 27.69 | 5.5x |
+| def2-svpd | 1010 | 997.85 | 4.28 | **233x** | 1064.65 -> 96.84 | **11.0x** |
+
+### Nitroxide, a doublet radical, unrestricted
+
+| basis | nao | four-centre J | RI-J J | J faster by | wall, 4c -> RI-J | whole faster by |
+| --- | ---: | ---: | ---: | ---: | --- | ---: |
+| def2-svp | 219 | 8.79 | 0.17 | 52x | 15.67 -> 5.73 | 2.7x |
+| def2-svpd | 330 | 33.13 | 0.37 | 90x | 47.26 -> 13.16 | 3.6x |
+| def2-tzvp | 419 | 111.19 | 0.61 | 182x | 132.95 -> 17.25 | 7.7x |
+| def2-tzvpd | 530 | 249.35 | 1.05 | **238x** | 284.01 -> 32.17 | **8.8x** |
+
+An open shell row is two Fock matrices an iteration and is not comparable with a
+closed shell one however alike the two read.
+
+### The Coulomb build stops being the cost, and the quadrature does not
+
+Read the two right hand columns of any table against each other. **The Coulomb build
+is between fifty and four hundred and fifty times faster and the calculation is
+between three and twenty.** The gap between those is the exchange correlation
+quadrature, which the approximation does not touch and which is the same in every
+row of a group:
+
+| | XC, as a share of the fitted wall |
+| --- | ---: |
+| caffeine | 88 to 91% |
+| tagrisso | 86 to 90% |
+| nitroxide | 91 to 92% |
+
+So a further hundredfold on the Coulomb build would be worth about ten per cent of
+the calculation. **Whatever is next for a pure functional is the grid, not the
+integrals.**
+
+The ratio also grows with the basis -- 81, 157, 304, 450 on caffeine -- for the
+reason the diffuse rows of the water cluster study give: the dense build pays a
+fourth power on a compact molecule and the fitted one pays about a first, and
+diffuse functions take away the screening which was the dense build's only defence.
+
+### Against the conventional driver of the same approximation
+
+| | J build | setup | whole |
+| --- | ---: | ---: | ---: |
+| caffeine, def2-tzvpd | 0.68 -> 0.86 | 1.50 -> 1.12 | 19.08 -> 19.59 |
+| tagrisso, def2-svp | 2.62 -> 1.45 | 7.78 -> 2.45 | 32.94 -> 27.69 |
+| tagrisso, def2-svpd | 4.93 -> 4.28 | 14.56 -> 5.04 | 101.95 -> 96.84 |
+| nitroxide, def2-tzvpd | 1.05 -> 1.05 | 1.72 -> 1.45 | 33.77 -> 32.17 |
+
+**The new driver wins where the setup is the difference and draws where it is not.**
+On tagrisso the conventional driver spends 7.8 and 14.6 seconds preparing against
+2.5 and 5.0; on the two small molecules the two are within a few per cent of each
+other and at def2-tzvpd their Coulomb builds are identical to the hundredth of a
+second. There is nothing left to win on a twenty-four atom molecule, and that is
+worth knowing before anyone optimises for one.
+
+### The way which holds nothing is not a peer
+
+`direct` re-forms the integrals in both sweeps of every iteration:
+
+| | RI-J in memory | RI-J direct |
+| --- | ---: | ---: |
+| caffeine, def2-tzvpd | 0.86 | 7.60 |
+| tagrisso, def2-svpd | 4.28 | 37.45 |
+| nitroxide, def2-tzvpd | 1.05 | 6.01 |
+
+Five to nine times behind, everywhere. It belongs where the memory forces it and
+not as a choice, which is what `ri_mode` currently offers; the automatic rule was
+inherited from the RI-JK driver and has not been revisited for this one.
+
+### One caveat on the four-centre column
+
+The caffeine and tagrisso rows were measured before `rijbench.py` existed, with a
+timer around the whole two-electron build. The runner uses the driver's own
+profiler, whose `FockERI` covers the integrals and not the screening and setup
+around them. Measured on caffeine at def2-svp the two differ by **0.83 s in 14.6**,
+the wrapper reading the higher: `11.41` against `10.58`, with the difference
+appearing in `rest` instead. Nothing else moves -- wall time and XC agree to a
+hundredth of a second, and the fitted rows agree to 0.01 s because there is almost
+nothing in them to differ. **So the four-centre J column of the first two tables
+reads about seven per cent high against the third**, and every ratio drawn from it
+is correspondingly generous.
