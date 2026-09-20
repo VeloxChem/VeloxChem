@@ -41,6 +41,7 @@
 #include "MolecularBasis.hpp"
 #include "Molecule.hpp"
 #include "PackedMatrix.hpp"
+#include "SimdRIFockCommon.hpp"
 #include "SimdRIFockDriver.hpp"
 #include "SparseTensor.hpp"
 #include "TripleSparsityPattern.hpp"
@@ -90,16 +91,6 @@ struct CDirectTimes
 /// @note The exchange is added with a factor the caller passes, so that a hybrid
 /// functional scales it by its fraction of exact exchange. A pure functional is
 /// served by a driver which never forms the B vectors and is not this one.
-/// @brief How the driver forms the Fock matrices.
-/// rimode::in_memory - the B vectors are formed once and held
-/// rimode::direct - the integrals are formed again on every call
-enum class rimode
-{
-    automatic,
-    in_memory,
-    direct
-};
-
 class CSimdRIJKFockDriver
 {
    public:
