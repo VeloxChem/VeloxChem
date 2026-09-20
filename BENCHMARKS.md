@@ -10878,3 +10878,133 @@ hundredth of a second, and the fitted rows agree to 0.01 s because there is almo
 nothing in them to differ. **So the four-centre J column of the first two tables
 reads about seven per cent high against the third**, and every ratio drawn from it
 is correspondingly generous.
+
+## The quadrature, where the functional is one per cent of it
+
+The Coulomb only tables above end by saying that the exchange correlation quadrature
+is 86 to 92 per cent of a fitted calculation and that whatever is next for a pure
+functional is the grid. This is what was found there.
+
+The integrators have carried named timers for a long while and printed none of them:
+the calls which would have were commented out, one per function. They are switched on
+by `VLX_XC_PROFILE` and the threads are added together, which is what `getTimings`
+was put there for. BLYP, one rank of 14 threads on the M4 Max.
+
+### Where a Vxc build goes
+
+Caffeine, def2-tzvp, 384 boxes, 0.412 s:
+
+| phase | time | share |
+| --- | ---: | ---: |
+| GTO pre-screening | 0.000 s | 0.1% |
+| density matrix slicing | 0.002 s | 0.4% |
+| gtoeval | 0.072 s | 17.5% |
+| **generate density grid** | **0.161 s** | **39.1%** |
+| **XC functional eval.** | **0.003 s** | **0.8%** |
+| Vxc matrix G | 0.014 s | 3.4% |
+| **Vxc matmul and symm.** | **0.145 s** | **35.1%** |
+| Vxc dist. | 0.005 s | 1.3% |
+| serial and imbalance | 0.009 s | 2.2% |
+
+**The functional is under one per cent.** What the quadrature costs is two matrix
+operations -- forming the density and its gradient on the grid, and contracting the
+potential back into the matrix -- and they are the same shape of work, points times
+the square of the basis functions a box keeps. The shares hold everywhere:
+
+| | gtoeval | density grid | Vxc matmul | functional |
+| --- | ---: | ---: | ---: | ---: |
+| caffeine def2-svp | 25% | 33% | 29% | 2% |
+| caffeine def2-tzvpd | 13% | 41% | 39% | 0% |
+| tagrisso def2-svpd | 12% | 42% | 40% | 0% |
+| water 47-mer def2-svp | 20% | 38% | 33% | 1% |
+
+So this is the third phase of this file to turn out to be linear algebra rather than
+the thing it is named after, after the gradient's fitted densities and the B vectors'
+contraction.
+
+### What the screening keeps
+
+The grid points grow linearly with the molecule, so if the screening held the
+surviving functions of a box steady the quadrature would be linear too. It does not
+quite:
+
+| water clusters, def2-svp | nao | kept per box | of the functions | of a dense quadrature |
+| --- | ---: | ---: | ---: | ---: |
+| 10 waters | 240 | 119 | 49.6% | 25.9% |
+| 20 waters | 480 | 180 | 37.5% | 14.9% |
+| 32 waters | 768 | 213 | 27.8% | 8.3% |
+| 47 waters | 1128 | 238 | 21.1% | 4.9% |
+
+**It is already avoiding ninety-five per cent of a dense quadrature and it is still
+growing.** The kept count goes as nao to the 0.42, which squared is the extra work
+per grid point, and the quadrature comes out at nao to the 1.7 rather than the 1.0 it
+would otherwise be. The growth is decelerating -- the exponent between neighbours
+falls 0.59, 0.35, 0.30 -- so it saturates eventually, but not at these sizes.
+
+On a compact molecule the screening cannot help and should not be expected to:
+caffeine keeps 165 of 246 at def2-svp and 442 of 614 at def2-tzvpd, because the
+molecule is smaller than the decay length. Those are the cases where the quadrature
+is cheap in absolute terms anyway.
+
+### Two constants which had never been tried
+
+The size of a grid box and the value a basis function has to reach over it were 1024
+points and 1e-12, and no other values had been measured. They pull against each
+other: a smaller box reaches fewer functions but pays its overhead more often.
+
+32 waters, def2-tzvp, seconds a Vxc build, the old default in bold:
+
+| box \ threshold | 1e-6 | 1e-8 | 1e-10 | 1e-12 |
+| ---: | ---: | ---: | ---: | ---: |
+| 128 | 0.513 | 0.750 | 1.012 | 1.318 |
+| **256** | 0.478 | **0.702** | 0.952 | 1.244 |
+| 512 | 0.514 | 0.762 | 1.041 | 1.355 |
+| 1024 | 0.655 | 0.951 | 1.268 | **1.645** |
+
+**256 is a real minimum and 1024 was the wrong end of the range.** 128 is worse than
+256 at every threshold, so the per box overhead does bite -- just below where the
+default sat.
+
+### The defaults are now 256 points and 1e-8
+
+| | XC | whole SCF |
+| --- | ---: | ---: |
+| caffeine def2-svp | 3.16 -> 2.24, 1.41x | 3.57 -> 2.72, 1.31x |
+| caffeine def2-tzvp | 9.66 -> 6.60, 1.46x | 10.96 -> 7.92, 1.38x |
+| tagrisso def2-svp | 23.79 -> 12.47, 1.91x | 27.69 -> 16.53, 1.68x |
+
+Of that, the box is worth 1.3 to 1.6 times and the threshold a further 1.2 to 1.5.
+**The rows of the Coulomb only tables above are therefore out of date by that much**,
+and their XC shares are the shares of the old quadrature.
+
+`xc_screening_threshold` is settable on the SCF driver, defaulting to the
+integrator's own value, so the default can be measured against something rather than
+assumed. The box is `_xcfun_ldstaging`, which was always settable and always 1024.
+
+### The accuracy, and a measurement which had to be done twice
+
+**At a fixed density, 1e-8, 1e-10 and 1e-12 give identical exchange correlation
+energies and 1e-6 differs by 1.2e-07 hartree.** That is the clean measurement of what
+the screening costs, because nothing else varies.
+
+Through a converged SCF the differences are **not** monotonic in the threshold -- at
+1e-8 they are smaller than at 1e-12 -- which is the signature of something other than
+the threshold. Three runs at one threshold spread **6.5e-09 at 1e-8 and 7.3e-08 at
+1e-12**, with identical iteration counts. So the converged differences of up to
+1.3e-07 are convergence noise at a threshold of 1e-8 and not screening error.
+
+This was first reported here as a real shift of 6.5e-07, which it is not. The tell was
+in the numbers and was not read: an error caused by the threshold would rise with it,
+and these did not. See "Benchmark runtime estimates" and the open shell rows of the
+Coulomb only suite, where the same mistake was made on the same day.
+
+### What is not measured
+
+**The response paths screen at 1e-8 now too.** Fxc and Kxc go through the same
+integrator, and nothing here has checked a polarizability or an excitation energy
+against the old value. The evidence is entirely from ground state energies.
+
+**And the exponent has not moved.** Smaller boxes shift the constant; the kept count
+still grows as nao to the 0.42 and the quadrature is still nao to the 1.7. Reaching
+linear needs the screening to saturate, which would be a different piece of work from
+choosing better values for two numbers.
