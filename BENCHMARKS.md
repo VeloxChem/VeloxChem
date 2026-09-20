@@ -9609,50 +9609,61 @@ which was written for this measurement and is committed with it.
 
 | basis | nao | four-centre J | RI-J J | J faster by | wall, 4c -> RI-J | whole faster by |
 | --- | ---: | ---: | ---: | ---: | --- | ---: |
-| def2-svp | 246 | 10.62 | 0.14 | 76x | 13.83 -> 2.68 | 5.2x |
-| def2-svpd | 366 | 46.26 | 0.28 | 164x | 53.28 -> 6.33 | 8.4x |
-| def2-tzvp | 494 | 160.49 | 0.55 | 290x | 170.35 -> 8.04 | 21.2x |
-| def2-tzvpd | 614 | 386.15 | 0.84 | **457x** | 403.12 -> 14.63 | **27.5x** |
+| def2-svp | 246 | 10.67 | 0.14 | 76x | 13.22 -> 2.01 | 6.6x |
+| def2-svpd | 366 | 45.99 | 0.29 | 159x | 50.76 -> 3.97 | 12.8x |
+| def2-tzvp | 494 | 161.58 | 0.52 | 311x | 169.16 -> 4.83 | 35.0x |
+| def2-tzvpd | 614 | 387.06 | 0.83 | **466x** | 399.24 -> 8.78 | **45.5x** |
 
 ### Tagrisso, closed shell
 
 | basis | nao | four-centre J | RI-J J | J faster by | wall, 4c -> RI-J | whole faster by |
 | --- | ---: | ---: | ---: | ---: | --- | ---: |
-| def2-svp | 683 | 122.72 | 1.35 | 91x | 143.19 -> 16.28 | 8.8x |
-| def2-svpd | 1010 | 985.56 | 3.06 | **322x** | 1039.91 -> 52.83 | **19.7x** |
+| def2-svp | 683 | 122.64 | 1.33 | 92x | 139.77 -> 11.96 | 11.7x |
+| def2-svpd | 1010 | 974.90 | 3.13 | **311x** | 1014.87 -> 33.67 | **30.1x** |
 
 ### Nitroxide, a doublet radical, unrestricted
 
 | basis | nao | four-centre J | RI-J J | J faster by | wall, 4c -> RI-J | whole faster by |
 | --- | ---: | ---: | ---: | ---: | --- | ---: |
-| def2-svp | 219 | 8.69 | 0.18 | 48x | 14.09 -> 4.33 | 3.3x |
-| def2-svpd | 330 | 33.67 | 0.37 | 92x | 45.18 -> 10.07 | 4.5x |
-| def2-tzvp | 419 | 116.53 | 0.60 | 195x | 133.62 -> 11.40 | 11.7x |
-| def2-tzvpd | 530 | 251.87 | 1.04 | **243x** | 279.87 -> 24.06 | **11.6x** |
+| def2-svp | 219 | 8.80 | 0.18 | 49x | 12.84 -> 2.67 | 4.8x |
+| def2-svpd | 330 | 33.31 | 0.38 | 88x | 40.83 -> 5.83 | 7.0x |
+| def2-tzvp | 419 | 117.60 | 0.60 | 196x | 130.87 -> 7.02 | 18.6x |
+| def2-tzvpd | 530 | 251.63 | 1.09 | **231x** | 271.93 -> 15.78 | **17.2x** |
 
 An open shell row is two Fock matrices an iteration and is not comparable with a
 closed shell one however alike the two read.
 
+**The def2-tzvpd row is the noisiest in this file and should not be read closely.**
+That case converges in **26 or 27 iterations depending on the run** -- five repeats
+of the fitted way in one session gave 26, 27, 27, 26, 27 -- and the row above is a
+27 iteration draw, which is why it reads slower than the conventional driver beside
+it. Best of five the two are 14.60 and 14.95 seconds, the simd way ahead. The same
+five repeats put the conventional driver's Coulomb build anywhere between 0.96 and
+1.47 seconds, a spread of half its own value, so **no Coulomb column of a one second
+case in this file separates the two drivers**. The iteration count wobbles because
+the fitted build is not bit reproducible -- the floor measured elsewhere here is
+2.5e-11 -- and near convergence that is enough to move a DIIS step.
+
 ### The Coulomb build stops being the cost, and the quadrature does not
 
 Read the two right hand columns of any table against each other. **The Coulomb build
-is between forty-eight and four hundred and fifty-seven times faster and the
-calculation is between three and twenty-eight.** The gap between those is the
+is between forty-nine and four hundred and sixty-six times faster and the
+calculation is between five and forty-six.** The gap between those is the
 exchange correlation quadrature, which the approximation does not touch and which is
 the same in every row of a group:
 
 | | XC, as a share of the fitted wall |
 | --- | ---: |
-| caffeine | 83 to 88% |
-| tagrisso | 75 to 85% |
-| nitroxide | 87 to 91% |
+| caffeine | 73 to 81% |
+| tagrisso | 66 to 77% |
+| nitroxide | 78 to 84% |
 
 So a further hundredfold on the Coulomb build would be worth about ten per cent of
 the calculation. **Whatever is next for a pure functional is the grid, not the
 integrals** -- which is what "The quadrature, where the functional is one per cent of
 it" then went and measured.
 
-The ratio also grows with the basis -- 76, 164, 290, 457 on caffeine -- for the
+The ratio also grows with the basis -- 76, 159, 311, 466 on caffeine -- for the
 reason the diffuse rows of the water cluster study give: the dense build pays a
 fourth power on a compact molecule and the fitted one pays about a first, and
 diffuse functions take away the screening which was the dense build's only defence.
@@ -9661,17 +9672,22 @@ diffuse functions take away the screening which was the dense build's only defen
 
 | | J build | setup | whole |
 | --- | ---: | ---: | ---: |
-| caffeine, def2-tzvpd | 0.88 -> 0.84 | 1.50 -> 1.16 | 14.64 -> 14.63 |
-| tagrisso, def2-svp | 2.50 -> 1.35 | 8.54 -> 2.76 | 23.01 -> 16.28 |
-| tagrisso, def2-svpd | 5.02 -> 3.06 | 14.94 -> 4.70 | 64.87 -> 52.83 |
-| nitroxide, def2-tzvpd | 1.01 -> 1.04 | 1.67 -> 1.46 | 26.69 -> 24.06 |
+| caffeine, def2-tzvpd | 1.49 -> 0.83 | 1.56 -> 1.09 | 10.37 -> 8.78 |
+| tagrisso, def2-svp | 2.75 -> 1.33 | 7.78 -> 2.76 | 18.44 -> 11.96 |
+| tagrisso, def2-svpd | 5.36 -> 3.13 | 13.35 -> 4.68 | 45.43 -> 33.67 |
+| nitroxide, def2-tzvpd | 1.08 -> 1.09 | 1.66 -> 1.45 | 15.10 -> 15.78 |
 
 **The new driver wins where the setup is the difference and draws where it is not.**
-On tagrisso the conventional driver spends 8.5 and 14.9 seconds preparing against 2.8
-and 4.7; on the two small molecules the two are within a few per cent of each other
-and their Coulomb builds agree to a hundredth of a second. There is nothing left to
-win on a twenty-four atom molecule, and that is worth knowing before anyone optimises
-for one.
+On tagrisso the conventional driver spends 7.8 and 13.4 seconds preparing against 2.8
+and 4.7; on the two small molecules the two are within a few per cent of each other.
+There is nothing left to win on a twenty-four atom molecule, and that is worth knowing
+before anyone optimises for one.
+
+The Coulomb columns of the two small rows are **not** evidence either way. They are
+one second quantities measured once, and the repeats reported under the nitroxide
+table put the run to run spread of exactly such a column at half its own value. The
+nitroxide row reads the wrong way round for that reason and for the iteration count,
+not because the conventional driver builds Coulomb faster.
 
 ### The way which holds nothing is not a peer
 
@@ -9679,34 +9695,49 @@ for one.
 
 | | RI-J in memory | RI-J direct |
 | --- | ---: | ---: |
-| caffeine, def2-tzvpd | 0.84 | 6.54 |
-| tagrisso, def2-svpd | 3.06 | 34.94 |
-| nitroxide, def2-tzvpd | 1.04 | 5.75 |
+| caffeine, def2-tzvpd | 0.83 | 6.52 |
+| tagrisso, def2-svpd | 3.13 | 35.94 |
+| nitroxide, def2-tzvpd | 1.09 | 5.99 |
 
-Six to eleven times behind, everywhere. It belongs where the memory forces it and not
-as a choice, which is what the automatic rule now does: it weighs the parts **a rank
-would hold** rather than the whole molecule's, which on eight ranks is an eighth of
-the figure it used to compare.
+Five and a half to eleven and a half times behind, everywhere. It belongs where the
+memory forces it and not as a choice, which is what the automatic rule now does: it
+weighs the parts **a rank would hold** rather than the whole molecule's, which on
+eight ranks is an eighth of the figure it used to compare.
 
-### These rows were measured twice
+### These rows were measured three times
 
 The first measurement of this suite was made before the quadrature's defaults were
-looked at, with grid boxes of 1024 points and a screening threshold of 1e-12. Every
-row here is the second measurement, at 256 and 1e-8, from one code path --
-`rijbench.py` throughout, timed by the driver's own profiler rather than by a wrapper
-around it.
+looked at, with grid boxes of 1024 points and a screening threshold of 1e-12. The
+second was at 256 and 1e-8. Every row here is the third, taken after the quadrature's
+matrix products were handed to the math library, from one code path -- `rijbench.py`
+throughout, driven by `rij_laptop.py` and timed by the driver's own profiler rather
+than by a wrapper around it. `OMP_NUM_THREADS=14`, one rank, `def2-universal-jfit`,
+and the record is `benchmarks/data/scf/2026-09-20_m4max_rij.json`.
 
-The Coulomb columns are unchanged between the two, as they should be: the quadrature
-does not touch them. What moved is the XC and therefore the wall, and with it every
-ratio in the right hand column -- caffeine at def2-tzvpd went from 20.6 to 27.5 times
-not because the fitting got faster but because the ceiling above it came down.
+The Coulomb columns are unchanged across all three, as they should be: neither the
+quadrature nor its linear algebra touches them. Across the ten cases the four centre
+Coulomb build reproduces the second measurement to within one per cent, which is what
+makes the rest of the table readable -- it is the control, not a result.
+
+What moved both times is the XC and therefore the wall, and with it every ratio in
+the right hand column: caffeine at def2-tzvpd went 20.6 to 27.5 to **45.5** times, not
+because the fitting ever got faster but because the ceiling above it came down twice.
+The fitted wall alone improved between 1.33 and 1.73 times in this third measurement.
+
+**The iteration counts are not equal between the columns** -- four centre converges in
+21 to 23, the fitted ways in 23 to 31, and tagrisso def2-svp is 23 against 30. The
+right hand ratio is a wall against a wall, so those rows understate the fitted way
+rather than flatter it.
 
 
 ## The quadrature, where the functional is one per cent of it
 
-The Coulomb only tables above end by saying that the exchange correlation quadrature
-is 86 to 92 per cent of a fitted calculation and that whatever is next for a pure
-functional is the grid. This is what was found there.
+The Coulomb only tables above ended, when this was written, by saying that the
+exchange correlation quadrature was 86 to 92 per cent of a fitted calculation and that
+whatever is next for a pure functional is the grid. This is what was found there. Those
+tables now read 66 to 84 per cent, because of this section and of the linear algebra
+change which followed it -- the share came down, and the conclusion did not: the
+quadrature is still the majority of every fitted row in this file.
 
 The integrators have carried named timers for a long while and printed none of them:
 the calls which would have were commented out, one per function. They are switched on
