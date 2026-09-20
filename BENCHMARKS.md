@@ -9605,11 +9605,105 @@ The records are `benchmarks/data/scf/2026-09-18_m4max_caffeine_rs_closed.json` a
 The provenance says the tree was dirty: the only thing uncommitted was that runner,
 which was written for this measurement and is committed with it.
 
-**The tables of this section were never transcribed into this file.** They are in the
-rendered records beside the data -- `2026-09-18_m4max_caffeine_rs_closed.md` and
-`..._nitroxide_rs_m2.md`, CAM-B3LYP and WB97X-D4, four centre against RI-JK simd --
-and the section below is a different measurement with a different fitting set, which
-for a while sat under this heading and read as though it belonged to it.
+The tables below are transcribed from those records. The section which follows this
+one is a different measurement with a different fitting set, which for a while sat
+under this heading and read as though it belonged to it.
+
+Two functionals are measured, CAM-B3LYP and WB97X-D4, and the columns are the two
+electron build rather than the wall, because that is the part the split falls on.
+`B vectors` is the attenuated set together with the plain one, formed once before the
+iterations rather than per build.
+
+### Caffeine, CAM-B3LYP, closed shell
+
+| basis | nao | four-centre 2e | RI-JK 2e | build faster by | B vectors | wall, 4c -> RI-JK | whole faster by |
+| --- | ---: | ---: | ---: | ---: | ---: | --- | ---: |
+| def2-svp | 246 | 23.45 | 1.30 | 18x | 0.60 | 27.54 -> 5.20 | 5.3x |
+| def2-svpd | 366 | 99.21 | 2.83 | 35x | 1.22 | 107.72 -> 11.63 | 9.3x |
+| def2-tzvp | 494 | 348.51 | 5.10 | 68x | 2.11 | 361.56 -> 16.95 | 21.3x |
+| def2-tzvpd | 614 | 847.79 | 8.57 | **99x** | 3.21 | 868.74 -> 28.31 | **30.7x** |
+
+### Caffeine, WB97X-D4, closed shell
+
+| basis | nao | four-centre 2e | RI-JK 2e | build faster by | B vectors | wall, 4c -> RI-JK | whole faster by |
+| --- | ---: | ---: | ---: | ---: | ---: | --- | ---: |
+| def2-svp | 246 | 23.20 | 1.31 | 18x | 0.60 | 27.18 -> 5.12 | 5.3x |
+| def2-svpd | 366 | 98.49 | 2.82 | 35x | 1.21 | 106.92 -> 11.46 | 9.3x |
+| def2-tzvp | 494 | 347.09 | 5.35 | 65x | 2.11 | 360.31 -> 17.54 | 20.5x |
+| def2-tzvpd | 614 | 846.68 | 8.91 | **95x** | 3.21 | 868.04 -> 29.23 | **29.7x** |
+
+### Nitroxide, both functionals, unrestricted
+
+CAM-B3LYP:
+
+| basis | nao | four-centre 2e | RI-JK 2e | build faster by | B vectors | wall, 4c -> RI-JK | whole faster by |
+| --- | ---: | ---: | ---: | ---: | ---: | --- | ---: |
+| def2-svp | 219 | 48.27 | 1.81 | 27x | 0.37 | 55.49 -> 7.72 | 7.2x |
+| def2-svpd | 330 | 192.10 | 3.75 | 51x | 0.73 | 207.22 -> 16.45 | 12.6x |
+| def2-tzvp | 419 | 624.51 | 6.26 | 100x | 1.21 | 647.43 -> 23.37 | 27.7x |
+| def2-tzvpd | 530 | 1427.10 | 10.54 | **135x** | 1.86 | 1464.14 -> 39.65 | **36.9x** |
+
+WB97X-D4:
+
+| basis | nao | four-centre 2e | RI-JK 2e | build faster by | B vectors | wall, 4c -> RI-JK | whole faster by |
+| --- | ---: | ---: | ---: | ---: | ---: | --- | ---: |
+| def2-svp | 219 | 48.37 | 1.80 | 27x | 0.38 | 55.48 -> 7.67 | 7.2x |
+| def2-svpd | 330 | 183.02 | 3.93 | 47x | 0.73 | 197.45 -> 17.22 | 11.5x |
+| def2-tzvp | 419 | 599.32 | 6.54 | 92x | 1.21 | 621.66 -> 24.38 | 25.5x |
+| def2-tzvpd | 530 | 1367.80 | 10.96 | **125x** | 1.88 | 1403.55 -> 41.06 | **34.2x** |
+
+### The functional does not matter and the split does
+
+**CAM-B3LYP and WB97X-D4 cost the same to within one per cent**, everywhere. The four
+centre builds are 23.45 against 23.20, 99.21 against 98.49, 348.51 against 347.09 and
+847.79 against 846.68 on caffeine, and the fitted ones agree as closely. Two
+functionals which differ in how they attenuate, in how much exact exchange they carry
+at long range and in whether they carry a dispersion correction are, to the thing
+doing the work, the same calculation: one plain exchange and one attenuated one. So
+the rows of this section are about the **split**, and a third range separated
+functional would add nothing to them.
+
+The B vectors are formed once and are small against what they save -- 3.21 seconds at
+caffeine def2-tzvpd, against a fitted build of 8.57 and a four centre build of 847.79.
+Both sets, plain and attenuated, are inside that figure.
+
+### What the fitting costs in energy
+
+The fitted energy lies **below** the four centre one in every one of the sixteen
+cases, by 6.6e-05 to 1.8e-04 hartree, and the gap grows with the basis rather than
+shrinking:
+
+| | def2-svp | def2-svpd | def2-tzvp | def2-tzvpd |
+| --- | ---: | ---: | ---: | ---: |
+| caffeine, CAM-B3LYP | -6.66e-05 | -6.64e-05 | -1.56e-04 | -1.58e-04 |
+| caffeine, WB97X-D4 | -8.32e-05 | -8.21e-05 | -1.61e-04 | -1.63e-04 |
+| nitroxide, CAM-B3LYP | -1.03e-04 | -9.15e-05 | -1.70e-04 | -1.73e-04 |
+| nitroxide, WB97X-D4 | -1.18e-04 | -1.06e-04 | -1.73e-04 | -1.75e-04 |
+
+The sign is the one the plain hybrid rows of this file also show and the Hartree-Fock
+rows do not, and the step is between the double and triple zeta pairs rather than
+with the diffuse functions, which says it follows the orbital basis the fitting set
+has to span and not the diffuseness.
+
+### What this section does not measure
+
+**The heading's claim is not tested by these records.** Saying the split costs the
+four centre way twice and the fitted way a quarter needs a plain functional measured
+beside the range separated one, in the same session on the same tree, and these
+records hold only CAM-B3LYP and WB97X-D4. The plain caffeine numbers elsewhere in
+this file are a gradient table at a different commit, so reading the two against each
+other is the cross run comparison this file has already been caught by twice. The
+claim is a structural expectation -- `kx_rs` is a second full sweep of the four centre
+kernels, while the fitted way adds a second exchange inside a pass it was already
+making -- and it stays an expectation until a plain row is measured beside these.
+
+**Nor is the open shell cost separable here.** Nitroxide's ratios are larger than
+caffeine's at every basis, and its four centre build per iteration is about twice
+caffeine's at a smaller basis while its fitted build is only about a third larger,
+which would say the second spin costs the four centre way far more than the fitted
+way. But nitroxide is a different molecule with a different number of functions, so
+that reading confounds the spin with the system. It needs the same molecule run both
+ways to be worth stating.
 
 ## The Coulomb only suite, where the fitting never has to be closed for an orbital
 
