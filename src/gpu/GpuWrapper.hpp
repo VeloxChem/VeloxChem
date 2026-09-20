@@ -45,6 +45,11 @@
     #define VLX_HAVE_ROCM_VERSION_HEADER 0
 #endif
 
+// check USE_MAGMA for ROCm version older than 7
+#if defined(USE_HIP) && !defined(USE_MAGMA) && VLX_HAVE_ROCM_VERSION_HEADER && (ROCM_VERSION_MAJOR < 7)
+    #error "USE_MAGMA is mandatory for ROCm < 7. Set USE_MAGMA := true in src/Makefile.setup"
+#endif
+
 #if defined(USE_CUDA)
 
     #define gpuSafe(e)                          cudaSafe(e)
