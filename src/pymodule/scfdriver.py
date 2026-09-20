@@ -58,6 +58,7 @@ from .matrix import Matrix
 from .aodensitymatrix import AODensityMatrix
 from .rifockdriver import RIFockDriver
 from .rijkfockdriver import RIJKFockDriver
+from .veloxchemlib import SimdRIJFockDriver
 from .veloxchemlib import SimdRIJKFockDriver
 from .veloxchemlib import rimode
 from .packedmatrix import PackedMatrix
@@ -236,6 +237,7 @@ class ScfDriver:
         self.ri_metric_route = 'cholesky'
         self.ri_dense_threshold = 0.0
         self.ri_jk_simd = False
+        self.ri_coulomb_simd = False
         self.ri_memory_budget = None
         self._ri_aux_atoms = []
         self.ri_mode = 'automatic'
@@ -372,6 +374,8 @@ class ScfDriver:
                      'exchange expands them; 0 expands always, above 1 never'),
                 'ri_jk_simd':
                     ('bool', 'use the SIMD RI-JK driver instead of the conventional one'),
+                'ri_coulomb_simd':
+                    ('bool', 'use the SIMD RI-J driver instead of the conventional one'),
                 'ri_memory_budget':
                     ('float', 'memory the SIMD RI-JK driver may hold, in GB'),
                 'ri_mode':
@@ -1805,7 +1809,62 @@ class ScfDriver:
         # builds nor to the rest of them, so it is timed on its own.
         ri_setup_t0 = tm.time()
 
-        if self.ri_coulomb:
+        if self.ri_coulomb and self.ri_coulomb_simd:
+            if isinstance(self.ri_auxiliary_basis, str):
+                basis_ri = MolecularBasis.read(molecule, self.ri_auxiliary_basis)
+            else:
+                basis_ri = MolecularBasis(self.ri_auxiliary_basis)
+
+            self._ri_drv = SimdRIJFockDriver()
+
+            # NOTE: the metric is inverted once on the master and handed to the
+            # ranks, for the reason the RI-JK path does it: the inversion picks its
+            # own fallback from the matrix, and two ranks choosing differently would
+            # build with metrics which are not the same.
+            metric = PackedMatrix()
+
+            if self.rank == mpi_master():
+                metric = self._ri_drv.make_metric(molecule, basis_ri,
+                                                  self.ri_metric_threshold)
+
+            metric = metric.broadcast(self.comm, root=mpi_master())
+
+            modes = {
+                'automatic': rimode.automatic,
+                'in_memory': rimode.in_memory,
+                'direct': rimode.direct,
+            }
+
+            assert_msg_critical(
+                self.ri_mode in modes,
+                'SCF driver: ri_mode must be automatic, in_memory or direct')
+
+            # NOTE: the parts are what the ranks divide, so there have to be at
+            # least as many of them as there are ranks. Unlike the RI-JK path the
+            # auxiliary basis is not divided between the ranks by atom: both sweeps
+            # here run over parts, and a part is the unit either of them takes.
+            self._ri_drv.prepare(molecule, ao_basis, basis_ri, self.eri_thresh,
+                                 self._get_ri_memory_budget(),
+                                 self.ri_metric_threshold, modes[self.ri_mode],
+                                 metric, self.nodes)
+
+            taken = ('held in memory'
+                     if self._ri_drv.get_mode() == rimode.in_memory else
+                     'formed again on every Fock build')
+
+            self.ostream.print_info(
+                'Using the SIMD resolution of the identity (RI-J).')
+            self.ostream.print_info(
+                'Dimension of RI auxiliary basis set ' +
+                f'({basis_ri.get_label().upper()}): ' +
+                f'{basis_ri.get_dimensions_of_basis()}')
+            self.ostream.print_info(
+                f'Three-center integrals are {taken}, in ' +
+                f'{self._ri_drv.number_of_parts()} parts.')
+            self.ostream.print_blank()
+            self.ostream.flush()
+
+        elif self.ri_coulomb:
             self._ri_drv = RIFockDriver(self.comm, self.ostream)
             self._ri_drv.prepare_buffers(molecule,
                                          ao_basis,
@@ -2717,6 +2776,63 @@ class ScfDriver:
 
         return npot_mat
 
+    def _simd_ri_j_fock(self, density):
+        """
+        Computes the Coulomb matrix with the SIMD RI-J driver.
+
+        :param density:
+            The density matrix of one spin, as a numpy array.
+
+        :return:
+            The Coulomb matrix of that density, as a numpy array.
+        """
+
+        # NOTE: once and not twice. The caller doubles what comes back, as it does
+        # for the conventional driver of this approximation and for the four-centre
+        # build of a matrix of the `j` kind. The RI-JK driver doubles it itself,
+        # because what it answers is a whole Fock matrix rather than a Coulomb one.
+
+        nao = density.shape[0]
+
+        packed_density = PackedMatrix(nao, nao, mat_t.symmetric)
+        packed_density.from_numpy(np.ascontiguousarray(density))
+
+        # NOTE: both sweeps divide over the parts and what couples them is the
+        # fitting, whose right hand side has to be complete before it is solved.
+        # That sum is the one thing the ranks exchange, and it is one value per
+        # auxiliary basis function.
+
+        parts = list(range(self._ri_drv.number_of_parts()))
+
+        mine = parts[self.rank::self.nodes]
+
+        local = np.array(self._ri_drv.compute_gamma(packed_density, mine),
+                         dtype=np.float64)
+
+        total = np.zeros_like(local)
+        self.comm.Allreduce(local, total, op=MPI.SUM)
+
+        # NOTE: every rank holds the inverted metric and applies it, rather than one
+        # applying it and sending. It is one multiply of the square of the auxiliary
+        # basis against a single right hand side, which is nothing beside a sweep.
+
+        gamma = self._ri_drv.solve_fitting(total)
+
+        fock = PackedMatrix(nao, nao, mat_t.symmetric)
+        fock.zero()
+
+        self._ri_drv.compute_coulomb(gamma, mine, fock)
+
+        fock_np = fock.to_numpy()
+
+        if self.nodes > 1:
+            total_fock = np.zeros_like(fock_np)
+            self.comm.Allreduce(np.ascontiguousarray(fock_np), total_fock,
+                                op=MPI.SUM)
+            fock_np = total_fock
+
+        return fock_np
+
     def _simd_ri_jk_fock(self,
                          density,
                          exchange_scaling_factor,
@@ -3060,7 +3176,9 @@ class ScfDriver:
 
         self._prepare_for_ri_fock_build(fock_type)
 
-        if self.ri_coulomb and fock_type == 'j':
+        if self.ri_coulomb and self.ri_coulomb_simd and fock_type == 'j':
+            fock_mat_np = self._simd_ri_j_fock(den_mat[0])
+        elif self.ri_coulomb and fock_type == 'j':
             fock_mat = self._ri_drv.compute(den_mat_for_fock, 'j')
             fock_mat_np = fock_mat.to_numpy()
         elif self.ri_jk and self.ri_jk_simd and fock_type != 'j':
