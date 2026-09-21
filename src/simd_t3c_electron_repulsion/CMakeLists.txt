@@ -1,7 +1,12 @@
 target_sources(vlxobjs
   PRIVATE
+    SimdRIFockCommon.cpp
     SimdRIFockDriver.cpp
+    SimdRIJFockDriver.cpp
+    SimdRIJGradientDriver.cpp
     SimdRIJKFockDriver.cpp
+    SimdRIJKGradientDriver.cpp
+    SimdRIJKResponseDriver.cpp
     SimdThreeCenterElectronRepulsionCtrVrrSSS.cpp
     SimdThreeCenterElectronRepulsionDriver.cpp
     SimdThreeCenterElectronRepulsionFunc.cpp
@@ -446,6 +451,13 @@ target_sources(vlxobjs
     SimdThreeCenterElectronRepulsionRecSSL.cpp
     SimdThreeCenterElectronRepulsionRecSSP.cpp
     SimdThreeCenterElectronRepulsionRecSSS.cpp
+    SimdThreeCenterElectronRepulsionVrrRecDPD.cpp
+    SimdThreeCenterElectronRepulsionVrrRecDPF.cpp
+    SimdThreeCenterElectronRepulsionVrrRecDPG.cpp
+    SimdThreeCenterElectronRepulsionVrrRecDPH.cpp
+    SimdThreeCenterElectronRepulsionVrrRecDPI.cpp
+    SimdThreeCenterElectronRepulsionVrrRecDPP.cpp
+    SimdThreeCenterElectronRepulsionVrrRecDPS.cpp
     SimdThreeCenterElectronRepulsionVrrRecDSD.cpp
     SimdThreeCenterElectronRepulsionVrrRecDSF.cpp
     SimdThreeCenterElectronRepulsionVrrRecDSG.cpp
@@ -455,6 +467,13 @@ target_sources(vlxobjs
     SimdThreeCenterElectronRepulsionVrrRecDSL.cpp
     SimdThreeCenterElectronRepulsionVrrRecDSP.cpp
     SimdThreeCenterElectronRepulsionVrrRecDSS.cpp
+    SimdThreeCenterElectronRepulsionVrrRecFPD.cpp
+    SimdThreeCenterElectronRepulsionVrrRecFPF.cpp
+    SimdThreeCenterElectronRepulsionVrrRecFPG.cpp
+    SimdThreeCenterElectronRepulsionVrrRecFPH.cpp
+    SimdThreeCenterElectronRepulsionVrrRecFPI.cpp
+    SimdThreeCenterElectronRepulsionVrrRecFPP.cpp
+    SimdThreeCenterElectronRepulsionVrrRecFPS.cpp
     SimdThreeCenterElectronRepulsionVrrRecFSD.cpp
     SimdThreeCenterElectronRepulsionVrrRecFSF.cpp
     SimdThreeCenterElectronRepulsionVrrRecFSG.cpp
@@ -464,6 +483,13 @@ target_sources(vlxobjs
     SimdThreeCenterElectronRepulsionVrrRecFSL.cpp
     SimdThreeCenterElectronRepulsionVrrRecFSP.cpp
     SimdThreeCenterElectronRepulsionVrrRecFSS.cpp
+    SimdThreeCenterElectronRepulsionVrrRecGPD.cpp
+    SimdThreeCenterElectronRepulsionVrrRecGPF.cpp
+    SimdThreeCenterElectronRepulsionVrrRecGPG.cpp
+    SimdThreeCenterElectronRepulsionVrrRecGPH.cpp
+    SimdThreeCenterElectronRepulsionVrrRecGPI.cpp
+    SimdThreeCenterElectronRepulsionVrrRecGPP.cpp
+    SimdThreeCenterElectronRepulsionVrrRecGPS.cpp
     SimdThreeCenterElectronRepulsionVrrRecGSD.cpp
     SimdThreeCenterElectronRepulsionVrrRecGSF.cpp
     SimdThreeCenterElectronRepulsionVrrRecGSG.cpp
@@ -536,6 +562,34 @@ target_sources(vlxobjs
     SimdThreeCenterElectronRepulsionVrrRecOSL.cpp
     SimdThreeCenterElectronRepulsionVrrRecOSP.cpp
     SimdThreeCenterElectronRepulsionVrrRecOSS.cpp
+    SimdThreeCenterElectronRepulsionVrrRecPDD.cpp
+    SimdThreeCenterElectronRepulsionVrrRecPDF.cpp
+    SimdThreeCenterElectronRepulsionVrrRecPDG.cpp
+    SimdThreeCenterElectronRepulsionVrrRecPDH.cpp
+    SimdThreeCenterElectronRepulsionVrrRecPDI.cpp
+    SimdThreeCenterElectronRepulsionVrrRecPDP.cpp
+    SimdThreeCenterElectronRepulsionVrrRecPDS.cpp
+    SimdThreeCenterElectronRepulsionVrrRecPFD.cpp
+    SimdThreeCenterElectronRepulsionVrrRecPFF.cpp
+    SimdThreeCenterElectronRepulsionVrrRecPFG.cpp
+    SimdThreeCenterElectronRepulsionVrrRecPFH.cpp
+    SimdThreeCenterElectronRepulsionVrrRecPFI.cpp
+    SimdThreeCenterElectronRepulsionVrrRecPFP.cpp
+    SimdThreeCenterElectronRepulsionVrrRecPFS.cpp
+    SimdThreeCenterElectronRepulsionVrrRecPGD.cpp
+    SimdThreeCenterElectronRepulsionVrrRecPGF.cpp
+    SimdThreeCenterElectronRepulsionVrrRecPGG.cpp
+    SimdThreeCenterElectronRepulsionVrrRecPGH.cpp
+    SimdThreeCenterElectronRepulsionVrrRecPGI.cpp
+    SimdThreeCenterElectronRepulsionVrrRecPGP.cpp
+    SimdThreeCenterElectronRepulsionVrrRecPGS.cpp
+    SimdThreeCenterElectronRepulsionVrrRecPPD.cpp
+    SimdThreeCenterElectronRepulsionVrrRecPPF.cpp
+    SimdThreeCenterElectronRepulsionVrrRecPPG.cpp
+    SimdThreeCenterElectronRepulsionVrrRecPPH.cpp
+    SimdThreeCenterElectronRepulsionVrrRecPPI.cpp
+    SimdThreeCenterElectronRepulsionVrrRecPPP.cpp
+    SimdThreeCenterElectronRepulsionVrrRecPPS.cpp
     SimdThreeCenterElectronRepulsionVrrRecPSD.cpp
     SimdThreeCenterElectronRepulsionVrrRecPSF.cpp
     SimdThreeCenterElectronRepulsionVrrRecPSG.cpp

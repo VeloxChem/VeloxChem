@@ -81,4 +81,10 @@ target_sources(vlxobjs
     SimdElectronRepulsionGeom10RsRecSL.cpp
     SimdElectronRepulsionGeom10RsRecSP.cpp
     SimdElectronRepulsionGeom10RsRecSS.cpp
+    SimdTwoCenterElectronRepulsionGradientRsDriver.cpp
+  )
+
+target_include_directories(vlxobjs
+  PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}>
   )

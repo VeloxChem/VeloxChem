@@ -176,3 +176,8 @@ target_sources(vlxobjs
     SimdThreeCenterElectronRepulsionGeom010RsRecSSP.cpp
     SimdThreeCenterElectronRepulsionGeom010RsRecSSS.cpp
   )
+
+target_include_directories(vlxobjs
+  PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}>
+  )

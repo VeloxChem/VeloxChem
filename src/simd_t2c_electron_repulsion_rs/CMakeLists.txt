@@ -84,3 +84,8 @@ target_sources(vlxobjs
     SimdTwoCenterElectronRepulsionRsFunc.cpp
     SimdTwoCenterElectronRepulsionRsDriver.cpp
   )
+
+target_include_directories(vlxobjs
+  PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}>
+  )

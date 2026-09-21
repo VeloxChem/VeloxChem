@@ -1,24 +1,23 @@
 target_sources(vlxobjs
   PRIVATE
-    PairDensityBecke88.cpp
     PairDensityB88_erf.cpp
+    PairDensityBecke88.cpp
     PairDensityGridGenerator.cpp
     PairDensityHPG20.cpp
     PairDensityLYP.cpp
     PairDensityLYP_erf.cpp
-    PairDensityPBE_C.cpp
-    PairDensityPBEC_erf.cpp
-    PairDensityLYP_erf.cpp
     PairDensityP86.cpp
-    PairDensityPBE_X.cpp
+    PairDensityPBEC_erf.cpp
     PairDensityPBEX_erf.cpp
+    PairDensityPBE_C.cpp
+    PairDensityPBE_X.cpp
     PairDensityPMGB06.cpp
     PairDensitySlater.cpp
     PairDensitySlater_erf.cpp
     PairDensityVWN.cpp
     XCIntegratorForPDFT.cpp
-    XCPairDensityFunctional.cpp
     XCMolecularGradientForPDFT.cpp
+    XCPairDensityFunctional.cpp
   )
 
 target_include_directories(vlxobjs

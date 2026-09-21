@@ -145,6 +145,15 @@ target_sources(vlxobjs
     SimdElectronRepulsionVrrRecLL.cpp
     SimdElectronRepulsionVrrRecLP.cpp
     SimdElectronRepulsionVrrRecLS.cpp
+    SimdElectronRepulsionVrrRecMD.cpp
+    SimdElectronRepulsionVrrRecMF.cpp
+    SimdElectronRepulsionVrrRecMG.cpp
+    SimdElectronRepulsionVrrRecMH.cpp
+    SimdElectronRepulsionVrrRecMI.cpp
+    SimdElectronRepulsionVrrRecMK.cpp
+    SimdElectronRepulsionVrrRecML.cpp
+    SimdElectronRepulsionVrrRecMP.cpp
+    SimdElectronRepulsionVrrRecMS.cpp
     SimdElectronRepulsionVrrRecPD.cpp
     SimdElectronRepulsionVrrRecPF.cpp
     SimdElectronRepulsionVrrRecPG.cpp
