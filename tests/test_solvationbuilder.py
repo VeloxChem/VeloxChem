@@ -874,6 +874,8 @@ class TestSolvationBuilder:
     def test_perform_equilibration_requires_water_model_for_pure_water_itself(
             self):
 
+        pytest.importorskip("openmm")
+
         np.random.seed(0)
         water = _make_water()
         box = [10.0, 10.0, 10.0]
