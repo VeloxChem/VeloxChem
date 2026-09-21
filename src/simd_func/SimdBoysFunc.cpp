@@ -36,6 +36,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <numeric>
 #include <string>
 #include <vector>
 
@@ -243,6 +244,101 @@ _scale_values(CSimdMatrix &buffer, const size_t target, const size_t nrows, cons
     }
 }
 
+/// @brief Scales the rows of values of the attenuated operator, order by order.
+/// @param buffer The buffer holding the values.
+/// @param target The row holding the arguments, the values following it.
+/// @param orders The order each row stands for, in the order the rows are packed.
+/// @param ncols The number of atom pairs to scale.
+/// @param fj The prefactor of the integral.
+/// @param theta The root of omega squared over omega squared plus mu.
+/// @note One factor per row and not one for all of them, which is the whole
+/// difference from the plain scaling: the attenuated function of order m carries
+/// theta to the 2m + 1, so a row's weight follows the order it stands for. In the
+/// form which asks for some orders alone the rows are packed consecutively while the
+/// orders they stand for are not, so the exponent comes from the order and never
+/// from the position of the row.
+static auto
+_scale_attenuated_values(CSimdMatrix                &buffer,
+                         const size_t                target,
+                         const std::vector<size_t>  &orders,
+                         const size_t                ncols,
+                         const double                fj,
+                         const double                theta) -> void
+{
+    for (size_t j = 0; j < orders.size(); j++)
+    {
+        const auto weight = fj * std::pow(theta, static_cast<double>(2 * orders[j] + 1));
+
+        auto *row = buffer.data(target + 1 + j);
+
+#pragma omp simd aligned(row : simd::cache_line_size())
+        for (size_t k = 0; k < ncols; k++)
+        {
+            row[k] *= weight;
+        }
+    }
+}
+
+/// @brief The root of the factor which carries the attenuation into the argument.
+/// @param mu The factor the squared distance is scaled by for the plain operator.
+/// @param omega The range separation parameter.
+/// @note The attenuated operator is the plain one with its argument scaled by theta
+/// squared and its value of order m scaled by theta to the 2m + 1. Sending omega to
+/// infinity sends theta to one and returns the plain function exactly; sending it to
+/// zero sends theta to zero, and every value with it, which is what
+/// erf(0 r) / r is.
+static auto
+_attenuation(const double mu, const double omega) -> double
+{
+    const auto omega_sq = omega * omega;
+
+    return std::sqrt(omega_sq / (omega_sq + mu));
+}
+
+auto
+compute_full_erf_boys_function(CSimdMatrix       &buffer,
+                               const CSimdMatrix &coordinates,
+                               const size_t       target,
+                               const size_t       order,
+                               const size_t       ncols,
+                               const double       fj,
+                               const double       mu,
+                               const double       omega) -> void
+{
+    const auto theta = _attenuation(mu, omega);
+
+    // NOTE: the argument is scaled by theta squared, which is the same as forming it
+    // from the reduced exponent the attenuation leaves behind.
+    _make_arguments(buffer, coordinates, target, ncols, mu * theta * theta);
+
+    compute_boys_values(buffer, target, order, ncols);
+
+    auto orders = std::vector<size_t>(order + 1);
+
+    std::iota(orders.begin(), orders.end(), size_t{0});
+
+    _scale_attenuated_values(buffer, target, orders, ncols, fj, theta);
+}
+
+auto
+compute_erf_boys_function(CSimdMatrix                        &buffer,
+                          const CSimdMatrix                  &coordinates,
+                          const size_t                        target,
+                          const std::initializer_list<size_t> orders,
+                          const size_t                        ncols,
+                          const double                        fj,
+                          const double                        mu,
+                          const double                        omega) -> void
+{
+    const auto theta = _attenuation(mu, omega);
+
+    _make_arguments(buffer, coordinates, target, ncols, mu * theta * theta);
+
+    compute_boys_values(buffer, target, orders, ncols);
+
+    _scale_attenuated_values(buffer, target, std::vector<size_t>(orders), ncols, fj, theta);
+}
+
 auto
 compute_full_boys_function(CSimdMatrix       &buffer,
                            const CSimdMatrix &coordinates,
@@ -275,19 +371,24 @@ compute_boys_function(CSimdMatrix                        &buffer,
     _scale_values(buffer, target, orders.size(), ncols, fj);
 }
 
-/// @brief Forms the arguments of a three-center Boys function from the displacement
-/// of the Gaussian product center from the atom on the ket side.
+/// @brief Forms the arguments of a Boys function from a displacement of the Gaussian
+/// product center, scaled by a factor the operator supplies.
 /// @param buffer The buffer holding that displacement in the three rows at pc.
 /// @param target The row to write the arguments to.
 /// @param pc The first of the three rows holding the displacement.
 /// @param ncols The number of atom pairs to form the arguments of.
-/// @param fq The factor the squared displacement is scaled by.
+/// @param factor The factor the squared displacement is scaled by.
+/// @note Two operators form their argument this way and differ only in the factor
+/// and in what the displacement is to: a three-center electron repulsion scales the
+/// displacement to the atom on the ket side by p gamma / q, and a nuclear attraction
+/// scales the displacement to a point charge by p.
 static auto
-_make_t3c_arguments(CSimdMatrix &buffer, const size_t target, const size_t pc, const size_t ncols, const double fq) -> void
+_make_scaled_arguments(CSimdMatrix  &buffer,
+                       const size_t  target,
+                       const size_t  pc,
+                       const size_t  ncols,
+                       const double  factor) -> void
 {
-    // NOTE: the argument is the squared displacement of the Gaussian product center
-    // from the atom on the ket side, scaled by the exponent of the pair of that
-    // center with the primitive on the ket side.
 
     auto *args = buffer.data(target);
 
@@ -298,44 +399,147 @@ _make_t3c_arguments(CSimdMatrix &buffer, const size_t target, const size_t pc, c
 #pragma omp simd aligned(args, pc_x, pc_y, pc_z : simd::cache_line_size())
     for (size_t k = 0; k < ncols; k++)
     {
-        args[k] = fq * (pc_x[k] * pc_x[k] + pc_y[k] * pc_y[k] + pc_z[k] * pc_z[k]);
+        args[k] = factor * (pc_x[k] * pc_x[k] + pc_y[k] * pc_y[k] + pc_z[k] * pc_z[k]);
     }
 }
 
-/// @brief Scales the values of a three-center Boys function by the prefactor of the
-/// integral and by the exponential the pair of primitives on bra side contributes.
-/// @param buffer The buffer holding the values in the rows after target.
-/// @param coordinates The coordinates of the atom pairs, whose row nine holds the
-/// squared distance of the atom pair.
+/// @brief The exponential of every pair of primitives of a bra, one run of atom
+/// pairs each, held per thread.
+/// @note A three-center kernel fills this once and reads it inside its loop over the
+/// atoms on the ket side. It is grown and never shrunk: it is sized by the pairs of
+/// primitives of a combination of basis functions and by the atom pairs of a block,
+/// and a thread walks combinations of every size.
+namespace {
+
+struct CPairExponents
+{
+    std::vector<double> values;
+
+    size_t stride{0};
+};
+
+thread_local CPairExponents pair_exponents;
+
+}  // namespace
+
+/// @brief Scales the values of a Boys function by the prefactor of the integral and
+/// by the exponential the pair of primitives contributes.
+/// @param buffer The buffer holding the values in the rows after target, and the
+/// exponential of the pair in the row at pair_exp.
 /// @param target The row holding the arguments, with the values following it.
 /// @param nrows The number of rows of values to scale.
 /// @param ncols The number of atom pairs to scale.
 /// @param fj The prefactor of the integral.
-/// @param mu The factor the squared distance of the atom pair is scaled by.
-/// @note The scaling is not one number here, as it is for the two-center form. The
-/// pair of primitives contributes exp(-mu R_AB^2), which varies with the atom pair,
-/// so the values are scaled column by column and not by fj alone.
+/// @param pair_exp The row holding exp(-mu AB^2), one value per atom pair.
+/// @note The scaling is not one number here, as it is for the two-center electron
+/// repulsion. The pair of primitives contributes exp(-mu R_AB^2), which varies with
+/// the atom pair, so the values are scaled column by column and not by fj alone. An
+/// operator which collapses the pair onto one center wants this: the three-center
+/// electron repulsion and the nuclear attraction both do.
+/// @note That exponential is not formed here. It depends on the pair of primitives
+/// and on the atom pair and on neither the order nor the point the operator is
+/// anchored at, so compute_pair_exponent writes it into a row once for the pair and
+/// every call below reads that row. Evaluating it where it is read instead cost 17 to
+/// 26 per cent of a nuclear attraction call and 10 to 14 of a three-center one.
 static auto
-_scale_t3c_values(CSimdMatrix       &buffer,
-                  const CSimdMatrix &coordinates,
-                  const size_t       target,
-                  const size_t       nrows,
-                  const size_t       ncols,
-                  const double       fj,
-                  const double       mu) -> void
+_scale_pair_values(CSimdMatrix  &buffer,
+                   const size_t  target,
+                   const size_t  nrows,
+                   const size_t  ncols,
+                   const double  fj,
+                   const double *factors) -> void
 {
-    const auto *ab_2 = coordinates.data(9);
-
     for (size_t j = 0; j < nrows; j++)
     {
         auto *row = buffer.data(target + 1 + j);
 
-#pragma omp simd aligned(row, ab_2 : simd::cache_line_size())
+#pragma omp simd aligned(row : simd::cache_line_size())
         for (size_t k = 0; k < ncols; k++)
         {
-            row[k] *= fj * std::exp(-mu * ab_2[k]);
+            row[k] *= fj * factors[k];
         }
     }
+}
+
+/// @brief Scales the rows of values of the attenuated operator for a pair which the
+/// operator collapses onto one center, order by order.
+/// @note The plain form applies one factor to every row. The attenuated one carries
+/// theta to the 2m + 1 on the row of order m as well, so the weight follows the order
+/// the row stands for and never its position: in the form which asks for some orders
+/// alone the rows are packed consecutively while the orders they stand for are not.
+static auto
+_scale_attenuated_pair_values(CSimdMatrix               &buffer,
+                              const size_t               target,
+                              const std::vector<size_t> &orders,
+                              const size_t               ncols,
+                              const double               fj,
+                              const double              *factors,
+                              const double               theta) -> void
+{
+    for (size_t j = 0; j < orders.size(); j++)
+    {
+        const auto weight = fj * std::pow(theta, static_cast<double>(2 * orders[j] + 1));
+
+        auto *row = buffer.data(target + 1 + j);
+
+#pragma omp simd aligned(row : simd::cache_line_size())
+        for (size_t k = 0; k < ncols; k++)
+        {
+            row[k] *= weight * factors[k];
+        }
+    }
+}
+
+auto
+compute_full_t3c_erf_boys_function(CSimdMatrix       &buffer,
+                                   const CSimdMatrix &coordinates,
+                                   const size_t       target,
+                                   const size_t       pc,
+                                   const size_t       order,
+                                   const size_t       ncols,
+                                   const double       fj,
+                                   const size_t       pair,
+                                   const double       fq,
+                                   const double       omega) -> void
+{
+    // NOTE: fq is the reduced exponent of the pair and the auxiliary primitive,
+    // which is what the attenuation is taken against. The argument is scaled by
+    // theta squared and the value of order m by theta to the 2m + 1, exactly as in
+    // the two-center case; only the argument and the per-pair exponential differ.
+    const auto theta = _attenuation(fq, omega);
+
+    _make_scaled_arguments(buffer, target, pc, ncols, fq * theta * theta);
+
+    compute_boys_values(buffer, target, order, ncols);
+
+    auto orders = std::vector<size_t>(order + 1);
+
+    std::iota(orders.begin(), orders.end(), size_t{0});
+
+    _scale_attenuated_pair_values(buffer, target, orders, ncols, fj,
+                                  pair_exponents.values.data() + pair * pair_exponents.stride, theta);
+}
+
+auto
+compute_t3c_erf_boys_function(CSimdMatrix                        &buffer,
+                              const CSimdMatrix                  &coordinates,
+                              const size_t                        target,
+                              const size_t                        pc,
+                              const std::initializer_list<size_t> orders,
+                              const size_t                        ncols,
+                              const double                        fj,
+                              const size_t                        pair,
+                              const double                        fq,
+                              const double                        omega) -> void
+{
+    const auto theta = _attenuation(fq, omega);
+
+    _make_scaled_arguments(buffer, target, pc, ncols, fq * theta * theta);
+
+    compute_boys_values(buffer, target, orders, ncols);
+
+    _scale_attenuated_pair_values(buffer, target, std::vector<size_t>(orders), ncols, fj,
+                                  pair_exponents.values.data() + pair * pair_exponents.stride, theta);
 }
 
 auto
@@ -346,14 +550,15 @@ compute_t3c_boys_function(CSimdMatrix                        &buffer,
                           const std::initializer_list<size_t> orders,
                           const size_t                        ncols,
                           const double                        fj,
-                          const double                        mu,
+                          const size_t                        pair,
                           const double                        fq) -> void
 {
-    _make_t3c_arguments(buffer, target, pc, ncols, fq);
+    _make_scaled_arguments(buffer, target, pc, ncols, fq);
 
     compute_boys_values(buffer, target, orders, ncols);
 
-    _scale_t3c_values(buffer, coordinates, target, orders.size(), ncols, fj, mu);
+    _scale_pair_values(buffer, target, orders.size(), ncols, fj,
+                       pair_exponents.values.data() + pair * pair_exponents.stride);
 }
 
 auto
@@ -364,14 +569,112 @@ compute_full_t3c_boys_function(CSimdMatrix       &buffer,
                                const size_t       order,
                                const size_t       ncols,
                                const double       fj,
-                               const double       mu,
+                               const size_t       pair,
                                const double       fq) -> void
 {
-    _make_t3c_arguments(buffer, target, pc, ncols, fq);
+    _make_scaled_arguments(buffer, target, pc, ncols, fq);
 
     compute_boys_values(buffer, target, order, ncols);
 
-    _scale_t3c_values(buffer, coordinates, target, order + 1, ncols, fj, mu);
+    _scale_pair_values(buffer, target, order + 1, ncols, fj,
+                       pair_exponents.values.data() + pair * pair_exponents.stride);
+}
+
+
+auto
+compute_pair_exponents(const CBasisFunction &bra,
+                       const CBasisFunction &ket,
+                       const CSimdMatrix    &coordinates,
+                       const size_t          ncols) -> void
+{
+    const auto &a_exps = bra.exponents();
+
+    const auto &b_exps = ket.exponents();
+
+    const auto nprim_a = a_exps.size();
+
+    const auto nprim_b = b_exps.size();
+
+    if (const auto wanted = nprim_a * nprim_b * ncols; pair_exponents.values.size() < wanted)
+    {
+        pair_exponents.values.resize(wanted);
+    }
+
+    pair_exponents.stride = ncols;
+
+    const auto *ab_2 = coordinates.data(9);
+
+    for (size_t i = 0; i < nprim_a; i++)
+    {
+        for (size_t j = 0; j < nprim_b; j++)
+        {
+            const auto p = a_exps[i] + b_exps[j];
+
+            const auto mu = a_exps[i] * b_exps[j] / p;
+
+            auto *row = pair_exponents.values.data() + (i * nprim_b + j) * ncols;
+
+#pragma omp simd
+            for (size_t k = 0; k < ncols; k++)
+            {
+                row[k] = std::exp(-mu * ab_2[k]);
+            }
+        }
+    }
+}
+
+auto
+compute_pair_exponent(CSimdMatrix       &buffer,
+                      const CSimdMatrix &coordinates,
+                      const size_t       target,
+                      const size_t       ncols,
+                      const double       mu) -> void
+{
+    auto *row = buffer.data(target);
+
+    const auto *ab_2 = coordinates.data(9);
+
+#pragma omp simd aligned(row, ab_2 : simd::cache_line_size())
+    for (size_t k = 0; k < ncols; k++)
+    {
+        row[k] = std::exp(-mu * ab_2[k]);
+    }
+}
+
+auto
+compute_npot_boys_function(CSimdMatrix                        &buffer,
+                           const CSimdMatrix                  &coordinates,
+                           const size_t                        target,
+                           const size_t                        pc,
+                           const std::initializer_list<size_t> orders,
+                           const size_t                        ncols,
+                           const double                        fz,
+                           const size_t                        pair_exp,
+                           const double                        p) -> void
+{
+    _make_scaled_arguments(buffer, target, pc, ncols, p);
+
+    compute_boys_values(buffer, target, orders, ncols);
+
+    _scale_pair_values(buffer, target, orders.size(), ncols, fz, buffer.data(pair_exp));
+}
+
+auto
+compute_full_npot_boys_function(CSimdMatrix       &buffer,
+                                const CSimdMatrix &coordinates,
+                                const size_t       target,
+                                const size_t       pc,
+                                const size_t       order,
+                                const size_t       ncols,
+                                const double       fz,
+                                const size_t       pair_exp,
+                                const double       p) -> void
+{
+    _make_scaled_arguments(buffer, target, pc, ncols, p);
+
+    compute_boys_values(buffer, target, order, ncols);
+
+    _scale_pair_values(buffer, target, order + 1, ncols, fz, buffer.data(pair_exp));
 }
 
 }  // namespace simdfunc

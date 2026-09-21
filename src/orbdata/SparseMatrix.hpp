@@ -826,8 +826,10 @@ class CSparseMatrix
         {
             const auto &block = _diagonal_blocks[static_cast<size_t>(iblk)];
 
-            errors::assertMsgCritical(block.get_storage() == diagstor::scalar,
+            errors::assertMsgCritical((block.get_storage() == diagstor::scalar) || (block.get_storage() == diagstor::full),
                                       std::string("SparseMatrix.to_dense: Storage layout of the diagonal blocks is not supported"));
+
+            const auto full_storage = (block.get_storage() == diagstor::full);
 
             const auto *block_values = diagonal_values(static_cast<size_t>(iblk));
 
@@ -852,11 +854,49 @@ class CSparseMatrix
 
                     if (block.number_of_elements(la, ia, lb, jb) == 0) continue;
 
+                    const auto offset = block.element_offset(la, ia, lb, jb);
+
+                    if (full_storage)
+                    {
+                        // NOTE: the operator is not spherically symmetric about the
+                        // atom -- the nuclear potential is centred on the charges --
+                        // so every pair of angular components carries its own value
+                        // for every atom, laid out as the pair blocks are with the
+                        // components running slowest.
+
+                        const auto ncomps_a = static_cast<size_t>(2 * la + 1);
+
+                        const auto ncomps_b = static_cast<size_t>(2 * lb + 1);
+
+                        for (size_t ma = 0; ma < ncomps_a; ma++)
+                        {
+                            for (size_t mb = 0; mb < ncomps_b; mb++)
+                            {
+                                const auto *row_values = block_values + offset + (ma * ncomps_b + mb) * atoms.size();
+
+                                for (size_t k = 0; k < atoms.size(); k++)
+                                {
+                                    const auto atom = static_cast<size_t>(atoms[k]);
+
+                                    const auto row = bra_starts[atom * bra_nmoms + la] + ia + ma * bra_strides[la];
+
+                                    const auto col = ket_starts[atom * ket_nmoms + lb] + jb + mb * ket_strides[lb];
+
+                                    values[row * ncols + col] = row_values[k];
+
+                                    if (block.is_triangular() && (row != col)) values[col * ncols + row] = row_values[k];
+                                }
+                            }
+                        }
+
+                        continue;
+                    }
+
                     // NOTE: the operator is spherically symmetric about the atom,
                     // so a single value is stored for the whole block and it is
                     // diagonal in the angular components.
 
-                    const auto fval = block_values[block.element_offset(la, ia, lb, jb)];
+                    const auto fval = block_values[offset];
 
                     const auto ncomps = static_cast<size_t>(tensor::number_of_spherical_components(std::array<int, 1>{la}));
 

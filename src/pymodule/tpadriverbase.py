@@ -35,6 +35,7 @@ import numpy as np
 import time
 
 from .oneeints import compute_electric_dipole_integrals
+from . import rijkresponse
 from .veloxchemlib import (mpi_master, bohr_in_angstrom, hartree_in_ev,
                            hartree_in_inverse_nm, hartree_in_wavenumber,
                            fine_structure_constant,
@@ -247,11 +248,14 @@ class TpaDriverBase(NonlinearSolver):
             'conv_thresh', 'max_iter', 'eri_thresh', 'timing',
             'memory_profiling', 'batch_size', 'restart', 'xcfun', 'grid_level',
             'potfile', 'electric_field', 'program_end_time', '_debug',
-            '_block_size_factor', 'ri_coulomb'
+            '_block_size_factor', 'ri_coulomb', 'ri_jk', 'ri_jk_simd',
+            'ri_auxiliary_basis'
         }
 
         for key in cpp_keywords:
             setattr(Nb_drv, key, getattr(self, key))
+
+        rijkresponse.share(self, Nb_drv)
 
         if self.checkpoint_file is not None:
             fpath = Path(self.checkpoint_file)

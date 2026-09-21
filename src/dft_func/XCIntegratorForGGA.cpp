@@ -52,6 +52,7 @@
 #include "MathFunc.hpp"
 #include "MultiTimer.hpp"
 #include "Prescreener.hpp"
+#include "XCTimingReport.hpp"
 #include "SerialDenseLinearAlgebra.hpp"
 #include "SerialDensityGridGenerator.hpp"
 #include "StringFormat.hpp"
@@ -107,6 +108,11 @@ integrateVxcFockForGgaClosedShell(const CMolecule&                  molecule,
     // set up number of grid blocks
 
     const auto n_boxes = counts.size();
+
+    // NOTE: what the prescreening leaves, which is what the two matrix phases are
+    // quadratic in. Counted only when the profile is asked for: the sums are
+    // atomic and the boxes are many.
+    size_t prof_ao_sum = 0, prof_ao_max = 0, prof_point_ao = 0, prof_point_ao_sq = 0, prof_points = 0;
 
     const auto n_gto_blocks = gto_blocks.size();
 
@@ -262,6 +268,32 @@ integrateVxcFockForGgaClosedShell(const CMolecule&                  molecule,
         const auto aocount = static_cast<int>(aoinds.size());
 
         omptimers[thread_id].stop("GTO pre-screening");
+
+        if (xcprof::wanted())
+        {
+            // NOTE: weighted by the points of the box as well as counted plainly.
+            // The work of a box is its points times the square of what survives, so
+            // a large box which keeps many functions counts for more than a small
+            // one which keeps as many, and the plain average would hide that.
+            const auto box_points = static_cast<size_t>(npoints);
+
+            const auto kept = static_cast<size_t>(aocount);
+
+#pragma omp atomic
+            prof_ao_sum += kept;
+
+#pragma omp atomic
+            prof_points += box_points;
+
+#pragma omp atomic
+            prof_point_ao += box_points * kept;
+
+#pragma omp atomic
+            prof_point_ao_sq += box_points * kept * kept;
+
+#pragma omp critical
+            prof_ao_max = std::max(prof_ao_max, kept);
+        }
 
         if (aocount > 0)
         {
@@ -480,6 +512,13 @@ integrateVxcFockForGgaClosedShell(const CMolecule&                  molecule,
     //     std::cout << "Thread " << thread_id << std::endl;
     //     std::cout << omptimers[thread_id].getSummary() << std::endl;
     // }
+
+    if (xcprof::wanted())
+    {
+        xcprof::report("Vxc, GGA, closed shell", timer, omptimers, n_boxes);
+
+        xcprof::report_blocks(naos, n_boxes, prof_points, prof_ao_sum, prof_ao_max, prof_point_ao, prof_point_ao_sq);
+    }
 
     return mat_Vxc;
 }
@@ -789,15 +828,7 @@ integrateVxcFockForGgaOpenShell(const CMolecule&                  molecule,
 
     timer.stop("Total timing");
 
-    // std::cout << "Timing of new integrator" << std::endl;
-    // std::cout << "------------------------" << std::endl;
-    // std::cout << timer.getSummary() << std::endl;
-    // std::cout << "OpenMP timing" << std::endl;
-    // for (int thread_id = 0; thread_id < nthreads; thread_id++)
-    // {
-    //     std::cout << "Thread " << thread_id << std::endl;
-    //     std::cout << omptimers[thread_id].getSummary() << std::endl;
-    // }
+    if (xcprof::wanted()) xcprof::report("Vxc, GGA, open shell", timer, omptimers, n_boxes);
 
     return mat_Vxc;
 }
@@ -1171,15 +1202,7 @@ integrateFxcFockForGgaClosedShell(const std::vector<double*>&       aoFockPointe
 
     timer.stop("Total timing");
 
-    // std::cout << "Timing of new integrator" << std::endl;
-    // std::cout << "------------------------" << std::endl;
-    // std::cout << timer.getSummary() << std::endl;
-    // std::cout << "OpenMP timing" << std::endl;
-    // for (int thread_id = 0; thread_id < nthreads; thread_id++)
-    // {
-    //     std::cout << "Thread " << thread_id << std::endl;
-    //     std::cout << omptimers[thread_id].getSummary() << std::endl;
-    // }
+    if (xcprof::wanted()) xcprof::report("Fxc, GGA, closed shell", timer, omptimers, n_boxes);
 }
 
 auto
@@ -1609,15 +1632,7 @@ integrateFxcFockForGgaOpenShell(const std::vector<double*>&       aoFockPointers
 
     timer.stop("Total timing");
 
-    // std::cout << "Timing of new integrator" << std::endl;
-    // std::cout << "------------------------" << std::endl;
-    // std::cout << timer.getSummary() << std::endl;
-    // std::cout << "OpenMP timing" << std::endl;
-    // for (int thread_id = 0; thread_id < nthreads; thread_id++)
-    // {
-    //     std::cout << "Thread " << thread_id << std::endl;
-    //     std::cout << omptimers[thread_id].getSummary() << std::endl;
-    // }
+    if (xcprof::wanted()) xcprof::report("Fxc, GGA, open shell", timer, omptimers, n_boxes);
 }
 
 auto
@@ -1950,15 +1965,7 @@ integrateKxcFockForGgaClosedShell(const std::vector<double*>& aoFockPointers,
 
     timer.stop("Total timing");
 
-    // std::cout << "Timing of new integrator" << std::endl;
-    // std::cout << "------------------------" << std::endl;
-    // std::cout << timer.getSummary() << std::endl;
-    // std::cout << "OpenMP timing" << std::endl;
-    // for (int thread_id = 0; thread_id < nthreads; thread_id++)
-    // {
-    //     std::cout << "Thread " << thread_id << std::endl;
-    //     std::cout << omptimers[thread_id].getSummary() << std::endl;
-    // }
+    if (xcprof::wanted()) xcprof::report("Kxc, GGA, closed shell", timer, omptimers, n_boxes);
 }
 
 auto
@@ -2358,15 +2365,7 @@ integrateKxcLxcFockForGgaClosedShell(const std::vector<double*>& aoFockPointers,
 
     timer.stop("Total timing");
 
-    // std::cout << "Timing of new integrator" << std::endl;
-    // std::cout << "------------------------" << std::endl;
-    // std::cout << timer.getSummary() << std::endl;
-    // std::cout << "OpenMP timing" << std::endl;
-    // for (int thread_id = 0; thread_id < nthreads; thread_id++)
-    // {
-    //     std::cout << "Thread " << thread_id << std::endl;
-    //     std::cout << omptimers[thread_id].getSummary() << std::endl;
-    // }
+    if (xcprof::wanted()) xcprof::report("KxcLxc, GGA, closed shell", timer, omptimers, n_boxes);
 }
 
 auto

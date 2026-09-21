@@ -1,0 +1,846 @@
+//
+//                                   VELOXCHEM
+//              ----------------------------------------------------
+//                          An Electronic Structure Code
+//
+//  SPDX-License-Identifier: BSD-3-Clause
+//
+//  Copyright 2018-2025 VeloxChem developers
+//
+//  Redistribution and use in source and binary forms, with or without modification,
+//  are permitted provided that the following conditions are met:
+//
+//  1. Redistributions of source code must retain the above copyright notice, this
+//     list of conditions and the following disclaimer.
+//  2. Redistributions in binary form must reproduce the above copyright notice,
+//     this list of conditions and the following disclaimer in the documentation
+//     and/or other materials provided with the distribution.
+//  3. Neither the name of the copyright holder nor the names of its contributors
+//     may be used to endorse or promote products derived from this software without
+//     specific prior written permission.
+//
+//  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+//  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+//  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+//  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+//  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+//  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+//  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+//  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+//  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+//  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+
+#include "SimdThreeCenterElectronRepulsionGeom010RsRecGDS.hpp"
+
+#include <algorithm>
+#include <cstddef>
+#include <string>
+
+#include "ErrorHandler.hpp"
+#include "MathConst.hpp"
+#include "ScreeningFunc.hpp"
+#include "SimdDimensions.hpp"
+#include "SimdPrimitives.hpp"
+#include "SimdBoysFunc.hpp"
+
+#include "SimdGeometryD1.hpp"
+#include "SimdGeometryF1.hpp"
+#include "SimdGeometryG1.hpp"
+#include "SimdGeometryH1.hpp"
+#include "SimdGeometryI1.hpp"
+#include "SimdThreeCenterElectronRepulsionVrrRecSDS.hpp"
+#include "SimdThreeCenterElectronRepulsionVrrRecSFS.hpp"
+#include "SimdThreeCenterElectronRepulsionVrrRecSGS.hpp"
+#include "SimdThreeCenterElectronRepulsionVrrRecSHS.hpp"
+#include "SimdThreeCenterElectronRepulsionVrrRecSIS.hpp"
+#include "SimdThreeCenterElectronRepulsionVrrRecSKS.hpp"
+#include "SimdThreeCenterElectronRepulsionVrrRecSPS.hpp"
+#include "SimdTransferDD.hpp"
+#include "SimdTransferDF.hpp"
+#include "SimdTransferFD.hpp"
+#include "SimdTransferGeom010XDD.hpp"
+#include "SimdTransferGeom010XDF.hpp"
+#include "SimdTransferGeom010XDG.hpp"
+#include "SimdTransferGeom010XFD.hpp"
+#include "SimdTransferGeom010XFF.hpp"
+#include "SimdTransferGeom010XGD.hpp"
+#include "SimdTransferGeom010XPD.hpp"
+#include "SimdTransferGeom010XPF.hpp"
+#include "SimdTransferGeom010XPG.hpp"
+#include "SimdTransferGeom010XPH.hpp"
+#include "SimdTransferGeom010YDD.hpp"
+#include "SimdTransferGeom010YDF.hpp"
+#include "SimdTransferGeom010YDG.hpp"
+#include "SimdTransferGeom010YFD.hpp"
+#include "SimdTransferGeom010YFF.hpp"
+#include "SimdTransferGeom010YGD.hpp"
+#include "SimdTransferGeom010YPD.hpp"
+#include "SimdTransferGeom010YPF.hpp"
+#include "SimdTransferGeom010YPG.hpp"
+#include "SimdTransferGeom010YPH.hpp"
+#include "SimdTransferGeom010ZDD.hpp"
+#include "SimdTransferGeom010ZDF.hpp"
+#include "SimdTransferGeom010ZDG.hpp"
+#include "SimdTransferGeom010ZFD.hpp"
+#include "SimdTransferGeom010ZFF.hpp"
+#include "SimdTransferGeom010ZGD.hpp"
+#include "SimdTransferGeom010ZPD.hpp"
+#include "SimdTransferGeom010ZPF.hpp"
+#include "SimdTransferGeom010ZPG.hpp"
+#include "SimdTransferGeom010ZPH.hpp"
+#include "SimdTransferPD.hpp"
+#include "SimdTransferPF.hpp"
+#include "SimdTransferPG.hpp"
+#include "SimdTransformD.hpp"
+#include "SimdTransformG.hpp"
+#include "SimdTransformS.hpp"
+
+namespace simdt3ceri {  // simdt3ceri namespace
+
+auto
+compute_rs_geom_010_gds_three_center_electron_repulsion(double               *values,
+                                                        const size_t          npairs,
+                                                        const size_t          natoms,
+                                                        const CBasisFunction &a_function,
+                                                        const CBasisFunction &b_function,
+                                                        const CBasisFunction &c_function,
+                                                        const CSimdMatrix    &coordinates,
+                                                        const CSimdMatrix    &c_coordinates,
+                                                        CSimdMatrix          &buffer,
+                                                        const double          omega,
+                                                        const double          threshold) -> void
+{
+    if (npairs > coordinates.number_of_columns())
+    {
+        errors::assertMsgCritical(
+            false, std::string("compute_rs_geom_010_gds_three_center_electron_repulsion: Number of values exceeds number of atom pairs"));
+    }
+
+    if (npairs == 0 || natoms == 0) return;
+
+    const auto &a_exps = a_function.exponents();
+
+    const auto &b_exps = b_function.exponents();
+
+    const auto &c_exps = c_function.exponents();
+
+    const auto &a_norms = a_function.normalization_factors();
+
+    const auto &b_norms = b_function.normalization_factors();
+
+    const auto &c_norms = c_function.normalization_factors();
+
+    const auto nprim_a = a_exps.size();
+
+    const auto nprim_b = b_exps.size();
+
+    const auto nprim_c = c_exps.size();
+
+    const auto nprims = nprim_a * nprim_b * nprim_c;
+
+    // NOTE: the bound neglects the position of the atom on the ket side, so the
+    // columns that survive are the same for every one of them and are counted
+    // once here rather than inside the loop over them.
+
+    // NOTE: a derivative screens with the integral's own bound, on purpose. It
+    // is not a bound on the derivative -- that is larger by roughly 2 alpha R,
+    // the relation reaching one shell higher -- and tightening it here would be
+    // the wrong repair. A screened Fock build defines an energy in which the
+    // dropped pairs contribute exactly zero, and the derivative of that energy
+    // is the derivative screened the same way; a tighter bound would add forces
+    // from pairs the energy never counted. One threshold controls both errors,
+    // so tightening it in the Fock build tightens the gradient with it.
+
+    const auto dimensions = simdfunc::make_column_dimensions(
+        a_function, b_function, c_function, npairs, coordinates,
+        screenfunc::three_center_electron_repulsion_primitive_bound,
+        threshold / static_cast<double>(nprims));
+
+    const auto nmax = simdfunc::prepare_buffer(buffer, 6441, 0, 0, dimensions);
+
+    if (nmax == 0)
+    {
+        std::fill(values, values + 270 * natoms * npairs, 0.0);
+
+        return;
+    }
+
+    const auto pi = mathconst::pi_value();
+
+    // NOTE: a row of the values spans every atom pair of every atom on the ket
+    // side, so a kernel handed the block of one atom steps by this to reach the
+    // next component -- which is what lets it be the kernel a two-center form
+    // uses, unchanged.
+
+    const auto nvalues = natoms * npairs;
+
+    simdfunc::compute_pair_exponents(a_function, b_function, coordinates, nmax);
+
+    for (size_t n = 0; n < natoms; n++)
+    {
+        simdfunc::prepare_buffer(buffer, 6441, 1148, 1140, dimensions);
+
+        for (size_t i = 0; i < nprim_a; i++)
+        {
+            for (size_t j = 0; j < nprim_b; j++)
+            {
+                const auto p = a_exps[i] + b_exps[j];
+
+                const auto beta = b_exps[j];
+
+                const auto fovl = a_norms[i] * b_norms[j];
+
+                const auto fb = a_exps[i] / p;
+
+                const auto fc = b_exps[j] / p;
+
+                simdfunc::compute_pb(buffer, coordinates, 0, nmax, fb);
+
+                simdfunc::compute_pc(buffer, coordinates, c_coordinates, 3, n, nmax, fc);
+
+                for (size_t k = 0; k < nprim_c; k++)
+                {
+                    const auto ncols = dimensions[(i * nprim_b + j) * nprim_c + k];
+
+                    if (ncols == 0) continue;
+
+                    const auto gamma = c_exps[k];
+
+                    const auto q = p + gamma;
+
+                    const auto fq = p * gamma / q;
+
+                    const auto fj = 2.0 * fovl * c_norms[k] * pi * pi * std::sqrt(pi)
+                                    / (p * gamma * std::sqrt(q));
+
+                    simdfunc::compute_full_t3c_erf_boys_function(buffer, coordinates, 6, 3, 7,
+                                                                 ncols, fj, i * nprim_b + j, fq,
+                                                                 omega);
+
+                    simdfunc::compute_full_t3c_boys_function(buffer, coordinates, 15, 3, 7,
+                                                             ncols, fj, i * nprim_b + j, fq);
+
+                    compute_prim_sps_three_center_electron_repulsion_0(buffer, 24, 0, 3, 7, 8,
+                                                                       ncols, gamma, q);
+
+                    compute_prim_sps_three_center_electron_repulsion_0(buffer, 27, 0, 3, 8, 9,
+                                                                       ncols, gamma, q);
+
+                    compute_prim_sps_three_center_electron_repulsion_0(buffer, 30, 0, 3, 9, 10,
+                                                                       ncols, gamma, q);
+
+                    compute_prim_sps_three_center_electron_repulsion_0(buffer, 33, 0, 3, 10, 11,
+                                                                       ncols, gamma, q);
+
+                    compute_prim_sps_three_center_electron_repulsion_0(buffer, 36, 0, 3, 11, 12,
+                                                                       ncols, gamma, q);
+
+                    compute_prim_sps_three_center_electron_repulsion_0(buffer, 39, 0, 3, 12, 13,
+                                                                       ncols, gamma, q);
+
+                    compute_prim_sps_three_center_electron_repulsion_0(buffer, 42, 0, 3, 13, 14,
+                                                                       ncols, gamma, q);
+
+                    compute_prim_sps_three_center_electron_repulsion_0(buffer, 45, 0, 3, 16, 17,
+                                                                       ncols, gamma, q);
+
+                    compute_prim_sps_three_center_electron_repulsion_0(buffer, 48, 0, 3, 17, 18,
+                                                                       ncols, gamma, q);
+
+                    compute_prim_sps_three_center_electron_repulsion_0(buffer, 51, 0, 3, 18, 19,
+                                                                       ncols, gamma, q);
+
+                    compute_prim_sps_three_center_electron_repulsion_0(buffer, 54, 0, 3, 19, 20,
+                                                                       ncols, gamma, q);
+
+                    compute_prim_sps_three_center_electron_repulsion_0(buffer, 57, 0, 3, 20, 21,
+                                                                       ncols, gamma, q);
+
+                    compute_prim_sps_three_center_electron_repulsion_0(buffer, 60, 0, 3, 21, 22,
+                                                                       ncols, gamma, q);
+
+                    compute_prim_sps_three_center_electron_repulsion_0(buffer, 63, 0, 3, 22, 23,
+                                                                       ncols, gamma, q);
+
+                    compute_prim_sds_three_center_electron_repulsion_0(buffer, 66, 0, 3, 7, 8,
+                                                                       24, 27, ncols, gamma, p,
+                                                                       q);
+
+                    compute_prim_sds_three_center_electron_repulsion_0(buffer, 72, 0, 3, 8, 9,
+                                                                       27, 30, ncols, gamma, p,
+                                                                       q);
+
+                    compute_prim_sds_three_center_electron_repulsion_0(buffer, 78, 0, 3, 9, 10,
+                                                                       30, 33, ncols, gamma, p,
+                                                                       q);
+
+                    compute_prim_sds_three_center_electron_repulsion_0(buffer, 84, 0, 3, 10, 11,
+                                                                       33, 36, ncols, gamma, p,
+                                                                       q);
+
+                    compute_prim_sds_three_center_electron_repulsion_0(buffer, 90, 0, 3, 11, 12,
+                                                                       36, 39, ncols, gamma, p,
+                                                                       q);
+
+                    compute_prim_sds_three_center_electron_repulsion_0(buffer, 96, 0, 3, 12, 13,
+                                                                       39, 42, ncols, gamma, p,
+                                                                       q);
+
+                    compute_prim_sds_three_center_electron_repulsion_0(buffer, 102, 0, 3, 16, 17,
+                                                                       45, 48, ncols, gamma, p,
+                                                                       q);
+
+                    compute_prim_sds_three_center_electron_repulsion_0(buffer, 108, 0, 3, 17, 18,
+                                                                       48, 51, ncols, gamma, p,
+                                                                       q);
+
+                    compute_prim_sds_three_center_electron_repulsion_0(buffer, 114, 0, 3, 18, 19,
+                                                                       51, 54, ncols, gamma, p,
+                                                                       q);
+
+                    compute_prim_sds_three_center_electron_repulsion_0(buffer, 120, 0, 3, 19, 20,
+                                                                       54, 57, ncols, gamma, p,
+                                                                       q);
+
+                    compute_prim_sds_three_center_electron_repulsion_0(buffer, 126, 0, 3, 20, 21,
+                                                                       57, 60, ncols, gamma, p,
+                                                                       q);
+
+                    compute_prim_sds_three_center_electron_repulsion_0(buffer, 132, 0, 3, 21, 22,
+                                                                       60, 63, ncols, gamma, p,
+                                                                       q);
+
+                    compute_prim_sfs_three_center_electron_repulsion_0(buffer, 138, 0, 3, 24, 27,
+                                                                       66, 72, ncols, gamma, p,
+                                                                       q);
+
+                    compute_prim_sfs_three_center_electron_repulsion_0(buffer, 148, 0, 3, 27, 30,
+                                                                       72, 78, ncols, gamma, p,
+                                                                       q);
+
+                    compute_prim_sfs_three_center_electron_repulsion_0(buffer, 158, 0, 3, 30, 33,
+                                                                       78, 84, ncols, gamma, p,
+                                                                       q);
+
+                    compute_prim_sfs_three_center_electron_repulsion_0(buffer, 168, 0, 3, 33, 36,
+                                                                       84, 90, ncols, gamma, p,
+                                                                       q);
+
+                    compute_prim_sfs_three_center_electron_repulsion_0(buffer, 178, 0, 3, 36, 39,
+                                                                       90, 96, ncols, gamma, p,
+                                                                       q);
+
+                    compute_prim_sfs_three_center_electron_repulsion_0(buffer, 188, 0, 3, 45, 48,
+                                                                       102, 108, ncols, gamma, p,
+                                                                       q);
+
+                    compute_prim_sfs_three_center_electron_repulsion_0(buffer, 198, 0, 3, 48, 51,
+                                                                       108, 114, ncols, gamma, p,
+                                                                       q);
+
+                    compute_prim_sfs_three_center_electron_repulsion_0(buffer, 208, 0, 3, 51, 54,
+                                                                       114, 120, ncols, gamma, p,
+                                                                       q);
+
+                    compute_prim_sfs_three_center_electron_repulsion_0(buffer, 218, 0, 3, 54, 57,
+                                                                       120, 126, ncols, gamma, p,
+                                                                       q);
+
+                    compute_prim_sfs_three_center_electron_repulsion_0(buffer, 228, 0, 3, 57, 60,
+                                                                       126, 132, ncols, gamma, p,
+                                                                       q);
+
+                    compute_prim_sgs_three_center_electron_repulsion_0(buffer, 238, 0, 3, 66, 72,
+                                                                       138, 148, ncols, gamma, p,
+                                                                       q);
+
+                    compute_prim_sgs_three_center_electron_repulsion_0(buffer, 253, 0, 3, 72, 78,
+                                                                       148, 158, ncols, gamma, p,
+                                                                       q);
+
+                    compute_prim_sgs_three_center_electron_repulsion_0(buffer, 268, 0, 3, 78, 84,
+                                                                       158, 168, ncols, gamma, p,
+                                                                       q);
+
+                    compute_prim_sgs_three_center_electron_repulsion_0(buffer, 283, 0, 3, 84, 90,
+                                                                       168, 178, ncols, gamma, p,
+                                                                       q);
+
+                    compute_prim_sgs_three_center_electron_repulsion_0(buffer, 298, 0, 3, 102,
+                                                                       108, 188, 198, ncols,
+                                                                       gamma, p, q);
+
+                    compute_prim_sgs_three_center_electron_repulsion_0(buffer, 313, 0, 3, 108,
+                                                                       114, 198, 208, ncols,
+                                                                       gamma, p, q);
+
+                    compute_prim_sgs_three_center_electron_repulsion_0(buffer, 328, 0, 3, 114,
+                                                                       120, 208, 218, ncols,
+                                                                       gamma, p, q);
+
+                    compute_prim_sgs_three_center_electron_repulsion_0(buffer, 343, 0, 3, 120,
+                                                                       126, 218, 228, ncols,
+                                                                       gamma, p, q);
+
+                    compute_prim_shs_three_center_electron_repulsion_0(buffer, 358, 0, 3, 138,
+                                                                       148, 238, 253, ncols,
+                                                                       gamma, p, q);
+
+                    compute_prim_shs_three_center_electron_repulsion_0(buffer, 379, 0, 3, 148,
+                                                                       158, 253, 268, ncols,
+                                                                       gamma, p, q);
+
+                    compute_prim_shs_three_center_electron_repulsion_0(buffer, 400, 0, 3, 158,
+                                                                       168, 268, 283, ncols,
+                                                                       gamma, p, q);
+
+                    compute_prim_shs_three_center_electron_repulsion_0(buffer, 421, 0, 3, 188,
+                                                                       198, 298, 313, ncols,
+                                                                       gamma, p, q);
+
+                    compute_prim_shs_three_center_electron_repulsion_0(buffer, 442, 0, 3, 198,
+                                                                       208, 313, 328, ncols,
+                                                                       gamma, p, q);
+
+                    compute_prim_shs_three_center_electron_repulsion_0(buffer, 463, 0, 3, 208,
+                                                                       218, 328, 343, ncols,
+                                                                       gamma, p, q);
+
+                    compute_prim_sis_three_center_electron_repulsion_0(buffer, 484, 0, 3, 238,
+                                                                       253, 358, 379, ncols,
+                                                                       gamma, p, q);
+
+                    compute_prim_sis_three_center_electron_repulsion_0(buffer, 512, 0, 3, 253,
+                                                                       268, 379, 400, ncols,
+                                                                       gamma, p, q);
+
+                    compute_prim_sis_three_center_electron_repulsion_0(buffer, 540, 0, 3, 298,
+                                                                       313, 421, 442, ncols,
+                                                                       gamma, p, q);
+
+                    compute_prim_sis_three_center_electron_repulsion_0(buffer, 568, 0, 3, 313,
+                                                                       328, 442, 463, ncols,
+                                                                       gamma, p, q);
+
+                    compute_prim_sks_three_center_electron_repulsion_0(buffer, 596, 0, 3, 358,
+                                                                       379, 484, 512, ncols,
+                                                                       gamma, p, q);
+
+                    compute_prim_sks_three_center_electron_repulsion_0(buffer, 632, 0, 3, 421,
+                                                                       442, 540, 568, ncols,
+                                                                       gamma, p, q);
+
+                    simdgeo::geom_d_x(buffer, 668, 24, 138, 1, 1, ncols, beta);
+
+                    simdgeo::geom_d_y(buffer, 674, 24, 138, 1, 1, ncols, beta);
+
+                    simdgeo::geom_d_z(buffer, 680, 24, 138, 1, 1, ncols, beta);
+
+                    simdgeo::geom_d_x(buffer, 686, 45, 188, 1, 1, ncols, beta);
+
+                    simdgeo::geom_d_y(buffer, 692, 45, 188, 1, 1, ncols, beta);
+
+                    simdgeo::geom_d_z(buffer, 698, 45, 188, 1, 1, ncols, beta);
+
+                    simdgeo::geom_f_x(buffer, 704, 66, 238, 1, 1, ncols, beta);
+
+                    simdgeo::geom_f_y(buffer, 714, 66, 238, 1, 1, ncols, beta);
+
+                    simdgeo::geom_f_z(buffer, 724, 66, 238, 1, 1, ncols, beta);
+
+                    simdgeo::geom_f_x(buffer, 734, 102, 298, 1, 1, ncols, beta);
+
+                    simdgeo::geom_f_y(buffer, 744, 102, 298, 1, 1, ncols, beta);
+
+                    simdgeo::geom_f_z(buffer, 754, 102, 298, 1, 1, ncols, beta);
+
+                    simdgeo::geom_g_x(buffer, 764, 138, 358, 1, 1, ncols, beta);
+
+                    simdgeo::geom_g_y(buffer, 779, 138, 358, 1, 1, ncols, beta);
+
+                    simdgeo::geom_g_z(buffer, 794, 138, 358, 1, 1, ncols, beta);
+
+                    simdgeo::geom_g_x(buffer, 809, 188, 421, 1, 1, ncols, beta);
+
+                    simdgeo::geom_g_y(buffer, 824, 188, 421, 1, 1, ncols, beta);
+
+                    simdgeo::geom_g_z(buffer, 839, 188, 421, 1, 1, ncols, beta);
+
+                    simdgeo::geom_h_x(buffer, 854, 238, 484, 1, 1, ncols, beta);
+
+                    simdgeo::geom_h_y(buffer, 875, 238, 484, 1, 1, ncols, beta);
+
+                    simdgeo::geom_h_z(buffer, 896, 238, 484, 1, 1, ncols, beta);
+
+                    simdgeo::geom_h_x(buffer, 917, 298, 540, 1, 1, ncols, beta);
+
+                    simdgeo::geom_h_y(buffer, 938, 298, 540, 1, 1, ncols, beta);
+
+                    simdgeo::geom_h_z(buffer, 959, 298, 540, 1, 1, ncols, beta);
+
+                    simdgeo::geom_i_x(buffer, 980, 358, 596, 1, 1, ncols, beta);
+
+                    simdgeo::geom_i_y(buffer, 1008, 358, 596, 1, 1, ncols, beta);
+
+                    simdgeo::geom_i_z(buffer, 1036, 358, 596, 1, 1, ncols, beta);
+
+                    simdgeo::geom_i_x(buffer, 1064, 421, 632, 1, 1, ncols, beta);
+
+                    simdgeo::geom_i_y(buffer, 1092, 421, 632, 1, 1, ncols, beta);
+
+                    simdgeo::geom_i_z(buffer, 1120, 421, 632, 1, 1, ncols, beta);
+
+                    simdfunc::contract_primitives(buffer, 1148, 668, 6, ncols);
+
+                    simdfunc::contract_primitives(buffer, 1160, 674, 6, ncols);
+
+                    simdfunc::contract_primitives(buffer, 1172, 680, 6, ncols);
+
+                    simdfunc::contract_primitives(buffer, 1184, 66, 6, ncols);
+
+                    simdfunc::contract_primitives(buffer, 1196, 686, 6, ncols);
+
+                    simdfunc::contract_primitives(buffer, 1208, 692, 6, ncols);
+
+                    simdfunc::contract_primitives(buffer, 1220, 698, 6, ncols);
+
+                    simdfunc::contract_primitives(buffer, 1232, 102, 6, ncols);
+
+                    simdfunc::contract_primitives(buffer, 1244, 704, 10, ncols);
+
+                    simdfunc::contract_primitives(buffer, 1264, 714, 10, ncols);
+
+                    simdfunc::contract_primitives(buffer, 1284, 724, 10, ncols);
+
+                    simdfunc::contract_primitives(buffer, 1304, 138, 10, ncols);
+
+                    simdfunc::contract_primitives(buffer, 1324, 734, 10, ncols);
+
+                    simdfunc::contract_primitives(buffer, 1344, 744, 10, ncols);
+
+                    simdfunc::contract_primitives(buffer, 1364, 754, 10, ncols);
+
+                    simdfunc::contract_primitives(buffer, 1384, 188, 10, ncols);
+
+                    simdfunc::contract_primitives(buffer, 1404, 764, 15, ncols);
+
+                    simdfunc::contract_primitives(buffer, 1434, 779, 15, ncols);
+
+                    simdfunc::contract_primitives(buffer, 1464, 794, 15, ncols);
+
+                    simdfunc::contract_primitives(buffer, 1494, 238, 15, ncols);
+
+                    simdfunc::contract_primitives(buffer, 1524, 809, 15, ncols);
+
+                    simdfunc::contract_primitives(buffer, 1554, 824, 15, ncols);
+
+                    simdfunc::contract_primitives(buffer, 1584, 839, 15, ncols);
+
+                    simdfunc::contract_primitives(buffer, 1614, 298, 15, ncols);
+
+                    simdfunc::contract_primitives(buffer, 1644, 854, 21, ncols);
+
+                    simdfunc::contract_primitives(buffer, 1686, 875, 21, ncols);
+
+                    simdfunc::contract_primitives(buffer, 1728, 896, 21, ncols);
+
+                    simdfunc::contract_primitives(buffer, 1770, 358, 21, ncols);
+
+                    simdfunc::contract_primitives(buffer, 1812, 917, 21, ncols);
+
+                    simdfunc::contract_primitives(buffer, 1854, 938, 21, ncols);
+
+                    simdfunc::contract_primitives(buffer, 1896, 959, 21, ncols);
+
+                    simdfunc::contract_primitives(buffer, 1938, 421, 21, ncols);
+
+                    simdfunc::contract_primitives(buffer, 1980, 980, 28, ncols);
+
+                    simdfunc::contract_primitives(buffer, 2036, 1008, 28, ncols);
+
+                    simdfunc::contract_primitives(buffer, 2092, 1036, 28, ncols);
+
+                    simdfunc::contract_primitives(buffer, 2148, 1064, 28, ncols);
+
+                    simdfunc::contract_primitives(buffer, 2204, 1092, 28, ncols);
+
+                    simdfunc::contract_primitives(buffer, 2260, 1120, 28, ncols);
+                }
+            }
+        }
+
+        simdtrf::transform_s_inner(buffer, 1154, 1148, 6, 1, nmax);
+
+        simdtrf::transform_s_inner(buffer, 1166, 1160, 6, 1, nmax);
+
+        simdtrf::transform_s_inner(buffer, 1178, 1172, 6, 1, nmax);
+
+        simdtrf::transform_s_inner(buffer, 1190, 1184, 6, 1, nmax);
+
+        simdtrf::transform_s_inner(buffer, 1202, 1196, 6, 1, nmax);
+
+        simdtrf::transform_s_inner(buffer, 1214, 1208, 6, 1, nmax);
+
+        simdtrf::transform_s_inner(buffer, 1226, 1220, 6, 1, nmax);
+
+        simdtrf::transform_s_inner(buffer, 1238, 1232, 6, 1, nmax);
+
+        simdtrf::transform_s_inner(buffer, 1254, 1244, 10, 1, nmax);
+
+        simdtrf::transform_s_inner(buffer, 1274, 1264, 10, 1, nmax);
+
+        simdtrf::transform_s_inner(buffer, 1294, 1284, 10, 1, nmax);
+
+        simdtrf::transform_s_inner(buffer, 1314, 1304, 10, 1, nmax);
+
+        simdtrf::transform_s_inner(buffer, 1334, 1324, 10, 1, nmax);
+
+        simdtrf::transform_s_inner(buffer, 1354, 1344, 10, 1, nmax);
+
+        simdtrf::transform_s_inner(buffer, 1374, 1364, 10, 1, nmax);
+
+        simdtrf::transform_s_inner(buffer, 1394, 1384, 10, 1, nmax);
+
+        simdtrf::transform_s_inner(buffer, 1419, 1404, 15, 1, nmax);
+
+        simdtrf::transform_s_inner(buffer, 1449, 1434, 15, 1, nmax);
+
+        simdtrf::transform_s_inner(buffer, 1479, 1464, 15, 1, nmax);
+
+        simdtrf::transform_s_inner(buffer, 1509, 1494, 15, 1, nmax);
+
+        simdtrf::transform_s_inner(buffer, 1539, 1524, 15, 1, nmax);
+
+        simdtrf::transform_s_inner(buffer, 1569, 1554, 15, 1, nmax);
+
+        simdtrf::transform_s_inner(buffer, 1599, 1584, 15, 1, nmax);
+
+        simdtrf::transform_s_inner(buffer, 1629, 1614, 15, 1, nmax);
+
+        simdtrf::transform_s_inner(buffer, 1665, 1644, 21, 1, nmax);
+
+        simdtrf::transform_s_inner(buffer, 1707, 1686, 21, 1, nmax);
+
+        simdtrf::transform_s_inner(buffer, 1749, 1728, 21, 1, nmax);
+
+        simdtrf::transform_s_inner(buffer, 1791, 1770, 21, 1, nmax);
+
+        simdtrf::transform_s_inner(buffer, 1833, 1812, 21, 1, nmax);
+
+        simdtrf::transform_s_inner(buffer, 1875, 1854, 21, 1, nmax);
+
+        simdtrf::transform_s_inner(buffer, 1917, 1896, 21, 1, nmax);
+
+        simdtrf::transform_s_inner(buffer, 1959, 1938, 21, 1, nmax);
+
+        simdtrf::transform_s_inner(buffer, 2008, 1980, 28, 1, nmax);
+
+        simdtrf::transform_s_inner(buffer, 2064, 2036, 28, 1, nmax);
+
+        simdtrf::transform_s_inner(buffer, 2120, 2092, 28, 1, nmax);
+
+        simdtrf::transform_s_inner(buffer, 2176, 2148, 28, 1, nmax);
+
+        simdtrf::transform_s_inner(buffer, 2232, 2204, 28, 1, nmax);
+
+        simdtrf::transform_s_inner(buffer, 2288, 2260, 28, 1, nmax);
+
+        simdtrf::compute_hrr_geom_010x_pd(buffer, coordinates, 2316, 1154, 1190, 1254, 1, nmax);
+
+        simdtrf::compute_hrr_geom_010y_pd(buffer, coordinates, 2334, 1166, 1190, 1274, 1, nmax);
+
+        simdtrf::compute_hrr_geom_010z_pd(buffer, coordinates, 2352, 1178, 1190, 1294, 1, nmax);
+
+        simdtrf::compute_hrr_pd(buffer, coordinates, 2370, 1190, 1314, 1, nmax);
+
+        simdtrf::compute_hrr_geom_010x_pd(buffer, coordinates, 2388, 1202, 1238, 1334, 1, nmax);
+
+        simdtrf::compute_hrr_geom_010y_pd(buffer, coordinates, 2406, 1214, 1238, 1354, 1, nmax);
+
+        simdtrf::compute_hrr_geom_010z_pd(buffer, coordinates, 2424, 1226, 1238, 1374, 1, nmax);
+
+        simdtrf::compute_hrr_pd(buffer, coordinates, 2442, 1238, 1394, 1, nmax);
+
+        simdtrf::compute_hrr_geom_010x_pf(buffer, coordinates, 2460, 1254, 1314, 1419, 1, nmax);
+
+        simdtrf::compute_hrr_geom_010y_pf(buffer, coordinates, 2490, 1274, 1314, 1449, 1, nmax);
+
+        simdtrf::compute_hrr_geom_010z_pf(buffer, coordinates, 2520, 1294, 1314, 1479, 1, nmax);
+
+        simdtrf::compute_hrr_pf(buffer, coordinates, 2550, 1314, 1509, 1, nmax);
+
+        simdtrf::compute_hrr_geom_010x_pf(buffer, coordinates, 2580, 1334, 1394, 1539, 1, nmax);
+
+        simdtrf::compute_hrr_geom_010y_pf(buffer, coordinates, 2610, 1354, 1394, 1569, 1, nmax);
+
+        simdtrf::compute_hrr_geom_010z_pf(buffer, coordinates, 2640, 1374, 1394, 1599, 1, nmax);
+
+        simdtrf::compute_hrr_pf(buffer, coordinates, 2670, 1394, 1629, 1, nmax);
+
+        simdtrf::compute_hrr_geom_010x_pg(buffer, coordinates, 2700, 1419, 1509, 1665, 1, nmax);
+
+        simdtrf::compute_hrr_geom_010y_pg(buffer, coordinates, 2745, 1449, 1509, 1707, 1, nmax);
+
+        simdtrf::compute_hrr_geom_010z_pg(buffer, coordinates, 2790, 1479, 1509, 1749, 1, nmax);
+
+        simdtrf::compute_hrr_pg(buffer, coordinates, 2835, 1509, 1791, 1, nmax);
+
+        simdtrf::compute_hrr_geom_010x_pg(buffer, coordinates, 2880, 1539, 1629, 1833, 1, nmax);
+
+        simdtrf::compute_hrr_geom_010y_pg(buffer, coordinates, 2925, 1569, 1629, 1875, 1, nmax);
+
+        simdtrf::compute_hrr_geom_010z_pg(buffer, coordinates, 2970, 1599, 1629, 1917, 1, nmax);
+
+        simdtrf::compute_hrr_pg(buffer, coordinates, 3015, 1629, 1959, 1, nmax);
+
+        simdtrf::compute_hrr_geom_010x_ph(buffer, coordinates, 3060, 1665, 1791, 2008, 1, nmax);
+
+        simdtrf::compute_hrr_geom_010y_ph(buffer, coordinates, 3123, 1707, 1791, 2064, 1, nmax);
+
+        simdtrf::compute_hrr_geom_010z_ph(buffer, coordinates, 3186, 1749, 1791, 2120, 1, nmax);
+
+        simdtrf::compute_hrr_geom_010x_ph(buffer, coordinates, 3249, 1833, 1959, 2176, 1, nmax);
+
+        simdtrf::compute_hrr_geom_010y_ph(buffer, coordinates, 3312, 1875, 1959, 2232, 1, nmax);
+
+        simdtrf::compute_hrr_geom_010z_ph(buffer, coordinates, 3375, 1917, 1959, 2288, 1, nmax);
+
+        simdtrf::compute_hrr_geom_010x_dd(buffer, coordinates, 3438, 2316, 2370, 2460, 1, nmax);
+
+        simdtrf::compute_hrr_geom_010y_dd(buffer, coordinates, 3474, 2334, 2370, 2490, 1, nmax);
+
+        simdtrf::compute_hrr_geom_010z_dd(buffer, coordinates, 3510, 2352, 2370, 2520, 1, nmax);
+
+        simdtrf::compute_hrr_dd(buffer, coordinates, 3546, 2370, 2550, 1, nmax);
+
+        simdtrf::compute_hrr_geom_010x_dd(buffer, coordinates, 3582, 2388, 2442, 2580, 1, nmax);
+
+        simdtrf::compute_hrr_geom_010y_dd(buffer, coordinates, 3618, 2406, 2442, 2610, 1, nmax);
+
+        simdtrf::compute_hrr_geom_010z_dd(buffer, coordinates, 3654, 2424, 2442, 2640, 1, nmax);
+
+        simdtrf::compute_hrr_dd(buffer, coordinates, 3690, 2442, 2670, 1, nmax);
+
+        simdtrf::compute_hrr_geom_010x_df(buffer, coordinates, 3726, 2460, 2550, 2700, 1, nmax);
+
+        simdtrf::compute_hrr_geom_010y_df(buffer, coordinates, 3786, 2490, 2550, 2745, 1, nmax);
+
+        simdtrf::compute_hrr_geom_010z_df(buffer, coordinates, 3846, 2520, 2550, 2790, 1, nmax);
+
+        simdtrf::compute_hrr_df(buffer, coordinates, 3906, 2550, 2835, 1, nmax);
+
+        simdtrf::compute_hrr_geom_010x_df(buffer, coordinates, 3966, 2580, 2670, 2880, 1, nmax);
+
+        simdtrf::compute_hrr_geom_010y_df(buffer, coordinates, 4026, 2610, 2670, 2925, 1, nmax);
+
+        simdtrf::compute_hrr_geom_010z_df(buffer, coordinates, 4086, 2640, 2670, 2970, 1, nmax);
+
+        simdtrf::compute_hrr_df(buffer, coordinates, 4146, 2670, 3015, 1, nmax);
+
+        simdtrf::compute_hrr_geom_010x_dg(buffer, coordinates, 4206, 2700, 2835, 3060, 1, nmax);
+
+        simdtrf::compute_hrr_geom_010y_dg(buffer, coordinates, 4296, 2745, 2835, 3123, 1, nmax);
+
+        simdtrf::compute_hrr_geom_010z_dg(buffer, coordinates, 4386, 2790, 2835, 3186, 1, nmax);
+
+        simdtrf::compute_hrr_geom_010x_dg(buffer, coordinates, 4476, 2880, 3015, 3249, 1, nmax);
+
+        simdtrf::compute_hrr_geom_010y_dg(buffer, coordinates, 4566, 2925, 3015, 3312, 1, nmax);
+
+        simdtrf::compute_hrr_geom_010z_dg(buffer, coordinates, 4656, 2970, 3015, 3375, 1, nmax);
+
+        simdtrf::compute_hrr_geom_010x_fd_out_of_second(buffer, coordinates, 4746, 3438, 3546,
+                                                        3726, 1, nmax);
+
+        simdtrf::compute_hrr_geom_010y_fd_out_of_second(buffer, coordinates, 4806, 3474, 3546,
+                                                        3786, 1, nmax);
+
+        simdtrf::compute_hrr_geom_010z_fd_out_of_second(buffer, coordinates, 4866, 3510, 3546,
+                                                        3846, 1, nmax);
+
+        simdtrf::compute_hrr_fd_out_of_second(buffer, coordinates, 4926, 3546, 3906, 1, nmax);
+
+        simdtrf::compute_hrr_geom_010x_fd_out_of_second(buffer, coordinates, 4986, 3582, 3690,
+                                                        3966, 1, nmax);
+
+        simdtrf::compute_hrr_geom_010y_fd_out_of_second(buffer, coordinates, 5046, 3618, 3690,
+                                                        4026, 1, nmax);
+
+        simdtrf::compute_hrr_geom_010z_fd_out_of_second(buffer, coordinates, 5106, 3654, 3690,
+                                                        4086, 1, nmax);
+
+        simdtrf::compute_hrr_fd_out_of_second(buffer, coordinates, 5166, 3690, 4146, 1, nmax);
+
+        simdtrf::compute_hrr_geom_010x_ff(buffer, coordinates, 5226, 3726, 3906, 4206, 1, nmax);
+
+        simdtrf::compute_hrr_geom_010y_ff(buffer, coordinates, 5326, 3786, 3906, 4296, 1, nmax);
+
+        simdtrf::compute_hrr_geom_010z_ff(buffer, coordinates, 5426, 3846, 3906, 4386, 1, nmax);
+
+        simdtrf::compute_hrr_geom_010x_ff(buffer, coordinates, 5526, 3966, 4146, 4476, 1, nmax);
+
+        simdtrf::compute_hrr_geom_010y_ff(buffer, coordinates, 5626, 4026, 4146, 4566, 1, nmax);
+
+        simdtrf::compute_hrr_geom_010z_ff(buffer, coordinates, 5726, 4086, 4146, 4656, 1, nmax);
+
+        simdtrf::compute_hrr_geom_010x_gd_out_of_second(buffer, coordinates, 5826, 4746, 4926,
+                                                        5226, 1, nmax);
+
+        simdtrf::compute_hrr_geom_010y_gd_out_of_second(buffer, coordinates, 5916, 4806, 4926,
+                                                        5326, 1, nmax);
+
+        simdtrf::compute_hrr_geom_010z_gd_out_of_second(buffer, coordinates, 6006, 4866, 4926,
+                                                        5426, 1, nmax);
+
+        simdtrf::compute_hrr_geom_010x_gd_out_of_second(buffer, coordinates, 6096, 4986, 5166,
+                                                        5526, 1, nmax);
+
+        simdtrf::compute_hrr_geom_010y_gd_out_of_second(buffer, coordinates, 6186, 5046, 5166,
+                                                        5626, 1, nmax);
+
+        simdtrf::compute_hrr_geom_010z_gd_out_of_second(buffer, coordinates, 6276, 5106, 5166,
+                                                        5726, 1, nmax);
+
+        simdtrf::transform_d_inner(buffer, 6366, 6096, 15, 1, nmax);
+
+        simdtrf::transform_g_outer(values + n * npairs, nvalues, buffer, 6366, 5, nmax);
+
+        simdtrf::transform_d_inner(buffer, 6366, 6186, 15, 1, nmax);
+
+        simdtrf::transform_g_outer(values + 45 * nvalues + n * npairs, nvalues, buffer, 6366, 5,
+                                   nmax);
+
+        simdtrf::transform_d_inner(buffer, 6366, 6276, 15, 1, nmax);
+
+        simdtrf::transform_g_outer(values + 90 * nvalues + n * npairs, nvalues, buffer, 6366, 5,
+                                   nmax);
+
+        simdtrf::transform_d_inner(buffer, 6366, 5826, 15, 1, nmax);
+
+        simdtrf::transform_g_outer(values + 135 * nvalues + n * npairs, nvalues, buffer, 6366, 5,
+                                   nmax);
+
+        simdtrf::transform_d_inner(buffer, 6366, 5916, 15, 1, nmax);
+
+        simdtrf::transform_g_outer(values + 180 * nvalues + n * npairs, nvalues, buffer, 6366, 5,
+                                   nmax);
+
+        simdtrf::transform_d_inner(buffer, 6366, 6006, 15, 1, nmax);
+
+        simdtrf::transform_g_outer(values + 225 * nvalues + n * npairs, nvalues, buffer, 6366, 5,
+                                   nmax);
+    }
+
+    for (size_t m = 0; m < 270; m++)
+    {
+        for (size_t n = 0; n < natoms; n++)
+        {
+            auto *pv = values + m * nvalues + n * npairs;
+
+            std::fill(pv + nmax, pv + npairs, 0.0);
+        }
+    }
+}
+
+}  // namespace simdt3ceri

@@ -375,6 +375,9 @@ export_sparse(py::module &m) -> void
     // CSparseTensor class
 
     PyClass<CSparseTensor>(m, "SparseTensor")
+        .def("number_of_components", &CSparseTensor::number_of_components,
+             "Gets the number of values each element carries. One for an integral, six for the "
+             "derivative of a three-center integral with respect to the two atoms on bra side.")
         .def(py::init<>())
         .def(py::init<const CMolecule &,
                       const CMolecularBasis &,
@@ -407,6 +410,15 @@ export_sparse(py::module &m) -> void
              py::overload_cast<const size_t>(&CSparseTensor::number_of_elements, py::const_),
              "Gets number of values required to store the integrals of block.",
              py::arg("index"))
+        .def(
+            "block_to_numpy",
+            [](const CSparseTensor &self, const size_t index) -> py::array_t<double> {
+                return vlx_general::pointer_to_numpy(self.values(index),
+                                                     {static_cast<py::ssize_t>(self.number_of_elements(index))});
+            },
+            "Gets a copy of the values of a block, the components of a combination one after another. "
+            "The copy may be large.",
+            py::arg("index"))
         .def("memory_size", &CSparseTensor::memory_size, "Gets memory required to store the values blocks of tensor in bytes.")
         .def(
             "block_to_numpy",

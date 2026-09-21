@@ -1,0 +1,127 @@
+{
+  "schema": 1,
+  "suite": "tda",
+  "run": {
+    "date": "2026-09-16T12:09:31+02:00",
+    "commit": "633e3a8ef",
+    "dirty": true,
+    "veloxchem": "1.0rc4",
+    "machine": {
+      "name": "m4max",
+      "cpu": "Apple M4 Max",
+      "cores": 14,
+      "os": "Darwin 25.6.0"
+    },
+    "config": {
+      "mpi_ranks": 1,
+      "omp_threads": 14,
+      "blas": []
+    }
+  },
+  "rows": [
+    {
+      "molecule": "tagrisso",
+      "atoms": 70,
+      "basis": "def2-svp",
+      "nao": 683,
+      "aux_basis": null,
+      "naux": null,
+      "occupied": 133,
+      "method": "full",
+      "ri_mode": null,
+      "functional": "HF",
+      "nstates": 5,
+      "conv_thresh": 1e-08,
+      "tda_thresh": 1e-05,
+      "scf_wall": 151.18,
+      "tda_wall": 866.137,
+      "iterations": 19,
+      "converged": true,
+      "excitation_energies": [
+        0.19369317749012024,
+        0.19586292576222894,
+        0.19856717408691532,
+        0.20597105177513828,
+        0.2083282748486018
+      ]
+    },
+    {
+      "molecule": "tagrisso",
+      "atoms": 70,
+      "basis": "def2-svp",
+      "nao": 683,
+      "aux_basis": "def2-universal-jkfit",
+      "naux": 3387,
+      "occupied": 133,
+      "method": "ri_jk_simd",
+      "ri_mode": "in_memory",
+      "functional": "HF",
+      "nstates": 5,
+      "conv_thresh": 1e-08,
+      "tda_thresh": 1e-05,
+      "scf_wall": 29.886,
+      "tda_wall": 138.381,
+      "iterations": 19,
+      "converged": true,
+      "excitation_energies": [
+        0.19368581993932865,
+        0.19586556674611794,
+        0.19856272938199027,
+        0.20597522522877443,
+        0.20833111872537144
+      ]
+    },
+    {
+      "molecule": "tagrisso",
+      "atoms": 70,
+      "basis": "def2-svp",
+      "nao": 683,
+      "aux_basis": null,
+      "naux": null,
+      "occupied": 133,
+      "method": "full",
+      "ri_mode": null,
+      "functional": "B3LYP",
+      "nstates": 5,
+      "conv_thresh": 1e-08,
+      "tda_thresh": 1e-05,
+      "scf_wall": 151.197,
+      "tda_wall": 693.416,
+      "iterations": 13,
+      "converged": true,
+      "excitation_energies": [
+        0.11295080722267031,
+        0.1194037977190975,
+        0.12603433588244412,
+        0.13366642495415906,
+        0.13520351457660268
+      ]
+    },
+    {
+      "molecule": "tagrisso",
+      "atoms": 70,
+      "basis": "def2-svp",
+      "nao": 683,
+      "aux_basis": "def2-universal-jkfit",
+      "naux": 3387,
+      "occupied": 133,
+      "method": "ri_jk_simd",
+      "ri_mode": "in_memory",
+      "functional": "B3LYP",
+      "nstates": 5,
+      "conv_thresh": 1e-08,
+      "tda_thresh": 1e-05,
+      "scf_wall": 46.741,
+      "tda_wall": 167.623,
+      "iterations": 13,
+      "converged": true,
+      "excitation_energies": [
+        0.11295546369804367,
+        0.11940883655208158,
+        0.1260381555315824,
+        0.13367026612923835,
+        0.1352031522192329
+      ]
+    }
+  ]
+}

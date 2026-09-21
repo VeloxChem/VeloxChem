@@ -48,6 +48,12 @@ from .matrix import Matrix
 from .distributedarray import DistributedArray
 from .subcommunicators import SubCommunicators
 from .rifockdriver import RIFockDriver
+from .veloxchemlib import SimdRIJKFockDriver
+from .veloxchemlib import SimdRIJKResponseDriver
+from .veloxchemlib import PackedMatrix
+from .veloxchemlib import rimode
+from .molecularbasis import MolecularBasis
+from . import rijkresponse
 from .fockdriver import FockDriver
 from .griddriver import GridDriver
 from .molecularorbitals import MolecularOrbitals, molorb
@@ -134,9 +140,18 @@ class LinearSolver:
         # RI-J
         self.ri_coulomb = False
         self.ri_jk = False
+        self.ri_jk_simd = False
         self.ri_auxiliary_basis = 'def2-universal-jfit'
         self.ri_metric_threshold = 1.0e-12
         self._ri_drv = None
+
+        # NOTE: the resolution of the identity for response needs a fitting basis
+        # for the exchange as well as the Coulomb. The default above fits the
+        # Coulomb alone, so a calculation which turns on ri_jk has to name a jkfit
+        # basis and is refused if it does not.
+        self._ri_jk_drv = None
+        self._ri_jk_response_drv = None
+        self._ri_jk_aux_basis = None
 
         # dft
         self.xcfun = None
@@ -232,7 +247,7 @@ class LinearSolver:
 
         self._debug = False
         self._block_size_factor = 8
-        self._xcfun_ldstaging = 1024
+        self._xcfun_ldstaging = 256
 
         # serial ratio as in Amdahl's law for estimating parallel efficiency
         self.serial_ratio = 0.05
@@ -268,7 +283,9 @@ class LinearSolver:
             },
             'method_settings': {
                 'ri_coulomb': ('bool', 'use RI-J approximation'),
-                'ri_auxiliary_basis': ('str', 'RI-J auxiliary basis set'),
+                'ri_jk': ('bool', 'use RI-JK approximation'),
+                'ri_jk_simd': ('bool', 'use the simd RI-JK driver'),
+                'ri_auxiliary_basis': ('str', 'RI auxiliary basis set'),
                 'xcfun': ('str_upper', 'exchange-correlation functional'),
                 'grid_level': ('int', 'accuracy level of DFT grid'),
                 'potfile': ('str', 'potential file for polarizable embedding'),
@@ -567,9 +584,17 @@ class LinearSolver:
         """
 
         # TODO: enable RI-JK
+        # NOTE: only the simd driver has a response path, and only on one rank.
+        # The Coulomb and the exchange both divide over the auxiliary basis, so
+        # nothing here forbids the ranks holding shares of it, but the B vectors
+        # are prepared whole below and dividing them is separate work.
         assert_msg_critical(
-            not self.ri_jk,
-            f'{type(self).__name__}.compute: RI-JK is not yet supported')
+            (not self.ri_jk) or self.ri_jk_simd,
+            f'{type(self).__name__}: RI-JK is supported only with ri_jk_simd')
+
+        assert_msg_critical(
+            (not self.ri_jk) or (self.nodes == 1),
+            f'{type(self).__name__}: the RI-JK response path runs on one rank')
 
         if self.rank == mpi_master():
             screening = T4CScreener()
@@ -585,9 +610,24 @@ class LinearSolver:
                                          self.ri_auxiliary_basis,
                                          verbose=True)
 
+        if self.ri_jk:
+            self._init_simd_ri_jk(molecule, basis)
+
         return {
             'screening': screening,
         }
+
+    def _init_simd_ri_jk(self, molecule, basis):
+        """
+        Forms the B vectors the simd RI-JK response driver contracts.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        """
+
+        rijkresponse.initialize(self, molecule, basis)
 
     def _init_dft(self, molecule, scf_results, silent=False):
         """
@@ -1788,6 +1828,24 @@ class LinearSolver:
                 kns = []
             else:
                 dks = None
+            # NOTE: the factors of the densities, collected beside them. None where
+            # this way of building cannot be taken, and then nothing looks for them.
+            #
+            # The two modes which restrict the orbital space carry a different set
+            # of orbitals and are left out for that reason. The test for a complex
+            # trial vector is not about anything this code does today: every solver
+            # which reaches here works in real arithmetic, the complex vectors of
+            # the damped response being carried as real blocks, so the test always
+            # passes. It is here so that the day the complex path is developed
+            # these solvers fall back to the dense route rather than hand complex
+            # data to a driver which takes doubles.
+            ri_jk_factors = None
+
+            if (self.rank == mpi_master() and self.ri_jk and self.ri_jk_simd and
+                    not getattr(self, 'core_excitation', False) and
+                    not getattr(self, 'restricted_subspace', False) and
+                    not np.iscomplexobj(vecs_ger.data)):
+                ri_jk_factors = (mo[:, :nocc], [], [])
 
             prep_t0 = tm.time()
 
@@ -1860,6 +1918,22 @@ class LinearSolver:
                         dak = self.commut_mo_density(kn, nocc)
                         dak = np.linalg.multi_dot([mo, dak, mo.T])
 
+                        # NOTE: the same density as the factors it is made of,
+                        # which the resolution of the identity wants and the dense
+                        # path does not. The commutator leaves the occupied
+                        # orbitals on the left of the excitation part and on the
+                        # right of the de-excitation part, so the density is
+                        # C(occupied) times the first factor transposed plus the
+                        # second factor times C(occupied) transposed, and one
+                        # transformation of the occupied orbitals serves both.
+                        if ri_jk_factors is not None:
+                            n_ov = nocc * (norb - nocc)
+                            mo_vir = mo[:, nocc:]
+                            zmat = vec[:n_ov].reshape(nocc, norb - nocc)
+                            ymat = vec[n_ov:].reshape(nocc, norb - nocc)
+                            ri_jk_factors[1].append(-np.matmul(mo_vir, zmat.T))
+                            ri_jk_factors[2].append(np.matmul(mo_vir, ymat.T))
+
                     dks.append(dak)
                     kns.append(kn)
 
@@ -1869,7 +1943,8 @@ class LinearSolver:
             # form Fock matrices
 
             fock = self._comp_lr_fock(dks, molecule, basis, eri_dict, dft_dict,
-                                      pe_dict, profiler)
+                                      pe_dict, profiler,
+                                      dens_factors=ri_jk_factors)
 
             if profiler is not None:
                 # only increment FockCount on master rank
@@ -2033,7 +2108,8 @@ class LinearSolver:
                       dft_dict,
                       pe_dict,
                       profiler=None,
-                      comm=None):
+                      comm=None,
+                      dens_factors=None):
         """
         Computes Fock/Fxc matrix (2e part) for linear response calculation.
 
@@ -2051,6 +2127,14 @@ class LinearSolver:
             The dictionary containing PE information.
         :param profiler:
             The profiler.
+        :param dens_factors:
+            The densities as the factors they were made from: a left factor which
+            the batch shares and one right factor for each density, so that
+            dens[i] is left times rights[i] transposed. Only the resolution of the
+            identity uses them, and only because the exchange of a factorised
+            density costs the basis squared where the exchange of the same density
+            as a matrix costs the basis cubed. None where the caller has not
+            formed them, and the dense path is taken.
 
         :return:
             The Fock matrix (2e part).
@@ -2114,7 +2198,22 @@ class LinearSolver:
 
         fock_arrays = []
 
-        for idx in range(num_densities):
+        # NOTE: the resolution of the identity takes the whole batch at once, as
+        # the left factor is transformed once for all of it, so it replaces the
+        # loop rather than sitting inside it.
+        use_ri_jk = (self.ri_jk and self.ri_jk_simd and dens_factors is not None)
+
+        if use_ri_jk:
+            # NOTE: a hybrid range-separated functional has its attenuated
+            # exchange subtracted inside the same call, in the same pass over the
+            # auxiliary basis. The four-centre correction further down is not
+            # reached for this path at all: it sits inside the loop over the
+            # densities, and that loop runs zero times here.
+            fock_arrays = self._comp_ri_jk_fock(
+                basis, dens_factors, exchange_scaling_factor,
+                erf_k_coef if need_omega else 0.0)
+
+        for idx in range(0 if use_ri_jk else num_densities):
             if self.ri_coulomb:
                 assert_msg_critical(
                     fock_type == 'j',
@@ -2226,6 +2325,34 @@ class LinearSolver:
         else:
             return None
 
+    def _comp_ri_jk_fock(self,
+                         basis,
+                         dens_factors,
+                         exchange_scaling_factor,
+                         erf_exchange_scaling_factor=0.0):
+        """
+        Computes the two-electron part for a batch of factorised densities.
+
+        :param basis:
+            The AO basis set.
+        :param dens_factors:
+            The left factor the batch shares and the right factor of each density.
+        :param exchange_scaling_factor:
+            The fraction of exact exchange.
+        :param erf_exchange_scaling_factor:
+            The coefficient of the exchange of the attenuated operator, which is
+            the erf coefficient of a hybrid range-separated functional and zero for
+            every other calculation. It is subtracted as the plain exchange is, so
+            this is the same number the four-centre way is passed.
+
+        :return:
+            The Fock matrices as numpy arrays, one for each density.
+        """
+
+        return rijkresponse.fock_matrices(self, basis, dens_factors,
+                                          exchange_scaling_factor,
+                                          erf_exchange_scaling_factor)
+
     def _comp_lr_fock_unrestricted(self,
                                    dens,
                                    molecule,
@@ -2234,7 +2361,8 @@ class LinearSolver:
                                    dft_dict,
                                    pe_dict,
                                    profiler=None,
-                                   comm=None):
+                                   comm=None,
+                                   dens_factors=None):
         """
         Computes Fock/Fxc matrix (2e part) for linear response calculation.
 
@@ -2252,6 +2380,12 @@ class LinearSolver:
             The dictionary containing PE information.
         :param profiler:
             The profiler.
+        :param dens_factors:
+            The factors of each spin's densities, as a pair of them, or None where
+            the caller has only the densities themselves. The resolution of the
+            identity takes the whole batch at once from these; a caller which does
+            not have them -- the orbital response solvers hand this raw densities --
+            is served by the four-centre way below as it always was.
 
         :return:
             The Fock matrix (2e part).
@@ -2319,7 +2453,25 @@ class LinearSolver:
 
         fock_arrays = []
 
-        for idx in range(num_densities):
+        # NOTE: the resolution of the identity takes the whole batch at once, as
+        # each spin's left factor is transformed once for all of it, so it replaces
+        # the loop rather than sitting inside it. The two spins share the Coulomb
+        # of their densities added and share nothing else, their occupied orbitals
+        # being neither the same orbitals nor the same number of them.
+        use_ri_jk = (self.ri_jk and self.ri_jk_simd and dens_factors is not None)
+
+        if use_ri_jk:
+            # NOTE: a range-separated functional has its attenuated exchange
+            # subtracted inside the same call. The four-centre correction further
+            # down is not reached for this path: it sits inside the loop over the
+            # densities, and that loop runs zero times here.
+            factors_a, factors_b = dens_factors
+
+            fock_arrays = rijkresponse.fock_matrices_unrestricted(
+                self, basis, factors_a, factors_b, exchange_scaling_factor,
+                erf_k_coef if need_omega else 0.0)
+
+        for idx in range(0 if use_ri_jk else num_densities):
             if self.ri_coulomb:
                 assert_msg_critical(
                     fock_type == 'j',
@@ -2623,6 +2775,19 @@ class LinearSolver:
                 dks_b = None
                 kns_b = None
 
+            # NOTE: the factors of each spin, gathered beside its densities. The
+            # left factor of a spin is its own occupied orbitals, so the two spins
+            # carry a set each rather than sharing one. Formed only where the
+            # resolution of the identity will use them, and only outside the core
+            # excitation case, whose orbitals are a subset the factors below do not
+            # describe.
+            ri_jk_factors = None
+
+            if (self.rank == mpi_master() and self.ri_jk and self.ri_jk_simd and
+                    not getattr(self, 'core_excitation', False)):
+                ri_jk_factors = ((mo_a[:, :nocc_a], [], []),
+                                 (mo_b[:, :nocc_b], [], []))
+
             prep_t0 = tm.time()
 
             for col in range(batch_start, batch_end):
@@ -2708,6 +2873,24 @@ class LinearSolver:
                         dak = np.linalg.multi_dot([mo_a, dak, mo_a.T])
                         dbk = np.linalg.multi_dot([mo_b, dbk, mo_b.T])
 
+                        # NOTE: the same densities as the factors they are made of,
+                        # spin by spin. The commutator leaves that spin's occupied
+                        # orbitals on the left of the excitation part and on the
+                        # right of the de-excitation part, exactly as in the
+                        # restricted case, so each density is C(occupied) times the
+                        # first factor transposed plus the second factor times
+                        # C(occupied) transposed.
+                        if ri_jk_factors is not None:
+                            for factors, vec, mo, nocc in (
+                                    (ri_jk_factors[0], vec_a, mo_a, nocc_a),
+                                    (ri_jk_factors[1], vec_b, mo_b, nocc_b)):
+                                n_ov = nocc * (norb - nocc)
+                                mo_vir = mo[:, nocc:]
+                                zmat = vec[:n_ov].reshape(nocc, norb - nocc)
+                                ymat = vec[n_ov:].reshape(nocc, norb - nocc)
+                                factors[1].append(-np.matmul(mo_vir, zmat.T))
+                                factors[2].append(np.matmul(mo_vir, ymat.T))
+
                     dks_a.append(dak)
                     dks_b.append(dbk)
                     kns_a.append(kn_a)
@@ -2720,7 +2903,7 @@ class LinearSolver:
 
             fock = self._comp_lr_fock_unrestricted(
                 (dks_a, dks_b), molecule, basis, eri_dict, dft_dict, pe_dict,
-                profiler)
+                profiler, dens_factors=ri_jk_factors)
 
             if profiler is not None:
                 # only increment FockCount on master rank

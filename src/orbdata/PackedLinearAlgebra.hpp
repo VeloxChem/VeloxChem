@@ -107,6 +107,18 @@ auto cholesky_factor(const CPackedMatrix &matrix) -> CPackedMatrix;
 /// fitting basis which loses them is worth knowing about.
 auto inverse_square_root(const CPackedMatrix &matrix, const double threshold = 1.0e-12) -> CPackedMatrix;
 
+/// @brief Inverts a symmetric positive semidefinite matrix stored in the packed
+/// format, dropping the directions which are not really there.
+/// @param matrix The symmetric matrix to invert.
+/// @param threshold The eigenvalue below which a direction is dropped.
+/// @return The inverse on the directions which remain.
+/// @note The same construction as the inverted square root and one power apart. A
+/// plain inversion of a nearly linearly dependent metric divides by an eigenvalue
+/// which is numerical noise and multiplies that noise into everything the inverse
+/// touches; this drops the direction instead, which is what a fitting basis that
+/// does not span it deserves.
+auto pseudo_inverse(const CPackedMatrix &matrix, const double threshold = 1.0e-12) -> CPackedMatrix;
+
 }  // namespace packlin
 
 #endif /* PackedLinearAlgebra_hpp */

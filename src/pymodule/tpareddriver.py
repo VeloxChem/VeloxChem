@@ -37,6 +37,7 @@ import time
 import sys
 
 from .veloxchemlib import mpi_master
+from . import rijkresponse
 from .outputstream import OutputStream
 from .distributedarray import DistributedArray
 from .cppsolver import ComplexResponseSolver
@@ -124,6 +125,18 @@ class TpaReducedDriver(TpaDriverBase):
         distributed_density_1 = None
         distributed_density_2 = None
 
+        # NOTE: the factors of the sigma densities, collected beside them and
+        # carried on the driver rather than returned: what this returns is three
+        # densities and the base class unpacks exactly that.
+        #
+        # A sigma density is block diagonal in the orbitals, the occupied block
+        # carrying the occupied orbitals on both sides and the virtual block the
+        # virtual ones, which is the shape the driver takes as four factors.
+        self._ri_jk_factors = None
+
+        if self.rank == mpi_master() and self.ri_jk and self.ri_jk_simd:
+            self._ri_jk_factors = (mo[:, :nocc], [], mo[:, nocc:], [])
+
         for w in wi:
 
             nx = ComplexResponseSolver.get_full_solution_vector(Nx[('x', w)])
@@ -157,6 +170,21 @@ class TpaReducedDriver(TpaDriverBase):
                 D_sig_xy = 6 * (self.commut(ky, Dx) + self.commut(kx, Dy))
                 D_sig_xz = 6 * (self.commut(kx, Dz) + self.commut(kz, Dx))
                 D_sig_yz = 6 * (self.commut(ky, Dz) + self.commut(kz, Dy))
+
+                # NOTE: the factors, taken before the transformation to the
+                # atomic orbitals throws the block structure away. Only the real
+                # part of each sigma density is sent to the Fock build below, so
+                # only the real part of each block is taken and the count of the
+                # factors is the count of the densities.
+                if self._ri_jk_factors is not None:
+                    mo_occ = mo[:, :nocc]
+                    mo_vir = mo[:, nocc:]
+                    for sigma in (D_sig_xx, D_sig_yy, D_sig_zz, D_sig_xy,
+                                  D_sig_xz, D_sig_yz):
+                        self._ri_jk_factors[1].append(
+                            np.matmul(mo_occ, np.real(sigma[:nocc, :nocc]).T))
+                        self._ri_jk_factors[3].append(
+                            np.matmul(mo_vir, np.real(sigma[nocc:, nocc:]).T))
 
                 # density transformation from MO to AO basis
 
@@ -283,12 +311,14 @@ class TpaReducedDriver(TpaDriverBase):
                 dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis, 'real',
                                                  eri_dict, dft_dict,
                                                  density_list1, density_list2,
-                                                 None, 'redtpa_i', profiler)
+                                                 None, 'redtpa_i', profiler,
+                                                 self._ri_jk_factors)
             else:
                 dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis, 'real',
                                                  eri_dict, None, None,
                                                  density_list2, None,
-                                                 'redtpa_i', profiler)
+                                                 'redtpa_i', profiler,
+                                                 self._ri_jk_factors)
 
             self._print_fock_time(time.time() - time_start_fock)
 
@@ -359,11 +389,13 @@ class TpaReducedDriver(TpaDriverBase):
             'max_iter', 'eri_thresh', 'timing', 'memory_profiling',
             'batch_size', 'restart', 'xcfun', 'grid_level', 'potfile',
             'electric_field', 'program_end_time', '_debug', '_block_size_factor',
-            'ri_coulomb'
+            'ri_coulomb', 'ri_jk', 'ri_jk_simd', 'ri_auxiliary_basis'
         }
 
         for key in cpp_keywords:
             setattr(N_total_drv, key, getattr(self, key))
+
+        rijkresponse.share(self, N_total_drv)
 
         if self.checkpoint_file is not None:
             fpath = Path(self.checkpoint_file)
@@ -530,6 +562,15 @@ class TpaReducedDriver(TpaDriverBase):
         distributed_density_1 = None
         distributed_density_2 = None
 
+        # NOTE: the factors of the densities of the second pass, which are block
+        # diagonal in the orbitals as the sigma densities of the first pass are,
+        # and are taken the same way. The first pass has had its Fock matrices
+        # built by the time this runs, so the two passes share the attribute.
+        self._ri_jk_factors = None
+
+        if self.rank == mpi_master() and self.ri_jk and self.ri_jk_simd:
+            self._ri_jk_factors = (mo[:, :nocc], [], mo[:, nocc:], [])
+
         for w in wi:
 
             nx = ComplexResponseSolver.get_full_solution_vector(Nx[('x', w)])
@@ -607,6 +648,23 @@ class TpaReducedDriver(TpaDriverBase):
 
                 Dz += self.commut(kz_, D_sig_zz)
                 Dz += self.commut(k_sig_zz, Dc_z_)
+
+                # NOTE: the factors, taken before the transformation to the
+                # atomic orbitals. This pass sends the real and the imaginary
+                # part of each of the three densities, six columns for three
+                # matrices, so both parts of each block are taken and in that
+                # order: the factors line up with the densities one for one.
+                if self._ri_jk_factors is not None:
+                    mo_occ = mo[:, :nocc]
+                    mo_vir = mo[:, nocc:]
+                    for dmat in (Dx, Dy, Dz):
+                        block_oo = dmat[:nocc, :nocc]
+                        block_vv = dmat[nocc:, nocc:]
+                        for part in (np.real, np.imag):
+                            self._ri_jk_factors[1].append(
+                                np.matmul(mo_occ, part(block_oo).T))
+                            self._ri_jk_factors[3].append(
+                                np.matmul(mo_vir, part(block_vv).T))
 
                 # density transformation from MO to AO basis
 
@@ -728,12 +786,14 @@ class TpaReducedDriver(TpaDriverBase):
                                                  'real_and_imag', eri_dict,
                                                  dft_dict, density_list1,
                                                  density_list2, None,
-                                                 'redtpa_ii', profiler)
+                                                 'redtpa_ii', profiler,
+                                                 self._ri_jk_factors)
             else:
                 dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
                                                  'real_and_imag', eri_dict,
                                                  None, None, density_list2,
-                                                 None, 'redtpa_ii', profiler)
+                                                 None, 'redtpa_ii', profiler,
+                                                 self._ri_jk_factors)
 
             self._print_fock_time(time.time() - time_start_fock)
 

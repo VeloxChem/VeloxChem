@@ -38,6 +38,7 @@
 #include <cstddef>
 #include <initializer_list>
 
+#include "BasisFunction.hpp"
 #include "SimdMatrix.hpp"
 
 namespace simdfunc {  // simdfunc namespace
@@ -119,6 +120,59 @@ auto compute_boys_function(CSimdMatrix                        &buffer,
                            const double                        fj,
                            const double                        mu) -> void;
 
+/// @brief Computes the values of the attenuated Boys function of every order up to
+/// the requested one for one pair of primitives of a two-center electron repulsion
+/// integral of the operator erf(omega r) / r.
+/// @param buffer The buffer of the combination of basis functions.
+/// @param coordinates The coordinates of the atom pairs, whose row nine holds the
+/// squared distance of the atom pair.
+/// @param target The row of the buffer to write the argument to, with the values
+/// following it.
+/// @param order The highest order to compute.
+/// @param ncols The number of atom pairs the pair of primitives reaches.
+/// @param fj The prefactor of the integral.
+/// @param mu The factor the squared distance is scaled by for the plain operator.
+/// @param omega The range separation parameter.
+/// @note The attenuated function is the plain one with its argument scaled by
+/// theta squared and its value of order m scaled by theta to the 2m + 1, where
+/// theta squared is omega squared over omega squared plus mu. It is therefore the
+/// same expansion and the same accuracy; what the attenuation changes is where the
+/// expansion is evaluated and what each order is weighted by.
+/// @note Sending omega to infinity returns the plain function exactly, and sending
+/// it to zero returns zeros, which is what erf(0 r) / r is. Both are checked.
+auto compute_full_erf_boys_function(CSimdMatrix       &buffer,
+                                    const CSimdMatrix &coordinates,
+                                    const size_t       target,
+                                    const size_t       order,
+                                    const size_t       ncols,
+                                    const double       fj,
+                                    const double       mu,
+                                    const double       omega) -> void;
+
+/// @brief Computes the values of the attenuated Boys function of the requested
+/// orders alone for one pair of primitives of a two-center electron repulsion
+/// integral of the operator erf(omega r) / r.
+/// @param buffer The buffer of the combination of basis functions.
+/// @param coordinates The coordinates of the atom pairs, whose row nine holds the
+/// squared distance of the atom pair.
+/// @param target The row of the buffer to write the argument to, with the values
+/// following it.
+/// @param orders The orders to compute.
+/// @param ncols The number of atom pairs the pair of primitives reaches.
+/// @param fj The prefactor of the integral.
+/// @param mu The factor the squared distance is scaled by for the plain operator.
+/// @param omega The range separation parameter.
+/// @note The rows are packed consecutively while the orders they stand for need not
+/// be, so each row is weighted by the order it stands for and not by where it sits.
+auto compute_erf_boys_function(CSimdMatrix                        &buffer,
+                               const CSimdMatrix                  &coordinates,
+                               const size_t                        target,
+                               const std::initializer_list<size_t> orders,
+                               const size_t                        ncols,
+                               const double                        fj,
+                               const double                        mu,
+                               const double                        omega) -> void;
+
 /// @brief Computes the values of Boys function of every order up to the requested
 /// one for one triple of primitives of a three-center electron repulsion integral.
 /// @param buffer The buffer of the combination of basis functions, holding the
@@ -166,7 +220,7 @@ auto compute_t3c_boys_function(CSimdMatrix                        &buffer,
                                const std::initializer_list<size_t> orders,
                                const size_t                        ncols,
                                const double                        fj,
-                               const double                        mu,
+                               const size_t                        pair,
                                const double                        fq) -> void;
 
 auto compute_full_t3c_boys_function(CSimdMatrix       &buffer,
@@ -176,8 +230,133 @@ auto compute_full_t3c_boys_function(CSimdMatrix       &buffer,
                                     const size_t       order,
                                     const size_t       ncols,
                                     const double       fj,
-                                    const double       mu,
+                                    const size_t       pair,
                                     const double       fq) -> void;
+
+/// @brief Computes the values of the attenuated Boys function of every order up to
+/// the requested one for one triple of primitives of a three-center electron
+/// repulsion integral of the operator erf(omega r) / r.
+/// @param fq The reduced exponent of the pair and the auxiliary primitive, which the
+/// argument is formed from and which the attenuation is taken against.
+/// @param omega The range separation parameter.
+/// @note The attenuation is the same as in the two-center case: the argument is
+/// scaled by theta squared and the value of order m by theta to the 2m + 1, with
+/// theta squared being omega squared over omega squared plus fq. What differs is
+/// only that the argument is the scaled displacement of the product center and that
+/// the values carry the exponential of the pair as well.
+auto compute_full_t3c_erf_boys_function(CSimdMatrix       &buffer,
+                                        const CSimdMatrix &coordinates,
+                                        const size_t       target,
+                                        const size_t       pc,
+                                        const size_t       order,
+                                        const size_t       ncols,
+                                        const double       fj,
+                                        const size_t       pair,
+                                        const double       fq,
+                                        const double       omega) -> void;
+
+/// @brief Computes the values of the attenuated Boys function of the requested
+/// orders alone for one triple of primitives of a three-center electron repulsion
+/// integral of the operator erf(omega r) / r.
+/// @note The rows are packed consecutively while the orders they stand for need not
+/// be, so each row is weighted by the order it stands for and not by where it sits.
+auto compute_t3c_erf_boys_function(CSimdMatrix                        &buffer,
+                                   const CSimdMatrix                  &coordinates,
+                                   const size_t                        target,
+                                   const size_t                        pc,
+                                   const std::initializer_list<size_t> orders,
+                                   const size_t                        ncols,
+                                   const double                        fj,
+                                   const size_t                        pair,
+                                   const double                        fq,
+                                   const double                        omega) -> void;
+
+/// @brief Computes the values of Boys function of the requested orders alone for one
+/// pair of primitives and one point charge of a nuclear attraction integral.
+/// @param buffer The buffer of the combination of basis functions, holding the
+/// displacement of the Gaussian product center from the charge in the three rows at
+/// pc.
+/// @param coordinates The coordinates of the atom pairs, whose row nine holds the
+/// squared distance of the atom pair.
+/// @param target The row of the buffer to write the argument to, with the values
+/// following it, one row per requested order and in the order they are requested.
+/// @param pc The first of the three rows holding that displacement, as
+/// simdfunc::compute_pc wrote them.
+/// @param orders The orders of Boys function to compute.
+/// @param ncols The number of atom pairs the pair of primitives reaches.
+/// @param fz The prefactor of the integral, 2 pi / p times the normalisations and the
+/// charge, which every value is scaled by.
+/// @param mu The factor the squared distance of the atom pair is scaled by, whose
+/// exponential every value is scaled by as well.
+/// @param p The exponent sum of the pair, which the squared displacement is scaled by
+/// to give the argument.
+/// @note The argument is p PC^2 where the electron repulsion's is mu R_AB^2, which is
+/// the whole of the difference: the operator is anchored at the charge rather than
+/// carried between two distributions. The scaling is the same shape as the
+/// three-center form's, the pair having been collapsed onto one center either way.
+/// @note What this form saves against the full one is the rows of the buffer and not
+/// the arithmetic, as the orders below the highest requested one are computed whether
+/// they are asked for or not.
+auto compute_npot_boys_function(CSimdMatrix                        &buffer,
+                                const CSimdMatrix                  &coordinates,
+                                const size_t                        target,
+                                const size_t                        pc,
+                                const std::initializer_list<size_t> orders,
+                                const size_t                        ncols,
+                                const double                        fz,
+                                const size_t                        pair_exp,
+                                const double                        p) -> void;
+
+auto compute_full_npot_boys_function(CSimdMatrix       &buffer,
+                                     const CSimdMatrix &coordinates,
+                                     const size_t       target,
+                                     const size_t       pc,
+                                     const size_t       order,
+                                     const size_t       ncols,
+                                     const double       fz,
+                                     const size_t       pair_exp,
+                                     const double       p) -> void;
+
+/// @brief Writes the exponential the pair of primitives contributes,
+/// exp(-mu AB^2), into one row.
+/// @param buffer The buffer of the combination of basis functions.
+/// @param coordinates The coordinates of the atom pairs, whose row nine holds the
+/// squared distance of the atom pair.
+/// @param target The row to write it to.
+/// @param ncols The number of atom pairs the pair of primitives reaches.
+/// @param mu The factor the squared distance of the atom pair is scaled by.
+/// @note It depends on the pair of primitives and on the atom pair and on neither
+/// the order of the Boys function nor the charge, so an anchored operator forms it
+/// once above its loop over the charges and every call inside that loop reads it.
+/// Evaluating it where it was read instead cost 17 to 26 per cent of a nuclear
+/// attraction call, rising with the molecule, the loop over the charges being the
+/// molecule.
+/// @brief Forms the exponential every pair of primitives of the bra contributes,
+/// exp(-mu AB^2), for all of them at once.
+/// @param bra The basis function on bra side.
+/// @param ket The basis function on ket side.
+/// @param coordinates The coordinates of the atom pairs, whose row nine holds the
+/// squared distance of the atom pair.
+/// @param ncols The number of atom pairs the widest pair of primitives reaches,
+/// which is the stride of the scratch.
+/// @note For a three-center form, whose loop over the atoms on the ket side stands
+/// outside the pair of primitives. A row of the buffer would be refilled for every
+/// one of those atoms; this is filled once for the call, and the pair is named
+/// rather than the row. It costs nprim_a * nprim_b * ncols of scratch a thread,
+/// which is what buys the whole repetition over the atoms.
+/// @note The scratch is held per thread and grown rather than allocated per call.
+/// **compute_t3c_boys_function and its full form read it, so it has to be filled
+/// before them**; a kernel that does not is reading the last call's pairs.
+auto compute_pair_exponents(const CBasisFunction &bra,
+                            const CBasisFunction &ket,
+                            const CSimdMatrix    &coordinates,
+                            const size_t          ncols) -> void;
+
+auto compute_pair_exponent(CSimdMatrix       &buffer,
+                           const CSimdMatrix &coordinates,
+                           const size_t       target,
+                           const size_t       ncols,
+                           const double       mu) -> void;
 
 }  // namespace simdfunc
 

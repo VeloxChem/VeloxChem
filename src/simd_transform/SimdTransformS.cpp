@@ -62,4 +62,28 @@ transform_s_inner(CSimdMatrix &buffer, const size_t target, const size_t source,
     }
 }
 
+auto
+transform_s_outer(double *values, const size_t nvalues, CSimdMatrix &buffer, const size_t source,
+                  const size_t ncomps, const size_t nmax) -> void
+{
+    // NOTE: the rows of the values are not aligned, starting at this combination's
+    // offset in the values block, so they are kept out of the clause below.
+
+    // NOTE: what the other side has left reaches this pass as a count of
+    // components, which is one where that side is a single function.
+
+    for (size_t c = 0; c < ncomps; c++)
+    {
+        auto *g_0 = values + (0 * ncomps + c) * nvalues;
+
+        const auto *s_0 = buffer.data(source + 0 * ncomps + c);
+
+#pragma omp simd aligned(s_0 : simd::cache_line_size())
+        for (size_t k = 0; k < nmax; k++)
+        {
+            g_0[k] = s_0[k];
+        }
+    }
+}
+
 }  // namespace simdtrf

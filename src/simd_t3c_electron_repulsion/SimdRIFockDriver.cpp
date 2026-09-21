@@ -50,7 +50,9 @@
 #include "OpenMPFunc.hpp"
 #include "ScreeningFunc.hpp"
 #include "SimdT3CDistributor.hpp"
+#include "SimdT3CRsDistributor.hpp"
 #include "SimdThreeCenterElectronRepulsionDriver.hpp"
+#include "SimdThreeCenterElectronRepulsionRsDriver.hpp"
 #include "TripleSparsityPattern.hpp"
 
 #ifdef VLX_USE_MATHLIB
@@ -166,6 +168,80 @@ _matrix_product(const size_t  nrows,
 #endif /* VLX_USE_MATHLIB */
 }
 
+/// @brief The fraction of the B vectors which is actually held.
+/// @param bq_vectors The B vectors.
+/// @param basis The molecular basis.
+/// @param aux_basis The auxiliary molecular basis.
+/// @return The number of values held over the number a dense tensor would hold.
+/// @note An off-diagonal pair of atoms is held once and fills two places of the
+/// square, and a diagonal pair is held with the basis functions of both sides and
+/// fills one. Counting the values twice over would put the density above one,
+/// which a fraction cannot be.
+/// @note It costs a walk over the combinations of every block, which is why the
+/// transformation asks for it only when the threshold makes it a question.
+auto
+_bq_density(const CSparseTensor   &bq_vectors,
+            const CMolecularBasis &basis,
+            const CMolecularBasis &aux_basis,
+            const size_t           held) -> double
+{
+    const auto nao = basis.dimensions_of_basis();
+
+    // NOTE: the auxiliary functions this tensor actually holds, which on more than
+    // one rank is a share of the basis and not the whole of it. Dividing by the
+    // whole reported a density smaller by the number of the ranks -- 0.0410 where
+    // the single rank trend gave 0.33 -- which reads as an extremely sparse tensor
+    // rather than as a tensor of which this rank holds an eighth.
+    const auto naux = (held > 0) ? held : aux_basis.dimensions_of_basis();
+
+    if ((nao == 0) || (naux == 0)) return 0.0;
+
+    const auto indices = denseidx::index_functions(basis);
+
+    const auto aux_indices = denseidx::index_functions(aux_basis);
+
+    size_t filled = 0;
+
+    for (size_t ib = 0; ib < bq_vectors.number_of_blocks(); ib++)
+    {
+        const auto &block = bq_vectors.block(ib);
+
+        const auto &a_atoms = block.a_atoms();
+
+        const auto &b_atoms = block.b_atoms();
+
+        const auto natoms = block.c_atoms().size();
+
+        if ((a_atoms.empty()) || (natoms == 0)) continue;
+
+        size_t ndiag = 0;
+
+        while ((ndiag < a_atoms.size()) && (a_atoms[ndiag] == b_atoms[ndiag])) ndiag++;
+
+        for (const auto [la, ia] : indices[static_cast<size_t>(block.a_index())])
+        {
+            for (const auto [lb, jb] : indices[static_cast<size_t>(block.b_index())])
+            {
+                for (const auto [lc, kc] : aux_indices[static_cast<size_t>(block.c_index())])
+                {
+                    const auto npairs = block.number_of_pairs(la, ia, lb, jb, lc, kc);
+
+                    if (npairs == 0) continue;
+
+                    const auto ncomps = static_cast<size_t>((2 * la + 1) * (2 * lb + 1) * (2 * lc + 1));
+
+                    const auto diagonal = std::min(ndiag, npairs);
+
+                    filled += (2 * npairs - diagonal) * natoms * ncomps;
+                }
+            }
+        }
+    }
+
+    return static_cast<double>(filled) /
+           (static_cast<double>(naux) * static_cast<double>(nao) * static_cast<double>(nao));
+}
+
 /// @brief Describes the basis functions of the atom basis groups on the auxiliary
 /// side and the place they occupy in the permuted metric.
 /// @param groups The atom basis groups on the auxiliary side.
@@ -277,6 +353,43 @@ prof_since(const prof_clock::time_point &mark) -> double
 /// iteration. What the phases are worth measuring against is the direct mode, which
 /// sweeps the same integrals on every build: the sweep here is the same work, so a
 /// phase of this which is many times that one is not the price of holding them.
+/// @brief How far one auxiliary entry of one item reaches, for the profile.
+/// @note The entry is named rather than its height carried, because a group holds
+/// several items and one entry may be reached by more than one of them. Counting
+/// the rows twice would say a band needs more of them than it does.
+struct TBqReach
+{
+    size_t entry;
+
+    size_t column;
+
+    size_t span;
+
+    size_t taken;
+};
+
+/// @brief One chunk of the atom pairs of one task, which is the unit the gather
+/// brings and the unit the scatter takes away.
+struct TBqItem
+{
+    size_t task;
+
+    size_t cfirst;
+
+    size_t count;
+};
+
+/// @brief A run of chunks gathered side by side into one buffer and handed to one
+/// product, holding at most the columns the buffer was allocated for.
+struct TBqGroup
+{
+    size_t first;
+
+    size_t last;
+
+    size_t columns;
+};
+
 struct CBqProfile
 {
     double metric = 0.0;
@@ -293,6 +406,15 @@ struct CBqProfile
     size_t nproducts = 0;
     size_t ngathered = 0;
     size_t nread = 0;
+    size_t nkept = 0;
+    size_t nabsent = 0;
+
+    /// @brief How far an auxiliary entry reaches into its chunk, in tenths, weighted
+    /// by the rows the entry carries. The last bin is the entries which reach the
+    /// whole width and set it.
+    std::array<size_t, 10> reach_bins = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    std::array<size_t, 4> nfixed = {0, 0, 0, 0};
+    std::array<size_t, 4> nsorted = {0, 0, 0, 0};
     size_t nblocks = 0;
     size_t nbatches = 0;
     size_t ntasks = 0;
@@ -324,6 +446,67 @@ struct CBqProfile
         std::printf("RIJK   %zu products, %.2f GB gathered, %.2f GB read back from it\n", nproducts, gb(ngathered),
                     gb(nread));
 
+        // NOTE: a chunk is gathered to its full width and multiplied whole, while a
+        // group of the auxiliary side may keep fewer atom pairs than the widest of
+        // them. The difference is multiplied against zeros which are known to be
+        // zero. The share is reported because the contraction is 94% of forming the
+        // B vectors and runs at 84% of what the library gives on a dense product:
+        // there is no arithmetic to win back by running it better, only by not
+        // doing it, and this is the only place where some of it is provably idle.
+        const auto kept_bytes = nkept * sizeof(double);
+
+        const auto absent_bytes = nabsent * sizeof(double);
+
+        const auto share = [ngathered = ngathered](const size_t bytes) {
+            return (ngathered > 0) ? 100.0 * static_cast<double>(bytes) / static_cast<double>(ngathered) : 0.0;
+        };
+
+        std::printf("RIJK   %.2f GB of values in that, %.1f %% padding\n", gb(kept_bytes),
+                    100.0 - share(kept_bytes));
+
+        std::printf("RIJK   padding is %.1f %% groups which reach no pair of the chunk, %.1f %% tails\n",
+                    share(absent_bytes), 100.0 - share(kept_bytes) - share(absent_bytes));
+
+        // NOTE: what banding the product across the pairs would leave, against the
+        // whole rectangle. The metric's order is fixed once for every block, so the
+        // `fixed` figure is what a single global ordering recovers and the `sorted`
+        // one what a per block ordering would; the second is an upper bound nobody
+        // can reach without gathering the metric block by block.
+        size_t total_rows = 0;
+
+        for (const auto bin : reach_bins) total_rows += bin;
+
+        if (total_rows > 0)
+        {
+            std::printf("RIJK   how far a row reaches, by tenths of the chunk:\n");
+
+            size_t widest = 1;
+
+            for (const auto bin : reach_bins) widest = std::max(widest, bin);
+
+            for (size_t k = 0; k < 10; k++)
+            {
+                std::printf("RIJK     %3zu-%3zu %%  %5.1f %%  %s\n", k * 10, (k + 1) * 10,
+                            100.0 * static_cast<double>(reach_bins[k]) / static_cast<double>(total_rows),
+                            std::string(static_cast<size_t>(40.0 * reach_bins[k] / widest), '#').c_str());
+            }
+        }
+
+        const auto rectangle = static_cast<double>(ngathered / sizeof(double));
+
+        if (rectangle > 0.0)
+        {
+            constexpr std::array<size_t, 4> bands = {2, 4, 8, 16};
+
+            for (size_t k = 0; k < bands.size(); k++)
+            {
+                std::printf("RIJK   in %2zu bands: %5.1f %% saved on the metric's order, %5.1f %% on a per block "
+                            "one\n",
+                            bands[k], 100.0 * (1.0 - static_cast<double>(nfixed[k]) / rectangle),
+                            100.0 * (1.0 - static_cast<double>(nsorted[k]) / rectangle));
+            }
+        }
+
         std::printf("RIJK   %zu blocks in %zu batches, %zu tasks, on %d threads, chunk %zu\n", nblocks, nbatches,
                     ntasks, omp::get_number_of_threads(), nchunk);
 
@@ -334,27 +517,51 @@ struct CBqProfile
 }  // anonymous namespace
 
 auto
-CSimdRIFockDriver::compute_bq_vectors(const CMolecule        &molecule,
-                                       const CMolecularBasis  &basis,
-                                       const CMolecularBasis  &aux_basis,
-                                       const CPackedMatrix    &inverse_metric,
-                                       const double            threshold,
-                                       const std::vector<int> &aux_atoms) const -> CSparseTensor
+CSimdRIFockDriver::_compute_bq_vectors(const CMolecule                          &molecule,
+                                       const CMolecularBasis                    &basis,
+                                       const CMolecularBasis                    &aux_basis,
+                                       const std::vector<const CPackedMatrix *> &inverse_metrics,
+                                       const double                              threshold,
+                                       const double                              omega,
+                                       const std::vector<int>                   &aux_atoms) const
+    -> std::vector<CSparseTensor>
 {
+    // NOTE: one operator or two. Two is a hybrid range separated functional, whose
+    // exchange needs the attenuated B vectors beside the plain ones. The two are
+    // built together rather than by two calls because they share everything but the
+    // values: one sparsity pattern, one set of blocks, one walk of the indices of
+    // the gather and of the scatter. What is doubled is the integrals, the metric
+    // product and the storage, which is the work itself.
+
+    const auto nops = inverse_metrics.size();
+
+    errors::assertMsgCritical((nops == 1) || (nops == 2),
+                              std::string("RIJFockDriver: The B vectors are formed for one operator or two"));
+
+    errors::assertMsgCritical((nops == 1) == (omega == 0.0),
+                              std::string("RIJFockDriver: Two operators are the Coulomb one and the attenuated one, "
+                                          "which asks for a range separation parameter, and one is the Coulomb "
+                                          "operator alone, which does not"));
+
     const auto naux = aux_basis.dimensions_of_basis();
 
-    errors::assertMsgCritical((inverse_metric.number_of_rows() == naux) && (inverse_metric.number_of_columns() == naux),
-                              std::string("RIJFockDriver: The inverse metric does not match the auxiliary basis"));
+    for (const auto *inverse_metric : inverse_metrics)
+    {
+        errors::assertMsgCritical((inverse_metric->number_of_rows() == naux) &&
+                                      (inverse_metric->number_of_columns() == naux),
+                                  std::string("RIJFockDriver: The inverse metric does not match the auxiliary basis"));
 
-    // NOTE: the metric is read as at(q, p), so the B vectors are the sum over p of
-    // M_qp times the integrals of p. A symmetric matrix makes the two orders of the
-    // index the same, and a lower triangular one does not: the inverted Cholesky
-    // factor L, with the matrix equal to L L transposed, is what makes B transposed
-    // times B the inverse of the matrix and closes the Coulomb matrix of the fitting.
+        // NOTE: the metric is read as at(q, p), so the B vectors are the sum over p
+        // of M_qp times the integrals of p. A symmetric matrix makes the two orders
+        // of the index the same, and a lower triangular one does not: the inverted
+        // Cholesky factor L, with the matrix equal to L L transposed, is what makes
+        // B transposed times B the inverse of the matrix and closes the Coulomb
+        // matrix of the fitting.
 
-    errors::assertMsgCritical((inverse_metric.get_type() == mat_t::symmetric) ||
-                                  (inverse_metric.get_type() == mat_t::lower_triangular),
-                              std::string("RIJFockDriver: The inverse metric must be symmetric or lower triangular"));
+        errors::assertMsgCritical((inverse_metric->get_type() == mat_t::symmetric) ||
+                                      (inverse_metric->get_type() == mat_t::lower_triangular),
+                                  std::string("RIJFockDriver: The inverse metric must be symmetric or lower triangular"));
+    }
 
     // the blocks of atom pairs, which both the integrals and the B vectors carry
 
@@ -406,20 +613,30 @@ CSimdRIFockDriver::compute_bq_vectors(const CMolecule        &molecule,
     // a contraction needs are a contiguous block of it. It is the square of the
     // auxiliary basis, which is nothing beside the B vectors themselves.
 
-    auto metric = std::make_unique_for_overwrite<double[]>(nrows * ncols);
+    // NOTE: the operators are permuted into one buffer, each holding its own
+    // metric, so that the product of an operator reads a contiguous block of it.
+
+    auto metric = std::make_unique_for_overwrite<double[]>(nops * nrows * ncols);
 
     const auto nmetric = static_cast<int>(nrows);
 
-#pragma omp parallel for schedule(static) if (nmetric > 1)
-    for (int i = 0; i < nmetric; i++)
+    for (size_t k = 0; k < nops; k++)
     {
-        const auto irow = static_cast<size_t>(i);
+        const auto &inverse_metric = *inverse_metrics[k];
 
-        auto *row = metric.get() + irow * ncols;
+        auto *into = metric.get() + k * nrows * ncols;
 
-        for (size_t j = 0; j < ncols; j++)
+#pragma omp parallel for schedule(static) if (nmetric > 1)
+        for (int i = 0; i < nmetric; i++)
         {
-            row[j] = inverse_metric.at(out_dense[irow], in_dense[j]);
+            const auto irow = static_cast<size_t>(i);
+
+            auto *row = into + irow * ncols;
+
+            for (size_t j = 0; j < ncols; j++)
+            {
+                row[j] = inverse_metric.at(out_dense[irow], in_dense[j]);
+            }
         }
     }
 
@@ -471,11 +688,25 @@ CSimdRIFockDriver::compute_bq_vectors(const CMolecule        &molecule,
 
     const auto mark_allocate = prof_clock::now();
 
-    auto bq_vectors = CSparseTensor(CTripleSparsityPattern(std::move(out_blocks), mat_t::symmetric, threshold));
+    // NOTE: the tensors are built on one pattern, so an element of either is found
+    // at the same place in the other and the two can be read together. It is the
+    // pattern of the Coulomb bound for both, as the attenuated operator is bounded
+    // by the plain one everywhere.
 
-    bq_vectors.allocate();
+    const auto out_pattern = CTripleSparsityPattern(std::move(out_blocks), mat_t::symmetric, threshold);
 
-    bq_vectors.zero();
+    std::vector<CSparseTensor> bq_vectors;
+
+    bq_vectors.reserve(nops);
+
+    for (size_t k = 0; k < nops; k++)
+    {
+        bq_vectors.emplace_back(out_pattern);
+
+        bq_vectors.back().allocate();
+
+        bq_vectors.back().zero();
+    }
 
     profile.allocate += prof_since(mark_allocate);
 
@@ -514,18 +745,45 @@ CSimdRIFockDriver::compute_bq_vectors(const CMolecule        &molecule,
 
     CSimdThreeCenterElectronRepulsionDriver eri_drv;
 
+    CSimdThreeCenterElectronRepulsionRsDriver eri_rs_drv;
+
     // the batches of blocks of atom pairs the integrals are formed in
 
     size_t first = 0;
 
-    size_t nproducts = 0, ngathered = 0, nread = 0;
+    size_t nproducts = 0, ngathered = 0, nread = 0, nkept = 0, nabsent = 0;
+
+    // NOTE: the shape of the staircase and not only its area. Whether the entries
+    // run out at a few places or at all of them decides whether the padding can be
+    // reached by cutting the product into a handful of pieces, which keeps the
+    // library's own kernel, or only one column at a time, which does not.
+    size_t bins[10] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+
+    // NOTE: what a banded product would touch, if the chunk were cut across the
+    // pairs into BANDS pieces and each piece multiplied against only the auxiliary
+    // rows which reach it. `sorted` orders the rows by how far they reach, which
+    // makes the rows of a band a prefix and recovers the whole staircase; `fixed`
+    // keeps the order the metric is permuted into once for every block, so a band
+    // must take every row up to the last one that reaches it. The gap between them
+    // is what a per block ordering would buy over a single global one, which is
+    // the cost that decides whether banding is worth doing.
+    // NOTE: swept rather than fixed. Fewer bands recover less of the staircase and
+    // leave the products wider, and which wins is a property of the library and not
+    // of the pattern, so the choice is made against a measurement of both curves
+    // rather than here.
+    constexpr std::array<size_t, 4> BANDS = {2, 4, 8, 16};
+
+    // NOTE: plain arrays and not std::array. An OpenMP array section reduction
+    // wants something it can subscript as a pointer, and a std::array is not that
+    // -- "subscripted value is not an array or pointer", from the reduction clause.
+    size_t nfixed[4] = {0, 0, 0, 0}, nsorted[4] = {0, 0, 0, 0};
 
     // NOTE: the gathered integrals and the product of the metric with them are both
     // the whole auxiliary basis deep, so a column of the pair costs the rows and
     // the columns together, and the memory one thread may hold bounds the chunk
     // from above.
 
-    const auto per_column = (nrows + ncols) * sizeof(double);
+    const auto per_column = nops * (nrows + ncols) * sizeof(double);
 
     const auto nchunk = std::max(size_t{1}, _bq_columns / std::max(per_column, size_t{1}));
 
@@ -568,13 +826,33 @@ CSimdRIFockDriver::compute_bq_vectors(const CMolecule        &molecule,
 
         const auto pattern = CTripleSparsityPattern(std::move(batch_blocks), mat_t::symmetric, threshold);
 
-        auto integrals = CSparseTensor(pattern);
+        // NOTE: the two operators of a range separated build come out of one call
+        // on one pattern, which forms them over one set of primitive pairs and one
+        // chain of Boys values rather than sweeping the batch twice.
 
-        integrals.allocate();
+        std::vector<CSparseTensor> integrals;
 
-        auto distributor = CSimdT3CDistributor<CSparseTensor>(&integrals);
+        integrals.reserve(nops);
 
-        eri_drv.compute(pattern, molecule, basis, aux_basis, distributor);
+        for (size_t k = 0; k < nops; k++)
+        {
+            integrals.emplace_back(pattern);
+
+            integrals.back().allocate();
+        }
+
+        if (nops == 1)
+        {
+            auto distributor = CSimdT3CDistributor<CSparseTensor>(&integrals[0]);
+
+            eri_drv.compute(pattern, molecule, basis, aux_basis, distributor);
+        }
+        else
+        {
+            auto distributor = CSimdT3CRsDistributor<CSparseTensor>(&integrals[0], &integrals[1]);
+
+            eri_rs_drv.compute(pattern, molecule, basis, aux_basis, distributor, omega);
+        }
 
         profile.integrals += prof_since(mark_integrals);
 
@@ -614,6 +892,10 @@ CSimdRIFockDriver::compute_bq_vectors(const CMolecule        &molecule,
 
         std::vector<TBqTask> tasks;
 
+    std::vector<TBqItem> items;
+
+    std::vector<TBqGroup> groups;
+
         for (size_t b = 0; b < last - first; b++)
         {
             const auto iab = first + b;
@@ -637,33 +919,100 @@ CSimdRIFockDriver::compute_bq_vectors(const CMolecule        &molecule,
 
         ntasks += tasks.size();
 
-        const auto nwork = static_cast<int>(tasks.size());
+        // NOTE: a task is one combination of basis functions of one pair block, and
+        // the pairs of a block are swept in chunks of at most nchunk. **The buffer
+        // is allocated for nchunk columns and a chunk holds thirty of them**: the
+        // widest block sets the allocation and the average block is far from it.
+        // So the chunks of several tasks are gathered side by side into the one
+        // buffer and handed to a single product, which costs no memory that was not
+        // already reserved and hands the library a shape it can work with -- thirty
+        // columns is a matrix multiply in name only.
+        items.clear();
+
+        for (size_t t = 0; t < tasks.size(); t++)
+        {
+            const auto jab = first + tasks[t].block;
+
+            const auto span = ab_blocks[jab].number_of_diagonal_atoms() + ab_blocks[jab].number_of_pairs();
+
+            for (size_t cfirst = 0; cfirst < span; cfirst += nchunk)
+            {
+                items.push_back(TBqItem{t, cfirst, std::min(nchunk, span - cfirst)});
+            }
+        }
+
+        groups.clear();
+
+        {
+            size_t gfirst = 0, gcols = 0;
+
+            for (size_t i = 0; i < items.size(); i++)
+            {
+                if ((gcols > 0) && (gcols + items[i].count > nchunk))
+                {
+                    groups.push_back(TBqGroup{gfirst, i, gcols});
+
+                    gfirst = i;
+
+                    gcols = 0;
+                }
+
+                gcols += items[i].count;
+            }
+
+            if (gcols > 0) groups.push_back(TBqGroup{gfirst, items.size(), gcols});
+        }
+
+        const auto nwork = static_cast<int>(groups.size());
 
         const auto mark_contract = prof_clock::now();
 
-#pragma omp parallel reduction(+ : nproducts, ngathered, nread)
+#pragma omp parallel reduction(+ : nproducts, ngathered, nread, nkept, nabsent) \
+    reduction(+ : nfixed[ : 4], nsorted[ : 4], bins[ : 10])
         {
-            std::vector<double> gathered(ncols * nchunk);
+            std::vector<double> gathered(nops * ncols * nchunk);
 
-            std::vector<double> product(nrows * nchunk);
+            std::vector<double> product(nops * nrows * nchunk);
+
+            std::vector<TBqReach> reaches;
+
+            std::vector<char> used;
 
 #pragma omp for schedule(dynamic)
-            for (int t = 0; t < nwork; t++)
+            for (int g = 0; g < nwork; g++)
             {
-                const auto &task = tasks[static_cast<size_t>(t)];
+                const auto &group = groups[static_cast<size_t>(g)];
 
-                const auto iab = first + task.block;
+                // NOTE: the columns of the whole group. It is the leading dimension
+                // of the gathered buffer and of the product for every item of the
+                // group, where a chunk on its own used its own count.
+                const auto total = group.columns;
 
-                const auto la = task.la, lb = task.lb;
+                size_t column = 0;
 
-                const auto ia = task.ia, jb = task.jb, m = task.component;
+                // NOTE: the staircase now spans the whole group, so the bands are
+                // cut across every item of it and the reaches are collected for all
+                // of them before any of it is counted.
+                if (profiled) reaches.clear();
 
-                const auto width =
-                    ab_blocks[iab].number_of_diagonal_atoms() + ab_blocks[iab].number_of_pairs();
-
-                for (size_t cfirst = 0; cfirst < width; cfirst += nchunk)
+                for (size_t it = group.first; it < group.last; it++)
                 {
-                    const auto count = std::min(nchunk, width - cfirst);
+                    const auto &item = items[it];
+
+                    const auto &task = tasks[item.task];
+
+                    const auto iab = first + task.block;
+
+                    const auto la = task.la, lb = task.lb;
+
+                    const auto ia = task.ia, jb = task.jb, m = task.component;
+
+                    const auto width =
+                        ab_blocks[iab].number_of_diagonal_atoms() + ab_blocks[iab].number_of_pairs();
+
+                    const auto cfirst = item.cfirst;
+
+                    const auto count = item.count;
 
                     // NOTE: a group whose block is absent, and the atom pairs a
                     // group keeps fewer of than the widest, leave zeros. The pairs
@@ -671,57 +1020,192 @@ CSimdRIFockDriver::compute_bq_vectors(const CMolecule        &molecule,
                     // last one a group keeps adds nothing, which is what the sum of
                     // the group would have added.
 
-                    ngathered += ncols * count * sizeof(double);
+                    ngathered += nops * ncols * count * sizeof(double);
 
-                    for (const auto &in_function : in_functions)
+                    // NOTE: the operators share the pattern of the batch, so which
+                    // block a function of the auxiliary side sits in, how many atom
+                    // pairs it keeps and how much of the chunk it reaches are the
+                    // same for both and are worked out once. Only the values differ,
+                    // and only the copy is repeated.
+
+                    // NOTE: (rows, reach) of every auxiliary entry of this chunk,
+                    // kept only while the profile is asked for. The vector lives
+                    // outside the loop over the entries and is cleared here, so the
+                    // allocation is paid once a thread and not once a chunk.
+
+                    for (size_t entry = 0; entry < in_functions.size(); entry++)
                     {
-                        auto *rows = gathered.data() + in_function.offset * count;
+                        const auto &in_function = in_functions[entry];
 
                         const auto iblock = batch_map[task.block * nin_groups + in_function.group];
 
                         size_t npairs_in = 0;
 
-                        const double *in_values = nullptr;
-
                         if (iblock != npos)
                         {
-                            npairs_in = integrals.block(iblock).number_of_pairs(la, ia, lb, jb,
-                                                                                in_function.momentum,
-                                                                                in_function.index);
-
-                            if (npairs_in > 0)
-                            {
-                                in_values = integrals.values(iblock, la, ia, lb, jb, in_function.momentum,
-                                                             in_function.index) +
-                                            m * in_function.count * npairs_in;
-                            }
+                            npairs_in = integrals[0].block(iblock).number_of_pairs(la, ia, lb, jb,
+                                                                                   in_function.momentum,
+                                                                                   in_function.index);
                         }
 
                         const auto kept = std::min(npairs_in, width);
 
                         const auto taken = (kept > cfirst) ? std::min(kept - cfirst, count) : size_t{0};
 
-                        for (size_t r = 0; r < in_function.count; r++)
+                        // NOTE: what the copy below actually brings, against the
+                        // in_function.count * count the product will read. One
+                        // operator's worth, counted once and scaled by nops to
+                        // match ngathered, the operators sharing the pattern.
+                        nkept += nops * in_function.count * taken;
+
+                        // NOTE: the padding is two different things and they want
+                        // two different answers. A group which reaches none of this
+                        // chunk's pairs contributes nothing but zeros to it, and its
+                        // rows need not be in the product at all -- the pairs a group
+                        // keeps are the leading ones of one ordered list, so a group
+                        // which ran out before this chunk began stays out for every
+                        // chunk after it. A group which reaches part of the chunk
+                        // leaves a tail of zeros, which is a packing question and is
+                        // worth less. `npairs_in == 0` was the first thing counted
+                        // here and it is always zero: no group is ever absent
+                        // outright, they run out at different places.
+                        if (taken == 0) nabsent += nops * in_function.count * count;
+
+                        if (profiled)
                         {
-                            auto *row = rows + r * count;
+                            reaches.push_back(TBqReach{entry, column, count, taken});
 
-                            if (taken > 0)
+                            // NOTE: weighted by the rows the entry carries, because
+                            // the product pays for rows and not for entries. An
+                            // entry which reaches the whole width lands in the last
+                            // bin and is the one which set the width.
+                            const auto bin = (count > 0) ? std::min<size_t>(9, taken * 10 / count) : 0;
+
+                            bins[bin] += in_function.count;
+                        }
+
+                        for (size_t k = 0; k < nops; k++)
+                        {
+                            // NOTE: the buffer holds one operator after another, each
+                            // of nchunk columns, while a chunk fills only the leading
+                            // count of them. The stride between the operators is
+                            // therefore nchunk and the stride within one is count.
+                            // Taking count for both is right for the first operator
+                            // and for a full chunk, and wrong everywhere else, which
+                            // is a wrong answer that hides behind a correct one.
+                            auto *rows = gathered.data() + k * ncols * nchunk + in_function.offset * total + column;
+
+                            const double *in_values =
+                                (npairs_in > 0) ? integrals[k].values(iblock, la, ia, lb, jb, in_function.momentum,
+                                                                      in_function.index) +
+                                                      m * in_function.count * npairs_in
+                                                : nullptr;
+
+                            for (size_t r = 0; r < in_function.count; r++)
                             {
-                                const auto *from = in_values + r * npairs_in + cfirst;
+                                auto *row = rows + r * total;
 
-                                std::copy(from, from + taken, row);
+                                if (taken > 0)
+                                {
+                                    const auto *from = in_values + r * npairs_in + cfirst;
+
+                                    std::copy(from, from + taken, row);
+                                }
+
+                                std::fill(row + taken, row + count, 0.0);
                             }
-
-                            std::fill(row + taken, row + count, 0.0);
                         }
                     }
 
-                    nproducts++;
+                    column += count;
+                }
 
-                    nread += ncols * count * sizeof(double);
+                if (profiled)
+                {
+                    used.assign(in_functions.size(), 0);
 
-                    _matrix_product(nrows, count, ncols, 1.0, metric.get(), ncols, gathered.data(), count, 0.0,
-                                    product.data(), count);
+                    for (size_t k = 0; k < 4; k++)
+                    {
+                        const auto bands = BANDS[k];
+
+                        for (size_t b = 0; b < bands; b++)
+                        {
+                            const auto band_first = b * total / bands;
+
+                            const auto band_last = (b + 1) * total / bands;
+
+                            if (band_last <= band_first) continue;
+
+                            std::fill(used.begin(), used.end(), static_cast<char>(0));
+
+                            for (const auto &reach : reaches)
+                            {
+                                // does this item overlap the band at all, and does
+                                // the entry reach into the part of it that does
+                                if ((reach.column >= band_last) || (reach.column + reach.span <= band_first))
+                                {
+                                    continue;
+                                }
+
+                                const auto local =
+                                    (band_first > reach.column) ? band_first - reach.column : size_t{0};
+
+                                if (reach.taken > local) used[reach.entry] = 1;
+                            }
+
+                            // NOTE: the metric's own order can only take a prefix,
+                            // so it pays down to the last row any band needs; an
+                            // order chosen per group would take exactly the rows
+                            // which are needed and nothing between them.
+                            size_t prefix = 0, exact = 0;
+
+                            for (size_t e = 0; e < in_functions.size(); e++)
+                            {
+                                if (used[e] == 0) continue;
+
+                                prefix = std::max(prefix, in_functions[e].offset + in_functions[e].count);
+
+                                exact += in_functions[e].count;
+                            }
+
+                            nfixed[k] += nops * prefix * (band_last - band_first);
+
+                            nsorted[k] += nops * exact * (band_last - band_first);
+                        }
+                    }
+                }
+
+                nproducts += nops;
+
+                nread += nops * ncols * total * sizeof(double);
+
+                for (size_t k = 0; k < nops; k++)
+                {
+                    _matrix_product(nrows, total, ncols, 1.0, metric.get() + k * nrows * ncols, ncols,
+                                    gathered.data() + k * ncols * nchunk, total, 0.0,
+                                    product.data() + k * nrows * nchunk, total);
+                }
+
+                column = 0;
+
+                for (size_t it = group.first; it < group.last; it++)
+                {
+                    const auto &item = items[it];
+
+                    const auto &task = tasks[item.task];
+
+                    const auto iab = first + task.block;
+
+                    const auto la = task.la, lb = task.lb;
+
+                    const auto ia = task.ia, jb = task.jb, m = task.component;
+
+                    const auto width =
+                        ab_blocks[iab].number_of_diagonal_atoms() + ab_blocks[iab].number_of_pairs();
+
+                    const auto cfirst = item.cfirst;
+
+                    const auto count = item.count;
 
                     for (const auto &out_function : out_functions)
                     {
@@ -729,7 +1213,11 @@ CSimdRIFockDriver::compute_bq_vectors(const CMolecule        &molecule,
 
                         if (oblock == npos) continue;
 
-                        const auto npairs_out = bq_vectors.block(oblock).number_of_pairs(
+                        // NOTE: the outputs share their pattern as the integrals do,
+                        // so where a function lands and how much of it is kept is
+                        // worked out once here too.
+
+                        const auto npairs_out = bq_vectors[0].block(oblock).number_of_pairs(
                             la, ia, lb, jb, out_function.momentum, out_function.index);
 
                         if (npairs_out == 0) continue;
@@ -740,19 +1228,25 @@ CSimdRIFockDriver::compute_bq_vectors(const CMolecule        &molecule,
 
                         const auto written = std::min(limit - cfirst, count);
 
-                        auto *out_values = bq_vectors.values(oblock, la, ia, lb, jb, out_function.momentum,
-                                                             out_function.index) +
-                                           m * out_function.count * npairs_out;
-
-                        for (size_t r = 0; r < out_function.count; r++)
+                        for (size_t k = 0; k < nops; k++)
                         {
-                            const auto *from = product.data() + (out_function.offset + r) * count;
+                            auto *out_values = bq_vectors[k].values(oblock, la, ia, lb, jb, out_function.momentum,
+                                                                    out_function.index) +
+                                               m * out_function.count * npairs_out;
 
-                            auto *into = out_values + r * npairs_out + cfirst;
+                            for (size_t r = 0; r < out_function.count; r++)
+                            {
+                                const auto *from = product.data() + k * nrows * nchunk +
+                                                   (out_function.offset + r) * total + column;
 
-                            for (size_t k = 0; k < written; k++) into[k] += from[k];
+                                auto *into = out_values + r * npairs_out + cfirst;
+
+                                for (size_t c = 0; c < written; c++) into[c] += from[c];
+                            }
                         }
                     }
+
+                    column += count;
                 }
             }
         }
@@ -776,11 +1270,64 @@ CSimdRIFockDriver::compute_bq_vectors(const CMolecule        &molecule,
 
     profile.nread = nread;
 
+    profile.nkept = nkept;
+
+    profile.nabsent = nabsent;
+
+    for (size_t k = 0; k < 10; k++) profile.reach_bins[k] = bins[k];
+
+    for (size_t k = 0; k < 4; k++)
+    {
+        profile.nfixed[k] = nfixed[k];
+
+        profile.nsorted[k] = nsorted[k];
+    }
+
     profile.total = prof_since(profile_start);
 
-    if (profiled) profile.report(bq_vectors.memory_size());
+    if (profiled)
+    {
+        size_t held = 0;
+
+        for (const auto &vectors : bq_vectors) held += vectors.memory_size();
+
+        profile.report(held);
+    }
 
     return bq_vectors;
+}
+
+auto
+CSimdRIFockDriver::compute_bq_vectors(const CMolecule        &molecule,
+                                       const CMolecularBasis  &basis,
+                                       const CMolecularBasis  &aux_basis,
+                                       const CPackedMatrix    &inverse_metric,
+                                       const double            threshold,
+                                       const std::vector<int> &aux_atoms) const -> CSparseTensor
+{
+    auto formed = _compute_bq_vectors(molecule, basis, aux_basis, {&inverse_metric}, threshold, 0.0, aux_atoms);
+
+    return std::move(formed[0]);
+}
+
+auto
+CSimdRIFockDriver::compute_bq_vectors_rs(const CMolecule        &molecule,
+                                          const CMolecularBasis  &basis,
+                                          const CMolecularBasis  &aux_basis,
+                                          const CPackedMatrix    &inverse_metric,
+                                          const CPackedMatrix    &inverse_metric_erf,
+                                          const double            threshold,
+                                          const double            omega,
+                                          const std::vector<int> &aux_atoms) const
+    -> std::pair<CSparseTensor, CSparseTensor>
+{
+    errors::assertMsgCritical(omega > 0.0,
+                              std::string("RIJFockDriver: The range separation parameter must be positive"));
+
+    auto formed = _compute_bq_vectors(molecule, basis, aux_basis, {&inverse_metric, &inverse_metric_erf}, threshold,
+                                      omega, aux_atoms);
+
+    return {std::move(formed[0]), std::move(formed[1])};
 }
 
 auto
@@ -1442,55 +1989,10 @@ CSimdRIFockDriver::compute_w_vectors(const CSparseTensor        &bq_vectors,
 
     if ((_dense_threshold > 0.0) && (_dense_threshold <= 1.0))
     {
-        // NOTE: an off-diagonal pair of atoms is held once and fills two places of
-        // the square, and a diagonal pair is held with the basis functions of both
-        // sides and fills one. Counting the values twice over would put the density
-        // above one, which a fraction cannot be.
-
-        size_t filled = 0;
-
-        for (size_t ib = 0; ib < bq_vectors.number_of_blocks(); ib++)
-        {
-            const auto &block = bq_vectors.block(ib);
-
-            const auto &a_atoms = block.a_atoms();
-
-            const auto &b_atoms = block.b_atoms();
-
-            const auto natoms = block.c_atoms().size();
-
-            if ((a_atoms.empty()) || (natoms == 0)) continue;
-
-            size_t ndiag = 0;
-
-            while ((ndiag < a_atoms.size()) && (a_atoms[ndiag] == b_atoms[ndiag])) ndiag++;
-
-            for (const auto [la, ia] : indices[static_cast<size_t>(block.a_index())])
-            {
-                for (const auto [lb, jb] : indices[static_cast<size_t>(block.b_index())])
-                {
-                    for (const auto [lc, kc] : aux_indices[static_cast<size_t>(block.c_index())])
-                    {
-                        const auto npairs = block.number_of_pairs(la, ia, lb, jb, lc, kc);
-
-                        if (npairs == 0) continue;
-
-                        const auto ncomps = static_cast<size_t>((2 * la + 1) * (2 * lb + 1) * (2 * lc + 1));
-
-                        const auto diagonal = std::min(ndiag, npairs);
-
-                        filled += (2 * npairs - diagonal) * natoms * ncomps;
-                    }
-                }
-            }
-        }
-
-        const auto density = (naux > 0) ? static_cast<double>(filled) / (static_cast<double>(naux) *
-                                                                        static_cast<double>(nao) *
-                                                                        static_cast<double>(nao))
-                                        : 0.0;
-
-        use_dense = (density >= _dense_threshold);
+        // NOTE: the rows of this transformation are the auxiliary functions this
+        // driver was given, which is what `nrows` counts, so the density is taken
+        // against those and not against the whole basis.
+        use_dense = (_bq_density(bq_vectors, basis, aux_basis, functions.size()) >= _dense_threshold);
     }
 
     if (use_dense)
@@ -1971,6 +2473,15 @@ CSimdRIFockDriver::compute_exchange_matrix(const std::vector<CPackedMatrix> &w_v
 
         std::fflush(stdout);
     }
+}
+
+auto
+CSimdRIFockDriver::bq_density(const CSparseTensor   &bq_vectors,
+                              const CMolecularBasis &basis,
+                              const CMolecularBasis &aux_basis,
+                              const size_t           held) const -> double
+{
+    return _bq_density(bq_vectors, basis, aux_basis, held);
 }
 
 auto

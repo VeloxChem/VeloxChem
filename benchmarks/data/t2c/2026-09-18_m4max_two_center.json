@@ -1,0 +1,391 @@
+{
+  "schema": 1,
+  "suite": "t2c",
+  "run": {
+    "date": "2026-09-18T06:55:49+02:00",
+    "commit": "befe15723",
+    "dirty": true,
+    "veloxchem": "1.0rc4",
+    "machine": {
+      "name": "m4max",
+      "cpu": "Apple M4 Max",
+      "cores": 14,
+      "os": "Darwin 25.6.0"
+    },
+    "config": {
+      "mpi_ranks": 1,
+      "omp_threads": 1,
+      "blas": []
+    }
+  },
+  "rows": [
+    {
+      "molecule": "tagrisso",
+      "atoms": 70,
+      "basis": "def2-universal-jfit",
+      "nao": 2176,
+      "lmax": 4,
+      "omega": 0.3,
+      "threads": 14,
+      "packed_gb": 0.0176,
+      "plain_wall": 0.002151,
+      "rs_wall": 0.003752,
+      "plain_walls": [
+        0.002379,
+        0.002152,
+        0.002151
+      ],
+      "rs_walls": [
+        0.003991,
+        0.003752,
+        0.003776
+      ],
+      "plain_block_vs_plain_driver": 0.0,
+      "attenuated_largest": 54.21774059976925
+    },
+    {
+      "molecule": "tagrisso",
+      "atoms": 70,
+      "basis": "def2-universal-jfit",
+      "nao": 2176,
+      "lmax": 4,
+      "omega": 0.3,
+      "threads": 1,
+      "packed_gb": 0.0176,
+      "plain_wall": 0.013079,
+      "rs_wall": 0.025388,
+      "plain_walls": [
+        0.013356,
+        0.013224,
+        0.013079
+      ],
+      "rs_walls": [
+        0.025598,
+        0.025388,
+        0.025911
+      ],
+      "plain_block_vs_plain_driver": 0.0,
+      "attenuated_largest": 54.21774059976925
+    },
+    {
+      "molecule": "tagrisso",
+      "atoms": 70,
+      "basis": "def2-universal-jkfit",
+      "nao": 3387,
+      "lmax": 4,
+      "omega": 0.3,
+      "threads": 14,
+      "packed_gb": 0.0427,
+      "plain_wall": 0.003693,
+      "rs_wall": 0.006706,
+      "plain_walls": [
+        0.003705,
+        0.003747,
+        0.003693
+      ],
+      "rs_walls": [
+        0.007385,
+        0.006917,
+        0.006706
+      ],
+      "plain_block_vs_plain_driver": 0.0,
+      "attenuated_largest": 69.98226127081277
+    },
+    {
+      "molecule": "tagrisso",
+      "atoms": 70,
+      "basis": "def2-universal-jkfit",
+      "nao": 3387,
+      "lmax": 4,
+      "omega": 0.3,
+      "threads": 1,
+      "packed_gb": 0.0427,
+      "plain_wall": 0.025475,
+      "rs_wall": 0.048692,
+      "plain_walls": [
+        0.025475,
+        0.02586,
+        0.026852
+      ],
+      "rs_walls": [
+        0.048692,
+        0.049315,
+        0.049564
+      ],
+      "plain_block_vs_plain_driver": 0.0,
+      "attenuated_largest": 69.98226127081277
+    },
+    {
+      "molecule": "taxol",
+      "atoms": 110,
+      "basis": "def2-universal-jfit",
+      "nao": 3528,
+      "lmax": 4,
+      "omega": 0.3,
+      "threads": 14,
+      "packed_gb": 0.0464,
+      "plain_wall": 0.004635,
+      "rs_wall": 0.008592,
+      "plain_walls": [
+        0.004765,
+        0.004765,
+        0.004635
+      ],
+      "rs_walls": [
+        0.008805,
+        0.008711,
+        0.008592
+      ],
+      "plain_block_vs_plain_driver": 0.0,
+      "attenuated_largest": 54.21774059976925
+    },
+    {
+      "molecule": "taxol",
+      "atoms": 110,
+      "basis": "def2-universal-jfit",
+      "nao": 3528,
+      "lmax": 4,
+      "omega": 0.3,
+      "threads": 1,
+      "packed_gb": 0.0464,
+      "plain_wall": 0.0351,
+      "rs_wall": 0.069811,
+      "plain_walls": [
+        0.035215,
+        0.0351,
+        0.035823
+      ],
+      "rs_walls": [
+        0.069834,
+        0.069811,
+        0.069847
+      ],
+      "plain_block_vs_plain_driver": 0.0,
+      "attenuated_largest": 54.21774059976925
+    },
+    {
+      "molecule": "taxol",
+      "atoms": 110,
+      "basis": "def2-universal-jkfit",
+      "nao": 5489,
+      "lmax": 4,
+      "omega": 0.3,
+      "threads": 14,
+      "packed_gb": 0.1123,
+      "plain_wall": 0.00853,
+      "rs_wall": 0.01598,
+      "plain_walls": [
+        0.00863,
+        0.0087,
+        0.00853
+      ],
+      "rs_walls": [
+        0.016277,
+        0.016197,
+        0.01598
+      ],
+      "plain_block_vs_plain_driver": 0.0,
+      "attenuated_largest": 69.98226127081277
+    },
+    {
+      "molecule": "taxol",
+      "atoms": 110,
+      "basis": "def2-universal-jkfit",
+      "nao": 5489,
+      "lmax": 4,
+      "omega": 0.3,
+      "threads": 1,
+      "packed_gb": 0.1123,
+      "plain_wall": 0.067827,
+      "rs_wall": 0.132156,
+      "plain_walls": [
+        0.068251,
+        0.068191,
+        0.067827
+      ],
+      "rs_walls": [
+        0.13293,
+        0.132156,
+        0.132819
+      ],
+      "plain_block_vs_plain_driver": 0.0,
+      "attenuated_largest": 69.98226127081277
+    },
+    {
+      "molecule": "crambin",
+      "atoms": 642,
+      "basis": "def2-universal-jfit",
+      "nao": 19500,
+      "lmax": 4,
+      "omega": 0.3,
+      "threads": 14,
+      "packed_gb": 1.4166,
+      "plain_wall": 0.136162,
+      "rs_wall": 0.278698,
+      "plain_walls": [
+        0.142907,
+        0.139747,
+        0.136162
+      ],
+      "rs_walls": [
+        0.278698,
+        0.280137,
+        0.280225
+      ]
+    },
+    {
+      "molecule": "crambin",
+      "atoms": 642,
+      "basis": "def2-universal-jfit",
+      "nao": 19500,
+      "lmax": 4,
+      "omega": 0.3,
+      "threads": 1,
+      "packed_gb": 1.4166,
+      "plain_wall": 1.171229,
+      "rs_wall": 2.291458,
+      "plain_walls": [
+        1.175304,
+        1.171229,
+        1.172438
+      ],
+      "rs_walls": [
+        2.291458,
+        2.309148,
+        2.299458
+      ]
+    },
+    {
+      "molecule": "crambin",
+      "atoms": 642,
+      "basis": "def2-universal-jkfit",
+      "nao": 30751,
+      "lmax": 4,
+      "omega": 0.3,
+      "threads": 14,
+      "packed_gb": 3.5228,
+      "plain_wall": 0.266951,
+      "rs_wall": 0.539467,
+      "plain_walls": [
+        0.269643,
+        0.271489,
+        0.266951
+      ],
+      "rs_walls": [
+        0.539467,
+        0.553238,
+        0.553761
+      ]
+    },
+    {
+      "molecule": "crambin",
+      "atoms": 642,
+      "basis": "def2-universal-jkfit",
+      "nao": 30751,
+      "lmax": 4,
+      "omega": 0.3,
+      "threads": 1,
+      "packed_gb": 3.5228,
+      "plain_wall": 2.382649,
+      "rs_wall": 4.832344,
+      "plain_walls": [
+        2.424288,
+        2.409111,
+        2.382649
+      ],
+      "rs_walls": [
+        4.860824,
+        4.832344,
+        4.868707
+      ]
+    },
+    {
+      "molecule": "ubiquitin",
+      "atoms": 1231,
+      "basis": "def2-universal-jfit",
+      "nao": 36419,
+      "lmax": 4,
+      "omega": 0.3,
+      "threads": 14,
+      "packed_gb": 4.9412,
+      "plain_wall": 0.576951,
+      "rs_wall": 1.208169,
+      "plain_walls": [
+        0.588882,
+        0.578616,
+        0.576951
+      ],
+      "rs_walls": [
+        1.220232,
+        1.208169,
+        1.210222
+      ]
+    },
+    {
+      "molecule": "ubiquitin",
+      "atoms": 1231,
+      "basis": "def2-universal-jfit",
+      "nao": 36419,
+      "lmax": 4,
+      "omega": 0.3,
+      "threads": 1,
+      "packed_gb": 4.9412,
+      "plain_wall": 4.555803,
+      "rs_wall": 8.917377,
+      "plain_walls": [
+        4.558675,
+        4.555896,
+        4.555803
+      ],
+      "rs_walls": [
+        9.018844,
+        8.917377,
+        9.118006
+      ]
+    },
+    {
+      "molecule": "ubiquitin",
+      "atoms": 1231,
+      "basis": "def2-universal-jkfit",
+      "nao": 56971,
+      "lmax": 4,
+      "omega": 0.3,
+      "threads": 14,
+      "packed_gb": 12.0914,
+      "plain_wall": 1.18645,
+      "rs_wall": 2.435942,
+      "plain_walls": [
+        1.237932,
+        1.190435,
+        1.18645
+      ],
+      "rs_walls": [
+        11.062353,
+        2.471222,
+        2.435942
+      ]
+    },
+    {
+      "molecule": "ubiquitin",
+      "atoms": 1231,
+      "basis": "def2-universal-jkfit",
+      "nao": 56971,
+      "lmax": 4,
+      "omega": 0.3,
+      "threads": 1,
+      "packed_gb": 12.0914,
+      "plain_wall": 9.38637,
+      "rs_wall": 34.651295,
+      "plain_walls": [
+        9.38637,
+        9.443913,
+        9.399167
+      ],
+      "rs_walls": [
+        34.651295,
+        39.835625,
+        36.554753
+      ]
+    }
+  ]
+}

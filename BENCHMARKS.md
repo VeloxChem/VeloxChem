@@ -4253,6 +4253,513 @@ before these changes, on the same grid.
 | aug-cc-pvqz | 1e-14 | 77098 | -- | 348.78 | -- |
 | aug-cc-pvqz | 1e-12 | 77098 | -- | 294.58 | -- |
 
+### The nuclear attraction driver against the reference
+
+`OMP_NUM_THREADS=14`, best of five runs inside a two second budget, so the large cases
+run once. Measured on 2026-09-15, after the driver was finished to angular momentum
+six; the overlap and kinetic numbers above are an A/B across a set of changes and this
+one is not, so read it as where the driver stands rather than as a movement.
+
+**ref** is `CNuclearPotentialDriver`, which computes every atom pair and carries no
+threshold, so one number serves both threshold rows. A dash marks a case it cannot run:
+it returns a dense matrix, and the cut is at 30000 functions, six gigabytes. The bases
+are those whose highest angular momentum is g, where the reference stops -- above that
+it returns zeros, which is not a reference.
+
+The geometric mean over the 170 comparable cases is **2.20**, and it is not one number:
+it rises with the molecule, 1.45 on tagrisso to 4.93 on ubiquitin.
+
+**This integral is the overlap times the number of nuclei.** Every kept pair is
+evaluated against every charge, so tagrisso at def2-qzvp is 85 ms here against 1.24 ms
+for the overlap, a factor of 68 on 70 atoms, and ubiquitin reaches 182 seconds. The
+grid is otherwise the one the overlap and kinetic sections use.
+
+The tagrisso, c60, taxol and paracetamol cluster tables were measured again after the
+block size floor below; crambin and ubiquitin were not, because the floor cannot reach
+them -- they choose 3685 and 13541 atom pairs a block, far above either value -- and a
+spot check agrees, crambin at def2-tzvp giving 3459 ms against 3429 before.
+
+
+#### tagrisso, 70 atoms
+
+| basis | threshold | nao | ref ms | simd ms | x ref |
+| --- | --- | --- | --- | --- | --- |
+| def2-svp | 1e-14 | 683 | 8.69 | 10.54 | 0.8 |
+| def2-svp | 1e-12 | 683 | 8.69 | 10.09 | 0.9 |
+| def2-svpd | 1e-14 | 1010 | 17.85 | 18.84 | 0.9 |
+| def2-svpd | 1e-12 | 1010 | 17.85 | 18.35 | 1.0 |
+| def2-tzvp | 1e-14 | 1345 | 46.00 | 29.21 | 1.6 |
+| def2-tzvp | 1e-12 | 1345 | 46.00 | 28.43 | 1.6 |
+| def2-tzvpp | 1e-14 | 1609 | 46.05 | 33.17 | 1.4 |
+| def2-tzvpp | 1e-12 | 1609 | 46.05 | 31.64 | 1.5 |
+| def2-tzvpd | 1e-14 | 1672 | 43.31 | 43.66 | 1.0 |
+| def2-tzvpd | 1e-12 | 1672 | 43.31 | 42.38 | 1.0 |
+| def2-tzvppd | 1e-14 | 1936 | 43.72 | 48.66 | 0.9 |
+| def2-tzvppd | 1e-12 | 1936 | 43.72 | 46.64 | 0.9 |
+| def2-qzvp | 1e-14 | 3099 | 186.46 | 87.89 | 2.1 |
+| def2-qzvp | 1e-12 | 3099 | 186.46 | 84.68 | 2.2 |
+| def2-qzvpp | 1e-14 | 3099 | 183.76 | 88.23 | 2.1 |
+| def2-qzvpp | 1e-12 | 3099 | 183.76 | 84.44 | 2.2 |
+| def2-qzvpd | 1e-14 | 3426 | 184.57 | 113.32 | 1.6 |
+| def2-qzvpd | 1e-12 | 3426 | 184.57 | 109.68 | 1.7 |
+| def2-qzvppd | 1e-14 | 3426 | 187.54 | 114.07 | 1.6 |
+| def2-qzvppd | 1e-12 | 3426 | 187.54 | 110.23 | 1.7 |
+| cc-pvdz | 1e-14 | 683 | 34.74 | 21.96 | 1.6 |
+| cc-pvdz | 1e-12 | 683 | 34.74 | 21.44 | 1.6 |
+| cc-pvtz | 1e-14 | 1572 | 51.72 | 41.48 | 1.2 |
+| cc-pvtz | 1e-12 | 1572 | 51.72 | 40.19 | 1.3 |
+| cc-pvqz | 1e-14 | 3025 | 191.37 | 91.43 | 2.1 |
+| cc-pvqz | 1e-12 | 3025 | 191.37 | 87.45 | 2.2 |
+| aug-cc-pvdz | 1e-14 | 1148 | 45.05 | 39.41 | 1.1 |
+| aug-cc-pvdz | 1e-12 | 1148 | 45.05 | 38.31 | 1.2 |
+| aug-cc-pvtz | 1e-14 | 2461 | 128.13 | 85.86 | 1.5 |
+| aug-cc-pvtz | 1e-12 | 2461 | 128.13 | 83.46 | 1.5 |
+| aug-cc-pvqz | 1e-14 | 4478 | 509.61 | 200.65 | 2.5 |
+| aug-cc-pvqz | 1e-12 | 4478 | 509.61 | 193.55 | 2.6 |
+
+#### c60, 60 atoms
+
+| basis | threshold | nao | ref ms | simd ms | x ref |
+| --- | --- | --- | --- | --- | --- |
+| def2-svp | 1e-14 | 840 | 16.33 | 15.03 | 1.1 |
+| def2-svp | 1e-12 | 840 | 16.33 | 14.40 | 1.1 |
+| def2-svpd | 1e-14 | 1200 | 22.92 | 25.37 | 0.9 |
+| def2-svpd | 1e-12 | 1200 | 22.92 | 24.84 | 0.9 |
+| def2-tzvp | 1e-14 | 1860 | 96.92 | 50.07 | 1.9 |
+| def2-tzvp | 1e-12 | 1860 | 96.92 | 47.53 | 2.0 |
+| def2-tzvpp | 1e-14 | 1860 | 94.27 | 49.44 | 1.9 |
+| def2-tzvpp | 1e-12 | 1860 | 94.27 | 47.65 | 2.0 |
+| def2-tzvpd | 1e-14 | 2220 | 96.39 | 67.91 | 1.4 |
+| def2-tzvpd | 1e-12 | 2220 | 96.39 | 66.12 | 1.5 |
+| def2-tzvppd | 1e-14 | 2220 | 91.19 | 68.32 | 1.3 |
+| def2-tzvppd | 1e-12 | 2220 | 91.19 | 65.58 | 1.4 |
+| def2-qzvp | 1e-14 | 3420 | 389.30 | 130.37 | 3.0 |
+| def2-qzvp | 1e-12 | 3420 | 389.30 | 123.95 | 3.1 |
+| def2-qzvpp | 1e-14 | 3420 | 391.52 | 129.68 | 3.0 |
+| def2-qzvpp | 1e-12 | 3420 | 391.52 | 123.71 | 3.2 |
+| def2-qzvpd | 1e-14 | 3780 | 381.38 | 159.09 | 2.4 |
+| def2-qzvpd | 1e-12 | 3780 | 381.38 | 152.41 | 2.5 |
+| def2-qzvppd | 1e-14 | 3780 | 368.34 | 158.53 | 2.3 |
+| def2-qzvppd | 1e-12 | 3780 | 368.34 | 153.42 | 2.4 |
+| cc-pvdz | 1e-14 | 840 | 35.61 | 33.12 | 1.1 |
+| cc-pvdz | 1e-12 | 840 | 35.61 | 31.98 | 1.1 |
+| cc-pvtz | 1e-14 | 1800 | 91.20 | 63.43 | 1.4 |
+| cc-pvtz | 1e-12 | 1800 | 91.20 | 60.93 | 1.5 |
+| cc-pvqz | 1e-14 | 3300 | 376.02 | 134.58 | 2.8 |
+| cc-pvqz | 1e-12 | 3300 | 376.02 | 129.60 | 2.9 |
+| aug-cc-pvdz | 1e-14 | 1380 | 48.98 | 56.46 | 0.9 |
+| aug-cc-pvdz | 1e-12 | 1380 | 48.98 | 55.13 | 0.9 |
+| aug-cc-pvtz | 1e-14 | 2760 | 120.06 | 121.65 | 1.0 |
+| aug-cc-pvtz | 1e-12 | 2760 | 120.06 | 117.95 | 1.0 |
+| aug-cc-pvqz | 1e-14 | 4800 | 453.16 | 276.83 | 1.6 |
+| aug-cc-pvqz | 1e-12 | 4800 | 453.16 | 266.08 | 1.7 |
+
+#### taxol, 110 atoms
+
+| basis | threshold | nao | ref ms | simd ms | x ref |
+| --- | --- | --- | --- | --- | --- |
+| def2-svp | 1e-14 | 1099 | 36.31 | 29.33 | 1.2 |
+| def2-svp | 1e-12 | 1099 | 36.31 | 27.63 | 1.3 |
+| def2-svpd | 1e-14 | 1657 | 46.65 | 58.24 | 0.8 |
+| def2-svpd | 1e-12 | 1657 | 46.65 | 56.33 | 0.8 |
+| def2-tzvp | 1e-14 | 2185 | 186.86 | 84.13 | 2.2 |
+| def2-tzvp | 1e-12 | 2185 | 186.86 | 80.14 | 2.3 |
+| def2-tzvpp | 1e-14 | 2577 | 172.59 | 94.41 | 1.8 |
+| def2-tzvpp | 1e-12 | 2577 | 172.59 | 90.37 | 1.9 |
+| def2-tzvpd | 1e-14 | 2743 | 182.34 | 134.05 | 1.4 |
+| def2-tzvpd | 1e-12 | 2743 | 182.34 | 127.99 | 1.4 |
+| def2-tzvppd | 1e-14 | 3135 | 186.80 | 148.95 | 1.3 |
+| def2-tzvppd | 1e-12 | 3135 | 186.80 | 142.40 | 1.3 |
+| def2-qzvp | 1e-14 | 4947 | 766.25 | 255.82 | 3.0 |
+| def2-qzvp | 1e-12 | 4947 | 766.25 | 243.59 | 3.1 |
+| def2-qzvpp | 1e-14 | 4947 | 776.72 | 256.66 | 3.0 |
+| def2-qzvpp | 1e-12 | 4947 | 776.72 | 242.07 | 3.2 |
+| def2-qzvpd | 1e-14 | 5505 | 768.16 | 349.44 | 2.2 |
+| def2-qzvpd | 1e-12 | 5505 | 768.16 | 334.23 | 2.3 |
+| def2-qzvppd | 1e-14 | 5505 | 760.93 | 348.85 | 2.2 |
+| def2-qzvppd | 1e-12 | 5505 | 760.93 | 335.48 | 2.3 |
+| cc-pvdz | 1e-14 | 1099 | 69.31 | 58.92 | 1.2 |
+| cc-pvdz | 1e-12 | 1099 | 69.31 | 55.73 | 1.2 |
+| cc-pvtz | 1e-14 | 2516 | 185.38 | 116.98 | 1.6 |
+| cc-pvtz | 1e-12 | 2516 | 185.38 | 110.07 | 1.7 |
+| cc-pvqz | 1e-14 | 4825 | 779.12 | 260.54 | 3.0 |
+| cc-pvqz | 1e-12 | 4825 | 779.12 | 247.23 | 3.2 |
+| aug-cc-pvdz | 1e-14 | 1844 | 98.85 | 116.55 | 0.8 |
+| aug-cc-pvdz | 1e-12 | 1844 | 98.85 | 112.56 | 0.9 |
+| aug-cc-pvtz | 1e-14 | 3933 | 309.31 | 261.33 | 1.2 |
+| aug-cc-pvtz | 1e-12 | 3933 | 309.31 | 250.47 | 1.2 |
+| aug-cc-pvqz | 1e-14 | 7134 | 1379.48 | 617.56 | 2.2 |
+| aug-cc-pvqz | 1e-12 | 7134 | 1379.48 | 591.25 | 2.3 |
+
+#### paracetamol_cluster, 320 atoms
+
+| basis | threshold | nao | ref ms | simd ms | x ref |
+| --- | --- | --- | --- | --- | --- |
+| def2-svp | 1e-14 | 3184 | 512.15 | 316.39 | 1.6 |
+| def2-svp | 1e-12 | 3184 | 512.15 | 287.20 | 1.8 |
+| def2-svpd | 1e-14 | 4768 | 923.26 | 801.14 | 1.2 |
+| def2-svpd | 1e-12 | 4768 | 923.26 | 728.53 | 1.3 |
+| def2-tzvp | 1e-14 | 6320 | 2149.43 | 942.27 | 2.3 |
+| def2-tzvp | 1e-12 | 6320 | 2149.43 | 857.68 | 2.5 |
+| def2-tzvpp | 1e-14 | 7472 | 2695.89 | 1081.83 | 2.5 |
+| def2-tzvpp | 1e-12 | 7472 | 2695.89 | 983.99 | 2.7 |
+| def2-tzvpd | 1e-14 | 7904 | 2941.29 | 1834.47 | 1.6 |
+| def2-tzvpd | 1e-12 | 7904 | 2941.29 | 1684.57 | 1.7 |
+| def2-tzvppd | 1e-14 | 9056 | 3586.70 | 2056.64 | 1.7 |
+| def2-tzvppd | 1e-12 | 9056 | 3586.70 | 1880.71 | 1.9 |
+| def2-qzvp | 1e-14 | 14352 | 13601.73 | 2930.58 | 4.6 |
+| def2-qzvp | 1e-12 | 14352 | 13601.73 | 2686.37 | 5.1 |
+| def2-qzvpp | 1e-14 | 14352 | 13714.12 | 2939.45 | 4.7 |
+| def2-qzvpp | 1e-12 | 14352 | 13714.12 | 2679.86 | 5.1 |
+| def2-qzvpd | 1e-14 | 15936 | 15498.40 | 4696.47 | 3.3 |
+| def2-qzvpd | 1e-12 | 15936 | 15498.40 | 4383.05 | 3.5 |
+| def2-qzvppd | 1e-14 | 15936 | 15569.90 | 4690.95 | 3.3 |
+| def2-qzvppd | 1e-12 | 15936 | 15569.90 | 4324.47 | 3.6 |
+| cc-pvdz | 1e-14 | 3184 | 940.98 | 579.41 | 1.6 |
+| cc-pvdz | 1e-12 | 3184 | 940.98 | 538.86 | 1.7 |
+| cc-pvtz | 1e-14 | 7296 | 3050.26 | 1226.12 | 2.5 |
+| cc-pvtz | 1e-12 | 7296 | 3050.26 | 1121.17 | 2.7 |
+| cc-pvqz | 1e-14 | 14000 | 13546.61 | 2815.16 | 4.8 |
+| cc-pvqz | 1e-12 | 14000 | 13546.61 | 2570.02 | 5.3 |
+| aug-cc-pvdz | 1e-14 | 5344 | 1641.70 | 1618.09 | 1.0 |
+| aug-cc-pvdz | 1e-12 | 5344 | 1641.70 | 1510.26 | 1.1 |
+| aug-cc-pvtz | 1e-14 | 11408 | 6620.42 | 3724.20 | 1.8 |
+| aug-cc-pvtz | 1e-12 | 11408 | 6620.42 | 3465.30 | 1.9 |
+| aug-cc-pvqz | 1e-14 | 20704 | 31557.92 | 8738.65 | 3.6 |
+| aug-cc-pvqz | 1e-12 | 20704 | 31557.92 | 8093.69 | 3.9 |
+
+#### crambin, 642 atoms
+
+| basis | threshold | nao | ref ms | simd ms | x ref |
+| --- | --- | --- | --- | --- | --- |
+| def2-svp | 1e-14 | 6177 | 3649.58 | 1304.02 | 2.8 |
+| def2-svp | 1e-12 | 6177 | 3649.58 | 1156.76 | 3.2 |
+| def2-svpd | 1e-14 | 9294 | 6706.62 | 3763.13 | 1.8 |
+| def2-svpd | 1e-12 | 9294 | 6706.62 | 3349.46 | 2.0 |
+| def2-tzvp | 1e-14 | 12063 | 15350.67 | 3924.63 | 3.9 |
+| def2-tzvp | 1e-12 | 12063 | 15350.67 | 3502.92 | 4.4 |
+| def2-tzvpp | 1e-14 | 14613 | 20186.36 | 4609.76 | 4.4 |
+| def2-tzvpp | 1e-12 | 14613 | 20186.36 | 4085.00 | 4.9 |
+| def2-tzvpd | 1e-14 | 15180 | 21420.68 | 8687.95 | 2.5 |
+| def2-tzvpd | 1e-12 | 15180 | 21420.68 | 7721.24 | 2.8 |
+| def2-tzvppd | 1e-14 | 17730 | 26492.34 | 9748.20 | 2.7 |
+| def2-tzvppd | 1e-12 | 17730 | 26492.34 | 8928.92 | 3.0 |
+| def2-qzvp | 1e-14 | 28167 | 102744.48 | 12745.29 | 8.1 |
+| def2-qzvp | 1e-12 | 28167 | 102744.48 | 11388.54 | 9.0 |
+| def2-qzvpp | 1e-14 | 28167 | 102655.91 | 12742.22 | 8.1 |
+| def2-qzvpp | 1e-12 | 28167 | 102655.91 | 11367.09 | 9.0 |
+| def2-qzvpd | 1e-14 | 31284 | -- | 22167.71 | -- |
+| def2-qzvpd | 1e-12 | 31284 | -- | 19981.53 | -- |
+| def2-qzvppd | 1e-14 | 31284 | -- | 22159.78 | -- |
+| def2-qzvppd | 1e-12 | 31284 | -- | 19956.65 | -- |
+| cc-pvdz | 1e-14 | 6177 | 6853.00 | 2308.52 | 3.0 |
+| cc-pvdz | 1e-12 | 6177 | 6853.00 | 2102.67 | 3.3 |
+| cc-pvtz | 1e-14 | 14244 | 22937.01 | 5148.58 | 4.5 |
+| cc-pvtz | 1e-12 | 14244 | 22937.01 | 4624.55 | 5.0 |
+| cc-pvqz | 1e-14 | 27459 | 103033.38 | 12029.83 | 8.6 |
+| cc-pvqz | 1e-12 | 27459 | 103033.38 | 10779.14 | 9.6 |
+| aug-cc-pvdz | 1e-14 | 10380 | 12116.90 | 8156.40 | 1.5 |
+| aug-cc-pvdz | 1e-12 | 10380 | 12116.90 | 7433.24 | 1.6 |
+| aug-cc-pvtz | 1e-14 | 22311 | 49477.94 | 18930.62 | 2.6 |
+| aug-cc-pvtz | 1e-12 | 22311 | 49477.94 | 17228.01 | 2.9 |
+| aug-cc-pvqz | 1e-14 | 40674 | -- | 44352.28 | -- |
+| aug-cc-pvqz | 1e-12 | 40674 | -- | 40141.93 | -- |
+
+#### ubiquitin, 1231 atoms
+
+| basis | threshold | nao | ref ms | simd ms | x ref |
+| --- | --- | --- | --- | --- | --- |
+| def2-svp | 1e-14 | 11577 | 23723.41 | 5004.68 | 4.7 |
+| def2-svp | 1e-12 | 11577 | 23723.41 | 4401.56 | 5.4 |
+| def2-svpd | 1e-14 | 17433 | 43953.05 | 15609.01 | 2.8 |
+| def2-svpd | 1e-12 | 17433 | 43953.05 | 13711.35 | 3.2 |
+| def2-tzvp | 1e-14 | 22442 | 98955.07 | 15024.17 | 6.6 |
+| def2-tzvp | 1e-12 | 22442 | 98955.07 | 13180.53 | 7.5 |
+| def2-tzvpp | 1e-14 | 27479 | 130750.69 | 18010.52 | 7.3 |
+| def2-tzvpp | 1e-12 | 27479 | 130750.69 | 15690.41 | 8.3 |
+| def2-tzvpd | 1e-14 | 28298 | 137340.08 | 35865.00 | 3.8 |
+| def2-tzvpd | 1e-12 | 28298 | 137340.08 | 31627.84 | 4.3 |
+| def2-tzvppd | 1e-14 | 33335 | -- | 41359.97 | -- |
+| def2-tzvppd | 1e-12 | 33335 | -- | 35865.71 | -- |
+| def2-qzvp | 1e-14 | 53197 | -- | 51076.91 | -- |
+| def2-qzvp | 1e-12 | 53197 | -- | 44789.30 | -- |
+| def2-qzvpp | 1e-14 | 53197 | -- | 50766.14 | -- |
+| def2-qzvpp | 1e-12 | 53197 | -- | 44595.72 | -- |
+| def2-qzvpd | 1e-14 | 59053 | -- | 95265.42 | -- |
+| def2-qzvpd | 1e-12 | 59053 | -- | 84079.52 | -- |
+| def2-qzvppd | 1e-14 | 59053 | -- | 95887.50 | -- |
+| def2-qzvppd | 1e-12 | 59053 | -- | 83948.12 | -- |
+| cc-pvdz | 1e-14 | 11577 | 43887.49 | 8254.35 | 5.3 |
+| cc-pvdz | 1e-12 | 11577 | 43887.49 | 7321.89 | 6.0 |
+| cc-pvtz | 1e-14 | 26870 | 148457.05 | 19260.87 | 7.7 |
+| cc-pvtz | 1e-12 | 26870 | 148457.05 | 16926.39 | 8.8 |
+| cc-pvqz | 1e-14 | 51984 | -- | 46050.47 | -- |
+| cc-pvqz | 1e-12 | 51984 | -- | 40661.67 | -- |
+| aug-cc-pvdz | 1e-14 | 19511 | 78025.18 | 37041.03 | 2.1 |
+| aug-cc-pvdz | 1e-12 | 19511 | 78025.18 | 32973.26 | 2.4 |
+| aug-cc-pvtz | 1e-14 | 42163 | -- | 88288.37 | -- |
+| aug-cc-pvtz | 1e-12 | 42163 | -- | 77356.21 | -- |
+| aug-cc-pvqz | 1e-14 | 77098 | -- | 203911.70 | -- |
+| aug-cc-pvqz | 1e-12 | 77098 | -- | 181524.88 | -- |
+
+#### The block size, and a floor of its own
+
+`make_block_size` gives `npairs / (4 x nthreads)` and floors it at
+`sparsity::min_block_size`, which is 256. Swept at fourteen threads, every case has the
+same shape -- steep below 512 atom pairs a block, flat from there to 32768:
+
+| case | default | 64 | 256 | 512 | 1024 | 4096 | 8192 | 32768 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| c60 def2-svpd | 25.74 | 41.50 | 25.64 | **24.58** | 24.61 | 25.02 | 24.99 | 25.56 |
+| taxol def2-svpd | 58.41 | 85.24 | 57.76 | **55.17** | 55.22 | 57.14 | 56.42 | 56.84 |
+| tagrisso def2-tzvpd | 44.08 | 56.76 | 43.62 | 41.89 | 42.37 | **41.83** | 42.45 | 43.53 |
+| crambin def2-tzvp | 3429 | 9152 | 5342 | 4223 | 3651 | **3427** | 3475 | 3525 |
+| ubiquitin def2-svp | 4360 | 14022 | 9812 | 7142 | 5520 | 4400 | **4310** | 4449 |
+
+**It is a fixed cost per block and not the buffer.** The arena is the largest block's
+pairs times the buffer rows of its momenta, and over this sweep it runs from 0.1 to 56
+MB a thread with no structure in the timings at all -- crambin's best point is the 23 MB
+one. It is not a scheduling effect either: c60 at four threads has the same shape, 53.60
+at 256 against 52.29 at 512, and at one thread the same ordering with the gain down to
+0.6 per cent.
+
+**So the floor binds, and only for the small molecules.** crambin chooses 3685 and
+ubiquitin 13541, both on the plateau and within one per cent of the best point in the
+sweep -- there is nothing to win there. Everything under about 150 atoms falls to the
+floor instead, and 256 costs it 4 to 6 per cent.
+
+The nuclear potential driver therefore carries a floor of its own, 512, passed as
+`min_pairs` through `make_pattern`. `sparsity::min_block_size` stays at 256: it was
+*lowered* to that from 2048 on the evidence of the overlap driver, whose buffer is ten
+rows against this one's hundreds, and reaching into it would change drivers this was not
+measured on. What it bought, as a ratio of the committed numbers over the same grid:
+
+| molecule | chosen block size | speedup |
+| --- | ---: | ---: |
+| tagrisso | 256 -> 512 | 1.057 |
+| c60 | 256 -> 512 | 1.063 |
+| taxol | 256 -> 512 | 1.058 |
+| paracetamol cluster | 917, unchanged | 0.996 |
+
+The paracetamol cluster is the control: its chosen size already exceeds both floors, and
+it does not move. Three of the sixteen rows which lost to the reference now win.
+
+**This is a laptop number and the floor is the kind of constant which inverts.** At 512
+c60 holds four blocks where 256 gave it seven, and the small molecules are the ones with
+the fewest tasks to spread over a node. The plateau is broad enough that 512 is not a
+risky point, but it has not been measured above fourteen threads.
+
+#### What these numbers say
+
+**The advantage is screening, so it grows with the molecule and nothing else.** The
+geometric mean by molecule: tagrisso 1.45, c60 1.64, taxol 1.70, paracetamol cluster
+2.45, crambin 3.80, ubiquitin 4.93. The reference computes every atom pair; the driver
+computes the pairs which survive, and on seventy atoms almost all of them do. The best
+case in the grid is crambin at cc-pvqz, 9.6. At the other end **thirteen rows, seven
+basis and molecule combinations, are slower than the reference**: tagrisso in def2-svp,
+def2-svpd and def2-tzvppd, c60 in def2-svpd and aug-cc-pvdz, and taxol in def2-svpd and
+aug-cc-pvdz, from 0.8 to 0.9. Every one is on the three smallest molecules and every one
+is double or triple zeta. Little to screen, and the fixed cost of a block is what is
+left.
+
+**Diffuse functions are what defeats it, and they cost more the larger the molecule.**
+At 1e-12, going from cc-pvdz to aug-cc-pvdz:
+
+| molecule | nao | time | x ref |
+| --- | ---: | ---: | --- |
+| tagrisso | x1.68 | x1.79 | 1.6 -> 1.2 |
+| crambin | x1.68 | x3.54 | 3.3 -> 1.6 |
+| ubiquitin | x1.69 | x4.50 | 6.0 -> 2.4 |
+
+The function count grows by the same 1.7 in all three; the time grows by 1.8 on seventy
+atoms and by 4.5 on twelve hundred. The reference is indifferent -- it had no screening
+to lose. So the ratio falling is the driver giving back exactly what it had gained, and
+the larger the molecule the more there was to give back. def2-svp to def2-svpd is the
+same story at 1.5 functions and 3.1 time, def2-tzvp to def2-tzvpd at 1.26 and 2.40.
+
+**The threshold is worth between three and fourteen per cent, in that order.** 1e-12
+against 1e-14: tagrisso 1.035, c60 1.038, taxol 1.048, paracetamol cluster 1.088,
+crambin 1.113, ubiquitin 1.137. It buys nothing where there is nothing to screen and
+the most where the screening is already doing the work -- the same axis as everything
+else here. Since the reference has no threshold at all, the whole of it shows up in the
+ratio, which is why the 1e-12 mean is 2.27 against 2.13.
+
+### Where the time of the nuclear attraction driver goes
+
+Profiled on 2026-09-15, fourteen threads, best of five. Nothing here is a share read
+off a sampler: `sample` over-reports the allocator badly enough that two rounds of work
+were once planned off its percentages and both measured as noise. Every number below is
+a wall clock A/B, an experiment which removes a cost and re-times, taken against the
+same baseline in one session.
+
+#### The charge loop is the whole call
+
+This operator has a knob the others do not: the number of charges. Timing the same
+molecule and basis against k of them separates what is paid per charge from what is
+paid once, with no instrumentation at all.
+
+| case | fit | fixed, at k = N |
+| --- | --- | ---: |
+| tagrisso def2-svp, 70 atoms | 0.54 ms + 138 us x k | 5.3% |
+| taxol def2-tzvp, 110 atoms | 1.07 ms + 715 us x k | 1.3% |
+| crambin def2-tzvp, 642 atoms | 3.58 ms + 5419 us x k | 0.1% |
+
+T(k) is linear over three decades of k. So the sparsity pattern, the coordinates, the
+task list, the HRR transfer, the harmonic transform, the distributor and the dense fill
+are together between five per cent and one part in a thousand. **There is nothing to
+optimise outside the charge loop**, which is why no driver-level phase timers appear
+below: they would be measuring noise.
+
+#### Inside it
+
+The body evaluated per charge is `compute_pc`, `compute_full_npot_boys_function`, the
+VRR ladder, and `contract_primitives`. Each of the first three was ablated in turn --
+the Boys ladder replaced by a fill of the same rows, the pair exponential by the factor
+it multiplies, the accumulation by one column instead of ncols -- so that the writes and
+the dependencies stay and nothing is eliminated as dead:
+
+| case | baseline | Boys ladder | pair exp | contraction | remainder |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| tagrisso def2-svp | 10.25 ms | 47.6% | 17.1% | 1.2% | 34.1% |
+| taxol def2-tzvp | 79.53 ms | 39.3% | 21.9% | 3.6% | 35.2% |
+| crambin def2-tzvp | 3470 ms | 34.5% | 26.2% | 5.3% | 34.0% |
+
+Removing the Boys ladder and the pair exponential together gives 67.5, 60.9 and 61.1
+per cent against 64.7, 61.2 and 60.7 for the two measured separately -- **additive
+within three points**, which is the check that the attributions mean anything. The
+remainder is by subtraction: the VRR ladder, `compute_pc`, `_make_scaled_arguments`,
+the transform, and the once-paid part above.
+
+The Boys share falls as the angular momentum rises, 48 to 35 per cent, because the VRR
+ladder grows faster than the order of the Boys function does. The contraction is
+vectorised already and is small.
+
+#### The pair exponential is recomputed thousands of times
+
+`_scale_pair_values` carries `std::exp(-mu * ab_2[k])` in its inner loop:
+
+```
+    for (size_t j = 0; j < nrows; j++)
+    {
+        auto *row = buffer.data(target + 1 + j);
+
+        for (size_t k = 0; k < ncols; k++)
+        {
+            row[k] *= fj * std::exp(-mu * ab_2[k]);
+        }
+    }
+```
+
+`mu` is the pair of primitives and `ab_2` the atom pair. **Neither depends on the row or
+on the charge**, and the call sits inside the loop over charges. For crambin at
+def2-tzvp that is of order seven rows times six hundred and forty two charges -- some
+four thousand evaluations of an exponential where one would do -- and it is 26 per cent
+of the call. The share rises with the molecule for exactly that reason: the charge loop
+is the molecule.
+
+This is the same shape as the three-center kernel's `e_ab`, which recomputes its
+exponential for every atom on the c side and was 17 per cent there.
+
+#### Hoisting it out of the row loop
+
+Formed once for the call into a scratch held per thread, every row then scaled by it.
+The A/B is the same binary either way, both measured in one session:
+
+| case | before | after | x |
+| --- | ---: | ---: | ---: |
+| tagrisso def2-svp | 10.24 ms | 9.26 ms | 1.106 |
+| taxol def2-tzvp | 79.86 ms | 70.38 ms | 1.135 |
+| crambin def2-tzvp | 3465.40 ms | 2966.55 ms | **1.168** |
+
+The gain rises with the molecule because the charge loop is the molecule. What is left
+of the 26 per cent is one `ncols` of exponentials per charge, where the operator wants
+one per pair of primitives.
+
+#### And then out of the charge loop
+
+Removing that last part means keeping the values across the charge loop, which needs a
+row of the buffer to keep them in. The generator now gives one: `BufferLayout` carries a
+`pair_exp` section of a single row for an anchored operator, `compute_pair_exponent`
+fills it once for the pair of primitives above the loop over the charges, and the Boys
+wrapper takes that row where it used to take the reduced exponent. Every buffer row
+behind it moves by one and the table of buffer rows counts one more.
+
+| case | before | row loop | charge loop | whole |
+| --- | ---: | ---: | ---: | ---: |
+| tagrisso def2-svp | 10.24 ms | 9.26 ms | 8.07 ms | **1.269** |
+| taxol def2-tzvp | 79.86 ms | 70.38 ms | 61.61 ms | **1.296** |
+| crambin def2-tzvp | 3465.40 ms | 2966.55 ms | 2536.17 ms | **1.366** |
+
+**The ablation predicted the ceiling and the change reached it.** Removing the
+exponential entirely measured 26.2 per cent of crambin at def2-tzvp; forming it once a
+pair of primitives instead of once a row of every charge took 26.8 per cent off. The
+exponential is now evaluated `ncols` times for a pair of primitives where it was
+evaluated `nrows` times `ncharges` times `ncols`, which on that case is four thousand
+evaluations down to one.
+
+#### The three-center kernels, once they were measured properly
+
+The earlier reading of these was worthless: two cases, one run each, one of them a
+fourteen second call which wanders by six per cent between runs of code nothing changed.
+Measured again on four cases small enough to repeat, best of five with spreads under
+1.12, ablating the exponential the same way:
+
+| case | baseline | no exponential | its share |
+| --- | ---: | ---: | ---: |
+| tagrisso def2-svp | 286.62 ms | 247.52 ms | 13.6% |
+| c60 def2-svp | 784.92 ms | 678.78 ms | 13.5% |
+| taxol def2-svp | 999.54 ms | 861.77 ms | 13.8% |
+| tagrisso def2-tzvp | 1094.17 ms | 980.87 ms | 10.4% |
+
+The same change was tried first and reached only two thirds of that, because the loop
+nest is not the nuclear attraction's. There the charges stand inside the pair of
+primitives, so one row above them kills the whole repetition. Here the nest is atoms on
+the c side, then the bra's two primitives, then the ket's: `mu` is the bra pair's and is
+fixed only *inside* the loop over the atoms, so a row is refilled for every one of them.
+That version measured 1.078 to 1.100.
+
+**Reordering the nest is not the way to fix that.** With the atoms innermost every one
+of them needs its partial sum live at once, and the contracted rows are reused per atom
+today -- zeroed at the top, accumulated, transformed into that atom's slice. The section
+would become `contracted x natoms`: 6 rows to 3.9 thousand for `(ss|d)`, 609 to 391
+thousand for `(dd|g)`, 15176 to 9.7 million for `(ii|i)`. At a few thousand columns the
+middle one alone is hundreds of gigabytes.
+
+**The screening does not stand in the way of it, though**, which was worth checking
+before ruling it out: the primitive bound neglects the position of the atom on the ket
+side, so `dimensions` is indexed by the three primitives alone and a reorder would leave
+it untouched. The kernels say so in a NOTE.
+
+What works instead is to keep the nest and hold *every* pair's exponential at once, in a
+scratch of `nprim_a * nprim_b` runs of atom pairs, filled once for the call above the
+loop over the atoms and indexed by the pair. It costs no buffer row, no reorder and no
+change to the accumulation:
+
+| case | before | after | x | of the ceiling |
+| --- | ---: | ---: | ---: | ---: |
+| tagrisso def2-svp | 286.62 ms | 247.03 ms | 1.160 | 101% |
+| c60 def2-svp | 784.92 ms | 676.12 ms | 1.161 | 102% |
+| taxol def2-svp | 999.54 ms | 858.34 ms | 1.165 | 102% |
+| tagrisso def2-tzvp | 1094.17 ms | 983.24 ms | 1.113 | 98% |
+
+**It reaches the ablation**, which is the whole of what was there to take: removing the
+exponential outright gave 247.52, 678.78, 861.77 and 980.87 ms, and forming every pair's
+once gives 247.03, 676.12, 858.34 and 983.24.
+
+The price is the scratch, and it is small: at most `nprim_a * nprim_b` runs of atom
+pairs a thread, which is 25 for these def2-svp cases and 36 for def2-tzvp, against
+buffers that are 22 rows for `(ss|d)` and 4998 for `(dd|g)`. Peak resident size is
+unmoved -- 13.8 GB for taxol at def2-svp, which is the tensor it returns.
+
+**The three-center kernels deliberately keep the old form.** They call the same
+function and the same argument applies to them, but measured once each way the two
+cases disagreed -- tagrisso/def2-svp 290 to 264 ms, taxol/def2-tzvp 13.49 to 15.59 s --
+and at thirteen seconds a run both numbers are single samples. The change trades an
+exponential for a stream of `ncols` doubles, which is a different trade for a kernel
+whose blocks are larger, and 441 kernels is too many to move on a coin toss. With the
+three-center path left alone it measures 287 ms and 13.79 s against 290 ms and 13.49 s,
+which is where it was.
+
 ### The two-center Coulomb driver against the reference
 
 The bases are the fitting sets, which is what this operator is used with. A dash in the
@@ -4954,91 +5461,14 @@ The chain is reachable from the input of a closed shell calculation, as the
 alternative path through the Fock build which ri_jk_simd selects. This is what it
 does to a whole calculation rather than to one matrix.
 
-### Caffeine, restricted Hartree-Fock
+### Caffeine and tagrisso, whole calculations
 
-Twenty four atoms, fifty one occupied orbitals, against def2-universal-jkfit with
-1242 auxiliary functions throughout. The convergence threshold is 1e-8 and the
-time is of the whole calculation.
-
-| basis | nao | method | time | speedup | iterations | energy | against full |
-| --- | ---: | --- | ---: | ---: | ---: | ---: | ---: |
-| def2-svp | 246 | full | 12.63 | 1.00 | 19 | -675.8010164955 | |
-| | | RI-JK conventional | 3.05 | 4.13 | 21 | -675.8004490084 | 5.67e-04 |
-| | | RI-JK simd | 2.64 | 4.78 | 21 | -675.8004490084 | 5.67e-04 |
-| def2-svpd | 366 | full | 51.35 | 1.00 | 19 | -675.8324037911 | |
-| | | RI-JK conventional | 8.31 | 6.18 | 22 | -675.8318417532 | 5.62e-04 |
-| | | RI-JK simd | 6.87 | 7.47 | 22 | -675.8318417532 | 5.62e-04 |
-| def2-tzvp | 494 | full | 177.50 | 1.00 | 19 | -676.5558320985 | |
-| | | RI-JK conventional | 19.17 | 9.26 | 22 | -676.5554233126 | 4.09e-04 |
-| | | RI-JK simd | 17.16 | 10.34 | 22 | -676.5554233126 | 4.09e-04 |
-| def2-tzvpd | 614 | full | 431.21 | 1.00 | 19 | -676.5579379117 | |
-| | | RI-JK conventional | 40.37 | 10.68 | 22 | -676.5575291942 | 4.09e-04 |
-| | | RI-JK simd | 34.68 | 12.43 | 22 | -676.5575291942 | 4.09e-04 |
-
-**The two routes converge to the same energy in every basis, to all ten of the
-digits printed, and in the same number of iterations.** That is what the table is
-for. The new path is the same approximation reached another way, in a single and
-in a triple zeta basis, with and without diffuse functions.
-
-The new path is twelve to twenty one per cent faster than the conventional one.
-Before the W matrices were formed by a matrix product it was three to fifteen per
-cent slower in every one of these four bases, and the entry of that table is kept
-in the history of this file. Caffeine gains the least of anything measured because
-its fifty one occupied orbitals make the exchange a smaller part of its run than
-of a larger molecule.
-
-### Tagrisso, restricted Hartree-Fock
-
-Seventy atoms and a hundred and thirty three occupied orbitals, in def2-svp
-against def2-universal-jkfit, whose 3387 auxiliary functions are close to three
-times the 1242 of caffeine.
-
-| method | time | speedup | iterations | energy | against full |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| full | 153.77 | 1.00 | 21 | -1609.0900864188 | |
-| RI-JK conventional | 99.20 | 1.55 | 23 | -1609.0890443496 | 1.04e-03 |
-| RI-JK simd | 46.01 | 3.34 | 23 | -1609.0890443498 | 1.04e-03 |
-
-**Twice the conventional route**, where caffeine gains a fifth. The advantage
-follows the auxiliary basis and the occupied orbitals, both of which are what the
-exchange is built from, and both of which are larger here.
-
-The energies of the two routes differ in the last of the ten digits printed, which
-is the different order the arithmetic is summed in over twenty three iterations
-rather than a difference of the approximation.
-
-**The approximation itself gains much less here than on caffeine**: 1.55 times the
-calculation without it for the conventional route, against four to eleven on
-caffeine. The four-center build screens well at seventy atoms while the work of
-the resolution of the identity follows the auxiliary basis, which is what has
-grown.
-
-### Tagrisso with the diffuse basis
-
-The same molecule and the same fitting set, in def2-svpd, whose 1010 orbital
-functions are half again the 683 of def2-svp.
-
-| method | time | speedup | iterations | energy | against full |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| full | 1199.89 | 1.00 | 21 | -1609.1565808182 | |
-| RI-JK conventional | 370.46 | 3.24 | 24 | -1609.1555344827 | 1.05e-03 |
-| RI-JK simd | 150.02 | 8.00 | 24 | -1609.1555344829 | 1.05e-03 |
-
-**Two and a half times the conventional route.** Taken together, the six
-calculations of these three tables:
-
-| molecule | auxiliary functions | orbital basis | simd against conventional |
-| --- | ---: | --- | ---: |
-| caffeine | 1242 | def2-svp to def2-tzvpd | 1.12 to 1.21 |
-| tagrisso | 3387 | def2-svp | 2.16 |
-| tagrisso | 3387 | def2-svpd | 2.47 |
-
-The advantage follows the auxiliary basis and the occupied orbitals, and the
-orbital basis multiplies whatever those have already given. The whole-calculation
-gains are well under the two and a half to five times the W matrices themselves
-gained, which is what a part of a calculation being made faster does to the whole
-of it: the W matrices were three quarters of a tagrisso run, so three times on
-them cannot give more than about twice on the run, and 2.16 is most of that.
+*Superseded. Both molecules at Hartree-Fock and B3LYP, four builds, with the B
+vectors timed apart from the builds:
+`benchmarks/data/scf/2026-09-15_m4max_caffeine.md` and
+`benchmarks/data/scf/2026-09-15_m4max_tagrisso.md`. The tables which stood here
+compared a full build against the two resolution of the identity routes over the
+def2 sets; they crossed two runs and are replaced by measurements which do not.*
 
 ### What the memory check did
 
@@ -5066,22 +5496,6 @@ including the diffuse ones, so the fallback to the inverted square root was neve
 taken and no warning was printed. The metrics of the universal fitting set are
 well enough conditioned for the cheaper factorization at these sizes. The fallback
 is therefore still covered by constructed matrices alone and not by a calculation.
-
-### A note on how these rows were taken
-
-**These three tables predate the change to the setup described in the section
-which follows.** That change takes the tagrisso def2-svpd run from 150.02 seconds
-to 138.75, which is 8.65 times the calculation without the approximation and 2.67
-times the conventional route rather than the 8.00 and 2.47 above. The other rows
-were not measured again, and the tables are left as the set they were taken as
-rather than with one row of a later state mixed into them.
-
-The full and the conventional columns of these three tables were measured once
-each, on an idle machine, before the W matrices were changed. They do not go
-through the changed code and were not measured again. The simd column was measured
-again afterwards, in a process of its own. The ratios therefore cross two runs,
-which is worth knowing though both were idle and the energies of the two agree to
-every digit printed.
 
 ## Forming the B vectors, and the depth of its products
 
@@ -5245,111 +5659,16 @@ fifths, and everything else, which is not the resolution of the identity at all,
 the other two fifths. For B3LYP the quadrature is three fifths of the run on its
 own.
 
-## Caffeine over the def2 basis sets, the two routes side by side
+## Caffeine, the routes side by side and against the build which makes none
 
-The tables of the earlier section were taken as sets, with the conventional column
-measured once and the simd column measured again later, so their ratios cross two
-runs. This one does not: both routes were run one after the other in the same
-process, at Hartree-Fock, against def2-universal-jkfit with 1242 auxiliary
-functions throughout. Caffeine has fifty one occupied orbitals whatever basis it
-is given.
-
-| basis | nao | conventional | simd | gain | iterations | energy, conventional | energy, simd |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| def2-svp | 246 | 3.14 | 1.66 | 1.89 | 21 | -675.8004490084 | -675.8004490084 |
-| def2-svpd | 366 | 8.25 | 3.39 | 2.44 | 22 | -675.8318417532 | -675.8318417532 |
-| def2-tzvp | 494 | 18.58 | 6.30 | 2.95 | 22 | -676.5554233126 | -676.5554233126 |
-| def2-tzvpd | 614 | 39.00 | 9.83 | 3.97 | 22 | -676.5575291942 | -676.5575291942 |
-| def2-qzvp | 1098 | 216.78 | 33.64 | 6.44 | 22 | -676.5876077721 | -676.5876077721 |
-| def2-qzvpd | 1218 | 357.17 | 43.70 | 8.17 | 23 | -676.5878809521 | -676.5878809522 |
-
-**The two routes reach the same energy** to all ten digits in five of the six, and
-to nine in the sixth, in the same number of iterations throughout.
-
-**The gain rises as the basis grows**, from 1.89 at a single zeta to 8.17 at a
-quadruple one.
-
-An earlier reading of this table had it falling, from 1.57 to 1.15, and drew a
-conclusion from that: the exchange is as thin as the occupied orbitals make it,
-fifty one is thin, and a larger basis was said to add work the new path could not
-help with. **That was not what the numbers meant.** Both routes were paying for one
-build of the four center integrals before either of them could start -- the exchange
-is formed from the occupied orbitals, and at the first iteration there are none, so
-the driver fell back to the build which needs none. That build grows with the basis
-far faster than anything else in the calculation. At def2-qzvpd it was about 290 of
-the 311 seconds the simd route took.
-
-Taking the orbitals of the first exchange from the density instead removed it from
-this route, and the trend reversed. The section on it is below. **The conventional
-route still pays it**, so part of every gain in this table is that fix rather than
-the driver, and a like for like comparison would be narrower.
-
-### Against the numbers recorded earlier
-
-The conventional column here is 3.19, 8.27, 18.98 and 39.22 against the 3.05, 8.31,
-19.17 and 40.37 of the earlier section, which is a few per cent either way on a
-route that has not changed. That is the run to run variation of this machine, and
-it is worth knowing as the scale below which none of the ratios in this file should
-be read.
-
-The simd column is 2.13, 5.67, 14.57 and 30.93 against 2.64, 6.87, 17.16 and 34.68.
-That difference is the gather of the auxiliary groups, worth 1.12 to 1.24 times
-here, which is the setup being a smaller part of a caffeine run than of the
-tagrisso one where it was worth 1.08 on the whole calculation.
-
-## Caffeine against the build which makes no approximation
-
-The table above this one sets the two resolution of the identity routes against each
-other. This one adds the build which makes none, so that what the approximation is
-worth can be read beside what the driver is worth. Caffeine, Hartree-Fock, against
-def2-universal-jkfit with 1242 auxiliary functions in every row, all four builds one
-after another in the same process, on sixteen cores.
-
-| basis | nao | four center | RI-JK veloxchem | simd, in memory | simd, direct |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| def2-svp | 246 | 12.32 | 3.15 | **1.27** | 3.22 |
-| def2-svpd | 366 | 50.42 | 7.71 | **2.69** | 6.04 |
-| def2-tzvp | 494 | 173.48 | 18.49 | **4.81** | 10.87 |
-| def2-tzvpd | 614 | 422.89 | 38.50 | **7.80** | 15.97 |
-
-and the same as ratios against the exact build:
-
-| basis | nao | RI-JK veloxchem | simd, in memory | simd, direct |
-| --- | ---: | ---: | ---: | ---: |
-| def2-svp | 246 | 3.91 | **9.73** | 3.82 |
-| def2-svpd | 366 | 6.54 | **18.74** | 8.35 |
-| def2-tzvp | 494 | 9.38 | **36.08** | 15.96 |
-| def2-tzvpd | 614 | 10.98 | **54.20** | 26.47 |
-
-The three routes of the approximation agree to the ninth decimal and take the same
-number of iterations. The exact build takes nineteen where they take twenty one or
-twenty two, and lands a thousandth of a hartree lower, which is the approximation
-and not an error.
-
-**The advantage climbs steeply with the basis, from ten times to fifty four.** The
-fitting set is 1242 functions in every row while the orbital set nearly triples, so
-the work the driver saves grows while the work it must do grows much more slowly.
-This is the same thing the sections on the node describe from the other side, where
-the Fock build was seen to grow as the square of the basis and the fitting set not
-at all.
-
-**The way which holds the B vectors beats the direct way by two and a half times
-here, at every basis.** On a node with a hundred and twenty eight cores it leads by
-between 14 and 30 per cent. It used to lose there by two to three times, and the
-sections on the node say what it was paying and what was done about it. **The
-machines no longer disagree about which mode to use, only about the margin.**
-
-These were measured again after that work. The way which holds the B vectors gained
-16 to 20 per cent of these rows from it, all of it from making one call of the half
-transformation for each build where it made twenty; the first touch which the node
-gained so much from buys nothing on a machine with one memory domain. The other
-three builds moved by under a per cent, which is what says the machine was quiet.
-
+*Superseded. Caffeine at Hartree-Fock and B3LYP, four builds, eight orbital and fitting pairs, with the B vectors timed apart from the builds:
+`benchmarks/data/scf/2026-09-15_m4max_caffeine.md`.*
 
 ## The larger molecules, the two routes side by side
 
 c60 and taxol at Hartree-Fock in def2-svp against def2-universal-jkfit, both routes
-one after the other in the same process, as for caffeine above.
+one after the other in the same process. Not measured again since; the caffeine and
+tagrisso tables they were taken beside have been.
 
 | molecule | nao | naux | occupied | conventional | simd | gain | iterations | energy, conventional | energy, simd |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -5361,7 +5680,8 @@ agree to the ninth decimal. The last digit or two differ, which is the order the
 arithmetic is summed in over twenty odd iterations.
 
 **These are the largest gains of any calculation in this file.** Taken with the
-tables above:
+tables above, and with the caffeine and tagrisso rows as they stood when this was
+written rather than as `benchmarks/data/scf` now has them:
 
 | molecule | auxiliary functions | occupied orbitals | simd against conventional |
 | --- | ---: | ---: | ---: |
@@ -5524,33 +5844,8 @@ follows the size of the number they are computing.
 
 ## The four ways of building a Fock matrix
 
-Tagrisso at Hartree-Fock against def2-universal-jkfit, all eight calculations one
-after another in the same process: the four center build which makes no
-approximation, the resolution of the identity as VeloxChem had it, and the two ways
-the new driver has of doing the same thing.
-
-| basis | nao | mode | time | against full | iterations | energy |
-| --- | ---: | --- | ---: | ---: | ---: | ---: |
-| def2-svp | 683 | full four-center | 150.59 | 1.00 | 21 | -1609.0900864188 |
-| | | RI-JK veloxchem | 96.76 | 1.56 | 23 | -1609.0890443496 |
-| | | RI-JK simd, in memory | **31.38** | **4.80** | 23 | -1609.0890443498 |
-| | | RI-JK simd, direct | 78.14 | 1.93 | 23 | -1609.0890443496 |
-| def2-svpd | 1010 | full four-center | 1177.14 | 1.00 | 21 | -1609.1565808182 |
-| | | RI-JK veloxchem | 357.00 | 3.30 | 24 | -1609.1555344827 |
-| | | RI-JK simd, in memory | **74.26** | **15.85** | 24 | -1609.1555344829 |
-| | | RI-JK simd, direct | 158.72 | 7.42 | 24 | -1609.1555344827 |
-
-**The three routes of the approximation agree to the ninth decimal**, and differ
-from the four center build by the error of the approximation alone, a thousandth of
-a hartree.
-
-Measured again after the work the sections on the node describe. The way which holds
-the B vectors gained 9 and 10 per cent of these two rows, less than the 16 to 20 of
-caffeine above, as it made fifty three calls of the half transformation for each
-build here and twenty there -- and now makes two and one. The other three builds
-moved by under a per cent, except the four center one at def2-svp which came in five
-per cent quicker without having been touched, and is the one figure here outside the
-spread of the machine.
+*Superseded. Tagrisso at Hartree-Fock and B3LYP, four builds, def2-svp and def2-svpd, with the B vectors timed apart from the builds:
+`benchmarks/data/scf/2026-09-15_m4max_tagrisso.md`.*
 
 ### The direct way costs less than counting its passes suggests
 
@@ -5561,9 +5856,13 @@ holds them sweeps them once for the whole calculation.
 
 | | def2-svp | def2-svpd |
 | --- | ---: | ---: |
-| against the way which holds them | 2.28 slower | 1.91 slower |
-| against the route VeloxChem had | **1.21 faster** | **2.27 faster** |
-| against the four center build | **2.01 faster** | **7.48 faster** |
+| against the way which holds them | 2.57 slower | 2.06 slower |
+| against the route VeloxChem had | **1.26 faster** | **2.37 faster** |
+| against the four center build | **1.97 faster** | **7.84 faster** |
+
+Those are the Hartree-Fock rows of
+`benchmarks/data/scf/2026-09-15_m4max_tagrisso.md`, recomputed from it rather than
+carried over from the table which used to stand above.
 
 A factor of two for holding nothing, not the five or ten a count of the passes
 would suggest. The reason is in the section on the setup: **the three-center
@@ -5574,7 +5873,7 @@ work around them.
 That makes the direct way more than a fallback. It is faster than the route
 VeloxChem had in both basis sets while holding a small fraction of the memory, on a
 molecule which fits either way. The gap to the way which holds the B vectors also
-narrows as the basis grows, 2.09 to 1.73, which is the direction that suits it:
+narrows as the basis grows, 2.57 to 2.06, which is the direction that suits it:
 the calculations which need it are the large ones.
 
 These are the numbers as the driver stands, measured again after all of the work of
@@ -7464,3 +7763,2386 @@ metric and has no other option, so that run used it throughout. Whether the eige
 route -- which the conventional RI-JK driver uses, and which `ri_metric_route` now
 selects for the way which holds the B vectors -- also cures it at the default
 `ovl_thresh` is untested. The two are independent and both may be real.
+
+### And it was not a stall either
+
+The section above is right that the driver is not at fault and wrong about what is.
+It was written from one controlled comparison -- `ovl_thresh` varied within the direct
+way on a laptop -- against a failure recorded on 12 September with older code. The
+control was never run. Run now, with the same binary, and on a node:
+
+| machine | way | ovl_thresh | verdict | iterations | energy |
+| --- | --- | ---: | --- | ---: | ---: |
+| laptop | direct | 1e-6 | **not converged** | 50 | -2272.3450690097 |
+| node, 8 x 32 | direct | 1e-6 | converged | 25 | -2272.3450690097 |
+| node, 8 x 32 | held | 1e-6 | converged | 25 | -2272.3450690105 |
+| laptop | direct | 1e-5 | converged | 25 | -2272.3448501388 |
+| node, 8 x 32 | held | 1e-5 | converged | 25 | -2272.3448501395 |
+
+**The run which does not converge reaches the same energy as the runs which do**, to
+ten decimals. Its last ten iterations:
+
+```
+ 41  -2272.345069009752  grad 1e-08      46  -2272.345069009743  grad 1e-08
+ 42  -2272.345069009749  grad 1e-08      47  -2272.345069009752  grad 2e-08
+ 43  -2272.345069009758  grad 2e-08      48  -2272.345069009749  grad 1e-08
+ 44  -2272.345069009758  grad 1e-08      49  -2272.345069009734  grad 2e-08
+ 45  -2272.345069009749  grad 1e-08      50  -2272.345069009745  grad 1e-08
+```
+
+The energy is settled to 2.4e-11 and the gradient oscillates between 1e-8 and 2e-8.
+**It is not a stall: it is a noise floor which sits exactly on `conv_thresh`.** At
+1e-5 the floor lands just under the threshold and the test passes at iteration 25; at
+1e-6 it lands just over and fifty iterations report failure. The node, with OpenBLAS
+instead of Accelerate and eight ranks of thirty two threads instead of fourteen, lands
+just under at 1e-6 and converges in twenty five.
+
+**So c60 at def2-tzvp is a calculation whose achievable gradient is `conv_thresh`**,
+and whether it is called converged is settled by the arithmetic: the math library, the
+thread count, the rank count, the linear dependence threshold. None of them change the
+answer. `conv_thresh = 1e-7` is met at iteration 21 in every configuration.
+
+**Raising `ovl_thresh` is not a free fix.** 1e-5 drops 37 directions where 1e-6 drops
+three, and the energies differ by 2.19e-04 Eh accordingly -- it is a smaller
+variational space, not a better converged one. What it also does is lower the gradient
+noise slightly, which is why it crossed the threshold; that was the effect measured
+and mistaken for the cause.
+
+**And the metric route changes none of it.** On the node, cholesky against
+eigenvalues: converged in twenty five iterations either way, in both ways of building,
+differing by 3.4e-07 Eh -- the same difference in both, so a systematic property of the
+two inversions rather than noise. It costs 5.5 per cent of a direct calculation and
+6.8 of a held one, which answers the question of what multiplying by the root costs
+against solving the factor: not much.
+
+## Against pyscf, where the core Hamiltonian was the thing being wrong
+
+Everything above compares the SIMD RI-JK driver against VeloxChem's own conventional
+build. That comparison was worth very little above g, and this section is how that was
+found out.
+
+Water at the geometry below, `conv_thresh = 1e-8` here and `conv_tol = 1e-12` in pyscf.
+The AO map is built from the quantum numbers of the two labellings and **verified on
+the overlap before anything else is compared** -- a wrong map gives a confident wrong
+answer. It agrees to 3e-11 at every basis, so the map is not in question anywhere
+below.
+
+```
+O   0.000000   0.000000   0.117790
+H   0.000000   0.755453  -0.471161
+H   0.000000  -0.755453  -0.471161
+```
+
+### The one-electron integrals, before and after
+
+Largest absolute difference from pyscf, whole matrix:
+
+| basis | nao | overlap | kinetic, SIMD | kinetic, plain | nuclear, SIMD | nuclear, plain |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| cc-pVTZ | 58 | 2.8e-11 | 1.1e-10 | 1.1e-10 | 4.7e-10 | 4.7e-10 |
+| cc-pVQZ | 115 | 2.8e-11 | 1.7e-10 | 1.7e-10 | 5.3e-10 | 5.3e-10 |
+| cc-pV5Z | 201 | 3.1e-11 | 3.0e-10 | **1.5e+01** | 4.8e-10 | **8.4e+00** |
+
+The plain drivers are exact through g and return **zeros for h blocks**. The SCF took
+its core Hamiltonian from them, so a basis with h functions was built on a wrong
+Hamiltonian with no warning of any kind. Both are now taken from the SIMD drivers,
+which are right at h and i.
+
+### What that did not fix, which is the larger half
+
+With the core Hamiltonian correct, the conventional SCF at cc-pV5Z is **still** wrong:
+
+| basis | conventional | pyscf exact | difference |
+| --- | ---: | ---: | ---: |
+| def2-svp | -75.9609698336 | -75.9609698336 | +1.5e-12 |
+| cc-pVTZ | -76.0570982357 | -76.0570982357 | +2.3e-12 |
+| cc-pV5Z | -76.0724789681 | -76.0670116535 | **-5.5e-03** |
+
+The four-center driver has no h kernels at all -- the highest in
+`ElectronRepulsionFunc.hpp` is `...RecSSSG`. From an identical density, mapped from a
+converged pyscf calculation, its matrices relative to pyscf's:
+
+| basis | Coulomb | exchange |
+| --- | ---: | ---: |
+| cc-pVQZ | 1.4e-11 | 1.1e-11 |
+| cc-pV5Z | **4.3e-01** | **1.4e-02** |
+
+**Above g, RI-JK is the only correct route in this code.** Which also means the
+comparisons this file made against the conventional build above g were measuring the
+conventional build's gaps, not the driver's -- the trap of using a reference whose
+coverage is narrower than the thing being checked.
+
+### The driver, against a reference which does reach h
+
+pyscf `RHF().density_fit(auxbasis=...)`, def2-universal-jkfit on both sides, so the
+fitting error is common to the two and what remains is the implementation:
+
+| basis | SIMD RI-JK | pyscf DF | difference | pyscf exact | RI error |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| def2-svp | -75.9609138700 | -75.9609138700 | +1.8e-12 | -75.9609698336 | 5.6e-05 |
+| cc-pVTZ | -76.0570953623 | -76.0570953623 | +2.6e-12 | -76.0570982357 | 2.9e-06 |
+| cc-pVQZ | -76.0647542452 | -76.0647542452 | +2.4e-12 | -76.0647584041 | 4.2e-06 |
+| cc-pV5Z | -76.0670057742 | -76.0670057742 | +2.5e-12 | -76.0670116535 | 5.9e-06 |
+
+**Agreement is 2.5e-12 at every basis, h functions included.** The last column is the
+resolution of the identity itself, which is the approximation being made and is four
+to seven orders larger than the disagreement between the two implementations of it.
+
+## The molecular gradient, where the diffuse functions decide the ratio
+
+*Superseded for the timings of the resolution of the identity, which are about ten
+times what the same calculation costs now. The shape of the argument, and every
+four-center number, still holds: "Ninety-two per cent of the gradient was not the
+integrals", at the end of this file.*
+
+The RI-JK gradient is wired into `ScfGradientDriver` and this is its first
+measurement. Caffeine, 24 atoms, def2-universal-jkfit, one rank of 14 threads on the
+M4 Max, at `cd9cb941a`. Records in
+`benchmarks/data/gradient/2026-09-16_m4max_caffeine.json`; the suite is
+`benchmarks/scripts/grad_laptop.py`.
+
+Gradient wall time alone -- the SCF before it is timed separately, because an RI-JK
+calculation has already won on the energy before the gradient starts. Best of two,
+both ways in one process per case, so the comparison is never made across runs.
+
+| functional | basis | nao | method | gradient | speedup | SCF | vs four-centre |
+| --- | --- | ---: | --- | ---: | ---: | ---: | ---: |
+| HF | def2-svp | 246 | four-centre | 8.69 | 1.00 | 12.45 | |
+| | | | RI-JK simd, in memory | 2.19 | 3.97 | 1.12 | 7.7e-05 |
+| HF | def2-svpd | 366 | four-centre | 42.13 | 1.00 | 50.71 | |
+| | | | RI-JK simd, in memory | 2.94 | **14.31** | 2.43 | 7.7e-05 |
+| B3LYP | def2-svp | 246 | four-centre | 9.54 | 1.00 | 15.04 | |
+| | | | RI-JK simd, in memory | 2.83 | 3.37 | 4.04 | 1.6e-05 |
+| B3LYP | def2-svpd | 366 | four-centre | 43.79 | 1.00 | 56.72 | |
+| | | | RI-JK simd, in memory | 4.24 | **10.33** | 8.80 | 1.7e-05 |
+
+The repeats were tight throughout -- 42.13 against 42.18, 2.99 against 2.94 -- so none
+of this is a single bad sample.
+
+**The ratio is not a property of the driver, it is a property of the basis.** Adding
+the diffuse shell costs the four-center gradient 8.69 to 42.13 seconds, a factor of
+4.8 for a factor of 1.49 in the basis, which is the fourth power it is built on. It
+costs the resolution of the identity 2.19 to 2.94, a factor of 1.3. Quoting a speedup
+without the basis beside it says nothing: the same driver is 4.0 and 14.3 in the same
+table.
+
+### The functional dilutes the ratio, and does not slow anything down
+
+B3LYP looks worse than Hartree-Fock -- 3.4 and 10.3 against 4.0 and 14.3 -- and the
+reason is in the two columns rather than in either of them. Subtracting the
+Hartree-Fock row from the B3LYP row of each method gives what the quadrature costs:
+
+| basis | four-centre | RI-JK simd |
+| --- | ---: | ---: |
+| def2-svp | 0.85 | 0.64 |
+| def2-svpd | 1.66 | 1.30 |
+
+It is **very nearly the same work in both rows**, and it does not shrink when the
+two-electron part does. At def2-svp it is added to a numerator of 8.69 and a
+denominator of 2.19, and a near-constant added to both sides of a ratio pulls it
+toward one. The RI-JK gradient is not slower at B3LYP than at Hartree-Fock for
+anything it is responsible for -- it is carrying a fixed passenger that the
+four-centre path barely notices and it cannot hide.
+
+### What the gradient agrees with, and what it does not
+
+Against the four-center gradient the difference is 7.7e-05 at Hartree-Fock and 1.6e-05
+at B3LYP -- the fitting error, consistent with the 5.7e-04 the energies differ by, and
+smaller at B3LYP because only a fifth of the exchange is fitted at all.
+
+The sharper test is finite differences of the RI-JK energy itself, which has no
+fitting error in it because both sides make the same approximation. def2-svp, central
+differences at 1e-4 bohr, largest component:
+
+| molecule | Hartree-Fock | B3LYP |
+| --- | ---: | ---: |
+| water | 1.2e-09 | 1.4e-06 |
+| CH3NH.OH, 6 atoms, no symmetry | 6.8e-09 | 2.2e-06 |
+
+**The B3LYP row is not the gradient.** Run the same finite differences against the
+four-center path and it gives 1.389e-06 on water -- the same number to four figures,
+where four-center Hartree-Fock gives 1.2e-09 against the resolution of the identity's
+1.2e-09. The residual is the quadrature grid and the step, and it belongs to both
+paths equally.
+
+The same thing shows in translational invariance, which is a check that costs nothing
+and travels with every record. At Hartree-Fock the gradient sums over the atoms to
+1e-12. At B3LYP it sums to 1.7e-05 -- and the four-center path sums to 1.73939e-05
+where the resolution of the identity sums to 1.73893e-05. An atom-centered grid is not
+translationally invariant, and a check that looks like a failure of the driver is a
+property of the quadrature that both drivers inherit.
+
+### One rank, and why that is not a temporary omission
+
+These numbers are OpenMP on one rank, and the gradient refuses to run on more. The
+Fock build tolerates B vectors spread over the ranks because the factor of the metric
+is folded into them, so the Coulomb matrix is a sum over the auxiliary basis which
+factorizes and the ranks simply add their shares. The gradient contracts the
+derivatives of the integrals themselves, so it needs the fitting coefficients in the
+basis of those integrals, and the transposed factor which carries them there reaches
+across the whole auxiliary basis. A rank holding a share of it cannot form them. The
+right-hand side has to be complete before the solve -- the same coupling the direct
+Fock build already handles with an explicit reduction before `solve_fitting`, and the
+same thing a distributed gradient will have to do.
+
+## Geometry optimization, where the step count is half the ratio
+
+The gradient is wired into `ScfGradientDriver`, so a geometry optimization can be
+carried with the resolution of the identity end to end. Caffeine from the geometry
+in `benchmarks/geometries`, def2-universal-jkfit, one rank of 14 threads on the M4
+Max, run to convergence with no cap on the iterations, at `ac2b22a5f`. The working
+tree was dirty for the run: what was uncommitted were the benchmark scripts
+themselves, which are now in `benchmarks/scripts/opt_laptop.py`, with the records in
+`benchmarks/data/optimization/2026-09-16_m4max_caffeine.json`. Two hours and five
+minutes of machine for the eight optimizations.
+
+| functional | basis | nao | method | total | speedup | steps | s/step | energy |
+| --- | --- | ---: | --- | ---: | ---: | ---: | ---: | ---: |
+| HF | def2-svp | 246 | four-centre | 619.8 | 1.00 | 33 | 18.78 | -675.83732476 |
+| | | | RI-JK simd, in memory | 90.2 | 6.87 | 27 | 3.34 | -675.83673457 |
+| HF | def2-svpd | 366 | four-centre | 2961.8 | 1.00 | 35 | 84.62 | -675.86719050 |
+| | | | RI-JK simd, in memory | 174.2 | **17.01** | 35 | 4.98 | -675.86660602 |
+| B3LYP | def2-svp | 246 | four-centre | 628.5 | 1.00 | 29 | 21.67 | -679.88509552 |
+| | | | RI-JK simd, in memory | 185.6 | 3.39 | 29 | 6.40 | -679.88514659 |
+| B3LYP | def2-svpd | 366 | four-centre | 2471.5 | 1.00 | 27 | 91.53 | -679.92921001 |
+| | | | RI-JK simd, in memory | 322.4 | **7.67** | 27 | 11.94 | -679.92926228 |
+
+### Why the record keeps the steps
+
+An optimization is not one measurement, it is a step count times a cost per step,
+and **only one of those two is the driver's doing**. Three of the four pairs
+converged in the same number of steps as each other, and for those the total
+speedup and the per-step speedup are the same number to three figures: 17.01 and
+16.99, 3.39 and 3.39, 7.67 and 7.67. Those are clean.
+
+The fourth is not. Hartree-Fock in def2-svp took the four-centre path 33 steps and
+the resolution of the identity 27, so its 6.87 is a per-step speedup of **5.62**
+multiplied by the optimizer happening to take a shorter route over a slightly
+different surface. That is luck and not merit, and it could as easily have gone the
+other way. A table which carried only the total would have reported the largest
+Hartree-Fock def2-svp speedup in this file and been wrong about where it came from.
+
+The shape of the rest is what the single-point gradients already said: the diffuse
+shell decides the ratio, 6.9 to 17.0 at Hartree-Fock, and B3LYP is lower only
+because the quadrature is a fixed cost in both columns.
+
+### An outlier which was a methyl group
+
+That same Hartree-Fock def2-svp row put an atom 4.57e-02 bohr away from where the
+four-centre optimization put it -- sixty-six times the displacement of any other
+row, and suspicious in exactly the row whose step count already disagreed.
+
+It is not a structural disagreement. The four atoms which moved are H17, H15, H16
+and H21, which is one methyl group, and the heavy atom framework agrees to 7.46e-05
+bohr, indistinguishable from every other row:
+
+| | four largest movers | heavy-atom bonds agree to |
+| --- | --- | ---: |
+| HF, def2-svp | H17, H15, H16, H21 | 7.46e-05 |
+| HF, def2-svpd | H17, H16, H22, H14 | 7.97e-05 |
+| B3LYP, def2-svp | H18, H20, H19, O11 | 3.86e-05 |
+| B3LYP, def2-svpd | H15, H17, C9, H16 | 3.40e-05 |
+
+Caffeine has three methyl groups and a methyl rotation costs almost nothing, so the
+two surfaces put the rotor at slightly different angles for no energy worth
+measuring -- and the optimizer spent its six extra steps chasing that flat
+direction. **A displacement is not a disagreement until it is a heavy atom.** The
+check is one line and it turns the alarming number in the table into the
+uninteresting one it actually is.
+
+### What the two surfaces differ by
+
+| | four-centre | RI-JK simd | difference |
+| --- | ---: | ---: | ---: |
+| HF, def2-svp | -675.83732476 | -675.83673457 | +5.90e-04 |
+| HF, def2-svpd | -675.86719050 | -675.86660602 | +5.84e-04 |
+| B3LYP, def2-svp | -679.88509552 | -679.88514659 | -5.11e-05 |
+| B3LYP, def2-svpd | -679.92921001 | -679.92926228 | -5.23e-05 |
+
+The fitting error, at each method's own minimum rather than at a common geometry.
+It is an order of magnitude smaller at B3LYP, where only a fifth of the exchange is
+fitted at all, and it changes sign there: the fitted B3LYP minima lie **below** the
+four-centre ones, which the Hartree-Fock rows do not.
+
+## Four bases of the gradient, and the exponent each way is really running at
+
+*Superseded. The exponents fitted here for the resolution of the identity are
+distorted by a constant which was later removed, and its timings are nine-tenths
+overhead. The four-center numbers stand: "Ninety-two per cent of the gradient was
+not the integrals", at the end of this file.*
+
+The gradient section above measured def2-svp and def2-svpd and concluded that the
+basis decides the ratio. This extends the same table to the triple zeta pair, which
+is enough points to fit an exponent instead of reasoning from two. Caffeine,
+def2-universal-jkfit, one rank of 14 threads on the M4 Max, best of two, both ways
+in one process per case, at `15b33b62e`. The records are in
+`benchmarks/data/gradient/2026-09-16_m4max_caffeine.json` and the table and its
+scaling page are rendered from them by `benchmarks/scripts/render_runs.py`.
+
+The def2-svp and def2-svpd rows were re-measured rather than carried over, and they
+reproduce the earlier run to within one or two per cent, so the two halves of this
+table are comparable.
+
+| functional | basis | nao | four-centre | RI-JK simd | speedup | vs four-centre |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| HF | def2-svp | 246 | 8.61 | 2.22 | 3.87 | 7.7e-05 |
+| HF | def2-svpd | 366 | 41.68 | 2.91 | 14.33 | 7.7e-05 |
+| HF | def2-tzvp | 494 | 136.34 | 4.13 | 33.00 | 7.1e-05 |
+| HF | def2-tzvpd | 614 | 352.64 | 5.46 | **64.61** | 7.3e-05 |
+| B3LYP | def2-svp | 246 | 9.26 | 2.78 | 3.33 | 1.6e-05 |
+| B3LYP | def2-svpd | 366 | 42.80 | 4.09 | 10.47 | 1.7e-05 |
+| B3LYP | def2-tzvp | 494 | 138.23 | 5.75 | 24.06 | 6.2e-05 |
+| B3LYP | def2-tzvpd | 614 | 356.52 | 7.92 | **45.04** | 6.3e-05 |
+
+Cost fitted as proportional to nao to the p, over all four bases:
+
+| functional | method | p |
+| --- | --- | ---: |
+| HF | four-centre | 4.04 |
+| HF | RI-JK simd | **0.98** |
+| B3LYP | four-centre | 3.97 |
+| B3LYP | RI-JK simd | **1.13** |
+
+**The four-center gradient is at its textbook exponent and the resolution of the
+identity is linear.** Four point oh four and three point nine seven are what a sum
+over four indices costs, with no screening benefit visible across this range. Nought
+point nine eight is the other side of it: over a factor of two and a half in the
+basis the gradient of the resolution of the identity went from 2.22 seconds to 5.46.
+The B3LYP exponent is higher at 1.13 because the quadrature is in that column and
+does grow, which is the same effect that lowers its speedups.
+
+### The exponent is in one dimension only, and the table says so
+
+One fitting set serves every row: naux is 1242 in all eight of them while nao runs
+246 to 614. **So the exponent measured for the resolution of the identity is in the
+orbital dimension alone, and it is not the scaling of the method with the problem.**
+The ratio between the columns widens from 3.9 to 64.6 partly because the denominator
+is being held still, and a reader who takes 64.6 as a trend and extrapolates it will
+be wrong. The naux column is in the rendered table for exactly this reason: the
+constant is visible beside the thing that is growing.
+
+What the numbers do support is narrower and still worth having. For a fixed fitting
+set, which is how these calculations are actually run, enlarging the orbital basis
+costs the four-center gradient a fourth power and costs this driver a first power.
+
+### And they do not survive the molecule growing either
+
+*Superseded. The collapse to 1.23 recorded here was one unthreaded loop and not a
+property of the method; it is 11.51 now and the two grow alike: "Ninety-two per
+cent of the gradient was not the integrals", at the end of this file.*
+
+The exponents above are scaling **with the basis at a fixed geometry**. They are not
+scaling with the size of the molecule, and the run which tested that broke both of
+them at once. Tagrisso, 70 atoms against caffeine's 24, in the same def2-svp and with
+the same fitting set, so nao goes 246 to 683 and naux 1242 to 3387:
+
+| | caffeine | tagrisso | observed | the exponent predicts |
+| --- | ---: | ---: | ---: | ---: |
+| four-centre | 8.61 | 114.17 | 13.3x | 61.9x |
+| RI-JK simd | 2.22 | 92.92 | **41.9x** | 2.7x |
+
+**Both predictions are wrong, in opposite directions, for different reasons.** The
+four-center gradient came in nearly five times cheaper than a fourth power says,
+because seventy atoms spread out is a geometry where screening finally has something
+to discard and a compact molecule with a bigger basis is not. The resolution of the
+identity came in fifteen times dearer than a first power says, because that exponent
+was fitted with naux held still and here it nearly tripled.
+
+So the speedup goes with it. The gradient is 3.87 on caffeine in def2-svp and **1.23
+on tagrisso in the same basis**, 3.33 and 1.22 at B3LYP. The advantage measured in
+the table above belongs to a compact molecule with a large basis, which is the shape
+this file has been measuring all along, and it does not carry to a large molecule
+with a small one.
+
+Two things do carry. The gradient is still right -- it agrees with the four-center
+one to 6.0e-05 at Hartree-Fock and 1.7e-05 at B3LYP, the same fitting error as
+caffeine, at 3387 auxiliary functions and 3.83 GB of B vectors. And the energy still
+wins outright, 151 seconds against 30, so a single point and its gradient together
+are 2.16 times quicker at Hartree-Fock and 1.88 at B3LYP. **It is the gradient
+specifically, and at this shape of problem specifically, that has lost its lead** --
+which is a statement about where to look next, not a retraction of the table above.
+
+### One column that does not behave, and is not yet explained
+
+The last column is the largest disagreement with the four-center gradient. At
+Hartree-Fock it is flat across the whole range -- 7.7, 7.7, 7.1, 7.3, all e-05 --
+which is what a fitting error should do. At B3LYP it is not:
+
+| | def2-svp | def2-svpd | def2-tzvp | def2-tzvpd |
+| --- | ---: | ---: | ---: | ---: |
+| B3LYP, observed | 1.6e-05 | 1.7e-05 | 6.2e-05 | 6.3e-05 |
+| a fifth of the Hartree-Fock row | 1.5e-05 | 1.5e-05 | 1.4e-05 | 1.5e-05 |
+
+At double zeta B3LYP sits where a functional which fits a fifth of its exchange
+should sit. At triple zeta it is four times that, and it steps rather than drifts:
+flat, then a jump at the double to triple zeta boundary, then flat again. A fitting
+error which is a fifth of another fitting error should not do that.
+
+The likely candidate is the quadrature rather than the fit -- the two paths converge
+to slightly different densities, so their exchange-correlation gradients are not
+quite the same number, and that difference is not scaled by the fraction of exact
+exchange -- but **this has not been checked and is written here as a question, not a
+finding.** It is 6e-05 on a gradient whose largest component is order 0.1, so it
+changes nothing about the numbers above; it is recorded because a column which steps
+where nothing else does is worth returning to.
+
+## Ninety-two per cent of the gradient was not the integrals
+
+Everything above about the gradient measured a driver in which the derivative
+integrals were under two per cent of the time. This section is the profile that
+found that out, what was changed, and the numbers the two sections above have to
+be read against now.
+
+### The profile
+
+Tagrisso, def2-svp, 70 atoms, 683 orbital and 3387 auxiliary functions. The phases
+timed through the bindings the driver already exposes, replicating its own loop
+rather than instrumenting it:
+
+| phase | time | share |
+| --- | ---: | ---: |
+| forming the fitted densities | 84.4 s | **92%** |
+| contraction, by remainder | 5.1 s | 5.6% |
+| the three-center derivative integrals | 1.75 s | 1.9% |
+| the per-atom sparsity patterns | 0.02 s | -- |
+| the two-center (P\|Q) term | 0.01 s | -- |
+
+**The SIMD derivative integrals, which is what the kernels were written for, were
+one part in fifty of the gradient.** Everything this file has measured about them
+was measuring a thing that was not the cost.
+
+Inside that phase were two steps, each of them the square of the auxiliary basis
+times the square of the orbitals, and neither of them threaded. The processor trace
+says it plainly on fourteen cores: two hundred and seventy-seven per cent falling
+to a hundred and ninety, and then a tail at ninety-nine. One core, for the last
+third of it.
+
+### What was changed
+
+Four commits, no kernel touched:
+
+| | fitted densities |
+| --- | ---: |
+| before | 84.4 s |
+| expanding the metric once per phase and not once per element | 69.3 s |
+| applying the transposed factor in one multiply over all elements | 27.6 s |
+| taking the Gram product of the fitted densities as one multiply | **1.2 s** |
+
+The first was a dense expansion of the metric, ninety-two megabytes, formed inside
+a loop that ran once per element of a matrix. The second and third were a matrix
+times a matrix written as a sum: one call to the library in place of eight thousand
+calls of ours, and a Gram product in place of a quadruple loop. The elements are
+taken in panels so the arrays are bounded by the budget and not by the problem,
+which costs nothing -- one panel and five hundred and fifty-seven panels differ by
+under two per cent and agree to 1e-12.
+
+Every gradient is unchanged. They reproduce the measurements above to 1.2e-12 and
+1.7e-12, the agreement with the four-center gradient does not move in any row, and
+water against finite differences is back to 1.157e-09, the figure it had before any
+of this.
+
+### The corrected tables
+
+Caffeine, gradient wall time, best of two, every four-center row re-measured in the
+same session as a control and every one of them reproducing to between 0.05 and 2.7
+per cent:
+
+| functional | basis | four-centre | RI-JK simd | speedup | was |
+| --- | --- | ---: | ---: | ---: | ---: |
+| HF | def2-svp | 8.84 | 0.74 | 11.95 | 3.87 |
+| HF | def2-svpd | 42.11 | 1.36 | 30.96 | 14.33 |
+| HF | def2-tzvp | 136.48 | 2.52 | 54.16 | 33.00 |
+| HF | def2-tzvpd | 352.46 | 3.84 | **91.79** | 64.61 |
+| B3LYP | def2-svp | 9.17 | 1.25 | 7.34 | 3.33 |
+| B3LYP | def2-svpd | 42.79 | 2.53 | 16.91 | 10.47 |
+| B3LYP | def2-tzvp | 138.15 | 4.01 | 34.45 | 24.06 |
+| B3LYP | def2-tzvpd | 353.66 | 6.64 | **53.26** | 45.04 |
+
+And tagrisso, which is the row that mattered:
+
+| functional | four-centre | RI-JK simd | speedup | was |
+| --- | ---: | ---: | ---: | ---: |
+| HF | 114.50 | 9.95 | **11.51** | 1.23 |
+| B3LYP | 117.10 | 13.01 | **9.00** | 1.22 |
+
+### Two conclusions above are now wrong, and this is how
+
+**The exponent.** The section above records the gradient of the resolution of the
+identity scaling as nao to the 0.98, and calls it linear. It is not:
+
+| | recorded | now |
+| --- | ---: | ---: |
+| HF, four-centre | 4.04 | 4.01 |
+| HF, RI-JK simd | **0.98** | **1.82** |
+| B3LYP, four-centre | 3.97 | 3.97 |
+| B3LYP, RI-JK simd | **1.13** | **1.78** |
+
+The four-center exponents do not move, as they cannot. The other two nearly doubled,
+and the reason is instructive rather than embarrassing: across the four bases of
+caffeine, naux is 1242 and the occupied orbitals are 51 in every one of them, and
+only nao grows. The term which cost the square of each was therefore **a constant
+of about one and a half seconds added to every row**, and a constant added to a
+power law flattens it. Take 1.5 off the recorded series and it reads 0.72, 1.41,
+2.63, 3.96, which is the new series. **A fitted exponent is only the exponent of
+the thing that varies; a large constant in the same column reads as a smaller
+power.**
+
+**The molecule.** The section above concludes that the advantage "does not carry to
+a large molecule with a small one", on the evidence that caffeine's 3.87 became
+tagrisso's 1.23. That conclusion was measuring the same constant, which is not
+constant between molecules: naux and the orbitals both grow with the molecule, so
+the term grew fifty-fold where everything else grew thirteen-fold. With it gone the
+two methods grow at the same rate from caffeine to tagrisso in def2-svp:
+
+| | caffeine | tagrisso | factor |
+| --- | ---: | ---: | ---: |
+| four-centre | 8.84 | 114.50 | 12.95x |
+| RI-JK simd | 0.74 | 9.95 | 13.45x |
+
+Thirteen and thirteen, where it was thirteen and forty-two. The divergence was the
+Gram product and nothing about the method. End to end a single point and its
+gradient on tagrisso is now 6.69 times quicker, where that section recorded 2.16.
+
+**What both mistakes have in common** is that the measurement was sound and the
+attribution was not. Every number in those sections is reproducible and none of
+them has been withdrawn. What was wrong was reading a curve without asking which
+of its terms was moving -- which a profile answers in twenty minutes and four
+tables of timings do not answer at all.
+
+## The excited states, where the ratio reaches a hundred
+
+The resolution of the identity is wired into the Tamm-Dancoff approximation, by way
+of a driver which is not the one the self consistent field uses. The two are asked
+for different things: the field has one density per build, symmetric and idempotent,
+and forms its exchange from the occupied orbitals alone, where a response
+calculation has a batch of densities per build, none of them symmetric and each of
+them living between the occupied orbitals and the virtual ones.
+
+What makes it cheap is that such a density arrives already factorised. A trial
+vector gives C(occupied) Z C(virtual) transposed, and with B(q) symmetric the
+exchange of a density left times right transposed is
+
+    K = sum over q of (B(q) left) (B(q) right) transposed
+
+so both halves are the transformation the field already had, with different
+coefficients. The virtual space never appears -- C(virtual) Z transposed is the
+basis by the occupied orbitals -- and the left factor is the ground state occupied
+orbitals for every trial vector of the batch, transformed once for all of them.
+
+Caffeine, five states, def2-universal-jkfit, one rank of 14 threads on the M4 Max,
+at `dfc9f00c6`. Records in `benchmarks/data/tda/2026-09-16_m4max_caffeine.json`.
+Two hours and twenty minutes for the sixteen rows.
+
+| functional | basis | nao | four-centre | RI-JK simd | speedup | iter | s/iter |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | --- |
+| HF | def2-svp | 246 | 58.50 | 3.37 | 17.34 | 15 | 3.90 to 0.22 |
+| HF | def2-svpd | 366 | 289.93 | 7.81 | 37.13 | 17 | 17.05 to 0.46 |
+| HF | def2-tzvp | 494 | 914.97 | 13.16 | 69.52 | 16 | 57.19 to 0.82 |
+| HF | def2-tzvpd | 614 | 2554.92 | 23.22 | **110.03** | 18 | 141.94 to 1.29 |
+| B3LYP | def2-svp | 246 | 51.64 | 12.24 | 4.22 | 10 | 5.16 to 1.22 |
+| B3LYP | def2-svpd | 366 | 211.23 | 29.41 | 7.18 | 10 | 21.12 to 2.94 |
+| B3LYP | def2-tzvp | 494 | 646.65 | 40.26 | 16.06 | 10 | 64.66 to 4.03 |
+| B3LYP | def2-tzvpd | 614 | 1509.78 | 64.36 | **23.46** | 9 | 167.75 to 7.15 |
+
+**Every pair converged in the same number of iterations as its partner**, which is
+what makes each ratio a comparison of speed and not of luck. The iteration column is
+in the table for that reason and is worth reading before the speedup column: it is
+the thing which, when it differs, quietly turns a ratio into something else.
+
+### The exponents, and a check across two calculations
+
+Cost per iteration fitted against the orbital basis:
+
+| | four-centre | RI-JK simd |
+| --- | ---: | ---: |
+| HF | 3.93 | **1.91** |
+| B3LYP | 3.78 | **1.84** |
+
+The gradient, measured the same day and through entirely separate code, gives 4.01
+and 1.82 at Hartree-Fock. **Two calculations which share nothing but the driver
+underneath agree on what that driver costs**, which is worth more than either number
+alone. The iteration counts vary from fifteen to eighteen across the Hartree-Fock
+series, so the per-iteration unit carries some noise from the batch of trial vectors
+changing size; fitting the totals instead gives 4.08 and 2.06, the same picture.
+
+### The fitting error falls as the basis grows
+
+| | def2-svp | def2-svpd | def2-tzvp | def2-tzvpd |
+| --- | ---: | ---: | ---: | ---: |
+| HF | 2.2e-05 | 1.7e-05 | 1.3e-05 | 7.4e-06 |
+| B3LYP | 6.0e-06 | 5.9e-06 | 5.6e-06 | 4.1e-06 |
+
+The largest disagreement in an excitation energy, in hartree, which is four
+hundredths of a millielectronvolt at its worst. It **improves** with the orbital
+basis, and for the reason the gradient section gives in reverse: one fitting set
+serves every row, and it is a better fit to a larger orbital basis than to a small
+one.
+
+### Why B3LYP is lower, which these numbers do not establish
+
+B3LYP reaches 23 where Hartree-Fock reaches 110, and the natural reading is the
+exchange-correlation quadrature: it is the same work in both columns, it does not
+shrink when the two-electron part does, and a constant added to both sides of a
+ratio pulls it toward one -- which is what the gradient section found for the same
+functional.
+
+**The reading is probably right and these numbers do not show it.** The obvious way
+to extract the quadrature is to subtract the Hartree-Fock cost per iteration from
+the B3LYP one at the same basis, and that gives two answers which disagree:
+
+| | from the RI-JK column | from the four-centre column |
+| --- | ---: | ---: |
+| def2-svp | 1.00 s | 1.26 s |
+| def2-svpd | 2.48 s | 4.07 s |
+| def2-tzvp | 3.20 s | 7.48 s |
+| def2-tzvpd | **5.86 s** | **25.81 s** |
+
+A factor of four and a half apart at the largest basis. The subtraction is not
+valid: Hartree-Fock converges in eighteen iterations there and B3LYP in nine, so the
+two runs do not carry the same number of trial vectors per iteration and a second
+per iteration is not the same unit in the two of them. **A quantity which can be
+estimated two ways and gives two answers has been estimated zero ways.** What the
+quadrature actually costs wants a profile, which is how the gradient's ninety-two
+per cent was found and not something a table of totals can answer.
+
+### The same calculation on a molecule three times the size
+
+Tagrisso, 70 atoms against caffeine's 24, in the same def2-svp and with the same
+fitting set, so nao goes 246 to 683, the auxiliary basis 1242 to 3387 and the
+occupied orbitals 51 to 133. Five states, at `633e3a8ef`, records in
+`benchmarks/data/tda/2026-09-16_m4max_tagrisso.json`.
+
+| functional | four-centre | RI-JK simd | speedup | iter | s/iter | max dE |
+| --- | ---: | ---: | ---: | ---: | --- | ---: |
+| HF | 866.14 | 138.38 | **6.26** | 19 | 45.59 to 7.28 | 7.4e-06 |
+| B3LYP | 693.42 | 167.62 | **4.14** | 13 | 53.34 to 12.89 | 5.0e-06 |
+
+**It is right at this size**, which was the open question and not the speedup: the
+response driver had never been asked for seventy atoms or three thousand auxiliary
+functions before this run. The excitation energies agree with the four-center ones
+to 7.4e-06 and 5.0e-06 hartree, which is **tighter** than the same molecule's
+caffeine rows, for the reason the caffeine section gives -- one fitting set is a
+better fit to a larger orbital basis. Both pairs converged in the same number of
+iterations as their partners.
+
+### Why the ratio falls, and why that is not the gradient's story
+
+Hartree-Fock goes from 17.36 on caffeine to 6.26 here. The gradient section above
+records a collapse of exactly this shape, from 3.87 to 1.23, and it turned out to be
+an unthreaded loop which should not have been there. **This one is not that.** The
+exchange of a factorised density is the auxiliary basis times the square of the
+orbital basis times the occupied orbitals, and all three of those grow with the
+molecule:
+
+| | caffeine | tagrisso | factor |
+| --- | ---: | ---: | ---: |
+| naux times nao squared times nocc | 3.83e+09 | 2.10e+11 | **54.8x** |
+| observed, per iteration | 0.22 s | 7.28 s | 32.4x |
+| four-centre, per iteration | 3.90 s | 45.59 s | 11.7x |
+
+The resolution of the identity grew by **less** than its own cost model says, so the
+batching of the trial vectors is earning something. The four-center path grew by far
+less than a fourth power, because seventy atoms spread out is where screening
+finally has distant pairs to discard. Two methods with honest costs, moving apart.
+The lesson of the gradient was to ask which term is growing before believing a
+curve; asking it here gives an answer that exonerates the implementation instead of
+indicting it.
+
+End to end, a ground state and its five excited states is 6.05 times quicker at
+Hartree-Fock and 3.94 at B3LYP.
+
+### The two functionals converge, which is worth noticing and not yet explaining
+
+| | caffeine | tagrisso |
+| --- | ---: | ---: |
+| HF | 17.36 | 6.26 |
+| B3LYP | 4.22 | 4.14 |
+
+Hartree-Fock falls by nearly three and B3LYP barely moves, so what was a fourfold
+gap between the functionals on caffeine is under fifty per cent here. A fixed
+quadrature cost mattering less as the two-electron work grows would produce exactly
+this, and that is the natural reading.
+
+**It is a reading and not a measurement**, for the same reason the caffeine section
+sets out: nineteen iterations against thirteen means the two runs do not carry the
+same trial vectors per iteration, so a second per iteration is not the same unit in
+the two of them and the functionals cannot be subtracted. So it was profiled, and
+the next section is the answer.
+
+### What the iteration is actually made of
+
+The solver's own profiler, on the two runs above. No subtraction of anything from
+anything:
+
+| | Hartree-Fock, 19 iter | B3LYP, 13 iter |
+| --- | ---: | ---: |
+| the two-electron build | 128.40 s, **93.7%** | 91.64 s, **54.6%** |
+| the quadrature | -- | 66.84 s, **39.8%** |
+| forming the B vectors, once | 7.77 s, 5.7% | 7.78 s, 4.6% |
+| everything else | under 1 s | under 2 s |
+
+**The quadrature is two fifths of a hybrid's iteration.** The guess this file was
+about to record, from the invalid subtraction, was four fifths. It was wrong by
+half, and wrong in the direction that would have sent the next piece of work at the
+wrong target.
+
+What makes the split believable is a number which appears twice: the two-electron
+build costs 6.76 seconds an iteration at Hartree-Fock and 7.05 at B3LYP. **Those
+should be equal** -- the exchange is formed whole and then scaled, so a fifth of it
+costs exactly what all of it costs -- and two runs which share no timing apparatus
+agree on it to four per cent. A quantity measured twice by accident is worth more
+than one measured once on purpose.
+
+### Inside the two-electron build
+
+Timing the driver's two entry points against a batch of trial vectors of the size
+the solver actually forms:
+
+| batch | the whole build | the exchange | the Coulomb and the assembly | per density |
+| ---: | ---: | ---: | ---: | ---: |
+| 1 | 2.14 s | 1.99 s | 0.15 s | 2.14 s |
+| 5 | 6.19 s | 6.01 s | 0.18 s | 1.24 s |
+| 10 | 11.26 s | 10.85 s | 0.41 s | 1.13 s |
+| 20 | 21.98 s | 21.15 s | 0.84 s | 1.10 s |
+
+**The exchange is ninety-three to ninety-six per cent of the build**, and the build
+is ninety-four per cent of a Hartree-Fock calculation, so nine parts in ten of the
+whole thing is one routine. The Coulomb, which the resolution of the identity is
+usually introduced for, is under a tenth of it.
+
+The last column is the batching working. The left factor is the ground state
+occupied orbitals and is transformed once for the whole batch, so its cost is fixed
+per batch and divided among the densities: half the time at one density, a few per
+cent at twenty, and flat from ten onward. That is the one thing the response driver
+does which the field's driver has no reason to.
+
+### Inside the exchange, as far as it can be seen from outside
+
+The driver's loop replicated through the bindings it calls, so that the two halves
+are timed where they stand and nothing in the C++ is instrumented:
+
+| batch | the exchange | the transforms | the rest, by remainder |
+| ---: | ---: | ---: | ---: |
+| 5 | 6.00 s | 3.07 s | 2.93 s |
+| 20 | 21.32 s | 10.20 s | 11.12 s |
+
+The totals reproduce the table above to within one per cent, so the replication is
+the same work. **The transform side is nevertheless too large**, and by a knowable
+amount: compute_w_vectors returns its matrices by value and pybind copies each of
+them into a python object, which at a batch of twenty is some four gigabytes across
+the boundary for every batch of the auxiliary basis and about fifty over the run --
+seconds of memcpy which the driver calling itself never pays.
+
+So what can be said is that **the transform is between a third and a half of the
+exchange and the accumulation is the rest, and neither of them dominates**. That is
+the useful part. There is no single routine here holding nine tenths of the time,
+which is what the gradient turned out to have and what makes a profile worth
+running: the two halves are both already products of matrices, and both are doing
+work the cost model asks for.
+
+The consequence is a negative result worth writing down. **There is no cheap win
+left in this code.** The one redundancy -- the left factor is the ground state
+occupied orbitals and is transformed again at every iteration of the Davidson,
+though it never changes -- is worth one part in one plus the batch, a few per cent
+where the batch is twenty, and would cost two and a half gigabytes to hold. What
+remains is algorithmic: a smaller fitting set, or something which screens the
+transformed vectors, neither of which is a change to this routine.
+
+Pinning the split closer wants timing inside the driver. The technique which
+answered the gradient in twenty minutes runs into the binding here, which is worth
+knowing about the technique.
+
+## Linear response, and what the second term of a density costs
+
+The Tamm-Dancoff approximation drops the de-excitation block, so its trial vector
+gives a density of one term. A full linear response vector gives two, and they are
+not each other's transpose:
+
+    D = C(occupied) (-Z) C(virtual) transposed + C(virtual) Y transposed C(occupied) transposed
+
+The second has the virtual orbitals on the left, which is the expensive side to
+transform. It need not be: the exchange of a transposed density is the transposed
+exchange of it, so the second term is taken as the transpose of one which carries
+the occupied orbitals on the left, and the virtual orbitals are never transformed.
+Both terms then share one transformation of the occupied orbitals. **And the Coulomb
+is taken once for the two of them**, because it sees only the symmetric part of a
+density and the two terms together have the same symmetric part as the single term
+whose right factor is the sum of theirs.
+
+Caffeine, five states, def2-universal-jkfit, one rank of 14 threads, at `29419eceb`.
+Records in `benchmarks/data/tda/2026-09-16_m4max_caffeine_rpa.json`.
+
+| functional | basis | nao | four-centre | RI-JK simd | speedup | iter |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| HF | def2-svp | 246 | 58.19 | 5.32 | 10.94 | 17 |
+| HF | def2-svpd | 366 | 281.97 | 11.75 | 24.00 | 19 |
+| HF | def2-tzvp | 494 | 935.20 | 20.89 | 44.76 | 19 |
+| HF | def2-tzvpd | 614 | 2666.00 | 39.17 | **68.06** | 22 |
+| B3LYP | def2-svp | 246 | 49.25 | 12.94 | 3.81 | 11 |
+| B3LYP | def2-svpd | 366 | 205.82 | 31.90 | 6.45 | 11 |
+| B3LYP | def2-tzvp | 494 | 656.47 | 46.16 | 14.22 | 12 |
+| B3LYP | def2-tzvpd | 614 | 1639.05 | 80.01 | **20.49** | 11 |
+
+Every pair converged in the same number of iterations as its partner. The excitation
+energies agree with the four-center ones to between 4.5e-06 and 2.3e-05 hartree, and
+improve with the basis as the Tamm-Dancoff ones do.
+
+### Measuring the second term without comparing two runs
+
+The obvious way to price the second term is to divide the linear response time by
+the Tamm-Dancoff one. **That comparison is not available**: the two runs converge in
+different numbers of iterations -- seventeen against fifteen in the first row alone
+-- so they do not carry the same trial vectors and their times are not of the same
+thing. This file has already recorded one quantity ruined that way.
+
+What is available is the **ratio of two ratios**. A speedup is measured inside one
+run between two methods which took the same iterations, so it is clean; and to the
+four-center path a density is a density, its cost not depending on whether it was
+made of one term or two. So the speedup falls by exactly what the second term costs
+the resolution of the identity, and nothing else:
+
+| functional | basis | Tamm-Dancoff | linear response | what the term cost |
+| --- | --- | ---: | ---: | ---: |
+| HF | def2-svp | 17.34 | 10.94 | 1.59 |
+| HF | def2-svpd | 37.13 | 24.00 | 1.55 |
+| HF | def2-tzvp | 69.52 | 44.76 | 1.55 |
+| HF | def2-tzvpd | 110.03 | 68.06 | 1.62 |
+| B3LYP | def2-svp | 4.22 | 3.81 | 1.11 |
+| B3LYP | def2-svpd | 7.18 | 6.45 | 1.11 |
+| B3LYP | def2-tzvp | 16.06 | 14.22 | 1.13 |
+| B3LYP | def2-tzvpd | 23.46 | 20.49 | 1.15 |
+
+**A second term costs about three fifths of a first one, and not a whole one.** Two
+exchanges are formed where one was, so the naive price is two; the measured price is
+1.55 to 1.62 across a factor of two and a half in the basis. The difference is the
+sharing: one Coulomb for both terms and one transformation of the occupied orbitals
+for the whole batch.
+
+At B3LYP it costs 1.11 to 1.15, which is the quadrature again. It does not care how
+many terms a density has, so where it is a large part of the iteration the second
+term is nearly free. **The same structure that caps the speedup at B3LYP also makes
+B3LYP the place where linear response is cheapest over Tamm-Dancoff.** One fact,
+cutting both ways.
+
+### The scaling does not move
+
+| | four-centre | RI-JK simd |
+| --- | ---: | ---: |
+| HF | 3.90 | 1.89 |
+| B3LYP | 3.78 | 1.88 |
+
+Against 3.93 and 1.91, and 3.78 and 1.84, for the Tamm-Dancoff approximation. Adding
+a term to the density changes the constant in front and not the power, which is what
+it should do and is worth having measured rather than assumed.
+
+## Three more solvers, which needed no code
+
+The linear response wiring was put into `_e2n_half_size_single_comm`, and that
+method is not the eigensolver's alone: the polarizability solver, the damped one
+and the C6 driver all reach the Fock build through it. Wiring it for excitation
+energies wired it for all of them. This section is the check that this is true and
+not merely plausible.
+
+Caffeine and water, def2-svp, one rank of 14 threads. Frequencies zero and 0.1, and
+for the damped solver a damping of 0.004556.
+
+| solver | molecule | functional | four-centre | RI-JK simd | speedup | largest difference |
+| --- | --- | --- | ---: | ---: | ---: | ---: |
+| polarizability | water | HF | 0.06 | 0.06 | 1.08 | 5.2e-04 |
+| polarizability | water | B3LYP | 0.11 | 0.10 | 1.07 | 2.2e-04 |
+| polarizability | caffeine | HF | 43.98 | 3.74 | **11.76** | 3.1e-03 |
+| polarizability | caffeine | B3LYP | 45.74 | 11.59 | 3.95 | 6.0e-03 |
+| damped | water | HF | 0.07 | 0.07 | 1.03 | 5.2e-04 |
+| damped | water | B3LYP | 0.11 | 0.11 | 1.03 | 2.2e-04 |
+| damped | caffeine | HF | 59.19 | 4.85 | **12.21** | 3.1e-03 |
+| damped | caffeine | B3LYP | 57.36 | 14.29 | 4.01 | 6.0e-03 |
+| C6 | water | HF | 0.14 | 0.11 | 1.19 | 5.1e-04 |
+| C6 | water | B3LYP | 0.21 | 0.19 | 1.08 | -- |
+| C6 | caffeine | HF | 94.00 | 8.52 | **11.03** | -- |
+| C6 | caffeine | B3LYP | 100.04 | 24.58 | 4.07 | -- |
+
+All eighteen components of each tensor, three directions by two frequencies, and for
+the damped solver the imaginary parts with them: -0.006699 against -0.006697 and
+-0.014854 against -0.014854 on water. The speedups sit where the excitation energies
+of the same molecule and basis put them, 10.94 and 3.81, which is what a calculation
+solving the same equations at fixed frequencies should give.
+
+**The difference is the evidence, not a worry.** Caffeine's components are about 130
+atomic units, so three thousandths is two parts in a hundred thousand -- the fitting
+error, and smaller in relative terms than water's. Had the guard quietly sent these
+solvers down the dense path the two columns would have agreed to 1e-14, and the
+agreement would have proved nothing.
+
+Water's speedup of about one is not a failure either. Twenty-four basis functions is
+far below where resolving the identity pays for itself, and the whole calculation is
+six hundredths of a second.
+
+### The C6 coefficients, which are the strictest of the four
+
+A C6 coefficient is a Gauss-Legendre quadrature over polarizabilities at imaginary
+frequencies: five points by three directions is fifteen independent response solves,
+each of them feeding a numerical integration. **An error with a sign to it would
+accumulate through that rather than cancel**, which is what makes the coefficient a
+better test than the components it is made of.
+
+| | four-centre | RI-JK simd | difference | relative |
+| --- | ---: | ---: | ---: | ---: |
+| water, HF | 16.74651323 | 16.74405803 | -2.46e-03 | 1.47e-04 |
+| water, B3LYP | 17.33060726 | 17.33133502 | +7.28e-04 | 4.20e-05 |
+| caffeine, HF | 5255.33816139 | 5255.25395011 | -8.42e-02 | **1.60e-05** |
+| caffeine, B3LYP | 5680.62292412 | 5680.85962728 | +2.37e-01 | 4.17e-05 |
+
+Caffeine at sixteen parts in a million is the closest agreement of any property
+measured today, and closer than the response components the quadrature is built
+from. The differences also change sign between the rows -- minus, plus, minus, plus
+-- which is what an error without a bias looks like and is the reason the quadrature
+does not make things worse.
+
+### A guard which does nothing, deliberately
+
+The factors are formed only for real trial vectors. **That test passes every time it
+is reached**: every solver which gets here works in real arithmetic, the complex
+vectors of the damped response being carried as real blocks, and the complex path is
+left for future development. So the test is dead code today.
+
+It is kept, and the comment beside it now says why rather than implying complex
+vectors are a live case. A driver which takes doubles should not be handed complex
+data by a caller which has quietly changed underneath it, and the cost of the test
+is one call per batch of trial vectors.
+
+## Higher order response, where the density changes shape with the order
+
+A response density is not one thing. Which blocks of it are nonzero alternates with
+the order of the perturbation, and the pattern decides what the resolution of the
+identity can do with it. Written out in the molecular orbitals, and checked by
+building each one and looking rather than by trusting the algebra:
+
+| density | nonzero blocks | rank |
+| --- | --- | ---: |
+| first order, a trial vector | ov, vo | twice the occupied |
+| second order, a commutator of two first-order things | **oo, vv** | occupied, twice the occupied |
+| third order | ov, vo | twice the occupied |
+
+The first and the third have the occupied orbitals on one side of each term, which is
+the shape the linear response driver already took. **The second does not**: it is
+block diagonal, and its virtual block is carried by the virtual orbitals, of which
+there are four times as many.
+
+### The measurement which made the plan smaller
+
+The virtual block factorises two ways, and which is cheaper is not obvious. Its
+rank is twice the occupied orbitals, so a factorisation of that rank with both
+factors different for every density has the fewest operations; taking the virtual
+orbitals themselves as a shared left factor has rank nvir, four times more. Counting
+operations says the first should win about two to one.
+
+Measured on caffeine in def2-svp, with densities of the right shape and rank:
+
+| densities | four-centre build | the occupied block | the virtual block, per density | the virtual block, shared |
+| ---: | ---: | ---: | ---: | ---: |
+| 4 | 2.73 s | 0.13 s | 0.43 s | **0.34 s** |
+| 10 | 6.84 s | 0.25 s | 1.08 s | **0.88 s** |
+| 20 | 13.66 s | 0.42 s | 2.17 s | **1.70 s** |
+
+**The count of operations had it backwards.** Sharing wins at every size, by about a
+quarter, because a shared factor is one wide product of matrices where per-density
+factors are many narrow ones, and the profile of the exchange had already said the
+transformation is half of it. The same lesson as the gradient, in a different place:
+the arithmetic is not the cost.
+
+That made the plan smaller than it was going to be. With the virtual orbitals as a
+shared factor the block diagonal density is **two calls of the interface which
+already existed, added** -- the Fock matrix being linear in the density -- and no new
+kernel, no new interface, and no per-density factors were needed at all.
+
+### What it bought
+
+Caffeine, def2-svp, one rank of 14 threads. Every number here is a whole calculation
+against the same calculation built the four-center way.
+
+| | four-centre | RI-JK simd | speedup | largest relative difference |
+| --- | ---: | ---: | ---: | ---: |
+| quadratic response, first hyperpolarizability | 27.81 | 4.06 | **6.84** | 2.6e-04 |
+| second harmonic generation, reduced | 99.26 | 10.07 | **9.86** | 9.5e-04 |
+| second harmonic generation, full | 103.33 | 10.83 | **9.54** | 9.5e-04 |
+| two-photon absorption, reduced | 164.61 | 16.32 | **10.09** | 1.5e-03 |
+
+Three drivers, one form. The second harmonic driver sends six real columns one way
+and twelve real and imaginary ones the other, and the reduced two-photon driver sends
+six real columns in its first pass and six real and imaginary in its second, so the
+factors are built from the same branch which chooses the columns and never from a
+rule of their own.
+
+The disagreements are larger than the linear response ones, which are two parts in a
+hundred thousand. That is the fitting error compounding: a hyperpolarizability is
+built from products of first-order vectors, and a two-photon amplitude from products
+of those, so each order carries the error of the one below it and adds its own.
+
+### A setting which is not passed down is a setting which does nothing
+
+The first quadratic response measurement was **1.03**, against six on the two-electron
+build measured directly. The Fock build was not the problem. A response driver of
+this kind drives linear solvers of its own, and the settings it hands them are a list
+written out by name -- which had `ri_coulomb` in it and not `ri_jk`. So the linear
+solves, which are most of the calculation, ran the four-center way in both columns
+and the ratio measured almost nothing.
+
+Adding three names to the list turned 1.03 into 6.84.
+
+**The same list appears in nine other drivers**, and in each of them a user setting
+ri_jk today would get a calculation which honours it in some places and not others,
+with no warning of any kind and a ratio near one to show for it. Two of them are
+fixed because their turn came. The rest are a trap for whoever measures them next,
+which is why it is written here and not only in the commit.
+
+The two-photon transition driver is the case which shows the difference cleanly. With
+its linear solves accelerated and its own Fock builds still on the dense path it
+reaches **5.63** on caffeine, against the reduced driver's **10.09** with both. Wiring
+the outer loop is worth nearly a factor of two, and the inner solves alone are worth
+more than half.
+
+## A frequency sweep of a third order property
+
+The reduced two-photon driver is wired, so the whole calculation goes through the
+resolution of the identity and not only the linear solves inside it. Caffeine, five
+frequencies from 0.050 to 0.150 in steps of 0.025, one rank of 14 threads. The gamma
+of every frequency is in the records, in
+`benchmarks/data/redtpa/2026-09-16_m4max_caffeine.json`, and drawn on the second
+page of the table beside it.
+
+| functional | basis | four-centre | RI-JK simd | speedup | gamma at 0.100 | largest relative difference |
+| --- | --- | ---: | ---: | ---: | --- | ---: |
+| HF | def2-svp | 521.42 | 54.72 | 9.53 | 13978.0 + 2441.8i | 8.9e-04 |
+| HF | def2-svpd | 2465.55 | 118.25 | **20.85** | 19061.8 + 7474.3i | 6.5e-04 |
+| B3LYP | def2-svp | 515.02 | 136.57 | 3.77 | 32374.7 + 20396.0i | 5.3e-04 |
+| B3LYP | def2-svpd | 2281.42 | 358.93 | **6.36** | 56171.7 + 26439.5i | 6.4e-04 |
+
+The agreement holds across the whole sweep and not only at the frequency the table
+can carry. **It holds where the real part passes through zero**, which it does
+between 0.125 and 0.150 in three of the four cells: a relative error is at its worst
+where the quantity is smallest, and a disagreement of structure rather than of
+fitting would show there first. It does not.
+
+### The sweep is cheaper than five calculations
+
+Five frequencies cost **3.17** times one, not five, on the four-center side, and 3.35
+on the other. The two scale alike, so the speedup barely moves from the single
+frequency measurement -- 9.53 against 10.09 -- and the run cost two hours where three
+were budgeted. Worth knowing before costing the next sweep: the frequencies of one
+calculation share more than they look like they do.
+
+### The quadrature, measured without subtracting anything
+
+This file has twice recorded a quantity spoiled by subtracting one run from another.
+Here the same question answers itself, because **the four-center columns are nearly
+the same for the two functionals** -- 521 against 515 seconds, and 2466 against 2281
+-- so the whole of the difference in the ratio sits on the other side:
+
+| | Hartree-Fock | B3LYP | B3LYP over Hartree-Fock |
+| --- | ---: | ---: | ---: |
+| RI-JK, def2-svp | 54.72 | 136.57 | **2.50** |
+| RI-JK, def2-svpd | 118.25 | 358.93 | **3.04** |
+
+The two-electron work is identical in the two rows, the exchange being formed whole
+and then scaled. So two and a half to three times is what the exchange-correlation
+quadrature costs across five frequencies of Fock builds, read off two columns of one
+table with nothing inferred. That is the number the two-photon and excitation
+sections could not get, and it took a case where the reference happened to cost the
+same either way.
+
+## Cubic response, and a form which carries any density at all
+
+The three-time perturbed calculations were left until last because their batch holds
+two orders of density at once. Working out how to hand that to the driver turned out
+to be the whole of the problem, and the answer made the problem disappear.
+
+### One form for every density
+
+A density in the molecular orbitals, transformed to the atomic ones, is
+
+    D = C(occ) M(oo) C(occ)^T + C(occ) M(ov) C(vir)^T
+      + C(vir) M(vo) C(occ)^T + C(vir) M(vv) C(vir)^T
+
+Gather the two terms which carry the occupied orbitals on the left, and the two which
+carry the virtual ones, and it is
+
+    D = C(occ) r_a^T + C(vir) r_b^T
+    r_a = C(occ) M(oo)^T + C(vir) M(ov)^T
+    r_b = C(occ) M(vo)^T + C(vir) M(vv)^T
+
+which is the four-factor shape the second-order densities already used, with the same
+two shared halves -- **and it holds whatever blocks of M are nonzero**. Checked to
+1e-14 against a density which is block diagonal and against one which is not.
+
+So a batch which mixes the orders needs no telling apart of its densities. It costs
+the basis times the orbitals where a density living only between the occupied
+orbitals and the virtual ones would cost the basis times twice the occupied, so it is
+the general form and not the cheapest one; for this driver two columns in eight pay
+that, which is the right trade for one code path.
+
+### The two batches are laid out differently
+
+| | densities in the batch | cut with |
+| --- | --- | --- |
+| no functional | the two-time and the three-time ones **in one array** | one stride |
+| a functional | two arrays | two strides of their own |
+
+The first of those was misread when this was planned -- the Hartree-Fock path was
+taken to send the three-time densities alone, and it concatenates both orders and
+sends them as one. The correction is what made the general form necessary, since a
+batch boundary can fall anywhere in a concatenated array, including between the
+orders.
+
+### What it bought
+
+Caffeine, def2-svp, one frequency triple, one rank of 14 threads.
+
+| | four-centre | RI-JK simd | speedup | gamma |
+| --- | ---: | ---: | ---: | --- |
+| Hartree-Fock | 67.39 | 10.39 | **6.49** | -4090.71 to -4093.39 |
+| B3LYP | 111.88 | 42.38 | **2.64** | 47628.6 to 47672.4 |
+
+Gamma agrees to 9.2e-04, and water to 4.5e-04 at Hartree-Fock and 1.1e-03 at B3LYP.
+The second pass of the driver, which is two-time perturbed and was wired after the
+first, is worth 5.92 to 6.49 and 2.59 to 2.64 -- nine per cent and two. It carries
+one density per frequency triple where the first pass carries four, and the ratio
+follows the count.
+
+### Two small terms, and why they read as four per cent
+
+The largest relative disagreement of any quantity the driver returns is 4.3e-02, on
+the X3 term. That is not the error of anything worth having:
+
+| term | four-centre | RI-JK simd | difference | relative |
+| --- | ---: | ---: | ---: | ---: |
+| X2 | 60678.4 | 60724.8 | 46.4 | 7.6e-04 |
+| gamma | 47628.6 | 47672.4 | 43.8 | 9.2e-04 |
+| E3 | -11157.4 | -11148.6 | 8.8 | 7.9e-04 |
+| A2 | -2501.83 | -2502.53 | 0.7 | 2.8e-04 |
+| A3 | 404.497 | 404.561 | 0.06 | 1.6e-04 |
+| **X3** | **397.019** | **380.077** | **16.9** | **4.3e-02** |
+| **T4** | **-192.161** | **-185.882** | **6.3** | **3.3e-02** |
+
+X3 and T4 are the two smallest terms of a sum whose largest is sixty thousand, and
+their differences are of the same size as everyone else's. **A relative error is a
+statement about the denominator as much as the numerator**, and a term which is a
+hundred and fiftieth of the sum it belongs to will always read badly by it.
+
+### One thing which does not fit the pattern
+
+Everywhere else in this file, B3LYP costs about what Hartree-Fock costs on the
+four-center side, and the ratio falls only because the quadrature sits in the other
+column and does not shrink. Here **the four-center calculation itself is sixty-six
+per cent dearer at B3LYP** -- 112 seconds against 67 -- which none of the other
+properties showed.
+
+That made 2.64 hard to read, so it was profiled. It is two things and not one.
+
+| | Hartree-Fock | B3LYP |
+| --- | ---: | ---: |
+| the whole calculation | 66.80 s | 111.95 s |
+| the four-center build | 65.80 s over 96 calls | 82.37 s over 118 calls |
+| **each of those calls** | **0.685 s** | **0.698 s** |
+| the quadrature | -- | **24.05 s** |
+| sigma builds of the inner solves | **71** | **94** |
+
+**A Fock matrix costs the same at either functional** -- 0.685 against 0.698 seconds
+-- so none of the difference is the build being dearer. Of the forty-five seconds
+between them, twenty-four are the quadrature, which Hartree-Fock does not pay at all,
+and fifteen are twenty-two more Fock matrices: the inner linear solves needed
+ninety-four sigma builds at B3LYP against seventy-one, a third more, because the
+calculation converged more slowly. The remainder is the quadrature of the nonlinear
+part and the setting up.
+
+So half of it is the functional's integration and half is the functional's
+convergence, and **neither is visible in a table of totals**, which is why this was
+left unexplained rather than guessed at.
+
+### What is left after the two-electron part goes away
+
+The same two calculations with the resolution of the identity:
+
+| | Hartree-Fock, 10.51 s | B3LYP, 42.39 s |
+| --- | ---: | ---: |
+| the quadrature | -- | **24.67 s, 58%** |
+| the two-electron build | 8.79 s, **84%** | 11.42 s, 27% |
+| forming the B vectors | 0.73 s | 0.74 s |
+
+**A cubic response calculation at B3LYP is a quadrature calculation now.** Fifty-eight
+per cent of it is integrating the functional and a quarter is the thing the
+resolution of the identity was brought in for, which is the whole of why the speedup
+is 2.64 and not 6.49. The excitation sections guessed at this and could not measure
+it; here it reads off one profile.
+
+The B vectors were formed **three times** in both of them, 0.74 seconds here. That
+was the driver and the solvers it drives each building their own, which is nothing at
+this size and was 7.8 seconds a time on tagrisso.
+
+**That is fixed.** The forming is now skipped where the vectors are already held, a
+driver hands its own to the solvers it drives, and the drivers which made a solver
+before setting up their integrals now form them first so there is something to hand
+over. Counting the builds rather than reading a profile, because the two-photon
+drivers nest profilers and the second one refuses to start:
+
+| | times the forming was entered | times it built anything |
+| --- | ---: | ---: |
+| quadratic response | 3 | **1** |
+| second harmonic generation | 3 | **1** |
+| two-photon absorption, reduced | 3 | **1** |
+| cubic response | 4 | **1** |
+
+The cubic calculation above went from 10.51 to 9.94 seconds by it, and the forming
+from 0.735 to 0.238. Small here and not small on a molecule where the transformation
+is eight seconds.
+
+## The remaining six drivers, and a check which is not a benchmark
+
+Cubic response was the hard one. After it, six drivers were left whose Fock builds
+still went through the four-centre integrals, and every one of them turned out to be
+the same two shapes already written: the `second`/`third` dictionary for a three-time
+perturbed pass, the four-factor tuple for a two-time one. **No new code was needed in
+the solver or in the shared module** -- `_comp_two_el_int` already took both shapes
+and both batch layouts, and `rijkresponse` was not touched. What each driver needed
+was the factors collected where its densities are made and handed to its Fock call.
+
+| driver | mode | two-time | three-time |
+| --- | --- | ---: | ---: |
+| two-photon absorption, full | `tpa` / `tpa_ii` | 24 / 6 | 6 |
+| third harmonic generation | `thg` / `thg_ii` | 12 / 6 | 6 |
+| third harmonic generation, reduced | `thgred` / `thgred_ii` | 6 / 3 | 3 |
+| three-photon absorption | `3pa` / `3pa_ii` | 9 / 6 | 6 |
+| two-photon transitions | `tpa_quad` | 4 | -- |
+| excited state moments | `qrf` | 2 | -- |
+
+Densities per frequency which become Fock matrices; the first-order ones beside them
+are there for the quadrature alone.
+
+### Two shapes which differ from the eight before
+
+**Four of them are real.** The reduced third harmonic, three-photon absorption and
+the two-photon transition driver build with `fock_flag='real'` and store only real
+columns, so each density is one factor and not the two a complex one is carried by.
+Read off the column counts rather than assumed.
+
+**One of them transformed in place.** The six two-time densities of the three-photon
+quadratic pass were formed straight into the atomic orbitals inside the `multi_dot`
+call, with no name in the molecular orbitals to take factors from. They are now named
+first and both the factors and the transformation read the one name, rather than the
+expression being written twice where two copies could drift apart.
+
+### What was checked, and how it was made to prove something
+
+Water, def2-svp, 24 basis functions, one frequency, one excited state where the
+driver needs one. Every value the driver returns, compared against the same
+calculation through the four-centre integrals.
+
+An agreement figure alone proves nothing here: a path which silently fell back to the
+four-centre integrals would agree perfectly. So each run also reports what actually
+happened inside, in two ways -- the densities in every batch the resolution of the
+identity built, and a probe on the Fock build itself which says the mode and whether
+the factors arrived.
+
+| | densities per batch, predicted | observed | HF | B3LYP |
+| --- | --- | --- | ---: | ---: |
+| two-photon, full | 30 joined, or 24 then 6 | as predicted, plus 6 | 2.803e-04 | 2.906e-04 |
+| third harmonic | 18 joined, or 12 then 6 | as predicted, plus 6 | 2.778e-04 | 2.867e-04 |
+| third harmonic, reduced | 9 joined, or 6 then 3 | as predicted, plus 3 | 2.778e-04 | 2.867e-04 |
+| three-photon | 15 joined, or 9 then 6 | as predicted, plus 6 | 2.324e-03 | 3.645e-03 |
+| two-photon transitions | 4 | 4 | 3.741e-04 | 1.711e-04 |
+| excited state moments | 2 | 2 | 3.741e-04 | 1.711e-04 |
+
+"Joined" is the Hartree-Fock layout, "then" the one with a functional; the trailing
+number is the two-time pass. For the last two the probe is the plainer evidence: the
+four-centre run reports `('tpa_quad', False)` and `('qrf', False)`, the other one
+`True`.
+
+Two of those numbers need qualifying rather than reading straight.
+
+**Three-photon absorption looks ten times worse and is not.** Its worst component is
+the `xxx` transition moment, 1.0066 at Hartree-Fock and 0.479 at B3LYP where the
+largest component of the same tensor is 46 and 61. The absolute difference is 2.3e-03
+and 1.7e-03; the components which are actually determined agree to 1.5e-04. A
+relative error on a near-zero number is a statement about the number, not the path.
+
+**Every three-photon value came back sign-flipped.** The phase of an excited state
+vector is arbitrary and the two runs pick it differently, so anything odd in that
+vector changes sign and means the same thing. The check compares magnitudes. The same
+appears in the two-photon transition driver, which reports three flips out of nine.
+
+### What this is not
+
+**There is no timing here on purpose.** Twenty-four basis functions is a correctness
+size, not a benchmark size; the wall clocks came out between 0.97 and 1.65 and that
+range is scheduling noise, not a result. Nothing in this section should be read as a
+speedup, and the tables above deliberately have no such column. What these drivers
+cost on a real molecule is not yet measured.
+
+The two-photon transition benchmark which was started and abandoned earlier is now
+worth running: **its outer loop was the gap**, the `tpa_quad` build, and that is what
+made the earlier attempt meaningless rather than merely slow.
+
+### Where the response path now stands
+
+Every `_comp_nlr_fock` call in `src/pymodule` is handed the factors of its densities
+-- checked by walking the call sites, not by memory. Ten nonlinear drivers and every
+linear solver.
+
+What is still outside it, unchanged and not a temporary omission in any of these
+cases:
+
+| | |
+| --- | --- |
+| unrestricted references | not covered anywhere in response |
+| range-separated functionals | **now covered; see the section on them below.** This row read "asserted against" until the attenuated B vectors were added |
+| more than one rank | refused, so the multi-rank half-size path never runs with it on |
+| core excitations, restricted subspaces | fall back to the dense route, excluded in the solver's guard |
+| complex trial vectors | fall back; the guard is a no-op today, since damped response carries them as real blocks |
+
+## Two-photon transitions, the calculation which was not worth measuring before
+
+This is the benchmark which was started and abandoned, on the grounds that the
+resolution of the identity was not reaching the outer loop. It was not: the
+`tpa_quad` build, the two-time perturbed Fock matrices the driver forms once its
+solvers have finished, went through the four-centre integrals in both columns. The
+solvers were fast and the thing they fed was not, so the ratio measured a fraction of
+the calculation and called it the calculation. It is wired now, and this is the run.
+
+Caffeine, five excited states, one rank of 14 threads, `def2-universal-jkfit` for all
+three orbital bases.
+
+| | basis | nao | four-centre | RI-JK simd | speedup | SCF |
+| --- | --- | ---: | ---: | ---: | ---: | --- |
+| Hartree-Fock | def2-svp | 246 | 154.08 s | 15.68 s | **9.83** | 12.41 -> 1.12 |
+| | def2-svpd | 366 | 713.21 s | 34.74 s | **20.53** | 50.38 -> 2.42 |
+| | def2-tzvp | 494 | 2362.74 s | 65.06 s | **36.32** | 173.57 -> 4.45 |
+| B3LYP | def2-svp | 246 | 150.87 s | 41.38 s | **3.65** | 14.89 -> 4.04 |
+| | def2-svpd | 366 | 626.89 s | 101.27 s | **6.19** | 56.22 -> 8.66 |
+| | def2-tzvp | 494 | 1946.67 s | 150.07 s | **12.97** | 180.24 -> 13.33 |
+
+**Forty minutes becomes a minute** at Hartree-Fock in def2-tzvp, and half an hour
+becomes two and a half minutes at B3LYP. The whole grid took 1 h 50 min where the
+four-centre half alone was 1 h 40 of it.
+
+### The exponent, and what it is an exponent in
+
+Fitted over the three bases of each row, cost proportional to nao to the p:
+
+| | four-centre | RI-JK simd |
+| --- | ---: | ---: |
+| Hartree-Fock | 3.91 | **2.04** |
+| B3LYP | 3.66 | **1.87** |
+
+The ground state underneath them fits 3.77 and 1.97 at Hartree-Fock, 3.56 and 1.72 at
+B3LYP -- the excited state part scales the way the ground state does, which is what
+should happen when both are made of the same Fock builds.
+
+**The second column is not the scaling of the method.** One fitting set serves all
+three orbital bases here, 1242 functions throughout, so the auxiliary dimension is
+held fixed while the orbital one grows and the exponent is in the orbital dimension
+alone. The same caveat was written into the gradient tables and it has not changed.
+
+### B3LYP gives up two thirds of the ratio, again
+
+| basis | HF | B3LYP | HF / B3LYP |
+| --- | ---: | ---: | ---: |
+| def2-svp | 9.83 | 3.65 | 2.69 |
+| def2-svpd | 20.53 | 6.19 | 3.32 |
+| def2-tzvp | 36.32 | 12.97 | 2.80 |
+
+Nothing new in it: what is left after the two-electron part goes away is the
+quadrature, and the cubic response profile measured that directly -- 58 per cent of a
+B3LYP calculation was integrating the functional. The ratio here is consistent with
+that and does not independently establish it.
+
+### The ground state is now a rounding error
+
+Of the whole RI-JK run, ground state and excited state together, the ground state is
+**6.4 to 6.7 per cent** at Hartree-Fock and **7.9 to 8.9** at B3LYP, and the fraction
+does not grow with the basis. Four-centre it is a fifth to a quarter. There is nothing
+left to win there.
+
+### What the two columns agree on
+
+The comparison is over everything the driver reports for all five states -- circular
+and linear two-photon strengths, oscillator strengths, photon energies -- and the
+column in the table is the worst of them, so a quantity which agrees cannot hide one
+which does not.
+
+| | def2-svp | def2-svpd | def2-tzvp |
+| --- | ---: | ---: | ---: |
+| Hartree-Fock | 1.9e-03 | 1.3e-03 | 8.9e-04 |
+| B3LYP | 6.7e-04 | 1.2e-03 | 2.1e-03 |
+
+It is a strength which sets the worst figure in five rows of six and an oscillator
+strength in the other two; **the photon energies agree an order of magnitude better
+throughout**, 8.99e-05 down to 2.84e-05. That ordering is the expected one -- an
+energy is an eigenvalue of the linear problem and a strength is a product of response
+vectors and a quadratic Fock matrix, so the fitting error enters it more times.
+
+The two rows move in opposite directions with basis size, Hartree-Fock improving and
+B3LYP worsening. Six points across two functionals is not enough to call that a
+trend, and no explanation is offered here.
+
+### What was fixed to get this table out
+
+Two defects in the benchmark suite, neither of them in the physics, both found by
+this run and not by reading:
+
+- **The record asked for a cross section.** `TpaTransitionDriver` reports strengths;
+  a cross section belongs to the full two-photon driver. Every row of the first run
+  stored `None` and the table printed an empty column. The strengths were being
+  saved all along, so the table above was rendered from that same data with nothing
+  recomputed.
+- **The output path was rebuilt every iteration**, so it followed the calendar. This
+  run crossed midnight, the last two rows went to a second file, and the first was
+  left as a stale prefix of itself. The path is formed once now.
+
+## The open shell, where the driver had been closed shell only
+
+The simd RI-JK driver built one Fock matrix from one density and one set of
+orbitals. An unrestricted calculation asking for it did not fall back and did not
+refuse: `_prepare_for_ri_fock_build` swapped in the simd driver, the open shell
+branch then called a method only the conventional driver has, and the calculation
+died part way with `AttributeError: 'SimdRIJKFockDriver' object has no attribute
+'compute_screened_j_fock'`. A restricted open shell run did the same, sharing the
+path. The **conventional** RI-JK driver had served both all along.
+
+The closed shell assumption was two lines, not a design:
+
+```cpp
+auto fock = _drv.compute_fock_matrix(_bq_vectors, _basis, _aux_basis, density);
+fock.scale(2.0);      // the density is one spin's, so the Coulomb enters twice
+```
+
+and one set of coefficients giving one exchange. What an open shell wants is the
+Coulomb of the **total** density undoubled, and an exchange from each spin's own
+occupied orbitals.
+
+### What was added
+
+One routine, taking the total density and a set of coefficients for each spin and
+returning both matrices:
+
+    compute(density, coefficients_alpha, coefficients_beta, exchange_scaling_factor)
+        -> (F_alpha, F_beta)
+
+Both spins run inside **one** pass over the ranges of the auxiliary basis, so a
+range's B vectors are read once and serve both rather than being swept twice. Two
+things follow from the spins occupying different numbers of orbitals: the W matrices
+need two storages rather than one reused, which would otherwise be formed again at
+every range of every build; and a function of a range costs the two spins together,
+so the same memory buys about half the range. That halving is what holding two
+spins' W matrices costs and is not a penalty of doing them in one pass.
+
+### What it agrees with
+
+def2-svp with the universal jkfit throughout, converged to 1e-8. The energy of the
+four centre path, then what each of the two resolutions of the identity differs from
+it by, and then -- the column that matters -- what the two of them differ from
+**each other** by:
+
+| | nao | naux | alpha/beta | four centre | conv vs 4c | simd vs 4c | **simd vs conv** |
+| --- | ---: | ---: | --- | ---: | ---: | ---: | ---: |
+| CH3 doublet, UHF | 29 | 129 | 5/4 | -39.5329552732 | 4.63e-06 | 4.63e-06 | **9.24e-14** |
+| CH3 doublet, UB3LYP | 29 | 129 | 5/4 | -39.8091355099 | 1.90e-05 | 1.90e-05 | **8.53e-14** |
+| O2 triplet, UHF | 28 | 154 | 9/7 | -149.4904009308 | 1.97e-04 | 1.97e-04 | **5.40e-13** |
+| H doublet, UHF | 5 | 18 | 1/0 | -0.4992784057 | 0.00e+00 | 1.67e-16 | **1.67e-16** |
+| CH3 doublet, ROHF | 29 | 129 | 5/4 | -39.5288782290 | 4.57e-06 | 4.57e-06 | **5.68e-14** |
+
+The middle two columns being equal row by row is the signature to look for: the two
+resolutions of the identity are the same approximation and should miss the four
+centre answer by the same fitting error, which is 4.6e-06 here and 2.0e-04 on O2 --
+a property of the fitting set and the molecule, not of either implementation. The
+last column is the implementation, and at **5.4e-13 and below** it is convergence
+noise.
+
+Three of the rows are there for branches rather than for chemistry. **H has one
+alpha orbital and no beta**, which is the spin with nothing to transform; **O2 has
+spins differing by two**, where a single W storage reused between them would be
+formed again at every range; and **ROHF** shares the open shell path and would have
+been missed by testing the unrestricted driver alone.
+
+### What is not here
+
+**No timing.** Twenty-nine basis functions is a correctness size and nothing above
+is a benchmark -- there is no speedup column on purpose, and what an open shell
+build costs against the four centre way on a real molecule is not yet measured. The
+structural expectation, which is a statement about the code and not a measurement,
+is that an open shell build is two exchanges where a closed shell one is a single
+exchange doubled, over B vectors formed once for both.
+
+**The direct way is not served.** It accumulates the right hand side of its fitting
+from the integrals during the same sweep which builds the exchange, and splits a
+build into three calls so a rank can gather that fitting between the first and the
+last. Two spins there means two exchanges and one fitting summed over both inside
+that sweep, which those three calls have no shape for. It refuses with a sentence
+saying so, which is also what removed the `AttributeError` above.
+
+**Range separated functionals** remain refused for RI-JK, open shell included, by
+the assertion which was already there.
+
+## The gradient of an open shell, and the largest ratio in this file
+
+The gradient driver was closed shell in the same way the Fock driver had been: one
+density, one set of occupied orbitals, one exchange. Unlike the Fock case it
+refused cleanly rather than dying in a binding, so an unrestricted calculation
+stopped with a sentence -- it simply had no gradient to give.
+
+### One routine, and where the factors come from
+
+A separate routine and not an overload, because the two differ in **which density
+the Coulomb half is of** and a caller passing the wrong one would get a gradient
+which is merely wrong rather than an error:
+
+    compute_open_shell(molecule, basis, aux_basis, bq_vectors, metric,
+                       density, coefficients_alpha, coefficients_beta, a_x, ...)
+
+The three-centre term underneath is not a second copy of its two hundred line
+kernel loop. It takes a list of spins, one for a closed shell and two for an open
+one, each carrying the orbitals it occupies and the fitted densities formed from
+them. The factors follow from writing the closed shell expressions in spin summed
+form, the closed shell ones being those expressions specialised to two identical
+spins:
+
+| | closed shell | open shell |
+| --- | --- | --- |
+| three-centre Coulomb | 4 c_P D(one spin) | c_P D(total) |
+| three-centre exchange | -2 a_x, one spin | -a_x, each spin |
+| two-centre Coulomb | 2 c_P c_Q | (1/2) c_P c_Q |
+| two-centre exchange | -a_x, one Gram | -(a_x/2), each spin's Gram |
+
+### Two defects the checks caught, both of which give a wrong gradient silently
+
+**The multiply overwrites.** `_multiply` passes `beta = 0.0` to the library, so the
+second spin's exchange was replacing the first rather than adding to it. The first
+check below failed at 9.8e-02 relative, and the failure scaled with the fraction of
+exact exchange, which placed it in the exchange half within one run. An accumulating
+form was added beside the one the Gram product already used.
+
+**A spin can occupy nothing.** The hydrogen atom is one alpha orbital and no beta.
+The transformation asked the library for a product of no columns and it refused.
+Guarded at the source rather than at each of the three places which consume it.
+
+### What it agrees with
+
+Three checks, in increasing independence. def2-svp throughout.
+
+**Identical spins must return the closed shell answer.** Feed the two spins the same
+orbitals and half the density each; the open shell routine has to reproduce the
+restricted gradient exactly. This pins every factor in the table above with no
+second implementation involved, and is the check which caught the multiply.
+
+| | agreement |
+| --- | ---: |
+| Hartree-Fock, a_x = 1 | **4.4e-16** |
+| B3LYP, a_x = 0.2 | **1.3e-15** |
+
+**Against the four centre gradient, and against finite differences.**
+
+| | four centre vs RI-JK | RI-JK vs numerical |
+| --- | ---: | ---: |
+| CH3 doublet, UHF | 9.047e-06 | **2.208e-07** |
+| CH3 doublet, UB3LYP | 1.577e-05 | 1.710e-05 |
+| O2 triplet, UHF | 1.214e-04 | **5.716e-07** |
+| O2 triplet, UB3LYP | 3.750e-05 | 1.906e-05 |
+| H doublet, UHF | 1.759e-34 | 5.551e-14 |
+| H doublet, UB3LYP | 3.556e-17 | 1.110e-13 |
+
+The right column is the one which tests this code: the analytic gradient against
+finite differences of **its own** energy, to 2e-07 at Hartree-Fock. The left column
+is the fitting error and is a property of the fitting set. The B3LYP rows of the
+right column are larger because a numerical gradient of a functional carries the
+quadrature grid's sensitivity to displacement; their Hartree-Fock counterparts at
+the same geometry are two orders better, which is what says the difference is the
+grid and not the term.
+
+Three of the rows are branches rather than chemistry: **H has a spin which occupies
+nothing**, **O2 has spins differing by two**, and both are in because the arithmetic
+of a second spin is where this could go wrong quietly.
+
+### What it bought
+
+The caffeine cation, doublet, against the neutral's table row for row. One rank of
+14 threads, `def2-universal-jkfit` throughout, the gradient timed twice and the
+better kept.
+
+| | four centre | RI-JK simd | speedup | the neutral's |
+| --- | ---: | ---: | ---: | ---: |
+| HF def2-svp | 21.17 | 0.84 | 25.3 | 11.9 |
+| HF def2-svpd | 94.75 | 1.59 | 59.6 | 31.0 |
+| HF def2-tzvp | 333.08 | 2.89 | 115.3 | 54.2 |
+| HF def2-tzvpd | 834.48 | **4.41** | **189.2** | 91.8 |
+| B3LYP def2-svp | 22.19 | 1.88 | 11.8 | 6.4 |
+| B3LYP def2-svpd | 96.79 | 3.88 | 25.0 | 14.6 |
+| B3LYP def2-tzvp | 335.82 | 5.84 | 57.5 | 34.5 |
+| B3LYP def2-tzvpd | 842.87 | **9.37** | **89.9** | 47.8 |
+
+**Fourteen minutes becomes four and a half seconds**, and 189 is the largest ratio
+anywhere in this file.
+
+### Why the open shell is *better* served than the closed one
+
+Every row is about twice its neutral counterpart, which is the opposite of what the
+self consistent field did, where the cation's extra iterations diluted the ratio.
+The gradient has no iterations to dilute it, and the two ways pay differently for
+the second spin:
+
+| what the second spin costs | def2-svp | def2-svpd | def2-tzvp | def2-tzvpd |
+| --- | ---: | ---: | ---: | ---: |
+| four centre, HF | 2.39 | 2.25 | 2.44 | 2.37 |
+| RI-JK simd, HF | **1.14** | **1.17** | **1.15** | **1.15** |
+| four centre, B3LYP | 2.42 | 2.26 | 2.43 | 2.38 |
+| RI-JK simd, B3LYP | **1.50** | **1.53** | **1.46** | **1.41** |
+
+The four centre way builds a second exchange from scratch and pays about 2.4 for it.
+The resolution of the identity forms the B vectors once, for both spins, and the
+second spin costs only the contraction against them -- 15 per cent at Hartree-Fock.
+**The dearest thing the method forms does not depend on spin**, which is the whole
+of why the ratio doubles.
+
+B3LYP pays more for the second spin than Hartree-Fock does, 1.46 against 1.15, and
+the reason is the quadrature: it is spin resolved, so the functional's integration
+genuinely doubles where the exchange contraction is the only part which grows in the
+Hartree-Fock rows.
+
+### The exponents do not move
+
+Fitted over the four bases, cost proportional to nao to the p:
+
+| | cation | neutral |
+| --- | ---: | ---: |
+| four centre, HF | 4.02 | 4.01 |
+| RI-JK simd, HF | 1.82 | 1.82 |
+| four centre, B3LYP | 3.98 | 3.97 |
+| RI-JK simd, B3LYP | 1.71 | 1.78 |
+
+An open shell is a constant times the work and not a different scaling, which is
+what the arithmetic says it should be and is worth having measured rather than
+assumed. The same caveat as every other table here: one fitting set serves all four
+orbital bases, so the second column of each pair is an exponent in the orbital
+dimension alone and not the scaling of the method.
+
+### Unchanged
+
+The l = 4 ceiling on the orbital centres is in the 175 generated derivative
+kernels and not in this driver. The single rank restriction is the same coupling of
+the fitting across the whole auxiliary basis. Range separated functionals are
+refused, open shell included. The conventional resolution of the identity has no
+open shell gradient at all, so `ri_jk` without `ri_jk_simd` is refused rather than
+measured.
+
+## Optimizing a radical, where the two ways agree on the path
+
+The open shell gradient made an unrestricted geometry optimization work without a
+line being written for it: the optimizer builds its gradient driver from whatever
+self consistent field driver it was handed, so the gradient was the only thing
+missing. What was checked rather than assumed is that the arrangements made for the
+closed shell case still hold -- the banner is said once over an optimization and not
+once a step, and a mode which cannot differentiate is refused before the first step
+rather than after it.
+
+The molecule is a nitronyl nitroxide core radical, C7H13N2O2, 24 atoms, a doublet
+with 43 alpha and 42 beta electrons. One rank of 14 threads,
+`def2-universal-jkfit` throughout, run to convergence with no cap on the steps.
+
+| | nao | four centre | RI-JK simd | speedup | steps |
+| --- | ---: | ---: | ---: | ---: | --- |
+| HF def2-svp | 219 | 347.0 s | **15.2 s** | **22.8** | 8 and 8 |
+| B3LYP def2-svp | 219 | 411.2 s | **60.2 s** | **6.8** | 9 and 9 |
+| HF def2-svpd | 330 | 1198.6 s | **26.9 s** | **44.5** | 7 and 7 |
+| B3LYP def2-svpd | 330 | 1521.9 s | **135.7 s** | **11.2** | 9 and 9 |
+
+The optimized energies agree to 3.9e-04 at Hartree-Fock and 8e-05 at B3LYP, which is
+the fitting error and not a difference in where the two paths stopped.
+
+### The cleanest ratio in this file, and why
+
+**Both ways take the same number of steps in all four rows.** That makes the whole
+run ratio and the per step ratio the same number, to two decimals. Nothing here is
+a total divided by a total over different amounts of work.
+
+It is worth saying why that matters, because the closed shell table does not have
+it. There, caffeine at def2-svp took 33 steps by the four centre way and 27 by the
+resolution of the identity, so its 6.87 is a ratio of two different journeys and the
+per step figure is 5.62. A speedup which moves when the optimizer takes a different
+path is a weaker measurement than one which does not, and this suite happens to give
+the stronger kind.
+
+### Against the closed shell table
+
+| | nitroxide, a radical | caffeine, closed shell |
+| --- | ---: | ---: |
+| HF def2-svp | **22.8** | 6.87 |
+| B3LYP def2-svp | **6.8** | 3.39 |
+| HF def2-svpd | **44.5** | 17.01 |
+| B3LYP def2-svpd | **11.2** | 7.67 |
+
+Two to three times better for the open shell, the same way round as the gradient
+table and for the same reason: the four centre way builds a second exchange from
+nothing while the resolution of the identity forms its B vectors once for both
+spins. The molecules differ -- 219 and 330 functions against 246 and 366 -- so this
+is not a controlled comparison of the two spin cases, and the gradient section,
+where the same molecule is measured both ways, is the one which establishes the
+effect. This table is consistent with it.
+
+### The estimate, and two defects in the suite
+
+**The first estimate was 1 to 1.5 hours and the run took 15 minutes.** The cause is
+worth recording because the information was in the file: the geometry's own comment
+line says "Optimized", so it converges in eight steps where the caffeine table's
+thirty was the number used to predict it. A step count taken from a different
+molecule's table is not an estimate.
+
+**The runner overwrote its own record.** The output path carried the date, the
+machine, the molecule and the spin state but not the basis, so running def2-svpd
+after def2-svp on the same day replaced the first file rather than writing beside
+it. The def2-svp numbers above survive because they had been committed. The path
+now carries the bases, and a run which would overwrite an existing record refuses
+to start instead: one file per run is what makes every ratio inside a file
+comparable, and a record replaced in silence is worse than one appended to.
+
+The optimizer also drops its checkpoints beside whatever ran it, which nearly went
+into a commit. They are ignored now.
+
+## The size of a block, when the buffer doubles
+
+The range separated three-center driver inherited its three sizing constants from
+the unattenuated one without measurement: a budget of 256 MB for the buffer a
+thread holds, at most 256 atom pairs to a block and at least 8. That inheritance is
+not obviously safe, because the buffer of a combination here is the larger of the
+two -- it carries two chains of Boys values, one for each operator -- so the same
+number of atom pairs costs twice the working set. The question is whether 256 still
+sits inside the flat part of the curve at that size.
+
+The table of rows is **1.86 to 1.99 times** the unattenuated one across its whole
+range, which is the doubling and the shared prefactors. What that does to the block
+size the budget computes:
+
+| | l bra / aux | rows plain | rows rs | block plain | block rs | MB a thread, rs |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| caffeine, def2-TZVP + jfit | 3 / 4 | 15103 | 29570 | 256 | 256 | 60.6 |
+| tagrisso, def2-SVP + jkfit | 2 / 4 | 4997 | 9718 | 256 | 256 | 19.9 |
+| c60, cc-pVDZ + RIFIT | 2 / 3 | 3012 | 5808 | 256 | 256 | 11.9 |
+| `(gg\|i)` | 4 / 6 | 80964 | 160167 | 256 | **209** | 267.8 |
+| `(ii\|l)` | 6 / 8 | 580552 | 1154910 | 57 | **29** | 267.9 |
+
+**The budget is not binding for any basis these drivers are used with.** It first
+bites at `(gg\|i)`, and everything to `(ff\|g)` reaches the ceiling of 256 in both
+drivers long before the 256 MB is spent. So the only constant the doubling can
+reach is the ceiling, and the ceiling is what was swept.
+
+### The doubled buffer does not move the optimum
+
+Milliseconds, fourteen threads, best of three, threshold 1e-12, omega 0.3. Each
+case runs in its own process. The two columns of a case were taken in one session,
+so they are an A/B and not two logs read against each other.
+
+| atom pairs | caffeine plain | caffeine rs | tagrisso plain | tagrisso rs | c60 plain | c60 rs |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| 8 | 130.2 | 260.2 | 662.6 | 1370.8 | 1633.9 | 3453.5 |
+| 32 | 86.4 | 175.8 | 362.5 | 747.7 | 941.1 | 2001.4 |
+| 128 | 84.1 | 169.1 | 270.3 | 559.3 | 700.3 | 1434.5 |
+| 256 | 84.0 | **168.3** | 250.1 | **531.2** | 687.0 | **1403.7** |
+| 512 | 84.8 | 167.7 | 248.9 | 528.4 | 682.3 | 1419.5 |
+
+The range separated curve has the same shape as the plain one on all three cases --
+steep below 128, flat from 256 -- so the inherited ceiling sits in the flat range
+for both and needs no change.
+
+The ratio is the sharper reading, because it is free of everything the two drivers
+share:
+
+| block size | 8 | 32 | 128 | 256 | 512 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| caffeine, def2-TZVP + jfit | 2.00 | 2.04 | 2.01 | 2.00 | 1.98 |
+| tagrisso, def2-SVP + jkfit | 2.07 | 2.06 | 2.07 | 2.12 | 2.12 |
+| c60, cc-pVDZ + RIFIT | 2.11 | 2.13 | 2.05 | 2.04 | 2.08 |
+
+**It does not drift with the block size.** The second operator costs what its second
+Boys chain costs, at every size, and nothing further through the working set. Were
+60 MB a thread hurting the caches where 30 did not, this ratio would grow towards
+the large sizes; it is flat to within the scatter of a best of three.
+
+### Caffeine cannot answer the question, and c60 can
+
+Caffeine's block count is 40 at 128, at 256 and at 512 alike. It has four distinct
+atom bases, so ten pairs of them, and the atom pairs of its groups run out before
+the ceiling does -- its flat tail is a property of the molecule and not evidence
+about the ceiling. Tagrisso goes 100, 64, 48 blocks over those three sizes and c60
+goes 14, 7, 4, so those two are the cases which actually probe it, and both are flat
+there too. A sweep on caffeine alone would have concluded nothing while appearing
+to.
+
+### How it was measured, and why the plain column was re-measured
+
+The ceiling is a `static constexpr`, so a sweep means a rebuild for each value. Both
+drivers were patched to read it from the environment instead, which makes it one
+rebuild and five free points; the patch was reverted afterwards and the library
+rebuilt, and the revert was checked by confirming that the variable no longer moves
+the block count.
+
+The plain column above is **not** the one in "The size of a block" earlier in this
+file, which reads 92.2, 310.8 and 837.6 at 256 against the 84.0, 250.1 and 687.0
+here. The driver has changed since that table was taken and the two are not
+comparable, which is the whole reason for measuring plain again beside the range
+separated driver rather than reading the new numbers against the old ones.
+
+## The range separated hybrids, where both ways pay about twice for the split
+
+A hybrid range separated functional splits its exchange between the plain operator
+and the attenuated one. The four-centre way makes a second full sweep of its own
+kernels on every iteration, `kx_rs` on top of `2jkx`. The simd resolution of the
+identity holds a second set of B vectors, formed once, and adds a second exchange
+inside the same pass over the auxiliary basis it was already making. That sounds like
+it ought to cost the two ways very differently, and **it does not**: measured against
+a plain functional in the same session, the split costs the fitted way 1.77 times and
+the four-centre way 1.69 to 1.94. The section which measures it is at the end of this
+one.
+
+The conventional RI-JK driver is not a column here. It has no attenuated B vectors
+and refuses a range separated functional, so it would be a column of refusals.
+
+`OMP_NUM_THREADS=14`, one rank, `def2-universal-jkfit` throughout, convergence 1e-8.
+The records are `benchmarks/data/scf/2026-09-18_m4max_caffeine_rs_closed.json` and
+`..._nitroxide_rs_m2.json`, and the runner is `benchmarks/scripts/scf_rs_laptop.py`.
+The provenance says the tree was dirty: the only thing uncommitted was that runner,
+which was written for this measurement and is committed with it.
+
+The tables below are transcribed from those records. The section which follows this
+one is a different measurement with a different fitting set, which for a while sat
+under this heading and read as though it belonged to it.
+
+Two functionals are measured, CAM-B3LYP and WB97X-D4, and the columns are the two
+electron build rather than the wall, because that is the part the split falls on.
+`B vectors` is the attenuated set together with the plain one, formed once before the
+iterations rather than per build.
+
+### Caffeine, CAM-B3LYP, closed shell
+
+| basis | nao | four-centre 2e | RI-JK 2e | build faster by | B vectors | wall, 4c -> RI-JK | whole faster by |
+| --- | ---: | ---: | ---: | ---: | ---: | --- | ---: |
+| def2-svp | 246 | 23.45 | 1.30 | 18x | 0.60 | 27.54 -> 5.20 | 5.3x |
+| def2-svpd | 366 | 99.21 | 2.83 | 35x | 1.22 | 107.72 -> 11.63 | 9.3x |
+| def2-tzvp | 494 | 348.51 | 5.10 | 68x | 2.11 | 361.56 -> 16.95 | 21.3x |
+| def2-tzvpd | 614 | 847.79 | 8.57 | **99x** | 3.21 | 868.74 -> 28.31 | **30.7x** |
+
+### Caffeine, WB97X-D4, closed shell
+
+| basis | nao | four-centre 2e | RI-JK 2e | build faster by | B vectors | wall, 4c -> RI-JK | whole faster by |
+| --- | ---: | ---: | ---: | ---: | ---: | --- | ---: |
+| def2-svp | 246 | 23.20 | 1.31 | 18x | 0.60 | 27.18 -> 5.12 | 5.3x |
+| def2-svpd | 366 | 98.49 | 2.82 | 35x | 1.21 | 106.92 -> 11.46 | 9.3x |
+| def2-tzvp | 494 | 347.09 | 5.35 | 65x | 2.11 | 360.31 -> 17.54 | 20.5x |
+| def2-tzvpd | 614 | 846.68 | 8.91 | **95x** | 3.21 | 868.04 -> 29.23 | **29.7x** |
+
+### Nitroxide, both functionals, unrestricted
+
+CAM-B3LYP:
+
+| basis | nao | four-centre 2e | RI-JK 2e | build faster by | B vectors | wall, 4c -> RI-JK | whole faster by |
+| --- | ---: | ---: | ---: | ---: | ---: | --- | ---: |
+| def2-svp | 219 | 48.27 | 1.81 | 27x | 0.37 | 55.49 -> 7.72 | 7.2x |
+| def2-svpd | 330 | 192.10 | 3.75 | 51x | 0.73 | 207.22 -> 16.45 | 12.6x |
+| def2-tzvp | 419 | 624.51 | 6.26 | 100x | 1.21 | 647.43 -> 23.37 | 27.7x |
+| def2-tzvpd | 530 | 1427.10 | 10.54 | **135x** | 1.86 | 1464.14 -> 39.65 | **36.9x** |
+
+WB97X-D4:
+
+| basis | nao | four-centre 2e | RI-JK 2e | build faster by | B vectors | wall, 4c -> RI-JK | whole faster by |
+| --- | ---: | ---: | ---: | ---: | ---: | --- | ---: |
+| def2-svp | 219 | 48.37 | 1.80 | 27x | 0.38 | 55.48 -> 7.67 | 7.2x |
+| def2-svpd | 330 | 183.02 | 3.93 | 47x | 0.73 | 197.45 -> 17.22 | 11.5x |
+| def2-tzvp | 419 | 599.32 | 6.54 | 92x | 1.21 | 621.66 -> 24.38 | 25.5x |
+| def2-tzvpd | 530 | 1367.80 | 10.96 | **125x** | 1.88 | 1403.55 -> 41.06 | **34.2x** |
+
+### The functional does not matter and the split does
+
+**CAM-B3LYP and WB97X-D4 cost the same to within one per cent**, everywhere. The four
+centre builds are 23.45 against 23.20, 99.21 against 98.49, 348.51 against 347.09 and
+847.79 against 846.68 on caffeine, and the fitted ones agree as closely. Two
+functionals which differ in how they attenuate, in how much exact exchange they carry
+at long range and in whether they carry a dispersion correction are, to the thing
+doing the work, the same calculation: one plain exchange and one attenuated one. So
+the rows of this section are about the **split**, and a third range separated
+functional would add nothing to them.
+
+The B vectors are formed once and are small against what they save -- 3.21 seconds at
+caffeine def2-tzvpd, against a fitted build of 8.57 and a four centre build of 847.79.
+Both sets, plain and attenuated, are inside that figure.
+
+### What the fitting costs in energy
+
+The fitted energy lies **below** the four centre one in every one of the sixteen
+cases, by 6.6e-05 to 1.8e-04 hartree, and the gap grows with the basis rather than
+shrinking:
+
+| | def2-svp | def2-svpd | def2-tzvp | def2-tzvpd |
+| --- | ---: | ---: | ---: | ---: |
+| caffeine, CAM-B3LYP | -6.66e-05 | -6.64e-05 | -1.56e-04 | -1.58e-04 |
+| caffeine, WB97X-D4 | -8.32e-05 | -8.21e-05 | -1.61e-04 | -1.63e-04 |
+| nitroxide, CAM-B3LYP | -1.03e-04 | -9.15e-05 | -1.70e-04 | -1.73e-04 |
+| nitroxide, WB97X-D4 | -1.18e-04 | -1.06e-04 | -1.73e-04 | -1.75e-04 |
+
+The sign is the one the plain hybrid rows of this file also show and the Hartree-Fock
+rows do not, and the step is between the double and triple zeta pairs rather than
+with the diffuse functions, which says it follows the orbital basis the fitting set
+has to span and not the diffuseness.
+
+### What the split actually costs, against a plain functional
+
+This heading used to say the split cost one way twice and the other a quarter, on no
+measurement: the records above hold only range separated functionals, so there was
+nothing in them to divide by. B3LYP was therefore run beside CAM-B3LYP, both
+functionals in one process per molecule so that the pair is one session on one tree,
+three bases, both ways. The records are
+`benchmarks/data/scf/2026-09-20_m4max_caffeine_rs_closed.json` and
+`..._nitroxide_rs_m2.json`.
+
+Milliseconds a build, so that unequal iteration counts do not enter, and the ratio is
+CAM-B3LYP over B3LYP:
+
+| | nao | four-centre plain | four-centre RS | ratio | fitted plain | fitted RS | ratio | B vectors |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| caffeine def2-svp | 246 | 565.5 | 1099.2 | 1.94x | 33.6 | 58.5 | 1.74x | 2.24x |
+| caffeine def2-svpd | 366 | 2433.8 | 4673.3 | 1.92x | 71.3 | 126.6 | 1.78x | 2.16x |
+| caffeine def2-tzvp | 494 | 8464.4 | 16411.3 | 1.94x | 130.6 | 229.0 | 1.75x | 2.11x |
+| nitroxide def2-svp | 219 | 1264.2 | 2155.3 | 1.70x | 44.1 | 78.1 | 1.77x | 2.14x |
+| nitroxide def2-svpd | 330 | 4831.3 | 8212.1 | 1.70x | 94.4 | 168.1 | 1.78x | 2.08x |
+| nitroxide def2-tzvp | 419 | 15914.1 | 26914.0 | 1.69x | 152.7 | 272.0 | 1.78x | 2.05x |
+
+**Both ways pay about twice, and the fitted way is the steadier of the two.** It is
+1.74 to 1.78 times in every row -- two molecules, two spin states, three bases -- while
+the four centre way is 1.92 to 1.94 closed shell and 1.69 to 1.70 open. Forming the
+second set of B vectors doubles the setup, 2.05 to 2.24 times, which is what a second
+set should cost and is small against what it saves.
+
+**Why the file said a quarter.** Read off the wall rather than the build, the fitted
+way does look nearly free: 2.53 against 3.42 seconds at caffeine def2-svp, 4.80
+against 6.96, 7.38 against 10.25, which is 1.35 to 1.45 times. The quadrature is
+identical between two functionals which differ only in their exchange, so it sits in
+both walls and dilutes the build. At the quadrature this file had when that heading
+was written -- before the 256 point boxes and before its matrix products went to the
+math library, so about twice today's cost -- the same wall ratio works out near 1.25.
+That is the quarter. It was a wall ratio quoted as a build ratio, and the number it
+quoted has since moved because the quadrature got cheaper underneath it.
+
+### The open shell pays less because its plain build is already three passes
+
+The four centre way pays 1.93 for the split closed shell and 1.70 open, and the ratio
+is **a count of sweeps over the integrals**, nothing more.
+`_comp_restricted_2e_fock` in `src/pymodule/scfdriver.py` builds its Fock matrix in
+one call, with the Coulomb and the exchange fused into a single pass, and
+`_comp_open_shell_2e_fock` beside it builds its two in three:
+
+| | plain | range separated |
+| --- | --- | --- |
+| restricted | `2jkx` -- one pass, J and K together | + `kx_rs` -- **two** |
+| unrestricted | `kx` alpha, `kx` beta, `j` -- **three** | + `kx_rs` alpha, `kx_rs` beta -- **five** |
+
+So the split adds one pass to one, and two passes to three. Two over one is 2.00
+against 1.93 measured, and five over three is 1.67 against 1.70. Dividing each build
+by its number of passes says the same thing from the other side -- the cost of a pass
+is flat within a molecule whichever kernel makes it:
+
+| | ms a pass, plain | ms a pass, range separated |
+| --- | ---: | ---: |
+| caffeine def2-svp | 565.5 | 549.6 |
+| caffeine def2-svpd | 2433.8 | 2336.7 |
+| caffeine def2-tzvp | 8464.4 | 8205.6 |
+| nitroxide def2-svp | 421.4 | 431.1 |
+| nitroxide def2-svpd | 1610.4 | 1642.4 |
+| nitroxide def2-tzvp | 5304.7 | 5382.8 |
+
+Within three per cent, everywhere. An attenuated exchange pass costs what a plain one
+costs, and the whole of the difference between 1.93 and 1.70 is that the open shell
+divides by three rather than by one.
+
+**Which is a statement about the plain open shell build, not about the split.** Its
+three passes recompute the same integrals three times over, where the restricted build
+gets its Coulomb and exchange from one. Nitroxide's plain build is 1264 ms against
+caffeine's 565 at *fewer* functions, 219 against 246, for that reason. A fused
+unrestricted kernel -- one pass answering J, K alpha and K beta, as `2jkx` already does
+for one spin -- is the obvious thing this measurement points at, and it would make the
+open shell's split ratio worse while making the calculation faster. The ratio is not
+the figure of merit.
+
+**The fitted way is indifferent to all of this**, 1.77 on both spin states, because a
+single set of B vectors serves both and is formed once.
+
+## The Coulomb only suite, where the fitting never has to be closed for an orbital
+
+A pure functional has no exact exchange, so the Coulomb matrix is the whole of the two
+electron build and the fitting set never has to describe the products of orbitals an
+exchange needs. **The fitting set is `def2-universal-jfit`**, a third the size of the
+jkfit the RI-JK tables use. What the suite measures is not only the ratio but **where
+the time goes afterwards**: once the Coulomb build is a hundred times faster it stops
+being the cost, and the quadrature is what remains.
+
+`OMP_NUM_THREADS=14`, one rank, BLYP, convergence 1e-8. The runner is
+`benchmarks/scripts/rij_laptop.py` over `rijbench.py`, and the record is
+`benchmarks/data/scf/2026-09-20_m4max_rij.json`. Nitroxide is a doublet radical and is
+run unrestricted, which is two Fock matrices an iteration.
+
+### Caffeine, closed shell
+
+| basis | nao | four-centre J | RI-J J | J faster by | wall, 4c -> RI-J | whole faster by |
+| --- | ---: | ---: | ---: | ---: | --- | ---: |
+| def2-svp | 246 | 10.67 | 0.14 | 76x | 13.22 -> 2.01 | 6.6x |
+| def2-svpd | 366 | 45.99 | 0.29 | 159x | 50.76 -> 3.97 | 12.8x |
+| def2-tzvp | 494 | 161.58 | 0.52 | 311x | 169.16 -> 4.83 | 35.0x |
+| def2-tzvpd | 614 | 387.06 | 0.83 | **466x** | 399.24 -> 8.78 | **45.5x** |
+
+### Tagrisso, closed shell
+
+| basis | nao | four-centre J | RI-J J | J faster by | wall, 4c -> RI-J | whole faster by |
+| --- | ---: | ---: | ---: | ---: | --- | ---: |
+| def2-svp | 683 | 122.64 | 1.33 | 92x | 139.77 -> 11.96 | 11.7x |
+| def2-svpd | 1010 | 974.90 | 3.13 | **311x** | 1014.87 -> 33.67 | **30.1x** |
+
+### Nitroxide, a doublet radical, unrestricted
+
+| basis | nao | four-centre J | RI-J J | J faster by | wall, 4c -> RI-J | whole faster by |
+| --- | ---: | ---: | ---: | ---: | --- | ---: |
+| def2-svp | 219 | 8.80 | 0.18 | 49x | 12.84 -> 2.67 | 4.8x |
+| def2-svpd | 330 | 33.31 | 0.38 | 88x | 40.83 -> 5.83 | 7.0x |
+| def2-tzvp | 419 | 117.60 | 0.60 | 196x | 130.87 -> 7.02 | 18.6x |
+| def2-tzvpd | 530 | 251.63 | 1.09 | **231x** | 271.93 -> 15.78 | **17.2x** |
+
+An open shell row is two Fock matrices an iteration and is not comparable with a
+closed shell one however alike the two read.
+
+**The def2-tzvpd row is the noisiest in this file and should not be read closely.**
+That case converges in **26 or 27 iterations depending on the run** -- five repeats
+of the fitted way in one session gave 26, 27, 27, 26, 27 -- and the row above is a
+27 iteration draw, which is why it reads slower than the conventional driver beside
+it. Best of five the two are 14.60 and 14.95 seconds, the simd way ahead. The same
+five repeats put the conventional driver's Coulomb build anywhere between 0.96 and
+1.47 seconds, a spread of half its own value, so **no Coulomb column of a one second
+case in this file separates the two drivers**. The iteration count wobbles because
+the fitted build is not bit reproducible -- the floor measured elsewhere here is
+2.5e-11 -- and near convergence that is enough to move a DIIS step.
+
+### The Coulomb build stops being the cost, and the quadrature does not
+
+Read the two right hand columns of any table against each other. **The Coulomb build
+is between forty-nine and four hundred and sixty-six times faster and the
+calculation is between five and forty-six.** The gap between those is the
+exchange correlation quadrature, which the approximation does not touch and which is
+the same in every row of a group:
+
+| | XC, as a share of the fitted wall |
+| --- | ---: |
+| caffeine | 73 to 81% |
+| tagrisso | 66 to 77% |
+| nitroxide | 78 to 84% |
+
+So a further hundredfold on the Coulomb build would be worth about ten per cent of
+the calculation. **Whatever is next for a pure functional is the grid, not the
+integrals** -- which is what "The quadrature, where the functional is one per cent of
+it" then went and measured.
+
+The ratio also grows with the basis -- 76, 159, 311, 466 on caffeine -- for the
+reason the diffuse rows of the water cluster study give: the dense build pays a
+fourth power on a compact molecule and the fitted one pays about a first, and
+diffuse functions take away the screening which was the dense build's only defence.
+
+### Against the conventional driver of the same approximation
+
+| | J build | setup | whole |
+| --- | ---: | ---: | ---: |
+| caffeine, def2-tzvpd | 1.49 -> 0.83 | 1.56 -> 1.09 | 10.37 -> 8.78 |
+| tagrisso, def2-svp | 2.75 -> 1.33 | 7.78 -> 2.76 | 18.44 -> 11.96 |
+| tagrisso, def2-svpd | 5.36 -> 3.13 | 13.35 -> 4.68 | 45.43 -> 33.67 |
+| nitroxide, def2-tzvpd | 1.08 -> 1.09 | 1.66 -> 1.45 | 15.10 -> 15.78 |
+
+**The new driver wins where the setup is the difference and draws where it is not.**
+On tagrisso the conventional driver spends 7.8 and 13.4 seconds preparing against 2.8
+and 4.7; on the two small molecules the two are within a few per cent of each other.
+There is nothing left to win on a twenty-four atom molecule, and that is worth knowing
+before anyone optimises for one.
+
+The Coulomb columns of the two small rows are **not** evidence either way. They are
+one second quantities measured once, and the repeats reported under the nitroxide
+table put the run to run spread of exactly such a column at half its own value. The
+nitroxide row reads the wrong way round for that reason and for the iteration count,
+not because the conventional driver builds Coulomb faster.
+
+### The way which holds nothing is not a peer
+
+`direct` re-forms the integrals in both sweeps of every iteration:
+
+| | RI-J in memory | RI-J direct |
+| --- | ---: | ---: |
+| caffeine, def2-tzvpd | 0.83 | 6.52 |
+| tagrisso, def2-svpd | 3.13 | 35.94 |
+| nitroxide, def2-tzvpd | 1.09 | 5.99 |
+
+Five and a half to eleven and a half times behind, everywhere. It belongs where the
+memory forces it and not as a choice, which is what the automatic rule now does: it
+weighs the parts **a rank would hold** rather than the whole molecule's, which on
+eight ranks is an eighth of the figure it used to compare.
+
+### These rows were measured three times
+
+The first measurement of this suite was made before the quadrature's defaults were
+looked at, with grid boxes of 1024 points and a screening threshold of 1e-12. The
+second was at 256 and 1e-8. Every row here is the third, taken after the quadrature's
+matrix products were handed to the math library, from one code path -- `rijbench.py`
+throughout, timed by the driver's own profiler rather than by a wrapper around it. The
+settings and the record are named at the head of this section.
+
+The Coulomb columns are unchanged across all three, as they should be: neither the
+quadrature nor its linear algebra touches them. Across the ten cases the four centre
+Coulomb build reproduces the second measurement to within one per cent, which is what
+makes the rest of the table readable -- it is the control, not a result.
+
+What moved both times is the XC and therefore the wall, and with it every ratio in
+the right hand column: caffeine at def2-tzvpd went 20.6 to 27.5 to **45.5** times, not
+because the fitting ever got faster but because the ceiling above it came down twice.
+The fitted wall alone improved between 1.33 and 1.73 times in this third measurement.
+
+**The iteration counts are not equal between the columns** -- four centre converges in
+21 to 23, the fitted ways in 23 to 31, and tagrisso def2-svp is 23 against 30. The
+right hand ratio is a wall against a wall, so those rows understate the fitted way
+rather than flatter it.
+
+
+## The Coulomb only gradient, where the ratio worth quoting is the smaller one
+
+A pure functional's gradient has no exchange to differentiate, so its two-electron
+part is the Coulomb term of the resolution of the identity and nothing else. The
+simd driver of it is new; what it replaces is the conventional driver of the same
+approximation, and both are measured here beside the four-centre way.
+
+The gradient wants one thing of a calculation which the Fock build already has: the
+fitting coefficients gamma of the converged density. There are no B vectors to hand
+over, no metric and no occupied orbitals -- a Coulomb fitting is closed over the
+basis functions and never over an orbital -- so the driver is handed a vector and a
+density and nothing else.
+
+BLYP, `def2-universal-jfit`, convergence 1e-8, one rank of 14 threads on the M4 Max,
+each gradient timed twice and the faster taken. The runner is
+`benchmarks/scripts/rij_grad_laptop.py` over `gradbench.py` and the record is
+`benchmarks/data/gradient/2026-09-20_m4max_rij_grad.json`. The provenance says the
+tree was dirty: what was uncommitted is that runner and the Coulomb only ways added
+to `gradbench.py`, both written for this measurement and committed with it.
+
+### Caffeine, the closed shell gradient
+
+Seconds a gradient:
+
+| basis | nao | four-centre | conventional RI-J | simd RI-J | simd over conventional | over four-centre |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| def2-svp | 246 | 7.35 | 0.96 | 0.90 | 1.07x | 8.2x |
+| def2-svpd | 366 | 30.11 | 2.22 | 1.97 | 1.13x | 15.3x |
+| def2-tzvp | 494 | 108.73 | 3.51 | 2.95 | 1.19x | 36.8x |
+| def2-tzvpd | 614 | 253.42 | 5.49 | 4.75 | **1.16x** | **53.4x** |
+
+### Nitroxide, the open shell gradient
+
+| basis | nao | four-centre | conventional RI-J | simd RI-J | simd over conventional | over four-centre |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| def2-svp | 219 | 6.41 | 1.25 | 1.32 | **0.95x** | 4.9x |
+| def2-svpd | 330 | 22.67 | 2.62 | 2.64 | 0.99x | 8.6x |
+| def2-tzvp | 419 | 72.36 | 3.43 | 3.31 | 1.04x | 21.9x |
+| def2-tzvpd | 530 | 163.98 | 6.30 | 5.53 | **1.14x** | 29.6x |
+
+### The small column is the honest one
+
+Against a dense build the fitted gradient is **eight to fifty-three times** faster
+closed shell and five to thirty open, and the ratio climbs steeply with the basis
+for the reason the energy tables give. That is the number which sells the
+approximation, and it was already true of the conventional driver.
+
+**Against the driver this one replaces it is 1.07 to 1.19 closed shell and 0.95 to
+1.14 open**, and the open shell's smallest basis is *below one*. That is the number
+which says what was gained by writing it, and it is far short of the 1.4 to 1.7 the
+Fock build got from the same kind of work. A gradient spends its time in the
+derivative integrals and in the quadrature, not in the linear algebra which the math
+library sped up.
+
+### Why the open shell trails the closed by about a basis step
+
+Not the fitting. The phases of a simd RI-J gradient, seconds:
+
+| | total | Coulomb | quadrature | one-electron | quadrature's share |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| caffeine def2-svp | 0.91 | 0.26 | 0.54 | 0.09 | 60% |
+| nitroxide def2-svp | 1.13 | 0.20 | 0.82 | 0.09 | **73%** |
+| caffeine def2-tzvpd | 4.57 | 1.55 | 2.57 | 0.37 | 56% |
+| nitroxide def2-tzvpd | 5.61 | 1.11 | 4.21 | 0.22 | **75%** |
+
+**The quadrature is three quarters of an open shell's gradient and the Coulomb term
+is a fifth.** The exchange correlation gradient runs over two spin densities where
+the Coulomb one still runs over a single total density -- nitroxide's Coulomb term is
+*smaller* than caffeine's, 1.11 against 1.55 seconds, at fewer functions. So the
+part this driver improves is a fifth of the wall it is measured on, and an
+improvement of half again there arrives as a tenth on the total. The open shell is
+diluted, not slower.
+
+It is the same sentence as the Fock tables end on, one phase further along: **the
+quadrature is the majority of a fitted gradient too**, 56 to 75 per cent of it.
+
+### What the rows check as well as time
+
+Three things travel with every row rather than being claimed once:
+
+**The two fitted ways agree to between 5e-10 and 2e-09** in every one of the eight
+cases, which is the floor this code reproduces itself at and not a difference.
+
+**The fitting error is identical for both of them**, 2.6e-05 to 7.9e-05 against the
+four-centre gradient, rising with the basis. It has to be: they fit the same thing
+in the same set, and a row where the two fitted ways differed from four-centre by
+different amounts would mean one of them was fitting something else.
+
+**The sum over the atoms is 7e-06 to 2.7e-05** and is the same for the four-centre
+way as for either fitted one. A gradient of every atom of a molecule in no field
+sums to zero, so that residual is the quadrature's, and the fitting neither adds to
+it nor removes it.
+
+### What is not measured
+
+**No finite difference is in this table.** The drivers were checked against one
+while they were written -- water and a methyl radical, both off equilibrium, both
+agreeing to about 6e-05 on components of 5e-02, which is the finite difference's own
+floor -- but that is a check on the coefficients and not a benchmark, and it is not
+what these rows are.
+
+**And no node.** Every number here is one rank of fourteen threads. The three-centre
+term divides over the atoms of the auxiliary basis and the two-centre term is asked
+of one rank alone, because the fitting coefficients are not divided the way the B
+vectors of an exchange are; neither of those divisions has been run on more than one
+rank.
+
+## The quadrature, where the functional is one per cent of it
+
+The Coulomb only tables above ended, when this was written, by saying that the
+exchange correlation quadrature was 86 to 92 per cent of a fitted calculation and that
+whatever is next for a pure functional is the grid. This is what was found there. Those
+tables now read 66 to 84 per cent, because of this section and of the linear algebra
+change which followed it -- the share came down, and the conclusion did not: the
+quadrature is still the majority of every fitted row in this file.
+
+The integrators have carried named timers for a long while and printed none of them:
+the calls which would have were commented out, one per function. They are switched on
+by `VLX_XC_PROFILE` and the threads are added together, which is what `getTimings`
+was put there for. BLYP, one rank of 14 threads on the M4 Max.
+
+### Where a Vxc build goes
+
+Caffeine, def2-tzvp, 384 boxes, 0.412 s:
+
+| phase | time | share |
+| --- | ---: | ---: |
+| GTO pre-screening | 0.000 s | 0.1% |
+| density matrix slicing | 0.002 s | 0.4% |
+| gtoeval | 0.072 s | 17.5% |
+| **generate density grid** | **0.161 s** | **39.1%** |
+| **XC functional eval.** | **0.003 s** | **0.8%** |
+| Vxc matrix G | 0.014 s | 3.4% |
+| **Vxc matmul and symm.** | **0.145 s** | **35.1%** |
+| Vxc dist. | 0.005 s | 1.3% |
+| serial and imbalance | 0.009 s | 2.2% |
+
+**The functional is under one per cent.** What the quadrature costs is two matrix
+operations -- forming the density and its gradient on the grid, and contracting the
+potential back into the matrix -- and they are the same shape of work, points times
+the square of the basis functions a box keeps. The shares hold everywhere:
+
+| | gtoeval | density grid | Vxc matmul | functional |
+| --- | ---: | ---: | ---: | ---: |
+| caffeine def2-svp | 25% | 33% | 29% | 2% |
+| caffeine def2-tzvpd | 13% | 41% | 39% | 0% |
+| tagrisso def2-svpd | 12% | 42% | 40% | 0% |
+| water 47-mer def2-svp | 20% | 38% | 33% | 1% |
+
+So this is the third phase of this file to turn out to be linear algebra rather than
+the thing it is named after, after the gradient's fitted densities and the B vectors'
+contraction.
+
+### What the screening keeps
+
+The grid points grow linearly with the molecule, so if the screening held the
+surviving functions of a box steady the quadrature would be linear too. It does not
+quite:
+
+| water clusters, def2-svp | nao | kept per box | of the functions | of a dense quadrature |
+| --- | ---: | ---: | ---: | ---: |
+| 10 waters | 240 | 119 | 49.6% | 25.9% |
+| 20 waters | 480 | 180 | 37.5% | 14.9% |
+| 32 waters | 768 | 213 | 27.8% | 8.3% |
+| 47 waters | 1128 | 238 | 21.1% | 4.9% |
+
+**It is already avoiding ninety-five per cent of a dense quadrature and it is still
+growing.** The kept count goes as nao to the 0.42, which squared is the extra work
+per grid point, and the quadrature comes out at nao to the 1.7 rather than the 1.0 it
+would otherwise be. The growth is decelerating -- the exponent between neighbours
+falls 0.59, 0.35, 0.30 -- so it saturates eventually, but not at these sizes.
+
+On a compact molecule the screening cannot help and should not be expected to:
+caffeine keeps 165 of 246 at def2-svp and 442 of 614 at def2-tzvpd, because the
+molecule is smaller than the decay length. Those are the cases where the quadrature
+is cheap in absolute terms anyway.
+
+### Two constants which had never been tried
+
+The size of a grid box and the value a basis function has to reach over it were 1024
+points and 1e-12, and no other values had been measured. They pull against each
+other: a smaller box reaches fewer functions but pays its overhead more often.
+
+32 waters, def2-tzvp, seconds a Vxc build, the old default in bold:
+
+| box \ threshold | 1e-6 | 1e-8 | 1e-10 | 1e-12 |
+| ---: | ---: | ---: | ---: | ---: |
+| 128 | 0.513 | 0.750 | 1.012 | 1.318 |
+| **256** | 0.478 | **0.702** | 0.952 | 1.244 |
+| 512 | 0.514 | 0.762 | 1.041 | 1.355 |
+| 1024 | 0.655 | 0.951 | 1.268 | **1.645** |
+
+**256 is a real minimum and 1024 was the wrong end of the range.** 128 is worse than
+256 at every threshold, so the per box overhead does bite -- just below where the
+default sat.
+
+### The defaults are now 256 points and 1e-8
+
+| | XC | whole SCF |
+| --- | ---: | ---: |
+| caffeine def2-svp | 3.16 -> 2.24, 1.41x | 3.57 -> 2.72, 1.31x |
+| caffeine def2-tzvp | 9.66 -> 6.60, 1.46x | 10.96 -> 7.92, 1.38x |
+| tagrisso def2-svp | 23.79 -> 12.47, 1.91x | 27.69 -> 16.53, 1.68x |
+
+Of that, the box is worth 1.3 to 1.6 times and the threshold a further 1.2 to 1.5.
+**The rows of the Coulomb only tables above are therefore out of date by that much**,
+and their XC shares are the shares of the old quadrature.
+
+`xc_screening_threshold` is settable on the SCF driver, defaulting to the
+integrator's own value, so the default can be measured against something rather than
+assumed. The box is `_xcfun_ldstaging`, which was always settable and always 1024.
+
+### The accuracy, and a measurement which had to be done twice
+
+**At a fixed density, 1e-8, 1e-10 and 1e-12 give identical exchange correlation
+energies and 1e-6 differs by 1.2e-07 hartree.** That is the clean measurement of what
+the screening costs, because nothing else varies.
+
+Through a converged SCF the differences are **not** monotonic in the threshold -- at
+1e-8 they are smaller than at 1e-12 -- which is the signature of something other than
+the threshold. Three runs at one threshold spread **6.5e-09 at 1e-8 and 7.3e-08 at
+1e-12**, with identical iteration counts. So the converged differences of up to
+1.3e-07 are convergence noise at a threshold of 1e-8 and not screening error.
+
+This was first reported here as a real shift of 6.5e-07, which it is not. The tell was
+in the numbers and was not read: an error caused by the threshold would rise with it,
+and these did not. See "Benchmark runtime estimates" and the open shell rows of the
+Coulomb only suite, where the same mistake was made on the same day.
+
+### What is not measured
+
+**The response paths screen at 1e-8 now too.** Fxc and Kxc go through the same
+integrator, and nothing here has checked a polarizability or an excitation energy
+against the old value. The evidence is entirely from ground state energies.
+
+**And the exponent has not moved.** Smaller boxes shift the constant; the kept count
+still grows as nao to the 0.42 and the quadrature is still nao to the 1.7. Reaching
+linear needs the screening to saturate, which would be a different piece of work from
+choosing better values for two numbers.

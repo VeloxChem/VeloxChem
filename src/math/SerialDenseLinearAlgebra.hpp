@@ -57,6 +57,20 @@ auto serialMultAB(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB) -> C
 auto serialMultABt(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB) -> CDenseMatrix;
 
 /**
+ Computes matrix multiplication: A * B, for a symmetric matrix A.
+
+ @note The caller guarantees that A is square and symmetric. This lets the
+ product be spelled with A transposed, which is the same matrix but a much
+ faster shape for the math library than the plain A * B: see the note in
+ sdenblas::serialMultSymAB.
+
+ @param matrixA the symmetric matrix A.
+ @param matrixB the matrix B
+ @return the matrix A * B.
+ */
+auto serialMultSymAB(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB) -> CDenseMatrix;
+
+/**
  Computes matrix multiplication: A^T * B.
 
  @param matrixA the matrix A.

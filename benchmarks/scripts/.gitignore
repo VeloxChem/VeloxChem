@@ -1,0 +1,3 @@
+# Checkpoints the optimization driver drops beside whatever ran it. They are a
+# calculation's scratch, not a record: the record is the json in ../data.
+vlx_*.h5

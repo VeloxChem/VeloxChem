@@ -37,6 +37,7 @@ import time
 import sys
 
 from .oneeints import compute_electric_dipole_integrals
+from . import rijkresponse
 from .veloxchemlib import (mpi_master, bohr_in_angstrom, hartree_in_ev,
                            hartree_in_inverse_nm, fine_structure_constant,
                            speed_of_light_in_vacuum_in_SI)
@@ -244,6 +245,13 @@ class TpaTransitionDriver(NonlinearSolver):
                 if operator == 'dipole':
                     b_grad[ind] *= -1.0
 
+        # NOTE: the B vectors are formed before the solvers this driver drives
+        # are made, so that each of them is handed the same ones rather than
+        # forming its own. Forming them again where the integrals are set up
+        # costs nothing, the driver holding them already.
+        if self.ri_jk:
+            rijkresponse.initialize(self, molecule, ao_basis)
+
         rpa_drv = LinearResponseEigenSolver(self.comm, self.ostream)
         rpa_drv.nonlinear = True
 
@@ -252,11 +260,13 @@ class TpaTransitionDriver(NonlinearSolver):
             'max_iter', 'eri_thresh', 'timing', 'memory_profiling',
             'batch_size', 'restart', 'xcfun', 'grid_level', 'potfile',
             'electric_field', 'program_end_time', '_debug', '_block_size_factor',
-            'ri_coulomb'
+            'ri_coulomb', 'ri_jk', 'ri_jk_simd', 'ri_auxiliary_basis'
         ]
 
         for key in rpa_keywords:
             setattr(rpa_drv, key, getattr(self, key))
+
+        rijkresponse.share(self, rpa_drv)
 
         if self.checkpoint_file is not None:
             fpath = Path(self.checkpoint_file)
@@ -307,11 +317,13 @@ class TpaTransitionDriver(NonlinearSolver):
             'max_iter', 'eri_thresh', 'timing', 'memory_profiling',
             'batch_size', 'restart', 'xcfun', 'grid_level', 'potfile',
             'electric_field', 'program_end_time', '_debug', '_block_size_factor',
-            'ri_coulomb'
+            'ri_coulomb', 'ri_jk', 'ri_jk_simd', 'ri_auxiliary_basis'
         }
 
         for key in cpp_keywords:
             setattr(N_drv, key, getattr(self, key))
+
+        rijkresponse.share(self, N_drv)
 
         if self.checkpoint_file is not None:
             fpath = Path(self.checkpoint_file)
@@ -710,6 +722,14 @@ class TpaTransitionDriver(NonlinearSolver):
         distributed_density_1 = None
         distributed_density_2 = None
 
+        # NOTE: the factors of the densities which reach the Fock build. Only the
+        # two-time perturbed ones are built from here, and they are real, so each
+        # of them is one factor and not the two a complex one is carried by.
+        self._ri_jk_factors = None
+
+        if self.rank == mpi_master() and self.ri_jk and self.ri_jk_simd:
+            self._ri_jk_factors = (mo[:, :nocc], [], mo[:, nocc:], [])
+
         for w_ind, w in enumerate(freqs):
 
             nx = ComplexResponseSolver.get_full_solution_vector(Nx[('x', w)])
@@ -742,6 +762,17 @@ class TpaTransitionDriver(NonlinearSolver):
                 Dbcy = self.commut(kby, Dc) + self.commut(kc, Dby)
                 Dbcz = self.commut(kbz, Dc) + self.commut(kc, Dbz)
                 Dcc_ = self.commut(kc_, Dc) + self.commut(kc, Dc_)
+
+                # NOTE: the factors, taken before the transformation to the
+                # atomic orbitals and in the order the columns are laid out
+                # below. The first-order densities beside them are there for the
+                # quadrature alone and no Fock matrix is asked of them.
+                if self._ri_jk_factors is not None:
+                    for mat in (Dbcx, Dbcy, Dbcz, Dcc_):
+                        ra, rb = rijkresponse.general_factors(
+                            mo, nocc, np.real(mat))
+                        self._ri_jk_factors[1].append(ra)
+                        self._ri_jk_factors[3].append(rb)
 
                 # Density transformation from MO to AO basis
 
@@ -872,7 +903,8 @@ class TpaTransitionDriver(NonlinearSolver):
                                              eri_dict, dft_dict,
                                              first_order_dens,
                                              second_order_dens, None,
-                                             'tpa_quad', profiler)
+                                             'tpa_quad', profiler,
+                                             dens_factors=self._ri_jk_factors)
 
             self._print_fock_time(time.time() - time_start_fock)
 

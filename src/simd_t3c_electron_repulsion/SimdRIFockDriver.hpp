@@ -87,6 +87,40 @@ class CSimdRIFockDriver
                             const double            threshold,
                             const std::vector<int> &aux_atoms = {}) const -> CSparseTensor;
 
+    /// @brief Computes the B vectors of the Coulomb operator and of the attenuated
+    /// one, for a hybrid range separated functional.
+    /// @param molecule The molecule to compute the B vectors of.
+    /// @param basis The molecular basis on a and b sides.
+    /// @param aux_basis The auxiliary molecular basis.
+    /// @param inverse_metric The inverse of the two-center Coulomb metric.
+    /// @param inverse_metric_erf The inverse of the two-center attenuated metric,
+    /// which is the metric of the operator its B vectors are of. The exchange of
+    /// the long range is the attenuated integrals fitted in the attenuated metric,
+    /// and mixing the two metrics fits neither operator.
+    /// @param threshold The screening threshold.
+    /// @param omega The range separation parameter, which must be positive.
+    /// @param aux_atoms The atoms whose auxiliary functions the B vectors are formed
+    /// for, or empty for all of them.
+    /// @return The B vectors of the Coulomb operator and those of the attenuated
+    /// one, on one sparsity pattern.
+    /// @note The pattern is the Coulomb bound for both, as the attenuated operator
+    /// is bounded by the plain one everywhere: erf(omega r) / r is at most 1 / r, so
+    /// a pair the Coulomb bound keeps cannot be one the attenuated integrals need
+    /// more of, and a pair it drops carries nothing in either.
+    /// @note The two are formed together and not by two calls. They share the
+    /// pattern, the blocks, and the walk of the indices of the gather and of the
+    /// scatter; what is doubled is the integrals, the product with the metric and
+    /// the storage, which is the work itself and not the bookkeeping around it.
+    auto compute_bq_vectors_rs(const CMolecule        &molecule,
+                               const CMolecularBasis  &basis,
+                               const CMolecularBasis  &aux_basis,
+                               const CPackedMatrix    &inverse_metric,
+                               const CPackedMatrix    &inverse_metric_erf,
+                               const double            threshold,
+                               const double            omega,
+                               const std::vector<int> &aux_atoms = {}) const
+        -> std::pair<CSparseTensor, CSparseTensor>;
+
     /// @brief Contracts the B vectors with a density matrix.
     /// @param bq_vectors The B vectors, as compute_bq_vectors returns them.
     /// @param basis The molecular basis on a and b sides.
@@ -233,6 +267,21 @@ class CSimdRIFockDriver
     /// compared against one another.
     auto set_dense_threshold(const double threshold) -> void;
 
+    /// @brief The fraction of the B vectors which is actually held.
+    /// @param bq_vectors The B vectors.
+    /// @param basis The molecular basis.
+    /// @param aux_basis The auxiliary molecular basis.
+    /// @return The number of values held over the number a dense tensor would hold.
+    /// @note This is the quantity the transformation compares against the threshold,
+    /// and it is the same walk, so what is reported is what would be decided on. It
+    /// is not free: it costs a pass over the combinations of every block.
+    /// @param held The auxiliary functions the tensor holds, which on more than one
+    /// rank is a share of the basis; zero takes the whole of it.
+    auto bq_density(const CSparseTensor   &bq_vectors,
+                    const CMolecularBasis &basis,
+                    const CMolecularBasis &aux_basis,
+                    const size_t           held = 0) const -> double;
+
     /// @brief Gets the density of the B vectors at which the transformation
     /// expands them.
     /// @return The density.
@@ -263,6 +312,31 @@ class CSimdRIFockDriver
                                  const double                      factor = 1.0) const -> void;
 
    private:
+    /// @brief Computes the B vectors of one operator or of two.
+    /// @param molecule The molecule to compute the B vectors of.
+    /// @param basis The molecular basis on a and b sides.
+    /// @param aux_basis The auxiliary molecular basis.
+    /// @param inverse_metrics The inverted metric of each operator, in the order the
+    /// tensors come back in: one for the Coulomb operator alone, or the Coulomb one
+    /// and then the attenuated one.
+    /// @param threshold The screening threshold.
+    /// @param omega The range separation parameter, or zero for the Coulomb operator
+    /// alone. It must be positive exactly when there are two metrics.
+    /// @param aux_atoms The atoms whose auxiliary functions the B vectors are formed
+    /// for, or empty for all of them.
+    /// @return One tensor per operator, all on one sparsity pattern.
+    /// @note Both public entries are written in terms of this, so the one operator
+    /// case is the same code as the two operator one and not a copy of it which
+    /// drifts. It carries the pattern, the blocks and the indices once whatever the
+    /// number of operators, and repeats only the values.
+    auto _compute_bq_vectors(const CMolecule                          &molecule,
+                             const CMolecularBasis                    &basis,
+                             const CMolecularBasis                    &aux_basis,
+                             const std::vector<const CPackedMatrix *> &inverse_metrics,
+                             const double                              threshold,
+                             const double                              omega,
+                             const std::vector<int>                   &aux_atoms) const -> std::vector<CSparseTensor>;
+
     /// @brief The density of the B vectors at which the transformation expands
     /// them into a square rather than walking their values.
     /// @note Zero, which is to say that the square is always formed. The product

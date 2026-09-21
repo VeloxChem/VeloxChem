@@ -52,9 +52,11 @@
 #include "Eigen/Dense"
 #endif
 #include "ScreeningFunc.hpp"
+#include "SimdRIFockCommon.hpp"
 #include "SimdThreeCenterElectronRepulsionDriver.hpp"
 #include "SimdT3CDistributor.hpp"
 #include "SimdTwoCenterElectronRepulsionDriver.hpp"
+#include "SimdTwoCenterElectronRepulsionRsDriver.hpp"
 #include "OpenMPFunc.hpp"
 #include "TripleSparsityPattern.hpp"
 
@@ -192,219 +194,18 @@ CSimdRIJKFockDriver::required_memory(const CMolecule        &molecule,
                                      const CMolecularBasis  &basis,
                                      const CMolecularBasis  &aux_basis,
                                      const double            threshold,
-                                     const std::vector<int> &aux_atoms) const -> size_t
+                                     const std::vector<int> &aux_atoms,
+                                     const bool              range_separated) const -> size_t
 {
-    // NOTE: the pattern of the B vectors is the pattern of the three-center
-    // integrals, as the metric is dense and the transformation of the auxiliary
-    // side keeps every atom which survives.
+    // NOTE: a hybrid range separated functional holds the attenuated B vectors
+    // beside the plain ones, on the same pattern, so it holds twice this. The
+    // doubling is here rather than in the shared count so that the budget check, the
+    // automatic choice of the way and the figure the output prints are all the
+    // memory this driver will actually hold.
 
-    // NOTE: the memory answered is the memory of the atoms asked for, which is the
-    // memory of this rank when the auxiliary basis is divided over a communicator.
-    // Answering the memory of the whole molecule there would put every rank on the
-    // direct way for a calculation each of them holds a fitting share of.
-
-    const CSimdThreeCenterElectronRepulsionDriver eri_drv;
-
-    const auto pattern = aux_atoms.empty() ? eri_drv.make_pattern(molecule, basis, aux_basis, threshold)
-                                           : eri_drv.make_pattern(molecule, basis, aux_basis, threshold, aux_atoms);
-
-    size_t nvalues = 0;
-
-    for (size_t i = 0; i < static_cast<size_t>(pattern.number_of_blocks()); i++)
-    {
-        nvalues += pattern.block(i).number_of_elements();
-    }
-
-    return nvalues * sizeof(double);
+    return (range_separated ? 2 : 1) * simdri::pattern_memory(molecule, basis, aux_basis, threshold, aux_atoms);
 }
 
-namespace {
-
-/// @brief Measures what each atom of the auxiliary side of a pattern carries.
-/// @param pattern The sparsity pattern to measure.
-/// @param natoms The number of atoms of the molecule.
-/// @return The memory of the values of each atom, in bytes.
-/// @note A block holds as many values for one of its atoms on the auxiliary side as
-/// for any other, so its memory divides evenly over them and the memory of an atom is
-/// the sum of the shares of the blocks which carry it.
-static auto
-atom_shares(const CTripleSparsityPattern &pattern, const size_t natoms) -> std::vector<double>
-{
-    std::vector<double> shares(natoms, 0.0);
-
-    for (const auto &block : pattern.blocks())
-    {
-        const auto &c_atoms = block.c_atoms();
-
-        if (c_atoms.empty()) continue;
-
-        const auto share =
-            static_cast<double>(block.number_of_elements() * sizeof(double)) / static_cast<double>(c_atoms.size());
-
-        for (const auto atom : c_atoms) shares[static_cast<size_t>(atom)] += share;
-    }
-
-    return shares;
-}
-
-/// @brief Gets the dense indices of the auxiliary basis functions of given atoms.
-/// @param aux_basis The auxiliary molecular basis.
-/// @param atoms The atoms, as their indices in the molecule, or none of them for all
-/// of them.
-/// @return The indices, in ascending order.
-/// @note The dense index runs over the angular momenta of the whole molecule before
-/// it runs over the atoms, so the functions of one atom are scattered through it and
-/// the functions of a set of atoms are a set rather than a range.
-static auto
-aux_functions_of(const CMolecularBasis &aux_basis, const std::vector<int> &atoms) -> std::vector<size_t>
-{
-    const auto set_indices = aux_basis.basis_sets_indices();
-
-    const auto natoms = set_indices.size();
-
-    const auto indices = denseidx::index_functions(aux_basis);
-
-    const auto starts = denseidx::make_dense_starts(aux_basis);
-
-    const auto strides = denseidx::make_dense_strides(aux_basis);
-
-    const auto nmoms = static_cast<size_t>(aux_basis.max_angular_momentum() + 1);
-
-    std::vector<int> all_atoms;
-
-    if (atoms.empty())
-    {
-        all_atoms.reserve(natoms);
-
-        for (size_t atom = 0; atom < natoms; atom++) all_atoms.push_back(static_cast<int>(atom));
-    }
-
-    std::vector<size_t> functions;
-
-    for (const auto atom : (atoms.empty() ? all_atoms : atoms))
-    {
-        const auto index = static_cast<size_t>(atom);
-
-        for (const auto [lc, kc] : indices[static_cast<size_t>(set_indices[index])])
-        {
-            const auto lval = static_cast<size_t>(lc);
-
-            for (size_t mc = 0; mc < static_cast<size_t>(2 * lc + 1); mc++)
-            {
-                functions.push_back(starts[index * nmoms + lval] + kc + mc * strides[lval]);
-            }
-        }
-    }
-
-    std::sort(functions.begin(), functions.end());
-
-    return functions;
-}
-
-/// @brief Forms the metric a way of building asks for, and the way it is for.
-/// @param molecule The molecule to compute the metric of.
-/// @param aux_basis The auxiliary molecular basis.
-/// @param metric_threshold The threshold below which a direction is dropped.
-/// @param use_inverse_square_root Whether to invert the square root of the metric.
-/// @param mode The way of building the metric is for.
-/// @param two_center_time Where to add the time of the two-center integrals, if
-/// anywhere.
-/// @param metric_time Where to add the time of the inversion, if anywhere.
-/// @return The metric, and the way it is for.
-static auto
-form_metric(const CMolecule       &molecule,
-            const CMolecularBasis &aux_basis,
-            const double           metric_threshold,
-            const bool             use_inverse_square_root,
-            const rimode           mode,
-            double                *two_center_time,
-            double                *metric_time) -> std::pair<CPackedMatrix, rimode>
-{
-    const auto mark_two_center = prof_clock::now();
-
-    const auto two_center = CSimdTwoCenterElectronRepulsionDriver().compute(molecule, aux_basis);
-
-    if (two_center_time) *two_center_time += prof_since(mark_two_center);
-
-    const auto mark_metric = prof_clock::now();
-
-    // NOTE: both forms of the metric close the resolution of the identity, and the
-    // Cholesky factor costs an order of magnitude less, so it is tried first. A
-    // fitting basis which is close to linearly dependent has none, and the square
-    // root is inverted in its place, dropping the directions which carry nothing.
-
-    // NOTE: the direct way solves with the factor rather than multiplying by its
-    // inverse, so it is the factor which is kept. The inverted square root is
-    // taken for a metric which has no factor, in either way, as the B vectors
-    // formed with it close the same sum.
-
-    if (mode == rimode::direct)
-    {
-        if (!use_inverse_square_root)
-        {
-            try
-            {
-                auto factor = packlin::cholesky_factor(two_center);
-
-                if (metric_time) *metric_time += prof_since(mark_metric);
-
-                return {std::move(factor), rimode::direct};
-            }
-            catch (const std::runtime_error &)
-            {
-                errors::msg(std::string("RIJKFockDriver: The metric of the fitting basis has no Cholesky factor, so "
-                                        "its square root is inverted instead and multiplied by. This is a nearly "
-                                        "linearly dependent fitting basis."),
-                            "Warning");
-            }
-        }
-
-        // NOTE: the direct way solves the Cholesky factor against the half
-        // transformed integrals where it has one, and multiplies by the inverted
-        // square root where that is what was asked for, or where there is no factor
-        // to be had. The two close the same sum: solving the factor gives B with
-        // B^T B equal to A^T V^-1 A, and so does multiplying by the root, the root
-        // being its own transpose. The root costs twice the arithmetic and is a
-        // product rather than a substitution, which is the trade. Falling back to
-        // holding the B vectors instead, which is what this did, asks for the
-        // memory the direct way was chosen for want of.
-
-        auto root = packlin::inverse_square_root(two_center, metric_threshold);
-
-        if (metric_time) *metric_time += prof_since(mark_metric);
-
-        return {std::move(root), rimode::direct};
-    }
-
-    auto metric = CPackedMatrix();
-
-    if (use_inverse_square_root)
-    {
-        metric = packlin::inverse_square_root(two_center, metric_threshold);
-    }
-    else
-    {
-        try
-        {
-            metric = packlin::cholesky_inverse(two_center);
-        }
-        catch (const std::runtime_error &)
-        {
-            errors::msg(std::string("RIJKFockDriver: The metric of the fitting basis has no Cholesky factor, so its "
-                                    "square root is inverted instead. This is a nearly linearly dependent fitting "
-                                    "basis."),
-                        "Warning");
-
-            metric = packlin::inverse_square_root(two_center, metric_threshold);
-        }
-    }
-
-    if (metric_time) *metric_time += prof_since(mark_metric);
-
-    return {std::move(metric), rimode::in_memory};
-}
-
-}  // namespace
 
 auto
 CSimdRIJKFockDriver::make_metric(const CMolecule       &molecule,
@@ -416,7 +217,69 @@ CSimdRIJKFockDriver::make_metric(const CMolecule       &molecule,
     errors::assertMsgCritical(mode != rimode::automatic,
                               std::string("RIJKFockDriver: The metric is formed for a named way of building"));
 
-    return form_metric(molecule, aux_basis, metric_threshold, use_inverse_square_root, mode, nullptr, nullptr);
+    return simdri::form_metric(molecule, aux_basis, metric_threshold, use_inverse_square_root, mode, nullptr, nullptr);
+}
+
+auto
+CSimdRIJKFockDriver::make_metric_rs(const CMolecule       &molecule,
+                                    const CMolecularBasis &aux_basis,
+                                    const double           metric_threshold,
+                                    const bool             use_inverse_square_root,
+                                    const rimode           mode,
+                                    const double           omega) const -> std::pair<CPackedMatrix, CPackedMatrix>
+{
+    // NOTE: the way which forms the integrals again on every call solves the factor
+    // of the metric against the half transformed integrals, and there is one such
+    // pass and one factor. Two operators there means two passes and two factors,
+    // which its three calls have no shape for, so the range separated way is the
+    // one which holds the B vectors and this refuses the other rather than forming
+    // a metric which cannot be used.
+    errors::assertMsgCritical(mode == rimode::in_memory,
+                              std::string("RIJKFockDriver: The range separated metrics are formed only for the way "
+                                          "which holds the B vectors"));
+
+    // NOTE: the attenuated metric of a vanishing omega is the zero matrix, whose
+    // inverse is not a thing to fall back into. A caller with no range separation
+    // wants the plain metric and make_metric above.
+    errors::assertMsgCritical(omega > 0.0,
+                              std::string("RIJKFockDriver: The range separation parameter must be positive"));
+
+    // NOTE: the two matrices come out of one call, which forms the two operators
+    // over one set of primitive pairs rather than sweeping the fitting basis twice.
+
+    const auto [two_center, two_center_erf] =
+        CSimdTwoCenterElectronRepulsionRsDriver().compute(molecule, aux_basis, omega);
+
+    // NOTE: both are inverted by the route asked for, with the same fallback. The
+    // attenuated metric is the worse conditioned of the two by construction -- the
+    // transform of erf(omega r) / r carries a Gaussian factor where that of 1 / r
+    // does not, so its spectrum falls away exponentially rather than as a power.
+    // The fitting sets measured have a least eigenvalue of 1e-15 to 1e-13 at the
+    // omega of a range separated functional, against 1e-6 to 1e-3 for the plain
+    // metric of the same basis. The warning names which of the two it was, as the
+    // two are not interchangeable and a reader of the output would otherwise not
+    // know.
+
+    // NOTE: the fallback is therefore not a reliable guard here, and is not meant
+    // to be one. A matrix whose least eigenvalue is a small positive number has a
+    // Cholesky factor as far as the factorization is concerned, so it succeeds and
+    // returns one whose inverse differs from the inverse on the conditioned
+    // directions by six orders of magnitude. **That is harmless, and forcing the
+    // eigenvalue route to avoid it would buy nothing.** All of that difference
+    // lives in the near null space, where the attenuated three-center integrals are
+    // themselves zero: the same Gaussian damping which empties the metric there
+    // empties them. Measured on water in def2-SVP against the four-center
+    // attenuated exchange, the two routes agree to every digit -- 3.85e-09 against
+    // 3.86e-09 of relative error at omega 0.2, 4.59e-07 at 0.33 -- and the error is
+    // the fitting error of the basis and not the conditioning of the metric.
+
+    auto metric = simdri::invert_metric(two_center, metric_threshold, use_inverse_square_root,
+                                "metric of the fitting basis");
+
+    auto metric_erf = simdri::invert_metric(two_center_erf, metric_threshold, use_inverse_square_root,
+                                    "attenuated metric of the fitting basis");
+
+    return {std::move(metric), std::move(metric_erf)};
 }
 
 auto
@@ -430,13 +293,24 @@ CSimdRIJKFockDriver::prepare(const CMolecule       &molecule,
                              const rimode           mode,
                              const std::vector<int> &aux_atoms,
                              const CPackedMatrix   &metric,
-                             const size_t           min_parts) -> void
+                             const size_t           min_parts,
+                             const double           omega,
+                             const CPackedMatrix   &metric_erf) -> void
 {
     CPrepareProfile profile;
 
     const auto profile_start = prof_clock::now();
 
-    const auto memory = required_memory(molecule, basis, aux_basis, threshold, aux_atoms);
+    errors::assertMsgCritical(omega >= 0.0,
+                              std::string("RIJKFockDriver: The range separation parameter must not be negative"));
+
+    // NOTE: a positive omega is what makes this a range separated build. It carries
+    // a second set of B vectors, so the memory it asks for is twice the plain one
+    // and the choice of the way is taken from that rather than from half of it.
+
+    const auto range_separated = (omega > 0.0);
+
+    const auto memory = required_memory(molecule, basis, aux_basis, threshold, aux_atoms, range_separated);
 
     _budget = memory_budget;
 
@@ -445,6 +319,20 @@ CSimdRIJKFockDriver::prepare(const CMolecule       &molecule,
     // way at once rather than after the work of forming them.
 
     _mode = (mode == rimode::automatic) ? ((memory > memory_budget) ? rimode::direct : rimode::in_memory) : mode;
+
+    // NOTE: the way which forms the integrals again on every call accumulates the
+    // right hand side of its fitting from them during the sweep which builds the
+    // exchange, and that sweep and that fitting are one apiece. Two operators there
+    // would be two sweeps and two fittings inside three calls which have no shape
+    // for them, so it is refused. The message names both ways of arriving here: the
+    // direct way asked for outright, and the automatic choice falling to it because
+    // two sets of B vectors do not fit where one would have.
+
+    errors::assertMsgCritical(!(range_separated && (_mode == rimode::direct)),
+                              std::string("RIJKFockDriver: A hybrid range separated functional is served only by the "
+                                          "way which holds the B vectors, and this calculation is on the direct way "
+                                          "-- either because it was asked for, or because the two sets of B vectors "
+                                          "do not fit in the budget"));
 
     _molecule = molecule;
 
@@ -461,12 +349,57 @@ CSimdRIJKFockDriver::prepare(const CMolecule       &molecule,
 
     const auto given = (metric.number_of_elements() > 0);
 
+    const auto given_erf = (metric_erf.number_of_elements() > 0);
+
     errors::assertMsgCritical(!(given && (_mode == rimode::automatic)),
                               std::string("RIJKFockDriver: A metric given to the driver is for a named way of building"));
 
-    auto [formed, formed_mode] =
-        given ? std::pair<CPackedMatrix, rimode>{metric, _mode}
-              : form_metric(molecule, aux_basis, metric_threshold, use_inverse_square_root, _mode, &profile.two_center, &profile.metric);
+    errors::assertMsgCritical(range_separated || !given_erf,
+                              std::string("RIJKFockDriver: An attenuated metric was given without a range separation "
+                                          "parameter to have formed it at"));
+
+    errors::assertMsgCritical(!range_separated || (given == given_erf),
+                              std::string("RIJKFockDriver: A range separated build takes both metrics from the caller "
+                                          "or forms both here, and not one of each"));
+
+    auto formed = CPackedMatrix();
+
+    auto formed_erf = CPackedMatrix();
+
+    auto formed_mode = _mode;
+
+    if (range_separated)
+    {
+        // NOTE: the two are formed together where they are not given, which is one
+        // sweep of the fitting basis rather than two. The whole of it is charged to
+        // the inversion, as the two-center call answers both operators at once and
+        // there is no separate integral time to report.
+
+        const auto mark_metric = prof_clock::now();
+
+        if (given)
+        {
+            formed = metric;
+
+            formed_erf = metric_erf;
+        }
+        else
+        {
+            std::tie(formed, formed_erf) =
+                make_metric_rs(molecule, aux_basis, metric_threshold, use_inverse_square_root, rimode::in_memory, omega);
+        }
+
+        profile.metric += prof_since(mark_metric);
+
+        formed_mode = rimode::in_memory;
+    }
+    else
+    {
+        std::tie(formed, formed_mode) =
+            given ? std::pair<CPackedMatrix, rimode>{metric, _mode}
+                  : simdri::form_metric(molecule, aux_basis, metric_threshold, use_inverse_square_root, _mode,
+                                &profile.two_center, &profile.metric);
+    }
 
     _mode = formed_mode;
 
@@ -511,9 +444,15 @@ CSimdRIJKFockDriver::prepare(const CMolecule       &molecule,
         // NOTE: the direct way holds no B vectors and refuses a division of the
         // atoms, so it sweeps the whole auxiliary basis and says so.
 
-        _aux_functions = aux_functions_of(aux_basis, {});
+        _aux_functions = simdri::aux_functions_of(aux_basis, {});
 
         _bq_vectors = CSparseTensor();
+
+        _bq_vectors_erf = CSparseTensor();
+
+        _metric_erf = CPackedMatrix();
+
+        _omega = 0.0;
 
         _w_vectors.clear();
 
@@ -528,15 +467,29 @@ CSimdRIJKFockDriver::prepare(const CMolecule       &molecule,
 
     _metric = std::move(formed);
 
+    _metric_erf = std::move(formed_erf);
+
+    _omega = omega;
+
     _parts.clear();
 
     _coulomb_parts.clear();
 
-    _aux_functions = aux_functions_of(aux_basis, aux_atoms);
+    _aux_functions = simdri::aux_functions_of(aux_basis, aux_atoms);
 
     const auto mark_bq_vectors = prof_clock::now();
 
-    _bq_vectors = _drv.compute_bq_vectors(molecule, basis, aux_basis, _metric, threshold, aux_atoms);
+    if (range_separated)
+    {
+        std::tie(_bq_vectors, _bq_vectors_erf) = _drv.compute_bq_vectors_rs(
+            molecule, basis, aux_basis, _metric, _metric_erf, threshold, omega, aux_atoms);
+    }
+    else
+    {
+        _bq_vectors = _drv.compute_bq_vectors(molecule, basis, aux_basis, _metric, threshold, aux_atoms);
+
+        _bq_vectors_erf = CSparseTensor();
+    }
 
     profile.bq_vectors += prof_since(mark_bq_vectors);
 
@@ -554,11 +507,26 @@ CSimdRIJKFockDriver::prepare(const CMolecule       &molecule,
 auto
 CSimdRIJKFockDriver::compute(const CPackedMatrix &density,
                              const CPackedMatrix &coefficients,
-                             const double         exchange_scaling_factor) -> CPackedMatrix
+                             const double         exchange_scaling_factor,
+                             const double         erf_exchange_scaling_factor) -> CPackedMatrix
 {
     errors::assertMsgCritical(_prepared, std::string("RIJKFockDriver: The driver has not been prepared"));
 
-    if (_mode == rimode::direct) return _compute_direct(coefficients, exchange_scaling_factor);
+    // NOTE: a driver which holds no attenuated B vectors cannot answer for an
+    // attenuated exchange, and a build which quietly left the long range term out
+    // would converge to a wrong energy without saying anything. It is refused.
+
+    errors::assertMsgCritical((erf_exchange_scaling_factor == 0.0) || (_omega > 0.0),
+                              std::string("RIJKFockDriver: The exchange of the attenuated operator was asked for and "
+                                          "the driver holds no attenuated B vectors"));
+
+    if (_mode == rimode::direct)
+    {
+        errors::assertMsgCritical(erf_exchange_scaling_factor == 0.0,
+                                  std::string("RIJKFockDriver: The direct way does not form the attenuated exchange"));
+
+        return _compute_direct(coefficients, exchange_scaling_factor);
+    }
 
     CInMemoryProfile profile;
 
@@ -576,7 +544,11 @@ CSimdRIJKFockDriver::compute(const CPackedMatrix &density,
 
     profile.coulomb += prof_since(mark_coulomb);
 
-    if (exchange_scaling_factor == 0.0)
+    // NOTE: the Coulomb matrix is of the plain operator alone. Only the exchange of
+    // a range separated functional is split between the two operators; its Coulomb
+    // term is the whole of 1/r and is formed from the plain B vectors as ever.
+
+    if ((exchange_scaling_factor == 0.0) && (erf_exchange_scaling_factor == 0.0))
     {
         profile.total = prof_since(profile_start);
 
@@ -648,11 +620,53 @@ CSimdRIJKFockDriver::compute(const CPackedMatrix &density,
 
     profile.allocate += prof_since(mark_allocate);
 
+    // NOTE: one operator or two, into the same storage and inside one pass over the
+    // ranges. The plain exchange of a range is added before the attenuated W
+    // matrices of that range are formed, so nothing of the first is still needed
+    // when the second overwrites it and the two operators cost one range's storage
+    // and not two.
+
+    auto add_exchange = [&](const CSparseTensor &bq_vectors, const double factor,
+                            const std::vector<size_t> &batch) {
+        if (factor == 0.0) return;
+
+        const auto mark_transform = prof_clock::now();
+
+        // NOTE: the last range is shorter than the others, and the storage is
+        // handed to the transformation as the range it is asked to fill.
+
+        if (batch.size() == _w_vectors.size())
+        {
+            _drv.compute_w_vectors(bq_vectors, _basis, _aux_basis, coefficients, batch, _w_vectors);
+
+            profile.transform += prof_since(mark_transform);
+
+            const auto mark_exchange = prof_clock::now();
+
+            _drv.compute_exchange_matrix(_w_vectors, fock, -factor);
+
+            profile.exchange += prof_since(mark_exchange);
+        }
+        else
+        {
+            auto tail =
+                std::vector<CPackedMatrix>(_w_vectors.begin(), _w_vectors.begin() + static_cast<long>(batch.size()));
+
+            _drv.compute_w_vectors(bq_vectors, _basis, _aux_basis, coefficients, batch, tail);
+
+            profile.transform += prof_since(mark_transform);
+
+            const auto mark_exchange = prof_clock::now();
+
+            _drv.compute_exchange_matrix(tail, fock, -factor);
+
+            profile.exchange += prof_since(mark_exchange);
+        }
+    };
+
     for (size_t first = 0; first < nheld; first += nbatch)
     {
         const auto last = std::min(first + nbatch, nheld);
-
-        const auto count = last - first;
 
         // NOTE: the functions of this range of the set this driver holds, which is
         // what the transformation is asked for. A rank which holds a share of the
@@ -663,37 +677,9 @@ CSimdRIJKFockDriver::compute(const CPackedMatrix &density,
         const auto batch = std::vector<size_t>(_aux_functions.begin() + static_cast<long>(first),
                                                _aux_functions.begin() + static_cast<long>(last));
 
-        // NOTE: the last range is shorter than the others, and the storage is
-        // handed to the transformation as the range it is asked to fill.
+        add_exchange(_bq_vectors, exchange_scaling_factor, batch);
 
-        const auto mark_transform = prof_clock::now();
-
-        if (count == nbatch)
-        {
-            _drv.compute_w_vectors(_bq_vectors, _basis, _aux_basis, coefficients, batch, _w_vectors);
-
-            profile.transform += prof_since(mark_transform);
-
-            const auto mark_exchange = prof_clock::now();
-
-            _drv.compute_exchange_matrix(_w_vectors, fock, -exchange_scaling_factor);
-
-            profile.exchange += prof_since(mark_exchange);
-        }
-        else
-        {
-            auto tail = std::vector<CPackedMatrix>(_w_vectors.begin(), _w_vectors.begin() + static_cast<long>(count));
-
-            _drv.compute_w_vectors(_bq_vectors, _basis, _aux_basis, coefficients, batch, tail);
-
-            profile.transform += prof_since(mark_transform);
-
-            const auto mark_exchange = prof_clock::now();
-
-            _drv.compute_exchange_matrix(tail, fock, -exchange_scaling_factor);
-
-            profile.exchange += prof_since(mark_exchange);
-        }
+        add_exchange(_bq_vectors_erf, erf_exchange_scaling_factor, batch);
     }
 
     profile.total = prof_since(profile_start);
@@ -701,6 +687,188 @@ CSimdRIJKFockDriver::compute(const CPackedMatrix &density,
     if (prof_wanted()) profile.report();
 
     return fock;
+}
+
+auto
+CSimdRIJKFockDriver::compute(const CPackedMatrix &density,
+                             const CPackedMatrix &coefficients_alpha,
+                             const CPackedMatrix &coefficients_beta,
+                             const double         exchange_scaling_factor,
+                             const double         erf_exchange_scaling_factor) -> std::pair<CPackedMatrix, CPackedMatrix>
+{
+    errors::assertMsgCritical(_prepared, std::string("RIJKFockDriver: The driver has not been prepared"));
+
+    errors::assertMsgCritical((erf_exchange_scaling_factor == 0.0) || (_omega > 0.0),
+                              std::string("RIJKFockDriver: The exchange of the attenuated operator was asked for and "
+                                          "the driver holds no attenuated B vectors"));
+
+    // NOTE: the direct way accumulates the right hand side of its fitting from the
+    // integrals during the same sweep which builds the exchange, and its build is
+    // split into three calls so that a rank can gather that fitting between the
+    // first and the last. Two spins there means two exchanges and one fitting
+    // summed over both inside that sweep, which those three calls have no shape
+    // for. It is refused rather than served wrongly.
+    errors::assertMsgCritical(_mode != rimode::direct,
+                              std::string("RIJKFockDriver: The open shell Fock matrices are formed only by the way "
+                                          "which holds the B vectors"));
+
+    CInMemoryProfile profile;
+
+    const auto profile_start = prof_clock::now();
+
+    // NOTE: the density is that of both spins added, so the Coulomb matrix enters
+    // once and is not doubled, where the closed shell call is handed one spin's
+    // density and doubles it.
+
+    const auto mark_coulomb = prof_clock::now();
+
+    auto fock_alpha = _drv.compute_fock_matrix(_bq_vectors, _basis, _aux_basis, density);
+
+    auto fock_beta = fock_alpha;
+
+    profile.coulomb += prof_since(mark_coulomb);
+
+    const auto nao = _basis.dimensions_of_basis();
+
+    const auto norb_alpha = coefficients_alpha.number_of_columns();
+
+    const auto norb_beta = coefficients_beta.number_of_columns();
+
+    errors::assertMsgCritical((coefficients_alpha.get_type() == mat_t::general) &&
+                                  (coefficients_alpha.number_of_rows() == nao),
+                              std::string("RIJKFockDriver: The alpha orbital coefficients do not match the molecular basis"));
+
+    errors::assertMsgCritical((coefficients_beta.get_type() == mat_t::general) &&
+                                  (coefficients_beta.number_of_rows() == nao),
+                              std::string("RIJKFockDriver: The beta orbital coefficients do not match the molecular basis"));
+
+    if (((exchange_scaling_factor == 0.0) && (erf_exchange_scaling_factor == 0.0)) ||
+        ((norb_alpha == 0) && (norb_beta == 0)))
+    {
+        profile.total = prof_since(profile_start);
+
+        if (prof_wanted()) profile.report();
+
+        return {std::move(fock_alpha), std::move(fock_beta)};
+    }
+
+    // NOTE: the range holds a matrix of the basis by the occupied orbitals of each
+    // spin, so a function of it costs the two together. The same memory therefore
+    // buys about half the range it buys for one spin, which is what holding two
+    // spins' worth of W matrices costs and is not a penalty of doing them together.
+
+    const auto per_function = nao * (norb_alpha + norb_beta) * sizeof(double);
+
+    const auto allowance = std::min(_w_batch_memory, std::max(_budget / _w_batch_divisor, size_t{1}));
+
+    const auto by_memory = std::max(size_t{1}, allowance / std::max(per_function, size_t{1}));
+
+    const auto nheld = _aux_functions.size();
+
+    const auto nbatch = std::min(nheld, std::max(_w_batch, by_memory));
+
+    const auto mark_allocate = prof_clock::now();
+
+    // NOTE: formed again only when the shape changes, as the closed shell call
+    // does. A spin with no occupied orbitals is given no storage and no pass.
+
+    auto fit = [&](std::vector<CPackedMatrix> &storage, const size_t norbitals) {
+        if (norbitals == 0) return;
+
+        if ((storage.size() != nbatch) || (storage.front().number_of_columns() != norbitals) ||
+            (storage.front().number_of_rows() != nao))
+        {
+            storage.clear();
+
+            storage.reserve(nbatch);
+
+            for (size_t i = 0; i < nbatch; i++)
+            {
+                storage.emplace_back(nao, norbitals, mat_t::general);
+            }
+        }
+    };
+
+    fit(_w_vectors, norb_alpha);
+
+    fit(_w_vectors_beta, norb_beta);
+
+    profile.allocate += prof_since(mark_allocate);
+
+    // NOTE: one pass over the ranges with both spins inside it, so a range's B
+    // vectors are read once and serve both rather than being swept twice.
+
+    auto add_exchange = [&](const CSparseTensor         &bq_vectors,
+                            const double                 factor,
+                            std::vector<CPackedMatrix>  &storage,
+                            const CPackedMatrix         &coefficients,
+                            const size_t                 norbitals,
+                            CPackedMatrix               &fock,
+                            const std::vector<size_t>   &batch) {
+        if ((norbitals == 0) || (factor == 0.0)) return;
+
+        const auto mark_transform = prof_clock::now();
+
+        if (batch.size() == storage.size())
+        {
+            _drv.compute_w_vectors(bq_vectors, _basis, _aux_basis, coefficients, batch, storage);
+
+            profile.transform += prof_since(mark_transform);
+
+            const auto mark_exchange = prof_clock::now();
+
+            _drv.compute_exchange_matrix(storage, fock, -factor);
+
+            profile.exchange += prof_since(mark_exchange);
+        }
+        else
+        {
+            // NOTE: the last range is shorter than the others, and the storage is
+            // handed to the transformation as the range it is asked to fill.
+            auto tail = std::vector<CPackedMatrix>(storage.begin(),
+                                                   storage.begin() + static_cast<long>(batch.size()));
+
+            _drv.compute_w_vectors(bq_vectors, _basis, _aux_basis, coefficients, batch, tail);
+
+            profile.transform += prof_since(mark_transform);
+
+            const auto mark_exchange = prof_clock::now();
+
+            _drv.compute_exchange_matrix(tail, fock, -factor);
+
+            profile.exchange += prof_since(mark_exchange);
+        }
+    };
+
+    for (size_t first = 0; first < nheld; first += nbatch)
+    {
+        const auto last = std::min(first + nbatch, nheld);
+
+        const auto batch = std::vector<size_t>(_aux_functions.begin() + static_cast<long>(first),
+                                               _aux_functions.begin() + static_cast<long>(last));
+
+        // NOTE: grouped by operator and not by spin, so that a range of the plain B
+        // vectors is read for both spins before the attenuated ones are touched at
+        // all. The other order reads each tensor twice for every range.
+
+        add_exchange(_bq_vectors, exchange_scaling_factor, _w_vectors, coefficients_alpha, norb_alpha, fock_alpha,
+                     batch);
+
+        add_exchange(_bq_vectors, exchange_scaling_factor, _w_vectors_beta, coefficients_beta, norb_beta, fock_beta,
+                     batch);
+
+        add_exchange(_bq_vectors_erf, erf_exchange_scaling_factor, _w_vectors, coefficients_alpha, norb_alpha,
+                     fock_alpha, batch);
+
+        add_exchange(_bq_vectors_erf, erf_exchange_scaling_factor, _w_vectors_beta, coefficients_beta, norb_beta,
+                     fock_beta, batch);
+    }
+
+    profile.total = prof_since(profile_start);
+
+    if (prof_wanted()) profile.report();
+
+    return {std::move(fock_alpha), std::move(fock_beta)};
 }
 
 auto
@@ -725,6 +893,44 @@ auto
 CSimdRIJKFockDriver::get_metric() const -> const CPackedMatrix &
 {
     return _metric;
+}
+
+auto
+CSimdRIJKFockDriver::get_bq_vectors_erf() const -> const CSparseTensor &
+{
+    return _bq_vectors_erf;
+}
+
+auto
+CSimdRIJKFockDriver::get_metric_erf() const -> const CPackedMatrix &
+{
+    return _metric_erf;
+}
+
+auto
+CSimdRIJKFockDriver::set_dense_threshold(const double threshold) -> void
+{
+    _drv.set_dense_threshold(threshold);
+}
+
+auto
+CSimdRIJKFockDriver::get_dense_threshold() const -> double
+{
+    return _drv.get_dense_threshold();
+}
+
+auto
+CSimdRIJKFockDriver::bq_density() const -> double
+{
+    if (_bq_vectors.number_of_blocks() == 0) return 0.0;
+
+    return _drv.bq_density(_bq_vectors, _basis, _aux_basis, _aux_functions.size());
+}
+
+auto
+CSimdRIJKFockDriver::get_omega() const -> double
+{
+    return _omega;
 }
 
 auto
@@ -784,8 +990,6 @@ CSimdRIJKFockDriver::compute_exchange(const CPackedMatrix &coefficients,
 
     const auto *cvalues = coefficients.data();
 
-    CSimdThreeCenterElectronRepulsionDriver eri_drv;
-
     // one sweep of the integrals for every batch of the orbitals asked for
 
     for (size_t first = ofirst; first < olast; first += nbatch)
@@ -831,15 +1035,9 @@ CSimdRIJKFockDriver::compute_exchange(const CPackedMatrix &coefficients,
 
         for (const auto &pattern : _parts)
         {
-            auto integrals = CSparseTensor(pattern);
-
-            integrals.allocate();
-
-            auto distributor = CSimdT3CDistributor<CSparseTensor>(&integrals);
-
             const auto mark_integrals = prof_clock::now();
 
-            eri_drv.compute(pattern, _molecule, _basis, _aux_basis, distributor);
+            auto integrals = simdri::integrals_of_part(pattern, _molecule, _basis, _aux_basis);
 
             _direct_times.integrals_a += prof_since(mark_integrals);
 
@@ -995,8 +1193,6 @@ CSimdRIJKFockDriver::compute_coulomb(const std::vector<double> &gamma,
 
     const auto profile_start = prof_clock::now();
 
-    CSimdThreeCenterElectronRepulsionDriver eri_drv;
-
     const auto &patterns = _coulomb_patterns();
 
     for (const auto index : parts)
@@ -1007,15 +1203,9 @@ CSimdRIJKFockDriver::compute_coulomb(const std::vector<double> &gamma,
 
         const auto &pattern = patterns[static_cast<size_t>(index)];
 
-        auto integrals = CSparseTensor(pattern);
-
-        integrals.allocate();
-
-        auto distributor = CSimdT3CDistributor<CSparseTensor>(&integrals);
-
         const auto mark_integrals = prof_clock::now();
 
-        eri_drv.compute(pattern, _molecule, _basis, _aux_basis, distributor);
+        auto integrals = simdri::integrals_of_part(pattern, _molecule, _basis, _aux_basis);
 
         _direct_times.integrals_b += prof_since(mark_integrals);
 
@@ -1056,9 +1246,7 @@ CSimdRIJKFockDriver::aux_atom_weights(const CMolecule       &molecule,
                                       const CMolecularBasis &aux_basis,
                                       const double           threshold) const -> std::vector<double>
 {
-    const auto pattern = CSimdThreeCenterElectronRepulsionDriver().make_pattern(molecule, basis, aux_basis, threshold);
-
-    return atom_shares(pattern, static_cast<size_t>(molecule.number_of_atoms()));
+    return simdri::aux_atom_weights(molecule, basis, aux_basis, threshold);
 }
 
 auto
@@ -1201,61 +1389,7 @@ CSimdRIJKFockDriver::_make_parts(const CMolecule              &molecule,
                                  const CTripleSparsityPattern &pattern,
                                  const size_t                  min_parts) const -> std::vector<CTripleSparsityPattern>
 {
-    const auto natoms = static_cast<size_t>(molecule.number_of_atoms());
-
-    const auto shares = atom_shares(pattern, natoms);
-
-    // NOTE: the parts are cut at whichever is the smaller of what the memory allows
-    // and an equal division into the number asked for. A machine with memory to spare
-    // gives one part, and the caller which divides the Coulomb pass over the ranks of
-    // a communicator then has one part for all of them: one rank sweeps the integrals
-    // a second time and the others wait. Cutting finer costs nothing, as the parts are
-    // a division of the same atoms and their integrals are the same integrals however
-    // they are grouped.
-
-    const auto total = std::accumulate(shares.begin(), shares.end(), 0.0);
-
-    const auto by_memory = static_cast<double>(_budget / 2);
-
-    const auto by_parts = total / static_cast<double>(std::max(min_parts, size_t{1}));
-
-    const auto cut = std::min(by_memory, by_parts);
-
-    // NOTE: the atoms are gathered in the order they are given until the integrals
-    // of a part reach the budget. An atom whose own integrals are above it is a part
-    // of its own, as there is nothing smaller to divide.
-
-    const CSimdThreeCenterElectronRepulsionDriver eri_drv;
-
-    std::vector<CTripleSparsityPattern> parts;
-
-    std::vector<int> atoms;
-
-    double memory = 0.0;
-
-    for (size_t atom = 0; atom < natoms; atom++)
-    {
-        const auto share = shares[atom];
-
-        if (share <= 0.0) continue;
-
-        if ((!atoms.empty()) && ((memory + share) > cut))
-        {
-            parts.push_back(eri_drv.make_pattern(molecule, basis, aux_basis, threshold, atoms));
-
-            atoms.clear();
-
-            memory = 0.0;
-        }
-
-        atoms.push_back(static_cast<int>(atom));
-
-        memory += share;
-    }
-
-    if (!atoms.empty()) parts.push_back(eri_drv.make_pattern(molecule, basis, aux_basis, threshold, atoms));
-
-    return parts;
+    return simdri::make_parts(molecule, basis, aux_basis, threshold, pattern, min_parts, _budget);
 }
 
 auto

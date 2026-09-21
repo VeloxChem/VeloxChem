@@ -37,6 +37,7 @@ import time
 import sys
 
 from .oneeints import compute_electric_dipole_integrals
+from . import rijkresponse
 from .veloxchemlib import mpi_master, hartree_in_wavenumber
 from .profiler import Profiler
 from .outputstream import OutputStream
@@ -269,6 +270,13 @@ class ShgDriver(NonlinearSolver):
 
         # Computing the first-order response vectors (3 per frequency)
 
+        # NOTE: the B vectors are formed before the solvers this driver drives
+        # are made, so that each of them is handed the same ones rather than
+        # forming its own. Forming them again where the integrals are set up
+        # costs nothing, the driver holding them already.
+        if self.ri_jk:
+            rijkresponse.initialize(self, molecule, ao_basis)
+
         N_drv = ComplexResponseSolver(self.comm, self.ostream)
 
         cpp_keywords = [
@@ -276,11 +284,14 @@ class ShgDriver(NonlinearSolver):
             'conv_thresh', 'max_iter', 'eri_thresh', 'timing',
             'memory_profiling', 'batch_size', 'restart', 'xcfun', 'grid_level',
             'potfile', 'electric_field', 'program_end_time', '_debug',
-            '_block_size_factor', 'ri_coulomb'
+            '_block_size_factor', 'ri_coulomb', 'ri_jk', 'ri_jk_simd',
+            'ri_auxiliary_basis'
         ]
 
         for key in cpp_keywords:
             setattr(N_drv, key, getattr(self, key))
+
+        rijkresponse.share(self, N_drv)
 
         if self.checkpoint_file is not None:
             fpath = Path(self.checkpoint_file)
@@ -553,6 +564,15 @@ class ShgDriver(NonlinearSolver):
         distributed_density_1 = None
         distributed_density_2 = None
 
+        # NOTE: the factors of the sigma and lambda densities, collected beside
+        # them and carried on the driver. They are block diagonal in the orbitals,
+        # each of them a commutator of two first-order things, which is the shape
+        # the driver takes as four factors.
+        self._ri_jk_factors = None
+
+        if self.rank == mpi_master() and self.ri_jk and self.ri_jk_simd:
+            self._ri_jk_factors = (mo[:, :nocc], [], mo[:, nocc:], [])
+
         for (wb, wc) in freqpairs:
 
             nx = ComplexResponseSolver.get_full_solution_vector(Nx[('x', wb)])
@@ -590,6 +610,24 @@ class ShgDriver(NonlinearSolver):
                 D_lam_yz = self.commut(k_y, D_z) + self.commut(k_z, D_y)
 
                 # density transformation from MO to AO basis
+
+                # NOTE: the factors, before the transformation to the atomic
+                # orbitals throws the block structure away. The columns below are
+                # the real parts alone for the reduced way and the real and the
+                # imaginary part of each for the full one, so the factors are
+                # built from the same branch and cannot drift from them.
+                if self._ri_jk_factors is not None:
+                    mo_occ = mo[:, :nocc]
+                    mo_vir = mo[:, nocc:]
+                    parts = ((np.real,) if self.shg_type == 'reduced'
+                             else (np.real, np.imag))
+                    for dmat in (D_sig_x, D_sig_y, D_sig_z, D_lam_xy, D_lam_xz,
+                                 D_lam_yz):
+                        for part in parts:
+                            self._ri_jk_factors[1].append(
+                                np.matmul(mo_occ, part(dmat[:nocc, :nocc]).T))
+                            self._ri_jk_factors[3].append(
+                                np.matmul(mo_vir, part(dmat[nocc:, nocc:]).T))
 
                 D_x = np.linalg.multi_dot([mo, D_x, mo.T])
                 D_y = np.linalg.multi_dot([mo, D_y, mo.T])
@@ -744,13 +782,14 @@ class ShgDriver(NonlinearSolver):
                                                  eri_dict, dft_dict,
                                                  first_order_dens,
                                                  second_order_dens, None,
-                                                 'shg_red', profiler)
+                                                 'shg_red', profiler,
+                                                 self._ri_jk_factors)
             elif self.shg_type == 'full':
                 dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
                                                  'real_and_imag', eri_dict,
                                                  dft_dict, first_order_dens,
                                                  second_order_dens, None, 'shg',
-                                                 profiler)
+                                                 profiler, self._ri_jk_factors)
 
             self._print_fock_time(time.time() - time_start_fock)
 

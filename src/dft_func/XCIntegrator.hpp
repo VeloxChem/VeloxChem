@@ -61,6 +61,27 @@ class CXCIntegrator
     double _screeningThresholdForGTOValues;
 
    public:
+    /// @brief Sets the value a basis function has to reach over a box of the grid to
+    /// be kept for it.
+    /// @param threshold The threshold, 1e-12 by default.
+    /// @note What this keeps is what the two matrix phases of the quadrature are
+    /// quadratic in, and those are two thirds to four fifths of its time. It has
+    /// been 1e-12 since it was written and no other value has been tried; it is
+    /// settable so that one can be.
+    auto setScreeningThresholdForGTOValues(const double threshold) -> void
+    {
+        _screeningThresholdForGTOValues = threshold;
+    }
+
+    /// @brief Gets the value a basis function has to reach to be kept.
+    auto getScreeningThresholdForGTOValues() const -> double
+    {
+        return _screeningThresholdForGTOValues;
+    }
+
+   private:
+
+   public:
     /**
      Creates an XC integrator object.
      */

@@ -280,8 +280,11 @@ class TdaEigenSolver(TdaEigenSolverBase):
                 if n_trials > 0:
                     tdens = self._get_trans_densities(trial_mat, scf_results,
                                                       molecule, basis)
+                    tfactors = self._get_trans_density_factors(
+                        trial_mat, scf_results, molecule, basis)
                     fock = self._comp_lr_fock(tdens, molecule, basis, eri_dict,
-                                              dft_dict, pe_dict, profiler)
+                                              dft_dict, pe_dict, profiler,
+                                              dens_factors=tfactors)
                     if self.rank == mpi_master():
                         sig_mat = self._get_sigmas(fock, scf_results, molecule,
                                                    basis, trial_mat)
@@ -311,8 +314,11 @@ class TdaEigenSolver(TdaEigenSolverBase):
 
             tdens = self._get_trans_densities(trial_mat, scf_results, molecule,
                                               basis)
+            tfactors = self._get_trans_density_factors(trial_mat, scf_results,
+                                                       molecule, basis)
             fock = self._comp_lr_fock(tdens, molecule, basis, eri_dict,
-                                      dft_dict, pe_dict, profiler)
+                                      dft_dict, pe_dict, profiler,
+                                      dens_factors=tfactors)
 
             profiler.start_timer('ReducedSpace')
 
@@ -727,6 +733,57 @@ class TdaEigenSolver(TdaEigenSolverBase):
             tdens = None
 
         return tdens
+
+    def _get_trans_density_factors(self, trial_mat, scf_results, molecule,
+                                   basis):
+        """
+        Computes the transition densities as the factors they are made from.
+
+        The density of a trial vector is the occupied orbitals times the vector
+        times the virtual orbitals transposed, and the resolution of the identity
+        wants those factors rather than their product: its exchange of a density
+        of rank k costs the basis squared times k where its exchange of the same
+        density as a matrix costs the basis cubed. The occupied orbitals are the
+        left factor of every density of the batch, which is what lets them be
+        transformed once for all of it.
+
+        :param trial_mat:
+            The matrix containing the Z vectors as columns.
+        :param scf_results:
+            The dictionary of results from converged SCF wavefunction.
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+
+        :return:
+            The left factor and one right factor for each trial vector, or None
+            away from the master rank.
+        """
+
+        if self.rank != mpi_master():
+            return None
+
+        nocc = molecule.number_of_alpha_occupied_orbitals(basis)
+        norb = scf_results['C_alpha'].shape[1]
+        nvir = norb - nocc
+
+        mo_occ, mo_vir = self._get_mo_occ_and_mo_vir(scf_results, nocc)
+
+        rights = []
+
+        for k in range(trial_mat.shape[1]):
+            if self.core_excitation:
+                mat = trial_mat[:, k].reshape(self.num_core_orbitals, nvir)
+            elif self.restricted_subspace:
+                mat = trial_mat[:, k].reshape(
+                    self.num_core_orbitals + self.num_valence_orbitals,
+                    self.num_virtual_orbitals)
+            else:
+                mat = trial_mat[:, k].reshape(nocc, nvir)
+            rights.append(np.matmul(mo_vir, mat.T))
+
+        return (mo_occ, rights)  # one term: the density is mo_occ times rights transposed
 
     def _get_sigmas(self, fock, scf_results, molecule, basis, trial_mat):
         """

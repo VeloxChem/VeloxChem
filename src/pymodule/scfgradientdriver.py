@@ -40,6 +40,10 @@ from .veloxchemlib import FockGeom1000Driver
 from .veloxchemlib import XCMolecularGradient
 from .veloxchemlib import T4CScreener
 from .veloxchemlib import RIFockGradDriver
+from .veloxchemlib import SimdRIJGradientDriver
+from .veloxchemlib import SimdRIJKGradientDriver
+from .veloxchemlib import SimdRIJKFockDriver
+from .veloxchemlib import PackedMatrix
 from .veloxchemlib import mpi_master, mat_t
 from .veloxchemlib import make_matrix
 from .veloxchemlib import parse_xc_func
@@ -93,6 +97,96 @@ class ScfGradientDriver(GradientDriver):
         # D4 dispersion correction
         self.dispersion = scf_drv.dispersion
 
+        # NOTE: one driver serves a whole geometry optimization, so a line which
+        # says how the two-electron part is built is the same line at every step.
+        # What has been said once is remembered here and not said again.
+        self._announced = set()
+
+    def _announce_once(self, message):
+        """
+        Writes a line the first time it is asked for, and not again.
+
+        :param message:
+            The line to write.
+        """
+
+        if message in self._announced:
+            return
+
+        self._announced.add(message)
+
+        self.ostream.print_info(message)
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+    def _check_ri_gradient_mode(self, molecule, basis):
+        """
+        Checks that the way the SCF resolves the identity can give a gradient.
+
+        The direct mode holds no B vectors and forms no inverted factor of the
+        metric, which the gradient needs, so it has no gradient. The mode is
+        chosen from the memory when it is left automatic, which means a molecule
+        large enough to want the resolution of the identity is the molecule most
+        likely to be given the mode which cannot differentiate. Left to itself
+        that surfaces as an abort after a converged SCF has been paid for, and in
+        a geometry optimization after the first step of many, so it is predicted
+        here instead and refused before any of it is spent.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        """
+
+        if not (self.scf_driver.ri_jk and self.scf_driver.ri_jk_simd):
+            return
+
+        advice = ('Set ri_mode to in_memory, raise ri_memory_budget, or use a ' +
+                  'smaller auxiliary basis')
+
+        assert_msg_critical(
+            self.scf_driver.ri_mode != 'direct',
+            f'{type(self).__name__}: the direct RI-JK mode has no gradient. ' +
+            'Set ri_mode to in_memory')
+
+        if self.scf_driver.ri_mode != 'automatic':
+            return
+
+        # NOTE: the mode a calculation was actually given, when there has been
+        # one. A prediction is only needed before the first SCF, and reading it
+        # back cannot disagree with what was chosen.
+        ri_drv = getattr(self.scf_driver, '_ri_drv', None)
+
+        if isinstance(ri_drv, SimdRIJKFockDriver) and ri_drv.is_prepared():
+            assert_msg_critical(
+                'direct' not in str(ri_drv.get_mode()),
+                f'{type(self).__name__}: the SCF was given the direct RI-JK ' +
+                f'mode, which has no gradient. {advice}')
+            return
+
+        aux_basis = MolecularBasis.read(
+            molecule, self.scf_driver.ri_auxiliary_basis, ostream=None)
+
+        needed = SimdRIJKFockDriver().required_memory(
+            molecule, basis, aux_basis, self.scf_driver.eri_thresh, [])
+
+        budget = self.scf_driver._get_ri_memory_budget()
+
+        # NOTE: in the unit the number is actually in. A budget set small enough
+        # to force the direct mode is megabytes, and a message which rounds both
+        # sides to "0.00 GB" says nothing about why it refused.
+        def _size(nbytes):
+            for unit, scale in (('GB', 1024**3), ('MB', 1024**2), ('kB', 1024)):
+                if nbytes >= scale:
+                    return f'{nbytes / scale:.2f} {unit}'
+            return f'{nbytes} B'
+
+        assert_msg_critical(
+            needed <= budget,
+            f'{type(self).__name__}: the B vectors need {_size(needed)} of ' +
+            f'{_size(budget)} available, so the SCF would be given the ' +
+            f'direct RI-JK mode, which has no gradient. {advice}')
+
     def read_settings(self, checkpoint_file):
         """
         Reads opt settings from checkpoint file.
@@ -117,14 +211,33 @@ class ScfGradientDriver(GradientDriver):
             For backward compatibility.
         """
 
-        # TODO: enable RI-JK
+        # NOTE: only the simd RI-JK driver has a gradient. The conventional one
+        # forms its Fock matrices a different way and no derivative of it was
+        # written, so a calculation which used it has no gradient to give rather
+        # than one which is merely approximate.
         assert_msg_critical(
-            not self.scf_driver.ri_jk,
-            f'{type(self).__name__}.compute: RI-JK is not yet supported')
+            (not self.scf_driver.ri_jk) or self.scf_driver.ri_jk_simd,
+            f'{type(self).__name__}.compute: RI-JK is supported only with ' +
+            'ri_jk_simd')
+
+        # NOTE: the fitting is what forbids this under MPI. The Fock build
+        # survives a distributed set of B vectors because the factor of the
+        # metric is already folded into them and the Coulomb matrix is a sum over
+        # the auxiliary basis which factorises, so the ranks add their shares. The
+        # gradient contracts the derivatives of the integrals themselves, which
+        # needs the fitting coefficients in the basis of the integrals, and the
+        # transposed factor that carries them there reaches across the whole of
+        # the auxiliary basis. A rank holding a share of it cannot form them.
+        assert_msg_critical(
+            (not self.scf_driver.ri_jk) or (self.nodes == 1),
+            f'{type(self).__name__}.compute: the RI-JK gradient runs on one ' +
+            'rank, as the fitting couples the whole auxiliary basis')
 
         assert_msg_critical(
             self.scf_driver.electric_field is None,
             f'{type(self).__name__}.compute: electric_field is not supported')
+
+        self._check_ri_gradient_mode(molecule, basis)
 
         scf_results = self.scf_driver.scf_results
         if scf_results is None:
@@ -624,15 +737,70 @@ class ScfGradientDriver(GradientDriver):
 
         thresh_int = int(-math.log10(self.eri_thresh))
 
-        if self.scf_driver.ri_coulomb:
+        if self.scf_driver.ri_coulomb and self.scf_driver.ri_coulomb_simd:
+
+            self._announce_once(
+                'Using the SIMD resolution of the identity (RI-J) gradient.')
+
+            basis_ri_j = MolecularBasis.read(
+                molecule, self.scf_driver.ri_auxiliary_basis)
+
+            t0 = time.time()
+
+            # NOTE: the fitting coefficients of the converged density, formed the
+            # way a Fock build forms them: every rank sums the right hand side over
+            # the parts it holds, the ranks add those, and each of them solves. The
+            # gradient wants the same gamma the last Fock matrix was built from, so
+            # it is taken from the driver which holds the integrals rather than
+            # formed again from a second set of them.
+            nao = D.shape[0]
+
+            packed_density = PackedMatrix(nao, nao, mat_t.symmetric)
+            packed_density.from_numpy(np.ascontiguousarray(D))
+
+            mine = self.scf_driver._ri_drv.owned_parts()
+
+            local = np.array(self.scf_driver._ri_drv.compute_gamma(
+                packed_density, mine),
+                             dtype=np.float64)
+
+            total = np.zeros_like(local)
+            self.comm.Allreduce(local, total, op=MPI.SUM)
+
+            gamma = self.scf_driver._ri_drv.solve_fitting(total)
+
+            ri_j_grad_drv = SimdRIJGradientDriver(self.scf_driver.eri_thresh)
+
+            # NOTE: the ranks divide the atoms of the **auxiliary** basis and each
+            # forms every row of a partial gradient, which the reduce at the end of
+            # this routine adds. That is the opposite of how the four-centre path
+            # divides -- there a rank owns rows -- and it is the division the
+            # three-centre term actually has: a rank which owned rows would still
+            # have to sweep the whole auxiliary basis to fill them.
+            #
+            # NOTE: the two-centre term is asked of one rank alone. Unlike the B
+            # vectors of an exchange the fitting coefficients are not divided, so
+            # every rank holds all of them and would otherwise add that term once
+            # per rank.
+            all_atoms = list(range(natoms))
+
+            atomgrad = ri_j_grad_drv.compute(molecule, basis, basis_ri_j, gamma,
+                                             packed_density, all_atoms,
+                                             list(local_atoms),
+                                             self.rank == mpi_master())
+
+            self.gradient += atomgrad.to_numpy()
+
+            grad_timing['Fock_grad'] += time.time() - t0
+
+        elif self.scf_driver.ri_coulomb:
+
             assert_msg_critical(
                 basis.get_label().lower().startswith('def2-'),
                 'ScfGradientDriver: Invalid basis set for RI-J')
 
-            self.ostream.print_info(
+            self._announce_once(
                 'Using the resolution of the identity (RI) approximation.')
-            self.ostream.print_blank()
-            self.ostream.flush()
 
             if self.rank == mpi_master():
                 basis_ri_j = MolecularBasis.read(
@@ -657,6 +825,59 @@ class ScfGradientDriver(GradientDriver):
                 # Note: RI gradient already contains factor of 2 for
                 # closed-shell
                 self.gradient[iatom, :] += np.array(atomgrad.coordinates())
+
+            grad_timing['Fock_grad'] += time.time() - t0
+
+        elif self.scf_driver.ri_jk and self.scf_driver.ri_jk_simd:
+
+            self._announce_once(
+                'Using the SIMD resolution of the identity (RI-JK) gradient.')
+
+            basis_ri_jk = MolecularBasis.read(
+                molecule, self.scf_driver.ri_auxiliary_basis)
+
+            nao = D.shape[0]
+
+            den_mat_for_ri = PackedMatrix(nao, nao, mat_t.symmetric)
+            den_mat_for_ri.from_numpy(np.ascontiguousarray(D))
+
+            orbitals_for_ri = PackedMatrix(nao, mo_occ.shape[1], mat_t.general)
+            orbitals_for_ri.from_numpy(np.ascontiguousarray(mo_occ))
+
+            ri_jk_grad_drv = SimdRIJKGradientDriver(self.scf_driver.eri_thresh)
+
+            t0 = time.time()
+
+            # NOTE: what comes back is the whole two-electron term of a closed
+            # shell, Gamma against the derivative of the three-center integrals
+            # less Omega against the derivative of the metric, with the factors of
+            # the closed shell already in it. It is added as it is.
+            if need_omega:
+                # NOTE: the range-separated gradient is a separate entry rather
+                # than a flag, matching the Fock build: it takes both sets of B
+                # vectors and both metrics, the attenuated exchange being fitted
+                # in a metric of its own. Only the exchange is split; the Coulomb
+                # term appears once, fitted in the plain metric.
+                assert_msg_critical(
+                    self.scf_driver._ri_drv.get_omega() == omega,
+                    f'{type(self).__name__}: the RI-JK driver holds B vectors ' +
+                    'of a different range-separation parameter')
+
+                atomgrad = ri_jk_grad_drv.compute_rs(
+                    molecule, basis, basis_ri_jk,
+                    self.scf_driver._ri_drv.get_bq_vectors(),
+                    self.scf_driver._ri_drv.get_bq_vectors_erf(),
+                    self.scf_driver._ri_drv.get_metric(),
+                    self.scf_driver._ri_drv.get_metric_erf(), den_mat_for_ri,
+                    orbitals_for_ri, exchange_scaling_factor, erf_k_coef, omega)
+            else:
+                atomgrad = ri_jk_grad_drv.compute(
+                    molecule, basis, basis_ri_jk,
+                    self.scf_driver._ri_drv.get_bq_vectors(),
+                    self.scf_driver._ri_drv.get_metric(), den_mat_for_ri,
+                    orbitals_for_ri, exchange_scaling_factor)
+
+            self.gradient += atomgrad.to_numpy()
 
             grad_timing['Fock_grad'] += time.time() - t0
 
@@ -749,6 +970,14 @@ class ScfGradientDriver(GradientDriver):
             The dictionary containing converged SCF results.
         """
 
+        # NOTE: the conventional RI-JK driver has no open shell gradient. The simd
+        # one does, below, and is the only RI-JK way an unrestricted calculation
+        # has here.
+        assert_msg_critical(
+            (not self.scf_driver.ri_jk) or self.scf_driver.ri_jk_simd,
+            f'{type(self).__name__}: the open shell RI-JK gradient needs ' +
+            'ri_jk_simd')
+
         grad_timing = self._init_grad_timing()
 
         if self.rank == mpi_master():
@@ -828,15 +1057,114 @@ class ScfGradientDriver(GradientDriver):
 
         thresh_int = int(-math.log10(self.eri_thresh))
 
-        if self.scf_driver.ri_coulomb:
+        if self.scf_driver.ri_jk and self.scf_driver.ri_jk_simd:
+
+            self._announce_once(
+                'Using the SIMD resolution of the identity (RI-JK) gradient.')
+
+            basis_ri_jk = MolecularBasis.read(
+                molecule, self.scf_driver.ri_auxiliary_basis)
+
+            nao = Da.shape[0]
+
+            # NOTE: the total density, which is what the Coulomb half is of. The
+            # closed shell call is handed one spin's and carries the factors of two
+            # which follow from that; this one is not and does not.
+            den_mat_for_ri = PackedMatrix(nao, nao, mat_t.symmetric)
+            den_mat_for_ri.from_numpy(np.ascontiguousarray(Da + Db))
+
+            orbitals_a = PackedMatrix(nao, mo_occ_a.shape[1], mat_t.general)
+            orbitals_a.from_numpy(np.ascontiguousarray(mo_occ_a))
+
+            orbitals_b = PackedMatrix(nao, mo_occ_b.shape[1], mat_t.general)
+            orbitals_b.from_numpy(np.ascontiguousarray(mo_occ_b))
+
+            ri_jk_grad_drv = SimdRIJKGradientDriver(self.scf_driver.eri_thresh)
+
+            t0 = time.time()
+
+            # NOTE: the whole two-electron term of an open shell, Gamma against the
+            # derivative of the three-center integrals less Omega against the
+            # derivative of the metric, with both spins inside it. Added as it is.
+            if need_omega:
+                assert_msg_critical(
+                    self.scf_driver._ri_drv.get_omega() == omega,
+                    f'{type(self).__name__}: the RI-JK driver holds B vectors ' +
+                    'of a different range-separation parameter')
+
+                # NOTE: the open shell range-separated entry has no overload over
+                # the whole molecule, so the atoms are named here.
+                atomgrad = ri_jk_grad_drv.compute_open_shell_rs(
+                    molecule, basis, basis_ri_jk,
+                    self.scf_driver._ri_drv.get_bq_vectors(),
+                    self.scf_driver._ri_drv.get_bq_vectors_erf(),
+                    self.scf_driver._ri_drv.get_metric(),
+                    self.scf_driver._ri_drv.get_metric_erf(), den_mat_for_ri,
+                    orbitals_a, orbitals_b, exchange_scaling_factor, erf_k_coef,
+                    omega, list(range(molecule.number_of_atoms())))
+            else:
+                atomgrad = ri_jk_grad_drv.compute_open_shell(
+                    molecule, basis, basis_ri_jk,
+                    self.scf_driver._ri_drv.get_bq_vectors(),
+                    self.scf_driver._ri_drv.get_metric(), den_mat_for_ri,
+                    orbitals_a, orbitals_b, exchange_scaling_factor)
+
+            self.gradient += atomgrad.to_numpy()
+
+            grad_timing['Fock_grad'] += time.time() - t0
+
+        elif self.scf_driver.ri_coulomb and self.scf_driver.ri_coulomb_simd:
+
+            self._announce_once(
+                'Using the SIMD resolution of the identity (RI-J) gradient.')
+
+            basis_ri_j = MolecularBasis.read(
+                molecule, self.scf_driver.ri_auxiliary_basis)
+
+            t0 = time.time()
+
+            # NOTE: the total density, of both spins added, which is what an open
+            # shell fits: the Coulomb matrix of the total density is what each spin
+            # sees, and the fitting is solved once rather than once a spin.
+            nao = Da.shape[0]
+
+            packed_density = PackedMatrix(nao, nao, mat_t.symmetric)
+            packed_density.from_numpy(np.ascontiguousarray(Da + Db))
+
+            mine = self.scf_driver._ri_drv.owned_parts()
+
+            local = np.array(self.scf_driver._ri_drv.compute_gamma(
+                packed_density, mine),
+                             dtype=np.float64)
+
+            total = np.zeros_like(local)
+            self.comm.Allreduce(local, total, op=MPI.SUM)
+
+            gamma = self.scf_driver._ri_drv.solve_fitting(total)
+
+            ri_j_grad_drv = SimdRIJGradientDriver(self.scf_driver.eri_thresh)
+
+            # NOTE: the ranks divide the auxiliary atoms and each forms every row
+            # of a partial gradient, and the two-centre term is asked of one rank
+            # alone, for the reasons the closed shell branch above gives.
+            all_atoms = list(range(molecule.number_of_atoms()))
+
+            atomgrad = ri_j_grad_drv.compute_open_shell(
+                molecule, basis, basis_ri_j, gamma, packed_density, all_atoms,
+                list(local_atoms), self.rank == mpi_master())
+
+            self.gradient += atomgrad.to_numpy()
+
+            grad_timing['Fock_grad'] += time.time() - t0
+
+        elif self.scf_driver.ri_coulomb:
+
             assert_msg_critical(
                 basis.get_label().lower().startswith('def2-'),
                 'ScfGradientDriver: Invalid basis set for RI-J')
 
-            self.ostream.print_info(
+            self._announce_once(
                 'Using the resolution of the identity (RI) approximation.')
-            self.ostream.print_blank()
-            self.ostream.flush()
 
             if self.rank == mpi_master():
                 basis_ri_j = MolecularBasis.read(
@@ -968,6 +1296,8 @@ class ScfGradientDriver(GradientDriver):
         :return:
             The energy.
         """
+
+        self._check_ri_gradient_mode(molecule, basis)
 
         if self.numerical:
             # disable restarting scf for numerical calculation

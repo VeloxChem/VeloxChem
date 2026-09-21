@@ -49,6 +49,13 @@ compute_hrr_fd_out_of_first(CSimdMatrix &buffer, const CSimdMatrix &coordinates,
 /// @brief Transfers a quantum between the two sides of a shell pair and
 /// transforms the result, once the sum over primitives has been taken.
 auto
+compute_hrr_fd_out_of_second(CSimdMatrix &buffer, const CSimdMatrix &coordinates,
+                             const size_t target, const size_t dd, const size_t df,
+                             const size_t ncomps, const size_t nmax) -> void;
+
+/// @brief Transfers a quantum between the two sides of a shell pair and
+/// transforms the result, once the sum over primitives has been taken.
+auto
 compute_hrr_fd(CSimdMatrix &buffer, const CSimdMatrix &coordinates, const size_t target,
                const size_t fp, const size_t gp, const size_t ncomps, const size_t nmax) -> void;
 

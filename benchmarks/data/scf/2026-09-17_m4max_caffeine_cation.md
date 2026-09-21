@@ -1,0 +1,38 @@
+## SCF: caffeine cation, multiplicity 2
+
+Measured at `3a2e0920c`, working tree dirty on m4max (Apple M4 Max, 14 cores), 1 rank of 14 threads, veloxchem 1.0rc4, 2026-09-17.
+
+#### HF
+
+| basis | nao | fitting set | naux | method | wall | B vectors | 2e build | XC | rest | iters | energy | build x | whole x |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| def2-svp | 246 | def2-universal-jkfit | 1242 | full four-centre | 74.60 | -- | 71.86 | 0.00 | 2.75 | 45 | -675.52967022 | -- | -- |
+|  |  |  |  | RI-JK veloxchem | 9.73 | 1.22 | 8.04 | 0.00 | 0.47 | 51 | -675.52911499 | 10.11 | 7.66 |
+|  |  |  |  | RI-JK simd, in memory | 3.92 | 0.26 | 3.17 | 0.00 | 0.49 | 51 | -675.52911499 | 25.61 | 19.02 |
+| def2-svpd | 366 | def2-universal-jkfit | 1242 | full four-centre | 300.00 | -- | 295.74 | 0.00 | 4.25 | 45 | -675.56232010 | -- | -- |
+|  |  |  |  | RI-JK veloxchem | 22.55 | 2.68 | 18.90 | 0.00 | 0.98 | 52 | -675.56177260 | 18.03 | 13.30 |
+|  |  |  |  | RI-JK simd, in memory | 8.47 | 0.55 | 6.94 | 0.00 | 0.98 | 52 | -675.56177260 | 49.12 | 35.42 |
+| def2-tzvp | 494 | def2-universal-jkfit | 1242 | full four-centre | 1058.58 | -- | 1047.30 | 0.00 | 11.27 | 44 | -676.28988017 | -- | -- |
+|  |  |  |  | RI-JK veloxchem | 52.13 | 4.94 | 45.31 | 0.00 | 1.88 | 52 | -676.28949325 | 27.22 | 20.31 |
+|  |  |  |  | RI-JK simd, in memory | 15.40 | 0.95 | 12.57 | 0.00 | 1.87 | 52 | -676.28949325 | 98.12 | 68.75 |
+| def2-tzvpd | 614 | def2-universal-jkfit | 1242 | full four-centre | 2556.01 | -- | 2540.57 | 0.00 | 15.45 | 44 | -676.29178133 | -- | -- |
+|  |  |  |  | RI-JK veloxchem | 107.29 | 9.35 | 94.80 | 0.00 | 3.13 | 53 | -676.29139290 | 32.16 | 23.82 |
+|  |  |  |  | RI-JK simd, in memory | 26.15 | 1.59 | 21.43 | 0.00 | 3.13 | 53 | -676.29139290 | 142.25 | 97.74 |
+
+#### B3LYP
+
+| basis | nao | fitting set | naux | method | wall | B vectors | 2e build | XC | rest | iters | energy | build x | whole x |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| def2-svp | 246 | def2-universal-jkfit | 1242 | full four-centre | 57.10 | -- | 47.53 | 6.84 | 2.73 | 30 | -679.57096712 | -- | -- |
+|  |  |  |  | RI-JK veloxchem | 13.76 | 1.23 | 5.04 | 7.09 | 0.41 | 30 | -679.57102714 | 9.44 | 4.15 |
+|  |  |  |  | RI-JK simd, in memory | 9.50 | 0.26 | 1.94 | 6.87 | 0.44 | 30 | -679.57102714 | 24.53 | 6.01 |
+| def2-svpd | 366 | def2-universal-jkfit | 1242 | full four-centre | 220.21 | -- | 199.02 | 17.13 | 4.06 | 30 | -679.60960497 | -- | -- |
+|  |  |  |  | RI-JK veloxchem | 36.46 | 2.72 | 14.38 | 18.63 | 0.74 | 31 | -679.60966788 | 14.29 | 6.04 |
+|  |  |  |  | RI-JK simd, in memory | 23.47 | 0.55 | 4.32 | 17.88 | 0.73 | 31 | -679.60966788 | 47.56 | 9.38 |
+| def2-tzvp | 494 | def2-universal-jkfit | 1242 | full four-centre | 802.42 | -- | 767.19 | 24.21 | 11.01 | 32 | -680.32181874 | -- | -- |
+|  |  |  |  | RI-JK veloxchem | 67.03 | 4.87 | 37.15 | 23.67 | 1.35 | 31 | -680.32198272 | 20.03 | 11.97 |
+|  |  |  |  | RI-JK simd, in memory | 33.10 | 0.96 | 7.78 | 23.00 | 1.36 | 31 | -680.32198272 | 95.67 | 24.24 |
+| def2-tzvpd | 614 | def2-universal-jkfit | 1242 | full four-centre | 1911.08 | -- | 1853.48 | 42.87 | 14.73 | 32 | -680.32399206 | -- | -- |
+|  |  |  |  | RI-JK veloxchem | 130.70 | 9.28 | 78.56 | 40.78 | 2.08 | 31 | -680.32415858 | 22.88 | 14.62 |
+|  |  |  |  | RI-JK simd, in memory | 56.56 | 1.46 | 12.82 | 40.19 | 2.10 | 31 | -680.32415858 | 140.17 | 33.79 |
+

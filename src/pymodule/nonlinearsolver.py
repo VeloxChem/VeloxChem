@@ -49,6 +49,7 @@ from .distributedarray import DistributedArray
 from .sanitychecks import dft_sanity_check, ri_sanity_check
 from .sanitychecks import nonlinear_response_environment_sanity_check
 from .errorhandler import assert_msg_critical
+from . import rijkresponse
 from .inputparser import parse_input, print_keywords, print_attributes
 from .dftutils import get_default_grid_level, get_optimal_grid_box_size
 from .batchsize import get_batch_size
@@ -104,7 +105,11 @@ class NonlinearSolver:
         # RI-J
         self.ri_coulomb = False
         self.ri_jk = False
+        self.ri_jk_simd = False
         self.ri_auxiliary_basis = 'def2-universal-jfit'
+        self._ri_jk_drv = None
+        self._ri_jk_response_drv = None
+        self._ri_jk_aux_basis = None
         self.ri_metric_threshold = 1.0e-12
         self._ri_drv = None
 
@@ -158,7 +163,7 @@ class NonlinearSolver:
 
         self._debug = False
         self._block_size_factor = 8
-        self._xcfun_ldstaging = 1024
+        self._xcfun_ldstaging = 256
 
         # input keywords
         self._input_keywords = {
@@ -181,7 +186,9 @@ class NonlinearSolver:
             },
             'method_settings': {
                 'ri_coulomb': ('bool', 'use RI-J approximation'),
-                'ri_auxiliary_basis': ('str', 'RI-J auxiliary basis set'),
+                'ri_jk': ('bool', 'use RI-JK approximation'),
+                'ri_jk_simd': ('bool', 'use the simd RI-JK driver'),
+                'ri_auxiliary_basis': ('str', 'RI auxiliary basis set'),
                 'xcfun': ('str_upper', 'exchange-correlation functional'),
                 'grid_level': ('int', 'accuracy level of DFT grid'),
                 'electric_field': ('seq_fixed', 'static electric field'),
@@ -302,10 +309,14 @@ class NonlinearSolver:
             The dictionary of ERI information.
         """
 
-        # TODO: enable RI-JK
+        # NOTE: only the simd driver has a response path, and only on one rank.
         assert_msg_critical(
-            not self.ri_jk,
-            f'{type(self).__name__}.compute: RI-JK is not yet supported')
+            (not self.ri_jk) or self.ri_jk_simd,
+            f'{type(self).__name__}: RI-JK is supported only with ri_jk_simd')
+
+        assert_msg_critical(
+            (not self.ri_jk) or (self.nodes == 1),
+            f'{type(self).__name__}: the RI-JK response path runs on one rank')
 
         if self.rank == mpi_master():
             screening = T4CScreener()
@@ -320,6 +331,9 @@ class NonlinearSolver:
                                          basis,
                                          self.ri_auxiliary_basis,
                                          verbose=False)
+
+        if self.ri_jk:
+            rijkresponse.initialize(self, molecule, basis)
 
         return {
             'screening': screening,
@@ -402,7 +416,8 @@ class NonlinearSolver:
                        second_order_dens,
                        third_oder_dens,
                        mode,
-                       profiler=None):
+                       profiler=None,
+                       dens_factors=None):
         """
         Computes and returns a list of Fock matrices.
 
@@ -436,7 +451,7 @@ class NonlinearSolver:
         f_total = self._comp_two_el_int(mo, molecule, ao_basis, eri_dict,
                                         dft_dict, first_order_dens,
                                         second_order_dens, third_oder_dens,
-                                        mode, profiler)
+                                        mode, profiler, dens_factors)
         nrows = f_total.data.shape[0]
         half_ncols = f_total.data.shape[1] // 2
         ff_data = np.zeros((nrows, half_ncols), dtype='complex128')
@@ -460,7 +475,8 @@ class NonlinearSolver:
                          second_order_dens,
                          third_order_dens,
                          mode,
-                         profiler=None):
+                         profiler=None,
+                         dens_factors=None):
         """
         Computes the two-electron (HF) and Vxc part of the two and three-time
         perturbed Fock matrices.
@@ -879,7 +895,87 @@ class NonlinearSolver:
 
             fock_arrays = []
 
-            for idx in range(len(dts_for_fock)):
+            # NOTE: the resolution of the identity takes the whole batch at once,
+            # as the shared factor is transformed once for all of it, so it
+            # replaces the loop rather than sitting inside it.
+            # NOTE: two shapes of factors are taken. A two-time perturbed
+            # calculation hands the factors of its densities directly, as a
+            # tuple. A three-time one hands a dictionary of two sets, because its
+            # batch holds the two-time densities followed by the three-time ones,
+            # cut from two arrays with strides of their own and carrying two
+            # different block structures between them.
+            factors_are_split = isinstance(dens_factors, dict)
+
+            # NOTE: a three-time calculation without a functional concatenates
+            # its two-time and three-time densities into one array and cuts them
+            # with one stride, so its factors are one set and not two. With a
+            # functional they are two arrays with strides of their own and the
+            # factors are the dictionary. Both are taken.
+            use_ri_jk = (self.ri_jk and self.ri_jk_simd and
+                         dens_factors is not None and
+                         (mode_is_quadratic or mode_is_cubic))
+
+            # NOTE: a hybrid range-separated functional has its attenuated
+            # exchange subtracted inside the same call, in the same pass over the
+            # auxiliary basis. The four-centre correction further down is not
+            # reached for this path at all: it sits inside the loop over the
+            # densities, and that loop runs zero times here. The coefficient is
+            # passed to every one of the calls below, as a batch which took it in
+            # one group and not another would be missing the long-range term of
+            # half its densities and say nothing about it.
+            erf_k_factor = erf_k_coef if need_omega else 0.0
+
+            if use_ri_jk:
+                # NOTE: the factors of this batch and not of the whole set. The
+                # densities above were cut from the same columns.
+                if not factors_are_split:
+                    fock_arrays = rijkresponse.fock_matrices(
+                        self, ao_basis,
+                        rijkresponse.slice_factors(dens_factors, batch_start,
+                                                   batch_end), fock_k_factor,
+                        erf_k_factor)
+                else:
+                    # NOTE: the two groups in the order dts_for_fock puts them,
+                    # the two-time densities first. They are built apart because
+                    # they are block diagonal where the three-time ones live
+                    # between the occupied orbitals and the virtual ones, and a
+                    # Fock matrix does not depend on the densities beside it, so
+                    # two batches laid end to end are the batch.
+                    fock_arrays = []
+
+                    second = dens_factors.get('second')
+
+                    if second is not None:
+                        # NOTE: the two-time densities are in the batch of a
+                        # three-time calculation only when there is a functional
+                        # to integrate, and the stride they are cut with is formed
+                        # only there. Factors for them without it is a caller
+                        # which has got the two cases the wrong way round, and is
+                        # said so rather than left to fail inside the arithmetic.
+                        assert_msg_critical(
+                            batch_size_second_order is not None,
+                            f'{type(self).__name__}: factors for the two-time ' +
+                            'densities were given where the batch holds none')
+
+                        # NOTE: the stride of the two-time array, formed the same
+                        # way the densities above were cut from it.
+                        first_two = batch_size_second_order * batch_ind
+                        last_two = min(first_two + batch_size_second_order,
+                                       second_order_dens.shape(1))
+
+                        fock_arrays += rijkresponse.fock_matrices(
+                            self, ao_basis,
+                            rijkresponse.slice_factors(second, first_two,
+                                                       last_two),
+                            fock_k_factor, erf_k_factor)
+
+                    fock_arrays += rijkresponse.fock_matrices(
+                        self, ao_basis,
+                        rijkresponse.slice_factors(dens_factors['third'],
+                                                   batch_start, batch_end),
+                        fock_k_factor, erf_k_factor)
+
+            for idx in range(0 if use_ri_jk else len(dts_for_fock)):
                 if self.ri_coulomb:
                     assert_msg_critical(
                         fock_type == 'j',

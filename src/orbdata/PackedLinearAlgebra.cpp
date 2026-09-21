@@ -522,6 +522,109 @@ inverse_square_root(const CPackedMatrix &matrix, const double threshold) -> CPac
     return result;
 }
 
+auto
+pseudo_inverse(const CPackedMatrix &matrix, const double threshold) -> CPackedMatrix
+{
+    errors::assertMsgCritical(matrix.get_type() == mat_t::symmetric,
+                              std::string("PackedMatrix pseudo inverse: The matrix must be symmetric"));
+
+    const auto ndim = matrix.number_of_rows();
+
+    errors::assertMsgCritical(ndim > 0, std::string("PackedMatrix pseudo inverse: The matrix must not be empty"));
+
+    auto dense = std::make_unique_for_overwrite<double[]>(ndim * ndim);
+
+    matrix.to_dense(dense.get());
+
+    const auto eigenvalues = _eigenvectors_in_place(dense.get(), ndim);
+
+    // NOTE: the eigenvectors are the rows of the array, as the library is column
+    // major and the array is read as row major. Scaling row k by the square root of
+    // the inverted eigenvalue and forming the array times its transpose gives V
+    // times the inverted eigenvalues times V transposed, which is the inverse, and
+    // is symmetric by construction rather than by cancellation.
+
+    // NOTE: the same construction as the inverted square root and one power apart,
+    // which is why the two sit together. A direction below the threshold is dropped
+    // from both: it is a direction the fitting basis does not really span, and what
+    // an inverse does with it is divide by nothing.
+
+    size_t ndropped = 0;
+
+    for (size_t k = 0; k < ndim; k++)
+    {
+        auto *row = dense.get() + k * ndim;
+
+        if (eigenvalues[k] > threshold)
+        {
+            const auto factor = 1.0 / std::sqrt(eigenvalues[k]);
+
+            for (size_t j = 0; j < ndim; j++)
+            {
+                row[j] *= factor;
+            }
+        }
+        else
+        {
+            std::fill(row, row + ndim, 0.0);
+
+            ndropped++;
+        }
+    }
+
+    if (ndropped > 0)
+    {
+        errors::msg(std::string("PackedMatrix pseudo inverse: ") + std::to_string(ndropped) + std::string(" of ") +
+                        std::to_string(ndim) +
+                        std::string(" directions of the matrix were dropped. This is a nearly linearly dependent "
+                                    "basis, and the matrix returned is the inverse on the directions which remain."),
+                    "Warning");
+    }
+
+    auto result = CPackedMatrix(ndim, ndim, mat_t::symmetric);
+
+    auto product = std::vector<double>(ndim * ndim, 0.0);
+
+#ifdef VLX_USE_MATHLIB
+
+    // NOTE: the rows of the array are the eigenvectors, so the columns of the
+    // array read as column major are the scaled eigenvectors, which is the matrix
+    // whose product with its own transpose is wanted. That is the untransposed
+    // update, unlike the exchange, where the array read as column major is the
+    // transposed matrix. The upper triangle of the library is the lower triangle
+    // of the array, which is the triangle the packed matrix stores.
+
+    const char uplo = 'U';
+
+    const char trans = 'N';
+
+    auto ndim_arg = static_cast<lapack_int_t>(ndim);
+
+    const double one = 1.0;
+
+    const double zero = 0.0;
+
+    dsyrk_(&uplo, &trans, &ndim_arg, &ndim_arg, &one, dense.get(), &ndim_arg, &zero, product.data(), &ndim_arg);
+
+#else
+
+    using RowMajorMatrix = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
+
+    const auto nrows = static_cast<Eigen::Index>(ndim);
+
+    Eigen::Map<const RowMajorMatrix> vmap(dense.get(), nrows, nrows);
+
+    Eigen::Map<RowMajorMatrix> pmap(product.data(), nrows, nrows);
+
+    pmap.noalias() = vmap.transpose() * vmap;
+
+#endif /* VLX_USE_MATHLIB */
+
+    result.from_dense(product.data());
+
+    return result;
+}
+
 }  // namespace packlin
 
 namespace packlin {  // packlin namespace

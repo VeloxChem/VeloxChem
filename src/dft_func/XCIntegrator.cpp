@@ -52,7 +52,12 @@
 
 CXCIntegrator::CXCIntegrator()
 
-    : _screeningThresholdForGTOValues(1.0e-12)
+    // NOTE: **1e-8 and not 1e-12.** What this keeps is what the matrix phases of the
+    // quadrature are quadratic in. Swept from 1e-6 to 1e-12: the exchange
+    // correlation energy is identical at 1e-8, 1e-10 and 1e-12 and moves by 1.2e-07
+    // hartree at 1e-6, so 1e-8 is the loosest which costs nothing and it is worth
+    // about 1.3 times against 1e-12.
+    : _screeningThresholdForGTOValues(1.0e-8)
 {
 }
 

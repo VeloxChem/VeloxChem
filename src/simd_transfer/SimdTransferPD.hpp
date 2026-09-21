@@ -45,6 +45,13 @@ auto
 compute_hrr_pd(CSimdMatrix &buffer, const CSimdMatrix &coordinates, const size_t target,
                const size_t sd, const size_t sf, const size_t ncomps, const size_t nmax) -> void;
 
+/// @brief Transfers a quantum between the two sides of a shell pair and
+/// transforms the result, once the sum over primitives has been taken.
+auto
+compute_hrr_pd_out_of_first(CSimdMatrix &buffer, const CSimdMatrix &coordinates,
+                            const size_t target, const size_t pp, const size_t dp,
+                            const size_t ncomps, const size_t nmax) -> void;
+
 }  // namespace simdtrf
 
 #endif /* SimdTransferPD_hpp */

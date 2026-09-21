@@ -183,6 +183,8 @@ compute_hdk_three_center_electron_repulsion(double               *values,
 
     const auto nvalues = natoms * npairs;
 
+    simdfunc::compute_pair_exponents(a_function, b_function, coordinates, nmax);
+
     for (size_t n = 0; n < natoms; n++)
     {
         simdfunc::prepare_buffer(buffer, 68812, 58807, 3795, dimensions);
@@ -192,8 +194,6 @@ compute_hdk_three_center_electron_repulsion(double               *values,
             for (size_t j = 0; j < nprim_b; j++)
             {
                 const auto p = a_exps[i] + b_exps[j];
-
-                const auto mu = a_exps[i] * b_exps[j] / p;
 
                 const auto fovl = a_norms[i] * b_norms[j];
 
@@ -222,7 +222,7 @@ compute_hdk_three_center_electron_repulsion(double               *values,
 
                     simdfunc::compute_t3c_boys_function(buffer, coordinates, 6, 3, {1, 2, 3, 4,
                                                         5, 6, 7, 8, 9, 10, 11, 12, 13, 14},
-                                                        ncols, fj, mu, fq);
+                                                        ncols, fj, i * nprim_b + j, fq);
 
                     compute_prim_pss_three_center_electron_repulsion_0(buffer, 21, 0, 3, 7, 8,
                                                                        ncols, gamma, q);

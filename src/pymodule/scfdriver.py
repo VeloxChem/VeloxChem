@@ -42,9 +42,10 @@ import re
 import numpy as np
 from mpi4py import MPI
 
-from .oneeints import compute_nuclear_potential_integrals
+from .oneeints import compute_simd_kinetic_energy_integrals
+from .oneeints import compute_simd_nuclear_potential_integrals
 from .oneeints import compute_electric_dipole_integrals
-from .veloxchemlib import OverlapDriver, KineticEnergyDriver
+from .veloxchemlib import OverlapDriver
 from .veloxchemlib import T4CScreener
 from .veloxchemlib import XCIntegrator
 from .veloxchemlib import EcpDriver
@@ -57,6 +58,7 @@ from .matrix import Matrix
 from .aodensitymatrix import AODensityMatrix
 from .rifockdriver import RIFockDriver
 from .rijkfockdriver import RIJKFockDriver
+from .veloxchemlib import SimdRIJFockDriver
 from .veloxchemlib import SimdRIJKFockDriver
 from .veloxchemlib import rimode
 from .packedmatrix import PackedMatrix
@@ -244,7 +246,9 @@ class ScfDriver:
         self.ri_auxiliary_basis = 'def2-universal-jfit'
         self.ri_metric_threshold = 1.0e-12
         self.ri_metric_route = 'cholesky'
+        self.ri_dense_threshold = 0.0
         self.ri_jk_simd = False
+        self.ri_coulomb_simd = False
         self.ri_memory_budget = None
         self._ri_aux_atoms = []
         self.ri_mode = 'automatic'
@@ -334,7 +338,8 @@ class ScfDriver:
 
         self._debug = False
         self._block_size_factor = 8
-        self._xcfun_ldstaging = 1024
+        self._xcfun_ldstaging = 256
+        self.xc_screening_threshold = None
         self.trim_mos = True
 
         # may be used in rare cases when user wants to skip the writing of h5
@@ -379,6 +384,9 @@ class ScfDriver:
                     ('raw', 'QM vdW parameter file path or array'),
                 '_debug': ('bool', 'print debug info'),
                 '_block_size_factor': ('int', 'block size factor for ERI'),
+                'xc_screening_threshold':
+                    ('float', 'value a basis function must reach over a grid box '
+                     'to be kept for it'),
                 'trim_mos': ('bool', 'trim molecular orbitals'),
             },
             'method_settings': {
@@ -390,8 +398,13 @@ class ScfDriver:
                      'eigenvalues'),
                 'ri_metric_threshold':
                     ('float', 'linear dependence threshold for RI-JK metric'),
+                'ri_dense_threshold':
+                    ('float', 'density of the B vectors at which the SIMD RI-JK '
+                     'exchange expands them; 0 expands always, above 1 never'),
                 'ri_jk_simd':
                     ('bool', 'use the SIMD RI-JK driver instead of the conventional one'),
+                'ri_coulomb_simd':
+                    ('bool', 'use the SIMD RI-J driver instead of the conventional one'),
                 'ri_memory_budget':
                     ('float', 'memory the SIMD RI-JK driver may hold, in GB'),
                 'ri_mode':
@@ -692,6 +705,15 @@ class ScfDriver:
             basis.get_dimensions_of_basis())
 
         profiler = Profiler()
+
+        # NOTE: kept so that a caller can read the per-iteration timings after the
+        # calculation. The profiler fills timing_dict with FockERI and FockXC among
+        # its labels when timing is set, and it was a local until the benchmarks
+        # needed to separate the two-electron build from the quadrature.
+        self._profiler = profiler
+
+        # Zero unless the resolution of the identity is used, and set below.
+        self._ri_setup_time = 0.0
 
         # Reset per-calculation state. This makes repeated compute() calls
         # on the same driver safe when point charges or the static electric
@@ -1837,8 +1859,8 @@ class ScfDriver:
             charges = self.point_charges[3, :].copy()[start:end]
             coords = self.point_charges[:3, :].T.copy()[start:end, :]
 
-            V_es = compute_nuclear_potential_integrals(molecule, ao_basis,
-                                                       charges, coords)
+            V_es = compute_simd_nuclear_potential_integrals(
+                molecule, ao_basis, charges, coords)
 
             self._V_es = self.comm.reduce(V_es, root=mpi_master())
             if self.rank != mpi_master():
@@ -1904,7 +1926,68 @@ class ScfDriver:
 
         profiler.check_memory_usage('Initial guess')
 
-        if self.ri_coulomb:
+        # NOTE: what the resolution of the identity pays before the first Fock
+        # build -- the metric and the B vectors. It is one cost for the whole
+        # calculation rather than one per iteration, and it belongs neither to the
+        # builds nor to the rest of them, so it is timed on its own.
+        ri_setup_t0 = tm.time()
+
+        if self.ri_coulomb and self.ri_coulomb_simd:
+            if isinstance(self.ri_auxiliary_basis, str):
+                basis_ri = MolecularBasis.read(molecule, self.ri_auxiliary_basis)
+            else:
+                basis_ri = MolecularBasis(self.ri_auxiliary_basis)
+
+            self._ri_drv = SimdRIJFockDriver()
+
+            # NOTE: the metric is inverted once on the master and handed to the
+            # ranks, for the reason the RI-JK path does it: the inversion picks its
+            # own fallback from the matrix, and two ranks choosing differently would
+            # build with metrics which are not the same.
+            metric = PackedMatrix()
+
+            if self.rank == mpi_master():
+                metric = self._ri_drv.make_metric(molecule, basis_ri,
+                                                  self.ri_metric_threshold)
+
+            metric = metric.broadcast(self.comm, root=mpi_master())
+
+            modes = {
+                'automatic': rimode.automatic,
+                'in_memory': rimode.in_memory,
+                'direct': rimode.direct,
+            }
+
+            assert_msg_critical(
+                self.ri_mode in modes,
+                'SCF driver: ri_mode must be automatic, in_memory or direct')
+
+            # NOTE: the parts are what the ranks divide, so there have to be at
+            # least as many of them as there are ranks. Unlike the RI-JK path the
+            # auxiliary basis is not divided between the ranks by atom: both sweeps
+            # here run over parts, and a part is the unit either of them takes.
+            self._ri_drv.prepare(molecule, ao_basis, basis_ri, self.eri_thresh,
+                                 self._get_ri_memory_budget(),
+                                 self.ri_metric_threshold, modes[self.ri_mode],
+                                 metric, self.rank, self.nodes)
+
+            taken = ('held in memory'
+                     if self._ri_drv.get_mode() == rimode.in_memory else
+                     'formed again on every Fock build')
+
+            self.ostream.print_info(
+                'Using the SIMD resolution of the identity (RI-J).')
+            self.ostream.print_info(
+                'Dimension of RI auxiliary basis set ' +
+                f'({basis_ri.get_label().upper()}): ' +
+                f'{basis_ri.get_dimensions_of_basis()}')
+            self.ostream.print_info(
+                f'Three-center integrals are {taken}, in ' +
+                f'{self._ri_drv.number_of_parts()} parts.')
+            self.ostream.print_blank()
+            self.ostream.flush()
+
+        elif self.ri_coulomb:
             self._ri_drv = RIFockDriver(self.comm, self.ostream)
             self._ri_drv.prepare_buffers(molecule,
                                          ao_basis,
@@ -1918,6 +2001,25 @@ class ScfDriver:
                 basis_ri = MolecularBasis(self.ri_auxiliary_basis)
 
             self._ri_drv = SimdRIJKFockDriver()
+
+            # NOTE: the exchange half transformation either walks the values of the
+            # B vectors or expands them into a square and hands that to a matrix
+            # product. The second does more arithmetic on a unit which runs it
+            # faster, and which wins follows from how dense the B vectors are. The
+            # default of zero expands always, which is what every calculation has
+            # done: the walk is reached only by asking for it.
+            self._ri_drv.set_dense_threshold(self.ri_dense_threshold)
+
+            # NOTE: a hybrid range separated functional is built from two sets of B
+            # vectors, the plain operator's and the attenuated one's, each fitted in
+            # its own metric. Whether that is what this calculation needs is a
+            # property of the functional and not of the iteration, so it is decided
+            # here, once, and not from the parameters of a build -- those say no on
+            # the first step, where the exchange is the plain one whatever the
+            # functional is.
+            range_separated = (self._dft and self.xcfun.is_range_separated())
+
+            omega = self.xcfun.get_rs_omega() if range_separated else 0.0
 
             modes = {
                 'automatic': rimode.automatic,
@@ -1954,7 +2056,8 @@ class ScfDriver:
 
             needed = self._ri_drv.required_memory(molecule, ao_basis, basis_ri,
                                                   self.eri_thresh,
-                                                  self._ri_aux_atoms)
+                                                  self._ri_aux_atoms,
+                                                  range_separated)
 
             # NOTE: the way of building has to be the same on every rank, as the
             # metric it is formed with differs between the two. The shares are not
@@ -1968,6 +2071,22 @@ class ScfDriver:
             if mode == rimode.automatic:
                 mode = (rimode.direct
                         if largest > budget else rimode.in_memory)
+
+            # NOTE: the way which forms the integrals again on every call has one
+            # sweep and one fitting, and two operators do not fit in it. It is
+            # refused here rather than at the first build, so a calculation which
+            # cannot be served says so before it forms anything. The message covers
+            # both ways of arriving: asked for outright, or chosen because two sets
+            # of B vectors do not fit where one would have.
+            if range_separated:
+                assert_msg_critical(
+                    mode == rimode.in_memory,
+                    'SCF driver: a hybrid range-separated functional is ' +
+                    'served only by the way which holds the B vectors, and ' +
+                    'this calculation is on the direct way -- either because ' +
+                    'ri_mode asked for it, or because the two sets need ' +
+                    f'{largest / (1024**3):.2f} GB of ' +
+                    f'{budget / (1024**3):.2f} GB available')
 
             # NOTE: the metric may be inverted through its Cholesky factor, which
             # is an order of magnitude cheaper, or through its eigenvalues, which
@@ -2016,15 +2135,29 @@ class ScfDriver:
             # differently and build with metrics which are not the same, so the
             # choice is taken in one place. The way of building comes back with it,
             # as a fallback can change it.
+            metric_erf = PackedMatrix()
+
             if self.rank == mpi_master():
-                metric, mode = self._ri_drv.make_metric(
-                    molecule, basis_ri, self.ri_metric_threshold,
-                    use_inverse_square_root, mode)
+                if range_separated:
+                    # NOTE: the two come out of one call, which forms both
+                    # operators over one set of primitive pairs. The way is not
+                    # answered here as make_metric answers it, there being only
+                    # one a range separated build can take.
+                    metric, metric_erf = self._ri_drv.make_metric_rs(
+                        molecule, basis_ri, self.ri_metric_threshold,
+                        use_inverse_square_root, mode, omega)
+                else:
+                    metric, mode = self._ri_drv.make_metric(
+                        molecule, basis_ri, self.ri_metric_threshold,
+                        use_inverse_square_root, mode)
             else:
                 metric = PackedMatrix()
 
             mode = self.comm.bcast(mode, root=mpi_master())
             metric = metric.broadcast(self.comm, root=mpi_master())
+
+            if range_separated:
+                metric_erf = metric_erf.broadcast(self.comm, root=mpi_master())
 
             # NOTE: the direct way sweeps the auxiliary basis in parts, and its
             # Coulomb pass is divided over them. They are cut to fit the memory of a
@@ -2035,10 +2168,22 @@ class ScfDriver:
             self._ri_drv.prepare(molecule, ao_basis, basis_ri, self.eri_thresh,
                                  budget, self.ri_metric_threshold,
                                  use_inverse_square_root, mode,
-                                 self._ri_aux_atoms, metric, self.nodes)
+                                 self._ri_aux_atoms, metric, self.nodes,
+                                 omega, metric_erf)
 
-            self.ostream.print_info(
-                f'Metric inverted through its {self.ri_metric_route}.')
+            if range_separated:
+                # NOTE: the attenuated metric is the worse conditioned of the two
+                # by construction, so it is the one likely to have fallen back to
+                # its square root. Which of them did says so in its own warning.
+                self.ostream.print_info(
+                    'Range-separated functional: two sets of B vectors at ' +
+                    f'omega = {omega:.3f}.')
+                self.ostream.print_info(
+                    'Both metrics inverted through their ' +
+                    f'{self.ri_metric_route}.')
+            else:
+                self.ostream.print_info(
+                    f'Metric inverted through its {self.ri_metric_route}.')
 
             taken = ('held in memory'
                      if self._ri_drv.get_mode() == rimode.in_memory else
@@ -2063,6 +2208,8 @@ class ScfDriver:
                                                      self.ri_auxiliary_basis,
                                                      thresh_int,
                                                      verbose=False)
+
+        self._ri_setup_time = tm.time() - ri_setup_t0
 
         e_grad = None
 
@@ -2668,9 +2815,7 @@ class ScfDriver:
             ovl_dt = tm.time() - t0
             t0 = tm.time()
 
-            kin_drv = KineticEnergyDriver()
-            kin_mat = kin_drv.compute(molecule, basis)
-            kin_mat = kin_mat.to_numpy()
+            kin_mat = compute_simd_kinetic_energy_integrals(molecule, basis)
 
             kin_dt = tm.time() - t0
         else:
@@ -2689,7 +2834,7 @@ class ScfDriver:
             mol_charges = molecule.get_effective_nuclear_charges(basis)
             mol_coords = molecule.get_coordinates_in_bohr()
             if self.rank == mpi_master():
-                npot_mat = compute_nuclear_potential_integrals(
+                npot_mat = compute_simd_nuclear_potential_integrals(
                     molecule, basis, mol_charges, mol_coords)
             else:
                 npot_mat = None
@@ -2794,14 +2939,76 @@ class ScfDriver:
         charges = molecule.get_effective_nuclear_charges(basis)[start:end]
         coords = molecule.get_coordinates_in_bohr()[start:end, :]
 
-        npot_mat = compute_nuclear_potential_integrals(molecule, basis, charges,
-                                                       coords)
+        npot_mat = compute_simd_nuclear_potential_integrals(
+            molecule, basis, charges, coords)
 
         npot_mat = self.comm.reduce(npot_mat, root=mpi_master())
 
         return npot_mat
 
-    def _simd_ri_jk_fock(self, density, exchange_scaling_factor):
+    def _simd_ri_j_fock(self, density):
+        """
+        Computes the Coulomb matrix with the SIMD RI-J driver.
+
+        :param density:
+            The density matrix of one spin, as a numpy array.
+
+        :return:
+            The Coulomb matrix of that density, as a numpy array.
+        """
+
+        # NOTE: once and not twice. The caller doubles what comes back, as it does
+        # for the conventional driver of this approximation and for the four-centre
+        # build of a matrix of the `j` kind. The RI-JK driver doubles it itself,
+        # because what it answers is a whole Fock matrix rather than a Coulomb one.
+
+        nao = density.shape[0]
+
+        packed_density = PackedMatrix(nao, nao, mat_t.symmetric)
+        packed_density.from_numpy(np.ascontiguousarray(density))
+
+        # NOTE: both sweeps divide over the parts and what couples them is the
+        # fitting, whose right hand side has to be complete before it is solved.
+        # That sum is the one thing the ranks exchange, and it is one value per
+        # auxiliary basis function.
+
+        # NOTE: the driver's own division and not one worked out again here. It
+        # held the integrals of these parts and of no others, so a rank asked for a
+        # part of someone else's would form them again and be right at the price of
+        # the memory holding them was meant to save.
+        mine = self._ri_drv.owned_parts()
+
+        local = np.array(self._ri_drv.compute_gamma(packed_density, mine),
+                         dtype=np.float64)
+
+        total = np.zeros_like(local)
+        self.comm.Allreduce(local, total, op=MPI.SUM)
+
+        # NOTE: every rank holds the inverted metric and applies it, rather than one
+        # applying it and sending. It is one multiply of the square of the auxiliary
+        # basis against a single right hand side, which is nothing beside a sweep.
+
+        gamma = self._ri_drv.solve_fitting(total)
+
+        fock = PackedMatrix(nao, nao, mat_t.symmetric)
+        fock.zero()
+
+        self._ri_drv.compute_coulomb(gamma, mine, fock)
+
+        fock_np = fock.to_numpy()
+
+        if self.nodes > 1:
+            total_fock = np.zeros_like(fock_np)
+            self.comm.Allreduce(np.ascontiguousarray(fock_np), total_fock,
+                                op=MPI.SUM)
+            fock_np = total_fock
+
+        return fock_np
+
+    def _simd_ri_jk_fock(self,
+                         density,
+                         exchange_scaling_factor,
+                         erf_exchange_scaling_factor=0.0):
         """
         Computes the closed shell Fock matrix with the SIMD RI-JK driver.
 
@@ -2809,6 +3016,11 @@ class ScfDriver:
             The alpha density matrix as a numpy array.
         :param exchange_scaling_factor:
             The fraction of exact exchange.
+        :param erf_exchange_scaling_factor:
+            The coefficient of the exchange of the attenuated operator, which is
+            the erf coefficient of a hybrid range-separated functional and zero
+            for every other calculation. It is subtracted as the plain exchange
+            is, so this is the same number the four-centre way is passed.
 
         :return:
             The Fock matrix as a numpy array.
@@ -2817,6 +3029,47 @@ class ScfDriver:
         nao = density.shape[0]
 
         # the occupied orbitals, which the exchange is formed from
+
+        orbitals = self._simd_ri_jk_occupied(density, 'alpha')
+
+        coeffs = PackedMatrix(nao, orbitals.shape[1], mat_t.general)
+        coeffs.from_numpy(orbitals)
+
+        packed_density = PackedMatrix(nao, nao, mat_t.symmetric)
+        packed_density.from_numpy(np.ascontiguousarray(density))
+
+        if (self.nodes > 1) and (self._ri_drv.get_mode() == rimode.direct):
+            # NOTE: a range-separated build never reaches here, as the direct way
+            # is refused where the driver is prepared. The assertion says so at
+            # the point where it would otherwise be dropped in silence.
+            assert_msg_critical(
+                erf_exchange_scaling_factor == 0.0,
+                'ScfDriver: the direct way does not form the attenuated ' +
+                'exchange of a range-separated functional')
+            fock = self._simd_ri_jk_direct_share(coeffs, exchange_scaling_factor)
+        else:
+            fock = self._ri_drv.compute(packed_density, coeffs,
+                                        exchange_scaling_factor,
+                                        erf_exchange_scaling_factor)
+
+        # NOTE: the limit is of the Fock matrix being expanded, which is the square
+        # of the basis and is modest, and not the budget of the B vectors, which
+        # bounds something else entirely and may be set small on purpose.
+
+        return fock.to_numpy(max_memory=2.0 * nao * nao * 8 / 1024**3 + 1.0)
+
+    def _simd_ri_jk_occupied(self, density, spin):
+        """
+        The occupied orbitals one spin's exchange is formed from.
+
+        :param density:
+            That spin's density matrix as a numpy array.
+        :param spin:
+            'alpha' or 'beta'.
+
+        :return:
+            The coefficients as a numpy array of one row per basis function.
+        """
 
         if self.molecular_orbitals.is_empty():
             # NOTE: the first build has no orbitals yet, as they come from the
@@ -2845,30 +3098,80 @@ class ScfDriver:
             else:
                 orbitals = None
 
-            orbitals = self.comm.bcast(orbitals, root=mpi_master())
-        else:
+            return self.comm.bcast(orbitals, root=mpi_master())
+
+        if spin == 'alpha':
             nocc = int(np.sum(self.molecular_orbitals.occa_to_numpy()))
 
-            orbitals = np.ascontiguousarray(
+            return np.ascontiguousarray(
                 self.molecular_orbitals.alpha_to_numpy()[:, :nocc])
 
-        coeffs = PackedMatrix(nao, orbitals.shape[1], mat_t.general)
-        coeffs.from_numpy(orbitals)
+        nocc = int(np.sum(self.molecular_orbitals.occb_to_numpy()))
+
+        return np.ascontiguousarray(
+            self.molecular_orbitals.beta_to_numpy()[:, :nocc])
+
+    def _simd_ri_jk_fock_unrestricted(self,
+                                      den_alpha,
+                                      den_beta,
+                                      exchange_scaling_factor,
+                                      erf_exchange_scaling_factor=0.0):
+        """
+        Computes the open shell Fock matrices with the SIMD RI-JK driver.
+
+        :param den_alpha:
+            The alpha density matrix as a numpy array.
+        :param den_beta:
+            The beta density matrix as a numpy array.
+        :param exchange_scaling_factor:
+            The fraction of exact exchange.
+        :param erf_exchange_scaling_factor:
+            The coefficient of the exchange of the attenuated operator, as above.
+            Each spin's attenuated exchange goes into its own matrix.
+
+        :return:
+            The alpha and the beta Fock matrices as numpy arrays.
+        """
+
+        nao = den_alpha.shape[0]
+
+        # NOTE: the two spins occupy different numbers of orbitals, so the two sets
+        # of coefficients have different numbers of columns and the driver is told
+        # both rather than one and a count.
+
+        orbitals_a = self._simd_ri_jk_occupied(den_alpha, 'alpha')
+        orbitals_b = self._simd_ri_jk_occupied(den_beta, 'beta')
+
+        coeffs_a = PackedMatrix(nao, orbitals_a.shape[1], mat_t.general)
+        coeffs_a.from_numpy(orbitals_a)
+
+        coeffs_b = PackedMatrix(nao, orbitals_b.shape[1], mat_t.general)
+        coeffs_b.from_numpy(orbitals_b)
+
+        # NOTE: the Coulomb is of the total density and is formed once, where the
+        # closed shell build is handed one spin's density and doubles it.
 
         packed_density = PackedMatrix(nao, nao, mat_t.symmetric)
-        packed_density.from_numpy(np.ascontiguousarray(density))
+        packed_density.from_numpy(np.ascontiguousarray(den_alpha + den_beta))
 
-        if (self.nodes > 1) and (self._ri_drv.get_mode() == rimode.direct):
-            fock = self._simd_ri_jk_direct_share(coeffs, exchange_scaling_factor)
-        else:
-            fock = self._ri_drv.compute(packed_density, coeffs,
-                                        exchange_scaling_factor)
+        assert_msg_critical(
+            self._ri_drv.get_mode() != rimode.direct,
+            'ScfDriver: the open shell RI-JK build is served only by ' +
+            'ri_mode in_memory, and this calculation got direct')
+
+        fock_a, fock_b = self._ri_drv.compute(packed_density, coeffs_a,
+                                              coeffs_b,
+                                              exchange_scaling_factor,
+                                              erf_exchange_scaling_factor)
 
         # NOTE: the limit is of the Fock matrix being expanded, which is the square
         # of the basis and is modest, and not the budget of the B vectors, which
         # bounds something else entirely and may be set small on purpose.
 
-        return fock.to_numpy(max_memory=2.0 * nao * nao * 8 / 1024**3 + 1.0)
+        limit = 2.0 * nao * nao * 8 / 1024**3 + 1.0
+
+        return fock_a.to_numpy(max_memory=limit), fock_b.to_numpy(
+            max_memory=limit)
 
     def _simd_ri_jk_direct_share(self, coeffs, exchange_scaling_factor):
         """
@@ -3052,15 +3355,20 @@ class ScfDriver:
 
         self._prepare_for_ri_fock_build(fock_type)
 
-        if self.ri_coulomb and fock_type == 'j':
+        if self.ri_coulomb and self.ri_coulomb_simd and fock_type == 'j':
+            fock_mat_np = self._simd_ri_j_fock(den_mat[0])
+        elif self.ri_coulomb and fock_type == 'j':
             fock_mat = self._ri_drv.compute(den_mat_for_fock, 'j')
             fock_mat_np = fock_mat.to_numpy()
         elif self.ri_jk and self.ri_jk_simd and fock_type != 'j':
             # NOTE: the driver returns twice the Coulomb less the scaled exchange
             # already, which is the matrix this branch is asked for, so nothing is
-            # scaled here.
-            fock_mat_np = self._simd_ri_jk_fock(den_mat[0],
-                                                exchange_scaling_factor)
+            # scaled here. A range-separated functional has its attenuated exchange
+            # subtracted inside the same call, in the same pass over the auxiliary
+            # basis, so the correction below is not made for this path.
+            fock_mat_np = self._simd_ri_jk_fock(
+                den_mat[0], exchange_scaling_factor,
+                erf_k_coef if need_omega else 0.0)
         elif self.ri_jk and fock_type != 'j' and (
                 not self.molecular_orbitals.is_empty()):
             fock_mat_j = self._ri_drv.compute_screened_j_fock(den_mat_for_fock,
@@ -3084,7 +3392,12 @@ class ScfDriver:
             # for pure functional
             fock_mat_np *= 2.0
 
-        if need_omega:
+        # NOTE: the simd resolution of the identity has already subtracted the
+        # attenuated exchange, inside the build rather than after it, so the four
+        # centre correction is made for every other way of building but not for it.
+        # The conventional RI-JK driver still has no attenuated B vectors and is
+        # refused rather than answered without the long-range term.
+        if need_omega and not (self.ri_jk and self.ri_jk_simd):
             assert_msg_critical(
                 not self.ri_jk, 'SCF driver: RI-JK not yet implemented for ' +
                 'range-separated functional')
@@ -3156,19 +3469,39 @@ class ScfDriver:
         if fock_type == 'j':
             # for pure functional
             # den_mat_for_Jab is D_total
-            if self.ri_coulomb:
-                fock_mat = self._ri_drv.compute(den_mat_for_Jab, 'j')
+            if self.ri_coulomb and self.ri_coulomb_simd:
+                # NOTE: the total density and no factor. A restricted build hands
+                # the density of one spin and doubles what comes back; here the two
+                # spins are already added, and the Coulomb matrix of the total
+                # density is what each of them sees.
+                J_ab_np = self._simd_ri_j_fock(den_mat[0] + den_mat[1])
             else:
-                fock_mat = fock_drv.compute(screener, den_mat_for_Jab, 'j', 0.0,
-                                            0.0, thresh_int)
-            J_ab_np = fock_mat.to_numpy()
-            fock_mat = Matrix()
+                if self.ri_coulomb:
+                    fock_mat = self._ri_drv.compute(den_mat_for_Jab, 'j')
+                else:
+                    fock_mat = fock_drv.compute(screener, den_mat_for_Jab, 'j',
+                                                0.0, 0.0, thresh_int)
+                J_ab_np = fock_mat.to_numpy()
+                fock_mat = Matrix()
 
             fock_mat_a_np = J_ab_np
             fock_mat_b_np = J_ab_np.copy()
 
         else:
-            if self.ri_jk and (not self.molecular_orbitals.is_empty()):
+            if self.ri_jk and self.ri_jk_simd:
+                # NOTE: the Coulomb of the total density and both exchanges in one
+                # call, which is handed a set of coefficients for each spin. There
+                # is no test of whether the orbitals exist yet, as the branch below
+                # has: where there are none the build is handed coefficients which
+                # reproduce the density of the guess, so it serves the first
+                # iteration too and does not fall back to the four centre way for
+                # it.
+                fock_mat_a_np, fock_mat_b_np = (
+                    self._simd_ri_jk_fock_unrestricted(
+                        den_mat[0], den_mat[1], exchange_scaling_factor,
+                        erf_k_coef if need_omega else 0.0))
+
+            elif self.ri_jk and (not self.molecular_orbitals.is_empty()):
                 fock_mat = self._ri_drv.compute_screened_j_fock(den_mat_for_Jab,
                                                                 'j',
                                                                 verbose=False)
@@ -3215,10 +3548,17 @@ class ScfDriver:
                 J_ab_np = fock_mat.to_numpy()
                 fock_mat = Matrix()
 
-            fock_mat_a_np = J_ab_np - K_a_np
-            fock_mat_b_np = J_ab_np - K_b_np
+            # NOTE: the two branches above answer with the Coulomb and the two
+            # exchanges apart, and are composed here. The simd branch answers with
+            # the two matrices already composed, which is what its driver forms,
+            # so it is left alone rather than taken apart and put back together.
+            if not (self.ri_jk and self.ri_jk_simd):
+                fock_mat_a_np = J_ab_np - K_a_np
+                fock_mat_b_np = J_ab_np - K_b_np
 
-        if need_omega:
+        # NOTE: as in the restricted build above -- the simd way subtracts both
+        # spins' attenuated exchange inside the call and takes no correction here.
+        if need_omega and not (self.ri_jk and self.ri_jk_simd):
             assert_msg_critical(
                 not self.ri_jk, 'SCF driver: RI-JK not yet implemented for ' +
                 'range-separated functional')
@@ -3300,6 +3640,14 @@ class ScfDriver:
                     xcfun_enum.lda, xcfun_enum.gga, xcfun_enum.mgga
             ]:
                 xc_drv = XCIntegrator()
+
+                # NOTE: what this keeps is what the matrix phases of the quadrature
+                # are quadratic in, and those are most of its time. None leaves the
+                # integrator's own default, which is what a calculation should use;
+                # it is settable so that the default can be measured against
+                # something rather than assumed.
+                if self.xc_screening_threshold is not None:
+                    xc_drv.set_screening_threshold(self.xc_screening_threshold)
                 # Note: vxc_mat will remain distributed across MPI processes.
                 # XC energy and Vxc matrix will be reduced in _comp_energy
                 # and _comp_full_fock

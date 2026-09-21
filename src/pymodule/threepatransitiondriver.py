@@ -38,6 +38,7 @@ import sys
 
 
 from .oneeints import compute_electric_dipole_integrals
+from . import rijkresponse
 from .veloxchemlib import (mpi_master, bohr_in_angstrom, hartree_in_ev,
                            fine_structure_constant, speed_of_light_in_vacuum_in_SI)
 from .profiler import Profiler
@@ -216,6 +217,13 @@ class ThreePATransitionDriver(NonlinearSolver):
                 if operator == 'dipole':
                     b_grad[ind] *= -1.0
 
+        # NOTE: the B vectors are formed before the solvers this driver drives
+        # are made, so that each of them is handed the same ones rather than
+        # forming its own. Forming them again where the integrals are set up
+        # costs nothing, the driver holding them already.
+        if self.ri_jk:
+            rijkresponse.initialize(self, molecule, ao_basis)
+
         rpa_drv = LinearResponseEigenSolver(self.comm, self.ostream)
         rpa_drv.nonlinear = True
 
@@ -224,11 +232,13 @@ class ThreePATransitionDriver(NonlinearSolver):
             'max_iter', 'eri_thresh', 'timing', 'memory_profiling',
             'batch_size', 'restart', 'xcfun', 'grid_level', 'potfile',
             'electric_field', 'program_end_time', '_debug', '_block_size_factor',
-            'ri_coulomb'
+            'ri_coulomb', 'ri_jk', 'ri_jk_simd', 'ri_auxiliary_basis'
         ]
 
         for key in rpa_keywords:
             setattr(rpa_drv, key, getattr(self, key))
+
+        rijkresponse.share(self, rpa_drv)
 
         if self.checkpoint_file is not None:
             fpath = Path(self.checkpoint_file)
@@ -281,11 +291,13 @@ class ThreePATransitionDriver(NonlinearSolver):
             'max_iter', 'eri_thresh', 'timing', 'memory_profiling',
             'batch_size', 'restart', 'xcfun', 'grid_level', 'potfile',
             'electric_field', 'program_end_time', '_debug', '_block_size_factor',
-            'ri_coulomb'
+            'ri_coulomb', 'ri_jk', 'ri_jk_simd', 'ri_auxiliary_basis'
         }
 
         for key in cpp_keywords:
             setattr(N_drv, key, getattr(self, key))
+
+        rijkresponse.share(self, N_drv)
 
         if self.checkpoint_file is not None:
             fpath = Path(self.checkpoint_file)
@@ -907,11 +919,13 @@ class ThreePATransitionDriver(NonlinearSolver):
             'max_iter', 'eri_thresh', 'timing', 'memory_profiling',
             'batch_size', 'restart', 'xcfun', 'grid_level', 'potfile',
             'electric_field', 'program_end_time', '_debug', '_block_size_factor',
-            'ri_coulomb'
+            'ri_coulomb', 'ri_jk', 'ri_jk_simd', 'ri_auxiliary_basis'
         }
 
         for key in cpp_keywords:
             setattr(Nxy_drv, key, getattr(self, key))
+
+        rijkresponse.share(self, Nxy_drv)
 
         if self.checkpoint_file is not None:
             fpath = Path(self.checkpoint_file)
@@ -951,6 +965,14 @@ class ThreePATransitionDriver(NonlinearSolver):
 
         distributed_density_1 = None
         distributed_density_2 = None
+
+        # NOTE: the factors of the densities which reach the Fock build. Only the
+        # two-time perturbed ones are built from here, so this is the one set of
+        # the general shape and not the two of the pass before.
+        self._ri_jk_factors = None
+
+        if self.rank == mpi_master() and self.ri_jk and self.ri_jk_simd:
+            self._ri_jk_factors = (mo[:, :nocc], [], mo[:, nocc:], [])
 
         for w_ind, w in enumerate(freq):
 
@@ -1059,31 +1081,53 @@ class ThreePATransitionDriver(NonlinearSolver):
                 Df_yz = self.commut(kf, Dyz)
                 Dyz_f = self.commut(kyz, Df)
 
-                # density transformation from MO to AO basis
+                # NOTE: named in the molecular orbitals rather than transformed
+                # where they are formed, so that the factors below and the
+                # matrices are the one expression and cannot drift apart.
 
                 # xx
                 # 0.5 * fxfx.T + 0.5 * fxfx.T + 0.5 * ffxx.T
-                Dfxx = np.linalg.multi_dot([mo, (2.0 * (Dx_fx + Dfx_x) + Df_xx + Dxx_f), mo.T])
+                mo_Dfxx = 2.0 * (Dx_fx + Dfx_x) + Df_xx + Dxx_f
 
                 # yy
                 # 0.5 * fyfy.T + 0.5 * fyfy.T + 0.5 * ffyy.T
-                Dfyy = np.linalg.multi_dot([mo, (2.0 * (Dy_fy + Dfy_y) + Df_yy + Dyy_f), mo.T])
+                mo_Dfyy = 2.0 * (Dy_fy + Dfy_y) + Df_yy + Dyy_f
 
                 # zz
                 # 0.5 * fzfz.T + 0.5 * fzfz.T + 0.5 * ffzz.T
-                Dfzz = np.linalg.multi_dot([mo, (2.0 * (Dz_fz + Dfz_z) + Df_zz + Dzz_f), mo.T])
+                mo_Dfzz = 2.0 * (Dz_fz + Dfz_z) + Df_zz + Dzz_f
 
                 # xy
                 # 0.5 * fxfy.T + 0.5 * fyfx.T + 0.5 * ffxy.T
-                Dfxy = np.linalg.multi_dot([mo, (Dx_fy + Dfy_x) + (Dy_fx + Dfx_y) + (Df_xy + Dxy_f), mo.T])
+                mo_Dfxy = (Dx_fy + Dfy_x) + (Dy_fx + Dfx_y) + (Df_xy + Dxy_f)
 
                 # xz
                 # 0.5 * fxfz.T + 0.5 * fzfx.T + 0.5 * ffxz.T
-                Dfxz = np.linalg.multi_dot([mo, (Dx_fz + Dfz_x) + (Dz_fx + Dfx_z) + (Df_xz + Dxz_f), mo.T])
+                mo_Dfxz = (Dx_fz + Dfz_x) + (Dz_fx + Dfx_z) + (Df_xz + Dxz_f)
 
                 # yz
                 # 0.5 * fyfz.T + 0.5 * fzyf.T + 0.5 * ffyz.T
-                Dfyz = np.linalg.multi_dot([mo, (Dy_fz + Dfz_y) + (Dz_fy + Dfy_z) + (Df_yz + Dyz_f), mo.T])
+                mo_Dfyz = (Dy_fz + Dfz_y) + (Dz_fy + Dfy_z) + (Df_yz + Dyz_f)
+
+                # NOTE: the factors, in the order the columns are laid out below.
+                # The first-order densities beside them are there for the
+                # quadrature alone and no Fock matrix is asked of them.
+                if self._ri_jk_factors is not None:
+                    for mat in (mo_Dfxx, mo_Dfyy, mo_Dfzz, mo_Dfxy, mo_Dfxz,
+                                mo_Dfyz):
+                        ra, rb = rijkresponse.general_factors(
+                            mo, nocc, np.real(mat))
+                        self._ri_jk_factors[1].append(ra)
+                        self._ri_jk_factors[3].append(rb)
+
+                # density transformation from MO to AO basis
+
+                Dfxx = np.linalg.multi_dot([mo, mo_Dfxx, mo.T])
+                Dfyy = np.linalg.multi_dot([mo, mo_Dfyy, mo.T])
+                Dfzz = np.linalg.multi_dot([mo, mo_Dfzz, mo.T])
+                Dfxy = np.linalg.multi_dot([mo, mo_Dfxy, mo.T])
+                Dfxz = np.linalg.multi_dot([mo, mo_Dfxz, mo.T])
+                Dfyz = np.linalg.multi_dot([mo, mo_Dfyz, mo.T])
 
                 Dx = np.linalg.multi_dot([mo, Dx, mo.T])
                 Dy = np.linalg.multi_dot([mo, Dy, mo.T])
@@ -1174,6 +1218,20 @@ class ThreePATransitionDriver(NonlinearSolver):
         distributed_density_2 = None
         distributed_density_3 = None
 
+        # NOTE: the factors of the two orders which reach the Fock build, kept
+        # apart as lists of the occupied and the virtual right factor. The
+        # densities of this driver are real, so each of them is one factor and
+        # not the two a complex one is carried by.
+        self._ri_jk_factors = None
+
+        if self.rank == mpi_master() and self.ri_jk and self.ri_jk_simd:
+            self._ri_jk_factors = {
+                'left_occ': mo[:, :nocc],
+                'left_vir': mo[:, nocc:],
+                'second': ([], []),
+                'third': ([], []),
+            }
+
         for w_ind, w in enumerate(freqs):
 
             nx = ComplexResponseSolver.get_full_solution_vector(Nx[('x', w)])
@@ -1240,6 +1298,26 @@ class ThreePATransitionDriver(NonlinearSolver):
                 Dbcf_yz = self.commut(ky, Dbfz)  # bcd + bdc
                 Dbcf_yz += self.commut(kz, Dbfy)  # cbd + cdb
                 Dbcf_yz += self.commut(kf, Dbc_yz)  # dbc + dcb
+
+                # NOTE: the factors, taken before the transformation to the
+                # atomic orbitals and in the order the columns are laid out
+                # below. The two orders are collected apart because the array of
+                # each is cut with a stride of its own where there is a
+                # functional, and laid end to end where there is not, which is
+                # the order they are joined in at the call.
+                if self._ri_jk_factors is not None:
+                    for name, mat in (('second', Dbfx), ('second', Dbfy),
+                                      ('second', Dbfz), ('second', Dbc_xx),
+                                      ('second', Dbc_yy), ('second', Dbc_zz),
+                                      ('second', Dbc_xy), ('second', Dbc_xz),
+                                      ('second', Dbc_yz), ('third', Dbcf_xx),
+                                      ('third', Dbcf_yy), ('third', Dbcf_zz),
+                                      ('third', Dbcf_xy), ('third', Dbcf_xz),
+                                      ('third', Dbcf_yz)):
+                        ra, rb = rijkresponse.general_factors(
+                            mo, nocc, np.real(mat))
+                        self._ri_jk_factors[name][0].append(ra)
+                        self._ri_jk_factors[name][1].append(rb)
 
                 # Density transformation from MO to AO basis
 
@@ -1388,15 +1466,15 @@ class ThreePATransitionDriver(NonlinearSolver):
             time_start_fock = time.time()
 
             if self._dft:
-                dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
-                                                 'real', eri_dict,
-                                                 dft_dict, density_list1,
-                                                 density_list2, None, '3pa_ii')
+                dist_focks = self._comp_nlr_fock(
+                    mo, molecule, ao_basis, 'real', eri_dict, dft_dict,
+                    density_list1, density_list2, None, '3pa_ii',
+                    dens_factors=self._ri_jk_factors)
             else:
-                dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
-                                                 'real', eri_dict,
-                                                 None, None, density_list2,
-                                                 None, '3pa_ii')
+                dist_focks = self._comp_nlr_fock(
+                    mo, molecule, ao_basis, 'real', eri_dict, None, None,
+                    density_list2, None, '3pa_ii',
+                    dens_factors=self._ri_jk_factors)
 
             self._print_fock_time(time.time() - time_start_fock)
 
@@ -1505,22 +1583,49 @@ class ThreePATransitionDriver(NonlinearSolver):
         else:
             time_start_fock = time.time()
 
+            factors = self._ri_jk_factors
+
             if self._dft:
+                # NOTE: two arrays, each cut with a stride of its own, so the
+                # factors go as the two sets they were collected as.
+                split = None
+
+                if factors is not None:
+                    split = {
+                        'second': (factors['left_occ'], factors['second'][0],
+                                   factors['left_vir'], factors['second'][1]),
+                        'third': (factors['left_occ'], factors['third'][0],
+                                  factors['left_vir'], factors['third'][1]),
+                    }
+
                 dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
                                                  'real', eri_dict,
                                                  dft_dict, first_order_dens,
                                                  second_order_dens, third_order_dens,
-                                                 '3pa',profiler)
+                                                 '3pa', profiler,
+                                                 dens_factors=split)
             else:
                 density_list_23 = DistributedArray(second_order_dens.data,
                                                    self.comm,
                                                    distribute=False)
 
                 density_list_23.append(third_order_dens, axis=1)
+
+                # NOTE: one array of the two orders laid end to end, cut with one
+                # stride, so the factors are one set joined in the same order.
+                joined = None
+
+                if factors is not None:
+                    joined = (factors['left_occ'],
+                              factors['second'][0] + factors['third'][0],
+                              factors['left_vir'],
+                              factors['second'][1] + factors['third'][1])
+
                 dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
                                                  'real', eri_dict,
                                                  None, None, None,
-                                                 density_list_23, '3pa')
+                                                 density_list_23, '3pa',
+                                                 dens_factors=joined)
 
             self._print_fock_time(time.time() - time_start_fock)
 
