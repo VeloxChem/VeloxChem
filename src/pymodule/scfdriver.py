@@ -338,7 +338,7 @@ class ScfDriver:
 
         self._debug = False
         self._block_size_factor = 8
-        self._xcfun_ldstaging = 256
+        self._xcfun_ldstaging = 1024
         self.xc_screening_threshold = None
         self.trim_mos = True
 
