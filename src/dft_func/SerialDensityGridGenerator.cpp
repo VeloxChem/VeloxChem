@@ -189,7 +189,7 @@ serialGenerateDensityForGGA(double*             rho,
 
     symmetricDensityMatrix.symmetrizeAndScale(0.5);
 
-    auto mat_F = sdenblas::serialMultSymAB(symmetricDensityMatrix, gtoValues);
+    auto mat_F = sdenblas::serialMultSymANonsymB(symmetricDensityMatrix, gtoValues);
 
     auto F_val = mat_F.values();
 
@@ -288,8 +288,8 @@ serialGenerateDensityForGGA(double*             rho,
     symmetricDensityMatrixAlpha.symmetrizeAndScale(0.5);
     symmetricDensityMatrixBeta.symmetrizeAndScale(0.5);
 
-    auto mat_F_a = sdenblas::serialMultSymAB(symmetricDensityMatrixAlpha, gtoValues);
-    auto mat_F_b = sdenblas::serialMultSymAB(symmetricDensityMatrixBeta, gtoValues);
+    auto mat_F_a = sdenblas::serialMultSymANonsymB(symmetricDensityMatrixAlpha, gtoValues);
+    auto mat_F_b = sdenblas::serialMultSymANonsymB(symmetricDensityMatrixBeta, gtoValues);
 
     // eq.(27), JCTC 2021, 17, 1512-1521
 
@@ -401,7 +401,7 @@ serialGenerateDensityGridForGGA(const CDenseMatrix&     gtoValues,
 
         symmetricDensityMatrix.symmetrizeAndScale(0.5);
 
-        auto mat_F = sdenblas::serialMultSymAB(symmetricDensityMatrix, gtoValues);
+        auto mat_F = sdenblas::serialMultSymANonsymB(symmetricDensityMatrix, gtoValues);
 
         auto naos = gtoValues.getNumberOfRows();
 
@@ -476,11 +476,11 @@ serialGenerateDensityForMGGA(double*             rho,
 
     symmetricDensityMatrix.symmetrizeAndScale(0.5);
 
-    auto mat_F = sdenblas::serialMultSymAB(symmetricDensityMatrix, gtoValues);
+    auto mat_F = sdenblas::serialMultSymANonsymB(symmetricDensityMatrix, gtoValues);
 
-    auto mat_F_x = sdenblas::serialMultSymAB(symmetricDensityMatrix, gtoValuesX);
-    auto mat_F_y = sdenblas::serialMultSymAB(symmetricDensityMatrix, gtoValuesY);
-    auto mat_F_z = sdenblas::serialMultSymAB(symmetricDensityMatrix, gtoValuesZ);
+    auto mat_F_x = sdenblas::serialMultSymANonsymB(symmetricDensityMatrix, gtoValuesX);
+    auto mat_F_y = sdenblas::serialMultSymANonsymB(symmetricDensityMatrix, gtoValuesY);
+    auto mat_F_z = sdenblas::serialMultSymANonsymB(symmetricDensityMatrix, gtoValuesZ);
 
     auto F_val = mat_F.values();
 
@@ -604,16 +604,16 @@ serialGenerateDensityForMGGA(double*             rho,
     symmetricDensityMatrixAlpha.symmetrizeAndScale(0.5);
     symmetricDensityMatrixBeta.symmetrizeAndScale(0.5);
 
-    auto mat_F_a = sdenblas::serialMultSymAB(symmetricDensityMatrixAlpha, gtoValues);
-    auto mat_F_b = sdenblas::serialMultSymAB(symmetricDensityMatrixBeta, gtoValues);
+    auto mat_F_a = sdenblas::serialMultSymANonsymB(symmetricDensityMatrixAlpha, gtoValues);
+    auto mat_F_b = sdenblas::serialMultSymANonsymB(symmetricDensityMatrixBeta, gtoValues);
 
-    auto mat_F_a_x = sdenblas::serialMultSymAB(symmetricDensityMatrixAlpha, gtoValuesX);
-    auto mat_F_a_y = sdenblas::serialMultSymAB(symmetricDensityMatrixAlpha, gtoValuesY);
-    auto mat_F_a_z = sdenblas::serialMultSymAB(symmetricDensityMatrixAlpha, gtoValuesZ);
+    auto mat_F_a_x = sdenblas::serialMultSymANonsymB(symmetricDensityMatrixAlpha, gtoValuesX);
+    auto mat_F_a_y = sdenblas::serialMultSymANonsymB(symmetricDensityMatrixAlpha, gtoValuesY);
+    auto mat_F_a_z = sdenblas::serialMultSymANonsymB(symmetricDensityMatrixAlpha, gtoValuesZ);
 
-    auto mat_F_b_x = sdenblas::serialMultSymAB(symmetricDensityMatrixBeta, gtoValuesX);
-    auto mat_F_b_y = sdenblas::serialMultSymAB(symmetricDensityMatrixBeta, gtoValuesY);
-    auto mat_F_b_z = sdenblas::serialMultSymAB(symmetricDensityMatrixBeta, gtoValuesZ);
+    auto mat_F_b_x = sdenblas::serialMultSymANonsymB(symmetricDensityMatrixBeta, gtoValuesX);
+    auto mat_F_b_y = sdenblas::serialMultSymANonsymB(symmetricDensityMatrixBeta, gtoValuesY);
+    auto mat_F_b_z = sdenblas::serialMultSymANonsymB(symmetricDensityMatrixBeta, gtoValuesZ);
 
     auto F_a_val = mat_F_a.values();
     auto F_b_val = mat_F_b.values();
@@ -751,11 +751,11 @@ serialGenerateDensityGridForMGGA(const CDenseMatrix&     gtoValues,
 
         symmetricDensityMatrix.symmetrizeAndScale(0.5);
 
-        auto mat_F = sdenblas::serialMultSymAB(symmetricDensityMatrix, gtoValues);
+        auto mat_F = sdenblas::serialMultSymANonsymB(symmetricDensityMatrix, gtoValues);
 
-        auto mat_F_x = sdenblas::serialMultSymAB(symmetricDensityMatrix, gtoValuesX);
-        auto mat_F_y = sdenblas::serialMultSymAB(symmetricDensityMatrix, gtoValuesY);
-        auto mat_F_z = sdenblas::serialMultSymAB(symmetricDensityMatrix, gtoValuesZ);
+        auto mat_F_x = sdenblas::serialMultSymANonsymB(symmetricDensityMatrix, gtoValuesX);
+        auto mat_F_y = sdenblas::serialMultSymANonsymB(symmetricDensityMatrix, gtoValuesY);
+        auto mat_F_z = sdenblas::serialMultSymANonsymB(symmetricDensityMatrix, gtoValuesZ);
 
         // eq.(27), JCTC 2021, 17, 1512-1521
 

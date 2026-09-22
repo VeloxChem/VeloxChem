@@ -150,7 +150,7 @@ serialMultABt(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB) -> CDens
 }
 
 auto
-serialMultSymAB(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB) -> CDenseMatrix
+serialMultSymANonsymB(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB) -> CDenseMatrix
 {
     // set up dimensions of matrix A
 
@@ -162,9 +162,9 @@ serialMultSymAB(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB) -> CDe
     auto nbrow = matrixB.getNumberOfRows();
     auto nbcol = matrixB.getNumberOfColumns();
 
-    errors::assertMsgCritical(narow == nacol, "sdenblas::serialMultSymAB: Matrix A is not square");
+    errors::assertMsgCritical(narow == nacol, "sdenblas::serialMultSymANonsymB: Matrix A is not square");
 
-    errors::assertMsgCritical(nacol == nbrow, "sdenblas::serialMultSymAB: Inconsistent sizes in matrix multiplication");
+    errors::assertMsgCritical(nacol == nbrow, "sdenblas::serialMultSymANonsymB: Inconsistent sizes in matrix multiplication");
 
     // allocate dense matrix
 
