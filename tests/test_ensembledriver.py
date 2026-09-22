@@ -152,7 +152,7 @@ class TestEnsembleDriver:
                 got = np.loadtxt(generated_csv, delimiter=",", skiprows=1)
                 ref = np.loadtxt(ref_csv, delimiter=",", skiprows=1)
                 assert got.shape == ref.shape
-                np.testing.assert_allclose(got, ref, rtol=0.0, atol=1.0e-6)
+                np.testing.assert_allclose(got, ref, rtol=1.0e-8, atol=1.0e-6)
 
                 plt.close(ax.figure)
             except ImportError:

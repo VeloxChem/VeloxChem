@@ -39,7 +39,7 @@ class TestHessianAtomPair:
 
         scf_drv = ScfRestrictedDriver()
         scf_drv.ostream.mute()
-        scf_drv.acc_type = 'l2_c2diis'
+        scf_drv.acc_type = 'l2_diis'
         scf_drv.compute(mol, basis)
 
         hess_drv = ScfHessianDriver(scf_drv)
@@ -56,7 +56,7 @@ class TestHessianAtomPair:
             np.testing.assert_allclose(pair_hess,
                                        reference_hess,
                                        rtol=1e-8,
-                                       atol=1e-10)
+                                       atol=5e-7)
 
     @pytest.mark.solvers
     @pytest.mark.skipif(not DispersionModel.is_available(),

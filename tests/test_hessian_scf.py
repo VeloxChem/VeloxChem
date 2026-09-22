@@ -22,7 +22,7 @@ class TestScfHessianDriver:
         task = MpiTask([inpfile, None])
 
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
-        scf_drv.acc_type = 'l2_c2diis'
+        scf_drv.acc_type = 'diis'
         scf_drv.compute(task.molecule, task.ao_basis)
 
         vib_settings = {
@@ -75,7 +75,7 @@ class TestScfHessianDriver:
         filename = task.mpi_comm.bcast(filename, root=mpi_master())
 
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
-        scf_drv.acc_type = 'l2_c2diis'
+        scf_drv.acc_type = 'l2_diis'
         scf_drv.filename = filename
         scf_drv.compute(task.molecule, task.ao_basis)
 
@@ -113,7 +113,7 @@ class TestScfHessianDriver:
         filename = task.mpi_comm.bcast(filename, root=mpi_master())
 
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
-        scf_drv.acc_type = 'l2_c2diis'
+        scf_drv.acc_type = 'l2_diis'
         scf_drv.filename = filename
         scf_drv.compute(task.molecule, task.ao_basis)
 

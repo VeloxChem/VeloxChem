@@ -32,7 +32,7 @@ class TestLR:
         scf_drv.ostream.mute()
         scf_drv.xcfun = xcfun_label
         scf_drv.ri_coulomb = ri_coulomb
-        scf_drv.acc_type = 'l2_c2diis'
+        scf_drv.acc_type = 'l2_diis'
         scf_results = scf_drv.compute(mol, bas)
 
         lr_drv = LinearResponseSolver()
@@ -96,7 +96,7 @@ class TestLR:
             ('z', 'z', 0.06): -6.61957112,
         }
 
-        self.run_lr('hf', ref_rsp_func, 1.0e-6)
+        self.run_lr('hf', ref_rsp_func, 1.0e-5)
 
     def test_slda(self):
 

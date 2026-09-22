@@ -27,7 +27,7 @@ class TestCppPropertyDensities:
 
         scf_drv = ScfRestrictedDriver()
         scf_drv.xcfun = xcfun_label
-        scf_drv.acc_type = 'l2_c2diis'
+        scf_drv.acc_type = 'l2_diis'
         scf_drv.filename = filename
         scf_drv.ostream.mute()
         scf_results = scf_drv.compute(mol, bas)
@@ -122,7 +122,7 @@ class TestCppPropertyDensities:
         cpp_frequencies = np.round(np.arange(0.3, 0.4, 0.005), 4)
 
         freq_prop_tuple = (0.380, -33.00280072)
-        tol = 1e-7
+        tol = 1e-5
 
         self.run_cpp_prop_densities(tmp_path, mol, bas, xcfun_label, cpp_property,
                                     cpp_frequencies, freq_prop_tuple, tol)

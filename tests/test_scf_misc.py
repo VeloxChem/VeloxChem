@@ -1063,7 +1063,7 @@ class TestScfDriverMiscellaneous:
             assert np.allclose(effective[0], fock_a)
             assert effective[0] is fock_a
 
-        driver.acc_type = 'c2diis'
+        driver.acc_type = 'diis'
         driver.diis_thresh = 1.0
         driver.max_err_vecs = 2
         driver._store_diis_data((fock_a,), (density_a,), ovl, 0.2)
@@ -1108,7 +1108,7 @@ class TestScfDriverMiscellaneous:
             assert np.allclose(passthrough[0], fock_a)
             assert np.allclose(passthrough[1], fock_b)
 
-        driver.acc_type = 'c2diis'
+        driver.acc_type = 'diis'
         driver.diis_thresh = 1.0
         driver.max_err_vecs = 2
         driver._store_diis_data((fock_a, fock_b), (density_a, density_b), ovl,
@@ -1213,7 +1213,7 @@ class TestScfDriverMiscellaneous:
             assert np.allclose(passthrough[0], fa)
             assert np.allclose(passthrough[1], fb)
 
-        driver.acc_type = 'c2diis'
+        driver.acc_type = 'diis'
         driver.diis_thresh = 1.0
         driver.max_err_vecs = 2
         driver._store_diis_data((fa, fb), (da, db), s, 0.2)
@@ -1433,7 +1433,6 @@ class TestScfDriverMiscellaneous:
 
     @pytest.mark.parametrize('acc_type, expected_acc_type', [
         ('l2_diis', 'DIIS'),
-        ('l2_c2diis', 'C2DIIS'),
     ])
     @pytest.mark.parametrize(
         'modifier', ['level_shifting', 'pfon', 'density_damping'])

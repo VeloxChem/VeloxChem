@@ -100,7 +100,7 @@ def _run_cpp_rsp_roundtrip(tmp_path, solver_cls):
     base = scf_drv.comm.bcast(base, root=mpi_master())
     scf_drv.filename = base
     scf_drv.xcfun = 'hf'
-    scf_drv.acc_type = 'l2_c2diis'
+    scf_drv.acc_type = 'l2_diis'
     scf_results = scf_drv.compute(molecule, basis)
 
     rsp_drv = solver_cls()
@@ -842,7 +842,7 @@ def test_vib_results_hdf5_roundtrip_with_water_calculation(tmp_path):
     filename = task.mpi_comm.bcast(filename, root=mpi_master())
 
     scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
-    scf_drv.acc_type = 'l2_c2diis'
+    scf_drv.acc_type = 'l2_diis'
     scf_drv.filename = filename
     _ = scf_drv.compute(task.molecule, task.ao_basis)
 

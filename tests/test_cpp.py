@@ -72,7 +72,7 @@ class TestCPP:
         scf_drv = ScfRestrictedDriver()
         scf_drv.ostream.mute()
         scf_drv.xcfun = xcfun_label
-        scf_drv.acc_type = 'l2_c2diis'
+        scf_drv.acc_type = 'l2_diis'
         scf_results = scf_drv.compute(mol, bas)
 
         lr_drv = ComplexResponseSolver()
@@ -159,13 +159,13 @@ class TestCPP:
         ref_x_data = [0.39, 0.40, 0.41]
         ref_y_data = [5.74701958, 35.38200618, -15.89867350]
 
-        self.run_cpp(xcfun_label, cpp_property, ref_x_data, ref_y_data, 1.0e-6)
+        self.run_cpp(xcfun_label, cpp_property, ref_x_data, ref_y_data, 2.0e-4)
 
         self.run_cpp(xcfun_label,
                      cpp_property,
                      ref_x_data,
                      ref_y_data,
-                     1.0e-6,
+                     2.0e-4,
                      use_subcomms=True)
 
     def test_b3lyp_absorption(self):

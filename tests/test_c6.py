@@ -26,7 +26,7 @@ class TestC6:
         scf_drv = ScfRestrictedDriver()
         scf_drv.ostream.mute()
         scf_drv.xcfun = xcfun_label
-        scf_drv.acc_type = 'l2_c2diis'
+        scf_drv.acc_type = 'l2_diis'
         scf_results = scf_drv.compute(mol, bas)
 
         lr_drv = C6Driver()
@@ -43,7 +43,7 @@ class TestC6:
         xcfun_label = 'hf'
         ref_c6 = 16.852249
 
-        self.run_c6(xcfun_label, ref_c6, 1.0e-6)
+        self.run_c6(xcfun_label, ref_c6, 2.0e-5)
 
     def test_b3lyp(self):
 

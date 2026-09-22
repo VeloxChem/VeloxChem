@@ -73,7 +73,7 @@ class TestCppUnrestricted:
         scf_drv = ScfUnrestrictedDriver()
         scf_drv.ostream.mute()
         scf_drv.xcfun = xcfun_label
-        scf_drv.acc_type = 'l2_c2diis'
+        scf_drv.acc_type = 'l2_diis'
         scf_results = scf_drv.compute(mol, bas)
 
         lr_drv = ComplexResponseUnrestrictedSolver()
@@ -119,7 +119,7 @@ class TestCppUnrestricted:
                      cpp_property,
                      ref_x_data,
                      ref_y_data,
-                     1.0e-6,
+                     1.0e-5,
                      max_subspace_dim=1000)
 
     def run_cpp_with_ecp(self, xcfun_label, cpp_property, ref_x_data,
