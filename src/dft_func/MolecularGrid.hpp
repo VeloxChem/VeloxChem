@@ -78,13 +78,6 @@ class CMolecularGrid
     /**
      The maximum number of grid points in a grid box.
      */
-    /// @brief The points a box may hold before it is cut again.
-    /// @note **256 and not 1024.** The quadrature screens the basis functions over
-    /// a box, and the two matrix phases which are most of its time are quadratic in
-    /// what survives; a smaller box reaches fewer functions. Swept over 128 to 4096
-    /// on water clusters and caffeine, 256 is the minimum -- 128 is worse, so the
-    /// per box overhead does bite, just below here -- and it is worth 1.3 to 1.6
-    /// times against the 1024 this was written with.
     int _maxNumberOfGridPointsPerBox;
 
    public:
