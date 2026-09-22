@@ -40,21 +40,6 @@
 #include "MathLibrary.hpp"
 #endif
 
-/// @note The matrices here are stored by rows, and the math library works by
-/// columns, so a matrix is seen by it as its own transpose. A row major
-/// C = op(A) * op(B) is therefore asked for as the column major
-/// C^T = op(B)^T * op(A)^T, with the operands handed over in the other order.
-///
-/// @note Which of the equivalent spellings is used is not a matter of taste.
-/// Measured on one core with the shapes the exchange-correlation quadrature
-/// produces, a contracted basis of 248 functions on a box of 225 points, the
-/// library reaches 440 Gflop/s against 58 for the expression templates, and on
-/// fourteen cores 112 against 36. But the plain A * B of a square matrix with a
-/// wide one, asked for in that order, collapses to 25 -- below the expression
-/// templates -- while the identical product with the square operand marked as
-/// transposed holds 92. The square operand here is a density matrix, which is
-/// symmetric, so marking it transposed costs nothing and buys the difference.
-
 namespace sdenblas {  // sdenblas namespace
 
 auto
@@ -114,7 +99,7 @@ serialMultABt(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB) -> CDens
 
     CDenseMatrix mat(narow, nbrow);
 
-    if ((narow == 0) || (nbrow == 0)) return mat;
+    if ((narow == 0) || (nbrow == 0) || (nacol == 0)) return mat;
 
     // compute matrix-matrix multiplcation
 

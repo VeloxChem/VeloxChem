@@ -60,12 +60,6 @@ auto serialMultABt(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB) -> 
  Computes matrix multiplication: A * B, for a symmetric matrix A and a
  general, non-symmetric matrix B.
 
- @note The caller guarantees that A is square and symmetric. This lets the
- product be spelled with A transposed, which is the same matrix but a much
- faster shape for the math library than the plain A * B: see the note in
- the sdenblas namespace. B is used as a general rectangular matrix, with no
- symmetry assumed.
-
  @param matrixA the symmetric matrix A.
  @param matrixB the general, non-symmetric matrix B.
  @return the matrix A * B.
