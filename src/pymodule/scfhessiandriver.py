@@ -172,6 +172,9 @@ class ScfHessianDriver(HessianDriver):
             scf_energy_not_used = self.compute_energy(molecule, ao_basis)
             scf_results = self.scf_driver.scf_results
 
+        # use the grid box size chosen by the SCF driver
+        self._xcfun_ldstaging = self.scf_driver._xcfun_ldstaging
+
         # Save the electronic energy
         self.elec_energy = self.scf_driver.get_scf_energy()
 
@@ -778,7 +781,7 @@ class ScfHessianDriver(HessianDriver):
                 molecule, ao_basis, grid_level)
 
             grid_drv.set_level(grid_level)
-            mol_grid = grid_drv.generate(molecule)
+            mol_grid = grid_drv.generate(molecule, self._xcfun_ldstaging)
 
             xc_mol_hess = XCMolecularHessian()
             hessian_dft_xc = xc_mol_hess.integrate_exc_hessian(
@@ -1638,7 +1641,7 @@ class ScfHessianDriver(HessianDriver):
                 molecule, ao_basis, grid_level)
 
             grid_drv.set_level(grid_level)
-            mol_grid = grid_drv.generate(molecule)
+            mol_grid = grid_drv.generate(molecule, self._xcfun_ldstaging)
 
             xc_mol_hess = XCMolecularHessian()
             hessian_dft_xc = xc_mol_hess.integrate_exc_hessian(

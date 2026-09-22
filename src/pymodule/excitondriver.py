@@ -56,7 +56,7 @@ from .oneeints import (compute_nuclear_potential_integrals,
                        compute_angular_momentum_integrals)
 from .errorhandler import assert_msg_critical
 from .inputparser import parse_input, print_keywords
-from .dftutils import get_default_grid_level
+from .dftutils import get_default_grid_level, get_optimal_grid_box_size
 from .checkpoint import read_rsp_hdf5, write_rsp_hdf5
 from .spectrumplot import plot_uv_vis_spectrum, plot_ecd_spectrum
 
@@ -1373,7 +1373,10 @@ class ExcitonModelDriver:
                           if self.grid_level is None else self.grid_level)
             grid_drv.set_level(grid_level)
 
-            dimer_molgrid = grid_drv.generate(dimer)
+            xcfun_ldstaging = get_optimal_grid_box_size(
+                basis.get_dimensions_of_basis())
+
+            dimer_molgrid = grid_drv.generate(dimer, xcfun_ldstaging)
         else:
             dimer_molgrid = None
 
@@ -1406,6 +1409,7 @@ class ExcitonModelDriver:
         exchange_scaling_factor = 1.0
         if self._dft:
             xcfun = parse_xc_func(self.xcfun.upper())
+            xcfun._set_leading_dimension(xcfun_ldstaging)
             if xcfun.is_hybrid():
                 fock_type = '2jkx'
                 exchange_scaling_factor = xcfun.get_frac_exact_exchange()

@@ -39,7 +39,7 @@ from .veloxchemlib import mpi_master
 from .griddriver import GridDriver
 from .outputstream import OutputStream
 from .molecule import Molecule
-from .dftutils import get_default_grid_level
+from .dftutils import get_default_grid_level, get_optimal_grid_box_size
 from .inputparser import parse_input, read_unparsed_input_from_hdf5
 from .sanitychecks import dft_sanity_check
 
@@ -292,7 +292,9 @@ class GradientDriver:
         grid_level = (get_default_grid_level(self.xcfun)
                       if self.grid_level is None else self.grid_level)
         grid_drv.set_level(grid_level)
-        mol_grid = grid_drv.generate(molecule)
+        xcfun_ldstaging = get_optimal_grid_box_size(
+            ao_basis.get_dimensions_of_basis())
+        mol_grid = grid_drv.generate(molecule, xcfun_ldstaging)
 
         xc_molgrad_drv = XCMolecularGradient()
         vxc_contrib = xc_molgrad_drv.integrate_vxc_gradient(
@@ -329,7 +331,9 @@ class GradientDriver:
         grid_level = (get_default_grid_level(self.xcfun)
                       if self.grid_level is None else self.grid_level)
         grid_drv.set_level(grid_level)
-        mol_grid = grid_drv.generate(molecule)
+        xcfun_ldstaging = get_optimal_grid_box_size(
+            ao_basis.get_dimensions_of_basis())
+        mol_grid = grid_drv.generate(molecule, xcfun_ldstaging)
 
         xc_molgrad_drv = XCMolecularGradient()
         vxc2_contrib = xc_molgrad_drv.integrate_fxc_gradient(
@@ -369,7 +373,9 @@ class GradientDriver:
         grid_level = (get_default_grid_level(self.xcfun)
                       if self.grid_level is None else self.grid_level)
         grid_drv.set_level(grid_level)
-        mol_grid = grid_drv.generate(molecule)
+        xcfun_ldstaging = get_optimal_grid_box_size(
+            ao_basis.get_dimensions_of_basis())
+        mol_grid = grid_drv.generate(molecule, xcfun_ldstaging)
 
         xc_molgrad_drv = XCMolecularGradient()
         vxc3_contrib = xc_molgrad_drv.integrate_kxc_gradient(
@@ -407,7 +413,9 @@ class GradientDriver:
         grid_level = (get_default_grid_level(self.xcfun)
                       if self.grid_level is None else self.grid_level)
         grid_drv.set_level(grid_level)
-        mol_grid = grid_drv.generate(molecule)
+        xcfun_ldstaging = get_optimal_grid_box_size(
+            ao_basis.get_dimensions_of_basis())
+        mol_grid = grid_drv.generate(molecule, xcfun_ldstaging)
 
         xcgrad_drv = XCMolecularGradient()
         tddft_xcgrad = xcgrad_drv.integrate_vxc_gradient(
