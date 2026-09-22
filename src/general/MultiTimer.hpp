@@ -83,13 +83,11 @@ class CMultiTimer
     std::string getSummary() const;
 
     /**
-     Gets the label and the elapsed time of each timer.
+     Gets the label and the elapsed time of each timer. Each elapsed time is
+     accumulated over completed start/stop intervals.
 
-     @return the labels and the elapsed times, in the order the timers were
-             started for the first time.
-
-     @note getSummary formats the same numbers for reading. This returns them so
-           that a caller holding one timer for every thread can add them together.
+     @return the labels and the elapsed times in seconds, in the order the
+             timers were started for the first time.
      */
     std::vector<std::pair<std::string, double>> getTimings() const;
 };
