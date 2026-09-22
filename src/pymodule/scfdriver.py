@@ -728,7 +728,7 @@ class ScfDriver:
 
         assert_msg_critical(
             isinstance(self.acc_type, str) and self.acc_type.upper() in [
-                'C2DIIS', 'DIIS', 'L2_C2DIIS', 'L2_DIIS'
+                'DIIS', 'L2_DIIS'
             ],
             f'SCF driver: Invalid acceleration type: {self.acc_type}')
 
@@ -830,14 +830,12 @@ class ScfDriver:
         # check print level (verbosity of output)
         self.print_level = max(1, min(self.print_level, 3))
 
-        # Use the corresponding single-level DIIS variant for custom start
-        # orbitals or convergence modifiers such as level shifting, pFON, and
-        # density damping.
+        # Use the single-level DIIS variant for custom start orbitals or
+        # convergence modifiers such as level shifting, pFON, and density
+        # damping.
         if (self._uses_custom_initial_guess() or self.level_shifting > 0.0 or
                 self.pfon or self.density_damping):
-            if self.acc_type.upper() == 'L2_C2DIIS':
-                self.acc_type = 'C2DIIS'
-            elif self.acc_type.upper() == 'L2_DIIS':
+            if self.acc_type.upper() == 'L2_DIIS':
                 self.acc_type = 'DIIS'
 
         if self._uses_custom_initial_guess():
@@ -1155,7 +1153,7 @@ class ScfDriver:
                 self.ostream.print_blank()
 
         # DIIS method
-        if self.acc_type.upper() in ['C2DIIS', 'DIIS']:
+        if self.acc_type.upper() == 'DIIS':
             den_mat = self._prepare_initial_density(
                 self._gen_single_step_initial_density, molecule, basis,
                 min_basis)
@@ -1166,7 +1164,7 @@ class ScfDriver:
             self._comp_diis(molecule, basis, den_mat, profiler)
 
         # two level DIIS method
-        elif self.acc_type.upper() in ['L2_C2DIIS', 'L2_DIIS']:
+        elif self.acc_type.upper() == 'L2_DIIS':
 
             # first step: temporarily use a looser threshold and fewer
             # iterations for the reduced-basis calculation. Restore the
@@ -4531,14 +4529,8 @@ class ScfDriver:
             The string with type of SCF convergence accelerator.
         """
 
-        if self.acc_type.upper() == 'C2DIIS':
-            return 'C2-DIIS'
-
         if self.acc_type.upper() == 'DIIS':
             return 'Direct Inversion of Iterative Subspace'
-
-        if self.acc_type.upper() == 'L2_C2DIIS':
-            return 'Two Level C2-DIIS'
 
         if self.acc_type.upper() == 'L2_DIIS':
             return 'Two Level Direct Inversion of Iterative Subspace'

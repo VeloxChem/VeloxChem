@@ -40,15 +40,14 @@ from .veloxchemlib import mpi_master, boltzmann_in_hartreeperkelvin
 from .molecularorbitals import MolecularOrbitals, molorb
 from .outputstream import OutputStream
 from .scfdriver import ScfDriver
-from .c2diis import CTwoDiis
 from .diis import Diis
 from .mathutils import solve_in_orthogonal_basis
 
 
 class ScfRestrictedOpenDriver(ScfDriver):
     """
-    Implements spin restricted open shell SCF method with C2-DIIS and
-    two-level C2-DIIS convergence accelerators.
+    Implements spin restricted open shell SCF method with DIIS and
+    two-level DIIS convergence accelerators.
 
     :param comm:
         The MPI communicator.
@@ -216,10 +215,7 @@ class ScfRestrictedOpenDriver(ScfDriver):
 
             if len(self._fock_matrices_alpha) > 1:
 
-                if self.acc_type.upper() in ['C2DIIS', 'L2_C2DIIS']:
-                    acc_diis = CTwoDiis()
-                elif self.acc_type.upper() in ['DIIS', 'L2_DIIS']:
-                    acc_diis = Diis()
+                acc_diis = Diis()
 
                 acc_diis.compute_error_vectors_restricted_openshell(
                     self._fock_matrices_alpha, self._fock_matrices_beta,
