@@ -35,13 +35,9 @@
 #include <omp.h>
 
 #include <algorithm>
-#include <charconv>
 #include <cmath>
-#include <cstdio>
-#include <cstdlib>
 #include <cstring>
 #include <iomanip>
-#include <new>
 #include <sstream>
 
 #include "DenseMatrix.hpp"
@@ -109,11 +105,6 @@ integrateVxcFockForGgaClosedShell(const CMolecule&                  molecule,
 
     const auto n_boxes = counts.size();
 
-    // NOTE: what the prescreening leaves, which is what the two matrix phases are
-    // quadratic in. Counted only when the profile is asked for: the sums are
-    // atomic and the boxes are many.
-    size_t prof_ao_sum = 0, prof_ao_max = 0, prof_point_ao = 0, prof_point_ao_sq = 0, prof_points = 0;
-
     const auto n_gto_blocks = gto_blocks.size();
 
     // set up pointers to OMP data
@@ -121,95 +112,6 @@ integrateVxcFockForGgaClosedShell(const CMolecule&                  molecule,
     auto ptr_gto_blocks = gto_blocks.data();
 
     auto ptr_xcFunctional = &xcFunctional;
-
-    // Scatter partial matrices into up to n_copies private Vxc copies (bounded
-    // by a cache-sized budget) instead of the shared critical section. Copies
-    // are enabled only for small boxes, where the serialized scatter is
-    // exposed. Env: VLX_XC_MODE=copy|critical, VLX_XC_COPY_BUDGET_MIB (default
-    // 0.5 MiB per thread, floor 16 MiB, cap 256 MiB), VLX_XC_DEBUG=1.
-
-    const auto matrix_bytes = static_cast<size_t>(naos) * static_cast<size_t>(naos) * sizeof(double);
-
-    const auto copy_bytes = ((matrix_bytes + 63) / 64) * 64;  // keep copies on separate cache lines
-
-    const auto mode_env = std::getenv("VLX_XC_MODE");
-
-    const auto mode = (mode_env != nullptr) ? std::string(mode_env) : std::string();
-
-    // 0.5 MiB per thread, clamped to [16, 256] MiB.
-    const auto budget_by_threads = static_cast<size_t>(0.5 * static_cast<double>(nthreads));
-
-    auto budget_mib = std::min(std::max(static_cast<size_t>(16), budget_by_threads), static_cast<size_t>(256));
-
-    if (const char* budget_env = std::getenv("VLX_XC_COPY_BUDGET_MIB"))
-    {
-        std::from_chars(budget_env, budget_env + std::strlen(budget_env), budget_mib);
-    }
-
-    const auto budget_bytes = budget_mib * 1024 * 1024;
-
-    const auto ld = molecularGrid.getMaxNumberOfGridPointsPerBox();
-
-    const auto box_small_enough = (ld <= 5 * nthreads);
-
-    auto n_copies = 0;
-
-    if ((matrix_bytes > 0) && (mode != "critical"))
-    {
-        if (mode == "copy")
-        {
-            n_copies = nthreads;
-        }
-        else if (box_small_enough)
-        {
-            n_copies = std::min(nthreads, static_cast<int>(budget_bytes / copy_bytes));
-        }
-    }
-
-    std::vector<double> private_matrices;
-
-    std::vector<double*> private_matrix_ptrs;
-
-    try
-    {
-        if (n_copies > 0)
-        {
-            private_matrices.assign(static_cast<size_t>(n_copies) * (copy_bytes / sizeof(double)), 0.0);
-
-            private_matrix_ptrs.resize(n_copies);
-
-            for (int icopy = 0; icopy < n_copies; icopy++)
-            {
-                private_matrix_ptrs[icopy] = private_matrices.data() + static_cast<size_t>(icopy) * (copy_bytes / sizeof(double));
-            }
-        }
-    }
-    catch (const std::bad_alloc&)
-    {
-        n_copies = 0;
-
-        private_matrices.clear();
-
-        private_matrix_ptrs.clear();
-    }
-
-    if (std::getenv("VLX_XC_DEBUG") != nullptr)
-    {
-        size_t total_points = 0;
-
-        for (const auto& count : counts) total_points += count;
-
-        const auto dist_mode = (n_copies == 0) ? (box_small_enough ? "critical" : "critical (box-gate)")
-                                               : ((n_copies < nthreads) ? "private copies + critical fallback" : "private copies");
-
-        std::fprintf(stderr,
-                     "XC Vxc distribution: %s, copies %d (matrix %.2f MiB, budget %zu MiB), max box %d, threads %d, boxes %zu, "
-                     "pts/box %.1f\n",
-                     dist_mode, n_copies, static_cast<double>(matrix_bytes) / (1024.0 * 1024.0), budget_mib, ld, nthreads,
-                     n_boxes, (n_boxes > 0) ? static_cast<double>(total_points) / n_boxes : 0.0);
-    }
-
-    std::vector<double> thread_nele(nthreads, 0.0), thread_xcene(nthreads, 0.0);
 
 #pragma omp parallel shared(displacements, xcoords, ycoords, zcoords, \
                             ptr_gto_blocks, gsDensityPointers, ptr_xcFunctional, \
@@ -268,32 +170,6 @@ integrateVxcFockForGgaClosedShell(const CMolecule&                  molecule,
         const auto aocount = static_cast<int>(aoinds.size());
 
         omptimers[thread_id].stop("GTO pre-screening");
-
-        if (xcprof::wanted())
-        {
-            // NOTE: weighted by the points of the box as well as counted plainly.
-            // The work of a box is its points times the square of what survives, so
-            // a large box which keeps many functions counts for more than a small
-            // one which keeps as many, and the plain average would hide that.
-            const auto box_points = static_cast<size_t>(npoints);
-
-            const auto kept = static_cast<size_t>(aocount);
-
-#pragma omp atomic
-            prof_ao_sum += kept;
-
-#pragma omp atomic
-            prof_points += box_points;
-
-#pragma omp atomic
-            prof_point_ao += box_points * kept;
-
-#pragma omp atomic
-            prof_point_ao_sq += box_points * kept * kept;
-
-#pragma omp critical
-            prof_ao_max = std::max(prof_ao_max, kept);
-        }
 
         if (aocount > 0)
         {
@@ -446,21 +322,13 @@ integrateVxcFockForGgaClosedShell(const CMolecule&                  molecule,
                 local_xcene += local_weights[g] * exc[g] * rho_total;
             }
 
-            thread_nele[thread_id] += local_nele;
-
-            thread_xcene[thread_id] += local_xcene;
-
-            if (thread_id < n_copies)
+            #pragma omp critical
             {
-                // Private copy: no synchronization, reduced after the region.
-                dftsubmat::distributeSubMatrixToKohnSham(private_matrix_ptrs[thread_id], naos, partial_mat_Vxc, aoinds);
-            }
-            else
-            {
-                #pragma omp critical
-                {
-                    dftsubmat::distributeSubMatrixToKohnSham(mat_Vxc, partial_mat_Vxc, aoinds);
-                }
+                nele += local_nele;
+
+                xcene += local_xcene;
+
+                dftsubmat::distributeSubMatrixToKohnSham(mat_Vxc, partial_mat_Vxc, aoinds);
             }
 
             omptimers[thread_id].stop("Vxc dist.");
@@ -470,55 +338,13 @@ integrateVxcFockForGgaClosedShell(const CMolecule&                  molecule,
     }
     }
 
-    for (int ithread = 0; ithread < nthreads; ithread++)
-    {
-        nele += thread_nele[ithread];
-
-        xcene += thread_xcene[ithread];
-    }
-
-    if (n_copies > 0)
-    {
-        auto ksmat_values = mat_Vxc.alphaValues();
-
-        const auto nelem = static_cast<size_t>(naos) * static_cast<size_t>(naos);
-
-        #pragma omp parallel for schedule(static)
-        for (size_t ielem = 0; ielem < nelem; ielem++)
-        {
-            auto sum = 0.0;
-
-            for (int icopy = 0; icopy < n_copies; icopy++)
-            {
-                sum += private_matrix_ptrs[icopy][ielem];
-            }
-
-            ksmat_values[ielem] += sum;
-        }
-    }
-
     mat_Vxc.setNumberOfElectrons(nele);
 
     mat_Vxc.setExchangeCorrelationEnergy(xcene);
 
     timer.stop("Total timing");
 
-    // std::cout << "Timing of new integrator" << std::endl;
-    // std::cout << "------------------------" << std::endl;
-    // std::cout << timer.getSummary() << std::endl;
-    // std::cout << "OpenMP timing" << std::endl;
-    // for (int thread_id = 0; thread_id < nthreads; thread_id++)
-    // {
-    //     std::cout << "Thread " << thread_id << std::endl;
-    //     std::cout << omptimers[thread_id].getSummary() << std::endl;
-    // }
-
-    if (xcprof::wanted())
-    {
-        xcprof::report("Vxc, GGA, closed shell", timer, omptimers, n_boxes);
-
-        xcprof::report_blocks(naos, n_boxes, prof_points, prof_ao_sum, prof_ao_max, prof_point_ao, prof_point_ao_sq);
-    }
+    if (xcprof::wanted()) xcprof::report("Vxc, GGA, closed shell", timer, omptimers, n_boxes);
 
     return mat_Vxc;
 }
