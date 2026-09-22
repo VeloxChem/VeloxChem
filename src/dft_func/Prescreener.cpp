@@ -34,6 +34,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 
 #include "GtoFunc.hpp"
 #include "GtoValuesRecD.hpp"
@@ -116,19 +117,9 @@ preScreenGtoBlock(const CGtoBlock& gtoBlock, const int gtoDeriv, const double gt
 
         if (r2 > 1.0)
         {
-            // NOTE: the bound is a sum over the primitives, each with its own
-            // exponent. It used to be the largest coefficient of the contraction
-            // times the decay of its **smallest** exponent, and, for a derivative,
-            // times a prefactor built from its **largest** -- three worst cases
-            // which never meet in one primitive. A function contracted from 100 to
-            // 0.3 was bounded by 200 r exp(-0.3 r^2) where the primitive which
-            // actually reaches that far contributes 0.6 r, and the bound decides
-            // how far a function is thought to reach.
-            //
-            // NOTE: still an upper bound, by the triangle inequality: the value is
-            // the sum of the primitives and is no larger than the sum of what each
-            // of them can be. Nothing is dropped which the old bound kept and which
-            // matters -- what is dropped is what the old bound was wrong about.
+            // Sum the bounds of the primitives, each evaluated with its own
+            // exponent and coefficient. By the triangle inequality the sum
+            // bounds the contraction and its derivatives.
 
             auto r = std::sqrt(r2);
 
@@ -141,6 +132,8 @@ preScreenGtoBlock(const CGtoBlock& gtoBlock, const int gtoDeriv, const double gt
 
             double gtolimit = 0.0;
 
+            auto minexp = std::numeric_limits<double>::max();
+
             for (int j = 0; j < npgtos; j++)
             {
                 int iprim = j * ncgtos + i;
@@ -148,6 +141,8 @@ preScreenGtoBlock(const CGtoBlock& gtoBlock, const int gtoDeriv, const double gt
                 const auto prim_exp = gto_exps[iprim];
 
                 const auto prim_norm = std::fabs(gto_norms[iprim]);
+
+                minexp = std::min(minexp, prim_exp);
 
                 const auto base = prim_norm * std::exp(-prim_exp * r2) * rpow;
 
@@ -191,7 +186,12 @@ preScreenGtoBlock(const CGtoBlock& gtoBlock, const int gtoDeriv, const double gt
                 gtolimit += limit;
             }
 
-            if (gtolimit < gtoThreshold)
+            // The bound is taken at the closest point, so screen only past the
+            // radial peak sqrt((gto_ang + gtoDeriv) / (2 * minexp)).
+
+            const auto past_peak = ((2.0 * minexp * r2) >= static_cast<double>(gto_ang + gtoDeriv));
+
+            if ((gtolimit < gtoThreshold) && past_peak)
             {
                 cgto_mask[i] = 0;
 
