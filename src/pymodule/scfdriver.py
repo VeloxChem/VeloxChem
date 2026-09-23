@@ -2133,11 +2133,18 @@ class ScfDriver:
             # sweeps the integrals a second time while the others wait -- a fifth of
             # a build, measured on two nodes. At least one part per rank is asked for
             # so there is something for each of them to take.
+            # NOTE: an empty share of the auxiliary atoms means this rank was dealt
+            # none of them, and not that it should take all of them. The driver
+            # cannot tell the two apart from its arguments, so it is told: a run on
+            # one rank asks for the whole molecule with an empty list, and a rank
+            # which came out of the deal empty says so here.
             self._ri_drv.prepare(molecule, ao_basis, basis_ri, self.eri_thresh,
                                  budget, self.ri_metric_threshold,
                                  use_inverse_square_root, mode,
                                  self._ri_aux_atoms, metric, self.nodes,
-                                 omega, metric_erf)
+                                 omega, metric_erf,
+                                 (self.nodes > 1) and
+                                 (len(self._ri_aux_atoms) == 0))
 
             if range_separated:
                 # NOTE: the attenuated metric is the worse conditioned of the two
@@ -2930,7 +2937,9 @@ class ScfDriver:
             The density matrix of one spin, as a numpy array.
 
         :return:
-            The Coulomb matrix of that density, as a numpy array.
+            This rank's share of the Coulomb matrix of that density, as a numpy
+            array. The shares are added by the reduction the caller makes at the
+            end of the build, as they are for every other way of building.
         """
 
         # NOTE: once and not twice. The caller doubles what comes back, as it does
@@ -2971,15 +2980,20 @@ class ScfDriver:
 
         self._ri_drv.compute_coulomb(gamma, mine, fock)
 
-        fock_np = fock.to_numpy()
+        # NOTE: **a share and not the whole.** This rank swept its own parts, so
+        # what it holds is the Coulomb matrix of those and the ranks have to add
+        # them. That sum is the one the caller already makes for every other way of
+        # building, at the end of the build, so it is not made here as well: adding
+        # the shares twice gave a Coulomb matrix as many times too large as there
+        # were ranks, which on a closed shell stopped the SCF converging and on an
+        # open shell converged it to an energy that was wrong by twenty hartree
+        # without saying anything.
+        #
+        # NOTE: the fitting above is the exception and is reduced here, because
+        # `solve_fitting` needs a right hand side which is already complete and the
+        # caller's reduction comes far too late for that.
 
-        if self.nodes > 1:
-            total_fock = np.zeros_like(fock_np)
-            self.comm.Allreduce(np.ascontiguousarray(fock_np), total_fock,
-                                op=MPI.SUM)
-            fock_np = total_fock
-
-        return fock_np
+        return fock.to_numpy()
 
     def _simd_ri_jk_fock(self,
                          density,

@@ -18,6 +18,7 @@
 
 #include "DenseIndexFunc.hpp"
 #include "ErrorHandler.hpp"
+#include "SimdRIFockCommon.hpp"
 #include "SimdThreeCenterElectronRepulsionDriver.hpp"
 #include "SimdThreeCenterElectronRepulsionGradientDriver.hpp"
 #include "SimdThreeCenterElectronRepulsionGradientRsDriver.hpp"
@@ -611,6 +612,630 @@ CSimdRIJKGradientDriver::_orbital_densities(const CSparseTensor   &bq_vectors,
     _apply_transposed_factor(metric, orbital_densities);
 
     return orbital_densities;
+}
+
+// NOTE: the distributed phases. What divides is the auxiliary index: a rank owns
+// the functions of the atoms whose B vectors it holds, forms their fitted densities
+// from its own integrals, and never sees another rank's. The one place the index
+// does not divide is the transposed factor of the metric, which reaches across the
+// whole of it, and that is the one place the ranks talk. See the notes on
+// TDistributedFit and on mpi_panel_partial.
+
+auto
+CSimdRIJKGradientDriver::_local_densities_for(const CSparseTensor        &bq_vectors,
+                                              const CMolecularBasis      &basis,
+                                              const CMolecularBasis      &aux_basis,
+                                              const CPackedMatrix        &coefficients,
+                                              const std::vector<size_t>  &functions,
+                                              const size_t                naux,
+                                              const size_t                budget,
+                                              std::vector<CPackedMatrix> &target) const -> void
+{
+    const auto norbs = coefficients.number_of_columns();
+
+    const auto nao = coefficients.number_of_rows();
+
+    target.clear();
+
+    // NOTE: a spin which occupies nothing has no fitted densities and no exchange.
+
+    if ((norbs == 0) || functions.empty()) return;
+
+    target.resize(naux);
+
+    auto transposed = std::vector<double>(norbs * nao, 0.0);
+
+    {
+        auto dense_c = std::vector<double>(nao * norbs, 0.0);
+
+        coefficients.to_dense(dense_c.data());
+
+        for (size_t mu = 0; mu < nao; mu++)
+        {
+            for (size_t ii = 0; ii < norbs; ii++) transposed[ii * nao + mu] = dense_c[mu * norbs + ii];
+        }
+    }
+
+    const auto per_function = nao * norbs * sizeof(double);
+
+    const auto batch_by_memory = std::max(size_t{1}, budget / std::max(per_function, size_t{1}));
+
+    const auto nbatch = std::min(functions.size(), std::max(_min_batch, batch_by_memory));
+
+    auto half = std::vector<CPackedMatrix>();
+
+    for (size_t at = 0; at < nbatch; at++)
+    {
+        half.push_back(CPackedMatrix(nao, norbs, mat_t::general));
+    }
+
+    for (size_t first = 0; first < functions.size(); first += nbatch)
+    {
+        const auto last = std::min(first + nbatch, functions.size());
+
+        const auto count = last - first;
+
+        auto wanted = std::vector<size_t>(functions.begin() + static_cast<long>(first),
+                                          functions.begin() + static_cast<long>(last));
+
+        if (count == nbatch)
+        {
+            _drv.compute_w_vectors(bq_vectors, basis, aux_basis, coefficients, wanted, half);
+        }
+        else
+        {
+            auto tail = std::vector<CPackedMatrix>(half.begin(), half.begin() + static_cast<long>(count));
+
+            _drv.compute_w_vectors(bq_vectors, basis, aux_basis, coefficients, wanted, tail);
+
+            std::copy(tail.begin(), tail.end(), half.begin());
+        }
+
+        const auto nrange = static_cast<int>(count);
+
+#pragma omp parallel for schedule(static) if (nrange > 1)
+        for (int at = 0; at < nrange; at++)
+        {
+            const auto local = static_cast<size_t>(at);
+
+            target[functions[first + local]] = _close_orbitals(transposed, nao, norbs, half[local]);
+        }
+    }
+}
+
+auto
+CSimdRIJKGradientDriver::mpi_local_densities(const CMolecule        &molecule,
+                                             const CMolecularBasis  &basis,
+                                             const CMolecularBasis  &aux_basis,
+                                             const CSparseTensor    &bq_vectors,
+                                             const CPackedMatrix    &density,
+                                             const CPackedMatrix    &coefficients,
+                                             const CPackedMatrix    &coefficients_beta,
+                                             const std::vector<int> &aux_atoms,
+                                             const size_t            budget) const -> TDistributedFit
+{
+    auto fit = TDistributedFit();
+
+    fit.naux = aux_basis.dimensions_of_basis();
+
+    const auto norbs = coefficients.number_of_columns();
+
+    // NOTE: **empty means empty here.** aux_functions_of reads a list of no atoms
+    // as every atom, which is right for a caller asking about a whole molecule and
+    // wrong for every caller of this routine: these are the atoms a rank was dealt,
+    // and a rank dealt none owns no functions. Expanded instead, such a rank asked
+    // the transformation for every auxiliary function in the molecule while holding
+    // the B vectors of none of them.
+    //
+    // NOTE: the third place this same convention has bitten -- the Coulomb only
+    // gradient driver, the fitted Fock driver, and here.
+
+    fit.functions = aux_atoms.empty() ? std::vector<size_t>()
+                                      : simdri::aux_functions_of(aux_basis, aux_atoms);
+
+    // the right hand side of the fitting, summed over this rank's B vectors alone.
+    // The caller adds the ranks' and hands the sum back to mpi_set_fitting.
+
+    fit.fitting = _drv.compute_y_vector(bq_vectors, basis, aux_basis, density);
+
+    if (norbs == 0) return fit;
+
+    fit.nelements = norbs * (norbs + 1) / 2;
+
+    // NOTE: the panel is what the ranks exchange and what a rank holds of the whole
+    // auxiliary basis at once, so it is sized from the budget this phase was given
+    // rather than from the driver's. Under a communicator the ranks share a node and
+    // the budget of one of them is not the budget of the machine.
+
+    const auto per_element = 2 * fit.naux * sizeof(double);
+
+    const auto by_memory = budget / std::max(per_element, size_t{1});
+
+    fit.npanel = std::min(fit.nelements, std::max(_min_batch, by_memory));
+
+    // NOTE: **both spins' panel geometry is settled before anything returns.** The
+    // second spin's used to be worked out further down, after the early return
+    // below, so a rank which owned no auxiliary functions came back reporting no
+    // beta panels while every other rank reported some. The caller loops over the
+    // panels and reduces each one, so those ranks ran different numbers of
+    // collectives and the job sat in Allreduce until it was killed -- which reads
+    // as water taking minutes, not as the deadlock it is.
+
+    if (coefficients_beta.number_of_columns() > 0)
+    {
+        const auto norbs_beta = coefficients_beta.number_of_columns();
+
+        fit.nelements_beta = norbs_beta * (norbs_beta + 1) / 2;
+
+        fit.npanel_beta = std::min(fit.nelements_beta, std::max(_min_batch, by_memory));
+    }
+
+    fit.densities.resize(fit.naux);
+
+    fit.gram_rows.assign(fit.functions.size() * fit.naux, 0.0);
+
+    if (fit.functions.empty()) return fit;
+
+    // NOTE: the same B vectors serve both spins. What differs between them is the
+    // orbitals the half transformed vectors are closed into, so a second spin is a
+    // second closing and not a second pass over the integrals.
+
+    _local_densities_for(bq_vectors, basis, aux_basis, coefficients, fit.functions, fit.naux, budget,
+                         fit.densities);
+
+    if (coefficients_beta.number_of_columns() > 0)
+    {
+        errors::assertMsgCritical(coefficients_beta.number_of_elements() == 0 ||
+                                      (coefficients_beta.number_of_rows() == coefficients.number_of_rows()),
+                                  std::string("SimdRIJKGradientDriver: The two spins' orbitals are not of "
+                                              "the same basis"));
+
+        _local_densities_for(bq_vectors, basis, aux_basis, coefficients_beta, fit.functions, fit.naux, budget,
+                             fit.densities_beta);
+    }
+
+    return fit;
+}
+
+auto
+CSimdRIJKGradientDriver::mpi_set_fitting(TDistributedFit           &fit,
+                                         const CPackedMatrix       &metric,
+                                         const std::vector<double> &total) const -> void
+{
+    errors::assertMsgCritical(total.size() == fit.naux,
+                              std::string("SimdRIJKGradientDriver: The summed fitting is not of the "
+                                          "auxiliary basis"));
+
+    fit.fitting = total;
+
+    _apply_transposed_factor(metric, fit.fitting.data(), 1);
+}
+
+auto
+CSimdRIJKGradientDriver::mpi_clear_fitting(TDistributedFit &fit) const -> void
+{
+    fit.fitting.clear();
+}
+
+auto
+CSimdRIJKGradientDriver::_transposed_columns(const CPackedMatrix       &metric,
+                                             const std::vector<size_t> &columns,
+                                             const size_t               naux) const -> std::vector<double>
+{
+    // NOTE: the columns of the transposed factor this rank owns, and not the whole
+    // of it. The serial phase writes out the square of the auxiliary basis; here
+    // only the columns of the owned functions are ever multiplied, and on eight
+    // ranks that is an eighth of the array.
+
+    const auto triangular = (metric.get_type() != mat_t::symmetric);
+
+    auto factor = std::vector<double>(naux * naux, 0.0);
+
+    metric.to_dense(factor.data());
+
+    auto columns_of = std::vector<double>(naux * columns.size(), 0.0);
+
+    const auto nrange = static_cast<int>(naux);
+
+#pragma omp parallel for schedule(static)
+    for (int at = 0; at < nrange; at++)
+    {
+        const auto p = static_cast<size_t>(at);
+
+        for (size_t k = 0; k < columns.size(); k++)
+        {
+            const auto q = columns[k];
+
+            // the transpose: the element at (p, q) of it is the element at (q, p) of
+            // the factor, and a triangular factor has nothing below the diagonal.
+
+            if (triangular && (q < p)) continue;
+
+            columns_of[p * columns.size() + k] = factor[q * naux + p];
+        }
+    }
+
+    return columns_of;
+}
+
+auto
+CSimdRIJKGradientDriver::mpi_panel_partial(const TDistributedFit &fit,
+                                           const CPackedMatrix   &metric,
+                                           const size_t           ipanel,
+                                           const bool             beta) const -> std::vector<double>
+{
+    const auto range = fit.panel_range(ipanel, beta);
+
+    const auto first = range.first;
+
+    const auto count = range.second;
+
+    if (count == 0) return {};
+
+    auto partial = std::vector<double>(fit.naux * count, 0.0);
+
+    const auto &densities = beta ? fit.densities_beta : fit.densities;
+
+    if (fit.functions.empty() || densities.empty()) return partial;
+
+    // this rank's rows of the panel, gathered so that the owned auxiliary index is
+    // the one a single product contracts
+
+    auto gathered = std::vector<double>(fit.functions.size() * count, 0.0);
+
+    const auto nowned = static_cast<int>(fit.functions.size());
+
+#pragma omp parallel for schedule(static)
+    for (int at = 0; at < nowned; at++)
+    {
+        const auto k = static_cast<size_t>(at);
+
+        const auto &matrix = densities[fit.functions[k]];
+
+        if (matrix.number_of_elements() == 0) continue;
+
+        std::copy_n(matrix.data() + first, count, gathered.data() + k * count);
+    }
+
+    const auto columns = _transposed_columns(metric, fit.functions, fit.naux);
+
+    _multiply(fit.naux, count, fit.functions.size(), columns.data(), gathered.data(), partial.data());
+
+    return partial;
+}
+
+auto
+CSimdRIJKGradientDriver::mpi_panel_absorb(TDistributedFit &fit,
+                                          const size_t     ipanel,
+                                          const double    *reduced,
+                                          const size_t     size,
+                                          const bool       beta) const -> void
+{
+    const auto range = fit.panel_range(ipanel, beta);
+
+    const auto first = range.first;
+
+    const auto count = range.second;
+
+    if (count == 0) return;
+
+    errors::assertMsgCritical(size == fit.naux * count,
+                              std::string("SimdRIJKGradientDriver: The reduced panel is not the auxiliary "
+                                          "basis by the elements of the panel"));
+
+    auto &densities = beta ? fit.densities_beta : fit.densities;
+
+    // the rows this rank owns, written back over the ones it formed. What was there
+    // was the fitted density before the metric; what goes in is after it.
+
+    const auto nowned = static_cast<int>(fit.functions.size());
+
+#pragma omp parallel for schedule(static)
+    for (int at = 0; at < nowned; at++)
+    {
+        const auto k = static_cast<size_t>(at);
+
+        auto &matrix = densities[fit.functions[k]];
+
+        if (matrix.number_of_elements() == 0) continue;
+
+        std::copy_n(reduced + fit.functions[k] * count, count, matrix.data() + first);
+    }
+
+    // and this rank's rows of the Gram, from the whole of the panel while it is
+    // here. The weights are the ones the serial phase uses: an element off the
+    // diagonal of a packed matrix stands for two of the sum over the pairs of
+    // orbitals, and the root of that multiplies once from each side.
+
+    // NOTE: the two spins add into one Gram, as they do in the serial phase, so the
+    // second is accumulated into the same rows rather than into rows of its own.
+
+    // NOTE: the weights are written out over the whole of the elements and the
+    // panel's slice taken, which is the same double loop the serial Gram uses. It
+    // is the orbitals squared over two doubles and is nothing beside the products
+    // below; working the row of an element out from the element instead would be an
+    // inverse triangular number, and getting it wrong would weight the Gram wrongly
+    // in a way no dimension check would catch.
+
+    size_t norbs = 0;
+
+    for (const auto q : fit.functions)
+    {
+        if (densities[q].number_of_elements() > 0)
+        {
+            norbs = densities[q].number_of_rows();
+
+            break;
+        }
+    }
+
+    if (norbs == 0) return;
+
+    auto all_weights = std::vector<double>(beta ? fit.nelements_beta : fit.nelements, 0.0);
+
+    for (size_t i = 0; i < norbs; i++)
+    {
+        for (size_t j = 0; j <= i; j++)
+        {
+            all_weights[i * (i + 1) / 2 + j] = (i == j) ? 1.0 : std::sqrt(2.0);
+        }
+    }
+
+    auto weight = std::vector<double>(all_weights.begin() + static_cast<long>(first),
+                                      all_weights.begin() + static_cast<long>(first + count));
+
+    auto scaled = std::vector<double>(fit.naux * count, 0.0);
+
+    const auto nrange = static_cast<int>(fit.naux);
+
+#pragma omp parallel for schedule(static)
+    for (int at = 0; at < nrange; at++)
+    {
+        const auto q = static_cast<size_t>(at);
+
+        for (size_t c = 0; c < count; c++)
+        {
+            scaled[q * count + c] = weight[c] * reduced[q * count + c];
+        }
+    }
+
+    // rows of this rank against the whole: gram_rows(|owned| x naux) += owned(|owned| x count) * scaled^T
+
+    auto owned = std::vector<double>(fit.functions.size() * count, 0.0);
+
+#pragma omp parallel for schedule(static)
+    for (int at = 0; at < nowned; at++)
+    {
+        const auto k = static_cast<size_t>(at);
+
+        std::copy_n(scaled.data() + fit.functions[k] * count, count, owned.data() + k * count);
+    }
+
+    _add_multiply_by_transpose(fit.functions.size(), fit.naux, count, owned.data(), scaled.data(),
+                               fit.gram_rows.data());
+}
+
+auto
+CSimdRIJKGradientDriver::mpi_omega(const TDistributedFit &fit,
+                                   const double          *gram,
+                                   const size_t           size,
+                                   const double           exchange_scaling_factor,
+                                   const bool             open_shell) const -> CPackedMatrix
+{
+    const auto naux = fit.naux;
+
+    auto omega = CPackedMatrix(naux, naux, mat_t::symmetric);
+
+    omega.zero();
+
+    const auto has_gram = (gram != nullptr) && (size > 0) && (exchange_scaling_factor != 0.0);
+
+    errors::assertMsgCritical((!has_gram) || (size == naux * naux),
+                              std::string("SimdRIJKGradientDriver: The gathered Gram is not the square of "
+                                          "the auxiliary basis"));
+
+    // NOTE: the same factors the serial phases carry, and for the same reasons. A
+    // closed shell is handed one spin's density and carries two on the Coulomb and
+    // one on a single spin's Gram; an open shell is handed the total and carries a
+    // half on each, the two spins having been added into one Gram already.
+
+    const auto coulomb_factor = open_shell ? 0.5 : 2.0;
+
+    const auto exchange_factor = open_shell ? 0.5 * exchange_scaling_factor : exchange_scaling_factor;
+
+    // NOTE: an empty fitting is how the attenuated operator says it has no Coulomb
+    // term, which is the same signal the serial phase uses: it returns the fitting
+    // empty rather than as zeros, so that a caller which reaches for it gets an
+    // error and not a number which looks like an answer.
+
+    const auto has_coulomb = (!fit.fitting.empty());
+
+    for (size_t p = 0; p < naux; p++)
+    {
+        for (size_t q = 0; q <= p; q++)
+        {
+            auto value = has_coulomb ? coulomb_factor * fit.fitting[p] * fit.fitting[q] : 0.0;
+
+            if (has_gram) value -= exchange_factor * gram[p * naux + q];
+
+            omega.data()[omega.index(p, q)] = value;
+        }
+    }
+
+    return omega;
+}
+
+auto
+CSimdRIJKGradientDriver::mpi_compute_share(const CMolecule        &molecule,
+                                           const CMolecularBasis  &basis,
+                                           const CMolecularBasis  &aux_basis,
+                                           const TDistributedFit  &fit,
+                                           const CPackedMatrix    &density,
+                                           const CPackedMatrix    &coefficients,
+                                           const CPackedMatrix    &coefficients_beta,
+                                           const CPackedMatrix    &omega,
+                                           const double            exchange_scaling_factor,
+                                           const std::vector<int> &atoms,
+                                           const std::vector<int> &aux_atoms) const -> CPackedMatrix
+{
+    const auto natoms = molecule.number_of_atoms();
+
+    auto gradient = CPackedMatrix(natoms, 3, mat_t::general);
+
+    gradient.zero();
+
+    auto wanted = std::vector<bool>(natoms, false);
+
+    for (const auto iatom : atoms)
+    {
+        errors::assertMsgCritical((iatom >= 0) && (static_cast<size_t>(iatom) < natoms),
+                                  std::string("SimdRIJKGradientDriver: An atom outside the molecule was "
+                                              "asked for"));
+
+        wanted[static_cast<size_t>(iatom)] = true;
+    }
+
+    // NOTE: the fitted densities are the length of the whole auxiliary basis with
+    // only this rank's entries filled, and the contraction below reads them only for
+    // the auxiliary atoms it is given, which are this rank's. An entry of another
+    // rank's is never touched, which is what lets the serial contraction stand
+    // unchanged under a communicator.
+
+    const auto open_shell = (!fit.densities_beta.empty());
+
+    // NOTE: each spin with its own orbitals. Handing the first spin's for both is
+    // the kind of mistake which leaves a gradient that looks like a gradient.
+
+    const auto spins = open_shell
+                           ? std::vector<TExchangeSpin>{{&coefficients, &fit.densities},
+                                                        {&coefficients_beta, &fit.densities_beta}}
+                           : std::vector<TExchangeSpin>{{&coefficients, &fit.densities}};
+
+    const auto coulomb_factor = open_shell ? 1.0 : 4.0;
+
+    const auto exchange_factor = open_shell ? -exchange_scaling_factor : -2.0 * exchange_scaling_factor;
+
+    // NOTE: a rank dealt no auxiliary atoms adds no three-center term. It is not
+    // passed on to the contraction, which reads an empty list as every atom.
+
+    if (!aux_atoms.empty())
+    {
+        _compute_three_center(gradient, molecule, basis, aux_basis, fit.fitting, density, spins,
+                              coulomb_factor, exchange_factor, wanted, aux_atoms);
+    }
+
+    // NOTE: the two-center term is asked of one rank alone. Omega is of the whole
+    // auxiliary basis on every rank, so every rank could form it and the ranks would
+    // then add it as many times as there are of them. An empty matrix is how a rank
+    // says it is not the one.
+
+    if (omega.number_of_elements() > 0)
+    {
+        const auto two_center = CSimdTwoCenterElectronRepulsionGradientDriver(_block_size);
+
+        const auto metric_part = two_center.compute(molecule, aux_basis, omega, atoms);
+
+        for (size_t iatom = 0; iatom < natoms; iatom++)
+        {
+            for (size_t c = 0; c < 3; c++)
+            {
+                gradient.data()[gradient.index(iatom, c)] -= metric_part.at(iatom, c);
+            }
+        }
+    }
+
+    return gradient;
+}
+
+auto
+CSimdRIJKGradientDriver::mpi_compute_share_rs(const CMolecule        &molecule,
+                                              const CMolecularBasis  &basis,
+                                              const CMolecularBasis  &aux_basis,
+                                              const TDistributedFit  &fit,
+                                              const TDistributedFit  &fit_erf,
+                                              const CPackedMatrix    &density,
+                                              const CPackedMatrix    &coefficients,
+                                              const CPackedMatrix    &coefficients_beta,
+                                              const CPackedMatrix    &omega_plain,
+                                              const CPackedMatrix    &omega_erf,
+                                              const double            exchange_scaling_factor,
+                                              const double            erf_exchange_scaling_factor,
+                                              const double            omega,
+                                              const std::vector<int> &atoms,
+                                              const std::vector<int> &aux_atoms) const -> CPackedMatrix
+{
+    errors::assertMsgCritical(omega > 0.0,
+                              std::string("SimdRIJKGradientDriver: A range separated share was asked for "
+                                          "without a range separation parameter"));
+
+    const auto natoms = molecule.number_of_atoms();
+
+    auto gradient = CPackedMatrix(natoms, 3, mat_t::general);
+
+    gradient.zero();
+
+    auto wanted = std::vector<bool>(natoms, false);
+
+    for (const auto iatom : atoms)
+    {
+        errors::assertMsgCritical((iatom >= 0) && (static_cast<size_t>(iatom) < natoms),
+                                  std::string("SimdRIJKGradientDriver: An atom outside the molecule was "
+                                              "asked for"));
+
+        wanted[static_cast<size_t>(iatom)] = true;
+    }
+
+    const auto open_shell = (!fit.densities_beta.empty());
+
+    const auto spins = open_shell
+                           ? std::vector<TExchangeSpin>{{&coefficients, &fit.densities},
+                                                        {&coefficients_beta, &fit.densities_beta}}
+                           : std::vector<TExchangeSpin>{{&coefficients, &fit.densities}};
+
+    const auto spins_erf = open_shell
+                               ? std::vector<TExchangeSpin>{{&coefficients, &fit_erf.densities},
+                                                            {&coefficients_beta, &fit_erf.densities_beta}}
+                               : std::vector<TExchangeSpin>{{&coefficients, &fit_erf.densities}};
+
+    // NOTE: the factors of the serial entry. The two operators come out of one call
+    // of the derivative driver, so the attenuated term costs a second contraction
+    // and not a second pass over the integrals; and the attenuated operator has no
+    // Coulomb term, which is why only one Coulomb factor appears.
+
+    const auto coulomb_factor = open_shell ? 1.0 : 4.0;
+
+    const auto exchange_factor = open_shell ? -exchange_scaling_factor : -2.0 * exchange_scaling_factor;
+
+    const auto erf_factor = open_shell ? -erf_exchange_scaling_factor : -2.0 * erf_exchange_scaling_factor;
+
+    if (!aux_atoms.empty())
+    {
+        _compute_three_center(gradient, molecule, basis, aux_basis, fit.fitting, density, spins,
+                              coulomb_factor, exchange_factor, wanted, aux_atoms, spins_erf, erf_factor,
+                              omega);
+    }
+
+    if (omega_plain.number_of_elements() > 0)
+    {
+        const auto two_center = CSimdTwoCenterElectronRepulsionGradientRsDriver(_block_size);
+
+        // NOTE: the attenuated driver answers with the two terms apart, the plain
+        // operator's and the attenuated one's, and both are subtracted.
+
+        const auto parts = two_center.compute(molecule, aux_basis, omega_plain, omega_erf, omega, atoms);
+
+        for (size_t iatom = 0; iatom < natoms; iatom++)
+        {
+            for (size_t c = 0; c < 3; c++)
+            {
+                gradient.data()[gradient.index(iatom, c)] -= parts.first.at(iatom, c);
+
+                gradient.data()[gradient.index(iatom, c)] -= parts.second.at(iatom, c);
+            }
+        }
+    }
+
+    return gradient;
 }
 
 auto
