@@ -277,6 +277,10 @@ class ScfDriver:
         self._nuc_mm_energy = 0.0
         self._V_es = None
 
+        # simd polarizable embedding
+        self.simd_embedding = None
+        self._emb_nuc_energy = 0.0
+
         # static electric field
         self.electric_field = None
         self._ef_nuc_energy = 0.0
@@ -722,6 +726,31 @@ class ScfDriver:
             self.restart = self.validate_checkpoint(molecule.get_element_ids(),
                                                     basis.get_label(),
                                                     self.scf_type)
+
+        if self.simd_embedding is not None:
+            # NOTE: each of these puts an environment around the same molecule.
+            # Two of them is either the same environment counted twice or two
+            # different ones, and neither is something to guess at: the energy
+            # which comes back looks like an energy either way. Checked here,
+            # which every run passes through, and not in update_settings, which
+            # only a run configured from a dictionary reaches.
+
+            assert_msg_critical(
+                self.point_charges is None,
+                'SCF driver: \'simd_embedding\' and \'point_charges\' both '
+                'put an environment around the molecule; use one of them')
+
+            # NOTE: asked of the settings which turn polarizable embedding
+            # on and not of the flag they are turned into, which is derived in
+            # pe_sanity_check and so is only as good as whether that has run
+            # yet. These are what the caller sets.
+
+            assert_msg_critical(
+                (self.potfile is None) and ('potfile' not in self.pe_options)
+                and (self.embedding is None),
+                'SCF driver: \'simd_embedding\' and the polarizable embedding '
+                'of \'potfile\' both put an environment around the molecule; '
+                'use one of them')
 
         # check molecule
         molecule_sanity_check(molecule, self.scf_type)
@@ -1728,6 +1757,31 @@ class ScfDriver:
         if self.rank == mpi_master() and self.electric_field is not None:
             dipole_ints = dipole_mats
 
+        if self.simd_embedding is not None:
+            t0embedding = tm.time()
+
+            # NOTE: into the core hamiltonian, which is where a contribution
+            # which does not depend on the density belongs: built once for this
+            # basis instead of once an iteration, and carried from there by
+            # whatever already adds the kinetic and nuclear potential matrices.
+            # The induced dipoles, when they come, do depend on the density and
+            # will not go here.
+
+            V_perm = self.simd_embedding.compute_permanent_fock(
+                molecule, ao_basis, comm=self.comm)
+
+            self._emb_nuc_energy = self.simd_embedding.compute_permanent_energy(
+                molecule, ao_basis)
+
+            if self.rank == mpi_master():
+                npot_mat = npot_mat + V_perm
+
+            if self.print_level > 1:
+                self.ostream.print_info(
+                    'Polarizable embedding one-electron integral computed in' +
+                    ' {:.2f} sec.'.format(tm.time() - t0embedding))
+                self.ostream.print_blank()
+
         if self.point_charges is not None and not self._first_step:
             t0point_charges = tm.time()
 
@@ -2184,7 +2238,8 @@ class ScfDriver:
             diff_den = self._comp_density_change(den_mat, self._density)
 
             e_scf = (e_el + self._nuc_energy + self._nuc_mm_energy +
-                     self._d4_energy + self._ef_nuc_energy)
+                     self._d4_energy + self._ef_nuc_energy +
+                     self._emb_nuc_energy)
 
             if self._smd and self.rank == mpi_master():
                 # do not double count e_sol
