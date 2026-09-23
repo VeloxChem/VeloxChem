@@ -89,8 +89,8 @@ class ScfRestrictedDriver(ScfDriver):
             The orthogonalization matrix.
 
         :return:
-            The error matrix, the electronic gradient and the maximum
-            gradient.
+            The error matrix (only populated on the master rank), the
+            electronic gradient and the maximum gradient.
         """
 
         if self.rank == mpi_master():
@@ -103,21 +103,15 @@ class ScfRestrictedDriver(ScfDriver):
             fds = np.matmul(fmat, np.matmul(dmat, smat))
 
             e_mat = np.matmul(tmat.T, np.matmul(fds - fds.T, tmat))
-            e_mat_shape = e_mat.shape
             e_grad = 2.0 * np.linalg.norm(e_mat)
             max_grad = np.max(np.abs(e_mat))
         else:
-            e_mat_shape = None
+            e_mat = None
             e_grad = None
             max_grad = None
 
-        e_mat_shape = self.comm.bcast(e_mat_shape, root=mpi_master())
         e_grad = self.comm.bcast(e_grad, root=mpi_master())
         max_grad = self.comm.bcast(max_grad, root=mpi_master())
-
-        if self.rank != mpi_master():
-            e_mat = np.zeros(e_mat_shape)
-        self.comm.Bcast(e_mat, root=mpi_master())
 
         return e_mat, e_grad, max_grad
 

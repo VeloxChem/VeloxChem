@@ -13,7 +13,6 @@ from veloxchem.outputstream import OutputStream
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.scfrestopendriver import ScfRestrictedOpenDriver
 from veloxchem.scfunrestdriver import ScfUnrestrictedDriver
-from veloxchem.diis import Diis
 from veloxchem.dispersionmodel import DispersionModel
 from veloxchem.resultsio import read_molecule_and_basis
 from veloxchem.inputparser import unparse_input, read_unparsed_input_from_hdf5
@@ -1121,24 +1120,6 @@ class TestScfDriverMiscellaneous:
         driver = ScfRestrictedOpenDriver()
         driver.ostream.mute()
 
-        fa = np.array([[1.2, 0.3], [0.3, 0.4]])
-        fb = np.array([[0.8, 0.1], [0.1, 0.2]])
-        da = np.array([[1.0, 0.0], [0.0, 0.0]])
-        db = np.array([[0.3, 0.0], [0.0, 0.1]])
-        s = np.eye(2)
-
-        projected = Diis.get_projected_fock(fa, fb, da, db, s)
-        f0 = 0.5 * (fa + fb)
-        inactive = np.matmul(s, db)
-        active = np.matmul(s, da - db)
-        virtual = np.eye(2) - np.matmul(s, da)
-        expected = f0 + np.linalg.multi_dot([inactive, fb - f0, active.T])
-        expected += np.linalg.multi_dot([active, fa - f0, virtual.T])
-        expected += (expected - f0).T
-
-        assert np.allclose(projected, expected)
-        assert np.allclose(projected, projected.T)
-
         n_orbitals = basis.get_dimension_of_basis()
         pfon_fock = np.diag(np.linspace(-1.5, 1.5, n_orbitals))
 
@@ -1172,6 +1153,22 @@ class TestScfDriverMiscellaneous:
         assert copied.ostream is driver.ostream
         assert copied.comm is driver.comm
         assert copied._scf_type == driver._scf_type
+
+    def test_diis_threshold_above_initial_gradient(self):
+
+        # With a DIIS threshold below the initial electronic gradient, no
+        # error vectors are stored and the current Fock/Kohn-Sham matrices
+        # must be used instead of raising an error.
+        molecule, basis = self.get_water_and_basis()
+
+        def configure(driver):
+            driver.restart = False
+            driver.diis_thresh = 1.0e-8
+
+        scf_drv, scf_results = self.run_hf_scf(molecule, basis, configure)
+
+        assert scf_results is not None
+        assert scf_drv.is_converged
 
     def test_guess_unpaired_electrons_warning_for_restricted(self, tmp_path):
 

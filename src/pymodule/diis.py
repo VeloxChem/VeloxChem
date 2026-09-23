@@ -32,7 +32,6 @@
 
 import numpy as np
 
-from .errorhandler import assert_msg_critical
 from .mathutils import safe_solve
 
 
@@ -42,12 +41,26 @@ class Diis:
 
     Instance variables
         - error_vectors: The list of error vectors.
+        - fock_matrices: The list of stored Fock/Kohn-Sham matrices.
+        - fock_matrices_proj: The list of stored projected Fock/Kohn-Sham
+          matrices (used in restricted open-shell SCF).
+        - max_err_vecs: The maximum number of error vectors.
+        - diis_thresh: The DIIS switch-on threshold.
+        - scf_type: The type of SCF calculation.
+        - b_matrix: The B matrix of error-vector inner products.
     """
 
     def __init__(self, max_err_vecs, diis_thresh, scf_type):
         """
-        Initializes iterative subspace by setting list of error vectors to
-        empty list.
+        Initializes the DIIS driver.
+
+        :param max_err_vecs:
+            The maximum number of error vectors.
+        :param diis_thresh:
+            The DIIS switch-on threshold.
+        :param scf_type:
+            The type of SCF calculation ('restricted', 'unrestricted' or
+            'restricted_openshell').
         """
 
         self.error_vectors = []
@@ -63,7 +76,7 @@ class Diis:
 
     def clear(self):
         """
-        Clears the stored error vectors and Fock/Kohn-Sham matrices.
+        Clears the stored error vectors, Fock/Kohn-Sham matrices and B matrix.
         """
 
         self.error_vectors.clear()
@@ -71,10 +84,7 @@ class Diis:
         self.fock_matrices.clear()
         self.fock_matrices_proj.clear()
 
-        self.max_err_vecs = None
-        self.diis_thresh = None
-
-        self.b_matrix = None
+        self.b_matrix = np.zeros((self.max_err_vecs, self.max_err_vecs))
 
     def store_diis_data(self, fock_mat, den_mat, ovl_mat, e_mat, e_grad):
         """
@@ -125,23 +135,26 @@ class Diis:
         stored Fock/Kohn-Sham matrices.
 
         :param fock_mat:
-            The Fock/Kohn-Sham matrix.
+            The current Fock/Kohn-Sham matrices, used when no error vectors
+            have been stored.
 
         :return:
-            The effective Fock/Kohn-Sham matrix.
+            The effective Fock/Kohn-Sham matrices as a tuple.
         """
 
         n_vecs = len(self.error_vectors)
 
-        assert_msg_critical(
-            n_vecs > 0,
-            'Diis.get_effective_fock: Need at least one set of error vectors')
+        if n_vecs == 0:
+            # No error vectors stored, e.g. when the electronic gradient is
+            # still above the DIIS threshold. Use the current Fock/Kohn-Sham
+            # matrices.
+            return tuple(fock_mat)
 
         if n_vecs == 1:
             if self.scf_type == 'restricted_openshell':
-                return self.fock_matrices_proj[0]
+                return tuple(self.fock_matrices_proj[0])
             else:
-                return self.fock_matrices[0]
+                return tuple(self.fock_matrices[0])
 
         else:
             weights = self.compute_weights()
