@@ -133,6 +133,17 @@ class CPolarizableSite
     /// @note Refused for a point site, for the reason above.
     auto get_polarizability_width() const -> double;
 
+    /// @brief Checks whether another site carries the same parameters.
+    /// @param other The other site.
+    /// @param tolerance The tolerance the numbers are compared within.
+    /// @return True if it does.
+    /// @note The form, the order and whether the polarizability is isotropic must
+    /// agree exactly; the numbers are compared within the tolerance, so that two
+    /// readings of the same parameter which differ in the last bit are the same
+    /// parameter. What this is for is telling one species from another, and those
+    /// differ by far more than any tolerance.
+    auto matches(const CPolarizableSite &other, const double tolerance = 1.0e-12) const -> bool;
+
    private:
     /// @brief The highest moment the site carries.
     int _order = 0;

@@ -10,7 +10,7 @@
 
 #include "PolarizableForceField.hpp"
 
-#include "ErrorHandler.hpp"
+#include "EmbeddingError.hpp"
 
 CPolarizableForceField::CPolarizableForceField(const std::string &name)
 
@@ -39,7 +39,7 @@ CPolarizableForceField::number_of_sites() const -> size_t
 auto
 CPolarizableForceField::get_site(const size_t index) const -> const CPolarizableSite &
 {
-    errors::assertMsgCritical(index < _sites.size(),
+    embedding::require(index < _sites.size(),
                               std::string("PolarizableForceField: There is no site of this index"));
 
     return _sites[index];
@@ -70,4 +70,17 @@ CPolarizableForceField::is_polarizable() const -> bool
     }
 
     return false;
+}
+
+auto
+CPolarizableForceField::matches(const CPolarizableForceField &other, const double tolerance) const -> bool
+{
+    if (_sites.size() != other._sites.size()) return false;
+
+    for (size_t i = 0; i < _sites.size(); i++)
+    {
+        if (!_sites[i].matches(other._sites[i], tolerance)) return false;
+    }
+
+    return true;
 }

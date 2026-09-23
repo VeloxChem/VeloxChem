@@ -68,6 +68,15 @@ class CPolarizableForceField
     /// @return True if one does.
     auto is_polarizable() const -> bool;
 
+    /// @brief Checks whether another force field carries the same parameters.
+    /// @param other The other force field.
+    /// @param tolerance The tolerance the numbers are compared within.
+    /// @return True if it does, site for site and in the same order.
+    /// @note The name is not compared. This answers whether two force fields say
+    /// the same thing, which is what settles whether one name stands for one set
+    /// of parameters.
+    auto matches(const CPolarizableForceField &other, const double tolerance = 1.0e-12) const -> bool;
+
    private:
     /// @brief The name of the kind of molecule.
     std::string _name;

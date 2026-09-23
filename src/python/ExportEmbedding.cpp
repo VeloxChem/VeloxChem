@@ -45,7 +45,9 @@
 #include <string>
 #include <vector>
 
+#include "EmbeddingRegion.hpp"
 #include "ExportGeneral.hpp"
+#include "PolarizableEmbedding.hpp"
 #include "PolarizableForceField.hpp"
 #include "PolarizableSite.hpp"
 
@@ -350,44 +352,26 @@ export_embedding(py::module &m) -> void
             "get_polarizability",
             [](const CPolarizableSite &self) -> py::array_t<double> { return _array_of_symmetric(self.get_polarizability()); },
             "Gets the polarizability as a three by three array.")
-        .def(
-            "get_isotropic_polarizability",
-            [](const CPolarizableSite &self) -> double {
-                if (!self.is_isotropic()) _refuse(std::string("PolarizableSite: The polarizability is anisotropic"));
-
-                return self.get_isotropic_polarizability();
-            },
-            "Gets the isotropic polarizability, which an anisotropic site has none of.")
-        .def(
-            "set_gaussian",
-            [](CPolarizableSite &self, const double multipole_width, const double polarizability_width) -> void {
-                if ((multipole_width <= 0.0) || (polarizability_width <= 0.0))
-                {
-                    _refuse(std::string("PolarizableSite: The width of a Gaussian site is not positive"));
-                }
-
-                self.set_gaussian(multipole_width, polarizability_width);
-            },
-            "Makes the site a Gaussian one of these widths.",
-            "multipole_width"_a,
-            "polarizability_width"_a)
+        .def("get_isotropic_polarizability",
+             &CPolarizableSite::get_isotropic_polarizability,
+             "Gets the isotropic polarizability, which an anisotropic site has none of.")
+        .def("set_gaussian",
+             &CPolarizableSite::set_gaussian,
+             "Makes the site a Gaussian one of these widths.",
+             "multipole_width"_a,
+             "polarizability_width"_a)
         .def("get_form", &CPolarizableSite::get_form, "Gets the form of the site, point or Gaussian.")
-        .def(
-            "get_multipole_width",
-            [](const CPolarizableSite &self) -> double {
-                if (self.get_form() != pesite::gaussian) _refuse(std::string("PolarizableSite: The site is a point one"));
-
-                return self.get_multipole_width();
-            },
-            "Gets the width of the Gaussian charges, which a point site has none of.")
-        .def(
-            "get_polarizability_width",
-            [](const CPolarizableSite &self) -> double {
-                if (self.get_form() != pesite::gaussian) _refuse(std::string("PolarizableSite: The site is a point one"));
-
-                return self.get_polarizability_width();
-            },
-            "Gets the width of the Gaussian polarizabilities, which a point site has none of.");
+        .def("get_multipole_width",
+             &CPolarizableSite::get_multipole_width,
+             "Gets the width of the Gaussian charges, which a point site has none of.")
+        .def("get_polarizability_width",
+             &CPolarizableSite::get_polarizability_width,
+             "Gets the width of the Gaussian polarizabilities, which a point site has none of.")
+        .def("matches",
+             &CPolarizableSite::matches,
+             "Checks whether another site carries the same parameters.",
+             "other"_a,
+             "tolerance"_a = 1.0e-12);
 
     // CPolarizableForceField class
 
@@ -418,7 +402,97 @@ export_embedding(py::module &m) -> void
             [](const CPolarizableForceField &self, const py::ssize_t index) -> const CPolarizableSite & {
                 return self.get_site(_index_of_site(self, index));
             },
-            py::return_value_policy::reference_internal);
+            py::return_value_policy::reference_internal)
+        .def("matches",
+             &CPolarizableForceField::matches,
+             "Checks whether another force field carries the same parameters.",
+             "other"_a,
+             "tolerance"_a = 1.0e-12);
+
+    // CEmbeddingRegion class
+
+    PyClass<CEmbeddingRegion>(m, "EmbeddingRegion")
+        .def(py::init<>())
+        .def(py::init<const bool>(), "allows_polarizabilities"_a)
+        .def("allows_polarizabilities",
+             &CEmbeddingRegion::allows_polarizabilities,
+             "Checks whether a force field of this region may carry a polarizability.")
+        .def("add_force_field",
+             &CEmbeddingRegion::add_force_field,
+             "Adds a force field, or finds the one already held, and gets its identifier.",
+             "force_field"_a)
+        .def("add_molecule",
+             py::overload_cast<const CMolecule &, const int>(&CEmbeddingRegion::add_molecule),
+             "Adds a molecule of a force field already held.",
+             "molecule"_a,
+             "identifier"_a)
+        .def("add_molecule",
+             py::overload_cast<const CMolecule &, const CPolarizableForceField &>(&CEmbeddingRegion::add_molecule),
+             "Adds a molecule and the force field which describes it.",
+             "molecule"_a,
+             "force_field"_a)
+        .def("index_of_force_field",
+             &CEmbeddingRegion::index_of_force_field,
+             "Gets the index of the force field of this name, or minus one.",
+             "name"_a)
+        .def("number_of_molecules", &CEmbeddingRegion::number_of_molecules, "Gets the number of molecules.")
+        .def("number_of_force_fields",
+             &CEmbeddingRegion::number_of_force_fields,
+             "Gets the number of kinds of molecule the region holds.")
+        .def("get_molecule",
+             &CEmbeddingRegion::get_molecule,
+             "Gets a molecule.",
+             "index"_a,
+             py::return_value_policy::reference_internal)
+        .def("get_identifier", &CEmbeddingRegion::get_identifier, "Gets the identifier of a molecule.", "index"_a)
+        .def("get_force_field",
+             &CEmbeddingRegion::get_force_field,
+             "Gets a force field.",
+             "index"_a,
+             py::return_value_policy::reference_internal)
+        .def("force_field_of",
+             &CEmbeddingRegion::force_field_of,
+             "Gets the force field of a molecule.",
+             "index"_a,
+             py::return_value_policy::reference_internal)
+        .def("get_molecules", &CEmbeddingRegion::get_molecules, "Gets the molecules.")
+        .def("get_identifiers",
+             [](const CEmbeddingRegion &self) -> std::vector<int> { return self.get_identifiers(); },
+             "Gets the identifiers, one for each molecule.")
+        .def("get_force_fields", &CEmbeddingRegion::get_force_fields, "Gets the force fields.")
+        .def("number_of_sites", &CEmbeddingRegion::number_of_sites, "Gets the number of sites the region carries.")
+        .def("number_of_polarizable_sites",
+             &CEmbeddingRegion::number_of_polarizable_sites,
+             "Gets the number of sites which carry a polarizability.")
+        .def("is_polarizable", &CEmbeddingRegion::is_polarizable, "Checks whether any molecule of the region is polarizable.")
+        .def("__len__", &CEmbeddingRegion::number_of_molecules);
+
+    // CPolarizableEmbedding class
+
+    PyClass<CPolarizableEmbedding>(m, "PolarizableEmbedding")
+        .def(py::init<>())
+        .def("get_polarizable_region",
+             &CPolarizableEmbedding::get_polarizable_region,
+             "Gets the polarizable region.",
+             py::return_value_policy::reference_internal)
+        .def("polarizable_region",
+             &CPolarizableEmbedding::polarizable_region,
+             "Gets the polarizable region, to add to.",
+             py::return_value_policy::reference_internal)
+        .def("get_nonpolarizable_region",
+             &CPolarizableEmbedding::get_nonpolarizable_region,
+             "Gets the nonpolarizable region.",
+             py::return_value_policy::reference_internal)
+        .def("nonpolarizable_region",
+             &CPolarizableEmbedding::nonpolarizable_region,
+             "Gets the nonpolarizable region, to add to.",
+             py::return_value_policy::reference_internal)
+        .def("number_of_molecules", &CPolarizableEmbedding::number_of_molecules, "Gets the number of molecules of both regions.")
+        .def("number_of_sites", &CPolarizableEmbedding::number_of_sites, "Gets the number of sites of both regions.")
+        .def("number_of_polarizable_sites",
+             &CPolarizableEmbedding::number_of_polarizable_sites,
+             "Gets the number of sites which carry a polarizability.")
+        .def("is_polarizable", &CPolarizableEmbedding::is_polarizable, "Checks whether the environment polarizes at all.");
 }
 
 }  // namespace vlx_embedding

@@ -10,9 +10,11 @@
 
 #include "PolarizableSite.hpp"
 
+#include <algorithm>
+#include <cmath>
 #include <string>
 
-#include "ErrorHandler.hpp"
+#include "EmbeddingError.hpp"
 
 CPolarizableSite::CPolarizableSite(const int                    order,
                                    const double                 charge,
@@ -24,7 +26,7 @@ CPolarizableSite::CPolarizableSite(const int                    order,
     , _dipole(dipole)
     , _quadrupole(quadrupole)
 {
-    errors::assertMsgCritical((order >= 0) && (order <= 2),
+    embedding::require((order >= 0) && (order <= 2),
                               std::string("PolarizableSite: The highest moment of a site is the quadrupole"));
 }
 
@@ -104,7 +106,7 @@ CPolarizableSite::get_polarizability() const -> const std::array<double, 6> &
 auto
 CPolarizableSite::get_isotropic_polarizability() const -> double
 {
-    errors::assertMsgCritical(_isotropic,
+    embedding::require(_isotropic,
                               std::string("PolarizableSite: The polarizability of this site is anisotropic and is "
                                           "not one number"));
 
@@ -114,7 +116,7 @@ CPolarizableSite::get_isotropic_polarizability() const -> double
 auto
 CPolarizableSite::set_gaussian(const double multipole_width, const double polarizability_width) -> void
 {
-    errors::assertMsgCritical((multipole_width > 0.0) && (polarizability_width > 0.0),
+    embedding::require((multipole_width > 0.0) && (polarizability_width > 0.0),
                               std::string("PolarizableSite: The width of a Gaussian site is positive"));
 
     _form = pesite::gaussian;
@@ -133,7 +135,7 @@ CPolarizableSite::get_form() const -> pesite
 auto
 CPolarizableSite::get_multipole_width() const -> double
 {
-    errors::assertMsgCritical(_form == pesite::gaussian,
+    embedding::require(_form == pesite::gaussian,
                               std::string("PolarizableSite: A point site has no width"));
 
     return _multipole_width;
@@ -142,8 +144,50 @@ CPolarizableSite::get_multipole_width() const -> double
 auto
 CPolarizableSite::get_polarizability_width() const -> double
 {
-    errors::assertMsgCritical(_form == pesite::gaussian,
+    embedding::require(_form == pesite::gaussian,
                               std::string("PolarizableSite: A point site has no width"));
 
     return _polarizability_width;
+}
+
+auto
+CPolarizableSite::matches(const CPolarizableSite &other, const double tolerance) const -> bool
+{
+    auto close = [&](const double lhs, const double rhs) -> bool {
+        return std::fabs(lhs - rhs) <= tolerance * std::max({1.0, std::fabs(lhs), std::fabs(rhs)});
+    };
+
+    if (_order != other._order) return false;
+
+    if (_form != other._form) return false;
+
+    if (_polarizable != other._polarizable) return false;
+
+    if (_isotropic != other._isotropic) return false;
+
+    if (!close(_charge, other._charge)) return false;
+
+    for (size_t i = 0; i < _dipole.size(); i++)
+    {
+        if (!close(_dipole[i], other._dipole[i])) return false;
+    }
+
+    for (size_t i = 0; i < _quadrupole.size(); i++)
+    {
+        if (!close(_quadrupole[i], other._quadrupole[i])) return false;
+    }
+
+    for (size_t i = 0; i < _polarizability.size(); i++)
+    {
+        if (!close(_polarizability[i], other._polarizability[i])) return false;
+    }
+
+    if (_form == pesite::gaussian)
+    {
+        if (!close(_multipole_width, other._multipole_width)) return false;
+
+        if (!close(_polarizability_width, other._polarizability_width)) return false;
+    }
+
+    return true;
 }
