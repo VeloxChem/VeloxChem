@@ -32,7 +32,6 @@
 
 from pathlib import Path
 from datetime import datetime
-from collections import deque
 from copy import deepcopy
 import time as tm
 import math
@@ -73,6 +72,7 @@ from .cpcmdriver import CpcmDriver
 from .smddriver import SmdDriver
 from .gostshypdriver import GostshypDriver
 from .dispersionmodel import DispersionModel
+from .diis import Diis
 from .inputparser import (parse_input, print_keywords, print_attributes,
                           unparse_input, write_unparsed_input_to_hdf5,
                           read_unparsed_input_from_hdf5)
@@ -190,14 +190,6 @@ class ScfDriver:
         self._is_converged = False
         self._scf_energy = 0.0
         self._num_iter = 0
-
-        # DIIS data
-        self._fock_matrices_alpha = deque()
-        self._fock_matrices_beta = deque()
-        self._fock_matrices_proj = deque()
-
-        self._density_matrices_alpha = deque()
-        self._density_matrices_beta = deque()
 
         # density matrix and molecular orbitals
         self._density = None
@@ -1199,13 +1191,6 @@ class ScfDriver:
                 False,
                 f'SCF driver: Invalid acceleration type: {self.acc_type}')
 
-        self._fock_matrices_alpha.clear()
-        self._fock_matrices_beta.clear()
-        self._fock_matrices_proj.clear()
-
-        self._density_matrices_alpha.clear()
-        self._density_matrices_beta.clear()
-
         self._level_shift_smooth_alpha = None
         self._level_shift_smooth_beta = None
 
@@ -1811,12 +1796,8 @@ class ScfDriver:
 
         diis_start_time = tm.time()
 
-        self._fock_matrices_alpha.clear()
-        self._fock_matrices_beta.clear()
-        self._fock_matrices_proj.clear()
-
-        self._density_matrices_alpha.clear()
-        self._density_matrices_beta.clear()
+        if self.rank == mpi_master():
+            acc_diis = Diis(self.max_err_vecs, self.diis_thresh, self.scf_type)
 
         self._level_shift_smooth_alpha = None
         self._level_shift_smooth_beta = None
@@ -2347,9 +2328,14 @@ class ScfDriver:
 
             profiler.start_timer('EffFock')
 
-            self._store_diis_data(fock_mat, den_mat, ovl_mat, e_grad)
+            if self.rank == mpi_master():
+                acc_diis.store_diis_data(fock_mat, den_mat, ovl_mat, e_mat,
+                                         e_grad)
 
-            eff_fock_mat = self._get_effective_fock(fock_mat, ovl_mat, oao_mat)
+            if self.rank == mpi_master():
+                eff_fock_mat = acc_diis.get_effective_fock(fock_mat)
+            else:
+                eff_fock_mat = None
 
             # Note: skip level-shifting only for the initial fresh guess (first
             # SCF cycle, _num_iter == 0). For restart or user-supplied start
@@ -2439,6 +2425,9 @@ class ScfDriver:
                 iter_in_hours = (tm.time() - iter_start_time) / 3600
                 if self._need_graceful_exit(iter_in_hours):
                     self._graceful_exit(molecule, ao_basis)
+
+        if self.rank == mpi_master():
+            acc_diis.clear()
 
         if not self._first_step:
             self.write_checkpoint(molecule, ao_basis)
@@ -3822,50 +3811,6 @@ class ScfDriver:
         raise NotImplementedError(
             'ScfDriver._comp_density_change must be implemented by a ' +
             'concrete SCF driver subclass')
-
-    def _store_diis_data(self, fock_mat, den_mat, ovl_mat, e_grad):
-        """
-        Stores Fock/Kohn-Sham and density matrices for current iteration.
-
-        Base-class placeholder; must be overridden by a concrete SCF driver
-        subclass.
-
-        :param fock_mat:
-            The Fock/Kohn-Sham matrix.
-        :param den_mat:
-            The density matrix.
-        :param ovl_mat:
-            The overlap matrix (used in ROSCF).
-        :param e_grad:
-            The electronic gradient.
-        """
-
-        raise NotImplementedError(
-            'ScfDriver._store_diis_data must be implemented by a concrete ' +
-            'SCF driver subclass')
-
-    def _get_effective_fock(self, fock_mat, ovl_mat, oao_mat):
-        """
-        Computes effective Fock/Kohn-Sham matrix in the AO basis (e.g., by
-        DIIS extrapolation of stored AO Fock/Kohn-Sham matrices).
-
-        Base-class placeholder; must be overridden by a concrete SCF driver
-        subclass.
-
-        :param fock_mat:
-            The Fock/Kohn-Sham matrix.
-        :param ovl_mat:
-            The overlap matrix.
-        :param oao_mat:
-            The orthogonalization matrix.
-
-        :return:
-            The effective Fock/Kohn-Sham matrix.
-        """
-
-        raise NotImplementedError(
-            'ScfDriver._get_effective_fock must be implemented by a concrete ' +
-            'SCF driver subclass')
 
     def _build_level_shift(self, molecule, ao_basis, ovl_mat):
         """

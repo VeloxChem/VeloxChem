@@ -30,178 +30,216 @@
 #  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-from .mathutils import safe_solve
-
 import numpy as np
+
+from .errorhandler import assert_msg_critical
+from .mathutils import safe_solve
 
 
 class Diis:
     """
-    Conventional DIIS driver that solves the augmented linear system.
+    Implements direct inversion of the iterative subspace.
 
-    Error vectors are built from (FDS - SDF) in the orthogonal AO basis so
-    the residuals match those used by the SCF drivers. The system enforces
-    the normalization constraint and fallbacks to a regularized least
-    squares solve when the B-matrix is singular.
+    Instance variables
+        - error_vectors: The list of error vectors.
     """
 
-    def __init__(self):
+    def __init__(self, max_err_vecs, diis_thresh, scf_type):
         """
-        Initializes the internal error-vector buffer.
+        Initializes iterative subspace by setting list of error vectors to
+        empty list.
         """
 
         self.error_vectors = []
 
-    def compute_error_vectors_restricted(self, fock_matrices, density_matrices,
-                                         overlap_matrix, oao_matrix):
+        self.fock_matrices = []
+        self.fock_matrices_proj = []
+
+        self.max_err_vecs = max_err_vecs
+        self.diis_thresh = diis_thresh
+        self.scf_type = scf_type
+
+        self.b_matrix = np.zeros((max_err_vecs, max_err_vecs))
+
+    def clear(self):
         """
-        Computes restricted-spin error vectors.
-
-        :param fock_matrices:
-            The list of AO Fock/Kohn-Sham matrices.
-        :param density_matrices:
-            The corresponding AO density matrices.
-        :param overlap_matrix:
-            The AO overlap matrix.
-        :param oao_matrix:
-            The orthogonalization matrix.
-        """
-
-        self.error_vectors = self._collect_error_matrices(
-            fock_matrices, density_matrices, overlap_matrix, oao_matrix)
-
-    def compute_error_vectors_restricted_openshell(self, fock_matrices,
-                                                   fock_matrices_beta,
-                                                   density_matrices,
-                                                   density_matrices_beta,
-                                                   overlap_matrix, oao_matrix):
-        """
-        Computes restricted open-shell error vectors.
-
-        :param fock_matrices:
-            The alpha-spin AO Fock matrices.
-        :param fock_matrices_beta:
-            The beta-spin AO Fock matrices.
-        :param density_matrices:
-            The alpha-spin density matrices.
-        :param density_matrices_beta:
-            The beta-spin density matrices.
-        :param overlap_matrix:
-            The AO overlap matrix.
-        :param oao_matrix:
-            The orthogonalization matrix.
+        Clears the stored error vectors and Fock/Kohn-Sham matrices.
         """
 
-        alpha_err = self._collect_error_matrices(fock_matrices, density_matrices,
-                                                 overlap_matrix, oao_matrix)
-        beta_err = self._collect_error_matrices(fock_matrices_beta,
-                                                density_matrices_beta,
-                                                overlap_matrix, oao_matrix)
+        self.error_vectors.clear()
 
-        self.error_vectors = [a + b for a, b in zip(alpha_err, beta_err)]
+        self.fock_matrices.clear()
+        self.fock_matrices_proj.clear()
 
-    def compute_error_vectors_unrestricted(self, fock_matrices,
-                                           fock_matrices_beta, density_matrices,
-                                           density_matrices_beta,
-                                           overlap_matrix, oao_matrix):
+        self.max_err_vecs = None
+        self.diis_thresh = None
+
+        self.b_matrix = None
+
+    def store_diis_data(self, fock_mat, den_mat, ovl_mat, e_mat, e_grad):
         """
-        Computes unrestricted error vectors.
+        Stores error vector and Fock/Kohn-Sham matrix for the current
+        iteration and updates the B matrix. For restricted open-shell SCF,
+        the projected Fock/Kohn-Sham matrix is also stored.
 
-        :param fock_matrices:
-            The alpha-spin AO Fock matrices.
-        :param fock_matrices_beta:
-            The beta-spin AO Fock matrices.
-        :param density_matrices:
-            The alpha-spin density matrices.
-        :param density_matrices_beta:
-            The beta-spin density matrices.
-        :param overlap_matrix:
-            The AO overlap matrix.
-        :param oao_matrix:
-            The orthogonalization matrix.
+        :param fock_mat:
+            The Fock/Kohn-Sham matrix.
+        :param den_mat:
+            The density matrix.
+        :param ovl_mat:
+            The overlap matrix (used in ROSCF).
+        :param e_mat:
+            The error vector.
+        :param e_grad:
+            The electronic gradient.
         """
 
-        alpha_err = self._collect_error_matrices(fock_matrices, density_matrices,
-                                                 overlap_matrix, oao_matrix)
-        beta_err = self._collect_error_matrices(fock_matrices_beta,
-                                                density_matrices_beta,
-                                                overlap_matrix, oao_matrix)
+        if e_grad < self.diis_thresh:
 
-        self.error_vectors = [
-            np.vstack((a, b)) for a, b in zip(alpha_err, beta_err)
-        ]
+            if len(self.error_vectors) == self.max_err_vecs:
+                self.error_vectors.pop(0)
+                self.fock_matrices.pop(0)
+                if self.scf_type == 'restricted_openshell':
+                    self.fock_matrices_proj.pop(0)
+                sub_bmat = self.b_matrix[1:, 1:].copy()
+                self.b_matrix[:-1, :-1] = sub_bmat[:, :]
+
+            self.error_vectors.append(e_mat.copy())
+            self.fock_matrices.append([x.copy() for x in fock_mat])
+            if self.scf_type == 'restricted_openshell':
+                fock_proj = self.get_projected_fock(
+                    fock_mat[0], fock_mat[1], den_mat[0], den_mat[1], ovl_mat)
+                # Note: append a list
+                self.fock_matrices_proj.append([fock_proj])
+
+            n_vecs = len(self.error_vectors)
+            for i in range(n_vecs):
+                fij = np.vdot(self.error_vectors[i],
+                              self.error_vectors[n_vecs - 1])
+                self.b_matrix[i, n_vecs - 1] = fij
+                self.b_matrix[n_vecs - 1, i] = fij
+
+    def get_effective_fock(self, fock_mat):
+        """
+        Computes effective Fock/Kohn-Sham matrix by DIIS extrapolation of
+        stored Fock/Kohn-Sham matrices.
+
+        :param fock_mat:
+            The Fock/Kohn-Sham matrix.
+
+        :return:
+            The effective Fock/Kohn-Sham matrix.
+        """
+
+        n_vecs = len(self.error_vectors)
+
+        assert_msg_critical(
+            n_vecs > 0,
+            'Diis.get_effective_fock: Need at least one set of error vectors')
+
+        if n_vecs == 1:
+            if self.scf_type == 'restricted_openshell':
+                return self.fock_matrices_proj[0]
+            else:
+                return self.fock_matrices[0]
+
+        else:
+            weights = self.compute_weights()
+
+            if self.scf_type == 'restricted':
+                fock_matrices_a = [m[0] for m in self.fock_matrices]
+                effmat_a = self._weighted_sum(weights, fock_matrices_a)
+                # Note: return a tuple
+                return (effmat_a,)
+
+            elif self.scf_type == 'unrestricted':
+                fock_matrices_a = [m[0] for m in self.fock_matrices]
+                fock_matrices_b = [m[1] for m in self.fock_matrices]
+                effmat_a = self._weighted_sum(weights, fock_matrices_a)
+                effmat_b = self._weighted_sum(weights, fock_matrices_b)
+                return (effmat_a, effmat_b)
+
+            else:
+                eff_fock_matrices = [m[0] for m in self.fock_matrices_proj]
+                effmat = self._weighted_sum(weights, eff_fock_matrices)
+                # Note: return a tuple
+                return (effmat,)
 
     def compute_weights(self):
         """
-        Computes DIIS weights from the stored error vectors.
+        Computes DIIS weights from error vectors.
 
         :return:
-            The weights normalized to sum to unity.
-        :raises ValueError:
-            If no error vectors have been collected.
+            The DIIS weights.
         """
 
-        if len(self.error_vectors) == 0:
-            raise ValueError('DIIS: no error vectors available')
+        n_vecs = len(self.error_vectors)
 
-        if len(self.error_vectors) == 1:
-            return np.array([1.0], dtype='float64')
+        bmat = np.zeros((n_vecs + 1, n_vecs + 1))
+        bmat[:n_vecs, :n_vecs] = self.b_matrix[:n_vecs, :n_vecs]
+        bmat[n_vecs, :n_vecs] = -1.0
+        bmat[:n_vecs, n_vecs] = -1.0
+        bmat[n_vecs, n_vecs] = 0.0
 
-        bmat = self._build_bmatrix()
-        dim = bmat.shape[0]
-        aug = np.zeros((dim + 1, dim + 1), dtype='float64')
-        aug[:dim, :dim] = bmat
-        aug[:dim, dim] = -1.0
-        aug[dim, :dim] = -1.0
+        bvec = np.zeros(n_vecs + 1)
+        bvec[:n_vecs] = 0.0
+        bvec[n_vecs] = -1.0
 
-        rhs = np.zeros(dim + 1, dtype='float64')
-        rhs[dim] = -1.0
+        return safe_solve(bmat, bvec)[:n_vecs]
 
-        sol = safe_solve(aug, rhs)
-
-        weights = sol[:dim]
-        return weights
-
-    def _collect_error_matrices(self, fock_matrices, density_matrices,
-                                overlap_matrix, oao_matrix):
+    @staticmethod
+    def _weighted_sum(weights, matrices):
         """
-        Builds spin-channel error matrices.
+        Computes the weighted sum of matrices.
 
-        :param fock_matrices:
-            The AO Fock matrices for one spin.
-        :param density_matrices:
-            The AO density matrices for the same spin.
-        :param overlap_matrix:
-            The AO overlap matrix.
-        :param oao_matrix:
-            The orthogonalization matrix.
-        :return:
-            The list of residual arrays.
-        """
-
-        smat = overlap_matrix
-        tmat = oao_matrix
-        errs = []
-        for fmat, dmat in zip(fock_matrices, density_matrices):
-            fds = np.matmul(fmat, np.matmul(dmat, smat))
-            err = np.matmul(tmat.T, np.matmul(fds - fds.T, tmat))
-            errs.append(err)
-        return errs
-
-    def _build_bmatrix(self):
-        """
-        Builds the symmetric B matrix from flattened error vectors.
+        :param weights:
+            The weights.
+        :param matrices:
+            The matrices.
 
         :return:
-            The B-matrix for the DIIS augmented system.
+            The weighted sum of matrices.
         """
 
-        dim = len(self.error_vectors)
-        bmat = np.zeros((dim, dim), dtype='float64')
-        flat = [vec.reshape(-1) for vec in self.error_vectors]
-        for i in range(dim):
-            for j in range(i, dim):
-                value = np.vdot(flat[i], flat[j])
-                bmat[i, j] = value
-                bmat[j, i] = value
-        return bmat
+        return sum([w * mat for w, mat in zip(weights, matrices)])
+
+    @staticmethod
+    def get_projected_fock(fa, fb, da, db, s):
+        """
+        Generates projected Fock matrix.
+
+        :param fa:
+            The Fock matrix of alpha spin.
+        :param fb:
+            The Fock matrix of beta spin.
+        :param da:
+            The density matrix of alpha spin.
+        :param db:
+            The density matrix of beta spin.
+        :param s:
+            The overlap matrix.
+
+        :return:
+            The projected Fock matrix.
+        """
+
+        naos = s.shape[0]
+
+        inactive = np.matmul(s, db)
+        active = np.matmul(s, da - db)
+        virtual = np.eye(naos) - np.matmul(s, da)
+
+        #       occ   act   vir
+        #     +----------------+
+        # occ | f0    fb    f0 |
+        # act | fb    f0    fa |
+        # vir | f0    fa    f0 |
+        #     +----------------+
+
+        f0 = 0.5 * (fa + fb)
+
+        fcorr = np.linalg.multi_dot([inactive, fb - f0, active.T])
+        fcorr += np.linalg.multi_dot([active, fa - f0, virtual.T])
+        fcorr += fcorr.T
+
+        return f0 + fcorr

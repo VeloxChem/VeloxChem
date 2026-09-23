@@ -13,6 +13,7 @@ from veloxchem.outputstream import OutputStream
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.scfrestopendriver import ScfRestrictedOpenDriver
 from veloxchem.scfunrestdriver import ScfUnrestrictedDriver
+from veloxchem.diis import Diis
 from veloxchem.dispersionmodel import DispersionModel
 from veloxchem.resultsio import read_molecule_and_basis
 from veloxchem.inputparser import unparse_input, read_unparsed_input_from_hdf5
@@ -1051,35 +1052,6 @@ class TestScfDriverMiscellaneous:
         driver = ScfRestrictedDriver()
         driver.ostream.mute()
 
-        ovl = np.eye(2)
-        oao = np.eye(2)
-        fock_a = np.array([[1.0, 0.2], [0.2, 0.4]])
-        fock_b = np.array([[0.8, 0.1], [0.1, 0.3]])
-        density_a = np.array([[1.0, 0.0], [0.0, 0.0]])
-        density_b = np.array([[0.85, 0.0], [0.0, 0.15]])
-
-        effective = driver._get_effective_fock((fock_a,), ovl, oao)
-        if self.is_master():
-            assert np.allclose(effective[0], fock_a)
-            assert effective[0] is fock_a
-
-        driver.acc_type = 'diis'
-        driver.diis_thresh = 1.0
-        driver.max_err_vecs = 2
-        driver._store_diis_data((fock_a,), (density_a,), ovl, 0.2)
-
-        single_effective = driver._get_effective_fock((fock_b,), ovl, oao)
-        if self.is_master():
-            assert np.allclose(single_effective[0], fock_a)
-            assert single_effective[0] is not driver._fock_matrices_alpha[0]
-
-        driver._store_diis_data((fock_b,), (density_b,), ovl, 0.2)
-
-        diis_effective = driver._get_effective_fock((fock_b,), ovl, oao)
-        if self.is_master():
-            assert diis_effective[0].shape == fock_a.shape
-            assert np.allclose(diis_effective[0], diis_effective[0].T)
-
         driver.embedding = {'settings': {'embedding_method': 'PE'}}
         assert driver.get_scf_type_str() == (
             'Spin-Restricted Hartree-Fock with PE')
@@ -1092,47 +1064,6 @@ class TestScfDriverMiscellaneous:
         molecule, basis = self.get_open_shell_water_and_basis()
         driver = ScfUnrestrictedDriver()
         driver.ostream.mute()
-
-        ovl = np.eye(2)
-        oao = np.eye(2)
-        fock_a = np.array([[1.0, 0.2], [0.2, 0.5]])
-        fock_b = np.array([[0.9, 0.1], [0.1, 0.3]])
-        fock_c = np.array([[0.7, 0.05], [0.05, 0.2]])
-        density_a = np.array([[1.0, 0.0], [0.0, 0.0]])
-        density_b = np.array([[0.0, 0.0], [0.0, 1.0]])
-        density_c = np.array([[0.8, 0.0], [0.0, 0.2]])
-        density_d = np.array([[0.1, 0.0], [0.0, 0.9]])
-
-        passthrough = driver._get_effective_fock((fock_a, fock_b), ovl, oao)
-        if self.is_master():
-            assert np.allclose(passthrough[0], fock_a)
-            assert np.allclose(passthrough[1], fock_b)
-
-        driver.acc_type = 'diis'
-        driver.diis_thresh = 1.0
-        driver.max_err_vecs = 2
-        driver._store_diis_data((fock_a, fock_b), (density_a, density_b), ovl,
-                                0.2)
-
-        single_effective = driver._get_effective_fock((fock_c, fock_c), ovl,
-                                                      oao)
-        if self.is_master():
-            assert np.allclose(single_effective[0], fock_a)
-            assert np.allclose(single_effective[1], fock_b)
-
-        driver._store_diis_data((fock_c, fock_c), (density_c, density_d), ovl,
-                                0.2)
-        driver._store_diis_data((fock_b, fock_a), (density_b, density_a), ovl,
-                                0.2)
-        if self.is_master():
-            assert len(driver._fock_matrices_alpha) == 2
-            assert np.allclose(driver._fock_matrices_alpha[0], fock_c)
-            assert np.allclose(driver._fock_matrices_beta[0], fock_c)
-
-        diis_effective = driver._get_effective_fock((fock_a, fock_b), ovl, oao)
-        if self.is_master():
-            assert diis_effective[0].shape == fock_a.shape
-            assert diis_effective[1].shape == fock_b.shape
 
         n_orbitals = basis.get_dimension_of_basis()
         pfon_fock_a = np.diag(np.linspace(-1.5, 1.5, n_orbitals))
@@ -1196,7 +1127,7 @@ class TestScfDriverMiscellaneous:
         db = np.array([[0.3, 0.0], [0.0, 0.1]])
         s = np.eye(2)
 
-        projected = driver.get_projected_fock(fa, fb, da, db, s)
+        projected = Diis.get_projected_fock(fa, fb, da, db, s)
         f0 = 0.5 * (fa + fb)
         inactive = np.matmul(s, db)
         active = np.matmul(s, da - db)
@@ -1207,32 +1138,6 @@ class TestScfDriverMiscellaneous:
 
         assert np.allclose(projected, expected)
         assert np.allclose(projected, projected.T)
-
-        passthrough = driver._get_effective_fock((fa, fb), s, s)
-        if self.is_master():
-            assert np.allclose(passthrough[0], fa)
-            assert np.allclose(passthrough[1], fb)
-
-        driver.acc_type = 'diis'
-        driver.diis_thresh = 1.0
-        driver.max_err_vecs = 2
-        driver._store_diis_data((fa, fb), (da, db), s, 0.2)
-
-        single_effective = driver._get_effective_fock((fa, fb), s, s)
-        if self.is_master():
-            assert len(single_effective) == 1
-            assert np.allclose(single_effective[0], projected)
-
-        fa_2 = np.array([[1.0, 0.2], [0.2, 0.6]])
-        fb_2 = np.array([[0.7, 0.15], [0.15, 0.5]])
-        da_2 = np.array([[0.9, 0.0], [0.0, 0.1]])
-        db_2 = np.array([[0.2, 0.0], [0.0, 0.2]])
-        driver._store_diis_data((fa_2, fb_2), (da_2, db_2), s, 0.2)
-
-        diis_effective = driver._get_effective_fock((fa_2, fb_2), s, s)
-        if self.is_master():
-            assert len(diis_effective) == 1
-            assert diis_effective[0].shape == fa.shape
 
         n_orbitals = basis.get_dimension_of_basis()
         pfon_fock = np.diag(np.linspace(-1.5, 1.5, n_orbitals))
@@ -1267,9 +1172,6 @@ class TestScfDriverMiscellaneous:
         assert copied.ostream is driver.ostream
         assert copied.comm is driver.comm
         assert copied._scf_type == driver._scf_type
-        if self.is_master():
-            assert np.allclose(copied._fock_matrices_proj[0],
-                               driver._fock_matrices_proj[0])
 
     def test_guess_unpaired_electrons_warning_for_restricted(self, tmp_path):
 
@@ -1727,10 +1629,11 @@ class TestScfDriverMiscellaneous:
         # trajectory. A gradient above 1.0e-2 activates damping, while the
         # subsequent smaller gradient makes den_damp equal to 1.0 and clears
         # the modifier flag for the next convergence check.
-        def controlled_gradient(*args):
+        def controlled_gradient(fock_mat, ovl_mat, den_mat, oao_mat):
             gradient_norm = (2.0e-2
                              if scf_drv._num_iter <= 1 else 1.0e-3)
-            return gradient_norm, gradient_norm
+            e_mat = np.zeros_like(ovl_mat)
+            return e_mat, gradient_norm, gradient_norm
 
         monkeypatch.setattr(scf_drv, '_comp_gradient', controlled_gradient)
 
