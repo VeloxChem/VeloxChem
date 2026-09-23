@@ -2350,6 +2350,67 @@ class LinearSolver:
 
         return fock_arrays
 
+    def _comp_simd_ri_j_fock_unrestricted(self, dens_a, dens_b, comm):
+        """
+        Computes this rank's share of the Coulomb matrices of an open shell batch.
+
+        :param dens_a:
+            The alpha densities, as numpy arrays.
+        :param dens_b:
+            The beta densities, as numpy arrays.
+        :param comm:
+            The communicator the build is divided over.
+
+        :return:
+            This rank's share of the Coulomb matrices, an alpha and a beta for each
+            density in the order the caller appends them.
+        """
+
+        # NOTE: the Coulomb of an open shell is of the two densities added and is
+        # the same matrix for both spins, so one is formed and handed to each. There
+        # is no factor of two here, where the closed shell carries one: the total
+        # density already counts both spins.
+
+        totals = [a + b for a, b in zip(dens_a, dens_b)]
+
+        nao = totals[0].shape[0]
+
+        mine = self._ri_drv.owned_parts()
+
+        packed = []
+
+        for density in totals:
+            matrix = PackedMatrix(nao, nao, mat_t.symmetric)
+            matrix.from_numpy(np.ascontiguousarray(0.5 * (density + density.T)))
+            packed.append(matrix)
+
+        local = np.array(
+            [self._ri_drv.compute_gamma(matrix, mine) for matrix in packed],
+            dtype=np.float64)
+
+        total = np.zeros_like(local)
+        comm.Allreduce(local, total, op=MPI.SUM)
+
+        fock_arrays = []
+
+        for idx in range(len(packed)):
+            gamma = self._ri_drv.solve_fitting(list(total[idx]))
+
+            fock = PackedMatrix(nao, nao, mat_t.symmetric)
+            fock.zero()
+
+            self._ri_drv.compute_coulomb(gamma, mine, fock)
+
+            coulomb = fock.to_numpy()
+
+            # NOTE: a copy each, not the same array twice. What the caller does to
+            # one spin's matrix afterwards must not reach the other's.
+
+            fock_arrays.append(coulomb.copy())
+            fock_arrays.append(coulomb.copy())
+
+        return fock_arrays
+
     def _comp_ri_jk_fock(self,
                          basis,
                          dens_factors,
@@ -2490,9 +2551,18 @@ class LinearSolver:
         # the loop rather than sitting inside it. The two spins share the Coulomb
         # of their densities added and share nothing else, their occupied orbitals
         # being neither the same orbitals nor the same number of them.
+        # NOTE: the simd Coulomb only driver takes the whole batch too, and the
+        # right hand sides of its fittings are reduced in one collective.
+        use_ri_j_simd = (self.ri_coulomb and self.ri_coulomb_simd and
+                         fock_type == 'j')
+
         use_ri_jk = (self.ri_jk and self.ri_jk_simd and dens_factors is not None)
 
-        if use_ri_jk:
+        if use_ri_j_simd:
+            fock_arrays = self._comp_simd_ri_j_fock_unrestricted(
+                dens_a, dens_b, comm)
+
+        elif use_ri_jk:
             # NOTE: a range-separated functional has its attenuated exchange
             # subtracted inside the same call. The four-centre correction further
             # down is not reached for this path: it sits inside the loop over the
@@ -2503,7 +2573,7 @@ class LinearSolver:
                 self, basis, factors_a, factors_b, exchange_scaling_factor,
                 erf_k_coef if need_omega else 0.0)
 
-        for idx in range(0 if use_ri_jk else num_densities):
+        for idx in range(0 if (use_ri_jk or use_ri_j_simd) else num_densities):
             if self.ri_coulomb:
                 assert_msg_critical(
                     fock_type == 'j',
