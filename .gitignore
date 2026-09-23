@@ -82,6 +82,11 @@ cover/
 *.mo
 *.pot
 
+# ... but a polarizable embedding force field is a .pot file and is not a
+# translation. The generated ones, such as the per frame pe_frame_*.pot an
+# ensemble writes, stay ignored.
+!database/environment_parameters/*.pot
+
 # Django stuff:
 *.log
 local_settings.py

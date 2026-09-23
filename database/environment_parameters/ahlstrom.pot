@@ -1,0 +1,38 @@
+# Ahlstrom polarizable water.
+#
+# P. Ahlstrom, A. Wallqvist, S. Engstrom, B. Jonsson,
+# A molecular dynamics study of polarizable water,
+# Mol. Phys. 68 (1989) 563.
+#
+# The charges give a dipole moment of 1.855 D, which is that of a water molecule
+# on its own. A polarizable model is built this way on purpose: the enhancement
+# of the dipole moment in the liquid is what the induced dipoles are there to
+# supply, and charges already carrying it would polarize the water twice.
+#
+# The polarizability is one isotropic point of 9.718 a.u., which is 1.440 cubic
+# angstrom.
+#
+# NOTE: Ahlstrom places that point at the centre of mass. It sits on the oxygen
+# here, which is where a force field of one site for each atom can put it, and
+# the two are about 0.065 angstrom apart. This is what an atom site
+# implementation of the model does and it is not what the paper says.
+#
+# The sites are the atoms in the order a structure file gives them, the oxygen
+# and then the two hydrogens. The hydrogens carry no polarizability.
+
+@FORCEFIELD
+name:  WATER
+sites: 3
+units: au
+
+@MULTIPOLES
+ORDER 0
+3
+1    -0.669000
+2     0.334500
+3     0.334500
+
+@POLARIZABILITIES
+ISOTROPIC
+1
+1     9.718000

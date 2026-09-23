@@ -1,0 +1,33 @@
+# TIP3P water.
+#
+# Jorgensen W, Chandrasekhar J, Madura J, Impey R, Klein M.
+# J Chem Phys. 1983;79:926-935.
+#
+# Charges only. TIP3P does not polarize, so a region built on this force field
+# carries fixed multipoles and no induced dipoles, and it is the force field for
+# the nonpolarizable region of an embedding.
+#
+# The charges are the condensed phase ones the model was fitted with, and give a
+# dipole moment of 2.35 D rather than the 1.85 D of a water molecule on its own.
+# That enhancement stands in for the polarization which the model leaves out, so
+# these charges are not the ones to give a polarizable region: it would then be
+# polarized twice.
+#
+# The Lennard-Jones parameters of the model are not here. This file holds what
+# the embedding uses, and the repulsion and dispersion of the environment are
+# not part of it.
+#
+# The sites are the atoms in the order a structure file gives them, the oxygen
+# and then the two hydrogens.
+
+@FORCEFIELD
+name:  WATER
+sites: 3
+units: au
+
+@MULTIPOLES
+ORDER 0
+3
+1    -0.834000
+2     0.417000
+3     0.417000
