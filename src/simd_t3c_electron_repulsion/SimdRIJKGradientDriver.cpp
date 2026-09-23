@@ -720,7 +720,18 @@ CSimdRIJKGradientDriver::mpi_local_densities(const CMolecule        &molecule,
 
     const auto norbs = coefficients.number_of_columns();
 
-    fit.functions = simdri::aux_functions_of(aux_basis, aux_atoms);
+    // NOTE: **empty means empty here.** aux_functions_of reads a list of no atoms
+    // as every atom, which is right for a caller asking about a whole molecule and
+    // wrong for every caller of this routine: these are the atoms a rank was dealt,
+    // and a rank dealt none owns no functions. Expanded instead, such a rank asked
+    // the transformation for every auxiliary function in the molecule while holding
+    // the B vectors of none of them.
+    //
+    // NOTE: the third place this same convention has bitten -- the Coulomb only
+    // gradient driver, the fitted Fock driver, and here.
+
+    fit.functions = aux_atoms.empty() ? std::vector<size_t>()
+                                      : simdri::aux_functions_of(aux_basis, aux_atoms);
 
     // the right hand side of the fitting, summed over this rank's B vectors alone.
     // The caller adds the ranks' and hands the sum back to mpi_set_fitting.
@@ -742,6 +753,23 @@ CSimdRIJKGradientDriver::mpi_local_densities(const CMolecule        &molecule,
 
     fit.npanel = std::min(fit.nelements, std::max(_min_batch, by_memory));
 
+    // NOTE: **both spins' panel geometry is settled before anything returns.** The
+    // second spin's used to be worked out further down, after the early return
+    // below, so a rank which owned no auxiliary functions came back reporting no
+    // beta panels while every other rank reported some. The caller loops over the
+    // panels and reduces each one, so those ranks ran different numbers of
+    // collectives and the job sat in Allreduce until it was killed -- which reads
+    // as water taking minutes, not as the deadlock it is.
+
+    if (coefficients_beta.number_of_columns() > 0)
+    {
+        const auto norbs_beta = coefficients_beta.number_of_columns();
+
+        fit.nelements_beta = norbs_beta * (norbs_beta + 1) / 2;
+
+        fit.npanel_beta = std::min(fit.nelements_beta, std::max(_min_batch, by_memory));
+    }
+
     fit.densities.resize(fit.naux);
 
     fit.gram_rows.assign(fit.functions.size() * fit.naux, 0.0);
@@ -757,12 +785,6 @@ CSimdRIJKGradientDriver::mpi_local_densities(const CMolecule        &molecule,
 
     if (coefficients_beta.number_of_columns() > 0)
     {
-        const auto norbs_beta = coefficients_beta.number_of_columns();
-
-        fit.nelements_beta = norbs_beta * (norbs_beta + 1) / 2;
-
-        fit.npanel_beta = std::min(fit.nelements_beta, std::max(_min_batch, by_memory));
-
         errors::assertMsgCritical(coefficients_beta.number_of_elements() == 0 ||
                                       (coefficients_beta.number_of_rows() == coefficients.number_of_rows()),
                                   std::string("SimdRIJKGradientDriver: The two spins' orbitals are not of "
@@ -1093,8 +1115,14 @@ CSimdRIJKGradientDriver::mpi_compute_share(const CMolecule        &molecule,
 
     const auto exchange_factor = open_shell ? -exchange_scaling_factor : -2.0 * exchange_scaling_factor;
 
-    _compute_three_center(gradient, molecule, basis, aux_basis, fit.fitting, density, spins,
-                          coulomb_factor, exchange_factor, wanted, aux_atoms);
+    // NOTE: a rank dealt no auxiliary atoms adds no three-center term. It is not
+    // passed on to the contraction, which reads an empty list as every atom.
+
+    if (!aux_atoms.empty())
+    {
+        _compute_three_center(gradient, molecule, basis, aux_basis, fit.fitting, density, spins,
+                              coulomb_factor, exchange_factor, wanted, aux_atoms);
+    }
 
     // NOTE: the two-center term is asked of one rank alone. Omega is of the whole
     // auxiliary basis on every rank, so every rank could form it and the ranks would
@@ -1180,8 +1208,12 @@ CSimdRIJKGradientDriver::mpi_compute_share_rs(const CMolecule        &molecule,
 
     const auto erf_factor = open_shell ? -erf_exchange_scaling_factor : -2.0 * erf_exchange_scaling_factor;
 
-    _compute_three_center(gradient, molecule, basis, aux_basis, fit.fitting, density, spins,
-                          coulomb_factor, exchange_factor, wanted, aux_atoms, spins_erf, erf_factor, omega);
+    if (!aux_atoms.empty())
+    {
+        _compute_three_center(gradient, molecule, basis, aux_basis, fit.fitting, density, spins,
+                              coulomb_factor, exchange_factor, wanted, aux_atoms, spins_erf, erf_factor,
+                              omega);
+    }
 
     if (omega_plain.number_of_elements() > 0)
     {
