@@ -36,10 +36,6 @@
 
 #include "ErrorHandler.hpp"
 
-#ifdef VLX_USE_MATHLIB
-#include "MathLibrary.hpp"
-#endif
-
 namespace sdenblas {  // sdenblas namespace
 
 auto
@@ -109,27 +105,11 @@ serialMultABt(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB) -> CDens
     mat.zero();
     auto C = mat.values();
 
-#ifdef VLX_USE_MATHLIB
-
-    // C^T = B * A^T, over the columns
-
-    const lapack_int_t mdim = static_cast<lapack_int_t>(nbrow);
-    const lapack_int_t ndim = static_cast<lapack_int_t>(narow);
-    const lapack_int_t kdim = static_cast<lapack_int_t>(nacol);
-
-    const double alpha = 1.0, beta = 0.0;
-
-    dgemm_("T", "N", &mdim, &ndim, &kdim, &alpha, B, &kdim, A, &kdim, &beta, C, &mdim);
-
-#else
-
     Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>, Eigen::Unaligned> ematA(A, narow, nacol);
     Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>, Eigen::Unaligned> ematB(B, nbrow, nbcol);
     Eigen::Map<Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>, Eigen::Unaligned> ematC(C, narow, nbrow);
 
     ematC.noalias() = ematA * ematB.transpose();
-
-#endif
 
     return mat;
 }
@@ -165,28 +145,11 @@ serialMultSymANonsymB(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB) 
     mat.zero();
     auto C = mat.values();
 
-#ifdef VLX_USE_MATHLIB
-
-    // C^T = B^T * A, over the columns, with A marked as transposed: it is
-    // symmetric, so this is the same matrix, and the shape the library is fast at
-
-    const lapack_int_t mdim = static_cast<lapack_int_t>(nbcol);
-    const lapack_int_t ndim = static_cast<lapack_int_t>(narow);
-    const lapack_int_t kdim = static_cast<lapack_int_t>(nacol);
-
-    const double alpha = 1.0, beta = 0.0;
-
-    dgemm_("N", "T", &mdim, &ndim, &kdim, &alpha, B, &mdim, A, &ndim, &beta, C, &mdim);
-
-#else
-
     Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>, Eigen::Unaligned> ematA(A, narow, nacol);
     Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>, Eigen::Unaligned> ematB(B, nbrow, nbcol);
     Eigen::Map<Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>, Eigen::Unaligned> ematC(C, narow, nbcol);
 
     ematC.noalias() = ematA * ematB;
-
-#endif
 
     return mat;
 }

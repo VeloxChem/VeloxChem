@@ -36,6 +36,15 @@
 #include "DenseMatrix.hpp"
 #include "SubMatrix.hpp"
 
+/**
+ Serial dense linear algebra.
+
+ All routines in this namespace are serial: each call runs on the calling
+ thread only and never starts threads of its own. The implementation uses
+ Eigen. The routines are intended for the serial inner loops of code that is
+ parallelized at a higher level with OpenMP or MPI, so they must not be
+ replaced by, or internally route to, a threaded BLAS.
+ */
 namespace sdenblas {  // sdenblas namespace
 
 /**
