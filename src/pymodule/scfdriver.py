@@ -2046,11 +2046,18 @@ class ScfDriver:
             # sweeps the integrals a second time while the others wait -- a fifth of
             # a build, measured on two nodes. At least one part per rank is asked for
             # so there is something for each of them to take.
+            # NOTE: an empty share of the auxiliary atoms means this rank was dealt
+            # none of them, and not that it should take all of them. The driver
+            # cannot tell the two apart from its arguments, so it is told: a run on
+            # one rank asks for the whole molecule with an empty list, and a rank
+            # which came out of the deal empty says so here.
             self._ri_drv.prepare(molecule, ao_basis, basis_ri, self.eri_thresh,
                                  budget, self.ri_metric_threshold,
                                  use_inverse_square_root, mode,
                                  self._ri_aux_atoms, metric, self.nodes,
-                                 omega, metric_erf)
+                                 omega, metric_erf,
+                                 (self.nodes > 1) and
+                                 (len(self._ri_aux_atoms) == 0))
 
             if range_separated:
                 # NOTE: the attenuated metric is the worse conditioned of the two

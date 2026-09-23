@@ -391,7 +391,8 @@ export_simdintegrals(py::module &m) -> void
              py::arg("metric") = CPackedMatrix(),
              py::arg("min_parts") = 1,
              py::arg("omega") = 0.0,
-             py::arg("metric_erf") = CPackedMatrix())
+             py::arg("metric_erf") = CPackedMatrix(),
+             py::arg("holds_nothing") = false)
         .def("compute",
              py::overload_cast<const CPackedMatrix &, const CPackedMatrix &, const double, const double>(
                  &CSimdRIJKFockDriver::compute),

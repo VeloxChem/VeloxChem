@@ -225,7 +225,8 @@ class CSimdRIJKFockDriver
                  const CPackedMatrix    &metric                 = CPackedMatrix(),
                  const size_t            min_parts              = 1,
                  const double            omega                  = 0.0,
-                 const CPackedMatrix    &metric_erf             = CPackedMatrix()) -> void;
+                 const CPackedMatrix    &metric_erf             = CPackedMatrix(),
+                 const bool              holds_nothing          = false) -> void;
 
     /// @brief Computes the Fock matrix of a density and a set of orbitals.
     /// @param density The density matrix, in the packed format, symmetric for a

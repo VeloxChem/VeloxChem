@@ -295,7 +295,8 @@ CSimdRIJKFockDriver::prepare(const CMolecule       &molecule,
                              const CPackedMatrix   &metric,
                              const size_t           min_parts,
                              const double           omega,
-                             const CPackedMatrix   &metric_erf) -> void
+                             const CPackedMatrix   &metric_erf,
+                             const bool             holds_nothing) -> void
 {
     CPrepareProfile profile;
 
@@ -310,22 +311,20 @@ CSimdRIJKFockDriver::prepare(const CMolecule       &molecule,
 
     const auto range_separated = (omega > 0.0);
 
-    // NOTE: **an empty share under a division is an empty share.** A list of no
-    // atoms means every atom to the routines below, which is what a caller asking
-    // for the whole molecule wants and is the opposite of what a rank dealt nothing
-    // wants. The two are told apart by min_parts, which is how many ranks are
-    // dividing the work: one rank asking for all of them passes an empty list with
-    // min_parts of one, and a rank which came out of the deal empty passes an empty
-    // list with more.
+    // NOTE: **an empty share is not the same as the whole molecule, and only the
+    // caller knows which it means.** A list of no atoms means every atom to the
+    // routines below, which is what a caller asking about a whole molecule wants and
+    // is the opposite of what a rank dealt nothing wants. Nothing in the arguments
+    // tells the two apart -- min_parts is how finely the direct way cuts its sweep
+    // and a single rank asks for several of those quite legitimately -- so the
+    // caller says which it means and is believed.
     //
-    // NOTE: unhandled, this converged and said nothing. Water on four ranks came
-    // back at -43.08 hartree against -76.36 on three, because the rank holding no
-    // atoms formed the whole set of B vectors and its whole Fock matrix was added
-    // to every other rank's share. Three ranks and fewer were right, which is why
-    // it had never been seen: a molecule usually has more atoms than the job has
-    // ranks.
-
-    const auto holds_nothing = (aux_atoms.empty() && (min_parts > 1));
+    // NOTE: left to be guessed at, this converged and said nothing. Water on four
+    // ranks came back at -43.08 hartree against -76.36 on three, because the rank
+    // holding no atoms formed the whole set of B vectors and its whole Fock matrix
+    // was added to every other rank's share. Three ranks and fewer were right,
+    // which is why it had never been seen: a molecule usually has more atoms than
+    // the job has ranks.
 
     _holds_nothing = holds_nothing;
 
@@ -438,16 +437,6 @@ CSimdRIJKFockDriver::prepare(const CMolecule       &molecule,
                                   std::string("RIJKFockDriver: The direct way cannot be divided over the atoms of the "
                                               "auxiliary basis, as its triangular solve reaches across all of them"));
 
-        // NOTE: and an undivided direct build on several ranks is no better. Each
-        // of them would form the whole Fock matrix and the caller adds them, so the
-        // answer comes back as many times too large as there are ranks. The check
-        // above catches a rank which was dealt atoms; this one catches the ranks
-        // which were dealt none because nothing was divided at all.
-
-        errors::assertMsgCritical(min_parts <= 1,
-                                  std::string("RIJKFockDriver: The direct way runs on one rank, as it cannot be "
-                                              "divided over the auxiliary basis and every rank would otherwise form "
-                                              "the whole of the Fock matrix"));
 
         const auto mark_pattern = prof_clock::now();
 

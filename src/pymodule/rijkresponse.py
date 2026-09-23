@@ -205,11 +205,15 @@ def initialize(solver, molecule, basis):
                                                      solver.ri_metric_threshold,
                                                      False, rimode.in_memory)
 
+    # NOTE: an empty share means this rank was dealt no auxiliary atoms, and not
+    # that it should take all of them. The driver is told which, for the reason the
+    # Fock build's own call gives.
     solver._ri_jk_drv.prepare(molecule, basis, solver._ri_jk_aux_basis,
                               solver.eri_thresh, budget,
                               solver.ri_metric_threshold, False, mode,
                               aux_atoms, metric, solver.nodes, omega,
-                              metric_erf)
+                              metric_erf,
+                              (solver.nodes > 1) and (len(aux_atoms) == 0))
 
     solver._ri_jk_response_drv = SimdRIJKResponseDriver(solver.eri_thresh)
 
