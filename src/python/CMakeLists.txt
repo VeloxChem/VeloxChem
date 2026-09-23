@@ -7,6 +7,7 @@ include(${PROJECT_SOURCE_DIR}/cmake/custom/FindPythonModule.cmake)
 pybind11_add_module(veloxchemlib
   NO_EXTRAS
     ExportDft.cpp
+    ExportEmbedding.cpp
     ExportGeneral.cpp
     ExportMath.cpp
     ExportMoldata.cpp

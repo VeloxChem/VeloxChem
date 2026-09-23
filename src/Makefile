@@ -34,6 +34,7 @@ CXXFLAGS += $(MATH_INC)
 VLX_LIBS_DIR := general
 VLX_LIBS_DIR += math
 VLX_LIBS_DIR += moldata
+VLX_LIBS_DIR += simd_embedding
 VLX_LIBS_DIR += orbdata
 VLX_LIBS_DIR += simd_func
 VLX_LIBS_DIR += simd_t2c_overlap

@@ -30,50 +30,18 @@
 //  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 //  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include <pybind11/pybind11.h>
 
-#include "ExportDft.hpp"
-#include "ExportEmbedding.hpp"
-#include "ExportGeneral.hpp"
-#include "ExportMath.hpp"
-#include "ExportMoldata.hpp"
-#include "ExportOneElecInts.hpp"
-#include "ExportOrbdata.hpp"
-#include "ExportSimdIntegrals.hpp"
-#include "ExportPacked.hpp"
-#include "ExportSparse.hpp"
-#include "ExportVisualization.hpp"
-#include "ExportT2CIntegrals.hpp"
-#include "ExportT3CIntegrals.hpp"
-#include "ExportT4CIntegrals.hpp"
+#ifndef ExportEmbedding_hpp
+#define ExportEmbedding_hpp
 
-PYBIND11_MODULE(veloxchemlib, m)
-{
-    vlx_general::export_general(m);
+#include "ExportHelpers.hpp"
 
-    vlx_math::export_math(m);
+namespace vlx_embedding {  // vlx_embedding namespace
 
-    vlx_moldata::export_moldata(m);
+/// @brief Exports polarizable embedding classes in src/simd_embedding to Python module.
+/// @param m The Python module.
+auto export_embedding(py::module &m) -> void;
 
-    vlx_orbdata::export_orbdata(m);
+}  // namespace vlx_embedding
 
-    vlx_packed::export_packed(m);
-
-    vlx_sparse::export_sparse(m);
-
-    vlx_dft::export_dft(m);
-
-    vlx_oneeints::export_oneeints(m);
-
-    vlx_visualization::export_visualization(m);
-
-    vlx_t2cintegrals::export_t2cintegrals(m);
-    
-    vlx_t3cintegrals::export_t3cintegrals(m);
-
-    vlx_t4cintegrals::export_t4cintegrals(m);
-
-    vlx_simdintegrals::export_simdintegrals(m);
-
-    vlx_embedding::export_embedding(m);
-}
+#endif /* ExportEmbedding_hpp */
