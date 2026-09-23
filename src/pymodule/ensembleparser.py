@@ -43,8 +43,8 @@ from .errorhandler import assert_msg_critical, print_exception_if_debug
 
 try:
     import MDAnalysis as mda
-    import MDAnalysis.transformations as mda_transform
     from MDAnalysis.guesser.default_guesser import DefaultGuesser as mda_DefaultGuesser
+    from MDAnalysis.lib.mdamath import make_whole
 except ImportError:
     pass
 
@@ -578,9 +578,9 @@ class EnsembleParser:
         prot_map = self._protonation_resname_map(env_atoms)
         term_map = self._terminal_resname_map(mda_universe)
 
-        # MDAnalysis transforms require valid box dimensions (ts.dimensions)
-        # (e.g. unwrap/center_in_box/wrap). For single PDBs without box info,
-        # skip transformations.
+        # The unwrap, center_in_box and wrap operations require valid box
+        # dimensions (ts.dimensions). For single PDBs without box info, skip
+        # them.
         has_box = False
         try:
             dims = getattr(seek_trajectory_frame(0), "dimensions", None)
@@ -592,19 +592,29 @@ class EnsembleParser:
             print_exception_if_debug()
             has_box = False
 
-        if has_box:
-            transforms = [
-                mda_transform.unwrap(qm_atoms),
-                mda_transform.center_in_box(qm_atoms, wrap=True),
-                mda_transform.wrap(env_atoms),
-            ]
-            mda_universe.trajectory.add_transformations(*transforms)
-
         atom_guesser = mda_DefaultGuesser(mda_universe)
 
         snapshots = []
         for iframe in frame_indices:
-            seek_trajectory_frame(iframe)
+            ts = seek_trajectory_frame(iframe)
+
+            if has_box:
+
+                # apply the unwrap, center_in_box and wrap operations directly
+                # on the coordinates, instead of through the MDAnalysis
+                # transformations, which adjust the thread limits of the math
+                # libraries of the process as a side effect
+
+                for fragment in qm_atoms.fragments:
+                    make_whole(fragment)
+
+                box_center = np.sum(ts.triclinic_dimensions, axis=0) / 2
+
+                shift = box_center - qm_atoms.center_of_geometry(wrap=True)
+
+                ts.positions += shift
+
+                env_atoms.wrap()
 
             qm_coords = np.asarray(qm_atoms.positions, dtype=float).copy()
             qm_atom_names = np.asarray(qm_atoms.names, dtype=object).copy()
