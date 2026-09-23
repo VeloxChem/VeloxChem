@@ -33,12 +33,12 @@
 # Makefile for internal VeloxChem library
 
 LOCAL_LIB := gpu.a
-LOCAL_SCR := $(wildcard *.cpp)
+LOCAL_SCR := $(filter-out $(wildcard *Hessian*.cpp),$(wildcard *.cpp))
 LOCAL_OBJ := $(subst .cpp,.o,$(LOCAL_SCR))
 LOCAL_DEP := $(subst .cpp,.d,$(LOCAL_SCR))
 LOCAL_OPT := $(subst .cpp,.optrpt,$(LOCAL_SCR))
 
-LOCAL_DEV_SCR := $(wildcard *.cu)
+LOCAL_DEV_SCR := $(filter-out $(wildcard *Hessian*.cu),$(wildcard *.cu))
 LOCAL_DEV_OBJ := $(subst .cu,.o,$(LOCAL_DEV_SCR))
 LOCAL_DEV_DEP := $(subst .cu,.d,$(LOCAL_DEV_SCR))
 LOCAL_DEV_OPT := $(subst .cu,.optrpt,$(LOCAL_DEV_SCR))

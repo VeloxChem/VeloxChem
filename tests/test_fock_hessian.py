@@ -4,9 +4,9 @@ from veloxchem.veloxchemlib import GradientScreeningData
 from veloxchem.veloxchemlib import DenseMatrix
 from veloxchem.veloxchemlib import AODensityMatrix, denmat
 from veloxchem.veloxchemlib import mpi_master
-from veloxchem.veloxchemlib import compute_fock_hessian_gpu_2000
-from veloxchem.veloxchemlib import compute_fock_hessian_gpu_1100
-from veloxchem.veloxchemlib import compute_fock_hessian_gpu_1010
+#from veloxchem.veloxchemlib import compute_fock_hessian_gpu_2000
+#from veloxchem.veloxchemlib import compute_fock_hessian_gpu_1100
+#from veloxchem.veloxchemlib import compute_fock_hessian_gpu_1010
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
@@ -75,7 +75,7 @@ class TestFockHessian:
         if scf_drv.rank == 0:
             assert np.max(np.abs(fock_hess - ref_hessian)) < tol
 
-    def test_Coulomb_hessian_methanol_sto3g(self):
+    def disabled_test_Coulomb_hessian_methanol_sto3g(self):
 
         xyzstr = """6
         methanol
@@ -318,7 +318,7 @@ class TestFockHessian:
         self.run_fock_hessian(mol, bas, coulomb_coef, exchange_coef,
                               'hessian_1010', ref_hessian_1010, 1e-5)
 
-    def test_exchange_hessian_h2_631g(self):
+    def disabled_test_exchange_hessian_h2_631g(self):
 
         xyzstr = """6
         h2
@@ -561,7 +561,7 @@ class TestFockHessian:
         self.run_fock_hessian(mol, bas, coulomb_coef, exchange_coef,
                               'hessian_1010', ref_hessian_1010, 1e-5)
 
-    def test_Coulomb_hessian_methanol_def2svp(self):
+    def disabled_test_Coulomb_hessian_methanol_def2svp(self):
 
         ref_hessian = np.array([[[[-2.219942, 0.033711, 1.183905],
                                   [0.033711, -2.800731, 0.061748],
@@ -766,7 +766,7 @@ class TestFockHessian:
 
             assert np.max(np.abs(j_hess - ref_hessian)) < 1.0e-5
 
-    def test_exchange_hessian_methanol_def2svp(self):
+    def disabled_test_exchange_hessian_methanol_def2svp(self):
 
         ref_hessian = np.array([[[[0.21850851, -0.00387226, -0.14367062],
                                   [-0.00387226, 0.27502568, -0.00699822],
