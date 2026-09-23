@@ -93,13 +93,16 @@ class ScfGradientDriver(GradientDriver):
         self._block_size_factor = 4
 
         # NOTE: the memory the distributed RI-JK gradient may hold for its panels
-        # and its half transformed vectors, per rank. It is **not** the Fock
-        # driver's budget: the ranks of a node share that node's memory, and a
-        # budget which is right for one rank holding everything is eight times too
-        # large when eight of them are holding a share each. Two gigabytes leaves a
-        # node of the usual size room for the fitted densities themselves, which are
-        # what the division exists to make fit.
-        self.ri_gradient_mpi_budget = 2 * 1024**3
+        # and its half transformed vectors, per rank, in gigabytes. None works it
+        # out from what the machine has and how many ranks are sharing it.
+        #
+        # NOTE: this was a bare two gigabytes, with a comment which said the ranks
+        # of a node share that node's memory and no arithmetic which did anything
+        # about it. Four ranks on a laptop then claimed eight gigabytes of buffers
+        # between them before the panels were copied on top, and the machine had to
+        # be rebooted. The Fock build had solved this already, by asking what is
+        # free and dividing it by the ranks on this host; that is what is done here.
+        self.ri_gradient_mpi_budget = None
 
         self._xcfun_ldstaging = scf_drv._xcfun_ldstaging
 
@@ -463,6 +466,41 @@ class ScfGradientDriver(GradientDriver):
                                         exchange_scaling_factor, erf_k_coef,
                                         omega, list(range(natoms)), aux_atoms)
 
+    def _get_ri_gradient_budget(self):
+        """
+        Gets the memory the distributed RI-JK gradient may hold, per rank.
+
+        :return:
+            The memory budget in bytes.
+        """
+
+        if self.ri_gradient_mpi_budget is not None:
+            return int(self.ri_gradient_mpi_budget * 1024**3)
+
+        try:
+            import psutil
+            available = psutil.virtual_memory().available
+        except ImportError:
+            available = 8 * 1024**3
+
+        # NOTE: the ranks of one node see the same free memory and would each claim
+        # the whole of it, so the node would be promised several times over. The
+        # ranks sharing a node are counted by their host name, as the Fock build
+        # counts them, and the memory is divided between them.
+        import platform
+        here = platform.node()
+        on_this_node = max(self.comm.allgather(here).count(here), 1)
+
+        per_rank = available / on_this_node
+
+        # NOTE: a quarter of a rank's share and not the whole of it. What the budget
+        # bounds is the panel and the half transformed vectors; the fitted densities
+        # this rank owns sit beside them for the whole phase and are not counted in
+        # it, and so does whatever the quadrature is holding. A floor of a quarter
+        # of a gigabyte keeps the panels from being cut so fine that the phase turns
+        # into a great many small reductions.
+        return int(max(0.25 * per_rank, 0.25 * 1024**3))
+
     def _distributed_fit(self, drv, molecule, basis, aux_basis, bq_vectors,
                          metric, density, coefficients, coefficients_beta,
                          aux_atoms, exchange_scaling_factor, open_shell,
@@ -481,7 +519,7 @@ class ScfGradientDriver(GradientDriver):
 
         fit = drv.mpi_local_densities(molecule, basis, aux_basis, bq_vectors,
                                       density, coefficients, coefficients_beta,
-                                      aux_atoms, self.ri_gradient_mpi_budget)
+                                      aux_atoms, self._get_ri_gradient_budget())
 
         # the right hand side of the fitting, which has to be complete before the
         # transposed factor is applied to it
@@ -507,11 +545,14 @@ class ScfGradientDriver(GradientDriver):
 
         for beta in spins:
             for ipanel in range(fit.panels(beta)):
-                partial = np.ascontiguousarray(
+                # NOTE: reduced in place. A second array of the panel's size was
+                # allocated here to receive the sum, which doubled the largest
+                # thing this phase holds for no reason: the partial is not wanted
+                # afterwards.
+                panel = np.ascontiguousarray(
                     drv.mpi_panel_partial(fit, metric, ipanel, beta))
-                reduced = np.zeros_like(partial)
-                self.comm.Allreduce(partial, reduced, op=MPI.SUM)
-                drv.mpi_panel_absorb(fit, ipanel, reduced, beta)
+                self.comm.Allreduce(MPI.IN_PLACE, panel, op=MPI.SUM)
+                drv.mpi_panel_absorb(fit, ipanel, panel, beta)
 
         # the Gram, whose rows the ranks hold disjointly, gathered by adding them:
         # a rank writes its own rows into a matrix of zeros and the sum is the whole.
