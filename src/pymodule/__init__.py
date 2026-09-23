@@ -203,6 +203,7 @@ from .mmdriver import MMDriver
 from .mmgradientdriver import MMGradientDriver
 from .symmetryanalyzer import SymmetryAnalyzer
 from .simdpolarizableembedding import SimdPolarizableEmbeddingDriver
+from .simdpolarizableembedding import read_potential_file
 from .solvationbuilder import SolvationBuilder
 from .solvationfepdriver import SolvationFepDriver
 from .openmmdynamics import OpenMMDynamics
