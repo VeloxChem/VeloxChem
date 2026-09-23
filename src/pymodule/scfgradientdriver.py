@@ -933,6 +933,17 @@ class ScfGradientDriver(GradientDriver):
                     f'{type(self).__name__}: the RI-JK driver holds B vectors ' +
                     'of a different range-separation parameter')
 
+                # NOTE: **this branch is taken before the one which divides**, so a
+                # refusal inside that one would never be reached by an attenuated
+                # functional. It was not, and a range separated gradient on two
+                # ranks came back with its largest component four orders too big
+                # rather than refusing: this entry is handed the B vectors a rank
+                # holds and answers as though they were all of them.
+                assert_msg_critical(
+                    self.nodes == 1,
+                    f'{type(self).__name__}: the range-separated RI-JK ' +
+                    'gradient runs on one rank')
+
                 atomgrad = ri_jk_grad_drv.compute_rs(
                     molecule, basis, basis_ri_jk,
                     self.scf_driver._ri_drv.get_bq_vectors(),
