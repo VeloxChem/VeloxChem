@@ -51,6 +51,7 @@ from .rifockdriver import RIFockDriver
 from .veloxchemlib import SimdRIJKFockDriver
 from .veloxchemlib import SimdRIJKResponseDriver
 from .veloxchemlib import PackedMatrix
+from .veloxchemlib import SimdRIJFockDriver
 from .veloxchemlib import rimode
 from .molecularbasis import MolecularBasis
 from . import rijkresponse
@@ -135,6 +136,7 @@ class LinearSolver:
 
         # RI-J
         self.ri_coulomb = False
+        self.ri_coulomb_simd = False
         self.ri_jk = False
         self.ri_jk_simd = False
         self.ri_auxiliary_basis = 'def2-universal-jfit'
@@ -268,6 +270,7 @@ class LinearSolver:
             },
             'method_settings': {
                 'ri_coulomb': ('bool', 'use RI-J approximation'),
+                'ri_coulomb_simd': ('bool', 'use the simd RI-J driver'),
                 'ri_jk': ('bool', 'use RI-JK approximation'),
                 'ri_jk_simd': ('bool', 'use the simd RI-JK driver'),
                 'ri_auxiliary_basis': ('str', 'RI auxiliary basis set'),
@@ -565,7 +568,10 @@ class LinearSolver:
             screening = None
         screening = self.comm.bcast(screening, root=mpi_master())
 
-        if self.ri_coulomb:
+        if self.ri_coulomb and self.ri_coulomb_simd:
+            self._init_simd_ri_j(molecule, basis)
+
+        elif self.ri_coulomb:
             self._ri_drv = RIFockDriver(self.comm, self.ostream)
             self._ri_drv.prepare_buffers(molecule,
                                          basis,
@@ -578,6 +584,78 @@ class LinearSolver:
         return {
             'screening': screening,
         }
+
+    def _init_simd_ri_j(self, molecule, basis):
+        """
+        Prepares the simd Coulomb only driver this solver builds with.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        """
+
+        basis_ri = MolecularBasis.read(molecule, self.ri_auxiliary_basis,
+                                       ostream=None)
+
+        self._ri_drv = SimdRIJFockDriver()
+
+        # NOTE: the metric is inverted once on the master and handed to the ranks,
+        # as the Fock build does it: the inversion picks its own fallback from the
+        # matrix, and two ranks choosing differently would build with metrics which
+        # are not the same.
+        metric = PackedMatrix()
+
+        if self.rank == mpi_master():
+            metric = self._ri_drv.make_metric(molecule, basis_ri,
+                                              self.ri_metric_threshold)
+
+        metric = metric.broadcast(self.comm, root=mpi_master())
+
+        # NOTE: the parts are what the ranks divide, so there have to be at least
+        # as many of them as there are ranks. The response builds many densities a
+        # call and every one of them sweeps the same integrals, so the way which
+        # holds them is what this path wants; automatic takes it wherever it fits.
+        self._ri_drv.prepare(molecule, basis, basis_ri, self.eri_thresh,
+                             self._get_ri_j_memory_budget(),
+                             self.ri_metric_threshold, rimode.automatic, metric,
+                             self.rank, self.nodes)
+
+        self._ri_j_basis = basis_ri
+
+        if self.rank == mpi_master():
+            held = ('held in memory'
+                    if self._ri_drv.get_mode() == rimode.in_memory else
+                    'formed again on every build')
+            self.ostream.print_info(
+                'Using the SIMD resolution of the identity (RI-J) for response.')
+            self.ostream.print_info(
+                f'Three-center integrals are {held}, in ' +
+                f'{self._ri_drv.number_of_parts()} parts.')
+            self.ostream.print_blank()
+            self.ostream.flush()
+
+    def _get_ri_j_memory_budget(self):
+        """
+        Gets the memory the simd Coulomb only driver may hold, per rank.
+
+        :return:
+            The memory budget in bytes.
+        """
+
+        try:
+            import psutil
+            available = psutil.virtual_memory().available
+        except ImportError:
+            available = 8 * 1024**3
+
+        # NOTE: the ranks of one node see the same free memory and would each claim
+        # the whole of it, so the node would be promised several times over.
+        import platform
+        here = platform.node()
+        on_this_node = max(self.comm.allgather(here).count(here), 1)
+
+        return int(max(available - 4 * 1024**3, 0.25 * available) / on_this_node)
 
     def _init_simd_ri_jk(self, molecule, basis):
         """
@@ -2104,7 +2182,18 @@ class LinearSolver:
         # loop rather than sitting inside it.
         use_ri_jk = (self.ri_jk and self.ri_jk_simd and dens_factors is not None)
 
-        if use_ri_jk:
+        # NOTE: the simd Coulomb only driver takes the whole batch too, for a
+        # reason of its own: every density is fitted against the same integrals,
+        # and the one thing the ranks have to exchange is the right hand side of
+        # each fitting. Gathered into one array and reduced once, that is a single
+        # collective for the batch where a density at a time would be one each.
+        use_ri_j_simd = (self.ri_coulomb and self.ri_coulomb_simd and
+                         fock_type == 'j')
+
+        if use_ri_j_simd:
+            fock_arrays = self._comp_simd_ri_j_fock(dens, comm)
+
+        elif use_ri_jk:
             # NOTE: a hybrid range-separated functional has its attenuated
             # exchange subtracted inside the same call, in the same pass over the
             # auxiliary basis. The four-centre correction further down is not
@@ -2114,7 +2203,7 @@ class LinearSolver:
                 basis, dens_factors, exchange_scaling_factor,
                 erf_k_coef if need_omega else 0.0)
 
-        for idx in range(0 if use_ri_jk else num_densities):
+        for idx in range(0 if (use_ri_jk or use_ri_j_simd) else num_densities):
             if self.ri_coulomb:
                 assert_msg_critical(
                     fock_type == 'j',
@@ -2205,6 +2294,61 @@ class LinearSolver:
             return fock_arrays
         else:
             return None
+
+    def _comp_simd_ri_j_fock(self, dens, comm):
+        """
+        Computes this rank's share of the Coulomb matrices of a batch of densities.
+
+        :param dens:
+            The densities, as numpy arrays.
+        :param comm:
+            The communicator the build is divided over.
+
+        :return:
+            This rank's share of each Coulomb matrix, as numpy arrays. The shares
+            are added by the reduction the caller makes at the end of the build.
+        """
+
+        nao = dens[0].shape[0]
+
+        mine = self._ri_drv.owned_parts()
+
+        # NOTE: the density is symmetrized, as it is for the conventional driver of
+        # this approximation: a response density is not symmetric and the fitting
+        # sees only the symmetric part of it.
+
+        packed = []
+
+        for density in dens:
+            matrix = PackedMatrix(nao, nao, mat_t.symmetric)
+            matrix.from_numpy(np.ascontiguousarray(0.5 * (density + density.T)))
+            packed.append(matrix)
+
+        local = np.array(
+            [self._ri_drv.compute_gamma(matrix, mine) for matrix in packed],
+            dtype=np.float64)
+
+        total = np.zeros_like(local)
+        comm.Allreduce(local, total, op=MPI.SUM)
+
+        fock_arrays = []
+
+        for idx in range(len(packed)):
+            gamma = self._ri_drv.solve_fitting(list(total[idx]))
+
+            fock = PackedMatrix(nao, nao, mat_t.symmetric)
+            fock.zero()
+
+            self._ri_drv.compute_coulomb(gamma, mine, fock)
+
+            # NOTE: twice, as every other way of building a matrix of the `j` kind
+            # is doubled by its caller. The loop below doubles what the conventional
+            # driver answers; this path does not go through that loop, so it doubles
+            # here instead.
+
+            fock_arrays.append(2.0 * fock.to_numpy())
+
+        return fock_arrays
 
     def _comp_ri_jk_fock(self,
                          basis,
