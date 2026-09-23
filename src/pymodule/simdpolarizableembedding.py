@@ -37,6 +37,7 @@ import numpy as np
 
 from .errorhandler import assert_msg_critical
 from .molecule import Molecule
+from .veloxchemlib import bohr_in_angstrom
 from .veloxchemlib import PolarizableEmbedding
 from .veloxchemlib import PolarizableForceField
 
@@ -65,6 +66,7 @@ class SimdPolarizableEmbeddingDriver:
         - box: The edges of the periodic box in angstrom, or None.
         - force_fields: The force fields of a potential file, keyed by name.
         - embedding: The environment the force fields and the structure make up.
+        - shells: How many molecules each shell took and how many were dropped.
     """
 
     def __init__(self, ostream=None):
@@ -83,6 +85,8 @@ class SimdPolarizableEmbeddingDriver:
         self.force_fields = OrderedDict()
 
         self.embedding = None
+
+        self.shells = None
 
     def read_pdb(self, pdb_file):
         """
@@ -213,26 +217,9 @@ class SimdPolarizableEmbeddingDriver:
         embedding = PolarizableEmbedding()
 
         for label, molecule in self.solvent:
-            species = label.rsplit('-', 1)[0]
-
-            assert_msg_critical(
-                species in self.force_fields,
-                f'build_embedding: the potential file has no force field named '
-                f'{species}, which {label} is made of. It holds '
-                f'{", ".join(self.force_fields)}')
-
-            force_field = self.force_fields[species]
-
-            # NOTE: the regions check this as well, and name the force field
-            # and the two counts. What they cannot name is which molecule of
-            # the environment was being added, and with five hundred of them
-            # that is the part worth having.
-
-            assert_msg_critical(
-                len(force_field) == molecule.number_of_atoms(),
-                f'build_embedding: the force field {species} has '
-                f'{len(force_field)} site(s) and {label} has '
-                f'{molecule.number_of_atoms()} atom(s)')
+            force_field = self._force_field_for(label, molecule,
+                                                self.force_fields,
+                                                'build_embedding')
 
             region = (embedding.polarizable_region()
                       if force_field.is_polarizable() else
@@ -243,6 +230,176 @@ class SimdPolarizableEmbeddingDriver:
         self.embedding = embedding
 
         return embedding
+
+    def build_shells(self,
+                     pdb_file,
+                     polarizable_radius,
+                     nonpolarizable_radius,
+                     polarizable_potential,
+                     nonpolarizable_potential,
+                     units='angstrom'):
+        """
+        Builds the environment as two shells about the solute.
+
+        The distance of a molecule of the environment is that between its own
+        centre of mass and the centre of mass of the solute. A molecule within
+        the polarizable radius goes to the polarizable region, one beyond it
+        and within the nonpolarizable radius goes to the nonpolarizable region,
+        and one beyond that is left out. How many went each way is kept in
+        `shells`, so a radius which drops most of the box says so.
+
+        The two shells are given separate potential files because they describe
+        the same species differently: the water of the inner shell polarizes
+        and the water of the outer shell does not, and the two force fields are
+        both named for that species. They do not collide, since each region
+        holds its own. The outer file must carry no polarizability, which the
+        nonpolarizable region sees to itself.
+
+        NOTE: a sphere about one point suits a solute whose atoms sit near
+        their own centre of mass. A long solute is cut by distance from its
+        middle instead of by distance from itself, so the molecules in contact
+        with its ends fall farther out than those in contact with its middle.
+
+        :param pdb_file:
+            The path of the PDB file of the solvated structure.
+        :param polarizable_radius:
+            The radius the polarizable shell reaches to.
+        :param nonpolarizable_radius:
+            The radius the nonpolarizable shell reaches to.
+        :param polarizable_potential:
+            The path of the potential file of the polarizable shell.
+        :param nonpolarizable_potential:
+            The path of the potential file of the nonpolarizable shell.
+        :param units:
+            The units the two radii are given in, angstrom or au.
+
+        :return:
+            The environment.
+        """
+
+        assert_msg_critical(
+            str(units).lower() in ('angstrom', 'au', 'bohr'),
+            f'build_shells: the radii are given in angstrom or in au, and '
+            f'these are in {units}')
+
+        assert_msg_critical(
+            polarizable_radius >= 0.0,
+            f'build_shells: the polarizable radius {polarizable_radius} is '
+            f'negative')
+
+        assert_msg_critical(
+            nonpolarizable_radius >= polarizable_radius,
+            f'build_shells: the nonpolarizable shell reaches to '
+            f'{nonpolarizable_radius} and the polarizable one to '
+            f'{polarizable_radius}, which is outside it')
+
+        to_bohr = (1.0 / bohr_in_angstrom()
+                   if str(units).lower() == 'angstrom' else 1.0)
+
+        inner = polarizable_radius * to_bohr
+        outer = nonpolarizable_radius * to_bohr
+
+        self.read_pdb(pdb_file)
+
+        force_fields = {
+            'polarizable': read_potential_file(polarizable_potential),
+            'nonpolarizable': read_potential_file(nonpolarizable_potential),
+        }
+
+        # NOTE: checked here and not left to the region, which would refuse on
+        # the first molecule of the outer shell instead of before any of them.
+        # The two files are the caller's choice and this is the one way of
+        # getting them the wrong way round.
+
+        polarizing = [
+            name for name, force_field in
+            force_fields['nonpolarizable'].items()
+            if force_field.is_polarizable()
+        ]
+
+        assert_msg_critical(
+            not polarizing,
+            f'build_shells: the outer shell does not polarize and '
+            f'{Path(nonpolarizable_potential).name} carries a polarizability '
+            f'for {", ".join(polarizing)}')
+
+        centre = np.array(self.solute.center_of_mass_in_bohr())
+
+        embedding = PolarizableEmbedding()
+
+        regions = {
+            'polarizable': embedding.polarizable_region(),
+            'nonpolarizable': embedding.nonpolarizable_region(),
+        }
+
+        shells = OrderedDict([('polarizable', 0), ('nonpolarizable', 0),
+                              ('dropped', 0)])
+
+        for label, molecule in self.solvent:
+            distance = np.linalg.norm(
+                np.array(molecule.center_of_mass_in_bohr()) - centre)
+
+            if distance <= inner:
+                shell = 'polarizable'
+            elif distance <= outer:
+                shell = 'nonpolarizable'
+            else:
+                shells['dropped'] += 1
+                continue
+
+            force_field = self._force_field_for(
+                label, molecule, force_fields[shell],
+                f'build_shells: in the {shell} shell')
+
+            regions[shell].add_molecule(molecule, force_field)
+
+            shells[shell] += 1
+
+        self.embedding = embedding
+        self.shells = shells
+
+        return embedding
+
+    @staticmethod
+    def _force_field_for(label, molecule, force_fields, what):
+        """
+        Finds the force field of the species a molecule belongs to.
+
+        :param label:
+            The label of the molecule, whose species is the part of it before
+            the number.
+        :param molecule:
+            The molecule.
+        :param force_fields:
+            The force fields to look in, keyed by name.
+        :param what:
+            What is being built, for the message if there is no force field.
+
+        :return:
+            The force field.
+        """
+
+        species = label.rsplit('-', 1)[0]
+
+        assert_msg_critical(
+            species in force_fields,
+            f'{what}: there is no force field named {species}, which {label} '
+            f'is made of. The potential file holds '
+            f'{", ".join(force_fields) if force_fields else "none"}')
+
+        force_field = force_fields[species]
+
+        # NOTE: the regions check this as well, and name the force field and
+        # the two counts. What they cannot name is which molecule of the
+        # environment was being added, and with five hundred of them that is
+        # the part worth having.
+
+        assert_msg_critical(
+            len(force_field) == molecule.number_of_atoms(),
+            f'{what}: the force field {species} has {len(force_field)} '
+            f'site(s) and {label} has {molecule.number_of_atoms()} atom(s)')
+
+        return force_field
 
     @staticmethod
     def _label_of(key, number):
