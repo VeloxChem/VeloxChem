@@ -47,6 +47,7 @@
 
 #include "EmbeddingRegion.hpp"
 #include "ExportGeneral.hpp"
+#include "PermanentMultipoles.hpp"
 #include "PolarizableEmbedding.hpp"
 #include "PolarizableForceField.hpp"
 #include "PolarizableSite.hpp"
@@ -310,6 +311,53 @@ _index_of_site(const CPolarizableForceField &self, const py::ssize_t index) -> s
     return static_cast<size_t>(at);
 }
 
+/// @brief Makes the arrays of a set of permanent multipoles.
+/// @param gathered The multipoles.
+/// @param owner The Python object which holds them.
+/// @return The coordinates, of shape (n, 3), and the values, of shape (n,) for
+/// the charges and (n, 3) or (n, 6) above them.
+/// @note Views onto what the embedding holds and not copies of it, so asking
+/// for them costs nothing however often it is done. Each array takes the object
+/// it came from as its base, so the environment cannot be collected while a
+/// view of it is still held.
+/// @note They are still only as good as the arrays underneath: adding a
+/// molecule to the environment builds those again and leaves a view which was
+/// taken before it pointing at what was there then. Take them again after
+/// adding.
+/// @brief Makes an array read only.
+/// @param array The array.
+/// @return The array, which can no longer be written through.
+/// @note These are views onto what the environment holds, so writing through
+/// one would change the environment itself and every later reader of it, with
+/// nothing to say that it had happened. A caller which wants to change the
+/// numbers takes a copy.
+static auto
+_read_only(py::array_t<double> array) -> py::array_t<double>
+{
+    py::detail::array_proxy(array.ptr())->flags &= ~py::detail::npy_api::NPY_ARRAY_WRITEABLE_;
+
+    return array;
+}
+
+static auto
+_arrays_of(const TPermanentMultipoles &gathered, const py::object &owner) -> py::tuple
+{
+    const auto nsites = static_cast<py::ssize_t>(gathered.number_of_sites());
+
+    const auto ncomponents = static_cast<py::ssize_t>(gathered.components());
+
+    const auto stride = static_cast<py::ssize_t>(sizeof(double));
+
+    auto coordinates = py::array_t<double>(
+        {nsites, static_cast<py::ssize_t>(3)}, {3 * stride, stride}, gathered.coordinates.data(), owner);
+
+    auto values = (ncomponents == 1)
+                      ? py::array_t<double>({nsites}, {stride}, gathered.values.data(), owner)
+                      : py::array_t<double>({nsites, ncomponents}, {ncomponents * stride, stride}, gathered.values.data(), owner);
+
+    return py::make_tuple(_read_only(coordinates), _read_only(values));
+}
+
 auto
 export_embedding(py::module &m) -> void
 {
@@ -465,6 +513,14 @@ export_embedding(py::module &m) -> void
              &CEmbeddingRegion::number_of_polarizable_sites,
              "Gets the number of sites which carry a polarizability.")
         .def("is_polarizable", &CEmbeddingRegion::is_polarizable, "Checks whether any molecule of the region is polarizable.")
+        .def(
+            "permanent_multipoles",
+            [](const py::object &self, const int order) -> py::tuple {
+                return _arrays_of(self.cast<const CEmbeddingRegion &>().permanent_multipoles(order), self);
+            },
+            "Gets the coordinates and the values of the permanent multipoles of an order.",
+            "order"_a)
+        .def("version", &CEmbeddingRegion::version, "Gets how many times the region has been added to.")
         .def("__len__", &CEmbeddingRegion::number_of_molecules);
 
     // CPolarizableEmbedding class
@@ -492,7 +548,35 @@ export_embedding(py::module &m) -> void
         .def("number_of_polarizable_sites",
              &CPolarizableEmbedding::number_of_polarizable_sites,
              "Gets the number of sites which carry a polarizability.")
-        .def("is_polarizable", &CPolarizableEmbedding::is_polarizable, "Checks whether the environment polarizes at all.");
+        .def("is_polarizable", &CPolarizableEmbedding::is_polarizable, "Checks whether the environment polarizes at all.")
+        .def(
+            "permanent_multipoles",
+            [](const py::object &self, const int order) -> py::tuple {
+                return _arrays_of(self.cast<const CPolarizableEmbedding &>().permanent_multipoles(order), self);
+            },
+            "Gets the coordinates and the values of the permanent multipoles of an order, "
+            "of both regions and the polarizable one first.",
+            "order"_a)
+        .def(
+            "permanent_nuclear_energy",
+            [](const CPolarizableEmbedding &self, const CArrayOfDoubles &charges, const CArrayOfDoubles &coordinates) -> double {
+                const auto nnuclei = charges.size();
+
+                if (coordinates.size() != 3 * nnuclei)
+                {
+                    _refuse(std::string("permanent_nuclear_energy: Expecting three coordinates for each nucleus"));
+                }
+
+                const auto *q = charges.data();
+
+                const auto *xyz = coordinates.data();
+
+                return self.permanent_nuclear_energy(std::vector<double>(q, q + nnuclei),
+                                                     std::vector<double>(xyz, xyz + 3 * nnuclei));
+            },
+            "Computes what the permanent charges of the environment do to the nuclei of the quantum region.",
+            "charges"_a,
+            "coordinates"_a);
 }
 
 }  // namespace vlx_embedding

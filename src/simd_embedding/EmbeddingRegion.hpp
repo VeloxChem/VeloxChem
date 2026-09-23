@@ -37,7 +37,10 @@
 #include <string>
 #include <vector>
 
+#include <array>
+
 #include "Molecule.hpp"
+#include "PermanentMultipoles.hpp"
 #include "PolarizableForceField.hpp"
 
 /// @brief Class CEmbeddingRegion holds one region of a polarizable environment:
@@ -146,7 +149,57 @@ class CEmbeddingRegion
     /// @brief Checks whether any molecule of the region is polarizable.
     auto is_polarizable() const -> bool;
 
+    /// @brief Gets the permanent multipoles of an order, put onto the molecules
+    /// which carry them.
+    /// @param order The order: zero for the charges, one for the dipoles, two
+    /// for the quadrupoles.
+    /// @return The multipoles.
+    /// @note Built once and held, and built again only after the region has been
+    /// added to. Whoever contracts these asks for them as often as it likes:
+    /// the fields of an induced dipole solve ask once for every iteration of
+    /// it, and walking the molecules again each time is work the region has
+    /// already done.
+    /// @note A site whose multipole of this order is a Gaussian rather than a
+    /// point is refused here, where the walk is, rather than by each of the
+    /// drivers which take these arrays.
+    auto permanent_multipoles(const int order) const -> const TPermanentMultipoles &;
+
+    /// @brief Gets how many times the region has been added to.
+    /// @return The count, which changes whenever what the region holds changes
+    /// and is what tells a reader of its multipoles that they were built from
+    /// something else.
+    auto version() const -> size_t;
+
    private:
+    /// @brief Checks whether a site carries a multipole of an order.
+    /// @param site The site.
+    /// @param order The order.
+    /// @return True if it does, and false if the moment is absent or zero.
+    static auto _carries(const CPolarizableSite &site, const int order) -> bool;
+
+    /// @brief Refuses a site whose multipole is a Gaussian rather than a point.
+    /// @param force_field The force field the site belongs to.
+    /// @param index The index of the site.
+    /// @param site The site.
+    /// @param order The order being gathered.
+    static auto _refuse_a_gaussian(const CPolarizableForceField &force_field,
+                                   const size_t                  index,
+                                   const CPolarizableSite       &site,
+                                   const int                     order) -> void;
+
+    /// @brief How many times the region has been added to, which says whether
+    /// the multipoles which were built are still the multipoles it holds.
+    size_t _version = 0;
+
+    /// @brief The multipoles of each order, as they were last built.
+    mutable std::array<TPermanentMultipoles, 3> _multipoles;
+
+    /// @brief The version each order's multipoles were built at.
+    mutable std::array<size_t, 3> _multipoles_version = {0, 0, 0};
+
+    /// @brief Whether each order's multipoles have ever been built.
+    mutable std::array<bool, 3> _has_multipoles = {false, false, false};
+
     /// @brief Whether a force field of this region may carry a polarizability.
     bool _allows_polarizabilities = true;
 

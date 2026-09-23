@@ -42,7 +42,6 @@ from .oneeints import compute_simd_nuclear_potential_integrals
 from .veloxchemlib import bohr_in_angstrom
 from .veloxchemlib import PolarizableEmbedding
 from .veloxchemlib import PolarizableForceField
-from .veloxchemlib import pesite
 
 # NOTE: how many numbers a multipole of each order is written with, in the order
 # the sites keep them: a charge, then x y z, then xx xy xz yy yz zz.
@@ -371,12 +370,13 @@ class SimdPolarizableEmbeddingDriver:
 
     def gather_multipoles(self):
         """
-        Gathers the permanent multipoles of the environment.
+        Gets the permanent multipoles of the environment.
 
-        This is where a force field meets an instance of it. The force fields
-        carry no coordinates, since one of them serves every molecule of its
-        kind; the molecules carry no parameters. Walking the two together, site
-        against atom and in that order, is what puts a multipole somewhere.
+        The walk itself is the embedding's own: it pairs each force field with
+        the molecules it describes, site against atom, and holds the flat
+        arrays the integral drivers take. It is done once and again only after
+        the environment has been added to, so asking for it costs nothing and
+        the induced dipole solve may ask once an iteration.
 
         Both regions are walked. The permanent multipoles of the whole
         environment act on the wave function, and what tells the two regions
@@ -385,11 +385,11 @@ class SimdPolarizableEmbeddingDriver:
         NOTE: a charge is a number and belongs wherever its atom is. A dipole
         is a vector and a quadrupole is a tensor, and both are written in the
         frame the force field was made in. An instance of the molecule turned
-        some other way needs them turned with it, and nothing here turns
-        anything. Whoever contracts the orders above zero has to rotate them
-        first, and nothing downstream can tell that they were not: the charges
-        stay right while the higher moments point the wrong way, which reads as
-        a small error in the energy rather than as a mistake.
+        some other way needs them turned with it, and nothing turns anything.
+        Whoever contracts the orders above zero has to rotate them first, and
+        nothing downstream can tell that they were not: the charges stay right
+        while the higher moments point the wrong way, which reads as a small
+        error in the energy rather than as a mistake.
 
         :return:
             The multipoles by order, each an array of coordinates in bohr and
@@ -400,54 +400,13 @@ class SimdPolarizableEmbeddingDriver:
             self.embedding is not None,
             'gather_multipoles: no environment has been built')
 
-        places = {order: [] for order in _MULTIPOLE_NAMES}
-        moments = {order: [] for order in _MULTIPOLE_NAMES}
-
-        for region in (self.embedding.get_polarizable_region(),
-                       self.embedding.get_nonpolarizable_region()):
-
-            for imol in range(region.number_of_molecules()):
-                molecule = region.get_molecule(imol)
-                force_field = region.force_field_of(imol)
-
-                coordinates = molecule.get_coordinates_in_bohr()
-
-                for index, site in enumerate(force_field.get_sites()):
-                    where = coordinates[index]
-
-                    charge = site.get_charge()
-
-                    if charge != 0.0:
-                        self._refuse_a_gaussian(force_field, index, site, 0)
-                        places[0].append(where)
-                        moments[0].append(charge)
-
-                    if site.get_order() >= 1:
-                        dipole = site.get_dipole()
-
-                        if np.any(dipole != 0.0):
-                            self._refuse_a_gaussian(force_field, index, site, 1)
-                            places[1].append(where)
-                            moments[1].append(dipole)
-
-                    if site.get_order() >= 2:
-                        theta = site.get_quadrupole()
-
-                        if np.any(theta != 0.0):
-                            self._refuse_a_gaussian(force_field, index, site, 2)
-                            places[2].append(where)
-                            moments[2].append(
-                                np.array([
-                                    theta[0, 0], theta[0, 1], theta[0, 2],
-                                    theta[1, 1], theta[1, 2], theta[2, 2]
-                                ]))
-
         multipoles = OrderedDict()
 
-        for order in sorted(places):
-            if places[order]:
-                multipoles[order] = (np.array(places[order]),
-                                     np.array(moments[order]))
+        for order in sorted(_MULTIPOLE_NAMES):
+            places, values = self.embedding.permanent_multipoles(order)
+
+            if len(values):
+                multipoles[order] = (places, values)
 
         return multipoles
 
@@ -514,6 +473,10 @@ class SimdPolarizableEmbeddingDriver:
         does to the nuclei; a total energy without it is wrong by the whole of
         this term.
 
+        The sum itself is the embedding's own and is threaded over the sites,
+        which for a real environment are the millions while the nuclei are the
+        tens.
+
         :param qm_molecule:
             The molecule of the quantum region.
         :param basis:
@@ -524,37 +487,11 @@ class SimdPolarizableEmbeddingDriver:
             The energy.
         """
 
-        multipoles = self.gather_multipoles()
+        self._refuse_what_is_not_implemented(self.gather_multipoles())
 
-        self._refuse_what_is_not_implemented(multipoles)
-
-        places, charges = multipoles.get(
-            0, (np.zeros((0, 3)), np.zeros(0)))
-
-        nuclear_charges = np.array(
-            qm_molecule.get_effective_nuclear_charges(basis))
-
-        nuclei = qm_molecule.get_coordinates_in_bohr()
-
-        energy = 0.0
-
-        # NOTE: one nucleus at a time rather than the whole matrix of
-        # distances, which for an environment of any size is the larger array
-        # by far and is never needed whole.
-
-        for charge, where in zip(nuclear_charges, nuclei):
-            distances = np.linalg.norm(places - where, axis=1)
-
-            closest = distances.min() if distances.size else np.inf
-
-            assert_msg_critical(
-                closest > 1.0e-6,
-                f'compute_permanent_energy: a site of the environment sits '
-                f'{closest:.2e} bohr from a nucleus of the quantum region')
-
-            energy += charge * np.sum(charges / distances)
-
-        return energy
+        return self.embedding.permanent_nuclear_energy(
+            qm_molecule.get_effective_nuclear_charges(basis),
+            qm_molecule.get_coordinates_in_bohr())
 
     def _refuse_what_is_not_implemented(self, multipoles):
         """
@@ -600,41 +537,6 @@ class SimdPolarizableEmbeddingDriver:
                     names.append(force_field.get_name())
 
         return names
-
-    @staticmethod
-    def _refuse_a_gaussian(force_field, index, site, order):
-        """
-        Refuses a site whose multipole is a Gaussian rather than a point.
-
-        The nuclear attraction driver contracts point charges. A Gaussian
-        charge of a width is a different integral, and computing it as a point
-        is an answer which is wrong by however much the width matters.
-
-        :param force_field:
-            The force field the site belongs to.
-        :param index:
-            The index of the site, which is the index of its atom.
-        :param site:
-            The site.
-        :param order:
-            The order of the multipole being gathered.
-        """
-
-        # NOTE: the message is built only once the site is known to be a
-        # Gaussian one. A point site has no width to ask for and refuses the
-        # question, so a message which names the width cannot be written until
-        # after the check rather than as its argument.
-
-        if site.get_form() == pesite.point:
-            return
-
-        assert_msg_critical(
-            False,
-            f'gather_multipoles: the site {index + 1} of the force field '
-            f'{force_field.get_name()} is a Gaussian of width '
-            f'{site.get_multipole_width()}, and the '
-            f'{_MULTIPOLE_NAMES[order]} of a Gaussian are not the point '
-            f'{_MULTIPOLE_NAMES[order]} this contracts')
 
     @staticmethod
     def _share_of(count, rank, nodes):

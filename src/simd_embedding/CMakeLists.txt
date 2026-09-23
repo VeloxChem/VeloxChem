@@ -1,6 +1,7 @@
 target_sources(vlxobjs
   PRIVATE
     EmbeddingRegion.cpp
+    PermanentMultipoles.cpp
     PolarizableEmbedding.cpp
     PolarizableSite.cpp
     PolarizableForceField.cpp

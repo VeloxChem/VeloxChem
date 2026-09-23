@@ -33,6 +33,7 @@
 
 #include "EmbeddingRegion.hpp"
 
+#include <algorithm>
 #include <string>
 
 #include "EmbeddingError.hpp"
@@ -62,6 +63,8 @@ CEmbeddingRegion::add_force_field(const CPolarizableForceField &force_field) -> 
     {
         _force_fields.push_back(force_field);
 
+        _version++;
+
         return static_cast<int>(_force_fields.size()) - 1;
     }
 
@@ -88,6 +91,8 @@ CEmbeddingRegion::add_molecule(const CMolecule &molecule, const int identifier) 
     _molecules.push_back(molecule);
 
     _identifiers.push_back(identifier);
+
+    _version++;
 }
 
 auto
@@ -204,4 +209,115 @@ auto
 CEmbeddingRegion::is_polarizable() const -> bool
 {
     return number_of_polarizable_sites() > 0;
+}
+
+auto
+CEmbeddingRegion::_carries(const CPolarizableSite &site, const int order) -> bool
+{
+    if (order == 0) return site.get_charge() != 0.0;
+
+    if (site.get_order() < order) return false;
+
+    if (order == 1)
+    {
+        const auto &dipole = site.get_dipole();
+
+        return std::ranges::any_of(dipole, [](const double value) { return value != 0.0; });
+    }
+
+    const auto &quadrupole = site.get_quadrupole();
+
+    return std::ranges::any_of(quadrupole, [](const double value) { return value != 0.0; });
+}
+
+auto
+CEmbeddingRegion::_refuse_a_gaussian(const CPolarizableForceField &force_field,
+                                     const size_t                  index,
+                                     const CPolarizableSite       &site,
+                                     const int                     order) -> void
+{
+    if (site.get_form() == pesite::point) return;
+
+    // NOTE: the width is asked for only once the site is known to be a Gaussian
+    // one. A point site has none and refuses the question, so a message which
+    // names it cannot be written before the check.
+
+    embedding::require(false,
+                       std::string("EmbeddingRegion: The site ") + std::to_string(index + 1) +
+                           std::string(" of the force field ") + force_field.get_name() +
+                           std::string(" is a Gaussian of width ") + std::to_string(site.get_multipole_width()) +
+                           std::string(", and the multipoles of a Gaussian are not the point multipoles of order ") +
+                           std::to_string(order));
+}
+
+auto
+CEmbeddingRegion::permanent_multipoles(const int order) const -> const TPermanentMultipoles &
+{
+    const auto ncomponents = multipoles::components(order);
+
+    auto &gathered = _multipoles[static_cast<size_t>(order)];
+
+    if (_has_multipoles[static_cast<size_t>(order)] && (_multipoles_version[static_cast<size_t>(order)] == _version))
+    {
+        return gathered;
+    }
+
+    gathered.order = order;
+
+    gathered.coordinates.clear();
+
+    gathered.values.clear();
+
+    gathered.coordinates.reserve(3 * static_cast<size_t>(number_of_sites()));
+
+    gathered.values.reserve(ncomponents * static_cast<size_t>(number_of_sites()));
+
+    for (size_t imol = 0; imol < _molecules.size(); imol++)
+    {
+        const auto &force_field = _force_fields[static_cast<size_t>(_identifiers[imol])];
+
+        const auto &coordinates = _molecules[imol].coordinates();
+
+        for (size_t isite = 0; isite < force_field.number_of_sites(); isite++)
+        {
+            const auto &site = force_field.get_site(isite);
+
+            if (!_carries(site, order)) continue;
+
+            _refuse_a_gaussian(force_field, isite, site, order);
+
+            const auto xyz = coordinates[isite].coordinates();
+
+            gathered.coordinates.insert(gathered.coordinates.end(), xyz.begin(), xyz.end());
+
+            if (order == 0)
+            {
+                gathered.values.push_back(site.get_charge());
+            }
+            else if (order == 1)
+            {
+                const auto &dipole = site.get_dipole();
+
+                gathered.values.insert(gathered.values.end(), dipole.begin(), dipole.end());
+            }
+            else
+            {
+                const auto &quadrupole = site.get_quadrupole();
+
+                gathered.values.insert(gathered.values.end(), quadrupole.begin(), quadrupole.end());
+            }
+        }
+    }
+
+    _multipoles_version[static_cast<size_t>(order)] = _version;
+
+    _has_multipoles[static_cast<size_t>(order)] = true;
+
+    return gathered;
+}
+
+auto
+CEmbeddingRegion::version() const -> size_t
+{
+    return _version;
 }

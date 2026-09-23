@@ -34,6 +34,10 @@
 #ifndef PolarizableEmbedding_hpp
 #define PolarizableEmbedding_hpp
 
+#include <array>
+#include <utility>
+#include <vector>
+
 #include "EmbeddingRegion.hpp"
 
 /// @brief Class CPolarizableEmbedding holds the environment a solute is embedded
@@ -84,7 +88,43 @@ class CPolarizableEmbedding
     /// and the induced dipoles need not be solved for.
     auto is_polarizable() const -> bool;
 
+    /// @brief Gets the permanent multipoles of an order of the whole
+    /// environment, put onto the molecules which carry them.
+    /// @param order The order: zero for the charges, one for the dipoles, two
+    /// for the quadrupoles.
+    /// @return The multipoles of both regions, the polarizable one first.
+    /// @note Both regions, because the permanent multipoles of the whole
+    /// environment act on the wave function. What tells the two regions apart
+    /// is the induction which is added on top of these, not these.
+    auto permanent_multipoles(const int order) const -> const TPermanentMultipoles &;
+
+    /// @brief Computes what the permanent charges of the environment do to the
+    /// nuclei of the quantum region.
+    /// @param charges The charge of each nucleus, which is what is left of it
+    /// once a core potential describes the rest.
+    /// @param coordinates The position of each nucleus, three per nucleus, in
+    /// bohr.
+    /// @return The energy.
+    /// @note The other half of the permanent electrostatics. The Fock matrix
+    /// carries what the environment does to the electrons and this is what it
+    /// does to the nuclei; a total energy without it is wrong by the whole of
+    /// this term.
+    /// @note The charges are asked for rather than taken from a molecule
+    /// because the ones wanted are the effective ones, which a core potential
+    /// changes and which a molecule alone does not know.
+    auto permanent_nuclear_energy(const std::vector<double> &charges,
+                                  const std::vector<double> &coordinates) const -> double;
+
    private:
+    /// @brief The multipoles of each order of both regions together.
+    mutable std::array<TPermanentMultipoles, 3> _multipoles;
+
+    /// @brief The versions of the two regions each order was last built from.
+    mutable std::array<std::pair<size_t, size_t>, 3> _multipoles_version;
+
+    /// @brief Whether each order's multipoles have ever been built.
+    mutable std::array<bool, 3> _has_multipoles = {false, false, false};
+
     /// @brief The region whose molecules polarize.
     CEmbeddingRegion _polarizable;
 
