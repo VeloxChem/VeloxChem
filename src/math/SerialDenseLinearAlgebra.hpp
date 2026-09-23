@@ -66,16 +66,6 @@ auto serialMultAB(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB) -> C
 auto serialMultABt(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB) -> CDenseMatrix;
 
 /**
- Computes matrix multiplication: A * B, for a symmetric matrix A and a
- general, non-symmetric matrix B.
-
- @param matrixA the symmetric matrix A.
- @param matrixB the general, non-symmetric matrix B.
- @return the matrix A * B.
- */
-auto serialMultSymANonsymB(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB) -> CDenseMatrix;
-
-/**
  Computes matrix multiplication: A^T * B.
 
  @param matrixA the matrix A.

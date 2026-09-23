@@ -115,46 +115,6 @@ serialMultABt(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB) -> CDens
 }
 
 auto
-serialMultSymANonsymB(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB) -> CDenseMatrix
-{
-    // set up dimensions of matrix A
-
-    auto narow = matrixA.getNumberOfRows();
-    auto nacol = matrixA.getNumberOfColumns();
-
-    // set up dimensions of matrix B
-
-    auto nbrow = matrixB.getNumberOfRows();
-    auto nbcol = matrixB.getNumberOfColumns();
-
-    errors::assertMsgCritical(narow == nacol, "sdenblas::serialMultSymANonsymB: Matrix A is not square");
-
-    errors::assertMsgCritical(nacol == nbrow, "sdenblas::serialMultSymANonsymB: Inconsistent sizes in matrix multiplication");
-
-    // allocate dense matrix
-
-    CDenseMatrix mat(narow, nbcol);
-
-    if ((narow == 0) || (nbcol == 0)) return mat;
-
-    // compute matrix-matrix multiplication
-
-    auto A = matrixA.values();
-    auto B = matrixB.values();
-
-    mat.zero();
-    auto C = mat.values();
-
-    Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>, Eigen::Unaligned> ematA(A, narow, nacol);
-    Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>, Eigen::Unaligned> ematB(B, nbrow, nbcol);
-    Eigen::Map<Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>, Eigen::Unaligned> ematC(C, narow, nbcol);
-
-    ematC.noalias() = ematA * ematB;
-
-    return mat;
-}
-
-auto
 serialMultAtB(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB) -> CDenseMatrix
 {
     // set up dimensions of matrix A
