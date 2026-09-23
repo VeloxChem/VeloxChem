@@ -40,6 +40,7 @@ target_link_libraries(vlxobjs
   PUBLIC
     OpenMP::OpenMP_CXX
     Math::LA
+    Math::Mathlib
     Libxc::xc
     Boost::headers
   )
