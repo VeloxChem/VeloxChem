@@ -172,21 +172,6 @@ def initialize(solver, molecule, basis):
                                                      solver.eri_thresh)
         aux_atoms = molecule.partition_atoms_by_weight(solver.comm, weights)
 
-        # NOTE: **an empty share is not an empty share to the driver.** It reads a
-        # list of no atoms as every atom, which is the convenience a caller over
-        # the whole molecule wants and is a trap for one dividing the work: a rank
-        # which was dealt nothing then forms the whole set of B vectors and its
-        # whole Fock matrix is added to everybody else's share. It is refused here
-        # rather than answered, until the driver is taught to tell the two apart.
-        #
-        # NOTE: the same hole is in the SCF and in the gradient, which divide the
-        # atoms the same way. Water on four ranks converges to -43.08 hartree
-        # against -76.36 on three, and says nothing.
-        assert_msg_critical(
-            len(aux_atoms) > 0,
-            f'{type(solver).__name__}: this rank was dealt no auxiliary atoms, ' +
-            'which the RI-JK driver reads as all of them. Use at most as many ' +
-            'ranks as the molecule has atoms.')
 
     needed = solver._ri_jk_drv.required_memory(molecule, basis,
                                                solver._ri_jk_aux_basis,

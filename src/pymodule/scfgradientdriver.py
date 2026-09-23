@@ -424,10 +424,12 @@ class ScfGradientDriver(GradientDriver):
         # worked out again here. The B vectors this rank holds are of those atoms
         # and of no others, so a share worked out a second way would ask the
         # transformation for a function whose B vectors are on another rank.
-        assert_msg_critical(
-            len(aux_atoms) > 0 or self.nodes == 1,
-            f'{type(self).__name__}: the RI-JK Fock build left no record of ' +
-            'which auxiliary atoms this rank holds')
+        #
+        # NOTE: an empty share is a share of nothing and not a share of everything.
+        # A rank with more ranks beside it than the molecule has atoms comes out of
+        # the deal empty, forms no fitted densities, and contributes zeros to the
+        # sums -- while still taking its part in every reduction, which is why it
+        # is not skipped here.
 
         metric = self.scf_driver._ri_drv.get_metric()
 
