@@ -553,18 +553,10 @@ class LinearSolver:
             The dictionary of ERI information.
         """
 
-        # TODO: enable RI-JK
-        # NOTE: only the simd driver has a response path, and only on one rank.
-        # The Coulomb and the exchange both divide over the auxiliary basis, so
-        # nothing here forbids the ranks holding shares of it, but the B vectors
-        # are prepared whole below and dividing them is separate work.
+        # NOTE: only the simd driver has a response path.
         assert_msg_critical(
             (not self.ri_jk) or self.ri_jk_simd,
             f'{type(self).__name__}: RI-JK is supported only with ri_jk_simd')
-
-        assert_msg_critical(
-            (not self.ri_jk) or (self.nodes == 1),
-            f'{type(self).__name__}: the RI-JK response path runs on one rank')
 
         if self.rank == mpi_master():
             screening = T4CScreener()
@@ -1061,7 +1053,20 @@ class LinearSolver:
             self.ostream.print_blank()
             self.ostream.flush()
 
-        # TODO: enable subcomms for RI-J
+        # NOTE: and for RI-JK, for a reason of its own. The B vectors are divided
+        # over the ranks of this solver's communicator, and a Fock build on a
+        # subcommunicator would sum the shares of that subcommunicator alone --
+        # which is a Fock matrix missing whatever the other ranks hold, and it
+        # would be returned rather than refused. Dividing the B vectors within
+        # each subcommunicator instead is separate work.
+        if self.use_subcomms and self.ri_jk and self.nodes > 1:
+            self.use_subcomms = False
+            warn_msg = 'Use of subcomms is disabled for RI-JK.'
+            self.ostream.print_warning(warn_msg)
+            self.ostream.print_blank()
+            self.ostream.flush()
+
+        # TODO: enable subcomms for RI-J and RI-JK
 
         if self.use_subcomms:
             if method_type == 'restricted':
@@ -2055,6 +2060,15 @@ class LinearSolver:
         for idx in range(num_densities):
             dens[idx] = comm.bcast(dens[idx], root=mpi_master())
 
+        # NOTE: **the factors are broadcast as the densities are.** They are built
+        # on the master rank alone, and were left there: a rank which found none
+        # took `use_ri_jk` to be false, built its share of the densities the four
+        # centre way instead, and the reduction below added that four centre share
+        # to the master's fitted whole. What came back was a Fock matrix of neither
+        # method, and on two ranks it turned the lowest excitation energies of water
+        # negative without any complaint.
+        dens_factors = comm.bcast(dens_factors, root=mpi_master())
+
         thresh_int = int(-math.log10(self.eri_thresh))
 
         t0 = tm.time()
@@ -2287,6 +2301,15 @@ class LinearSolver:
         for idx in range(num_densities):
             dens_a[idx] = comm.bcast(dens_a[idx], root=mpi_master())
             dens_b[idx] = comm.bcast(dens_b[idx], root=mpi_master())
+
+        # NOTE: **the factors are broadcast as the densities are.** They are built
+        # on the master rank alone, and were left there: a rank which found none
+        # took `use_ri_jk` to be false, built its share of the densities the four
+        # centre way instead, and the reduction below added that four centre share
+        # to the master's fitted whole. What came back was a Fock matrix of neither
+        # method, and on two ranks it turned the lowest excitation energies of water
+        # negative without any complaint.
+        dens_factors = comm.bcast(dens_factors, root=mpi_master())
 
         thresh_int = int(-math.log10(self.eri_thresh))
 
