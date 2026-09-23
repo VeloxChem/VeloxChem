@@ -2278,8 +2278,8 @@ class ScfDriver:
                         (coords[atom_idx] - self._dipole_origin),
                         self.electric_field)
 
-            e_grad, max_grad = self._comp_gradient(fock_mat, ovl_mat, den_mat,
-                                                   oao_mat)
+            e_mat, e_grad, max_grad = self._comp_gradient(
+                fock_mat, ovl_mat, den_mat, oao_mat)
 
             # threshold for deactivating pseudo-FON and level-shifting
             if e_grad < 1.0e-4 or e_grad < (10.0 * self.conv_thresh):

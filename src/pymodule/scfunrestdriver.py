@@ -90,7 +90,8 @@ class ScfUnrestrictedDriver(ScfDriver):
             The orthogonalization matrix.
 
         :return:
-            The electronic gradient.
+            The error matrix, the electronic gradient and the maximum
+            gradient.
         """
 
         if self.rank == mpi_master():
@@ -109,16 +110,31 @@ class ScfUnrestrictedDriver(ScfDriver):
             e_mat_a = np.matmul(tmat.T, np.matmul(fds_a - fds_a.T, tmat))
             e_mat_b = np.matmul(tmat.T, np.matmul(fds_b - fds_b.T, tmat))
 
+            e_mat_a_shape = e_mat_a.shape
+            e_mat_b_shape = e_mat_b.shape
+
             e_grad = np.linalg.norm(e_mat_a) + np.linalg.norm(e_mat_b)
             max_grad = max(np.max(np.abs(e_mat_a)), np.max(np.abs(e_mat_b)))
         else:
-            e_grad = 0.0
-            max_grad = 0.0
+            e_mat_a_shape = None
+            e_mat_b_shape = None
+            e_grad = None
+            max_grad = None
 
-        e_grad = self.comm.bcast(e_grad, root=mpi_master())
-        max_grad = self.comm.bcast(max_grad, root=mpi_master())
+        e_mat_a_shape, e_mat_b_shape = self.comm.bcast(
+            (e_mat_a_shape, e_mat_b_shape), root=mpi_master())
+        e_grad, max_grad = self.comm.bcast((e_grad, max_grad),
+                                           root=mpi_master())
 
-        return e_grad, max_grad
+        if self.rank != mpi_master():
+            e_mat_a = np.zeros(e_mat_a_shape)
+            e_mat_b = np.zeros(e_mat_b_shape)
+        self.comm.Bcast(e_mat_a, root=mpi_master())
+        self.comm.Bcast(e_mat_b, root=mpi_master())
+
+        e_mat = np.vstack((e_mat_a, e_mat_b))
+
+        return e_mat, e_grad, max_grad
 
     def _comp_density_change(self, den_mat, old_den_mat):
         """

@@ -90,7 +90,8 @@ class ScfRestrictedOpenDriver(ScfDriver):
             The orthogonalization matrix.
 
         :return:
-            The electronic gradient.
+            The error matrix, the electronic gradient and the maximum
+            gradient.
         """
 
         if self.rank == mpi_master():
@@ -112,16 +113,24 @@ class ScfRestrictedOpenDriver(ScfDriver):
             e_mat = e_mat_a + e_mat_b
             e_mat *= np.sqrt(2)
 
+            e_mat_shape = e_mat.shape
+
             e_grad = np.linalg.norm(e_mat)
             max_grad = np.max(np.abs(e_mat))
         else:
-            e_grad = 0.0
-            max_grad = 0.0
+            e_mat_shape = None
+            e_grad = None
+            max_grad = None
 
-        e_grad = self.comm.bcast(e_grad, root=mpi_master())
-        max_grad = self.comm.bcast(max_grad, root=mpi_master())
+        e_mat_shape = self.comm.bcast(e_mat_shape, root=mpi_master())
+        e_grad, max_grad = self.comm.bcast((e_grad, max_grad),
+                                           root=mpi_master())
 
-        return e_grad, max_grad
+        if self.rank != mpi_master():
+            e_mat = np.zeros(e_mat_shape)
+        self.comm.Bcast(e_mat, root=mpi_master())
+
+        return e_mat, e_grad, max_grad
 
     def _comp_density_change(self, den_mat, old_den_mat):
         """
