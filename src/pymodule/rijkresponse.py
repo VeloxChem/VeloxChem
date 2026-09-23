@@ -60,9 +60,12 @@ from .molecularbasis import MolecularBasis
 from .errorhandler import assert_msg_critical
 
 
-def memory_budget():
+def memory_budget(solver):
     """
-    Gets the memory the simd RI-JK driver may hold, in bytes.
+    Gets the memory the simd RI-JK driver may hold, per rank, in bytes.
+
+    :param solver:
+        The solver, whose communicator says how many ranks share this machine.
 
     :return:
         The memory budget in bytes.
@@ -76,7 +79,17 @@ def memory_budget():
 
     reserve = 4 * 1024**3
 
-    return int(max(available - reserve, 0.25 * available))
+    # NOTE: the ranks of one node see the same free memory and would each claim the
+    # whole of it, so the node would be promised several times over. The ranks
+    # sharing a node are counted by their host name, as the Fock build counts them,
+    # and the memory is divided between them. This asked for the whole of it on
+    # every rank, which on eight ranks of a node promised that node its memory eight
+    # times.
+    import platform
+    here = platform.node()
+    on_this_node = max(solver.comm.allgather(here).count(here), 1)
+
+    return int(max(available - reserve, 0.25 * available) / on_this_node)
 
 
 def range_separation(solver):
@@ -142,15 +155,48 @@ def initialize(solver, molecule, basis):
     # it holds twice this and the check below is made against twice this.
     omega = range_separation(solver)
 
+    # NOTE: the atoms of the auxiliary basis this rank holds. Every term of the
+    # Coulomb and of the exchange is a sum over the auxiliary basis, so a rank given
+    # a share of its atoms forms a share of each Fock matrix and the reduction the
+    # solver already makes adds the shares. One rank is given the whole of it.
+    #
+    # NOTE: divided by the work the atoms carry and not by their number, as the Fock
+    # build divides them: dealing them round robin gave the ranks equal counts of
+    # auxiliary functions and unequal counts of values, and a build ends when its
+    # last rank ends.
+    if solver.nodes == 1:
+        aux_atoms = []
+    else:
+        weights = solver._ri_jk_drv.aux_atom_weights(molecule, basis,
+                                                     solver._ri_jk_aux_basis,
+                                                     solver.eri_thresh)
+        aux_atoms = molecule.partition_atoms_by_weight(solver.comm, weights)
+
+        # NOTE: **an empty share is not an empty share to the driver.** It reads a
+        # list of no atoms as every atom, which is the convenience a caller over
+        # the whole molecule wants and is a trap for one dividing the work: a rank
+        # which was dealt nothing then forms the whole set of B vectors and its
+        # whole Fock matrix is added to everybody else's share. It is refused here
+        # rather than answered, until the driver is taught to tell the two apart.
+        #
+        # NOTE: the same hole is in the SCF and in the gradient, which divide the
+        # atoms the same way. Water on four ranks converges to -43.08 hartree
+        # against -76.36 on three, and says nothing.
+        assert_msg_critical(
+            len(aux_atoms) > 0,
+            f'{type(solver).__name__}: this rank was dealt no auxiliary atoms, ' +
+            'which the RI-JK driver reads as all of them. Use at most as many ' +
+            'ranks as the molecule has atoms.')
+
     needed = solver._ri_jk_drv.required_memory(molecule, basis,
                                                solver._ri_jk_aux_basis,
-                                               solver.eri_thresh, [],
+                                               solver.eri_thresh, aux_atoms,
                                                omega > 0.0)
 
     # NOTE: the response driver contracts the B vectors and cannot form them
     # again, so the mode which holds them is the only one it can use. The memory
     # is checked here rather than left to the allocator.
-    budget = memory_budget()
+    budget = memory_budget(solver)
 
     assert_msg_critical(
         needed <= budget,
@@ -176,8 +222,9 @@ def initialize(solver, molecule, basis):
 
     solver._ri_jk_drv.prepare(molecule, basis, solver._ri_jk_aux_basis,
                               solver.eri_thresh, budget,
-                              solver.ri_metric_threshold, False, mode, [],
-                              metric, 1, omega, metric_erf)
+                              solver.ri_metric_threshold, False, mode,
+                              aux_atoms, metric, solver.nodes, omega,
+                              metric_erf)
 
     solver._ri_jk_response_drv = SimdRIJKResponseDriver(solver.eri_thresh)
 
@@ -188,9 +235,13 @@ def initialize(solver, molecule, basis):
             'Range-separated functional: two sets of B vectors at ' +
             f'omega = {omega:.3f}.')
 
+    if solver.nodes > 1:
+        solver.ostream.print_info(
+            f'The auxiliary basis is divided over {solver.nodes} ranks.')
+
     solver.ostream.print_info(
         f'B vectors need {needed / 1024**3:.2f} GB of ' +
-        f'{budget / 1024**3:.2f} GB available.')
+        f'{budget / 1024**3:.2f} GB available, a rank.')
     solver.ostream.print_blank()
     solver.ostream.flush()
 
