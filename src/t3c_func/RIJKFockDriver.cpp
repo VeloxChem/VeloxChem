@@ -39,6 +39,7 @@
 #include "BatchFunc.hpp"
 #include "ThreeCenterElectronRepulsionDriver.hpp"
 #include "SerialDenseLinearAlgebra.hpp"
+#include "ThreadedDenseLinearAlgebra.hpp"
 
 #include <iostream>
 
@@ -344,9 +345,9 @@ CRIJKFockDriver::compute_k_fock(const CMatrix &density, const CSubMatrix &molorb
         
         bqmo.zero();
         
-        sdenblas::serialMultAtB(bqmo, molorbs, bqao);
+        tdenblas::threadedMultAtB(bqmo, molorbs, bqao);
         
-        sdenblas::serialMultAtB(kmat, bqmo, bqmo);
+        tdenblas::threadedMultAtB(kmat, bqmo, bqmo);
     }
     
     fmat.assign_values(kmat);
