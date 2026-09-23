@@ -393,8 +393,10 @@ class ScfGradientDriver(GradientDriver):
         return gradient
 
     def _distributed_ri_jk_gradient(self, molecule, basis, aux_basis, drv,
-                                    density, coefficients,
-                                    exchange_scaling_factor, natoms):
+                                    density, coefficients, coefficients_beta,
+                                    exchange_scaling_factor, natoms,
+                                    open_shell=False, need_omega=False,
+                                    erf_k_coef=0.0, omega=0.0):
         """
         Computes this rank's share of the SIMD RI-JK gradient.
 
@@ -413,16 +415,6 @@ class ScfGradientDriver(GradientDriver):
             The gradient of this rank's share, which the caller reduces.
         """
 
-        # NOTE: the range-separated and open shell gradients are not divided yet.
-        # Both are the same arrangement with more of it -- a second set of B vectors
-        # for the one, a second spin's fitted densities for the other -- and both
-        # are refused here rather than reached by a path which would quietly leave
-        # a term out.
-        assert_msg_critical(
-            not (self.scf_driver._dft and self.scf_driver.xcfun.is_range_separated()),
-            f'{type(self).__name__}: the range-separated RI-JK gradient runs ' +
-            'on one rank')
-
         aux_atoms = list(self.scf_driver._ri_aux_atoms)
 
         # NOTE: the share of the auxiliary atoms the Fock build dealt, and not one
@@ -436,19 +428,71 @@ class ScfGradientDriver(GradientDriver):
 
         metric = self.scf_driver._ri_drv.get_metric()
 
-        fit = drv.mpi_local_densities(molecule, basis, aux_basis,
-                                      self.scf_driver._ri_drv.get_bq_vectors(),
-                                      density, coefficients, aux_atoms,
-                                      self.ri_gradient_mpi_budget)
+        fit, omega_plain = self._distributed_fit(
+            drv, molecule, basis, aux_basis,
+            self.scf_driver._ri_drv.get_bq_vectors(), metric, density,
+            coefficients, coefficients_beta, aux_atoms,
+            exchange_scaling_factor, open_shell, with_coulomb=True)
+
+        if not need_omega:
+            return drv.mpi_compute_share(molecule, basis, aux_basis, fit,
+                                         density, coefficients,
+                                         coefficients_beta, omega_plain,
+                                         exchange_scaling_factor,
+                                         list(range(natoms)), aux_atoms)
+
+        # NOTE: the attenuated operator is a second set of B vectors fitted in a
+        # metric of its own, and the same phases run over it. It has no Coulomb
+        # term, which is what the empty fitting below says and what mpi_omega reads.
+
+        assert_msg_critical(
+            self.scf_driver._ri_drv.get_omega() == omega,
+            f'{type(self).__name__}: the RI-JK driver holds B vectors of a ' +
+            'different range-separation parameter')
+
+        fit_erf, omega_erf = self._distributed_fit(
+            drv, molecule, basis, aux_basis,
+            self.scf_driver._ri_drv.get_bq_vectors_erf(),
+            self.scf_driver._ri_drv.get_metric_erf(), density, coefficients,
+            coefficients_beta, aux_atoms, erf_k_coef, open_shell,
+            with_coulomb=False)
+
+        return drv.mpi_compute_share_rs(molecule, basis, aux_basis, fit, fit_erf,
+                                        density, coefficients, coefficients_beta,
+                                        omega_plain, omega_erf,
+                                        exchange_scaling_factor, erf_k_coef,
+                                        omega, list(range(natoms)), aux_atoms)
+
+    def _distributed_fit(self, drv, molecule, basis, aux_basis, bq_vectors,
+                         metric, density, coefficients, coefficients_beta,
+                         aux_atoms, exchange_scaling_factor, open_shell,
+                         with_coulomb):
+        """
+        Runs the distributed phases for one operator and returns its share of the
+        fitted densities together with its two-index fitted density.
+
+        :param with_coulomb:
+            Whether the operator carries a Coulomb term. The attenuated one does
+            not: it enters the Fock matrix through the exchange alone.
+
+        :return:
+            The share and Omega, the latter on the master rank and empty elsewhere.
+        """
+
+        fit = drv.mpi_local_densities(molecule, basis, aux_basis, bq_vectors,
+                                      density, coefficients, coefficients_beta,
+                                      aux_atoms, self.ri_gradient_mpi_budget)
 
         # the right hand side of the fitting, which has to be complete before the
         # transposed factor is applied to it
 
-        local = np.array(fit.fitting(), dtype=np.float64)
-        total = np.zeros_like(local)
-        self.comm.Allreduce(local, total, op=MPI.SUM)
-
-        drv.mpi_set_fitting(fit, metric, total)
+        if with_coulomb:
+            local = np.array(fit.fitting(), dtype=np.float64)
+            total = np.zeros_like(local)
+            self.comm.Allreduce(local, total, op=MPI.SUM)
+            drv.mpi_set_fitting(fit, metric, total)
+        else:
+            drv.mpi_clear_fitting(fit)
 
         # the transposed factor on the fitted densities, a panel of the matrix
         # elements at a time. Every rank answers for every auxiliary function and
@@ -456,12 +500,18 @@ class ScfGradientDriver(GradientDriver):
         # the rows it owns and takes its rows of the Gram from the whole while the
         # whole is there to take them from.
 
-        for ipanel in range(fit.panels()):
-            partial = np.ascontiguousarray(
-                drv.mpi_panel_partial(fit, metric, ipanel))
-            reduced = np.zeros_like(partial)
-            self.comm.Allreduce(partial, reduced, op=MPI.SUM)
-            drv.mpi_panel_absorb(fit, ipanel, reduced)
+        # NOTE: one pass for each spin, and each spin has panels of its own: they
+        # occupy different numbers of orbitals, so their fitted densities are
+        # different sizes. The two spins' Gram products add into the same rows.
+        spins = [False, True] if open_shell else [False]
+
+        for beta in spins:
+            for ipanel in range(fit.panels(beta)):
+                partial = np.ascontiguousarray(
+                    drv.mpi_panel_partial(fit, metric, ipanel, beta))
+                reduced = np.zeros_like(partial)
+                self.comm.Allreduce(partial, reduced, op=MPI.SUM)
+                drv.mpi_panel_absorb(fit, ipanel, reduced, beta)
 
         # the Gram, whose rows the ranks hold disjointly, gathered by adding them:
         # a rank writes its own rows into a matrix of zeros and the sum is the whole.
@@ -479,15 +529,12 @@ class ScfGradientDriver(GradientDriver):
         # others say they are not the one.
 
         if self.rank == mpi_master():
-            omega = drv.mpi_omega(fit, np.ascontiguousarray(gram),
-                                  exchange_scaling_factor, False)
+            omega_matrix = drv.mpi_omega(fit, np.ascontiguousarray(gram),
+                                         exchange_scaling_factor, open_shell)
         else:
-            omega = PackedMatrix()
+            omega_matrix = PackedMatrix()
 
-        return drv.mpi_compute_share(molecule, basis, aux_basis, fit, density,
-                                     coefficients, omega,
-                                     exchange_scaling_factor,
-                                     list(range(natoms)), aux_atoms)
+        return fit, omega_matrix
 
     def _init_grad_timing(self):
         """
@@ -922,7 +969,20 @@ class ScfGradientDriver(GradientDriver):
             # shell, Gamma against the derivative of the three-center integrals
             # less Omega against the derivative of the metric, with the factors of
             # the closed shell already in it. It is added as it is.
-            if need_omega:
+            # NOTE: **the divided way is asked for first.** It used to be reached
+            # only after the attenuated branch had been tried, so an attenuated
+            # functional on two ranks never got here at all: it took the serial
+            # entry, was handed the B vectors one rank holds, answered as though
+            # they were all of them, and returned a gradient whose largest
+            # component was four orders too big without a word.
+            if self.nodes > 1:
+                atomgrad = self._distributed_ri_jk_gradient(
+                    molecule, basis, basis_ri_jk, ri_jk_grad_drv, den_mat_for_ri,
+                    orbitals_for_ri, PackedMatrix(), exchange_scaling_factor,
+                    natoms, open_shell=False, need_omega=need_omega,
+                    erf_k_coef=erf_k_coef, omega=omega)
+
+            elif need_omega:
                 # NOTE: the range-separated gradient is a separate entry rather
                 # than a flag, matching the Fock build: it takes both sets of B
                 # vectors and both metrics, the attenuated exchange being fitted
@@ -933,17 +993,6 @@ class ScfGradientDriver(GradientDriver):
                     f'{type(self).__name__}: the RI-JK driver holds B vectors ' +
                     'of a different range-separation parameter')
 
-                # NOTE: **this branch is taken before the one which divides**, so a
-                # refusal inside that one would never be reached by an attenuated
-                # functional. It was not, and a range separated gradient on two
-                # ranks came back with its largest component four orders too big
-                # rather than refusing: this entry is handed the B vectors a rank
-                # holds and answers as though they were all of them.
-                assert_msg_critical(
-                    self.nodes == 1,
-                    f'{type(self).__name__}: the range-separated RI-JK ' +
-                    'gradient runs on one rank')
-
                 atomgrad = ri_jk_grad_drv.compute_rs(
                     molecule, basis, basis_ri_jk,
                     self.scf_driver._ri_drv.get_bq_vectors(),
@@ -951,17 +1000,6 @@ class ScfGradientDriver(GradientDriver):
                     self.scf_driver._ri_drv.get_metric(),
                     self.scf_driver._ri_drv.get_metric_erf(), den_mat_for_ri,
                     orbitals_for_ri, exchange_scaling_factor, erf_k_coef, omega)
-            elif self.nodes > 1:
-                # NOTE: the distributed way. A rank holds the B vectors of its own
-                # auxiliary atoms and forms the fitted densities of those and of no
-                # others, which is where the work and the memory both are. The one
-                # phase which does not divide is the transposed factor of the metric,
-                # which reaches across the whole auxiliary basis; it is taken a panel
-                # of the matrix elements at a time, and the ranks add each panel.
-                atomgrad = self._distributed_ri_jk_gradient(
-                    molecule, basis, basis_ri_jk, ri_jk_grad_drv, den_mat_for_ri,
-                    orbitals_for_ri, exchange_scaling_factor, natoms)
-
             else:
                 atomgrad = ri_jk_grad_drv.compute(
                     molecule, basis, basis_ri_jk,
@@ -1177,22 +1215,19 @@ class ScfGradientDriver(GradientDriver):
 
             ri_jk_grad_drv = SimdRIJKGradientDriver(self.scf_driver.eri_thresh)
 
-            # NOTE: the open shell is not divided over the ranks yet. The closed
-            # shell is, and this is the same arrangement with a second spin's fitted
-            # densities in it; until that is written, a rank here would be handed the
-            # B vectors of its own auxiliary atoms and would answer as though they
-            # were all of them, which is a gradient that is wrong and says nothing.
-            assert_msg_critical(
-                self.nodes == 1,
-                f'{type(self).__name__}: the open shell RI-JK gradient runs on ' +
-                'one rank')
-
             t0 = time.time()
 
             # NOTE: the whole two-electron term of an open shell, Gamma against the
             # derivative of the three-center integrals less Omega against the
             # derivative of the metric, with both spins inside it. Added as it is.
-            if need_omega:
+            if self.nodes > 1:
+                atomgrad = self._distributed_ri_jk_gradient(
+                    molecule, basis, basis_ri_jk, ri_jk_grad_drv, den_mat_for_ri,
+                    orbitals_a, orbitals_b, exchange_scaling_factor, natoms,
+                    open_shell=True, need_omega=need_omega,
+                    erf_k_coef=erf_k_coef, omega=omega)
+
+            elif need_omega:
                 assert_msg_critical(
                     self.scf_driver._ri_drv.get_omega() == omega,
                     f'{type(self).__name__}: the RI-JK driver holds B vectors ' +

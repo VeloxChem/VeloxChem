@@ -740,15 +740,23 @@ export_simdintegrals(py::module &m) -> void
              "communicated. The `fitting` of what comes back is this rank's partial sum of the right "
              "hand side of the fitting, which the caller adds across the ranks.",
              py::arg("molecule"), py::arg("basis"), py::arg("aux_basis"), py::arg("bq_vectors"),
-             py::arg("density"), py::arg("coefficients"), py::arg("aux_atoms"), py::arg("budget"))
+             py::arg("density"), py::arg("coefficients"), py::arg("coefficients_beta"),
+             py::arg("aux_atoms"), py::arg("budget"))
         .def("mpi_set_fitting", &CSimdRIJKGradientDriver::mpi_set_fitting,
              "Applies the transposed factor to the fitting coefficients the ranks have added together.",
              py::arg("fit"), py::arg("metric"), py::arg("total"))
+        .def("mpi_clear_fitting", &CSimdRIJKGradientDriver::mpi_clear_fitting,
+             "Empties the fitting coefficients of a share, which is how the attenuated operator says it "
+             "has no Coulomb term.",
+             py::arg("fit"))
         .def("mpi_panel_partial",
              [](const CSimdRIJKGradientDriver &self, const TDistributedFit &fit, const CPackedMatrix &metric,
                 const size_t ipanel, const bool beta) -> py::array_t<double> {
                  auto values = self.mpi_panel_partial(fit, metric, ipanel, beta);
-                 const auto count = fit.panel_range(ipanel).second;
+                 // NOTE: the shape follows the spin the panel belongs to. Taking it
+                 // from the first spin's geometry gave the second spin an array of
+                 // the wrong width, which the absorbing side then refused.
+                 const auto count = fit.panel_range(ipanel, beta).second;
                  return vlx_general::pointer_to_numpy(values.data(),
                                                       {static_cast<int>(fit.naux), static_cast<int>(count)});
              },
@@ -773,12 +781,22 @@ export_simdintegrals(py::module &m) -> void
              "Assembles the two-index fitted density from the fitting coefficients and the Gram the "
              "ranks have gathered.",
              py::arg("fit"), py::arg("gram"), py::arg("exchange_scaling_factor"), py::arg("open_shell"))
+        .def("mpi_compute_share_rs", &CSimdRIJKGradientDriver::mpi_compute_share_rs,
+             "This rank's share of a range separated gradient, from the plain and the attenuated fitted "
+             "densities it owns. An empty omega_plain leaves the two-center terms out, which every rank "
+             "but one does.",
+             py::arg("molecule"), py::arg("basis"), py::arg("aux_basis"), py::arg("fit"),
+             py::arg("fit_erf"), py::arg("density"), py::arg("coefficients"),
+             py::arg("coefficients_beta"), py::arg("omega_plain"), py::arg("omega_erf"),
+             py::arg("exchange_scaling_factor"), py::arg("erf_exchange_scaling_factor"),
+             py::arg("omega"), py::arg("atoms"), py::arg("aux_atoms"))
         .def("mpi_compute_share", &CSimdRIJKGradientDriver::mpi_compute_share,
              "This rank's share of the gradient. An empty omega leaves the two-center term out, which "
              "every rank but one does.",
              py::arg("molecule"), py::arg("basis"), py::arg("aux_basis"), py::arg("fit"),
-             py::arg("density"), py::arg("coefficients"), py::arg("omega"),
-             py::arg("exchange_scaling_factor"), py::arg("atoms"), py::arg("aux_atoms"))
+             py::arg("density"), py::arg("coefficients"), py::arg("coefficients_beta"),
+             py::arg("omega"), py::arg("exchange_scaling_factor"), py::arg("atoms"),
+             py::arg("aux_atoms"))
         .def("compute",
              py::overload_cast<const CMolecule &,
                                const CMolecularBasis &,

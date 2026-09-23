@@ -81,23 +81,41 @@ struct TDistributedFit
     size_t naux = 0;
 
     /// @brief The elements of one fitted density, the packed orbital pairs.
+    /// @note **One of these for each spin.** The two spins of an open shell occupy
+    /// different numbers of orbitals, so their fitted densities are different sizes
+    /// and their panels are different panels. Running the second spin over the
+    /// first's geometry reads past the end of every matrix it touches.
     size_t nelements = 0;
 
     /// @brief The elements a panel carries.
     size_t npanel = 0;
 
-    /// @brief The number of panels the elements are divided into.
-    auto panels() const -> size_t
+    /// @brief The elements of one fitted density of the second spin.
+    size_t nelements_beta = 0;
+
+    /// @brief The elements a panel of the second spin carries.
+    size_t npanel_beta = 0;
+
+    /// @brief The number of panels the elements of a spin are divided into.
+    auto panels(const bool beta = false) const -> size_t
     {
-        return (npanel == 0) ? 0 : (nelements + npanel - 1) / npanel;
+        const auto total = beta ? nelements_beta : nelements;
+
+        const auto width = beta ? npanel_beta : npanel;
+
+        return (width == 0) ? 0 : (total + width - 1) / width;
     }
 
-    /// @brief The first element of a panel and how many it carries.
-    auto panel_range(const size_t ipanel) const -> std::pair<size_t, size_t>
+    /// @brief The first element of a panel of a spin and how many it carries.
+    auto panel_range(const size_t ipanel, const bool beta = false) const -> std::pair<size_t, size_t>
     {
-        const auto first = ipanel * npanel;
+        const auto total = beta ? nelements_beta : nelements;
 
-        return {first, std::min(npanel, (first < nelements) ? nelements - first : size_t{0})};
+        const auto width = beta ? npanel_beta : npanel;
+
+        const auto first = ipanel * width;
+
+        return {first, std::min(width, (first < total) ? total - first : size_t{0})};
     }
 };
 
@@ -225,12 +243,16 @@ class CSimdRIJKGradientDriver
     /// @note This is the expensive phase and the one which needed no arranging: the
     /// half transformed W vectors come from the B vectors of this rank's own atoms,
     /// so the transformation is divided already by the division the Fock build made.
+    /// @param coefficients_beta The occupied orbitals of the second spin, or an
+    /// empty matrix for a closed shell. An open shell fits a set of densities for
+    /// each spin, from the same B vectors and its own orbitals.
     auto mpi_local_densities(const CMolecule        &molecule,
                              const CMolecularBasis  &basis,
                              const CMolecularBasis  &aux_basis,
                              const CSparseTensor    &bq_vectors,
                              const CPackedMatrix    &density,
                              const CPackedMatrix    &coefficients,
+                             const CPackedMatrix    &coefficients_beta,
                              const std::vector<int> &aux_atoms,
                              const size_t            budget) const -> TDistributedFit;
 
@@ -242,6 +264,13 @@ class CSimdRIJKGradientDriver
     auto mpi_set_fitting(TDistributedFit           &fit,
                          const CPackedMatrix       &metric,
                          const std::vector<double> &total) const -> void;
+
+    /// @brief Empties the fitting coefficients of a share, which is how the
+    /// attenuated operator says it has no Coulomb term.
+    /// @note Empty and not zero, so that anything which reaches for them fails
+    /// rather than returning a number which looks like an answer. It is the
+    /// convention the serial attenuated phase already uses.
+    auto mpi_clear_fitting(TDistributedFit &fit) const -> void;
 
     /// @brief This rank's contribution to one panel of the transposed factor
     /// applied to the fitted densities.
@@ -293,16 +322,40 @@ class CSimdRIJKGradientDriver
     /// two-center term out, which every rank but one does.
     /// @param aux_atoms The atoms of the auxiliary basis this rank holds.
     /// @return The gradient of this rank's share, which the ranks add.
+    /// @param coefficients_beta The occupied orbitals of the second spin, empty
+    /// for a closed shell. A spin occupies its own orbitals, and handing the first
+    /// spin's for both is an exchange of a wavefunction nobody asked for.
     auto mpi_compute_share(const CMolecule        &molecule,
                            const CMolecularBasis  &basis,
                            const CMolecularBasis  &aux_basis,
                            const TDistributedFit  &fit,
                            const CPackedMatrix    &density,
                            const CPackedMatrix    &coefficients,
+                           const CPackedMatrix    &coefficients_beta,
                            const CPackedMatrix    &omega,
                            const double            exchange_scaling_factor,
                            const std::vector<int> &atoms,
                            const std::vector<int> &aux_atoms) const -> CPackedMatrix;
+
+    /// @brief This rank's share of a range separated gradient, from the plain and
+    /// the attenuated fitted densities it owns.
+    /// @note The attenuated operator has no Coulomb term, so its fit comes with an
+    /// empty fitting and its Omega carries the exchange alone.
+    auto mpi_compute_share_rs(const CMolecule        &molecule,
+                              const CMolecularBasis  &basis,
+                              const CMolecularBasis  &aux_basis,
+                              const TDistributedFit  &fit,
+                              const TDistributedFit  &fit_erf,
+                              const CPackedMatrix    &density,
+                              const CPackedMatrix    &coefficients,
+                              const CPackedMatrix    &coefficients_beta,
+                              const CPackedMatrix    &omega_plain,
+                              const CPackedMatrix    &omega_erf,
+                              const double            exchange_scaling_factor,
+                              const double            erf_exchange_scaling_factor,
+                              const double            omega,
+                              const std::vector<int> &atoms,
+                              const std::vector<int> &aux_atoms) const -> CPackedMatrix;
 
     /// @brief The fitted densities of the occupied orbitals of one spin.
     /// @param bq_vectors The B vectors.
@@ -555,6 +608,16 @@ class CSimdRIJKGradientDriver
                                const std::vector<TExchangeSpin> &spins_erf = {},
                                const double                      erf_exchange_factor = 0.0,
                                const double                      omega = 0.0) const -> void;
+
+    /// @brief Forms one spin's fitted densities for the functions this rank owns.
+    auto _local_densities_for(const CSparseTensor       &bq_vectors,
+                              const CMolecularBasis     &basis,
+                              const CMolecularBasis     &aux_basis,
+                              const CPackedMatrix       &coefficients,
+                              const std::vector<size_t> &functions,
+                              const size_t               naux,
+                              const size_t               budget,
+                              std::vector<CPackedMatrix> &target) const -> void;
 
     /// @brief The columns of the transposed factor of the metric which belong to
     /// the given auxiliary functions.
