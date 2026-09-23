@@ -648,6 +648,14 @@ class CSimdRIJKFockDriver
 
     /// @brief Whether the B vectors have been formed.
     bool _prepared = false;
+
+    /// @brief Whether this rank was dealt no atoms of the auxiliary basis.
+    /// @note Such a rank holds no B vectors and its share of every sum over the
+    /// auxiliary basis is zero, so it answers matrices of zeros. It is not the same
+    /// as a driver which was asked for the whole molecule: that one is handed an
+    /// empty list of atoms too, and the two are told apart by how many ranks are
+    /// dividing the work.
+    bool _holds_nothing = false;
 };
 
 #endif /* SimdRIJKFockDriver_hpp */

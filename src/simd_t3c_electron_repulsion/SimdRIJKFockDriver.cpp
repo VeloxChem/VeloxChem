@@ -310,7 +310,28 @@ CSimdRIJKFockDriver::prepare(const CMolecule       &molecule,
 
     const auto range_separated = (omega > 0.0);
 
-    const auto memory = required_memory(molecule, basis, aux_basis, threshold, aux_atoms, range_separated);
+    // NOTE: **an empty share under a division is an empty share.** A list of no
+    // atoms means every atom to the routines below, which is what a caller asking
+    // for the whole molecule wants and is the opposite of what a rank dealt nothing
+    // wants. The two are told apart by min_parts, which is how many ranks are
+    // dividing the work: one rank asking for all of them passes an empty list with
+    // min_parts of one, and a rank which came out of the deal empty passes an empty
+    // list with more.
+    //
+    // NOTE: unhandled, this converged and said nothing. Water on four ranks came
+    // back at -43.08 hartree against -76.36 on three, because the rank holding no
+    // atoms formed the whole set of B vectors and its whole Fock matrix was added
+    // to every other rank's share. Three ranks and fewer were right, which is why
+    // it had never been seen: a molecule usually has more atoms than the job has
+    // ranks.
+
+    const auto holds_nothing = (aux_atoms.empty() && (min_parts > 1));
+
+    _holds_nothing = holds_nothing;
+
+    const auto memory = holds_nothing
+                            ? size_t{0}
+                            : required_memory(molecule, basis, aux_basis, threshold, aux_atoms, range_separated);
 
     _budget = memory_budget;
 
@@ -417,6 +438,17 @@ CSimdRIJKFockDriver::prepare(const CMolecule       &molecule,
                                   std::string("RIJKFockDriver: The direct way cannot be divided over the atoms of the "
                                               "auxiliary basis, as its triangular solve reaches across all of them"));
 
+        // NOTE: and an undivided direct build on several ranks is no better. Each
+        // of them would form the whole Fock matrix and the caller adds them, so the
+        // answer comes back as many times too large as there are ranks. The check
+        // above catches a rank which was dealt atoms; this one catches the ranks
+        // which were dealt none because nothing was divided at all.
+
+        errors::assertMsgCritical(min_parts <= 1,
+                                  std::string("RIJKFockDriver: The direct way runs on one rank, as it cannot be "
+                                              "divided over the auxiliary basis and every rank would otherwise form "
+                                              "the whole of the Fock matrix"));
+
         const auto mark_pattern = prof_clock::now();
 
         const CSimdThreeCenterElectronRepulsionDriver eri_drv;
@@ -475,11 +507,21 @@ CSimdRIJKFockDriver::prepare(const CMolecule       &molecule,
 
     _coulomb_parts.clear();
 
-    _aux_functions = simdri::aux_functions_of(aux_basis, aux_atoms);
+    _aux_functions = holds_nothing ? std::vector<size_t>()
+                                   : simdri::aux_functions_of(aux_basis, aux_atoms);
 
     const auto mark_bq_vectors = prof_clock::now();
 
-    if (range_separated)
+    if (holds_nothing)
+    {
+        // a rank with no auxiliary atoms holds no B vectors and answers a Fock
+        // matrix of zeros, which is its share of the sum and is what the ranks add.
+
+        _bq_vectors = CSparseTensor();
+
+        _bq_vectors_erf = CSparseTensor();
+    }
+    else if (range_separated)
     {
         std::tie(_bq_vectors, _bq_vectors_erf) = _drv.compute_bq_vectors_rs(
             molecule, basis, aux_basis, _metric, _metric_erf, threshold, omega, aux_atoms);
@@ -519,6 +561,25 @@ CSimdRIJKFockDriver::compute(const CPackedMatrix &density,
     errors::assertMsgCritical((erf_exchange_scaling_factor == 0.0) || (_omega > 0.0),
                               std::string("RIJKFockDriver: The exchange of the attenuated operator was asked for and "
                                           "the driver holds no attenuated B vectors"));
+
+    // NOTE: a rank which was dealt no auxiliary atoms holds no B vectors, and its
+    // share of every sum over the auxiliary basis is zero, so it answers a matrix
+    // of zeros. Reaching into the tensor which holds nothing instead was a null
+    // dereference and a crash report, which is at least the better of the two ways
+    // of being wrong: before the share was told apart from the whole molecule, this
+    // rank formed every B vector and answered a whole Fock matrix which was then
+    // added to everybody else's share.
+
+    if (_holds_nothing)
+    {
+        const auto nao = density.number_of_rows();
+
+        auto zeros = CPackedMatrix(nao, nao, mat_t::general);
+
+        zeros.zero();
+
+        return zeros;
+    }
 
     if (_mode == rimode::direct)
     {
@@ -701,6 +762,24 @@ CSimdRIJKFockDriver::compute(const CPackedMatrix &density,
     errors::assertMsgCritical((erf_exchange_scaling_factor == 0.0) || (_omega > 0.0),
                               std::string("RIJKFockDriver: The exchange of the attenuated operator was asked for and "
                                           "the driver holds no attenuated B vectors"));
+
+    // NOTE: a rank dealt no auxiliary atoms answers zeros, for both spins. See the
+    // closed shell entry above.
+
+    if (_holds_nothing)
+    {
+        const auto nao = density.number_of_rows();
+
+        auto zeros_a = CPackedMatrix(nao, nao, mat_t::general);
+
+        auto zeros_b = CPackedMatrix(nao, nao, mat_t::general);
+
+        zeros_a.zero();
+
+        zeros_b.zero();
+
+        return {std::move(zeros_a), std::move(zeros_b)};
+    }
 
     // NOTE: the direct way accumulates the right hand side of its fitting from the
     // integrals during the same sweep which builds the exchange, and its build is
