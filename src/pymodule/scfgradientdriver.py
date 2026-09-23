@@ -639,9 +639,17 @@ class ScfGradientDriver(GradientDriver):
         else:
             D = None
             W = None
+            mo_occ = None
 
+        # NOTE: the occupied orbitals are broadcast as the density and the energy
+        # weighted density are. They were not, and nothing noticed: the only path
+        # which reads them is the fitted exchange, and that path ran on one rank.
+        # The first rank other than the master to reach it raised an
+        # UnboundLocalError and left the others waiting in the reduction, which
+        # reads as a hang rather than as the crash it is.
         D = self.comm.bcast(D, root=mpi_master())
         W = self.comm.bcast(W, root=mpi_master())
+        mo_occ = self.comm.bcast(mo_occ, root=mpi_master())
 
         natoms = molecule.number_of_atoms()
 
@@ -943,11 +951,17 @@ class ScfGradientDriver(GradientDriver):
             Db = None
             Wa = None
             Wb = None
+            mo_occ_a = None
+            mo_occ_b = None
 
+        # NOTE: the occupied orbitals of both spins, for the reason the closed shell
+        # branch above gives.
         Da = self.comm.bcast(Da, root=mpi_master())
         Db = self.comm.bcast(Db, root=mpi_master())
         Wa = self.comm.bcast(Wa, root=mpi_master())
         Wb = self.comm.bcast(Wb, root=mpi_master())
+        mo_occ_a = self.comm.bcast(mo_occ_a, root=mpi_master())
+        mo_occ_b = self.comm.bcast(mo_occ_b, root=mpi_master())
 
         natoms = molecule.number_of_atoms()
 
