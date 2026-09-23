@@ -32,6 +32,9 @@
 
 #include "Molecule.hpp"
 
+#include "ErrorHandler.hpp"
+#include "MolecularBasis.hpp"
+
 #include <algorithm>
 #include <cmath>
 #include <iterator>
@@ -587,4 +590,42 @@ CMolecule::_is_angstrom(const std::string &unit) const -> bool
     {
         return false;
     }
+}
+
+auto
+CMolecule::effective_charges(const CMolecularBasis &basis) const -> std::vector<double>
+{
+    const auto indices = basis.basis_sets_indices();
+
+    errors::assertMsgCritical(indices.size() == _identifiers.size(),
+                              std::string("Molecule.effective_charges: The basis describes ") + std::to_string(indices.size()) +
+                                  std::string(" atoms and the molecule has ") + std::to_string(_identifiers.size()));
+
+    const auto &basis_sets = basis.basis_sets();
+
+    std::vector<double> charges;
+
+    charges.reserve(_identifiers.size());
+
+    for (size_t i = 0; i < _identifiers.size(); i++)
+    {
+        const auto &atom_basis = basis_sets[static_cast<size_t>(indices[i])];
+
+        int core_electrons = 0;
+
+        if (atom_basis.has_ecp())
+        {
+            core_electrons = atom_basis.get_ecp_potential().number_of_core_electrons();
+
+            errors::assertMsgCritical(core_electrons >= 0,
+                                      std::string("Molecule.effective_charges: ECP core electron count must be non-negative"));
+
+            errors::assertMsgCritical(core_electrons % 2 == 0,
+                                      std::string("Molecule.effective_charges: ECP core electron count must be even"));
+        }
+
+        charges.push_back(static_cast<double>(_identifiers[i] - core_electrons));
+    }
+
+    return charges;
 }

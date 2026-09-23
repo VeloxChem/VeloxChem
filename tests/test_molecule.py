@@ -32,6 +32,15 @@ class FakeBasis:
 
 class TestMolecule:
 
+    def auh_molecule(self):
+
+        # NOTE: gold carries a real effective core potential in def2-svp, sixty
+        # electrons of it, and the hydrogen carries none. That is what makes
+        # this pair worth testing with: the effective charges differ from the
+        # bare ones on one atom and not on the other.
+
+        return Molecule.read_xyz_string('2\n\nAu 0.0 0.0 0.0\nH 0.0 0.0 1.52\n')
+
     def nh3_elements(self):
         return [7, 1, 1, 1]
 
@@ -473,7 +482,9 @@ class TestMolecule:
 
         mol = Molecule.read_str(self.h2o_xyzstr(), 'au')
         basis = MolecularBasis.read(mol, 'sto-3g', ostream=None)
-        ecp_basis = FakeBasis([2, 0, 0])
+
+        ecp_mol = self.auh_molecule()
+        ecp_basis = MolecularBasis.read(ecp_mol, 'def2-svp', ostream=None)
 
         assert math.isclose(mol.nuclear_repulsion_energy(),
                             9.34363815797054450919,
@@ -483,8 +494,8 @@ class TestMolecule:
                             mol.effective_nuclear_repulsion_energy(basis),
                             rel_tol=tol,
                             abs_tol=tol)
-        assert math.isclose(mol.nuclear_repulsion_energy(ecp_basis),
-                            mol.effective_nuclear_repulsion_energy(ecp_basis),
+        assert math.isclose(ecp_mol.nuclear_repulsion_energy(ecp_basis),
+                            ecp_mol.effective_nuclear_repulsion_energy(ecp_basis),
                             rel_tol=tol,
                             abs_tol=tol)
 
@@ -492,11 +503,14 @@ class TestMolecule:
 
         tol = 1.0e-12
 
-        mol = Molecule.read_str(self.h2o_xyzstr(), 'au')
-        basis = FakeBasis([2, 0, 0])
+        mol = self.auh_molecule()
+        basis = MolecularBasis.read(mol, 'def2-svp', ostream=None)
+
+        assert basis.has_ecp()
+        assert basis.get_number_of_ecp_core_electrons() == [60, 0]
 
         coords = mol.get_coordinates_in_bohr()
-        charges = np.array(mol.get_element_ids()) - np.array([2, 0, 0])
+        charges = np.array(mol.get_element_ids()) - np.array([60, 0])
         ref_energy = 0.0
 
         for i in range(len(charges)):
@@ -513,22 +527,17 @@ class TestMolecule:
                         reason='skip pytest.raises for multiple MPI processes')
     def test_effective_nuclear_repulsion_energy_rejects_ecp_length_mismatch(self):
 
-        mol = Molecule.read_str(self.h2o_xyzstr(), 'au')
-
-        with pytest.raises(
-                VeloxChemError,
-                match='ECP core electron list must match number of atoms'):
-            mol.effective_nuclear_repulsion_energy(FakeBasis([2, 0]))
-
-    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
-                        reason='skip pytest.raises for multiple MPI processes')
-    def test_effective_nuclear_repulsion_energy_rejects_negative_ecp_electrons(self):
+        # NOTE: a basis of another molecule, which is the way the atoms of a
+        # basis and the atoms of a molecule come to disagree now that the
+        # count comes from the basis itself rather than from a list handed in
+        # beside it.
 
         mol = Molecule.read_str(self.h2o_xyzstr(), 'au')
+        other = self.auh_molecule()
 
-        with pytest.raises(VeloxChemError,
-                           match='ECP core electrons must be non-negative'):
-            mol.effective_nuclear_repulsion_energy(FakeBasis([2, -1, 0]))
+        with pytest.raises(RuntimeError, match='The basis describes'):
+            mol.effective_nuclear_repulsion_energy(
+                MolecularBasis.read(other, 'def2-svp', ostream=None))
 
     def test_check_proximity(self):
 

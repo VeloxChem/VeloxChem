@@ -143,11 +143,20 @@ CPolarizableEmbedding::permanent_multipoles(const int order) const -> const TPer
 }
 
 auto
-CPolarizableEmbedding::permanent_nuclear_energy(const std::vector<double> &charges,
-                                                const std::vector<double> &coordinates) const -> double
+CPolarizableEmbedding::permanent_nuclear_energy(const CMolecule &molecule, const CMolecularBasis &basis) const -> double
 {
-    embedding::require(coordinates.size() == 3 * charges.size(),
-                       std::string("PolarizableEmbedding: Expecting three coordinates for each nucleus"));
+    // NOTE: checked here, where this library throws, rather than left to the
+    // molecule, where the convention is to assert and a basis built for some
+    // other molecule would take the interpreter down with it.
+
+    embedding::require(static_cast<int>(basis.basis_sets_indices().size()) == molecule.number_of_atoms(),
+                       std::string("PolarizableEmbedding: The basis describes ") +
+                           std::to_string(basis.basis_sets_indices().size()) + std::string(" atoms and the molecule has ") +
+                           std::to_string(molecule.number_of_atoms()));
+
+    const auto charges = molecule.effective_charges(basis);
+
+    const auto &points = molecule.coordinates();
 
     const auto &gathered = permanent_multipoles(0);
 
@@ -159,7 +168,7 @@ CPolarizableEmbedding::permanent_nuclear_energy(const std::vector<double> &charg
 
     const auto *values = gathered.values.data();
 
-    const auto *nuclei = coordinates.data();
+    const auto *nuclei = points.data();
 
     const auto *nuclear_charges = charges.data();
 
@@ -185,11 +194,13 @@ CPolarizableEmbedding::permanent_nuclear_energy(const std::vector<double> &charg
 
         for (int inuc = 0; inuc < nnuclei; inuc++)
         {
-            const double dx = x - nuclei[3 * inuc + 0];
+            const auto xyz = nuclei[inuc].coordinates();
 
-            const double dy = y - nuclei[3 * inuc + 1];
+            const double dx = x - xyz[0];
 
-            const double dz = z - nuclei[3 * inuc + 2];
+            const double dy = y - xyz[1];
+
+            const double dz = z - xyz[2];
 
             const double r = std::sqrt(dx * dx + dy * dy + dz * dz);
 

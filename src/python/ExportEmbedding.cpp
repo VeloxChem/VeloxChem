@@ -557,26 +557,11 @@ export_embedding(py::module &m) -> void
             "Gets the coordinates and the values of the permanent multipoles of an order, "
             "of both regions and the polarizable one first.",
             "order"_a)
-        .def(
-            "permanent_nuclear_energy",
-            [](const CPolarizableEmbedding &self, const CArrayOfDoubles &charges, const CArrayOfDoubles &coordinates) -> double {
-                const auto nnuclei = charges.size();
-
-                if (coordinates.size() != 3 * nnuclei)
-                {
-                    _refuse(std::string("permanent_nuclear_energy: Expecting three coordinates for each nucleus"));
-                }
-
-                const auto *q = charges.data();
-
-                const auto *xyz = coordinates.data();
-
-                return self.permanent_nuclear_energy(std::vector<double>(q, q + nnuclei),
-                                                     std::vector<double>(xyz, xyz + 3 * nnuclei));
-            },
-            "Computes what the permanent charges of the environment do to the nuclei of the quantum region.",
-            "charges"_a,
-            "coordinates"_a);
+        .def("permanent_nuclear_energy",
+             &CPolarizableEmbedding::permanent_nuclear_energy,
+             "Computes what the permanent charges of the environment do to the nuclei of the quantum region.",
+             "molecule"_a,
+             "basis"_a);
 }
 
 }  // namespace vlx_embedding

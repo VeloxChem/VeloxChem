@@ -42,6 +42,8 @@
 
 /// @brief Class CMolecule stores geometrical data of molecule and provides set
 /// of methods for handling of this data.
+class CMolecularBasis;
+
 class CMolecule
 {
    public:
@@ -177,6 +179,18 @@ class CMolecule
     /// @brief Gets charges of all atoms in molecule.
     /// @return The vector of atomic charges of molecule.
     auto charges() const -> std::vector<double>;
+
+    /// @brief Gets the effective charge of each nucleus in a basis.
+    /// @param basis The molecular basis, which says how much of each core is
+    /// described by a potential instead of by electrons.
+    /// @return The charges.
+    /// @note Not the same as charges(). An atom whose core is replaced by an
+    /// effective core potential is left with the charge the remaining electrons
+    /// see, and it is that charge which enters the nuclear attraction, the
+    /// nuclear repulsion and whatever a classical environment does to the
+    /// nuclei. Using the bare charge for an atom with a potential is an error
+    /// of the size of its core.
+    auto effective_charges(const CMolecularBasis &basis) const -> std::vector<double>;
 
     /// @brief Gets masses of all atoms in molecule.
     /// @return The vector of atomic masses of molecule.

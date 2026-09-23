@@ -41,6 +41,10 @@
 #include "Codata.hpp"
 #include "ErrorHandler.hpp"
 #include "ExportGeneral.hpp"
+#include <stdexcept>
+#include <string>
+
+#include "MolecularBasis.hpp"
 #include "Molecule.hpp"
 #include "Point.hpp"
 #include "StringFormat.hpp"
@@ -274,6 +278,27 @@ export_moldata(py::module &m)
             },
             "Gets covalent radii for molecule.")
         .def("get_masses", &CMolecule::masses, "Gets a vector of atomic masses in molecule.")
+        .def(
+            "get_effective_nuclear_charges",
+            [](const CMolecule &self, const CMolecularBasis &basis) -> py::array_t<double> {
+                // NOTE: checked here and thrown rather than left to the assert
+                // underneath, which aborts. What is being checked is that the
+                // caller handed over a basis of this molecule, which is a
+                // mistake somebody makes and not a reason to stop the process.
+
+                if (static_cast<int>(basis.basis_sets_indices().size()) != self.number_of_atoms())
+                {
+                    throw std::runtime_error("Molecule.get_effective_nuclear_charges: The basis describes " +
+                                             std::to_string(basis.basis_sets_indices().size()) +
+                                             " atoms and the molecule has " + std::to_string(self.number_of_atoms()));
+                }
+
+                const auto charges = self.effective_charges(basis);
+
+                return vlx_general::pointer_to_numpy(charges.data(), {static_cast<int>(charges.size())});
+            },
+            "Gets the charge of each nucleus once its core is described by an effective core potential.",
+            "basis"_a)
         .def("get_labels", &CMolecule::labels, "Gets a vector of atomic labels in molecule.")
         .def("get_label", &CMolecule::label, "Gets an atomic labels of specific atom in molecule.")
         .def(

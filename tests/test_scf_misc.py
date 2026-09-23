@@ -1685,23 +1685,17 @@ class TestScfDriverMiscellaneous:
 
     def test_effective_nuclear_charges_subtract_ecp_core(self):
 
-        class MoleculeStub:
+        # NOTE: gold carries sixty electrons of effective core potential in
+        # def2-svp and the hydrogen carries none, so the effective charges
+        # differ from the bare ones on one atom of this pair and not the other.
 
-            @staticmethod
-            def get_element_ids():
-                return np.array([8.0, 1.0])
+        mol = Molecule.read_xyz_string(
+            '2\n\nAu 0.0 0.0 0.0\nH 0.0 0.0 1.52\n')
+        basis = MolecularBasis.read(mol, 'def2-svp', ostream=None)
 
-            @staticmethod
-            def number_of_atoms():
-                return 2
+        assert np.allclose(mol.get_element_ids(), np.array([79.0, 1.0]))
+        assert basis.get_number_of_ecp_core_electrons() == [60, 0]
 
-        class BasisStub:
+        effective_charges = mol.get_effective_nuclear_charges(basis)
 
-            @staticmethod
-            def get_number_of_ecp_core_electrons():
-                return np.array([2.0, 0.0])
-
-        effective_charges = Molecule.get_effective_nuclear_charges(
-            MoleculeStub(), BasisStub())
-
-        assert np.allclose(effective_charges, np.array([6.0, 1.0]))
+        assert np.allclose(effective_charges, np.array([19.0, 1.0]))

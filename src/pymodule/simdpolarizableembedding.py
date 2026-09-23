@@ -489,9 +489,7 @@ class SimdPolarizableEmbeddingDriver:
 
         self._refuse_what_is_not_implemented(self.gather_multipoles())
 
-        return self.embedding.permanent_nuclear_energy(
-            qm_molecule.get_effective_nuclear_charges(basis),
-            qm_molecule.get_coordinates_in_bohr())
+        return self.embedding.permanent_nuclear_energy(qm_molecule, basis)
 
     def _refuse_what_is_not_implemented(self, multipoles):
         """

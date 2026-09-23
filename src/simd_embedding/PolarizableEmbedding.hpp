@@ -38,6 +38,9 @@
 #include <utility>
 #include <vector>
 
+#include "MolecularBasis.hpp"
+#include "Molecule.hpp"
+
 #include "EmbeddingRegion.hpp"
 
 /// @brief Class CPolarizableEmbedding holds the environment a solute is embedded
@@ -100,20 +103,17 @@ class CPolarizableEmbedding
 
     /// @brief Computes what the permanent charges of the environment do to the
     /// nuclei of the quantum region.
-    /// @param charges The charge of each nucleus, which is what is left of it
-    /// once a core potential describes the rest.
-    /// @param coordinates The position of each nucleus, three per nucleus, in
-    /// bohr.
+    /// @param molecule The molecule of the quantum region.
+    /// @param basis The molecular basis of it, which says what is left of each
+    /// nucleus once a core potential describes the rest.
     /// @return The energy.
     /// @note The other half of the permanent electrostatics. The Fock matrix
     /// carries what the environment does to the electrons and this is what it
     /// does to the nuclei; a total energy without it is wrong by the whole of
     /// this term.
-    /// @note The charges are asked for rather than taken from a molecule
-    /// because the ones wanted are the effective ones, which a core potential
-    /// changes and which a molecule alone does not know.
-    auto permanent_nuclear_energy(const std::vector<double> &charges,
-                                  const std::vector<double> &coordinates) const -> double;
+    /// @note The effective charges and not the bare ones, which for an atom
+    /// whose core is a potential are not the same number.
+    auto permanent_nuclear_energy(const CMolecule &molecule, const CMolecularBasis &basis) const -> double;
 
    private:
     /// @brief The multipoles of each order of both regions together.
