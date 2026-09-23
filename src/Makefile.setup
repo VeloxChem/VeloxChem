@@ -35,8 +35,8 @@ USE_CUDA := true
 CUDA_LIB_DIR := /path/to/cuda/lib64
 LIBXC_HOME   := /path/to/libxc
 
-# if nvhpc is used
-CUDA_MATHLIB_DIR := /path/to/nvhpc/math_libs/lib64
+# if nvhpc is used, point this to nvhpc math_libs/lib64 folder
+CUDA_MATHLIB_DIR :=
 
 CXX    := nvc++
 PYTHON := python3
