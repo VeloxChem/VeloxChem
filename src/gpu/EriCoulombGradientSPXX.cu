@@ -73,7 +73,8 @@ computeCoulombGradientSPSS_I_0(double*         grad_x,
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PB_0, PA_x, PB_x;
+    double PB_0, PA_x;
+    // double PB_x;
     uint32_t i, j, b0;
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
@@ -114,7 +115,7 @@ computeCoulombGradientSPSS_I_0(double*         grad_x,
         ij_factor_D = 2.0 * sp_mat_D_local[ij];
 
         PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
-        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
+        // PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
 
         b0 = j % 3;
 
@@ -263,7 +264,8 @@ computeCoulombGradientSPSS_J_0(double*         grad_x,
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PB_0, PA_x, PB_x;
+    double PB_0, PB_x;
+    // double PA_x;
     uint32_t i, j, b0;
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
@@ -303,7 +305,7 @@ computeCoulombGradientSPSS_J_0(double*         grad_x,
 
         ij_factor_D = 2.0 * sp_mat_D_local[ij];
 
-        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
+        // PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
         PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
 
         b0 = j % 3;
@@ -457,7 +459,8 @@ computeCoulombGradientSPSP_I_0(double*         grad_x,
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PB_0, PA_x, PB_x;
+    double PB_0, PA_x;
+    // double PB_x;
     uint32_t i, j, b0;
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
@@ -498,7 +501,7 @@ computeCoulombGradientSPSP_I_0(double*         grad_x,
         ij_factor_D = 2.0 * sp_mat_D_local[ij];
 
         PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
-        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
+        // PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
 
         b0 = j % 3;
 
@@ -679,7 +682,8 @@ computeCoulombGradientSPSP_J_0(double*         grad_x,
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PB_0, PA_x, PB_x;
+    double PB_0, PB_x;
+    // double PA_x;
     uint32_t i, j, b0;
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
@@ -719,7 +723,7 @@ computeCoulombGradientSPSP_J_0(double*         grad_x,
 
         ij_factor_D = 2.0 * sp_mat_D_local[ij];
 
-        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
+        // PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
         PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
 
         b0 = j % 3;
@@ -912,7 +916,8 @@ computeCoulombGradientSPSD_I_0(double*         grad_x,
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PB_0, PA_x, PB_x;
+    double PB_0, PA_x;
+    // double PB_x;
     uint32_t i, j, b0;
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
@@ -960,7 +965,7 @@ computeCoulombGradientSPSD_I_0(double*         grad_x,
         ij_factor_D = 2.0 * sp_mat_D_local[ij];
 
         PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
-        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
+        // PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
 
         b0 = j % 3;
 
@@ -1206,7 +1211,8 @@ computeCoulombGradientSPSD_J_0(double*         grad_x,
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PB_0, PA_x, PB_x;
+    double PB_0, PB_x;
+    // double PA_x;
     uint32_t i, j, b0;
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
@@ -1253,7 +1259,7 @@ computeCoulombGradientSPSD_J_0(double*         grad_x,
 
         ij_factor_D = 2.0 * sp_mat_D_local[ij];
 
-        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
+        // PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
         PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
 
         b0 = j % 3;
@@ -1517,7 +1523,8 @@ computeCoulombGradientSPPP_I_0(double*         grad_x,
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PB_0, PA_x, PB_x;
+    double PB_0, PA_x;
+    // double PB_x;
     uint32_t i, j, b0;
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
@@ -1558,7 +1565,7 @@ computeCoulombGradientSPPP_I_0(double*         grad_x,
         ij_factor_D = 2.0 * sp_mat_D_local[ij];
 
         PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
-        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
+        // PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
 
         b0 = j % 3;
 
@@ -1801,7 +1808,8 @@ computeCoulombGradientSPPP_J_0(double*         grad_x,
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PB_0, PA_x, PB_x;
+    double PB_0, PB_x;
+    // double PA_x;
     uint32_t i, j, b0;
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
@@ -1841,7 +1849,7 @@ computeCoulombGradientSPPP_J_0(double*         grad_x,
 
         ij_factor_D = 2.0 * sp_mat_D_local[ij];
 
-        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
+        // PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
         PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
 
         b0 = j % 3;
@@ -2108,7 +2116,8 @@ computeCoulombGradientSPPD_I_0(double*         grad_x,
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PB_0, PA_x, PB_x;
+    double PB_0, PA_x;
+    // double PB_x;
     uint32_t i, j, b0;
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
@@ -2156,7 +2165,7 @@ computeCoulombGradientSPPD_I_0(double*         grad_x,
         ij_factor_D = 2.0 * sp_mat_D_local[ij];
 
         PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
-        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
+        // PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
 
         b0 = j % 3;
 
@@ -2476,7 +2485,8 @@ computeCoulombGradientSPPD_J_0(double*         grad_x,
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PB_0, PA_x, PB_x;
+    double PB_0, PB_x;
+    // double PA_x;
     uint32_t i, j, b0;
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
@@ -2523,7 +2533,7 @@ computeCoulombGradientSPPD_J_0(double*         grad_x,
 
         ij_factor_D = 2.0 * sp_mat_D_local[ij];
 
-        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
+        // PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
         PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
 
         b0 = j % 3;
@@ -2878,7 +2888,8 @@ computeCoulombGradientSPDD_I_0(double*         grad_x,
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PB_0, PA_x, PB_x;
+    double PB_0, PA_x;
+    // double PB_x;
     uint32_t i, j, b0;
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
@@ -2926,7 +2937,7 @@ computeCoulombGradientSPDD_I_0(double*         grad_x,
         ij_factor_D = 2.0 * sp_mat_D_local[ij];
 
         PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
-        PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
+        // PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
 
         b0 = j % 3;
 
@@ -3356,7 +3367,8 @@ computeCoulombGradientSPDD_J_0(double*         grad_x,
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
     double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    double PB_0, PA_x, PB_x;
+    double PB_0, PB_x;
+    // double PA_x;
     uint32_t i, j, b0;
 
     ERIs[threadIdx.y][threadIdx.x] = 0.0;
@@ -3403,7 +3415,7 @@ computeCoulombGradientSPDD_J_0(double*         grad_x,
 
         ij_factor_D = 2.0 * sp_mat_D_local[ij];
 
-        PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
+        // PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
         PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
 
         b0 = j % 3;

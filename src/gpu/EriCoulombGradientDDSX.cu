@@ -73,7 +73,8 @@ computeCoulombGradientDDSS_I_0(double*         grad_x,
     __shared__ uint32_t g0;
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x, PB_x;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x;
+    // __shared__ double PB_x;
     __shared__ uint32_t i, j, a0, a1, b0, b1;
 
     ERIs[threadIdx.y] = 0.0;
@@ -120,7 +121,7 @@ computeCoulombGradientDDSS_I_0(double*         grad_x,
             ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
             PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
-            PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
+            // PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
 
             a0 = d_cart_inds[i % 6][0];
             a1 = d_cart_inds[i % 6][1];
@@ -395,7 +396,8 @@ computeCoulombGradientDDSS_J_0(double*         grad_x,
     __shared__ uint32_t g0;
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x, PB_x;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PB_x;
+    // __shared__ double PA_x;
     __shared__ uint32_t i, j, a0, a1, b0, b1;
 
     ERIs[threadIdx.y] = 0.0;
@@ -441,7 +443,7 @@ computeCoulombGradientDDSS_J_0(double*         grad_x,
 
             ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
-            PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
+            // PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
             PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
 
             a0 = d_cart_inds[i % 6][0];
@@ -718,7 +720,8 @@ computeCoulombGradientDDSP_I_0(double*         grad_x,
     __shared__ uint32_t g0;
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x, PB_x;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x;
+    // __shared__ double PB_x;
     __shared__ uint32_t i, j, a0, a1, b0, b1;
 
     ERIs[threadIdx.y] = 0.0;
@@ -765,7 +768,7 @@ computeCoulombGradientDDSP_I_0(double*         grad_x,
             ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
             PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
-            PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
+            // PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
 
             a0 = d_cart_inds[i % 6][0];
             a1 = d_cart_inds[i % 6][1];
@@ -1219,7 +1222,8 @@ computeCoulombGradientDDSP_J_0(double*         grad_x,
     __shared__ uint32_t g0;
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x, PB_x;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PB_x;
+    // __shared__ double PA_x;
     __shared__ uint32_t i, j, a0, a1, b0, b1;
 
     ERIs[threadIdx.y] = 0.0;
@@ -1265,7 +1269,7 @@ computeCoulombGradientDDSP_J_0(double*         grad_x,
 
             ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
-            PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
+            // PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
             PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
 
             a0 = d_cart_inds[i % 6][0];
@@ -1715,7 +1719,8 @@ computeCoulombGradientDDSD_I_0(double*         grad_x,
     __shared__ uint32_t g0;
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x, PB_x;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x;
+    // __shared__ double PB_x;
     __shared__ uint32_t i, j, a0, a1, b0, b1;
 
     ERIs[threadIdx.y] = 0.0;
@@ -1762,7 +1767,7 @@ computeCoulombGradientDDSD_I_0(double*         grad_x,
             ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
             PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
-            PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
+            // PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
 
             a0 = d_cart_inds[i % 6][0];
             a1 = d_cart_inds[i % 6][1];
@@ -2046,7 +2051,8 @@ computeCoulombGradientDDSD_I_1(double*         grad_x,
     __shared__ uint32_t g0;
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x, PB_x;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x;
+    // __shared__ double PB_x;
     __shared__ uint32_t i, j, a0, a1, b0, b1;
 
     ERIs[threadIdx.y] = 0.0;
@@ -2093,7 +2099,7 @@ computeCoulombGradientDDSD_I_1(double*         grad_x,
             ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
             PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
-            PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
+            // PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
 
             a0 = d_cart_inds[i % 6][0];
             a1 = d_cart_inds[i % 6][1];
@@ -2317,7 +2323,8 @@ computeCoulombGradientDDSD_I_2(double*         grad_x,
     __shared__ uint32_t g0;
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x, PB_x;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x;
+    // __shared__ double PB_x;
     __shared__ uint32_t i, j, a0, a1, b0, b1;
 
     ERIs[threadIdx.y] = 0.0;
@@ -2364,7 +2371,7 @@ computeCoulombGradientDDSD_I_2(double*         grad_x,
             ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
             PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
-            PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
+            // PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
 
             a0 = d_cart_inds[i % 6][0];
             a1 = d_cart_inds[i % 6][1];
@@ -2588,7 +2595,8 @@ computeCoulombGradientDDSD_I_3(double*         grad_x,
     __shared__ uint32_t g0;
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x, PB_x;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x;
+    // __shared__ double PB_x;
     __shared__ uint32_t i, j, a0, a1, b0, b1;
 
     ERIs[threadIdx.y] = 0.0;
@@ -2635,7 +2643,7 @@ computeCoulombGradientDDSD_I_3(double*         grad_x,
             ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
             PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
-            PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
+            // PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
 
             a0 = d_cart_inds[i % 6][0];
             a1 = d_cart_inds[i % 6][1];
@@ -2861,7 +2869,8 @@ computeCoulombGradientDDSD_I_4(double*         grad_x,
     __shared__ uint32_t g0;
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x, PB_x;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x;
+    // __shared__ double PB_x;
     __shared__ uint32_t i, j, a0, a1, b0, b1;
 
     ERIs[threadIdx.y] = 0.0;
@@ -2908,7 +2917,7 @@ computeCoulombGradientDDSD_I_4(double*         grad_x,
             ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
             PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
-            PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
+            // PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
 
             a0 = d_cart_inds[i % 6][0];
             a1 = d_cart_inds[i % 6][1];
@@ -3120,7 +3129,8 @@ computeCoulombGradientDDSD_I_5(double*         grad_x,
     __shared__ uint32_t g0;
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x, PB_x;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x;
+    // __shared__ double PB_x;
     __shared__ uint32_t i, j, a0, a1, b0, b1;
 
     ERIs[threadIdx.y] = 0.0;
@@ -3167,7 +3177,7 @@ computeCoulombGradientDDSD_I_5(double*         grad_x,
             ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
             PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
-            PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
+            // PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
 
             a0 = d_cart_inds[i % 6][0];
             a1 = d_cart_inds[i % 6][1];
@@ -3383,7 +3393,8 @@ computeCoulombGradientDDSD_I_6(double*         grad_x,
     __shared__ uint32_t g0;
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x, PB_x;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x;
+    // __shared__ double PB_x;
     __shared__ uint32_t i, j, a0, a1, b0, b1;
 
     ERIs[threadIdx.y] = 0.0;
@@ -3430,7 +3441,7 @@ computeCoulombGradientDDSD_I_6(double*         grad_x,
             ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
             PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
-            PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
+            // PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
 
             a0 = d_cart_inds[i % 6][0];
             a1 = d_cart_inds[i % 6][1];
@@ -3624,7 +3635,8 @@ computeCoulombGradientDDSD_J_0(double*         grad_x,
     __shared__ uint32_t g0;
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x, PB_x;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PB_x;
+    // __shared__ double PA_x;
     __shared__ uint32_t i, j, a0, a1, b0, b1;
 
     ERIs[threadIdx.y] = 0.0;
@@ -3670,7 +3682,7 @@ computeCoulombGradientDDSD_J_0(double*         grad_x,
 
             ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
-            PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
+            // PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
             PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
 
             a0 = d_cart_inds[i % 6][0];
@@ -3955,7 +3967,8 @@ computeCoulombGradientDDSD_J_1(double*         grad_x,
     __shared__ uint32_t g0;
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x, PB_x;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PB_x;
+    // __shared__ double PA_x;
     __shared__ uint32_t i, j, a0, a1, b0, b1;
 
     ERIs[threadIdx.y] = 0.0;
@@ -4001,7 +4014,7 @@ computeCoulombGradientDDSD_J_1(double*         grad_x,
 
             ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
-            PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
+            // PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
             PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
 
             a0 = d_cart_inds[i % 6][0];
@@ -4226,7 +4239,8 @@ computeCoulombGradientDDSD_J_2(double*         grad_x,
     __shared__ uint32_t g0;
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x, PB_x;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PB_x;
+    // __shared__ double PA_x;
     __shared__ uint32_t i, j, a0, a1, b0, b1;
 
     ERIs[threadIdx.y] = 0.0;
@@ -4272,7 +4286,7 @@ computeCoulombGradientDDSD_J_2(double*         grad_x,
 
             ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
-            PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
+            // PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
             PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
 
             a0 = d_cart_inds[i % 6][0];
@@ -4497,7 +4511,8 @@ computeCoulombGradientDDSD_J_3(double*         grad_x,
     __shared__ uint32_t g0;
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x, PB_x;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PB_x;
+    // __shared__ double PA_x;
     __shared__ uint32_t i, j, a0, a1, b0, b1;
 
     ERIs[threadIdx.y] = 0.0;
@@ -4543,7 +4558,7 @@ computeCoulombGradientDDSD_J_3(double*         grad_x,
 
             ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
-            PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
+            // PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
             PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
 
             a0 = d_cart_inds[i % 6][0];
@@ -4770,7 +4785,8 @@ computeCoulombGradientDDSD_J_4(double*         grad_x,
     __shared__ uint32_t g0;
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x, PB_x;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PB_x;
+    // __shared__ double PA_x;
     __shared__ uint32_t i, j, a0, a1, b0, b1;
 
     ERIs[threadIdx.y] = 0.0;
@@ -4816,7 +4832,7 @@ computeCoulombGradientDDSD_J_4(double*         grad_x,
 
             ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
-            PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
+            // PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
             PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
 
             a0 = d_cart_inds[i % 6][0];
@@ -5029,7 +5045,8 @@ computeCoulombGradientDDSD_J_5(double*         grad_x,
     __shared__ uint32_t g0;
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x, PB_x;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PB_x;
+    // __shared__ double PA_x;
     __shared__ uint32_t i, j, a0, a1, b0, b1;
 
     ERIs[threadIdx.y] = 0.0;
@@ -5075,7 +5092,7 @@ computeCoulombGradientDDSD_J_5(double*         grad_x,
 
             ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
-            PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
+            // PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
             PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
 
             a0 = d_cart_inds[i % 6][0];
@@ -5292,7 +5309,8 @@ computeCoulombGradientDDSD_J_6(double*         grad_x,
     __shared__ uint32_t g0;
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1, ij_factor_D;
-    __shared__ double PA_0, PA_1, PB_0, PB_1, PA_x, PB_x;
+    __shared__ double PA_0, PA_1, PB_0, PB_1, PB_x;
+    // __shared__ double PA_x;
     __shared__ uint32_t i, j, a0, a1, b0, b1;
 
     ERIs[threadIdx.y] = 0.0;
@@ -5338,7 +5356,7 @@ computeCoulombGradientDDSD_J_6(double*         grad_x,
 
             ij_factor_D = (static_cast<double>(i != j) + 1.0) * dd_mat_D_local[ij];
 
-            PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
+            // PA_x = (a_j  * inv_S1) * (r_j[g0] - r_i[g0]);
             PB_x = (-a_i * inv_S1) * (r_j[g0] - r_i[g0]);
 
             a0 = d_cart_inds[i % 6][0];

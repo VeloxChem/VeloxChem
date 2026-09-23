@@ -25353,7 +25353,7 @@ computeCoulombFockDDDD6_FP64(double*         mat_J,
     __shared__ double   delta[3][3];
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    __shared__ double PA_0, PA_1, PB_0, PB_1;
+    // __shared__ double PA_0, PA_1, PB_0, PB_1;
     __shared__ uint32_t i, j, a0, a1, b0, b1;
 
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
@@ -25401,10 +25401,10 @@ computeCoulombFockDDDD6_FP64(double*         mat_J,
             b0 = d_cart_inds[j % 6][0];
             b1 = d_cart_inds[j % 6][1];
 
-            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            // PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            // PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            // PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            // PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -26854,7 +26854,7 @@ computeCoulombFockDDDD14_FP64(double*         mat_J,
     __shared__ double   delta[3][3];
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    __shared__ double PA_0, PA_1, PB_0, PB_1;
+    // __shared__ double PA_0, PA_1, PB_0, PB_1;
     __shared__ uint32_t i, j, a0, a1, b0, b1;
 
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
@@ -26902,10 +26902,10 @@ computeCoulombFockDDDD14_FP64(double*         mat_J,
             b0 = d_cart_inds[j % 6][0];
             b1 = d_cart_inds[j % 6][1];
 
-            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            // PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            // PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            // PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            // PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -27397,7 +27397,7 @@ computeCoulombFockDDDD17_FP64(double*         mat_J,
     __shared__ double   delta[3][3];
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    __shared__ double PA_0, PA_1, PB_0, PB_1;
+    // __shared__ double PA_0, PA_1, PB_0, PB_1;
     __shared__ uint32_t i, j, a0, a1, b0, b1;
 
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
@@ -27445,10 +27445,10 @@ computeCoulombFockDDDD17_FP64(double*         mat_J,
             b0 = d_cart_inds[j % 6][0];
             b1 = d_cart_inds[j % 6][1];
 
-            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            // PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            // PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            // PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            // PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -28147,7 +28147,7 @@ computeCoulombFockDDDD21_FP64(double*         mat_J,
     __shared__ double   delta[3][3];
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    __shared__ double PA_0, PA_1, PB_0, PB_1;
+    // __shared__ double PA_0, PA_1, PB_0, PB_1;
     __shared__ uint32_t i, j, a0, a1, b0, b1;
 
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
@@ -28195,10 +28195,10 @@ computeCoulombFockDDDD21_FP64(double*         mat_J,
             b0 = d_cart_inds[j % 6][0];
             b1 = d_cart_inds[j % 6][1];
 
-            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            // PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            // PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            // PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            // PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -28499,7 +28499,7 @@ computeCoulombFockDDDD23_FP64(double*         mat_J,
     __shared__ double   delta[3][3];
 
     __shared__ double a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    __shared__ double PA_0, PA_1, PB_0, PB_1;
+    // __shared__ double PA_0, PA_1, PB_0, PB_1;
     __shared__ uint32_t i, j, a0, a1, b0, b1;
 
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
@@ -28547,10 +28547,10 @@ computeCoulombFockDDDD23_FP64(double*         mat_J,
             b0 = d_cart_inds[j % 6][0];
             b1 = d_cart_inds[j % 6][1];
 
-            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            // PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            // PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            // PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            // PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -30583,7 +30583,7 @@ computeCoulombFockDDDD6_FP32(double*         mat_J,
     __shared__ float    delta[3][3];
 
     __shared__ float  a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    __shared__ float  PA_0, PA_1, PB_0, PB_1;
+    // __shared__ float  PA_0, PA_1, PB_0, PB_1;
     __shared__ uint32_t i, j, a0, a1, b0, b1;
 
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
@@ -30632,10 +30632,10 @@ computeCoulombFockDDDD6_FP32(double*         mat_J,
             b0 = d_cart_inds[j % 6][0];
             b1 = d_cart_inds[j % 6][1];
 
-            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            // PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            // PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            // PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            // PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -32233,7 +32233,7 @@ computeCoulombFockDDDD14_FP32(double*         mat_J,
     __shared__ float    delta[3][3];
 
     __shared__ float  a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    __shared__ float  PA_0, PA_1, PB_0, PB_1;
+    // __shared__ float  PA_0, PA_1, PB_0, PB_1;
     __shared__ uint32_t i, j, a0, a1, b0, b1;
 
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
@@ -32282,10 +32282,10 @@ computeCoulombFockDDDD14_FP32(double*         mat_J,
             b0 = d_cart_inds[j % 6][0];
             b1 = d_cart_inds[j % 6][1];
 
-            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            // PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            // PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            // PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            // PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -32839,7 +32839,7 @@ computeCoulombFockDDDD17_FP32(double*         mat_J,
     __shared__ float    delta[3][3];
 
     __shared__ float  a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    __shared__ float  PA_0, PA_1, PB_0, PB_1;
+    // __shared__ float  PA_0, PA_1, PB_0, PB_1;
     __shared__ uint32_t i, j, a0, a1, b0, b1;
 
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
@@ -32888,10 +32888,10 @@ computeCoulombFockDDDD17_FP32(double*         mat_J,
             b0 = d_cart_inds[j % 6][0];
             b1 = d_cart_inds[j % 6][1];
 
-            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            // PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            // PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            // PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            // PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -33673,7 +33673,7 @@ computeCoulombFockDDDD21_FP32(double*         mat_J,
     __shared__ float    delta[3][3];
 
     __shared__ float  a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    __shared__ float  PA_0, PA_1, PB_0, PB_1;
+    // __shared__ float  PA_0, PA_1, PB_0, PB_1;
     __shared__ uint32_t i, j, a0, a1, b0, b1;
 
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
@@ -33722,10 +33722,10 @@ computeCoulombFockDDDD21_FP32(double*         mat_J,
             b0 = d_cart_inds[j % 6][0];
             b1 = d_cart_inds[j % 6][1];
 
-            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            // PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            // PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            // PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            // PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 
@@ -34067,7 +34067,7 @@ computeCoulombFockDDDD23_FP32(double*         mat_J,
     __shared__ float    delta[3][3];
 
     __shared__ float  a_i, a_j, r_i[3], r_j[3], S_ij_00, S1, inv_S1;
-    __shared__ float  PA_0, PA_1, PB_0, PB_1;
+    // __shared__ float  PA_0, PA_1, PB_0, PB_1;
     __shared__ uint32_t i, j, a0, a1, b0, b1;
 
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
@@ -34116,10 +34116,10 @@ computeCoulombFockDDDD23_FP32(double*         mat_J,
             b0 = d_cart_inds[j % 6][0];
             b1 = d_cart_inds[j % 6][1];
 
-            PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
-            PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
-            PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
-            PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
+            // PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
+            // PA_1 = (a_j  * inv_S1) * (r_j[a1] - r_i[a1]);
+            // PB_0 = (-a_i * inv_S1) * (r_j[b0] - r_i[b0]);
+            // PB_1 = (-a_i * inv_S1) * (r_j[b1] - r_i[b1]);
 
         }
 

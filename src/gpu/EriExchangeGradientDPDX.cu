@@ -811,7 +811,8 @@ computeExchangeGradientDPDS_K_0(double*         grad_x,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double PA_0, PA_1, PB_0, PA_x;
+        double PA_0, PA_1, PB_0;
+        // double PA_x;
         uint32_t j_prim, j_cgto, b0;
 
         if (j < count_i)
@@ -833,7 +834,7 @@ computeExchangeGradientDPDS_K_0(double*         grad_x,
 
             S_ij_00 = pair_data_K_dp[displ_i + j];
 
-            PA_x = (a_j * inv_S1) * (r_j[g0] - r_i[g0]);
+            // PA_x = (a_j * inv_S1) * (r_j[g0] - r_i[g0]);
 
             b0 = j_prim % 3;
 
@@ -3519,7 +3520,8 @@ computeExchangeGradientDPDP_K_0(double*         grad_x,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double PA_0, PA_1, PB_0, PA_x;
+        double PA_0, PA_1, PB_0;
+        // double PA_x;
         uint32_t j_prim, j_cgto, b0;
 
         if (j < count_i)
@@ -3541,7 +3543,7 @@ computeExchangeGradientDPDP_K_0(double*         grad_x,
 
             S_ij_00 = pair_data_K_dp[displ_i + j];
 
-            PA_x = (a_j * inv_S1) * (r_j[g0] - r_i[g0]);
+            // PA_x = (a_j * inv_S1) * (r_j[g0] - r_i[g0]);
 
             b0 = j_prim % 3;
 
@@ -3902,7 +3904,8 @@ computeExchangeGradientDPDP_K_1(double*         grad_x,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double PA_0, PA_1, PB_0, PA_x;
+        double PA_0, PA_1, PB_0;
+        // double PA_x;
         uint32_t j_prim, j_cgto, b0;
 
         if (j < count_i)
@@ -3924,7 +3927,7 @@ computeExchangeGradientDPDP_K_1(double*         grad_x,
 
             S_ij_00 = pair_data_K_dp[displ_i + j];
 
-            PA_x = (a_j * inv_S1) * (r_j[g0] - r_i[g0]);
+            // PA_x = (a_j * inv_S1) * (r_j[g0] - r_i[g0]);
 
             b0 = j_prim % 3;
 
@@ -4314,7 +4317,8 @@ computeExchangeGradientDPDP_K_2(double*         grad_x,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double PA_0, PA_1, PB_0, PA_x;
+        double PA_0, PA_1, PB_0;
+        // double PA_x;
         uint32_t j_prim, j_cgto, b0;
 
         if (j < count_i)
@@ -4336,7 +4340,7 @@ computeExchangeGradientDPDP_K_2(double*         grad_x,
 
             S_ij_00 = pair_data_K_dp[displ_i + j];
 
-            PA_x = (a_j * inv_S1) * (r_j[g0] - r_i[g0]);
+            // PA_x = (a_j * inv_S1) * (r_j[g0] - r_i[g0]);
 
             b0 = j_prim % 3;
 
@@ -4651,7 +4655,8 @@ computeExchangeGradientDPDP_K_3(double*         grad_x,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double PA_0, PA_1, PB_0, PA_x;
+        double PA_0, PA_1, PB_0;
+        // double PA_x;
         uint32_t j_prim, j_cgto, b0;
 
         if (j < count_i)
@@ -4673,7 +4678,7 @@ computeExchangeGradientDPDP_K_3(double*         grad_x,
 
             S_ij_00 = pair_data_K_dp[displ_i + j];
 
-            PA_x = (a_j * inv_S1) * (r_j[g0] - r_i[g0]);
+            // PA_x = (a_j * inv_S1) * (r_j[g0] - r_i[g0]);
 
             b0 = j_prim % 3;
 
@@ -4959,7 +4964,8 @@ computeExchangeGradientDPDP_K_4(double*         grad_x,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double PA_0, PA_1, PB_0, PA_x;
+        double PA_0, PA_1, PB_0;
+        // double PA_x;
         uint32_t j_prim, j_cgto, b0;
 
         if (j < count_i)
@@ -4981,7 +4987,7 @@ computeExchangeGradientDPDP_K_4(double*         grad_x,
 
             S_ij_00 = pair_data_K_dp[displ_i + j];
 
-            PA_x = (a_j * inv_S1) * (r_j[g0] - r_i[g0]);
+            // PA_x = (a_j * inv_S1) * (r_j[g0] - r_i[g0]);
 
             b0 = j_prim % 3;
 
@@ -10697,7 +10703,8 @@ computeExchangeGradientDPDD_K_0(double*         grad_x,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double PA_0, PA_1, PB_0, PA_x;
+        double PA_0, PA_1, PB_0;
+        // double PA_x;
         uint32_t j_prim, j_cgto, b0;
 
         if (j < count_i)
@@ -10719,7 +10726,7 @@ computeExchangeGradientDPDD_K_0(double*         grad_x,
 
             S_ij_00 = pair_data_K_dp[displ_i + j];
 
-            PA_x = (a_j * inv_S1) * (r_j[g0] - r_i[g0]);
+            // PA_x = (a_j * inv_S1) * (r_j[g0] - r_i[g0]);
 
             b0 = j_prim % 3;
 
@@ -11039,7 +11046,8 @@ computeExchangeGradientDPDD_K_1(double*         grad_x,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double PA_0, PA_1, PB_0, PA_x;
+        double PA_0, PA_1, PB_0;
+        // double PA_x;
         uint32_t j_prim, j_cgto, b0;
 
         if (j < count_i)
@@ -11061,7 +11069,7 @@ computeExchangeGradientDPDD_K_1(double*         grad_x,
 
             S_ij_00 = pair_data_K_dp[displ_i + j];
 
-            PA_x = (a_j * inv_S1) * (r_j[g0] - r_i[g0]);
+            // PA_x = (a_j * inv_S1) * (r_j[g0] - r_i[g0]);
 
             b0 = j_prim % 3;
 
@@ -11339,7 +11347,8 @@ computeExchangeGradientDPDD_K_2(double*         grad_x,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double PA_0, PA_1, PB_0, PA_x;
+        double PA_0, PA_1, PB_0;
+        // double PA_x;
         uint32_t j_prim, j_cgto, b0;
 
         if (j < count_i)
@@ -11361,7 +11370,7 @@ computeExchangeGradientDPDD_K_2(double*         grad_x,
 
             S_ij_00 = pair_data_K_dp[displ_i + j];
 
-            PA_x = (a_j * inv_S1) * (r_j[g0] - r_i[g0]);
+            // PA_x = (a_j * inv_S1) * (r_j[g0] - r_i[g0]);
 
             b0 = j_prim % 3;
 
@@ -11620,7 +11629,8 @@ computeExchangeGradientDPDD_K_3(double*         grad_x,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double PA_0, PA_1, PB_0, PA_x;
+        double PA_0, PA_1, PB_0;
+        // double PA_x;
         uint32_t j_prim, j_cgto, b0;
 
         if (j < count_i)
@@ -11642,7 +11652,7 @@ computeExchangeGradientDPDD_K_3(double*         grad_x,
 
             S_ij_00 = pair_data_K_dp[displ_i + j];
 
-            PA_x = (a_j * inv_S1) * (r_j[g0] - r_i[g0]);
+            // PA_x = (a_j * inv_S1) * (r_j[g0] - r_i[g0]);
 
             b0 = j_prim % 3;
 
@@ -11887,7 +11897,8 @@ computeExchangeGradientDPDD_K_4(double*         grad_x,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double PA_0, PA_1, PB_0, PA_x;
+        double PA_0, PA_1, PB_0;
+        // double PA_x;
         uint32_t j_prim, j_cgto, b0;
 
         if (j < count_i)
@@ -11909,7 +11920,7 @@ computeExchangeGradientDPDD_K_4(double*         grad_x,
 
             S_ij_00 = pair_data_K_dp[displ_i + j];
 
-            PA_x = (a_j * inv_S1) * (r_j[g0] - r_i[g0]);
+            // PA_x = (a_j * inv_S1) * (r_j[g0] - r_i[g0]);
 
             b0 = j_prim % 3;
 
@@ -12162,7 +12173,8 @@ computeExchangeGradientDPDD_K_5(double*         grad_x,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double PA_0, PA_1, PB_0, PA_x;
+        double PA_0, PA_1, PB_0;
+        // double PA_x;
         uint32_t j_prim, j_cgto, b0;
 
         if (j < count_i)
@@ -12184,7 +12196,7 @@ computeExchangeGradientDPDD_K_5(double*         grad_x,
 
             S_ij_00 = pair_data_K_dp[displ_i + j];
 
-            PA_x = (a_j * inv_S1) * (r_j[g0] - r_i[g0]);
+            // PA_x = (a_j * inv_S1) * (r_j[g0] - r_i[g0]);
 
             b0 = j_prim % 3;
 
@@ -12471,7 +12483,8 @@ computeExchangeGradientDPDD_K_6(double*         grad_x,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double PA_0, PA_1, PB_0, PA_x;
+        double PA_0, PA_1, PB_0;
+        // double PA_x;
         uint32_t j_prim, j_cgto, b0;
 
         if (j < count_i)
@@ -12493,7 +12506,7 @@ computeExchangeGradientDPDD_K_6(double*         grad_x,
 
             S_ij_00 = pair_data_K_dp[displ_i + j];
 
-            PA_x = (a_j * inv_S1) * (r_j[g0] - r_i[g0]);
+            // PA_x = (a_j * inv_S1) * (r_j[g0] - r_i[g0]);
 
             b0 = j_prim % 3;
 
@@ -12758,7 +12771,8 @@ computeExchangeGradientDPDD_K_7(double*         grad_x,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double PA_0, PA_1, PB_0, PA_x;
+        double PA_0, PA_1, PB_0;
+        // double PA_x;
         uint32_t j_prim, j_cgto, b0;
 
         if (j < count_i)
@@ -12780,7 +12794,7 @@ computeExchangeGradientDPDD_K_7(double*         grad_x,
 
             S_ij_00 = pair_data_K_dp[displ_i + j];
 
-            PA_x = (a_j * inv_S1) * (r_j[g0] - r_i[g0]);
+            // PA_x = (a_j * inv_S1) * (r_j[g0] - r_i[g0]);
 
             b0 = j_prim % 3;
 
@@ -13030,7 +13044,8 @@ computeExchangeGradientDPDD_K_8(double*         grad_x,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double PA_0, PA_1, PB_0, PA_x;
+        double PA_0, PA_1, PB_0;
+        // double PA_x;
         uint32_t j_prim, j_cgto, b0;
 
         if (j < count_i)
@@ -13052,7 +13067,7 @@ computeExchangeGradientDPDD_K_8(double*         grad_x,
 
             S_ij_00 = pair_data_K_dp[displ_i + j];
 
-            PA_x = (a_j * inv_S1) * (r_j[g0] - r_i[g0]);
+            // PA_x = (a_j * inv_S1) * (r_j[g0] - r_i[g0]);
 
             b0 = j_prim % 3;
 
@@ -13298,7 +13313,8 @@ computeExchangeGradientDPDD_K_9(double*         grad_x,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double PA_0, PA_1, PB_0, PA_x;
+        double PA_0, PA_1, PB_0;
+        // double PA_x;
         uint32_t j_prim, j_cgto, b0;
 
         if (j < count_i)
@@ -13320,7 +13336,7 @@ computeExchangeGradientDPDD_K_9(double*         grad_x,
 
             S_ij_00 = pair_data_K_dp[displ_i + j];
 
-            PA_x = (a_j * inv_S1) * (r_j[g0] - r_i[g0]);
+            // PA_x = (a_j * inv_S1) * (r_j[g0] - r_i[g0]);
 
             b0 = j_prim % 3;
 
@@ -13634,7 +13650,8 @@ computeExchangeGradientDPDD_K_10(double*         grad_x,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double PA_0, PA_1, PB_0, PA_x;
+        double PA_0, PA_1, PB_0;
+        // double PA_x;
         uint32_t j_prim, j_cgto, b0;
 
         if (j < count_i)
@@ -13656,7 +13673,7 @@ computeExchangeGradientDPDD_K_10(double*         grad_x,
 
             S_ij_00 = pair_data_K_dp[displ_i + j];
 
-            PA_x = (a_j * inv_S1) * (r_j[g0] - r_i[g0]);
+            // PA_x = (a_j * inv_S1) * (r_j[g0] - r_i[g0]);
 
             b0 = j_prim % 3;
 
@@ -13926,7 +13943,8 @@ computeExchangeGradientDPDD_K_11(double*         grad_x,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double PA_0, PA_1, PB_0, PA_x;
+        double PA_0, PA_1, PB_0;
+        // double PA_x;
         uint32_t j_prim, j_cgto, b0;
 
         if (j < count_i)
@@ -13948,7 +13966,7 @@ computeExchangeGradientDPDD_K_11(double*         grad_x,
 
             S_ij_00 = pair_data_K_dp[displ_i + j];
 
-            PA_x = (a_j * inv_S1) * (r_j[g0] - r_i[g0]);
+            // PA_x = (a_j * inv_S1) * (r_j[g0] - r_i[g0]);
 
             b0 = j_prim % 3;
 
@@ -14227,7 +14245,8 @@ computeExchangeGradientDPDD_K_12(double*         grad_x,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double PA_0, PA_1, PB_0, PA_x;
+        double PA_0, PA_1, PB_0;
+        // double PA_x;
         uint32_t j_prim, j_cgto, b0;
 
         if (j < count_i)
@@ -14249,7 +14268,7 @@ computeExchangeGradientDPDD_K_12(double*         grad_x,
 
             S_ij_00 = pair_data_K_dp[displ_i + j];
 
-            PA_x = (a_j * inv_S1) * (r_j[g0] - r_i[g0]);
+            // PA_x = (a_j * inv_S1) * (r_j[g0] - r_i[g0]);
 
             b0 = j_prim % 3;
 
@@ -14504,7 +14523,8 @@ computeExchangeGradientDPDD_K_13(double*         grad_x,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double PA_0, PA_1, PB_0, PA_x;
+        double PA_0, PA_1, PB_0;
+        // double PA_x;
         uint32_t j_prim, j_cgto, b0;
 
         if (j < count_i)
@@ -14526,7 +14546,7 @@ computeExchangeGradientDPDD_K_13(double*         grad_x,
 
             S_ij_00 = pair_data_K_dp[displ_i + j];
 
-            PA_x = (a_j * inv_S1) * (r_j[g0] - r_i[g0]);
+            // PA_x = (a_j * inv_S1) * (r_j[g0] - r_i[g0]);
 
             b0 = j_prim % 3;
 
@@ -14783,7 +14803,8 @@ computeExchangeGradientDPDD_K_14(double*         grad_x,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double PA_0, PA_1, PB_0, PA_x;
+        double PA_0, PA_1, PB_0;
+        // double PA_x;
         uint32_t j_prim, j_cgto, b0;
 
         if (j < count_i)
@@ -14805,7 +14826,7 @@ computeExchangeGradientDPDD_K_14(double*         grad_x,
 
             S_ij_00 = pair_data_K_dp[displ_i + j];
 
-            PA_x = (a_j * inv_S1) * (r_j[g0] - r_i[g0]);
+            // PA_x = (a_j * inv_S1) * (r_j[g0] - r_i[g0]);
 
             b0 = j_prim % 3;
 
@@ -15066,7 +15087,8 @@ computeExchangeGradientDPDD_K_15(double*         grad_x,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double PA_0, PA_1, PB_0, PA_x;
+        double PA_0, PA_1, PB_0;
+        // double PA_x;
         uint32_t j_prim, j_cgto, b0;
 
         if (j < count_i)
@@ -15088,7 +15110,7 @@ computeExchangeGradientDPDD_K_15(double*         grad_x,
 
             S_ij_00 = pair_data_K_dp[displ_i + j];
 
-            PA_x = (a_j * inv_S1) * (r_j[g0] - r_i[g0]);
+            // PA_x = (a_j * inv_S1) * (r_j[g0] - r_i[g0]);
 
             b0 = j_prim % 3;
 
@@ -15378,7 +15400,8 @@ computeExchangeGradientDPDD_K_16(double*         grad_x,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double PA_0, PA_1, PB_0, PA_x;
+        double PA_0, PA_1, PB_0;
+        // double PA_x;
         uint32_t j_prim, j_cgto, b0;
 
         if (j < count_i)
@@ -15400,7 +15423,7 @@ computeExchangeGradientDPDD_K_16(double*         grad_x,
 
             S_ij_00 = pair_data_K_dp[displ_i + j];
 
-            PA_x = (a_j * inv_S1) * (r_j[g0] - r_i[g0]);
+            // PA_x = (a_j * inv_S1) * (r_j[g0] - r_i[g0]);
 
             b0 = j_prim % 3;
 

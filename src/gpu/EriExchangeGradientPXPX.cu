@@ -406,7 +406,8 @@ computeExchangeGradientPSPS_K_0(double*         grad_x,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double PA_0, PA_x;
+        double PA_0;
+        // double PA_x;
         uint32_t j_prim, j_cgto;
 
         if (j < count_i)
@@ -428,7 +429,7 @@ computeExchangeGradientPSPS_K_0(double*         grad_x,
 
             S_ij_00 = pair_data_K_ps[displ_i + j];
 
-            PA_x = (a_j * inv_S1) * (r_j[g0] - r_i[g0]);
+            // PA_x = (a_j * inv_S1) * (r_j[g0] - r_i[g0]);
 
 
             PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
@@ -1049,7 +1050,8 @@ computeExchangeGradientPSPP_K_0(double*         grad_x,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double PA_0, PA_x;
+        double PA_0;
+        // double PA_x;
         uint32_t j_prim, j_cgto;
 
         if (j < count_i)
@@ -1071,7 +1073,7 @@ computeExchangeGradientPSPP_K_0(double*         grad_x,
 
             S_ij_00 = pair_data_K_ps[displ_i + j];
 
-            PA_x = (a_j * inv_S1) * (r_j[g0] - r_i[g0]);
+            // PA_x = (a_j * inv_S1) * (r_j[g0] - r_i[g0]);
 
 
             PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
@@ -1848,7 +1850,8 @@ computeExchangeGradientPSPD_K_0(double*         grad_x,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double PA_0, PA_x;
+        double PA_0;
+        // double PA_x;
         uint32_t j_prim, j_cgto;
 
         if (j < count_i)
@@ -1870,7 +1873,7 @@ computeExchangeGradientPSPD_K_0(double*         grad_x,
 
             S_ij_00 = pair_data_K_ps[displ_i + j];
 
-            PA_x = (a_j * inv_S1) * (r_j[g0] - r_i[g0]);
+            // PA_x = (a_j * inv_S1) * (r_j[g0] - r_i[g0]);
 
 
             PA_0 = (a_j  * inv_S1) * (r_j[a0] - r_i[a0]);
@@ -2595,7 +2598,8 @@ computeExchangeGradientPPPS_K_0(double*         grad_x,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double PA_0, PB_0, PA_x;
+        double PA_0, PB_0;
+        // double PA_x;
         uint32_t j_prim, j_cgto, b0;
 
         if (j < count_i)
@@ -2617,7 +2621,7 @@ computeExchangeGradientPPPS_K_0(double*         grad_x,
 
             S_ij_00 = pair_data_K_pp[displ_i + j];
 
-            PA_x = (a_j * inv_S1) * (r_j[g0] - r_i[g0]);
+            // PA_x = (a_j * inv_S1) * (r_j[g0] - r_i[g0]);
 
             b0 = j_prim % 3;
 
@@ -3392,7 +3396,8 @@ computeExchangeGradientPPPP_K_0(double*         grad_x,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double PA_0, PB_0, PA_x;
+        double PA_0, PB_0;
+        // double PA_x;
         uint32_t j_prim, j_cgto, b0;
 
         if (j < count_i)
@@ -3414,7 +3419,7 @@ computeExchangeGradientPPPP_K_0(double*         grad_x,
 
             S_ij_00 = pair_data_K_pp[displ_i + j];
 
-            PA_x = (a_j * inv_S1) * (r_j[g0] - r_i[g0]);
+            // PA_x = (a_j * inv_S1) * (r_j[g0] - r_i[g0]);
 
             b0 = j_prim % 3;
 
@@ -4475,7 +4480,8 @@ computeExchangeGradientPPPD_K_0(double*         grad_x,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double PA_0, PB_0, PA_x;
+        double PA_0, PB_0;
+        // double PA_x;
         uint32_t j_prim, j_cgto, b0;
 
         if (j < count_i)
@@ -4497,7 +4503,7 @@ computeExchangeGradientPPPD_K_0(double*         grad_x,
 
             S_ij_00 = pair_data_K_pp[displ_i + j];
 
-            PA_x = (a_j * inv_S1) * (r_j[g0] - r_i[g0]);
+            // PA_x = (a_j * inv_S1) * (r_j[g0] - r_i[g0]);
 
             b0 = j_prim % 3;
 
@@ -5530,7 +5536,8 @@ computeExchangeGradientPDPS_K_0(double*         grad_x,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double PA_0, PB_0, PB_1, PA_x;
+        double PA_0, PB_0, PB_1;
+        // double PA_x;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if (j < count_i)
@@ -5552,7 +5559,7 @@ computeExchangeGradientPDPS_K_0(double*         grad_x,
 
             S_ij_00 = pair_data_K_pd[displ_i + j];
 
-            PA_x = (a_j * inv_S1) * (r_j[g0] - r_i[g0]);
+            // PA_x = (a_j * inv_S1) * (r_j[g0] - r_i[g0]);
 
             b0 = d_cart_inds[j_prim % 6][0];
             b1 = d_cart_inds[j_prim % 6][1];
@@ -6609,7 +6616,8 @@ computeExchangeGradientPDPP_K_0(double*         grad_x,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double PA_0, PB_0, PB_1, PA_x;
+        double PA_0, PB_0, PB_1;
+        // double PA_x;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if (j < count_i)
@@ -6631,7 +6639,7 @@ computeExchangeGradientPDPP_K_0(double*         grad_x,
 
             S_ij_00 = pair_data_K_pd[displ_i + j];
 
-            PA_x = (a_j * inv_S1) * (r_j[g0] - r_i[g0]);
+            // PA_x = (a_j * inv_S1) * (r_j[g0] - r_i[g0]);
 
             b0 = d_cart_inds[j_prim % 6][0];
             b1 = d_cart_inds[j_prim % 6][1];
@@ -9273,7 +9281,8 @@ computeExchangeGradientPDPD_K_0(double*         grad_x,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double PA_0, PB_0, PB_1, PA_x;
+        double PA_0, PB_0, PB_1;
+        // double PA_x;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if (j < count_i)
@@ -9295,7 +9304,7 @@ computeExchangeGradientPDPD_K_0(double*         grad_x,
 
             S_ij_00 = pair_data_K_pd[displ_i + j];
 
-            PA_x = (a_j * inv_S1) * (r_j[g0] - r_i[g0]);
+            // PA_x = (a_j * inv_S1) * (r_j[g0] - r_i[g0]);
 
             b0 = d_cart_inds[j_prim % 6][0];
             b1 = d_cart_inds[j_prim % 6][1];
@@ -9652,7 +9661,8 @@ computeExchangeGradientPDPD_K_1(double*         grad_x,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double PA_0, PB_0, PB_1, PA_x;
+        double PA_0, PB_0, PB_1;
+        // double PA_x;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if (j < count_i)
@@ -9674,7 +9684,7 @@ computeExchangeGradientPDPD_K_1(double*         grad_x,
 
             S_ij_00 = pair_data_K_pd[displ_i + j];
 
-            PA_x = (a_j * inv_S1) * (r_j[g0] - r_i[g0]);
+            // PA_x = (a_j * inv_S1) * (r_j[g0] - r_i[g0]);
 
             b0 = d_cart_inds[j_prim % 6][0];
             b1 = d_cart_inds[j_prim % 6][1];
@@ -10056,7 +10066,8 @@ computeExchangeGradientPDPD_K_2(double*         grad_x,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double PA_0, PB_0, PB_1, PA_x;
+        double PA_0, PB_0, PB_1;
+        // double PA_x;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if (j < count_i)
@@ -10078,7 +10089,7 @@ computeExchangeGradientPDPD_K_2(double*         grad_x,
 
             S_ij_00 = pair_data_K_pd[displ_i + j];
 
-            PA_x = (a_j * inv_S1) * (r_j[g0] - r_i[g0]);
+            // PA_x = (a_j * inv_S1) * (r_j[g0] - r_i[g0]);
 
             b0 = d_cart_inds[j_prim % 6][0];
             b1 = d_cart_inds[j_prim % 6][1];
@@ -10391,7 +10402,8 @@ computeExchangeGradientPDPD_K_3(double*         grad_x,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double PA_0, PB_0, PB_1, PA_x;
+        double PA_0, PB_0, PB_1;
+        // double PA_x;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if (j < count_i)
@@ -10413,7 +10425,7 @@ computeExchangeGradientPDPD_K_3(double*         grad_x,
 
             S_ij_00 = pair_data_K_pd[displ_i + j];
 
-            PA_x = (a_j * inv_S1) * (r_j[g0] - r_i[g0]);
+            // PA_x = (a_j * inv_S1) * (r_j[g0] - r_i[g0]);
 
             b0 = d_cart_inds[j_prim % 6][0];
             b1 = d_cart_inds[j_prim % 6][1];
@@ -10695,7 +10707,8 @@ computeExchangeGradientPDPD_K_4(double*         grad_x,
         __syncthreads();
 
         double Q_ij, a_j, r_j[3], S_ij_00, S1, inv_S1;
-        double PA_0, PB_0, PB_1, PA_x;
+        double PA_0, PB_0, PB_1;
+        // double PA_x;
         uint32_t j_prim, j_cgto, b0, b1;
 
         if (j < count_i)
@@ -10717,7 +10730,7 @@ computeExchangeGradientPDPD_K_4(double*         grad_x,
 
             S_ij_00 = pair_data_K_pd[displ_i + j];
 
-            PA_x = (a_j * inv_S1) * (r_j[g0] - r_i[g0]);
+            // PA_x = (a_j * inv_S1) * (r_j[g0] - r_i[g0]);
 
             b0 = d_cart_inds[j_prim % 6][0];
             b1 = d_cart_inds[j_prim % 6][1];
