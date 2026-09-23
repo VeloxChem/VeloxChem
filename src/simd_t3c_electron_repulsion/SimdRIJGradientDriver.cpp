@@ -158,7 +158,7 @@ CSimdRIJGradientDriver::compute(const CMolecule           &molecule,
 
     std::iota(atoms.begin(), atoms.end(), 0);
 
-    return compute(molecule, basis, aux_basis, fitting, density, atoms, {}, true);
+    return compute(molecule, basis, aux_basis, fitting, density, atoms, atoms, true);
 }
 
 auto
@@ -190,7 +190,7 @@ CSimdRIJGradientDriver::compute_open_shell(const CMolecule           &molecule,
 
     std::iota(atoms.begin(), atoms.end(), 0);
 
-    return compute_open_shell(molecule, basis, aux_basis, fitting, density, atoms, {}, true);
+    return compute_open_shell(molecule, basis, aux_basis, fitting, density, atoms, atoms, true);
 }
 
 auto
@@ -228,16 +228,16 @@ CSimdRIJGradientDriver::_three_center(CPackedMatrix             &gradient,
 
     density.to_dense(dense_d.data());
 
-    // every atom of the auxiliary basis, or the share the caller holds
+    // NOTE: **the share the caller holds, and an empty share is empty.** This
+    // used to read an empty list as every atom, which is the convenience a caller
+    // over the whole molecule wants and is a trap for one dividing the work: a
+    // rank whose share of the atoms came out empty -- which happens whenever there
+    // are more ranks than atoms -- then added the whole of the three-center term
+    // instead of none of it, once per idle rank, and the gradient came back wrong
+    // by hundreds of times without a word. The overload which takes no share names
+    // every atom explicitly instead.
 
-    auto atoms = aux_atoms;
-
-    if (atoms.empty())
-    {
-        atoms.resize(molecule.number_of_atoms());
-
-        std::iota(atoms.begin(), atoms.end(), 0);
-    }
+    const auto &atoms = aux_atoms;
 
     const auto eri_drv = CSimdThreeCenterElectronRepulsionDriver();
 
