@@ -37,6 +37,7 @@ import numpy as np
 
 from .errorhandler import assert_msg_critical
 from .molecule import Molecule
+from .veloxchemlib import PolarizableEmbedding
 from .veloxchemlib import PolarizableForceField
 
 # NOTE: how many numbers a multipole of each order is written with, in the order
@@ -63,6 +64,7 @@ class SimdPolarizableEmbeddingDriver:
         - solvent: The molecules of the environment, as (label, molecule) pairs.
         - box: The edges of the periodic box in angstrom, or None.
         - force_fields: The force fields of a potential file, keyed by name.
+        - embedding: The environment the force fields and the structure make up.
     """
 
     def __init__(self, ostream=None):
@@ -79,6 +81,8 @@ class SimdPolarizableEmbeddingDriver:
         self.solute_label = None
 
         self.force_fields = OrderedDict()
+
+        self.embedding = None
 
     def read_pdb(self, pdb_file):
         """
@@ -175,6 +179,70 @@ class SimdPolarizableEmbeddingDriver:
         self.force_fields = read_potential_file(potential_file)
 
         return self
+
+    def build_embedding(self):
+        """
+        Builds the environment of the structure and the force fields.
+
+        Each molecule of the environment is given the force field of its
+        species, which is the part of its label before the number: a molecule
+        labelled `WAT-17` is described by the force field named `WAT`.
+
+        Which region a molecule goes to follows from its force field, and is
+        not a choice: one carrying a polarizability goes to the polarizable
+        region and one without goes to the nonpolarizable region. The regions
+        hold to that themselves, the nonpolarizable one refusing a force field
+        which polarizes, so a rule which said anything else would produce
+        refusals nobody asked for.
+
+        The solute is not part of it. The environment is what surrounds the
+        molecule the wave function is of.
+
+        :return:
+            The environment.
+        """
+
+        assert_msg_critical(
+            self.solvent or self.solute is not None,
+            'build_embedding: no structure has been read')
+
+        assert_msg_critical(
+            len(self.force_fields) > 0,
+            'build_embedding: no force field has been read')
+
+        embedding = PolarizableEmbedding()
+
+        for label, molecule in self.solvent:
+            species = label.rsplit('-', 1)[0]
+
+            assert_msg_critical(
+                species in self.force_fields,
+                f'build_embedding: the potential file has no force field named '
+                f'{species}, which {label} is made of. It holds '
+                f'{", ".join(self.force_fields)}')
+
+            force_field = self.force_fields[species]
+
+            # NOTE: the regions check this as well, and name the force field
+            # and the two counts. What they cannot name is which molecule of
+            # the environment was being added, and with five hundred of them
+            # that is the part worth having.
+
+            assert_msg_critical(
+                len(force_field) == molecule.number_of_atoms(),
+                f'build_embedding: the force field {species} has '
+                f'{len(force_field)} site(s) and {label} has '
+                f'{molecule.number_of_atoms()} atom(s)')
+
+            region = (embedding.polarizable_region()
+                      if force_field.is_polarizable() else
+                      embedding.nonpolarizable_region())
+
+            region.add_molecule(molecule, force_field)
+
+        self.embedding = embedding
+
+        return embedding
 
     @staticmethod
     def _label_of(key, number):

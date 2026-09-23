@@ -21,7 +21,7 @@
 # and then the two hydrogens.
 
 @FORCEFIELD
-name:  WATER
+name:  WAT
 sites: 3
 units: au
 

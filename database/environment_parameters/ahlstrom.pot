@@ -21,7 +21,7 @@
 # and then the two hydrogens. The hydrogens carry no polarizability.
 
 @FORCEFIELD
-name:  WATER
+name:  WAT
 sites: 3
 units: au
 
