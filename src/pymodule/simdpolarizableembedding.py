@@ -36,6 +36,7 @@ from pathlib import Path
 import numpy as np
 
 from .errorhandler import assert_msg_critical
+from .veloxchemlib import mpi_master
 from .molecule import Molecule
 from .oneeints import compute_simd_nuclear_potential_integrals
 from .veloxchemlib import bohr_in_angstrom
@@ -468,9 +469,10 @@ class SimdPolarizableEmbeddingDriver:
             every site here.
 
         :return:
-            The matrix to add to the Fock matrix. It is the **whole** of the
-            contribution on every rank, not a share of it: a caller which
-            reduces it again gets it as many times over as there are ranks.
+            The matrix to add to the Fock matrix on the master rank, and None
+            on every other rank. It is the **whole** of the contribution and
+            not a share of it: a caller which reduces it again gets it as many
+            times over as there are ranks.
         """
 
         multipoles = self.gather_multipoles()
@@ -492,7 +494,13 @@ class SimdPolarizableEmbeddingDriver:
             qm_molecule, basis, charges, places)
 
         if comm is not None and comm.Get_size() > 1:
-            matrix = comm.allreduce(matrix)
+
+            # NOTE: gathered on the master rank alone, which is where the Fock
+            # matrix is built. The other ranks answer None rather than a zero
+            # matrix or a share of one, so that a rank which was not meant to
+            # use this cannot quietly add the wrong thing.
+
+            matrix = comm.reduce(matrix, root=mpi_master())
 
         return matrix
 
