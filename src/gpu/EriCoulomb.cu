@@ -25271,10 +25271,10 @@ computeCoulombFockDDDD5_FP64(double*         mat_J,
 
         gpu::computeBoysFunction(F8_t, S1 * S2 * inv_S4 * r2_PQ, 3, boys_func_table, boys_func_ft);
 
-        const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
-        const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
-        const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
-        const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
+        // const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+        // const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+        // const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+        // const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
         const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -25841,10 +25841,10 @@ computeCoulombFockDDDD8_FP64(double*         mat_J,
 
         gpu::computeBoysFunction(F8_t, S1 * S2 * inv_S4 * r2_PQ, 3, boys_func_table, boys_func_ft);
 
-        const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
-        const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
-        const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
-        const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
+        // const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+        // const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+        // const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+        // const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
         const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -26784,10 +26784,10 @@ computeCoulombFockDDDD13_FP64(double*         mat_J,
 
         gpu::computeBoysFunction(F8_t, S1 * S2 * inv_S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
-        const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
-        const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
-        const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
-        const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
+        // const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+        // const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+        // const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+        // const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
         const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -27146,10 +27146,10 @@ computeCoulombFockDDDD15_FP64(double*         mat_J,
 
         gpu::computeBoysFunction(F8_t, S1 * S2 * inv_S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
-        const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
-        const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
-        const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
-        const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
+        // const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+        // const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+        // const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+        // const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
         const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -27687,10 +27687,10 @@ computeCoulombFockDDDD18_FP64(double*         mat_J,
 
         gpu::computeBoysFunction(F8_t, S1 * S2 * inv_S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
-        const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
-        const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
-        const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
-        const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
+        // const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+        // const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+        // const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+        // const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
         const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -28258,10 +28258,10 @@ computeCoulombFockDDDD21_FP64(double*         mat_J,
 
         gpu::computeBoysFunction(F8_t, S1 * S2 * inv_S4 * r2_PQ, 5, boys_func_table, boys_func_ft);
 
-        const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
-        const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
-        const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
-        const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
+        // const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+        // const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+        // const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+        // const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
         const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -28429,10 +28429,10 @@ computeCoulombFockDDDD22_FP64(double*         mat_J,
 
         gpu::computeBoysFunction(F8_t, S1 * S2 * inv_S4 * r2_PQ, 5, boys_func_table, boys_func_ft);
 
-        const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
-        const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
-        const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
-        const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
+        // const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+        // const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+        // const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+        // const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
         const double eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -30462,15 +30462,15 @@ computeCoulombFockDDDD5_FP32(double*         mat_J,
         const auto d0 = d_cart_inds[l % 6][0];
         const auto d1 = d_cart_inds[l % 6][1];
 
-        const float r_l_c0 = (c0 == 0 ? r_l0 : (c0 == 1 ? r_l1 : r_l2));
-        const float r_l_c1 = (c1 == 0 ? r_l0 : (c1 == 1 ? r_l1 : r_l2));
-        const float r_l_d0 = (d0 == 0 ? r_l0 : (d0 == 1 ? r_l1 : r_l2));
-        const float r_l_d1 = (d1 == 0 ? r_l0 : (d1 == 1 ? r_l1 : r_l2));
+        // const float r_l_c0 = (c0 == 0 ? r_l0 : (c0 == 1 ? r_l1 : r_l2));
+        // const float r_l_c1 = (c1 == 0 ? r_l0 : (c1 == 1 ? r_l1 : r_l2));
+        // const float r_l_d0 = (d0 == 0 ? r_l0 : (d0 == 1 ? r_l1 : r_l2));
+        // const float r_l_d1 = (d1 == 0 ? r_l0 : (d1 == 1 ? r_l1 : r_l2));
 
-        const float r_k_c0 = (c0 == 0 ? r_k0 : (c0 == 1 ? r_k1 : r_k2));
-        const float r_k_c1 = (c1 == 0 ? r_k0 : (c1 == 1 ? r_k1 : r_k2));
-        const float r_k_d0 = (d0 == 0 ? r_k0 : (d0 == 1 ? r_k1 : r_k2));
-        const float r_k_d1 = (d1 == 0 ? r_k0 : (d1 == 1 ? r_k1 : r_k2));
+        // const float r_k_c0 = (c0 == 0 ? r_k0 : (c0 == 1 ? r_k1 : r_k2));
+        // const float r_k_c1 = (c1 == 0 ? r_k0 : (c1 == 1 ? r_k1 : r_k2));
+        // const float r_k_d0 = (d0 == 0 ? r_k0 : (d0 == 1 ? r_k1 : r_k2));
+        // const float r_k_d1 = (d1 == 0 ? r_k0 : (d1 == 1 ? r_k1 : r_k2));
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -30500,10 +30500,10 @@ computeCoulombFockDDDD5_FP32(double*         mat_J,
 
         gpu::computeBoysFunction_f(F8_t, S1 * S2 * inv_S4 * r2_PQ, 3, boys_func_table, boys_func_ft);
 
-        const auto QC_0 = (a_l * inv_S2) * (r_l_c0 - r_k_c0);
-        const auto QC_1 = (a_l * inv_S2) * (r_l_c1 - r_k_c1);
-        const auto QD_0 = (-a_k * inv_S2) * (r_l_d0 - r_k_d0);
-        const auto QD_1 = (-a_k * inv_S2) * (r_l_d1 - r_k_d1);
+        // const auto QC_0 = (a_l * inv_S2) * (r_l_c0 - r_k_c0);
+        // const auto QC_1 = (a_l * inv_S2) * (r_l_c1 - r_k_c1);
+        // const auto QD_0 = (-a_k * inv_S2) * (r_l_d0 - r_k_d0);
+        // const auto QD_1 = (-a_k * inv_S2) * (r_l_d1 - r_k_d1);
 
         const float  eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -31076,15 +31076,15 @@ computeCoulombFockDDDD8_FP32(double*         mat_J,
         const auto d0 = d_cart_inds[l % 6][0];
         const auto d1 = d_cart_inds[l % 6][1];
 
-        const float r_l_c0 = (c0 == 0 ? r_l0 : (c0 == 1 ? r_l1 : r_l2));
-        const float r_l_c1 = (c1 == 0 ? r_l0 : (c1 == 1 ? r_l1 : r_l2));
-        const float r_l_d0 = (d0 == 0 ? r_l0 : (d0 == 1 ? r_l1 : r_l2));
-        const float r_l_d1 = (d1 == 0 ? r_l0 : (d1 == 1 ? r_l1 : r_l2));
+        // const float r_l_c0 = (c0 == 0 ? r_l0 : (c0 == 1 ? r_l1 : r_l2));
+        // const float r_l_c1 = (c1 == 0 ? r_l0 : (c1 == 1 ? r_l1 : r_l2));
+        // const float r_l_d0 = (d0 == 0 ? r_l0 : (d0 == 1 ? r_l1 : r_l2));
+        // const float r_l_d1 = (d1 == 0 ? r_l0 : (d1 == 1 ? r_l1 : r_l2));
 
-        const float r_k_c0 = (c0 == 0 ? r_k0 : (c0 == 1 ? r_k1 : r_k2));
-        const float r_k_c1 = (c1 == 0 ? r_k0 : (c1 == 1 ? r_k1 : r_k2));
-        const float r_k_d0 = (d0 == 0 ? r_k0 : (d0 == 1 ? r_k1 : r_k2));
-        const float r_k_d1 = (d1 == 0 ? r_k0 : (d1 == 1 ? r_k1 : r_k2));
+        // const float r_k_c0 = (c0 == 0 ? r_k0 : (c0 == 1 ? r_k1 : r_k2));
+        // const float r_k_c1 = (c1 == 0 ? r_k0 : (c1 == 1 ? r_k1 : r_k2));
+        // const float r_k_d0 = (d0 == 0 ? r_k0 : (d0 == 1 ? r_k1 : r_k2));
+        // const float r_k_d1 = (d1 == 0 ? r_k0 : (d1 == 1 ? r_k1 : r_k2));
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -31114,10 +31114,10 @@ computeCoulombFockDDDD8_FP32(double*         mat_J,
 
         gpu::computeBoysFunction_f(F8_t, S1 * S2 * inv_S4 * r2_PQ, 3, boys_func_table, boys_func_ft);
 
-        const auto QC_0 = (a_l * inv_S2) * (r_l_c0 - r_k_c0);
-        const auto QC_1 = (a_l * inv_S2) * (r_l_c1 - r_k_c1);
-        const auto QD_0 = (-a_k * inv_S2) * (r_l_d0 - r_k_d0);
-        const auto QD_1 = (-a_k * inv_S2) * (r_l_d1 - r_k_d1);
+        // const auto QC_0 = (a_l * inv_S2) * (r_l_c0 - r_k_c0);
+        // const auto QC_1 = (a_l * inv_S2) * (r_l_c1 - r_k_c1);
+        // const auto QD_0 = (-a_k * inv_S2) * (r_l_d0 - r_k_d0);
+        // const auto QD_1 = (-a_k * inv_S2) * (r_l_d1 - r_k_d1);
 
         const float  eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -32124,15 +32124,15 @@ computeCoulombFockDDDD13_FP32(double*         mat_J,
         const auto d0 = d_cart_inds[l % 6][0];
         const auto d1 = d_cart_inds[l % 6][1];
 
-        const float r_l_c0 = (c0 == 0 ? r_l0 : (c0 == 1 ? r_l1 : r_l2));
-        const float r_l_c1 = (c1 == 0 ? r_l0 : (c1 == 1 ? r_l1 : r_l2));
-        const float r_l_d0 = (d0 == 0 ? r_l0 : (d0 == 1 ? r_l1 : r_l2));
-        const float r_l_d1 = (d1 == 0 ? r_l0 : (d1 == 1 ? r_l1 : r_l2));
+        // const float r_l_c0 = (c0 == 0 ? r_l0 : (c0 == 1 ? r_l1 : r_l2));
+        // const float r_l_c1 = (c1 == 0 ? r_l0 : (c1 == 1 ? r_l1 : r_l2));
+        // const float r_l_d0 = (d0 == 0 ? r_l0 : (d0 == 1 ? r_l1 : r_l2));
+        // const float r_l_d1 = (d1 == 0 ? r_l0 : (d1 == 1 ? r_l1 : r_l2));
 
-        const float r_k_c0 = (c0 == 0 ? r_k0 : (c0 == 1 ? r_k1 : r_k2));
-        const float r_k_c1 = (c1 == 0 ? r_k0 : (c1 == 1 ? r_k1 : r_k2));
-        const float r_k_d0 = (d0 == 0 ? r_k0 : (d0 == 1 ? r_k1 : r_k2));
-        const float r_k_d1 = (d1 == 0 ? r_k0 : (d1 == 1 ? r_k1 : r_k2));
+        // const float r_k_c0 = (c0 == 0 ? r_k0 : (c0 == 1 ? r_k1 : r_k2));
+        // const float r_k_c1 = (c1 == 0 ? r_k0 : (c1 == 1 ? r_k1 : r_k2));
+        // const float r_k_d0 = (d0 == 0 ? r_k0 : (d0 == 1 ? r_k1 : r_k2));
+        // const float r_k_d1 = (d1 == 0 ? r_k0 : (d1 == 1 ? r_k1 : r_k2));
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -32162,10 +32162,10 @@ computeCoulombFockDDDD13_FP32(double*         mat_J,
 
         gpu::computeBoysFunction_f(F8_t, S1 * S2 * inv_S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
-        const auto QC_0 = (a_l * inv_S2) * (r_l_c0 - r_k_c0);
-        const auto QC_1 = (a_l * inv_S2) * (r_l_c1 - r_k_c1);
-        const auto QD_0 = (-a_k * inv_S2) * (r_l_d0 - r_k_d0);
-        const auto QD_1 = (-a_k * inv_S2) * (r_l_d1 - r_k_d1);
+        // const auto QC_0 = (a_l * inv_S2) * (r_l_c0 - r_k_c0);
+        // const auto QC_1 = (a_l * inv_S2) * (r_l_c1 - r_k_c1);
+        // const auto QD_0 = (-a_k * inv_S2) * (r_l_d0 - r_k_d0);
+        // const auto QD_1 = (-a_k * inv_S2) * (r_l_d1 - r_k_d1);
 
         const float  eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -32528,15 +32528,15 @@ computeCoulombFockDDDD15_FP32(double*         mat_J,
         const auto d0 = d_cart_inds[l % 6][0];
         const auto d1 = d_cart_inds[l % 6][1];
 
-        const float r_l_c0 = (c0 == 0 ? r_l0 : (c0 == 1 ? r_l1 : r_l2));
-        const float r_l_c1 = (c1 == 0 ? r_l0 : (c1 == 1 ? r_l1 : r_l2));
-        const float r_l_d0 = (d0 == 0 ? r_l0 : (d0 == 1 ? r_l1 : r_l2));
-        const float r_l_d1 = (d1 == 0 ? r_l0 : (d1 == 1 ? r_l1 : r_l2));
+        // const float r_l_c0 = (c0 == 0 ? r_l0 : (c0 == 1 ? r_l1 : r_l2));
+        // const float r_l_c1 = (c1 == 0 ? r_l0 : (c1 == 1 ? r_l1 : r_l2));
+        // const float r_l_d0 = (d0 == 0 ? r_l0 : (d0 == 1 ? r_l1 : r_l2));
+        // const float r_l_d1 = (d1 == 0 ? r_l0 : (d1 == 1 ? r_l1 : r_l2));
 
-        const float r_k_c0 = (c0 == 0 ? r_k0 : (c0 == 1 ? r_k1 : r_k2));
-        const float r_k_c1 = (c1 == 0 ? r_k0 : (c1 == 1 ? r_k1 : r_k2));
-        const float r_k_d0 = (d0 == 0 ? r_k0 : (d0 == 1 ? r_k1 : r_k2));
-        const float r_k_d1 = (d1 == 0 ? r_k0 : (d1 == 1 ? r_k1 : r_k2));
+        // const float r_k_c0 = (c0 == 0 ? r_k0 : (c0 == 1 ? r_k1 : r_k2));
+        // const float r_k_c1 = (c1 == 0 ? r_k0 : (c1 == 1 ? r_k1 : r_k2));
+        // const float r_k_d0 = (d0 == 0 ? r_k0 : (d0 == 1 ? r_k1 : r_k2));
+        // const float r_k_d1 = (d1 == 0 ? r_k0 : (d1 == 1 ? r_k1 : r_k2));
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -32566,10 +32566,10 @@ computeCoulombFockDDDD15_FP32(double*         mat_J,
 
         gpu::computeBoysFunction_f(F8_t, S1 * S2 * inv_S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
-        const auto QC_0 = (a_l * inv_S2) * (r_l_c0 - r_k_c0);
-        const auto QC_1 = (a_l * inv_S2) * (r_l_c1 - r_k_c1);
-        const auto QD_0 = (-a_k * inv_S2) * (r_l_d0 - r_k_d0);
-        const auto QD_1 = (-a_k * inv_S2) * (r_l_d1 - r_k_d1);
+        // const auto QC_0 = (a_l * inv_S2) * (r_l_c0 - r_k_c0);
+        // const auto QC_1 = (a_l * inv_S2) * (r_l_c1 - r_k_c1);
+        // const auto QD_0 = (-a_k * inv_S2) * (r_l_d0 - r_k_d0);
+        // const auto QD_1 = (-a_k * inv_S2) * (r_l_d1 - r_k_d1);
 
         const float  eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -33132,15 +33132,15 @@ computeCoulombFockDDDD18_FP32(double*         mat_J,
         const auto d0 = d_cart_inds[l % 6][0];
         const auto d1 = d_cart_inds[l % 6][1];
 
-        const float r_l_c0 = (c0 == 0 ? r_l0 : (c0 == 1 ? r_l1 : r_l2));
-        const float r_l_c1 = (c1 == 0 ? r_l0 : (c1 == 1 ? r_l1 : r_l2));
-        const float r_l_d0 = (d0 == 0 ? r_l0 : (d0 == 1 ? r_l1 : r_l2));
-        const float r_l_d1 = (d1 == 0 ? r_l0 : (d1 == 1 ? r_l1 : r_l2));
+        // const float r_l_c0 = (c0 == 0 ? r_l0 : (c0 == 1 ? r_l1 : r_l2));
+        // const float r_l_c1 = (c1 == 0 ? r_l0 : (c1 == 1 ? r_l1 : r_l2));
+        // const float r_l_d0 = (d0 == 0 ? r_l0 : (d0 == 1 ? r_l1 : r_l2));
+        // const float r_l_d1 = (d1 == 0 ? r_l0 : (d1 == 1 ? r_l1 : r_l2));
 
-        const float r_k_c0 = (c0 == 0 ? r_k0 : (c0 == 1 ? r_k1 : r_k2));
-        const float r_k_c1 = (c1 == 0 ? r_k0 : (c1 == 1 ? r_k1 : r_k2));
-        const float r_k_d0 = (d0 == 0 ? r_k0 : (d0 == 1 ? r_k1 : r_k2));
-        const float r_k_d1 = (d1 == 0 ? r_k0 : (d1 == 1 ? r_k1 : r_k2));
+        // const float r_k_c0 = (c0 == 0 ? r_k0 : (c0 == 1 ? r_k1 : r_k2));
+        // const float r_k_c1 = (c1 == 0 ? r_k0 : (c1 == 1 ? r_k1 : r_k2));
+        // const float r_k_d0 = (d0 == 0 ? r_k0 : (d0 == 1 ? r_k1 : r_k2));
+        // const float r_k_d1 = (d1 == 0 ? r_k0 : (d1 == 1 ? r_k1 : r_k2));
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -33170,10 +33170,10 @@ computeCoulombFockDDDD18_FP32(double*         mat_J,
 
         gpu::computeBoysFunction_f(F8_t, S1 * S2 * inv_S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
-        const auto QC_0 = (a_l * inv_S2) * (r_l_c0 - r_k_c0);
-        const auto QC_1 = (a_l * inv_S2) * (r_l_c1 - r_k_c1);
-        const auto QD_0 = (-a_k * inv_S2) * (r_l_d0 - r_k_d0);
-        const auto QD_1 = (-a_k * inv_S2) * (r_l_d1 - r_k_d1);
+        // const auto QC_0 = (a_l * inv_S2) * (r_l_c0 - r_k_c0);
+        // const auto QC_1 = (a_l * inv_S2) * (r_l_c1 - r_k_c1);
+        // const auto QD_0 = (-a_k * inv_S2) * (r_l_d0 - r_k_d0);
+        // const auto QD_1 = (-a_k * inv_S2) * (r_l_d1 - r_k_d1);
 
         const float  eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -33766,15 +33766,15 @@ computeCoulombFockDDDD21_FP32(double*         mat_J,
         const auto d0 = d_cart_inds[l % 6][0];
         const auto d1 = d_cart_inds[l % 6][1];
 
-        const float r_l_c0 = (c0 == 0 ? r_l0 : (c0 == 1 ? r_l1 : r_l2));
-        const float r_l_c1 = (c1 == 0 ? r_l0 : (c1 == 1 ? r_l1 : r_l2));
-        const float r_l_d0 = (d0 == 0 ? r_l0 : (d0 == 1 ? r_l1 : r_l2));
-        const float r_l_d1 = (d1 == 0 ? r_l0 : (d1 == 1 ? r_l1 : r_l2));
+        // const float r_l_c0 = (c0 == 0 ? r_l0 : (c0 == 1 ? r_l1 : r_l2));
+        // const float r_l_c1 = (c1 == 0 ? r_l0 : (c1 == 1 ? r_l1 : r_l2));
+        // const float r_l_d0 = (d0 == 0 ? r_l0 : (d0 == 1 ? r_l1 : r_l2));
+        // const float r_l_d1 = (d1 == 0 ? r_l0 : (d1 == 1 ? r_l1 : r_l2));
 
-        const float r_k_c0 = (c0 == 0 ? r_k0 : (c0 == 1 ? r_k1 : r_k2));
-        const float r_k_c1 = (c1 == 0 ? r_k0 : (c1 == 1 ? r_k1 : r_k2));
-        const float r_k_d0 = (d0 == 0 ? r_k0 : (d0 == 1 ? r_k1 : r_k2));
-        const float r_k_d1 = (d1 == 0 ? r_k0 : (d1 == 1 ? r_k1 : r_k2));
+        // const float r_k_c0 = (c0 == 0 ? r_k0 : (c0 == 1 ? r_k1 : r_k2));
+        // const float r_k_c1 = (c1 == 0 ? r_k0 : (c1 == 1 ? r_k1 : r_k2));
+        // const float r_k_d0 = (d0 == 0 ? r_k0 : (d0 == 1 ? r_k1 : r_k2));
+        // const float r_k_d1 = (d1 == 0 ? r_k0 : (d1 == 1 ? r_k1 : r_k2));
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -33804,10 +33804,10 @@ computeCoulombFockDDDD21_FP32(double*         mat_J,
 
         gpu::computeBoysFunction_f(F8_t, S1 * S2 * inv_S4 * r2_PQ, 5, boys_func_table, boys_func_ft);
 
-        const auto QC_0 = (a_l * inv_S2) * (r_l_c0 - r_k_c0);
-        const auto QC_1 = (a_l * inv_S2) * (r_l_c1 - r_k_c1);
-        const auto QD_0 = (-a_k * inv_S2) * (r_l_d0 - r_k_d0);
-        const auto QD_1 = (-a_k * inv_S2) * (r_l_d1 - r_k_d1);
+        // const auto QC_0 = (a_l * inv_S2) * (r_l_c0 - r_k_c0);
+        // const auto QC_1 = (a_l * inv_S2) * (r_l_c1 - r_k_c1);
+        // const auto QD_0 = (-a_k * inv_S2) * (r_l_d0 - r_k_d0);
+        // const auto QD_1 = (-a_k * inv_S2) * (r_l_d1 - r_k_d1);
 
         const float  eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 
@@ -33958,15 +33958,15 @@ computeCoulombFockDDDD22_FP32(double*         mat_J,
         const auto d0 = d_cart_inds[l % 6][0];
         const auto d1 = d_cart_inds[l % 6][1];
 
-        const float r_l_c0 = (c0 == 0 ? r_l0 : (c0 == 1 ? r_l1 : r_l2));
-        const float r_l_c1 = (c1 == 0 ? r_l0 : (c1 == 1 ? r_l1 : r_l2));
-        const float r_l_d0 = (d0 == 0 ? r_l0 : (d0 == 1 ? r_l1 : r_l2));
-        const float r_l_d1 = (d1 == 0 ? r_l0 : (d1 == 1 ? r_l1 : r_l2));
+        // const float r_l_c0 = (c0 == 0 ? r_l0 : (c0 == 1 ? r_l1 : r_l2));
+        // const float r_l_c1 = (c1 == 0 ? r_l0 : (c1 == 1 ? r_l1 : r_l2));
+        // const float r_l_d0 = (d0 == 0 ? r_l0 : (d0 == 1 ? r_l1 : r_l2));
+        // const float r_l_d1 = (d1 == 0 ? r_l0 : (d1 == 1 ? r_l1 : r_l2));
 
-        const float r_k_c0 = (c0 == 0 ? r_k0 : (c0 == 1 ? r_k1 : r_k2));
-        const float r_k_c1 = (c1 == 0 ? r_k0 : (c1 == 1 ? r_k1 : r_k2));
-        const float r_k_d0 = (d0 == 0 ? r_k0 : (d0 == 1 ? r_k1 : r_k2));
-        const float r_k_d1 = (d1 == 0 ? r_k0 : (d1 == 1 ? r_k1 : r_k2));
+        // const float r_k_c0 = (c0 == 0 ? r_k0 : (c0 == 1 ? r_k1 : r_k2));
+        // const float r_k_c1 = (c1 == 0 ? r_k0 : (c1 == 1 ? r_k1 : r_k2));
+        // const float r_k_d0 = (d0 == 0 ? r_k0 : (d0 == 1 ? r_k1 : r_k2));
+        // const float r_k_d1 = (d1 == 0 ? r_k0 : (d1 == 1 ? r_k1 : r_k2));
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -33996,10 +33996,10 @@ computeCoulombFockDDDD22_FP32(double*         mat_J,
 
         gpu::computeBoysFunction_f(F8_t, S1 * S2 * inv_S4 * r2_PQ, 5, boys_func_table, boys_func_ft);
 
-        const auto QC_0 = (a_l * inv_S2) * (r_l_c0 - r_k_c0);
-        const auto QC_1 = (a_l * inv_S2) * (r_l_c1 - r_k_c1);
-        const auto QD_0 = (-a_k * inv_S2) * (r_l_d0 - r_k_d0);
-        const auto QD_1 = (-a_k * inv_S2) * (r_l_d1 - r_k_d1);
+        // const auto QC_0 = (a_l * inv_S2) * (r_l_c0 - r_k_c0);
+        // const auto QC_1 = (a_l * inv_S2) * (r_l_c1 - r_k_c1);
+        // const auto QD_0 = (-a_k * inv_S2) * (r_l_d0 - r_k_d0);
+        // const auto QD_1 = (-a_k * inv_S2) * (r_l_d1 - r_k_d1);
 
         const float  eri_ijkl = Lambda * S_ij_00 * S_kl_00 * (
 

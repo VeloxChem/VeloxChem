@@ -67,18 +67,18 @@ computeAngularMomentumSS(double*         mat_mu_X,
                         const uint32_t* second_inds_local,
                         const uint32_t  ss_prim_pair_count_local)
 {
-    __shared__ double   delta[3][3];
+    // __shared__ double   delta[3][3];
 
     // each thread computes a primitive matrix element
 
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
-    if (threadIdx.x == 0)
-    {
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-    }
+    // if (threadIdx.x == 0)
+    // {
+    //     delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
+    //     delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
+    //     delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
+    // }
 
     __syncthreads();
 
@@ -457,8 +457,8 @@ computeAngularMomentumPP(double*         mat_mu_X,
             const auto m1 = (m + 1) % 3;
             const auto m2 = (m + 2) % 3;
 
-            const auto PA_m1 = (a_j / (a_i + a_j)) * rij[m1];
-            const auto PA_m2 = (a_j / (a_i + a_j)) * rij[m2];
+            // const auto PA_m1 = (a_j / (a_i + a_j)) * rij[m1];
+            // const auto PA_m2 = (a_j / (a_i + a_j)) * rij[m2];
 
             const auto PB_m1 = (-a_i / (a_i + a_j)) * rij[m1];
             const auto PB_m2 = (-a_i / (a_i + a_j)) * rij[m2];
@@ -612,8 +612,8 @@ computeAngularMomentumPD(double*         mat_mu_X,
             const auto m1 = (m + 1) % 3;
             const auto m2 = (m + 2) % 3;
 
-            const auto PA_m1 = (a_j / (a_i + a_j)) * rij[m1];
-            const auto PA_m2 = (a_j / (a_i + a_j)) * rij[m2];
+            // const auto PA_m1 = (a_j / (a_i + a_j)) * rij[m1];
+            // const auto PA_m2 = (a_j / (a_i + a_j)) * rij[m2];
 
             const auto PB_m1 = (-a_i / (a_i + a_j)) * rij[m1];
             const auto PB_m2 = (-a_i / (a_i + a_j)) * rij[m2];
@@ -815,8 +815,8 @@ computeAngularMomentumDD(double*         mat_mu_X,
             const auto m1 = (m + 1) % 3;
             const auto m2 = (m + 2) % 3;
 
-            const auto PA_m1 = (a_j / (a_i + a_j)) * rij[m1];
-            const auto PA_m2 = (a_j / (a_i + a_j)) * rij[m2];
+            // const auto PA_m1 = (a_j / (a_i + a_j)) * rij[m1];
+            // const auto PA_m2 = (a_j / (a_i + a_j)) * rij[m2];
 
             const auto PB_m1 = (-a_i / (a_i + a_j)) * rij[m1];
             const auto PB_m2 = (-a_i / (a_i + a_j)) * rij[m2];

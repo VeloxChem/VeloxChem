@@ -9215,10 +9215,10 @@ computeCoulombGradientPDDD_I_7(double*         grad_x,
 
         gpu::computeBoysFunction(F8_t, S1 * S2 * inv_S4 * r2_PQ, 3, boys_func_table, boys_func_ft);
 
-        const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
-        const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
-        const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
-        const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
+        // const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+        // const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+        // const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+        // const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
         double kl_factor = (static_cast<double>(k != l) + 1.0);
 
@@ -10337,10 +10337,10 @@ computeCoulombGradientPDDD_I_12(double*         grad_x,
 
         gpu::computeBoysFunction(F8_t, S1 * S2 * inv_S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
-        const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
-        const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
-        const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
-        const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
+        // const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+        // const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+        // const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+        // const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
         double kl_factor = (static_cast<double>(k != l) + 1.0);
 
@@ -15081,10 +15081,10 @@ computeCoulombGradientPDDD_J_12(double*         grad_x,
 
         gpu::computeBoysFunction(F8_t, S1 * S2 * inv_S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
-        const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
-        const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
-        const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
-        const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
+        // const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+        // const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+        // const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+        // const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
         double kl_factor = (static_cast<double>(k != l) + 1.0);
 

@@ -215,7 +215,7 @@ computeExchangeGradientSSPS_I_0(double*         grad_x,
                 F2_t[2] *= d2 * d2;
             }
 
-            const double QC_x = (a_l * inv_S2) * (r_l[g0] - r_k[g0]);
+            // const double QC_x = (a_l * inv_S2) * (r_l[g0] - r_k[g0]);
 
             const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
 
@@ -705,7 +705,7 @@ computeExchangeGradientSSPP_I_0(double*         grad_x,
                 F3_t[3] *= d2 * d2 * d2;
             }
 
-            const double QC_x = (a_l * inv_S2) * (r_l[g0] - r_k[g0]);
+            // const double QC_x = (a_l * inv_S2) * (r_l[g0] - r_k[g0]);
 
             const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
             const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
@@ -1262,7 +1262,7 @@ computeExchangeGradientSSPD_I_0(double*         grad_x,
                 F4_t[4] *= d2 * d2 * d2 * d2;
             }
 
-            const double QC_x = (a_l * inv_S2) * (r_l[g0] - r_k[g0]);
+            // const double QC_x = (a_l * inv_S2) * (r_l[g0] - r_k[g0]);
 
             const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
             const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
@@ -1896,7 +1896,7 @@ computeExchangeGradientSPPS_I_0(double*         grad_x,
                 F3_t[3] *= d2 * d2 * d2;
             }
 
-            const double QC_x = (a_l * inv_S2) * (r_l[g0] - r_k[g0]);
+            // const double QC_x = (a_l * inv_S2) * (r_l[g0] - r_k[g0]);
 
             const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
 
@@ -2452,7 +2452,7 @@ computeExchangeGradientSPPP_I_0(double*         grad_x,
                 F4_t[4] *= d2 * d2 * d2 * d2;
             }
 
-            const double QC_x = (a_l * inv_S2) * (r_l[g0] - r_k[g0]);
+            // const double QC_x = (a_l * inv_S2) * (r_l[g0] - r_k[g0]);
 
             const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
             const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
@@ -3133,7 +3133,7 @@ computeExchangeGradientSPPD_I_0(double*         grad_x,
                 F5_t[5] *= d2 * d2 * d2 * d2 * d2;
             }
 
-            const double QC_x = (a_l * inv_S2) * (r_l[g0] - r_k[g0]);
+            // const double QC_x = (a_l * inv_S2) * (r_l[g0] - r_k[g0]);
 
             const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
             const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
@@ -3974,7 +3974,7 @@ computeExchangeGradientSDPS_I_0(double*         grad_x,
                 F4_t[4] *= d2 * d2 * d2 * d2;
             }
 
-            const double QC_x = (a_l * inv_S2) * (r_l[g0] - r_k[g0]);
+            // const double QC_x = (a_l * inv_S2) * (r_l[g0] - r_k[g0]);
 
             const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
 
@@ -4666,7 +4666,7 @@ computeExchangeGradientSDPP_I_0(double*         grad_x,
                 F5_t[5] *= d2 * d2 * d2 * d2 * d2;
             }
 
-            const double QC_x = (a_l * inv_S2) * (r_l[g0] - r_k[g0]);
+            // const double QC_x = (a_l * inv_S2) * (r_l[g0] - r_k[g0]);
 
             const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
             const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
@@ -5560,7 +5560,7 @@ computeExchangeGradientSDPD_I_0(double*         grad_x,
                 F6_t[6] *= d2 * d2 * d2 * d2 * d2 * d2;
             }
 
-            const double QC_x = (a_l * inv_S2) * (r_l[g0] - r_k[g0]);
+            // const double QC_x = (a_l * inv_S2) * (r_l[g0] - r_k[g0]);
 
             const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
             const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);

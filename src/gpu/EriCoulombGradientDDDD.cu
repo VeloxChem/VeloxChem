@@ -3858,10 +3858,10 @@ computeCoulombGradientDDDD_I_17(double*         grad_x,
 
         gpu::computeBoysFunction(F9_t, S1 * S2 * inv_S4 * r2_PQ, 3, boys_func_table, boys_func_ft);
 
-        const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
-        const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
-        const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
-        const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
+        // const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+        // const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+        // const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+        // const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
         double kl_factor = (static_cast<double>(k != l) + 1.0);
 
@@ -4060,10 +4060,10 @@ computeCoulombGradientDDDD_I_18(double*         grad_x,
 
         gpu::computeBoysFunction(F9_t, S1 * S2 * inv_S4 * r2_PQ, 3, boys_func_table, boys_func_ft);
 
-        const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
-        const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
-        const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
-        const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
+        // const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+        // const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+        // const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+        // const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
         double kl_factor = (static_cast<double>(k != l) + 1.0);
 
@@ -4670,10 +4670,10 @@ computeCoulombGradientDDDD_I_21(double*         grad_x,
 
         gpu::computeBoysFunction(F9_t, S1 * S2 * inv_S4 * r2_PQ, 3, boys_func_table, boys_func_ft);
 
-        const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
-        const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
-        const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
-        const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
+        // const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+        // const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+        // const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+        // const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
         double kl_factor = (static_cast<double>(k != l) + 1.0);
 
@@ -6742,10 +6742,10 @@ computeCoulombGradientDDDD_I_31(double*         grad_x,
 
         gpu::computeBoysFunction(F9_t, S1 * S2 * inv_S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
-        const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
-        const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
-        const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
-        const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
+        // const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+        // const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+        // const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+        // const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
         double kl_factor = (static_cast<double>(k != l) + 1.0);
 
@@ -7332,10 +7332,10 @@ computeCoulombGradientDDDD_I_34(double*         grad_x,
 
         gpu::computeBoysFunction(F9_t, S1 * S2 * inv_S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
-        const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
-        const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
-        const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
-        const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
+        // const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+        // const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+        // const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+        // const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
         double kl_factor = (static_cast<double>(k != l) + 1.0);
 
@@ -8160,10 +8160,10 @@ computeCoulombGradientDDDD_I_38(double*         grad_x,
 
         gpu::computeBoysFunction(F9_t, S1 * S2 * inv_S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
-        const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
-        const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
-        const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
-        const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
+        // const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+        // const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+        // const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+        // const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
         double kl_factor = (static_cast<double>(k != l) + 1.0);
 
@@ -9416,10 +9416,10 @@ computeCoulombGradientDDDD_I_44(double*         grad_x,
 
         gpu::computeBoysFunction(F9_t, S1 * S2 * inv_S4 * r2_PQ, 5, boys_func_table, boys_func_ft);
 
-        const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
-        const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
-        const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
-        const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
+        // const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+        // const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+        // const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+        // const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
         double kl_factor = (static_cast<double>(k != l) + 1.0);
 
@@ -10012,10 +10012,10 @@ computeCoulombGradientDDDD_I_47(double*         grad_x,
 
         gpu::computeBoysFunction(F9_t, S1 * S2 * inv_S4 * r2_PQ, 5, boys_func_table, boys_func_ft);
 
-        const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
-        const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
-        const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
-        const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
+        // const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+        // const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+        // const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+        // const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
         double kl_factor = (static_cast<double>(k != l) + 1.0);
 
@@ -11028,10 +11028,10 @@ computeCoulombGradientDDDD_I_52(double*         grad_x,
 
         gpu::computeBoysFunction(F9_t, S1 * S2 * inv_S4 * r2_PQ, 5, boys_func_table, boys_func_ft);
 
-        const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
-        const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
-        const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
-        const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
+        // const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+        // const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+        // const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+        // const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
         double kl_factor = (static_cast<double>(k != l) + 1.0);
 
@@ -11214,10 +11214,10 @@ computeCoulombGradientDDDD_I_53(double*         grad_x,
 
         gpu::computeBoysFunction(F9_t, S1 * S2 * inv_S4 * r2_PQ, 6, boys_func_table, boys_func_ft);
 
-        const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
-        const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
-        const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
-        const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
+        // const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+        // const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+        // const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+        // const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
         double kl_factor = (static_cast<double>(k != l) + 1.0);
 
@@ -11400,10 +11400,10 @@ computeCoulombGradientDDDD_I_54(double*         grad_x,
 
         gpu::computeBoysFunction(F9_t, S1 * S2 * inv_S4 * r2_PQ, 6, boys_func_table, boys_func_ft);
 
-        const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
-        const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
-        const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
-        const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
+        // const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+        // const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+        // const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+        // const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
         double kl_factor = (static_cast<double>(k != l) + 1.0);
 
@@ -16510,10 +16510,10 @@ computeCoulombGradientDDDD_J_17(double*         grad_x,
 
         gpu::computeBoysFunction(F9_t, S1 * S2 * inv_S4 * r2_PQ, 3, boys_func_table, boys_func_ft);
 
-        const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
-        const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
-        const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
-        const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
+        // const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+        // const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+        // const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+        // const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
         double kl_factor = (static_cast<double>(k != l) + 1.0);
 
@@ -16700,10 +16700,10 @@ computeCoulombGradientDDDD_J_18(double*         grad_x,
 
         gpu::computeBoysFunction(F9_t, S1 * S2 * inv_S4 * r2_PQ, 3, boys_func_table, boys_func_ft);
 
-        const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
-        const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
-        const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
-        const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
+        // const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+        // const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+        // const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+        // const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
         double kl_factor = (static_cast<double>(k != l) + 1.0);
 
@@ -16892,10 +16892,10 @@ computeCoulombGradientDDDD_J_19(double*         grad_x,
 
         gpu::computeBoysFunction(F9_t, S1 * S2 * inv_S4 * r2_PQ, 3, boys_func_table, boys_func_ft);
 
-        const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
-        const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
-        const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
-        const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
+        // const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+        // const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+        // const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+        // const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
         double kl_factor = (static_cast<double>(k != l) + 1.0);
 
@@ -17502,10 +17502,10 @@ computeCoulombGradientDDDD_J_22(double*         grad_x,
 
         gpu::computeBoysFunction(F9_t, S1 * S2 * inv_S4 * r2_PQ, 3, boys_func_table, boys_func_ft);
 
-        const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
-        const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
-        const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
-        const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
+        // const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+        // const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+        // const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+        // const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
         double kl_factor = (static_cast<double>(k != l) + 1.0);
 
@@ -19574,10 +19574,10 @@ computeCoulombGradientDDDD_J_32(double*         grad_x,
 
         gpu::computeBoysFunction(F9_t, S1 * S2 * inv_S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
-        const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
-        const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
-        const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
-        const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
+        // const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+        // const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+        // const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+        // const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
         double kl_factor = (static_cast<double>(k != l) + 1.0);
 
@@ -20164,10 +20164,10 @@ computeCoulombGradientDDDD_J_35(double*         grad_x,
 
         gpu::computeBoysFunction(F9_t, S1 * S2 * inv_S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
-        const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
-        const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
-        const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
-        const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
+        // const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+        // const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+        // const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+        // const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
         double kl_factor = (static_cast<double>(k != l) + 1.0);
 
@@ -20992,10 +20992,10 @@ computeCoulombGradientDDDD_J_39(double*         grad_x,
 
         gpu::computeBoysFunction(F9_t, S1 * S2 * inv_S4 * r2_PQ, 4, boys_func_table, boys_func_ft);
 
-        const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
-        const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
-        const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
-        const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
+        // const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+        // const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+        // const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+        // const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
         double kl_factor = (static_cast<double>(k != l) + 1.0);
 
@@ -22248,10 +22248,10 @@ computeCoulombGradientDDDD_J_45(double*         grad_x,
 
         gpu::computeBoysFunction(F9_t, S1 * S2 * inv_S4 * r2_PQ, 5, boys_func_table, boys_func_ft);
 
-        const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
-        const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
-        const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
-        const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
+        // const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+        // const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+        // const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+        // const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
         double kl_factor = (static_cast<double>(k != l) + 1.0);
 
@@ -22844,10 +22844,10 @@ computeCoulombGradientDDDD_J_48(double*         grad_x,
 
         gpu::computeBoysFunction(F9_t, S1 * S2 * inv_S4 * r2_PQ, 5, boys_func_table, boys_func_ft);
 
-        const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
-        const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
-        const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
-        const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
+        // const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+        // const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+        // const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+        // const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
         double kl_factor = (static_cast<double>(k != l) + 1.0);
 
@@ -23860,10 +23860,10 @@ computeCoulombGradientDDDD_J_53(double*         grad_x,
 
         gpu::computeBoysFunction(F9_t, S1 * S2 * inv_S4 * r2_PQ, 5, boys_func_table, boys_func_ft);
 
-        const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
-        const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
-        const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
-        const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
+        // const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+        // const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+        // const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+        // const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
         double kl_factor = (static_cast<double>(k != l) + 1.0);
 
@@ -24046,10 +24046,10 @@ computeCoulombGradientDDDD_J_54(double*         grad_x,
 
         gpu::computeBoysFunction(F9_t, S1 * S2 * inv_S4 * r2_PQ, 6, boys_func_table, boys_func_ft);
 
-        const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
-        const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
-        const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
-        const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
+        // const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+        // const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+        // const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+        // const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
         double kl_factor = (static_cast<double>(k != l) + 1.0);
 
@@ -24232,10 +24232,10 @@ computeCoulombGradientDDDD_J_55(double*         grad_x,
 
         gpu::computeBoysFunction(F9_t, S1 * S2 * inv_S4 * r2_PQ, 6, boys_func_table, boys_func_ft);
 
-        const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
-        const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
-        const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
-        const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
+        // const auto QC_0 = (a_l * inv_S2) * (r_l[c0] - r_k[c0]);
+        // const auto QC_1 = (a_l * inv_S2) * (r_l[c1] - r_k[c1]);
+        // const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
+        // const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
         double kl_factor = (static_cast<double>(k != l) + 1.0);
 
