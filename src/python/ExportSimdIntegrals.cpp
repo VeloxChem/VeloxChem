@@ -34,11 +34,13 @@
 
 #include "ExportSimdIntegrals.hpp"
 
+#include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
 #include <vector>
 
+#include "ExportGeneral.hpp"
 #include "MolecularBasis.hpp"
 #include "Molecule.hpp"
 #include "PackedMatrix.hpp"
@@ -703,6 +705,25 @@ export_simdintegrals(py::module &m) -> void
 
     // CSimdRIJKGradientDriver class
 
+    // TDistributedFit, the share of the fitted densities a rank holds
+
+    PyClass<TDistributedFit>(m, "DistributedFit")
+        .def_readonly("naux", &TDistributedFit::naux, "The dimensions of the auxiliary basis.")
+        .def_readonly("nelements", &TDistributedFit::nelements, "The elements of one fitted density.")
+        .def_readonly("npanel", &TDistributedFit::npanel, "The elements a panel carries.")
+        .def("panels", &TDistributedFit::panels, "The number of panels the elements are divided into.")
+        .def("functions", [](const TDistributedFit &self) { return self.functions; },
+             "The auxiliary functions this rank owns.")
+        .def("fitting", [](const TDistributedFit &self) { return self.fitting; },
+             "The fitting coefficients, partial until the ranks have added theirs.")
+        .def("gram_rows",
+             [](const TDistributedFit &self) -> py::array_t<double> {
+                 const auto nrows = static_cast<int>(self.functions.size());
+                 return vlx_general::pointer_to_numpy(self.gram_rows.data(),
+                                                      {nrows, static_cast<int>(self.naux)});
+             },
+             "This rank's rows of the Gram product.");
+
     PyClass<CSimdRIJKGradientDriver>(m, "SimdRIJKGradientDriver")
         .def(py::init<>())
         .def(py::init<const double, const size_t, const size_t>(),
@@ -714,6 +735,50 @@ export_simdintegrals(py::module &m) -> void
              py::arg("memory_budget") = size_t{4} * 1024 * 1024 * 1024)
         .def("get_memory_budget", &CSimdRIJKGradientDriver::get_memory_budget,
              "Gets the memory the driver may hold, in bytes.")
+        .def("mpi_local_densities", &CSimdRIJKGradientDriver::mpi_local_densities,
+             "Forms this rank's share of the fitted densities, with no metric applied and nothing "
+             "communicated. The `fitting` of what comes back is this rank's partial sum of the right "
+             "hand side of the fitting, which the caller adds across the ranks.",
+             py::arg("molecule"), py::arg("basis"), py::arg("aux_basis"), py::arg("bq_vectors"),
+             py::arg("density"), py::arg("coefficients"), py::arg("aux_atoms"), py::arg("budget"))
+        .def("mpi_set_fitting", &CSimdRIJKGradientDriver::mpi_set_fitting,
+             "Applies the transposed factor to the fitting coefficients the ranks have added together.",
+             py::arg("fit"), py::arg("metric"), py::arg("total"))
+        .def("mpi_panel_partial",
+             [](const CSimdRIJKGradientDriver &self, const TDistributedFit &fit, const CPackedMatrix &metric,
+                const size_t ipanel, const bool beta) -> py::array_t<double> {
+                 auto values = self.mpi_panel_partial(fit, metric, ipanel, beta);
+                 const auto count = fit.panel_range(ipanel).second;
+                 return vlx_general::pointer_to_numpy(values.data(),
+                                                      {static_cast<int>(fit.naux), static_cast<int>(count)});
+             },
+             "This rank's contribution to one panel of the transposed factor applied to the fitted "
+             "densities. The caller adds the ranks' panels and hands the sum to mpi_panel_absorb.",
+             py::arg("fit"), py::arg("metric"), py::arg("ipanel"), py::arg("beta") = false)
+        .def("mpi_panel_absorb",
+             [](const CSimdRIJKGradientDriver &self, TDistributedFit &fit, const size_t ipanel,
+                const py::array_t<double> &reduced, const bool beta) -> void {
+                 self.mpi_panel_absorb(fit, ipanel, reduced.data(), static_cast<size_t>(reduced.size()), beta);
+             },
+             "Takes one panel the ranks have added together, keeping the rows this rank owns and "
+             "accumulating its rows of the Gram product from the whole of it.",
+             py::arg("fit"), py::arg("ipanel"), py::arg("reduced"), py::arg("beta") = false)
+        .def("mpi_omega",
+             [](const CSimdRIJKGradientDriver &self, const TDistributedFit &fit,
+                const py::array_t<double> &gram, const double exchange_scaling_factor,
+                const bool open_shell) -> CPackedMatrix {
+                 return self.mpi_omega(fit, gram.data(), static_cast<size_t>(gram.size()),
+                                       exchange_scaling_factor, open_shell);
+             },
+             "Assembles the two-index fitted density from the fitting coefficients and the Gram the "
+             "ranks have gathered.",
+             py::arg("fit"), py::arg("gram"), py::arg("exchange_scaling_factor"), py::arg("open_shell"))
+        .def("mpi_compute_share", &CSimdRIJKGradientDriver::mpi_compute_share,
+             "This rank's share of the gradient. An empty omega leaves the two-center term out, which "
+             "every rank but one does.",
+             py::arg("molecule"), py::arg("basis"), py::arg("aux_basis"), py::arg("fit"),
+             py::arg("density"), py::arg("coefficients"), py::arg("omega"),
+             py::arg("exchange_scaling_factor"), py::arg("atoms"), py::arg("aux_atoms"))
         .def("compute",
              py::overload_cast<const CMolecule &,
                                const CMolecularBasis &,

@@ -12,6 +12,7 @@
 #define SimdRIJKGradientDriver_hpp
 
 #include <cstddef>
+#include <utility>
 #include <vector>
 
 #include "MolecularBasis.hpp"
@@ -39,6 +40,65 @@ struct TFittedDensities
     /// @brief The two-index fitted density, one row and column per auxiliary
     /// basis function.
     CPackedMatrix omega;
+};
+
+/// @brief The fitted densities of a gradient divided over the ranks of a
+/// communicator, which each rank holds a share of.
+///
+/// @note **The rows are the share and the columns are not.** A rank owns the
+/// auxiliary functions of the atoms whose B vectors it holds, and holds the fitted
+/// densities of those and of no others. `densities` is the length of the whole
+/// auxiliary basis all the same, with only the owned entries allocated: an entry
+/// nobody filled is an empty matrix and costs the header, so the contraction which
+/// indexes it by the global auxiliary function needs no second index and no change.
+///
+/// @note The Gram rows are this rank's rows of a matrix the whole of which is
+/// needed, and are gathered once at the end. It is the square of the auxiliary
+/// basis, an order of magnitude below the fitted densities on anything worth
+/// dividing, which is why it is the one thing here that ends up on every rank.
+struct TDistributedFit
+{
+    /// @brief The auxiliary functions this rank owns, as indices into the whole
+    /// auxiliary basis, ascending.
+    std::vector<size_t> functions;
+
+    /// @brief The fitted densities, the length of the auxiliary basis, with only
+    /// the owned entries allocated.
+    std::vector<CPackedMatrix> densities;
+
+    /// @brief The fitted densities of the second spin, empty for a closed shell.
+    std::vector<CPackedMatrix> densities_beta;
+
+    /// @brief The fitting coefficients. Partial until the ranks have added theirs
+    /// and the transposed factor has been applied to the sum.
+    std::vector<double> fitting;
+
+    /// @brief This rank's rows of the Gram product, its own functions by the whole
+    /// auxiliary basis, accumulated one panel at a time.
+    std::vector<double> gram_rows;
+
+    /// @brief The dimensions of the auxiliary basis.
+    size_t naux = 0;
+
+    /// @brief The elements of one fitted density, the packed orbital pairs.
+    size_t nelements = 0;
+
+    /// @brief The elements a panel carries.
+    size_t npanel = 0;
+
+    /// @brief The number of panels the elements are divided into.
+    auto panels() const -> size_t
+    {
+        return (npanel == 0) ? 0 : (nelements + npanel - 1) / npanel;
+    }
+
+    /// @brief The first element of a panel and how many it carries.
+    auto panel_range(const size_t ipanel) const -> std::pair<size_t, size_t>
+    {
+        const auto first = ipanel * npanel;
+
+        return {first, std::min(npanel, (first < nelements) ? nelements - first : size_t{0})};
+    }
 };
 
 /// @brief One spin's half of the exchange: the orbitals it occupies and the
@@ -152,6 +212,97 @@ class CSimdRIJKGradientDriver
                  const CPackedMatrix   &density,
                  const CPackedMatrix   &coefficients,
                  const double           exchange_scaling_factor) const -> CPackedMatrix;
+
+    /// @brief Forms this rank's share of the fitted densities, with no metric
+    /// applied and nothing communicated.
+    /// @param bq_vectors The B vectors this rank holds, of its auxiliary atoms.
+    /// @param coefficients The occupied molecular orbitals.
+    /// @param aux_atoms The atoms of the auxiliary basis this rank holds.
+    /// @param budget The memory this phase may hold, which under a communicator is
+    /// a share of the node's and not the whole of it.
+    /// @return The share, with `fitting` holding this rank's **partial** sum of the
+    /// right hand side of the fitting, which the caller adds across the ranks.
+    /// @note This is the expensive phase and the one which needed no arranging: the
+    /// half transformed W vectors come from the B vectors of this rank's own atoms,
+    /// so the transformation is divided already by the division the Fock build made.
+    auto mpi_local_densities(const CMolecule        &molecule,
+                             const CMolecularBasis  &basis,
+                             const CMolecularBasis  &aux_basis,
+                             const CSparseTensor    &bq_vectors,
+                             const CPackedMatrix    &density,
+                             const CPackedMatrix    &coefficients,
+                             const std::vector<int> &aux_atoms,
+                             const size_t            budget) const -> TDistributedFit;
+
+    /// @brief Applies the transposed factor to the fitting coefficients the ranks
+    /// have added together.
+    /// @param fit The share, whose `fitting` is replaced by the coefficients.
+    /// @param metric The inverted factor of the metric.
+    /// @param total The sum over the ranks of the right hand side.
+    auto mpi_set_fitting(TDistributedFit           &fit,
+                         const CPackedMatrix       &metric,
+                         const std::vector<double> &total) const -> void;
+
+    /// @brief This rank's contribution to one panel of the transposed factor
+    /// applied to the fitted densities.
+    /// @return The whole auxiliary basis by the elements of the panel, row major,
+    /// holding the part of the sum over the auxiliary functions this rank owns.
+    /// @note Every rank answers for every auxiliary function and for the elements
+    /// of this panel alone. What makes the phase divisible is that the sum over the
+    /// **owned** index is the one which factorises; the sum over the answered index
+    /// is what the ranks then add.
+    auto mpi_panel_partial(const TDistributedFit &fit,
+                           const CPackedMatrix   &metric,
+                           const size_t           ipanel,
+                           const bool             beta = false) const -> std::vector<double>;
+
+    /// @brief Takes one panel the ranks have added together, keeping the rows this
+    /// rank owns and accumulating its rows of the Gram product from the whole.
+    /// @param fit The share.
+    /// @param ipanel The panel.
+    /// @param reduced The panel, summed over the ranks.
+    /// @param beta Whether the panel is the second spin's.
+    /// @note The Gram is accumulated here rather than afterwards because this is
+    /// the one moment the whole of a panel exists on a rank. Afterwards only the
+    /// owned rows remain, and the Gram of a pair of rows on different ranks could
+    /// not be formed at all.
+    /// @note The panel is taken as a pointer and not as a vector, so that a caller
+    /// handing over a buffer of the size the budget allows does not copy it first.
+    auto mpi_panel_absorb(TDistributedFit &fit,
+                          const size_t     ipanel,
+                          const double    *reduced,
+                          const size_t     size,
+                          const bool       beta = false) const -> void;
+
+    /// @brief Assembles the two-index fitted density from the fitting coefficients
+    /// and the Gram rows the ranks have gathered.
+    /// @param fit The share.
+    /// @param gram The Gram, the whole of it, gathered from the rows of the ranks.
+    /// @param exchange_scaling_factor The fraction of exact exchange.
+    /// @param open_shell Whether the factors are an open shell's.
+    /// @return Omega, of the whole auxiliary basis.
+    auto mpi_omega(const TDistributedFit &fit,
+                   const double          *gram,
+                   const size_t           size,
+                   const double           exchange_scaling_factor,
+                   const bool             open_shell) const -> CPackedMatrix;
+
+    /// @brief This rank's share of the gradient, from the fitted densities it owns.
+    /// @param fit The share, with its densities transformed and its fitting set.
+    /// @param omega The two-index fitted density, or an empty matrix to leave the
+    /// two-center term out, which every rank but one does.
+    /// @param aux_atoms The atoms of the auxiliary basis this rank holds.
+    /// @return The gradient of this rank's share, which the ranks add.
+    auto mpi_compute_share(const CMolecule        &molecule,
+                           const CMolecularBasis  &basis,
+                           const CMolecularBasis  &aux_basis,
+                           const TDistributedFit  &fit,
+                           const CPackedMatrix    &density,
+                           const CPackedMatrix    &coefficients,
+                           const CPackedMatrix    &omega,
+                           const double            exchange_scaling_factor,
+                           const std::vector<int> &atoms,
+                           const std::vector<int> &aux_atoms) const -> CPackedMatrix;
 
     /// @brief The fitted densities of the occupied orbitals of one spin.
     /// @param bq_vectors The B vectors.
@@ -404,6 +555,16 @@ class CSimdRIJKGradientDriver
                                const std::vector<TExchangeSpin> &spins_erf = {},
                                const double                      erf_exchange_factor = 0.0,
                                const double                      omega = 0.0) const -> void;
+
+    /// @brief The columns of the transposed factor of the metric which belong to
+    /// the given auxiliary functions.
+    /// @param metric The inverted factor of the metric.
+    /// @param columns The auxiliary functions whose columns are wanted.
+    /// @param naux The dimensions of the auxiliary basis.
+    /// @return The whole auxiliary basis by those columns, row major.
+    auto _transposed_columns(const CPackedMatrix       &metric,
+                             const std::vector<size_t> &columns,
+                             const size_t               naux) const -> std::vector<double>;
 
     /// @brief Checks the metric is one this driver can use.
     /// @param metric The metric handed over.
