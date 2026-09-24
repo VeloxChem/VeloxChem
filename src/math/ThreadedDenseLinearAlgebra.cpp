@@ -92,4 +92,151 @@ threadedMultAtB(CSubMatrix& matrixC, const CSubMatrix& matrixA, const CSubMatrix
     sdenblas::serialMultAtB(matrixC, matrixA, matrixB);
 }
 
+auto
+threadedMultAB(const size_t  nrows,
+               const size_t  ncols,
+               const size_t  nsums,
+               const double  alpha,
+               const double *matrixA,
+               const size_t  lda,
+               const double *matrixB,
+               const size_t  ldb,
+               const double  beta,
+               double       *matrixC,
+               const size_t  ldc) -> void
+{
+#ifdef VLX_USE_MATHLIB
+
+    // use the math library only outside OpenMP parallel regions, and fall back
+    // to the serial implementation otherwise
+
+    if (!omp_in_parallel())
+    {
+        // NOTE: the library is column major and the column major matrix of a row
+        // major array is its transpose, so the product of the row major arrays is
+        // the product of the two in the other order with the rows and the columns
+        // swapped.
+
+        const char trans = 'N';
+
+        auto m_arg = static_cast<lapack_int_t>(ncols);
+
+        auto n_arg = static_cast<lapack_int_t>(nrows);
+
+        auto k_arg = static_cast<lapack_int_t>(nsums);
+
+        auto lda_arg = static_cast<lapack_int_t>(lda);
+
+        auto ldb_arg = static_cast<lapack_int_t>(ldb);
+
+        auto ldc_arg = static_cast<lapack_int_t>(ldc);
+
+        dgemm_(&trans, &trans, &m_arg, &n_arg, &k_arg, &alpha, matrixB, &ldb_arg, matrixA, &lda_arg, &beta, matrixC,
+               &ldc_arg);
+
+        return;
+    }
+
+#endif
+
+    sdenblas::serialMultAB(nrows, ncols, nsums, alpha, matrixA, lda, matrixB, ldb, beta, matrixC, ldc);
+}
+
+auto
+threadedMultABt(const size_t  nrows,
+                const size_t  ncols,
+                const size_t  nsums,
+                const double  alpha,
+                const double *matrixA,
+                const size_t  lda,
+                const double *matrixB,
+                const size_t  ldb,
+                const double  beta,
+                double       *matrixC,
+                const size_t  ldc) -> void
+{
+#ifdef VLX_USE_MATHLIB
+
+    // use the math library only outside OpenMP parallel regions, and fall back
+    // to the serial implementation otherwise
+
+    if (!omp_in_parallel())
+    {
+        // NOTE: the library is column major and the column major matrix of a row
+        // major array is its transpose, so the product of the row major arrays is
+        // the product of the two in the other order with the rows and the columns
+        // swapped.
+
+        const char trans_t = 'T';
+
+        const char trans_n = 'N';
+
+        auto m_arg = static_cast<lapack_int_t>(ncols);
+
+        auto n_arg = static_cast<lapack_int_t>(nrows);
+
+        auto k_arg = static_cast<lapack_int_t>(nsums);
+
+        auto lda_arg = static_cast<lapack_int_t>(lda);
+
+        auto ldb_arg = static_cast<lapack_int_t>(ldb);
+
+        auto ldc_arg = static_cast<lapack_int_t>(ldc);
+
+        dgemm_(&trans_t, &trans_n, &m_arg, &n_arg, &k_arg, &alpha, matrixB, &ldb_arg, matrixA, &lda_arg, &beta,
+               matrixC, &ldc_arg);
+
+        return;
+    }
+
+#endif
+
+    sdenblas::serialMultABt(nrows, ncols, nsums, alpha, matrixA, lda, matrixB, ldb, beta, matrixC, ldc);
+}
+
+auto
+threadedRankUpdate(const size_t  n,
+                   const size_t  k,
+                   const double  alpha,
+                   const double *matrixA,
+                   const size_t  lda,
+                   double       *matrixC,
+                   const size_t  ldc) -> void
+{
+#ifdef VLX_USE_MATHLIB
+
+    // use the math library only outside OpenMP parallel regions, and fall back
+    // to the serial implementation otherwise
+
+    if (!omp_in_parallel())
+    {
+        // NOTE: the library is column major and the column major matrix of a row
+        // major array is its transpose, so the upper triangle of the library is
+        // the lower triangle of the array. The update of the transposed stored
+        // matrix is therefore the update of the row major array.
+
+        const char uplo = 'U';
+
+        const char trans = 'T';
+
+        auto n_arg = static_cast<lapack_int_t>(n);
+
+        auto k_arg = static_cast<lapack_int_t>(k);
+
+        auto lda_arg = static_cast<lapack_int_t>(lda);
+
+        auto ldc_arg = static_cast<lapack_int_t>(ldc);
+
+        const double one = 1.0;
+
+        dsyrk_(&uplo, &trans, &n_arg, &k_arg, &alpha, matrixA, &lda_arg, &one, matrixC, &ldc_arg);
+
+        return;
+    }
+
+#endif
+
+    sdenblas::serialRankUpdate(n, k, alpha, matrixA, lda, matrixC, ldc);
+}
+
 }  // namespace tdenblas

@@ -14,75 +14,7 @@
 #include <string>
 
 #include "ErrorHandler.hpp"
-
-#ifdef VLX_USE_MATHLIB
-#include "MathLibrary.hpp"
-#else
-#include "Eigen/Dense"
-#endif
-
-/// @brief The product of a row major matrix by the transpose of another, scaled
-/// and added to what is there: C += scale A B^T, for A of nrows by nsums and B of
-/// ncols by nsums.
-/// @note The rows of the three are given as they are laid out and not as they are
-/// used, so a block of a wider array is multiplied where it stands. The right
-/// factors of a batch are transformed as one wide matrix, and each density's share
-/// of the result is such a block.
-static auto
-_add_multiply_by_transpose(const size_t  nrows,
-                           const size_t  ncols,
-                           const size_t  nsums,
-                           const double *amat,
-                           const size_t  arow,
-                           const double *bmat,
-                           const size_t  brow,
-                           double       *cmat,
-                           const size_t  crow,
-                           const double  scale = 1.0) -> void
-{
-#ifdef VLX_USE_MATHLIB
-
-    const char trans_t = 'T';
-
-    const char trans_n = 'N';
-
-    const double alpha = scale;
-
-    const double beta = 1.0;
-
-    auto m_arg = static_cast<lapack_int_t>(ncols);
-
-    auto n_arg = static_cast<lapack_int_t>(nrows);
-
-    auto k_arg = static_cast<lapack_int_t>(nsums);
-
-    auto lda_arg = static_cast<lapack_int_t>(brow);
-
-    auto ldb_arg = static_cast<lapack_int_t>(arow);
-
-    auto ldc_arg = static_cast<lapack_int_t>(crow);
-
-    dgemm_(&trans_t, &trans_n, &m_arg, &n_arg, &k_arg, &alpha, bmat, &lda_arg, amat, &ldb_arg, &beta, cmat, &ldc_arg);
-
-#else
-
-    using RowMajorMatrix = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
-
-    using Stride = Eigen::Stride<Eigen::Dynamic, 1>;
-
-    Eigen::Map<const RowMajorMatrix, 0, Stride> a(
-        amat, static_cast<Eigen::Index>(nrows), static_cast<Eigen::Index>(nsums), Stride(static_cast<Eigen::Index>(arow), 1));
-
-    Eigen::Map<const RowMajorMatrix, 0, Stride> b(
-        bmat, static_cast<Eigen::Index>(ncols), static_cast<Eigen::Index>(nsums), Stride(static_cast<Eigen::Index>(brow), 1));
-
-    Eigen::Map<RowMajorMatrix, 0, Stride> c(
-        cmat, static_cast<Eigen::Index>(nrows), static_cast<Eigen::Index>(ncols), Stride(static_cast<Eigen::Index>(crow), 1));
-
-    c.noalias() += scale * (a * b.transpose());
-
-#endif
-}
+#include "ThreadedDenseLinearAlgebra.hpp"
 
 auto
 CSimdRIJKResponseDriver::get_threshold() const -> double
@@ -363,25 +295,11 @@ CSimdRIJKResponseDriver::_unrestricted(const std::vector<std::pair<const CSparse
 
         density.zero();
 
-        _add_multiply_by_transpose(nao,
-                                   nao,
-                                   nvec_alpha,
-                                   left_alpha.data(),
-                                   nvec_alpha,
-                                   coulomb_rights_alpha[idens].data(),
-                                   nvec_alpha,
-                                   density.data(),
-                                   nao);
+        tdenblas::threadedMultABt(nao, nao, nvec_alpha, 1.0, left_alpha.data(), nvec_alpha,
+                                  coulomb_rights_alpha[idens].data(), nvec_alpha, 1.0, density.data(), nao);
 
-        _add_multiply_by_transpose(nao,
-                                   nao,
-                                   nvec_beta,
-                                   left_beta.data(),
-                                   nvec_beta,
-                                   coulomb_rights_beta[idens].data(),
-                                   nvec_beta,
-                                   density.data(),
-                                   nao);
+        tdenblas::threadedMultABt(nao, nao, nvec_beta, 1.0, left_beta.data(), nvec_beta,
+                                  coulomb_rights_beta[idens].data(), nvec_beta, 1.0, density.data(), nao);
 
         const auto yvector = _drv.compute_y_vector(coulomb_vectors, basis, aux_basis, density);
 
@@ -535,16 +453,9 @@ CSimdRIJKResponseDriver::_exchange(const std::vector<std::pair<const CSparseTens
                 {
                     const auto iq = static_cast<size_t>(q);
 
-                    _add_multiply_by_transpose(nao,
-                                               nao,
-                                               nvec,
-                                               uvecs[iq].data(),
-                                               nvec,
-                                               pvecs[iq].data() + idens * nvec,
-                                               nwide,
-                                               exchanges[idens].data(),
-                                               nao,
-                                               scale);
+                    tdenblas::threadedMultABt(nao, nao, nvec, scale, uvecs[iq].data(), nvec,
+                                              pvecs[iq].data() + idens * nvec, nwide, 1.0,
+                                              exchanges[idens].data(), nao);
                 }
             }
         }
@@ -697,8 +608,8 @@ CSimdRIJKResponseDriver::compute(const CSparseTensor              &bq_vectors,
 
         density.zero();
 
-        _add_multiply_by_transpose(
-            nao, nao, nvec, left.data(), nvec, coulomb_rights[idens].data(), nvec, density.data(), nao);
+        tdenblas::threadedMultABt(nao, nao, nvec, 1.0, left.data(), nvec, coulomb_rights[idens].data(),
+                                  nvec, 1.0, density.data(), nao);
 
         const auto yvector = _drv.compute_y_vector(bq_vectors, basis, aux_basis, density);
 

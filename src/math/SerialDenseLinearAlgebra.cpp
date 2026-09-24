@@ -30,6 +30,12 @@
 //  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 //  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+// NOTE: the serial routines must not start threads of their own, as their callers
+// parallelize above them. Eigen parallelizes with OpenMP when this file is
+// compiled with it, so its parallelizer is disabled here.
+
+#define EIGEN_DONT_PARALLELIZE
+
 #include "SerialDenseLinearAlgebra.hpp"
 
 #include "Eigen/Dense"
@@ -319,6 +325,120 @@ serialMultAtB(CSubMatrix& matrixC, const CSubMatrix& matrixA, const CSubMatrix& 
     Eigen::Map<Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>, Eigen::Unaligned> ematC(C, ncrow, nccol);
     
     ematC.noalias() += ematA.transpose() * ematB;
+}
+
+auto
+serialMultAB(const size_t  nrows,
+             const size_t  ncols,
+             const size_t  nsums,
+             const double  alpha,
+             const double *matrixA,
+             const size_t  lda,
+             const double *matrixB,
+             const size_t  ldb,
+             const double  beta,
+             double       *matrixC,
+             const size_t  ldc) -> void
+{
+    using RowMajorMatrix = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
+
+    using RowMajorStride = Eigen::Stride<Eigen::Dynamic, 1>;
+
+    const auto rows = static_cast<Eigen::Index>(nrows);
+
+    const auto cols = static_cast<Eigen::Index>(ncols);
+
+    const auto sums = static_cast<Eigen::Index>(nsums);
+
+    Eigen::Map<const RowMajorMatrix, 0, RowMajorStride> ematA(matrixA, rows, sums,
+                                                              RowMajorStride(static_cast<Eigen::Index>(lda), 1));
+
+    Eigen::Map<const RowMajorMatrix, 0, RowMajorStride> ematB(matrixB, sums, cols,
+                                                              RowMajorStride(static_cast<Eigen::Index>(ldb), 1));
+
+    Eigen::Map<RowMajorMatrix, 0, RowMajorStride> ematC(matrixC, rows, cols,
+                                                        RowMajorStride(static_cast<Eigen::Index>(ldc), 1));
+
+    if (beta == 0.0)
+    {
+        ematC.noalias() = alpha * ematA * ematB;
+    }
+    else
+    {
+        if (beta != 1.0) ematC *= beta;
+
+        ematC.noalias() += alpha * ematA * ematB;
+    }
+}
+
+auto
+serialMultABt(const size_t  nrows,
+              const size_t  ncols,
+              const size_t  nsums,
+              const double  alpha,
+              const double *matrixA,
+              const size_t  lda,
+              const double *matrixB,
+              const size_t  ldb,
+              const double  beta,
+              double       *matrixC,
+              const size_t  ldc) -> void
+{
+    using RowMajorMatrix = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
+
+    using RowMajorStride = Eigen::Stride<Eigen::Dynamic, 1>;
+
+    const auto rows = static_cast<Eigen::Index>(nrows);
+
+    const auto cols = static_cast<Eigen::Index>(ncols);
+
+    const auto sums = static_cast<Eigen::Index>(nsums);
+
+    Eigen::Map<const RowMajorMatrix, 0, RowMajorStride> ematA(matrixA, rows, sums,
+                                                              RowMajorStride(static_cast<Eigen::Index>(lda), 1));
+
+    Eigen::Map<const RowMajorMatrix, 0, RowMajorStride> ematB(matrixB, cols, sums,
+                                                              RowMajorStride(static_cast<Eigen::Index>(ldb), 1));
+
+    Eigen::Map<RowMajorMatrix, 0, RowMajorStride> ematC(matrixC, rows, cols,
+                                                        RowMajorStride(static_cast<Eigen::Index>(ldc), 1));
+
+    if (beta == 0.0)
+    {
+        ematC.noalias() = alpha * (ematA * ematB.transpose());
+    }
+    else
+    {
+        if (beta != 1.0) ematC *= beta;
+
+        ematC.noalias() += alpha * (ematA * ematB.transpose());
+    }
+}
+
+auto
+serialRankUpdate(const size_t  n,
+                 const size_t  k,
+                 const double  alpha,
+                 const double *matrixA,
+                 const size_t  lda,
+                 double       *matrixC,
+                 const size_t  ldc) -> void
+{
+    using RowMajorMatrix = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
+
+    using RowMajorStride = Eigen::Stride<Eigen::Dynamic, 1>;
+
+    const auto rows = static_cast<Eigen::Index>(n);
+
+    const auto sums = static_cast<Eigen::Index>(k);
+
+    Eigen::Map<const RowMajorMatrix, 0, RowMajorStride> ematA(matrixA, rows, sums,
+                                                              RowMajorStride(static_cast<Eigen::Index>(lda), 1));
+
+    Eigen::Map<RowMajorMatrix, 0, RowMajorStride> ematC(matrixC, rows, rows,
+                                                        RowMajorStride(static_cast<Eigen::Index>(ldc), 1));
+
+    ematC.template selfadjointView<Eigen::Lower>().rankUpdate(ematA, alpha);
 }
 
 

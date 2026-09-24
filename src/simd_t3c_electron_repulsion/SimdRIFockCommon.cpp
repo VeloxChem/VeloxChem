@@ -17,8 +17,6 @@
 
 #include "DenseIndexFunc.hpp"
 #include "ErrorHandler.hpp"
-#include "Eigen/Dense"
-#include "MathLibrary.hpp"
 #include "PackedLinearAlgebra.hpp"
 #include "SimdT3CDistributor.hpp"
 #include "SimdThreeCenterElectronRepulsionDriver.hpp"

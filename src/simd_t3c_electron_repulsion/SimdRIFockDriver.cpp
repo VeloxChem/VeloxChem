@@ -53,13 +53,8 @@
 #include "SimdT3CRsDistributor.hpp"
 #include "SimdThreeCenterElectronRepulsionDriver.hpp"
 #include "SimdThreeCenterElectronRepulsionRsDriver.hpp"
+#include "ThreadedDenseLinearAlgebra.hpp"
 #include "TripleSparsityPattern.hpp"
-
-#ifdef VLX_USE_MATHLIB
-#include "MathLibrary.hpp"
-#else
-#include "Eigen/Dense"
-#endif
 
 namespace {  // anonymous namespace
 
@@ -89,84 +84,6 @@ struct TAuxFunction
     /// @brief The first row or column of the permuted metric.
     size_t offset;
 };
-
-/// @brief Computes the product of two row major matrices, C = alpha A B + beta C.
-/// @param nrows The number of rows of A and of C.
-/// @param ncols The number of columns of B and of C.
-/// @param nsums The number of columns of A and of rows of B.
-/// @param alpha The factor of the product.
-/// @param amat The values of A, as a row major array with leading dimension lda.
-/// @param lda The leading dimension of A.
-/// @param bmat The values of B, as a row major array with leading dimension ldb.
-/// @param ldb The leading dimension of B.
-/// @param beta The factor of C.
-/// @param cmat The values of C, as a row major array with leading dimension ldc.
-/// @param ldc The leading dimension of C.
-auto
-_matrix_product(const size_t  nrows,
-                const size_t  ncols,
-                const size_t  nsums,
-                const double  alpha,
-                const double *amat,
-                const size_t  lda,
-                const double *bmat,
-                const size_t  ldb,
-                const double  beta,
-                double       *cmat,
-                const size_t  ldc) -> void
-{
-#ifdef VLX_USE_MATHLIB
-
-    // NOTE: the library is column major, and the column major matrix of a row
-    // major array is its transpose. The transpose of A B is B transposed times A
-    // transposed, so the product of the row major arrays is the product of the
-    // two in the other order, with the rows and the columns swapped.
-
-    const char trans = 'N';
-
-    auto m_arg = static_cast<lapack_int_t>(ncols);
-
-    auto n_arg = static_cast<lapack_int_t>(nrows);
-
-    auto k_arg = static_cast<lapack_int_t>(nsums);
-
-    auto ldb_arg = static_cast<lapack_int_t>(ldb);
-
-    auto lda_arg = static_cast<lapack_int_t>(lda);
-
-    auto ldc_arg = static_cast<lapack_int_t>(ldc);
-
-    dgemm_(&trans, &trans, &m_arg, &n_arg, &k_arg, &alpha, bmat, &ldb_arg, amat, &lda_arg, &beta, cmat, &ldc_arg);
-
-#else
-
-    using RowMajorMatrix = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
-
-    using RowMajorStride = Eigen::Stride<Eigen::Dynamic, 1>;
-
-    const auto rows = static_cast<Eigen::Index>(nrows);
-
-    const auto cols = static_cast<Eigen::Index>(ncols);
-
-    const auto sums = static_cast<Eigen::Index>(nsums);
-
-    Eigen::Map<const RowMajorMatrix, 0, RowMajorStride> amap(amat, rows, sums, RowMajorStride(static_cast<Eigen::Index>(lda), 1));
-
-    Eigen::Map<const RowMajorMatrix, 0, RowMajorStride> bmap(bmat, sums, cols, RowMajorStride(static_cast<Eigen::Index>(ldb), 1));
-
-    Eigen::Map<RowMajorMatrix, 0, RowMajorStride> cmap(cmat, rows, cols, RowMajorStride(static_cast<Eigen::Index>(ldc), 1));
-
-    if (beta == 0.0)
-    {
-        cmap.noalias() = alpha * amap * bmap;
-    }
-    else
-    {
-        cmap.noalias() = beta * cmap + alpha * amap * bmap;
-    }
-
-#endif /* VLX_USE_MATHLIB */
-}
 
 /// @brief The fraction of the B vectors which is actually held.
 /// @param bq_vectors The B vectors.
@@ -1181,9 +1098,9 @@ CSimdRIFockDriver::_compute_bq_vectors(const CMolecule                          
 
                 for (size_t k = 0; k < nops; k++)
                 {
-                    _matrix_product(nrows, total, ncols, 1.0, metric.get() + k * nrows * ncols, ncols,
-                                    gathered.data() + k * ncols * nchunk, total, 0.0,
-                                    product.data() + k * nrows * nchunk, total);
+                    tdenblas::threadedMultAB(nrows, total, ncols, 1.0, metric.get() + k * nrows * ncols, ncols,
+                                             gathered.data() + k * ncols * nchunk, total, 0.0,
+                                             product.data() + k * nrows * nchunk, total);
                 }
 
                 column = 0;
@@ -2127,8 +2044,8 @@ CSimdRIFockDriver::compute_w_vectors(const CSparseTensor        &bq_vectors,
 
                 const auto mark_product = prof_clock::now();
 
-                _matrix_product(nao, nocc, nao, 1.0, square.data(), nao, cvalues, nocc,
-                                accumulate ? 1.0 : 0.0, w_vectors[iq].data(), nocc);
+                tdenblas::threadedMultAB(nao, nocc, nao, 1.0, square.data(), nao, cvalues, nocc,
+                                         accumulate ? 1.0 : 0.0, w_vectors[iq].data(), nocc);
 
                 product_time += prof_since(mark_product);
             }
@@ -2399,37 +2316,7 @@ CSimdRIFockDriver::compute_exchange_matrix(const std::vector<CPackedMatrix> &w_v
 
             const auto mark_update = profiled ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
 
-#ifdef VLX_USE_MATHLIB
-
-            const char uplo = 'U';
-
-            const char trans = 'T';
-
-            auto n_arg = static_cast<lapack_int_t>(nao);
-
-            auto k_arg = static_cast<lapack_int_t>(depth);
-
-            auto lda = static_cast<lapack_int_t>(depth);
-
-            auto ldc = static_cast<lapack_int_t>(nao);
-
-            const double one = 1.0;
-
-            dsyrk_(&uplo, &trans, &n_arg, &k_arg, &one, staged.get(), &lda, &one, triangle.data(), &ldc);
-
-#else
-
-            using RowMajorMatrix = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
-
-            Eigen::Map<const RowMajorMatrix> wmap(staged.get(), static_cast<Eigen::Index>(nao),
-                                                  static_cast<Eigen::Index>(depth));
-
-            Eigen::Map<RowMajorMatrix> cmap(triangle.data(), static_cast<Eigen::Index>(nao),
-                                            static_cast<Eigen::Index>(nao));
-
-            cmap.template selfadjointView<Eigen::Lower>().rankUpdate(wmap, 1.0);
-
-#endif /* VLX_USE_MATHLIB */
+            tdenblas::threadedRankUpdate(nao, depth, 1.0, staged.get(), depth, triangle.data(), nao);
 
             if (profiled)
             {

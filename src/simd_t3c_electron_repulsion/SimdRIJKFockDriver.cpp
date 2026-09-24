@@ -45,6 +45,7 @@
 #include "DenseIndexFunc.hpp"
 #include "ErrorHandler.hpp"
 #include "PackedLinearAlgebra.hpp"
+#include "ThreadedDenseLinearAlgebra.hpp"
 
 #ifdef VLX_USE_MATHLIB
 #include "MathLibrary.hpp"
@@ -1348,52 +1349,7 @@ CSimdRIJKFockDriver::_multiply_metric(const double *metric, double *values, cons
 
         double *out = values + first;
 
-#ifdef VLX_USE_MATHLIB
-
-        // NOTE: the library is column major and the column major matrix of a row
-        // major array is its transpose, so the product of the row major arrays is
-        // the product of the two in the other order with the rows and columns
-        // swapped, as everywhere else in these drivers.
-
-        const char trans = 'N';
-
-        auto m_arg = static_cast<lapack_int_t>(count);
-
-        auto n_arg = static_cast<lapack_int_t>(nrows);
-
-        auto k_arg = static_cast<lapack_int_t>(nrows);
-
-        auto ldb_arg = static_cast<lapack_int_t>(count);
-
-        auto lda_arg = static_cast<lapack_int_t>(nrows);
-
-        auto ldc_arg = static_cast<lapack_int_t>(ncols);
-
-        const double one = 1.0, zero = 0.0;
-
-        dgemm_(&trans, &trans, &m_arg, &n_arg, &k_arg, &one, buffer.data(), &ldb_arg, metric, &lda_arg, &zero, out,
-               &ldc_arg);
-
-#else
-
-        using RowMajorMatrix = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
-
-        using RowMajorStride = Eigen::Stride<Eigen::Dynamic, 1>;
-
-        const auto n = static_cast<Eigen::Index>(nrows);
-
-        const auto m = static_cast<Eigen::Index>(count);
-
-        Eigen::Map<const RowMajorMatrix> mmap(metric, n, n);
-
-        Eigen::Map<const RowMajorMatrix> bmap(buffer.data(), n, m);
-
-        Eigen::Map<RowMajorMatrix, 0, RowMajorStride> omap(out, n, m,
-                                                           RowMajorStride(static_cast<Eigen::Index>(ncols), 1));
-
-        omap.noalias() = mmap * bmap;
-
-#endif /* VLX_USE_MATHLIB */
+        tdenblas::threadedMultAB(nrows, count, nrows, 1.0, metric, nrows, buffer.data(), count, 0.0, out, ncols);
     }
 }
 

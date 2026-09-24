@@ -25,12 +25,7 @@
 #include "SimdTwoCenterElectronRepulsionGradientDriver.hpp"
 #include "SimdTwoCenterElectronRepulsionGradientRsDriver.hpp"
 #include "TensorComponents.hpp"
-
-#ifdef VLX_USE_MATHLIB
-#include "MathLibrary.hpp"
-#else
-#include "Eigen/Dense"
-#endif
+#include "ThreadedDenseLinearAlgebra.hpp"
 
 auto
 CSimdRIJKGradientDriver::get_threshold() const -> double
@@ -42,159 +37,6 @@ auto
 CSimdRIJKGradientDriver::get_block_size() const -> size_t
 {
     return _block_size;
-}
-
-/// @brief The product of two row major matrices, C = A B.
-/// @note The library is column major and the column major matrix of a row major
-/// array is its transpose, so the product of the row major arrays is the product
-/// of the two in the other order with the rows and the columns swapped. The same
-/// reading the Fock driver's multiply takes.
-static auto
-_multiply(const size_t  nrows,
-          const size_t  ncols,
-          const size_t  nsums,
-          const double *amat,
-          const double *bmat,
-          double       *cmat) -> void
-{
-#ifdef VLX_USE_MATHLIB
-
-    const char trans = 'N';
-
-    const double alpha = 1.0;
-
-    const double beta = 0.0;
-
-    auto m_arg = static_cast<lapack_int_t>(ncols);
-
-    auto n_arg = static_cast<lapack_int_t>(nrows);
-
-    auto k_arg = static_cast<lapack_int_t>(nsums);
-
-    auto ldb_arg = static_cast<lapack_int_t>(ncols);
-
-    auto lda_arg = static_cast<lapack_int_t>(nsums);
-
-    auto ldc_arg = static_cast<lapack_int_t>(ncols);
-
-    dgemm_(&trans, &trans, &m_arg, &n_arg, &k_arg, &alpha, bmat, &ldb_arg, amat, &lda_arg, &beta, cmat, &ldc_arg);
-
-#else
-
-    using RowMajorMatrix = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
-
-    Eigen::Map<const RowMajorMatrix> a(amat, static_cast<Eigen::Index>(nrows), static_cast<Eigen::Index>(nsums));
-
-    Eigen::Map<const RowMajorMatrix> b(bmat, static_cast<Eigen::Index>(nsums), static_cast<Eigen::Index>(ncols));
-
-    Eigen::Map<RowMajorMatrix> c(cmat, static_cast<Eigen::Index>(nrows), static_cast<Eigen::Index>(ncols));
-
-    c.noalias() = a * b;
-
-#endif
-}
-
-/// @brief The product of two row major matrices added to what is there,
-/// C += A B.
-/// @note The same reading of the library's ordering as the product above, with the
-/// one difference that it accumulates. An open shell adds a term per spin into one
-/// matrix, and the overwriting form silently kept only the last of them.
-static auto
-_add_multiply(const size_t  nrows,
-              const size_t  ncols,
-              const size_t  nsums,
-              const double *amat,
-              const double *bmat,
-              double       *cmat) -> void
-{
-#ifdef VLX_USE_MATHLIB
-
-    const char trans = 'N';
-
-    const double alpha = 1.0;
-
-    const double beta = 1.0;
-
-    auto m_arg = static_cast<lapack_int_t>(ncols);
-
-    auto n_arg = static_cast<lapack_int_t>(nrows);
-
-    auto k_arg = static_cast<lapack_int_t>(nsums);
-
-    auto ldb_arg = static_cast<lapack_int_t>(ncols);
-
-    auto lda_arg = static_cast<lapack_int_t>(nsums);
-
-    auto ldc_arg = static_cast<lapack_int_t>(ncols);
-
-    dgemm_(&trans, &trans, &m_arg, &n_arg, &k_arg, &alpha, bmat, &ldb_arg, amat, &lda_arg, &beta, cmat, &ldc_arg);
-
-#else
-
-    using RowMajorMatrix = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
-
-    Eigen::Map<const RowMajorMatrix> a(amat, static_cast<Eigen::Index>(nrows), static_cast<Eigen::Index>(nsums));
-
-    Eigen::Map<const RowMajorMatrix> b(bmat, static_cast<Eigen::Index>(nsums), static_cast<Eigen::Index>(ncols));
-
-    Eigen::Map<RowMajorMatrix> c(cmat, static_cast<Eigen::Index>(nrows), static_cast<Eigen::Index>(ncols));
-
-    c.noalias() += a * b;
-
-#endif
-}
-
-/// @brief The product of a row major matrix by the transpose of another, with the
-/// result added to what is there: C += A B^T, for A of nrows by nsums and B of
-/// ncols by nsums.
-/// @note The same reading of the library's ordering as the product above. The two
-/// arrays may be the same one, which is how a Gram product is taken without a
-/// second copy of the matrix transposed.
-static auto
-_add_multiply_by_transpose(const size_t  nrows,
-                           const size_t  ncols,
-                           const size_t  nsums,
-                           const double *amat,
-                           const double *bmat,
-                           double       *cmat) -> void
-{
-#ifdef VLX_USE_MATHLIB
-
-    const char trans_t = 'T';
-
-    const char trans_n = 'N';
-
-    const double alpha = 1.0;
-
-    const double beta = 1.0;
-
-    auto m_arg = static_cast<lapack_int_t>(ncols);
-
-    auto n_arg = static_cast<lapack_int_t>(nrows);
-
-    auto k_arg = static_cast<lapack_int_t>(nsums);
-
-    auto lda_arg = static_cast<lapack_int_t>(nsums);
-
-    auto ldb_arg = static_cast<lapack_int_t>(nsums);
-
-    auto ldc_arg = static_cast<lapack_int_t>(ncols);
-
-    dgemm_(&trans_t, &trans_n, &m_arg, &n_arg, &k_arg, &alpha, bmat, &lda_arg, amat, &ldb_arg, &beta, cmat, &ldc_arg);
-
-#else
-
-    using RowMajorMatrix = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
-
-    Eigen::Map<const RowMajorMatrix> a(amat, static_cast<Eigen::Index>(nrows), static_cast<Eigen::Index>(nsums));
-
-    Eigen::Map<const RowMajorMatrix> b(bmat, static_cast<Eigen::Index>(ncols), static_cast<Eigen::Index>(nsums));
-
-    Eigen::Map<RowMajorMatrix> c(cmat, static_cast<Eigen::Index>(nrows), static_cast<Eigen::Index>(ncols));
-
-    c.noalias() += a * b.transpose();
-
-#endif
 }
 
 /// @brief Applies the transpose of the inverted metric to a set of columns held
@@ -363,7 +205,8 @@ CSimdRIJKGradientDriver::_apply_transposed_factor(const CPackedMatrix        &me
             std::copy_n(matrices[q].data() + first, count, gathered.data() + q * count);
         }
 
-        _multiply(naux, count, naux, transposed.data(), gathered.data(), result.data());
+        tdenblas::threadedMultAB(naux, count, naux, 1.0, transposed.data(), naux, gathered.data(), count, 0.0,
+                                 result.data(), count);
 
 #pragma omp parallel for schedule(static)
         for (int at = 0; at < nrange; at++)
@@ -394,7 +237,8 @@ CSimdRIJKGradientDriver::_close_orbitals(const std::vector<double> &transposed,
 
     auto square = std::vector<double>(norbs * norbs, 0.0);
 
-    _multiply(norbs, norbs, nao, transposed.data(), dense_w.data(), square.data());
+    tdenblas::threadedMultAB(norbs, norbs, nao, 1.0, transposed.data(), nao, dense_w.data(), norbs, 0.0,
+                             square.data(), norbs);
 
     auto closed = CPackedMatrix(norbs, norbs, mat_t::symmetric);
 
@@ -498,7 +342,8 @@ CSimdRIJKGradientDriver::_gram(const std::vector<CPackedMatrix> &orbital_densiti
                 }
             }
 
-            _add_multiply_by_transpose(naux, naux, count, scaled.data(), scaled.data(), gram.data());
+            tdenblas::threadedMultABt(naux, naux, count, 1.0, scaled.data(), count, scaled.data(), count, 1.0,
+                                      gram.data(), naux);
         }
 
     return gram;
@@ -899,7 +744,8 @@ CSimdRIJKGradientDriver::mpi_panel_partial(const TDistributedFit &fit,
 
     const auto columns = _transposed_columns(metric, fit.functions, fit.naux);
 
-    _multiply(fit.naux, count, fit.functions.size(), columns.data(), gathered.data(), partial.data());
+    tdenblas::threadedMultAB(fit.naux, count, fit.functions.size(), 1.0, columns.data(), fit.functions.size(),
+                             gathered.data(), count, 0.0, partial.data(), count);
 
     return partial;
 }
@@ -1011,8 +857,8 @@ CSimdRIJKGradientDriver::mpi_panel_absorb(TDistributedFit &fit,
         std::copy_n(scaled.data() + fit.functions[k] * count, count, owned.data() + k * count);
     }
 
-    _add_multiply_by_transpose(fit.functions.size(), fit.naux, count, owned.data(), scaled.data(),
-                               fit.gram_rows.data());
+    tdenblas::threadedMultABt(fit.functions.size(), fit.naux, count, 1.0, owned.data(), count, scaled.data(), count,
+                              1.0, fit.gram_rows.data(), fit.naux);
 }
 
 auto
@@ -2118,12 +1964,14 @@ CSimdRIJKGradientDriver::_compute_three_center(CPackedMatrix                    
 
                         auto half = std::vector<double>(nao * norbs, 0.0);
 
-                        _multiply(nao, norbs, norbs, dense.dense_c.data(), dense_q.data(), half.data());
+                        tdenblas::threadedMultAB(nao, norbs, norbs, 1.0, dense.dense_c.data(), norbs,
+                                                 dense_q.data(), norbs, 0.0, half.data(), norbs);
 
                         // NOTE: added and not assigned. The spins accumulate into
                         // one matrix, and the overwriting product kept only the
                         // last of them.
-                        _add_multiply(nao, nao, norbs, half.data(), dense.transposed.data(), matrix.data());
+                        tdenblas::threadedMultAB(nao, nao, norbs, 1.0, half.data(), norbs, dense.transposed.data(),
+                                                 nao, 1.0, matrix.data(), nao);
                     }
 
                     for (auto &value : matrix) value *= factor;
