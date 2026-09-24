@@ -146,6 +146,33 @@ auto threadedRankUpdate(const size_t  n,
                         double       *matrixC,
                         const size_t  ldc) -> void;
 
+/**
+ Solves a triangular system with many right hand sides: factor * X = values, or
+ factor^T * X = values when the factor is transposed, for a row major lower
+ triangular factor and row major right hand sides. The solution is written over
+ the right hand sides in place.
+
+ Uses the math library when one is available and the call is made outside an
+ OpenMP parallel region. Falls back to sdenblas::serialSolveTriangular otherwise.
+
+ @param nrows the number of rows and columns of the factor, and the rows of values.
+ @param ncols the number of columns of values.
+ @param factor the values of the lower triangular factor, as a row major array
+ with leading dimension ldf.
+ @param ldf the leading dimension of the factor.
+ @param values the values of the right hand sides, as a row major array with
+ leading dimension ldv, overwritten by the solution.
+ @param ldv the leading dimension of the values.
+ @param transposed whether to solve against the transpose of the factor.
+ */
+auto threadedSolveTriangular(const size_t  nrows,
+                             const size_t  ncols,
+                             const double *factor,
+                             const size_t  ldf,
+                             double       *values,
+                             const size_t  ldv,
+                             const bool    transposed) -> void;
+
 }  // namespace tdenblas
 
 #endif /* ThreadedDenseLinearAlgebra_hpp */

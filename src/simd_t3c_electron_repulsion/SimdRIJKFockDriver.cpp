@@ -46,12 +46,6 @@
 #include "ErrorHandler.hpp"
 #include "PackedLinearAlgebra.hpp"
 #include "ThreadedDenseLinearAlgebra.hpp"
-
-#ifdef VLX_USE_MATHLIB
-#include "MathLibrary.hpp"
-#else
-#include "Eigen/Dense"
-#endif
 #include "ScreeningFunc.hpp"
 #include "SimdRIFockCommon.hpp"
 #include "SimdThreeCenterElectronRepulsionDriver.hpp"
@@ -1440,60 +1434,8 @@ CSimdRIJKFockDriver::_apply_metric(double *values, const size_t nrows, const siz
         return;
     }
 
-#ifdef VLX_USE_MATHLIB
+    // NOTE: the factor is lower triangular and row major, and the transposed flag
+    // asks for the solve against its transpose rather than against it.
 
-    // NOTE: the array of the factor is row major and the library is column major,
-    // so the column major matrix of it is the transpose of the lower triangular
-    // factor, which is upper triangular. Solving L X = B with the row major arrays
-    // is therefore the transposed upper triangular solve of the library, and the
-    // right hand sides are transposed in the same way, which swaps the side.
-
-    const char side = 'R';
-
-    const char uplo = 'U';
-
-    // NOTE: solving L X = B with row major arrays is X L transposed = B
-    // transposed, which the library takes as a solve from the right against the
-    // upper triangular matrix its column major reading of the factor gives. That
-    // is the untransposed call; solving against the transpose of the factor is the
-    // transposed one.
-
-    const char trans = transposed ? 'T' : 'N';
-
-    const char diag = 'N';
-
-    auto m_arg = static_cast<lapack_int_t>(ncols);
-
-    auto n_arg = static_cast<lapack_int_t>(nrows);
-
-    auto lda = static_cast<lapack_int_t>(nrows);
-
-    auto ldb = static_cast<lapack_int_t>(ncols);
-
-    const double one = 1.0;
-
-    dtrsm_(&side, &uplo, &trans, &diag, &m_arg, &n_arg, &one, dense.data(), &lda, values, &ldb);
-
-#else
-
-    using RowMajorMatrix = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
-
-    const auto n = static_cast<Eigen::Index>(nrows);
-
-    const auto m = static_cast<Eigen::Index>(ncols);
-
-    Eigen::Map<const RowMajorMatrix> lmap(dense.data(), n, n);
-
-    Eigen::Map<RowMajorMatrix> bmap(values, n, m);
-
-    if (transposed)
-    {
-        lmap.transpose().template triangularView<Eigen::Upper>().solveInPlace(bmap);
-    }
-    else
-    {
-        lmap.template triangularView<Eigen::Lower>().solveInPlace(bmap);
-    }
-
-#endif /* VLX_USE_MATHLIB */
+    tdenblas::threadedSolveTriangular(nrows, ncols, dense.data(), nrows, values, ncols, transposed);
 }

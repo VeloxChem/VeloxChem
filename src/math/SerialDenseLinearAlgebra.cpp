@@ -441,5 +441,38 @@ serialRankUpdate(const size_t  n,
     ematC.template selfadjointView<Eigen::Lower>().rankUpdate(ematA, alpha);
 }
 
+auto
+serialSolveTriangular(const size_t  nrows,
+                      const size_t  ncols,
+                      const double *factor,
+                      const size_t  ldf,
+                      double       *values,
+                      const size_t  ldv,
+                      const bool    transposed) -> void
+{
+    using RowMajorMatrix = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
+
+    using RowMajorStride = Eigen::Stride<Eigen::Dynamic, 1>;
+
+    const auto rows = static_cast<Eigen::Index>(nrows);
+
+    const auto cols = static_cast<Eigen::Index>(ncols);
+
+    Eigen::Map<const RowMajorMatrix, 0, RowMajorStride> ematL(factor, rows, rows,
+                                                             RowMajorStride(static_cast<Eigen::Index>(ldf), 1));
+
+    Eigen::Map<RowMajorMatrix, 0, RowMajorStride> ematB(values, rows, cols,
+                                                        RowMajorStride(static_cast<Eigen::Index>(ldv), 1));
+
+    if (transposed)
+    {
+        ematL.transpose().template triangularView<Eigen::Upper>().solveInPlace(ematB);
+    }
+    else
+    {
+        ematL.template triangularView<Eigen::Lower>().solveInPlace(ematB);
+    }
+}
+
 
 }  // namespace sdenblas

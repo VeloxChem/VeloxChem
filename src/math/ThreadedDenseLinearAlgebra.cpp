@@ -239,4 +239,55 @@ threadedRankUpdate(const size_t  n,
     sdenblas::serialRankUpdate(n, k, alpha, matrixA, lda, matrixC, ldc);
 }
 
+auto
+threadedSolveTriangular(const size_t  nrows,
+                        const size_t  ncols,
+                        const double *factor,
+                        const size_t  ldf,
+                        double       *values,
+                        const size_t  ldv,
+                        const bool    transposed) -> void
+{
+#ifdef VLX_USE_MATHLIB
+
+    // use the math library only outside OpenMP parallel regions, and fall back
+    // to the serial implementation otherwise
+
+    if (!omp_in_parallel())
+    {
+        // NOTE: the factor is row major and lower triangular, and the column
+        // major matrix of a row major array is its transpose, so the library's
+        // reading of the factor is upper triangular. Solving L X = B with the row
+        // major arrays is therefore a solve from the right against that upper
+        // triangle, with the right hand sides read transposed, which swaps the
+        // side.
+
+        const char side = 'R';
+
+        const char uplo = 'U';
+
+        const char trans = transposed ? 'T' : 'N';
+
+        const char diag = 'N';
+
+        auto m_arg = static_cast<lapack_int_t>(ncols);
+
+        auto n_arg = static_cast<lapack_int_t>(nrows);
+
+        auto lda_arg = static_cast<lapack_int_t>(ldf);
+
+        auto ldb_arg = static_cast<lapack_int_t>(ldv);
+
+        const double one = 1.0;
+
+        dtrsm_(&side, &uplo, &trans, &diag, &m_arg, &n_arg, &one, factor, &lda_arg, values, &ldb_arg);
+
+        return;
+    }
+
+#endif
+
+    sdenblas::serialSolveTriangular(nrows, ncols, factor, ldf, values, ldv, transposed);
+}
+
 }  // namespace tdenblas
