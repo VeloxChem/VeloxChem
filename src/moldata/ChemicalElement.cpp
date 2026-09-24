@@ -2907,7 +2907,7 @@ CChemicalElement::_selectHydrogenIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 1:
 
@@ -2915,7 +2915,7 @@ CChemicalElement::_selectHydrogenIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 2:
 
@@ -2923,7 +2923,7 @@ CChemicalElement::_selectHydrogenIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 3:
 
@@ -2931,13 +2931,13 @@ CChemicalElement::_selectHydrogenIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -2952,7 +2952,7 @@ CChemicalElement::_selectHeliumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 3:
 
@@ -2960,7 +2960,7 @@ CChemicalElement::_selectHeliumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 4:
 
@@ -2968,13 +2968,13 @@ CChemicalElement::_selectHeliumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -2989,7 +2989,7 @@ CChemicalElement::_selectLithiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 6:
 
@@ -2997,7 +2997,7 @@ CChemicalElement::_selectLithiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 7:
 
@@ -3005,13 +3005,13 @@ CChemicalElement::_selectLithiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -3026,7 +3026,7 @@ CChemicalElement::_selectBerylliumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 9:
 
@@ -3034,13 +3034,13 @@ CChemicalElement::_selectBerylliumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -3055,7 +3055,7 @@ CChemicalElement::_selectBoronIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 10:
 
@@ -3063,7 +3063,7 @@ CChemicalElement::_selectBoronIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 11:
 
@@ -3071,13 +3071,13 @@ CChemicalElement::_selectBoronIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -3092,7 +3092,7 @@ CChemicalElement::_selectCarbonIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 12:
 
@@ -3100,7 +3100,7 @@ CChemicalElement::_selectCarbonIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 13:
 
@@ -3108,13 +3108,13 @@ CChemicalElement::_selectCarbonIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -3129,7 +3129,7 @@ CChemicalElement::_selectNitrogenIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 14:
 
@@ -3137,7 +3137,7 @@ CChemicalElement::_selectNitrogenIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 15:
 
@@ -3145,13 +3145,13 @@ CChemicalElement::_selectNitrogenIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -3166,7 +3166,7 @@ CChemicalElement::_selectOxygenIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 16:
 
@@ -3174,7 +3174,7 @@ CChemicalElement::_selectOxygenIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 17:
 
@@ -3182,7 +3182,7 @@ CChemicalElement::_selectOxygenIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 18:
 
@@ -3190,13 +3190,13 @@ CChemicalElement::_selectOxygenIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -3211,7 +3211,7 @@ CChemicalElement::_selectFlourineIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 19:
 
@@ -3219,13 +3219,13 @@ CChemicalElement::_selectFlourineIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -3240,7 +3240,7 @@ CChemicalElement::_selectNeonIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 20:
 
@@ -3248,7 +3248,7 @@ CChemicalElement::_selectNeonIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 21:
 
@@ -3256,7 +3256,7 @@ CChemicalElement::_selectNeonIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 22:
 
@@ -3264,13 +3264,13 @@ CChemicalElement::_selectNeonIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -3285,7 +3285,7 @@ CChemicalElement::_selectSodiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 23:
 
@@ -3293,13 +3293,13 @@ CChemicalElement::_selectSodiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -3314,7 +3314,7 @@ CChemicalElement::_selectMagnesiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 24:
 
@@ -3322,7 +3322,7 @@ CChemicalElement::_selectMagnesiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 25:
 
@@ -3330,7 +3330,7 @@ CChemicalElement::_selectMagnesiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 26:
 
@@ -3338,13 +3338,13 @@ CChemicalElement::_selectMagnesiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -3359,7 +3359,7 @@ CChemicalElement::_selectAluminiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 27:
 
@@ -3367,13 +3367,13 @@ CChemicalElement::_selectAluminiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -3388,7 +3388,7 @@ CChemicalElement::_selectSiliconIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 28:
 
@@ -3396,7 +3396,7 @@ CChemicalElement::_selectSiliconIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 29:
 
@@ -3404,7 +3404,7 @@ CChemicalElement::_selectSiliconIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 30:
 
@@ -3412,13 +3412,13 @@ CChemicalElement::_selectSiliconIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -3433,7 +3433,7 @@ CChemicalElement::_selectPhosphorusIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 31:
 
@@ -3441,13 +3441,13 @@ CChemicalElement::_selectPhosphorusIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -3462,7 +3462,7 @@ CChemicalElement::_selectSulfurIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 32:
 
@@ -3470,7 +3470,7 @@ CChemicalElement::_selectSulfurIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 33:
 
@@ -3478,7 +3478,7 @@ CChemicalElement::_selectSulfurIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 34:
 
@@ -3486,7 +3486,7 @@ CChemicalElement::_selectSulfurIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 36:
 
@@ -3494,13 +3494,13 @@ CChemicalElement::_selectSulfurIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -3515,7 +3515,7 @@ CChemicalElement::_selectChlorineIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 35:
 
@@ -3523,7 +3523,7 @@ CChemicalElement::_selectChlorineIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 37:
 
@@ -3531,13 +3531,13 @@ CChemicalElement::_selectChlorineIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -3552,7 +3552,7 @@ CChemicalElement::_selectArgonIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 36:
 
@@ -3560,7 +3560,7 @@ CChemicalElement::_selectArgonIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 38:
 
@@ -3568,7 +3568,7 @@ CChemicalElement::_selectArgonIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 40:
 
@@ -3576,13 +3576,13 @@ CChemicalElement::_selectArgonIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -3597,7 +3597,7 @@ CChemicalElement::_selectPotasiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 39:
 
@@ -3605,7 +3605,7 @@ CChemicalElement::_selectPotasiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 40:
 
@@ -3613,7 +3613,7 @@ CChemicalElement::_selectPotasiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 41:
 
@@ -3621,13 +3621,13 @@ CChemicalElement::_selectPotasiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -3642,7 +3642,7 @@ CChemicalElement::_selectCalciumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 40:
 
@@ -3650,7 +3650,7 @@ CChemicalElement::_selectCalciumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 42:
 
@@ -3658,7 +3658,7 @@ CChemicalElement::_selectCalciumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 43:
 
@@ -3666,7 +3666,7 @@ CChemicalElement::_selectCalciumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 44:
 
@@ -3674,7 +3674,7 @@ CChemicalElement::_selectCalciumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 46:
 
@@ -3682,7 +3682,7 @@ CChemicalElement::_selectCalciumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 48:
 
@@ -3690,13 +3690,13 @@ CChemicalElement::_selectCalciumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -3711,7 +3711,7 @@ CChemicalElement::_selectScandiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 45:
 
@@ -3719,13 +3719,13 @@ CChemicalElement::_selectScandiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -3740,7 +3740,7 @@ CChemicalElement::_selectTitaniumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 46:
 
@@ -3748,7 +3748,7 @@ CChemicalElement::_selectTitaniumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 47:
 
@@ -3756,7 +3756,7 @@ CChemicalElement::_selectTitaniumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 48:
 
@@ -3764,7 +3764,7 @@ CChemicalElement::_selectTitaniumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 49:
 
@@ -3772,7 +3772,7 @@ CChemicalElement::_selectTitaniumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 50:
 
@@ -3780,13 +3780,13 @@ CChemicalElement::_selectTitaniumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -3801,7 +3801,7 @@ CChemicalElement::_selectVanadiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 50:
 
@@ -3809,7 +3809,7 @@ CChemicalElement::_selectVanadiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 51:
 
@@ -3817,13 +3817,13 @@ CChemicalElement::_selectVanadiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -3838,7 +3838,7 @@ CChemicalElement::_selectChromiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 50:
 
@@ -3846,7 +3846,7 @@ CChemicalElement::_selectChromiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 52:
 
@@ -3854,7 +3854,7 @@ CChemicalElement::_selectChromiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 53:
 
@@ -3862,7 +3862,7 @@ CChemicalElement::_selectChromiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 54:
 
@@ -3870,13 +3870,13 @@ CChemicalElement::_selectChromiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -3891,7 +3891,7 @@ CChemicalElement::_selectManganeseIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 55:
 
@@ -3903,7 +3903,7 @@ CChemicalElement::_selectManganeseIsotopeMass(const int64_t label) -> bool
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -3918,7 +3918,7 @@ CChemicalElement::_selectIronIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 54:
 
@@ -3926,7 +3926,7 @@ CChemicalElement::_selectIronIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 56:
 
@@ -3934,7 +3934,7 @@ CChemicalElement::_selectIronIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 57:
 
@@ -3942,7 +3942,7 @@ CChemicalElement::_selectIronIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 58:
 
@@ -3950,13 +3950,13 @@ CChemicalElement::_selectIronIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -3971,7 +3971,7 @@ CChemicalElement::_selectCobaltIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 59:
 
@@ -3979,13 +3979,13 @@ CChemicalElement::_selectCobaltIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -4000,7 +4000,7 @@ CChemicalElement::_selectNickelIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 58:
 
@@ -4008,7 +4008,7 @@ CChemicalElement::_selectNickelIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 60:
 
@@ -4016,7 +4016,7 @@ CChemicalElement::_selectNickelIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 61:
 
@@ -4024,7 +4024,7 @@ CChemicalElement::_selectNickelIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 62:
 
@@ -4032,7 +4032,7 @@ CChemicalElement::_selectNickelIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 64:
 
@@ -4040,13 +4040,13 @@ CChemicalElement::_selectNickelIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -4061,7 +4061,7 @@ CChemicalElement::_selectCopperIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 63:
 
@@ -4069,7 +4069,7 @@ CChemicalElement::_selectCopperIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 65:
 
@@ -4077,13 +4077,13 @@ CChemicalElement::_selectCopperIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -4098,7 +4098,7 @@ CChemicalElement::_selectZincIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 64:
 
@@ -4106,7 +4106,7 @@ CChemicalElement::_selectZincIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 66:
 
@@ -4114,7 +4114,7 @@ CChemicalElement::_selectZincIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 67:
 
@@ -4122,7 +4122,7 @@ CChemicalElement::_selectZincIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 68:
 
@@ -4130,7 +4130,7 @@ CChemicalElement::_selectZincIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 70:
 
@@ -4138,13 +4138,13 @@ CChemicalElement::_selectZincIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -4159,7 +4159,7 @@ CChemicalElement::_selectGalliumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 69:
 
@@ -4167,7 +4167,7 @@ CChemicalElement::_selectGalliumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 71:
 
@@ -4175,13 +4175,13 @@ CChemicalElement::_selectGalliumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -4196,7 +4196,7 @@ CChemicalElement::_selectGermaniumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 70:
 
@@ -4204,7 +4204,7 @@ CChemicalElement::_selectGermaniumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 72:
 
@@ -4212,7 +4212,7 @@ CChemicalElement::_selectGermaniumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 73:
 
@@ -4220,7 +4220,7 @@ CChemicalElement::_selectGermaniumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 74:
 
@@ -4228,7 +4228,7 @@ CChemicalElement::_selectGermaniumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 76:
 
@@ -4236,13 +4236,13 @@ CChemicalElement::_selectGermaniumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -4257,7 +4257,7 @@ CChemicalElement::_selectArsenicIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 75:
 
@@ -4265,13 +4265,13 @@ CChemicalElement::_selectArsenicIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -4286,7 +4286,7 @@ CChemicalElement::_selectSeleniumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 74:
 
@@ -4294,7 +4294,7 @@ CChemicalElement::_selectSeleniumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 76:
 
@@ -4302,7 +4302,7 @@ CChemicalElement::_selectSeleniumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 77:
 
@@ -4310,7 +4310,7 @@ CChemicalElement::_selectSeleniumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 78:
 
@@ -4318,7 +4318,7 @@ CChemicalElement::_selectSeleniumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 80:
 
@@ -4326,7 +4326,7 @@ CChemicalElement::_selectSeleniumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 82:
 
@@ -4334,13 +4334,13 @@ CChemicalElement::_selectSeleniumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -4355,7 +4355,7 @@ CChemicalElement::_selectBromineIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 79:
 
@@ -4363,7 +4363,7 @@ CChemicalElement::_selectBromineIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 81:
 
@@ -4371,13 +4371,13 @@ CChemicalElement::_selectBromineIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -4392,7 +4392,7 @@ CChemicalElement::_selectKryptonIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 78:
 
@@ -4400,7 +4400,7 @@ CChemicalElement::_selectKryptonIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 80:
 
@@ -4408,7 +4408,7 @@ CChemicalElement::_selectKryptonIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 82:
 
@@ -4416,7 +4416,7 @@ CChemicalElement::_selectKryptonIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 83:
 
@@ -4424,7 +4424,7 @@ CChemicalElement::_selectKryptonIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 84:
 
@@ -4432,7 +4432,7 @@ CChemicalElement::_selectKryptonIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 86:
 
@@ -4440,13 +4440,13 @@ CChemicalElement::_selectKryptonIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -4461,7 +4461,7 @@ CChemicalElement::_selectRubidiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 85:
 
@@ -4469,7 +4469,7 @@ CChemicalElement::_selectRubidiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 87:
 
@@ -4477,13 +4477,13 @@ CChemicalElement::_selectRubidiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -4498,7 +4498,7 @@ CChemicalElement::_selectStrontiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 84:
 
@@ -4506,7 +4506,7 @@ CChemicalElement::_selectStrontiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 86:
 
@@ -4514,7 +4514,7 @@ CChemicalElement::_selectStrontiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 87:
 
@@ -4522,7 +4522,7 @@ CChemicalElement::_selectStrontiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 88:
 
@@ -4530,13 +4530,13 @@ CChemicalElement::_selectStrontiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -4551,7 +4551,7 @@ CChemicalElement::_selectYttriumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 89:
 
@@ -4559,13 +4559,13 @@ CChemicalElement::_selectYttriumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -4580,7 +4580,7 @@ CChemicalElement::_selectZirconiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 90:
 
@@ -4588,7 +4588,7 @@ CChemicalElement::_selectZirconiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 91:
 
@@ -4596,7 +4596,7 @@ CChemicalElement::_selectZirconiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 92:
 
@@ -4604,7 +4604,7 @@ CChemicalElement::_selectZirconiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 94:
 
@@ -4612,7 +4612,7 @@ CChemicalElement::_selectZirconiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 96:
 
@@ -4620,13 +4620,13 @@ CChemicalElement::_selectZirconiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -4641,7 +4641,7 @@ CChemicalElement::_selectNiobiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 93:
 
@@ -4649,13 +4649,13 @@ CChemicalElement::_selectNiobiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -4670,7 +4670,7 @@ CChemicalElement::_selectMolybdenumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 92:
 
@@ -4678,7 +4678,7 @@ CChemicalElement::_selectMolybdenumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 94:
 
@@ -4686,7 +4686,7 @@ CChemicalElement::_selectMolybdenumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 95:
 
@@ -4694,7 +4694,7 @@ CChemicalElement::_selectMolybdenumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 96:
 
@@ -4702,7 +4702,7 @@ CChemicalElement::_selectMolybdenumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 97:
 
@@ -4710,7 +4710,7 @@ CChemicalElement::_selectMolybdenumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 98:
 
@@ -4718,7 +4718,7 @@ CChemicalElement::_selectMolybdenumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 100:
 
@@ -4726,13 +4726,13 @@ CChemicalElement::_selectMolybdenumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -4747,7 +4747,7 @@ CChemicalElement::_selectTechnetiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 98:
 
@@ -4755,13 +4755,13 @@ CChemicalElement::_selectTechnetiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -4776,7 +4776,7 @@ CChemicalElement::_selectRutheniumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 96:
 
@@ -4784,7 +4784,7 @@ CChemicalElement::_selectRutheniumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 98:
 
@@ -4792,7 +4792,7 @@ CChemicalElement::_selectRutheniumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 99:
 
@@ -4800,7 +4800,7 @@ CChemicalElement::_selectRutheniumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 100:
 
@@ -4808,7 +4808,7 @@ CChemicalElement::_selectRutheniumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 101:
 
@@ -4816,7 +4816,7 @@ CChemicalElement::_selectRutheniumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 102:
 
@@ -4824,7 +4824,7 @@ CChemicalElement::_selectRutheniumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 104:
 
@@ -4832,13 +4832,13 @@ CChemicalElement::_selectRutheniumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -4853,7 +4853,7 @@ CChemicalElement::_selectRhodiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 103:
 
@@ -4861,13 +4861,13 @@ CChemicalElement::_selectRhodiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -4882,7 +4882,7 @@ CChemicalElement::_selectPaladiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 102:
 
@@ -4890,7 +4890,7 @@ CChemicalElement::_selectPaladiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 104:
 
@@ -4898,7 +4898,7 @@ CChemicalElement::_selectPaladiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 105:
 
@@ -4906,7 +4906,7 @@ CChemicalElement::_selectPaladiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 106:
 
@@ -4914,7 +4914,7 @@ CChemicalElement::_selectPaladiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 108:
 
@@ -4922,7 +4922,7 @@ CChemicalElement::_selectPaladiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 110:
 
@@ -4930,13 +4930,13 @@ CChemicalElement::_selectPaladiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -4951,7 +4951,7 @@ CChemicalElement::_selectSilverIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 107:
 
@@ -4959,7 +4959,7 @@ CChemicalElement::_selectSilverIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 109:
 
@@ -4967,13 +4967,13 @@ CChemicalElement::_selectSilverIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -4988,7 +4988,7 @@ CChemicalElement::_selectCadmiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 106:
 
@@ -4996,7 +4996,7 @@ CChemicalElement::_selectCadmiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 108:
 
@@ -5004,7 +5004,7 @@ CChemicalElement::_selectCadmiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 110:
 
@@ -5012,7 +5012,7 @@ CChemicalElement::_selectCadmiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 111:
 
@@ -5020,7 +5020,7 @@ CChemicalElement::_selectCadmiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 112:
 
@@ -5028,7 +5028,7 @@ CChemicalElement::_selectCadmiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 113:
 
@@ -5036,7 +5036,7 @@ CChemicalElement::_selectCadmiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 114:
 
@@ -5044,7 +5044,7 @@ CChemicalElement::_selectCadmiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 116:
 
@@ -5052,13 +5052,13 @@ CChemicalElement::_selectCadmiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -5073,7 +5073,7 @@ CChemicalElement::_selectIndiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 113:
 
@@ -5081,7 +5081,7 @@ CChemicalElement::_selectIndiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 115:
 
@@ -5089,13 +5089,13 @@ CChemicalElement::_selectIndiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -5110,7 +5110,7 @@ CChemicalElement::_selectTinIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 112:
 
@@ -5118,7 +5118,7 @@ CChemicalElement::_selectTinIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 114:
 
@@ -5126,7 +5126,7 @@ CChemicalElement::_selectTinIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 115:
 
@@ -5134,7 +5134,7 @@ CChemicalElement::_selectTinIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 116:
 
@@ -5142,7 +5142,7 @@ CChemicalElement::_selectTinIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 117:
 
@@ -5150,7 +5150,7 @@ CChemicalElement::_selectTinIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 118:
 
@@ -5158,7 +5158,7 @@ CChemicalElement::_selectTinIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 119:
 
@@ -5166,7 +5166,7 @@ CChemicalElement::_selectTinIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 120:
 
@@ -5174,7 +5174,7 @@ CChemicalElement::_selectTinIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 122:
 
@@ -5182,7 +5182,7 @@ CChemicalElement::_selectTinIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 124:
 
@@ -5190,13 +5190,13 @@ CChemicalElement::_selectTinIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -5211,7 +5211,7 @@ CChemicalElement::_selectAntimonyIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 121:
 
@@ -5219,7 +5219,7 @@ CChemicalElement::_selectAntimonyIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 123:
 
@@ -5227,13 +5227,13 @@ CChemicalElement::_selectAntimonyIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -5248,7 +5248,7 @@ CChemicalElement::_selectTelluriumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 120:
 
@@ -5256,7 +5256,7 @@ CChemicalElement::_selectTelluriumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 122:
 
@@ -5264,7 +5264,7 @@ CChemicalElement::_selectTelluriumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 123:
 
@@ -5272,7 +5272,7 @@ CChemicalElement::_selectTelluriumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 124:
 
@@ -5280,7 +5280,7 @@ CChemicalElement::_selectTelluriumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 125:
 
@@ -5288,7 +5288,7 @@ CChemicalElement::_selectTelluriumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 126:
 
@@ -5296,7 +5296,7 @@ CChemicalElement::_selectTelluriumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 128:
 
@@ -5304,7 +5304,7 @@ CChemicalElement::_selectTelluriumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 130:
 
@@ -5312,13 +5312,13 @@ CChemicalElement::_selectTelluriumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -5333,7 +5333,7 @@ CChemicalElement::_selectIodineIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 127:
 
@@ -5341,13 +5341,13 @@ CChemicalElement::_selectIodineIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -5362,7 +5362,7 @@ CChemicalElement::_selectXenonIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 124:
 
@@ -5370,7 +5370,7 @@ CChemicalElement::_selectXenonIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 126:
 
@@ -5378,7 +5378,7 @@ CChemicalElement::_selectXenonIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 128:
 
@@ -5386,7 +5386,7 @@ CChemicalElement::_selectXenonIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 129:
 
@@ -5394,7 +5394,7 @@ CChemicalElement::_selectXenonIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 130:
 
@@ -5402,7 +5402,7 @@ CChemicalElement::_selectXenonIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 131:
 
@@ -5410,7 +5410,7 @@ CChemicalElement::_selectXenonIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 132:
 
@@ -5418,7 +5418,7 @@ CChemicalElement::_selectXenonIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 134:
 
@@ -5426,7 +5426,7 @@ CChemicalElement::_selectXenonIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 136:
 
@@ -5434,13 +5434,13 @@ CChemicalElement::_selectXenonIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -5455,7 +5455,7 @@ CChemicalElement::_selectCesiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 133:
 
@@ -5463,13 +5463,13 @@ CChemicalElement::_selectCesiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -5484,7 +5484,7 @@ CChemicalElement::_selectBariumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 130:
 
@@ -5492,7 +5492,7 @@ CChemicalElement::_selectBariumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 132:
 
@@ -5500,7 +5500,7 @@ CChemicalElement::_selectBariumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 134:
 
@@ -5508,7 +5508,7 @@ CChemicalElement::_selectBariumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 135:
 
@@ -5516,7 +5516,7 @@ CChemicalElement::_selectBariumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 136:
 
@@ -5524,7 +5524,7 @@ CChemicalElement::_selectBariumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 137:
 
@@ -5532,7 +5532,7 @@ CChemicalElement::_selectBariumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 138:
 
@@ -5540,13 +5540,13 @@ CChemicalElement::_selectBariumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -5561,7 +5561,7 @@ CChemicalElement::_selectLanthanumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 138:
 
@@ -5569,7 +5569,7 @@ CChemicalElement::_selectLanthanumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 139:
 
@@ -5577,13 +5577,13 @@ CChemicalElement::_selectLanthanumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -5598,7 +5598,7 @@ CChemicalElement::_selectCeriumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 136:
 
@@ -5606,7 +5606,7 @@ CChemicalElement::_selectCeriumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 138:
 
@@ -5614,7 +5614,7 @@ CChemicalElement::_selectCeriumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 140:
 
@@ -5622,7 +5622,7 @@ CChemicalElement::_selectCeriumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 142:
 
@@ -5630,13 +5630,13 @@ CChemicalElement::_selectCeriumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -5651,7 +5651,7 @@ CChemicalElement::_selectPraseodymiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 141:
 
@@ -5659,13 +5659,13 @@ CChemicalElement::_selectPraseodymiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -5680,7 +5680,7 @@ CChemicalElement::_selectNeodymiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 142:
 
@@ -5688,7 +5688,7 @@ CChemicalElement::_selectNeodymiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 143:
 
@@ -5696,7 +5696,7 @@ CChemicalElement::_selectNeodymiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 144:
 
@@ -5704,7 +5704,7 @@ CChemicalElement::_selectNeodymiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 145:
 
@@ -5712,7 +5712,7 @@ CChemicalElement::_selectNeodymiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 146:
 
@@ -5720,7 +5720,7 @@ CChemicalElement::_selectNeodymiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 148:
 
@@ -5728,7 +5728,7 @@ CChemicalElement::_selectNeodymiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 150:
 
@@ -5736,13 +5736,13 @@ CChemicalElement::_selectNeodymiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -5757,7 +5757,7 @@ CChemicalElement::_selectPromethiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 147:
 
@@ -5765,13 +5765,13 @@ CChemicalElement::_selectPromethiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -5786,7 +5786,7 @@ CChemicalElement::_selectSamariumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 144:
 
@@ -5794,7 +5794,7 @@ CChemicalElement::_selectSamariumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 147:
 
@@ -5802,7 +5802,7 @@ CChemicalElement::_selectSamariumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 148:
 
@@ -5810,7 +5810,7 @@ CChemicalElement::_selectSamariumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 149:
 
@@ -5818,7 +5818,7 @@ CChemicalElement::_selectSamariumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 150:
 
@@ -5826,7 +5826,7 @@ CChemicalElement::_selectSamariumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 152:
 
@@ -5834,7 +5834,7 @@ CChemicalElement::_selectSamariumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 154:
 
@@ -5842,13 +5842,13 @@ CChemicalElement::_selectSamariumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -5863,7 +5863,7 @@ CChemicalElement::_selectEuropiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 151:
 
@@ -5871,7 +5871,7 @@ CChemicalElement::_selectEuropiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 153:
 
@@ -5879,13 +5879,13 @@ CChemicalElement::_selectEuropiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -5900,7 +5900,7 @@ CChemicalElement::_selectGadoliniumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 152:
 
@@ -5908,7 +5908,7 @@ CChemicalElement::_selectGadoliniumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 154:
 
@@ -5916,7 +5916,7 @@ CChemicalElement::_selectGadoliniumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 155:
 
@@ -5924,7 +5924,7 @@ CChemicalElement::_selectGadoliniumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 156:
 
@@ -5932,7 +5932,7 @@ CChemicalElement::_selectGadoliniumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 157:
 
@@ -5940,7 +5940,7 @@ CChemicalElement::_selectGadoliniumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 158:
 
@@ -5948,7 +5948,7 @@ CChemicalElement::_selectGadoliniumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 160:
 
@@ -5956,13 +5956,13 @@ CChemicalElement::_selectGadoliniumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -5977,7 +5977,7 @@ CChemicalElement::_selectTerbiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 159:
 
@@ -5985,13 +5985,13 @@ CChemicalElement::_selectTerbiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -6006,7 +6006,7 @@ CChemicalElement::_selectDysprosiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 156:
 
@@ -6014,7 +6014,7 @@ CChemicalElement::_selectDysprosiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 158:
 
@@ -6022,7 +6022,7 @@ CChemicalElement::_selectDysprosiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 160:
 
@@ -6030,7 +6030,7 @@ CChemicalElement::_selectDysprosiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 161:
 
@@ -6038,7 +6038,7 @@ CChemicalElement::_selectDysprosiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 162:
 
@@ -6046,7 +6046,7 @@ CChemicalElement::_selectDysprosiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 163:
 
@@ -6054,7 +6054,7 @@ CChemicalElement::_selectDysprosiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 164:
 
@@ -6062,13 +6062,13 @@ CChemicalElement::_selectDysprosiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -6083,7 +6083,7 @@ CChemicalElement::_selectHolmiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 165:
 
@@ -6091,13 +6091,13 @@ CChemicalElement::_selectHolmiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -6112,7 +6112,7 @@ CChemicalElement::_selectErbiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 162:
 
@@ -6120,7 +6120,7 @@ CChemicalElement::_selectErbiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 164:
 
@@ -6128,7 +6128,7 @@ CChemicalElement::_selectErbiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 166:
 
@@ -6136,7 +6136,7 @@ CChemicalElement::_selectErbiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 167:
 
@@ -6144,7 +6144,7 @@ CChemicalElement::_selectErbiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 168:
 
@@ -6152,7 +6152,7 @@ CChemicalElement::_selectErbiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 170:
 
@@ -6160,13 +6160,13 @@ CChemicalElement::_selectErbiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -6181,7 +6181,7 @@ CChemicalElement::_selectThuliumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 169:
 
@@ -6189,13 +6189,13 @@ CChemicalElement::_selectThuliumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -6210,7 +6210,7 @@ CChemicalElement::_selectYtterbiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 168:
 
@@ -6218,7 +6218,7 @@ CChemicalElement::_selectYtterbiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 170:
 
@@ -6226,7 +6226,7 @@ CChemicalElement::_selectYtterbiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 171:
 
@@ -6234,7 +6234,7 @@ CChemicalElement::_selectYtterbiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 172:
 
@@ -6242,7 +6242,7 @@ CChemicalElement::_selectYtterbiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 173:
 
@@ -6250,7 +6250,7 @@ CChemicalElement::_selectYtterbiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 174:
 
@@ -6258,7 +6258,7 @@ CChemicalElement::_selectYtterbiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 176:
 
@@ -6266,13 +6266,13 @@ CChemicalElement::_selectYtterbiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -6287,7 +6287,7 @@ CChemicalElement::_selectLutheniumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 175:
 
@@ -6295,7 +6295,7 @@ CChemicalElement::_selectLutheniumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 176:
 
@@ -6303,13 +6303,13 @@ CChemicalElement::_selectLutheniumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -6324,7 +6324,7 @@ CChemicalElement::_selectHafniumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 174:
 
@@ -6332,7 +6332,7 @@ CChemicalElement::_selectHafniumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 176:
 
@@ -6340,7 +6340,7 @@ CChemicalElement::_selectHafniumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 177:
 
@@ -6348,7 +6348,7 @@ CChemicalElement::_selectHafniumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 178:
 
@@ -6356,7 +6356,7 @@ CChemicalElement::_selectHafniumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 179:
 
@@ -6364,7 +6364,7 @@ CChemicalElement::_selectHafniumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 180:
 
@@ -6372,13 +6372,13 @@ CChemicalElement::_selectHafniumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -6393,7 +6393,7 @@ CChemicalElement::_selectTantalumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 180:
 
@@ -6401,7 +6401,7 @@ CChemicalElement::_selectTantalumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 181:
 
@@ -6409,13 +6409,13 @@ CChemicalElement::_selectTantalumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -6430,7 +6430,7 @@ CChemicalElement::_selectTungstenIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 180:
 
@@ -6438,7 +6438,7 @@ CChemicalElement::_selectTungstenIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 182:
 
@@ -6446,7 +6446,7 @@ CChemicalElement::_selectTungstenIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 183:
 
@@ -6454,7 +6454,7 @@ CChemicalElement::_selectTungstenIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 184:
 
@@ -6462,7 +6462,7 @@ CChemicalElement::_selectTungstenIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 186:
 
@@ -6470,13 +6470,13 @@ CChemicalElement::_selectTungstenIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -6491,7 +6491,7 @@ CChemicalElement::_selectRheniumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 185:
 
@@ -6499,7 +6499,7 @@ CChemicalElement::_selectRheniumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 187:
 
@@ -6507,13 +6507,13 @@ CChemicalElement::_selectRheniumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -6528,7 +6528,7 @@ CChemicalElement::_selectOsmiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 184:
 
@@ -6536,7 +6536,7 @@ CChemicalElement::_selectOsmiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 186:
 
@@ -6544,7 +6544,7 @@ CChemicalElement::_selectOsmiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 187:
 
@@ -6552,7 +6552,7 @@ CChemicalElement::_selectOsmiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 188:
 
@@ -6560,7 +6560,7 @@ CChemicalElement::_selectOsmiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 189:
 
@@ -6568,7 +6568,7 @@ CChemicalElement::_selectOsmiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 190:
 
@@ -6576,7 +6576,7 @@ CChemicalElement::_selectOsmiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 192:
 
@@ -6584,13 +6584,13 @@ CChemicalElement::_selectOsmiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -6605,7 +6605,7 @@ CChemicalElement::_selectIridiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 191:
 
@@ -6613,7 +6613,7 @@ CChemicalElement::_selectIridiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 193:
 
@@ -6621,13 +6621,13 @@ CChemicalElement::_selectIridiumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -6642,7 +6642,7 @@ CChemicalElement::_selectPlatinumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 190:
 
@@ -6650,7 +6650,7 @@ CChemicalElement::_selectPlatinumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 192:
 
@@ -6658,7 +6658,7 @@ CChemicalElement::_selectPlatinumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 194:
 
@@ -6666,7 +6666,7 @@ CChemicalElement::_selectPlatinumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 195:
 
@@ -6674,7 +6674,7 @@ CChemicalElement::_selectPlatinumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 196:
 
@@ -6682,7 +6682,7 @@ CChemicalElement::_selectPlatinumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 198:
 
@@ -6690,13 +6690,13 @@ CChemicalElement::_selectPlatinumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -6711,7 +6711,7 @@ CChemicalElement::_selectGoldIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 197:
 
@@ -6719,13 +6719,13 @@ CChemicalElement::_selectGoldIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -6740,7 +6740,7 @@ CChemicalElement::_selectMercuryIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 196:
 
@@ -6748,7 +6748,7 @@ CChemicalElement::_selectMercuryIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 198:
 
@@ -6756,7 +6756,7 @@ CChemicalElement::_selectMercuryIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 199:
 
@@ -6764,7 +6764,7 @@ CChemicalElement::_selectMercuryIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 200:
 
@@ -6772,7 +6772,7 @@ CChemicalElement::_selectMercuryIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 201:
 
@@ -6780,7 +6780,7 @@ CChemicalElement::_selectMercuryIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 202:
 
@@ -6788,7 +6788,7 @@ CChemicalElement::_selectMercuryIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 204:
 
@@ -6796,13 +6796,13 @@ CChemicalElement::_selectMercuryIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -6817,7 +6817,7 @@ CChemicalElement::_selectThalliumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 203:
 
@@ -6825,7 +6825,7 @@ CChemicalElement::_selectThalliumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 205:
 
@@ -6833,13 +6833,13 @@ CChemicalElement::_selectThalliumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -6854,7 +6854,7 @@ CChemicalElement::_selectLeadIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 204:
 
@@ -6862,7 +6862,7 @@ CChemicalElement::_selectLeadIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 206:
 
@@ -6870,7 +6870,7 @@ CChemicalElement::_selectLeadIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 207:
 
@@ -6878,7 +6878,7 @@ CChemicalElement::_selectLeadIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 208:
 
@@ -6886,13 +6886,13 @@ CChemicalElement::_selectLeadIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -6907,7 +6907,7 @@ CChemicalElement::_selectBismuthIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 209:
 
@@ -6915,13 +6915,13 @@ CChemicalElement::_selectBismuthIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -6936,7 +6936,7 @@ CChemicalElement::_selectPoloniumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 209:
 
@@ -6944,13 +6944,13 @@ CChemicalElement::_selectPoloniumIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -6965,7 +6965,7 @@ CChemicalElement::_selectAstatineIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 210:
 
@@ -6973,13 +6973,13 @@ CChemicalElement::_selectAstatineIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
 
@@ -6994,7 +6994,7 @@ CChemicalElement::_selectRadonIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         case 222:
 
@@ -7002,12 +7002,12 @@ CChemicalElement::_selectRadonIsotopeMass(const int64_t label) -> bool
 
             return true;
 
-            break;
+            // break;
 
         default:
 
             return false;
 
-            break;
+            // break;
     }
 }
