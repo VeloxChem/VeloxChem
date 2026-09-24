@@ -30,12 +30,6 @@
 //  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 //  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-// NOTE: the serial routines must not start threads of their own, as their callers
-// parallelize above them. Eigen parallelizes with OpenMP when this file is
-// compiled with it, so its parallelizer is disabled here.
-
-#define EIGEN_DONT_PARALLELIZE
-
 #include "SerialDenseLinearAlgebra.hpp"
 
 #include "Eigen/Dense"
