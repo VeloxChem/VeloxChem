@@ -37,12 +37,24 @@
 #include <cstdint>
 #include <vector>
 
+#include "GpuDeviceBufferStorage.hpp"
 #include "GpuRuntime.hpp"
 #include "GpuSafeChecks.hpp"
 #include "GpuWrapper.hpp"
 #include "ScreeningData.hpp"
 
 namespace gpujprep {
+
+struct JPrepDeviceBufferPools
+{
+    CGpuDeviceBuffer mat_D_J;
+    CGpuDeviceBuffer mat_Q;
+    CGpuDeviceBuffer first_second_inds;
+    CGpuDeviceBuffer pair_data;
+    CGpuDeviceBuffer mat_Q_local;
+    CGpuDeviceBuffer first_second_inds_local;
+    CGpuDeviceBuffer pair_data_local;
+};
 
 struct JPrepDeviceData
 {
@@ -128,10 +140,11 @@ struct JPrepDeviceData
     double* d_dd_pair_data_local{nullptr};
 };
 
-inline auto uploadJPrepDeviceData(const CScreeningData& screening,
-                                  const int64_t         gpu_id,
-                                  const int             rank,
-                                  const int64_t         total_num_gpus_per_compute_node) -> JPrepDeviceData
+inline auto ensureJPrepDeviceData(JPrepDeviceBufferPools& pools,
+                                  const CScreeningData&   screening,
+                                  const int64_t           gpu_id,
+                                  const int               rank,
+                                  const int64_t           total_num_gpus_per_compute_node) -> JPrepDeviceData
 {
     const auto& ss_first_inds = screening.get_ss_first_inds();
     const auto& sp_first_inds = screening.get_sp_first_inds();
@@ -219,19 +232,20 @@ inline auto uploadJPrepDeviceData(const CScreeningData& screening,
                                                data.pd_prim_pair_count_local,
                                                data.dd_prim_pair_count_local});
 
-    const auto gpu_rank = gpu_id + rank * total_num_gpus_per_compute_node;
+    const auto device_id = static_cast<int>((gpu_id + rank * total_num_gpus_per_compute_node) % total_num_gpus_per_compute_node);
 
-    gpuSafe(gpuSetDevice(gpu_rank % total_num_gpus_per_compute_node));
+    const auto mat_D_J_bytes = static_cast<size_t>(data.max_prim_pair_count + data.max_prim_pair_count_local) * sizeof(double);
 
-    gpuSafe(gpuMalloc(&data.d_data_mat_D_J, (data.max_prim_pair_count + data.max_prim_pair_count_local) * sizeof(double)));
+    data.d_data_mat_D_J = static_cast<double*>(pools.mat_D_J.ensure(device_id, mat_D_J_bytes));
 
     data.d_mat_D = data.d_data_mat_D_J;
     data.d_mat_J = data.d_mat_D + data.max_prim_pair_count;
 
-    gpuSafe(gpuMalloc(&data.d_data_mat_Q,
-                      (data.ss_prim_pair_count + data.sp_prim_pair_count + data.sd_prim_pair_count + data.pp_prim_pair_count +
-                       data.pd_prim_pair_count + data.dd_prim_pair_count) *
-                          sizeof(double)));
+    const auto mat_Q_bytes = static_cast<size_t>(data.ss_prim_pair_count + data.sp_prim_pair_count + data.sd_prim_pair_count +
+                                                 data.pp_prim_pair_count + data.pd_prim_pair_count + data.dd_prim_pair_count) *
+                             sizeof(double);
+
+    data.d_data_mat_Q = static_cast<double*>(pools.mat_Q.ensure(device_id, mat_Q_bytes));
 
     data.d_ss_mat_Q = data.d_data_mat_Q;
     data.d_sp_mat_Q = data.d_ss_mat_Q + data.ss_prim_pair_count;
@@ -240,11 +254,14 @@ inline auto uploadJPrepDeviceData(const CScreeningData& screening,
     data.d_pd_mat_Q = data.d_pp_mat_Q + data.pp_prim_pair_count;
     data.d_dd_mat_Q = data.d_pd_mat_Q + data.pd_prim_pair_count;
 
-    gpuSafe(gpuMalloc(&data.d_data_first_second_inds,
-                      (data.ss_prim_pair_count + data.ss_prim_pair_count + data.sp_prim_pair_count + data.sp_prim_pair_count +
-                       data.sd_prim_pair_count + data.sd_prim_pair_count + data.pp_prim_pair_count + data.pp_prim_pair_count +
-                       data.pd_prim_pair_count + data.pd_prim_pair_count + data.dd_prim_pair_count + data.dd_prim_pair_count) *
-                          sizeof(uint32_t)));
+    const auto first_second_inds_bytes = static_cast<size_t>(
+                                             data.ss_prim_pair_count + data.ss_prim_pair_count + data.sp_prim_pair_count +
+                                             data.sp_prim_pair_count + data.sd_prim_pair_count + data.sd_prim_pair_count +
+                                             data.pp_prim_pair_count + data.pp_prim_pair_count + data.pd_prim_pair_count +
+                                             data.pd_prim_pair_count + data.dd_prim_pair_count + data.dd_prim_pair_count) *
+                                         sizeof(uint32_t);
+
+    data.d_data_first_second_inds = static_cast<uint32_t*>(pools.first_second_inds.ensure(device_id, first_second_inds_bytes));
 
     data.d_ss_first_inds  = data.d_data_first_second_inds;
     data.d_ss_second_inds = data.d_ss_first_inds + data.ss_prim_pair_count;
@@ -259,10 +276,11 @@ inline auto uploadJPrepDeviceData(const CScreeningData& screening,
     data.d_dd_first_inds  = data.d_pd_second_inds + data.pd_prim_pair_count;
     data.d_dd_second_inds = data.d_dd_first_inds + data.dd_prim_pair_count;
 
-    gpuSafe(gpuMalloc(&data.d_data_pair_data,
-                      (ss_pair_data.size() + sp_pair_data.size() + sd_pair_data.size() + pp_pair_data.size() + pd_pair_data.size() +
-                       dd_pair_data.size()) *
-                          sizeof(double)));
+    const auto pair_data_bytes = static_cast<size_t>(ss_pair_data.size() + sp_pair_data.size() + sd_pair_data.size() + pp_pair_data.size() +
+                                                     pd_pair_data.size() + dd_pair_data.size()) *
+                                 sizeof(double);
+
+    data.d_data_pair_data = static_cast<double*>(pools.pair_data.ensure(device_id, pair_data_bytes));
 
     data.d_ss_pair_data = data.d_data_pair_data;
     data.d_sp_pair_data = data.d_ss_pair_data + ss_pair_data.size();
@@ -271,10 +289,12 @@ inline auto uploadJPrepDeviceData(const CScreeningData& screening,
     data.d_pd_pair_data = data.d_pp_pair_data + pp_pair_data.size();
     data.d_dd_pair_data = data.d_pd_pair_data + pd_pair_data.size();
 
-    gpuSafe(gpuMalloc(&data.d_data_mat_Q_local,
-                      (data.ss_prim_pair_count_local + data.sp_prim_pair_count_local + data.sd_prim_pair_count_local +
-                       data.pp_prim_pair_count_local + data.pd_prim_pair_count_local + data.dd_prim_pair_count_local) *
-                          sizeof(double)));
+    const auto mat_Q_local_bytes = static_cast<size_t>(data.ss_prim_pair_count_local + data.sp_prim_pair_count_local +
+                                                       data.sd_prim_pair_count_local + data.pp_prim_pair_count_local +
+                                                       data.pd_prim_pair_count_local + data.dd_prim_pair_count_local) *
+                                   sizeof(double);
+
+    data.d_data_mat_Q_local = static_cast<double*>(pools.mat_Q_local.ensure(device_id, mat_Q_local_bytes));
 
     data.d_ss_mat_Q_local = data.d_data_mat_Q_local;
     data.d_sp_mat_Q_local = data.d_ss_mat_Q_local + data.ss_prim_pair_count_local;
@@ -283,12 +303,17 @@ inline auto uploadJPrepDeviceData(const CScreeningData& screening,
     data.d_pd_mat_Q_local = data.d_pp_mat_Q_local + data.pp_prim_pair_count_local;
     data.d_dd_mat_Q_local = data.d_pd_mat_Q_local + data.pd_prim_pair_count_local;
 
-    gpuSafe(gpuMalloc(&data.d_data_first_second_inds_local,
-                      (data.ss_prim_pair_count_local + data.ss_prim_pair_count_local + data.sp_prim_pair_count_local +
-                       data.sp_prim_pair_count_local + data.sd_prim_pair_count_local + data.sd_prim_pair_count_local +
-                       data.pp_prim_pair_count_local + data.pp_prim_pair_count_local + data.pd_prim_pair_count_local +
-                       data.pd_prim_pair_count_local + data.dd_prim_pair_count_local + data.dd_prim_pair_count_local) *
-                          sizeof(uint32_t)));
+    const auto first_second_inds_local_bytes = static_cast<size_t>(
+                                                   data.ss_prim_pair_count_local + data.ss_prim_pair_count_local +
+                                                   data.sp_prim_pair_count_local + data.sp_prim_pair_count_local +
+                                                   data.sd_prim_pair_count_local + data.sd_prim_pair_count_local +
+                                                   data.pp_prim_pair_count_local + data.pp_prim_pair_count_local +
+                                                   data.pd_prim_pair_count_local + data.pd_prim_pair_count_local +
+                                                   data.dd_prim_pair_count_local + data.dd_prim_pair_count_local) *
+                                               sizeof(uint32_t);
+
+    data.d_data_first_second_inds_local =
+        static_cast<uint32_t*>(pools.first_second_inds_local.ensure(device_id, first_second_inds_local_bytes));
 
     data.d_ss_first_inds_local  = data.d_data_first_second_inds_local;
     data.d_ss_second_inds_local = data.d_ss_first_inds_local + data.ss_prim_pair_count_local;
@@ -303,10 +328,12 @@ inline auto uploadJPrepDeviceData(const CScreeningData& screening,
     data.d_dd_first_inds_local  = data.d_pd_second_inds_local + data.pd_prim_pair_count_local;
     data.d_dd_second_inds_local = data.d_dd_first_inds_local + data.dd_prim_pair_count_local;
 
-    gpuSafe(gpuMalloc(&data.d_data_pair_data_local,
-                      (ss_pair_data_local.size() + sp_pair_data_local.size() + sd_pair_data_local.size() + pp_pair_data_local.size() +
-                       pd_pair_data_local.size() + dd_pair_data_local.size()) *
-                          sizeof(double)));
+    const auto pair_data_local_bytes = static_cast<size_t>(ss_pair_data_local.size() + sp_pair_data_local.size() +
+                                                           sd_pair_data_local.size() + pp_pair_data_local.size() +
+                                                           pd_pair_data_local.size() + dd_pair_data_local.size()) *
+                                       sizeof(double);
+
+    data.d_data_pair_data_local = static_cast<double*>(pools.pair_data_local.ensure(device_id, pair_data_local_bytes));
 
     data.d_ss_pair_data_local = data.d_data_pair_data_local;
     data.d_sp_pair_data_local = data.d_ss_pair_data_local + ss_pair_data_local.size();
@@ -404,6 +431,26 @@ inline auto uploadJPrepDeviceData(const CScreeningData& screening,
         gpuSafe(gpuMemcpy(data.d_dd_pair_data_local, dd_pair_data_local.data(), dd_pair_data_local.size() * sizeof(double),
                           gpuMemcpyHostToDevice));
     }
+
+    return data;
+}
+
+inline auto uploadJPrepDeviceData(const CScreeningData& screening,
+                                  const int64_t         gpu_id,
+                                  const int             rank,
+                                  const int64_t         total_num_gpus_per_compute_node) -> JPrepDeviceData
+{
+    JPrepDeviceBufferPools pools;
+
+    auto data = ensureJPrepDeviceData(pools, screening, gpu_id, rank, total_num_gpus_per_compute_node);
+
+    pools.mat_D_J.releaseOwnership();
+    pools.mat_Q.releaseOwnership();
+    pools.first_second_inds.releaseOwnership();
+    pools.pair_data.releaseOwnership();
+    pools.mat_Q_local.releaseOwnership();
+    pools.first_second_inds_local.releaseOwnership();
+    pools.pair_data_local.releaseOwnership();
 
     return data;
 }

@@ -42,6 +42,8 @@
 #include "MolecularBasis.hpp"
 #include "Molecule.hpp"
 
+class CGpuScreeningDeviceStorage;
+
 /**
  Class CScreeningData stores screening data for ERI evaluation on GPUs.
  */
@@ -217,6 +219,8 @@ class CScreeningData
     std::vector<uint32_t> _p_prim_aoinds;
     std::vector<uint32_t> _d_prim_aoinds;
 
+    mutable CGpuScreeningDeviceStorage* _device_storage{nullptr};
+
     auto _computeQMatrices(const CMolecule& molecule, const CMolecularBasis& basis) -> void;
 
     auto _sortQ(const int64_t s_prim_count,
@@ -228,6 +232,8 @@ class CScreeningData
 
    public:
     CScreeningData(const CMolecule& molecule, const CMolecularBasis& basis, const int64_t num_gpus_per_node, const double pair_threshold, const double density_threshold, const int rank, const int nnodes);
+
+    ~CScreeningData();
 
     auto getNumGpusPerNode() const -> const int64_t;
 
@@ -427,6 +433,16 @@ class CScreeningData
                                  const std::vector<double>&   d_prim_info) -> void;
 
     auto form_pair_inds_for_K(const int64_t s_prim_count, const int64_t p_prim_count, const int64_t d_prim_count, const CDenseMatrix& Q_prime, const double Q_prime_thresh) -> void;
+
+    auto getOrCreateDeviceStorage() const -> CGpuScreeningDeviceStorage&;
+
+    auto detachDeviceStorage() -> CGpuScreeningDeviceStorage*;
+
+    auto attachDeviceStorage(CGpuScreeningDeviceStorage* storage) -> void;
+
+    auto releaseDeviceStorage() -> void;
 };
+
+auto destroyGpuScreeningDeviceStorage(void* storage) -> void;
 
 #endif /* ScreeningData_hpp */

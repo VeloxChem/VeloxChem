@@ -74,6 +74,22 @@ export_gpu(py::module& m)
         .def("get_timer_summary", &CScreeningData::getTimerSummary)
         .def("get_gpu_timer_summary", &CScreeningData::getGpuTimerSummary)
         .def(
+            "detach_device_storage",
+            [](CScreeningData& self) -> py::capsule {
+                return py::capsule(static_cast<void*>(self.detachDeviceStorage()), "GpuScreeningDeviceStorage",
+                                   &destroyGpuScreeningDeviceStorage);
+            })
+        .def(
+            "attach_device_storage",
+            [](CScreeningData& self, py::capsule storage_capsule) {
+                auto* storage = static_cast<CGpuScreeningDeviceStorage*>(
+                    PyCapsule_GetPointer(storage_capsule.ptr(), "GpuScreeningDeviceStorage"));
+                self.attachDeviceStorage(storage);
+                PyCapsule_SetDestructor(storage_capsule.ptr(), nullptr);
+            },
+            py::arg("storage"))
+        .def("release_device_storage", &CScreeningData::releaseDeviceStorage)
+        .def(
             "get_q_matrix",
             [](CScreeningData& self, const int64_t s_prim_count, const int64_t p_prim_count, const int64_t d_prim_count) -> py::array_t<double> {
                 const auto q_mat = self.get_mat_Q_full(s_prim_count, p_prim_count, d_prim_count);

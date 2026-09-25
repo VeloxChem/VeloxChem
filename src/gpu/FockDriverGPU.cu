@@ -61,6 +61,7 @@
 
 #include "ScreeningData.hpp"
 #include "ScreeningJPrepGpu.hpp"
+#include "GpuScreeningDeviceStorage.hpp"
 #include "BoysFuncTable.hpp"
 #include "BoysFuncTableGpu.hpp"
 #include "FockDriverGPU.hpp"
@@ -3964,9 +3965,16 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     std::vector<CMultiTimer> omptimers(num_gpus_per_node);
 
-    auto d_boys_device_tables = boysfunc::uploadFullBoysFuncTables(num_gpus_per_node, rank, total_num_gpus_per_compute_node);
+    auto& device_storage = screening.getOrCreateDeviceStorage();
 
-    auto j_prep_device_buffers = gpujprep::uploadJPrepForAllDevices(screening, num_gpus_per_node, rank, total_num_gpus_per_compute_node);
+    device_storage.configure(rank, num_gpus_per_node, total_num_gpus_per_compute_node);
+    device_storage.ensureBoysTables();
+    device_storage.ensureJPrep(screening);
+
+    for (int64_t gpu_id = 0; gpu_id < num_gpus_per_node; gpu_id++)
+    {
+        device_storage.ensurePrimInfo(gpu_id, s_prim_info, p_prim_info, d_prim_info, s_prim_aoinds, p_prim_aoinds, d_prim_aoinds);
+    }
 
 #pragma omp parallel num_threads(num_gpus_per_node)
     {
@@ -3988,7 +3996,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     // Boys tables uploaded serially before the parallel region.
 
-    const auto& d_boys_tables     = d_boys_device_tables[gpu_id];
+    const auto& d_boys_tables     = device_storage.getBoysTables(gpu_id);
     double*       d_boys_func_table = d_boys_tables.table;
     double*       d_boys_func_ft    = d_boys_tables.ft;
 
@@ -3996,29 +4004,17 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     omptimers[gpu_id].start("GTO block prep.");
 
-    // Reuse primitive info built serially before the parallel region; upload once per GPU.
+    // Primitive info uploaded serially before the parallel region.
 
-    double*   d_data_spd_prim_info;
-    gpuSafe(gpuMalloc(&d_data_spd_prim_info, (s_prim_info.size() + p_prim_info.size() + d_prim_info.size()) * sizeof(double)));
+    const auto& prim_views = device_storage.getPrimViews(gpu_id);
 
-    uint32_t* d_data_spd_prim_aoinds;
-    gpuSafe(gpuMalloc(&d_data_spd_prim_aoinds, (s_prim_aoinds.size() + p_prim_aoinds.size() + d_prim_aoinds.size())* sizeof(uint32_t)));
+    double*   d_s_prim_info = prim_views.d_s_prim_info;
+    double*   d_p_prim_info = prim_views.d_p_prim_info;
+    double*   d_d_prim_info = prim_views.d_d_prim_info;
 
-    double*   d_s_prim_info = d_data_spd_prim_info;
-    double*   d_p_prim_info = d_s_prim_info + s_prim_info.size();
-    double*   d_d_prim_info = d_p_prim_info + p_prim_info.size();
-
-    uint32_t* d_s_prim_aoinds = d_data_spd_prim_aoinds;
-    uint32_t* d_p_prim_aoinds = d_s_prim_aoinds + s_prim_aoinds.size();
-    uint32_t* d_d_prim_aoinds = d_p_prim_aoinds + p_prim_aoinds.size();
-
-    gpuSafe(gpuMemcpy(d_s_prim_info, s_prim_info.data(), s_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_p_prim_info, p_prim_info.data(), p_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_d_prim_info, d_prim_info.data(), d_prim_info.size() * sizeof(double), gpuMemcpyHostToDevice));
-
-    gpuSafe(gpuMemcpy(d_s_prim_aoinds, s_prim_aoinds.data(), s_prim_aoinds.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_p_prim_aoinds, p_prim_aoinds.data(), p_prim_aoinds.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
-    gpuSafe(gpuMemcpy(d_d_prim_aoinds, d_prim_aoinds.data(), d_prim_aoinds.size() * sizeof(uint32_t), gpuMemcpyHostToDevice));
+    uint32_t* d_s_prim_aoinds = prim_views.d_s_prim_aoinds;
+    uint32_t* d_p_prim_aoinds = prim_views.d_p_prim_aoinds;
+    uint32_t* d_d_prim_aoinds = prim_views.d_d_prim_aoinds;
 
     omptimers[gpu_id].stop("GTO block prep.");
 
@@ -4096,7 +4092,7 @@ computeFockOnGPU(const              CMolecule& molecule,
     const auto& pd_pair_data = screening.get_pd_pair_data(); 
     const auto& dd_pair_data = screening.get_dd_pair_data(); 
 
-    const auto& j_prep = j_prep_device_buffers[gpu_id];
+    const auto& j_prep = device_storage.getJPrep(gpu_id);
 
     const auto ss_prim_pair_count = j_prep.ss_prim_pair_count;
     const auto sp_prim_pair_count = j_prep.sp_prim_pair_count;
@@ -6582,7 +6578,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     omptimers[gpu_id].start("J finalize");
 
-    gpujprep::freeJPrepDeviceData(gpu_id, rank, total_num_gpus_per_compute_node, j_prep_device_buffers[gpu_id]);
+    // J-prep device buffers persist in screening device storage.
 
     omptimers[gpu_id].stop("J finalize");
 
@@ -10111,9 +10107,6 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     omptimers[gpu_id].start("K finalize");
 
-    gpuSafe(gpuFree(d_data_spd_prim_info));
-    gpuSafe(gpuFree(d_data_spd_prim_aoinds));
-
     gpuSafe(gpuFree(d_mat_K));
     gpuSafe(gpuFree(d_data_pair_inds_for_K));
     gpuSafe(gpuFree(d_mat_D_full_AO));
@@ -10125,8 +10118,6 @@ computeFockOnGPU(const              CMolecule& molecule,
     omptimers[gpu_id].stop("K finalize");
     }
     }
-
-    boysfunc::freeFullBoysFuncTables(num_gpus_per_node, rank, total_num_gpus_per_compute_node, d_boys_device_tables);
 
     timer.stop("Compute Fockmat");
 
