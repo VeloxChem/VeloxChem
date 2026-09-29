@@ -96,6 +96,8 @@ class LinearSolver:
         - dft: The flag for running DFT.
         - grid_level: The accuracy level of DFT grid.
         - xcfun: The XC functional.
+        - xc_screening_threshold: The value a basis function must reach over a
+          grid box to be kept for it.
         - pe: The flag for running polarizable embedding calculation.
         - pe_options: The dictionary with options for polarizable embedding.
         - electric_field: The static electric field.
@@ -158,6 +160,7 @@ class LinearSolver:
         # dft
         self.xcfun = None
         self.grid_level = None
+        self.xc_screening_threshold = None
         self._dft = False
 
         # polarizable embedding
@@ -259,6 +262,9 @@ class LinearSolver:
         self._input_keywords = {
             'response': {
                 'eri_thresh': ('float', 'ERI screening threshold'),
+                'xc_screening_threshold':
+                    ('float', 'value a basis function must reach over a grid '
+                     'box to be kept for it'),
                 'batch_size': ('int', 'batch size for Fock build'),
                 'conv_thresh': ('float', 'convergence threshold'),
                 'max_iter': ('int', 'maximum number of iterations'),
@@ -2366,6 +2372,10 @@ class LinearSolver:
                     comm.Get_rank(), comm.Get_size())
 
             xc_drv = XCIntegrator()
+
+            if self.xc_screening_threshold is not None:
+                xc_drv.set_screening_threshold(self.xc_screening_threshold)
+
             xc_drv.integrate_fxc_fock(fock_arrays, molecule, basis, dens,
                                       gs_density, molgrid, self.xcfun)
 
@@ -2794,6 +2804,10 @@ class LinearSolver:
                 dens_a_and_b.append(db)
 
             xc_drv = XCIntegrator()
+
+            if self.xc_screening_threshold is not None:
+                xc_drv.set_screening_threshold(self.xc_screening_threshold)
+
             xc_drv.integrate_fxc_fock(fock_arrays, molecule, basis,
                                       dens_a_and_b, gs_density, molgrid,
                                       self.xcfun)

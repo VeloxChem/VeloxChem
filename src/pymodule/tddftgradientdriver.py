@@ -75,6 +75,8 @@ class TddftGradientDriver(GradientDriver):
         - do_first_order_prop: Controls the printout of first-order properties.
         - delta_h: The displacement for finite difference.
         - do_four_point: Flag for four-point finite difference.
+        - xc_screening_threshold: The value a basis function must reach over a
+          grid box to be kept for it.
     """
 
     # TODO: add response driver here? Save scf_drv as an instance variable?
@@ -95,6 +97,8 @@ class TddftGradientDriver(GradientDriver):
         self._block_size_factor = 4
 
         self._xcfun_ldstaging = scf_drv._xcfun_ldstaging
+
+        self.xc_screening_threshold = scf_drv.xc_screening_threshold
 
         self.timing = scf_drv.timing
 
@@ -753,6 +757,11 @@ class TddftGradientDriver(GradientDriver):
             xcfun_label = self._scf_drv.xcfun.get_func_label()
 
             xcgrad_drv = XCMolecularGradient()
+
+            if self.xc_screening_threshold is not None:
+                xcgrad_drv.set_screening_threshold(
+                    self.xc_screening_threshold)
+
             mol_grid = self._scf_drv._mol_grid
 
             for s in range(dof):

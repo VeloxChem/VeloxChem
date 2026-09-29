@@ -75,6 +75,8 @@ class NonlinearSolver:
         - dft: The flag for running DFT.
         - grid_level: The accuracy level of DFT grid.
         - xcfun: The XC functional.
+        - xc_screening_threshold: The value a basis function must reach over a
+          grid box to be kept for it.
         - electric_field: The static electric field.
         - conv_thresh: The convergence threshold for the solver.
         - max_iter: The maximum number of solver iterations.
@@ -122,6 +124,7 @@ class NonlinearSolver:
         self._dft = False
         self.xcfun = None
         self.grid_level = None
+        self.xc_screening_threshold = None
 
         # polarizable embedding
         self.potfile = None
@@ -174,6 +177,9 @@ class NonlinearSolver:
         self._input_keywords = {
             'response': {
                 'eri_thresh': ('float', 'ERI screening threshold'),
+                'xc_screening_threshold':
+                    ('float', 'value a basis function must reach over a grid '
+                     'box to be kept for it'),
                 'batch_size': ('int', 'batch size for Fock build'),
                 'max_iter': ('int', 'maximum number of iterations'),
                 'conv_thresh': ('float', 'convergence threshold'),
@@ -1148,6 +1154,11 @@ class NonlinearSolver:
                 t0 = tm.time()
 
                 xc_drv = XCIntegrator()
+
+                if self.xc_screening_threshold is not None:
+                    xc_drv.set_screening_threshold(
+                        self.xc_screening_threshold)
+
                 molgrid = dft_dict['molgrid']
                 gs_density = dft_dict['gs_density']
 

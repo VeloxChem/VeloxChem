@@ -400,6 +400,11 @@ class PolOrbitalResponse(CphfSolver):
                     fock_gxc_ao_imre.append(dm_i_mat.copy())
 
                 xc_drv = XCIntegrator()
+
+                if self.xc_screening_threshold is not None:
+                    xc_drv.set_screening_threshold(
+                        self.xc_screening_threshold)
+
                 xc_drv.integrate_kxc_fock(fock_gxc_ao_rere, molecule, basis,
                                           perturbed_dm_ao_list_rere, zero_dm_ao_list,
                                           gs_density, molgrid,
@@ -882,6 +887,11 @@ class PolOrbitalResponse(CphfSolver):
                     fock_gxc_ao_imre.append(dm_i_mat.copy())
 
                 xc_drv = XCIntegrator()
+
+                if self.xc_screening_threshold is not None:
+                    xc_drv.set_screening_threshold(
+                        self.xc_screening_threshold)
+
                 xc_drv.integrate_kxc_fock(fock_gxc_ao_rere, molecule, basis,
                                           perturbed_dm_ao_list_rere, zero_dm_ao_list,
                                           gs_density, molgrid,
@@ -1303,6 +1313,11 @@ class PolOrbitalResponse(CphfSolver):
                     fock_gxc_ao.append(dm_i_mat.copy())
 
                 xc_drv = XCIntegrator()
+
+                if self.xc_screening_threshold is not None:
+                    xc_drv.set_screening_threshold(
+                        self.xc_screening_threshold)
+
                 xc_drv.integrate_kxc_fock(fock_gxc_ao, molecule, basis,
                                           perturbed_dm_ao_list, zero_dm_ao_list,
                                           gs_density, molgrid,
@@ -1632,6 +1647,11 @@ class PolOrbitalResponse(CphfSolver):
                     fock_gxc_ao.append(dm_i_mat.copy())
 
                 xc_drv = XCIntegrator()
+
+                if self.xc_screening_threshold is not None:
+                    xc_drv.set_screening_threshold(
+                        self.xc_screening_threshold)
+
                 xc_drv.integrate_kxc_fock(fock_gxc_ao, molecule, basis,
                                           perturbed_dm_ao_list, zero_dm_ao_list,
                                           gs_density, molgrid,

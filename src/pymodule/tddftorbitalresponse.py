@@ -377,6 +377,11 @@ class TddftOrbitalResponse(CphfSolver):
         if self._dft:
             # Quadratic response routine for TDDFT E[3] term g^xc
             xc_drv = XCIntegrator()
+
+            if self.xc_screening_threshold is not None:
+                xc_drv.set_screening_threshold(
+                    self.xc_screening_threshold)
+
             # molgrid.partition_grid_points()
             # molgrid.distribute_counts_and_displacements(self.rank,
             #                                    self.nodes, self.comm)

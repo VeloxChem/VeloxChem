@@ -71,6 +71,8 @@ class PolarizabilityGradient:
         - do_four_point: Four-point numerical differentiation
         - frequencies: The frequencies
         - vector_components: Cartesian components of the tensor
+        - xc_screening_threshold: The value a basis function must reach over a
+          grid box to be kept for it.
     """
 
     def __init__(self, scf_drv, comm=None, ostream=None):
@@ -122,6 +124,7 @@ class PolarizabilityGradient:
         self._dft = False
         self.grid_level = None
         self.xcfun = None
+        self.xc_screening_threshold = scf_drv.xc_screening_threshold
         self._xcfun_ldstaging = scf_drv._xcfun_ldstaging
 
         self.flag = 'Polarizability Gradient Driver'
@@ -1662,6 +1665,10 @@ class PolarizabilityGradient:
 
             xcgrad_drv = XCMolecularGradient()
 
+            if self.xc_screening_threshold is not None:
+                xcgrad_drv.set_screening_threshold(
+                    self.xc_screening_threshold)
+
             polgrad_xcgrad = xcgrad_drv.integrate_vxc_gradient(
                 molecule, ao_basis, [rhow_dm_sym], [gs_dm], mol_grid, xcfun_label)
 
@@ -1772,6 +1779,10 @@ class PolarizabilityGradient:
                                                         root=mpi_master())
 
             xcgrad_drv = XCMolecularGradient()
+
+            if self.xc_screening_threshold is not None:
+                xcgrad_drv.set_screening_threshold(
+                    self.xc_screening_threshold)
 
             # real contribution
             polgrad_xcgrad_real = xcgrad_drv.integrate_vxc_gradient(  # Re DM

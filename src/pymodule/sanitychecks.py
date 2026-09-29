@@ -177,6 +177,12 @@ def scf_results_sanity_check(obj, scf_results):
                 if 'grid_level' in scf_results:
                     updated_scf_info['grid_level'] = scf_results['grid_level']
 
+        if scf_results.get('xc_screening_threshold', None) is not None:
+            # the threshold used for the SCF quadrature is also used for the
+            # response quadrature, so that the two screen consistently
+            updated_scf_info['xc_screening_threshold'] = scf_results[
+                'xc_screening_threshold']
+
         if scf_results.get('potfile', None) is not None:
             # the environment is inherited from SCF; a different potfile in
             # response settings is overwritten with a warning

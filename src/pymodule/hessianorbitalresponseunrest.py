@@ -293,6 +293,10 @@ class UnrestrictedHessianOrbitalResponse(CphfSolver):
         if self._dft:
             xc_mol_hess = XCMolecularHessian()
 
+            if self.xc_screening_threshold is not None:
+                xc_mol_hess.set_screening_threshold(
+                    self.xc_screening_threshold)
+
             naos = basis.get_dimensions_of_basis()
 
             if atom_pairs is None:

@@ -2513,6 +2513,9 @@ class ScfDriver:
                     self._scf_results['xcfun'] = self.xcfun.get_func_label()
                     if self.grid_level is not None:
                         self._scf_results['grid_level'] = self.grid_level
+                    if self.xc_screening_threshold is not None:
+                        self._scf_results['xc_screening_threshold'] = (
+                            self.xc_screening_threshold)
 
                 if self._pe:
                     # pe info, energy and potential matrix
