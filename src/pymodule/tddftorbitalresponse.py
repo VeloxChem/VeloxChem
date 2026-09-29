@@ -382,9 +382,6 @@ class TddftOrbitalResponse(CphfSolver):
                 xc_drv.set_screening_threshold(
                     self.xc_screening_threshold)
 
-            # molgrid.partition_grid_points()
-            # molgrid.distribute_counts_and_displacements(self.rank,
-            #                                    self.nodes, self.comm)
             xc_drv.integrate_kxc_fock(fock_gxc_ao, molecule, basis,
                                       perturbed_dm_ao_list, zero_dm_ao_list,
                                       gs_density, molgrid,
