@@ -80,6 +80,8 @@ class ScfHessianDriver(HessianDriver):
         - hessian: The Hessian in Hartree per Bohr**2.
         - flag: The type of Hessian driver.
         - perturbed_density: The perturbed density
+        - xc_screening_threshold: The value a basis function must reach over a
+          grid box to be kept for it.
     """
 
     def __init__(self, scf_drv):
@@ -103,6 +105,8 @@ class ScfHessianDriver(HessianDriver):
         # self._block_size_factor = 4
 
         self._xcfun_ldstaging = scf_drv._xcfun_ldstaging
+
+        self.xc_screening_threshold = scf_drv.xc_screening_threshold
 
         self.use_subcomms = False
 
@@ -784,6 +788,11 @@ class ScfHessianDriver(HessianDriver):
             mol_grid = grid_drv.generate(molecule, self._xcfun_ldstaging)
 
             xc_mol_hess = XCMolecularHessian()
+
+            if self.xc_screening_threshold is not None:
+                xc_mol_hess.set_screening_threshold(
+                    self.xc_screening_threshold)
+
             hessian_dft_xc = xc_mol_hess.integrate_exc_hessian(
                 molecule, ao_basis, [density], mol_grid,
                 self.scf_driver.xcfun.get_func_label())
@@ -1644,6 +1653,11 @@ class ScfHessianDriver(HessianDriver):
             mol_grid = grid_drv.generate(molecule, self._xcfun_ldstaging)
 
             xc_mol_hess = XCMolecularHessian()
+
+            if self.xc_screening_threshold is not None:
+                xc_mol_hess.set_screening_threshold(
+                    self.xc_screening_threshold)
+
             hessian_dft_xc = xc_mol_hess.integrate_exc_hessian(
                 molecule, ao_basis, [density_a, density_b], mol_grid,
                 self.scf_driver.xcfun.get_func_label())

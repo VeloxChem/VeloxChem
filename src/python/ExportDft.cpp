@@ -862,6 +862,13 @@ export_dft(py::module& m)
     PyClass<CXCMolecularHessian>(m, "XCMolecularHessian")
         .def(py::init<>())
         .def(
+            "set_screening_threshold", &CXCMolecularHessian::setScreeningThresholdForGTOValues,
+            "Sets the value a basis function has to reach over a box of the grid to be kept for it.",
+            "threshold"_a)
+        .def(
+            "get_screening_threshold", &CXCMolecularHessian::getScreeningThresholdForGTOValues,
+            "Gets the value a basis function has to reach to be kept.")
+        .def(
             "integrate_exc_hessian",
             [](CXCMolecularHessian&                    self,
                const CMolecule&                        molecule,

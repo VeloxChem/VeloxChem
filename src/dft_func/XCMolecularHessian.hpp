@@ -58,6 +58,20 @@ class CXCMolecularHessian
      */
     CXCMolecularHessian();
 
+    /// @brief Sets the value a basis function has to reach over a box of the grid to
+    /// be kept for it.
+    /// @param threshold The threshold.
+    auto setScreeningThresholdForGTOValues(const double threshold) -> void
+    {
+        _screeningThresholdForGTOValues = threshold;
+    }
+
+    /// @brief Gets the value a basis function has to reach to be kept.
+    auto getScreeningThresholdForGTOValues() const -> double
+    {
+        return _screeningThresholdForGTOValues;
+    }
+
     /**
      Integrates exchnage-correlation functional contribution to molecular
      Hessian.
