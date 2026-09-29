@@ -793,6 +793,13 @@ export_dft(py::module& m)
     PyClass<CXCMolecularGradient>(m, "XCMolecularGradient")
         .def(py::init<>())
         .def(
+            "set_screening_threshold", &CXCMolecularGradient::setScreeningThresholdForGTOValues,
+            "Sets the value a basis function has to reach over a box of the grid to be kept for it.",
+            "threshold"_a)
+        .def(
+            "get_screening_threshold", &CXCMolecularGradient::getScreeningThresholdForGTOValues,
+            "Gets the value a basis function has to reach to be kept.")
+        .def(
             "integrate_vxc_gradient",
             [](CXCMolecularGradient&      self,
                const CMolecule&           molecule,

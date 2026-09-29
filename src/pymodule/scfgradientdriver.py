@@ -74,6 +74,8 @@ class ScfGradientDriver(GradientDriver):
         - flag: The driver flag.
         - delta_h: The displacement for finite difference.
         - dispersion: The flag for calculating D4 dispersion correction.
+        - xc_screening_threshold: The value a basis function must reach over a
+          grid box to be kept for it.
     """
 
     def __init__(self, scf_drv):
@@ -89,6 +91,8 @@ class ScfGradientDriver(GradientDriver):
         self.eri_thresh = scf_drv.eri_thresh
         self.timing = scf_drv.timing
         self._debug = scf_drv._debug
+
+        self.xc_screening_threshold = scf_drv.xc_screening_threshold
 
         self._block_size_factor = 4
 
@@ -1150,6 +1154,10 @@ class ScfGradientDriver(GradientDriver):
 
         if use_dft:
             grad_drv = XCMolecularGradient()
+
+            if self.xc_screening_threshold is not None:
+                grad_drv.set_screening_threshold(self.xc_screening_threshold)
+
             self.gradient += grad_drv.integrate_vxc_gradient(
                 molecule, basis, [D], self.scf_driver._mol_grid, xcfun_label)
 
@@ -1486,6 +1494,10 @@ class ScfGradientDriver(GradientDriver):
 
         if use_dft:
             grad_drv = XCMolecularGradient()
+
+            if self.xc_screening_threshold is not None:
+                grad_drv.set_screening_threshold(self.xc_screening_threshold)
+
             self.gradient += grad_drv.integrate_vxc_gradient(
                 molecule, basis, [Da, Db], self.scf_driver._mol_grid,
                 xcfun_label)
