@@ -144,6 +144,8 @@ export_general(py::module &m) -> void
     m.def("amu_in_electron_masses", &units::getAtomicMassUnitInElectronMasses, "Gets atomic mass unit in electron masses.");
     m.def("amu_in_kg", &units::getAtomicMassUnitInKg, "Gets atomic mass unit in kg.");
     m.def("speed_of_light_in_vacuum_in_SI", &units::getSpeedOfLightInVacuumInSI, "Gets speed of light in vacuum in SI.");
+    m.def("vacuum_electric_permittivity_in_SI", &units::getVacuumElectricPermittivityInSI, "Gets vacuum electric permittivity in SI.");
+    m.def("au_of_electric_polarizability_in_SI", &units::getAtomicUnitOfElectricPolarizibilityInSI, "Gets the atomic unit of electric polarizability in SI.");
     m.def("avogadro_constant", &units::getAvogadroConstant, "Gets Avogadro constant.");
     m.def("boltzmann_in_evperkelvin", &units::getBoltzmannConstantInElectronVoltsPerKelvin, "Gets Boltzmann constant in eV/K.");
     m.def("boltzmann_in_hartreeperkelvin", &units::getBoltzmannConstantInHartreePerKelvin, "Gets Boltzmann constant in Hartree/K.");
