@@ -252,6 +252,15 @@ class TestFikaIntegrals:
 
         assert np.max(np.abs(multipole - direct)) < 1.0e-11
 
+        # All-zero dipoles or quadrupoles give a zero matrix.
+        summation = FikaChargeSummation.multipole
+        zero = FikaDipolePotentialDriver(0, summation).compute(
+            molecule, basis, np.zeros((len(coordinates), 3)), coordinates)
+        assert np.max(np.abs(zero)) == 0.0
+        zero = FikaQuadrupolePotentialDriver(0, summation).compute(
+            molecule, basis, np.zeros((len(coordinates), 6)), coordinates)
+        assert np.max(np.abs(zero)) == 0.0
+
     def test_invalid_input(self):
 
         molecule = get_acrolein()

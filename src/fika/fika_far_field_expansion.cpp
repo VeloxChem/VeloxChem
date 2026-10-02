@@ -599,8 +599,10 @@ void FarFieldExpansion::traverse(const FarFieldOptions& options,
   const double leaf_radius = targets_[leaf_nodes_.front()].radius;
   std::array<std::vector<double>, kind_count> distances;
   std::array<double, kind_count> nearest{};
+  // Every kind with sites needs its distances, also at zero norm: the sites of a kind whose
+  // values are all zero are admissible at order rank outside the penetration sphere.
   for (std::size_t kind = 0; kind < kind_count; ++kind) {
-    if (kind == charge_kind || sums[kind] > 0.0) {
+    if (kind == charge_kind || counts_[kind] > 0) {
       distances[kind] =
           admissible_distances(leaf_radius, penetration_radius, options.rank, max_order,
                                [&](double d) { return kind_order(kind, 0.0, leaf_radius, d); });
