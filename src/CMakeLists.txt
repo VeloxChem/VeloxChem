@@ -46,6 +46,7 @@ target_link_libraries(vlxobjs
   )
 
 add_subdirectory(dft_func)
+add_subdirectory(fika)
 add_subdirectory(general)
 add_subdirectory(math)
 add_subdirectory(moldata)

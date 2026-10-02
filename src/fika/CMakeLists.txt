@@ -1,0 +1,46 @@
+target_sources(vlxobjs
+  PRIVATE
+    fika_atom_basis.cpp
+    fika_atom_pair_group.cpp
+    fika_basis_shell.cpp
+    fika_block_sparse_matrix.cpp
+    fika_boys.cpp
+    fika_classical_region.cpp
+    fika_classical_system.cpp
+    fika_dense_matrix.cpp
+    fika_density_fmm.cpp
+    fika_density_multipoles.cpp
+    fika_dipole_interaction.cpp
+    fika_dipole_potential_driver.cpp
+    fika_electric_field.cpp
+    fika_embedding.cpp
+    fika_far_field_expansion.cpp
+    fika_force_field.cpp
+    fika_gaunt.cpp
+    fika_label.cpp
+    fika_mm_induced_dipoles.cpp
+    fika_molecular_basis.cpp
+    fika_multipole_expansion.cpp
+    fika_nuclear_attraction_driver.cpp
+    fika_nuclear_attraction_kernels.cpp
+    fika_nuclear_repulsion.cpp
+    fika_overlap_screening.cpp
+    fika_point_sources.cpp
+    fika_polarizable_sites.cpp
+    fika_qm_field.cpp
+    fika_qmmm_induced_dipoles.cpp
+    fika_quadrupole_potential_driver.cpp
+    fika_residue.cpp
+    fika_solid_harmonics.cpp
+    fika_two_centre_driver.cpp
+    fika_two_centre_kernels.cpp
+    fika_uniform_m2l.cpp
+    fika_vector_math.cpp
+    fika_veloxchem_order.cpp
+    fika_volume_fmm.cpp
+  )
+
+target_include_directories(vlxobjs
+  PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}>
+  )
