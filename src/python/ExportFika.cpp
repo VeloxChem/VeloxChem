@@ -358,13 +358,11 @@ export_fika(py::module& m) -> void
                                                 std::to_string(total) + " atoms for residues of " +
                                                 std::to_string(atoms));
                 }
-                // Indices continue those of the residues with this name already present.
+                // Indices continue those of the residues with this name already in the region.
                 const auto label = fika::detail::normalized_label(name, "FikaClassicalSystem.add_residues: residue name");
                 std::size_t index = 0;
-                for (const auto* region : {&self.polarizable_region(), &self.nonpolarizable_region()})
-                {
-                    for (const auto& residue : region->residues()) index += residue.name() == label ? 1 : 0;
-                }
+                const auto& region = polarizable ? self.polarizable_region() : self.nonpolarizable_region();
+                for (const auto& residue : region.residues()) index += residue.name() == label ? 1 : 0;
                 const double* data = coordinates.data();
                 for (std::size_t r = 0; r < total / atoms; ++r)
                 {
@@ -379,7 +377,7 @@ export_fika(py::module& m) -> void
                 }
             },
             "Adds residues of one kind: atomic numbers of one residue and coordinates (residues, atoms, 3) or "
-            "(residues * atoms, 3) in bohr.",
+            "(residues * atoms, 3) in bohr; their indices continue those of the residues of that name in the region.",
             "name"_a,
             "force_field"_a,
             "elements"_a,
