@@ -871,10 +871,9 @@ auto dipole_field_tensor_error_bound(int order, int rank, double dipole_sum, dou
   double best = std::numeric_limits<double>::infinity();
   for (int k = 1; k <= 10; ++k) {
     const double delta = gap / static_cast<double>(1 << k);
-    best =
-        std::min(best, 3.0 / delta *
-                           field_tensor_error_bound(order, rank, dipole_sum, source_radius + delta,
-                                                    target_radius, distance));
+    best = std::min(best, field_tensor_error_bound(order, rank, dipole_sum, source_radius + delta,
+                                                   target_radius, distance) /
+                              dipole_tolerance_scale(delta));
   }
   return best;
 }
@@ -889,14 +888,12 @@ auto quadrupole_field_tensor_error_bound(int order, int rank, double quadrupole_
   // smallest over delta = gap / 2^k, gap = d - r_S - r_T.
   const double gap = distance - source_radius - target_radius;
   assert(gap > 0.0);
-  const double constant = 20.0 / (3.0 * std::sqrt(3.0));
   double best = std::numeric_limits<double>::infinity();
   for (int k = 1; k <= 10; ++k) {
     const double delta = gap / static_cast<double>(1 << k);
-    best = std::min(best,
-                    constant / (delta * delta) *
-                        field_tensor_error_bound(order, rank, quadrupole_sum, source_radius + delta,
-                                                 target_radius, distance));
+    best = std::min(best, field_tensor_error_bound(order, rank, quadrupole_sum,
+                                                   source_radius + delta, target_radius, distance) /
+                              quadrupole_tolerance_scale(delta));
   }
   return best;
 }
@@ -953,18 +950,6 @@ auto real_multipole_field_tensor_error_bound(int order, int rank,
     total += best;
   }
   return total;
-}
-
-auto real_multipole_order(double accuracy, int rank, std::span<const double> moment_sums,
-                          double source_radius, double target_radius, double distance,
-                          int max_order) -> int {
-  for (int order = rank; order <= max_order; ++order) {
-    if (real_multipole_field_tensor_error_bound(order, rank, moment_sums, source_radius,
-                                                target_radius, distance) <= accuracy) {
-      return order;
-    }
-  }
-  return -1;
 }
 
 }  // namespace fika::detail

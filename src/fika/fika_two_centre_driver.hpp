@@ -39,6 +39,7 @@
 #include <cstddef>
 #include <memory>
 #include <span>
+#include <string_view>
 #include <variant>
 #include <vector>
 
@@ -146,6 +147,11 @@ auto contract_primitives(const BasisShell& bra, const BasisShell& ket, F&& primi
       },
       bra, ket);
 }
+
+/// Throws std::invalid_argument, prefixed with `caller`, for a negative or non-finite threshold or
+/// a basis whose atom count differs from the molecule's.
+void check_two_centre_input(std::string_view caller, const Molecule<double>& molecule,
+                            const MolecularBasis& basis, double threshold);
 
 /// Matrix of `op` between `bra` and `ket` (bases of `molecule`, already validated): symmetric
 /// with scalar (or, for operators without diagonal same-atom blocks, full) same-centre blocks

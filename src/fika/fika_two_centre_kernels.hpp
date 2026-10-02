@@ -79,6 +79,10 @@ struct IntegralForm {
 /// Geometry-independent data of a shell pair (bra shell l on A, ket shell l' on B), both
 /// uncontracted or segmented: mu_ab and the factors q_ab,j = c_a d_b w_ab,j / exp(-mu_ab R^2)
 /// (power_count rows of primitive_pairs).
+/// Dense contraction matrix of a shell: N x K row-major (primitives as rows), or K x N with
+/// `contractions_as_rows`; coefficients of primitives a contraction does not use are 0.
+auto coefficient_matrix(const BasisShell& shell, bool contractions_as_rows) -> std::vector<double>;
+
 struct SegmentedShellPair {
   int l = 0;
   int l_prime = 0;
@@ -114,6 +118,11 @@ struct KernelWorkspace {
   std::vector<double> translation_bra;   // G^(lambda)_m,mu(R) over n (factorized assembly)
   std::vector<double> translation_ket;   // H^(lambda')_m',mu'(R) over n
   std::vector<double> gaunt_contracted;  // Z^(lambda lambda')_mu,mu' over n
+  std::vector<std::size_t> counts;             // harmonic counts per order: charges
+  std::vector<std::size_t> dipole_counts;      //   dipoles
+  std::vector<std::size_t> quadrupole_counts;  //   quadrupoles
+  std::vector<std::size_t> bra_offsets;        // translation-matrix offsets per lambda
+  std::vector<std::size_t> ket_offsets;        //   per lambda'
   std::vector<double> bra_transformed;   // W^(lambda')_m,mu' over n
   ExpansionWorkspace expansion;          // far-field evaluation (L2P)
   std::vector<double> gathered_charges;  // near charges of a far-field leaf

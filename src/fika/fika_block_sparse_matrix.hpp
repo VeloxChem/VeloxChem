@@ -32,7 +32,6 @@
 #ifndef fika_block_sparse_matrix_hpp
 #define fika_block_sparse_matrix_hpp
 
-#include <cassert>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -85,26 +84,18 @@ struct DefaultInitAllocator : std::allocator<T> {
 /// Value storage of block-sparse matrices.
 using ValueVector = std::vector<double, DefaultInitAllocator<double>>;
 
-/// Shell lists and storage rules shared by patterns and builders.
+/// Shell lists and storage rules of a pattern.
 struct MatrixShape {
   std::vector<MolecularShell> bra_shells;
-  std::vector<MolecularShell> ket_shells;
-  bool square = true;  // ket shells are the bra shells (diagonal blocks exist)
+  std::vector<MolecularShell> ket_shells;  // empty for square matrices: the bra shells
+  bool square = true;                      // ket shells are the bra shells (diagonal blocks exist)
   MatrixSymmetry symmetry = MatrixSymmetry::general;
   DiagonalFormat diagonal_format = DiagonalFormat::full;
-};
 
-/// Blocks appended in (bra, ket) order: bra and ket shell per block and its values.
-struct BlockBuffer {
-  std::vector<std::uint32_t> bras;
-  std::vector<std::uint32_t> kets;
-  std::vector<std::size_t> value_ends;
-  std::vector<double> values;
+  auto kets() const noexcept -> const std::vector<MolecularShell>& {
+    return square ? bra_shells : ket_shells;
+  }
 };
-
-/// Joins buffered blocks, already in (bra, ket) shell order across the buffers, into a matrix;
-/// blocks without values are dropped and buffers are released as they are consumed.
-auto assemble(MatrixShape shape, std::vector<BlockBuffer*> buffers) -> BlockSparseMatrix;
 
 }  // namespace detail
 
@@ -145,7 +136,7 @@ class SparsityPattern {
   auto diagonal_format() const noexcept -> DiagonalFormat { return shape_.diagonal_format; }
   auto square() const noexcept -> bool { return shape_.square; }
   auto bra_shells() const noexcept -> std::span<const MolecularShell> { return shape_.bra_shells; }
-  auto ket_shells() const noexcept -> std::span<const MolecularShell> { return shape_.ket_shells; }
+  auto ket_shells() const noexcept -> std::span<const MolecularShell> { return shape_.kets(); }
 
   /// Dimensions of the dense matrix (bra and ket basis functions).
   auto row_count() const noexcept -> std::size_t;
@@ -175,8 +166,6 @@ class SparsityPattern {
   auto find_block(std::size_t bra_start, std::size_t ket_start) const -> std::optional<std::size_t>;
 
  private:
-  friend auto detail::assemble(detail::MatrixShape, std::vector<detail::BlockBuffer*>)
-      -> BlockSparseMatrix;
   SparsityPattern() = default;
 
   static auto from_rows(detail::MatrixShape shape, std::vector<std::size_t> row_offsets,
@@ -236,57 +225,8 @@ class BlockSparseMatrix {
   auto to_dense_matrix() const -> DenseMatrix;
 
  private:
-  friend auto detail::assemble(detail::MatrixShape, std::vector<detail::BlockBuffer*>)
-      -> BlockSparseMatrix;
-  BlockSparseMatrix(std::shared_ptr<const SparsityPattern> pattern, detail::ValueVector values)
-      : pattern_(std::move(pattern)), values_(std::move(values)) {}
-
   std::shared_ptr<const SparsityPattern> pattern_;
   detail::ValueVector values_;
-};
-
-/// Builds pattern and values in one pass with one buffer per bra shell (row), so different rows
-/// may be filled concurrently; a row must be filled by one thread at a time, kets increasing.
-///
-///   std::span<double> v = builder.row(a).add_block(b);
-class BlockSparseBuilder {
- public:
-  class Row {
-   public:
-    /// Starts the block with ket shell `ket_shell` (increasing within a row) and returns its
-    /// values to fill: zero-initialized, valid until the next add_block on this row.
-    auto add_block(std::size_t ket_shell) -> std::span<double>;
-
-   private:
-    friend class BlockSparseBuilder;
-    Row(const detail::MatrixShape& shape, std::size_t bra) : shape_(&shape), bra_(bra) {}
-    const detail::MatrixShape* shape_;
-    std::size_t bra_;
-    detail::BlockBuffer buffer_;
-  };
-
-  /// Square matrix over `shells`.
-  BlockSparseBuilder(std::span<const MolecularShell> shells, MatrixSymmetry symmetry,
-                     DiagonalFormat diagonal_format);
-
-  /// Rectangular (general) matrix between `bra_shells` and `ket_shells`.
-  BlockSparseBuilder(std::span<const MolecularShell> bra_shells,
-                     std::span<const MolecularShell> ket_shells);
-
-  // Rows refer to the builder's shape, so it stays in place.
-  BlockSparseBuilder(const BlockSparseBuilder&) = delete;
-  auto operator=(const BlockSparseBuilder&) -> BlockSparseBuilder& = delete;
-
-  auto row(std::size_t bra_shell) -> Row& {
-    assert(bra_shell < rows_.size());
-    return rows_[bra_shell];
-  }
-
-  auto finish() && -> BlockSparseMatrix;
-
- private:
-  detail::MatrixShape shape_;
-  std::vector<Row> rows_;
 };
 
 }  // namespace fika

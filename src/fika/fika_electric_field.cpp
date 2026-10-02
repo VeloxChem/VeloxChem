@@ -75,6 +75,10 @@ void PermanentChargeField::add_field(const PolarizableSites& sites,
                                 std::to_string(field.size()) + " entries for " + std::to_string(n) +
                                 " sites");
   }
+  if (sites.owners.size() != n) {
+    throw std::invalid_argument("fika::PermanentChargeField: " + std::to_string(sites.owners.size()) +
+                                " owners for " + std::to_string(n) + " sites");
+  }
   const std::size_t residues = charges_.residue_offsets.size() - 1;
   for (const std::size_t owner : sites.owners) {
     if (owner >= residues) {
@@ -108,6 +112,10 @@ void FmmChargeField::add_field(const PolarizableSites& sites,
     throw std::invalid_argument("fika::FmmChargeField: field has " + std::to_string(field.size()) +
                                 " entries for " + std::to_string(n) + " sites");
   }
+  if (sites.owners.size() != n) {
+    throw std::invalid_argument("fika::FmmChargeField: " + std::to_string(sites.owners.size()) +
+                                " owners for " + std::to_string(n) + " sites");
+  }
   const std::size_t residues = charges_.residue_offsets.size() - 1;
   for (const std::size_t owner : sites.owners) {
     if (owner >= residues) {
@@ -134,7 +142,8 @@ void FmmChargeField::add_field(const PolarizableSites& sites,
       detail::VolumeFmmReport report;
       fmm.field(charges_.charges, no_dipoles, fmm_field, &report);
       order_ = fmm.order();
-      if (report.sampled_error <= 0.1 * options_.absolute_accuracy || order_ + 2 > 26) {
+      if (report.sampled_error <= 0.1 * options_.absolute_accuracy ||
+          order_ + 2 > detail::largest_automatic_fmm_order) {
         break;
       }
       order = order_ + 2;

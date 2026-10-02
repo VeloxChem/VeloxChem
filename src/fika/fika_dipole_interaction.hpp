@@ -102,9 +102,10 @@ class DipoleCorrections {
   std::vector<std::size_t> owner_offsets_;
   std::vector<std::uint32_t> owner_sites_;
   std::vector<std::size_t> owner_group_;
-  // Cell grid of edge cutoff_ (with damping): sites of cell c are
+  // Cell grid of edge cell_edge_ >= cutoff_ (with damping): sites of cell c are
   // cell_sites_[cell_offsets_[c] .. cell_offsets_[c + 1]).
   Point3D<double> origin_{};
+  double cell_edge_ = 0.0;
   std::size_t cells_[3] = {0, 0, 0};
   std::vector<std::size_t> cell_offsets_;
   std::vector<std::uint32_t> cell_sites_;

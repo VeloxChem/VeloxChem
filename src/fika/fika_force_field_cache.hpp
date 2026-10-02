@@ -51,7 +51,7 @@ class ForceFieldCache {
       : system_(&system), caller_(std::move(caller)) {}
 
   /// Force field of the residue's type; throws std::runtime_error if the system holds none for it
-  /// and std::invalid_argument if the residue's atom count differs from it.
+  /// and std::invalid_argument if the residue's atom count or polarizable flag differs from it.
   auto of(const Residue& residue) const -> const ForceField& {
     const ForceField* field = system_->force_field(residue.force_field(), residue.name());
     if (field == nullptr) {
@@ -63,6 +63,13 @@ class ForceFieldCache {
           caller_ + ": residue " + residue.name() + " " + std::to_string(residue.index()) +
           " has " + std::to_string(residue.molecule().size()) + " atoms, force field " +
           field->label() + " " + std::to_string(field->atom_count()));
+    }
+    if (residue.polarizable() != field->polarizable()) {
+      // A mismatch would silently drop the residue's polarizabilities or give it no sites.
+      throw std::invalid_argument(caller_ + ": residue " + residue.name() + " " +
+                                  std::to_string(residue.index()) + " is marked " +
+                                  (residue.polarizable() ? "polarizable" : "nonpolarizable") +
+                                  ", force field " + field->label() + " is not");
     }
     return *field;
   }

@@ -44,6 +44,11 @@
 
 namespace fika {
 
+/// Which sources polarize the MM region: all of them (the ground state: MM permanent charges, QM
+/// nuclei and electrons), or the electrons of the density alone (response theory: a perturbed
+/// density D^1 induces mu^1 with B mu^1 = F_e(D^1)).
+enum class QmmmSources { all, electrons_only };
+
 /// Induced dipoles of a QM/MM system and how the field of the QM electrons was summed.
 struct QmmmInducedDipoles {
   InducedDipoles induced;  // dipoles, the field they respond to, and the solver statistics
@@ -55,12 +60,14 @@ struct QmmmInducedDipoles {
 /// both regions and of the QM region: its nuclei (QmNuclearField) and electrons
 /// (QmElectronicField, total density `density` over `basis` in VeloxChem's AO order). The electron
 /// field meets options.field_accuracy (0: tolerance / 10), as the MM field does, and is summed as
-/// options.summation selects (automatic: its own multipole crossover). Throws as induced_dipoles,
-/// QmNuclearField and QmElectronicField.
+/// options.summation selects (automatic: its own multipole crossover). With
+/// QmmmSources::electrons_only the dipoles respond to the electrons alone (no permanent charges or
+/// nuclei). Throws as induced_dipoles, QmNuclearField and QmElectronicField.
 auto qmmm_induced_dipoles(const Molecule<double>& molecule, const MolecularBasis& basis,
                           const DenseMatrix& density, const ClassicalSystem& system,
                           std::optional<TholeDamping> damping,
-                          const InducedDipoleOptions& options = {}) -> QmmmInducedDipoles;
+                          const InducedDipoleOptions& options = {},
+                          QmmmSources sources = QmmmSources::all) -> QmmmInducedDipoles;
 
 }  // namespace fika
 

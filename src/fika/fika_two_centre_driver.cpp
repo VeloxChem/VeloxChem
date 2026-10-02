@@ -33,6 +33,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cmath>
 #include <cstdint>
 #include <functional>
 #include <limits>
@@ -40,6 +41,7 @@
 #include <omp.h>
 #include <span>
 #include <stdexcept>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -125,14 +127,18 @@ struct BasisPairShells {
 };
 
 /// Shell-pair data of every pair of unique bra and ket bases, index bra * (unique ket bases) +
-/// ket. Pattern and kernels read the same cutoffs, so they agree on every screened block.
+/// ket; symmetric matrices only read (and get) bra <= ket. Pattern and kernels read the same
+/// cutoffs, so they agree on every screened block.
 auto basis_pair_shells(const TwoCentreOperator& op, const MolecularBasis& bra,
-                       const MolecularBasis& ket, double threshold)
+                       const MolecularBasis& ket, bool symmetric, double threshold)
     -> std::vector<BasisPairShells> {
   const std::size_t ket_count = ket.unique_bases().size();
   std::vector<BasisPairShells> tables(bra.unique_bases().size() * ket_count);
 #pragma omp parallel for schedule(dynamic, 1)
   for (std::size_t index = 0; index < tables.size(); ++index) {
+    if (symmetric && index / ket_count > index % ket_count) {
+      continue;
+    }
     const AtomBasis& bra_basis = bra.unique_bases()[index / ket_count];
     const AtomBasis& ket_basis = ket.unique_bases()[index % ket_count];
     BasisPairShells& table = tables[index];
@@ -710,13 +716,27 @@ auto make_integral_kernel(const BasisShell& bra, const BasisShell& ket, TwoCentr
   return std::make_unique<SegmentedKernel>(make_segmented_shell_pair(bra, ket, integral));
 }
 
+void check_two_centre_input(std::string_view caller, const Molecule<double>& molecule,
+                            const MolecularBasis& basis, double threshold) {
+  if (!std::isfinite(threshold) || threshold < 0.0) {
+    throw std::invalid_argument(std::string(caller) +
+                                ": threshold must be finite and non-negative");
+  }
+  if (molecule.size() != basis.atom_count()) {
+    throw std::invalid_argument(std::string(caller) + ": molecule has " +
+                                std::to_string(molecule.size()) + " atoms, basis " +
+                                std::to_string(basis.atom_count()));
+  }
+}
+
 auto compute_two_centre(const TwoCentreOperator& op, const Molecule<double>& molecule,
                         const MolecularBasis& bra, const MolecularBasis& ket, bool symmetric,
                         double threshold, std::size_t block_size, PairCost cost)
     -> BlockSparseMatrix {
   // Two passes over the atom-pair groups: 1) sort each group's atom pairs by distance and keep
   // them, 2) build the pattern row by row from the resulting neighbour lists, 3) compute the
-  // blocks and write them in place.
+  // blocks and write them in place. Screening compares distances, which NaN would pass silently.
+  molecule.check_finite_coordinates("fika::compute_two_centre");
   if (block_size == 0) {
     const std::size_t atoms = molecule.size();
     const std::size_t pairs = symmetric ? atoms * (atoms + 1) / 2 : atoms * atoms;
@@ -730,7 +750,7 @@ auto compute_two_centre(const TwoCentreOperator& op, const Molecule<double>& mol
                   symmetric,
                   atom_shell_offsets(bra),
                   atom_shell_offsets(ket),
-                  basis_pair_shells(op, bra, ket, threshold),
+                  basis_pair_shells(op, bra, ket, symmetric, threshold),
                   std::vector<GroupPairs>(factory->block_count())};
 
   // 1) Atom pairs within each group's largest cutoff, by distance.

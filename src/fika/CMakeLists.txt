@@ -25,6 +25,7 @@ target_sources(vlxobjs
     fika_nuclear_attraction_kernels.cpp
     fika_nuclear_repulsion.cpp
     fika_overlap_screening.cpp
+    fika_point_source_operator.cpp
     fika_point_sources.cpp
     fika_polarizable_sites.cpp
     fika_qm_field.cpp

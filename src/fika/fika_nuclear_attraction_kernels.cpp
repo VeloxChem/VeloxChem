@@ -38,12 +38,12 @@
 #include <cstdint>
 #include <limits>
 #include <map>
-#include <mutex>
 #include <numbers>
 #include <tuple>
 #include <variant>
 
 #include "fika_gaussian_normalization.hpp"
+#include "fika_lazy_table.hpp"
 #include "fika_overlap_screening.hpp"
 #include "fika_boys.hpp"
 #include "fika_gaunt.hpp"
@@ -57,25 +57,22 @@ auto squared_distance(const Point3D<double>& a, const Point3D<double>& b) -> dou
   return x * x + y * y + z * z;
 }
 
-/// Dense contraction matrix of a shell, K x N row-major (transpose = false) or N x K (true).
-auto coefficient_matrix(const BasisShell& shell, bool transpose) -> std::vector<double> {
-  return std::visit(
-      [transpose](const auto& s) {
-        const std::size_t primitives = s.primitive_count();
-        const std::size_t contractions = s.contraction_count();
-        std::vector<double> matrix(contractions * primitives, 0.0);
-        for (std::size_t k = 0; k < contractions; ++k) {
-          for_each_coefficient(s, k, [&](std::size_t i, double coefficient) {
-            matrix[transpose ? k * primitives + i : i * contractions + k] = coefficient;
-          });
-        }
-        return matrix;
-      },
-      shell);
-}
-
 auto coupling_count(int l, int l_prime) -> std::size_t {
   return static_cast<std::size_t>(std::min(l, l_prime) + 1);
+}
+
+/// Largest |coefficient| of each primitive over the shell's contractions.
+auto largest_coefficients(const BasisShell& shell) -> std::vector<double> {
+  const std::size_t primitives = exponents(shell).size();
+  const auto matrix = coefficient_matrix(shell, false);  // N x K
+  const std::size_t contractions = matrix.size() / primitives;
+  std::vector<double> result(primitives, 0.0);
+  for (std::size_t i = 0; i < primitives; ++i) {
+    for (std::size_t k = 0; k < contractions; ++k) {
+      result[i] = std::max(result[i], std::abs(matrix[i * contractions + k]));
+    }
+  }
+  return result;
 }
 
 }  // namespace
@@ -373,9 +370,8 @@ void same_atom_potential_values(const SameAtomShellPair& pair, const SourceField
   const auto coordinates = fields.charge_coordinates();
   const auto dipoles = fields.dipoles();
   const auto dipole_coordinates = fields.dipole_coordinates();
-  const auto quadrupoles = fields.quadrupoles();
   const auto quadrupole_coordinates = fields.quadrupole_coordinates();
-  std::vector<std::size_t> counts;
+  std::vector<std::size_t>& counts = workspace.counts;
 
   for (std::size_t i = 0; i < n; ++i) {
     const std::size_t atom = pairs[i].bra;
@@ -506,7 +502,7 @@ void same_atom_potential_values(const SameAtomShellPair& pair, const SourceField
       double* b_same = b_raised + field_rows;
       double* b_lowered = b_same + field_rows;
       for (std::size_t e = 0; e < near_quadrupoles.size(); ++e) {
-        const auto theta = quadrupole_components(quadrupoles[near_quadrupoles[e]]);
+        const auto& theta = fields.thetas()[near_quadrupoles[e]];  // precomputed per quadrupole
         std::fill_n(b_raised, 3 * field_rows, 0.0);
         for (std::size_t coupling = 0; coupling < couplings; ++coupling) {
           const int big_l = lowest + 2 * static_cast<int>(coupling);
@@ -727,20 +723,16 @@ auto build_scheme_two_table(int l, int l_prime) -> SchemeTwoTable {
   return table;
 }
 
-template <typename Table, typename Build>
-auto lazy_table(int l, int l_prime, Build&& build) -> const Table& {
-  struct Slot {
-    std::once_flag built;
-    Table table;
-  };
-  static std::array<std::array<Slot, max_angular_momentum + 1>, max_angular_momentum + 1> slots;
-  Slot& slot = slots[static_cast<std::size_t>(l)][static_cast<std::size_t>(l_prime)];
-  std::call_once(slot.built, [&] { slot.table = build(l, l_prime); });
-  return slot.table;
+/// Slot of a shell pair (l, l') in a table over all pairs.
+constexpr std::size_t shell_pair_slots = (max_angular_momentum + 1) * (max_angular_momentum + 1);
+
+auto shell_pair_slot(int l, int l_prime) -> std::size_t {
+  return static_cast<std::size_t>(l * (max_angular_momentum + 1) + l_prime);
 }
 
 auto scheme_two_table(int l, int l_prime) -> const SchemeTwoTable& {
-  return lazy_table<SchemeTwoTable>(l, l_prime, build_scheme_two_table);
+  return lazy_entry<SchemeTwoTable, shell_pair_slots>(
+      shell_pair_slot(l, l_prime), [&] { return build_scheme_two_table(l, l_prime); });
 }
 
 /// Factorized Scheme II assembly of a pair (l, l'):
@@ -828,7 +820,8 @@ auto build_factorized_table(int l, int l_prime) -> FactorizedTable {
 }
 
 auto factorized_table(int l, int l_prime) -> const FactorizedTable& {
-  return lazy_table<FactorizedTable>(l, l_prime, build_factorized_table);
+  return lazy_entry<FactorizedTable, shell_pair_slots>(
+      shell_pair_slot(l, l_prime), [&] { return build_factorized_table(l, l_prime); });
 }
 
 }  // namespace
@@ -939,29 +932,24 @@ auto dipole_kernels(int kappa, int big_l, double p, double u2, std::span<const d
 auto dipole_couplings(int big_l) -> const DipoleCouplings& {
   constexpr int max_rank = 2 * max_angular_momentum;
   assert(big_l >= 0 && big_l <= max_rank);
-  struct Slot {
-    std::once_flag built;
+  return lazy_entry<DipoleCouplings, max_rank + 1>(static_cast<std::size_t>(big_l), [&] {
     DipoleCouplings couplings;
-  };
-  static std::array<Slot, max_rank + 1> slots;
-  Slot& slot = slots[static_cast<std::size_t>(big_l)];
-  std::call_once(slot.built, [&] {
     // A+: S_1m S_Lambda,M = sum C^{Lambda+1,M'}_{1m,Lambda M} S_(Lambda+1),M' + ... .
     for (const GauntEntry& entry : multipole_gaunt_coefficients(1, big_l)) {
       if (entry.big_l == big_l + 1) {
-        slot.couplings.plus.push_back({entry.m_prime, entry.m, entry.big_m, entry.value});
+        couplings.plus.push_back({entry.m_prime, entry.m, entry.big_m, entry.value});
       }
     }
     // A-: C^{Lambda M}_{1m,(Lambda-1)M'} from S_1m S_(Lambda-1),M'.
     if (big_l > 0) {
       for (const GauntEntry& entry : multipole_gaunt_coefficients(1, big_l - 1)) {
         if (entry.big_l == big_l) {
-          slot.couplings.minus.push_back({entry.big_m, entry.m, entry.m_prime, entry.value});
+          couplings.minus.push_back({entry.big_m, entry.m, entry.m_prime, entry.value});
         }
       }
     }
+    return couplings;
   });
-  return slot.couplings;
 }
 
 auto quadrupole_components(const Quadrupole& q) -> std::array<double, 5> {
@@ -995,38 +983,27 @@ auto quadrupole_kernels(int kappa, int big_l, double p, double u2, std::span<con
 auto quadrupole_couplings(int big_l) -> const QuadrupoleCouplings& {
   constexpr int max_rank = 2 * max_angular_momentum;
   assert(big_l >= 0 && big_l <= max_rank);
-  struct Slot {
-    std::once_flag built;
+  return lazy_entry<QuadrupoleCouplings, max_rank + 1>(static_cast<std::size_t>(big_l), [&] {
     QuadrupoleCouplings couplings;
-  };
-  static std::array<Slot, max_rank + 1> slots;
-  Slot& slot = slots[static_cast<std::size_t>(big_l)];
-  std::call_once(slot.built, [&] {
     // S_2mu S_Lambda,M = sum C^{L'M'}_{2mu,Lambda M} r^(2k') S_L'M', L' = Lambda + 2 - 2k'.
     for (const GauntEntry& entry : multipole_gaunt_coefficients(2, big_l)) {
       const QuadrupoleCouplingTerm term{entry.m_prime, entry.m, entry.big_m, entry.value};
       if (entry.big_l == big_l + 2) {
-        slot.couplings.raised.push_back(term);
+        couplings.raised.push_back(term);
       } else if (entry.big_l == big_l) {
-        slot.couplings.same.push_back(term);
+        couplings.same.push_back(term);
       } else {
-        slot.couplings.lowered.push_back(term);
+        couplings.lowered.push_back(term);
       }
     }
+    return couplings;
   });
-  return slot.couplings;
 }
 
 auto translation_terms(int l) -> std::span<const TranslationTerm> {
   assert(l >= 0 && l <= max_angular_momentum);
-  struct Slot {
-    std::once_flag built;
-    std::vector<TranslationTerm> terms;
-  };
-  static std::array<Slot, max_angular_momentum + 1> slots;
-  Slot& slot = slots[static_cast<std::size_t>(l)];
-  std::call_once(slot.built, [&] { slot.terms = build_translation_terms(l); });
-  return slot.terms;
+  return lazy_entry<std::vector<TranslationTerm>, max_angular_momentum + 1>(
+      static_cast<std::size_t>(l), [&] { return build_translation_terms(l); });
 }
 
 auto make_two_atom_shell_pair(const BasisShell& bra, const BasisShell& ket, const SourceSums& sums,
@@ -1045,20 +1022,8 @@ auto make_two_atom_shell_pair(const BasisShell& bra, const BasisShell& ket, cons
   pair.far_threshold = far_field_threshold(pair.l + pair.l_prime);
   pair.dipole_far_threshold = far_field_threshold(pair.l + pair.l_prime + 1);
   pair.quadrupole_far_threshold = far_field_threshold(pair.l + pair.l_prime + 2);
-  const auto largest = [](const std::vector<double>& matrix, std::size_t rows, std::size_t columns,
-                          bool per_column) {
-    std::vector<double> result(per_column ? columns : rows, 0.0);
-    for (std::size_t i = 0; i < rows; ++i) {
-      for (std::size_t j = 0; j < columns; ++j) {
-        double& value = result[per_column ? j : i];
-        value = std::max(value, std::abs(matrix[i * columns + j]));
-      }
-    }
-    return result;
-  };
-  // c^T is N_A x K_A (primitives are columns); d is K_B x N_B (primitives are rows).
-  pair.bra_largest = largest(pair.bra_coefficients, pair.bra_contractions, alphas.size(), true);
-  pair.ket_largest = largest(pair.ket_coefficients, betas.size(), pair.ket_contractions, false);
+  pair.bra_largest = largest_coefficients(bra);
+  pair.ket_largest = largest_coefficients(ket);
   pair.bound_prefactor = (pair.l + pair.l_prime + 1) * 2.0 * std::numbers::pi * sums.charges;
   pair.dipole_prefactor =
       (pair.l + pair.l_prime + 1) * 2.0 * std::numbers::pi * 2.0 * dipole_boys_bound * sums.dipoles;
@@ -1081,20 +1046,8 @@ auto far_field_moment_bound(const BasisShell& bra, const BasisShell& ket, int ra
   }
   const auto alphas = exponents(bra);
   const auto betas = exponents(ket);
-  const auto largest = [](const BasisShell& shell) {
-    const std::size_t primitives = exponents(shell).size();
-    const auto matrix = coefficient_matrix(shell, false);  // K x N
-    const std::size_t contractions = matrix.size() / primitives;
-    std::vector<double> result(primitives, 0.0);
-    for (std::size_t i = 0; i < primitives; ++i) {
-      for (std::size_t k = 0; k < contractions; ++k) {
-        result[i] = std::max(result[i], std::abs(matrix[i * contractions + k]));
-      }
-    }
-    return result;
-  };
-  const auto bra_largest = largest(bra);
-  const auto ket_largest = largest(ket);
+  const auto bra_largest = largest_coefficients(bra);
+  const auto ket_largest = largest_coefficients(ket);
   const auto binomial = [](int n, int k) {
     double value = 1.0;
     for (int i = 1; i <= k; ++i) {
@@ -1211,7 +1164,8 @@ void two_atom_potential_values(const TwoAtomShellPair& pair, const SourceFields&
   // leaf (gathered) with the rest through the leaf's local expansion.
   std::span<const double> charges = fields.charges();
   std::span<const Point3D<double>> coordinates = fields.charge_coordinates();
-  std::vector<std::size_t> counts(static_cast<std::size_t>(order) + 1, coordinates.size());
+  std::vector<std::size_t>& counts = workspace.counts;
+  counts.assign(static_cast<std::size_t>(order) + 1, coordinates.size());
   const double* f = workspace.boys.data();
   const std::size_t tensor_size = static_cast<std::size_t>((order + 1) * (order + 1));
   workspace.far_field.resize(2 * tensor_size);
@@ -1220,11 +1174,13 @@ void two_atom_potential_values(const TwoAtomShellPair& pair, const SourceFields&
   // Dipoles likewise: all of them, or the near dipoles of the leaf (gathered).
   std::span<const Dipole> dipoles = fields.dipoles();
   std::span<const Point3D<double>> dipole_coordinates = fields.dipole_coordinates();
-  std::vector<std::size_t> dipole_counts(static_cast<std::size_t>(order) + 2, dipoles.size());
+  std::vector<std::size_t>& dipole_counts = workspace.dipole_counts;
+  dipole_counts.assign(static_cast<std::size_t>(order) + 2, dipoles.size());
   // Quadrupoles likewise (theta_mu and positions).
   std::span<const std::array<double, 5>> thetas = fields.thetas();
   std::span<const Point3D<double>> quadrupole_coordinates = fields.quadrupole_coordinates();
-  std::vector<std::size_t> quadrupole_counts(static_cast<std::size_t>(order) + 3, thetas.size());
+  std::vector<std::size_t>& quadrupole_counts = workspace.quadrupole_counts;
+  quadrupole_counts.assign(static_cast<std::size_t>(order) + 3, thetas.size());
 
   for (std::size_t i = 0; i < n; ++i) {
     const Point3D<double>& a_position = fields.atom_position(pairs[i].bra);
@@ -1245,12 +1201,13 @@ void two_atom_potential_values(const TwoAtomShellPair& pair, const SourceFields&
         const double p = pair.bra_exponents[a] + pair.ket_exponents[b];
         const double t = pair.ket_exponents[b] / p;
         const double mu_r2 = pair.bra_exponents[a] * pair.ket_exponents[b] / p * r2;
+        const double exponential = std::exp(-mu_r2);  // e^(-mu R^2), also the prefactor below
         if (pair.bra_largest[a] * pair.ket_largest[b] * pair.bound_prefactor / p * r_power *
-                    std::exp(-mu_r2) +
+                    exponential +
                 pair.bra_largest[a] * pair.ket_largest[b] * pair.dipole_prefactor / std::sqrt(p) *
-                    r_power * std::exp(-mu_r2) +
+                    r_power * exponential +
                 pair.bra_largest[a] * pair.ket_largest[b] * pair.quadrupole_prefactor * r_power *
-                    std::exp(-mu_r2) <
+                    exponential <
             pair.primitive_threshold) {
           continue;  // negligible primitive pair: its field and prefactors stay zero
         }
@@ -1561,7 +1518,6 @@ void two_atom_potential_values(const TwoAtomShellPair& pair, const SourceFields&
 
         // Contraction prefactors e^(-mu R^2) (-t)^(l - lambda) (1 - t)^(l' - lambda'), with the
         // coefficients folded in for segmented pairs.
-        const double exponential = std::exp(-mu_r2);
         const double coefficients =
             segmented ? pair.bra_coefficients[a] * pair.ket_coefficients[b] : 1.0;
         for (std::size_t k = 0; k < table.combinations.size(); ++k) {
@@ -1658,7 +1614,8 @@ void two_atom_potential_values(const TwoAtomShellPair& pair, const SourceFields&
           }
         }
       };
-  std::vector<std::size_t> bra_offsets, ket_offsets;
+  std::vector<std::size_t>& bra_offsets = workspace.bra_offsets;
+  std::vector<std::size_t>& ket_offsets = workspace.ket_offsets;
   translation_matrices(factorized.bra, bra_components, workspace.translation_bra, bra_offsets);
   translation_matrices(factorized.ket, ket_components, workspace.translation_ket, ket_offsets);
   const double* g = workspace.translation_bra.data();

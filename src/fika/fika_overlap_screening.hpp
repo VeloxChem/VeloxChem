@@ -84,7 +84,10 @@ struct ShellPairBound {
   auto operator()(double distance_squared) const noexcept -> double;
 
   /// Largest R^2 at which the bound still reaches `threshold`: beyond it the bound stays below
-  /// the threshold. Negative if the bound never reaches it; infinite for threshold <= 0.
+  /// the threshold. Negative if the bound never reaches it; infinite for threshold <= 0. The
+  /// bound may rise with R before it decays (diffuse shells, R^L and R^2 factors) and may lie
+  /// below the integrals of close pairs; screening by this cutoff only drops pairs in the
+  /// decaying tail, where it covers them (measured within the threshold up to 0.1).
   auto cutoff_distance_squared(double threshold) const -> double;
 };
 

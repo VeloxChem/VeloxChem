@@ -76,8 +76,11 @@ class QmNuclearField final : public FieldContribution {
 /// the thread count).
 class QmElectronicField final : public FieldContribution {
  public:
-  /// Site count from which ChargeSummation::automatic uses the multipole summation.
-  static constexpr std::size_t multipole_site_count = 4000;
+  /// Site count from which ChargeSummation::automatic uses the multipole summation (measured
+  /// break-even near 9300 sites: osimertinib/def2-SVP, accuracy 1e-9, the water oxygens nearest
+  /// the molecule, 14 threads; the FMM takes 1.28x the direct time at 8000, 0.85x at 10000 and
+  /// 0.57-0.66x at 14000-20000).
+  static constexpr std::size_t multipole_site_count = 10000;
 
   /// `density`: over the functions of `basis` in VeloxChem's order (veloxchem_order), of any
   /// symmetry; only its symmetric part (D + D^T) / 2 creates a field (e.g. of a perturbed

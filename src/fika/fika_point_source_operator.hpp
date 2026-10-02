@@ -29,28 +29,42 @@
 //  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
 //  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 
-#ifndef fika_boys_hpp
-#define fika_boys_hpp
+#ifndef fika_point_source_operator_hpp
+#define fika_point_source_operator_hpp
 
-// Internal: Boys functions F_k(x) = int_0^1 t^(2k) exp(-x t^2) dt.
+// Internal: the matrix of point sources of one kind (charges, dipoles or quadrupoles), shared by
+// NuclearAttractionDriver, DipolePotentialDriver and QuadrupolePotentialDriver.
 
-#include <span>
+#include <cstddef>
+#include <string_view>
+
+#include "fika_molecular_basis.hpp"
+#include "fika_summation.hpp"
+#include "fika_block_sparse_matrix.hpp"
+#include "fika_molecule.hpp"
+#include "fika_far_field_expansion.hpp"
 
 namespace fika::detail {
 
-/// Highest Boys order boys() evaluates.
-inline constexpr int max_boys_order = 32;
+enum class PointSourceKind { charges, dipoles, quadrupoles };
 
-/// F_0(x)..F_k_max(x) into out[0..k_max] (0 <= k_max <= max_boys_order, x >= 0). Method of
-/// Vikhamar-Sandberg and Repisky (arXiv:2512.10059): on [0, x0) the rational minimax
-/// approximation of F_k_max and downward recursion, on [x0, x1) that of F_0 and upward recursion.
-/// Beyond x1 (where the paper drops exp(-x) and only bounds the absolute error) F_0 =
-/// sqrt(pi) erf(sqrt(x)) / (2 sqrt(x)) and the exact upward recursion keep the relative error
-/// small for every order. Absolute error <= 5e-14; the relative error, unbounded by the paper,
-/// is measured up to ~7e-11 for k <= 16 and ~8e-8 at k = 32 (largest where F_k is small on
-/// [0, x0)) and ~1e-15 beyond x1.
-void boys(int k_max, double x, std::span<double> out);
+struct PointSourceSettings {
+  std::string_view caller;     // error-message prefix, e.g. "fika::DipolePotentialDriver"
+  std::size_t block_size = 0;  // atom pairs per task; 0: automatic
+  ChargeSummation summation = ChargeSummation::automatic;
+  std::size_t multipole_count = 0;  // sources from which automatic summation uses multipoles
+};
+
+/// Symmetric matrix of the sources of `kind` in `sources` (the other kinds empty) over `basis`:
+/// (A|V|A) blocks with ordering A, (A|V|B) blocks with Scheme II, far sources through a
+/// FarFieldExpansion with multipole summation. Throws std::invalid_argument (prefixed with
+/// settings.caller) for a negative or non-finite threshold, a basis of another molecule, source
+/// counts that differ from the coordinate counts, non-finite sources or coordinates, or multipole
+/// summation with threshold 0.
+auto point_source_matrix(const Molecule<double>& molecule, const MolecularBasis& basis,
+                         const PointSources& sources, PointSourceKind kind, double threshold,
+                         const PointSourceSettings& settings) -> BlockSparseMatrix;
 
 }  // namespace fika::detail
 
-#endif  // fika_boys_hpp
+#endif  // fika_point_source_operator_hpp

@@ -77,6 +77,8 @@ auto permuted(const DenseMatrix& matrix, const std::vector<std::size_t>& order) 
   const std::size_t n = order.size();
   DenseMatrix result(n, n, matrix.symmetry());
   const bool full = matrix.symmetry() == MatrixSymmetry::general;
+  // Every (i, j) is its own element: rows run in parallel for large matrices.
+#pragma omp parallel for schedule(dynamic, 16) if (n * n >= (std::size_t{1} << 16))
   for (std::size_t i = 0; i < n; ++i) {
     const std::size_t end = full ? n : i + 1;
     for (std::size_t j = 0; j < end; ++j) {

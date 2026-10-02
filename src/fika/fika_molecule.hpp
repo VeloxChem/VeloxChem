@@ -32,10 +32,12 @@
 #ifndef fika_molecule_hpp
 #define fika_molecule_hpp
 
+#include <cmath>
 #include <cstddef>
 #include <span>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -52,7 +54,8 @@ class Molecule {
  public:
   Molecule() = default;
 
-  /// Takes ownership of both arrays; throws std::invalid_argument if their sizes differ.
+  /// Takes ownership of both arrays; throws std::invalid_argument if their sizes differ or a
+  /// coordinate is not finite.
   Molecule(std::vector<Element> elements, std::vector<Point3D<T>> coordinates)
       : elements_(std::move(elements)), coordinates_(std::move(coordinates)) {
     if (elements_.size() != coordinates_.size()) {
@@ -60,10 +63,16 @@ class Molecule {
                                   " elements but " + std::to_string(coordinates_.size()) +
                                   " coordinates");
     }
+    check_finite_coordinates("fika::Molecule");
   }
 
-  /// Appends an atom; position in bohr. Leaves the molecule unchanged if allocation fails.
+  /// Appends an atom; position in bohr. Throws std::invalid_argument for a non-finite position;
+  /// leaves the molecule unchanged if it throws.
   auto add_atom(Element element, Point3D<T> position) -> void {
+    if (!finite(position)) {
+      throw std::invalid_argument("fika::Molecule: atom " + std::to_string(size()) +
+                                  " has a non-finite position");
+    }
     elements_.push_back(element);
     try {
       coordinates_.push_back(position);
@@ -106,9 +115,24 @@ class Molecule {
   }
 
   /// Editable atomic positions in bohr; the number of atoms cannot change through this view.
+  /// Positions written here are not checked: consumers call check_finite_coordinates.
   auto coordinates() noexcept -> std::span<Point3D<T>> { return coordinates_; }
 
+  /// Throws std::invalid_argument, prefixed with `who`, if a position is not finite.
+  auto check_finite_coordinates(std::string_view who) const -> void {
+    for (std::size_t atom = 0; atom < coordinates_.size(); ++atom) {
+      if (!finite(coordinates_[atom])) {
+        throw std::invalid_argument(std::string(who) + ": atom " + std::to_string(atom) +
+                                    " has a non-finite position");
+      }
+    }
+  }
+
  private:
+  static auto finite(const Point3D<T>& p) noexcept -> bool {
+    return std::isfinite(p.x) && std::isfinite(p.y) && std::isfinite(p.z);
+  }
+
   std::vector<Element> elements_;
   std::vector<Point3D<T>> coordinates_;
 };

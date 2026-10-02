@@ -66,6 +66,11 @@ struct InducedDipoleOptions {
   bool permanent_field = true;
 };
 
+/// Field error target of the fast multipole methods: options.field_accuracy, or tolerance / 10.
+inline auto field_accuracy(const InducedDipoleOptions& options) noexcept -> double {
+  return options.field_accuracy > 0.0 ? options.field_accuracy : 0.1 * options.tolerance;
+}
+
 /// Polarizable sites from which induced_dipoles uses the fast multipole methods automatically
 /// (measured crossovers of full solves on Ahlstrom water droplets, 14 threads: the FMM coupling
 /// breaks even near 80000 sites and wins 1.2x at 160000).
@@ -113,6 +118,32 @@ auto solve_induced_dipoles(const PolarizableSites& sites, std::span<const Point3
 auto induced_dipoles(const ClassicalSystem& system, std::optional<TholeDamping> damping,
                      const InducedDipoleOptions& options = {},
                      std::span<const FieldContribution* const> external = {}) -> InducedDipoles;
+
+namespace detail {
+
+/// How the permanent field was summed (direct or multipole) and its final FMM order (0: direct).
+struct PermanentFieldSummation {
+  ChargeSummation summation = ChargeSummation::direct;
+  int order = 0;
+};
+
+/// Adds the field of the permanent charges of `system` at `sites` (its polarizable sites) to
+/// `field`, summed as induced_dipoles does.
+auto add_permanent_field(const ClassicalSystem& system, const PolarizableSites& sites,
+                         const InducedDipoleOptions& options, std::span<Point3D<double>> field)
+    -> PermanentFieldSummation;
+
+/// Solves for the dipoles in `field` with the coupling induced_dipoles selects (FMM from the
+/// coupling crossover, else direct); `direct` (an operator of the same sites and damping) is used
+/// instead of building one when given. The result holds `field`.
+auto solve_with_selected_coupling(const PolarizableSites& sites,
+                                  std::vector<Point3D<double>> field,
+                                  std::optional<TholeDamping> damping,
+                                  const InducedDipoleOptions& options,
+                                  const DirectDipoleInteraction* direct = nullptr)
+    -> InducedDipoles;
+
+}  // namespace detail
 
 /// Induction energy -1/2 sum_i mu_i . F_i (Hartree).
 auto induction_energy(std::span<const Point3D<double>> dipoles,

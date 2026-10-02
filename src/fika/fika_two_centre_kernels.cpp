@@ -35,13 +35,13 @@
 #include <array>
 #include <cassert>
 #include <cmath>
-#include <mutex>
 #include <numbers>
 #include <stdexcept>
 #include <type_traits>
 #include <variant>
 
 #include "fika_gaussian_normalization.hpp"
+#include "fika_lazy_table.hpp"
 #include "fika_gaunt.hpp"
 #include "fika_vector_math.hpp"
 
@@ -94,17 +94,11 @@ auto build_assembly_terms(int l, int l_prime) -> std::vector<AssemblyTerm> {
 }
 
 /// One pair's assembly terms, built on first request.
-struct AssemblySlot {
-  std::once_flag built;
-  std::vector<AssemblyTerm> terms;
-};
-
 auto assembly_terms(int l, int l_prime) -> const std::vector<AssemblyTerm>& {
-  static std::array<std::array<AssemblySlot, max_angular_momentum + 1>, max_angular_momentum + 1>
-      table;
-  AssemblySlot& slot = table[static_cast<std::size_t>(l)][static_cast<std::size_t>(l_prime)];
-  std::call_once(slot.built, [&] { slot.terms = build_assembly_terms(l, l_prime); });
-  return slot.terms;
+  constexpr std::size_t slots = (max_angular_momentum + 1) * (max_angular_momentum + 1);
+  return lazy_entry<std::vector<AssemblyTerm>, slots>(
+      static_cast<std::size_t>(l * (max_angular_momentum + 1) + l_prime),
+      [&] { return build_assembly_terms(l, l_prime); });
 }
 
 /// values[(m, m')] = W0 S_lm S_l'm' + sum_L T_L sum_M C^{LM}_{lm,l'm'} S_LM over n columns.
@@ -236,23 +230,23 @@ auto leading_term(const IntegralForm& form, std::span<const double> r2, const do
   return leading.data();
 }
 
-/// Dense transposed contraction matrix of a shell: N x K, row-major (effective coefficients).
-auto transposed_coefficients(const BasisShell& shell) -> std::vector<double> {
+}  // namespace
+
+auto coefficient_matrix(const BasisShell& shell, bool contractions_as_rows) -> std::vector<double> {
   return std::visit(
-      [](const auto& s) {
+      [contractions_as_rows](const auto& s) {
         const std::size_t primitives = s.primitive_count();
-        std::vector<double> matrix(s.contraction_count() * primitives, 0.0);
-        for (std::size_t k = 0; k < s.contraction_count(); ++k) {
+        const std::size_t contractions = s.contraction_count();
+        std::vector<double> matrix(contractions * primitives, 0.0);
+        for (std::size_t k = 0; k < contractions; ++k) {
           for_each_coefficient(s, k, [&](std::size_t i, double coefficient) {
-            matrix[k * primitives + i] = coefficient;
+            matrix[contractions_as_rows ? k * primitives + i : i * contractions + k] = coefficient;
           });
         }
         return matrix;
       },
       shell);
 }
-
-}  // namespace
 
 auto make_segmented_shell_pair(const BasisShell& bra, const BasisShell& ket,
                                TwoCentreIntegral integral) -> SegmentedShellPair {
@@ -404,8 +398,8 @@ auto make_general_shell_pair(const BasisShell& bra, const BasisShell& ket,
       ++index;
     }
   }
-  pair.bra_coefficients = transposed_coefficients(bra);
-  pair.ket_coefficients = transposed_coefficients(ket);
+  pair.bra_coefficients = coefficient_matrix(bra, true);
+  pair.ket_coefficients = coefficient_matrix(ket, true);
 
   // Multiply-adds per power and separation of the two orders of the half-transformations.
   const std::size_t bra_first_cost =

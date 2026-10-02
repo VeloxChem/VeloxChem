@@ -35,6 +35,7 @@
 #include <cassert>
 #include <cstddef>
 #include <span>
+#include <stdexcept>
 #include <vector>
 
 #include "fika_matrix_symmetry.hpp"
@@ -83,15 +84,17 @@ class DenseMatrix {
     return 0.0;
   }
 
-  /// Sets element (i, j) (and its mirror); the antisymmetric diagonal only takes 0.
-  void set(std::size_t i, std::size_t j, double value) noexcept {
+  /// Sets element (i, j) (and its mirror). Throws std::invalid_argument for a nonzero value on
+  /// the diagonal of an antisymmetric matrix.
+  void set(std::size_t i, std::size_t j, double value) {
     if (double* stored = element(i, j, value)) {
       *stored = value;
     }
   }
 
-  /// Adds to element (i, j) (and its mirror); the antisymmetric diagonal only takes 0.
-  void add(std::size_t i, std::size_t j, double value) noexcept {
+  /// Adds to element (i, j) (and its mirror). Throws std::invalid_argument for a nonzero value on
+  /// the diagonal of an antisymmetric matrix.
+  void add(std::size_t i, std::size_t j, double value) {
     if (double* stored = element(i, j, value)) {
       *stored += value;
     }
@@ -102,8 +105,8 @@ class DenseMatrix {
 
  private:
   /// Stored value of (i, j), with `value` negated when (i, j) is the upper triangle of an
-  /// antisymmetric matrix; nullptr for its diagonal.
-  auto element(std::size_t i, std::size_t j, double& value) noexcept -> double* {
+  /// antisymmetric matrix; nullptr for its diagonal, which only takes 0.
+  auto element(std::size_t i, std::size_t j, double& value) -> double* {
     assert(i < rows_ && j < columns_);
     switch (symmetry_) {
       case MatrixSymmetry::general:
@@ -112,7 +115,10 @@ class DenseMatrix {
         return i >= j ? &values_[i * (i + 1) / 2 + j] : &values_[j * (j + 1) / 2 + i];
       case MatrixSymmetry::antisymmetric:
         if (i == j) {
-          assert(value == 0.0);
+          if (value != 0.0) {
+            throw std::invalid_argument("fika::DenseMatrix: nonzero diagonal of an "
+                                        "antisymmetric matrix");
+          }
           return nullptr;
         }
         if (i < j) {

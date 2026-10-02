@@ -156,43 +156,67 @@ auto solve_induced_dipoles(const PolarizableSites& sites, std::span<const Point3
         "catastrophe; damping may be needed)");
   };
 
+  const auto is_zero = [](const Vector& v) {
+    return std::ranges::all_of(
+        v, [](const Point3D<double>& mu) { return mu.x == 0.0 && mu.y == 0.0 && mu.z == 0.0; });
+  };
   InducedDipoles result;
   Vector& x = result.dipoles;
   x.resize(n);
   precondition(f, x);  // alpha F
+  // The starting residual r = F - B x reuses the products the guess decision computes, and B 0 = 0
+  // is not applied (a zero field without a guess costs no operator application).
+  Vector r(n), z(n), p(n);
+  const auto residual_from = [&](const Vector& b_times, double scale) {
+    for (std::size_t i = 0; i < n; ++i) {
+      r[i] = {f[i].x - scale * b_times[i].x, f[i].y - scale * b_times[i].y,
+              f[i].z - scale * b_times[i].z};
+    }
+  };
+  bool have_residual = false;
   if (!options.initial_guess.empty() && !options.scale_initial_guess) {
     x = options.initial_guess;
     result.guess_used = true;
     result.guess_scale = 1.0;
-  } else if (!options.initial_guess.empty()) {
+  } else if (!options.initial_guess.empty() && !is_zero(options.initial_guess)) {
     // Q(s g) is smallest at s = (g . F) / (g . B g), where Q = -1/2 s (g . F); keep it when below
     // Q(alpha F).
     const Vector& g = options.initial_guess;
     Vector bg(n);
     apply_b(g, bg);
     const double gbg = dot(g, bg);
-    const bool zero = std::ranges::all_of(
-        g, [](const Point3D<double>& mu) { return mu.x == 0.0 && mu.y == 0.0 && mu.z == 0.0; });
-    if (!zero && !(gbg > 0.0)) {
+    if (!(gbg > 0.0)) {
       not_positive_definite();
     }
-    if (!zero) {
-      const double gf = dot(g, f);
-      const double scale = gf / gbg;
-      Vector bx(n);
+    const double gf = dot(g, f);
+    const double scale = gf / gbg;
+    const bool zero_default = is_zero(x);
+    Vector bx(zero_default ? 0 : n);
+    if (!zero_default) {
       apply_b(x, bx);
-      const double q_default = 0.5 * dot(x, bx) - dot(x, f);
-      if (scale > 0.0 && std::isfinite(scale) && -0.5 * scale * gf < q_default) {
-        for (std::size_t i = 0; i < n; ++i) {
-          x[i] = {scale * g[i].x, scale * g[i].y, scale * g[i].z};
-        }
-        result.guess_used = true;
-        result.guess_scale = scale;
+    }
+    const double q_default = zero_default ? 0.0 : 0.5 * dot(x, bx) - dot(x, f);
+    if (scale > 0.0 && std::isfinite(scale) && -0.5 * scale * gf < q_default) {
+      for (std::size_t i = 0; i < n; ++i) {
+        x[i] = {scale * g[i].x, scale * g[i].y, scale * g[i].z};
       }
+      result.guess_used = true;
+      result.guess_scale = scale;
+      residual_from(bg, scale);
+    } else if (zero_default) {
+      r = f;
+    } else {
+      residual_from(bx, 1.0);
+    }
+    have_residual = true;
+  }
+  if (!have_residual) {
+    if (is_zero(x)) {
+      r = f;
+    } else {
+      residual(x, r);
     }
   }
-  Vector r(n), z(n), p(n);
-  residual(x, r);
   ResidualNorms norm = norms(r);
   while (norm.largest > options.tolerance && result.iterations < options.max_iterations) {
     // (Re)start from the true residual.
@@ -231,39 +255,30 @@ auto solve_induced_dipoles(const PolarizableSites& sites, std::span<const Point3
   return result;
 }
 
-auto induced_dipoles(const ClassicalSystem& system, std::optional<TholeDamping> damping,
-                     const InducedDipoleOptions& options,
-                     std::span<const FieldContribution* const> external) -> InducedDipoles {
-  const PolarizableSites sites = polarizable_sites(system);
+auto detail::add_permanent_field(const ClassicalSystem& system, const PolarizableSites& sites,
+                                 const InducedDipoleOptions& options,
+                                 std::span<Point3D<double>> field) -> PermanentFieldSummation {
   const std::size_t n = sites.positions.size();
-  const double accuracy =
-      options.field_accuracy > 0.0 ? options.field_accuracy : 0.1 * options.tolerance;
-  const auto multipole = [&](std::size_t crossover) {
-    return options.summation == ChargeSummation::multipole ||
-           (options.summation == ChargeSummation::automatic && n >= crossover);
-  };
-
-  std::vector<Point3D<double>> field(n, Point3D<double>{0.0, 0.0, 0.0});
-  ChargeSummation field_summation = ChargeSummation::direct;
-  int field_order = 0;
-  if (options.permanent_field && multipole(multipole_field_sites)) {
-    const FmmChargeField source(system, {.absolute_accuracy = accuracy});
+  if (options.summation == ChargeSummation::multipole ||
+      (options.summation == ChargeSummation::automatic && n >= multipole_field_sites)) {
+    const FmmChargeField source(system, {.absolute_accuracy = field_accuracy(options)});
     source.add_field(sites, field);
-    field_summation = ChargeSummation::multipole;
-    field_order = source.order();
-  } else if (options.permanent_field) {
-    PermanentChargeField(system).add_field(sites, field);
+    return {ChargeSummation::multipole, source.order()};
   }
-  for (const FieldContribution* contribution : external) {
-    if (contribution == nullptr) {
-      throw std::invalid_argument("fika::induced_dipoles: null external field contribution");
-    }
-    contribution->add_field(sites, field);
-  }
+  PermanentChargeField(system).add_field(sites, field);
+  return {};
+}
 
+auto detail::solve_with_selected_coupling(const PolarizableSites& sites,
+                                          std::vector<Point3D<double>> field,
+                                          std::optional<TholeDamping> damping,
+                                          const InducedDipoleOptions& options,
+                                          const DirectDipoleInteraction* direct)
+    -> InducedDipoles {
+  const std::size_t n = sites.positions.size();
   // Dipole scale of the coupling: the starting dipoles alpha F, or the initial guess if larger.
   double largest_field = 0.0, largest_alpha = 0.0;
-  for (std::size_t i = 0; i < n; ++i) {
+  for (std::size_t i = 0; i < n && i < field.size(); ++i) {
     largest_field = std::max(largest_field, std::hypot(field[i].x, field[i].y, field[i].z));
     for (const double a : sites.polarizabilities[i].components) {
       largest_alpha = std::max(largest_alpha, std::abs(a));
@@ -275,19 +290,45 @@ auto induced_dipoles(const ClassicalSystem& system, std::optional<TholeDamping> 
   }
   const double dipole_scale =
       std::max(std::sqrt(3.0) * largest_alpha * largest_field, largest_guess);
+  const bool multipole =
+      options.summation == ChargeSummation::multipole ||
+      (options.summation == ChargeSummation::automatic && n >= multipole_coupling_sites);
   InducedDipoles result;
-  if (multipole(multipole_coupling_sites) && dipole_scale > 0.0) {
+  if (multipole && dipole_scale > 0.0) {
     const FmmDipoleInteraction coupling(
-        sites, damping, {.absolute_accuracy = accuracy, .dipole_scale = dipole_scale});
+        sites, damping,
+        {.absolute_accuracy = field_accuracy(options), .dipole_scale = dipole_scale});
     result = solve_induced_dipoles(sites, field, coupling, options);
     result.coupling_summation = ChargeSummation::multipole;
     result.coupling_order = coupling.order();
+  } else if (direct != nullptr) {
+    result = solve_induced_dipoles(sites, field, *direct, options);
   } else {
     result = solve_induced_dipoles(sites, field, DirectDipoleInteraction(sites, damping), options);
   }
-  result.field_summation = field_summation;
-  result.field_order = field_order;
   result.field = std::move(field);
+  return result;
+}
+
+auto induced_dipoles(const ClassicalSystem& system, std::optional<TholeDamping> damping,
+                     const InducedDipoleOptions& options,
+                     std::span<const FieldContribution* const> external) -> InducedDipoles {
+  const PolarizableSites sites = polarizable_sites(system);
+  std::vector<Point3D<double>> field(sites.positions.size(), Point3D<double>{0.0, 0.0, 0.0});
+  detail::PermanentFieldSummation permanent;
+  if (options.permanent_field) {
+    permanent = detail::add_permanent_field(system, sites, options, field);
+  }
+  for (const FieldContribution* contribution : external) {
+    if (contribution == nullptr) {
+      throw std::invalid_argument("fika::induced_dipoles: null external field contribution");
+    }
+    contribution->add_field(sites, field);
+  }
+  InducedDipoles result =
+      detail::solve_with_selected_coupling(sites, std::move(field), damping, options);
+  result.field_summation = permanent.summation;
+  result.field_order = permanent.order;
   return result;
 }
 

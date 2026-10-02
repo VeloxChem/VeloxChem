@@ -69,6 +69,9 @@
 
 namespace fika::detail {
 
+/// Highest order of the calibrated automatic order, and of the order retries of its users.
+inline constexpr int largest_automatic_fmm_order = 26;
+
 struct VolumeFmmOptions {
   double absolute_accuracy = 1e-9;  // field error target (a.u.) of the automatic order
   int order = 0;                    // expansion order p; 0: from absolute_accuracy
@@ -111,8 +114,8 @@ class VolumeFmm {
   /// Tree and lists for charges at `charge_positions`, dipoles at `dipole_positions` and fields
   /// at `targets` (bohr; points of different sets may coincide). Throws std::invalid_argument
   /// for an order outside 0..max_expansion_order, a separation other than 1 or 2, a zero leaf
-  /// capacity, a nonpositive accuracy, a missing scale for the automatic order, or too many
-  /// points.
+  /// capacity, the automatic order with separation 1, a nonpositive accuracy, a missing scale for
+  /// the automatic order, or too many points.
   VolumeFmm(std::span<const Point3D<double>> charge_positions,
             std::span<const Point3D<double>> dipole_positions,
             std::span<const Point3D<double>> targets, const VolumeFmmOptions& options);

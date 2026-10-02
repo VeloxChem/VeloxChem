@@ -29,28 +29,33 @@
 //  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
 //  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 
-#ifndef fika_boys_hpp
-#define fika_boys_hpp
+#ifndef fika_lazy_table_hpp
+#define fika_lazy_table_hpp
 
-// Internal: Boys functions F_k(x) = int_0^1 t^(2k) exp(-x t^2) dt.
+// Internal: tables built on first request, once, from any thread.
 
-#include <span>
+#include <array>
+#include <cassert>
+#include <cstddef>
+#include <mutex>
 
 namespace fika::detail {
 
-/// Highest Boys order boys() evaluates.
-inline constexpr int max_boys_order = 32;
-
-/// F_0(x)..F_k_max(x) into out[0..k_max] (0 <= k_max <= max_boys_order, x >= 0). Method of
-/// Vikhamar-Sandberg and Repisky (arXiv:2512.10059): on [0, x0) the rational minimax
-/// approximation of F_k_max and downward recursion, on [x0, x1) that of F_0 and upward recursion.
-/// Beyond x1 (where the paper drops exp(-x) and only bounds the absolute error) F_0 =
-/// sqrt(pi) erf(sqrt(x)) / (2 sqrt(x)) and the exact upward recursion keep the relative error
-/// small for every order. Absolute error <= 5e-14; the relative error, unbounded by the paper,
-/// is measured up to ~7e-11 for k <= 16 and ~8e-8 at k = 32 (largest where F_k is small on
-/// [0, x0)) and ~1e-15 beyond x1.
-void boys(int k_max, double x, std::span<double> out);
+/// Entry `index` (< Size) of a table built by build() on its first request; thread safe. Every
+/// distinct `Build` type (a lambda per call site) has its own storage.
+template <typename Table, std::size_t Size, typename Build>
+auto lazy_entry(std::size_t index, Build&& build) -> const Table& {
+  struct Slot {
+    std::once_flag built;
+    Table table;
+  };
+  static std::array<Slot, Size> slots;
+  assert(index < Size);
+  Slot& slot = slots[index];
+  std::call_once(slot.built, [&] { slot.table = build(); });
+  return slot.table;
+}
 
 }  // namespace fika::detail
 
-#endif  // fika_boys_hpp
+#endif  // fika_lazy_table_hpp

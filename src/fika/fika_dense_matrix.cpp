@@ -63,11 +63,10 @@ DenseMatrix::DenseMatrix(std::size_t rows, std::size_t columns, MatrixSymmetry s
 }
 
 auto DenseMatrix::to_full() const -> std::vector<double> {
-  std::vector<double> full(rows_ * columns_);
   if (symmetry_ == MatrixSymmetry::general) {
-    full.assign(values_.begin(), values_.end());
-    return full;
+    return values_;
   }
+  std::vector<double> full(rows_ * columns_);
   const double sign = symmetry_ == MatrixSymmetry::symmetric ? 1.0 : -1.0;
   const std::size_t n = rows_;
   std::size_t index = 0;

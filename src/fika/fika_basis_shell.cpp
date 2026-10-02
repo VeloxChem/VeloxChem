@@ -176,13 +176,18 @@ auto nonzero_count(const std::vector<double>& coefficients) -> std::size_t {
 
 }  // namespace
 
-UncontractedShell::UncontractedShell(int angular_momentum, double exponent)
+UncontractedShell::UncontractedShell(int angular_momentum, double exponent,
+                                     double file_coefficient)
     : angular_momentum_(angular_momentum), exponent_(exponent) {
   check_angular_momentum(angular_momentum);
   check_exponent(exponent);
-  coefficient_ = dispatch_angular_momentum(
+  if (file_coefficient == 0.0 || !std::isfinite(file_coefficient)) {
+    fail("the coefficient of an uncontracted shell must be nonzero and finite");
+  }
+  const double normalization = dispatch_angular_momentum(
       angular_momentum,
       [&]<int L>(std::integral_constant<int, L>) { return primitive_normalization<L>(exponent); });
+  coefficient_ = std::copysign(normalization, file_coefficient);
 }
 
 UncontractedShell::UncontractedShell(int angular_momentum, double exponent, double coefficient,
@@ -258,7 +263,8 @@ auto make_basis_shell(int angular_momentum, std::vector<double> exponents,
   if (nonzero_count(coefficients) == 1) {
     const auto nonzero = std::ranges::find_if(coefficients, [](double c) { return c != 0.0; });
     return UncontractedShell(angular_momentum,
-                             exponents[static_cast<std::size_t>(nonzero - coefficients.begin())]);
+                             exponents[static_cast<std::size_t>(nonzero - coefficients.begin())],
+                             *nonzero);
   }
   return SegmentedShell(angular_momentum, std::move(exponents), coefficients);
 }
@@ -287,7 +293,7 @@ auto max_coefficient_sum(const BasisShell& shell) noexcept -> double {
   return std::visit(
       [](const auto& s) -> double {
         if constexpr (std::is_same_v<std::decay_t<decltype(s)>, UncontractedShell>) {
-          return s.coefficient();
+          return std::abs(s.coefficient());
         } else {
           return s.max_coefficient_sum();
         }

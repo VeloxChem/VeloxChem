@@ -61,7 +61,6 @@ constexpr double charge_error_constant = 1.8e-4;
 constexpr double dipole_error_constant = 7e-3;
 constexpr double error_margin = 1.0;
 constexpr int smallest_automatic_order = 14;  // the calibrated range starts here
-constexpr int largest_automatic_order = 26;
 constexpr std::size_t order_sample_size = 64;
 
 auto shift_of(int level) -> int {
@@ -98,6 +97,10 @@ VolumeFmm::VolumeFmm(std::span<const Point3D<double>> charge_positions,
   if (options.order < 0 || options.order > max_expansion_order) {
     throw std::invalid_argument("fika::VolumeFmm: order outside 0.." +
                                 std::to_string(max_expansion_order));
+  }
+  if (options.order == 0 && options.separation != 2) {
+    // The calibrated model holds for separation 2 only (at 1 it underestimates ~1000x).
+    throw std::invalid_argument("fika::VolumeFmm: the automatic order needs separation 2");
   }
   if (options.order == 0 &&
       (!(options.absolute_accuracy > 0.0) || !std::isfinite(options.absolute_accuracy) ||
@@ -143,16 +146,19 @@ VolumeFmm::VolumeFmm(std::span<const Point3D<double>> charge_positions,
         estimates.empty() ? 0.0 : *std::max_element(estimates.begin(), estimates.end());
     order = smallest_automatic_order;
     double predicted = scale * std::pow(error_ratio, order);
-    while (order < largest_automatic_order &&
+    while (order < largest_automatic_fmm_order &&
            error_margin * predicted > options.absolute_accuracy) {
       ++order;
       predicted *= error_ratio;
     }
     statistics_.predicted_error = predicted;
   }
-  m2l_.emplace(order, separation_);
   statistics_.order = order;
-  statistics_.operator_bytes = m2l_->operator_bytes();
+  // The operators (tens to hundreds of MB at high orders) only when a translation uses them.
+  if (statistics_.multipole_to_local > 0) {
+    m2l_.emplace(order, separation_);
+    statistics_.operator_bytes = m2l_->operator_bytes();
+  }
 }
 
 void VolumeFmm::build(std::span<const Point3D<double>> charges,
@@ -422,7 +428,7 @@ void VolumeFmm::field(std::span<const double> charges, std::span<const Dipole> d
   VolumeFmmReport& time = report != nullptr ? *report : local_report;
   auto start = Clock::now();
   const int depth = static_cast<int>(levels_.size()) - 1;
-  const int order = m2l_->order();
+  const int order = statistics_.order;
   const std::size_t size = expansion_size(order);
   std::vector<double> q(charges_.index.size());
   for (std::size_t i = 0; i < q.size(); ++i) {
@@ -509,8 +515,8 @@ void VolumeFmm::field(std::span<const double> charges, std::span<const Dipole> d
     locals[static_cast<std::size_t>(level)].assign(
         levels_[static_cast<std::size_t>(level)].size() * size, Complex{});
   }
-  const auto offsets = m2l_->offsets();
-  for (int level = 2; level <= depth; ++level) {
+  const auto offsets = m2l_ ? m2l_->offsets() : std::span<const CellOffset>{};
+  for (int level = 2; m2l_ && level <= depth; ++level) {
     const auto& chunks = chunks_[static_cast<std::size_t>(level)];
     const auto& source = multipoles[static_cast<std::size_t>(level)];
     auto& target = locals[static_cast<std::size_t>(level)];

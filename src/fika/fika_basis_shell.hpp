@@ -52,8 +52,10 @@ struct EffectiveCoefficients {};
 /// A single normalized primitive: one contracted function of one primitive.
 class UncontractedShell {
  public:
-  /// Throws std::invalid_argument for invalid angular momentum or exponent.
-  UncontractedShell(int angular_momentum, double exponent);
+  /// `file_coefficient` as listed in basis-set files: a lone primitive is normalized, so only its
+  /// sign is kept. Throws std::invalid_argument for invalid angular momentum or exponent, or a
+  /// zero or non-finite file coefficient.
+  UncontractedShell(int angular_momentum, double exponent, double file_coefficient = 1.0);
 
   /// With the effective coefficient as given (no normalization). Throws std::invalid_argument for
   /// invalid angular momentum, exponent or coefficient.
@@ -64,7 +66,8 @@ class UncontractedShell {
   auto primitive_count() const noexcept -> std::size_t { return 1; }
   auto contraction_count() const noexcept -> std::size_t { return 1; }
   auto exponent() const noexcept -> double { return exponent_; }
-  /// Effective coefficient N_l(exponent); also the shell's sum of |coefficient|.
+  /// Effective coefficient +-N_l(exponent), with the sign of the file coefficient; its absolute
+  /// value is the shell's sum of |coefficient|.
   auto coefficient() const noexcept -> double { return coefficient_; }
 
   auto exponents() const noexcept -> std::span<const double> { return {&exponent_, 1}; }

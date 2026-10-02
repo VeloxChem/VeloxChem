@@ -51,6 +51,7 @@
 // field tensor of rank Lambda evaluated from it holds every term of degree <= p - Lambda in the
 // combined displacement u = (s - O) - (x - Q) (see field_tensor_error_bound).
 
+#include <cmath>
 #include <complex>
 #include <cstddef>
 #include <span>
@@ -199,6 +200,17 @@ auto field_tensor_error_bound(int order, int rank, double charge_sum, double sou
 auto dipole_field_tensor_error_bound(int order, int rank, double dipole_sum, double source_radius,
                                      double target_radius, double distance) -> double;
 
+/// Charge-bound tolerance per unit dipole at ball radius delta: delta / 3 (the dipole bound is the
+/// charge bound for radius source_radius + delta divided by it). Shared with FarFieldExpansion.
+inline auto dipole_tolerance_scale(double delta) noexcept -> double {
+  return delta / 3.0;
+}
+
+/// Charge-bound tolerance per unit quadrupole at ball radius delta: delta^2 3 sqrt 3 / 20.
+inline auto quadrupole_tolerance_scale(double delta) noexcept -> double {
+  return delta * delta * 3.0 * std::sqrt(3.0) / 20.0;
+}
+
 /// The same bound for point quadrupoles of total norm sum ||Theta||_2 within `source_radius` of
 /// O: the charge error is harmonic in the source position, and its second derivatives obey
 /// |1/2 Theta : grad grad e| <= (20 / (3 sqrt 3)) ||Theta||_2 sup |e| / delta^2 over a ball of
@@ -223,12 +235,6 @@ auto real_multipole_field_tensor_error_bound(int order, int rank,
                                              std::span<const double> moment_sums,
                                              double source_radius, double target_radius,
                                              double distance) -> double;
-
-/// Smallest order p in [rank, max_order] whose real_multipole_field_tensor_error_bound is at most
-/// `accuracy`; -1 if none is.
-auto real_multipole_order(double accuracy, int rank, std::span<const double> moment_sums,
-                          double source_radius, double target_radius, double distance,
-                          int max_order) -> int;
 
 }  // namespace fika::detail
 

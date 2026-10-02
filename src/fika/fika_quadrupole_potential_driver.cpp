@@ -31,118 +31,9 @@
 
 #include "fika_quadrupole_potential_driver.hpp"
 
-#include <algorithm>
-#include <cmath>
-#include <memory>
-#include <stdexcept>
-#include <string>
-#include <vector>
-
-#include "fika_basis_shell.hpp"
-#include "fika_nuclear_attraction_kernels.hpp"
-#include "fika_overlap_screening.hpp"
-#include "fika_two_centre_driver.hpp"
-#include "fika_far_field_expansion.hpp"
+#include "fika_point_source_operator.hpp"
 
 namespace fika {
-
-namespace {
-
-[[noreturn]] void fail(const std::string& reason) {
-  throw std::invalid_argument("fika::QuadrupolePotentialDriver: " + reason);
-}
-
-/// Kernel of a shell pair: (A|Q|A) blocks with ordering A, (A|Q|B) blocks with Scheme II (the
-/// point-source kernels with quadrupoles only).
-class QuadrupolePotentialKernel final : public detail::ShellPairKernel {
- public:
-  QuadrupolePotentialKernel(const BasisShell& bra, const BasisShell& ket,
-                            const detail::SourceFields& fields,
-                            const detail::FarFieldExpansion* far_field, double quadrupole_sum,
-                            double threshold)
-      : same_atom_(detail::make_same_atom_shell_pair(bra, ket)),
-        two_atom_(
-            detail::make_two_atom_shell_pair(bra, ket, {.quadrupoles = quadrupole_sum}, threshold)),
-        fields_(&fields),
-        far_field_(far_field) {}
-
-  // The blocks are not symmetric in m, m' for l == l' (the quadrupoles break the symmetry).
-  auto shape() const noexcept -> detail::KernelShape override {
-    return {same_atom_.l, same_atom_.l_prime, same_atom_.bra_contractions,
-            same_atom_.ket_contractions, false};
-  }
-
-  void compute(const SolidHarmonics& harmonics, std::span<const AtomPair> pairs, std::size_t n,
-               detail::KernelWorkspace& workspace, std::span<double> values) const override {
-    if (n > 0 && pairs[0].bra == pairs[0].ket) {
-      detail::same_atom_potential_values(same_atom_, *fields_, pairs, n, workspace, values);
-    } else {
-      detail::two_atom_potential_values(two_atom_, *fields_, harmonics, pairs, n, workspace, values,
-                                        far_field_);
-    }
-  }
-
- private:
-  detail::SameAtomShellPair same_atom_;
-  detail::TwoAtomShellPair two_atom_;
-  const detail::SourceFields* fields_;
-  const detail::FarFieldExpansion* far_field_;
-};
-
-class QuadrupolePotentialOperator final : public detail::TwoCentreOperator {
- public:
-  QuadrupolePotentialOperator(const Molecule<double>& molecule, const MolecularBasis& basis,
-                              std::span<const Quadrupole> quadrupoles,
-                              std::span<const Point3D<double>> coordinates, double threshold,
-                              bool multipole)
-      : threshold_(threshold),
-        quadrupole_sum_(norm_sum(quadrupoles)),
-        far_field_(multipole
-                       ? std::make_unique<detail::FarFieldExpansion>(detail::make_source_far_field(
-                             molecule, basis,
-                             detail::PointSources{.quadrupoles = quadrupoles,
-                                                  .quadrupole_coordinates = coordinates},
-                             threshold))
-                       : nullptr),
-        fields_(
-            molecule, basis,
-            detail::PointSources{.quadrupoles = quadrupoles, .quadrupole_coordinates = coordinates},
-            far_field_.get()) {}
-
-  auto bound(const BasisShell& bra, const BasisShell& ket) const
-      -> detail::ShellPairBound override {
-    return detail::quadrupole_potential_shell_pair_bound(bra, ket, quadrupole_sum_);
-  }
-
-  auto kernel(const BasisShell& bra, const BasisShell& ket) const
-      -> std::unique_ptr<detail::ShellPairKernel> override {
-    return std::make_unique<QuadrupolePotentialKernel>(bra, ket, fields_, far_field_.get(),
-                                                       quadrupole_sum_, threshold_);
-  }
-
-  auto same_centre_blocks_diagonal() const -> bool override { return false; }
-
-  auto same_centre(const BasisShell&, const BasisShell&) const -> std::vector<double> override {
-    throw std::logic_error("fika: quadrupole-potential same-atom blocks come from the kernels");
-  }
-
- private:
-  static auto norm_sum(std::span<const Quadrupole> quadrupoles) -> double {
-    double sum = 0.0;
-    for (const Quadrupole& quadrupole : quadrupoles) {
-      sum += detail::traceless_quadrupole_norm(quadrupole);
-    }
-    return sum;
-  }
-
-  // Built in this order: the quadrupole fields use the far-field expansion.
-  double threshold_;
-  double quadrupole_sum_;
-  std::unique_ptr<detail::FarFieldExpansion> far_field_;
-  detail::SourceFields fields_;
-};
-
-}  // namespace
 
 QuadrupolePotentialDriver::QuadrupolePotentialDriver(std::size_t block_size,
                                                      ChargeSummation summation)
@@ -153,37 +44,15 @@ auto QuadrupolePotentialDriver::compute(const Molecule<double>& molecule,
                                         std::span<const Quadrupole> quadrupoles,
                                         std::span<const Point3D<double>> quadrupole_coordinates,
                                         double threshold) const -> BlockSparseMatrix {
-  if (!std::isfinite(threshold) || threshold < 0.0) {
-    fail("threshold must be finite and non-negative");
-  }
-  if (molecule.size() != basis.atom_count()) {
-    fail("molecule has " + std::to_string(molecule.size()) + " atoms, basis " +
-         std::to_string(basis.atom_count()));
-  }
-  if (quadrupoles.size() != quadrupole_coordinates.size()) {
-    fail(std::to_string(quadrupoles.size()) + " quadrupoles but " +
-         std::to_string(quadrupole_coordinates.size()) + " quadrupole coordinates");
-  }
-  const auto finite_point = [](const Point3D<double>& p) {
-    return std::isfinite(p.x) && std::isfinite(p.y) && std::isfinite(p.z);
-  };
-  const auto finite_quadrupole = [](const Quadrupole& q) {
-    return std::ranges::all_of(q.components, [](double v) { return std::isfinite(v); });
-  };
-  if (!std::ranges::all_of(quadrupoles, finite_quadrupole) ||
-      !std::ranges::all_of(quadrupole_coordinates, finite_point)) {
-    fail("quadrupoles and their coordinates must be finite");
-  }
-  if (summation_ == ChargeSummation::multipole && threshold == 0.0) {
-    fail("the multipole summation needs a positive threshold");
-  }
-  const bool multipole = summation_ == ChargeSummation::multipole ||
-                         (summation_ == ChargeSummation::automatic && threshold > 0.0 &&
-                          quadrupoles.size() >= multipole_quadrupole_count);
-  return detail::compute_two_centre(
-      QuadrupolePotentialOperator(molecule, basis, quadrupoles, quadrupole_coordinates, threshold,
-                                  multipole),
-      molecule, basis, basis, true, threshold, block_size_, PairCost::heavy);
+  return detail::point_source_matrix(
+      molecule, basis,
+      detail::PointSources{.quadrupoles = quadrupoles,
+                           .quadrupole_coordinates = quadrupole_coordinates},
+      detail::PointSourceKind::quadrupoles, threshold,
+      {.caller = "fika::QuadrupolePotentialDriver",
+       .block_size = block_size_,
+       .summation = summation_,
+       .multipole_count = multipole_quadrupole_count});
 }
 
 }  // namespace fika

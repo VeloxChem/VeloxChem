@@ -109,6 +109,7 @@ auto block_energy(const Molecule<T>& small, const Molecule<T>& large, std::size_
 // on the number of threads and equals the serial sum.
 template <real_scalar T>
 auto nuclear_repulsion_energy(const Molecule<T>& molecule) -> double {
+  molecule.check_finite_coordinates("fika::nuclear_repulsion_energy");
   const std::size_t n = molecule.size();
   if (n < 2) {
     return 0.0;
@@ -137,6 +138,8 @@ auto nuclear_repulsion_energy(const Molecule<T>& molecule) -> double {
 // so the result does not depend on the number of threads.
 template <real_scalar T>
 auto nuclear_repulsion_energy(const Molecule<T>& a, const Molecule<T>& b) -> double {
+  a.check_finite_coordinates("fika::nuclear_repulsion_energy");
+  b.check_finite_coordinates("fika::nuclear_repulsion_energy");
   const bool a_is_small = a.size() <= b.size();
   const Molecule<T>& small = a_is_small ? a : b;
   const Molecule<T>& large = a_is_small ? b : a;
@@ -178,6 +181,9 @@ auto point_charge_block_energy(std::span<const double> x, std::span<const double
   detail::NeumaierSum energy;
   const std::size_t atoms = nuclear_charges.size();
   for (std::size_t c = begin; c < end; ++c) {
+    if (charges[c] == 0.0) {
+      continue;  // a zero charge on a nucleus would give 0 * inf
+    }
     const Point3D<double>& position = coordinates[c];
     double potential = 0.0;  // sum_A Z_A / |R_A - C|
     for (std::size_t a = 0; a < atoms; ++a) {
@@ -208,6 +214,7 @@ auto nuclear_point_charge_energy(const Molecule<double>& molecule, std::span<con
     throw std::invalid_argument(
         "fika::nuclear_point_charge_energy: charges and coordinates must be finite");
   }
+  molecule.check_finite_coordinates("fika::nuclear_point_charge_energy");
   // Nuclei as contiguous arrays for the inner loop.
   const std::size_t atoms = molecule.size();
   std::vector<double> x(atoms), y(atoms), z(atoms), nuclear_charges(atoms);

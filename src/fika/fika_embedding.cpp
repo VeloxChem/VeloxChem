@@ -31,7 +31,8 @@
 
 #include "fika_embedding.hpp"
 
-#include <array>
+#include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <stdexcept>
 #include <string>
@@ -86,6 +87,24 @@ auto induced_dipole_fock(const Molecule<double>& molecule, const MolecularBasis&
     throw std::invalid_argument("fika::induced_dipole_fock: " + std::to_string(dipoles.size()) +
                                 " dipoles at " + std::to_string(positions.size()) + " positions");
   }
+  const auto finite = [](const Point3D<double>& p) {
+    return std::isfinite(p.x) && std::isfinite(p.y) && std::isfinite(p.z);
+  };
+  const auto zero = [](const Point3D<double>& p) {
+    return p.x == 0.0 && p.y == 0.0 && p.z == 0.0;
+  };
+  // All-zero dipoles (e.g. in response to a vanishing density) contribute nothing: skip the
+  // integrals, after the checks the driver would make.
+  if (std::ranges::all_of(dipoles, zero)) {
+    if (!std::isfinite(threshold) || threshold < 0.0) {
+      throw std::invalid_argument("fika::induced_dipole_fock: threshold must be finite and "
+                                  "non-negative");
+    }
+    if (!std::ranges::all_of(positions, finite)) {
+      throw std::invalid_argument("fika::induced_dipole_fock: positions must be finite");
+    }
+    return DenseMatrix(basis.function_count(), MatrixSymmetry::symmetric);
+  }
   std::vector<Dipole> negated(dipoles.size());
   for (std::size_t s = 0; s < dipoles.size(); ++s) {
     negated[s] = Dipole{{-dipoles[s].x, -dipoles[s].y, -dipoles[s].z}};
@@ -96,44 +115,95 @@ auto induced_dipole_fock(const Molecule<double>& molecule, const MolecularBasis&
                            basis);
 }
 
+QmmmEmbeddingDriver::QmmmEmbeddingDriver(const Molecule<double>& molecule,
+                                         const MolecularBasis& basis,
+                                         const ClassicalSystem& system,
+                                         std::optional<TholeDamping> damping,
+                                         const QmmmEmbeddingOptions& options)
+    : molecule_(molecule),
+      basis_(basis),
+      damping_(damping),
+      options_(options),
+      sites_(polarizable_sites(system)),
+      system_(system) {
+  options_.induced.initial_guess.clear();
+  const InducedDipoleOptions& induced = options_.induced;
+  if (induced.summation == ChargeSummation::direct ||
+      (induced.summation == ChargeSummation::automatic &&
+       sites_.positions.size() < multipole_coupling_sites)) {
+    direct_.emplace(sites_, damping_);
+  }
+}
+
+auto QmmmEmbeddingDriver::compute(const DenseMatrix& density, QmmmSources sources,
+                                  std::span<const Point3D<double>> initial_guess)
+    -> QmmmEmbedding {
+  const bool ground = sources == QmmmSources::all;
+  if (ground && !permanent_) {
+    // Field in the order induced_dipoles sums it: MM permanent charges, then the QM nuclei.
+    Permanent permanent;
+    permanent.field.assign(sites_.positions.size(), Point3D<double>{0.0, 0.0, 0.0});
+    if (options_.induced.permanent_field) {
+      permanent.field_summation =
+          detail::add_permanent_field(*system_, sites_, options_.induced, permanent.field);
+    }
+    QmNuclearField(molecule_).add_field(sites_, permanent.field);
+    permanent.fock =
+        fika_to_veloxchem(NuclearAttractionDriver(0, options_.fock_summation)
+                              .compute(molecule_, basis_, *system_, options_.fock_threshold)
+                              .to_dense_matrix(),
+                          basis_);
+    permanent.nuclear_energy = nuclear_classical_energy(molecule_, *system_);
+    permanent_ = std::move(permanent);
+    system_.reset();
+  }
+
+  InducedDipoleOptions induced = options_.induced;
+  induced.initial_guess.assign(initial_guess.begin(), initial_guess.end());
+  if (!ground) {
+    induced.permanent_field = false;
+  }
+  std::vector<Point3D<double>> field =
+      ground ? permanent_->field
+             : std::vector<Point3D<double>>(sites_.positions.size(), Point3D<double>{});
+  const QmElectronicField electrons(molecule_, basis_, density, field_accuracy(induced),
+                                    induced.summation);
+  electrons.add_field(sites_, field);
+
+  QmmmEmbedding result;
+  result.induced = detail::solve_with_selected_coupling(sites_, std::move(field), damping_, induced,
+                                                        direct_ ? &*direct_ : nullptr);
+  if (ground) {
+    result.induced.field_summation = permanent_->field_summation.summation;
+    result.induced.field_order = permanent_->field_summation.order;
+  }
+  result.electron_field_order = electrons.report().order;
+  result.electron_field_summation =
+      result.electron_field_order > 0 ? ChargeSummation::multipole : ChargeSummation::direct;
+  if (!result.induced.converged && !options_.allow_unconverged) {
+    throw std::runtime_error("fika::qmmm_embedding: induced dipoles not converged after " +
+                             std::to_string(result.induced.iterations) +
+                             " iterations (residual " + std::to_string(result.induced.residual) +
+                             ")");
+  }
+  result.induced_fock =
+      induced_dipole_fock(molecule_, basis_, sites_.positions, result.induced.dipoles,
+                          options_.fock_threshold, options_.fock_summation);
+  if (ground) {
+    result.permanent_fock = permanent_->fock;
+    result.electron_permanent_energy = trace_product(density, result.permanent_fock);
+    result.nuclear_permanent_energy = permanent_->nuclear_energy;
+    result.polarization_energy = induction_energy(result.induced.dipoles, result.induced.field);
+  }
+  return result;
+}
+
 auto qmmm_embedding(const Molecule<double>& molecule, const MolecularBasis& basis,
                     const DenseMatrix& density, const ClassicalSystem& system,
                     std::optional<TholeDamping> damping, const QmmmEmbeddingOptions& options)
     -> QmmmEmbedding {
-  QmmmEmbedding result;
-  const auto sites = polarizable_sites(system);
-  if (options.sources == QmmmSources::all) {
-    auto induced = qmmm_induced_dipoles(molecule, basis, density, system, damping, options.induced);
-    result.induced = std::move(induced.induced);
-    result.electron_field_summation = induced.electron_field_summation;
-    result.electron_field_order = induced.electron_field_order;
-  } else {
-    const InducedDipoleOptions& induced = options.induced;
-    const double accuracy =
-        induced.field_accuracy > 0.0 ? induced.field_accuracy : 0.1 * induced.tolerance;
-    const QmElectronicField electrons(molecule, basis, density, accuracy, induced.summation);
-    const std::array<const FieldContribution*, 1> external{&electrons};
-    InducedDipoleOptions electrons_only = induced;
-    electrons_only.permanent_field = false;
-    result.induced = induced_dipoles(system, damping, electrons_only, external);
-    result.electron_field_order = electrons.report().order;
-    result.electron_field_summation =
-        result.electron_field_order > 0 ? ChargeSummation::multipole : ChargeSummation::direct;
-  }
-  result.induced_fock =
-      induced_dipole_fock(molecule, basis, sites.positions, result.induced.dipoles,
-                          options.fock_threshold, options.fock_summation);
-  if (options.sources == QmmmSources::all) {
-    result.permanent_fock =
-        fika_to_veloxchem(NuclearAttractionDriver(0, options.fock_summation)
-                              .compute(molecule, basis, system, options.fock_threshold)
-                              .to_dense_matrix(),
-                          basis);
-    result.electron_permanent_energy = trace_product(density, result.permanent_fock);
-    result.nuclear_permanent_energy = nuclear_classical_energy(molecule, system);
-    result.polarization_energy = induction_energy(result.induced.dipoles, result.induced.field);
-  }
-  return result;
+  return QmmmEmbeddingDriver(molecule, basis, system, damping, options)
+      .compute(density, options.sources, options.induced.initial_guess);
 }
 
 }  // namespace fika

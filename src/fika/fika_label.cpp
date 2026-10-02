@@ -35,6 +35,8 @@
 #include <cctype>
 #include <stdexcept>
 
+#include "fika_text_parsing.hpp"
+
 namespace fika::detail {
 
 auto normalized_label(std::string label, const std::string& what) -> std::string {
@@ -45,10 +47,7 @@ auto normalized_label(std::string label, const std::string& what) -> std::string
   if (std::ranges::any_of(label, is_space)) {
     throw std::invalid_argument(what + " \"" + label + "\" contains whitespace");
   }
-  std::ranges::transform(label, label.begin(), [](char c) {
-    return static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-  });
-  return label;
+  return lower_case(label);
 }
 
 }  // namespace fika::detail

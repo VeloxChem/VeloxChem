@@ -135,7 +135,8 @@ auto derivative_required_order(std::size_t kind, double source_radius, double ta
   int best = -1;
   for (int k = 1; k <= 10; ++k) {
     const double delta = gap / static_cast<double>(1 << k);
-    const double scale = kind == 1 ? delta / 3.0 : delta * delta * 3.0 * std::sqrt(3.0) / 20.0;
+    const double scale =
+        kind == 1 ? dipole_tolerance_scale(delta) : quadrupole_tolerance_scale(delta);
     const int order =
         required_order(source_radius + delta + target_radius, d, 0.0, tolerances, max_order, scale);
     if (order >= 0 && (best < 0 || order < best)) {

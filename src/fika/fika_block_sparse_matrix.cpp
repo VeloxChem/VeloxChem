@@ -87,11 +87,7 @@ auto first_column(std::size_t i, MatrixSymmetry symmetry) -> std::size_t {
 
 auto square_shape(std::span<const MolecularShell> shells, MatrixSymmetry symmetry,
                   DiagonalFormat diagonal_format) -> detail::MatrixShape {
-  return {{shells.begin(), shells.end()},
-          {shells.begin(), shells.end()},
-          true,
-          symmetry,
-          diagonal_format};
+  return {{shells.begin(), shells.end()}, {}, true, symmetry, diagonal_format};
 }
 
 auto rectangular_shape(std::span<const MolecularShell> bra_shells,
@@ -103,35 +99,19 @@ auto rectangular_shape(std::span<const MolecularShell> bra_shells,
           DiagonalFormat::full};
 }
 
-/// Validates block (bra, ket), appends it to `buffer` and returns its zeroed values.
-auto add_block_to(detail::BlockBuffer& buffer, const detail::MatrixShape& shape, std::size_t bra,
-                  std::size_t ket) -> std::span<double> {
-  if (bra >= shape.bra_shells.size() || ket >= shape.ket_shells.size()) {
-    fail("shell pair (" + std::to_string(bra) + ", " + std::to_string(ket) + ") outside " +
-         std::to_string(shape.bra_shells.size()) + " x " + std::to_string(shape.ket_shells.size()));
-  }
-  if (is_mirrored(shape.symmetry) && ket < bra) {
-    fail("symmetric and antisymmetric matrices store only ket shell >= bra shell");
-  }
-  const MolecularShell& a = shape.bra_shells[bra];
-  const MolecularShell& b = shape.ket_shells[ket];
-  const std::size_t count = block_value_count(a, b, block_kind(a, b, bra == ket, shape.square),
-                                              shape.symmetry, shape.diagonal_format);
-  const std::size_t offset = buffer.values.size();
-  buffer.bras.push_back(static_cast<std::uint32_t>(bra));
-  buffer.kets.push_back(static_cast<std::uint32_t>(ket));
-  buffer.values.resize(offset + count, 0.0);
-  buffer.value_ends.push_back(buffer.values.size());
-  return std::span(buffer.values).subspan(offset, count);
-}
+// Dense element count from which the conversions below run in parallel.
+constexpr std::size_t parallel_dense_elements = std::size_t{1} << 16;
 
 /// Calls element(value_index, row, column) for every dense element a stored value represents,
-/// in its stored (upper) position; scalar diagonal values are visited once per m.
+/// in its stored (upper) position; scalar diagonal values are visited once per m. Every call has
+/// its own value and (row, column), so bra shells run in parallel for large patterns.
 template <typename Element>
 void for_each_stored_element(const SparsityPattern& pattern, Element&& element) {
   const auto bra_shells = pattern.bra_shells();
   const auto ket_shells = pattern.ket_shells();
   const MatrixSymmetry symmetry = pattern.symmetry();
+  const bool parallel = pattern.row_count() * pattern.column_count() >= parallel_dense_elements;
+#pragma omp parallel for schedule(dynamic, 8) if (parallel)
   for (std::size_t bra = 0; bra < bra_shells.size(); ++bra) {
     const MolecularShell& a = bra_shells[bra];
     for (std::size_t block = pattern.row_offsets()[bra]; block < pattern.row_offsets()[bra + 1];
@@ -208,7 +188,7 @@ auto SparsityPattern::row_count() const noexcept -> std::size_t {
 }
 
 auto SparsityPattern::column_count() const noexcept -> std::size_t {
-  return function_count(shape_.ket_shells);
+  return function_count(shape_.kets());
 }
 
 auto SparsityPattern::from_rows(std::span<const MolecularShell> shells, MatrixSymmetry symmetry,
@@ -250,13 +230,13 @@ auto SparsityPattern::from_rows(detail::MatrixShape shape, std::vector<std::size
     std::size_t total = 0;
     for (std::size_t block = row_offsets[bra]; block < row_offsets[bra + 1]; ++block) {
       const std::size_t ket = block_kets[block];
-      if (ket >= shape.ket_shells.size() || (mirrored && ket < bra) ||
+      if (ket >= shape.kets().size() || (mirrored && ket < bra) ||
           (block > row_offsets[bra] && ket <= block_kets[block - 1])) {
         invalid = true;
         break;
       }
       const MolecularShell& a = shape.bra_shells[bra];
-      const MolecularShell& b = shape.ket_shells[ket];
+      const MolecularShell& b = shape.kets()[ket];
       offsets[block] = fika::block_value_count(a, b, block_kind(a, b, bra == ket, shape.square),
                                                shape.symmetry, shape.diagonal_format);
       total += offsets[block];
@@ -296,7 +276,7 @@ auto SparsityPattern::find_block(std::size_t bra_start, std::size_t ket_start) c
     return static_cast<std::size_t>(shell - shells.begin());
   };
   const std::size_t bra = shell_index(shape_.bra_shells, bra_start);
-  const std::size_t ket = shell_index(shape_.ket_shells, ket_start);
+  const std::size_t ket = shell_index(shape_.kets(), ket_start);
   const auto first = block_ket_.begin() + static_cast<std::ptrdiff_t>(row_offsets_[bra]);
   const auto last = block_ket_.begin() + static_cast<std::ptrdiff_t>(row_offsets_[bra + 1]);
   const auto block = std::lower_bound(first, last, ket);
@@ -355,80 +335,6 @@ auto BlockSparseMatrix::to_dense_matrix() const -> DenseMatrix {
     dense.set(row, column, values_[value]);
   });
   return dense;
-}
-
-auto detail::assemble(MatrixShape shape, std::vector<BlockBuffer*> buffers) -> BlockSparseMatrix {
-  const auto value_begin = [](const BlockBuffer& buffer, std::size_t block) {
-    return block == 0 ? std::size_t{0} : buffer.value_ends[block - 1];
-  };
-  const auto has_values = [&](const BlockBuffer& buffer, std::size_t block) {
-    return buffer.value_ends[block] > value_begin(buffer, block);
-  };
-  auto pattern = std::shared_ptr<SparsityPattern>(new SparsityPattern());
-  const std::size_t rows = shape.bra_shells.size();
-  ValueVector values;
-
-  std::size_t value_total = 0;
-  for (const BlockBuffer* buffer : buffers) {
-    value_total += buffer->values.size();
-  }
-  values.reserve(value_total);
-  pattern->row_offsets_.assign(rows + 1, 0);
-  pattern->block_value_offsets_.push_back(0);
-  for (BlockBuffer* buffer : buffers) {
-    for (std::size_t block = 0; block < buffer->kets.size(); ++block) {
-      if (!has_values(*buffer, block)) {
-        continue;
-      }
-      ++pattern->row_offsets_[buffer->bras[block] + 1];
-      pattern->block_ket_.push_back(buffer->kets[block]);
-      values.insert(
-          values.end(),
-          buffer->values.begin() + static_cast<std::ptrdiff_t>(value_begin(*buffer, block)),
-          buffer->values.begin() + static_cast<std::ptrdiff_t>(buffer->value_ends[block]));
-      pattern->block_value_offsets_.push_back(values.size());
-    }
-    *buffer = BlockBuffer{};  // release as soon as consumed to limit peak memory
-  }
-  for (std::size_t bra = 0; bra < rows; ++bra) {
-    pattern->row_offsets_[bra + 1] += pattern->row_offsets_[bra];
-  }
-  pattern->shape_ = std::move(shape);
-  return BlockSparseMatrix(std::move(pattern), std::move(values));
-}
-
-BlockSparseBuilder::BlockSparseBuilder(std::span<const MolecularShell> shells,
-                                       MatrixSymmetry symmetry, DiagonalFormat diagonal_format)
-    : shape_(square_shape(shells, symmetry, diagonal_format)) {
-  rows_.reserve(shape_.bra_shells.size());
-  for (std::size_t bra = 0; bra < shape_.bra_shells.size(); ++bra) {
-    rows_.push_back(Row(shape_, bra));
-  }
-}
-
-BlockSparseBuilder::BlockSparseBuilder(std::span<const MolecularShell> bra_shells,
-                                       std::span<const MolecularShell> ket_shells)
-    : shape_(rectangular_shape(bra_shells, ket_shells)) {
-  rows_.reserve(shape_.bra_shells.size());
-  for (std::size_t bra = 0; bra < shape_.bra_shells.size(); ++bra) {
-    rows_.push_back(Row(shape_, bra));
-  }
-}
-
-auto BlockSparseBuilder::Row::add_block(std::size_t ket_shell) -> std::span<double> {
-  if (!buffer_.kets.empty() && ket_shell <= buffer_.kets.back()) {
-    fail("ket shells must increase within a row");
-  }
-  return add_block_to(buffer_, *shape_, bra_, ket_shell);
-}
-
-auto BlockSparseBuilder::finish() && -> BlockSparseMatrix {
-  std::vector<detail::BlockBuffer*> buffers;
-  buffers.reserve(rows_.size());
-  for (Row& row : rows_) {
-    buffers.push_back(&row.buffer_);
-  }
-  return detail::assemble(shape_, std::move(buffers));
 }
 
 }  // namespace fika

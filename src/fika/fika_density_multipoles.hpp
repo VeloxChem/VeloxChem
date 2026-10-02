@@ -98,6 +98,7 @@ auto density_multipoles(const Molecule<double>& molecule, const MolecularBasis& 
 /// Scratch storage of add_density_field_block.
 struct DensityFieldWorkspace {
   std::vector<Point3D<double>> separations;
+  std::vector<double> inverse;  // U^-(2L + 3) per site of the current source
   std::vector<double> boys;
   SolidHarmonics harmonics;
 };

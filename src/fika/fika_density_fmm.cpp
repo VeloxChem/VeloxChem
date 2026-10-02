@@ -103,10 +103,13 @@ auto build_octree(std::span<const Point3D<double>> points, std::size_t leaf_size
     stack.pop_back();
     Octree::Cell cell = tree.cells[index];
     const auto range = std::span(tree.order).subspan(cell.first, cell.count);
+    bool coincident = true;  // all points of the cell at one position (one-centre sources)
     for (const std::uint32_t i : range) {
       cell.radius = std::max(cell.radius, distance(points[i], cell.centre));
+      coincident = coincident && points[i] == points[range.front()];
     }
-    if (cell.count > leaf_size && cell.level < max_level) {
+    // Coincident points stay together: splitting them would only add single-child levels.
+    if (cell.count > leaf_size && cell.level < max_level && !coincident) {
       // Stable partition by octant.
       std::array<std::vector<std::uint32_t>, 8> octants;
       for (const std::uint32_t i : range) {
@@ -280,44 +283,42 @@ auto add_density_field_fmm(const DensityMultipoles& sources, std::span<const Poi
   }
 
   // Smallest order whose bound, summed over the expansions reaching each target leaf, meets the
-  // accuracy (the bound decreases with the order).
+  // accuracy (the bound decreases with the order). The bound of every expansion pair is computed
+  // in parallel, then summed down the tree in preorder (the same order as one serial pass).
+  std::vector<std::size_t> expansion_offsets(target_tree.cells.size() + 1, 0);
+  for (std::size_t t = 0; t < target_tree.cells.size(); ++t) {
+    expansion_offsets[t + 1] = expansion_offsets[t] + lists.expansions[t].size();
+  }
+  std::vector<double> pair_bounds(expansion_offsets.back());
   const auto max_leaf_bound = [&](int order) {
+#pragma omp parallel for schedule(dynamic, 16)
+    for (std::size_t t = 0; t < target_tree.cells.size(); ++t) {
+      const auto& target = target_tree.cells[t];
+      std::size_t k = expansion_offsets[t];
+      for (const std::uint32_t s : lists.expansions[t]) {
+        const auto& source = source_tree.cells[s];
+        pair_bounds[k++] = real_multipole_field_tensor_error_bound(
+            order, 1, std::span(moment_sums).subspan(s * ranks, ranks), source.radius,
+            target.radius, distance(target.centre, source.centre));
+      }
+    }
     std::vector<double> total(target_tree.cells.size(), 0.0);
     double worst = 0.0;
     for (std::size_t t = 0; t < target_tree.cells.size(); ++t) {
       const auto& target = target_tree.cells[t];
       double sum = target.parent >= 0 ? total[static_cast<std::size_t>(target.parent)] : 0.0;
-      for (const std::uint32_t s : lists.expansions[t]) {
-        const auto& source = source_tree.cells[s];
-        sum += real_multipole_field_tensor_error_bound(
-            order, 1, std::span(moment_sums).subspan(s * ranks, ranks), source.radius,
-            target.radius, distance(target.centre, source.centre));
+      for (std::size_t k = expansion_offsets[t]; k < expansion_offsets[t + 1]; ++k) {
+        sum += pair_bounds[k];
       }
       total[t] = sum;
       if (target.leaf()) {
-        worst = std::max(worst, sum);
+        worst = std::isnan(sum) ? std::numeric_limits<double>::infinity() : std::max(worst, sum);
       }
     }
     return worst;
   };
-  const auto meets = [&](int order) {
-    std::vector<double> total(target_tree.cells.size(), 0.0);
-    for (std::size_t t = 0; t < target_tree.cells.size(); ++t) {
-      const auto& target = target_tree.cells[t];
-      double sum = target.parent >= 0 ? total[static_cast<std::size_t>(target.parent)] : 0.0;
-      for (const std::uint32_t s : lists.expansions[t]) {
-        const auto& source = source_tree.cells[s];
-        sum += real_multipole_field_tensor_error_bound(
-            order, 1, std::span(moment_sums).subspan(s * ranks, ranks), source.radius,
-            target.radius, distance(target.centre, source.centre));
-      }
-      total[t] = sum;
-      if (target.leaf() && sum > options.accuracy) {
-        return false;
-      }
-    }
-    return true;
-  };
+  // NaN bounds give an infinite worst bound, which misses the accuracy.
+  const auto meets = [&](int order) { return max_leaf_bound(order) <= options.accuracy; };
   int low = 1, high = options.max_order;
   if (options.order > 0) {
     low = high = std::min(options.order, options.max_order);
@@ -437,21 +438,23 @@ auto add_density_field_fmm(const DensityMultipoles& sources, std::span<const Poi
         }
       }
     }
+    // A NaN deviation counts as an infinite error.
     double error = 0.0;
     for (std::size_t k = 0; k < samples; ++k) {
-      const Point3D<double>& a = result[sample_indices[k]];
-      error = std::max(error, distance(a, exact[k]));
+      const double deviation = distance(result[sample_indices[k]], exact[k]);
+      error = std::isnan(deviation) ? std::numeric_limits<double>::infinity()
+                                    : std::max(error, deviation);
     }
     report.sampled_error = error;
     if (error <= options.accuracy) {
       break;
     }
-    if (order + 2 > options.max_order) {
+    if (order >= options.max_order) {
       throw std::runtime_error("fika::add_density_field_fmm: sampled error " +
                                std::to_string(error) + " above the accuracy at order " +
                                std::to_string(order));
     }
-    order += 2;
+    order = std::min(order + 2, options.max_order);
     ++report.retries;
   }
   report.order = order;

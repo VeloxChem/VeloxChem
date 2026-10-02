@@ -36,6 +36,7 @@
 #include <cassert>
 #include <cmath>
 #include <map>
+#include <omp.h>
 #include <stdexcept>
 #include <string>
 
@@ -47,6 +48,18 @@
 namespace fika::detail {
 
 namespace {
+
+// Orders 0..rank + 1 of a source: rank <= 2 l_max = 16.
+constexpr std::size_t max_harmonic_orders = 18;
+
+/// The first `orders` entries of `storage` set to `count` (harmonic counts without an allocation).
+auto uniform_counts(std::size_t orders, std::size_t count,
+                    std::array<std::size_t, max_harmonic_orders>& storage)
+    -> std::span<const std::size_t> {
+  assert(orders <= storage.size());
+  std::fill_n(storage.begin(), orders, count);
+  return std::span(storage).first(orders);
+}
 
 [[noreturn]] void fail(const std::string& reason) {
   throw std::invalid_argument("fika::density_multipoles: " + reason);
@@ -138,8 +151,9 @@ void append_block(const Block& block, const MolecularBasis& basis,
   const Point3D<double> r{a_position.x - b_position.x, a_position.y - b_position.y,
                           a_position.z - b_position.z};
   const int order = l + l_prime;
-  const std::vector<std::size_t> counts(static_cast<std::size_t>(order) + 1, 1);
-  scratch.harmonics.compute(std::span(&r, 1), counts);
+  std::array<std::size_t, max_harmonic_orders> storage;
+  scratch.harmonics.compute(std::span(&r, 1),
+                            uniform_counts(static_cast<std::size_t>(order) + 1, 1, storage));
   const double r2 = scratch.harmonics.distances_squared()[0];
   const double r_power = std::max(1.0, std::pow(std::sqrt(r2), order));
   const auto moment_rows = static_cast<std::size_t>((order + 1) * (order + 1));
@@ -244,6 +258,10 @@ auto density_multipoles(const Molecule<double>& molecule, const MolecularBasis& 
   if (!(accuracy > 0.0) || !std::isfinite(accuracy)) {
     fail("the accuracy must be positive and finite");
   }
+  if (!std::ranges::all_of(density.values(), [](double v) { return std::isfinite(v); })) {
+    fail("the density must be finite");
+  }
+  molecule.check_finite_coordinates("fika::density_multipoles");
   const auto blocks = density_blocks(basis);
   // Shell pairs (exponents, coefficients, bounds) per pair of shells of the unique bases.
   const auto bases = basis.atom_basis_indices();
@@ -335,6 +353,69 @@ void add_source_field(const DensityMultipoles& sources, std::size_t s,
   }
 }
 
+/// Far field of a source of rank <= 2 at the sites of a chunk in closed form: the gradient of
+///   phi(U) = q / r + d . U / r^3 + U^T Theta U / r^5,  U = site - P, r = |U|,
+/// with q = Q_00, d = (Q_11, Q_1-1, Q_10) (S_1M = (y, z, x)) and the traceless Theta of the Racah
+/// S_2M (Theta_xx = -Q_20 / 2 + sqrt3/2 Q_22, Theta_yy = -Q_20 / 2 - sqrt3/2 Q_22, Theta_zz =
+/// Q_20, Theta_xy = sqrt3/2 Q_2-2, Theta_yz = sqrt3/2 Q_2-1, Theta_xz = sqrt3/2 Q_21):
+///   E = -q U / r^3 + d / r^3 - 3 (d . U) U / r^5 + 2 Theta U / r^5 - 5 (U^T Theta U) U / r^7,
+/// the same field add_source_field's far branch sums term by term. Sites within the penetration
+/// radius are skipped (and flagged in `near`); e holds 3 values per site (y, z, x).
+template <int Rank>
+auto add_low_rank_far_field(const Point3D<double>& centre, std::span<const double> moments,
+                            double penetration_squared, std::span<const Point3D<double>> sites,
+                            double* e) -> bool {
+  constexpr double half_sqrt3 = 0.8660254037844386;
+  const double q = moments[0];
+  double dx = 0.0, dy = 0.0, dz = 0.0;
+  if constexpr (Rank >= 1) {
+    dx = moments[3];
+    dy = moments[1];
+    dz = moments[2];
+  }
+  double txx = 0.0, tyy = 0.0, tzz = 0.0, txy = 0.0, tyz = 0.0, txz = 0.0;
+  if constexpr (Rank >= 2) {
+    txx = -0.5 * moments[6] + half_sqrt3 * moments[8];
+    tyy = -0.5 * moments[6] - half_sqrt3 * moments[8];
+    tzz = moments[6];
+    txy = half_sqrt3 * moments[4];
+    tyz = half_sqrt3 * moments[5];
+    txz = half_sqrt3 * moments[7];
+  }
+  bool near = false;
+  for (std::size_t i = 0; i < sites.size(); ++i) {
+    const double ux = sites[i].x - centre.x;
+    const double uy = sites[i].y - centre.y;
+    const double uz = sites[i].z - centre.z;
+    const double r2 = ux * ux + uy * uy + uz * uz;
+    const bool far = r2 >= penetration_squared;
+    near = near || !far;
+    const double safe = far ? r2 : 1.0;  // near sites (r may be 0) weigh 0
+    const double inverse3 = far ? 1.0 / (safe * std::sqrt(safe)) : 0.0;
+    double fx = -q * inverse3 * ux, fy = -q * inverse3 * uy, fz = -q * inverse3 * uz;
+    if constexpr (Rank >= 1) {
+      const double inverse5 = inverse3 / safe;
+      const double projection = 3.0 * (dx * ux + dy * uy + dz * uz) * inverse5;
+      fx += dx * inverse3 - projection * ux;
+      fy += dy * inverse3 - projection * uy;
+      fz += dz * inverse3 - projection * uz;
+      if constexpr (Rank >= 2) {
+        const double tx = txx * ux + txy * uy + txz * uz;
+        const double ty = txy * ux + tyy * uy + tyz * uz;
+        const double tz = txz * ux + tyz * uy + tzz * uz;
+        const double quadratic = 5.0 * (tx * ux + ty * uy + tz * uz) * inverse5 / safe;
+        fx += 2.0 * tx * inverse5 - quadratic * ux;
+        fy += 2.0 * ty * inverse5 - quadratic * uy;
+        fz += 2.0 * tz * inverse5 - quadratic * uz;
+      }
+    }
+    e[3 * i] += fy;
+    e[3 * i + 1] += fz;
+    e[3 * i + 2] += fx;
+  }
+  return near;
+}
+
 }  // namespace
 
 void add_density_field_block(const DensityMultipoles& sources, std::span<const std::uint32_t> which,
@@ -343,18 +424,78 @@ void add_density_field_block(const DensityMultipoles& sources, std::span<const s
   const std::size_t count = sites.size();
   assert(sums.size() >= 3 * count);
   workspace.separations.resize(count);
+  workspace.inverse.resize(count);
+  std::array<std::size_t, max_harmonic_orders> storage;
+  double* e = sums.data();
   for (const std::uint32_t s : which) {
     const Point3D<double>& centre = sources.centres[s];
+    const int rank = sources.rank(s);
+    const double penetration = sources.penetration_squared[s];
+    if (rank <= 2) {
+      // Closed form far fields (most sources); the rare near sites through add_source_field.
+      const auto moments = sources.moments_of(s);
+      const bool any_near =
+          rank == 0   ? add_low_rank_far_field<0>(centre, moments, penetration, sites, e)
+          : rank == 1 ? add_low_rank_far_field<1>(centre, moments, penetration, sites, e)
+                      : add_low_rank_far_field<2>(centre, moments, penetration, sites, e);
+      if (any_near) {
+        for (std::size_t i = 0; i < count; ++i) {
+          workspace.separations[i] = {sites[i].x - centre.x, sites[i].y - centre.y,
+                                      sites[i].z - centre.z};
+        }
+        workspace.harmonics.compute(
+            workspace.separations,
+            uniform_counts(static_cast<std::size_t>(rank) + 2, count, storage));
+        for (std::size_t i = 0; i < count; ++i) {
+          const Point3D<double>& u = workspace.separations[i];
+          if (u.x * u.x + u.y * u.y + u.z * u.z < penetration) {  // as the closed form decides
+            add_source_field(sources, s, workspace.harmonics, i, false, workspace.boys,
+                             e + 3 * i);
+          }
+        }
+      }
+      continue;
+    }
     for (std::size_t i = 0; i < count; ++i) {
       workspace.separations[i] = {sites[i].x - centre.x, sites[i].y - centre.y,
                                   sites[i].z - centre.z};
     }
-    const std::vector<std::size_t> counts(static_cast<std::size_t>(sources.rank(s)) + 2, count);
-    workspace.harmonics.compute(workspace.separations, counts);
+    workspace.harmonics.compute(
+        workspace.separations,
+        uniform_counts(static_cast<std::size_t>(rank) + 2, count, storage));
     const auto u2 = workspace.harmonics.distances_squared();
+    const auto r = workspace.harmonics.distances();
+    const double penetration_squared = sources.penetration_squared[s];
+    // Far sites (almost all): the multipole field, term by term over the sites (as
+    // add_source_field's far branch computes it per site); near sites weigh 0 here.
+    double* inverse = workspace.inverse.data();  // U^-(2L + 3), 0 for near sites
+    bool any_near = false;
     for (std::size_t i = 0; i < count; ++i) {
-      add_source_field(sources, s, workspace.harmonics, i, u2[i] >= sources.penetration_squared[s],
-                       workspace.boys, sums.data() + 3 * i);
+      const bool far = u2[i] >= penetration_squared;
+      any_near = any_near || !far;
+      inverse[i] = far ? 1.0 / (u2[i] * r[i]) : 0.0;
+    }
+    const auto moments = sources.moments_of(s);
+    for (int big_l = 0; big_l <= rank; ++big_l) {
+      const double factor = -(2 * big_l + 1);
+      for (const DipoleCouplingTerm& term : dipole_couplings(big_l).plus) {
+        const double moment = moments[static_cast<std::size_t>(big_l * big_l + term.big_m + big_l)];
+        const double* h = workspace.harmonics.values(big_l + 1, term.harmonic_m).data();
+        double* out = e + term.m + 1;
+        for (std::size_t i = 0; i < count; ++i) {
+          out[3 * i] += factor * inverse[i] * moment * term.value * h[i];
+        }
+      }
+      for (std::size_t i = 0; i < count; ++i) {
+        inverse[i] = inverse[i] == 0.0 ? 0.0 : inverse[i] / u2[i];  // near sites (U may be 0)
+      }
+    }
+    if (any_near) {
+      for (std::size_t i = 0; i < count; ++i) {
+        if (u2[i] < penetration_squared) {
+          add_source_field(sources, s, workspace.harmonics, i, false, workspace.boys, e + 3 * i);
+        }
+      }
     }
   }
 }
@@ -370,7 +511,10 @@ void add_density_field(const DensityMultipoles& sources, std::span<const Point3D
   for (std::size_t s = 0; s < all.size(); ++s) {
     all[s] = static_cast<std::uint32_t>(s);
   }
-  constexpr std::size_t chunk = 64;
+  // Chunks of up to 64 sites, smaller when there are few sites so every thread gets some (each
+  // site sums the sources in the same order whatever its chunk).
+  const auto threads = static_cast<std::size_t>(omp_get_max_threads());
+  const std::size_t chunk = std::clamp<std::size_t>((sites.size() + threads - 1) / threads, 1, 64);
   const std::size_t chunks = (sites.size() + chunk - 1) / chunk;
 #pragma omp parallel
   {
