@@ -33,7 +33,8 @@
 
 #include <algorithm>
 #include <cassert>
-#include <cmath>
+
+#include "Eigen/Dense"
 
 #ifdef VLX_USE_MATHLIB
 #include "MathLibrary.hpp"
@@ -50,9 +51,8 @@ void exp_scaled_negative(std::span<const double> x, double scale, std::span<doub
   const int n = static_cast<int>(out.size());
   vvexp(out.data(), out.data(), &n);
 #else
-  for (double& value : out) {
-    value = std::exp(value);
-  }
+  Eigen::Map<Eigen::ArrayXd> values(out.data(), static_cast<Eigen::Index>(out.size()));
+  values = values.exp();
 #endif
 }
 
@@ -82,6 +82,12 @@ void blas_gemm_transposed(std::size_t m, std::size_t n, std::size_t k, const dou
   if (m == 0 || n == 0) {
     return;
   }
+  if (k == 0) {
+    for (std::size_t i = 0; i < m; ++i) {
+      std::fill(c + i * ldc, c + i * ldc + n, 0.0);  // BLAS rejects leading dimensions of 0
+    }
+    return;
+  }
 #ifdef VLX_USE_MATHLIB
   // Row-major C = A B^T is column-major C^T = B A^T: B (k x n column-major) transposed.
   const auto mm = static_cast<lapack_int_t>(n), nn = static_cast<lapack_int_t>(m);
@@ -91,15 +97,17 @@ void blas_gemm_transposed(std::size_t m, std::size_t n, std::size_t k, const dou
   const double one = 1.0, zero = 0.0;
   dgemm_("T", "N", &mm, &nn, &kk, &one, b, &lda_, a, &ldb_, &zero, c, &ldc_);
 #else
-  for (std::size_t i = 0; i < m; ++i) {
-    for (std::size_t j = 0; j < n; ++j) {
-      double sum = 0.0;
-      for (std::size_t p = 0; p < k; ++p) {
-        sum += a[i * lda + p] * b[j * ldb + p];
-      }
-      c[i * ldc + j] = sum;
-    }
-  }
+  using RowMajor = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
+  using Stride = Eigen::OuterStride<>;
+  const auto rows = static_cast<Eigen::Index>(m), cols = static_cast<Eigen::Index>(n);
+  const auto depth = static_cast<Eigen::Index>(k);
+  const Eigen::Map<const RowMajor, Eigen::Unaligned, Stride> mat_a(
+      a, rows, depth, Stride(static_cast<Eigen::Index>(lda)));
+  const Eigen::Map<const RowMajor, Eigen::Unaligned, Stride> mat_b(
+      b, cols, depth, Stride(static_cast<Eigen::Index>(ldb)));
+  Eigen::Map<RowMajor, Eigen::Unaligned, Stride> mat_c(c, rows, cols,
+                                                       Stride(static_cast<Eigen::Index>(ldc)));
+  mat_c.noalias() = mat_a * mat_b.transpose();
 #endif
 }
 
