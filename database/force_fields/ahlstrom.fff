@@ -1,0 +1,12 @@
+fika-force-field 1 ahlstrom polarizable
+# Polarizable water of P. Ahlstrom, A. Wallqvist, S. Engstrom and B. Jonsson, Mol. Phys. 68, 563
+# (1989): point charges (e) on O, H, H and an isotropic polarizability (a.u., 1.44 A^3) on O.
+
+residue hoh 3
+charges
+1 -0.669
+2  0.3345
+3  0.3345
+polarizabilities isotropic 1
+1 9.718
+end
