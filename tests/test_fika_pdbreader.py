@@ -328,8 +328,8 @@ class TestFikaPdbReader:
         basis = MolecularBasis.read(molecule, 'sto-3g', ostream=None)
         n = basis.get_dimensions_of_basis()
         density = np.eye(n) * 0.1
-        result = FikaQmmmEmbeddingDriver().compute(molecule, basis, density,
-                                                   system)
+        result = FikaQmmmEmbeddingDriver(molecule, basis,
+                                         system).compute(density)
         assert result.induced.converged
         assert np.isfinite(result.energy())
         assert result.fock().shape == (n, n)

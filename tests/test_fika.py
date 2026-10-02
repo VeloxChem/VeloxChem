@@ -362,8 +362,9 @@ class TestFikaEmbedding:
             molecule, basis, get_pyframe_embedding(molecule, waters, tmp_path))
         e_emb, v_emb = pe.compute_pe_contributions(density)
 
-        result = FikaQmmmEmbeddingDriver(self.get_options()).compute(
-            molecule, basis, density, get_classical_system(waters), None)
+        result = FikaQmmmEmbeddingDriver(molecule, basis,
+                                         get_classical_system(waters), None,
+                                         self.get_options()).compute(density)
 
         assert result.induced.converged
         assert result.electron_permanent_energy == pytest.approx(
@@ -403,8 +404,9 @@ class TestFikaEmbedding:
         ref = lrs.compute_pe_contributions(0.5 * (perturbed + perturbed.T))
 
         result = FikaQmmmEmbeddingDriver(
-            self.get_options(FikaQmmmSources.electrons_only)).compute(
-                molecule, basis, perturbed, get_classical_system(waters), None)
+            molecule, basis, get_classical_system(waters), None,
+            self.get_options()).compute(perturbed,
+                                        FikaQmmmSources.electrons_only)
 
         assert result.energy() == 0.0
         assert result.permanent_fock.shape == (0, 0)
@@ -421,13 +423,11 @@ class TestFikaEmbedding:
         # Converged tightly, so the restart needs no rescaling (s = 1).
         tight = FikaQmmmEmbeddingOptions()
         tight.induced.tolerance = 1.0e-11
-        first = FikaQmmmEmbeddingDriver(tight).compute(molecule, basis,
-                                                       density, system)
+        first = FikaQmmmEmbeddingDriver(molecule, basis, system,
+                                        options=tight).compute(density)
 
-        options = FikaQmmmEmbeddingOptions()
-        options.induced.initial_guess = first.induced.dipoles
-        second = FikaQmmmEmbeddingDriver(options).compute(
-            molecule, basis, density, system)
+        driver = FikaQmmmEmbeddingDriver(molecule, basis, system)
+        second = driver.compute(density, initial_guess=first.induced.dipoles)
 
         assert second.induced.guess_used
         assert second.induced.guess_scale == pytest.approx(1.0, abs=1.0e-8)
@@ -437,3 +437,10 @@ class TestFikaEmbedding:
         fock = FikaInducedDipoleFockDriver().compute(molecule, basis, positions,
                                                      second.induced.dipoles)
         assert np.max(np.abs(fock - second.induced_fock)) < 1.0e-14
+
+        # The driver reuses its geometry-only parts: a repeated computation
+        # gives the same bits, and the sites are those of the system.
+        again = driver.compute(density, initial_guess=first.induced.dipoles)
+        assert np.array_equal(again.induced.dipoles, second.induced.dipoles)
+        assert np.array_equal(again.fock(), second.fock())
+        assert np.array_equal(driver.site_positions(), positions)

@@ -151,10 +151,6 @@ struct InducedDipolesDriver {
     fika::InducedDipoleOptions options;
 };
 
-struct QmmmEmbeddingDriver {
-    fika::QmmmEmbeddingOptions options;
-};
-
 struct InducedDipoleFockDriver {
     double                threshold = 1.0e-12;
     fika::ChargeSummation summation = fika::ChargeSummation::automatic;
@@ -471,7 +467,8 @@ export_fika(py::module& m) -> void
         .def_readwrite("induced", &fika::QmmmEmbeddingOptions::induced)
         .def_readwrite("sources", &fika::QmmmEmbeddingOptions::sources)
         .def_readwrite("fock_threshold", &fika::QmmmEmbeddingOptions::fock_threshold)
-        .def_readwrite("fock_summation", &fika::QmmmEmbeddingOptions::fock_summation);
+        .def_readwrite("fock_summation", &fika::QmmmEmbeddingOptions::fock_summation)
+        .def_readwrite("allow_unconverged", &fika::QmmmEmbeddingOptions::allow_unconverged);
 
     py::class_<fika::QmmmEmbedding>(m, "FikaQmmmEmbedding")
         .def_readonly("induced", &fika::QmmmEmbedding::induced)
@@ -485,39 +482,53 @@ export_fika(py::module& m) -> void
         .def("energy", &fika::QmmmEmbedding::energy, "Sum of the energy components (Hartree).")
         .def("fock", [](const fika::QmmmEmbedding& self) { return to_numpy(self.fock()); }, "Sum of the Fock contributions.");
 
-    py::class_<QmmmEmbeddingDriver>(m, "FikaQmmmEmbeddingDriver")
-        .def(py::init([](const fika::QmmmEmbeddingOptions& options) { return QmmmEmbeddingDriver{options}; }),
+    py::class_<fika::QmmmEmbeddingDriver>(m, "FikaQmmmEmbeddingDriver")
+        .def(py::init([](const CMolecule&                         molecule,
+                         const CMolecularBasis&                   basis,
+                         const fika::ClassicalSystem&             system,
+                         const std::optional<fika::TholeDamping>& damping,
+                         const fika::QmmmEmbeddingOptions&        options) {
+                 const auto fmol   = fika::from_veloxchem(molecule);
+                 const auto fbasis = fika::from_veloxchem(basis, molecule);
+                 py::gil_scoped_release release;
+                 return std::make_unique<fika::QmmmEmbeddingDriver>(fmol, fbasis, system, damping, options);
+             }),
+             "QM/MM embedding driver of one geometry (molecule, basis, classical system): the polarizable sites and the "
+             "direct dipole operator are built here, the permanent field, Fock matrix and nuclear-MM energy with the first "
+             "ground-state computation, and reused by every compute().",
+             "molecule"_a,
+             "basis"_a,
+             "system"_a,
+             "damping"_a = fika::TholeDamping{},
              "options"_a = fika::QmmmEmbeddingOptions{})
-        .def_readwrite("options", &QmmmEmbeddingDriver::options)
         .def(
             "compute",
-            [](const QmmmEmbeddingDriver&                 self,
-               const CMolecule&                           molecule,
-               const CMolecularBasis&                     basis,
-               const Array&                               density,
-               const fika::ClassicalSystem&               system,
-               const std::optional<fika::TholeDamping>&   damping) {
-                const auto fmol   = fika::from_veloxchem(molecule);
-                const auto fbasis = fika::from_veloxchem(basis, molecule);
-                const auto n      = fbasis.function_count();
-                if (density.ndim() != 2 || static_cast<std::size_t>(density.shape(0)) != n ||
-                    static_cast<std::size_t>(density.shape(1)) != n)
+            [](fika::QmmmEmbeddingDriver&    self,
+               const Array&                  density,
+               const fika::QmmmSources       sources,
+               const std::optional<Array>&   initial_guess) {
+                const auto n = static_cast<std::size_t>(density.ndim() == 2 ? density.shape(0) : 0);
+                if (density.ndim() != 2 || n == 0 || static_cast<std::size_t>(density.shape(1)) != n)
                 {
-                    throw std::invalid_argument("FikaQmmmEmbeddingDriver: the density must be " + std::to_string(n) + " x " +
-                                                std::to_string(n));
+                    throw std::invalid_argument("FikaQmmmEmbeddingDriver: the density must be a square matrix");
                 }
                 fika::DenseMatrix matrix(n, n, fika::MatrixSymmetry::general);
                 std::copy(density.data(), density.data() + n * n, matrix.values().begin());
+                const auto guess = initial_guess ? points(*initial_guess, rows(*initial_guess, 3, "initial guess"))
+                                                 : std::vector<fika::Point3D<double>>{};
                 py::gil_scoped_release release;
-                return fika::qmmm_embedding(fmol, fbasis, matrix, system, damping, self.options);
+                return self.compute(matrix, sources, guess);
             },
             "QM/MM embedding of the density (n_ao x n_ao, VeloxChem AO order, alpha + beta; any symmetry, its symmetric "
-            "part acts): induced dipoles, energy components and Fock contributions in VeloxChem AO order.",
-            "molecule"_a,
-            "basis"_a,
+            "part acts) with the given sources, the dipole solve starting from initial_guess (None: alpha F): induced "
+            "dipoles, energy components and Fock contributions in VeloxChem AO order.",
             "density"_a,
-            "system"_a,
-            "damping"_a = fika::TholeDamping{});
+            "sources"_a       = fika::QmmmSources::all,
+            "initial_guess"_a = py::none())
+        .def(
+            "site_positions",
+            [](const fika::QmmmEmbeddingDriver& self) { return to_numpy(self.sites().positions); },
+            "Positions (bohr) of the polarizable sites, the order of the induced dipoles.");
 
     py::class_<InducedDipoleFockDriver>(m, "FikaInducedDipoleFockDriver")
         .def(py::init([](const double threshold, const fika::ChargeSummation summation) {

@@ -232,7 +232,13 @@ class FikaEmbedding:
             'fock_threshold', min(1.0e-12, 1.0e-4 * conv_thresh))
         self.driver_options.fock_summation = self._summation(
             settings.get('fock_summation', 'automatic'))
+        # Unconverged dipoles are reported below (assert_msg_critical).
+        self.driver_options.allow_unconverged = True
 
+        # Built on first use by the rank that computes: the geometry-only
+        # parts (sites, permanent field and Fock matrix, dipole operator) are
+        # then reused by every computation.
+        self.driver = None
         self.result = None
         self.timing = 0.0
 
@@ -261,17 +267,20 @@ class FikaEmbedding:
             same, 'fika embedding: the molecule is not the solute of the ' +
             'PDB file (take it from FikaPdbReader.get_solute)')
 
-    def _compute(self, density_matrix, sources):
+    def _compute(self, density_matrix, sources, initial_guess=None):
         """
-        Computes the embedding of a density on the master rank.
+        Computes the embedding of a density on the master rank, the dipole
+        solve starting from `initial_guess` (None: alpha F).
         """
 
         t0 = time.time()
-        options = self.driver_options
-        options.sources = sources
-        result = FikaQmmmEmbeddingDriver(options).compute(
-            self.molecule, self.basis, np.asarray(density_matrix),
-            self.classical_system, self.damping)
+        if self.driver is None:
+            self.driver = FikaQmmmEmbeddingDriver(self.molecule, self.basis,
+                                                  self.classical_system,
+                                                  self.damping,
+                                                  self.driver_options)
+        result = self.driver.compute(np.asarray(density_matrix), sources,
+                                     initial_guess)
         assert_msg_critical(
             result.induced.converged,
             'fika embedding: induced dipoles did not converge in ' +
@@ -335,9 +344,8 @@ class FikaEmbeddingSCF(FikaEmbedding):
         if self.rank != mpi_master():
             return 0.0, None
 
-        if self.result is not None:
-            self.driver_options.induced.initial_guess = self.result.induced.dipoles
-        self.result = self._compute(density_matrix, FikaQmmmSources.all)
+        guess = None if self.result is None else self.result.induced.dipoles
+        self.result = self._compute(density_matrix, FikaQmmmSources.all, guess)
         self.iterations.append(self.result.induced.iterations)
         return self.result.energy(), self.result.fock()
 
