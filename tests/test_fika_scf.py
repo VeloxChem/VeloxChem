@@ -182,6 +182,68 @@ class TestFikaScf:
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
             assert np.max(np.abs(fika_prop - pe_prop)) < 1.0e-6
 
+    def test_excitations_and_complex_response_against_pyframe(self, tmp_path):
+
+        pytest.importorskip('pyframe')
+        from veloxchem.lreigensolver import LinearResponseEigenSolver
+        from veloxchem.tdaeigensolver import TdaEigenSolver
+        from veloxchem import ComplexResponse
+
+        pdb_file = write_droplet(tmp_path)
+        reader = FikaPdbReader()
+        residues = reader.read(pdb_file)
+        molecule = reader.get_solute(residues)
+        basis = MolecularBasis.read(molecule, 'def2-svp', ostream=None)
+
+        embeddings = {
+            'fika': fika_embedding(pdb_file),
+            'pe': pyframe_embedding(residues, molecule, tmp_path),
+        }
+        scf_results = {
+            name: run_scf(molecule, basis, embedding)[1]
+            for name, embedding in embeddings.items()
+        }
+
+        def solve(solver, name, **settings):
+            solver.ostream.mute()
+            solver.conv_thresh = 1.0e-6
+            solver.embedding = embeddings[name]
+            for key, value in settings.items():
+                setattr(solver, key, value)
+            return solver.compute(molecule, basis, scf_results[name])
+
+        rank_is_master = MPI.COMM_WORLD.Get_rank() == mpi_master()
+
+        for solver_class in [LinearResponseEigenSolver, TdaEigenSolver]:
+            results = {
+                name: solve(solver_class(), name, nstates=4)
+                for name in embeddings
+            }
+            if rank_is_master:
+                assert np.max(
+                    np.abs(results['fika']['eigenvalues'] -
+                           results['pe']['eigenvalues'])) < 1.0e-8
+
+        frequencies = [0.0, 0.1, 0.2]
+        results = {
+            name: solve(ComplexResponse(),
+                        name,
+                        frequencies=frequencies,
+                        damping=0.004)
+            for name in embeddings
+        }
+        if rank_is_master:
+            values = {
+                name: np.array([
+                    results[name]['response_functions'][(a, a, w)]
+                    for w in frequencies
+                    for a in 'xyz'
+                ])
+                for name in embeddings
+            }
+            assert np.max(np.abs(values['fika'] - values['pe'])) < (
+                1.0e-7 * np.max(np.abs(values['pe'])))
+
     def test_damping_and_objects(self, tmp_path):
 
         pdb_file = write_droplet(tmp_path)
