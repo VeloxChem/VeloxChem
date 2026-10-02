@@ -30,50 +30,18 @@
 //  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 //  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include <pybind11/pybind11.h>
+#ifndef ExportFika_hpp
+#define ExportFika_hpp
 
-#include "ExportDft.hpp"
-#include "ExportFika.hpp"
-#include "ExportGeneral.hpp"
-#include "ExportMath.hpp"
-#include "ExportMoldata.hpp"
-#include "ExportOneElecInts.hpp"
-#include "ExportOrbdata.hpp"
-#include "ExportSimdIntegrals.hpp"
-#include "ExportPacked.hpp"
-#include "ExportSparse.hpp"
-#include "ExportVisualization.hpp"
-#include "ExportT2CIntegrals.hpp"
-#include "ExportT3CIntegrals.hpp"
-#include "ExportT4CIntegrals.hpp"
+#include "ExportHelpers.hpp"
 
-PYBIND11_MODULE(veloxchemlib, m)
-{
-    vlx_general::export_general(m);
+namespace vlx_fika {
 
-    vlx_math::export_math(m);
+/**
+ Exports classes/functions in src/fika to python.
+ */
+auto export_fika(py::module& m) -> void;
 
-    vlx_moldata::export_moldata(m);
+}  // namespace vlx_fika
 
-    vlx_orbdata::export_orbdata(m);
-
-    vlx_packed::export_packed(m);
-
-    vlx_sparse::export_sparse(m);
-
-    vlx_dft::export_dft(m);
-
-    vlx_oneeints::export_oneeints(m);
-
-    vlx_visualization::export_visualization(m);
-
-    vlx_t2cintegrals::export_t2cintegrals(m);
-    
-    vlx_t3cintegrals::export_t3cintegrals(m);
-
-    vlx_t4cintegrals::export_t4cintegrals(m);
-
-    vlx_simdintegrals::export_simdintegrals(m);
-
-    vlx_fika::export_fika(m);
-}
+#endif /* ExportFika_hpp */

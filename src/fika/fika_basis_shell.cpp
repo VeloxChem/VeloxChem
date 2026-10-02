@@ -185,6 +185,39 @@ UncontractedShell::UncontractedShell(int angular_momentum, double exponent)
       [&]<int L>(std::integral_constant<int, L>) { return primitive_normalization<L>(exponent); });
 }
 
+UncontractedShell::UncontractedShell(int angular_momentum, double exponent, double coefficient,
+                                     EffectiveCoefficients)
+    : angular_momentum_(angular_momentum), exponent_(exponent), coefficient_(coefficient) {
+  check_angular_momentum(angular_momentum);
+  check_exponent(exponent);
+  if (!std::isfinite(coefficient) || coefficient == 0.0) {
+    fail("coefficient is not finite and nonzero");
+  }
+}
+
+SegmentedShell::SegmentedShell(int angular_momentum, std::vector<double> exponents,
+                               const std::vector<double>& coefficients, EffectiveCoefficients)
+    : angular_momentum_(angular_momentum), coefficient_sum_(0.0) {
+  check_input(angular_momentum, exponents, {coefficients});
+  if (nonzero_count(coefficients) < 2) {
+    fail("a segmented shell needs at least two nonzero coefficients");
+  }
+  std::vector<std::size_t> order(exponents.size());
+  std::iota(order.begin(), order.end(), std::size_t{0});
+  std::ranges::stable_sort(
+      order, [&](std::size_t a, std::size_t b) { return exponents[a] > exponents[b]; });
+  for (std::size_t k = 0; k < order.size(); ++k) {
+    if (k > 0 && exponents[order[k]] == exponents[order[k - 1]]) {
+      fail("duplicate exponents");
+    }
+    if (const double c = coefficients[order[k]]; c != 0.0) {
+      exponents_.push_back(exponents[order[k]]);
+      coefficients_.push_back(c);
+      coefficient_sum_ += std::abs(c);
+    }
+  }
+}
+
 SegmentedShell::SegmentedShell(int angular_momentum, std::vector<double> exponents,
                                const std::vector<double>& coefficients)
     : angular_momentum_(angular_momentum) {

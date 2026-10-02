@@ -36,6 +36,7 @@ target_sources(vlxobjs
     fika_two_centre_kernels.cpp
     fika_uniform_m2l.cpp
     fika_vector_math.cpp
+    fika_veloxchem.cpp
     fika_veloxchem_order.cpp
     fika_volume_fmm.cpp
   )

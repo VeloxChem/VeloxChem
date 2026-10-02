@@ -45,11 +45,20 @@ namespace fika {
 // effective: they include the primitive normalization N_l(a) and the normalization of each
 // contracted function. Exponents are stored in decreasing order.
 
+/// Tag of the shell constructors taking effective coefficients (normalization included, as
+/// another code stores them) instead of basis-file coefficients.
+struct EffectiveCoefficients {};
+
 /// A single normalized primitive: one contracted function of one primitive.
 class UncontractedShell {
  public:
   /// Throws std::invalid_argument for invalid angular momentum or exponent.
   UncontractedShell(int angular_momentum, double exponent);
+
+  /// With the effective coefficient as given (no normalization). Throws std::invalid_argument for
+  /// invalid angular momentum, exponent or coefficient.
+  UncontractedShell(int angular_momentum, double exponent, double coefficient,
+                    EffectiveCoefficients);
 
   auto angular_momentum() const noexcept -> int { return angular_momentum_; }
   auto primitive_count() const noexcept -> std::size_t { return 1; }
@@ -75,6 +84,12 @@ class SegmentedShell {
   /// input or fewer than two nonzero coefficients.
   SegmentedShell(int angular_momentum, std::vector<double> exponents,
                  const std::vector<double>& coefficients);
+
+  /// coefficients[i]: effective coefficient of primitive i as given (normalization included, not
+  /// renormalized); exponents are sorted decreasingly with them and zero coefficients dropped.
+  /// Throws std::invalid_argument for invalid input or fewer than two nonzero coefficients.
+  SegmentedShell(int angular_momentum, std::vector<double> exponents,
+                 const std::vector<double>& coefficients, EffectiveCoefficients);
 
   auto angular_momentum() const noexcept -> int { return angular_momentum_; }
   auto primitive_count() const noexcept -> std::size_t { return exponents_.size(); }

@@ -28,52 +28,35 @@
 //  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
 //  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
 //  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-//  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include <pybind11/pybind11.h>
+#ifndef fika_veloxchem_hpp
+#define fika_veloxchem_hpp
 
-#include "ExportDft.hpp"
-#include "ExportFika.hpp"
-#include "ExportGeneral.hpp"
-#include "ExportMath.hpp"
-#include "ExportMoldata.hpp"
-#include "ExportOneElecInts.hpp"
-#include "ExportOrbdata.hpp"
-#include "ExportSimdIntegrals.hpp"
-#include "ExportPacked.hpp"
-#include "ExportSparse.hpp"
-#include "ExportVisualization.hpp"
-#include "ExportT2CIntegrals.hpp"
-#include "ExportT3CIntegrals.hpp"
-#include "ExportT4CIntegrals.hpp"
+#include "AtomBasis.hpp"
+#include "MolecularBasis.hpp"
+#include "Molecule.hpp"
+#include "fika_molecular_basis.hpp"
+#include "fika_molecule.hpp"
 
-PYBIND11_MODULE(veloxchemlib, m)
-{
-    vlx_general::export_general(m);
+namespace fika {
 
-    vlx_math::export_math(m);
+/// Molecule of VeloxChem's `molecule`: elements from the atom identifiers, coordinates in bohr.
+/// Throws std::invalid_argument for an atom without nuclear charge (a ghost atom, identifier 0),
+/// which fika does not support.
+auto from_veloxchem(const CMolecule& molecule) -> Molecule<double>;
 
-    vlx_moldata::export_moldata(m);
+/// Atom basis of VeloxChem's `basis`: one shell per basis function (VeloxChem has no general
+/// contractions), in VeloxChem's order within each angular momentum, with VeloxChem's
+/// normalization factors as effective coefficients (not renormalized). Throws
+/// std::invalid_argument for an identifier without nuclear charge or an effective core potential.
+auto from_veloxchem(const CAtomBasis& basis) -> AtomBasis;
 
-    vlx_orbdata::export_orbdata(m);
+/// Molecular basis of VeloxChem's `basis` for `molecule`: its unique atom bases and their
+/// assignment to atoms. With veloxchem_order the basis functions keep VeloxChem's AO order.
+/// Throws std::invalid_argument if the basis does not match the molecule (atom count or
+/// elements) or as the atom-basis overload.
+auto from_veloxchem(const CMolecularBasis& basis, const CMolecule& molecule) -> MolecularBasis;
 
-    vlx_packed::export_packed(m);
+}  // namespace fika
 
-    vlx_sparse::export_sparse(m);
-
-    vlx_dft::export_dft(m);
-
-    vlx_oneeints::export_oneeints(m);
-
-    vlx_visualization::export_visualization(m);
-
-    vlx_t2cintegrals::export_t2cintegrals(m);
-    
-    vlx_t3cintegrals::export_t3cintegrals(m);
-
-    vlx_t4cintegrals::export_t4cintegrals(m);
-
-    vlx_simdintegrals::export_simdintegrals(m);
-
-    vlx_fika::export_fika(m);
-}
+#endif  // fika_veloxchem_hpp
