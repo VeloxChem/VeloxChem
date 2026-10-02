@@ -51,7 +51,7 @@ struct PointCharges {
 };
 
 /// Permanent charges of every atom of a classical system, from the force field of each residue
-/// (loaded from the force-field library once per force field and residue name): the polarizable
+/// (held by the system for each force field and residue name): the polarizable
 /// region first, then the nonpolarizable one, residues and atoms in order (zero charges kept).
 /// Throws std::invalid_argument if a residue's atom count differs from its force field's, and
 /// std::runtime_error if a force field is not found.
