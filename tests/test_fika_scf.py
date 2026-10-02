@@ -244,6 +244,34 @@ class TestFikaScf:
             assert np.max(np.abs(values['fika'] - values['pe'])) < (
                 1.0e-7 * np.max(np.abs(values['pe'])))
 
+    def test_response_with_subcommunicators(self, tmp_path):
+
+        # With subcommunicators each one embeds its own trial densities.
+        from veloxchem.lreigensolver import LinearResponseEigenSolver
+
+        pdb_file = write_droplet(tmp_path)
+        reader = FikaPdbReader()
+        molecule = reader.get_solute(reader.read(pdb_file))
+        basis = MolecularBasis.read(molecule, 'def2-svp', ostream=None)
+        embedding = fika_embedding(pdb_file)
+        _, scf_results = run_scf(molecule, basis, embedding)
+
+        def excitation_energies(use_subcomms):
+            solver = LinearResponseEigenSolver()
+            solver.ostream.mute()
+            solver.conv_thresh = 1.0e-6
+            solver.nstates = 4
+            solver.use_subcomms = use_subcomms
+            solver.embedding = embedding
+            results = solver.compute(molecule, basis, scf_results)
+            return results['eigenvalues'] if MPI.COMM_WORLD.Get_rank(
+            ) == mpi_master() else None
+
+        reference = excitation_energies(False)
+        distributed = excitation_energies(True)
+        if MPI.COMM_WORLD.Get_rank() == mpi_master():
+            assert np.max(np.abs(distributed - reference)) < 1.0e-10
+
     def test_damping_and_objects(self, tmp_path):
 
         pdb_file = write_droplet(tmp_path)

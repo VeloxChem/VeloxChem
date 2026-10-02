@@ -374,22 +374,28 @@ class FikaEmbeddingSCF(FikaEmbedding):
 class FikaEmbeddingLRS(FikaEmbedding):
     """
     The fika embedding in linear response: the Fock contribution of the
-    dipoles induced by the electron field of a perturbed density alone.
+    dipoles induced by the electron field of a perturbed density alone. With
+    subcommunicators each subcommunicator's master embeds its own densities,
+    so the classical system is built on every rank.
     """
 
-    def compute_pe_contributions(self, density_matrix):
+    def compute_pe_contributions(self, density_matrix, comm=None):
         """
-        Computes the Fock contribution of a perturbed density (master rank).
+        Computes the Fock contribution of a perturbed density on the master
+        rank of `comm`, e.g. of the subcommunicator building its Fock matrix.
 
         :param density_matrix:
             The perturbed total AO density matrix (any symmetry; its
             symmetric part acts).
+        :param comm:
+            The communicator; None for the communicator of the embedding.
 
         :return:
             The Fock contribution (None on other ranks).
         """
 
-        if self.rank != mpi_master():
+        rank = self.rank if comm is None else comm.Get_rank()
+        if rank != mpi_master():
             return None
 
         return self._compute(density_matrix,

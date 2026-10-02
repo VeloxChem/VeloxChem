@@ -771,6 +771,29 @@ class LinearSolver:
             'dft_func_label': dft_func_label,
         }
 
+    def _compute_pe_fock(self, density_matrix, comm):
+        """
+        Computes the embedding Fock contribution of a response density.
+
+        :param density_matrix:
+            The total (alpha + beta) response density matrix.
+        :param comm:
+            The communicator of the Fock build (a subcommunicator when the
+            densities are distributed); the fika embedding is computed on
+            its master rank.
+
+        :return:
+            The Fock contribution (on the master rank of the communicator).
+        """
+
+        from .fikaembedding import FikaEmbeddingLRS
+
+        if isinstance(self._embedding_drv, FikaEmbeddingLRS):
+            return self._embedding_drv.compute_pe_contributions(
+                density_matrix=density_matrix, comm=comm)
+        return self._embedding_drv.compute_pe_contributions(
+            density_matrix=density_matrix)
+
     def _init_pe(self, molecule, basis, silent=False):
         """
         Initializes polarizable embedding.
@@ -2402,8 +2425,7 @@ class LinearSolver:
             for idx in range(num_densities):
                 # Note: only closed shell density for now
                 dm = dens[idx] * 2.0
-                V_emb = self._embedding_drv.compute_pe_contributions(
-                    density_matrix=dm)
+                V_emb = self._compute_pe_fock(dm, comm)
                 if comm_rank == mpi_master():
                     fock_arrays[idx] += V_emb
 
@@ -2835,8 +2857,7 @@ class LinearSolver:
 
             for idx in range(num_densities):
                 dm = dens_a[idx] + dens_b[idx]
-                V_emb = self._embedding_drv.compute_pe_contributions(
-                    density_matrix=dm)
+                V_emb = self._compute_pe_fock(dm, comm)
 
                 if comm_rank == mpi_master():
                     fock_arrays[idx * 2 + 0] += V_emb
