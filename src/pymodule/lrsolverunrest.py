@@ -42,6 +42,7 @@ from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            solvation_model_sanity_check, gostshyp_sanity_check,
                            environment_compatibility_sanity_check)
 from .errorhandler import assert_msg_critical
+from .fikaembedding import is_fika_embedding
 from .mathutils import safe_solve
 from .checkpoint import check_rsp_hdf5
 from .resultsio import (clear_group_in_hdf5, write_rsp_full_solution_to_hdf5,
@@ -183,9 +184,11 @@ class LinearResponseUnrestrictedSolver(LinearResponseSolverBase):
         # GOSTSHYP information
         self._init_gostshyp(molecule, basis, scf_results)
 
-        # TODO: enable PE
+        # TODO: enable PE (PyFraME); the fika embedding needs only the total
+        # density and is supported
         assert_msg_critical(
-            not self._pe, f'{type(self).__name__}: ' +
+            not self._pe or is_fika_embedding(self.embedding),
+            f'{type(self).__name__}: ' +
             'not yet implemented for polarizable embedding')
 
         # right-hand side (gradient)

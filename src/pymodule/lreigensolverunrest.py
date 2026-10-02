@@ -48,6 +48,7 @@ from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            solvation_model_sanity_check, gostshyp_sanity_check,
                            environment_compatibility_sanity_check)
 from .errorhandler import assert_msg_critical
+from .fikaembedding import is_fika_embedding
 from .mathutils import screened_eigh, symmetric_matrix_function
 from .checkpoint import check_rsp_hdf5
 from .resultsio import (write_rsp_results_to_hdf5,
@@ -219,9 +220,11 @@ class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
             not self.nonlinear,
             f'{type(self).__name__}: ' + 'not implemented for nonlinear')
 
-        # TODO: enable PE
+        # TODO: enable PE (PyFraME); the fika embedding needs only the total
+        # density and is supported
         assert_msg_critical(
-            not self._pe, f'{type(self).__name__}: ' +
+            not self._pe or is_fika_embedding(self.embedding),
+            f'{type(self).__name__}: ' +
             'not yet implemented for polarizable embedding')
 
         if self.nonlinear:

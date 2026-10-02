@@ -272,6 +272,97 @@ class TestFikaScf:
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
             assert np.max(np.abs(distributed - reference)) < 1.0e-10
 
+    def test_unrestricted(self, tmp_path):
+
+        from veloxchem.molecule import Molecule
+        from veloxchem.scfunrestdriver import ScfUnrestrictedDriver
+        from veloxchem.scfrestopendriver import ScfRestrictedOpenDriver
+        from veloxchem import (ComplexResponse, ComplexResponseUnrestrictedSolver,
+                               LinearResponseUnrestrictedSolver,
+                               LinearResponseUnrestrictedEigenSolver,
+                               TdaEigenSolver, TdaUnrestrictedEigenSolver)
+
+        pdb_file = write_droplet(tmp_path)
+        reader = FikaPdbReader()
+        molecule = reader.get_solute(reader.read(pdb_file))
+        basis = MolecularBasis.read(molecule, 'def2-svp', ostream=None)
+        embedding = fika_embedding(pdb_file)
+        master = MPI.COMM_WORLD.Get_rank() == mpi_master()
+
+        def scf(driver_class, mol):
+            driver = driver_class()
+            driver.ostream.mute()
+            driver.conv_thresh = 1.0e-8
+            driver.embedding = embedding
+            return driver.compute(mol, basis)
+
+        def solve(solver, scf_results, mol, **settings):
+            solver.ostream.mute()
+            solver.conv_thresh = 1.0e-6
+            solver.embedding = embedding
+            for key, value in settings.items():
+                setattr(solver, key, value)
+            return solver.compute(mol, basis, scf_results)
+
+        def functions(results, frequencies):
+            return np.array([
+                results['response_functions'][(a, b, w)]
+                for w in frequencies
+                for a in 'xyz'
+                for b in 'xyz'
+            ])
+
+        # A closed shell through the unrestricted path gives the restricted
+        # results (TDA: closed-shell unrestricted RPA has a triplet
+        # instability).
+        restricted = run_scf(molecule, basis, embedding)[1]
+        unrestricted = scf(ScfUnrestrictedDriver, molecule)
+        frequencies = [0.0, 0.05]
+        alpha = solve(LinearResponseSolver(), restricted, molecule,
+                      frequencies=frequencies)
+        alpha_u = solve(LinearResponseUnrestrictedSolver(), unrestricted,
+                        molecule,
+                        frequencies=frequencies)
+        cpp = solve(ComplexResponse(), restricted, molecule,
+                    frequencies=[0.1], damping=0.004)
+        cpp_u = solve(ComplexResponseUnrestrictedSolver(), unrestricted,
+                      molecule,
+                      frequencies=[0.1],
+                      damping=0.004)
+        tda = solve(TdaEigenSolver(), restricted, molecule, nstates=3)
+        tda_u = solve(TdaUnrestrictedEigenSolver(), unrestricted, molecule,
+                      nstates=8)
+        if master:
+            assert unrestricted['scf_energy'] == pytest.approx(
+                restricted['scf_energy'], abs=1.0e-9)
+            assert np.max(
+                np.abs(functions(alpha_u, frequencies) -
+                       functions(alpha, frequencies))) < 1.0e-7
+            assert np.max(
+                np.abs(functions(cpp_u, [0.1]) - functions(cpp, [0.1]))) < 1.0e-7
+            for energy in tda['eigenvalues']:
+                assert np.min(np.abs(tda_u['eigenvalues'] - energy)) < 1.0e-8
+
+        # An open shell: the cation doublet with UHF and ROHF, and the
+        # unrestricted solvers.
+        cation = Molecule(molecule)
+        cation.set_charge(1)
+        cation.set_multiplicity(2)
+        uhf = scf(ScfUnrestrictedDriver, cation)
+        rohf = scf(ScfRestrictedOpenDriver, cation)
+        polarizability = solve(LinearResponseUnrestrictedSolver(), uhf, cation,
+                               frequencies=[0.0])
+        rpa = solve(LinearResponseUnrestrictedEigenSolver(), uhf, cation,
+                    nstates=3,
+                    max_iter=400)
+        if master:
+            assert uhf['E_emb'] < 0.0 and rohf['E_emb'] < 0.0
+            assert uhf['scf_energy'] < rohf['scf_energy']
+            assert all(
+                polarizability['response_functions'][(a, a, 0.0)] < 0.0
+                for a in 'xyz')
+            assert np.all(rpa['eigenvalues'] > 0.0)
+
     def test_damping_and_objects(self, tmp_path):
 
         pdb_file = write_droplet(tmp_path)
