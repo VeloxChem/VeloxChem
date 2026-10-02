@@ -446,3 +446,50 @@ class TestFikaScf:
         with pytest.raises(VeloxChemError,
                            match='gradients with the fika embedding'):
             grad_drv.compute(molecule, basis, scf_results)
+
+    def test_response_on_fika_reference(self, tmp_path):
+
+        pdb_file = write_droplet(tmp_path)
+        reader = FikaPdbReader()
+        molecule = reader.get_solute(reader.read(pdb_file))
+        basis = MolecularBasis.read(molecule, 'sto-3g', ostream=None)
+
+        _, fika_results = run_scf(molecule, basis, fika_embedding(pdb_file))
+        _, gas_results = run_scf(molecule, basis, None)
+        assert fika_results['embedding_method'] == 'fika'
+        assert 'embedding_method' not in gas_results
+
+        # Linear response on a fika reference needs the fika embedding; a
+        # reused driver accepts a gas-phase reference afterwards.
+        lrs_drv = LinearResponseSolver()
+        lrs_drv.ostream.mute()
+        lrs_drv.frequencies = [0.0]
+        with pytest.raises(VeloxChemError,
+                           match='SCF reference used the fika embedding'):
+            lrs_drv.compute(molecule, basis, fika_results)
+        lrs_drv.compute(molecule, basis, gas_results)
+
+        # Nonlinear response rejects the fika embedding, whether it comes
+        # from the SCF reference or is set on the driver.
+        from veloxchem.quadraticresponsedriver import QuadraticResponseDriver
+        from veloxchem.cubicresponsedriver import CubicResponseDriver
+
+        def nonlinear_driver(driver_type):
+            driver = driver_type()
+            driver.ostream.mute()
+            for label in 'abcd':
+                if hasattr(driver, f'{label}_component'):
+                    setattr(driver, f'{label}_component', 'z')
+            return driver
+
+        for driver_type in (QuadraticResponseDriver, CubicResponseDriver):
+            driver = nonlinear_driver(driver_type)
+            with pytest.raises(VeloxChemError,
+                               match='fika embedding is not supported'):
+                driver.compute(molecule, basis, fika_results)
+
+        driver = nonlinear_driver(QuadraticResponseDriver)
+        driver.embedding = fika_embedding(pdb_file)
+        with pytest.raises(VeloxChemError,
+                           match='fika embedding is not supported'):
+            driver.compute(molecule, basis, gas_results)

@@ -2537,6 +2537,8 @@ class ScfDriver:
                     self._scf_results['E_emb'] = e_emb
                     self._scf_results['F_emb'] = V_emb
                     if isinstance(self._embedding_drv, FikaEmbeddingSCF):
+                        # marks the reference for the response sanity checks
+                        self._scf_results['embedding_method'] = 'fika'
                         self._scf_results['induced_dipoles'] = (
                             self._embedding_drv.get_induced_dipoles())
 

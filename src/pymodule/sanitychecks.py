@@ -190,6 +190,11 @@ def scf_results_sanity_check(obj, scf_results):
                                              scf_results['potfile'])
             updated_scf_info['potfile'] = scf_results['potfile']
 
+        # the embedding method of the SCF reference (None when gas phase) is
+        # always updated, so that a reused driver does not keep a stale value
+        updated_scf_info['_scf_embedding_method'] = scf_results.get(
+            'embedding_method', None)
+
         if scf_results.get('solvation_model', None) is not None:
             # the environment is inherited from SCF; a different solvation
             # model in response settings is overwritten with a warning
@@ -268,10 +273,10 @@ def nonlinear_response_environment_sanity_check(obj):
     """
     Checks environment settings in nonlinear response drivers.
 
-    Solvation, pressure and polarizable embedding are not supported in
-    nonlinear response calculations. The settings are rejected here whether
-    they were set explicitly or inherited from the SCF results, so that an
-    unsupported environment is never silently ignored.
+    Solvation, pressure, polarizable embedding and the fika embedding are not
+    supported in nonlinear response calculations. The settings are rejected
+    here whether they were set explicitly or inherited from the SCF results,
+    so that an unsupported environment is never silently ignored.
 
     :param obj:
         The nonlinear response driver.
@@ -280,6 +285,15 @@ def nonlinear_response_environment_sanity_check(obj):
     if obj.potfile is not None:
         errmsg = "NonlinearSolver: The 'potfile' keyword is not supported "
         errmsg += 'in nonlinear response calculation.'
+        if obj.rank == mpi_master():
+            assert_msg_critical(False, errmsg)
+
+    from .fikaembedding import is_fika_embedding
+
+    if (getattr(obj, '_scf_embedding_method', None) == 'fika' or
+            is_fika_embedding(getattr(obj, 'embedding', None))):
+        errmsg = 'NonlinearSolver: The fika embedding is not supported in '
+        errmsg += 'nonlinear response calculation.'
         if obj.rank == mpi_master():
             assert_msg_critical(False, errmsg)
 
@@ -617,6 +631,13 @@ def pe_sanity_check(obj, method_dict=None, molecule=None):
             obj.pe_options = {}
 
     from .fikaembedding import is_fika_embedding, fika_embedding_sanity_check
+
+    if getattr(obj, '_scf_embedding_method', None) == 'fika':
+        # a response on a fika SCF reference needs the fika embedding as well
+        assert_msg_critical(
+            is_fika_embedding(obj.embedding),
+            f'{type(obj).__name__}: The SCF reference used the fika ' +
+            'embedding; set the same fika embedding on the response driver')
 
     if is_fika_embedding(obj.embedding):
         assert_msg_critical(
