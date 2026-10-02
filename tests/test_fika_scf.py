@@ -1,0 +1,267 @@
+from mpi4py import MPI
+from pathlib import Path
+import json
+import numpy as np
+import pytest
+
+from veloxchem.veloxchemlib import mpi_master
+from veloxchem.errorhandler import VeloxChemError
+from veloxchem.molecularbasis import MolecularBasis
+from veloxchem.scfrestdriver import ScfRestrictedDriver
+from veloxchem.lrsolver import LinearResponseSolver
+from veloxchem.fikapdbreader import FikaPdbReader
+from veloxchem.veloxchemlib import (FikaClassicalSystem, FikaForceField,
+                                    fika_polarizable_sites)
+
+from test_fika_pdbreader import get_pdb, get_waters
+
+
+def write_droplet(directory):
+    """
+    Acrolein (MOL) and 40 waters in a PDB file in a directory shared by all
+    ranks.
+    """
+
+    path = None
+    if MPI.COMM_WORLD.Get_rank() == mpi_master():
+        path = Path(directory) / 'fika_droplet.pdb'
+        path.write_text(get_pdb(get_waters(40)))
+        path = str(path)
+    return MPI.COMM_WORLD.bcast(path, root=mpi_master())
+
+
+def fika_embedding(pdb_file, damping=None):
+
+    return {
+        'settings': {
+            'embedding_method': 'fika',
+            'damping': damping,
+        },
+        'inputs': {
+            'pdb_file': pdb_file,
+            'solvent': {
+                'HOH': 'ahlstrom'
+            },
+        },
+    }
+
+
+def pyframe_embedding(residues, molecule, directory):
+    """
+    The same embedding for PyFraME: Ahlstrom charges, polarizabilities (zero
+    on hydrogens) and exclusions within each water, without damping.
+    """
+
+    path = None
+    if MPI.COMM_WORLD.Get_rank() == mpi_master():
+        fragments = []
+        waters = [r for r in residues if r.name == 'HOH']
+        for w, water in enumerate(waters):
+            first = 3 * w + 1
+            atoms = []
+            for k, (element, charge, alpha) in enumerate([('O', -0.669, 9.718),
+                                                          ('H', 0.3345, 0.0),
+                                                          ('H', 0.3345, 0.0)]):
+                atoms.append({
+                    'index': first + k,
+                    'element': element,
+                    'coordinate': list(water.coordinates[k]),
+                    'multipoles': {
+                        'elements': [charge]
+                    },
+                    'exclusions': [first, first + 1, first + 2],
+                    'polarizabilities': {
+                        'elements':
+                            [0.0, 0.0, 0.0, 0.0, alpha, 0.0, 0.0, alpha, 0.0, alpha],
+                        'order': [1, 1]
+                    },
+                })
+            fragments.append({'index': w + 1, 'name': 'HOH', 'atoms': atoms})
+        nuclei = [{
+            'index': i + 1,
+            'element': label,
+            'charge': float(charge),
+            'coordinate': list(xyz)
+        } for i, (label, charge, xyz) in enumerate(
+            zip(molecule.get_labels(), molecule.get_element_ids(),
+                molecule.get_coordinates_in_bohr()))]
+        path = Path(directory) / 'fika_pe.json'
+        path.write_text(
+            json.dumps({
+                'quantum_subsystems': [{
+                    'nuclei': nuclei
+                }],
+                'classical_subsystems': [{
+                    'classical_fragments': fragments
+                }],
+            }))
+        path = str(path)
+    path = MPI.COMM_WORLD.bcast(path, root=mpi_master())
+
+    return {
+        'settings': {
+            'embedding_method': 'PE',
+            'induced_dipoles': {
+                'solver': 'jidiis',
+                'threshold': 1e-10,
+                'max_iterations': 200,
+            },
+        },
+        'inputs': {
+            'json_file': path,
+        },
+    }
+
+
+def run_scf(molecule, basis, embedding):
+
+    scf_drv = ScfRestrictedDriver()
+    scf_drv.ostream.mute()
+    scf_drv.conv_thresh = 1.0e-8
+    scf_drv.embedding = embedding
+    return scf_drv, scf_drv.compute(molecule, basis)
+
+
+def run_lrs(molecule, basis, embedding, scf_results):
+
+    lrs_drv = LinearResponseSolver()
+    lrs_drv.ostream.mute()
+    lrs_drv.conv_thresh = 1.0e-8
+    lrs_drv.frequencies = [0.0, 0.04]
+    lrs_drv.embedding = embedding
+    results = lrs_drv.compute(molecule, basis, scf_results)
+    if MPI.COMM_WORLD.Get_rank() != mpi_master():
+        return None
+    return np.array([
+        results['response_functions'][(a, b, w)]
+        for w in lrs_drv.frequencies
+        for a in 'xyz'
+        for b in 'xyz'
+    ])
+
+
+@pytest.mark.solvers
+class TestFikaScf:
+
+    def test_scf_and_response_against_pyframe(self, tmp_path):
+
+        pytest.importorskip('pyframe')
+
+        pdb_file = write_droplet(tmp_path)
+        reader = FikaPdbReader()
+        residues = reader.read(pdb_file)
+        molecule = reader.get_solute(residues)
+        basis = MolecularBasis.read(molecule, 'def2-svp', ostream=None)
+
+        fika = fika_embedding(pdb_file)
+        pe = pyframe_embedding(residues, molecule, tmp_path)
+
+        fika_drv, fika_results = run_scf(molecule, basis, fika)
+        _, pe_results = run_scf(molecule, basis, pe)
+
+        if MPI.COMM_WORLD.Get_rank() == mpi_master():
+            assert fika_results['scf_energy'] == pytest.approx(
+                pe_results['scf_energy'], abs=1.0e-8)
+            assert fika_results['E_emb'] == pytest.approx(pe_results['E_emb'],
+                                                          abs=1.0e-8)
+            assert np.max(np.abs(fika_results['F_emb'] -
+                                 pe_results['F_emb'])) < 1.0e-7
+
+            # Induced dipoles of the final density, one per oxygen.
+            positions, _, _ = fika_polarizable_sites(
+                fika_drv._embedding_drv.classical_system)
+            assert fika_results['induced_dipoles'].shape == positions.shape
+
+            # Each SCF step starts the dipoles from those of the previous one.
+            iterations = fika_drv._embedding_drv.iterations
+            assert max(iterations[len(iterations) // 2:]) < iterations[0]
+
+        fika_prop = run_lrs(molecule, basis, fika, fika_results)
+        pe_prop = run_lrs(molecule, basis, pe, pe_results)
+
+        if MPI.COMM_WORLD.Get_rank() == mpi_master():
+            assert np.max(np.abs(fika_prop - pe_prop)) < 1.0e-6
+
+    def test_damping_and_objects(self, tmp_path):
+
+        pdb_file = write_droplet(tmp_path)
+        reader = FikaPdbReader()
+        residues = reader.read(pdb_file)
+        molecule = reader.get_solute(residues)
+        basis = MolecularBasis.read(molecule, 'sto-3g', ostream=None)
+
+        # Thole damping is the default.
+        thole = fika_embedding(pdb_file)
+        del thole['settings']['damping']
+        _, thole_results = run_scf(molecule, basis, thole)
+        _, undamped_results = run_scf(molecule, basis, fika_embedding(pdb_file))
+
+        # The same classical system given as an object.
+        system, _ = reader.get_classical_system(residues, {'HOH': 'ahlstrom'})
+        objects = {
+            'settings': {
+                'embedding_method': 'FIKA'
+            },
+            'inputs': {
+                'objects': {
+                    'classical_system': system
+                }
+            },
+        }
+        _, object_results = run_scf(molecule, basis, objects)
+
+        if MPI.COMM_WORLD.Get_rank() == mpi_master():
+            assert abs(thole_results['scf_energy'] -
+                       undamped_results['scf_energy']) > 1.0e-6
+            assert object_results['scf_energy'] == pytest.approx(
+                thole_results['scf_energy'], abs=1.0e-9)
+
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='input errors abort MPI runs')
+    def test_errors(self, tmp_path):
+
+        pdb_file = write_droplet(tmp_path)
+        reader = FikaPdbReader()
+        residues = reader.read(pdb_file)
+        molecule = reader.get_solute(residues)
+        basis = MolecularBasis.read(molecule, 'sto-3g', ostream=None)
+
+        def fails(embedding, message, molecule=molecule, basis=basis):
+            with pytest.raises(VeloxChemError, match=message):
+                run_scf(molecule, basis, embedding)
+
+        # The molecule must be the solute of the PDB file.
+        moved = molecule.get_coordinates_in_bohr()
+        moved[0, 0] += 0.1
+        from veloxchem.molecule import Molecule
+        other = Molecule([int(z) for z in molecule.get_element_ids()], moved,
+                         'bohr')
+        fails(fika_embedding(pdb_file), 'not the solute of the PDB file',
+              molecule=other,
+              basis=MolecularBasis.read(other, 'sto-3g', ostream=None))
+
+        embedding = fika_embedding(pdb_file)
+        embedding['settings']['damping'] = 'exponential'
+        fails(embedding, "damping must be 'thole' or None")
+
+        embedding = fika_embedding(pdb_file)
+        embedding['settings']['solver'] = 'jidiis'
+        fails(embedding, 'unknown settings')
+
+        embedding = fika_embedding(pdb_file)
+        del embedding['inputs']['solvent']
+        fails(embedding, "inputs need 'solvent'")
+
+        embedding = fika_embedding(pdb_file)
+        embedding['inputs']['objects'] = {}
+        fails(embedding, "either 'pdb_file' or 'objects'")
+
+        # Gradients are not available yet.
+        from veloxchem.scfgradientdriver import ScfGradientDriver
+        scf_drv, scf_results = run_scf(molecule, basis,
+                                       fika_embedding(pdb_file))
+        grad_drv = ScfGradientDriver(scf_drv)
+        grad_drv.ostream.mute()
+        with pytest.raises(VeloxChemError,
+                           match='gradients with the fika embedding'):
+            grad_drv.compute(molecule, basis, scf_results)

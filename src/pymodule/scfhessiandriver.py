@@ -64,6 +64,7 @@ from .profiler import Profiler
 from .matrices import Matrices
 from .dftutils import get_default_grid_level
 from .errorhandler import assert_msg_critical
+from .fikaembedding import is_fika_embedding
 from .oneeints import compute_electric_dipole_integrals
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            dft_sanity_check, pe_sanity_check)
@@ -927,6 +928,10 @@ class ScfHessianDriver(HessianDriver):
 
             # add pe contr to hessian
             if self.scf_driver._pe:
+                assert_msg_critical(
+                    not is_fika_embedding(self.scf_driver.embedding),
+                    'ScfHessianDriver: Hessians with the fika embedding ' +
+                    'are not available yet')
                 from .embedding import PolarizableEmbeddingHess
                 embedding_drv = PolarizableEmbeddingHess(
                     molecule=molecule,
@@ -1792,6 +1797,10 @@ class ScfHessianDriver(HessianDriver):
 
             # add pe contr to hessian
             if self.scf_driver._pe:
+                assert_msg_critical(
+                    not is_fika_embedding(self.scf_driver.embedding),
+                    'ScfHessianDriver: Hessians with the fika embedding ' +
+                    'are not available yet')
                 from .embedding import PolarizableEmbeddingHess
                 embedding_drv = PolarizableEmbeddingHess(
                     molecule=molecule,

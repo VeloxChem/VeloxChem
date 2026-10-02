@@ -59,6 +59,7 @@ from .oneeints import compute_nuclear_potential_gradient
 from .oneeints import compute_point_charge_gradient
 from .oneeints import compute_ecp_gradient
 from .errorhandler import assert_msg_critical
+from .fikaembedding import is_fika_embedding
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            dft_sanity_check)
 
@@ -694,6 +695,11 @@ class ScfGradientDriver(GradientDriver):
         t0 = time.time()
 
         if self.scf_driver._pe:
+            assert_msg_critical(
+                not is_fika_embedding(self.scf_driver.embedding),
+                'ScfGradientDriver: gradients with the fika embedding are ' +
+                'not available yet')
+
             from .embedding import PolarizableEmbeddingGrad
 
             # pass along emb object from scf, or make a new one? -> for ind dipoles.

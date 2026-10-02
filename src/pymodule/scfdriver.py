@@ -57,6 +57,8 @@ from .matrix import Matrix
 from .aodensitymatrix import AODensityMatrix
 from .rifockdriver import RIFockDriver
 from .rijkfockdriver import RIJKFockDriver
+from .fikaembedding import (FikaEmbeddingSCF, fika_embedding_text,
+                            is_fika_embedding)
 from .veloxchemlib import SimdRIJFockDriver
 from .veloxchemlib import SimdRIJKFockDriver
 from .veloxchemlib import rimode
@@ -919,8 +921,21 @@ class ScfDriver:
                 self.ostream.print_blank()
                 self.ostream.flush()
 
+        # set up polarizable embedding through fika
+        if self._pe and is_fika_embedding(self.embedding):
+
+            self._embedding_drv = FikaEmbeddingSCF(molecule=molecule,
+                                                   ao_basis=basis,
+                                                   options=self.embedding,
+                                                   comm=self.comm,
+                                                   conv_thresh=self.conv_thresh)
+
+            for line in self._embedding_drv.get_info():
+                self.ostream.print_info(line)
+            self.ostream.print_blank()
+
         # set up polarizable embedding
-        if self._pe:
+        elif self._pe:
 
             # TODO: print PyFraME info
 
@@ -1728,8 +1743,7 @@ class ScfDriver:
                     xc_label = 'HF'
 
                 if self._pe:
-                    with Path(self.pe_options['potfile']).open('r') as f_pot:
-                        potfile_text = '\n'.join(f_pot.readlines())
+                    potfile_text = self._get_pe_potfile_text()
                 else:
                     potfile_text = ''
 
@@ -2522,6 +2536,9 @@ class ScfDriver:
                     self._scf_results['potfile'] = self._get_pe_potfile()
                     self._scf_results['E_emb'] = e_emb
                     self._scf_results['F_emb'] = V_emb
+                    if isinstance(self._embedding_drv, FikaEmbeddingSCF):
+                        self._scf_results['induced_dipoles'] = (
+                            self._embedding_drv.get_induced_dipoles())
 
                 if self.point_charges is not None:
                     self._scf_results['point_charges'] = self.point_charges
@@ -2700,6 +2717,15 @@ class ScfDriver:
 
         return self._pe or self.point_charges is not None
 
+    def _get_pe_potfile_text(self):
+        """Returns the text identifying the embedding in checkpoints."""
+
+        if is_fika_embedding(self.embedding):
+            return fika_embedding_text(self.embedding)
+
+        with Path(self.pe_options['potfile']).open('r') as f_pot:
+            return '\n'.join(f_pot.readlines())
+
     def _get_pe_potfile(self):
         """Returns the PE potfile, falling back to pe_options when unset."""
 
@@ -2764,7 +2790,8 @@ class ScfDriver:
         if self._pe:
             from .embedding import PolarizableEmbeddingSCF
             assert_msg_critical(
-                isinstance(self._embedding_drv, PolarizableEmbeddingSCF),
+                isinstance(self._embedding_drv,
+                           (PolarizableEmbeddingSCF, FikaEmbeddingSCF)),
                 'ScfDriver: Inconsistent embedding driver for SCF')
             return self._embedding_drv.compute_pe_contributions(
                 density_matrix=density_matrix)
@@ -4762,8 +4789,7 @@ class ScfDriver:
             xc_label = 'HF'
 
         if self._pe:
-            with Path(self.pe_options['potfile']).open('r') as f_pot:
-                potfile_text = '\n'.join(f_pot.readlines())
+            potfile_text = self._get_pe_potfile_text()
         else:
             potfile_text = ''
 

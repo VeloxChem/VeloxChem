@@ -616,6 +616,18 @@ def pe_sanity_check(obj, method_dict=None, molecule=None):
         else:
             obj.pe_options = {}
 
+    from .fikaembedding import is_fika_embedding, fika_embedding_sanity_check
+
+    if is_fika_embedding(obj.embedding):
+        assert_msg_critical(
+            not obj.potfile,
+            'PE sanity check: a potfile cannot be combined with the fika ' +
+            'embedding')
+        fika_embedding_sanity_check(obj.embedding)
+        obj.pe_options = {}
+        obj._pe = True
+        return
+
     if obj.potfile:
         obj.pe_options['potfile'] = obj.potfile
 

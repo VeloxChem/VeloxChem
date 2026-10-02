@@ -68,6 +68,7 @@ from .sanitychecks import (dft_sanity_check, ri_sanity_check, pe_sanity_check,
                            gostshyp_sanity_check,
                            environment_compatibility_sanity_check)
 from .errorhandler import assert_msg_critical
+from .fikaembedding import fika_embedding_text, is_fika_embedding
 from .inputparser import (parse_input, print_keywords, print_attributes,
                           get_random_string_parallel, unparse_input,
                           write_unparsed_input_to_hdf5,
@@ -782,6 +783,20 @@ class LinearSolver:
         :return:
             The dictionary of polarizable embedding information.
         """
+
+        if self._pe and is_fika_embedding(self.embedding):
+            from .fikaembedding import FikaEmbeddingLRS
+
+            self._embedding_drv = FikaEmbeddingLRS(molecule=molecule,
+                                                   ao_basis=basis,
+                                                   options=self.embedding,
+                                                   comm=self.comm,
+                                                   conv_thresh=self.conv_thresh)
+            if not silent:
+                for line in self._embedding_drv.get_info():
+                    self.ostream.print_info(line)
+                self.ostream.print_blank()
+            return {'potfile_text': fika_embedding_text(self.embedding)}
 
         if self._pe:
             assert_msg_critical(
