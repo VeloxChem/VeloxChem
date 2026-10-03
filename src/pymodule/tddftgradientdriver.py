@@ -111,6 +111,10 @@ class TddftGradientDriver(GradientDriver):
         self.relaxed_dipole_moment = None
         self.unrelaxed_dipole_moment = None
 
+        # flag if these are core-excited states
+        self.core_excitation = False
+        self.num_core_orbitals = None
+
         # option dictionaries from input
         # TODO: cleanup
         self.method_dict = {}
@@ -121,6 +125,7 @@ class TddftGradientDriver(GradientDriver):
             'tamm_dancoff': ('bool', 'whether RPA or TDA is calculated'),
             'state_deriv_index': ('seq_fixed_int', 'excited state information'),
             'do_first_order_prop': ('bool', 'do first-order property'),
+            'core_excitation': ('bool', 'compute gradient of core-excited states'),
         })
 
     def update_settings(self,
@@ -160,6 +165,10 @@ class TddftGradientDriver(GradientDriver):
             grad_dict['tamm_dancoff'] = rsp_dict['tamm_dancoff']
             orbrsp_dict['tamm_dancoff'] = rsp_dict['tamm_dancoff']
 
+        if 'core_excitation' in rsp_dict.keys():
+            grad_dict['core_excitation'] = rsp_dict['core_excitation']
+            orbrsp_dict['core_excitation'] = rsp_dict['core_excitation']
+
         if 'do_first_order_prop' in grad_dict.keys():
             orbrsp_dict['do_first_order_prop'] = grad_dict[
                 'do_first_order_prop']
@@ -193,9 +202,14 @@ class TddftGradientDriver(GradientDriver):
         scf_results_sanity_check(self, self._scf_drv.scf_tensors)
         dft_sanity_check(self, 'compute')
 
-        # TODO: replace with a sanity check?
+        # TODO: replace with a sanity check
         if isinstance(rsp_drv, TdaEigenSolver):
             self.tamm_dancoff = True
+
+        # TODO: replace with sanity check
+        if rsp_drv.core_excitation:
+            self.core_excitation = True
+            self.num_core_orbitals = rsp_drv.num_core_orbitals
 
         if self.rank == mpi_master():
             if self.tamm_dancoff:
@@ -274,7 +288,8 @@ class TddftGradientDriver(GradientDriver):
 
         # TODO: also check other attributes
         orbrsp_keywords = [
-            'state_deriv_index', 'timing', 'filename', 'print_level'
+            'state_deriv_index', 'timing', 'filename', 'print_level',
+            'num_core_orbitals', 'core_excitation'
         ]
         for key in orbrsp_keywords:
             if (key not in self.orbrsp_dict) and hasattr(self, key):
@@ -365,7 +380,8 @@ class TddftGradientDriver(GradientDriver):
 
         # TODO: also check other attributes
         orbrsp_keywords = [
-            'state_deriv_index', 'timing', 'filename', 'print_level'
+            'state_deriv_index', 'timing', 'filename', 'print_level',
+            'num_core_orbitals', 'core_excitation'
         ]
         for key in orbrsp_keywords:
             if (key not in self.orbrsp_dict) and hasattr(self, key):
@@ -402,7 +418,6 @@ class TddftGradientDriver(GradientDriver):
             mo = scf_tensors['C_alpha']
             mo_occ = mo[:, :nocc]
             mo_vir = mo[:, nocc:]
-            nocc = mo_occ.shape[1]
             nvir = mo_vir.shape[1]
 
             # TODO: check variable names and make sure they are consistent
