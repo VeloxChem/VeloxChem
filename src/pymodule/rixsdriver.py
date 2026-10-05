@@ -109,6 +109,7 @@ class RixsDriver(LinearSolver):
         self.cpp = False
         self.components = 'xyz'
         self.energyloss_frequencies = None
+        self.lindep_thresh = 1.0e-6
         # TODO: enable emission freqs. in a good way
         self.emission_frequencies = None
 
@@ -217,6 +218,9 @@ class RixsDriver(LinearSolver):
             and the scattering amplitude tensor.
         """
 
+        if isinstance(self.photon_energy, (float, int, np.floating)):
+            self.photon_energy = [self.photon_energy]
+
         if self.cpp and (self.energyloss_frequencies is not None or self.emission_frequencies is not None):
             return self.compute_cpp(molecule, basis, scf_results,
                              rsp_results=cvs_rsp_results, cvs_rsp_results=cvs_rsp_results)
@@ -241,11 +245,12 @@ class RixsDriver(LinearSolver):
         self._approach_string = 'Running RIXS calculation in the double-CPP approach'
         
         if rsp_results is None:
-
+            # set up the response driver for the final states
             rsp_keys = [
                 'frequencies',
                 'conv_thresh',
                 'restart',
+                # no lindep_thresh for final/valence manifold
             ]
 
             rsp_drv = ComplexResponseSolver(self.comm, self.ostream)
@@ -269,7 +274,14 @@ class RixsDriver(LinearSolver):
             self._print_header(molecule)
 
         if cvs_rsp_results is None:
-            init_photon_set = True if self.photon_energy is not None else False 
+            if self.photon_energy is not None:
+                init_photon_set = True
+                if len(self.photon_energy) == 1:
+                    # tighten the linear dependence threshold for single photon energy
+                    self._ostream.print_info('Single photon energy provided, tightening linear dependence threshold to 1.0e-8')
+                    self.lindep_thresh = 1.0e-8
+            else:
+                init_photon_set = False
             assert_msg_critical(init_photon_set,
                                             'Must provide incoming photon energies for the CPP approach!')
             
@@ -277,6 +289,7 @@ class RixsDriver(LinearSolver):
                 'frequencies',
                 'conv_thresh',
                 'restart',
+                'lindep_thresh',
             ]
 
             core_rsp_drv = ComplexResponseSolver(self.comm, self.ostream)
@@ -443,6 +456,10 @@ class RixsDriver(LinearSolver):
             
             if self.cpp:
                 init_photon_set = True if self.photon_energy is not None else False 
+                if len(self.photon_energy) == 1:
+                                    # tighten the linear dependence threshold for single photon energy
+                                    self._ostream.print_info('Single photon energy provided, tightening linear dependence threshold to 1.0e-10')
+                                    self.lindep_thresh = 1.0e-10
                 assert_msg_critical(init_photon_set,
                                             'Must provide incoming photon energies for the CPP approach!')
             
@@ -450,6 +467,7 @@ class RixsDriver(LinearSolver):
                     'frequencies',
                     'conv_thresh',
                     'restart',
+                    'lindep_thresh',
                 ]
                 
                 core_rsp_drv = ComplexResponseSolver(self.comm, self.ostream)
@@ -1210,7 +1228,7 @@ class RixsDriver(LinearSolver):
         Get effective RHS/gradient vectors of a previous LR calculation.
 
         :return: 
-            Excited state gradient (yuple)
+            Excited state gradient (tuple)
         """
         dip = compute_electric_dipole_integrals(molecule, basis, [0.0, 0.0, 0.0])
         dip_ints = {'x': dip[0], 'y': dip[1], 'z': dip[2]}
@@ -1223,7 +1241,6 @@ class RixsDriver(LinearSolver):
 
         sqrt_2 = np.sqrt(2.0)
         grads = []
-
         for comp in components:
             dip_x_ao = dip_ints[comp]
             dip_x_mo = C.T @ dip_x_ao.T @ C
