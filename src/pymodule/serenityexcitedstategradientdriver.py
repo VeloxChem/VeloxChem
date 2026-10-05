@@ -679,6 +679,9 @@ class SerenityExcitedStateGradientDriver(GradientDriver):
             self.state_deriv_index = int(selection['selected_raw_root'])
             self.state_selection_info = selection
         else:
+            # The energy of state_deriv_index is consumed directly, so that
+            # root is held to Serenity's own convergence threshold.
+            self.rsp_driver.lr_strict_roots = int(self.state_deriv_index)
             rsp_results = self.rsp_driver.compute(molecule, broadcast=False)
         eigenvalues = np.asarray(
             rsp_results['eigenvalues'], dtype=float).reshape(-1)
@@ -979,6 +982,14 @@ class SerenityExcitedStateGradientDriver(GradientDriver):
             self.exc_method = 'tda'
         if minimum_roots is not None and int(minimum_roots) > int(rsp.nstates):
             rsp.set_nstates(int(minimum_roots))
+
+        # Roots this caller consumes directly must meet Serenity's own
+        # threshold before a spectrum whose remaining roots only reached the
+        # usable residual tolerance is accepted.  The adiabatic selection
+        # reads the whole window, so it sets no extra requirement and relies
+        # on the tolerance, which bounds every excitation energy.
+        rsp.lr_strict_roots = (None if minimum_roots is None
+                               else int(minimum_roots))
 
         results = rsp.compute(molecule, broadcast=False)
         controller = rsp.get_lr_controller()
@@ -1379,6 +1390,12 @@ class SerenityExcitedStateGradientDriver(GradientDriver):
         # The captured text covers every iterative solve of the task (the
         # LRSCF step and the Z-vector equations).
         parsed = parse_serenity_lr_output(capture.text)
+        nstates_req = max(int(self.state_deriv_index),
+                          int(self.rsp_driver.nstates))
+        run = self.rsp_driver.summarize_lr_run(
+            parsed, restart=decision['restart'],
+            max_cycles=int(grad_task.settings.lrscfSettings.maxCycles),
+            conv=float(grad_task.settings.lrscfSettings.conv))
         provenance = {
             'root': int(self.state_deriv_index),
             'lr_restart_requested': bool(decision['restart']),
@@ -1390,21 +1407,55 @@ class SerenityExcitedStateGradientDriver(GradientDriver):
             'davidson_iterations': parsed['davidson_iterations'],
             'n_converged_solves': parsed['n_converged_solves'],
             'warnings': parsed['warnings'],
+            'residual_norms': run.get('residual_norms'),
+            'max_residual': run.get('max_residual'),
+            'lr_stalled': run.get('stalled'),
         }
         self.last_gradient_task_provenance = provenance
+
+        verdict = None
         if parsed['converged'] is not True:
+            # Only the eigenvalue solver reports per-root residual norms and
+            # only its roots are Ritz pairs whose error the residual bounds.
+            # A warning printed after the excitation table belongs to the
+            # Z-vector equations, whose solution enters the gradient
+            # directly, so it stays fatal.
+            if (parsed['converged'] is False and
+                    not parsed['post_spectrum_warnings']):
+                verdict = self.rsp_driver.assess_lr_convergence(
+                    run, strict_roots=int(self.state_deriv_index),
+                    nstates=nstates_req)
+                provenance['residual_verdict'] = verdict
+
+        if parsed['converged'] is not True and not (
+                verdict is not None and verdict['usable']):
             self.rsp_driver.invalidate_lr_restart_ledger()
             if parsed['converged'] is None:
                 reason = ('Serenity printed no convergence status for the '
                           'iterative solves of the gradient task, so '
                           'convergence cannot be verified')
+            elif parsed['post_spectrum_warnings']:
+                reason = ('The Z-vector equations of the Serenity gradient '
+                          'task did not converge ("Convergence criterion '
+                          'not reached")')
             else:
-                reason = ('An iterative solve of the Serenity gradient task '
-                          '(LRSCF step or Z-vector) did not converge '
-                          '("Convergence criterion not reached")')
+                reason = ('The LRSCF step of the Serenity gradient task did '
+                          'not converge ("Convergence criterion not '
+                          'reached")')
+                if verdict is not None:
+                    reason += f' and {verdict["reason"]}'
             raise SerenityCalculationError(
                 f'{reason}; the gradient is not usable.', stage='gradient',
                 details=provenance)
+
+        if verdict is not None and verdict['usable']:
+            provenance['lr_accepted_within_residual_tolerance'] = True
+            self.ostream.print_info(
+                'The LRSCF step of the Serenity gradient task reported '
+                '"Convergence criterion not reached", but '
+                f'{verdict["reason"]}; the gradient of root '
+                f'{int(self.state_deriv_index)} is accepted.')
+            self.ostream.flush()
 
         # The gradient task left its converged LR solution in the System.
         self.rsp_driver.record_lr_solution(signature)

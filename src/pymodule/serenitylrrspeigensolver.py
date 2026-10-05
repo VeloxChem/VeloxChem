@@ -52,6 +52,24 @@ except ImportError:
     pass
 
 
+# Serenity leaves maxSubspaceDimension at 1e6, so the Davidson subspace is
+# never collapsed.  While every root still moves that is harmless, but a root
+# whose residual has floored contributes a correction vector that barely
+# changes from cycle to cycle; those nearly parallel vectors keep being
+# appended and, with the single pass of classical Gram-Schmidt that Serenity
+# orthogonalizes them with, the subspace metric degrades until the Ritz pairs
+# break down (observed on this scan: 11 of 12 roots converged with a largest
+# residual of 1.4e-05 at cycle 26, all 12 lost with 3.2e-01 at cycle 31, at a
+# subspace dimension of 155).  Above the bound Serenity collapses the space
+# onto the current Ritz vectors and transforms the sigma vectors with the same
+# expansion coefficients, i.e. it performs a proper thick restart, so bounding
+# the dimension only costs a few extra cycles.
+# 5 * nstates was measured on the breakdown above: with the bound at 60 the
+# same 12-root solve converged all twelve roots to <= 8.7e-06 in ~30 cycles.
+LR_SUBSPACE_DIMENSION_PER_ROOT = 5
+LR_SUBSPACE_DIMENSION_MARGIN = 20
+
+
 class SerenityLinearResponseSolver:
     """
     Implements Serenity linear-response solver.
@@ -67,7 +85,28 @@ class SerenityLinearResponseSolver:
         - small_grid_accuracy: Pre-optimization LR integration grid accuracy.
         - lr_restart_policy: ``'same_geometry'`` (default) or ``'never'``.
         - lr_convergence_retries: Fresh re-solves with doubled Davidson
-          cycles before a non-converged spectrum is rejected.
+          cycles before a non-converged spectrum is rejected.  A retry is
+          only spent when the previous solve was still making progress.
+        - lr_residual_tolerance: Largest residual norm at which a root is
+          still usable; see `Convergence of a dense root manifold` below.
+        - lr_strict_roots: Number of leading roots that must additionally
+          reach Serenity's own threshold.
+
+    Convergence of a dense root manifold
+        Serenity reports one convergence flag for the whole Davidson run:
+        if a single root misses ``conv`` the spectrum is flagged as not
+        converged, however well every other root did.  In a dense manifold
+        of valence states a root can floor above ``conv`` -- its residual
+        stops moving, Serenity's subspace expansion rejects the correction
+        vector as linearly dependent, collapses the subspace and rebuilds
+        the same vector, and the solver then cycles at a fixed residual
+        until maxCycles.  Re-solving with more cycles repeats that run
+        exactly.  Since the error of a Ritz value is bounded by the norm of
+        its residual, a spectrum whose every root is below
+        ``lr_residual_tolerance`` is accepted with a warning instead, and
+        the roots the caller consumes (``lr_strict_roots``) must still meet
+        ``conv``.  Setting ``lr_residual_tolerance`` to None restores the
+        strict behaviour.
 
     LRSCF restart versus SCF warm start versus state tracking
         Serenity's LRSCF restart loads the stored excitation vectors of the
@@ -114,6 +153,23 @@ class SerenityLinearResponseSolver:
 
         self.lr_restart_policy = 'same_geometry'
         self.lr_convergence_retries = 1
+
+        # Residual norm below which a Ritz pair is still usable even though
+        # Serenity did not call the run converged.  For the symmetric TDA
+        # problem an exact eigenvalue lies within ||r|| of the Ritz value
+        # (and in practice within ||r||^2/gap), so 1e-4 Hartree = 2.7 meV
+        # bounds every excitation energy well below anything a geometry
+        # optimization resolves; for RPA the same bound holds to the extent
+        # that the paired eigenvalues stay real and separated.  None restores
+        # the strict "every root or nothing".
+        self.lr_residual_tolerance = 1.0e-4
+        # Leading roots that must reach Serenity's own threshold anyway.
+        # Callers that consume one state set this to that root's index.
+        self.lr_strict_roots = None
+        # Collapse the Davidson subspace on a re-solve after a non-converged
+        # run.  The first solve keeps Serenity's own (unbounded) setting, so
+        # calculations that converge today are untouched.
+        self.lr_collapse_subspace_on_retry = True
 
         self._lr_task = None
         self._rsp_results = None
@@ -243,6 +299,19 @@ class SerenityLinearResponseSolver:
         if 'lr_convergence_retries' in rsp_dict:
             self.lr_convergence_retries = int(rsp_dict['lr_convergence_retries'])
 
+        if 'lr_residual_tolerance' in rsp_dict:
+            value = rsp_dict['lr_residual_tolerance']
+            self.lr_residual_tolerance = (None if value is None
+                                          else float(value))
+
+        if 'lr_strict_roots' in rsp_dict:
+            value = rsp_dict['lr_strict_roots']
+            self.lr_strict_roots = None if value is None else int(value)
+
+        if 'lr_collapse_subspace_on_retry' in rsp_dict:
+            self.lr_collapse_subspace_on_retry = bool(
+                rsp_dict['lr_collapse_subspace_on_retry'])
+
         if 'grid_level' in method_dict:
             lvl = int(method_dict['grid_level'])
             self.grid_accuracy = lvl
@@ -356,6 +425,24 @@ class SerenityLinearResponseSolver:
             'supported because Serenity does not transform stored vectors '
             'to the MO basis of the new geometry.')
         self.lr_restart_policy = label
+
+    def retry_max_subspace_dimension(self, nstates=None):
+        """
+        Davidson subspace bound used when a solve has to be repeated.
+
+        Serenity collapses the guess space onto the current Ritz vectors once
+        it exceeds this many vectors; see LR_SUBSPACE_DIMENSION_PER_ROOT.
+
+        :param nstates:
+            Root count of the solve; defaults to ``nstates``.
+        """
+
+        nst = int(self.nstates if nstates is None else nstates)
+        bound = max(LR_SUBSPACE_DIMENSION_PER_ROOT * nst,
+                    nst + LR_SUBSPACE_DIMENSION_MARGIN)
+        if self.max_subspace_dimension is not None:
+            return min(int(self.max_subspace_dimension), bound)
+        return bound
 
     def _invalidate_rsp_cache(self):
         self._lr_task = None
@@ -482,33 +569,72 @@ class SerenityLinearResponseSolver:
         # the class docstring and decide_lr_restart().
         decision = self.decide_lr_restart(rsp_signature)
         attempts = []
+        verdict = None
         max_cycles = None
+        max_subspace = None
         for attempt in range(1 + max(0, int(self.lr_convergence_retries))):
             # A retry after non-convergence always starts from scratch.
             restart = bool(decision['restart']) and attempt == 0
-            run = self._run_lr_task(restart, max_cycles)
+            run = self._run_lr_task(restart, max_cycles, max_subspace)
             attempts.append(run)
+            # The verdict always belongs to the attempt that is kept.
+            verdict = (self.assess_lr_convergence(run)
+                       if run['converged'] is False else None)
             # converged is None when Serenity printed no convergence status;
             # more Davidson cycles cannot fix that.
             if run['converged'] is not False:
                 break
-            max_cycles = 2 * int(run['max_cycles'])
+            if verdict['usable']:
+                # The residuals are already good enough; a re-solve would
+                # only reproduce them.
+                break
+            # A re-solve has to change the algorithm, not only its length:
+            # Serenity's Davidson is deterministic, so repeating the same
+            # settings repeats the same trajectory.  Collapsing the subspace
+            # is what a run whose Ritz pairs degraded needs, and more cycles
+            # only help a run whose residual was still moving.
+            if self.lr_collapse_subspace_on_retry and max_subspace is None:
+                max_subspace = self.retry_max_subspace_dimension()
+            elif run.get('stalled'):
+                # Nothing left to vary: the residual stopped moving with a
+                # collapsing subspace too.
+                break
+            if not run.get('stalled'):
+                max_cycles = 2 * int(run['max_cycles'])
 
+        accepted_within_tolerance = False
         if attempts[-1]['converged'] is not True:
-            # A non-converged solve may have overwritten the restart file.
-            self.invalidate_lr_restart_ledger()
-            self._rsp_results = None
-            self._rsp_results_key = None
-            if attempts[-1]['converged'] is None:
-                reason = ('Serenity printed no convergence status for the '
-                          'LRSCF solve, so convergence cannot be verified')
+            final = attempts[-1]
+            if verdict is not None and verdict['usable']:
+                accepted_within_tolerance = True
+                self.scf_driver.ostream.print_info(
+                    'Serenity LRSCF reported "Convergence criterion not '
+                    f'reached" after {final["cycles_run"]} cycle(s), but '
+                    f'{verdict["reason"]}; the spectrum is accepted. '
+                    'Largest residual norm '
+                    f'{final["max_residual"]:.2e} at root '
+                    f'{1 + final["residual_norms"].index(final["max_residual"])}.')
+                self.scf_driver.ostream.flush()
             else:
-                reason = ('Serenity LRSCF did not converge ("Convergence '
-                          'criterion not reached") in '
-                          f'{len(attempts)} attempt(s)')
-            raise SerenityCalculationError(
-                f'{reason}; the spectrum is not usable.', stage='response',
-                details={'attempts': attempts})
+                # A non-converged solve may have overwritten the restart file.
+                self.invalidate_lr_restart_ledger()
+                self._rsp_results = None
+                self._rsp_results_key = None
+                if final['converged'] is None:
+                    reason = ('Serenity printed no convergence status for '
+                              'the LRSCF solve, so convergence cannot be '
+                              'verified')
+                else:
+                    reason = ('Serenity LRSCF did not converge '
+                              '("Convergence criterion not reached") in '
+                              f'{len(attempts)} attempt(s)')
+                    if verdict is not None:
+                        reason += f' and {verdict["reason"]}'
+                raise SerenityCalculationError(
+                    f'{reason}; the spectrum is not usable.',
+                    stage='response',
+                    details={'attempts': attempts,
+                             'residual_verdict': verdict})
 
         transitions = self._get_serenity_transitions()
         eigvecs = self._get_serenity_excitation_vectors()
@@ -535,6 +661,12 @@ class SerenityLinearResponseSolver:
             'restart_used': final_run['restart_used'],
             'restart_reason': decision['reason'],
             'converged': True,
+            'accepted_within_residual_tolerance':
+                bool(accepted_within_tolerance),
+            'residual_norms': final_run.get('residual_norms'),
+            'max_residual': final_run.get('max_residual'),
+            'residual_verdict': (verdict if accepted_within_tolerance
+                                 else None),
             'davidson_iterations': final_run['davidson_iterations'],
             'attempts': attempts,
             'nstates': int(self.nstates),
@@ -544,7 +676,10 @@ class SerenityLinearResponseSolver:
         }
         self.last_lr_provenance = dict(rsp_results['lr_provenance'])
 
-        # Only a converged, validated solution enters the ledger.
+        # Only a validated solution enters the ledger: either converged, or
+        # accepted because every root reached the usable residual tolerance.
+        # Both are Ritz vectors of this geometry's MO basis, so they are a
+        # legitimate Davidson guess for the gradient task's LRSCF step.
         self.record_lr_solution(rsp_signature)
         self._rsp_results = rsp_results
         self._rsp_results_key = results_key
@@ -555,7 +690,8 @@ class SerenityLinearResponseSolver:
 
         return self._copy_rsp_results(self._rsp_results)
 
-    def _run_lr_task(self, restart, max_cycles=None):
+    def _run_lr_task(self, restart, max_cycles=None,
+                     max_subspace_dimension=None):
         """
         Runs one LRSCF solve on the current System and parses its output.
 
@@ -563,10 +699,15 @@ class SerenityLinearResponseSolver:
             Explicit Serenity restart flag for this solve.
         :param max_cycles:
             Optional Davidson cycle limit overriding ``max_cycles``.
+        :param max_subspace_dimension:
+            Optional Davidson subspace bound overriding
+            ``max_subspace_dimension``.
 
         :return:
-            Dictionary describing the solve (restart requested/used,
-            convergence, Davidson iterations, cycle limit, warnings).
+            Attempt record from ``summarize_lr_run`` (restart requested and
+            used, convergence, Davidson iterations, cycle and subspace
+            limits, warnings, per-root residual norms and whether the run
+            stalled).
         """
 
         mode = self.scf_driver._current_scf_mode
@@ -576,7 +717,9 @@ class SerenityLinearResponseSolver:
             else:
                 self._lr_task = spy.LRSCFTask_U(self.scf_driver._system)
 
-        self._configure_lr_task(restart=restart, max_cycles=max_cycles)
+        self._configure_lr_task(
+            restart=restart, max_cycles=max_cycles,
+            max_subspace_dimension=max_subspace_dimension)
 
         capture = self.scf_driver.capture_serenity_output('response')
         try:
@@ -590,15 +733,144 @@ class SerenityLinearResponseSolver:
             ) from error
 
         parsed = parse_serenity_lr_output(capture.text)
+        run = self.summarize_lr_run(
+            parsed, restart=restart,
+            max_cycles=int(self._lr_task.settings.maxCycles),
+            conv=float(self._lr_task.settings.conv))
+        run['max_subspace_dimension'] = int(
+            self._lr_task.settings.maxSubspaceDimension)
+        return run
+
+    @staticmethod
+    def summarize_lr_run(parsed, restart, max_cycles, conv):
+        """
+        Condenses one parsed Serenity solve into a record of the attempt.
+
+        Keeps the per-root residual norms and the shape of the iteration
+        trace (not the trace itself, which the callers archive as JSON) so
+        that a non-converged solve can be judged instead of only rejected.
+        ``cycles_run`` counts every cycle the parsed text contains, so for a
+        gradient task it covers the LRSCF step *and* the Z-vector solves.
+
+        :param parsed:
+            Output of ``parse_serenity_lr_output``.
+        :param restart:
+            Whether a Serenity LRSCF restart was requested for this solve.
+        :param max_cycles:
+            Davidson cycle limit the solve ran with.
+        :param conv:
+            Residual-norm threshold the solve ran with.
+        """
+
+        trace = parsed.get('iteration_trace') or []
+        residuals = parsed.get('residual_norms')
         return {
             'restart_requested': bool(restart),
             # None if Serenity printed no restart message.
             'restart_used': parsed['restart_loaded'] if restart else False,
             'converged': parsed['converged'],
             'davidson_iterations': parsed['davidson_iterations'],
-            'max_cycles': int(self._lr_task.settings.maxCycles),
+            'max_cycles': int(max_cycles),
+            'conv': float(conv),
             'warnings': parsed['warnings'],
+            'residual_norms': (None if residuals is None
+                               else [float(value) for value in residuals]),
+            'max_residual': parsed.get('max_residual'),
+            'stalled': parsed.get('stalled'),
+            'cycles_run': len(trace),
+            'converged_roots': (trace[-1]['converged_roots'] if trace
+                                else None),
         }
+
+    def assess_lr_convergence(self, run, strict_roots=None, nstates=None):
+        """
+        Judges a solve Serenity flagged as not converged by its residuals.
+
+        Serenity's flag is all-or-nothing over the requested roots.  The
+        variational error of a Ritz value is bounded by the norm of its
+        residual, so a root that only reached ``lr_residual_tolerance``
+        still carries an excitation energy accurate to that bound, while a
+        root far above it is not usable at all.
+
+        :param run:
+            Attempt record from ``summarize_lr_run``.
+        :param strict_roots:
+            Number of leading roots that must reach Serenity's own
+            threshold; defaults to ``lr_strict_roots``.
+        :param nstates:
+            Number of roots the solve requested; defaults to ``nstates``.
+
+        :return:
+            Dictionary with ``usable`` (bool), ``reason``,
+            ``roots_above_tolerance``, ``roots_above_conv`` and the
+            thresholds that were applied.
+        """
+
+        tolerance = self.lr_residual_tolerance
+        conv = run.get('conv')
+        residuals = run.get('residual_norms')
+        requested = int(self.nstates if nstates is None else nstates)
+        strict = self.lr_strict_roots if strict_roots is None else strict_roots
+
+        verdict = {
+            'usable': False,
+            'residual_tolerance': tolerance,
+            'conv': conv,
+            'strict_roots': None if strict is None else int(strict),
+            'roots_above_tolerance': [],
+            'roots_above_conv': [],
+        }
+
+        if tolerance is None:
+            verdict['reason'] = ('no residual tolerance is configured '
+                                 '(lr_residual_tolerance is None)')
+            return verdict
+        if not residuals:
+            verdict['reason'] = ('Serenity printed no per-root residual '
+                                 'norms, so the spectrum cannot be judged')
+            return verdict
+        if len(residuals) < requested:
+            verdict['reason'] = (
+                f'Serenity reported {len(residuals)} residual norm(s) for '
+                f'{requested} requested root(s)')
+            return verdict
+
+        verdict['roots_above_tolerance'] = [
+            index + 1 for index, value in enumerate(residuals)
+            if not value < tolerance]
+        if conv is not None:
+            verdict['roots_above_conv'] = [
+                index + 1 for index, value in enumerate(residuals)
+                if not value < conv]
+
+        if verdict['roots_above_tolerance']:
+            worst = max(residuals)
+            verdict['reason'] = (
+                'root(s) ' +
+                ', '.join(str(root)
+                          for root in verdict['roots_above_tolerance']) +
+                f' have a residual norm up to {worst:.2e}, above the '
+                f'usable tolerance {tolerance:.2e}')
+            return verdict
+
+        if strict is not None and conv is not None:
+            missed = [root for root in verdict['roots_above_conv']
+                      if root <= int(strict)]
+            if missed:
+                verdict['reason'] = (
+                    'root(s) ' + ', '.join(str(root) for root in missed) +
+                    f' are consumed by the caller but did not reach the '
+                    f'Serenity threshold {conv:.2e}')
+                return verdict
+
+        verdict['usable'] = True
+        verdict['reason'] = (
+            'every root is below the usable residual tolerance '
+            f'{tolerance:.2e}' +
+            ('' if strict is None or conv is None else
+             f'; root(s) 1-{int(strict)} reached the Serenity threshold '
+             f'{conv:.2e}'))
+        return verdict
 
     def _validate_lr_solution(self, transitions, eigvecs):
         """Rejects spectra with missing, nonfinite or empty roots."""
@@ -626,7 +898,8 @@ class SerenityLinearResponseSolver:
                 '; '.join(problems), stage='response',
                 details={'problems': problems})
 
-    def _configure_lr_task(self, restart=False, max_cycles=None):
+    def _configure_lr_task(self, restart=False, max_cycles=None,
+                           max_subspace_dimension=None):
         """
         Configures the LRSCF task.
 
@@ -635,12 +908,16 @@ class SerenityLinearResponseSolver:
             ``decide_lr_restart`` allows it; never set it for a new geometry.
         :param max_cycles:
             Optional Davidson cycle limit overriding ``max_cycles``.
+        :param max_subspace_dimension:
+            Optional Davidson subspace bound overriding
+            ``max_subspace_dimension``.
         """
 
-        # Print level NORMAL: at MINIMUM Serenity silences "Iterative solver
-        # converged in N iterations" and the restart messages, which are
-        # the only evidence of convergence and restart use.  The output is
-        # captured and only echoed in verbose mode.
+        # Serenity's convergence, restart and residual messages are plain
+        # printf and appear at every print level; NORMAL is set so that the
+        # rest of the LRSCF output (the iteration trace) is written too,
+        # since it is what tells a stalled run from a slow one.  The output
+        # is captured and only echoed in verbose mode.
         if hasattr(self._lr_task, 'generalSettings'):
             self._lr_task.generalSettings.printLevel = (
                 spy.GLOBAL_PRINT_LEVELS.NORMAL)
@@ -664,9 +941,11 @@ class SerenityLinearResponseSolver:
                 '2; Serenity reports no convergence status for 1 cycle')
             self._lr_task.settings.maxCycles = int(max_cycles)
 
-        if self.max_subspace_dimension is not None:
+        if max_subspace_dimension is None:
+            max_subspace_dimension = self.max_subspace_dimension
+        if max_subspace_dimension is not None:
             self._lr_task.settings.maxSubspaceDimension = int(
-                self.max_subspace_dimension)
+                max_subspace_dimension)
 
         if self.densfit_j is not None:
             self._lr_task.settings.densFitJ = self.densfit_j

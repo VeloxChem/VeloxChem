@@ -106,26 +106,142 @@ SERENITY_LR_RESTART_SCRATCH = 'Will continue from scratch'
 _SERENITY_LR_ITERATIONS = re.compile(
     r'Iterative solver converged in\s+(\d+)\s+iterations')
 
+# EigenvalueSolver::iterate() and NonlinearResponseSolver::iterate() print one
+# line per cycle: "%5i %10i %14.3f %11i %13.2e  (%2i)" = iteration, subspace
+# dimension, time, converged roots, largest residual norm and its root.
+_SERENITY_LR_CYCLE = re.compile(
+    r'^\s*(\d+)\s+(\d+)\s+(-?\d+\.\d+)\s+(\d+)\s+'
+    r'(-?\d+\.\d+[eE][-+]\d+)\s+\(\s*(\d+)\)\s*$')
+
+# EigenvalueSolver::postProcessing() prints this table after every solve,
+# converged or not: "%6i %12.7f %9.5f %11.3e" = root, eigenvalue in a.u. and
+# in eV, and the residual norm the root actually reached.
+_SERENITY_LR_SPECTRUM_HEAD = re.compile(
+    r'^\s*(?:TDA|TDDFT) excitation energies\s*$')
+_SERENITY_LR_SPECTRUM_ROW = re.compile(
+    r'^\s*(\d+)\s+(-?\d+\.\d{7})\s+(-?\d+\.\d{5})\s+'
+    r'(-?\d+\.\d+[eE][-+]\d+)\s*$')
+
+# A Davidson run is "stalled" when the largest residual norm stopped moving:
+# Serenity's subspace expansion drops a correction vector whose component
+# orthogonal to the guess space is below 0.1 % of its norm, collapses the
+# subspace to the current Ritz vectors and rebuilds the same vector, so the
+# solver can cycle at a fixed residual until maxCycles.  More cycles or an
+# identical re-solve cannot move such a run.
+SERENITY_LR_STALL_WINDOW = 8
+SERENITY_LR_STALL_SPREAD = 0.1
+
+
+def _parse_serenity_lr_cycles(text):
+    """Returns the Davidson/response iteration trace printed by Serenity."""
+
+    trace = []
+    for line in text.splitlines():
+        match = _SERENITY_LR_CYCLE.match(line)
+        if match is None:
+            continue
+        trace.append({
+            'iteration': int(match.group(1)),
+            'subspace_dimension': int(match.group(2)),
+            'converged_roots': int(match.group(4)),
+            'max_residual': float(match.group(5)),
+            'max_residual_root': int(match.group(6)),
+        })
+    return trace
+
+
+def _parse_serenity_lr_spectrum(text):
+    """
+    Returns (eigenvalues, residual_norms) of the last excitation table.
+
+    The table is printed by ``EigenvalueSolver::postProcessing()`` whether or
+    not the solver converged, so it is the only place where the residual norm
+    actually reached by each root is reported.
+    """
+
+    lines = text.splitlines()
+    starts = [i for i, line in enumerate(lines)
+              if _SERENITY_LR_SPECTRUM_HEAD.match(line)]
+    if not starts:
+        return None, None
+
+    eigenvalues, residuals = [], []
+    for line in lines[starts[-1]:]:
+        match = _SERENITY_LR_SPECTRUM_ROW.match(line)
+        if match is None:
+            if eigenvalues:
+                break
+            continue
+        if int(match.group(1)) != len(eigenvalues) + 1:
+            break
+        eigenvalues.append(float(match.group(2)))
+        residuals.append(float(match.group(4)))
+
+    if not eigenvalues:
+        return None, None
+    return eigenvalues, residuals
+
+
+def serenity_lr_run_is_stalled(trace,
+                               window=SERENITY_LR_STALL_WINDOW,
+                               spread=SERENITY_LR_STALL_SPREAD):
+    """
+    Decides from the iteration trace whether more cycles can still help.
+
+    :param trace:
+        Iteration trace as returned by ``parse_serenity_lr_output``.
+
+    :return:
+        True when the largest residual norm of the last ``window`` cycles
+        varies by less than ``spread`` (relative), False when it is still
+        moving, None when the trace is too short to tell.
+    """
+
+    norms = [row['max_residual'] for row in trace or []]
+    if len(norms) < window:
+        return None
+    tail = norms[-window:]
+    largest = max(tail)
+    if largest <= 0.0:
+        return True
+    return (largest - min(tail)) / largest < spread
+
 
 def parse_serenity_lr_output(text):
     """
     Extracts convergence and restart information from captured LRSCF output.
 
-    The non-convergence warning is printed at every print level, but
-    "Iterative solver converged in N iterations" and the restart messages
-    are silenced at print level MINIMUM.  Convergence is therefore only
-    accepted on positive evidence: without either message ``converged`` is
-    None, and callers must treat that as "not verified".
+    Serenity writes all of this with plain ``printf``, which
+    GLOBAL_PRINT_LEVEL does not gate (only the ``OutputControl`` wrappers in
+    io/FormattedOutputStream.h are gated), so the messages appear at every
+    print level.  Convergence is nevertheless only accepted on positive
+    evidence: without "Iterative solver converged in N iterations" and
+    without the non-convergence warning ``converged`` is None, and callers
+    must treat that as "not verified" -- the output may have been lost
+    rather than never written.
 
     :param text:
         Everything Serenity wrote to stdout during one LRSCF solve (an
         ``LRSCFTask`` or the LRSCF step inside a ``GradientTask``).
 
+    Besides the convergence flag the output also carries the numbers needed
+    to tell *how far* a non-converged solve got: the per-cycle trace and the
+    excitation table that ``EigenvalueSolver::postProcessing()`` prints even
+    when the solver gave up.  Both are parsed here, because "not converged"
+    alone cannot distinguish a solve that needs more cycles from one whose
+    residual stopped moving, nor a spectrum that is unusable from one whose
+    roots all sit just above Serenity's threshold.
+
     :return:
         Dictionary with ``converged`` (True, False or None),
         ``restart_loaded`` (True, False or None if no restart message was
         printed), ``davidson_iterations`` (last reported count),
-        ``n_converged_solves`` and ``warnings``.
+        ``n_converged_solves``, ``warnings``, the per-cycle
+        ``iteration_trace``, ``eigenvalues`` and ``residual_norms`` of the
+        final excitation table (None when Serenity printed none),
+        ``max_residual``, ``stalled`` and ``post_spectrum_warnings`` (the
+        warnings printed after the excitation table, i.e. by the Z-vector
+        solves of a gradient task rather than by the eigenvalue solver).
     """
 
     text = '' if text is None else str(text)
@@ -147,12 +263,34 @@ def parse_serenity_lr_output(text):
         restart_loaded = False
     else:
         restart_loaded = None
+
+    eigenvalues, residual_norms = _parse_serenity_lr_spectrum(text)
+    trace = _parse_serenity_lr_cycles(text)
+
+    # Warnings printed after the last excitation table do not belong to the
+    # eigenvalue solver; in a gradient task they come from the Z-vector
+    # equations, whose result enters the gradient directly.
+    spectrum_end = text.rfind('excitation energies')
+    if spectrum_end < 0:
+        post_spectrum_warnings = list(warnings)
+    else:
+        post_spectrum_warnings = [
+            line.strip() for line in text[spectrum_end:].splitlines()
+            if SERENITY_LR_NOT_CONVERGED in line
+        ]
+
     return {
         'converged': converged,
         'restart_loaded': restart_loaded,
         'davidson_iterations': iterations[-1] if iterations else None,
         'n_converged_solves': len(iterations),
         'warnings': warnings,
+        'post_spectrum_warnings': post_spectrum_warnings,
+        'iteration_trace': trace,
+        'eigenvalues': eigenvalues,
+        'residual_norms': residual_norms,
+        'max_residual': (max(residual_norms) if residual_norms else None),
+        'stalled': serenity_lr_run_is_stalled(trace),
     }
 
 
