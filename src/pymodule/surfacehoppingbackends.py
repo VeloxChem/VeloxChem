@@ -1371,6 +1371,20 @@ class SerenitySFAdapter(ElectronicBackendAdapter):
     gradient task was verified by central finite differences to return the
     total target gradient, so no reference gradient is added.
 
+    By default the targets are the lowest ``number_of_states`` raw SF roots,
+    which interleave singlets, the triplet Ms = 0 component and
+    spin-incomplete roots.  With ``target_multiplicity`` set, the targets are
+    instead the lowest ``number_of_states`` roots of that multiplicity in the
+    computed response window (nearest-multiplicity classification, the same
+    rule as ``SerenityExcitedStateGradientDriver.set_adiabatic_state``), so
+    ``target_multiplicity=1`` gives the spin-pure S0, S1, ... ladder that
+    OpenQP MRSF produces.  Raw target ``r`` is then the r-th state of that
+    manifold; its Serenity root number can change between geometries and is
+    carried per snapshot in :attr:`ElectronicSnapshot.derivative_selectors`.
+    The response window (``nstates`` of the response driver) must be larger
+    than ``number_of_states`` so that the triplet and spin-incomplete roots
+    interleaved below the highest target fit into it.
+
     :param molecule_template:
         Molecule supplying labels, charge and the high-spin reference
         multiplicity.
@@ -1381,6 +1395,12 @@ class SerenitySFAdapter(ElectronicBackendAdapter):
         Number of physical SF target states.
     :param degeneracy_threshold:
         Threshold handed to Serenity's transition-density tracking.
+    :param target_multiplicity:
+        ``None`` for the raw SF root ladder, or the spin multiplicity whose
+        lowest ``number_of_states`` roots are the targets (1 = singlets).
+    :param manifold_filter:
+        ``'nearest'`` or ``'strict'`` multiplicity classification for
+        ``target_multiplicity``.
     """
 
     backend = 'serenity'
@@ -1399,7 +1419,9 @@ class SerenitySFAdapter(ElectronicBackendAdapter):
                  native_cache_size=4,
                  gradient_identity_threshold=0.9,
                  gradient_ambiguity_ratio=0.8,
-                 gradient_energy_tolerance=1.0e-6):
+                 gradient_energy_tolerance=1.0e-6,
+                 target_multiplicity=None,
+                 manifold_filter='nearest'):
 
         super().__init__(molecule_template, number_of_states)
 
@@ -1412,6 +1434,21 @@ class SerenitySFAdapter(ElectronicBackendAdapter):
             gradient_identity_threshold)
         self.gradient_ambiguity_ratio = float(gradient_ambiguity_ratio)
         self.gradient_energy_tolerance = float(gradient_energy_tolerance)
+        self.target_multiplicity = (None if target_multiplicity is None else
+                                    int(target_multiplicity))
+        self.manifold_filter = str(manifold_filter).strip().lower()
+
+        if self.target_multiplicity is not None:
+            assert_msg_critical(
+                self.target_multiplicity >= 1,
+                'SerenitySFAdapter: target_multiplicity must be positive.')
+            assert_msg_critical(
+                self.manifold_filter in ('nearest', 'strict'),
+                'SerenitySFAdapter: manifold_filter must be nearest or '
+                'strict.')
+            self.target_manifold = (
+                'singlet' if self.target_multiplicity == 1 else
+                f'multiplicity-{self.target_multiplicity}')
 
         assert_msg_critical(
             0.0 <= self.gradient_identity_threshold <= 1.0,
@@ -1452,6 +1489,7 @@ class SerenitySFAdapter(ElectronicBackendAdapter):
 
         self._native = {}
         self._active_geometry_fingerprint = None
+        self._last_selectors = None
 
     def describe_settings(self):
         """
@@ -1479,6 +1517,15 @@ class SerenitySFAdapter(ElectronicBackendAdapter):
             'gradient_ambiguity_ratio': self.gradient_ambiguity_ratio,
             'gradient_energy_tolerance': self.gradient_energy_tolerance,
         })
+        # Only a spin-adapted ladder adds keys, so the fingerprint of the
+        # raw-ladder configuration (and its checkpoints) is unchanged.
+        if self.target_multiplicity is not None:
+            payload.update({
+                'rohf_type': str(getattr(scf, 'rohf_type', None) or 'NONE'),
+                'target_multiplicity': self.target_multiplicity,
+                'manifold_filter': self.manifold_filter,
+                's2_tolerance': float(self.gradient_driver.s2_tolerance),
+            })
 
         return payload
 
@@ -1539,7 +1586,7 @@ class SerenitySFAdapter(ElectronicBackendAdapter):
                     'cross-geometry electronic descriptor is available and '
                     'production surface hopping is refused.')
 
-        return {
+        capabilities = {
             'backend': self.backend,
             'backend_version': self.backend_version(),
             'method': self.method,
@@ -1552,6 +1599,17 @@ class SerenitySFAdapter(ElectronicBackendAdapter):
             'state_specific_gradients': True,
             'cross_geometry_descriptor': 'serenity_transition_density_overlap',
         }
+        if self.target_multiplicity is not None:
+            capabilities.update({
+                'target_state_selection':
+                    f'lowest {self.number_of_states} roots of multiplicity '
+                    f'{self.target_multiplicity} ({self.manifold_filter}) in '
+                    f'a {int(self.response_driver.nstates)}-root SF window',
+                'reference_type': str(
+                    getattr(self.scf_driver, 'rohf_type', None) or 'NONE'),
+            })
+
+        return capabilities
 
     def compute_snapshot(self, geometry, previous_snapshot=None,
                          gradient_hint=None):
@@ -1563,12 +1621,16 @@ class SerenitySFAdapter(ElectronicBackendAdapter):
 
         molecule = self.build_molecule(geometry)
         raw_hint = 0 if gradient_hint is None else int(gradient_hint)
-        selector = raw_hint + 1
 
         assert_msg_critical(
             0 <= raw_hint < self.number_of_states,
             f'SerenitySFAdapter: gradient hint {raw_hint} is outside the '
             f'{self.number_of_states} tracked SF target states.')
+
+        # The Serenity root of a spin-adapted target is only known after the
+        # response solve, so the task differentiates the predicted root; a
+        # wrong prediction is corrected below by a validated second task.
+        selector = self._predict_selector(previous_snapshot, raw_hint)
 
         task = self._run_gradient_task(molecule, selector)
         controller = task.getLRSCFController()
@@ -1590,17 +1652,27 @@ class SerenitySFAdapter(ElectronicBackendAdapter):
             'working-reference energy; the SF target totals cannot be built.')
         reference_energy = float(reference_energy)
 
-        omegas = omegas[:self.number_of_states]
+        if self.target_multiplicity is None:
+            roots = np.arange(self.number_of_states)
+            spin_metadata = self._spin_metadata(controller)
+        else:
+            roots, selection = self._select_target_roots(controller)
+            spin_metadata = self._spin_metadata(controller, roots, selection)
+
+        omegas = omegas[roots]
         # A negative SF response energy is physical: the lowest SF target
         # normally lies BELOW the high-spin working reference.  It is kept.
         target_energies = reference_energy + omegas
 
-        spin_metadata = self._spin_metadata(controller)
         overlap = None
 
         if previous_snapshot is not None:
-            overlap = self._transition_density_overlap(previous_snapshot,
-                                                       controller)
+            if self.target_multiplicity is None:
+                overlap = self._transition_density_overlap(previous_snapshot,
+                                                           controller)
+            else:
+                overlap = self._transition_density_overlap(
+                    previous_snapshot, controller, roots)
             self.n_overlap_calls += 1
 
         self.n_scf_calls += 1
@@ -1622,8 +1694,7 @@ class SerenitySFAdapter(ElectronicBackendAdapter):
             basis=self.basis_label,
             reference_energy=reference_energy,
             target_energies=target_energies,
-            derivative_selectors=tuple(
-                range(1, self.number_of_states + 1)),
+            derivative_selectors=tuple(int(root) + 1 for root in roots),
             response_energies=omegas,
             overlap_to_previous=overlap,
             previous_calculation_id=(
@@ -1634,6 +1705,8 @@ class SerenitySFAdapter(ElectronicBackendAdapter):
         gradient = np.asarray(
             self.scf_driver._system.getGeometry().getGradients(), dtype=float)
 
+        # Gradients are keyed by Serenity selector: the task above
+        # differentiated ``selector``, whichever target it turns out to be.
         self._store_native(snapshot, {
             'controller': controller,
             'system': self.scf_driver._system,
@@ -1642,8 +1715,14 @@ class SerenitySFAdapter(ElectronicBackendAdapter):
             'coefficients': controller.getCoefficients(),
             'excitation_vectors': controller.getExcitationVectors('isolated'),
             'molecule': molecule,
-            'gradients': {raw_hint: gradient.copy()},
+            'gradients': {selector: gradient.copy()},
         })
+        self._last_selectors = snapshot.derivative_selectors
+
+        if snapshot.selector_for(raw_hint) != selector:
+            if gradient_hint is None:
+                return snapshot, None
+            return snapshot, self.compute_gradient(snapshot, raw_hint)
 
         return snapshot, gradient.copy()
 
@@ -1656,7 +1735,7 @@ class SerenitySFAdapter(ElectronicBackendAdapter):
         payload = self._native_payload(snapshot)
         index = int(raw_target)
 
-        cached = payload['gradients'].get(index, None)
+        cached = payload['gradients'].get(selector, None)
         if cached is not None:
             return np.array(cached, dtype=float, copy=True)
 
@@ -1689,7 +1768,7 @@ class SerenitySFAdapter(ElectronicBackendAdapter):
         gradient = np.asarray(
             self.scf_driver._system.getGeometry().getGradients(), dtype=float)
 
-        payload['gradients'][index] = gradient.copy()
+        payload['gradients'][selector] = gradient.copy()
 
         return gradient.copy()
 
@@ -1704,8 +1783,15 @@ class SerenitySFAdapter(ElectronicBackendAdapter):
 
         current_payload = self._native_payload(current_snapshot)
 
-        return self._transition_density_overlap(previous_snapshot,
-                                                current_payload['controller'])
+        if self.target_multiplicity is None:
+            return self._transition_density_overlap(
+                previous_snapshot, current_payload['controller'])
+
+        roots = np.asarray(current_snapshot.derivative_selectors,
+                           dtype=int) - 1
+
+        return self._transition_density_overlap(
+            previous_snapshot, current_payload['controller'], roots)
 
     def release(self, calculation_id):
         """
@@ -1755,15 +1841,17 @@ class SerenitySFAdapter(ElectronicBackendAdapter):
 
         return driver._run_excited_gradient_task(mode)
 
-    def _spin_metadata(self, controller):
+    def _spin_metadata(self, controller, roots=None, selection=None):
         """
         Collects Serenity's spin diagnostics for every raw target.
 
         Serenity's SF roots interleave spin manifolds, so ``<S^2>`` and the
         inferred multiplicity are recorded per raw target and travel with the
-        snapshot.  They are diagnostics: the raw target numbering is *not*
-        renumbered by spin, because the derivative selector must stay
-        ``r + 1``.
+        snapshot.  For the raw ladder they are diagnostics: the raw target
+        numbering is *not* renumbered by spin, because the derivative
+        selector must stay ``r + 1``.  For a spin-adapted ladder, ``roots``
+        are the zero-based Serenity roots of the targets and ``selection``
+        the manifold selection whose window diagnostics are recorded too.
         """
 
         try:
@@ -1771,21 +1859,42 @@ class SerenitySFAdapter(ElectronicBackendAdapter):
         except Exception:
             return None
 
-        n = self.number_of_states
+        index = (np.arange(self.number_of_states) if roots is None else
+                 np.asarray(roots, dtype=int))
 
         def take(name):
             values = metadata.get(name, None)
             if values is None:
                 return None
-            return np.asarray(values).reshape(-1)[:n].tolist()
+            return np.asarray(values).reshape(-1)[index].tolist()
 
-        return {
+        spin = {
             'reference_s2': float(metadata.get('reference_s2', np.nan)),
             'state_s2': take('state_s2'),
             'state_multiplicities': take('state_multiplicities'),
             's2_deviation': take('s2_deviation'),
             's2_tolerance': float(self.gradient_driver.s2_tolerance),
         }
+
+        if roots is not None:
+            window = {
+                'serenity_roots': (index + 1).tolist(),
+                'window_state_s2': np.asarray(
+                    metadata['state_s2'], dtype=float).reshape(-1).tolist(),
+                'window_multiplicities': np.asarray(
+                    metadata['state_multiplicities'],
+                    dtype=int).reshape(-1).tolist(),
+            }
+            if selection is not None:
+                window.update({
+                    'manifold_roots': list(selection['manifold_roots']),
+                    'spin_ambiguous_roots': list(
+                        selection['spin_ambiguous_roots']),
+                    'selection_robust': bool(selection['selection_robust']),
+                })
+            spin.update(window)
+
+        return spin
 
     def _validate_recomputed_gradient_identity(
             self, snapshot, raw_target, controller):
@@ -1806,7 +1915,15 @@ class SerenitySFAdapter(ElectronicBackendAdapter):
                                             solve_assignment)
         from .veloxchemlib import hartree_in_ev
 
-        overlap = self._transition_density_overlap(snapshot, controller)
+        # A spin-adapted ladder is matched to the recomputed controller's own
+        # target roots; the raw ladder keeps its first number_of_states roots.
+        if getattr(self, 'target_multiplicity', None) is None:
+            current_roots = np.arange(self.number_of_states)
+            overlap = self._transition_density_overlap(snapshot, controller)
+        else:
+            current_roots, selection = self._select_target_roots(controller)
+            overlap = self._transition_density_overlap(snapshot, controller,
+                                                       current_roots)
         similarity = assignment_similarity(overlap)
         assignment = solve_assignment(similarity)
         scores = similarity[np.arange(self.number_of_states), assignment]
@@ -1835,7 +1952,7 @@ class SerenitySFAdapter(ElectronicBackendAdapter):
                 'working-reference energy for state validation.')
 
         current_totals = (float(reference_energy) +
-                          current_omegas[:self.number_of_states])
+                          current_omegas[current_roots])
         mapped_totals = current_totals[assignment]
         deviations = np.abs(
             mapped_totals - np.asarray(snapshot.target_energies, dtype=float))
@@ -1848,7 +1965,11 @@ class SerenitySFAdapter(ElectronicBackendAdapter):
                 f'{self.gradient_energy_tolerance:.3e}).')
 
         previous_spin = snapshot.spin_metadata
-        current_spin = self._spin_metadata(controller)
+        if getattr(self, 'target_multiplicity', None) is None:
+            current_spin = self._spin_metadata(controller)
+        else:
+            current_spin = self._spin_metadata(controller, current_roots,
+                                               selection)
         if previous_spin is not None and current_spin is not None:
             previous_mult = np.asarray(
                 previous_spin.get('state_multiplicities', []),
@@ -1864,17 +1985,88 @@ class SerenitySFAdapter(ElectronicBackendAdapter):
                     'SerenitySFAdapter: the recomputed gradient root maps to '
                     'an incompatible spin sector.')
 
-        return int(assignment[int(raw_target)]) + 1
+        return int(current_roots[assignment[int(raw_target)]]) + 1
 
-    def _transition_density_overlap(self, previous_snapshot, controller):
+    def _predict_selector(self, previous_snapshot, raw_target):
+        """
+        Serenity selector to differentiate before the spectrum is known.
+
+        The raw ladder always uses ``r + 1``.  A spin-adapted target keeps
+        the root it had at the previous geometry, which is right unless a
+        root of another multiplicity crossed it during the step.
+        """
+
+        selector = int(raw_target) + 1
+        if self.target_multiplicity is None:
+            return selector
+
+        selectors = (previous_snapshot.derivative_selectors
+                     if previous_snapshot is not None else
+                     self._last_selectors)
+        if selectors is not None and len(selectors) == self.number_of_states:
+            candidate = int(selectors[int(raw_target)])
+            if 1 <= candidate <= int(self.response_driver.nstates):
+                selector = candidate
+
+        return selector
+
+    def _select_target_roots(self, controller):
+        """
+        Zero-based Serenity roots of the spin-adapted targets.
+
+        Uses :func:`select_adiabatic_manifold_root`, the classification of
+        ``SerenityExcitedStateGradientDriver.set_adiabatic_state``, so target
+        ``r`` is the same state an adiabatic optimization of manifold state
+        ``r + 1`` would follow.
+
+        :return:
+            ``(roots, selection)``: the energy-ordered roots and the selection
+            diagnostics of the highest target.
+        """
+
+        from .serenityexcitedstategradientdriver import (
+            select_adiabatic_manifold_root)
+        from .serenityscfdriver import AdiabaticStateSelectionError
+
+        driver = self.gradient_driver
+        try:
+            metadata = self.response_driver.get_spinflip_metadata(controller)
+            _, selection = select_adiabatic_manifold_root(
+                controller.getExcitationEnergies('isolated'),
+                metadata['state_multiplicities'],
+                metadata['state_s2'],
+                metadata['s2_deviation'],
+                target_multiplicity=self.target_multiplicity,
+                manifold_state_index=self.number_of_states,
+                manifold_filter=self.manifold_filter,
+                s2_tolerance=float(driver.s2_tolerance),
+                spin_ambiguity_margin=float(driver.spin_ambiguity_margin),
+                spin_contamination_threshold=float(
+                    driver.spin_contamination_threshold),
+                near_crossing_threshold_ev=float(
+                    driver.near_crossing_threshold_ev))
+        except AdiabaticStateSelectionError as error:
+            raise BackendCapabilityError(
+                'SerenitySFAdapter: the spin-adapted target ladder is '
+                f'incomplete: {error}')
+
+        roots = np.asarray(selection['manifold_roots'][:self.number_of_states],
+                           dtype=int) - 1
+
+        return roots, selection
+
+    def _transition_density_overlap(self, previous_snapshot, controller,
+                                    current_roots=None):
         """
         Evaluates Serenity's native transition-density overlap.
 
         Serenity returns ``|<Psi_i(current)|Psi_j(reference)>|`` with current
         roots in rows and reference roots in columns, already phase-invariant
         by construction.  The transpose restores the module-wide
-        ``(previous, current)`` orientation, and the block is truncated to the
-        tracked target states.
+        ``(previous, current)`` orientation.  The block is restricted to the
+        tracked target states: the previous snapshot's roots (its derivative
+        selectors) and ``current_roots`` (zero-based, default: the first
+        ``number_of_states`` roots).
         """
 
         from qcserenity import serenipy as spy
@@ -1924,15 +2116,23 @@ class SerenitySFAdapter(ElectronicBackendAdapter):
                 'transition-density overlap.')
 
         n = self.number_of_states
+        previous_roots = np.asarray(previous_snapshot.derivative_selectors,
+                                    dtype=int) - 1
+        current_roots = (np.arange(n) if current_roots is None else
+                         np.asarray(current_roots, dtype=int))
 
-        if overlap.shape[0] < n or overlap.shape[1] < n:
+        if (overlap.shape[0] <= int(np.max(current_roots)) or
+                overlap.shape[1] <= int(np.max(previous_roots))):
             raise BackendCapabilityError(
                 'SerenitySFAdapter: the transition-density overlap has shape '
-                f'{overlap.shape} but {n} tracked target states are required.')
+                f'{overlap.shape} but the tracked target states are roots '
+                f'{(previous_roots + 1).tolist()} (previous) and '
+                f'{(current_roots + 1).tolist()} (current).')
 
-        # (current, reference) -> (previous, current), truncated to the
+        # (current, reference) -> (previous, current), restricted to the
         # tracked block.
-        return np.ascontiguousarray(overlap[:n, :n].T)
+        return np.ascontiguousarray(
+            overlap[np.ix_(current_roots, previous_roots)].T)
 
     def _store_native(self, snapshot, native):
         """
