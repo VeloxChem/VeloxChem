@@ -76,6 +76,104 @@ from .resultsio import read_molecule_and_basis, write_opt_results_to_hdf5
 with redirect_stderr(StringIO()) as fg_err:
     import geometric
 
+# Seam convergence.  A minimization that ends on an intersection with the next
+# lower state sits on a cusp of the adiabatic surface, where the projected
+# gradient cannot vanish and geomeTRIC never converges.  While the gap to the
+# lower state stays below gap_ev, a step is also accepted as converged when
+#   seam_gradient: the gap was below gap_ev for the current and the previous
+#                  min_steps - 1 accepted steps, the energy change and the
+#                  displacements meet geomeTRIC's thresholds and the gradient
+#                  meets the relaxed thresholds grms / gmax;
+#   seam_plateau:  the gap was below gap_ev for the last window steps and none
+#                  of them lowered the energy by more than plateau_energy (Eh).
+# Away from the seam geomeTRIC's own test is unchanged.
+SEAM_CONVERGENCE_DEFAULTS = {
+    'gap_ev': 0.010,
+    'min_steps': 3,
+    'grms': 1.7e-3,
+    'gmax': 2.5e-3,
+    'window': 10,
+    'plateau_energy': 1.0e-5,
+}
+
+
+def seam_convergence_verdict(settings, history, delta_e, grms, gmax, drms,
+                             dmax, conv_energy, conv_drms, conv_dmax):
+    """
+    Applies the seam convergence criteria to one optimizer step.
+
+    :param settings:
+        The seam convergence settings (see SEAM_CONVERGENCE_DEFAULTS).
+    :param history:
+        (energy, gap in eV) of the accepted steps followed by the current one.
+    :param delta_e, grms, gmax, drms, dmax:
+        geomeTRIC's convergence measures of the current step.
+    :param conv_energy, conv_drms, conv_dmax:
+        geomeTRIC's energy and displacement thresholds.
+
+    :return:
+        'seam_gradient', 'seam_plateau' or None.
+    """
+
+    def below_gate(entries):
+        return all(gap is not None and gap < settings['gap_ev']
+                   for energy, gap in entries)
+
+    n = int(settings['min_steps'])
+    if (len(history) >= n and below_gate(history[-n:]) and
+            abs(delta_e) < conv_energy and drms < conv_drms and
+            dmax < conv_dmax and grms < settings['grms'] and
+            gmax < settings['gmax']):
+        return 'seam_gradient'
+
+    w = int(settings['window'])
+    if len(history) > w and below_gate(history[-w:]):
+        energies = [energy for energy, gap in history]
+        if min(energies[-w:]) > min(energies[:-w]) - settings['plateau_energy']:
+            return 'seam_plateau'
+
+    return None
+
+
+class _SeamConvergenceOptimizer(geometric.optimize.Optimizer):
+    """
+    geomeTRIC optimizer that applies the seam criteria of its engine after
+    geomeTRIC's own convergence test has failed.
+    """
+
+    def evaluate_OPT_step(self, params, step_state, *args):
+
+        terminate, step_state = super().evaluate_OPT_step(
+            params, step_state, *args)
+        engine = self.engine
+        if terminate or not self.conSatisfied or not engine.seam_history:
+            return terminate, step_state
+
+        history = [(entry['energy'], entry['gap_ev'])
+                   for entry in engine.seam_history[:-1] if entry['accepted']]
+        history.append((self.E, engine.seam_history[-1]['gap_ev']))
+        grms, gmax = self.calcGradNorm()
+        drms, dmax = geometric.optimize.calc_drms_dmax(self.X, self.Xprev)
+        verdict = seam_convergence_verdict(
+            engine.seam_convergence, history, self.E - self.Eprev, grms, gmax,
+            drms, dmax, params.Convergence_energy, params.Convergence_drms,
+            params.Convergence_dmax)
+        if verdict is None:
+            return terminate, step_state
+
+        engine.seam_verdict = {
+            'criterion': verdict,
+            'iteration': int(self.Iteration),
+            'gap_ev': history[-1][1],
+            'energy_change': float(self.E - self.Eprev),
+            'grms': float(grms),
+            'gmax': float(gmax),
+            'drms': float(drms),
+            'dmax': float(dmax),
+        }
+        self.state = geometric.optimize.OPT_STATE.CONVERGED
+        return True, step_state
+
 
 class OptimizationDriver:
     """
@@ -123,6 +221,10 @@ class OptimizationDriver:
         self.conv_gmax = None
         self.conv_drms = None
         self.conv_dmax = None
+
+        # None, or a dict overriding SEAM_CONVERGENCE_DEFAULTS (minimization
+        # only; requires a gradient driver that reports the lower-state gap)
+        self.seam_convergence = None
 
         self.transition = False
         self.irc = False
@@ -483,6 +585,32 @@ class OptimizationDriver:
         else:
             default_tmax = self.tmax
 
+        # seam convergence: geomeTRIC builds its Optimizer from the module
+        # attribute, so the subclass is swapped in for this run only
+
+        seam_settings = None
+        geometric_optimizer = geometric.optimize.Optimizer
+        if self.seam_convergence is not None and not (self.transition or
+                                                      self.irc):
+            unknown = set(self.seam_convergence) - set(
+                SEAM_CONVERGENCE_DEFAULTS)
+            assert_msg_critical(
+                not unknown,
+                f'OptimizationDriver: unknown seam_convergence keys {unknown}')
+            assert_msg_critical(
+                hasattr(geometric_optimizer, 'evaluate_OPT_step'),
+                'OptimizationDriver: seam_convergence requires geomeTRIC 1.1')
+            # the history is per optimization; a scan runs several in one
+            assert_msg_critical(
+                not any(line.split()[0] == 'scan'
+                        for line in (self.constraints or [])),
+                'OptimizationDriver: seam_convergence is not available for '
+                'scan constraints')
+            seam_settings = dict(SEAM_CONVERGENCE_DEFAULTS)
+            seam_settings.update(self.seam_convergence)
+            opt_engine.seam_convergence = seam_settings
+            geometric.optimize.Optimizer = _SeamConvergenceOptimizer
+
         # redirect geomeTRIC stdout/stderr
 
         with redirect_stdout(StringIO()) as fg_out, redirect_stderr(
@@ -503,12 +631,26 @@ class OptimizationDriver:
                     input=optinp_filename)
             except geometric.errors.HessianExit:
                 hessian_exit = True
+            finally:
+                geometric.optimize.Optimizer = geometric_optimizer
 
         # geomeTRIC's stdout carries the only record of a trust-radius
         # collapse, which is otherwise invisible: the energy looks converged
         # while the gradient stays large and the steps shrink to nothing.
         if self.rank == mpi_master():
             self.report_optimizer_stall(fg_out.getvalue())
+
+        seam_verdict = opt_engine.seam_verdict
+        if self.rank == mpi_master() and seam_verdict is not None:
+            self.ostream.print_info(
+                'Converged on the seam with the lower state '
+                f"({seam_verdict['criterion']}): gap "
+                f"{seam_verdict['gap_ev'] * 1000:.3f} meV < "
+                f"{seam_settings['gap_ev'] * 1000:.1f} meV, gradient "
+                f"{seam_verdict['grms']:.2e}/{seam_verdict['gmax']:.2e} "
+                '(RMS/max)')
+            self.ostream.print_blank()
+            self.ostream.flush()
 
         # geomeTRIC returns from evaluateStep() as soon as the convergence
         # criteria are met, before its accepted-step hook runs, so the final
@@ -645,6 +787,14 @@ class OptimizationDriver:
                                            opt_results)
 
             opt_results = self.comm.bcast(opt_results, root=mpi_master())
+
+        if seam_settings is not None:
+            opt_results['convergence_criterion'] = (
+                'gau' if seam_verdict is None else seam_verdict['criterion'])
+            opt_results['seam_convergence'] = {
+                'settings': seam_settings,
+                'verdict': seam_verdict,
+            }
 
         if opt_engine.intermediate_data_directory is not None:
             opt_results['intermediate_data_directory'] = \

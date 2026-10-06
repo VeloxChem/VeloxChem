@@ -37,7 +37,7 @@ from io import StringIO
 import numpy as np
 import time as tm
 
-from .veloxchemlib import mpi_master
+from .veloxchemlib import mpi_master, hartree_in_ev
 from .outputstream import OutputStream
 from .scfgradientdriver import ScfGradientDriver
 from .molecule import Molecule
@@ -167,6 +167,37 @@ class OptimizationEngine(geometric.engine.Engine):
         # of every evaluated geometry.
         self._constraints = []
         self._scan_point_index = 0
+
+        # Seam convergence (OptimizationDriver.seam_convergence).  None keeps
+        # geomeTRIC's convergence test untouched.  Otherwise every evaluation
+        # appends its energy and gap to the lower state, and the accepted /
+        # rejected hooks below mark the optimizer's verdict on it.
+        self.seam_convergence = None
+        self.seam_history = []
+        self.seam_verdict = None
+
+    def lower_state_gap_ev(self):
+        """
+        Returns the gap in eV between the optimized state and the next lower
+        state at the last evaluated geometry, or None when the gradient driver
+        does not provide one.
+        """
+
+        record = getattr(self.grad_drv, 'evaluation_record', None)
+        if isinstance(record, dict):
+            gap = (record.get('selection') or
+                   {}).get('gap_to_lower_manifold_state_ev')
+            return None if gap is None else float(gap)
+
+        # OpenQP: total energies of the target states, one-based root index.
+        energies = getattr(self.grad_drv, 'target_state_energies', None)
+        root = getattr(self.grad_drv, 'state_deriv_index', None)
+        if energies is not None and root is not None and 2 <= int(root) <= len(
+                energies):
+            root = int(root)
+            return float(energies[root - 1] -
+                         energies[root - 2]) * hartree_in_ev()
+        return None
 
     def set_intermediate_data_directory(self, directory):
         """Enables durable per-evaluation optimization records.
@@ -356,6 +387,8 @@ class OptimizationEngine(geometric.engine.Engine):
                 'accepted', tracking_reference_advanced=committed)
         if self._last_evaluated_coords is not None:
             self._accepted_tracking_coords = self._last_evaluated_coords.copy()
+        if self.seam_history and self.seam_history[-1]['accepted'] is None:
+            self.seam_history[-1]['accepted'] = True
 
     def load_guess_files(self, dirname):
         """
@@ -377,6 +410,8 @@ class OptimizationEngine(geometric.engine.Engine):
                 'rejected',
                 tracking_reference_advanced=(
                     False if rollback is not None else None))
+        if self.seam_history and self.seam_history[-1]['accepted'] is None:
+            self.seam_history[-1]['accepted'] = False
 
     def _tracking_record(self):
         """Returns backend-neutral tracking diagnostics for one evaluation."""
@@ -647,6 +682,15 @@ class OptimizationEngine(geometric.engine.Engine):
             energy, gradient, new_mol.number_of_atoms())
 
         self._record_intermediate_step(coords, energy, gradient)
+
+        if self.seam_convergence is not None:
+            gap = self.comm.bcast(self.lower_state_gap_ev(), root=mpi_master())
+            # The first evaluation is geomeTRIC's accepted starting point.
+            self.seam_history.append({
+                'energy': energy,
+                'gap_ev': gap,
+                'accepted': True if self.opt_current_step == 0 else None,
+            })
 
         self._last_evaluated_coords = np.asarray(coords, dtype=float).copy()
         if self.opt_current_step == 0:
