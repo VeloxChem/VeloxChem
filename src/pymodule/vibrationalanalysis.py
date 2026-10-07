@@ -49,7 +49,9 @@ from .lrsolver import LinearResponseSolver
 from .cppsolver import ComplexResponseSolver
 from .veloxchemlib import (mpi_master, bohr_in_angstrom, avogadro_constant,
                            fine_structure_constant, electron_mass_in_amu,
-                           amu_in_kg, speed_of_light_in_vacuum_in_SI)
+                           amu_in_kg, speed_of_light_in_vacuum_in_SI,
+			   au_of_electric_polarizability_in_SI,
+			   vacuum_electric_permittivity_in_SI)
 from .errorhandler import assert_msg_critical
 from .inputparser import parse_input, get_random_string_serial
 from .resultsio import write_results_to_hdf5
@@ -639,12 +641,37 @@ class VibrationalAnalysis:
         alpha = fine_structure_constant()
         bohr_in_km = bohr_in_angstrom() * 1e-13
 
+        bohr_in_m = bohr_in_angstrom() * 1e-10 # m
+        polarizability_in_si = au_of_electric_polarizability_in_SI() # Cm^2/V
+        epsilon_0_in_si = vacuum_electric_permittivity_in_SI() # C/mV
+        m4_to_ang4 = 1e40 # m^4 to Angstrom^4
+        amu_to_amu = 1.0 # for completeness
+
         # conversion factor of IR intensity to km/mol
         if prop == 'ir':
             conv_factor = (electron_mass_in_amu() * avogadro_constant() *
                            alpha**2 * bohr_in_km * np.pi / 3.0)
         elif prop == 'raman':
-            conv_factor = 0.078424
+            # To get the conversion factor in A^4/amu, we use the
+	    # polarizability volume calculated as alpha/(4 pi epsilon_0)
+	    # where alpha is the electronic polarizability and
+            # epsilon_0 is the electric constant/vacuum permittivity.
+            #
+	    # The normal modes are output in sqrt(amu)*bohr.
+            #
+	    # The Raman intensity is calculated from the squared invariants of the 
+	    # polarizability gradient, and the units of the intensity is thus given by
+	    # the square of the unit of the polarizability gradient.
+	    
+	    # The conversion factor in A^4/amu is thus given by
+	    # (alpha_in_SI / (4 pi epsilon_0_in_SI) / (sqrt(amu)*bohr_in_m))^2 * m4_to_ang4
+
+            #conv_factor = 0.078424 # from Q-chem
+            conv_factor = (
+                ((polarizability_in_si / (4.0 * np.pi* epsilon_0_in_si))
+                / (np.sqrt(amu_to_amu) * bohr_in_m))**2 
+                * m4_to_ang4  
+                )
 
         return conv_factor
 
