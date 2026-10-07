@@ -41,6 +41,8 @@ from .veloxchemlib import mpi_master
 from .veloxchemlib import bohr_in_angstroms
 from .veloxchemlib import hartree_in_ev
 from .veloxchemlib import hartree_in_inverse_nm
+from .veloxchemlib import (chemical_element_identifier, FikaClassicalSystem,
+                           FikaForceField)
 from .molecule import Molecule
 from .molecularbasis import MolecularBasis
 from .scfrestdriver import ScfRestrictedDriver
@@ -257,6 +259,53 @@ class TrajectoryDriver:
 
         default_guesser = DefaultGuesser(u)
 
+        # solvent parameters for the fika embedding: charges of the
+        # polarizable and non-polarizable residues and isotropic
+        # polarizabilities (the trace of the input tensor) of the polarizable
+        # ones
+        pe_res_name = 'water'
+        npe_res_name = 'water-n'
+        pe_res_charges = []
+        npe_res_charges = []
+        pe_res_polarizabilities = []
+        if self.charges:
+            for line in self.charges:
+                content = line.split()
+                if content[-1] == pe_res_name:
+                    pe_res_charges.append(float(content[1]))
+                if content[-1] == npe_res_name:
+                    npe_res_charges.append(float(content[1]))
+        if self.polarizabilities:
+            for line in self.polarizabilities:
+                content = line.split()
+                if content[-1] == pe_res_name:
+                    values = [float(x) for x in content[1:7]]
+                    pe_res_polarizabilities.append(
+                        (values[0] + values[3] + values[5]) / 3.0)
+
+        def _add_fika_residues(system, selection, residue_name, field_label,
+                               atom_charges, atom_polarizabilities):
+            polarizable = atom_polarizabilities is not None
+            for res in selection.residues:
+                assert_msg_critical(
+                    len(atom_charges) == len(res.atoms),
+                    'TrajectoryDriver: Inconsistent charges for residue ' +
+                    f'{residue_name}')
+                if polarizable:
+                    assert_msg_critical(
+                        len(atom_polarizabilities) == len(res.atoms),
+                        'TrajectoryDriver: Inconsistent polarizabilities ' +
+                        f'for residue {residue_name}')
+                elements = [
+                    chemical_element_identifier(
+                        default_guesser.guess_atom_element(atom.name).upper())
+                    for atom in res.atoms
+                ]
+                coordinates = (np.array([atom.position for atom in res.atoms]) /
+                               bohr_in_angstroms())
+                system.add_residues(residue_name, field_label, elements,
+                                    coordinates, polarizable)
+
         # go through frames in trajectory
         for ts in u.trajectory:
             # skip frames that are not in sampling_time
@@ -325,147 +374,55 @@ class TrajectoryDriver:
 
                 qm_mol = Molecule()
                 qm_basis = MolecularBasis()
+                embedding = None
 
-            # create json file for embedding
-            jsonfile = output_dir / '{}_frame_{}.json'.format(
-                Path(self.filename).name, ts.frame)
-
+            # build the classical system of the frame for the fika embedding
             if local_rank == mpi_master():
 
-                qm_mol_labels = qm_mol.get_labels()
-                qm_mol_coords = qm_mol.get_coordinates_in_bohr()
-                qm_mol_nuc_charges = qm_mol.get_element_ids()
+                classical_system = FikaClassicalSystem()
 
-                qm_nuclei = []
-                for atom_idx in range(qm_mol.number_of_atoms()):
-                    # Note: make sure all elements in qm_nuclei are
-                    # serializable by json
-                    qm_nuclei.append({
-                        'index': atom_idx + 1,
-                        'element': qm_mol_labels[atom_idx].capitalize(),
-                        'charge': float(qm_mol_nuc_charges[atom_idx]),
-                        'coordinate': [
-                            float(qm_mol_coords[atom_idx, 0]),
-                            float(qm_mol_coords[atom_idx, 1]),
-                            float(qm_mol_coords[atom_idx, 2]),
-                        ],
-                    })
+                if len(mm_pol.residues) > 0:
+                    assert_msg_critical(
+                        pe_res_charges,
+                        'TrajectoryDriver: Missing charges for the ' +
+                        f'{pe_res_name} residues')
+                    assert_msg_critical(
+                        pe_res_polarizabilities,
+                        'TrajectoryDriver: Missing polarizabilities for the ' +
+                        f'{pe_res_name} residues')
+                    classical_system.add_force_field(
+                        FikaForceField('trajectory_pe', pe_res_name,
+                                       pe_res_charges,
+                                       dict(enumerate(pe_res_polarizabilities))))
+                    _add_fika_residues(classical_system, mm_pol, pe_res_name,
+                                       'trajectory_pe', pe_res_charges,
+                                       pe_res_polarizabilities)
 
-                embedding_json = {
-                    "quantum_subsystems": [{
-                        "nuclei": qm_nuclei,
-                    }],
+                if len(mm_nonpol.residues) > 0:
+                    assert_msg_critical(
+                        npe_res_charges,
+                        'TrajectoryDriver: Missing charges for the ' +
+                        f'{npe_res_name} residues')
+                    classical_system.add_force_field(
+                        FikaForceField('trajectory_npe', npe_res_name,
+                                       npe_res_charges))
+                    _add_fika_residues(classical_system, mm_nonpol,
+                                       npe_res_name, 'trajectory_npe',
+                                       npe_res_charges, None)
+
+                embedding = {
+                    'settings': {
+                        'embedding_method': 'fika',
+                        # the trajectory input follows the undamped
+                        # polarizable embedding of the previous input format
+                        'damping': None,
+                    },
+                    'inputs': {
+                        'objects': {
+                            'classical_system': classical_system,
+                        },
+                    },
                 }
-
-                classical_fragments = []
-
-                res_count = 0
-                atom_count = 0
-
-                # water parameters
-                pe_res_name = 'water'
-                npe_res_name = 'water-n'
-                pe_res_charges = []
-                npe_res_charges = []
-                pe_res_polarizabilities = []
-                if self.charges:
-                    for line in self.charges:
-                        content = line.split()
-                        if content[-1] == pe_res_name:
-                            pe_res_charges.append(float(content[1]))
-                        if content[-1] == npe_res_name:
-                            npe_res_charges.append(float(content[1]))
-                if self.polarizabilities:
-                    for line in self.polarizabilities:
-                        content = line.split()
-                        if content[-1] == pe_res_name:
-                            pe_res_polarizabilities.append(
-                                [float(x) for x in content[1:7]])
-
-                def _append_classical_fragment(res, fragment_name,
-                                               atom_charges,
-                                               atom_polarizabilities):
-                    nonlocal res_count, atom_count
-
-                    assert_msg_critical(
-                        len(atom_charges) == len(res.atoms),
-                        'TrajectoryDriver: Inconsistent charges for residue ' +
-                        f'{fragment_name}')
-
-                    assert_msg_critical(
-                        len(atom_polarizabilities) == len(res.atoms),
-                        'TrajectoryDriver: Inconsistent polarizabilities for residue '
-                        + f'{fragment_name}')
-
-                    res_count += 1
-                    start_index = atom_count + 1
-                    end_index = atom_count + len(res.atoms)
-
-                    classical_fragments.append({
-                        "index": res_count,
-                        "name": fragment_name,
-                        "atoms": [],
-                    })
-
-                    for atom_idx, atom in enumerate(res.atoms):
-                        atom_label = default_guesser.guess_atom_element(
-                            atom.name)
-                        atom_index = start_index + atom_idx
-
-                        # Note: make sure all elements in classical_fragments
-                        # are serializable by json
-                        classical_fragments[-1]["atoms"].append({
-                            "index": atom_index,
-                            "element": atom_label.capitalize(),
-                            "coordinate": [
-                                float(atom.position[0]) / bohr_in_angstroms(),
-                                float(atom.position[1]) / bohr_in_angstroms(),
-                                float(atom.position[2]) / bohr_in_angstroms(),
-                            ],
-                            "multipoles": {
-                                "elements": [atom_charges[atom_idx]],
-                            },
-                            "exclusions": list(range(start_index,
-                                                     end_index + 1)),
-                            "polarizabilities": {
-                                "elements": ([0.0, 0.0, 0.0, 0.0] +
-                                             atom_polarizabilities[atom_idx]),
-                                "order": [1, 1],
-                            },
-                        })
-
-                    atom_count = end_index
-
-                for res in mm_pol.residues:
-                    resname = getattr(res, 'resname', pe_res_name)
-                    _append_classical_fragment(
-                        res, f'{str(resname)}_pe', pe_res_charges,
-                        pe_res_polarizabilities)
-
-                for res in mm_nonpol.residues:
-                    resname = getattr(res, 'resname', npe_res_name)
-                    zero_polarizabilities = [[0.0 for _ in range(6)]
-                                             for _ in range(len(res.atoms))]
-                    _append_classical_fragment(
-                        res, f'{str(resname)}_npe', npe_res_charges,
-                        zero_polarizabilities)
-
-                embedding_json.update({
-                    "classical_subsystems": [{
-                        "classical_fragments": classical_fragments,
-                    }],
-                })
-
-                with open(jsonfile, 'w') as fh:
-                    json.dump(embedding_json, fh, indent=4)
-
-            potfile = jsonfile
-
-            # update method_dict with potential file
-            if 'pe_options' in self.method_dict:
-                self.method_dict['pe_options']['potfile'] = str(potfile)
-            else:
-                self.method_dict['potfile'] = str(potfile)
 
             # broadcast molecule and basis set
             qm_mol = local_comm.bcast(qm_mol, root=mpi_master())
@@ -480,6 +437,7 @@ class TrajectoryDriver:
             # run SCF
             scf_drv = ScfRestrictedDriver(local_comm, ostream)
             scf_drv.update_settings({}, self.method_dict)
+            scf_drv.embedding = embedding
             scf_drv.compute(qm_mol, qm_basis)
 
             if local_rank == mpi_master():
@@ -488,6 +446,7 @@ class TrajectoryDriver:
             # run response for spectrum
             abs_spec = Absorption({'nstates': self.nstates}, self.method_dict)
             abs_spec.init_driver(local_comm, ostream)
+            abs_spec.rsp_driver.embedding = embedding
             abs_spec.compute(qm_mol, qm_basis, scf_drv.scf_results)
 
             if local_rank == mpi_master():
