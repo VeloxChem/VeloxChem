@@ -31,6 +31,7 @@
 
 #include "fika_uniform_m2l.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdlib>
 #include <stdexcept>
