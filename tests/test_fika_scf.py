@@ -456,8 +456,32 @@ class TestFikaScf:
 
         _, fika_results = run_scf(molecule, basis, fika_embedding(pdb_file))
         _, gas_results = run_scf(molecule, basis, None)
-        assert fika_results['embedding_method'] == 'fika'
-        assert 'embedding_method' not in gas_results
+        # the SCF results are filled on the master rank only
+        if MPI.COMM_WORLD.Get_rank() == mpi_master():
+            assert fika_results['embedding_method'] == 'fika'
+            assert 'embedding_method' not in gas_results
+
+        # Linear response on a fika reference needs the fika embedding; a
+        # reused driver accepts a gas-phase reference afterwards.
+        lrs_drv = LinearResponseSolver()
+        lrs_drv.ostream.mute()
+        lrs_drv.frequencies = [0.0]
+        lrs_drv.embedding = fika_embedding(pdb_file)
+        lrs_drv.compute(molecule, basis, fika_results)
+        lrs_drv.embedding = None
+        lrs_drv.compute(molecule, basis, gas_results)
+
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='skip pytest.raises for multiple MPI processes')
+    def test_response_on_fika_reference_errors(self, tmp_path):
+
+        pdb_file = write_droplet(tmp_path)
+        reader = FikaPdbReader()
+        molecule = reader.get_solute(reader.read(pdb_file))
+        basis = MolecularBasis.read(molecule, 'sto-3g', ostream=None)
+
+        _, fika_results = run_scf(molecule, basis, fika_embedding(pdb_file))
+        _, gas_results = run_scf(molecule, basis, None)
 
         # Linear response on a fika reference needs the fika embedding; a
         # reused driver accepts a gas-phase reference afterwards.
