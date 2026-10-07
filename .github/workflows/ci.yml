@@ -10,7 +10,7 @@ on:
       - dft-update
       - hessian-update
       - ri-test
-      - ri-grad-test
+      - rijk-test
       - tddft_vibanalysis_test
       - tddft_grad_test
       - feature-test
@@ -26,7 +26,7 @@ jobs:
         shell: bash -l -e -o pipefail {0}
 
     container:
-      image: ghcr.io/veloxchem/meta-vlx/vlx-ci_gnu:sha-2074132
+      image: ghcr.io/veloxchem/meta-vlx/vlx-ci_gnu:sha-ffcf0d3
 
     env:
       VLX_NUM_BUILD_JOBS: 4
@@ -73,11 +73,11 @@ jobs:
           export EIGEN_INCLUDE_DIR=$(pwd)/eigen
           export BOOST_INCLUDE_DIR=$(pwd)/boost-math/include
           CXX=g++ python -m pip install git+https://github.com/VeloxChem/PyFraME.git
-          python -m pip install dftd4 xtb
+          python -m pip install dftd4
           python -m pip install openmm rdkit pymbar
           echo "=== VeloxChem build ==="
           export CMAKE_PREFIX_PATH=$CMAKE_PREFIX_PATH:/usr/local
-          SKBUILD_CONFIGURE_OPTIONS="-DCMAKE_CXX_COMPILER=g++" \
+          SKBUILD_CONFIGURE_OPTIONS="-DCMAKE_CXX_COMPILER=g++ -DVLX_USE_MATHLIB=ON -DVLX_MATH_LIBRARY=/usr/lib/x86_64-linux-gnu/openblas-openmp/libopenblas.so" \
             python -m pip install -v .[test,qmmm]
           echo "=== VeloxChem test ==="
           python -c "import veloxchem; print(veloxchem.__version__)"
