@@ -30,6 +30,8 @@ jobs:
 
     env:
       VLX_NUM_BUILD_JOBS: 4
+      OMPI_ALLOW_RUN_AS_ROOT: "1"
+      OMPI_ALLOW_RUN_AS_ROOT_CONFIRM: "1"
 
     steps:
       - name: checkout code
@@ -46,11 +48,15 @@ jobs:
           ulimit -a
           ulimit -s unlimited
           lscpu | egrep 'Thread|Core|Socket|^CPU\('
+          echo "=== Replace Ubuntu 24.04 mpich with openmpi ==="
+          apt-get update -qq
+          apt-get purge -y -qq mpich libmpich12 libmpich-dev
+          apt-get install -y -qq --no-install-recommends openmpi-bin libopenmpi-dev
+          apt-get autoremove -y -qq
+          which mpicc mpiexec mpicc.openmpi mpiexec.openmpi
+          mpicc.openmpi --showme:version
+          mpiexec.openmpi --version | head -2
           echo "=== GNU Compiler ==="
-          #mpicc --version
-          #mpicc -show
-          #mpicxx --version
-          #mpicxx -show
           gcc --version
           g++ --version
           echo "=== Python ==="
@@ -63,7 +69,9 @@ jobs:
           python -V
           echo "=== Python dependencies ==="
           python -m pip install --upgrade pip setuptools wheel
-          CC=gcc MPICC=mpicc python -m pip install mpi4py --no-binary=mpi4py
+          CC=gcc MPICC=mpicc.openmpi python -m pip install --no-cache-dir mpi4py --no-binary=mpi4py
+          echo "=== MPI sanity check ==="
+          mpiexec.openmpi -n 2 python -c "from mpi4py import MPI; size = MPI.COMM_WORLD.Get_size(); assert size == 2, size"
           CC=gcc CXX=g++ python -m pip install MDAnalysis
           git config --global --add safe.directory $PWD
           git clone -b 3.4.0 https://gitlab.com/libeigen/eigen.git
@@ -81,7 +89,7 @@ jobs:
             python -m pip install -v .[test,qmmm]
           echo "=== VeloxChem test ==="
           python -c "import veloxchem; print(veloxchem.__version__)"
-          OMP_NUM_THREADS=2 mpiexec -n 2 python -m pytest --capture=no --log-cli-level=INFO \
+          OMP_NUM_THREADS=2 mpiexec.openmpi -n 2 python -m pytest --capture=no --log-cli-level=INFO \
             -m "solvers" --durations=10
           OMP_NUM_THREADS=4 python -m pytest --cov=veloxchem --capture=no --log-cli-level=INFO \
             -m "not timeconsuming" --durations=10

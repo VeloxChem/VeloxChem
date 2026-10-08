@@ -51,6 +51,8 @@ stages:
 .monkey:conf:
   variables:
     VLX_NUM_BUILD_JOBS: "6"
+    OMPI_ALLOW_RUN_AS_ROOT: "1"
+    OMPI_ALLOW_RUN_AS_ROOT_CONFIRM: "1"
   before_script:
     - uname -a
     - free -m
@@ -61,6 +63,14 @@ stages:
     - python -V
     - gcc --version
     - g++ --version
+    - echo "=== Replace Ubuntu 24.04 mpich with openmpi ==="
+    - apt-get update -qq
+    - apt-get purge -y -qq mpich libmpich12 libmpich-dev
+    - apt-get install -y -qq --no-install-recommends openmpi-bin libopenmpi-dev
+    - apt-get autoremove -y -qq
+    - which mpicc mpiexec mpicc.openmpi mpiexec.openmpi
+    - mpicc.openmpi --showme:version
+    - mpiexec.openmpi --version | head -2
 
 .monkey:setup:
   extends:
@@ -82,7 +92,7 @@ monkey:cmake_build:
     - python -m pip install
         numpy
         pybind11[global]
-    - CC=gcc MPICC=mpicc python -m pip install mpi4py --no-binary=mpi4py
+    - CC=gcc MPICC=mpicc.openmpi python -m pip install --no-cache-dir mpi4py --no-binary=mpi4py
     - git clone -b 3.4.0 https://gitlab.com/libeigen/eigen.git
     - git clone -b boost-1.90.0 https://github.com/boostorg/math.git boost-math
     - cd eigen && test "$(git rev-parse HEAD)" = "3147391d946bb4b6c68edd901f2add6ac1f31f8c" && cd ..
@@ -105,7 +115,8 @@ monkey:pip_install:
   extends: .monkey:setup
   stage: build
   script:
-    - CC=gcc MPICC=mpicc python -m pip install mpi4py --no-binary=mpi4py
+    - CC=gcc MPICC=mpicc.openmpi python -m pip install --no-cache-dir mpi4py --no-binary=mpi4py
+    - mpiexec.openmpi -n 2 python -c "from mpi4py import MPI; size = MPI.COMM_WORLD.Get_size(); assert size == 2, size"
     - CC=gcc CXX=g++ python -m pip install
         MDAnalysis
     - git clone -b 3.4.0 https://gitlab.com/libeigen/eigen.git
@@ -132,7 +143,8 @@ monkey:python_tests:
   script:
     - source venv/bin/activate
     - python -c "import veloxchem; print(veloxchem.__version__)"
-    - mpiexec -n 2 python -m pytest --capture=no --log-cli-level=INFO
+    - mpiexec.openmpi -n 2 python -c "from mpi4py import MPI; size = MPI.COMM_WORLD.Get_size(); assert size == 2, size"
+    - mpiexec.openmpi -n 2 python -m pytest --capture=no --log-cli-level=INFO
         -m "solvers" --durations=10
     - python -m pytest --cov=veloxchem --capture=no --log-cli-level=INFO
         -m "not timeconsuming" --durations=10
