@@ -29,7 +29,7 @@ jobs:
       image: ghcr.io/veloxchem/meta-vlx/vlx-ci_gnu:sha-ffcf0d3
 
     env:
-      VLX_NUM_BUILD_JOBS: 4
+      VLX_NUM_BUILD_JOBS: "4"
       OMPI_ALLOW_RUN_AS_ROOT: "1"
       OMPI_ALLOW_RUN_AS_ROOT_CONFIRM: "1"
 
