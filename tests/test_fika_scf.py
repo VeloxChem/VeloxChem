@@ -246,6 +246,8 @@ class TestFikaScf:
 
     def test_response_with_subcommunicators(self, tmp_path):
 
+        pytest.importorskip('pyframe')
+
         # With subcommunicators each one embeds its own trial densities.
         from veloxchem.lreigensolver import LinearResponseEigenSolver
 
@@ -273,6 +275,8 @@ class TestFikaScf:
             assert np.max(np.abs(distributed - reference)) < 1.0e-10
 
     def test_unrestricted(self, tmp_path):
+
+        pytest.importorskip('pyframe')
 
         from veloxchem.molecule import Molecule
         from veloxchem.scfunrestdriver import ScfUnrestrictedDriver
@@ -365,6 +369,8 @@ class TestFikaScf:
 
     def test_damping_and_objects(self, tmp_path):
 
+        pytest.importorskip('pyframe')
+
         pdb_file = write_droplet(tmp_path)
         reader = FikaPdbReader()
         residues = reader.read(pdb_file)
@@ -400,6 +406,8 @@ class TestFikaScf:
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason='input errors abort MPI runs')
     def test_errors(self, tmp_path):
+
+        pytest.importorskip('pyframe')
 
         pdb_file = write_droplet(tmp_path)
         reader = FikaPdbReader()
@@ -449,6 +457,8 @@ class TestFikaScf:
 
     def test_response_on_fika_reference(self, tmp_path):
 
+        pytest.importorskip('pyframe')
+
         pdb_file = write_droplet(tmp_path)
         reader = FikaPdbReader()
         molecule = reader.get_solute(reader.read(pdb_file))
@@ -474,6 +484,8 @@ class TestFikaScf:
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason='skip pytest.raises for multiple MPI processes')
     def test_response_on_fika_reference_errors(self, tmp_path):
+
+        pytest.importorskip('pyframe')
 
         pdb_file = write_droplet(tmp_path)
         reader = FikaPdbReader()
