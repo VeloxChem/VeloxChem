@@ -89,7 +89,7 @@ monkey:pip_install:
   stage: build
   script:
     - CC=gcc MPICC=mpicc.openmpi python -m pip install --no-cache-dir mpi4py --no-binary=mpi4py
-    - mpiexec.openmpi -n 2 python -c "from mpi4py import MPI; size = MPI.COMM_WORLD.Get_size(); assert size == 2, size"
+    - mpiexec.openmpi --bind-to none -n 2 python -c "from mpi4py import MPI; size = MPI.COMM_WORLD.Get_size(); assert size == 2, size"
     - CC=gcc CXX=g++ python -m pip install
         MDAnalysis
         "networkx<3.7"
@@ -116,8 +116,8 @@ monkey:python_tests:
   script:
     - source venv/bin/activate
     - python -c "import veloxchem; print(veloxchem.__version__)"
-    - mpiexec.openmpi -n 2 python -c "from mpi4py import MPI; size = MPI.COMM_WORLD.Get_size(); assert size == 2, size"
-    - mpiexec.openmpi -n 2 python -m pytest --capture=no --log-cli-level=INFO
+    - mpiexec.openmpi --bind-to none -n 2 python -c "from mpi4py import MPI; size = MPI.COMM_WORLD.Get_size(); assert size == 2, size"
+    - mpiexec.openmpi --bind-to none -n 2 python -m pytest --capture=no --log-cli-level=INFO
         -m "solvers" --durations=10
     - python -m pytest --cov=veloxchem --capture=no --log-cli-level=INFO
         -m "not timeconsuming" --durations=10
