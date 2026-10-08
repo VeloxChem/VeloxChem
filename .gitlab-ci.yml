@@ -119,6 +119,7 @@ monkey:pip_install:
     - mpiexec.openmpi -n 2 python -c "from mpi4py import MPI; size = MPI.COMM_WORLD.Get_size(); assert size == 2, size"
     - CC=gcc CXX=g++ python -m pip install
         MDAnalysis
+        "networkx<3.7"
     - git clone -b 3.4.0 https://gitlab.com/libeigen/eigen.git
     - git clone -b boost-1.90.0 https://github.com/boostorg/math.git boost-math
     - cd eigen && test "$(git rev-parse HEAD)" = "3147391d946bb4b6c68edd901f2add6ac1f31f8c" && cd ..

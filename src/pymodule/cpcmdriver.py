@@ -707,14 +707,14 @@ class CpcmDriver:
 
         return V_es
 
-    def visualize_cpcm_grid(self, molecule, grid):
+    def visualize_cpcm_grid(self, molecule, grid=None):
         """
         Visualizes grid for surface discretization.
 
         :param molecule:
             The molecule.
         :param grid:
-            The grid.
+            The grid. If None, the grid stored in the driver is used.
         """
 
         try:
@@ -722,8 +722,16 @@ class CpcmDriver:
         except ImportError:
             raise ImportError('Unable to import py3Dmol.')
 
-        assert_msg_critical(grid.shape[1] == 6,
-                            'CpcmDriver.visualize_grid: Invalid grid size')
+        if grid is None:
+            grid = self._cpcm_grid
+
+        assert_msg_critical(
+            grid is not None, 'CpcmDriver.visualize_cpcm_grid: '
+            'Grid not available. Driver not initialized.')
+
+        assert_msg_critical(
+            grid.shape[1] == 6,
+            'CpcmDriver.visualize_cpcm_grid: Invalid grid size')
 
         grid_in_angstrom = grid[:, :3] * bohr_in_angstrom()
 
@@ -782,10 +790,11 @@ class CpcmDriver:
         q = self._cpcm_q
 
         assert_msg_critical(grid.shape[1] == 6,
-                            "CpcmDriver.visualize_grid: Invalid grid size")
+                            "CpcmDriver.visualize_cpcm_charges: "
+                            "Invalid grid size")
         assert_msg_critical(
             len(q) == len(grid),
-            "CpcmDriver.visualize_grid: Invalid q-vector size")
+            "CpcmDriver.visualize_cpcm_charges: Invalid q-vector size")
 
         grid_in_angstrom = grid[:, :3] * bohr_in_angstrom()
 

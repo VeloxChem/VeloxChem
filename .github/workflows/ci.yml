@@ -72,7 +72,7 @@ jobs:
           CC=gcc MPICC=mpicc.openmpi python -m pip install --no-cache-dir mpi4py --no-binary=mpi4py
           echo "=== MPI sanity check ==="
           mpiexec.openmpi -n 2 python -c "from mpi4py import MPI; size = MPI.COMM_WORLD.Get_size(); assert size == 2, size"
-          CC=gcc CXX=g++ python -m pip install MDAnalysis
+          CC=gcc CXX=g++ python -m pip install MDAnalysis "networkx<3.7"
           git config --global --add safe.directory $PWD
           git clone -b 3.4.0 https://gitlab.com/libeigen/eigen.git
           git clone -b boost-1.90.0 https://github.com/boostorg/math.git boost-math
