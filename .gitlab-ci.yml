@@ -84,33 +84,6 @@ stages:
         setuptools
         wheel
 
-monkey:cmake_build:
-  extends:
-    - .monkey:setup
-  stage: build
-  script:
-    - python -m pip install
-        numpy
-        pybind11[global]
-    - CC=gcc MPICC=mpicc.openmpi python -m pip install --no-cache-dir mpi4py --no-binary=mpi4py
-    - git clone -b 3.4.0 https://gitlab.com/libeigen/eigen.git
-    - git clone -b boost-1.90.0 https://github.com/boostorg/math.git boost-math
-    - cd eigen && test "$(git rev-parse HEAD)" = "3147391d946bb4b6c68edd901f2add6ac1f31f8c" && cd ..
-    - cd boost-math && test "$(git rev-parse HEAD)" = "e0fcd19f7227d81391770ea46015acc3c80af810" && cd ..
-    - export EIGEN_INCLUDE_DIR=$(pwd)/eigen
-    - export BOOST_INCLUDE_DIR=$(pwd)/boost-math/include
-    - cmake
-        -S.
-        -Bbuild
-        -GNinja
-        -DCMAKE_CXX_COMPILER=g++
-    - cmake --build build --parallel "$VLX_NUM_BUILD_JOBS" --target veloxchemlib -- -d stats
-  timeout: 2h
-  artifacts:
-    paths:
-      - build
-    expire_in: 2 days
-
 monkey:pip_install:
   extends: .monkey:setup
   stage: build
@@ -140,7 +113,6 @@ monkey:python_tests:
   needs: ["monkey:pip_install"]
   variables:
     OMP_NUM_THREADS: "6"
-    OMP_PLACES: "cores"
   script:
     - source venv/bin/activate
     - python -c "import veloxchem; print(veloxchem.__version__)"
