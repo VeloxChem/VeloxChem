@@ -425,6 +425,10 @@ class NonlinearSolver:
             This rank's share of each Coulomb matrix, as numpy arrays.
         """
 
+        # NOTE: a three-time DFT calculation may hand empty trailing batches.
+        if not dens:
+            return []
+
         nao = dens[0].shape[0]
 
         mine = self._ri_drv.owned_parts()
