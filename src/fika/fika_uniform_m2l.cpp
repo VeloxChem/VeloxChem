@@ -38,8 +38,8 @@
 #include <string>
 
 #include "fika_point3d.hpp"
-#include "fika_vector_math.hpp"
 #include "fika_multipole_expansion.hpp"
+#include "SerialDenseLinearAlgebra.hpp"
 
 namespace fika::detail {
 
@@ -205,8 +205,8 @@ void UniformM2L::apply(const CellOffset& offset, double edge,
       row[size_ + c] = in_factor[c] * conjugate * source[c].imag();
     }
   }
-  blas_gemm_transposed(n, dim, dim, workspace.packed.data(), dim, kernel.data(), dim,
-                       workspace.product.data(), dim);
+  sdenblas::serialMultABt(n, dim, dim, 1.0, workspace.packed.data(), dim, kernel.data(), dim, 0.0,
+                          workspace.product.data(), dim);
   for (std::size_t i = 0; i < n; ++i) {
     Complex* target = locals.data() + i * size_;
     const double* row = workspace.product.data() + i * dim;

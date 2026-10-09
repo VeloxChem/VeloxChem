@@ -32,7 +32,7 @@
 #ifndef fika_vector_math_hpp
 #define fika_vector_math_hpp
 
-// Internal: vectorized elementary functions and dense matrix products over contiguous arrays.
+// Internal: vectorized elementary functions over contiguous arrays.
 
 #include <cstddef>
 #include <span>
@@ -49,13 +49,6 @@ void exp_scaled_negative(std::span<const double> x, double scale, std::span<doub
 /// do not depend on n.
 void gemm(std::size_t m, std::size_t n, std::size_t k, const double* a, std::size_t lda,
           const double* b, std::size_t ldb, double* c, std::size_t ldc);
-
-/// Row-major product c = a b^T of an m x k matrix a (row stride lda) and an n x k matrix b (row
-/// stride ldb) into the m x n matrix c (row stride ldc), through BLAS (Accelerate's dgemm on
-/// macOS, a plain loop elsewhere) for large products. Results may depend on m.
-void blas_gemm_transposed(std::size_t m, std::size_t n, std::size_t k, const double* a,
-                          std::size_t lda, const double* b, std::size_t ldb, double* c,
-                          std::size_t ldc);
 
 }  // namespace fika::detail
 
