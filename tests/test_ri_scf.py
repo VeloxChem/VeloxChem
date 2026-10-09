@@ -29,6 +29,7 @@ class TestScfRestrictedDriverWithRI:
         scf_drv.ostream.mute()
         scf_drv.xcfun = xcfun_label
         scf_drv.ri_coulomb = True
+        scf_drv.ri_coulomb_simd = True
         scf_drv.ri_auxiliary_basis = 'def2-universal-jfit'
         scf_results = scf_drv.compute(mol, bas)
 
