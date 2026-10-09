@@ -28,41 +28,37 @@
 //  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
 //  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
 //  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+//  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "fika_vector_math.hpp"
+#ifndef SerialVectorMath_hpp
+#define SerialVectorMath_hpp
 
-#include <algorithm>
-#include <cassert>
+#include <span>
 
-#include "SerialVectorMath.hpp"
+/**
+ Serial vector math.
 
-namespace fika::detail {
+ Elementwise elementary functions over contiguous arrays: the vector
+ counterpart of the scalar math functions, for code that is parallelized at a
+ higher level with OpenMP or MPI. Each call runs on the calling thread only and
+ never starts threads of its own, so a routine may be called from inside an
+ OpenMP parallel region. The routines are not dense linear algebra; those live
+ in the sdenblas namespace.
+ */
+namespace svecmath {  // svecmath namespace
 
-void exp_scaled_negative(std::span<const double> x, double scale, std::span<double> out) {
-  assert(x.size() >= out.size());
-  for (std::size_t i = 0; i < out.size(); ++i) {
-    out[i] = -scale * x[i];
-  }
-  svecmath::exp_in_place(out);
-}
+/**
+ Computes the exponential of the elements of a contiguous array in place.
 
-void gemm(std::size_t m, std::size_t n, std::size_t k, const double* a, std::size_t lda,
-          const double* b, std::size_t ldb, double* c, std::size_t ldc) {
-  assert(lda >= k && ldb >= n && ldc >= n);
-  for (std::size_t i = 0; i < m; ++i) {
-    double* row = c + i * ldc;
-    std::fill(row, row + n, 0.0);
-    for (std::size_t p = 0; p < k; ++p) {
-      const double factor = a[i * lda + p];
-      if (factor == 0.0) {
-        continue;  // zero contraction coefficients are common in general contractions
-      }
-      const double* source = b + p * ldb;
-      for (std::size_t j = 0; j < n; ++j) {
-        row[j] += factor * source[j];
-      }
-    }
-  }
-}
+ values[i] = exp(values[i]) for i < values.size().
 
-}  // namespace fika::detail
+ Uses vvexp of Accelerate's vForce on macOS when VLX_USE_MATHLIB is defined, and
+ the vectorized exp of Eigen otherwise.
+
+ @param values the values, overwritten by their exponential.
+ */
+auto exp_in_place(std::span<double> values) -> void;
+
+}  // namespace svecmath
+
+#endif /* SerialVectorMath_hpp */

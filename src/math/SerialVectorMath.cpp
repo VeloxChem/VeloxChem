@@ -28,41 +28,43 @@
 //  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
 //  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
 //  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-
-#include "fika_vector_math.hpp"
-
-#include <algorithm>
-#include <cassert>
+//  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "SerialVectorMath.hpp"
 
-namespace fika::detail {
+#include "Eigen/Dense"
 
-void exp_scaled_negative(std::span<const double> x, double scale, std::span<double> out) {
-  assert(x.size() >= out.size());
-  for (std::size_t i = 0; i < out.size(); ++i) {
-    out[i] = -scale * x[i];
-  }
-  svecmath::exp_in_place(out);
-}
+#ifdef VLX_USE_MATHLIB
+#include "MathLibrary.hpp"
+#endif
 
-void gemm(std::size_t m, std::size_t n, std::size_t k, const double* a, std::size_t lda,
-          const double* b, std::size_t ldb, double* c, std::size_t ldc) {
-  assert(lda >= k && ldb >= n && ldc >= n);
-  for (std::size_t i = 0; i < m; ++i) {
-    double* row = c + i * ldc;
-    std::fill(row, row + n, 0.0);
-    for (std::size_t p = 0; p < k; ++p) {
-      const double factor = a[i * lda + p];
-      if (factor == 0.0) {
-        continue;  // zero contraction coefficients are common in general contractions
-      }
-      const double* source = b + p * ldb;
-      for (std::size_t j = 0; j < n; ++j) {
-        row[j] += factor * source[j];
-      }
+namespace svecmath {  // svecmath namespace
+
+auto
+exp_in_place(std::span<double> values) -> void
+{
+    if (values.empty())
+    {
+        return;
     }
-  }
+
+#if defined(VLX_USE_MATHLIB) && defined(__APPLE__)
+
+    // vvexp of Accelerate's vForce: SIMD, thread safe and run on the calling
+    // thread, so it is serial vector math and not a threaded BLAS routine. The
+    // routine reads and writes the same array.
+
+    const int n = static_cast<int>(values.size());
+
+    vvexp(values.data(), values.data(), &n);
+
+#else
+
+    Eigen::Map<Eigen::ArrayXd> result(values.data(), static_cast<Eigen::Index>(values.size()));
+
+    result = result.exp();
+
+#endif
 }
 
-}  // namespace fika::detail
+}  // namespace svecmath

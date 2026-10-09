@@ -39,8 +39,9 @@
 
 namespace fika::detail {
 
-/// out[i] = exp(-scale * x[i]) for i < out.size() (x.size() >= out.size()). Uses Accelerate's
-/// vectorized exponential on macOS, std::exp elsewhere.
+/// out[i] = exp(-scale * x[i]) for i < out.size() (x.size() >= out.size()). Uses the serial
+/// vector math exponential of svecmath (Accelerate's vvexp on macOS, Eigen's vectorized exp
+/// elsewhere).
 void exp_scaled_negative(std::span<const double> x, double scale, std::span<double> out);
 
 /// Row-major product c = a b of an m x k matrix a (row stride lda) and a k x n matrix b (row

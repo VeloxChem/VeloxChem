@@ -6,6 +6,7 @@ target_sources(vlxobjs
     Matrix.cpp
     MatrixFunc.cpp
     SerialDenseLinearAlgebra.cpp
+    SerialVectorMath.cpp
     SubMatrix.cpp
     ThreadedDenseLinearAlgebra.cpp
   )
