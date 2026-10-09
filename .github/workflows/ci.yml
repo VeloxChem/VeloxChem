@@ -26,7 +26,7 @@ jobs:
         shell: bash -l -e -o pipefail {0}
 
     container:
-      image: ghcr.io/veloxchem/meta-vlx/vlx-ci_gnu:sha-ffcf0d3
+      image: ghcr.io/veloxchem/meta-vlx/vlx-ci_gnu:sha-0e81798
 
     env:
       VLX_NUM_BUILD_JOBS: "4"
@@ -48,11 +48,7 @@ jobs:
           ulimit -a
           ulimit -s unlimited
           lscpu | egrep 'Thread|Core|Socket|^CPU\('
-          echo "=== Replace Ubuntu 24.04 mpich with openmpi ==="
-          apt-get update -qq
-          apt-get purge -y -qq mpich libmpich12 libmpich-dev
-          apt-get install -y -qq --no-install-recommends openmpi-bin libopenmpi-dev
-          apt-get autoremove -y -qq
+          echo "=== OpenMPI ==="
           which mpicc mpiexec mpicc.openmpi mpiexec.openmpi
           mpicc.openmpi --showme:version
           mpiexec.openmpi --version | head -2
@@ -70,7 +66,7 @@ jobs:
           echo "=== Python dependencies ==="
           python -m pip install --upgrade pip setuptools wheel
           CC=gcc MPICC=mpicc.openmpi python -m pip install --no-cache-dir mpi4py --no-binary=mpi4py
-          echo "=== MPI sanity check ==="
+          echo "--- MPI sanity check ---"
           mpiexec.openmpi --bind-to none -n 2 python -c "from mpi4py import MPI; size = MPI.COMM_WORLD.Get_size(); assert size == 2, size"
           CC=gcc CXX=g++ python -m pip install MDAnalysis "networkx<3.7"
           git config --global --add safe.directory $PWD

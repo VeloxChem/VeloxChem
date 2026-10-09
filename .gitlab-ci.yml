@@ -33,7 +33,7 @@
 default:
   tags:
     - vlx-docker
-  image: ghcr.io/veloxchem/meta-vlx/vlx-ci_gnu:sha-ffcf0d3
+  image: ghcr.io/veloxchem/meta-vlx/vlx-ci_gnu:sha-0e81798
   interruptible: true
 
 workflow:
@@ -63,11 +63,7 @@ stages:
     - python -V
     - gcc --version
     - g++ --version
-    - echo "=== Replace Ubuntu 24.04 mpich with openmpi ==="
-    - apt-get update -qq
-    - apt-get purge -y -qq mpich libmpich12 libmpich-dev
-    - apt-get install -y -qq --no-install-recommends openmpi-bin libopenmpi-dev
-    - apt-get autoremove -y -qq
+    - echo "=== OpenMPI ==="
     - which mpicc mpiexec mpicc.openmpi mpiexec.openmpi
     - mpicc.openmpi --showme:version
     - mpiexec.openmpi --version | head -2
