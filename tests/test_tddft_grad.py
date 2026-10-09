@@ -35,6 +35,7 @@ class TestGrad:
         method_dict = {'xcfun': xcfun_label, 'grid_level': 5}
         if use_ri:
             method_dict['ri_coulomb'] = True
+            method_dict['ri_coulomb_simd'] = True
 
         scf_drv.update_settings(scf_dict, method_dict)
 

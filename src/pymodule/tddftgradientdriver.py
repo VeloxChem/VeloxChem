@@ -39,10 +39,12 @@ from .veloxchemlib import (OverlapGeom100Driver, KineticEnergyGeom100Driver,
                            NuclearPotentialGeom100Driver,
                            NuclearPotentialGeom010Driver, FockGeom1000Driver)
 from .veloxchemlib import RIFockGradDriver
+from .veloxchemlib import SimdRIJGradientDriver
 from .veloxchemlib import T4CScreener
 from .veloxchemlib import XCMolecularGradient
 from .veloxchemlib import mpi_master, mat_t
 from .veloxchemlib import make_matrix
+from .veloxchemlib import PackedMatrix
 from .matrices import Matrices
 from .molecularbasis import MolecularBasis
 from .tdaeigensolver import TdaEigenSolver
@@ -613,12 +615,6 @@ class TddftGradientDriver(GradientDriver):
 
         if self._scf_drv.ri_coulomb:
 
-            sym_den_mat_for_fock_rel = make_matrix(basis, mat_t.symmetric)
-
-            sym_den_mat_for_fock_xmy = make_matrix(basis, mat_t.symmetric)
-            sym_den_mat_for_fock_xmy_p_xmyT = make_matrix(
-                basis, mat_t.symmetric)
-
             assert_msg_critical(
                 basis.get_label().lower().startswith('def2-'),
                 'TddftGradientDriver: Invalid basis set for RI-J')
@@ -630,50 +626,114 @@ class TddftGradientDriver(GradientDriver):
                 basis_ri_j = None
             basis_ri_j = self.comm.bcast(basis_ri_j, root=mpi_master())
 
-            self._scf_drv._ri_drv.prepare_buffers(molecule,
-                                                  basis,
-                                                  basis_ri_j,
-                                                  verbose=False)
+            if self._scf_drv.ri_coulomb_simd:
 
-            ri_grad_drv = RIFockGradDriver()
+                # The SIMD driver forms one self term G(g, D). A cross term
+                # between sides a and b is
+                # [G(ga+gb, Da+Db) - G(ga-gb, Da-Db)]/8. The rel/gs sides
+                # give (grad_plus - grad_minus)/4; the x - y sides are 2:1,
+                # giving grad_xmy.
+                ri_j_grad_drv = SimdRIJGradientDriver(
+                    self._scf_drv.eri_thresh)
 
-            ri_gvec_gs = self._scf_drv._ri_drv.compute_bq_vector(
-                den_mat_for_fock_gs)
+                all_atoms = list(range(molecule.number_of_atoms()))
 
-            for idx in range(dof):
+                ri_gvec_gs = self._compute_simd_ri_gamma(gs_dm)
 
-                sym_den_mat_for_fock_rel.set_values(
-                    self.get_sym_mat(relaxed_density_ao[idx]))
+                for idx in range(dof):
 
-                sym_den_mat_for_fock_xmy.set_values(
-                    self.get_sym_mat(x_minus_y_ao[idx]))
-                sym_den_mat_for_fock_xmy_p_xmyT.set_values(
-                    self.get_sym_mat(x_minus_y_ao[idx] + x_minus_y_ao[idx].T))
+                    den_mat_for_fock_rel = self.get_sym_mat(
+                        relaxed_density_ao[idx])
+                    den_mat_for_fock_xmy = self.get_sym_mat(
+                        x_minus_y_ao[idx])
 
-                ri_gvec_rel = self._scf_drv._ri_drv.compute_bq_vector(
-                    sym_den_mat_for_fock_rel)
-                ri_gvec_xmy = self._scf_drv._ri_drv.compute_bq_vector(
-                    sym_den_mat_for_fock_xmy)
-                ri_gvec_xmy_2 = self._scf_drv._ri_drv.compute_bq_vector(
-                    sym_den_mat_for_fock_xmy_p_xmyT)
+                    ri_gvec_rel = self._compute_simd_ri_gamma(
+                        den_mat_for_fock_rel)
+                    ri_gvec_xmy = self._compute_simd_ri_gamma(
+                        den_mat_for_fock_xmy)
 
-                for iatom in local_atoms:
+                    grad_plus = ri_j_grad_drv.compute(
+                        molecule, basis, basis_ri_j,
+                        ri_gvec_rel + ri_gvec_gs,
+                        self._pack_symmetric_density(den_mat_for_fock_rel +
+                                                     gs_dm), all_atoms,
+                        list(local_atoms), self.rank == mpi_master())
 
-                    atomgrad_rel = ri_grad_drv.direct_compute(
-                        screener, basis, basis_ri_j, molecule, ri_gvec_rel,
-                        ri_gvec_gs, sym_den_mat_for_fock_rel,
-                        den_mat_for_fock_gs, iatom, thresh_int)
+                    grad_minus = ri_j_grad_drv.compute(
+                        molecule, basis, basis_ri_j,
+                        ri_gvec_rel - ri_gvec_gs,
+                        self._pack_symmetric_density(den_mat_for_fock_rel -
+                                                     gs_dm), all_atoms,
+                        list(local_atoms), self.rank == mpi_master())
 
-                    atomgrad_xmy = ri_grad_drv.direct_compute(
-                        screener, basis, basis_ri_j, molecule, ri_gvec_xmy_2,
-                        ri_gvec_xmy, sym_den_mat_for_fock_xmy_p_xmyT,
-                        sym_den_mat_for_fock_xmy, iatom, thresh_int)
+                    grad_xmy = ri_j_grad_drv.compute(
+                        molecule, basis, basis_ri_j, ri_gvec_xmy,
+                        self._pack_symmetric_density(den_mat_for_fock_xmy),
+                        all_atoms, list(local_atoms),
+                        self.rank == mpi_master())
 
-                    # Note: RI gradient from direct_compute does NOT contain factor of 2
-                    self.gradient[idx, iatom, :] += np.array(
-                        atomgrad_rel.coordinates()) * 2.0
-                    self.gradient[idx, iatom, :] += 0.5 * np.array(
-                        atomgrad_xmy.coordinates()) * 2.0
+                    self.gradient[idx] += (
+                        (grad_plus.to_numpy() - grad_minus.to_numpy()) / 4.0 +
+                        grad_xmy.to_numpy())
+
+            else:
+
+                sym_den_mat_for_fock_rel = make_matrix(basis,
+                                                       mat_t.symmetric)
+
+                sym_den_mat_for_fock_xmy = make_matrix(basis,
+                                                       mat_t.symmetric)
+                sym_den_mat_for_fock_xmy_p_xmyT = make_matrix(
+                    basis, mat_t.symmetric)
+
+                self._scf_drv._ri_drv.prepare_buffers(molecule,
+                                                      basis,
+                                                      basis_ri_j,
+                                                      verbose=False)
+
+                ri_grad_drv = RIFockGradDriver()
+
+                ri_gvec_gs = self._scf_drv._ri_drv.compute_bq_vector(
+                    den_mat_for_fock_gs)
+
+                for idx in range(dof):
+
+                    sym_den_mat_for_fock_rel.set_values(
+                        self.get_sym_mat(relaxed_density_ao[idx]))
+
+                    sym_den_mat_for_fock_xmy.set_values(
+                        self.get_sym_mat(x_minus_y_ao[idx]))
+                    sym_den_mat_for_fock_xmy_p_xmyT.set_values(
+                        self.get_sym_mat(x_minus_y_ao[idx] +
+                                         x_minus_y_ao[idx].T))
+
+                    ri_gvec_rel = self._scf_drv._ri_drv.compute_bq_vector(
+                        sym_den_mat_for_fock_rel)
+                    ri_gvec_xmy = self._scf_drv._ri_drv.compute_bq_vector(
+                        sym_den_mat_for_fock_xmy)
+                    ri_gvec_xmy_2 = self._scf_drv._ri_drv.compute_bq_vector(
+                        sym_den_mat_for_fock_xmy_p_xmyT)
+
+                    for iatom in local_atoms:
+
+                        atomgrad_rel = ri_grad_drv.direct_compute(
+                            screener, basis, basis_ri_j, molecule,
+                            ri_gvec_rel, ri_gvec_gs,
+                            sym_den_mat_for_fock_rel, den_mat_for_fock_gs,
+                            iatom, thresh_int)
+
+                        atomgrad_xmy = ri_grad_drv.direct_compute(
+                            screener, basis, basis_ri_j, molecule,
+                            ri_gvec_xmy_2, ri_gvec_xmy,
+                            sym_den_mat_for_fock_xmy_p_xmyT,
+                            sym_den_mat_for_fock_xmy, iatom, thresh_int)
+
+                        # Note: RI gradient from direct_compute does NOT
+                        # contain factor of 2
+                        self.gradient[idx, iatom, :] += np.array(
+                            atomgrad_rel.coordinates()) * 2.0
+                        self.gradient[idx, iatom, :] += 0.5 * np.array(
+                            atomgrad_xmy.coordinates()) * 2.0
 
         else:
 
@@ -838,6 +898,52 @@ class TddftGradientDriver(GradientDriver):
             for key, val in grad_timing.items():
                 self.ostream.print_info(f'    {key:<25s}:  {val:.2f} sec')
             self.ostream.print_blank()
+
+    @staticmethod
+    def _pack_symmetric_density(density):
+        """
+        Packs a symmetric density matrix into the form the SIMD driver holds.
+
+        :param density:
+            The symmetric density matrix as a numpy array.
+
+        :return:
+            The packed density matrix.
+        """
+
+        nao = density.shape[0]
+
+        packed_density = PackedMatrix(nao, nao, mat_t.symmetric)
+        packed_density.from_numpy(np.ascontiguousarray(density))
+
+        return packed_density
+
+    def _compute_simd_ri_gamma(self, density):
+        """
+        Computes the RI-J fitting coefficients of a density with the SIMD
+        driver, which holds the integrals and the metric rather than a set of
+        B vectors.
+
+        :param density:
+            The symmetric density matrix as a numpy array.
+
+        :return:
+            The fitting coefficients.
+        """
+
+        ri_drv = self._scf_drv._ri_drv
+
+        mine = ri_drv.owned_parts()
+
+        packed_density = self._pack_symmetric_density(density)
+
+        local = np.array(ri_drv.compute_gamma(packed_density, mine),
+                         dtype=np.float64)
+
+        total = np.zeros_like(local)
+        self.comm.Allreduce(local, total, op=MPI.SUM)
+
+        return np.array(ri_drv.solve_fitting(total), dtype=np.float64)
 
     def compute_dipole_moment(self,
                               molecule,
