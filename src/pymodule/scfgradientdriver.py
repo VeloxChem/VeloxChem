@@ -964,6 +964,10 @@ class ScfGradientDriver(GradientDriver):
 
         if self.scf_driver.ri_coulomb and self.scf_driver.ri_coulomb_simd:
 
+            assert_msg_critical(
+                basis.get_label().lower().startswith('def2-'),
+                'ScfGradientDriver: Invalid basis set for RI-J')
+
             self._announce_once(
                 'Using the SIMD resolution of the identity (RI-J) gradient.')
 
@@ -1369,6 +1373,10 @@ class ScfGradientDriver(GradientDriver):
             grad_timing['Fock_grad'] += time.time() - t0
 
         elif self.scf_driver.ri_coulomb and self.scf_driver.ri_coulomb_simd:
+
+            assert_msg_critical(
+                basis.get_label().lower().startswith('def2-'),
+                'ScfGradientDriver: Invalid basis set for RI-J')
 
             self._announce_once(
                 'Using the SIMD resolution of the identity (RI-J) gradient.')

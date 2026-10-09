@@ -32,6 +32,7 @@ class TestLR:
         scf_drv.ostream.mute()
         scf_drv.xcfun = xcfun_label
         scf_drv.ri_coulomb = ri_coulomb
+        scf_drv.ri_coulomb_simd = ri_coulomb
         scf_drv.acc_type = 'l2_diis'
         scf_results = scf_drv.compute(mol, bas)
 

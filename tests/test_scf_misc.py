@@ -327,6 +327,7 @@ class TestScfDriverMiscellaneous:
             driver.density_damping = True
             driver.xcfun = 'blyp'
             driver.ri_coulomb = True
+            driver.ri_coulomb_simd = True
             driver.ri_auxiliary_basis = 'def2-universal-jkfit'
             driver.ri_metric_threshold = 1.0e-10
             driver.solvation_model = 'cpcm'
@@ -409,8 +410,10 @@ class TestScfDriverMiscellaneous:
 
         if self.is_master():
             assert third_results['scf_type'] == scf_results['scf_type']
+            # NOTE: threaded builds are not bitwise reproducible, so use the
+            # same tolerance as assert_scf_results_close.
             assert abs(third_results['scf_energy'] -
-                       scf_results['scf_energy']) < 1e-12
+                       scf_results['scf_energy']) < 1.0e-10
             assert np.max(
                 np.abs(third_results['D_alpha'] -
                        scf_results['D_alpha'])) < 1e-8
@@ -446,6 +449,7 @@ class TestScfDriverMiscellaneous:
             driver.density_damping = True
             driver.xcfun = 'blyp'
             driver.ri_coulomb = True
+            driver.ri_coulomb_simd = True
             driver.ri_auxiliary_basis = 'def2-universal-jkfit'
             driver.ri_metric_threshold = 1.0e-10
 
@@ -479,6 +483,7 @@ class TestScfDriverMiscellaneous:
 
         def configure(driver):
             driver.ri_coulomb = True
+            driver.ri_coulomb_simd = True
             driver.ri_jk = True
 
         with pytest.raises(VeloxChemError, match="either ri_coulomb or ri_jk"):
