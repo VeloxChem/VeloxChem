@@ -40,9 +40,7 @@
 #include "ThreeCenterElectronRepulsionGeom0X0Driver.hpp"
 #include "ThreeCenterOverlapDriver.hpp"
 #include "T3FlatBuffer.hpp"
-#include "RIFockDriver.hpp"
 #include "RIJKFockDriver.hpp"
-#include "RIFockGradDriver.hpp"
 #include "T4CScreener.hpp"
 
 namespace vlx_t3cintegrals {
@@ -74,34 +72,6 @@ export_t3cintegrals(py::module& m)
             },
             "Computes electron repulsion integrals for given molecule, screener, auxilary basis, and list of atoms.");
     
-    // CRIFockDriver class
-    // Note: RIFockDriver is prefixed by an underscore and will be used in rifockdriver.py
-    PyClass<CRIFockDriver>(m, "_RIFockDriver")
-        .def(py::init<>())
-        .def(py::init<const CSubMatrix&>())
-        .def("prepare_buffers", py::overload_cast<const CMolecule&,
-                                                  const CMolecularBasis&,
-                                                  const CMolecularBasis&>
-             (&CRIFockDriver::prepare_buffers),
-             "Computes three center electron repulsion integral buffers.")
-        .def("prepare_buffers", py::overload_cast<const CMolecule&,
-                                                  const CMolecularBasis&,
-                                                  const CMolecularBasis&,
-                                                  const std::vector<int>&>
-             (&CRIFockDriver::prepare_buffers),
-             "Computes three center electron repulsion integral buffers.")
-        .def("compute",  py::overload_cast<const CMatrix&, const std::string&>
-             (&CRIFockDriver::compute, py::const_),
-             "Computes Coulomb Fock matrix for given density.")
-        .def("compute",  py::overload_cast<const CMatrix&, const std::vector<double>&, const std::string&>
-             (&CRIFockDriver::compute, py::const_),
-             "Computes Coulomb Fock matrix for given density.")
-        .def("local_compute", &CRIFockDriver::local_compute, "Computes local Coulomb Fock matrix for given density.")
-        .def("compute_bq_vector", py::overload_cast<const CMatrix&> (&CRIFockDriver::compute_bq_vector, py::const_),
-             "Computes transformed Gamma vector for given density.")
-        .def("compute_bq_vector", py::overload_cast<const CSubMatrix&, const CSubMatrix&> (&CRIFockDriver::compute_bq_vector, py::const_),
-             "Computes transformed Bq vector for given similarity transformed MOs.")
-        .def("compute_local_bq_vector", &CRIFockDriver::compute_local_bq_vector, "Computes transformed local Gamma vector for given density.");
     
     // CRIJKFockDriver class
     // Note: RIJKFockDriver is prefixed by an underscore and will be used in rijkfockdriver.py
@@ -116,91 +86,6 @@ export_t3cintegrals(py::module& m)
         .def("compute_screened_k_fock", &CRIJKFockDriver::compute_screened_k_fock, "Computes screened exchange Fock matrix.")
         .def("compute_mo_bq_vectors", &CRIJKFockDriver::compute_mo_bq_vectors, "Computes batch of MOs transformed B^Q vectors."); 
     
-    // CRIFockGradDriver class
-    PyClass<CRIFockGradDriver>(m, "RIFockGradDriver")
-        .def(py::init<>())
-        .def("compute",
-             [] (const CRIFockGradDriver&   grad_drv,
-                 const CMolecularBasis&     basis,
-                 const CMolecularBasis&     aux_basis,
-                 const CMolecule&           molecule,
-                 const std::vector<double>& gamma,
-                 const CMatrix&             density,
-                 const int                  iatom) -> TPoint<double>
-             {
-                return grad_drv.compute(basis, aux_basis, molecule, gamma, density, iatom);
-             },
-          "Computes Coulomb Fock contribution to atom's gradient.")
-        .def("compute",
-             [] (const CRIFockGradDriver&   grad_drv,
-                 const CT4CScreener&        screener,
-                 const CMolecularBasis&     basis,
-                 const CMolecularBasis&     aux_basis,
-                 const CMolecule&           molecule,
-                 const std::vector<double>& gamma,
-                 const CMatrix&             density,
-                 const int                  iatom,
-                 const int                  ithreshold) -> TPoint<double>
-             {
-                return grad_drv.compute(screener, basis, aux_basis, molecule, gamma, density, iatom, ithreshold);
-             },
-          "Computes Coulomb Fock contribution to atom's gradient.")
-        .def("direct_compute",
-             [] (const CRIFockGradDriver&   grad_drv,
-                 const CT4CScreener&        screener,
-                 const CMolecularBasis&     basis,
-                 const CMolecularBasis&     aux_basis,
-                 const CMolecule&           molecule,
-                 const std::vector<double>& gamma,
-                 const CMatrix&             density,
-                 const int                  iatom,
-                 const int                  ithreshold) -> TPoint<double>
-             {
-                return grad_drv.direct_compute(screener, basis, aux_basis, molecule, gamma, density, iatom, ithreshold);
-             },
-          "Computes Coulomb Fock contribution to atom's gradient.")
-        .def("direct_compute",
-             [] (const CRIFockGradDriver&   grad_drv,
-                 const CT4CScreener&        screener,
-                 const CMolecularBasis&     basis,
-                 const CMolecularBasis&     aux_basis,
-                 const CMolecule&           molecule,
-                 const std::vector<double>& bra_gamma,
-                 const std::vector<double>& ket_gamma,
-                 const CMatrix&             bra_density,
-                 const CMatrix&             ket_density,
-                 const int                  iatom,
-                 const int                  ithreshold) -> TPoint<double>
-             {
-                return grad_drv.direct_compute(screener, basis, aux_basis, molecule, bra_gamma, ket_gamma, bra_density, ket_density, iatom, ithreshold);
-             },
-          "Computes Coulomb Fock contribution to atom's gradient.")
-        .def("compute",
-             [] (const CRIFockGradDriver&   grad_drv,
-                 const CMolecularBasis&     basis,
-                 const CMolecularBasis&     aux_basis,
-                 const CMolecule&           molecule,
-                 const std::vector<double>& gamma,
-                 const CMatrix&             density,
-                 const std::vector<int>&    atoms) -> std::vector<TPoint<double>>
-             {
-                return grad_drv.compute(basis, aux_basis, molecule, gamma, density, atoms);
-             },
-          "Computes Coulomb Fock contribution to atoms gradient.")
-        .def("compute",
-             [] (const CRIFockGradDriver&   grad_drv,
-                 const CT4CScreener&        screener,
-                 const CMolecularBasis&     basis,
-                 const CMolecularBasis&     aux_basis,
-                 const CMolecule&           molecule,
-                 const std::vector<double>& gamma,
-                 const CMatrix&             density,
-                 const std::vector<int>&    atoms,
-                 const int                  ithreshold) -> std::vector<TPoint<double>>
-             {
-                return grad_drv.compute(screener, basis, aux_basis, molecule, gamma, density, atoms, ithreshold);
-             },
-          "Computes Coulomb Fock contribution to atoms gradient.");
 
     // CThreeCenterOverlapDriver class
     PyClass<CThreeCenterOverlapDriver>(m, "ThreeCenterOverlapDriver")
