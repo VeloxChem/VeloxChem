@@ -50,7 +50,7 @@ stages:
 
 .monkey:conf:
   variables:
-    VLX_NUM_BUILD_JOBS: "6"
+    VLX_NUM_BUILD_JOBS: "12"
     OMPI_ALLOW_RUN_AS_ROOT: "1"
     OMPI_ALLOW_RUN_AS_ROOT_CONFIRM: "1"
   before_script:
@@ -108,7 +108,7 @@ monkey:python_tests:
   stage: test
   needs: ["monkey:pip_install"]
   variables:
-    OMP_NUM_THREADS: "6"
+    OMP_NUM_THREADS: "12"
   script:
     - source venv/bin/activate
     - python -c "import veloxchem; print(veloxchem.__version__)"
