@@ -183,7 +183,8 @@ def normalized_mrsf_response_overlap(previous_response,
     return np.ascontiguousarray(overlap)
 
 
-def _validated_mrsf_overlap(state_overlap, nstates, descriptor):
+def _validated_mrsf_overlap(state_overlap, nstates, descriptor,
+                            allow_unnormalized=False):
     """Validates one candidate OpenQP MRSF assignment descriptor."""
 
     count = int(nstates)
@@ -200,7 +201,8 @@ def _validated_mrsf_overlap(state_overlap, nstates, descriptor):
     # Never clip: a magnitude above one means that the descriptor is not a
     # normalized state overlap. Hiding it would silently corrupt assignment.
     largest = float(np.max(np.abs(overlap))) if overlap.size else 0.0
-    if largest > 1.0 + _OVERLAP_MAGNITUDE_TOLERANCE:
+    if (largest > 1.0 + _OVERLAP_MAGNITUDE_TOLERANCE and
+            not allow_unnormalized):
         raise ValueError(
             f'OpenQP MRSF {descriptor} overlap has magnitude '
             f'{largest:.6f}, which exceeds one by more than the accepted '
@@ -229,10 +231,12 @@ def select_mrsf_assignment_overlap(native_overlap,
                                    nstates=None):
     """Selects a conditioned MRSF descriptor for state assignment.
 
-    The native OpenQP matrix is retained when its largest singular value is at
-    most ``1.05``.  Otherwise the normalized response-vector overlap is used,
-    when available.  Both optimization and surface hopping call this function,
-    so the physical validity criterion and fallback cannot drift apart.
+    The native OpenQP matrix is retained when every magnitude is normalized
+    (at most ``1.001``) and its largest singular value is at most ``1.05``.
+    Otherwise the normalized response-vector overlap is used, when available,
+    while the native matrix is kept only as provenance.  Both optimization and
+    surface hopping call this function, so the physical validity criterion and
+    fallback cannot drift apart.
 
     :return:
         An :class:`OpenQPMRSFOverlapSelection` retaining both descriptors and
@@ -248,11 +252,19 @@ def select_mrsf_assignment_overlap(native_overlap,
                 'not supplied.')
         nstates = int(native_array.shape[0])
 
+    # Keep an unnormalized native matrix for diagnostics only when a
+    # normalized independent response-vector descriptor is available.  It
+    # must not prevent the documented fallback from being considered.
     native_signed = _validated_mrsf_overlap(
-        native_array, nstates, 'native state')
+        native_array, nstates, 'native state',
+        allow_unnormalized=response_overlap is not None)
+    native_largest = float(np.max(np.abs(native_signed)))
+    native_magnitude_is_conditioned = bool(
+        native_largest <= 1.0 + _OVERLAP_MAGNITUDE_TOLERANCE)
     native_spectral_norm = float(
         np.linalg.svd(native_signed, compute_uv=False)[0])
     native_is_conditioned = bool(
+        native_magnitude_is_conditioned and
         native_spectral_norm <= 1.0 + _OVERLAP_SPECTRAL_TOLERANCE)
 
     response_signed = None
@@ -261,10 +273,17 @@ def select_mrsf_assignment_overlap(native_overlap,
     warnings = []
 
     if not native_is_conditioned:
-        warnings.append(
-            'native state-overlap matrix is not a valid overlap operator: '
-            f'largest singular value {native_spectral_norm:.6f} exceeds '
-            f'{1.0 + _OVERLAP_SPECTRAL_TOLERANCE:.6f}')
+        if not native_magnitude_is_conditioned:
+            warnings.append(
+                'native state-overlap matrix is not normalized: largest '
+                f'magnitude {native_largest:.6f} exceeds '
+                f'{1.0 + _OVERLAP_MAGNITUDE_TOLERANCE:.6f}')
+        if native_spectral_norm > 1.0 + _OVERLAP_SPECTRAL_TOLERANCE:
+            warnings.append(
+                'native state-overlap matrix is not a valid overlap '
+                'operator: largest singular value '
+                f'{native_spectral_norm:.6f} exceeds '
+                f'{1.0 + _OVERLAP_SPECTRAL_TOLERANCE:.6f}')
         if response_overlap is not None:
             response_signed = _validated_mrsf_overlap(
                 response_overlap, nstates, 'response-vector')

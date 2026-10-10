@@ -379,15 +379,31 @@ class LandauZenerSurfaceHoppingDynamics:
                 'Serenity SF returned incomplete or nonfinite per-root spin '
                 'metadata; production dynamics is refused.')
 
+        # In standard-SF overlap-transport mode multiplicity is a persistent
+        # label initialized at the first clean frame.  Instantaneous <S^2>
+        # remains a prominently archived quality diagnostic, but using it to
+        # hard-filter or renumber the state here would undo the full-window
+        # transport precisely at a physical singlet-triplet crossing.  The
+        # adapter has already emitted per-target warnings.  The strict,
+        # historical policy retains its fail-closed cutoff unchanged.
+        labels_transported = bool(
+            metadata.get('spin_labels_transported', False))
         invalid = np.flatnonzero(deviations > tolerance)
-        if invalid.size:
-            roots = (invalid + 1).tolist()
+        if invalid.size and not labels_transported:
+            raw_targets = invalid.tolist()
+            selectors = [
+                int(snapshot.selector_for(index)) for index in raw_targets
+            ]
             raise SurfaceHoppingError(
-                'Serenity SF target root(s) '
-                f'{roots} are spin-incomplete: their <S^2> deviations exceed '
-                f'the configured tolerance {tolerance:.6f}. Increase the '
-                'response window or choose a compatible target ladder; these '
-                'roots cannot enter production surface hopping.')
+                'Serenity SF dynamics target(s) '
+                f'{raw_targets} (Serenity root selector(s) {selectors}) are '
+                'spin-incomplete: their <S^2> deviations exceed '
+                f'the configured tolerance {tolerance:.6f}. A larger '
+                'response window can help only when required roots are '
+                'missing; it cannot purify this selected root. Use a '
+                'spin-adapted method or a structure and target ladder that '
+                'remain spin compatible; these roots cannot enter production '
+                'surface hopping.')
 
         permutation = np.asarray(tracking.permutation, dtype=int)
         tracked = multiplicities[permutation]
@@ -989,8 +1005,16 @@ class LandauZenerSurfaceHoppingDynamics:
             'trajectory_step': int(step),
             'accepted': False,
             'eligible_for_lz': False,
-            'active_raw_state': int(result.active_raw_state),
-            'active_tracked_state': int(result.active_tracked_state),
+            'active_raw_state': (
+                None if result.active_raw_state is None else
+                int(result.active_raw_state)),
+            # Tracking and spin validation happen before this field is
+            # installed on the result.  A rejected trial must still be
+            # archived, and the original SurfaceHoppingError must remain the
+            # exception seen by the caller.
+            'active_tracked_state': (
+                None if result.active_tracked_state is None else
+                int(result.active_tracked_state)),
             'failure': str(error),
             'electronic_provenance_path': path,
             'lz_history_before_rejection': serializable_history,
