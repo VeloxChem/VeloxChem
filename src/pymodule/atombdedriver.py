@@ -123,6 +123,7 @@ class AtomBdeDriver:
         self.mol_scf_drv = ScfRestrictedDriver(self._comm)
         self.mol_scf_drv.conv_thresh = 1e-3
         self.mol_scf_drv.ri_coulomb = True
+        self.mol_scf_drv.ri_coulomb_simd = True
         self.mol_scf_drv.grid_level = 2
         self.mol_opt_drv = OptimizationDriver(self.mol_scf_drv)
         self.mol_opt_drv.conv_energy = 1e-04
@@ -136,6 +137,7 @@ class AtomBdeDriver:
         self.radical_scf_drv = ScfUnrestrictedDriver(self._comm)
         self.radical_scf_drv.conv_thresh = 1e-3
         self.radical_scf_drv.ri_coulomb = True
+        self.radical_scf_drv.ri_coulomb_simd = True
         self.radical_scf_drv.grid_level = 2
         self.radical_opt_drv = OptimizationDriver(self.radical_scf_drv)
         self.radical_opt_drv.conv_energy = 1e-04

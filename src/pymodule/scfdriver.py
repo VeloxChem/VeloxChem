@@ -2518,6 +2518,8 @@ class ScfDriver:
                 if self.ri_coulomb or self.ri_jk:
                     # RI info
                     self._scf_results['ri_coulomb'] = self.ri_coulomb
+                    self._scf_results['ri_coulomb_simd'] = (
+                        self.ri_coulomb_simd)
                     self._scf_results['ri_jk'] = self.ri_jk
                     self._scf_results[
                         'ri_auxiliary_basis'] = self.ri_auxiliary_basis
