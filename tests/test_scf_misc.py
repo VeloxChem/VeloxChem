@@ -485,6 +485,7 @@ class TestScfDriverMiscellaneous:
             driver.ri_coulomb = True
             driver.ri_coulomb_simd = True
             driver.ri_jk = True
+            driver.ri_jk_simd = True
 
         with pytest.raises(VeloxChemError, match="either ri_coulomb or ri_jk"):
             self.run_hf_scf(molecule, basis, configure)

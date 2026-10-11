@@ -173,35 +173,37 @@ class TestScfGradientDriverMiscellaneous:
         with pytest.raises(VeloxChemError, match='Invalid basis set for RI-J'):
             grad_drv.compute(molecule, basis, scf_results)
 
-    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
-                        reason='skip pytest.raises for multiple MPI processes')
-    def test_restricted_ri_jk_gradient_rejects(self):
+    def test_restricted_ri_jk_simd_gradient(self):
 
         molecule, basis = self.get_h2o_molecule_and_basis()
-        scf_drv, scf_results = self.run_restricted_scf(molecule, basis)
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ostream.mute()
+        scf_drv.xcfun = 'hf'
         scf_drv.ri_jk = True
+        scf_drv.ri_jk_simd = True
+        scf_results = scf_drv.compute(molecule, basis)
 
         grad_drv = ScfGradientDriver(scf_drv)
+        grad_drv.compute(molecule, basis, scf_results)
 
-        with pytest.raises(
-                VeloxChemError,
-                match='RI-JK is supported only with ri_jk_simd'):
-            grad_drv.compute(molecule, basis, scf_results)
+        assert np.max(np.abs(grad_drv.get_gradient())) > 0.0
 
-    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
-                        reason='skip pytest.raises for multiple MPI processes')
-    def test_unrestricted_ri_jk_gradient_rejects(self):
+    def test_unrestricted_ri_jk_simd_gradient(self):
 
         molecule, basis = self.get_ch3_molecule_and_basis()
-        scf_drv, scf_results = self.run_unrestricted_scf(molecule, basis)
+
+        scf_drv = ScfUnrestrictedDriver()
+        scf_drv.ostream.mute()
+        scf_drv.xcfun = 'hf'
         scf_drv.ri_jk = True
+        scf_drv.ri_jk_simd = True
+        scf_results = scf_drv.compute(molecule, basis)
 
         grad_drv = ScfGradientDriver(scf_drv)
+        grad_drv.compute(molecule, basis, scf_results)
 
-        with pytest.raises(
-                VeloxChemError,
-                match='RI-JK is supported only with ri_jk_simd'):
-            grad_drv.compute(molecule, basis, scf_results)
+        assert np.max(np.abs(grad_drv.get_gradient())) > 0.0
 
     def test_restricted_gradient_timing_output_path(self):
 

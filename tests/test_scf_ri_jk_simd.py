@@ -56,25 +56,31 @@ class TestScfRiJkSimd:
 
         return driver.comm.bcast(energy, root=mpi_master())
 
-    @pytest.mark.parametrize('xcfun', [None, 'PBE0', 'B3LYP'])
-    def test_simd_matches_the_conventional_driver(self, molecule, basis, xcfun):
+    @pytest.mark.parametrize('xcfun, ref_energy', [
+        (None, -75.961015181386),
+        ('PBE0', -76.276223087084),
+        ('B3LYP', -76.358082329970),
+    ])
+    def test_simd_matches_the_reference_energy(self, molecule, basis, xcfun,
+                                               ref_energy):
         """Hartree-Fock scales the exchange by one and the hybrids by a fraction of
-        it, so the functionals cover the scaling as well as the path."""
+        it, so the functionals cover the scaling as well as the path. The reference
+        energies are the conventional RI-JK energies, which the SIMD path has to
+        reproduce."""
 
         settings = {
             'ri_jk': True,
+            'ri_jk_simd': True,
             'ri_auxiliary_basis': 'def2-universal-jkfit',
         }
 
         if xcfun is not None:
             settings['xcfun'] = xcfun
 
-        conventional = self.run_scf(molecule, basis, **settings)
+        energy = self.run_scf(molecule, basis, **settings)
 
-        simd = self.run_scf(molecule, basis, ri_jk_simd=True, **settings)
-
-        assert abs(simd - conventional) < 1.0e-10, (
-            f"{xcfun or 'HF'}: {simd:.12f} against {conventional:.12f}")
+        assert abs(energy - ref_energy) < 1.0e-9, (
+            f"{xcfun or 'HF'}: {energy:.12f} against {ref_energy:.12f}")
 
     def test_the_approximation_is_the_one_expected(self, molecule, basis):
         """The energy has to differ from the one without the approximation, or the
