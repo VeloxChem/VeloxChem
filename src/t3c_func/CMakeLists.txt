@@ -1,6 +1,5 @@
 target_sources(vlxobjs
   PRIVATE
-    RIJKFockDriver.cpp
     T3CDistributor.cpp
     T3CGeom010SumDistributor.cpp
     T3CGeom0X0Distributor.cpp

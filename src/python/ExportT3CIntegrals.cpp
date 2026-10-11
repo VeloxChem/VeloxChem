@@ -40,7 +40,6 @@
 #include "ThreeCenterElectronRepulsionGeom0X0Driver.hpp"
 #include "ThreeCenterOverlapDriver.hpp"
 #include "T3FlatBuffer.hpp"
-#include "RIJKFockDriver.hpp"
 #include "T4CScreener.hpp"
 
 namespace vlx_t3cintegrals {
@@ -73,20 +72,6 @@ export_t3cintegrals(py::module& m)
             "Computes electron repulsion integrals for given molecule, screener, auxilary basis, and list of atoms.");
     
     
-    // CRIJKFockDriver class
-    // Note: RIJKFockDriver is prefixed by an underscore and will be used in rijkfockdriver.py
-    PyClass<CRIJKFockDriver>(m, "_RIJKFockDriver")
-        .def(py::init<>())
-        .def("compute_bq_vectors", &CRIJKFockDriver::compute_bq_vectors, "Computes B^Q vectors in batches.")
-        .def("compute_screened_bq_vectors", &CRIJKFockDriver::compute_screened_bq_vectors, "Computes B^Q vectors in batches.")
-        .def("local_compute_screened_bq_vectors", &CRIJKFockDriver::local_compute_screened_bq_vectors, "Computes local B^Q vectors on MPI rank.")
-        .def("compute_j_fock", &CRIJKFockDriver::compute_j_fock, "Computes Coulomb Fock matrix.")
-        .def("compute_screened_j_fock", &CRIJKFockDriver::compute_screened_j_fock, "Computes screened Coulomb Fock matrix.")
-        .def("compute_k_fock", &CRIJKFockDriver::compute_k_fock, "Computes exchange Fock matrix.")
-        .def("compute_screened_k_fock", &CRIJKFockDriver::compute_screened_k_fock, "Computes screened exchange Fock matrix.")
-        .def("compute_mo_bq_vectors", &CRIJKFockDriver::compute_mo_bq_vectors, "Computes batch of MOs transformed B^Q vectors."); 
-    
-
     // CThreeCenterOverlapDriver class
     PyClass<CThreeCenterOverlapDriver>(m, "ThreeCenterOverlapDriver")
         .def(py::init<>())
