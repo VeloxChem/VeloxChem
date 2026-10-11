@@ -55,7 +55,6 @@ from .veloxchemlib import denmat, mat_t
 from .veloxchemlib import make_matrix
 from .matrix import Matrix
 from .aodensitymatrix import AODensityMatrix
-from .rifockdriver import RIFockDriver
 from .rijkfockdriver import RIJKFockDriver
 from .fikaembedding import (FikaEmbeddingSCF, fika_embedding_text,
                             is_fika_embedding)
@@ -1914,6 +1913,10 @@ class ScfDriver:
         # builds nor to the rest of them, so it is timed on its own.
         ri_setup_t0 = tm.time()
 
+        assert_msg_critical(
+            (not self.ri_coulomb) or self.ri_coulomb_simd,
+            'SCF driver: RI-J is supported only with ri_coulomb_simd')
+
         if self.ri_coulomb and self.ri_coulomb_simd:
             if isinstance(self.ri_auxiliary_basis, str):
                 basis_ri = MolecularBasis.read(molecule, self.ri_auxiliary_basis)
@@ -1969,13 +1972,6 @@ class ScfDriver:
             self.ostream.print_blank()
             self.ostream.flush()
 
-        elif self.ri_coulomb:
-            self._ri_drv = RIFockDriver(self.comm, self.ostream)
-            self._ri_drv.prepare_buffers(molecule,
-                                         ao_basis,
-                                         self.ri_auxiliary_basis,
-                                         k_metric=False,
-                                         verbose=True)
         elif self.ri_jk and self.ri_jk_simd:
             if isinstance(self.ri_auxiliary_basis, str):
                 basis_ri = MolecularBasis.read(molecule, self.ri_auxiliary_basis)
@@ -3381,9 +3377,6 @@ class ScfDriver:
 
         if self.ri_coulomb and self.ri_coulomb_simd and fock_type == 'j':
             fock_mat_np = self._simd_ri_j_fock(den_mat[0])
-        elif self.ri_coulomb and fock_type == 'j':
-            fock_mat = self._ri_drv.compute(den_mat_for_fock, 'j')
-            fock_mat_np = fock_mat.to_numpy()
         elif self.ri_jk and self.ri_jk_simd and fock_type != 'j':
             # NOTE: the driver returns twice the Coulomb less the scaled exchange
             # already, which is the matrix this branch is asked for, so nothing is
@@ -3500,11 +3493,8 @@ class ScfDriver:
                 # density is what each of them sees.
                 J_ab_np = self._simd_ri_j_fock(den_mat[0] + den_mat[1])
             else:
-                if self.ri_coulomb:
-                    fock_mat = self._ri_drv.compute(den_mat_for_Jab, 'j')
-                else:
-                    fock_mat = fock_drv.compute(screener, den_mat_for_Jab, 'j',
-                                                0.0, 0.0, thresh_int)
+                fock_mat = fock_drv.compute(screener, den_mat_for_Jab, 'j',
+                                            0.0, 0.0, thresh_int)
                 J_ab_np = fock_mat.to_numpy()
                 fock_mat = Matrix()
 

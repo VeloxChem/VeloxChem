@@ -46,7 +46,6 @@ from .veloxchemlib import rimode
 from .matrix import Matrix
 from .aodensitymatrix import AODensityMatrix
 from .griddriver import GridDriver
-from .rifockdriver import RIFockDriver
 from .fockdriver import FockDriver
 from .linearsolver import LinearSolver
 from .distributedarray import DistributedArray
@@ -330,6 +329,11 @@ class NonlinearSolver:
             (not self.ri_jk) or (self.nodes == 1),
             f'{type(self).__name__}: the RI-JK response path runs on one rank')
 
+        assert_msg_critical(
+            (not self.ri_coulomb) or self.ri_coulomb_simd,
+            f'{type(self).__name__}: RI-J is supported only with ' +
+            'ri_coulomb_simd')
+
         if self.rank == mpi_master():
             screening = T4CScreener()
             screening.partition(basis, molecule, 'eri')
@@ -339,13 +343,6 @@ class NonlinearSolver:
 
         if self.ri_coulomb and self.ri_coulomb_simd:
             self._init_simd_ri_j(molecule, basis)
-
-        elif self.ri_coulomb:
-            self._ri_drv = RIFockDriver(self.comm, self.ostream)
-            self._ri_drv.prepare_buffers(molecule,
-                                         basis,
-                                         self.ri_auxiliary_basis,
-                                         verbose=False)
 
         if self.ri_jk:
             rijkresponse.initialize(self, molecule, basis)
@@ -1120,19 +1117,11 @@ class NonlinearSolver:
                         'NonlinearSolver: RI is only applicable to pure DFT functional'
                     )
 
-                if self.ri_coulomb and fock_type == 'j':
-                    # symmetrize density for RI-J
-                    den_mat_for_ri_j = make_matrix(ao_basis, mat_t.symmetric)
-                    den_mat_for_ri_j.set_values(
-                        0.5 * (dts_for_fock[idx] + dts_for_fock[idx].T))
+                den_mat = make_matrix(ao_basis, mat_t.general)
+                den_mat.set_values(dts_for_fock[idx])
 
-                    fock_mat = self._ri_drv.compute(den_mat_for_ri_j, 'j')
-                else:
-                    den_mat = make_matrix(ao_basis, mat_t.general)
-                    den_mat.set_values(dts_for_fock[idx])
-
-                    fock_mat = fock_drv.compute(screening, den_mat, fock_type,
-                                                fock_k_factor, 0.0, thresh_int)
+                fock_mat = fock_drv.compute(screening, den_mat, fock_type,
+                                            fock_k_factor, 0.0, thresh_int)
 
                 fock_np = fock_mat.to_numpy()
                 fock_mat = Matrix()

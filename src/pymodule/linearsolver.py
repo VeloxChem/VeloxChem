@@ -47,7 +47,6 @@ from .veloxchemlib import make_matrix, mat_t
 from .matrix import Matrix
 from .distributedarray import DistributedArray
 from .subcommunicators import SubCommunicators
-from .rifockdriver import RIFockDriver
 from .veloxchemlib import SimdRIJKFockDriver
 from .veloxchemlib import SimdRIJKResponseDriver
 from .veloxchemlib import PackedMatrix
@@ -598,6 +597,11 @@ class LinearSolver:
             (not self.ri_jk) or self.ri_jk_simd,
             f'{type(self).__name__}: RI-JK is supported only with ri_jk_simd')
 
+        assert_msg_critical(
+            (not self.ri_coulomb) or self.ri_coulomb_simd,
+            f'{type(self).__name__}: RI-J is supported only with ' +
+            'ri_coulomb_simd')
+
         if self.rank == mpi_master():
             screening = T4CScreener()
             screening.partition(basis, molecule, 'eri')
@@ -607,13 +611,6 @@ class LinearSolver:
 
         if self.ri_coulomb and self.ri_coulomb_simd:
             self._init_simd_ri_j(molecule, basis)
-
-        elif self.ri_coulomb:
-            self._ri_drv = RIFockDriver(self.comm, self.ostream)
-            self._ri_drv.prepare_buffers(molecule,
-                                         basis,
-                                         self.ri_auxiliary_basis,
-                                         verbose=True)
 
         if self.ri_jk:
             self._init_simd_ri_jk(molecule, basis)
@@ -2367,19 +2364,12 @@ class LinearSolver:
                     'LinearSolver: RI is only applicable to pure DFT functional'
                 )
 
-            if self.ri_coulomb and fock_type == 'j':
-                # symmetrize density for RI-J
-                den_mat_for_ri_j = make_matrix(basis, mat_t.symmetric)
-                den_mat_for_ri_j.set_values(0.5 * (dens[idx] + dens[idx].T))
+            den_mat_for_fock = make_matrix(basis, mat_t.general)
+            den_mat_for_fock.set_values(dens[idx])
 
-                fock_mat = self._ri_drv.compute(den_mat_for_ri_j, 'j')
-            else:
-                den_mat_for_fock = make_matrix(basis, mat_t.general)
-                den_mat_for_fock.set_values(dens[idx])
-
-                fock_mat = fock_drv.compute(screening, den_mat_for_fock,
-                                            fock_type, exchange_scaling_factor,
-                                            0.0, thresh_int)
+            fock_mat = fock_drv.compute(screening, den_mat_for_fock,
+                                        fock_type, exchange_scaling_factor,
+                                        0.0, thresh_int)
 
             fock_np = fock_mat.to_numpy()
             fock_mat = Matrix()
@@ -2762,47 +2752,35 @@ class LinearSolver:
                     'LinearSolver: RI is only applicable to pure DFT functional'
                 )
 
-            if self.ri_coulomb and fock_type == 'j':
-                # TODO: double check
-                # symmetrize density for RI-J
-                den_mat_for_ri_j = make_matrix(basis, mat_t.symmetric)
-                dens_Jab = dens_a[idx] + dens_b[idx]
-                den_mat_for_ri_j.set_values(0.5 * (dens_Jab + dens_Jab.T))
+            # for now we calculate Ka, Kb and Jab separately for open-shell
+            den_mat_for_Ka = make_matrix(basis, mat_t.general)
+            den_mat_for_Ka.set_values(dens_a[idx])
 
-                fock_mat = self._ri_drv.compute(den_mat_for_ri_j, 'j')
+            fock_mat = fock_drv.compute(screening, den_mat_for_Ka, 'kx',
+                                        exchange_scaling_factor, 0.0,
+                                        thresh_int)
+            K_a_np = fock_mat.to_numpy()
 
-                fock_mat_a_np = fock_mat.to_numpy()
-                fock_mat_b_np = fock_mat.to_numpy()
-            else:
-                # for now we calculate Ka, Kb and Jab separately for open-shell
-                den_mat_for_Ka = make_matrix(basis, mat_t.general)
-                den_mat_for_Ka.set_values(dens_a[idx])
+            den_mat_for_Kb = make_matrix(basis, mat_t.general)
+            den_mat_for_Kb.set_values(dens_b[idx])
 
-                fock_mat = fock_drv.compute(screening, den_mat_for_Ka, 'kx',
-                                            exchange_scaling_factor, 0.0,
-                                            thresh_int)
-                K_a_np = fock_mat.to_numpy()
+            fock_mat = fock_drv.compute(screening, den_mat_for_Kb, 'kx',
+                                        exchange_scaling_factor, 0.0,
+                                        thresh_int)
 
-                den_mat_for_Kb = make_matrix(basis, mat_t.general)
-                den_mat_for_Kb.set_values(dens_b[idx])
+            K_b_np = fock_mat.to_numpy()
 
-                fock_mat = fock_drv.compute(screening, den_mat_for_Kb, 'kx',
-                                            exchange_scaling_factor, 0.0,
-                                            thresh_int)
+            den_mat_for_Jab = make_matrix(basis, mat_t.general)
+            den_mat_for_Jab.set_values(dens_a[idx] + dens_b[idx])
 
-                K_b_np = fock_mat.to_numpy()
+            fock_mat = fock_drv.compute(screening, den_mat_for_Jab, 'j',
+                                        exchange_scaling_factor, 0.0,
+                                        thresh_int)
 
-                den_mat_for_Jab = make_matrix(basis, mat_t.general)
-                den_mat_for_Jab.set_values(dens_a[idx] + dens_b[idx])
+            J_ab_np = fock_mat.to_numpy()
 
-                fock_mat = fock_drv.compute(screening, den_mat_for_Jab, 'j',
-                                            exchange_scaling_factor, 0.0,
-                                            thresh_int)
-
-                J_ab_np = fock_mat.to_numpy()
-
-                fock_mat_a_np = J_ab_np - K_a_np
-                fock_mat_b_np = J_ab_np - K_b_np
+            fock_mat_a_np = J_ab_np - K_a_np
+            fock_mat_b_np = J_ab_np - K_b_np
 
             if need_omega:
                 # for range-separated functional

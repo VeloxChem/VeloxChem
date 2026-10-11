@@ -39,7 +39,6 @@ import math
 from .veloxchemlib import FockGeom1000Driver
 from .veloxchemlib import XCMolecularGradient
 from .veloxchemlib import T4CScreener
-from .veloxchemlib import RIFockGradDriver
 from .veloxchemlib import SimdRIJGradientDriver
 from .veloxchemlib import SimdRIJKGradientDriver
 from .veloxchemlib import SimdRIJKFockDriver
@@ -236,6 +235,12 @@ class ScfGradientDriver(GradientDriver):
             (not self.scf_driver.ri_jk) or self.scf_driver.ri_jk_simd,
             f'{type(self).__name__}.compute: RI-JK is supported only with ' +
             'ri_jk_simd')
+
+        assert_msg_critical(
+            (not self.scf_driver.ri_coulomb) or
+            self.scf_driver.ri_coulomb_simd,
+            f'{type(self).__name__}.compute: RI-J is supported only with ' +
+            'ri_coulomb_simd')
 
         # NOTE: the fitting is what forbids this under MPI. The Fock build
         # survives a distributed set of B vectors because the factor of the
@@ -1022,41 +1027,6 @@ class ScfGradientDriver(GradientDriver):
 
             grad_timing['Fock_grad'] += time.time() - t0
 
-        elif self.scf_driver.ri_coulomb:
-
-            assert_msg_critical(
-                basis.get_label().lower().startswith('def2-'),
-                'ScfGradientDriver: Invalid basis set for RI-J')
-
-            self._announce_once(
-                'Using the resolution of the identity (RI) approximation.')
-
-            if self.rank == mpi_master():
-                basis_ri_j = MolecularBasis.read(
-                    molecule, self.scf_driver.ri_auxiliary_basis)
-            else:
-                basis_ri_j = None
-            basis_ri_j = self.comm.bcast(basis_ri_j, root=mpi_master())
-
-            ri_gvec = self.scf_driver._ri_drv.compute_bq_vector(
-                den_mat_for_fock)
-
-            ri_grad_drv = RIFockGradDriver()
-
-            t0 = time.time()
-
-            for iatom in local_atoms:
-                atomgrad = ri_grad_drv.direct_compute(screener, basis,
-                                                      basis_ri_j, molecule,
-                                                      ri_gvec, den_mat_for_fock,
-                                                      iatom, thresh_int)
-
-                # Note: RI gradient already contains factor of 2 for
-                # closed-shell
-                self.gradient[iatom, :] += np.array(atomgrad.coordinates())
-
-            grad_timing['Fock_grad'] += time.time() - t0
-
         elif self.scf_driver.ri_jk and self.scf_driver.ri_jk_simd:
 
             self._announce_once(
@@ -1372,7 +1342,8 @@ class ScfGradientDriver(GradientDriver):
 
             grad_timing['Fock_grad'] += time.time() - t0
 
-        elif self.scf_driver.ri_coulomb and self.scf_driver.ri_coulomb_simd:
+        elif (self.scf_driver.ri_coulomb and
+              self.scf_driver.ri_coulomb_simd):
 
             assert_msg_critical(
                 basis.get_label().lower().startswith('def2-'),
@@ -1417,40 +1388,6 @@ class ScfGradientDriver(GradientDriver):
                 list(local_atoms), self.rank == mpi_master())
 
             self.gradient += atomgrad.to_numpy()
-
-            grad_timing['Fock_grad'] += time.time() - t0
-
-        elif self.scf_driver.ri_coulomb:
-
-            assert_msg_critical(
-                basis.get_label().lower().startswith('def2-'),
-                'ScfGradientDriver: Invalid basis set for RI-J')
-
-            self._announce_once(
-                'Using the resolution of the identity (RI) approximation.')
-
-            if self.rank == mpi_master():
-                basis_ri_j = MolecularBasis.read(
-                    molecule, self.scf_driver.ri_auxiliary_basis)
-            else:
-                basis_ri_j = None
-            basis_ri_j = self.comm.bcast(basis_ri_j, root=mpi_master())
-
-            ri_gvec = self.scf_driver._ri_drv.compute_bq_vector(Dab_for_fock)
-
-            ri_grad_drv = RIFockGradDriver()
-
-            t0 = time.time()
-
-            for iatom in local_atoms:
-                atomgrad = ri_grad_drv.direct_compute(screener, basis,
-                                                      basis_ri_j, molecule,
-                                                      ri_gvec, Dab_for_fock,
-                                                      iatom, thresh_int)
-                # Note: RI gradient already contains factor of 2 for
-                # closed-shell, so for unrestricted factor becomes 0.25
-                self.gradient[iatom, :] += 0.25 * np.array(
-                    atomgrad.coordinates())
 
             grad_timing['Fock_grad'] += time.time() - t0
 
