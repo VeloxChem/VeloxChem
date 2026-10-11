@@ -242,7 +242,6 @@ class IMDatabasePointCollecter:
         self.point_adding_molecule = {}
         self.energy_threshold = None
         self.gradient_rmsd_thrsh = None
-        self.force_orient_thrsh = 0.00001
         self.start_collect = 0
         self.previous_energy_list = []
         # state-resolved symmetry metadata excluding the invariant core atoms
@@ -734,9 +733,13 @@ class IMDatabasePointCollecter:
             if len(atoms) != expected:
                 raise ValueError(f"metadynamics.variables[{idx}].atoms must have {expected} entries.")
             if natoms is not None:
+                # _build_metadynamics_cv_force reads torsion atoms as 1-based
+                # and distance/angle atoms as 0-based indices
+                first = 1 if vtype == 'torsion' else 0
+                last = first + natoms - 1
                 for a in atoms:
-                    if a < 0 or a >= natoms:
-                        raise ValueError(f"metadynamics.variables[{idx}] atom index {a} out of range [0, {natoms-1}].")
+                    if a < first or a > last:
+                        raise ValueError(f"metadynamics.variables[{idx}] atom index {a} out of range [{first}, {last}].")
 
             # Unit-range keys
             if vtype in ('angle', 'torsion'):
@@ -873,11 +876,9 @@ class IMDatabasePointCollecter:
             self.gradient_rmsd_thrsh = dynamics_settings['grad_rmsd_thrsh']
 
         if 'sampling_drivers' in dynamics_settings:
-            sampling_settings = dynamics_settings.get('sampling_settings', {
-                'enabled':False,
-                'e_thrsh_kcal_per_atom': 0.1,
-                'g_thrsh_kcal_ang_per_atom':2.0,
-                'force_orient_cos': 0.0001})
+            # the xTB pre-screening compares energies only
+            sampling_settings = {'enabled': False, 'e_thrsh_kcal_per_atom': 0.1}
+            sampling_settings.update(dynamics_settings.get('sampling_settings') or {})
             self.sampling_enabled = bool(sampling_settings.get('enabled'))
             self.sampling_driver = dynamics_settings.get('sampling_drivers', None)
             self.sampling_settings = sampling_settings
@@ -3319,12 +3320,16 @@ class IMDatabasePointCollecter:
         )
         h = self._compute_hessian(sampling_hess, molecule, basis=None)
 
-        masses = molecule.get_masses().copy()
-        inv_sqrt = 1.0 / np.sqrt(np.repeat(masses, 3))
+        inv_sqrt = None
         grad_vec = g[0].reshape(-1)
         hess_mat = h[0].reshape(grad_vec.size, grad_vec.size)
-        mw_grad = inv_sqrt * grad_vec
-        mw_hess = (inv_sqrt[:, None] * hess_mat) * inv_sqrt[None, :]
+        mw_grad = grad_vec
+        mw_hess = hess_mat
+        if self.sampling_interpolation_settings[root].get('use_mass_weight', False):
+            masses = molecule.get_masses().copy()
+            inv_sqrt = 1.0 / np.sqrt(np.repeat(masses, 3))
+            mw_grad = inv_sqrt * grad_vec
+            mw_hess = (inv_sqrt[:, None] * hess_mat) * inv_sqrt[None, :]
 
         dp = InterpolationDatapoint(self.root_z_matrix[root])
         dp.update_settings(self.sampling_interpolation_settings[root])
@@ -3359,6 +3364,9 @@ class IMDatabasePointCollecter:
         driver_object = self.sampling_impes_drivers[root]
 
         im_labels, _ = driver_object.read_labels()
+        # same order as self.sorted_state_spec_im_labels, which is used to
+        # address the datapoints by position
+        im_labels = sorted(im_labels, key=lambda x: int(x.split('_')[1]))
 
         self.sampling_qm_data_point_dict[root] = []
 
@@ -4223,10 +4231,7 @@ class IMDatabasePointCollecter:
         valid_checkpoint = (outputfile and isinstance(outputfile, str))
 
         if valid_checkpoint:
-            try:
-                h5f = h5py.File(outputfile, 'a')
-            except IOError:
-                h5f = h5py.File(outputfile, 'w')
+            h5f = h5py.File(outputfile, 'a')
 
         # 1. Write temperatures
         ds_name = 'mol_labels'

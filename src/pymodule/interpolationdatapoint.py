@@ -750,10 +750,9 @@ class InterpolationDatapoint:
         valid_checkpoint = (fname and isinstance(fname, str))
 
         if valid_checkpoint:
-            try:
-                h5f = h5py.File(fname, 'a')
-            except IOError:
-                h5f = h5py.File(fname, 'w')
+            # mode 'a' creates the file if it does not exist. An existing
+            # database that cannot be opened must not be overwritten.
+            h5f = h5py.File(fname, 'a')
 
             if self.use_inverse_bond_length:
                 label += "_rinv"
@@ -1007,7 +1006,7 @@ class InterpolationDatapoint:
         """
         if use_inverse_bond_length:
             label += "_rinv"
-        if use_eq_bond_length:
+        elif use_eq_bond_length:
             label += "_eq"
         else:
             label += "_r"
@@ -1019,7 +1018,7 @@ class InterpolationDatapoint:
             label + "_gradient",
             label + "_hessian",
             label + "_internal_coordinates",
-            label + "eq_bond_lengths",
+            label + "_eq_bond_lengths",
             label + "_cartesian_coordinates",
             label + "_cartesian_gradient",
             label + "_cartesian_hessian",

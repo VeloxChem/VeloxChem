@@ -171,6 +171,28 @@ class IMForceFieldGenerator:
                                         used when system is not improving without stricter locality constraints!   
     """
 
+    # Settings of earlier versions of the framework that are no longer used.
+    _removed_settings = {
+        'qm_omp_threads':
+            'QM calculations use the number of threads given by OMP_NUM_THREADS.',
+        'use_cosine_dihedral':
+            'Proper dihedrals always use the 2*sin(delta/2) displacement.',
+        'force_orient_thrsh':
+            'New datapoints are selected by energy_threshold and gradient_rmsd_thrsh only.',
+        'excitation_pulse':
+            'Only ground-state database construction is supported.',
+    }
+
+    # Keys of sampling_settings that are read by the xTB pre-screening.
+    _sampling_settings_keys = ('enabled', 'e_thrsh_kcal_per_atom')
+
+    # Attributes that enter the interpolation settings in set_up_the_system.
+    _interpolation_setting_names = (
+        'interpolation_type', 'weightfunction_type', 'exponent_p', 'exponent_q',
+        'confidence_radius', 'use_inverse_bond_length', 'use_eq_bond_length',
+        'use_tc_weights', 'tc_weight_mode', 'use_mass_weight',
+    )
+
     def __init__(self, ground_state_driver, roots_to_follow=None, comm=None, ostream=None):
 
         if comm is None:
@@ -195,6 +217,7 @@ class IMForceFieldGenerator:
         self.qm_data_points = None
         self.qmlabels = None
 
+        self.molecule = None
         self.molecules_along_rp = None
         self.conformal_structures = None
         self.sampling_structures = 1
@@ -294,11 +317,10 @@ class IMForceFieldGenerator:
         self.bias_force_reaction_prop = None  # this is being set by giving a dihedral, force constant and the final theta, steps_when_increased
 
         # sampling settings
+        # the xTB pre-screening compares energies only
         self.sampling_settings = {
             'enabled': False,
             'e_thrsh_kcal_per_atom': 0.1,
-            'g_rmsd_thrsh_kcal_ang_per_atom':2.0,
-            'force_orient_cos': 0.0001
         }
 
         self.sampling_imforcefieldfiles = None
@@ -314,6 +336,8 @@ class IMForceFieldGenerator:
         #             [
         #                 {
         #                     "type":"torsion",
+        #                     # torsion atoms are 1-based, distance and angle
+        #                     # atoms are 0-based
         #                     "atoms":[3,4,6,10],
         #                     "min_deg":-180,
         #                     "max_deg":180,
@@ -348,6 +372,108 @@ class IMForceFieldGenerator:
         self.imp_int_coordinates = []
 
         self._system_is_set_up = False
+
+        # every attribute defined up to here is a setting or internal state of
+        # the generator; anything assigned later under another name is not
+        # read by the construction (see _check_user_settings)
+        self._known_attributes = set(vars(self))
+        self._known_attributes.add('_known_attributes')
+
+    def _check_user_settings(self):
+        """
+        Reports settings that were assigned by the user but are not used in
+        the database construction. Python accepts any attribute name, so a
+        misspelled or outdated setting would otherwise be ignored silently.
+
+        :return:
+            The list of warning messages.
+        """
+
+        messages = []
+
+        for name in sorted(vars(self)):
+            if name in self._known_attributes:
+                continue
+            msg = f'IMForceFieldGenerator: setting "{name}" is not used and has no effect.'
+            if name in self._removed_settings:
+                msg += ' ' + self._removed_settings[name]
+            messages.append(msg)
+
+        if isinstance(self.sampling_settings, dict):
+            for key in self.sampling_settings:
+                if key not in self._sampling_settings_keys:
+                    messages.append(
+                        f'IMForceFieldGenerator: sampling_settings["{key}"] is not used '
+                        'and has no effect. The xTB pre-screening compares energies only.')
+
+        # The interpolation settings are assembled in set_up_the_system. If it
+        # was called explicitly, later changes do not reach the interpolation.
+        if self._system_is_set_up:
+            for root, settings in self.states_interpolation_settings.items():
+                if settings is None:
+                    continue
+                for name in self._interpolation_setting_names:
+                    if name in settings and settings[name] != getattr(self, name):
+                        messages.append(
+                            f'IMForceFieldGenerator: "{name}" was changed after set_up_the_system '
+                            f'and has no effect (used value: {settings[name]}). '
+                            'Assign interpolation settings before calling set_up_the_system.')
+                break
+
+        for msg in messages:
+            self.ostream.print_warning(msg)
+        if messages:
+            self.ostream.flush()
+
+        return messages
+
+    def _seed_constraints_to_imp_int_coordinates(self, constraints, z_matrix):
+        """
+        Converts the constraints of a seed-structure optimization into the
+        important internal coordinates of the datapoint. The constraints use
+        1-based atom indices (as passed to geomeTRIC), while important internal
+        coordinates are entries of the Z-matrix, which is 0-based.
+
+        :param constraints:
+            The list of constraints (tuples of 1-based atom indices).
+        :param z_matrix:
+            The Z-matrix dictionary of the root.
+
+        :return:
+            The dictionary of important internal coordinates.
+        """
+
+        imp_int_coordinates = {'bonds': [], 'angles': [], 'dihedrals': [], 'impropers': []}
+        sections = {2: ('bonds',), 3: ('angles',), 4: ('dihedrals', 'impropers')}
+
+        for constraint in constraints:
+            # geomeTRIC constraint strings carry no Z-matrix coordinate
+            if isinstance(constraint, str) or len(constraint) not in sections:
+                continue
+
+            coord = tuple(int(idx) - 1 for idx in constraint)
+
+            matched = False
+            for section in sections[len(coord)]:
+                entries = [tuple(int(idx) for idx in entry) for entry in z_matrix.get(section, [])]
+                # impropers are centered on the first atom and cannot be reversed
+                candidates = (coord,) if section == 'impropers' else (coord, coord[::-1])
+                for candidate in candidates:
+                    if candidate in entries:
+                        if candidate not in imp_int_coordinates[section]:
+                            imp_int_coordinates[section].append(candidate)
+                        matched = True
+                        break
+                if matched:
+                    break
+
+            if not matched:
+                self.ostream.print_warning(
+                    f'IMForceFieldGenerator: constraint {tuple(constraint)} is not part of the '
+                    'Z-matrix and is not stored as important internal coordinate.')
+                self.ostream.flush()
+
+        return imp_int_coordinates
 
     def define_z_matrix_dict(self, molecule, add_coordinates=None):
         g_molecule = geometric.molecule.Molecule()
@@ -915,6 +1041,14 @@ class IMForceFieldGenerator:
 
         """
 
+        self._check_user_settings()
+
+        if self.sampling_settings.get('enabled', False):
+            assert_msg_critical(
+                XtbDriver.is_available(),
+                'IMForceFieldGenerator: sampling_settings["enabled"] requires xtb-python, '
+                'which is not available. Install xtb-python or disable the xTB pre-screening.')
+
         if self.reference_struc_energy_file is not None and not Path(self.reference_struc_energy_file).exists():
             self.reference_struc_energy_file = None
 
@@ -951,7 +1085,7 @@ class IMForceFieldGenerator:
                 'drivers': self.drivers,
                 'basis_set_label': states_basis,
                 'duration': self.duration, 'temperature': self.temperature, 'solvent': self.solvent,
-                'pressure': self.force_constant, 'force_constant': self.force_constant, 'ensemble': self.ensemble,
+                'pressure': self.pressure, 'force_constant': self.force_constant, 'ensemble': self.ensemble,
                 'timestep': self.timestep, 'nsteps': self.nsteps, 'friction': self.friction,
                 'snapshots': self.snapshots, 'trajectory_file': self.trajectory_file, 'reference_struc_energy_file': self.reference_struc_energy_file,
                 'desired_datapoint_density': self.desired_point_density, 'converged_cycle': self.converged_cycle,
@@ -1959,9 +2093,11 @@ class IMForceFieldGenerator:
                     im_settings[root],
                 )
 
-                masses = molecule.get_masses().copy()
-                masses_cart = np.repeat(masses, 3)
-                inv_sqrt_masses = 1.0 / np.sqrt(masses_cart)
+                inv_sqrt_masses = None
+                if im_settings[root].get('use_mass_weight', False):
+                    masses = molecule.get_masses().copy()
+                    masses_cart = np.repeat(masses, 3)
+                    inv_sqrt_masses = 1.0 / np.sqrt(masses_cart)
 
                 impes_driver = InterpolationDriver(self.roots_z_matrix[root])
                 impes_driver.update_settings(im_settings[root])
@@ -1979,6 +2115,7 @@ class IMForceFieldGenerator:
                     qm_data_point = InterpolationDatapoint(self.roots_z_matrix[root])
                     qm_data_point.update_settings(im_settings[root])
                     qm_data_point.read_hdf5(current_datafile, label)
+                    qm_data_point.inv_sqrt_masses = inv_sqrt_masses
 
                     if impes_driver.impes_coordinate.eq_bond_lengths is None:
                         impes_driver.impes_coordinate.eq_bond_lengths = qm_data_point.eq_bond_lengths
@@ -2162,14 +2299,8 @@ class IMForceFieldGenerator:
                 if not mol_basis[5]:
                     label_counter = 0
 
-                imp_int_constraints = {'bonds': [], 'angles': [], 'dihedrals': [], 'impropers': []}
-                for constraint in mol_basis[-1]:
-                    if len(constraint) == 2:
-                        imp_int_constraints["bonds"].append(constraint)
-                    if len(constraint) == 3:
-                        imp_int_constraints["angles"].append(constraint)
-                    if len(constraint) == 4:
-                        imp_int_constraints["dihedrals"].append(constraint)
+                imp_int_constraints = self._seed_constraints_to_imp_int_coordinates(
+                    mol_basis[-1], self.roots_z_matrix[mol_basis[4][0]])
 
                 energies, scf_results, rsp_results = self._compute_energy(drivers[0], mol_basis[0], mol_basis[1])
 

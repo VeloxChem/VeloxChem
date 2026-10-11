@@ -170,8 +170,8 @@ class InterpolationDriver:
                     ('str', 'type of interpolation (Shepard)'),
                 'weightfunction_type':
                     ('str', 'type of interpolation (cartesian/internal)'),
-                'exponent_p': ('int', 'the main exponent'),
-                'exponent_q': ('int', 'the additional exponent (Shepard IM)'),
+                'exponent_p': ('float', 'the main exponent'),
+                'exponent_q': ('float', 'the additional exponent (Shepard IM)'),
                 'confidence_radius': ('float', 'the confidence radius'),
                 'imforcefield_file':
                     ('str', 'the name of the chk file with QM data'),
@@ -1590,7 +1590,12 @@ class InterpolationDriver:
                         -min(lam * A_imp, self.tc_imp_gate_exp_clip)
                     )
 
-                    grad_gate = -lam * gate * grad_A_imp
+                    # same convention as _apply_imp_coordinate_penalty_gate:
+                    # the clipped gate is constant
+                    if lam * A_imp >= self.tc_imp_gate_exp_clip:
+                        grad_gate = np.zeros_like(grad_A_imp)
+                    else:
+                        grad_gate = -lam * gate * grad_A_imp
 
                     dw_base_dR = self.trust_radius_weight_gradient(
                         data_point.confidence_radius,
