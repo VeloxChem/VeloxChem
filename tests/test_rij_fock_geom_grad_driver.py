@@ -1,15 +1,14 @@
 from pathlib import Path
-import math as mt
+
 import numpy as np
 import pytest
 
-from veloxchem import MolecularBasis
-from veloxchem import Molecule
-from veloxchem import FockGeom1000Driver
-from veloxchem import T4CScreener
-from veloxchem import make_matrix, mat_t
-from veloxchem.rifockdriver import RIFockDriver
-from veloxchem.veloxchemlib import RIFockGradDriver
+from mpi4py import MPI
+
+from veloxchem import MolecularBasis, Molecule
+from veloxchem.veloxchemlib import (PackedMatrix, mat_t, mpi_master, rimode,
+                                    make_matrix, FockGeom1000Driver,
+                                    SimdRIJFockDriver, SimdRIJGradientDriver)
 
 
 @pytest.mark.solvers
@@ -35,54 +34,71 @@ class TestRIJFockGeomGradDriver:
 
         return mol, bas, aux_bas
 
-    def test_h2o_trimer_fock_2j_grad_h2o_svp_screened(self):
+    def test_h2o_trimer_ri_j_gradient(self):
 
-        mol_h2o_trimer, bas_svp, bas_aux = self.get_data_h2o_trimer()
+        mol, bas, aux_bas = self.get_data_h2o_trimer()
 
-        # load density matrix
+        natoms = mol.number_of_atoms()
+        nao = bas.get_dimensions_of_basis()
+
         here = Path(__file__).parent
-        npyfile = str(here / 'data' / 'h2o.trimer.svp.density.npy')
-        density = np.load(npyfile)
-        den_mat = make_matrix(bas_svp, mat_t.symmetric)
+        density = np.load(here / 'data' / 'h2o.trimer.svp.density.npy')
+
+        den_mat = make_matrix(bas, mat_t.symmetric)
         den_mat.set_values(density)
 
-        # convectional gradient
+        # four-centre Coulomb gradient for reference
+
         fock_drv = FockGeom1000Driver()
-        ref_grad = []
+        ref_grad = np.zeros((natoms, 3))
 
-        for i in range(9):
-            fmats = fock_drv.compute(bas_svp, mol_h2o_trimer, den_mat, i,
-                                     "2jkx", 0.0, 0.0)
-            fmatx = fmats.matrix('X').full_matrix().to_numpy()
-            gradx = np.trace(np.matmul(fmatx, density))
-            fmaty = fmats.matrix('Y').full_matrix().to_numpy()
-            grady = np.trace(np.matmul(fmaty, density))
-            fmatz = fmats.matrix('Z').full_matrix().to_numpy()
-            gradz = np.trace(np.matmul(fmatz, density))
-            ref_grad.append(gradx)
-            ref_grad.append(grady)
-            ref_grad.append(gradz)
+        for iatom in range(natoms):
+            fmats = fock_drv.compute(bas, mol, den_mat, iatom, '2jkx', 0.0, 0.0)
+            for xyz, label in enumerate('XYZ'):
+                fmat = fmats.matrix(label).full_matrix().to_numpy()
+                ref_grad[iatom, xyz] = np.trace(np.matmul(fmat, density))
 
-        # compute B_q vector
-        ri_fock_drv = RIFockDriver()
-        ri_fock_drv.prepare_buffers(mol_h2o_trimer,
-                                    bas_svp,
-                                    bas_aux,
-                                    verbose=False)
-        gv = ri_fock_drv.compute_bq_vector(den_mat)
+        # fitting coefficients of the density
 
-        # screen basis function pairs
-        t4c_drv = T4CScreener()
-        t4c_drv.partition(bas_svp, mol_h2o_trimer, "eri")
+        comm = MPI.COMM_WORLD
+        rank = comm.Get_rank()
+        nodes = comm.Get_size()
 
-        # compute RI gradients for all atoms
-        ri_grad_drv = RIFockGradDriver()
-        for i in range(9):
-            g = ri_grad_drv.compute(t4c_drv, bas_svp, bas_aux, mol_h2o_trimer,
-                                    gv, den_mat, i, 12)
-            grad = g.coordinates()
-            for j in range(3):
-                assert mt.isclose(ref_grad[3 * i + j],
-                                  grad[j],
-                                  rel_tol=1.0e-4,
-                                  abs_tol=1.0e-4)
+        packed_density = PackedMatrix(nao, nao, mat_t.symmetric)
+        packed_density.from_numpy(np.ascontiguousarray(density))
+
+        ri_drv = SimdRIJFockDriver()
+
+        metric = PackedMatrix()
+        if rank == mpi_master():
+            metric = ri_drv.make_metric(mol, aux_bas, 1.0e-12)
+        metric = metric.broadcast(comm, root=mpi_master())
+
+        ri_drv.prepare(mol, bas, aux_bas, 1.0e-12, 1 << 30, 1.0e-12,
+                       rimode.in_memory, metric, rank, nodes)
+
+        mine = ri_drv.owned_parts()
+
+        local = np.array(ri_drv.compute_gamma(packed_density, mine),
+                         dtype=np.float64)
+
+        total = np.zeros_like(local)
+        comm.Allreduce(local, total, op=MPI.SUM)
+
+        gamma = ri_drv.solve_fitting(total)
+
+        # SIMD RI-J Coulomb gradient of every atom
+
+        grad_drv = SimdRIJGradientDriver(1.0e-12)
+
+        all_atoms = list(range(natoms))
+        local_atoms = mol.partition_atoms(comm)
+
+        atomgrad = grad_drv.compute(mol, bas, aux_bas, gamma, packed_density,
+                                    all_atoms, list(local_atoms),
+                                    rank == mpi_master())
+
+        calc_grad = comm.allreduce(atomgrad.to_numpy())
+
+        assert np.allclose(ref_grad, calc_grad,
+                           rtol=1.0e-4, atol=1.0e-4)
