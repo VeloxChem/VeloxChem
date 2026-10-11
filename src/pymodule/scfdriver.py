@@ -55,7 +55,6 @@ from .veloxchemlib import denmat, mat_t
 from .veloxchemlib import make_matrix
 from .matrix import Matrix
 from .aodensitymatrix import AODensityMatrix
-from .rijkfockdriver import RIJKFockDriver
 from .fikaembedding import (FikaEmbeddingSCF, fika_embedding_text,
                             is_fika_embedding)
 from .veloxchemlib import SimdRIJFockDriver
@@ -1917,6 +1916,10 @@ class ScfDriver:
             (not self.ri_coulomb) or self.ri_coulomb_simd,
             'SCF driver: RI-J is supported only with ri_coulomb_simd')
 
+        assert_msg_critical(
+            (not self.ri_jk) or self.ri_jk_simd,
+            'SCF driver: RI-JK is supported only with ri_jk_simd')
+
         if self.ri_coulomb and self.ri_coulomb_simd:
             if isinstance(self.ri_auxiliary_basis, str):
                 basis_ri = MolecularBasis.read(molecule, self.ri_auxiliary_basis)
@@ -2180,19 +2183,6 @@ class ScfDriver:
                 f'B vectors for RI done in {tm.time() - ri_prep_t0:.2f} sec.')
             self.ostream.print_blank()
             self.ostream.flush()
-
-        elif self.ri_jk:
-            self._ri_drv = RIJKFockDriver(self.comm, self.ostream)
-            self._ri_drv.metric_threshold = self.ri_metric_threshold
-            self._ri_drv.compute_metric(molecule,
-                                        self.ri_auxiliary_basis,
-                                        verbose=True)
-            thresh_int = int(-math.log10(self.eri_thresh))
-            self._ri_drv.compute_screened_bq_vectors(screener,
-                                                     molecule,
-                                                     self.ri_auxiliary_basis,
-                                                     thresh_int,
-                                                     verbose=False)
 
         self._ri_setup_time = tm.time() - ri_setup_t0
 
@@ -3409,18 +3399,6 @@ class ScfDriver:
                 den_mat[0], exchange_scaling_factor,
                 erf_k_coef if need_omega else 0.0,
                 use_density_factor=use_density_factor)
-        elif self.ri_jk and fock_type != 'j' and (
-                not self.molecular_orbitals.is_empty()):
-            fock_mat_j = self._ri_drv.compute_screened_j_fock(den_mat_for_fock,
-                                                              'j',
-                                                              verbose=False)
-            fock_mat_k = self._ri_drv.compute_screened_k_fock(
-                den_mat_for_fock,
-                self.molecular_orbitals,
-                verbose=False,
-                use_density_factor=use_density_factor)
-            fock_mat_np = (fock_mat_j.to_numpy() * 2.0 -
-                           fock_mat_k.to_numpy() * exchange_scaling_factor)
         else:
             fock_mat = fock_drv.compute(screener, den_mat_for_fock, fock_type,
                                         exchange_scaling_factor, 0.0,
@@ -3435,13 +3413,7 @@ class ScfDriver:
         # NOTE: the simd resolution of the identity has already subtracted the
         # attenuated exchange, inside the build rather than after it, so the four
         # centre correction is made for every other way of building but not for it.
-        # The conventional RI-JK driver still has no attenuated B vectors and is
-        # refused rather than answered without the long-range term.
         if need_omega and not (self.ri_jk and self.ri_jk_simd):
-            assert_msg_critical(
-                not self.ri_jk, 'SCF driver: RI-JK not yet implemented for ' +
-                'range-separated functional')
-
             # for range-separated functional
             fock_mat = fock_drv.compute(screener, den_mat_for_fock, 'kx_rs',
                                         erf_k_coef, omega, thresh_int)
@@ -3527,9 +3499,8 @@ class ScfDriver:
         else:
             if self.ri_jk and self.ri_jk_simd:
                 # NOTE: the Coulomb of the total density and both exchanges in one
-                # call, which is handed a set of coefficients for each spin. There
-                # is no test of whether the orbitals exist yet, as the branch below
-                # has: where there are none the build is handed coefficients which
+                # call, which is handed a set of coefficients for each spin. Where
+                # there are no orbitals yet the build is handed coefficients which
                 # reproduce the density of the guess, so it serves the first
                 # iteration too and does not fall back to the four centre way for
                 # it.
@@ -3538,31 +3509,6 @@ class ScfDriver:
                         den_mat[0], den_mat[1], exchange_scaling_factor,
                         erf_k_coef if need_omega else 0.0,
                         use_density_factor=use_density_factor))
-
-            elif self.ri_jk and (not self.molecular_orbitals.is_empty()):
-                fock_mat = self._ri_drv.compute_screened_j_fock(den_mat_for_Jab,
-                                                                'j',
-                                                                verbose=False)
-                J_ab_np = fock_mat.to_numpy()
-                fock_mat = Matrix()
-
-                fock_mat = self._ri_drv.compute_screened_k_fock(
-                    den_mat_for_Ka,
-                    self.molecular_orbitals,
-                    verbose=False,
-                    spin='alpha',
-                    use_density_factor=use_density_factor)
-                K_a_np = fock_mat.to_numpy() * exchange_scaling_factor
-                fock_mat = Matrix()
-
-                fock_mat = self._ri_drv.compute_screened_k_fock(
-                    den_mat_for_Kb,
-                    self.molecular_orbitals,
-                    verbose=False,
-                    spin='beta',
-                    use_density_factor=use_density_factor)
-                K_b_np = fock_mat.to_numpy() * exchange_scaling_factor
-                fock_mat = Matrix()
 
             else:
                 fock_mat = fock_drv.compute(screener, den_mat_for_Ka, 'kx',
@@ -3586,8 +3532,8 @@ class ScfDriver:
                 J_ab_np = fock_mat.to_numpy()
                 fock_mat = Matrix()
 
-            # NOTE: the two branches above answer with the Coulomb and the two
-            # exchanges apart, and are composed here. The simd branch answers with
+            # NOTE: the four centre branch above answers with the Coulomb and the two
+            # exchanges apart, and is composed here. The simd branch answers with
             # the two matrices already composed, which is what its driver forms,
             # so it is left alone rather than taken apart and put back together.
             if not (self.ri_jk and self.ri_jk_simd):
@@ -3597,10 +3543,6 @@ class ScfDriver:
         # NOTE: as in the restricted build above -- the simd way subtracts both
         # spins' attenuated exchange inside the call and takes no correction here.
         if need_omega and not (self.ri_jk and self.ri_jk_simd):
-            assert_msg_critical(
-                not self.ri_jk, 'SCF driver: RI-JK not yet implemented for ' +
-                'range-separated functional')
-
             # for range-separated functional
             fock_mat = fock_drv.compute(screener, den_mat_for_Ka, 'kx_rs',
                                         erf_k_coef, omega, thresh_int)
