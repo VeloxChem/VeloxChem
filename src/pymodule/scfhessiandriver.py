@@ -154,11 +154,6 @@ class ScfHessianDriver(HessianDriver):
             For backward compatibility.
         """
 
-        # TODO: enable RI-JK
-        assert_msg_critical(
-            not self.scf_driver.ri_jk,
-            f'{type(self).__name__}.compute: RI-JK is not yet supported')
-
         assert_msg_critical(
             self.scf_driver.electric_field is None,
             f'{type(self).__name__}.compute: electric_field is not supported')

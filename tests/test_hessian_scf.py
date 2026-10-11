@@ -5,6 +5,8 @@ import pytest
 
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.mpitask import MpiTask
+from veloxchem.molecule import Molecule
+from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.scfhessiandriver import ScfHessianDriver
 from veloxchem.vibrationalanalysis import VibrationalAnalysis
@@ -269,3 +271,42 @@ class TestScfHessianDriver:
             hf.close()
             diff_hessian = np.max(np.abs(hessian_drv.hessian - ref_hessian))
             assert diff_hessian < 1e-6
+
+    @pytest.mark.timeconsuming
+    def test_restricted_ri_jk_hessian(self):
+        """The RI-JK analytical Hessian must run and stay within the RI-JK
+        approximation error of the no-RI Hessian.  This exercises the RI-JK
+        factors of the CPHF sigma and of the fock_uij right-hand side."""
+
+        mol = Molecule.read_xyz_string("""3
+        water
+        O    0.000000    0.000000    0.000000
+        H    0.000000   -0.757160    0.586260
+        H    0.000000    0.757160    0.586260
+        """)
+        bas = MolecularBasis.read(mol, 'def2-svp', ostream=None)
+
+        scf_ref = ScfRestrictedDriver()
+        scf_ref.ostream.mute()
+        scf_ref.xcfun = 'hf'
+        scf_ref.compute(mol, bas)
+
+        hess_ref = ScfHessianDriver(scf_ref)
+        hess_ref.ostream.mute()
+        hess_ref.compute(mol, bas)
+
+        scf_rijk = ScfRestrictedDriver()
+        scf_rijk.ostream.mute()
+        scf_rijk.xcfun = 'hf'
+        scf_rijk.ri_jk = True
+        scf_rijk.ri_jk_simd = True
+        scf_rijk.compute(mol, bas)
+
+        hess_rijk = ScfHessianDriver(scf_rijk)
+        hess_rijk.ostream.mute()
+        hess_rijk.compute(mol, bas)
+
+        if scf_rijk.rank == mpi_master():
+            rel_diff = (np.linalg.norm(hess_rijk.hessian - hess_ref.hessian) /
+                        np.linalg.norm(hess_ref.hessian))
+            assert rel_diff < 1.0e-3

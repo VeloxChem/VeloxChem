@@ -129,6 +129,7 @@ class UnrestrictedHessianOrbitalResponse(CphfSolver):
             eocc_b = scf_results['E_beta'][:nocc_b]
             mo_a = scf_results['C_alpha']
             mo_b = scf_results['C_beta']
+            S = scf_results['S']
             point_charges = scf_results.get('point_charges', None)
             qm_vdw_params = scf_results.get('qm_vdw_params', None)
         else:
@@ -138,6 +139,7 @@ class UnrestrictedHessianOrbitalResponse(CphfSolver):
             eocc_b = None
             mo_a = None
             mo_b = None
+            S = None
             point_charges = None
             qm_vdw_params = None
 
@@ -476,21 +478,36 @@ class UnrestrictedHessianOrbitalResponse(CphfSolver):
             if self.rank == mpi_master():
                 uij_ao_list_a = []
                 uij_ao_list_b = []
+                # NOTE: one set of oo-density factors per spin for the
+                # resolution of the identity, with the overlap as in the
+                # restricted case.
+                if self.ri_jk and self.ri_jk_simd:
+                    ri_jk_factors_uij = ((mo_occ_a, []), (mo_occ_b, []))
+                else:
+                    ri_jk_factors_uij = None
             else:
                 uij_ao_list_a = None
                 uij_ao_list_b = None
+                ri_jk_factors_uij = None
 
             for x in range(3):
                 key_ix = (iatom, x)
                 ovlp_deriv_ao_ix = dist_ovlp_deriv_ao[key_ix].get_full_matrix()
 
                 if self.rank == mpi_master():
-                    uij_ao_list_a.append(
-                        np.linalg.multi_dot(
-                            [density_a, -0.5 * ovlp_deriv_ao_ix, density_a]))
-                    uij_ao_list_b.append(
-                        np.linalg.multi_dot(
-                            [density_b, -0.5 * ovlp_deriv_ao_ix, density_b]))
+                    uij_ao_a = np.linalg.multi_dot(
+                        [density_a, -0.5 * ovlp_deriv_ao_ix, density_a])
+                    uij_ao_b = np.linalg.multi_dot(
+                        [density_b, -0.5 * ovlp_deriv_ao_ix, density_b])
+                    uij_ao_list_a.append(uij_ao_a)
+                    uij_ao_list_b.append(uij_ao_b)
+                    if ri_jk_factors_uij is not None:
+                        xmat_a = np.linalg.multi_dot(
+                            [mo_occ_a.T, S, uij_ao_a, S, mo_occ_a])
+                        xmat_b = np.linalg.multi_dot(
+                            [mo_occ_b.T, S, uij_ao_b, S, mo_occ_b])
+                        ri_jk_factors_uij[0][1].append(mo_occ_a @ xmat_a.T)
+                        ri_jk_factors_uij[1][1].append(mo_occ_b @ xmat_b.T)
 
             profiler.add_timing_info('UijAO', tm.time() - uij_t0)
 
@@ -500,7 +517,8 @@ class UnrestrictedHessianOrbitalResponse(CphfSolver):
             # a is an alpha component and b is beta.
             fock_uij = self._comp_lr_fock_unrestricted(
                 (uij_ao_list_a, uij_ao_list_b), molecule, basis, eri_dict,
-                dft_dict, pe_dict, profiler)
+                dft_dict, pe_dict, profiler,
+                dens_factors=ri_jk_factors_uij)
 
             if self.rank == mpi_master():
                 uij_ao_list_a.clear()

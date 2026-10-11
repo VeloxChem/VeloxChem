@@ -191,3 +191,46 @@ class TestScfUnrestrictedHessian:
                                        ref_hessian,
                                        rtol=1.0e-8,
                                        atol=1.0e-10)
+
+    @pytest.mark.timeconsuming
+    def test_unrestricted_ri_jk_hessian(self):
+        """The unrestricted RI-JK analytical Hessian must run and stay within
+        the RI-JK approximation error of the no-RI Hessian.  This exercises the
+        per-spin factors of the CPHF sigma and of the fock_uij right-hand
+        side."""
+
+        mol = Molecule.read_xyz_string("""4
+        xyz
+        C   -1.85334300   -0.63945100    1.29623300
+        H   -2.40884500   -1.56570200    1.04276400
+        H   -2.24160900   -0.22442700    2.24900500
+        H   -1.98830700    0.10613700    0.48589200
+        """)
+        mol.set_multiplicity(2)
+
+        bas = MolecularBasis.read(mol, 'def2-svp', ostream=None)
+
+        scf_ref = ScfUnrestrictedDriver()
+        scf_ref.ostream.mute()
+        scf_ref.xcfun = 'hf'
+        scf_ref.compute(mol, bas)
+
+        hess_ref = ScfHessianDriver(scf_ref)
+        hess_ref.ostream.mute()
+        hess_ref.compute(mol, bas)
+
+        scf_rijk = ScfUnrestrictedDriver()
+        scf_rijk.ostream.mute()
+        scf_rijk.xcfun = 'hf'
+        scf_rijk.ri_jk = True
+        scf_rijk.ri_jk_simd = True
+        scf_rijk.compute(mol, bas)
+
+        hess_rijk = ScfHessianDriver(scf_rijk)
+        hess_rijk.ostream.mute()
+        hess_rijk.compute(mol, bas)
+
+        if scf_rijk.rank == mpi_master():
+            rel_diff = (np.linalg.norm(hess_rijk.hessian - hess_ref.hessian) /
+                        np.linalg.norm(hess_ref.hessian))
+            assert rel_diff < 1.0e-3

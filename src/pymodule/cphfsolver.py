@@ -884,11 +884,19 @@ class CphfSolver(LinearSolver):
 
                 if is_local_master:
                     vec = vec_list[subcomm_index]
-                    vec_ao = np.linalg.multi_dot(
-                        [mo_occ, vec.reshape(nocc, nvir), mo_vir.T])
+                    vec = vec.reshape(nocc, nvir)
+                    vec_ao = np.linalg.multi_dot([mo_occ, vec, mo_vir.T])
                     dens = [vec_ao]
+                    # NOTE: the factors of the trial density for the resolution
+                    # of the identity, as in build_sigmas_single_comm.  The
+                    # local master of this subcommunicator holds them and the
+                    # broadcast in _comp_lr_fock sends them to its ranks.
+                    ri_jk_factors = (
+                        (mo_occ, [np.matmul(mo_vir, vec.T)])
+                        if (self.ri_jk and self.ri_jk_simd) else None)
                 else:
                     dens = None
+                    ri_jk_factors = None
 
                 if profiler is not None:
                     profiler.add_timing_info('PreProc', tm.time() - prep_t0)
@@ -896,7 +904,8 @@ class CphfSolver(LinearSolver):
                 # create Fock matrices and contract with two-electron integrals
                 fock = self._comp_lr_fock(dens, molecule, basis, eri_dict,
                                           dft_dict, pe_dict, profiler,
-                                          local_comm)
+                                          local_comm,
+                                          dens_factors=ri_jk_factors)
 
                 if profiler is not None:
                     # only increment FockCount on local master
@@ -1057,8 +1066,14 @@ class CphfSolver(LinearSolver):
 
             if self.rank == mpi_master():
                 vec_list = []
+                # NOTE: the trial densities for the resolution of the identity,
+                # D = C(occ) U C(vir)^T = left right^T.  Built only where the
+                # RI-JK driver will use them.
+                ri_jk_factors = ((mo_occ, [])
+                                 if (self.ri_jk and self.ri_jk_simd) else None)
             else:
                 vec_list = None
+                ri_jk_factors = None
 
             prep_t0 = tm.time()
 
@@ -1070,13 +1085,16 @@ class CphfSolver(LinearSolver):
                     vec = vec.reshape(nocc, nvir)
                     vec_ao = np.linalg.multi_dot([mo_occ, vec, mo_vir.T])
                     vec_list.append(vec_ao)
+                    if ri_jk_factors is not None:
+                        ri_jk_factors[1].append(np.matmul(mo_vir, vec.T))
 
             if profiler is not None:
                 profiler.add_timing_info('PreProc', tm.time() - prep_t0)
 
             # create Fock matrices and contract with two-electron integrals
             fock = self._comp_lr_fock(vec_list, molecule, basis, eri_dict,
-                                      dft_dict, pe_dict, profiler)
+                                      dft_dict, pe_dict, profiler,
+                                      dens_factors=ri_jk_factors)
 
             if profiler is not None:
                 # only increment FockCount on master rank
@@ -1215,9 +1233,16 @@ class CphfSolver(LinearSolver):
             if self.rank == mpi_master():
                 vec_list_a = []
                 vec_list_b = []
+                # NOTE: one set of trial-density factors per spin for the
+                # resolution of the identity.
+                if self.ri_jk and self.ri_jk_simd:
+                    ri_jk_factors = ((mo_occ_a, []), (mo_occ_b, []))
+                else:
+                    ri_jk_factors = None
             else:
                 vec_list_a = None
                 vec_list_b = None
+                ri_jk_factors = None
 
             prep_t0 = tm.time()
 
@@ -1234,14 +1259,19 @@ class CphfSolver(LinearSolver):
                         [mo_occ_b, vec_b, mo_vir_b.T])
                     vec_list_a.append(vec_ao_a)
                     vec_list_b.append(vec_ao_b)
+                    if ri_jk_factors is not None:
+                        ri_jk_factors[0][1].append(
+                            np.matmul(mo_vir_a, vec_a.T))
+                        ri_jk_factors[1][1].append(
+                            np.matmul(mo_vir_b, vec_b.T))
 
             if profiler is not None:
                 profiler.add_timing_info('PreProc', tm.time() - prep_t0)
 
             # create Fock matrices and contract with two-electron integrals
-            fock = self._comp_lr_fock_unrestricted([vec_list_a, vec_list_b],
-                                                   molecule, basis, eri_dict,
-                                                   dft_dict, pe_dict, profiler)
+            fock = self._comp_lr_fock_unrestricted(
+                [vec_list_a, vec_list_b], molecule, basis, eri_dict, dft_dict,
+                pe_dict, profiler, dens_factors=ri_jk_factors)
 
             if profiler is not None:
                 # only increment FockCount on master rank
