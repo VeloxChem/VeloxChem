@@ -421,6 +421,10 @@ def ri_sanity_check(obj):
     if hasattr(obj, 'ri_coulomb_simd'):
         obj.ri_coulomb_simd = ri_coulomb
 
+    # NOTE: the simd flag follows ri_jk.
+    if hasattr(obj, 'ri_jk_simd'):
+        obj.ri_jk_simd = ri_jk
+
     if not (ri_coulomb or ri_jk):
         return
 

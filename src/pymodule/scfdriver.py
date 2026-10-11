@@ -2517,6 +2517,7 @@ class ScfDriver:
                     self._scf_results['ri_coulomb_simd'] = (
                         self.ri_coulomb_simd)
                     self._scf_results['ri_jk'] = self.ri_jk
+                    self._scf_results['ri_jk_simd'] = self.ri_jk_simd
                     self._scf_results[
                         'ri_auxiliary_basis'] = self.ri_auxiliary_basis
 
