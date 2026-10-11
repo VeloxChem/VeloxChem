@@ -3,9 +3,9 @@ import pytest
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
+from veloxchem.scfdriver import ScfDriver
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.scfunrestdriver import ScfUnrestrictedDriver
-from veloxchem.rijkfockdriver import RIJKFockDriver
 
 
 @pytest.mark.solvers
@@ -21,6 +21,7 @@ class TestScfDriverWithRIJK:
         scf_drv.ostream.mute()
         scf_drv.xcfun = xcfun_label
         scf_drv.ri_jk = True
+        scf_drv.ri_jk_simd = True
         scf_results = scf_drv.compute(mol, bas)
 
         if scf_drv.rank == mpi_master():
@@ -41,6 +42,7 @@ class TestScfDriverWithRIJK:
 
         scf_drv.ostream.mute()
         scf_drv.ri_jk = True
+        scf_drv.ri_jk_simd = True
         configure(scf_drv)
         scf_results = scf_drv.compute(mol, bas)
 
@@ -54,18 +56,18 @@ class TestScfDriverWithRIJK:
 
     def _record_density_factor_calls(self, monkeypatch):
         """
-        Patches the RI-JK screened exchange method to record whether the
+        Patches the SIMD RI-JK occupied-orbital build to record whether the
         density-factor path is requested.
         """
 
         calls = []
-        original = RIJKFockDriver.compute_screened_k_fock
+        original = ScfDriver._simd_ri_jk_occupied
 
         def spy(instance, *args, **kwargs):
             calls.append(kwargs.get('use_density_factor', False))
             return original(instance, *args, **kwargs)
 
-        monkeypatch.setattr(RIJKFockDriver, 'compute_screened_k_fock', spy)
+        monkeypatch.setattr(ScfDriver, '_simd_ri_jk_occupied', spy)
 
         return calls
 

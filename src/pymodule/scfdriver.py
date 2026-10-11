@@ -3028,7 +3028,8 @@ class ScfDriver:
     def _simd_ri_jk_fock(self,
                          density,
                          exchange_scaling_factor,
-                         erf_exchange_scaling_factor=0.0):
+                         erf_exchange_scaling_factor=0.0,
+                         use_density_factor=False):
         """
         Computes the closed shell Fock matrix with the SIMD RI-JK driver.
 
@@ -3041,6 +3042,11 @@ class ScfDriver:
             the erf coefficient of a hybrid range-separated functional and zero
             for every other calculation. It is subtracted as the plain exchange
             is, so this is the same number the four-centre way is passed.
+        :param use_density_factor:
+            Whether the exchange should be formed from the density rather than
+            from the stored orbitals. pFON and density damping pass a density
+            which the stored orbitals do not describe, so the factor of the
+            density has to be used for it.
 
         :return:
             The Fock matrix as a numpy array.
@@ -3050,7 +3056,8 @@ class ScfDriver:
 
         # the occupied orbitals, which the exchange is formed from
 
-        orbitals = self._simd_ri_jk_occupied(density, 'alpha')
+        orbitals = self._simd_ri_jk_occupied(
+            density, 'alpha', use_density_factor=use_density_factor)
 
         coeffs = PackedMatrix(nao, orbitals.shape[1], mat_t.general)
         coeffs.from_numpy(orbitals)
@@ -3078,7 +3085,7 @@ class ScfDriver:
 
         return fock.to_numpy(max_memory=2.0 * nao * nao * 8 / 1024**3 + 1.0)
 
-    def _simd_ri_jk_occupied(self, density, spin):
+    def _simd_ri_jk_occupied(self, density, spin, use_density_factor=False):
         """
         The occupied orbitals one spin's exchange is formed from.
 
@@ -3086,12 +3093,16 @@ class ScfDriver:
             That spin's density matrix as a numpy array.
         :param spin:
             'alpha' or 'beta'.
+        :param use_density_factor:
+            Whether to factorize the density rather than read the stored
+            orbitals. True when the density is not idempotent, which pFON and
+            density damping make it.
 
         :return:
             The coefficients as a numpy array of one row per basis function.
         """
 
-        if self.molecular_orbitals.is_empty():
+        if use_density_factor or self.molecular_orbitals.is_empty():
             # NOTE: the first build has no orbitals yet, as they come from the
             # matrix it is about to make. Any C with C C^T equal to the density
             # gives that density's exchange, and the eigenvectors of the density
@@ -3101,6 +3112,10 @@ class ScfDriver:
             # of the molecule, so this costs about that much more than an ordinary
             # build -- against a build of the four center integrals, which is what
             # it replaces and which is an order of magnitude dearer.
+
+            # NOTE: the same factorization serves a density which is not
+            # idempotent, as pFON and density damping make it: the stored
+            # orbitals carry integer occupations and do not reproduce it.
 
             # NOTE: they are formed on the master and handed over rather than
             # formed again on every rank. The exchange depends on C only through
@@ -3135,7 +3150,8 @@ class ScfDriver:
                                       den_alpha,
                                       den_beta,
                                       exchange_scaling_factor,
-                                      erf_exchange_scaling_factor=0.0):
+                                      erf_exchange_scaling_factor=0.0,
+                                      use_density_factor=False):
         """
         Computes the open shell Fock matrices with the SIMD RI-JK driver.
 
@@ -3148,6 +3164,9 @@ class ScfDriver:
         :param erf_exchange_scaling_factor:
             The coefficient of the exchange of the attenuated operator, as above.
             Each spin's attenuated exchange goes into its own matrix.
+        :param use_density_factor:
+            Whether each spin's exchange should be formed from its density
+            rather than from the stored orbitals, as in the closed shell build.
 
         :return:
             The alpha and the beta Fock matrices as numpy arrays.
@@ -3159,8 +3178,10 @@ class ScfDriver:
         # of coefficients have different numbers of columns and the driver is told
         # both rather than one and a count.
 
-        orbitals_a = self._simd_ri_jk_occupied(den_alpha, 'alpha')
-        orbitals_b = self._simd_ri_jk_occupied(den_beta, 'beta')
+        orbitals_a = self._simd_ri_jk_occupied(
+            den_alpha, 'alpha', use_density_factor=use_density_factor)
+        orbitals_b = self._simd_ri_jk_occupied(
+            den_beta, 'beta', use_density_factor=use_density_factor)
 
         coeffs_a = PackedMatrix(nao, orbitals_a.shape[1], mat_t.general)
         coeffs_a.from_numpy(orbitals_a)
@@ -3385,7 +3406,8 @@ class ScfDriver:
             # basis, so the correction below is not made for this path.
             fock_mat_np = self._simd_ri_jk_fock(
                 den_mat[0], exchange_scaling_factor,
-                erf_k_coef if need_omega else 0.0)
+                erf_k_coef if need_omega else 0.0,
+                use_density_factor=use_density_factor)
         elif self.ri_jk and fock_type != 'j' and (
                 not self.molecular_orbitals.is_empty()):
             fock_mat_j = self._ri_drv.compute_screened_j_fock(den_mat_for_fock,
@@ -3513,7 +3535,8 @@ class ScfDriver:
                 fock_mat_a_np, fock_mat_b_np = (
                     self._simd_ri_jk_fock_unrestricted(
                         den_mat[0], den_mat[1], exchange_scaling_factor,
-                        erf_k_coef if need_omega else 0.0))
+                        erf_k_coef if need_omega else 0.0,
+                        use_density_factor=use_density_factor))
 
             elif self.ri_jk and (not self.molecular_orbitals.is_empty()):
                 fock_mat = self._ri_drv.compute_screened_j_fock(den_mat_for_Jab,
