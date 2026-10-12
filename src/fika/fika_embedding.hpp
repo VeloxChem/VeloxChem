@@ -46,6 +46,7 @@
 #include "fika_polarizable_sites.hpp"
 #include "fika_molecule.hpp"
 #include "fika_qmmm_induced_dipoles.hpp"
+#include "fika_switching.hpp"
 
 namespace fika {
 
@@ -91,11 +92,12 @@ struct QmmmEmbedding {
 /// With QmmmSources::electrons_only the dipoles respond to the electron field alone and only
 /// induced_fock is formed. The MM-MM energies (independent of D) are not included. Throws as
 /// qmmm_induced_dipoles and the integral drivers, and std::runtime_error when the dipoles do not
-/// converge (unless options.allow_unconverged).
+/// converge (unless options.allow_unconverged). `switching`, when set, scales the MM
+/// permanent-charge field and the MM dipole coupling of pairs of different residues by S(r).
 auto qmmm_embedding(const Molecule<double>& molecule, const MolecularBasis& basis,
                     const DenseMatrix& density, const ClassicalSystem& system,
-                    std::optional<TholeDamping> damping, const QmmmEmbeddingOptions& options = {})
-    -> QmmmEmbedding;
+                    std::optional<TholeDamping> damping, const QmmmEmbeddingOptions& options = {},
+                    std::optional<InnerSwitch> switching = std::nullopt) -> QmmmEmbedding;
 
 /// qmmm_embedding for many densities of one geometry (SCF and response iterations): the parts that
 /// depend only on the geometry are built once. The polarizable sites and the direct dipole
@@ -108,7 +110,8 @@ class QmmmEmbeddingDriver {
   /// as polarizable_sites and DirectDipoleInteraction.
   QmmmEmbeddingDriver(const Molecule<double>& molecule, const MolecularBasis& basis,
                       const ClassicalSystem& system, std::optional<TholeDamping> damping,
-                      const QmmmEmbeddingOptions& options = {});
+                      const QmmmEmbeddingOptions& options = {},
+                      std::optional<InnerSwitch> switching = std::nullopt);
 
   /// Embedding of `density` (as qmmm_embedding with `sources`), the dipole solve starting from
   /// `initial_guess` (empty: alpha F).
@@ -130,6 +133,7 @@ class QmmmEmbeddingDriver {
   Molecule<double> molecule_;
   MolecularBasis basis_;
   std::optional<TholeDamping> damping_;
+  std::optional<InnerSwitch> switching_;
   QmmmEmbeddingOptions options_;
   PolarizableSites sites_;
   std::optional<DirectDipoleInteraction> direct_;  // when the coupling may be summed directly

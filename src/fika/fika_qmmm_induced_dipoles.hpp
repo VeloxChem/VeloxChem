@@ -41,6 +41,7 @@
 #include "fika_dipole_interaction.hpp"
 #include "fika_mm_induced_dipoles.hpp"
 #include "fika_molecule.hpp"
+#include "fika_switching.hpp"
 
 namespace fika {
 
@@ -62,12 +63,16 @@ struct QmmmInducedDipoles {
 /// field meets options.field_accuracy (0: tolerance / 10), as the MM field does, and is summed as
 /// options.summation selects (automatic: its own multipole crossover). With
 /// QmmmSources::electrons_only the dipoles respond to the electrons alone (no permanent charges or
-/// nuclei). Throws as induced_dipoles, QmNuclearField and QmElectronicField.
+/// nuclei). Throws as induced_dipoles, QmNuclearField and QmElectronicField. `switching`, when
+/// set, scales the MM permanent-charge field and the MM dipole coupling of pairs of different
+/// residues by S(r); the QM fields are not switched.
 auto qmmm_induced_dipoles(const Molecule<double>& molecule, const MolecularBasis& basis,
                           const DenseMatrix& density, const ClassicalSystem& system,
                           std::optional<TholeDamping> damping,
                           const InducedDipoleOptions& options = {},
-                          QmmmSources sources = QmmmSources::all) -> QmmmInducedDipoles;
+                          QmmmSources sources = QmmmSources::all,
+                          std::optional<InnerSwitch> switching = std::nullopt)
+    -> QmmmInducedDipoles;
 
 }  // namespace fika
 

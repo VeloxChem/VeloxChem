@@ -157,3 +157,120 @@ class TestEnsembleDriver:
                 plt.close(ax.figure)
             except ImportError:
                 pass
+
+    def test_compute_with_fika_switched_embedding(self, tmp_path):
+        """
+        Runs the same ensemble with the fika switched embedding (r_on/r_off of
+        1.1/1.8 angstrom, damping off) instead of the CP3/PyFraME potfiles.
+
+        The fika model approximates the CP3 1-2/1-3 exclusions with a smooth
+        distance switch and uses the isotropic part (trace/3) of the PE
+        polarizabilities, so it is compared with the CP3 reference using the
+        measured model deviations (atol below), and with its own regression
+        values tightly.
+        """
+        data_dir = Path(__file__).parent / "data"
+        traj = str(data_dir / "alpha-helix-acetone-water.xtc")
+        top = str(data_dir / "alpha-helix-acetone-water.tpr")
+
+        ens_parser = EnsembleParser()
+        ens_parser.ostream.mute()
+
+        ensemble = ens_parser.structures(
+            trajectory_file=traj,
+            topology_file=top,
+            qm_region="resname LIG",
+            num_snapshots=2,
+            pe_cutoff=3.0,
+            npe_cutoff=5.0,
+        )
+
+        ens_drv = EnsembleDriver()
+        ens_drv.ostream.mute()
+
+        ens_drv.set_env_models(
+            pe_model=["CP3", "SEP"],
+            npe_model=["ff19sb", "tip3p"],
+        )
+
+        scf_options = {
+            "scf_type": "restricted",
+            "conv_thresh": 1.0e-7,
+            "max_iter": 150,
+            "xcfun": "CAM-B3LYP",
+            "grid_level": 4,
+        }
+
+        property_options = {
+            "property": "absorption",
+            "nstates": 6,
+            "nto": True,
+        }
+
+        results = ens_drv.compute(
+            ensemble,
+            basis_set="6-31G",
+            scf_options=scf_options,
+            property_options=property_options,
+            embedding_method="fika",
+            fika_r_on=1.1,
+            fika_r_off=1.8,
+        )
+
+        assert "scf_all" in results
+        assert "rsp_all" in results
+        assert len(results["scf_all"]) == 2
+        assert len(results["rsp_all"]) == 2
+
+        ref_frames = [0, 100]
+
+        # CP3/PyFraME reference (same values as the potfile regression test)
+        ref_scf = np.array([
+            -193.055643527,
+            -193.066013148,
+        ])
+        ref_eigs = {
+            0: np.array([0.160392, 0.303838, 0.321107, 0.32427, 0.344735, 0.360693]),
+            100: np.array([0.158489, 0.289851, 0.313072, 0.320164, 0.351021, 0.362582]),
+        }
+
+        # fika switched embedding regression values
+        fika_scf = np.array([-193.06050131725181, -193.07317475046915])
+        fika_eigs = {
+            0: np.array([0.16045385639156504, 0.30435844171589671, 0.32227296861273669,
+                         0.32426836052319863, 0.34656747751606809, 0.35873062888169038]),
+            100: np.array([0.15861465901557309, 0.29054785216247409, 0.31304864563620899,
+                           0.32038618804225932, 0.35186852439588912, 0.36045917831984770]),
+        }
+
+        got_frames = [int(frame) for frame, _ in results["scf_all"]]
+        assert got_frames == ref_frames
+
+        if ens_drv.rank == mpi_master():
+            got_scf = np.array(
+                [float(scf_res["scf_energy"]) for _, scf_res in results["scf_all"]])
+
+            # fika regression
+            np.testing.assert_allclose(got_scf, fika_scf, rtol=0.0,
+                                       atol=2.0e-6)
+
+            # deviation from the CP3 reference (measured: <= 7.2e-3 Ha)
+            dev_scf = got_scf - ref_scf
+            assert np.max(np.abs(dev_scf)) < 3.0e-2
+
+            for frame, rsp_res in results["rsp_all"]:
+                frame = int(frame)
+                eig = np.array(rsp_res.get("eigenvalues", []), dtype=float)
+                np.testing.assert_allclose(eig, fika_eigs[frame], rtol=0.0,
+                                           atol=2.0e-5)
+                # deviation from the CP3 reference (measured: <= 2.2e-3 Ha)
+                dev_eig = eig - ref_eigs[frame]
+                assert np.max(np.abs(dev_eig)) < 5.0e-3
+
+                print(f'fika vs CP3 frame {frame}: '
+                      f'dSCF = {dev_scf[got_frames.index(frame)]:+.6e} Ha, '
+                      f'max |dEig| = {np.max(np.abs(dev_eig)):+.6e} Ha '
+                      f'({np.max(np.abs(dev_eig)) * 27.211386:+.4f} eV)')
+
+            (data_dir /
+             ".alpha-helix-acetone-water.xtc_offsets.npz").unlink(missing_ok=True)

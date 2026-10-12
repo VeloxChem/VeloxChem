@@ -38,7 +38,9 @@ import sys
 import csv
 import re
 
-from .veloxchemlib import mpi_master, bohr_in_angstrom
+from .veloxchemlib import (mpi_master, bohr_in_angstrom,
+                           chemical_element_identifier, FikaClassicalSystem,
+                           FikaForceField, FikaResidue)
 from .outputstream import OutputStream
 from .molecule import Molecule
 from .molecularbasis import MolecularBasis
@@ -922,6 +924,147 @@ class EnsembleDriver:
         pc[3, :] = q
         return pc
 
+    def _build_fika_embedding(self, snap, r_on: float = 1.1,
+                              r_off: float = 1.8) -> dict | None:
+        """
+        Builds the fika embedding of one snapshot: the polarizable PE residues
+        and the non-polarizable NPE residues of the snapshot, with the inner
+        switching function S(r) on the permanent-charge and induced-dipole
+        interactions of pairs of different residues. S(r) is 0 below `r_on`,
+        1 above `r_off` (angstrom) and a smooth cosine in between, removing
+        short-range inter-residue couplings without atom-name exclusion lists;
+        the anisotropic PE polarizabilities are reduced to their isotropic
+        part (trace/3).
+
+        :param snap:
+            A snapshot dictionary.
+        :param r_on:
+            Inner switching radius (angstrom).
+        :param r_off:
+            Outer switching radius (angstrom).
+
+        :return:
+            The fika embedding dictionary, or None without environment atoms.
+        """
+
+        pe_resnames = np.asarray(snap.get("pe_resnames", []), dtype=object)
+        pe_resindices = np.asarray(
+            snap.get("pe_resindices", snap.get("pe_resids", [])), dtype=int)
+        pe_atom_names = np.asarray(snap.get("pe_atom_names", []), dtype=object)
+        pe_coords = np.asarray(snap.get("pe_coords", []), dtype=float)
+        pe_elements = np.asarray(snap.get("pe_elements", []), dtype=object)
+
+        npe_resnames = np.asarray(snap.get("npe_resnames", []), dtype=object)
+        npe_resindices = np.asarray(
+            snap.get("npe_resindices", snap.get("npe_resids", [])), dtype=int)
+        npe_atom_names = np.asarray(snap.get("npe_atom_names", []), dtype=object)
+        npe_coords = np.asarray(snap.get("npe_coords", []), dtype=float)
+        npe_elements = np.asarray(snap.get("npe_elements", []), dtype=object)
+
+        if pe_coords.size == 0 and npe_coords.size == 0:
+            return None
+
+        system = FikaClassicalSystem()
+
+        # Polarizable PE residues: charges and isotropic polarizabilities from
+        # the selected PE database, atoms in the order of the snapshot.
+        if pe_coords.size > 0:
+            if self.pe_model is None:
+                raise RuntimeError(
+                    "Snapshot contains PE atoms but pe_model is not set. "
+                    "Call set_env_models(pe_model=...).")
+            self._validate_pe_residue_atom_patterns(pe_atom_names,
+                                                    pe_resindices, pe_resnames)
+            pe_db = self.pe_model["db"]
+            seen = set()
+            index_of = {}
+            for residue_index in np.unique(pe_resindices):
+                sel = np.where(pe_resindices == residue_index)[0]
+                resname = str(pe_resnames[sel[0]])
+                atom_names = [str(pe_atom_names[i]) for i in sel]
+                key = (resname, tuple(atom_names))
+                if key not in seen:
+                    seen.add(key)
+                    db_resname = self._normalize_resname_for_pe_db(
+                        pe_db, resname)
+                    if db_resname not in pe_db:
+                        raise KeyError(
+                            f"No PE parameters for residue name '{resname}'")
+                    charges = []
+                    polarizabilities = {}
+                    for i, atom_name in enumerate(atom_names):
+                        resolved = self._resolve_atom_name_for_pe_db(
+                            atom_name, pe_db[db_resname].keys(), db_resname)
+                        if resolved is None:
+                            raise KeyError(
+                                f"No PE params for {resname}/{atom_name}. "
+                                f"Available: {sorted(pe_db[db_resname].keys())}")
+                        params = pe_db[db_resname][resolved]
+                        charges.append(params["charge"])
+                        polar = params["polar"]
+                        alpha = (polar[0] + polar[3] + polar[5]) / 3.0
+                        if alpha != 0.0:
+                            polarizabilities[i] = alpha
+                    system.add_force_field(
+                        FikaForceField("ensemble_pe", resname, charges,
+                                       polarizabilities))
+                index = index_of.get(resname, 0)
+                index_of[resname] = index + 1
+                elements = [
+                    chemical_element_identifier(str(e).upper())
+                    for e in pe_elements[sel]
+                ]
+                system.add_residue(
+                    FikaResidue(resname, index, "ensemble_pe", elements,
+                                pe_coords[sel] / bohr_in_angstrom(), True))
+
+        # Non-polarizable NPE residues: charges from the selected NPE database.
+        if npe_coords.size > 0:
+            if self.npe_model is None:
+                raise RuntimeError(
+                    "Snapshot contains NPE atoms but npe_model is not set. "
+                    "Call set_env_models(npe_model=...).")
+            seen = set()
+            index_of = {}
+            for residue_index in np.unique(npe_resindices):
+                sel = np.where(npe_resindices == residue_index)[0]
+                resname = str(npe_resnames[sel[0]])
+                atom_names = [str(npe_atom_names[i]) for i in sel]
+                key = (resname, tuple(atom_names))
+                if key not in seen:
+                    seen.add(key)
+                    charges = [
+                        self._get_npe_params(atom_name, resname)["charge"]
+                        for atom_name in atom_names
+                    ]
+                    system.add_force_field(
+                        FikaForceField("ensemble_npe", resname, charges))
+                index = index_of.get(resname, 0)
+                index_of[resname] = index + 1
+                elements = [
+                    chemical_element_identifier(str(e).upper())
+                    for e in npe_elements[sel]
+                ]
+                system.add_residue(
+                    FikaResidue(resname, index, "ensemble_npe", elements,
+                                npe_coords[sel] / bohr_in_angstrom(), False))
+
+        return {
+            "settings": {
+                "embedding_method": "fika",
+                "damping": None,
+                "switching": {
+                    "r_on": float(r_on),
+                    "r_off": float(r_off),
+                },
+            },
+            "inputs": {
+                "objects": {
+                    "classical_system": system,
+                },
+            },
+        }
+
     def write_pot_files(
         self,
         snapshots,
@@ -1215,6 +1358,9 @@ class EnsembleDriver:
         write_pe_potfiles: bool = True,
         qm_charge: int | None = None,
         qm_multiplicity: int | None = None,
+        embedding_method: str = "potfile",
+        fika_r_on: float = 1.1,
+        fika_r_off: float = 1.8,
     ):
         """
         Drives the computation over the ensemble of snapshots.
@@ -1244,6 +1390,21 @@ class EnsembleDriver:
         :param qm_multiplicity:
             Optional override for the QM-region multiplicity. If None, the value stored
             in each snapshot is used, defaulting to 1 when absent.
+        :param embedding_method: (str)
+            'potfile' (default): PE via the per-snapshot .pot files, which are
+            converted to the PyFraME input with the CP3 peptide-neighbor
+            exclusions. 'fika': the fika embedding built from the snapshot
+            parameters, with the inner switching function (default r_on/r_off
+            of 1.1/1.8 angstrom, see fika_r_on/fika_r_off) on the
+            permanent-charge and induced-dipole interactions of pairs of
+            different residues, and the anisotropic PE polarizabilities
+            reduced to their isotropic part (trace/3).
+        :param fika_r_on: (float)
+            Inner switching radius (angstrom) of the fika embedding: S(r) = 0
+            below it. Only used with embedding_method='fika'.
+        :param fika_r_off: (float)
+            Outer switching radius (angstrom) of the fika embedding: S(r) = 1
+            above it. Only used with embedding_method='fika'.
 
         :return:
             Dictionary with keys:
@@ -1276,6 +1437,11 @@ class EnsembleDriver:
 
         potdir = Path(potdir)
 
+        embedding_method = str(embedding_method).lower()
+        if embedding_method not in ("potfile", "fika"):
+            raise ValueError(
+                "embedding_method must be 'potfile' or 'fika'.")
+
         # Detect whether PE / NPE models are needed
         has_any_pe = any(np.asarray(s.get("pe_coords", [])).size > 0 for s in snapshots)
         has_any_npe = any(np.asarray(s.get("npe_coords", [])).size > 0 for s in snapshots)
@@ -1296,7 +1462,7 @@ class EnsembleDriver:
         for snap in snapshots:
             self._ensure_no_split_residues_between_pe_and_npe(snap)
 
-        if write_pe_potfiles and has_any_pe:
+        if write_pe_potfiles and has_any_pe and embedding_method == "potfile":
             self.write_pot_files(snapshots, outdir=potdir)
 
         do_rsp = bool(property_options)
@@ -1353,11 +1519,17 @@ class EnsembleDriver:
             # Reset embedding inputs every frame
             scf_driver.potfile = None
             scf_driver.point_charges = None
+            scf_driver.embedding = None
+            fika_embedding = None
 
-            if has_pe:
+            if embedding_method == "fika":
+                fika_embedding = self._build_fika_embedding(
+                    snap, r_on=fika_r_on, r_off=fika_r_off)
+                scf_driver.embedding = fika_embedding
+            elif has_pe:
                 scf_driver.potfile = str(potdir / f"pe_frame_{frame:06d}.pot")
 
-            if has_npe and not has_pe:
+            if embedding_method == "potfile" and has_npe and not has_pe:
                 npe_atom_names = snap.get("npe_atom_names", [])
                 npe_resnames = snap.get("npe_resnames", [])
                 if len(npe_atom_names) == 0:
@@ -1377,6 +1549,8 @@ class EnsembleDriver:
                     property_options,
                     skip_keys={"property"},
                 )
+                if embedding_method == "fika":
+                    rsp_driver.embedding = fika_embedding
                 rsp_results = rsp_driver.compute(molecule, basis, scf_results)
                 rsp_all.append((frame, rsp_results))
 

@@ -119,10 +119,12 @@ QmmmEmbeddingDriver::QmmmEmbeddingDriver(const Molecule<double>& molecule,
                                          const MolecularBasis& basis,
                                          const ClassicalSystem& system,
                                          std::optional<TholeDamping> damping,
-                                         const QmmmEmbeddingOptions& options)
+                                         const QmmmEmbeddingOptions& options,
+                                         std::optional<InnerSwitch> switching)
     : molecule_(molecule),
       basis_(basis),
       damping_(damping),
+      switching_(switching),
       options_(options),
       sites_(polarizable_sites(system)),
       system_(system) {
@@ -131,7 +133,7 @@ QmmmEmbeddingDriver::QmmmEmbeddingDriver(const Molecule<double>& molecule,
   if (induced.summation == ChargeSummation::direct ||
       (induced.summation == ChargeSummation::automatic &&
        sites_.positions.size() < multipole_coupling_sites)) {
-    direct_.emplace(sites_, damping_);
+    direct_.emplace(sites_, damping_, switching_);
   }
 }
 
@@ -144,8 +146,8 @@ auto QmmmEmbeddingDriver::compute(const DenseMatrix& density, QmmmSources source
     Permanent permanent;
     permanent.field.assign(sites_.positions.size(), Point3D<double>{0.0, 0.0, 0.0});
     if (options_.induced.permanent_field) {
-      permanent.field_summation =
-          detail::add_permanent_field(*system_, sites_, options_.induced, permanent.field);
+      permanent.field_summation = detail::add_permanent_field(
+          *system_, sites_, options_.induced, permanent.field, switching_);
     }
     QmNuclearField(molecule_).add_field(sites_, permanent.field);
     permanent.fock =
@@ -171,8 +173,8 @@ auto QmmmEmbeddingDriver::compute(const DenseMatrix& density, QmmmSources source
   electrons.add_field(sites_, field);
 
   QmmmEmbedding result;
-  result.induced = detail::solve_with_selected_coupling(sites_, std::move(field), damping_, induced,
-                                                        direct_ ? &*direct_ : nullptr);
+  result.induced = detail::solve_with_selected_coupling(
+      sites_, std::move(field), damping_, induced, direct_ ? &*direct_ : nullptr, switching_);
   if (ground) {
     result.induced.field_summation = permanent_->field_summation.summation;
     result.induced.field_order = permanent_->field_summation.order;
@@ -200,9 +202,9 @@ auto QmmmEmbeddingDriver::compute(const DenseMatrix& density, QmmmSources source
 
 auto qmmm_embedding(const Molecule<double>& molecule, const MolecularBasis& basis,
                     const DenseMatrix& density, const ClassicalSystem& system,
-                    std::optional<TholeDamping> damping, const QmmmEmbeddingOptions& options)
-    -> QmmmEmbedding {
-  return QmmmEmbeddingDriver(molecule, basis, system, damping, options)
+                    std::optional<TholeDamping> damping, const QmmmEmbeddingOptions& options,
+                    std::optional<InnerSwitch> switching) -> QmmmEmbedding {
+  return QmmmEmbeddingDriver(molecule, basis, system, damping, options, switching)
       .compute(density, options.sources, options.induced.initial_guess);
 }
 

@@ -413,9 +413,11 @@ class TrajectoryDriver:
                 embedding = {
                     'settings': {
                         'embedding_method': 'fika',
-                        # the trajectory input follows the undamped
-                        # polarizable embedding of the previous input format
                         'damping': None,
+                        'switching': {
+                            'r_on': 1.1,
+                            'r_off': 1.8,
+                        },
                     },
                     'inputs': {
                         'objects': {

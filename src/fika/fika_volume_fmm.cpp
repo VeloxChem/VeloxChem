@@ -87,7 +87,9 @@ auto coordinates_of(std::uint64_t key) -> Coordinates {
 VolumeFmm::VolumeFmm(std::span<const Point3D<double>> charge_positions,
                      std::span<const Point3D<double>> dipole_positions,
                      std::span<const Point3D<double>> targets, const VolumeFmmOptions& options)
-    : separation_(options.separation), sample_size_(options.sample_size) {
+    : separation_(options.separation),
+      minimum_near_radius_(options.minimum_near_radius),
+      sample_size_(options.sample_size) {
   if (options.leaf_capacity == 0) {
     throw std::invalid_argument("fika::VolumeFmm: the leaf capacity must be positive");
   }
@@ -220,6 +222,15 @@ void VolumeFmm::build(std::span<const Point3D<double>> charges,
   int depth = 2;
   while (depth < source_depth && keys.size() > capacity * distinct(depth)) {
     ++depth;
+  }
+  // A requested near radius bounds the leaf edge from below (the depth from above): every source
+  // within it is then in the P2P lists, so a near-field weighting sees all of them. Leaves may
+  // hold more than `capacity` points on average then.
+  if (minimum_near_radius_ > 0.0 && edge_ > 0.0) {
+    const double minimum_leaf_edge = minimum_near_radius_ / static_cast<double>(separation_);
+    const int maximum_depth =
+        static_cast<int>(std::floor(std::log2(edge_ / minimum_leaf_edge)));
+    depth = std::min(depth, std::max(2, maximum_depth));
   }
 
   // Non-empty cells of every level.
@@ -412,7 +423,9 @@ void VolumeFmm::build(std::span<const Point3D<double>> charges,
 }
 
 void VolumeFmm::field(std::span<const double> charges, std::span<const Dipole> dipoles,
-                      std::span<Point3D<double>> out, VolumeFmmReport* report) const {
+                      std::span<Point3D<double>> out, VolumeFmmReport* report,
+                      const NearFieldWeight* charge_weight,
+                      const NearFieldWeight* dipole_weight) const {
   if (charges.size() != charges_.index.size() || dipoles.size() != dipoles_.index.size() ||
       out.size() != targets_.index.size()) {
     throw std::invalid_argument(
@@ -607,7 +620,11 @@ void VolumeFmm::field(std::span<const double> charges, std::span<const Dipole> d
           for (std::size_t j = source.charges[0]; j < source.charges[1]; ++j) {
             const double rx = x.x - cx[j], ry = x.y - cy[j], rz = x.z - cz[j];
             const double r2 = rx * rx + ry * ry + rz * rz;
-            const double scale = r2 > 0.0 ? q[j] / (r2 * std::sqrt(r2)) : 0.0;
+            const double weight = charge_weight != nullptr
+                                      ? (*charge_weight)(targets_.index[i], charges_.index[j], r2)
+                                      : 1.0;
+            const double scale =
+                (r2 > 0.0 && weight != 0.0) ? weight * q[j] / (r2 * std::sqrt(r2)) : 0.0;
             fx += scale * rx;
             fy += scale * ry;
             fz += scale * rz;
@@ -618,7 +635,10 @@ void VolumeFmm::field(std::span<const double> charges, std::span<const Dipole> d
             if (r2 == 0.0) {
               continue;
             }
-            const double inverse3 = 1.0 / (r2 * std::sqrt(r2));
+            const double weight = dipole_weight != nullptr
+                                      ? (*dipole_weight)(targets_.index[i], dipoles_.index[j], r2)
+                                      : 1.0;
+            const double inverse3 = weight / (r2 * std::sqrt(r2));
             const double projection =
                 3.0 * (rx * mu[j](0) + ry * mu[j](1) + rz * mu[j](2)) * inverse3 / r2;
             fx += projection * rx - inverse3 * mu[j](0);
@@ -654,11 +674,14 @@ void VolumeFmm::field(std::span<const double> charges, std::span<const Dipole> d
       if (r2 == 0.0) {
         continue;
       }
-      const double scale = q[j] / (r2 * std::sqrt(r2));
+      const double weight = charge_weight != nullptr
+                                ? (*charge_weight)(targets_.index[i], charges_.index[j], r2)
+                                : 1.0;
+      const double scale = weight * q[j] / (r2 * std::sqrt(r2));
       ex += scale * rx;
       ey += scale * ry;
       ez += scale * rz;
-      absolute += std::abs(q[j]) / r2;
+      absolute += weight * std::abs(q[j]) / r2;
     }
     for (std::size_t j = 0; j < mu.size(); ++j) {
       const double rx = x.x - dx[j], ry = x.y - dy[j], rz = x.z - dz[j];
@@ -666,7 +689,10 @@ void VolumeFmm::field(std::span<const double> charges, std::span<const Dipole> d
       if (r2 == 0.0) {
         continue;
       }
-      const double inverse3 = 1.0 / (r2 * std::sqrt(r2));
+      const double weight = dipole_weight != nullptr
+                                ? (*dipole_weight)(targets_.index[i], dipoles_.index[j], r2)
+                                : 1.0;
+      const double inverse3 = weight / (r2 * std::sqrt(r2));
       const double projection =
           3.0 * (rx * mu[j](0) + ry * mu[j](1) + rz * mu[j](2)) * inverse3 / r2;
       ex += projection * rx - inverse3 * mu[j](0);

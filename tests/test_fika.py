@@ -4,13 +4,16 @@ import pytest
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
+from veloxchem.fikaembedding import (FikaEmbedding,
+                                     fika_embedding_sanity_check)
 from veloxchem.oneeints import compute_electric_field_integrals
 from veloxchem.oneeints import compute_nuclear_potential_integrals
-from veloxchem.veloxchemlib import mpi_master
+from veloxchem.veloxchemlib import mpi_master, bohr_in_angstroms
 from veloxchem.veloxchemlib import (FikaChargeSummation, FikaClassicalSystem,
                                     FikaDipolePotentialDriver, FikaForceField,
                                     FikaInducedDipoleFockDriver,
                                     FikaInducedDipolesDriver,
+                                    FikaInnerSwitch,
                                     FikaNuclearAttractionDriver,
                                     FikaQmmmEmbeddingDriver,
                                     FikaQmmmEmbeddingOptions, FikaQmmmSources,
@@ -333,6 +336,340 @@ class TestFikaClassicalSystem:
         # Thole damping keeps it positive definite.
         result = FikaInducedDipolesDriver().compute(system, FikaTholeDamping())
         assert result.converged
+
+
+class TestFikaSwitching:
+
+    @staticmethod
+    def _switch():
+
+        return FikaInnerSwitch(1.1 / bohr_in_angstroms(),
+                               1.8 / bohr_in_angstroms())
+
+    @staticmethod
+    def _charge_system(r_ang, alpha=2.0, q=0.5):
+        # polarizable site at the origin, a charge of another residue at +x
+
+        r = r_ang / bohr_in_angstroms()
+        system = FikaClassicalSystem()
+        system.add_force_field(FikaForceField('p', 'p', [0.0], {0: alpha}))
+        system.add_force_field(FikaForceField('c', 'c', [q]))
+        system.add_residue(
+            FikaResidue('p', 0, 'p', [6], np.array([[0.0, 0.0, 0.0]]), True))
+        system.add_residue(
+            FikaResidue('c', 0, 'c', [6], np.array([[r, 0.0, 0.0]]), False))
+        return system
+
+    @staticmethod
+    def _two_site_system(alpha1, alpha2, r12_ang, q, rq_ang):
+
+        r12 = r12_ang / bohr_in_angstroms()
+        rq = rq_ang / bohr_in_angstroms()
+        system = FikaClassicalSystem()
+        system.add_force_field(FikaForceField('p', 'p', [0.0], {0: alpha1}))
+        system.add_force_field(FikaForceField('q', 'q', [0.0], {0: alpha2}))
+        system.add_force_field(FikaForceField('c', 'c', [q]))
+        system.add_residue(
+            FikaResidue('p', 0, 'p', [6], np.array([[0.0, 0.0, 0.0]]), True))
+        system.add_residue(
+            FikaResidue('q', 0, 'q', [6], np.array([[r12, 0.0, 0.0]]),
+                        True))
+        system.add_residue(
+            FikaResidue('c', 0, 'c', [6], np.array([[0.0, 0.0, rq]]), False))
+        return system
+
+    def test_charge_dipole_switch(self):
+
+        alpha, q = 2.0, 0.5
+        switch = self._switch()
+
+        for r_ang in (1.0, 1.3, 1.4, 1.5, 1.6, 1.7, 2.0):
+            r = r_ang / bohr_in_angstroms()
+            if r_ang <= 1.1:
+                s = 0.0
+            elif r_ang >= 1.8:
+                s = 1.0
+            else:
+                s = 0.5 * (1.0 - np.cos(np.pi * (r_ang - 1.1) / 0.7))
+            result = FikaInducedDipolesDriver().compute(
+                self._charge_system(r_ang), None, switch)
+            # the fixed charge field at the origin is -q/r^2 along x,
+            # scaled by S(r); mu = alpha F for a single site
+            assert result.dipoles[0, 0] == pytest.approx(
+                -alpha * q * s / r**2, abs=1.0e-10)
+            assert result.dipoles[0, 1] == 0.0
+            assert result.dipoles[0, 2] == 0.0
+
+    def test_switch_none_is_undamped_field(self):
+
+        r = 1.0 / bohr_in_angstroms()
+        result = FikaInducedDipolesDriver().compute(self._charge_system(1.0),
+                                                     None)
+        assert result.dipoles[0, 0] == pytest.approx(-2.0 * 0.5 / r**2,
+                                                     abs=1.0e-10)
+
+    def test_invalid_switch(self):
+
+        for r_on, r_off in [(-1.0, 1.8), (1.8, 1.2), (1.2, 1.2)]:
+            switch = FikaInnerSwitch(r_on / bohr_in_angstroms(),
+                                     r_off / bohr_in_angstroms())
+            with pytest.raises(ValueError):
+                FikaInducedDipolesDriver().compute(
+                    self._charge_system(2.0), None, switch)
+
+    def test_overlapping_charge_auto_excluded(self):
+
+        # a permanent charge of another residue at the site position is a
+        # degenerate overlap; S(0) = 0 auto-excludes it, like the FMM near
+        # field excludes a source at the target point itself
+        system = FikaClassicalSystem()
+        system.add_force_field(FikaForceField('p', 'p', [0.0], {0: 2.0}))
+        system.add_force_field(FikaForceField('c', 'c', [0.5]))
+        system.add_residue(
+            FikaResidue('p', 0, 'p', [6], np.array([[0.0, 0.0, 0.0]]), True))
+        system.add_residue(
+            FikaResidue('c', 0, 'c', [6], np.array([[0.0, 0.0, 0.0]]), False))
+
+        direct = FikaInducedDipolesDriver().compute(system, None,
+                                                    self._switch())
+        assert direct.converged
+        assert np.array_equal(direct.dipoles, np.zeros((1, 3)))
+
+        multipole_drv = FikaInducedDipolesDriver()
+        multipole_drv.options.summation = FikaChargeSummation.multipole
+        multipole = multipole_drv.compute(system, None, self._switch())
+        assert multipole.converged
+        assert np.array_equal(multipole.dipoles, np.zeros((1, 3)))
+
+    def test_multipole_near_field_switch(self):
+
+        # A spread system whose FMM near radius covers r_off: the switch is
+        # applied in the near-field P2P sums themselves, so a different-
+        # residue charge at ~1e-12 A gives no spurious field from cancellation
+        # (the (S - 1) correction of the far-field path would leave
+        # ~eps * q / r^2, i.e. ~1e9 a.u. here).
+        system = FikaClassicalSystem()
+        system.add_force_field(FikaForceField('p', 'p', [0.0], {0: 2.0}))
+        system.add_force_field(FikaForceField('c', 'c', [0.7]))
+        system.add_residue(
+            FikaResidue('p', 0, 'p', [6],
+                        np.array([[0.1 + 1.0e-12, 0.0, 0.0]]), True))
+        for x, y, z in [(0.1, 0.0, 0.0), (100.0, 0.0, 0.0),
+                        (-100.0, 0.0, 0.0), (0.0, 100.0, 0.0),
+                        (0.0, -100.0, 0.0), (0.0, 0.0, 100.0),
+                        (0.0, 0.0, -100.0)]:
+            system.add_residue(
+                FikaResidue('c', 0, 'c', [8],
+                            np.array([[x, y, z]]), False))
+
+        direct_drv = FikaInducedDipolesDriver()
+        direct_drv.options.summation = FikaChargeSummation.direct
+        direct = direct_drv.compute(system, None, self._switch())
+
+        multipole_drv = FikaInducedDipolesDriver()
+        multipole_drv.options.summation = FikaChargeSummation.multipole
+        multipole = multipole_drv.compute(system, None, self._switch())
+
+        assert direct.converged and multipole.converged
+        assert np.max(np.abs(direct.dipoles - multipole.dipoles)) < 1.0e-6
+
+    def test_multipole_near_field_switch_dipoles(self):
+
+        # Spread polarizable sites whose FMM near radius covers r_off. Part 1 checks that a pair
+        # at an extreme overlap is switched off by the weighted near field (the correction path
+        # would leave ~eps / r^3 spurious coupling); part 2 checks the S (lambda - 1) damping
+        # part of the weighted path against the direct sum.
+
+        switch = self._switch()
+        r_on = 1.1 / bohr_in_angstroms()
+        r_off = 1.8 / bohr_in_angstroms()
+        alphas = [2.0, 3.0, 1.0, 1.0, 1.0]
+        far = [[10.0, 0.0, 0.0], [-10.0, 0.0, 0.0], [0.0, 10.0, 0.0]]
+        charges = np.array([[0.0, 0.0, 8.0], [0.0, 0.0, -4.0]])
+        q = 0.5
+
+        def build(r12):
+
+            positions = np.vstack(([[0.0, 0.0, 0.0], [r12, 0.0, 0.0]], far))
+            system = FikaClassicalSystem()
+            for i, alpha in enumerate(alphas):
+                system.add_force_field(
+                    FikaForceField(f'p{i}', f'p{i}', [0.0], {0: alpha}))
+                system.add_residue(
+                    FikaResidue(f'p{i}', 0, f'p{i}', [6],
+                                positions[i].reshape(1, 3), True))
+            system.add_force_field(FikaForceField('c', 'c', [q]))
+            for pos in charges:
+                system.add_residue(
+                    FikaResidue('c', 0, 'c', [8], pos.reshape(1, 3), False))
+            return system, positions
+
+        # part 1: extreme overlap, no damping, switched reference
+        system, positions = build(1.0e-6)
+        n = len(alphas)
+        field = np.zeros((n, 3))
+        for pos in charges:
+            for i in range(n):
+                d = positions[i] - pos
+                field[i] += q * d / np.linalg.norm(d)**3
+        b = np.zeros((3 * n, 3 * n))
+        for i in range(n):
+            b[3 * i:3 * i + 3, 3 * i:3 * i + 3] = np.eye(3) / alphas[i]
+        for i in range(n):
+            for j in range(i + 1, n):
+                d = positions[i] - positions[j]
+                r = np.linalg.norm(d)
+                if r <= r_on:
+                    s = 0.0
+                elif r >= r_off:
+                    s = 1.0
+                else:
+                    s = 0.5 * (1.0 - np.cos(np.pi * (r - r_on) /
+                                            (r_off - r_on)))
+                t = s * (3.0 * np.outer(d, d) - r * r * np.eye(3)) / r**5
+                b[3 * i:3 * i + 3, 3 * j:3 * j + 3] = -t
+                b[3 * j:3 * j + 3, 3 * i:3 * i + 3] = -t
+        ref = np.linalg.solve(b, field.reshape(-1)).reshape(-1, 3)
+
+        multipole_drv = FikaInducedDipolesDriver()
+        multipole_drv.options.summation = FikaChargeSummation.multipole
+        multipole = multipole_drv.compute(system, None, switch)
+        assert multipole.converged
+        assert np.max(np.abs(multipole.dipoles - ref)) < 1.0e-7
+
+        # part 2: ramp pair, Thole damping on, direct against multipole
+        system, _ = build(2.8)
+        direct_drv = FikaInducedDipolesDriver()
+        direct_drv.options.summation = FikaChargeSummation.direct
+        direct = direct_drv.compute(system, FikaTholeDamping(), switch)
+        multipole = multipole_drv.compute(system, FikaTholeDamping(), switch)
+        assert direct.converged and multipole.converged
+        assert np.max(np.abs(direct.dipoles - multipole.dipoles)) < 1.0e-7
+
+    def test_dipole_dipole_switch(self):
+
+        # two polarizable sites 1.4 A apart (their T coupling is switched)
+        # plus a distant charge; compare with a direct solve of
+        # (alpha^-1 - S(r) T) mu = F
+
+        alpha1, alpha2, q = 2.0, 3.0, 0.8
+        r12_ang, rq_ang = 1.4, 4.0
+        r12 = r12_ang / bohr_in_angstroms()
+        rq = rq_ang / bohr_in_angstroms()
+        system = self._two_site_system(alpha1, alpha2, r12_ang, q, rq_ang)
+        dipole_driver = FikaInducedDipolesDriver()
+        dipole_driver.options.tolerance = 1.0e-12
+        result = dipole_driver.compute(system, None, self._switch())
+
+        pos = np.array([[0.0, 0.0, 0.0], [r12, 0.0, 0.0]])
+        field = np.zeros((2, 3))
+        for i in range(2):
+            d = pos[i] - np.array([0.0, 0.0, rq])
+            field[i] = q * d / np.linalg.norm(d)**3
+        b = np.zeros((6, 6))
+        b[0:3, 0:3] = np.eye(3) / alpha1
+        b[3:6, 3:6] = np.eye(3) / alpha2
+        d = pos[0] - pos[1]
+        r = np.linalg.norm(d)
+        s = 0.5 * (1.0 - np.cos(np.pi * (r12_ang - 1.1) / 0.7))
+        t = s * (3.0 * np.outer(d, d) - r * r * np.eye(3)) / r**5
+        b[0:3, 3:6] = -t
+        b[3:6, 0:3] = -t
+        ref = np.linalg.solve(b, field.reshape(-1)).reshape(-1, 3)
+
+        assert np.max(np.abs(result.dipoles - ref)) < 1.0e-8
+        # without the switch the coupling (and the dipoles) differ
+        bare = FikaInducedDipolesDriver().compute(system, None)
+        assert np.max(np.abs(bare.dipoles - ref)) > 1.0e-6
+
+    def test_direct_against_multipole(self):
+
+        # direct and multipole summations must agree with the switch (and
+        # with Thole damping on top of it)
+
+        rng = np.random.default_rng(11)
+        system = FikaClassicalSystem()
+        for i in range(4):
+            system.add_force_field(
+                FikaForceField(f'p{i}', f'p{i}', [0.0], {0: 2.0 + i}))
+            system.add_residue(
+                FikaResidue(f'p{i}', 0, f'p{i}', [6],
+                            rng.normal(size=(1, 3)) * 1.0, True))
+        for i in range(6):
+            system.add_force_field(
+                FikaForceField(f'c{i}', f'c{i}',
+                               [(-1.0)**i * 0.4]))
+            system.add_residue(
+                FikaResidue(f'c{i}', 0, f'c{i}', [8],
+                            rng.normal(size=(1, 3)) * 1.0, False))
+
+        direct = FikaInducedDipolesDriver().compute(system, None,
+                                                    self._switch())
+        multipole_drv = FikaInducedDipolesDriver()
+        multipole_drv.options.summation = FikaChargeSummation.multipole
+        multipole = multipole_drv.compute(system, None, self._switch())
+        assert np.max(np.abs(direct.dipoles - multipole.dipoles)) < 1.0e-7
+
+        # the same with Thole damping on top of the switch
+        direct = FikaInducedDipolesDriver().compute(system,
+                                                    FikaTholeDamping(),
+                                                    self._switch())
+        multipole = multipole_drv.compute(system, FikaTholeDamping(),
+                                          self._switch())
+        assert np.max(np.abs(direct.dipoles - multipole.dipoles)) < 1.0e-7
+
+    def test_embedding_switching_settings(self):
+
+        system = FikaClassicalSystem()
+        system.add_force_field(FikaForceField('p', 'p', [0.0], {0: 1.0}))
+        system.add_residue(
+            FikaResidue('p', 0, 'p', [6], np.array([[0.0, 0.0, 0.0]]), True))
+        options = {
+            'settings': {
+                'embedding_method': 'fika',
+                'damping': None,
+                'switching': {
+                    'r_on': 1.1,
+                    'r_off': 1.8,
+                },
+            },
+            'inputs': {
+                'objects': {
+                    'classical_system': system,
+                },
+            },
+        }
+        molecule = get_acrolein()
+        basis = MolecularBasis.read(molecule, 'sto-3g', ostream=None)
+
+        fika_embedding_sanity_check(options)
+        embedding = FikaEmbedding(molecule, basis, options)
+        assert embedding.switching.r_on == pytest.approx(
+            1.1 / bohr_in_angstroms())
+        assert embedding.switching.r_off == pytest.approx(
+            1.8 / bohr_in_angstroms())
+
+        # radii in bohr are used as given
+        options['settings']['switching'] = {
+            'r_on': 2.5,
+            'r_off': 3.2,
+            'unit': 'bohr',
+        }
+        fika_embedding_sanity_check(options)
+        embedding = FikaEmbedding(molecule, basis, options)
+        assert embedding.switching.r_on == pytest.approx(2.5)
+        assert embedding.switching.r_off == pytest.approx(3.2)
+
+        for switching in [
+                {'r_on': 1.8, 'r_off': 1.0},
+                {'r_on': 1.0},
+                {'r_off': 1.8},
+                {'r_on': 1.0, 'r_off': 1.8, 'unit': 'nm'},
+                {'r_on': 1.0, 'r_off': 1.8, 'unknown': 1},
+        ]:
+            options['settings']['switching'] = switching
+            with pytest.raises(Exception):
+                fika_embedding_sanity_check(options)
 
 
 class TestFikaEmbedding:

@@ -58,6 +58,7 @@
 #include "fika_quadrupole_potential_driver.hpp"
 #include "fika_residue.hpp"
 #include "fika_summation.hpp"
+#include "fika_switching.hpp"
 #include "fika_veloxchem.hpp"
 #include "fika_veloxchem_order.hpp"
 
@@ -259,6 +260,17 @@ export_fika(py::module& m) -> void
         .def(py::init([](const double a) { return fika::TholeDamping{a}; }), "a"_a = 2.1304)
         .def_readwrite("a", &fika::TholeDamping::a);
 
+    py::class_<fika::InnerSwitch>(m, "FikaInnerSwitch")
+        .def(py::init([](const double r_on, const double r_off) {
+                 return fika::InnerSwitch{r_on, r_off};
+             }),
+             "Inner switching function of the short-range coupling of pairs of different "
+             "residues: 0 at r <= r_on, 1 at r >= r_off, a C1 cosine in between. Radii in bohr.",
+             "r_on"_a,
+             "r_off"_a)
+        .def_readwrite("r_on", &fika::InnerSwitch::r_on)
+        .def_readwrite("r_off", &fika::InnerSwitch::r_off);
+
     py::class_<fika::ForceField>(m, "FikaForceField")
         .def(py::init([](const std::string&                          label,
                          const std::string&                          residue,
@@ -450,13 +462,17 @@ export_fika(py::module& m) -> void
         .def_readwrite("options", &InducedDipolesDriver::options)
         .def(
             "compute",
-            [](const InducedDipolesDriver& self, const fika::ClassicalSystem& system, const std::optional<fika::TholeDamping>& damping) {
+            [](const InducedDipolesDriver& self, const fika::ClassicalSystem& system,
+               const std::optional<fika::TholeDamping>& damping,
+               const std::optional<fika::InnerSwitch>& switching) {
                 py::gil_scoped_release release;
-                return fika::induced_dipoles(system, damping, self.options);
+                return fika::induced_dipoles(system, damping, self.options, {}, switching);
             },
-            "Induced dipoles of the polarizable region in the field of the permanent charges (damping None: undamped).",
+            "Induced dipoles of the polarizable region in the field of the permanent charges "
+            "(damping None: undamped; switching None: no inner switching).",
             "system"_a,
-            "damping"_a = fika::TholeDamping{});
+            "damping"_a = fika::TholeDamping{},
+            "switching"_a = py::none());
 
     py::enum_<fika::QmmmSources>(m, "FikaQmmmSources")
         .value("all", fika::QmmmSources::all)
@@ -487,11 +503,13 @@ export_fika(py::module& m) -> void
                          const CMolecularBasis&                   basis,
                          const fika::ClassicalSystem&             system,
                          const std::optional<fika::TholeDamping>& damping,
-                         const fika::QmmmEmbeddingOptions&        options) {
+                         const fika::QmmmEmbeddingOptions&        options,
+                         const std::optional<fika::InnerSwitch>&  switching) {
                  const auto fmol   = fika::from_veloxchem(molecule);
                  const auto fbasis = fika::from_veloxchem(basis, molecule);
                  py::gil_scoped_release release;
-                 return std::make_unique<fika::QmmmEmbeddingDriver>(fmol, fbasis, system, damping, options);
+                 return std::make_unique<fika::QmmmEmbeddingDriver>(fmol, fbasis, system, damping,
+                                                                    options, switching);
              }),
              "QM/MM embedding driver of one geometry (molecule, basis, classical system): the polarizable sites and the "
              "direct dipole operator are built here, the permanent field, Fock matrix and nuclear-MM energy with the first "
@@ -500,7 +518,8 @@ export_fika(py::module& m) -> void
              "basis"_a,
              "system"_a,
              "damping"_a = fika::TholeDamping{},
-             "options"_a = fika::QmmmEmbeddingOptions{})
+             "options"_a = fika::QmmmEmbeddingOptions{},
+             "switching"_a = py::none())
         .def(
             "compute",
             [](fika::QmmmEmbeddingDriver&    self,

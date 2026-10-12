@@ -257,15 +257,17 @@ auto solve_induced_dipoles(const PolarizableSites& sites, std::span<const Point3
 
 auto detail::add_permanent_field(const ClassicalSystem& system, const PolarizableSites& sites,
                                  const InducedDipoleOptions& options,
-                                 std::span<Point3D<double>> field) -> PermanentFieldSummation {
+                                 std::span<Point3D<double>> field,
+                                 std::optional<InnerSwitch> switching) -> PermanentFieldSummation {
   const std::size_t n = sites.positions.size();
   if (options.summation == ChargeSummation::multipole ||
       (options.summation == ChargeSummation::automatic && n >= multipole_field_sites)) {
-    const FmmChargeField source(system, {.absolute_accuracy = field_accuracy(options)});
+    const FmmChargeField source(system, {.absolute_accuracy = field_accuracy(options)},
+                                switching);
     source.add_field(sites, field);
     return {ChargeSummation::multipole, source.order()};
   }
-  PermanentChargeField(system).add_field(sites, field);
+  PermanentChargeField(system, switching).add_field(sites, field);
   return {};
 }
 
@@ -273,7 +275,8 @@ auto detail::solve_with_selected_coupling(const PolarizableSites& sites,
                                           std::vector<Point3D<double>> field,
                                           std::optional<TholeDamping> damping,
                                           const InducedDipoleOptions& options,
-                                          const DirectDipoleInteraction* direct)
+                                          const DirectDipoleInteraction* direct,
+                                          std::optional<InnerSwitch> switching)
     -> InducedDipoles {
   const std::size_t n = sites.positions.size();
   // Dipole scale of the coupling: the starting dipoles alpha F, or the initial guess if larger.
@@ -297,14 +300,15 @@ auto detail::solve_with_selected_coupling(const PolarizableSites& sites,
   if (multipole && dipole_scale > 0.0) {
     const FmmDipoleInteraction coupling(
         sites, damping,
-        {.absolute_accuracy = field_accuracy(options), .dipole_scale = dipole_scale});
+        {.absolute_accuracy = field_accuracy(options), .dipole_scale = dipole_scale}, switching);
     result = solve_induced_dipoles(sites, field, coupling, options);
     result.coupling_summation = ChargeSummation::multipole;
     result.coupling_order = coupling.order();
   } else if (direct != nullptr) {
     result = solve_induced_dipoles(sites, field, *direct, options);
   } else {
-    result = solve_induced_dipoles(sites, field, DirectDipoleInteraction(sites, damping), options);
+    result = solve_induced_dipoles(
+        sites, field, DirectDipoleInteraction(sites, damping, switching), options);
   }
   result.field = std::move(field);
   return result;
@@ -312,12 +316,13 @@ auto detail::solve_with_selected_coupling(const PolarizableSites& sites,
 
 auto induced_dipoles(const ClassicalSystem& system, std::optional<TholeDamping> damping,
                      const InducedDipoleOptions& options,
-                     std::span<const FieldContribution* const> external) -> InducedDipoles {
+                     std::span<const FieldContribution* const> external,
+                     std::optional<InnerSwitch> switching) -> InducedDipoles {
   const PolarizableSites sites = polarizable_sites(system);
   std::vector<Point3D<double>> field(sites.positions.size(), Point3D<double>{0.0, 0.0, 0.0});
   detail::PermanentFieldSummation permanent;
   if (options.permanent_field) {
-    permanent = detail::add_permanent_field(system, sites, options, field);
+    permanent = detail::add_permanent_field(system, sites, options, field, switching);
   }
   for (const FieldContribution* contribution : external) {
     if (contribution == nullptr) {
@@ -326,7 +331,8 @@ auto induced_dipoles(const ClassicalSystem& system, std::optional<TholeDamping> 
     contribution->add_field(sites, field);
   }
   InducedDipoles result =
-      detail::solve_with_selected_coupling(sites, std::move(field), damping, options);
+      detail::solve_with_selected_coupling(sites, std::move(field), damping, options, nullptr,
+                                           switching);
   result.field_summation = permanent.summation;
   result.field_order = permanent.order;
   return result;

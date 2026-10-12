@@ -70,14 +70,18 @@ inline void add_pair(double dx, double dy, double dz, double c3, double c5, cons
 
 detail::DipoleCorrections::DipoleCorrections(const PolarizableSites& sites,
                                              std::optional<TholeDamping> damping,
+                                             std::optional<InnerSwitch> switching,
                                              const char* caller)
-    : damping_(damping) {
+    : damping_(damping), switching_(switching) {
   const std::size_t n = sites.positions.size();
   if (sites.polarizabilities.size() != n || sites.owners.size() != n) {
     throw std::invalid_argument(std::string(caller) + ": inconsistent site arrays");
   }
   if (damping && !(damping->a > 0.0 && std::isfinite(damping->a))) {
     throw std::invalid_argument(std::string(caller) + ": damping parameter must be positive");
+  }
+  if (switching) {
+    check_inner_switch(*switching, caller);
   }
   x_.resize(n);
   y_.resize(n);
@@ -112,23 +116,29 @@ detail::DipoleCorrections::DipoleCorrections(const PolarizableSites& sites,
     owner_offsets_.push_back(n);
   }
 
-  if (!damping || n == 0) {
+  if ((!damping && !switching) || n == 0) {
     return;
   }
-  double largest = 0.0;
-  scales_.resize(n);
-  for (std::size_t i = 0; i < n; ++i) {
-    const auto& alpha = sites.polarizabilities[i];
-    const double mean = (alpha(0, 0) + alpha(1, 1) + alpha(2, 2)) / 3.0;
-    if (!(mean > 0.0) || !std::isfinite(mean)) {
-      throw std::invalid_argument(std::string(caller) + ": site " + std::to_string(i) +
-                                  " needs a positive polarizability for damping");
+  if (damping) {
+    double largest = 0.0;
+    scales_.resize(n);
+    for (std::size_t i = 0; i < n; ++i) {
+      const auto& alpha = sites.polarizabilities[i];
+      const double mean = (alpha(0, 0) + alpha(1, 1) + alpha(2, 2)) / 3.0;
+      if (!(mean > 0.0) || !std::isfinite(mean)) {
+        throw std::invalid_argument(std::string(caller) + ": site " + std::to_string(i) +
+                                    " needs a positive polarizability for damping");
+      }
+      scales_[i] = std::pow(mean, 1.0 / 6.0);
+      largest = std::max(largest, scales_[i]);
     }
-    scales_[i] = std::pow(mean, 1.0 / 6.0);
-    largest = std::max(largest, scales_[i]);
+    // v = a r / (s_i s_j) <= damping_cutoff() for r <= thole_cutoff_.
+    thole_cutoff_ = damping_cutoff() * largest * largest / damping->a;
+    cutoff_ = thole_cutoff_;
   }
-  // v = a r / (s_i s_j) <= damping_cutoff() for r <= cutoff.
-  cutoff_ = damping_cutoff() * largest * largest / damping->a;
+  if (switching) {
+    cutoff_ = std::max(cutoff_, switching->r_off);
+  }
 
   Point3D<double> high{-std::numeric_limits<double>::infinity(),
                        -std::numeric_limits<double>::infinity(),
@@ -177,8 +187,9 @@ detail::DipoleCorrections::DipoleCorrections(const PolarizableSites& sites,
 }
 
 DirectDipoleInteraction::DirectDipoleInteraction(const PolarizableSites& sites,
-                                                 std::optional<TholeDamping> damping)
-    : corrections_(sites, damping, "fika::DirectDipoleInteraction") {}
+                                                 std::optional<TholeDamping> damping,
+                                                 std::optional<InnerSwitch> switching)
+    : corrections_(sites, damping, switching, "fika::DirectDipoleInteraction") {}
 
 void DirectDipoleInteraction::apply(std::span<const Point3D<double>> mu,
                                     std::span<Point3D<double>> y) const {
@@ -233,9 +244,22 @@ void DirectDipoleInteraction::apply(std::span<const Point3D<double>> mu,
   corrections_.apply(qx, qy, qz, ox, oy, oz, y);
 }
 
+auto detail::DipoleCorrections::near_field_weight() const -> NearFieldWeight {
+  if (!switching_) {
+    return {};
+  }
+  return [this](std::size_t target, std::size_t source, double r2) -> double {
+    if (owner_group_[target] == owner_group_[source]) {
+      return 1.0;
+    }
+    return inner_switch(std::sqrt(r2), *switching_);
+  };
+}
+
 void detail::DipoleCorrections::apply(const double* qx, const double* qy, const double* qz,
                                       const double* ox, const double* oy, const double* oz,
-                                      std::span<Point3D<double>> y) const {
+                                      std::span<Point3D<double>> y,
+                                      bool switching_in_near_field) const {
   const std::size_t n = x_.size();
   const double* px = x_.data();
   const double* py = y_.data();
@@ -254,10 +278,11 @@ void detail::DipoleCorrections::apply(const double* qx, const double* qy, const 
       }
     }
 
-    // Damping corrections (lambda - 1) for close pairs of different residues.
-    if (damping_) {
-      const double a = damping_->a;
+    // Thole damping and inner switching corrections for close pairs of different residues.
+    if (damping_ || switching_) {
       const double cutoff2 = cutoff_ * cutoff_;
+      const double thole_cutoff2 = thole_cutoff_ * thole_cutoff_;
+      const double switch_cutoff2 = switching_ ? switching_->r_off * switching_->r_off : 0.0;
       const auto cell = [&](double value, double low, std::size_t count) {
         return std::min(count - 1, static_cast<std::size_t>((value - low) / cell_edge_));
       };
@@ -280,12 +305,43 @@ void detail::DipoleCorrections::apply(const double* qx, const double* qy, const 
               if (r2 >= cutoff2) {
                 continue;
               }
-              const double v = a * std::sqrt(r2) / (scales_[i] * scales_[j]);
-              const double e = std::exp(-v);
-              const double p2 = 1.0 + v + v * v / 2.0;
-              // lambda3 - 1 and lambda5 - 1 directly (no cancellation against 1).
+              const bool in_thole = damping_ && thole_cutoff2 > 0.0 && r2 < thole_cutoff2;
+              const bool in_switch = switching_ && r2 < switch_cutoff2;
+              if (!in_thole && !in_switch) {
+                continue;
+              }
+              const double r = std::sqrt(r2);
+              double v = 0.0, e = 0.0, p2 = 0.0;
+              if (in_thole) {
+                v = damping_->a * r / (scales_[i] * scales_[j]);
+                e = std::exp(-v);
+                p2 = 1.0 + v + v * v / 2.0;
+              }
+              double c3 = 0.0, c5 = 0.0;
+              if (switching_in_near_field) {
+                // The near field already holds S T: add the damping part S (lambda - 1), which
+                // is zero when S = 0 (in_switch means r < r_off here).
+                if (in_thole) {
+                  const double sw = in_switch ? inner_switch(r, *switching_) : 1.0;
+                  c3 = -sw * p2 * e;
+                  c5 = -sw * (p2 + v * v * v / 6.0) * e;
+                }
+              } else if (in_switch && in_thole) {
+                // S lambda - 1 as (S - 1) + S (lambda - 1), no cancellation against 1.
+                const double sw = inner_switch(r, *switching_);
+                c3 = (sw - 1.0) - sw * p2 * e;
+                c5 = (sw - 1.0) - sw * (p2 + v * v * v / 6.0) * e;
+              } else if (in_thole) {
+                // lambda3 - 1 and lambda5 - 1 directly (no cancellation against 1).
+                c3 = -p2 * e;
+                c5 = -(p2 + v * v * v / 6.0) * e;
+              } else {
+                const double sw = inner_switch(r, *switching_);
+                c3 = sw - 1.0;
+                c5 = sw - 1.0;
+              }
               const double m[3] = {qx[j], qy[j], qz[j]};
-              add_pair(dx, dy, dz, -p2 * e, -(p2 + v * v * v / 6.0) * e, m, field);
+              add_pair(dx, dy, dz, c3, c5, m, field);
             }
           }
         }
@@ -297,8 +353,9 @@ void detail::DipoleCorrections::apply(const double* qx, const double* qy, const 
 
 FmmDipoleInteraction::FmmDipoleInteraction(const PolarizableSites& sites,
                                            std::optional<TholeDamping> damping,
-                                           const FmmDipoleOptions& options)
-    : corrections_(sites, damping, "fika::FmmDipoleInteraction"),
+                                           const FmmDipoleOptions& options,
+                                           std::optional<InnerSwitch> switching)
+    : corrections_(sites, damping, switching, "fika::FmmDipoleInteraction"),
       positions_(sites.positions),
       options_(options) {
   if (!(options.dipole_scale > 0.0) || !std::isfinite(options.dipole_scale) ||
@@ -311,11 +368,11 @@ FmmDipoleInteraction::FmmDipoleInteraction(const PolarizableSites& sites,
 
 void FmmDipoleInteraction::build(int order) const {
   const std::vector<Point3D<double>> none;
-  fmm_ = std::make_unique<detail::VolumeFmm>(
-      none, positions_, positions_,
-      detail::VolumeFmmOptions{.absolute_accuracy = options_.absolute_accuracy,
-                               .order = order,
-                               .dipole_scale = options_.dipole_scale});
+  detail::VolumeFmmOptions options{.absolute_accuracy = options_.absolute_accuracy,
+                                   .order = order,
+                                   .dipole_scale = options_.dipole_scale};
+  options.minimum_near_radius = corrections_.near_field_radius();
+  fmm_ = std::make_unique<detail::VolumeFmm>(none, positions_, positions_, options);
 }
 
 void FmmDipoleInteraction::apply(std::span<const Point3D<double>> mu,
@@ -334,12 +391,19 @@ void FmmDipoleInteraction::apply(std::span<const Point3D<double>> mu,
   }
   const std::vector<double> no_charges;
   std::vector<Point3D<double>> undamped(n);
+  // The tree keeps every pair within r_off in its near sums, where the weight applies S directly
+  // (no short-range cancellation); the correction then adds only the damping part inside r_off.
+  const double radius = corrections_.near_field_radius();
+  const bool weighted = radius > 0.0 && radius <= fmm_->near_radius();
+  const detail::NearFieldWeight weight =
+      weighted ? corrections_.near_field_weight() : detail::NearFieldWeight{};
+  const detail::NearFieldWeight* weight_ptr = weighted ? &weight : nullptr;
   if (!checked_) {
     // First product (the starting dipoles, of the scale the order was chosen for): raise the
     // order while the sampled error exceeds a tenth of the accuracy.
     while (true) {
       detail::VolumeFmmReport report;
-      fmm_->field(no_charges, dipoles, undamped, &report);
+      fmm_->field(no_charges, dipoles, undamped, &report, nullptr, weight_ptr);
       if (report.sampled_error <= 0.1 * options_.absolute_accuracy ||
           fmm_->order() + 2 > detail::largest_automatic_fmm_order) {
         break;
@@ -349,7 +413,7 @@ void FmmDipoleInteraction::apply(std::span<const Point3D<double>> mu,
     }
     checked_ = true;
   } else {
-    fmm_->field(no_charges, dipoles, undamped);
+    fmm_->field(no_charges, dipoles, undamped, nullptr, nullptr, weight_ptr);
   }
   std::vector<double> ux(n), uy(n), uz(n);
   for (std::size_t i = 0; i < n; ++i) {
@@ -357,7 +421,8 @@ void FmmDipoleInteraction::apply(std::span<const Point3D<double>> mu,
     uy[i] = undamped[i].y;
     uz[i] = undamped[i].z;
   }
-  corrections_.apply(mx.data(), my.data(), mz.data(), ux.data(), uy.data(), uz.data(), y);
+  corrections_.apply(mx.data(), my.data(), mz.data(), ux.data(), uy.data(), uz.data(), y,
+                     weighted);
 }
 
 }  // namespace fika

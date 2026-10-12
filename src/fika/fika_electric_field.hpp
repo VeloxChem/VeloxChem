@@ -32,12 +32,17 @@
 #ifndef fika_electric_field_hpp
 #define fika_electric_field_hpp
 
+#include <cstddef>
+#include <cstdint>
+#include <optional>
 #include <span>
+#include <vector>
 
 #include "fika_point3d.hpp"
 #include "fika_classical_system.hpp"
 #include "fika_point_sources.hpp"
 #include "fika_polarizable_sites.hpp"
+#include "fika_switching.hpp"
 
 namespace fika {
 
@@ -52,18 +57,22 @@ class FieldContribution {
 };
 
 /// Field of the permanent charges of a classical system (both regions), E(s) = sum_C q_C (s - C)
-/// / |s - C|^3, without the charges of each site's own residue. Summed directly per site (in a
-/// fixed order, so independent of the thread count).
+/// / |s - C|^3, without the charges of each site's own residue and with the field of charges of
+/// other residues scaled by the inner switching function S(|s - C|) when one is given (S = 0
+/// removes the pair, S = 1 leaves the bare field). Summed directly per site (in a fixed order, so
+/// independent of the thread count).
 class PermanentChargeField final : public FieldContribution {
  public:
-  /// Throws as classical_charges.
-  explicit PermanentChargeField(const ClassicalSystem& system);
+  /// Throws as classical_charges and check_inner_switch.
+  explicit PermanentChargeField(const ClassicalSystem& system,
+                                std::optional<InnerSwitch> switching = std::nullopt);
 
   /// The sites must come from the same classical system (their owners index its residues).
   void add_field(const PolarizableSites& sites, std::span<Point3D<double>> field) const override;
 
  private:
   PointCharges charges_;
+  std::optional<InnerSwitch> switching_;
 };
 
 /// Options of the fast multipole permanent field.
@@ -74,13 +83,18 @@ struct FmmFieldOptions {
 
 /// The field of PermanentChargeField through a fast multipole method (detail::VolumeFmm,
 /// separation 2): the FMM sums every charge except one at the site itself, and the other charges
-/// of the site's own residue are then subtracted directly. The evaluation checks the error on a
-/// sample of sites; above accuracy / 10 the order is raised by 2 (up to 26) and the field
-/// recomputed. add_field is therefore not safe to call concurrently.
+/// of the site's own residue are then subtracted directly. With a switching function, the
+/// different-residue charges within r_off are scaled by S(r) in the near-field sums themselves
+/// (the tree keeps them in the P2P lists via minimum_near_radius, so there is no cancellation at
+/// short range); a system too small for that sums the switched field directly instead. The
+/// evaluation checks the error on a sample of sites; above accuracy / 10 the order is raised by
+/// 2 (up to 26) and the field recomputed. add_field is therefore not safe to call concurrently.
 class FmmChargeField final : public FieldContribution {
  public:
-  /// Throws as classical_charges, or std::invalid_argument for a nonpositive accuracy.
-  explicit FmmChargeField(const ClassicalSystem& system, const FmmFieldOptions& options = {});
+  /// Throws as classical_charges and check_inner_switch, or std::invalid_argument for a
+  /// nonpositive accuracy.
+  explicit FmmChargeField(const ClassicalSystem& system, const FmmFieldOptions& options = {},
+                          std::optional<InnerSwitch> switching = std::nullopt);
 
   void add_field(const PolarizableSites& sites, std::span<Point3D<double>> field) const override;
 
@@ -91,6 +105,10 @@ class FmmChargeField final : public FieldContribution {
  private:
   PointCharges charges_;
   FmmFieldOptions options_;
+  std::optional<InnerSwitch> switching_;
+  // Residue of every charge (with switching): same-residue pairs keep the bare field in the
+  // weighted near field and are removed exactly afterwards.
+  std::vector<std::uint32_t> charge_residue_;
   mutable int order_ = 0;
   mutable int retries_ = 0;
 };

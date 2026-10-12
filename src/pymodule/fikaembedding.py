@@ -34,8 +34,9 @@ import json
 import time
 import numpy as np
 
-from .veloxchemlib import (mpi_master, FikaChargeSummation,
-                           FikaClassicalSystem, FikaQmmmEmbeddingDriver,
+from .veloxchemlib import (mpi_master, bohr_in_angstroms,
+                           FikaChargeSummation, FikaClassicalSystem,
+                           FikaInnerSwitch, FikaQmmmEmbeddingDriver,
                            FikaQmmmEmbeddingOptions, FikaQmmmSources,
                            FikaTholeDamping)
 from .errorhandler import assert_msg_critical
@@ -82,6 +83,10 @@ def fika_embedding_sanity_check(embedding):
             - embedding_method: 'fika'
             - damping: 'thole' (default) or None
             - thole_a: the Thole parameter (default 2.1304)
+            - switching: dictionary with r_on and r_off (default units:
+              angstrom) and optionally unit ('angstrom' or 'bohr'), the inner
+              switching function of the MM permanent-charge field and the MM
+              dipole coupling of pairs of different residues
             - induced_dipoles: tolerance, field_accuracy, max_iterations,
               summation ('automatic', 'direct' or 'multipole')
             - fock_threshold, fock_summation
@@ -103,8 +108,8 @@ def fika_embedding_sanity_check(embedding):
                         "fika embedding: missing 'inputs' dictionary")
 
     known = {
-        'embedding_method', 'damping', 'thole_a', 'induced_dipoles',
-        'fock_threshold', 'fock_summation'
+        'embedding_method', 'damping', 'thole_a', 'switching',
+        'induced_dipoles', 'fock_threshold', 'fock_summation'
     }
     unknown = set(settings) - known
     assert_msg_critical(
@@ -114,6 +119,28 @@ def fika_embedding_sanity_check(embedding):
     assert_msg_critical(
         damping is None or str(damping).lower() in ('thole', 'none'),
         "fika embedding: damping must be 'thole' or None")
+    switching = settings.get('switching')
+    if switching is not None:
+        assert_msg_critical(
+            isinstance(switching, dict),
+            'fika embedding: switching must be a dictionary')
+        unknown = set(switching) - {'r_on', 'r_off', 'unit'}
+        assert_msg_critical(
+            not unknown,
+            f'fika embedding: unknown switching entries {sorted(unknown)}')
+        assert_msg_critical(
+            'r_on' in switching and 'r_off' in switching,
+            'fika embedding: switching needs r_on and r_off')
+        unit = str(switching.get('unit', 'angstrom')).lower()
+        assert_msg_critical(
+            (len(unit) >= 3 and 'angstrom'.startswith(unit)) or
+            unit in ('au', 'bohr'),
+            'fika embedding: switching unit must be angstrom or bohr')
+        r_on = float(switching['r_on'])
+        r_off = float(switching['r_off'])
+        assert_msg_critical(
+            0.0 <= r_on < r_off,
+            'fika embedding: switching needs 0 <= r_on < r_off')
     dipoles = settings.get('induced_dipoles', {})
     assert_msg_critical(
         isinstance(dipoles, dict) and not (set(dipoles) - {
@@ -216,6 +243,19 @@ class FikaEmbedding:
         else:
             self.damping = FikaTholeDamping(settings.get('thole_a', 2.1304))
 
+        switching = settings.get('switching')
+        if switching is None:
+            self.switching = None
+        else:
+            unit = str(switching.get('unit', 'angstrom')).lower()
+            if len(unit) >= 3 and 'angstrom'.startswith(unit):
+                scale = 1.0 / bohr_in_angstroms()
+            else:
+                scale = 1.0
+            self.switching = FikaInnerSwitch(
+                float(switching['r_on']) * scale,
+                float(switching['r_off']) * scale)
+
         dipoles = settings.get('induced_dipoles', {})
         self.driver_options = FikaQmmmEmbeddingOptions()
         induced = self.driver_options.induced
@@ -278,7 +318,8 @@ class FikaEmbedding:
             self.driver = FikaQmmmEmbeddingDriver(self.molecule, self.basis,
                                                   self.classical_system,
                                                   self.damping,
-                                                  self.driver_options)
+                                                  self.driver_options,
+                                                  self.switching)
         result = self.driver.compute(np.asarray(density_matrix), sources,
                                      initial_guess)
         assert_msg_critical(
@@ -309,6 +350,10 @@ class FikaEmbedding:
                      f'{system.number_of_residues(False)} nonpolarizable')
         lines.append('- damping         : ' + (
             'none' if self.damping is None else f'Thole (a = {self.damping.a})'))
+        lines.append('- switching       : ' + (
+            'none' if self.switching is None else
+            f'S(r), r_on = {self.switching.r_on:.4f}, '
+            f'r_off = {self.switching.r_off:.4f} bohr'))
         induced = self.driver_options.induced
         lines.append(f'- tolerance       : {induced.tolerance:.1e} ' +
                      f'(field accuracy {induced.field_accuracy:.1e}, ' +

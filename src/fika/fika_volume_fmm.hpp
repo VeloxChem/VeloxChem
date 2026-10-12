@@ -37,7 +37,8 @@
 // of, polarizable MM sites).
 //
 // A uniform octree covers all points; its leaf level is the shallowest (>= 2) whose non-empty
-// leaves hold at most leaf_capacity points on average, and only non-empty cells are stored. Two
+// leaves hold at most leaf_capacity points on average (a requested minimum_near_radius bounds the
+// leaf edge from below), and only non-empty cells are stored. Two
 // cells of one level interact through their expansions (M2L) once separated by more than
 // `separation` cells, their parents not; target leaves sum the source leaves within
 // `separation` cells directly (P2P). Multipole-to-local translations use precomputed operators
@@ -59,6 +60,7 @@
 #include <complex>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <optional>
 #include <span>
 #include <vector>
@@ -72,11 +74,23 @@ namespace fika::detail {
 /// Highest order of the calibrated automatic order, and of the order retries of its users.
 inline constexpr int largest_automatic_fmm_order = 26;
 
+/// Near-field (P2P) weighting of one field evaluation: the contribution of a charge or dipole
+/// `source` to target `target` is multiplied by the returned factor, which is evaluated for every
+/// pair summed directly. The far field is not weighted, so a caller may pass a weight only when
+/// every pair with weight != 1 lies within near_radius() and is therefore in the P2P lists; the
+/// weight must be finite and nonnegative. r2 is |x_target - source|^2.
+using NearFieldWeight =
+    std::function<double(std::size_t target, std::size_t source, double r2)>;
+
 struct VolumeFmmOptions {
   double absolute_accuracy = 1e-9;  // field error target (a.u.) of the automatic order
   int order = 0;                    // expansion order p; 0: from absolute_accuracy
   int separation = 2;               // cells between interacting cells (1 or 2)
   std::size_t leaf_capacity = 512;  // average points (sources and targets) per non-empty leaf
+  // If positive, keep every source within this distance in the P2P (near) lists by bounding the
+  // leaf edge from below; leaves may then hold more than leaf_capacity points on average. Callers
+  // that weight the near field need every weighted pair to be in those lists.
+  double minimum_near_radius = 0.0;
   std::size_t sample_size = 64;     // targets whose exact field checks each evaluation (0: none)
   double charge_scale = 0.0;        // largest |q| expected (automatic order with charges)
   double dipole_scale = 0.0;        // largest |mu| expected (automatic order with dipoles)
@@ -123,13 +137,21 @@ class VolumeFmm {
   /// Sets out[i] to the field at target i of the charges, sum_j q_j r / r^3, and the dipoles,
   /// sum_k (3 r (r . mu_k) - r^2 mu_k) / r^5 (r = x_i - source), without sources at the target
   /// point itself. Independent of the thread count. With a report, also the stage timings and the
-  /// error on a fixed sample of targets (evenly spaced in Morton order), computed exactly.
-  /// Throws std::invalid_argument if the sizes do not match.
+  /// error on a fixed sample of targets (evenly spaced in Morton order), computed exactly. With a
+  /// weight, the weighted near field is also the reference of the sampled error. Throws
+  /// std::invalid_argument if the sizes do not match.
   void field(std::span<const double> charges, std::span<const Dipole> dipoles,
-             std::span<Point3D<double>> out, VolumeFmmReport* report = nullptr) const;
+             std::span<Point3D<double>> out, VolumeFmmReport* report = nullptr,
+             const NearFieldWeight* charge_weight = nullptr,
+             const NearFieldWeight* dipole_weight = nullptr) const;
 
   auto order() const noexcept -> int { return statistics_.order; }
   auto statistics() const noexcept -> const VolumeFmmStatistics& { return statistics_; }
+
+  /// Distance within which every source is summed directly (P2P): separation * leaf edge.
+  auto near_radius() const noexcept -> double {
+    return static_cast<double>(separation_) * statistics_.leaf_edge;
+  }
 
  private:
   /// Points of one set in Morton order.
@@ -169,6 +191,7 @@ class VolumeFmm {
 
   std::optional<UniformM2L> m2l_;
   int separation_ = 1;
+  double minimum_near_radius_ = 0.0;
   std::size_t sample_size_ = 0;
   Point3D<double> origin_{};  // lowest corner of the root cube
   double edge_ = 0.0;         // root edge

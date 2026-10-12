@@ -41,6 +41,7 @@
 
 #include "fika_point3d.hpp"
 #include "fika_polarizable_sites.hpp"
+#include "fika_switching.hpp"
 #include "fika_volume_fmm.hpp"
 
 namespace fika {
@@ -53,7 +54,8 @@ struct TholeDamping {
 };
 
 /// The coupling of induced dipoles: y = T mu, the field at every site of the dipoles at the other
-/// sites (sites of the same residue excluded).
+/// sites (sites of the same residue excluded; pairs of different residues scaled by the inner
+/// switching function when one is given, and by Thole damping when that is given).
 class DipoleInteraction {
  public:
   virtual ~DipoleInteraction() = default;
@@ -72,20 +74,31 @@ namespace detail {
 /// Corrections of an undamped sum of T mu over all pairs of different sites: pairs of sites of the
 /// same residue removed, and for close pairs of different residues the Thole damping added as
 /// lambda - 1 terms (where it changes lambda by more than 1e-15, found with a cell grid). Shared
-/// by the direct and fast multipole dipole couplings.
+/// by the direct and fast multipole dipole couplings. With `switching_in_near_field` the FMM has
+/// already applied the switching in its near sums (near_field_weight), so apply only removes the
+/// same-residue pairs and adds the damping part S (lambda - 1) inside r_off.
 class DipoleCorrections {
  public:
   /// Throws std::invalid_argument (prefixed with `caller`) for inconsistent site arrays, a
-  /// nonpositive damping parameter, or a site whose mean polarizability is not positive (with
-  /// damping).
+  /// nonpositive damping parameter or invalid switching radii, or a site whose mean polarizability
+  /// is not positive (with damping).
   DipoleCorrections(const PolarizableSites& sites, std::optional<TholeDamping> damping,
-                    const char* caller);
+                    std::optional<InnerSwitch> switching, const char* caller);
 
   /// y[i] = undamped[i] + the corrections at site i for dipoles mu (structure of arrays);
   /// parallel over sites, independent of the thread count.
   void apply(const double* mu_x, const double* mu_y, const double* mu_z, const double* undamped_x,
              const double* undamped_y, const double* undamped_z,
-             std::span<Point3D<double>> y) const;
+             std::span<Point3D<double>> y, bool switching_in_near_field = false) const;
+
+  /// r_off of the switching function (0 without one): the near radius the FMM path needs.
+  auto near_field_radius() const noexcept -> double {
+    return switching_ ? switching_->r_off : 0.0;
+  }
+
+  /// Weight of the switched near field of the FMM path (see VolumeFmm): 1 for pairs of the same
+  /// residue, which are removed exactly afterwards, and S(r) for the others.
+  auto near_field_weight() const -> NearFieldWeight;
 
   auto size() const noexcept -> std::size_t { return x_.size(); }
   auto x() const noexcept -> const double* { return x_.data(); }
@@ -96,7 +109,9 @@ class DipoleCorrections {
   std::vector<double> x_, y_, z_;
   std::vector<double> scales_;  // mean polarizability^(1/6), with damping
   std::optional<TholeDamping> damping_;
-  double cutoff_ = 0.0;  // damping negligible beyond (bohr)
+  std::optional<InnerSwitch> switching_;
+  double thole_cutoff_ = 0.0;  // dipole damping negligible beyond (bohr)
+  double cutoff_ = 0.0;        // cell edge and pair cutoff: the largest of the two
   // Sites grouped by residue: the sites of site i's residue are
   // owner_sites_[owner_offsets_[g] .. owner_offsets_[g + 1]), g = owner_group_[i].
   std::vector<std::size_t> owner_offsets_;
@@ -115,9 +130,10 @@ class DipoleCorrections {
 
 class DirectDipoleInteraction final : public DipoleInteraction {
  public:
-  /// Throws std::invalid_argument for a nonpositive damping parameter or a site whose mean
-  /// polarizability is not positive (with damping).
-  DirectDipoleInteraction(const PolarizableSites& sites, std::optional<TholeDamping> damping);
+  /// Throws std::invalid_argument for a nonpositive damping parameter or invalid switching radii,
+  /// or a site whose mean polarizability is not positive (with damping).
+  DirectDipoleInteraction(const PolarizableSites& sites, std::optional<TholeDamping> damping,
+                          std::optional<InnerSwitch> switching = std::nullopt);
 
   void apply(std::span<const Point3D<double>> mu, std::span<Point3D<double>> y) const override;
 
@@ -134,7 +150,10 @@ struct FmmDipoleOptions {
 
 /// T mu through a fast multipole method (detail::VolumeFmm, separation 2) for the undamped sum
 /// over all pairs, then the same corrections as DirectDipoleInteraction (same-residue pairs,
-/// Thole damping). The FMM error is linear in mu, so products of smaller vectors (CG search
+/// Thole damping, inner switching). When a switching function is given, the tree keeps the pairs
+/// within r_off in its near sums and they are switched there (no cancellation at short range);
+/// the damping correction inside r_off is scaled by S accordingly. The FMM error is linear in
+/// mu, so products of smaller vectors (CG search
 /// directions) are proportionally more accurate. The first apply checks the error on a sample of
 /// sites; above accuracy / 10 the order is raised by 2 (up to 26) and the product recomputed.
 /// apply is therefore not safe to call concurrently.
@@ -143,7 +162,8 @@ class FmmDipoleInteraction final : public DipoleInteraction {
   /// Throws std::invalid_argument as DirectDipoleInteraction, or for a nonpositive dipole scale
   /// or accuracy.
   FmmDipoleInteraction(const PolarizableSites& sites, std::optional<TholeDamping> damping,
-                       const FmmDipoleOptions& options);
+                       const FmmDipoleOptions& options,
+                       std::optional<InnerSwitch> switching = std::nullopt);
 
   void apply(std::span<const Point3D<double>> mu, std::span<Point3D<double>> y) const override;
 

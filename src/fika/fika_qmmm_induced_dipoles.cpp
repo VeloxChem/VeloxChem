@@ -40,19 +40,20 @@ namespace fika {
 auto qmmm_induced_dipoles(const Molecule<double>& molecule, const MolecularBasis& basis,
                           const DenseMatrix& density, const ClassicalSystem& system,
                           std::optional<TholeDamping> damping, const InducedDipoleOptions& options,
-                          QmmmSources sources) -> QmmmInducedDipoles {
+                          QmmmSources sources, std::optional<InnerSwitch> switching)
+    -> QmmmInducedDipoles {
   const QmElectronicField electrons(molecule, basis, density, field_accuracy(options),
                                     options.summation);
   QmmmInducedDipoles result;
   if (sources == QmmmSources::all) {
     const QmNuclearField nuclei(molecule);
     const std::array<const FieldContribution*, 2> external{&nuclei, &electrons};
-    result.induced = induced_dipoles(system, damping, options, external);
+    result.induced = induced_dipoles(system, damping, options, external, switching);
   } else {
     InducedDipoleOptions electrons_only = options;
     electrons_only.permanent_field = false;
     const std::array<const FieldContribution*, 1> external{&electrons};
-    result.induced = induced_dipoles(system, damping, electrons_only, external);
+    result.induced = induced_dipoles(system, damping, electrons_only, external, switching);
   }
   result.electron_field_order = electrons.report().order;
   result.electron_field_summation =

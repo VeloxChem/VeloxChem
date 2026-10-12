@@ -43,6 +43,7 @@
 #include "fika_dipole_interaction.hpp"
 #include "fika_electric_field.hpp"
 #include "fika_polarizable_sites.hpp"
+#include "fika_switching.hpp"
 
 namespace fika {
 
@@ -115,9 +116,12 @@ auto solve_induced_dipoles(const PolarizableSites& sites, std::span<const Point3
 /// options.summation selects, plus the `external` contributions (e.g. of a QM region) added in
 /// order; the dipoles are in the order of polarizable_sites(system). The external contributions
 /// see the sites of polarizable_sites(system) and should meet options.field_accuracy themselves.
+/// `switching`, when set, scales the field of the permanent charges and the dipole coupling of
+/// pairs of different residues by S(r).
 auto induced_dipoles(const ClassicalSystem& system, std::optional<TholeDamping> damping,
                      const InducedDipoleOptions& options = {},
-                     std::span<const FieldContribution* const> external = {}) -> InducedDipoles;
+                     std::span<const FieldContribution* const> external = {},
+                     std::optional<InnerSwitch> switching = std::nullopt) -> InducedDipoles;
 
 namespace detail {
 
@@ -130,17 +134,19 @@ struct PermanentFieldSummation {
 /// Adds the field of the permanent charges of `system` at `sites` (its polarizable sites) to
 /// `field`, summed as induced_dipoles does.
 auto add_permanent_field(const ClassicalSystem& system, const PolarizableSites& sites,
-                         const InducedDipoleOptions& options, std::span<Point3D<double>> field)
+                         const InducedDipoleOptions& options, std::span<Point3D<double>> field,
+                         std::optional<InnerSwitch> switching = std::nullopt)
     -> PermanentFieldSummation;
 
 /// Solves for the dipoles in `field` with the coupling induced_dipoles selects (FMM from the
-/// coupling crossover, else direct); `direct` (an operator of the same sites and damping) is used
-/// instead of building one when given. The result holds `field`.
+/// coupling crossover, else direct); `direct` (an operator of the same sites, damping and
+/// switching) is used instead of building one when given. The result holds `field`.
 auto solve_with_selected_coupling(const PolarizableSites& sites,
                                   std::vector<Point3D<double>> field,
                                   std::optional<TholeDamping> damping,
                                   const InducedDipoleOptions& options,
-                                  const DirectDipoleInteraction* direct = nullptr)
+                                  const DirectDipoleInteraction* direct = nullptr,
+                                  std::optional<InnerSwitch> switching = std::nullopt)
     -> InducedDipoles;
 
 }  // namespace detail
