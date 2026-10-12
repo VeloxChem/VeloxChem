@@ -45,6 +45,12 @@ from .veloxchemlib import mpi_master
 from collections import Counter
 
 
+class _TimeLimitExceeded(Exception):
+    """
+    Raised from inside the graph matching once ReactionMatcher.max_time is exceeded.
+    """
+
+
 class ReactionMatcher:
 
     def __init__(self, comm=None, ostream=None):
@@ -68,6 +74,7 @@ class ReactionMatcher:
         self._iso_count = 0
         self._mono_count = 0
         self._start_time = 0
+        self._time_limit_active = False
         self.verbose = False
         self.print_starting_index = 1
         self.max_time = 600
@@ -105,7 +112,7 @@ class ReactionMatcher:
         if self._breaking_depth == -1:
             self._breaking_depth = self._decide_breaking_depth()
 
-        map, breaking_edges, forming_edges = self._find_mapping(
+        map, breaking_edges, forming_edges = self._find_mapping_in_time(
             self.rea_graph.copy(),
             self.pro_graph.copy(),
             breaking_bonds,
@@ -129,7 +136,7 @@ class ReactionMatcher:
                 self.rea_graph,
                 self.pro_graph,
             )
-            map, breaking_edges, forming_edges = self._find_mapping(
+            map, breaking_edges, forming_edges = self._find_mapping_in_time(
                 self.rea_graph.copy(),
                 self.pro_graph.copy(),
                 breaking_bonds,
@@ -586,6 +593,27 @@ class ReactionMatcher:
         """
         groups = ReactionMatcher._group_unassigned_by_hash(graph, hashes)
         return {h: nodes[0] for h, nodes in groups.items() if len(nodes) == 1}
+
+    def _find_mapping_in_time(self, A, B, forced_breaking_edges,
+                              forced_forming_edges):
+        """
+        Run _find_mapping, aborting it once it takes longer than max_time.
+        The time limit is also checked inside every graph matching, because a single subgraph check that fails can
+        take arbitrarily long. Returns None for all results if the time limit was exceeded.
+        """
+        self._start_time = time.time()
+        self._time_limit_active = True
+        try:
+            return self._find_mapping(A, B, forced_breaking_edges,
+                                      forced_forming_edges)
+        except _TimeLimitExceeded:
+            self.ostream.print_warning(
+                f"Spent more then {self.max_time:.3f} s finding mapping, aborting"
+            )
+            self.ostream.flush()
+            return None, None, None
+        finally:
+            self._time_limit_active = False
 
     def _find_mapping(self, A, B, forced_breaking_edges, forced_forming_edges):
         """
@@ -1103,6 +1131,11 @@ class ReactionMatcher:
     def get_graph_matcher(self, A, B):
 
         def node_match(a, b):
+            # The graph matcher calls this for every candidate pair, which makes it the place to stop a long search
+            if self._time_limit_active and (time.time() - self._start_time
+                                            > self.max_time):
+                raise _TimeLimitExceeded()
+
             # the elem key is always expected, the assist_id key and H_bond_count key are optional
             elem_match = a['elem'] == b['elem']
             h_count_match = a.get('H_bond_count', 0) == b.get('H_bond_count', 0)
