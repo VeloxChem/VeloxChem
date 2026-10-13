@@ -2,14 +2,14 @@
 # install(DIRECTORY ...) preserves subdirectory structure (e.g. mofbuilder/)
 # and resolves file matching at install time, so new or deleted .py files are
 # automatically picked up without a CMake reconfigure.
-# __init__.py is excluded from the directory install to allow commit-hash
-# injection and is handled separately below.
+# All __init__.py files are installed here (e.g. mofbuilder/__init__.py). The
+# top-level __init__.py is overwritten below when a commit hash is injected;
+# install rules are executed in declaration order.
 install(
   DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/
   DESTINATION ${PYMOD_INSTALL_FULLDIR}
   FILES_MATCHING
   PATTERN "*.py"
-  PATTERN "__init__.py" EXCLUDE
   PATTERN "__pycache__" EXCLUDE
   PATTERN "CMakeLists.txt" EXCLUDE
   PATTERN "*.egg-info" EXCLUDE
@@ -44,6 +44,7 @@ if(NOT _vlx_commit STREQUAL "unknown")
   file(READ ${CMAKE_CURRENT_SOURCE_DIR}/__init__.py _init_content)
   file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/veloxchem_init.py
        "${_init_content}\n__commit__ = \"${_vlx_commit}\"\n")
+  # Overwrites the top-level __init__.py installed above.
   install(
     FILES ${CMAKE_CURRENT_BINARY_DIR}/veloxchem_init.py
     DESTINATION ${PYMOD_INSTALL_FULLDIR}
