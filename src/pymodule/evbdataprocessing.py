@@ -236,16 +236,21 @@ class EvbDataProcessing:
         for i, l in enumerate(self.Lambda[:-1]):
             delta_lambda = self.Lambda[i + 1] - l
 
-            forward_energy = self._beta(Temp_set) * delta_lambda * de_lambda[i]
-            backward_energy = self._beta(Temp_set) * delta_lambda * de_lambda[
-                i + 1]
+            # Reduced works in pymbar's convention, with dE = E1 - E2' so that
+            # u_{i+1} - u_i = -beta * delta_lambda * dE: forward work on
+            # window-i frames, reverse work on window-(i+1) frames. Passing
+            # the negated works instead gives the same estimate only for
+            # equal frame counts, and a wrong uncertainty in any case.
+            forward_work = -self._beta(Temp_set) * delta_lambda * de_lambda[i]
+            reverse_work = self._beta(Temp_set) * delta_lambda * de_lambda[i +
+                                                                           1]
 
             try:
                 bar_result = pymbar.other_estimators.bar(
-                    forward_energy, -backward_energy, False)
+                    forward_work, reverse_work)
                 dF = bar_result["Delta_f"]
                 ddF = bar_result["dDelta_f"]
-                dg_bar = -1 / self._beta(Temp_set) * dF
+                dg_bar = 1 / self._beta(Temp_set) * dF
                 ddg_bar = 1 / self._beta(Temp_set) * ddF
             except Exception as e:
                 print_exception_if_debug()
