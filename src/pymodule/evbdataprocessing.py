@@ -350,6 +350,18 @@ class EvbDataProcessing:
                                    dtype=object)
         return binned_data
 
+    def _bin_average(self, data, lambda_indices=None):
+        """Mean of data per lambda window.
+
+        _bin returns a ragged object array when windows hold different
+        numbers of frames (e.g. after time sub-sampling), which
+        np.average(..., axis=1) cannot handle.
+        """
+        binned_data = self._bin(data, lambda_indices)
+        if binned_data.dtype == object:
+            return np.array([np.average(b) for b in binned_data])
+        return np.average(binned_data, axis=1)
+
     @staticmethod
     def _dGevb_analytical(dGfep, Lambda, H12, xi):
 
@@ -530,11 +542,11 @@ class EvbDataProcessing:
             E2_shifted, V, dE, Eg = self._calculate_Eg_V_dE(
                 E1_ref, E2_ref, self.alpha, self.H12)
 
-            E1_avg = np.average(self._bin(E1_ref), axis=1)
-            E2_avg = np.average(self._bin(E2_ref), axis=1)
-            Eg_avg = np.average(self._bin(Eg), axis=1)
-            V_avg = np.average(self._bin(V), axis=1)
-            dE_avg = np.average(self._bin(dE), axis=1)
+            E1_avg = self._bin_average(E1_ref)
+            E2_avg = self._bin_average(E2_ref)
+            Eg_avg = self._bin_average(Eg)
+            V_avg = self._bin_average(V)
+            dE_avg = self._bin_average(dE)
             result.update({
                 "dE": dE,
                 "Eg": Eg,
