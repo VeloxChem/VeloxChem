@@ -1076,15 +1076,22 @@ class EvbDataProcessing:
 
     @staticmethod
     def print_uncertainties(results, ostream=None):
-        """Print total uncertainty, per-replica/direction uncertainty, and hysteresis diagnostics.
+        """Print statistical uncertainty, per-replica/direction uncertainty, and hysteresis diagnostics.
 
-        The total-uncertainty section only needs the pooled dGfep_unc /
+        The pooled uncertainties are BAR/MBAR statistical errors, which treat
+        every frame as independent. Correlated frames make them too small by
+        about sqrt(g), with g the statistical inefficiency, so they are not a
+        complete error bar. The replica average (mean +/- SEM across
+        replicas) also captures correlation within a replica and is the
+        better error bar when there are several replicas.
+
+        The statistical-uncertainty section only needs the pooled dGfep_unc /
         analytical uncertainty, always present once EvbDataProcessing.compute
         has run. The per-replica and hysteresis sections additionally
         require EvbDataProcessing.calculate_per_replica = True (the default)
         and Replica_frame/Direction_frame to have been loaded (see
         EvbDriver._load_output_files) -- if neither is available this prints
-        a note and returns after the total-uncertainty section.
+        a note and returns after the statistical-uncertainty section.
 
         Args:
             results (dict): EVB results, as produced by EvbDataProcessing.compute.
@@ -1094,7 +1101,9 @@ class EvbDataProcessing:
             ostream = OutputStream(sys.stdout)
 
         ostream.print_header(
-            "Total uncertainty (pooled over all replicas/directions)")
+            "Statistical uncertainty (pooled, assumes uncorrelated frames)")
+        ostream.print_info(
+            "Too small for correlated frames; see the replica average below.")
         ostream.print_info(
             f"{'Configuration':<20} {'Barrier (kJ/mol)':>25} {'Free Energy (kJ/mol)':>25} {'dGfep(l=1) unc':>18}"
         )
