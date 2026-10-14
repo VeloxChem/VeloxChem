@@ -596,8 +596,9 @@ class EnsembleDriver:
 
         water_resnames = {"TIP3", "TIP3P", "WAT", "HOH", "SOL"}
         if resname in water_resnames:
-            # CHARMM/GROMACS water atom names vs TIP3P database atom names
-            if atom_name == "OH2":
+            # AMBER (O/H1/H2) and CHARMM/GROMACS (OH2/H1/H2) water atom
+            # names vs the TIP3P database atom names
+            if atom_name in ("OH2", "O"):
                 candidates.append("OW")
             elif atom_name == "H1":
                 candidates.extend(["HW1", "HW"])
@@ -707,8 +708,9 @@ class EnsembleDriver:
 
         water_resnames = {"TIP3", "TIP3P", "WAT", "HOH", "SOL"}
         if resname in water_resnames:
-            # CHARMM/GROMACS water atom names vs SEP water atom names
-            if atom_name == "OH2":
+            # AMBER (O/H1/H2) and CHARMM/GROMACS (OH2/H1/H2) water atom
+            # names vs the SEP water atom names
+            if atom_name in ("OH2", "O"):
                 candidates.append("OW")
             elif atom_name == "H1":
                 candidates.extend(["HW1", "HW"])
@@ -973,18 +975,20 @@ class EnsembleDriver:
                 raise RuntimeError(
                     "Snapshot contains PE atoms but pe_model is not set. "
                     "Call set_env_models(pe_model=...).")
-            self._validate_pe_residue_atom_patterns(pe_atom_names,
-                                                    pe_resindices, pe_resnames)
             pe_db = self.pe_model["db"]
-            seen = set()
+            pattern_labels = {}
             index_of = {}
             for residue_index in np.unique(pe_resindices):
                 sel = np.where(pe_resindices == residue_index)[0]
                 resname = str(pe_resnames[sel[0]])
                 atom_names = [str(pe_atom_names[i]) for i in sel]
                 key = (resname, tuple(atom_names))
-                if key not in seen:
-                    seen.add(key)
+                if key not in pattern_labels:
+                    # One force field per distinct atom pattern, so residues
+                    # sharing a name but not an atom order still get their
+                    # own charges and polarizabilities.
+                    ff_label = f"ensemble_pe_{len(pattern_labels)}"
+                    pattern_labels[key] = ff_label
                     db_resname = self._normalize_resname_for_pe_db(
                         pe_db, resname)
                     if db_resname not in pe_db:
@@ -1006,8 +1010,9 @@ class EnsembleDriver:
                         if alpha != 0.0:
                             polarizabilities[i] = alpha
                     system.add_force_field(
-                        FikaForceField("ensemble_pe", resname, charges,
+                        FikaForceField(ff_label, resname, charges,
                                        polarizabilities))
+                ff_label = pattern_labels[key]
                 index = index_of.get(resname, 0)
                 index_of[resname] = index + 1
                 elements = [
@@ -1015,7 +1020,7 @@ class EnsembleDriver:
                     for e in pe_elements[sel]
                 ]
                 system.add_residue(
-                    FikaResidue(resname, index, "ensemble_pe", elements,
+                    FikaResidue(resname, index, ff_label, elements,
                                 pe_coords[sel] / bohr_in_angstrom(), True))
 
         # Non-polarizable NPE residues: charges from the selected NPE database.
@@ -1024,21 +1029,26 @@ class EnsembleDriver:
                 raise RuntimeError(
                     "Snapshot contains NPE atoms but npe_model is not set. "
                     "Call set_env_models(npe_model=...).")
-            seen = set()
+            pattern_labels = {}
             index_of = {}
             for residue_index in np.unique(npe_resindices):
                 sel = np.where(npe_resindices == residue_index)[0]
                 resname = str(npe_resnames[sel[0]])
                 atom_names = [str(npe_atom_names[i]) for i in sel]
                 key = (resname, tuple(atom_names))
-                if key not in seen:
-                    seen.add(key)
+                if key not in pattern_labels:
+                    # One force field per distinct atom pattern, so residues
+                    # sharing a name but not an atom order still get their
+                    # own charges.
+                    ff_label = f"ensemble_npe_{len(pattern_labels)}"
+                    pattern_labels[key] = ff_label
                     charges = [
                         self._get_npe_params(atom_name, resname)["charge"]
                         for atom_name in atom_names
                     ]
                     system.add_force_field(
-                        FikaForceField("ensemble_npe", resname, charges))
+                        FikaForceField(ff_label, resname, charges))
+                ff_label = pattern_labels[key]
                 index = index_of.get(resname, 0)
                 index_of[resname] = index + 1
                 elements = [
@@ -1046,7 +1056,7 @@ class EnsembleDriver:
                     for e in npe_elements[sel]
                 ]
                 system.add_residue(
-                    FikaResidue(resname, index, "ensemble_npe", elements,
+                    FikaResidue(resname, index, ff_label, elements,
                                 npe_coords[sel] / bohr_in_angstrom(), False))
 
         return {
