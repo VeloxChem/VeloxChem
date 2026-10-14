@@ -105,6 +105,12 @@ SERENITY_LR_RESTART_LOADED = 'Successfully loaded'
 SERENITY_LR_RESTART_SCRATCH = 'Will continue from scratch'
 _SERENITY_LR_ITERATIONS = re.compile(
     r'Iterative solver converged in\s+(\d+)\s+iterations')
+_SERENITY_SCF_CYCLE = re.compile(
+    r'^\s*(\d+)\s+([-+]?\d+\.\d+)\s+'
+    r'(inf|[-+]?\d+\.\d+[eE][-+]?\d+)\s+'
+    r'(inf|[-+]?\d+\.\d+[eE][-+]?\d+)\s+'
+    r'(inf|[-+]?\d+\.\d+[eE][-+]?\d+)\s+'
+    r'\d+:\d+(?::\d+)?(?:\s+\S+)?\s*$', re.MULTILINE)
 
 # EigenvalueSolver::iterate() and NonlinearResponseSolver::iterate() print one
 # line per cycle: "%5i %10i %14.3f %11i %13.2e  (%2i)" = iteration, subspace
@@ -544,6 +550,12 @@ class SerenityScfDriver:
         self._system_generation = 0
         self._system_scf_count = 0
         self._scf_provenance = None
+        # Description of an orbital guess explicitly installed in a freshly
+        # constructed Serenity System.  This is distinct from reusing a
+        # System across geometries: the latter leaves geometry-dependent grid
+        # controllers stale, whereas ElectronicStructureCopyTask projects the
+        # previous orbitals into a new, geometry-clean System.
+        self._pending_scf_guess = None
         self.last_serenity_output = {}
 
         # h5 part of the file
@@ -836,12 +848,13 @@ class SerenityScfDriver:
 
         ``_system_signature`` is reset, so ``_ensure_system`` builds a new
         System (new name, new scratch directory) instead of moving the atoms
-        of the current one.  A new System means a fresh SCF guess and no LRSCF
-        restart file.  Surface-hopping measurements found that moving the
-        atoms of a System on which a gradient had been evaluated shifted the
-        SF reference energy (basis-function-on-grid data stayed tied to the
-        old geometry), so callers that evaluate gradients reset the System
-        after each evaluation unless same-System reuse has been validated.
+        of the current one.  A new System has no LRSCF restart file and starts
+        cold unless a caller subsequently installs a projected orbital guess.
+        Surface-hopping measurements found that moving the atoms of a System
+        on which a gradient had been evaluated shifted the SF reference
+        energy (basis-function-on-grid data stayed tied to the old geometry),
+        so callers that evaluate gradients reset the System after each
+        evaluation unless same-System reuse has been validated.
         """
 
         # self._system = None
@@ -855,6 +868,7 @@ class SerenityScfDriver:
         self._gradient = None
         self._scf_results = None
         self._current_scf_mode = None
+        self._pending_scf_guess = None
 
     def _compute_energy_master(self, molecule):
         self._ensure_system(molecule)
@@ -867,17 +881,32 @@ class SerenityScfDriver:
             # the electronic structure it already holds, i.e. the orbitals of
             # the previous geometry.  This is independent of (and never
             # implies) an LRSCF restart; see SerenityLinearResponseSolver.
-            warm_start = self._system_scf_count > 0
+            guess_provenance = (None if self._pending_scf_guess is None else
+                                dict(self._pending_scf_guess))
+            same_system_warm_start = self._system_scf_count > 0
+            warm_start = (same_system_warm_start or
+                          guess_provenance is not None)
             capture = self.capture_serenity_output('scf')
             try:
                 with capture:
                     self.print_title()
                     self._scf_task.run()
             except Exception as error:
+                last_cycle = self._last_scf_cycle(capture.text)
+                cycle_message = ''
+                if last_cycle is not None:
+                    cycle_message = (
+                        f' Last reported cycle {last_cycle["cycle"]}: '
+                        f'E={last_cycle["energy"]:.10f} Eh, '
+                        f'|dE|={last_cycle["energy_change"]:.3e}, '
+                        f'RMSD[D]={last_cycle["density_rmsd"]:.3e}, '
+                        f'|[F,P]|={last_cycle["commutator"]:.3e}.')
                 raise SerenityCalculationError(
-                    f'Serenity SCF failed: {error}', stage='scf',
+                    f'Serenity SCF failed: {error}{cycle_message}',
+                    stage='scf',
                     details={'serenity_output_tail':
-                             capture.text[-4000:]}) from error
+                             capture.text[-4000:],
+                             'last_scf_cycle': last_cycle}) from error
 
             energy = float(self._system.getEnergy())
             converged = (SERENITY_SCF_NOT_CONVERGED not in capture.text and
@@ -903,8 +932,17 @@ class SerenityScfDriver:
                 'scf_revision': int(self._scf_revision),
                 'system_name': self._system_name,
                 'system_generation': int(self._system_generation),
-                'system_reused': bool(warm_start),
+                'system_reused': bool(same_system_warm_start),
                 'scf_warm_start': bool(warm_start),
+                'scf_guess_source': (
+                    ('checkpoint_accepted_reference'
+                     if guess_provenance is not None and
+                     guess_provenance.get('method') ==
+                     'serenity_native_orbital_checkpoint' else
+                     'projected_previous_geometry')
+                    if guess_provenance is not None else
+                    ('same_system' if warm_start else 'atomic')),
+                'projected_guess': guess_provenance,
                 'geometry_signature': geom_signature,
                 'scf_converged': True,
                 'reference_energy': float(energy),
@@ -915,8 +953,179 @@ class SerenityScfDriver:
                 'occupied_space_nesting':
                     self._scf_results.get('occupied_space_nesting'),
             }
+            self._pending_scf_guess = None
 
         return self._scf_results
+
+    @staticmethod
+    def _last_scf_cycle(output):
+        """Returns the last printed SCF residual tuple, if available."""
+
+        matches = list(_SERENITY_SCF_CYCLE.finditer(str(output)))
+        if not matches:
+            return None
+        match = matches[-1]
+        return {
+            'cycle': int(match.group(1)),
+            'energy': float(match.group(2)),
+            'energy_change': float(match.group(3)),
+            'density_rmsd': float(match.group(4)),
+            'commutator': float(match.group(5)),
+        }
+
+    def _project_scf_guess_from(self, source_system,
+                                source_provenance=None):
+        """Projects orbitals from a converged System into the current one.
+
+        Both Systems remain geometry-specific.  Serenity's native
+        ``ElectronicStructureCopyTask`` rotates/translates and projects the
+        source orbitals, avoiding the stale basis-on-grid controllers caused
+        by changing coordinates on an already evaluated System.
+
+        This internal hook is used by the SF dynamics adapter only after it
+        has identified the previous *accepted* electronic snapshot.
+        """
+
+        assert_msg_critical(
+            self._system is not None and self._current_scf_mode is not None,
+            'SerenityScfDriver: a target System must be constructed before '
+            'installing a projected SCF guess.')
+        assert_msg_critical(
+            source_system is not None and source_system is not self._system,
+            'SerenityScfDriver: projected SCF guesses require a distinct '
+            'source System.')
+
+        task_class = (spy.ElectronicStructureCopyTask_R
+                      if self._current_scf_mode == 'restricted' else
+                      spy.ElectronicStructureCopyTask_U)
+        capture = self.capture_serenity_output('scf_guess')
+        try:
+            with capture:
+                copy_task = task_class(source_system, [self._system])
+                if hasattr(copy_task, 'generalSettings'):
+                    copy_task.generalSettings.printLevel = (
+                        spy.GLOBAL_PRINT_LEVELS.MINIMUM)
+                copy_task.run()
+        except Exception as error:
+            raise SerenityCalculationError(
+                f'Serenity SCF guess projection failed: {error}',
+                stage='scf_guess',
+                details={'serenity_output_tail': capture.text[-4000:]}
+            ) from error
+
+        provenance = {} if source_provenance is None else dict(
+            source_provenance)
+        provenance['method'] = 'serenity_electronic_structure_copy'
+        provenance['target_system_name'] = self._system_name
+        self._pending_scf_guess = provenance
+        return dict(provenance)
+
+    def _restore_scf_guess(self, payload):
+        """Restores a checkpointed native Serenity orbital guess.
+
+        ``ElectronicStructureCopyTask`` is the normal geometry-to-geometry
+        path.  A process restart has no live source ``System``, so the
+        accepted System's minimal native electronic-structure file set
+        (orbitals, density, Fock matrix and energies) is carried by the
+        dynamics checkpoint and read into the freshly constructed System at
+        the same geometry.  The following nuclear step then uses the normal
+        copy task.
+        """
+
+        import hashlib
+        import os
+
+        assert_msg_critical(
+            self._system is not None and self._current_scf_mode is not None,
+            'SerenityScfDriver: a target System must be constructed before '
+            'restoring an SCF guess.')
+
+        expected_format = 'serenity_electronic_structure_hdf5'
+        if not isinstance(payload, dict) or payload.get('format') != \
+                expected_format or int(payload.get('revision', -1)) != 1:
+            raise SerenityCalculationError(
+                'Serenity SCF checkpoint guess has an unsupported format.',
+                stage='scf_guess')
+
+        mode = str(payload.get('scf_mode', '')).strip().lower()
+        if mode != self._current_scf_mode:
+            raise SerenityCalculationError(
+                'Serenity SCF checkpoint guess mode does not match the '
+                f'current {self._current_scf_mode} reference.',
+                stage='scf_guess', details={'checkpoint_scf_mode': mode})
+
+        suffixes = (('.orbs.res.h5', '.dmat.res.h5',
+                     '.FockMatrix.res.h5', '.energies.res')
+                    if mode == 'restricted' else
+                    ('.orbs.unres.h5', '.dmat.unres.h5',
+                     '.FockMatrix.unres.h5', '.energies.unres'))
+        file_payload = payload.get('files', None)
+        file_digests = payload.get('sha256', None)
+        if (not isinstance(file_payload, dict) or
+                not isinstance(file_digests, dict) or
+                set(file_payload) != set(suffixes) or
+                set(file_digests) != set(suffixes)):
+            raise SerenityCalculationError(
+                'Serenity SCF checkpoint guess does not contain the exact '
+                'native electronic-structure file set.', stage='scf_guess')
+
+        system_directory = os.path.join(
+            str(self.scratch_dir), str(self._system_name))
+        observed_digests = {}
+        for suffix in suffixes:
+            file_bytes = file_payload[suffix]
+            if not isinstance(file_bytes, bytes) or not file_bytes:
+                raise SerenityCalculationError(
+                    'Serenity SCF checkpoint guess contains an empty native '
+                    f'file payload for {suffix}.', stage='scf_guess')
+            digest = hashlib.sha256(file_bytes).hexdigest()
+            observed_digests[suffix] = digest
+            expected_digest = str(file_digests[suffix])
+            if digest != expected_digest:
+                raise SerenityCalculationError(
+                    'Serenity SCF checkpoint payload failed its SHA-256 '
+                    f'integrity check for {suffix}.', stage='scf_guess',
+                    details={'expected_sha256': expected_digest,
+                             'observed_sha256': digest})
+            file_path = os.path.join(
+                system_directory, str(self._system_name) + suffix)
+            try:
+                with open(file_path, 'wb') as native_file:
+                    native_file.write(file_bytes)
+            except OSError as error:
+                raise SerenityCalculationError(
+                    'Serenity SCF checkpoint electronic structure could not '
+                    f'be staged: {error}', stage='scf_guess') from error
+
+        task_class = (spy.OrbitalsIOTask_R if mode == 'restricted' else
+                      spy.OrbitalsIOTask_U)
+        capture = self.capture_serenity_output('scf_guess')
+        try:
+            with capture:
+                io_task = task_class(self._system)
+                io_task.settings.fileFormat = spy.ORBITAL_FILE_TYPES.SERENITY
+                io_task.settings.path = system_directory
+                if hasattr(io_task, 'generalSettings'):
+                    io_task.generalSettings.printLevel = (
+                        spy.GLOBAL_PRINT_LEVELS.MINIMUM)
+                io_task.run()
+        except Exception as error:
+            raise SerenityCalculationError(
+                f'Serenity SCF checkpoint guess restoration failed: {error}',
+                stage='scf_guess',
+                details={'serenity_output_tail': capture.text[-4000:]}
+            ) from error
+
+        self._pending_scf_guess = {
+            'method': 'serenity_native_orbital_checkpoint',
+            'source_calculation_id': payload.get('source_calculation_id'),
+            'source_geometry_fingerprint': payload.get(
+                'source_geometry_fingerprint'),
+            'source_system_name': payload.get('source_system_name'),
+            'target_system_name': self._system_name,
+            'native_file_sha256': observed_digests,
+        }
+        return dict(self._pending_scf_guess)
 
     def _reference_type_label(self):
         """Human-readable reference label, e.g. ``CUHF-DFT(bhlyp)``."""
@@ -1064,6 +1273,7 @@ class SerenityScfDriver:
         self._system_generation += 1
         self._system_scf_count = 0
         self._scf_provenance = None
+        self._pending_scf_guess = None
 
     def _sync_geometry_if_needed(self, molecule):
         """
@@ -1403,4 +1613,3 @@ class SerenityScfDriver:
     def _reorder_serenity_mo_coefficients_to_veloxchem(coefficients, perm):
         coefficients = np.array(coefficients, dtype=float)
         return coefficients[perm, :]
-                

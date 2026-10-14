@@ -768,7 +768,7 @@ class ElectronicBackendAdapter:
     # -- required interface ------------------------------------------------
 
     def compute_snapshot(self, geometry, previous_snapshot=None,
-                         gradient_hint=None):
+                         gradient_hint=None, reference_guess_payload=None):
         """
         Runs the backend at one geometry.
 
@@ -782,6 +782,9 @@ class ElectronicBackendAdapter:
             Raw target index whose gradient the caller will most likely want.
             Backends that produce energies and one gradient in a single task
             use it to avoid a second task; others may ignore it.
+        :param reference_guess_payload:
+            Optional backend-native, portable SCF reference used only while
+            rebuilding an accepted snapshot after a process restart.
 
         :return:
             A tuple ``(snapshot, gradient_or_None)``.
@@ -1394,13 +1397,15 @@ class SerenitySFAdapter(ElectronicBackendAdapter):
     geometry initializes the lowest ``number_of_states`` roots of that
     multiplicity in the computed response window.
 
-    ``manifold_tracking='instantaneous'`` repeats that classification at every
-    geometry.  ``manifold_tracking='overlap_transport'`` instead transports
-    the initialized S0, S1, ... labels through the complete response-window
-    overlap before extracting the dynamics targets.  Instantaneous ``<S^2>``
-    then remains a quality diagnostic but cannot discontinuously renumber a
-    persistent target near a singlet-triplet crossing.  This is standard-SF
-    character tracking, not spin purification of the underlying roots.
+    For a multiplicity-targeted ladder, the safe default is
+    ``manifold_tracking='overlap_transport'``: the initialized S0, S1, ...
+    labels are transported through the complete response-window overlap
+    before the dynamics targets are extracted.  Instantaneous ``<S^2>`` then
+    remains a quality diagnostic but cannot discontinuously renumber a
+    persistent target near a singlet-triplet crossing.  The historical
+    ``manifold_tracking='instantaneous'`` policy remains available only when
+    requested explicitly.  This is standard-SF character tracking, not spin
+    purification of the underlying roots.
 
     Raw target ``r`` is the r-th persistent state of that manifold; its
     Serenity root number can change between geometries and is carried per
@@ -1426,15 +1431,24 @@ class SerenitySFAdapter(ElectronicBackendAdapter):
         ``'nearest'`` or ``'strict'`` multiplicity classification for
         ``target_multiplicity``.
     :param manifold_tracking:
-        ``'instantaneous'`` preserves historical per-geometry spin
-        classification.  ``'overlap_transport'`` uses the classification only
-        at initialization and subsequently transports labels through the full
-        response-window overlap.
+        ``None`` selects ``'overlap_transport'`` for a multiplicity-targeted
+        ladder and ``'instantaneous'`` for the raw SF ladder.
+        ``'instantaneous'`` explicitly requests the historical per-geometry
+        spin classification.  ``'overlap_transport'`` uses the classification
+        only at initialization and subsequently transports labels through the
+        full response-window overlap.
+    :param scf_guess_transport:
+        ``None`` selects ``'projected_previous'`` for a multiplicity-targeted
+        ladder and historical ``'cold'`` behavior for the raw SF ladder.
+        Projection builds a fresh Serenity System at every geometry and
+        copies orbitals from the previous accepted snapshot with Serenity's
+        ``ElectronicStructureCopyTask``.  It therefore transports the CUHF
+        reference branch without reusing geometry-dependent grid controllers.
     """
 
     backend = 'serenity'
     method = 'sf-tda'
-    adapter_revision = '1'
+    adapter_revision = '2'
     target_manifold = 'spin-flip'
 
     #: Serenity SF requires a high-spin working reference.
@@ -1451,7 +1465,8 @@ class SerenitySFAdapter(ElectronicBackendAdapter):
                  gradient_energy_tolerance=1.0e-6,
                  target_multiplicity=None,
                  manifold_filter='nearest',
-                 manifold_tracking='instantaneous'):
+                 manifold_tracking=None,
+                 scf_guess_transport=None):
 
         super().__init__(molecule_template, number_of_states)
 
@@ -1467,7 +1482,29 @@ class SerenitySFAdapter(ElectronicBackendAdapter):
         self.target_multiplicity = (None if target_multiplicity is None else
                                     int(target_multiplicity))
         self.manifold_filter = str(manifold_filter).strip().lower()
-        self.manifold_tracking = str(manifold_tracking).strip().lower()
+        if manifold_tracking is None:
+            # A multiplicity label is established only once.  Reclassifying
+            # it from instantaneous <S^2> before evaluating cross-geometry
+            # overlap can replace a continuous SF eigenvector by a different
+            # root at an S/T mixing event.  Raw ladders already have fixed
+            # root semantics and retain their historical policy.
+            self.manifold_tracking = (
+                'overlap_transport'
+                if self.target_multiplicity is not None else 'instantaneous')
+        else:
+            self.manifold_tracking = str(manifold_tracking).strip().lower()
+        if scf_guess_transport is None:
+            self.scf_guess_transport = (
+                'projected_previous'
+                if self.target_multiplicity is not None else 'cold')
+        else:
+            self.scf_guess_transport = str(
+                scf_guess_transport).strip().lower()
+
+        assert_msg_critical(
+            self.scf_guess_transport in ('cold', 'projected_previous'),
+            'SerenitySFAdapter: scf_guess_transport must be cold or '
+            'projected_previous.')
 
         if self.target_multiplicity is not None:
             assert_msg_critical(
@@ -1563,8 +1600,15 @@ class SerenitySFAdapter(ElectronicBackendAdapter):
             'gradient_ambiguity_ratio': self.gradient_ambiguity_ratio,
             'gradient_energy_tolerance': self.gradient_energy_tolerance,
         })
-        # Only a multiplicity-targeted ladder adds keys, so the fingerprint of
-        # the raw-ladder configuration (and its checkpoints) is unchanged.
+        # Preserve the historical cold-start fingerprint only when it is
+        # requested explicitly.  Projected reference transport changes the
+        # SCF branch semantics and must invalidate cold-start checkpoints.
+        if self.scf_guess_transport != 'cold':
+            payload['scf_guess_transport'] = self.scf_guess_transport
+        # Only a multiplicity-targeted ladder adds the selection keys below,
+        # so raw ladders retain their historical cold/instantaneous semantics.
+        # The adapter-revision bump above still deliberately invalidates all
+        # revision-1 checkpoints because the restart contract changed.
         if self.target_multiplicity is not None:
             payload.update({
                 'rohf_type': str(getattr(scf, 'rohf_type', None) or 'NONE'),
@@ -1572,8 +1616,9 @@ class SerenitySFAdapter(ElectronicBackendAdapter):
                 'manifold_filter': self.manifold_filter,
             })
             # Preserve fingerprints of the historical instantaneous policy.
-            # The opt-in transported policy changes target selection and must
-            # therefore be explicit in new checkpoints and cache keys.
+            # Transport changes target selection and must therefore remain
+            # explicit in new checkpoints and cache keys, including when it
+            # was selected by the safe constructor default.
             if self.manifold_tracking != 'instantaneous':
                 payload['manifold_tracking'] = self.manifold_tracking
             # With 'nearest' the tolerance selects nothing and remains a
@@ -1641,6 +1686,19 @@ class SerenitySFAdapter(ElectronicBackendAdapter):
                     f'SerenitySFAdapter: serenipy lacks {name}; no validated '
                     'cross-geometry electronic descriptor is available and '
                     'production surface hopping is refused.')
+        for name in ('OrbitalsIOTask_R', 'OrbitalsIOTask_U'):
+            if not hasattr(spy, name):
+                raise BackendCapabilityError(
+                    f'SerenitySFAdapter: serenipy lacks {name}; accepted '
+                    'reference orbitals cannot be restored from a dynamics '
+                    'checkpoint.')
+        if self.scf_guess_transport == 'projected_previous':
+            for name in ('ElectronicStructureCopyTask_R',
+                         'ElectronicStructureCopyTask_U'):
+                if not hasattr(spy, name):
+                    raise BackendCapabilityError(
+                        f'SerenitySFAdapter: serenipy lacks {name}; the '
+                        'geometry-safe projected SCF guess is unavailable.')
 
         capabilities = {
             'backend': self.backend,
@@ -1654,6 +1712,7 @@ class SerenitySFAdapter(ElectronicBackendAdapter):
             'multi_state_total_energies': True,
             'state_specific_gradients': True,
             'cross_geometry_descriptor': 'serenity_transition_density_overlap',
+            'scf_geometry_guess': self.scf_guess_transport,
         }
         if self.target_multiplicity is not None:
             capabilities.update({
@@ -1669,7 +1728,7 @@ class SerenitySFAdapter(ElectronicBackendAdapter):
         return capabilities
 
     def compute_snapshot(self, geometry, previous_snapshot=None,
-                         gradient_hint=None):
+                         gradient_hint=None, reference_guess_payload=None):
         """
         See :func:`ElectronicBackendAdapter.compute_snapshot`.
         """
@@ -1690,8 +1749,39 @@ class SerenitySFAdapter(ElectronicBackendAdapter):
         # second task.
         selector = self._predict_selector(previous_snapshot, raw_hint)
 
+        reference_system = None
+        reference_guess_provenance = None
+        assert_msg_critical(
+            not (previous_snapshot is not None and
+                 reference_guess_payload is not None),
+            'SerenitySFAdapter: a live previous snapshot and a checkpoint '
+            'reference guess cannot both seed one calculation.')
+        if (previous_snapshot is not None and
+                self.scf_guess_transport == 'projected_previous'):
+            previous_payload = self._native_payload(previous_snapshot)
+            reference_system = previous_payload['system']
+            reference_guess_provenance = {
+                'source_calculation_id': previous_snapshot.calculation_id,
+                'source_geometry_fingerprint':
+                    previous_snapshot.geometry_fingerprint,
+                'source_system_name': previous_payload.get('system_name'),
+            }
+        if reference_guess_payload is not None:
+            source_fingerprint = reference_guess_payload.get(
+                'source_geometry_fingerprint', None)
+            current_fingerprint = geometry_fingerprint(geometry)
+            if source_fingerprint != current_fingerprint:
+                raise BackendCapabilityError(
+                    'SerenitySFAdapter: the checkpoint SCF guess belongs to '
+                    'a different geometry than the accepted reference being '
+                    'recomputed.')
+
         log = []
-        task = self._run_gradient_task(molecule, selector, log)
+        task = self._run_gradient_task(
+            molecule, selector, log,
+            reference_system=reference_system,
+            reference_guess_provenance=reference_guess_provenance,
+            reference_guess_payload=reference_guess_payload)
         controller = task.getLRSCFController()
 
         omegas = np.asarray(controller.getExcitationEnergies('isolated'),
@@ -1729,9 +1819,14 @@ class SerenitySFAdapter(ElectronicBackendAdapter):
             roots = np.arange(self.number_of_states)
             spin_metadata = self._spin_metadata(controller)
         else:
-            roots, selection = self._select_target_roots(
-                controller, previous_snapshot=previous_snapshot,
-                window_overlap=window_overlap)
+            if (reference_guess_payload is not None and
+                    self.manifold_tracking == 'overlap_transport'):
+                roots, selection = self._select_restart_target_roots(
+                    controller, reference_guess_payload)
+            else:
+                roots, selection = self._select_target_roots(
+                    controller, previous_snapshot=previous_snapshot,
+                    window_overlap=window_overlap)
             spin_metadata = self._spin_metadata(controller, roots, selection)
 
         window_omegas = omegas.copy()
@@ -1852,7 +1947,17 @@ class SerenitySFAdapter(ElectronicBackendAdapter):
         # snapshot's descriptor payload must keep belonging to the response
         # calculation that produced the energies, so the new controller is
         # deliberately discarded rather than replacing it.
-        task = self._run_gradient_task(payload['molecule'], selector, log)
+        guess_provenance = {
+            'source_calculation_id': snapshot.calculation_id,
+            'source_geometry_fingerprint': snapshot.geometry_fingerprint,
+            'source_system_name': payload.get('system_name'),
+        }
+        task = self._run_gradient_task(
+            payload['molecule'], selector, log,
+            reference_system=(payload['system'] if
+                              self.scf_guess_transport ==
+                              'projected_previous' else None),
+            reference_guess_provenance=guess_provenance)
         self.n_gradient_calls += 1
         mapped_selector = self._validate_recomputed_gradient_identity(
             snapshot, index, task.getLRSCFController())
@@ -1863,8 +1968,12 @@ class SerenitySFAdapter(ElectronicBackendAdapter):
             # to the wrong raw root and is discarded. Recompute once with the
             # descriptor-mapped selector, then prove that calculation retained
             # the same assignment before accepting its gradient.
-            task = self._run_gradient_task(payload['molecule'],
-                                           mapped_selector, log)
+            task = self._run_gradient_task(
+                payload['molecule'], mapped_selector, log,
+                reference_system=(payload['system'] if
+                                  self.scf_guess_transport ==
+                                  'projected_previous' else None),
+                reference_guess_provenance=guess_provenance)
             self.n_gradient_calls += 1
             confirmed = self._validate_recomputed_gradient_identity(
                 snapshot, index, task.getLRSCFController())
@@ -1910,6 +2019,63 @@ class SerenitySFAdapter(ElectronicBackendAdapter):
         """
 
         self._native.pop(str(calculation_id), None)
+
+    def reference_restart_payload(self, snapshot):
+        """Serializes the accepted native orbitals into a checkpoint.
+
+        Serenity ``System`` objects cannot survive a process restart.  The
+        minimal native electronic-structure file set is therefore embedded as
+        bytes with integrity digests.  LRSCF vectors are deliberately absent.
+        On restart the SCF files are loaded at the checkpoint geometry; normal
+        projected-previous transport resumes at the following geometry.
+        """
+
+        payload = self._native_payload(snapshot)
+        system_directory = payload.get('system_directory', None)
+        system_name = payload.get('system_name', None)
+        mode = str(payload.get('mode', '')).strip().lower()
+        if system_directory is None or system_name is None:
+            return None
+        if mode not in ('restricted', 'unrestricted'):
+            raise BackendCapabilityError(
+                'SerenitySFAdapter: the accepted snapshot has no valid SCF '
+                'mode for checkpoint serialization.')
+        suffixes = (('.orbs.res.h5', '.dmat.res.h5',
+                     '.FockMatrix.res.h5', '.energies.res')
+                    if mode == 'restricted' else
+                    ('.orbs.unres.h5', '.dmat.unres.h5',
+                     '.FockMatrix.unres.h5', '.energies.unres'))
+        native_files = {}
+        file_digests = {}
+        for suffix in suffixes:
+            native_path = os.path.join(
+                str(system_directory), str(system_name) + suffix)
+            try:
+                with open(native_path, 'rb') as native_file:
+                    file_bytes = native_file.read()
+            except OSError as error:
+                raise OSError(
+                    'SerenitySFAdapter: cannot checkpoint the accepted SCF '
+                    f'file {native_path}: {error}') from error
+            if not file_bytes:
+                raise OSError(
+                    'SerenitySFAdapter: an accepted SCF native file is '
+                    f'empty: {native_path}')
+            native_files[suffix] = file_bytes
+            file_digests[suffix] = hashlib.sha256(file_bytes).hexdigest()
+        return {
+            'format': 'serenity_electronic_structure_hdf5',
+            'revision': 1,
+            'scf_mode': mode,
+            'files': native_files,
+            'sha256': file_digests,
+            'source_calculation_id': snapshot.calculation_id,
+            'source_geometry_fingerprint': snapshot.geometry_fingerprint,
+            'source_system_name': str(system_name),
+            'derivative_selectors': [
+                int(value) for value in snapshot.derivative_selectors
+            ],
+        }
 
     def write_native_provenance(self, snapshot, directory, step):
         """Archives Serenity's files and a readable log for one snapshot.
@@ -2186,7 +2352,10 @@ class SerenitySFAdapter(ElectronicBackendAdapter):
         lines.append('')
         return '\n'.join(lines)
 
-    def _run_gradient_task(self, molecule, selector, log=None):
+    def _run_gradient_task(self, molecule, selector, log=None,
+                           reference_system=None,
+                           reference_guess_provenance=None,
+                           reference_guess_payload=None):
         """
         Runs one Serenity excited-state gradient task for a raw selector.
 
@@ -2207,6 +2376,14 @@ class SerenitySFAdapter(ElectronicBackendAdapter):
         :param log:
             Optional list that receives the Serenity output, LR convergence
             summary and gradient of this task for the step log.
+        :param reference_system:
+            Previous accepted Serenity System whose converged orbitals are
+            projected into the fresh System at a new geometry.
+        :param reference_guess_provenance:
+            Identity metadata for the projected guess.
+        :param reference_guess_payload:
+            Native accepted orbitals restored while recomputing a checkpoint
+            reference after a process restart.
 
         :return:
             The finished Serenity gradient task.
@@ -2218,7 +2395,8 @@ class SerenitySFAdapter(ElectronicBackendAdapter):
         fingerprint = geometry_fingerprint(
             molecule.get_coordinates_in_bohr())
 
-        if self._active_geometry_fingerprint != fingerprint:
+        new_geometry = self._active_geometry_fingerprint != fingerprint
+        if new_geometry:
             self.scf_driver._invalidate_cache()
             self.response_driver._invalidate_rsp_cache()
             self._active_geometry_fingerprint = fingerprint
@@ -2226,6 +2404,12 @@ class SerenitySFAdapter(ElectronicBackendAdapter):
         # The step log shows the SCF iterations, so the SCF task of a new
         # System prints at Serenity's NORMAL level; this changes output only.
         self.scf_driver._ensure_system(molecule)
+        if (new_geometry and reference_system is not None and
+                self.scf_guess_transport == 'projected_previous'):
+            self.scf_driver._project_scf_guess_from(
+                reference_system, reference_guess_provenance)
+        elif new_geometry and reference_guess_payload is not None:
+            self.scf_driver._restore_scf_guess(reference_guess_payload)
         scf_task = getattr(self.scf_driver, '_scf_task', None)
         if hasattr(scf_task, 'generalSettings'):
             from qcserenity import serenipy as spy
@@ -2627,6 +2811,123 @@ class SerenitySFAdapter(ElectronicBackendAdapter):
                 energies[transported[1]] - energies[transported[0]])
 
         return transported, selection
+
+    def _select_restart_target_roots(self, controller, restart_payload):
+        """Restores persistent target labels while rebuilding a checkpoint.
+
+        No cross-geometry controller survives a process restart.  For an
+        overlap-transported manifold the accepted derivative selectors are
+        therefore part of the portable electronic identity.  Instantaneous
+        spin classification is recomputed for diagnostics, but cannot replace
+        those labels; the provider's independent target-energy guard proves
+        that the rebuilt snapshot matches the checkpoint before dynamics can
+        continue.
+        """
+
+        from .serenityexcitedstategradientdriver import manifold_state_label
+
+        selectors = np.asarray(
+            restart_payload.get('derivative_selectors', ()), dtype=int)
+        roots = selectors - 1
+        window_size = np.asarray(
+            controller.getExcitationEnergies('isolated'),
+            dtype=float).reshape(-1).size
+        if (selectors.size != self.number_of_states or
+                np.any(roots < 0) or np.any(roots >= window_size) or
+                np.unique(roots).size != roots.size):
+            raise BackendCapabilityError(
+                'SerenitySFAdapter: the checkpoint does not contain a valid '
+                'set of persistent derivative selectors for the current SF '
+                'response window.')
+
+        try:
+            instantaneous, instantaneous_selection = (
+                self._select_target_roots(controller))
+        except BackendCapabilityError as error:
+            # Instantaneous classification is diagnostic during restart.  A
+            # previously accepted persistent label must not become
+            # unrestartable merely because no complete nearest-spin subset is
+            # visible at this one geometry.  Selector bounds and the provider's
+            # target-energy comparison remain hard identity gates.
+            instantaneous = np.asarray([], dtype=int)
+            instantaneous_selection = {
+                'selection_robust': False,
+                'warnings': [
+                    'instantaneous classification unavailable during '
+                    f'checkpoint restoration: {error}'
+                ],
+            }
+
+        metadata = self.response_driver.get_spinflip_metadata(controller)
+        state_s2 = np.asarray(metadata['state_s2'], dtype=float).reshape(-1)
+        spin = 0.5 * (int(self.target_multiplicity) - 1)
+        ideal_s2 = spin * (spin + 1.0)
+        deviations = np.abs(state_s2[roots] - ideal_s2)
+        energies = np.asarray(
+            controller.getExcitationEnergies('isolated'),
+            dtype=float).reshape(-1)
+
+        selection = dict(instantaneous_selection)
+        selection.update({
+            'manifold_tracking': 'overlap_transport',
+            'spin_labels_transported': True,
+            'restart_labels_restored': True,
+            'restart_identity_guard':
+                'checkpoint_target_energies_within_1e-6_hartree',
+            'instantaneous_selection': _json_compatible(
+                instantaneous_selection),
+            'instantaneous_manifold_roots':
+                (instantaneous + 1).tolist(),
+            'previous_transported_roots': selectors.tolist(),
+            'manifold_roots': selectors.tolist(),
+            'manifold_labels': [
+                manifold_state_label(self.target_multiplicity, index + 1)
+                for index in range(self.number_of_states)
+            ],
+            'transported_target_s2_deviation': deviations.tolist(),
+            'instantaneous_selection_robust': bool(
+                instantaneous_selection.get('selection_robust', False)),
+            'selection_robust': True,
+            'manifold_ground_root': int(selectors[0]),
+            'selected_raw_root': int(selectors[-1]),
+            'selected_excitation_energy_ev': float(energies[roots[-1]]),
+            'selected_s2': float(state_s2[roots[-1]]),
+            'selected_s2_deviation': float(deviations[-1]),
+            'selected_spin_quality': 'checkpointed_persistent_label',
+        })
+
+        warnings = [
+            f'instantaneous-classification diagnostic: {message}'
+            for message in instantaneous_selection.get('warnings', ())
+        ]
+        if instantaneous.size and not np.array_equal(roots, instantaneous):
+            warnings.append(
+                'checkpoint restart restored persistent target selector(s) '
+                f'{selectors.tolist()}; instantaneous <S^2> classification '
+                f'would select {(instantaneous + 1).tolist()}')
+        elif not instantaneous.size:
+            warnings.append(
+                'checkpoint restart restored persistent target selector(s) '
+                f'{selectors.tolist()} while instantaneous <S^2> '
+                'classification was unavailable')
+        tolerance = float(self.gradient_driver.s2_tolerance)
+        for target, (root, s2_value, deviation) in enumerate(zip(
+                roots, state_s2[roots], deviations)):
+            if float(deviation) > tolerance:
+                label = manifold_state_label(
+                    self.target_multiplicity, target + 1)
+                warnings.append(
+                    f'checkpointed {label} label remains on Serenity root '
+                    f'{int(root) + 1}, but <S^2> = '
+                    f'{float(s2_value):.6f} deviates from its target-spin '
+                    f'value by {float(deviation):.6f} (warning threshold '
+                    f'{tolerance:.6f})')
+        selection['warnings'] = warnings
+        if self.target_multiplicity == 1 and self.number_of_states >= 2:
+            selection['gap_s0_s1_ev'] = float(
+                energies[roots[1]] - energies[roots[0]])
+
+        return roots, selection
 
     def _transition_density_overlap(self, previous_snapshot, controller,
                                     current_roots=None, return_full=False):
