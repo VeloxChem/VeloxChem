@@ -51,9 +51,14 @@ class EvbTestHelper:
             if isinstance(val1, dict):
                 EvbTestHelper.evb_compare_dict(val1, val2, float_tol=float_tol)
             elif isinstance(val1, (float, np.float64)):
+                # NaN is a legitimate stored value: a profile with no
+                # barrier reports one (see EvbDataProcessing).
+                if np.isnan(val1) and np.isnan(val2):
+                    continue
                 assert abs(val1 - val2) < float_tol
             elif isinstance(val1, (list, np.ndarray)):
-                assert np.allclose(val1, val2, atol=float_tol)
+                assert np.allclose(val1, val2, atol=float_tol,
+                                   equal_nan=True)
             else:
                 assert val1 == val2
 

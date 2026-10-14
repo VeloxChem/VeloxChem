@@ -121,8 +121,17 @@ class EvbDataProcessing:
 
         # Warm-start cache for _calculate_dGfep_mbar
         self._mbar_f_k_warm_start = None
+        # The Savitzky-Golay filter only locates the extrema of an EVB
+        # profile; the reported energies are read from the unsmoothed
+        # profile (see _get_free_energies), so a wide window no longer
+        # flattens the barrier.
         self.smooth_window_size = 10
         self.smooth_polynomial_order = 3
+        # Energy scale of a feature worth calling a well or a barrier, in
+        # kJ/mol (about kT at 300 K). It is both the prominence a candidate
+        # extremum must have to survive the noise filter and the depth over
+        # which the parabola that refines an extremum is fitted.
+        self.extremum_tolerance = 2.5
         self.coordinate_bins = np.array([])
         self.bin_size = 10
         self.dens_threshold = 0.1
@@ -182,6 +191,14 @@ class EvbDataProcessing:
         E2_ref = self.results[reference_key]["E2_pes"]
         Temp_set = self.results[reference_key]["Temp_set"]
 
+        # fsolve does not raise on a NaN residual, it just stops and hands
+        # back whatever it has, so broken input would come out as plausible
+        # looking alpha and H12. Catch it here instead.
+        assert_msg_critical(
+            np.all(np.isfinite(E1_ref)) and np.all(np.isfinite(E2_ref)),
+            f"EvbDataProcessing: configuration '{reference_key}' holds " +
+            "non-finite state energies, so alpha and H12 cannot be fitted.")
+
         xi = np.linspace(-10000, 10000, 20000)
 
         def get_barrier_and_free_energy_difference(x):
@@ -193,7 +210,13 @@ class EvbDataProcessing:
             dGevb_ana, shiftxi, fepxi = self._dGevb_analytical(
                 dGfep, self.Lambda, H12, xi)
             dGevb_smooth, barrier, free_energy, _, _, _, _, _ = self._get_free_energies(
-                dGevb_ana, fitting=True)
+                dGevb_ana, xi, fitting=True)
+            assert_msg_critical(
+                np.isfinite(barrier) and np.isfinite(free_energy),
+                "EvbDataProcessing: the EVB profile has no barrier or no " +
+                f"reaction free energy at alpha = {alpha:.3f}, " +
+                f"H12 = {H12:.3f}, so there is nothing to fit to. Provide " +
+                "both alpha and H12, or check the sampling.")
             barrier_dif = self.barrier - barrier
             free_energy_dif = self.free_energy - free_energy
 
@@ -363,19 +386,29 @@ class EvbDataProcessing:
         return np.average(binned_data, axis=1)
 
     @staticmethod
+    def _ground_state_shift_and_lambda(xi, H12):
+        """The two xi-dependent pieces of the analytical EVB profile.
+
+        shift = -2 H12^2 / R and lambda* = (1 + xi/R) / 2, with
+        R = sqrt(xi^2 + 4 H12^2). R is 0 only for H12 = 0 at xi = 0, where
+        both are 0/0: the shift tends to 0, and the two one-sided limits of
+        lambda* meet at the midpoint 1/2.
+        """
+
+        xi = np.asarray(xi, dtype=float)
+        R = np.sqrt(xi**2 + 4 * H12**2)
+        positive = R > 0
+        R_safe = np.where(positive, R, 1.0)
+        shift = np.where(positive, -2 * H12**2 / R_safe, 0.0)
+        lambda_star = 0.5 * (1 + np.where(positive, xi / R_safe, 0.0))
+        return shift, lambda_star
+
+    @staticmethod
     def _dGevb_analytical(dGfep, Lambda, H12, xi):
 
-        def R(de):
-            return np.sqrt(de**2 + 4 * H12**2)
-
-        def shift(xi):
-            return -2 * H12**2 / R(xi)
-
-        def arg(xi):
-            return 0.5 * (1 + xi / R(xi))
-
-        shiftxi = shift(xi)
-        fepxi = np.interp(arg(xi), Lambda, dGfep)
+        shiftxi, lambda_star = (
+            EvbDataProcessing._ground_state_shift_and_lambda(xi, H12))
+        fepxi = np.interp(lambda_star, Lambda, dGfep)
         dGevb = shiftxi + fepxi
         return dGevb, shiftxi, fepxi
 
@@ -390,13 +423,9 @@ class EvbDataProcessing:
         correlation between neighbouring lambda windows.
         """
 
-        def R(de):
-            return np.sqrt(de**2 + 4 * H12**2)
-
-        def arg(xi):
-            return 0.5 * (1 + xi / R(xi))
-
-        return np.interp(arg(xi), Lambda, ddGfep)
+        _, lambda_star = (EvbDataProcessing._ground_state_shift_and_lambda(
+            xi, H12))
+        return np.interp(lambda_star, Lambda, ddGfep)
 
     @staticmethod
     def _propagate_free_energy_uncertainty(dGevb_unc, erea_ind, ebar_ind,
@@ -455,84 +484,347 @@ class EvbDataProcessing:
                 if pnssum > 0:
                     pns[n, s] = pnscount[n, s] / pnssum
 
+        # Window-density term -kT ln P_n(s), with P_n(s) = N_ns / N_n, the
+        # fraction of window n's frames that fall in bin s. Without it the
+        # sum below reduces to dG_n + (Eg - V_n)(s) per window, which is the
+        # free energy of window n's whole ensemble rather than of bin s, and
+        # the barrier comes out too low (0.5-2.0 kJ/mol on the exact models,
+        # WP-A3 Q3).
+        dGdens = np.zeros((N, S))
+        window_count = np.sum(pnscount, axis=1)
+        for n in range(N):
+            if window_count[n] == 0:
+                continue
+            occupied = pnscount[n] > 0
+            dGdens[n, occupied] = -self.kb * Temp_set * np.log(
+                pnscount[n, occupied] / window_count[n])
+
         pns = pns.transpose()
 
         pnsfep = pns @ dGfep
-        pnscor = np.sum(pns * dGcor.transpose(), axis=1)
+        pnscor = np.sum(pns * (dGcor + dGdens).transpose(), axis=1)
         dGevb = pnsfep + pnscor
+        # A bin no window ever visited has no free energy. Leaving it at 0
+        # puts a point hundreds of kJ/mol away from the rest of the profile
+        # wherever the sampling has a hole, which the extremum search then
+        # picks up; NaN says "not sampled" and is skipped instead.
+        dGevb[np.sum(pnscount, axis=0) == 0] = np.nan
 
-        return dGevb, pns, dGcor
+        return dGevb, pns, dGcor, dGdens
 
-    def _get_free_energies(self, dGevb, fitting=True):
+    def _profile_axis(self, n_points, xi):
+        """Coordinate of every point of a profile, and the range to search.
+
+        The analytical profile is evaluated at the coordinate bins, one
+        point per bin edge. The discretised profile has one point per bin,
+        len(bins) + 1 of them: entry s covers (bins[s-1], bins[s]], and the
+        first and last entries collect everything outside the grid, so they
+        get nominal coordinates and are never searched for extrema.
+
+        Returns the coordinate array and the first and last searchable
+        index.
+        """
+
+        if xi is None:
+            return np.arange(n_points, dtype=float), 0, n_points - 1
+        xi = np.asarray(xi, dtype=float)
+        if n_points == len(xi):
+            return xi, 0, n_points - 1
+        assert_msg_critical(
+            n_points == len(xi) + 1,
+            f"EvbDataProcessing: a profile of {n_points} points matches " +
+            f"neither {len(xi)} coordinate bins nor the {len(xi) + 1} bins " +
+            "they define.")
+        centers = 0.5 * (xi[:-1] + xi[1:])
+        axis = np.concatenate(([xi[0] - 0.5 * (xi[1] - xi[0])], centers,
+                               [xi[-1] + 0.5 * (xi[-1] - xi[-2])]))
+        return axis, 1, n_points - 2
+
+    @staticmethod
+    def _prominent_extrema(profile, lo, hi, is_maximum, prominence):
+        """Local extrema between lo and hi, noise-sized ones dropped.
+
+        Prominence is how far the profile has to climb away from an extremum
+        before it reaches a deeper one, so it separates a real well or
+        barrier from a wiggle on a slope. It is measured inside [lo, hi]
+        only, so the out-of-range bins of a discretised profile cannot
+        inflate it.
+
+        find_peaks is used rather than argrelmax because a profile often has
+        a flat top: binned data repeats values, and an even smoothing window
+        turns the top of a symmetric barrier into two equal points, which a
+        strict point-by-point comparison misses altogether.
+        """
+
+        window = np.asarray(profile[lo:hi + 1], dtype=float)
+        signed = window if is_maximum else -window
+        found, _ = scipy.signal.find_peaks(signed, prominence=prominence)
+        return np.asarray(found, dtype=int) + lo
+
+    def _extremum_window(self,
+                         profile,
+                         index,
+                         lo,
+                         hi,
+                         is_maximum,
+                         adaptive=True):
+        """Indices to fit a parabola over: the points within
+        extremum_tolerance of profile[index], at least one on each side.
+
+        The width adapts to the profile: wide where it is flat, so that noise
+        averages out, and narrow at a sharp barrier, where a wide parabola
+        would cut the top off. With adaptive=False a fixed five points are
+        used instead; see _refine_extremum.
+        """
+
+        if not adaptive:
+            return np.arange(max(lo, index - 2), min(hi, index + 2) + 1)
+
+        sign = -1.0 if is_maximum else 1.0
+        left, right = index, index
+        while (left - 1 >= lo and sign *
+               (profile[left - 1] - profile[index]) < self.extremum_tolerance):
+            left -= 1
+        while (right + 1 <= hi and sign *
+               (profile[right + 1] - profile[index]) < self.extremum_tolerance):
+            right += 1
+        left = min(left, max(lo, index - 1))
+        right = max(right, min(hi, index + 1))
+        return np.arange(left, right + 1)
+
+    def _refine_extremum(self,
+                         axis,
+                         profile,
+                         index,
+                         lo,
+                         hi,
+                         is_maximum,
+                         adaptive=True):
+        """Energy, position and grid index of one extremum of the unsmoothed
+        profile.
+
+        The smoothed profile only says which point is the extremum; its
+        energy comes from a parabola fitted to the raw profile around it.
+        That removes the flattening of the Savitzky-Golay window and
+        recovers most of what is lost when the true extremum falls between
+        two grid points.
+
+        The filter also displaces a peak by a bin or so, which matters when
+        the barrier is sharp, so the fit is re-centered on the grid point
+        nearest its own vertex and repeated. A step is only taken towards a
+        more extreme raw point, so the walk cannot wander off into noise.
+        The raw value is kept whenever the parabola curves the wrong way or
+        puts its vertex outside the fitted window, which is what noise does.
+
+        The index is returned because the walk may have moved it: everything
+        that points back at the profile, the markers and the uncertainty,
+        has to use the point the energy actually came from.
+
+        adaptive=False fits five points once and does not walk. Both the
+        width rule and the walk change in steps as the profile moves under
+        them, which is no help on the dense, well-resolved grid the
+        alpha/H12 fit evaluates on, and turns that fit's target into a
+        staircase: measured over a 20 kJ/mol scan of H12, the largest step
+        in the target is 16 times the median with the walk and 1.1 times
+        without, for the same barrier to 0.05 kJ/mol.
+        """
+
+        sign = -1.0 if is_maximum else 1.0
+
+        def more_extreme(candidate, current):
+            return (lo <= candidate <= hi
+                    and sign * (profile[candidate] - profile[current]) < 0)
+
+        for _ in range(4 if adaptive else 1):
+            window = self._extremum_window(profile, index, lo, hi, is_maximum,
+                                           adaptive)
+            if len(window) < 3:
+                return profile[index], axis[index], index
+            x = axis[window] - axis[index]
+            a, b, c = np.polyfit(x, profile[window], 2)
+            if a == 0 or (a > 0) == is_maximum:
+                return profile[index], axis[index], index
+            x_top = -0.5 * b / a
+            spacing = 0.5 * (axis[min(index + 1, hi)] -
+                             axis[max(index - 1, lo)])
+            if abs(x_top) > spacing:
+                # A fit that puts the extremum more than a bin away is not
+                # describing the point it was centered on. Either the filter
+                # located the wrong grid point, in which case stepping that
+                # way lands on a more extreme one and the next fit is
+                # centered properly, or the profile is too flat or too noisy
+                # here for a parabola to say anything, and the raw value
+                # stands.
+                step = index + (1 if x_top > 0 else -1)
+                if adaptive and more_extreme(step, index):
+                    index = step
+                    continue
+                return profile[index], axis[index], index
+            return c - 0.25 * b**2 / a, axis[index] + x_top, index
+        return profile[index], axis[index], index
+
+    def _get_free_energies(self, dGevb, xi=None, fitting=True):
+        """Reactant, transition state and product of one EVB profile.
+
+        Returns the profile shifted to the reactant well, the barrier and
+        the reaction free energy, the extrema that survived the noise
+        filter, and the three indices the energies were taken at.
+
+        Smoothing only locates the extrema and never sets a reported energy:
+        each of the three comes from a parabola fitted to the unsmoothed
+        profile (_refine_extremum), so the filter window cannot flatten the
+        barrier. The transition state is the highest maximum whose
+        prominence clears extremum_tolerance, and the reactant and product
+        are the lowest points on either side of it. A profile with no such
+        maximum has no barrier to report, and says so with NaN and a
+        warning, rather than returning a number read off noise.
+
+        xi is the coordinate of the profile, used to fit the parabolas and
+        to recognize the out-of-range bins of a discretised profile.
+
+        With fitting=True, which is how the alpha/H12 fit calls this, the
+        wells are always taken on either side of the highest point and a
+        number is returned even when nothing clears the noise filter, and
+        nothing is printed. The parabola is fitted over a fixed five points
+        and does not walk, which keeps the target fsolve differentiates
+        smooth (see _refine_extremum). A profile that is all NaN still gives
+        a NaN barrier; _fit_EVB_parameters checks for that before it starts.
+        """
 
         assert_msg_critical('scipy' in sys.modules,
                             'scipy is required for EvbDataProcessing.')
 
+        dGevb = np.asarray(dGevb, dtype=float)
+        full_axis, full_lo, full_hi = self._profile_axis(len(dGevb), xi)
+
+        # Unsampled bins hold NaN (see _dGevb_discretised). Everything below
+        # runs on the points that do hold a free energy, and the indices are
+        # mapped back at the end, so a hole in the sampling is stepped over
+        # rather than treated as a well or a barrier.
+        sampled = full_lo + np.flatnonzero(
+            np.isfinite(dGevb[full_lo:full_hi + 1]))
+        if len(sampled) < 3:
+            if not fitting:
+                self.ostream.print_warning(
+                    f"Only {len(sampled)} points of the EVB profile hold a "
+                    "free energy, which is too few to find a barrier. Check "
+                    "the sampling and the coordinate range.")
+                self.ostream.flush()
+            empty = np.array([], dtype=int)
+            return (dGevb, np.nan, np.nan, empty, empty, full_lo, full_hi,
+                    full_lo)
+        profile, axis = dGevb[sampled], full_axis[sampled]
+        lo, hi = 0, len(profile) - 1
+
+        # A short profile (a narrow gap range, or coarse bins) cannot carry
+        # the default 10-point window: it would span the whole reaction and
+        # smear the barrier into the wells. Shrink it to a third of the
+        # profile, which leaves the default untouched for the usual grids of
+        # 30 points or more.
+        window = int(min(self.smooth_window_size, max(3, len(profile) // 3)))
+        order = int(min(self.smooth_polynomial_order, window - 1))
         try:
-            dGevb_smooth = scipy.signal.savgol_filter(
-                dGevb, self.smooth_window_size, self.smooth_polynomial_order)
+            smooth = scipy.signal.savgol_filter(profile, window, order)
         except ValueError:
-            self.ostream.print_warning(
-                f"Could not apply Savitzky-Golay filter with window size {self.smooth_window_size} and polynomial order {self.smooth_polynomial_order}. Using unfiltered data."
-            )
-            dGevb_smooth = dGevb
+            if not fitting:
+                self.ostream.print_warning(
+                    f"Could not apply Savitzky-Golay filter with window size "
+                    f"{window} and polynomial order {order}. Using "
+                    "unfiltered data.")
+            smooth = profile
 
-        if fitting:
-            min_arg = scipy.signal.argrelmin(dGevb_smooth)[0]
-            max_arg = scipy.signal.argrelmax(dGevb_smooth)[0]
+        min_arg = self._prominent_extrema(smooth, lo, hi, False,
+                                          self.extremum_tolerance)
+        max_arg = self._prominent_extrema(smooth, lo, hi, True,
+                                          self.extremum_tolerance)
+
+        # The transition state is found first, as the highest maximum that
+        # stands clear of the noise, and the reactant and product are then
+        # sought on either side of it.
+        barrier_found = len(max_arg) > 0
+        if barrier_found:
+            ebar_ind = int(max_arg[np.argmax(smooth[max_arg])])
         else:
-            scope = len(dGevb_smooth) // 4
-            min_arg = scipy.signal.argrelmin(dGevb_smooth, order=scope)[0]
-            max_arg = scipy.signal.argrelmax(dGevb_smooth, order=scope)[0]
-            if len(min_arg) < 2:
-                min_arg = scipy.signal.argrelmin(dGevb_smooth)[0]
-            if len(max_arg) < 1:
-                max_arg = scipy.signal.argrelmax(dGevb_smooth)[0]
+            # The fit still needs a target, so it gets the highest point of
+            # the profile even when nothing stands out.
+            ebar_ind = lo + int(np.argmax(smooth[lo:hi + 1]))
 
-            # if len(min_arg) < 2:
-            #     min_arg = [0,-1]
+        def well(first, last):
+            """The reactant or product well between two indices.
 
-        if len(min_arg) >= 2:
-            erea_ind = min_arg[0]
-            epro_ind = min_arg[-1]
+            The deepest minimum that cleared the noise filter is taken when
+            there is one. Otherwise the lowest point of the stretch is used,
+            which is what a shallow well, or one that runs into the edge of
+            the sampled range, looks like. That fallback can land on a noisy
+            end point, so it says so.
+            """
+
+            candidates = min_arg[(min_arg >= first) & (min_arg <= last)]
+            if len(candidates) > 0:
+                return int(candidates[np.argmin(smooth[candidates])])
+            return first + int(np.argmin(smooth[first:last + 1]))
+
+        if barrier_found or fitting:
+            erea_ind = well(lo, ebar_ind)
+            epro_ind = well(ebar_ind, hi)
         else:
-            erea_ind = 0
-            epro_ind = len(dGevb_smooth) - 1
-        Erea = dGevb_smooth[erea_ind]
-        Epro = dGevb_smooth[epro_ind]
+            # Without a transition state there is nothing to split the
+            # profile at, so the reaction free energy is quoted between the
+            # ends of the sampled gap range.
+            erea_ind, epro_ind = lo, hi
 
-        if not fitting and len(min_arg) != 2:
+        if not fitting and (erea_ind in (lo, hi) or epro_ind in (lo, hi)):
             self.ostream.print_warning(
-                f"Found {len(min_arg)} minima in the EVB profile instead of 2. Confirm the calculated extrema with the plot."
-            )
+                "The reactant or product well of the EVB profile sits at the "
+                "end of the sampled gap range, so it is an end point rather "
+                "than a minimum, and a single noisy bin there sets the zero "
+                "of the whole profile. Widen the gap range, or check the "
+                "sampling at the ends.")
 
-        if len(max_arg) == 1:
-            ebar_ind = max_arg[0]
-        elif len(max_arg) > 1:
-            # NOTE: picks the positional-middle candidate maximum, not
-            # necessarily the tallest one. Left as-is on purpose: this value
-            # feeds into the alpha/H12 fsolve calibration in
-            # _fit_EVB_parameters, so changing the selection rule would
-            # shift the fitted EVB parameters for every caller, not just
-            # what gets plotted.
-            ebar_ind = max_arg[len(max_arg) // 2]
+        def energy_at(index, is_maximum):
+            # An extremum against the edge of the range is not a stationary
+            # point, so there is nothing for a parabola to refine.
+            if index <= lo or index >= hi:
+                return profile[index], index
+            value, _, settled = self._refine_extremum(axis,
+                                                      profile,
+                                                      index,
+                                                      lo,
+                                                      hi,
+                                                      is_maximum,
+                                                      adaptive=not fitting)
+            return value, settled
+
+        Erea, erea_ind = energy_at(erea_ind, False)
+        Epro, epro_ind = energy_at(epro_ind, False)
+        if barrier_found or fitting:
+            Ebar, ebar_ind = energy_at(ebar_ind, True)
+            barrier = Ebar - Erea
         else:
-            ebar_ind = len(dGevb_smooth) // 2
-        Ebar = dGevb_smooth[ebar_ind]
-
-        if not fitting and len(max_arg) != 1:
+            barrier = np.nan
             self.ostream.print_warning(
-                f"Found {len(max_arg)} maxima in the EVB profile instead of 1. Confirm the calculated extrema with the plot."
-            )
+                "No barrier was found in the EVB profile: no maximum stands "
+                f"more than {self.extremum_tolerance} kJ/mol above its "
+                "surroundings. The barrier is reported as NaN. A barrierless "
+                "or inverted-region reaction looks like this, and so does a "
+                "gap range that stops short of the transition state or bins "
+                "too coarse to resolve it.")
 
-        barrier = Ebar - Erea
         free_energy = Epro - Erea
-        # Avoid mutating the caller's array in place: when fitting is False,
-        # dGevb_smooth is the same object as the input dGevb.
-        dGevb_smooth = dGevb_smooth - Erea
+
+        if not fitting and len(max_arg) > 1:
+            self.ostream.print_warning(
+                f"Found {len(max_arg)} maxima in the EVB profile instead of "
+                "1, and took the highest one. Confirm the calculated extrema "
+                "with the plot.")
+
+        # The reported curve is the unsmoothed profile, so that it passes
+        # through the reported barrier and reaction free energy.
+        dGevb_shifted = dGevb - Erea
         self.ostream.flush()
-        return (dGevb_smooth, barrier, free_energy, min_arg, max_arg, erea_ind,
-                epro_ind, ebar_ind)
+        return (dGevb_shifted, barrier, free_energy,
+                sampled[min_arg], sampled[max_arg], int(sampled[erea_ind]),
+                int(sampled[epro_ind]), int(sampled[ebar_ind]))
 
     def _get_FEP_and_EVB(self):
 
@@ -580,7 +872,7 @@ class EvbDataProcessing:
 
             result.update({"dGfep": dGfep, "dGfep_unc": dGfep_unc})
             if self.calculate_discrete:
-                dGevb_discrete, pns, dGcor = self._dGevb_discretised(
+                dGevb_discrete, pns, dGcor, dGdens = self._dGevb_discretised(
                     dGfep, result["Eg"], result["V"], result["dE"],
                     result["Temp_set"])
 
@@ -590,10 +882,12 @@ class EvbDataProcessing:
                     reaction_free_energy_discretised,
                     min_arg,
                     max_arg,
-                    _,
-                    _,
-                    _,
-                ) = self._get_free_energies(dGevb_discrete)
+                    erea_ind,
+                    epro_ind,
+                    ebar_ind,
+                ) = self._get_free_energies(dGevb_discrete,
+                                            self.coordinate_bins,
+                                            fitting=False)
 
                 result.update({
                     "discrete": {
@@ -602,8 +896,12 @@ class EvbDataProcessing:
                         "barrier": barrier_discretised,
                         "pns": pns,
                         "dGcor": dGcor,
+                        "dGdens": dGdens,
                         "min_arg": min_arg,
                         "max_arg": max_arg,
+                        "reactant_index": erea_ind,
+                        "barrier_index": ebar_ind,
+                        "product_index": epro_ind,
                     }
                 })
 
@@ -634,7 +932,9 @@ class EvbDataProcessing:
                     erea_ind,
                     epro_ind,
                     ebar_ind,
-                ) = self._get_free_energies(dGevb_analytical, fitting=False)
+                ) = self._get_free_energies(dGevb_analytical,
+                                            self.coordinate_bins,
+                                            fitting=False)
 
                 barrier_analytical_unc, free_energy_analytical_unc = (
                     self._propagate_free_energy_uncertainty(
@@ -652,6 +952,9 @@ class EvbDataProcessing:
                         "barrier_unc": barrier_analytical_unc,
                         "min_arg": min_arg,
                         "max_arg": max_arg,
+                        "reactant_index": erea_ind,
+                        "barrier_index": ebar_ind,
+                        "product_index": epro_ind,
                     }
                 })
 
@@ -896,7 +1199,9 @@ class EvbDataProcessing:
                             erea_ind_sub,
                             epro_ind_sub,
                             ebar_ind_sub,
-                        ) = self._get_free_energies(dGevb_sub, fitting=False)
+                        ) = self._get_free_energies(dGevb_sub,
+                                                    self.coordinate_bins,
+                                                    fitting=False)
 
                         barrier_unc_sub, free_energy_unc_sub = (
                             self._propagate_free_energy_uncertainty(
@@ -968,6 +1273,11 @@ class EvbDataProcessing:
             Lambda_indices_kde = Lambda_indices_arr[kde_idx]
 
             xy = np.vstack([dE_kde, Lambda_indices_kde])
+            assert_msg_critical(
+                np.ptp(dE_kde) > 0,
+                'EvbDataProcessing: the energy gap dE is constant, so no ' +
+                'reaction coordinate can be defined. Check that the two ' +
+                'states differ and that alpha and H12 are set.')
             dens = scipy.stats.gaussian_kde(xy)(xy)
             dens = dens / np.max(dens)
             result.update({"dE_dens": dens})
@@ -985,6 +1295,14 @@ class EvbDataProcessing:
 
             minde = np.min(dE)
             maxde = np.max(dE)
+            assert_msg_critical(
+                maxde - minde >= 2 * bin_size,
+                'EvbDataProcessing: the energy gap spans only ' +
+                f'{maxde - minde:.2f} kJ/mol, less than the two bins of ' +
+                f'{bin_size} kJ/mol a reaction coordinate needs. Check that ' +
+                'the two states differ, and lower bin_size.')
+            # One entry per 2 kJ/mol of observed gap; the assert above keeps
+            # this at two or more.
             steps = int((maxde - minde) // 2)
             dE_bins = np.linspace(np.min(dE), np.max(dE), steps)
             bin_inds = np.digitize(dE_kde, dE_bins)
@@ -999,7 +1317,18 @@ class EvbDataProcessing:
                     dens_max = np.append(dens_max, 0)
 
             middle = len(dens_max) // 2
-            window_size = self.dens_max_window
+            # dens_max holds one entry per 2 kJ/mol of observed dE range, so
+            # a narrow gap distribution can be shorter than dens_max_window.
+            # The running maximum below then gets a negative length. Shrink
+            # the window to what the range allows instead.
+            window_size = min(self.dens_max_window, max(1, len(dens_max) - 2))
+            window_size = min(window_size, len(dens_max))
+            if window_size < self.dens_max_window:
+                self.ostream.print_warning(
+                    f"The dE range only holds {len(dens_max)} density bins, "
+                    f"so the running-maximum window is reduced from "
+                    f"{self.dens_max_window} to {window_size}.")
+                self.ostream.flush()
             dens_max_smooth = np.zeros(len(dens_max) - window_size)
             for i in range(1, len(dens_max) - window_size):
                 dens_max_smooth[i] = np.max(dens_max[i:i + window_size])
@@ -1340,57 +1669,50 @@ class EvbDataProcessing:
             if plot_analytical:
                 if "analytical" in result.keys():
                     EVB = result["analytical"]["EVB"]
+                    # The analytical curve is evaluated at the bin edges,
+                    # not at the bin centres the discretised profile uses,
+                    # so it is drawn against coordinate_bins. Drawing EVB[1:]
+                    # against the centres shifted it left by half a bin.
+                    analytical_x = coordinate_bins
                     ax[1].plot(
-                        bin_indicators,
-                        EVB[1:],
+                        analytical_x,
+                        EVB,
                         label=f"{name} analytical",
                         color=colors[colorkeys[i]],
                     )
-                    # Re-derive the specific minima/maximum indices actually
-                    # used for "barrier"/"free_energy" in _get_free_energies,
-                    # rather than assuming they sit at min_arg[0]/min_arg[1]/
-                    # max_arg[0] -- there can be more than 2 minima or more
-                    # than 1 maximum, in which case those fixed positions
-                    # silently point at the wrong peak (wrong marker location
-                    # and/or a label that doesn't match the marked point).
-                    min_arg = result['analytical']['min_arg']
                     max_arg = result['analytical']['max_arg']
                     barrier = result['analytical']['barrier']
                     free_energy = result['analytical']['free_energy']
 
-                    if len(min_arg) >= 2:
-                        erea_ind, epro_ind = min_arg[0], min_arg[-1]
-                    else:
-                        erea_ind, epro_ind = 0, len(EVB) - 1
-                    # Mirrors _get_free_energies' selection rule exactly
-                    # (positional-middle candidate, not the tallest one).
-                    if len(max_arg) == 1:
-                        ebar_ind = max_arg[0]
-                    elif len(max_arg) > 1:
-                        ebar_ind = max_arg[len(max_arg) // 2]
-                    else:
-                        ebar_ind = len(EVB) // 2
+                    # The points the reported numbers were taken at, as
+                    # chosen by _get_free_energies. Results written before
+                    # those indices were stored fall back to the ends.
+                    erea_ind = result['analytical'].get('reactant_index', 0)
+                    epro_ind = result['analytical'].get('product_index',
+                                                        len(EVB) - 1)
+                    ebar_ind = result['analytical'].get(
+                        'barrier_index',
+                        int(np.argmax(EVB)) if len(max_arg) else len(EVB) // 2)
 
-                    # EVB[1:] is what's actually plotted against
-                    # bin_indicators, so an index into EVB corresponds to
-                    # bin_indicators[index - 1].
-                    zero_ind = max(erea_ind - 1, 0)
-                    barrier_ind = max(ebar_ind - 1, 0)
-                    free_ind = max(epro_ind - 1, 0)
+                    # EVB is plotted against analytical_x one for one, so
+                    # the extremum indices need no shift.
+                    zero_ind = erea_ind
+                    barrier_ind = ebar_ind
+                    free_ind = epro_ind
 
                     # mark the zero-point
                     ax[1].plot(
                         [
-                            bin_indicators[max(0, zero_ind - 25)],
-                            bin_indicators[min(
-                                len(bin_indicators) - 1, zero_ind + 25)]
+                            analytical_x[max(0, zero_ind - 25)],
+                            analytical_x[min(
+                                len(analytical_x) - 1, zero_ind + 25)]
                         ],
                         [0, 0],
                         color=colors[colorkeys[i]],
                         linewidth=.5,
                     )
                     ax[1].plot(
-                        [bin_indicators[zero_ind]] * 2,
+                        [analytical_x[zero_ind]] * 2,
                         [-10, +10],
                         color=colors[colorkeys[i]],
                         linewidth=.5,
@@ -1398,16 +1720,16 @@ class EvbDataProcessing:
 
                     ax[1].plot(
                         [
-                            bin_indicators[max(0, barrier_ind - 25)],
-                            bin_indicators[min(
-                                len(bin_indicators) - 1, barrier_ind + 25)]
+                            analytical_x[max(0, barrier_ind - 25)],
+                            analytical_x[min(
+                                len(analytical_x) - 1, barrier_ind + 25)]
                         ],
                         [barrier, barrier],
                         color=colors[colorkeys[i]],
                         linewidth=.5,
                     )
                     ax[1].plot(
-                        [bin_indicators[barrier_ind]] * 2,
+                        [analytical_x[barrier_ind]] * 2,
                         [barrier - 10, barrier + 10],
                         color=colors[colorkeys[i]],
                         linewidth=.5,
@@ -1416,7 +1738,7 @@ class EvbDataProcessing:
                     barrier_label = f"{barrier:.0f}"
                     if barrier_unc is not None:
                         barrier_label += f" ± {barrier_unc:.0f}"
-                    ax[1].text(bin_indicators[barrier_ind],
+                    ax[1].text(analytical_x[barrier_ind],
                                barrier,
                                barrier_label,
                                ha='left',
@@ -1424,16 +1746,16 @@ class EvbDataProcessing:
 
                     ax[1].plot(
                         [
-                            bin_indicators[max(0, free_ind - 25)],
-                            bin_indicators[min(
-                                len(bin_indicators) - 1, free_ind + 25)]
+                            analytical_x[max(0, free_ind - 25)],
+                            analytical_x[min(
+                                len(analytical_x) - 1, free_ind + 25)]
                         ],
                         [free_energy, free_energy],
                         color=colors[colorkeys[i]],
                         linewidth=.5,
                     )
                     ax[1].plot(
-                        [bin_indicators[free_ind]] * 2,
+                        [analytical_x[free_ind]] * 2,
                         [free_energy - 10, free_energy + 10],
                         color=colors[colorkeys[i]],
                         linewidth=.5,
@@ -1443,7 +1765,7 @@ class EvbDataProcessing:
                     free_energy_label = f"{free_energy:.0f}"
                     if free_energy_unc is not None:
                         free_energy_label += f" ± {free_energy_unc:.0f}"
-                    ax[1].text(bin_indicators[free_ind],
+                    ax[1].text(analytical_x[free_ind],
                                free_energy,
                                free_energy_label,
                                ha='left',
@@ -1594,7 +1916,7 @@ class EvbDataProcessing:
 
         Args:
             results (dict): EVB results, as produced by EvbDataProcessing.compute.
-            configuration_name (str): key into results["configuration_results"].
+            configuration_names (str | list[str], optional): string or list of strings to use as alternative plotting names.
             replicas (list, optional): which replicas to plot. Defaults to all replicas that have the requested direction.
             direction (str, optional): "both" (pool forward+backward frames per replica), "forward", or "backward". Defaults to "both".
             figsize (tuple, optional): figure size. Defaults to (6, 4).
@@ -1629,7 +1951,6 @@ class EvbDataProcessing:
             )
 
             coordinate_bins = results['coordinate_bins']
-            bin_indicators = (coordinate_bins[:-1] + coordinate_bins[1:]) / 2
 
             if replicas is None:
                 replicas = sorted(r for r, d in by_replica.items()
@@ -1647,8 +1968,9 @@ class EvbDataProcessing:
                         label = None
                 else:
                     label = f"Replica {replica}"
-                ax.plot(bin_indicators,
-                        EVB[1:],
+                # The analytical curve is evaluated at the bin edges.
+                ax.plot(coordinate_bins,
+                        EVB,
                         alpha=0.5,
                         linewidth=1,
                         color=plot_colours[i % len(plot_colours)],
@@ -1676,10 +1998,13 @@ class EvbDataProcessing:
             dGfep = result["dGfep"]
             # discrete curves
             pns = result['discrete']['pns']
+            # Both correction terms, as _dGevb_discretised sums them, so the
+            # curve drawn here is the one in result['discrete']['EVB'].
             dGcor = result['discrete']['dGcor']
+            dGdens = result['discrete'].get('dGdens', np.zeros_like(dGcor))
 
             pnsfep = pns @ dGfep
-            pnscor = np.sum(pns * dGcor.transpose(), axis=1)
+            pnscor = np.sum(pns * (dGcor + dGdens).transpose(), axis=1)
             dGevb_disc = pnsfep + pnscor
 
             ax[i].plot(coordinate_bins,
@@ -1779,13 +2104,21 @@ class EvbDataProcessing:
         for name, result in results['configuration_results'].items():
             if name == list(conf_keys)[dif_to]:
                 continue
-            max_arg = result['analytical']['max_arg']
-            min_arg = result['analytical']['min_arg']
+            analytical = result['analytical']
             dif = result['dGevb_fg'] - ref_evb
 
-            barrier = dif[:, max_arg[0]]
-            e0 = dif[:, min_arg[0]]
-            e1 = dif[:, min_arg[1]]
+            # The points the reported barrier and reaction free energy were
+            # taken at. min_arg/max_arg hold every extremum that cleared the
+            # noise filter, which is neither necessarily two minima and one
+            # maximum nor the ones that were used.
+            n_points = dif.shape[1]
+            erea_ind = analytical.get('reactant_index', 0)
+            ebar_ind = analytical.get('barrier_index', n_points // 2)
+            epro_ind = analytical.get('product_index', n_points - 1)
+
+            barrier = dif[:, ebar_ind]
+            e0 = dif[:, erea_ind]
+            e1 = dif[:, epro_ind]
             free_energy = e1 - e0
             to_plot.update({
                 f"{name}_barrier_dif": barrier,
@@ -1960,7 +2293,7 @@ class EvbDataProcessing:
                         bins,
                     )
                     dGevb, _, _, min_arg, max_arg, _, _, _ = dp._get_free_energies(
-                        dGevb, fitting=False)
+                        dGevb, bins, fitting=False)
                     evbs.append(dGevb)
                     ax1[0].plot(lam, dGfep)
 
