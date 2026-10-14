@@ -924,8 +924,8 @@ class EnsembleDriver:
         pc[3, :] = q
         return pc
 
-    def _build_fika_embedding(self, snap, r_on: float = 1.1,
-                              r_off: float = 1.8) -> dict | None:
+    def _build_fika_embedding(self, snap, r_on: float = 1.0,
+                              r_off: float = 1.9) -> dict | None:
         """
         Builds the fika embedding of one snapshot: the polarizable PE residues
         and the non-polarizable NPE residues of the snapshot, with the inner
@@ -1359,8 +1359,8 @@ class EnsembleDriver:
         qm_charge: int | None = None,
         qm_multiplicity: int | None = None,
         embedding_method: str = "potfile",
-        fika_r_on: float = 1.1,
-        fika_r_off: float = 1.8,
+        fika_r_on: float = 1.0,
+        fika_r_off: float = 1.9,
     ):
         """
         Drives the computation over the ensemble of snapshots.
@@ -1395,7 +1395,7 @@ class EnsembleDriver:
             converted to the PyFraME input with the CP3 peptide-neighbor
             exclusions. 'fika': the fika embedding built from the snapshot
             parameters, with the inner switching function (default r_on/r_off
-            of 1.1/1.8 angstrom, see fika_r_on/fika_r_off) on the
+            of 1.0/1.9 angstrom, see fika_r_on/fika_r_off) on the
             permanent-charge and induced-dipole interactions of pairs of
             different residues, and the anisotropic PE polarizabilities
             reduced to their isotropic part (trace/3).

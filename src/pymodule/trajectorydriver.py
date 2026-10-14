@@ -415,8 +415,8 @@ class TrajectoryDriver:
                         'embedding_method': 'fika',
                         'damping': None,
                         'switching': {
-                            'r_on': 1.1,
-                            'r_off': 1.8,
+                            'r_on': 1.0,
+                            'r_off': 1.9,
                         },
                     },
                     'inputs': {

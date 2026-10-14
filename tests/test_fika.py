@@ -343,8 +343,8 @@ class TestFikaSwitching:
     @staticmethod
     def _switch():
 
-        return FikaInnerSwitch(1.1 / bohr_in_angstroms(),
-                               1.8 / bohr_in_angstroms())
+        return FikaInnerSwitch(1.0 / bohr_in_angstroms(),
+                               1.9 / bohr_in_angstroms())
 
     @staticmethod
     def _charge_system(r_ang, alpha=2.0, q=0.5):
@@ -383,14 +383,15 @@ class TestFikaSwitching:
         alpha, q = 2.0, 0.5
         switch = self._switch()
 
-        for r_ang in (1.0, 1.3, 1.4, 1.5, 1.6, 1.7, 2.0):
+        for r_ang in (1.0, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 2.0):
             r = r_ang / bohr_in_angstroms()
-            if r_ang <= 1.1:
+            if r_ang <= 1.0:
                 s = 0.0
-            elif r_ang >= 1.8:
+            elif r_ang >= 1.9:
                 s = 1.0
             else:
-                s = 0.5 * (1.0 - np.cos(np.pi * (r_ang - 1.1) / 0.7))
+                x = (r_ang - 1.0) / 0.9
+                s = x**3 * (10.0 + x * (-15.0 + 6.0 * x))
             result = FikaInducedDipolesDriver().compute(
                 self._charge_system(r_ang), None, switch)
             # the fixed charge field at the origin is -q/r^2 along x,
@@ -481,8 +482,8 @@ class TestFikaSwitching:
         # part of the weighted path against the direct sum.
 
         switch = self._switch()
-        r_on = 1.1 / bohr_in_angstroms()
-        r_off = 1.8 / bohr_in_angstroms()
+        r_on = 1.0 / bohr_in_angstroms()
+        r_off = 1.9 / bohr_in_angstroms()
         alphas = [2.0, 3.0, 1.0, 1.0, 1.0]
         far = [[10.0, 0.0, 0.0], [-10.0, 0.0, 0.0], [0.0, 10.0, 0.0]]
         charges = np.array([[0.0, 0.0, 8.0], [0.0, 0.0, -4.0]])
@@ -524,8 +525,8 @@ class TestFikaSwitching:
                 elif r >= r_off:
                     s = 1.0
                 else:
-                    s = 0.5 * (1.0 - np.cos(np.pi * (r - r_on) /
-                                            (r_off - r_on)))
+                    x = (r - r_on) / (r_off - r_on)
+                    s = x**3 * (10.0 + x * (-15.0 + 6.0 * x))
                 t = s * (3.0 * np.outer(d, d) - r * r * np.eye(3)) / r**5
                 b[3 * i:3 * i + 3, 3 * j:3 * j + 3] = -t
                 b[3 * j:3 * j + 3, 3 * i:3 * i + 3] = -t
@@ -571,7 +572,8 @@ class TestFikaSwitching:
         b[3:6, 3:6] = np.eye(3) / alpha2
         d = pos[0] - pos[1]
         r = np.linalg.norm(d)
-        s = 0.5 * (1.0 - np.cos(np.pi * (r12_ang - 1.1) / 0.7))
+        x = (r12_ang - 1.0) / 0.9
+        s = x**3 * (10.0 + x * (-15.0 + 6.0 * x))
         t = s * (3.0 * np.outer(d, d) - r * r * np.eye(3)) / r**5
         b[0:3, 3:6] = -t
         b[3:6, 0:3] = -t
@@ -629,8 +631,8 @@ class TestFikaSwitching:
                 'embedding_method': 'fika',
                 'damping': None,
                 'switching': {
-                    'r_on': 1.1,
-                    'r_off': 1.8,
+                    'r_on': 1.0,
+                    'r_off': 1.9,
                 },
             },
             'inputs': {
@@ -645,9 +647,9 @@ class TestFikaSwitching:
         fika_embedding_sanity_check(options)
         embedding = FikaEmbedding(molecule, basis, options)
         assert embedding.switching.r_on == pytest.approx(
-            1.1 / bohr_in_angstroms())
+            1.0 / bohr_in_angstroms())
         assert embedding.switching.r_off == pytest.approx(
-            1.8 / bohr_in_angstroms())
+            1.9 / bohr_in_angstroms())
 
         # radii in bohr are used as given
         options['settings']['switching'] = {

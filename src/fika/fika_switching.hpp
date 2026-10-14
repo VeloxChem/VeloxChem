@@ -42,10 +42,10 @@ namespace fika {
 /// Inner switching function of the short-range coupling of pairs of different residues, e.g. of
 /// a permanent charge with an induced dipole or of two induced dipoles:
 ///   S(r) = 0 for r <= r_on, 1 for r >= r_off, and
-///   S(r) = 1/2 [1 - cos(pi (r - r_on) / (r_off - r_on))] in between,
-/// so S and its first derivative are continuous and S = 0 removes the pair while S = 1 leaves
-/// the bare Coulomb coupling. Distances in bohr; the radii exclude short-range inter-residue
-/// couplings by distance (typical values: 1.0 and 1.8 Angstrom).
+///   S(r) = 6 x^5 - 15 x^4 + 10 x^3, x = (r - r_on) / (r_off - r_on), in between,
+/// so S and its first two derivatives are continuous and S = 0 removes the pair while S = 1
+/// leaves the bare Coulomb coupling. Distances in bohr; the radii exclude short-range
+/// inter-residue couplings by distance (typical values: 1.0 and 1.9 Angstrom).
 struct InnerSwitch {
   double r_on = 0.0;
   double r_off = 0.0;
@@ -69,8 +69,8 @@ inline auto inner_switch(double r, const InnerSwitch& switching) noexcept -> dou
   if (r >= switching.r_off) {
     return 1.0;
   }
-  constexpr double pi = 3.14159265358979323846;
-  return 0.5 * (1.0 - std::cos(pi * (r - switching.r_on) / (switching.r_off - switching.r_on)));
+  const double x = (r - switching.r_on) / (switching.r_off - switching.r_on);
+  return x * x * x * (10.0 + x * (-15.0 + 6.0 * x));
 }
 
 }  // namespace fika

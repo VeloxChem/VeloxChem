@@ -161,7 +161,7 @@ class TestEnsembleDriver:
     def test_compute_with_fika_switched_embedding(self, tmp_path):
         """
         Runs the same ensemble with the fika switched embedding (r_on/r_off of
-        1.1/1.8 angstrom, damping off) instead of the CP3/PyFraME potfiles.
+        1.0/1.9 angstrom, damping off) instead of the CP3/PyFraME potfiles.
 
         The fika model approximates the CP3 1-2/1-3 exclusions with a smooth
         distance switch and uses the isotropic part (trace/3) of the PE
@@ -213,8 +213,8 @@ class TestEnsembleDriver:
             scf_options=scf_options,
             property_options=property_options,
             embedding_method="fika",
-            fika_r_on=1.1,
-            fika_r_off=1.8,
+            fika_r_on=1.0,
+            fika_r_off=1.9,
         )
 
         assert "scf_all" in results
@@ -235,12 +235,12 @@ class TestEnsembleDriver:
         }
 
         # fika switched embedding regression values
-        fika_scf = np.array([-193.06050131725181, -193.07317475046915])
+        fika_scf = np.array([-193.06034957088235, -193.07240911173659])
         fika_eigs = {
-            0: np.array([0.16045385639156504, 0.30435844171589671, 0.32227296861273669,
-                         0.32426836052319863, 0.34656747751606809, 0.35873062888169038]),
-            100: np.array([0.15861465901557309, 0.29054785216247409, 0.31304864563620899,
-                           0.32038618804225932, 0.35186852439588912, 0.36045917831984770]),
+            0: np.array([0.16050853418304933, 0.30431999889453182, 0.32229297177261362,
+                         0.32426471406231583, 0.34648956533088582, 0.35888440891963413]),
+            100: np.array([0.15864089418964447, 0.29047523079792154, 0.31302834208192948,
+                           0.32034455071253437, 0.35180399247685890, 0.36055513066270850]),
         }
 
         got_frames = [int(frame) for frame, _ in results["scf_all"]]
@@ -254,7 +254,7 @@ class TestEnsembleDriver:
             np.testing.assert_allclose(got_scf, fika_scf, rtol=0.0,
                                        atol=2.0e-6)
 
-            # deviation from the CP3 reference (measured: <= 7.2e-3 Ha)
+            # deviation from the CP3 reference (measured: <= 6.4e-3 Ha)
             dev_scf = got_scf - ref_scf
             assert np.max(np.abs(dev_scf)) < 3.0e-2
 
@@ -263,7 +263,7 @@ class TestEnsembleDriver:
                 eig = np.array(rsp_res.get("eigenvalues", []), dtype=float)
                 np.testing.assert_allclose(eig, fika_eigs[frame], rtol=0.0,
                                            atol=2.0e-5)
-                # deviation from the CP3 reference (measured: <= 2.2e-3 Ha)
+                # deviation from the CP3 reference (measured: <= 2.1e-3 Ha)
                 dev_eig = eig - ref_eigs[frame]
                 assert np.max(np.abs(dev_eig)) < 5.0e-3
 
