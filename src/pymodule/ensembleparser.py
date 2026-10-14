@@ -83,6 +83,22 @@ class EnsembleParser:
         self.ostream = ostream
 
     @staticmethod
+    def _pdb_has_conect_records(pdb_file: str) -> bool:
+        """
+        Checks whether a PDB file contains CONECT records.
+
+        :param pdb_file:
+            Path to the PDB file.
+        :return:
+            True if at least one CONECT record is present.
+        """
+        with open(pdb_file, "rb") as fh:
+            for line in fh:
+                if line[:6].strip().upper() == b"CONECT":
+                    return True
+        return False
+
+    @staticmethod
     def _prefixed_resname(resname: str, prefix: str) -> str:
         """
         Resname in PDBs often go by 3 letters, and terminal residues (e.g., NASN or CASN for
@@ -348,7 +364,9 @@ class EnsembleParser:
         :param trajectory_file:
             Path to the trajectory file:
                 - .xtc with a corresponding topology (.tpr) via topology_file
-                - .pdb (several configurations, or a single configuration; bonds are guessed
+                - .pdb (several configurations, or a single configuration;
+                  CONECT records are honored when present, otherwise bonds are
+                  guessed)
         :param pdb_file:
             Path to a PDB file. This is a convenience alternative to
             trajectory_file and cannot be used together with trajectory_file.
@@ -464,28 +482,36 @@ class EnsembleParser:
             raise ValueError("qm_multiplicity must be a positive integer")
 
         if trajectory_file.lower().endswith(".pdb"):
-            raw_mda_version = version("MDAnalysis")
-            match = re.match(r"^(\d+)\.(\d+)", raw_mda_version)
-            if not match:
-                raise RuntimeError(
-                    "Cannot parse required major.minor version from "
-                    f"MDAnalysis: {raw_mda_version!r}"
-                )
-            mda_version = int(match.group(1)), int(match.group(2))
-            if mda_version >= (2, 8):
-                # https://docs.mdanalysis.org/2.8.0/documentation_pages/core/universe.html
-                # The `guess_bonds` keyword is deprecated and will be removed in MDAnalysis 3.0.
-                # Please pass ("bonds", "angles", "dihedrals") into to_guess or force_guess
-                # instead to guess bonds, angles, and dihedrals respectively.
-                mda_universe = mda.Universe(
-                    trajectory_file,
-                    to_guess=("bonds", "angles", "dihedrals"),
-                )
+            if self._pdb_has_conect_records(trajectory_file):
+                # Honor the connectivity records of the file.  Bond guessing
+                # would otherwise turn short intermolecular contacts (e.g.
+                # hydrogen bonds between a protein and crystallographic
+                # waters) into covalent bonds and corrupt the chain and
+                # fragment detection used for the terminal residue names.
+                mda_universe = mda.Universe(trajectory_file)
             else:
-                mda_universe = mda.Universe(
-                    trajectory_file,
-                    guess_bonds=True,
-                )
+                raw_mda_version = version("MDAnalysis")
+                match = re.match(r"^(\d+)\.(\d+)", raw_mda_version)
+                if not match:
+                    raise RuntimeError(
+                        "Cannot parse required major.minor version from "
+                        f"MDAnalysis: {raw_mda_version!r}"
+                    )
+                mda_version = int(match.group(1)), int(match.group(2))
+                if mda_version >= (2, 8):
+                    # https://docs.mdanalysis.org/2.8.0/documentation_pages/core/universe.html
+                    # The `guess_bonds` keyword is deprecated and will be removed in MDAnalysis 3.0.
+                    # Please pass ("bonds", "angles", "dihedrals") into to_guess or force_guess
+                    # instead to guess bonds, angles, and dihedrals respectively.
+                    mda_universe = mda.Universe(
+                        trajectory_file,
+                        to_guess=("bonds", "angles", "dihedrals"),
+                    )
+                else:
+                    mda_universe = mda.Universe(
+                        trajectory_file,
+                        guess_bonds=True,
+                    )
         else:
             if topology_file is None:
                 raise ValueError("topology_file is required unless trajectory_file is a .pdb")
