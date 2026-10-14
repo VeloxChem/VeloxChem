@@ -58,7 +58,7 @@ class DoubleResTransition(ResponseProperty):
         else:
             method_dict = dict(method_dict)
 
-        rsp_dict['property'] = 'transition dipole moment'
+        rsp_dict['property'] = 'excited state moment'
         rsp_dict['order'] = 'quadratic'
         rsp_dict['residue'] = 'double'
         rsp_dict['is_complex'] = 'yes'
