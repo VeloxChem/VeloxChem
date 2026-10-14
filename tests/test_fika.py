@@ -1,3 +1,4 @@
+from mpi4py import MPI
 import numpy as np
 import pytest
 
@@ -405,7 +406,7 @@ class TestFikaSwitching:
 
         r = 1.0 / bohr_in_angstroms()
         result = FikaInducedDipolesDriver().compute(self._charge_system(1.0),
-                                                     None)
+                                                    None)
         assert result.dipoles[0, 0] == pytest.approx(-2.0 * 0.5 / r**2,
                                                      abs=1.0e-10)
 
@@ -620,6 +621,8 @@ class TestFikaSwitching:
                                           self._switch())
         assert np.max(np.abs(direct.dipoles - multipole.dipoles)) < 1.0e-7
 
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='skip pytest.raises for multiple MPI processes')
     def test_embedding_switching_settings(self):
 
         system = FikaClassicalSystem()
