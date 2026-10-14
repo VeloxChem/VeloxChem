@@ -838,10 +838,11 @@ class EnsembleDriver:
             )
 
     @classmethod
-    def _validate_pe_residue_atom_patterns(cls, atom_names, residue_ids, resnames):
+    def _validate_pe_residue_atom_patterns(cls, atom_names, residue_ids, resnames,
+                                           region: str = "PE"):
         """
-        Validate that all PE residues sharing the same residue name also share the
-        same ordered atom-name pattern.
+        Validate that all PE (or NPE) residues sharing the same residue name
+        also share the same ordered atom-name pattern.
 
         The current PE writer stores one @charges/@polarizabilities template per
         residue name. If two residue instances with the same resname contain
@@ -851,11 +852,14 @@ class EnsembleDriver:
         :param cls:
             The class object (used for calling the _first_residue_atom_pattern method).
         :param atom_names:
-            The array of atom names for the PE atoms.
+            The array of atom names for the PE/NPE atoms.
         :param residue_ids:
-            The array of residue ids for the PE atoms (e.g., MDAnalysis resindex).
+            The array of residue ids for the PE/NPE atoms (e.g., MDAnalysis resindex).
         :param resnames:
-            The array of residue names for the PE atoms.
+            The array of residue names for the PE/NPE atoms.
+        :param region:
+            The environment region the atoms belong to ('PE' or 'NPE'), used
+            in the error message.
         """
         atom_names = np.asarray(atom_names, dtype=object)
         residue_ids = np.asarray(residue_ids, dtype=int)
@@ -880,11 +884,13 @@ class EnsembleDriver:
                 cur_pattern = [str(atom_names[i]) for i in idx]
                 if cur_pattern != ref_pattern:
                     raise ValueError(
-                        "Inconsistent PE atom pattern detected for residue name "
-                        f"'{resn}'. Residue id {int(unique_residue_ids[0])} has "
-                        f"pattern {ref_pattern}, while residue id {int(residue_id)} "
-                        f"has pattern {cur_pattern}. PE residues with the same "
-                        "residue name must contain the same ordered atom list."
+                        f"Inconsistent {region} atom pattern detected for "
+                        f"residue name '{resn}'. Residue id "
+                        f"{int(unique_residue_ids[0])} has pattern "
+                        f"{ref_pattern}, while residue id {int(residue_id)} "
+                        f"has pattern {cur_pattern}. {region} residues with "
+                        "the same residue name must contain the same ordered "
+                        "atom list."
                     )
 
     def _build_point_charges(self, coords_ang, atom_names, resnames) -> np.ndarray | None:
@@ -1187,6 +1193,13 @@ class EnsembleDriver:
                     pe_atom_names,
                     pe_resindices,
                     pe_resnames,
+                )
+            if npe_coords.size > 0:
+                self._validate_pe_residue_atom_patterns(
+                    npe_atom_names,
+                    npe_resindices,
+                    npe_resnames,
+                    region="NPE",
                 )
 
             pe_resname_set = []
