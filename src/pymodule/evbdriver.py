@@ -899,12 +899,27 @@ class EvbDriver:
                                 results_filename="results"):
         """Compute the EVB energy profiles using the FEP results, print the results and save them to an h5 file
 
+        The first configuration in system_confs is the reference: alpha and
+        H12 are fitted so that its analytical EVB profile has the given
+        barrier and reaction free energy, and the same alpha and H12 are then
+        used for every other configuration. Each call starts afresh: alpha,
+        H12 and coordinate bins that an earlier call derived are not reused.
+
         Args:
-            barrier (float): the reaction barrier in kJ/mol of the reference system
+            barrier (float): the reaction barrier in kJ/mol of the reference system. Must be positive and larger than free_energy, since the transition state lies above both wells.
             free_energy (float): the reaction free energy in kJ/mol of the reference system
             lambda_sub_sample (int, optional): Factor with which the lambda vector will be subsampled. Setting this to two will discard every other lambda frame. Defaults to 1.
             lambda_sub_sample_ends (bool, optional): If set to False, the lambda frames up to 0.1 and from 0.9 will not be subsampled. Defaults to False.
             time_sub_sample (int, optional): Factor with which the time vector will be subsampled. Setting this to two will discard every other snapshot. Defaults to 1.
+            dE_range (tuple, optional): (min, max) energy gap in kJ/mol over which the profiles are evaluated, with 200 coordinate bins. Defaults to None, which derives the range from the sampled gap density with bins dataprocessing.bin_size apart.
+            alpha (float, optional): the shift in kJ/mol added to the product (state 2) energy, E2' = E2 + alpha. A negative alpha lowers the product. Give it together with H12 to skip the fit; given alone, it is discarded with a warning and both are fitted. Defaults to None.
+            H12 (float, optional): the constant coupling between the two states in kJ/mol; only its square enters. Give it together with alpha to skip the fit. Defaults to None.
+            alpha_guess (float, optional): starting value of alpha for the fit. Defaults to None, which keeps dataprocessing.alpha_guess (0).
+            H12_guess (float, optional): starting value of H12 for the fit. Small values (about 1 kJ/mol or less) can lead the fit into a region its grid cannot resolve. Defaults to None, which keeps dataprocessing.H12_guess (10).
+            results_filename (str, optional): name of the h5 file the results are written to in the current directory, without extension. Defaults to "results".
+
+        Returns:
+            dict: the results, also stored in self.results.
         """
         # Post-processing reads the FEP output files that only the master rank
         # produced; the reporter / helper ranks have no data to analyse.

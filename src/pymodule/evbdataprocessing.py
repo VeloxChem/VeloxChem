@@ -78,13 +78,47 @@ class EvbDataProcessing:
         self.barrier: float = None
         self.free_energy: float = None
 
+        # The EVB parameters, in kJ/mol. alpha is added to the product
+        # (state 2) energy, E2' = E2 + alpha, and H12 is the constant
+        # off-diagonal coupling; only H12**2 enters. Give both to skip the
+        # fit; if either is None, compute() fits both to the target barrier
+        # and reaction free energy of the first configuration.
         self.alpha: float = None
         self.H12: float = None
 
+        # Settings of the alpha/H12 fit (scipy.optimize.fsolve).
+        # max_iter: about the largest number of evaluations of the fit's
+        # target function (fsolve's maxfev; fsolve can go a few over it while
+        # it estimates derivatives). Each evaluation recomputes the FEP free
+        # energies of the reference configuration, so this bounds the cost
+        # of a fit that does not converge; converged fits need 7-53. A fit
+        # that reaches it is refused.
         self.max_iter: int = 100
+        # Not used.
         self.fitting_slowness: float = .5
+        # tol: fsolve's xtol, the relative change in (alpha, H12) between
+        # two iterations below which the fit stops. It is not an energy, and
+        # stopping is not the same as solving: see fit_residual_tolerance.
         self.tol: float = 0.01
+        # fit_residual_tolerance: the largest difference, in kJ/mol, between
+        # the target and the fitted barrier and reaction free energy (as the
+        # fit reads them) that is accepted as a solution. A larger residual
+        # means the targets were not reached, and compute() raises. Converged
+        # fits leave at most about 0.02.
+        self.fit_residual_tolerance: float = 0.1
+        # fit_report_tolerance: the largest difference, in kJ/mol, between
+        # the targets and the barrier and reaction free energy that compute()
+        # reports for the reference configuration after the fit. The fit
+        # reads the profile on a 1 kJ/mol grid and the report on the
+        # coordinate bins (bin_size), so a barrier too narrow for the bins
+        # comes out lower in the report; that gives a warning. When the
+        # fitted H12 is itself below what the fit grid resolves, the fit has
+        # found an artefact of that grid rather than a solution, and
+        # compute() raises.
+        self.fit_report_tolerance: float = 1.0
 
+        # Starting point of the fit, in kJ/mol. Small H12_guess values (about
+        # 1) can lead the fit to the unresolvable region described above.
         self.alpha_guess: float = 0
         self.H12_guess: float = 10
 
@@ -142,6 +176,17 @@ class EvbDataProcessing:
         # in the canned test fixtures, so that regression test is unaffected).
         self.dens_kde_max_samples: int = 8000
         self.kde_seed = 0
+        # What the last compute() call derived from its own data and
+        # targets, kept to tell it apart from values the caller sets.
+        self._fitted_alpha = None
+        self._fitted_H12 = None
+        self._derived_coordinate_bins = None
+        # The gap range each configuration samples, by name; see
+        # _calculate_coordinate_bins.
+        self._gap_ranges = {}
+        # The ranges the current compute() reads each configuration over;
+        # empty for a single configuration (see _get_FEP_and_EVB).
+        self._reading_ranges = {}
 
     def _beta(self, T) -> float:
         return 1 / (self.kb * T)
@@ -156,26 +201,104 @@ class EvbDataProcessing:
         self.Lambda_frame = results["Lambda_frame"]
         self.Lambda_indices = results["Lambda_indices"]
 
+        # One instance can serve several calls (EvbDriver keeps one for its
+        # lifetime). The alpha, H12 and coordinate bins an earlier call
+        # derived belong to that call's data and targets, so they are
+        # dropped; values the caller has set since are kept.
+        if self.alpha is self._fitted_alpha:
+            self.alpha = None
+        if self.H12 is self._fitted_H12:
+            self.H12 = None
+        if self.coordinate_bins is self._derived_coordinate_bins:
+            self.coordinate_bins = np.array([])
+        self._fitted_alpha = None
+        self._fitted_H12 = None
+        self._derived_coordinate_bins = None
+
         if self.alpha is None or self.H12 is None:
             self.ostream.print_info("Fitting H12 and alpha")
+            # Only one parameter was given: the fit needs both free, so the
+            # given value is discarded, which the user has to know about.
             if self.alpha is not None:
-                self.ostream.print_info(
+                self.ostream.print_warning(
                     "Overwriting provided alpha. Provide both H12 and alpha to skip fitting"
                 )
             if self.H12 is not None:
-                self.ostream.print_info(
+                self.ostream.print_warning(
                     "Overwriting provided H12. Provide both H12 and alpha to skip fitting"
                 )
             self.ostream.flush()
             self.alpha, self.H12 = self._fit_EVB_parameters()
+            self._fitted_alpha, self._fitted_H12 = self.alpha, self.H12
         else:
             self.ostream.print_info("Using provided H12 and alpha")
         results.update({'alpha': self.alpha, 'H12': self.H12})
         self.ostream.print_info("Calculating FEP and EVB curves")
         self.ostream.flush()
         self._get_FEP_and_EVB()
+        if self._fitted_alpha is not None:
+            self._check_fit_against_report()
         results["coordinate_bins"] = self.coordinate_bins
         return results
+
+    @staticmethod
+    def _fit_xi_grid():
+        """The xi grid, in kJ/mol, that the alpha/H12 fit reads the
+        analytical profile on: about 1 kJ/mol apart over +-10^4 kJ/mol."""
+
+        return np.linspace(-10000, 10000, 20000)
+
+    def _check_fit_against_report(self):
+        """Compare the reported barrier and reaction free energy of the
+        reference configuration with the targets the fit was given.
+
+        The fit reads the analytical profile on _fit_xi_grid and the report
+        on the coordinate bins, so a barrier that is narrow next to the bins
+        (one about 2*H12 wide) comes out lower in the report. That gets a
+        warning, since a smaller bin_size resolves it. The fit grid has a
+        limit of its own: once 2*H12 is no wider than its spacing, the grid
+        points skip over the top of the barrier, the barrier the fit reads
+        falls with H12 instead of rising, and the fit can match the targets
+        with an H12 that has nothing to do with them. Such a fit is not a
+        solution, so it is an error.
+        """
+
+        if not self.calculate_analytical:
+            return
+        reference_key = list(self.results.keys())[0]
+        analytical = self.results[reference_key]["analytical"]
+        reported = np.array(
+            [analytical["barrier"], analytical["free_energy"]], dtype=float)
+        targets = np.array([self.barrier, self.free_energy], dtype=float)
+        if np.all(np.abs(reported - targets) <= self.fit_report_tolerance):
+            return
+
+        fit_xi = self._fit_xi_grid()
+        resolvable_H12 = 2 * (fit_xi[1] - fit_xi[0])
+        comparison = (
+            "the reported barrier and reaction free energy of " +
+            f"configuration '{reference_key}' are {reported[0]:.2f} and " +
+            f"{reported[1]:.2f} kJ/mol, against targets of " +
+            f"{targets[0]:.2f} and {targets[1]:.2f} kJ/mol")
+        assert_msg_critical(
+            abs(self.H12) >= resolvable_H12,
+            f"EvbDataProcessing: the fit settled on H12 = {self.H12:.3f} " +
+            f"kJ/mol, below the {resolvable_H12:.1f} kJ/mol its xi grid " +
+            "can resolve, and " + comparison + ". At such a small H12 " +
+            "the fit reads a barrier that is not there, so this alpha and " +
+            "H12 are an artefact of the fit grid, not a solution. Start " +
+            "the fit from a larger H12_guess, or provide both alpha and " +
+            "H12.")
+        bin_spacing = (self.coordinate_bins[1] - self.coordinate_bins[0]
+                       if len(self.coordinate_bins) > 1 else self.bin_size)
+        self.ostream.print_warning(
+            "After the alpha/H12 fit, " + comparison + ", a difference " +
+            f"larger than fit_report_tolerance ({self.fit_report_tolerance} " +
+            "kJ/mol). The fit reads the EVB profile on a 1 kJ/mol grid and " +
+            f"the report on coordinate bins {bin_spacing:g} kJ/mol apart, so " +
+            "a barrier only a few bins wide is under-resolved in the " +
+            "report. Lower bin_size.")
+        self.ostream.flush()
 
     def _fit_EVB_parameters(self):
 
@@ -198,8 +321,18 @@ class EvbDataProcessing:
             np.all(np.isfinite(E1_ref)) and np.all(np.isfinite(E2_ref)),
             f"EvbDataProcessing: configuration '{reference_key}' holds " +
             "non-finite state energies, so alpha and H12 cannot be fitted.")
+        # The transition state is the highest point between the two wells,
+        # so it never lies below the product well: the barrier is positive
+        # and at least the reaction free energy on every EVB profile.
+        assert_msg_critical(
+            self.barrier > max(self.free_energy, 0),
+            f"EvbDataProcessing: the target barrier ({self.barrier} kJ/mol) " +
+            "must be positive and larger than the target reaction free " +
+            f"energy ({self.free_energy} kJ/mol). The transition state " +
+            "lies above both the reactant and the product well, so no EVB " +
+            "profile has a barrier below its reaction free energy.")
 
-        xi = np.linspace(-10000, 10000, 20000)
+        xi = self._fit_xi_grid()
 
         def get_barrier_and_free_energy_difference(x):
             alpha, H12 = x
@@ -222,11 +355,33 @@ class EvbDataProcessing:
 
             return barrier_dif, free_energy_dif
 
-        alpha, H12 = scipy.optimize.fsolve(
+        (alpha, H12), info, ier, message = scipy.optimize.fsolve(
             get_barrier_and_free_energy_difference,
             [self.alpha_guess, self.H12_guess],
-            xtol=self.tol)
-        self.ostream.print_info(f"Fitted alpha: {alpha}, H12: {H12}")
+            xtol=self.tol,
+            maxfev=self.max_iter,
+            full_output=True)
+        # ier = 1 only means the last step was below xtol. fsolve stops there
+        # just as readily on targets the profile cannot reach, and on a
+        # profile whose barrier the fit cannot see, and returns a point that
+        # does not solve the equations, so the residual decides.
+        residual = np.max(np.abs(info['fvec']))
+        assert_msg_critical(
+            ier == 1 and residual <= self.fit_residual_tolerance,
+            "EvbDataProcessing: the alpha/H12 fit did not reach the target " +
+            "barrier and reaction free energy: the residual is " +
+            f"{residual:.3f} kJ/mol at alpha = {alpha:.3f}, " +
+            f"H12 = {H12:.3f} ({' '.join(str(message).split())}). The " +
+            "targets may be out of reach of the sampled reaction, for " +
+            "example a barrier above the H12 = 0 limit or one below " +
+            "extremum_tolerance. Check the targets, try other alpha_guess " +
+            "and H12_guess values, or provide both alpha and H12.")
+        # Only H12**2 enters the EVB Hamiltonian, so the sign fsolve lands on
+        # carries no meaning; report the magnitude, as the literature does.
+        H12 = abs(H12)
+        self.ostream.print_info(
+            f"Fitted alpha: {alpha}, H12: {H12} " +
+            f"(residual {residual:.2g} kJ/mol)")
         return alpha, H12
 
     def _calculate_Eg_V_dE(self, E1, E2, alpha, H12):
@@ -663,7 +818,7 @@ class EvbDataProcessing:
             return c - 0.25 * b**2 / a, axis[index] + x_top, index
         return profile[index], axis[index], index
 
-    def _get_free_energies(self, dGevb, xi=None, fitting=True):
+    def _get_free_energies(self, dGevb, xi=None, fitting=True, xi_range=None):
         """Reactant, transition state and product of one EVB profile.
 
         Returns the profile shifted to the reactant well, the barrier and
@@ -681,6 +836,12 @@ class EvbDataProcessing:
 
         xi is the coordinate of the profile, used to fit the parabolas and
         to recognize the out-of-range bins of a discretised profile.
+
+        xi_range, if given, is the (min, max) gap the configuration sampled;
+        points outside it are not searched or fitted. Outside its sampled
+        range a configuration's analytical profile has no walls (it levels
+        off towards dGfep at lambda 0 or 1), so when the bins span a wider
+        configuration, a parabola fitted there misreads the wells.
 
         With fitting=True, which is how the alpha/H12 fit calls this, the
         wells are always taken on either side of the highest point and a
@@ -701,8 +862,11 @@ class EvbDataProcessing:
         # runs on the points that do hold a free energy, and the indices are
         # mapped back at the end, so a hole in the sampling is stepped over
         # rather than treated as a well or a barrier.
-        sampled = full_lo + np.flatnonzero(
-            np.isfinite(dGevb[full_lo:full_hi + 1]))
+        usable = np.isfinite(dGevb[full_lo:full_hi + 1])
+        if xi_range is not None:
+            inside = full_axis[full_lo:full_hi + 1]
+            usable &= (inside >= xi_range[0]) & (inside <= xi_range[1])
+        sampled = full_lo + np.flatnonzero(usable)
         if len(sampled) < 3:
             if not fitting:
                 self.ostream.print_warning(
@@ -854,11 +1018,27 @@ class EvbDataProcessing:
             self.coordinate_bins = self._calculate_coordinate_bins(
                 self.Lambda_indices, self.results, self.bin_size,
                 self.dens_threshold)
+            self._derived_coordinate_bins = self.coordinate_bins
         else:
             self.ostream.print_info(
                 f"Using provided coordinate bins, min: {self.coordinate_bins[0]}, max: {self.coordinate_bins[-1]}, length: {len(self.coordinate_bins)}"
             )
             self.ostream.flush()
+
+        # With several configurations the bins span all of them, so one with
+        # a narrower gap range (an enzyme next to water) would be read where
+        # it has no data. Each is read over its own range instead. A single
+        # configuration's range is the span of the bins, so nothing changes
+        # for it.
+        self._reading_ranges = {}
+        if len(self.results) > 1:
+            if self._derived_coordinate_bins is None:
+                self._calculate_coordinate_bins(self.Lambda_indices,
+                                                self.results,
+                                                self.bin_size,
+                                                self.dens_threshold,
+                                                store_density=False)
+            self._reading_ranges = dict(self._gap_ranges)
 
         for name, result in self.results.items():
             Temp_set = result["Temp_set"]
@@ -885,9 +1065,11 @@ class EvbDataProcessing:
                     erea_ind,
                     epro_ind,
                     ebar_ind,
-                ) = self._get_free_energies(dGevb_discrete,
-                                            self.coordinate_bins,
-                                            fitting=False)
+                ) = self._get_free_energies(
+                    dGevb_discrete,
+                    self.coordinate_bins,
+                    fitting=False,
+                    xi_range=self._reading_ranges.get(name))
 
                 result.update({
                     "discrete": {
@@ -932,9 +1114,11 @@ class EvbDataProcessing:
                     erea_ind,
                     epro_ind,
                     ebar_ind,
-                ) = self._get_free_energies(dGevb_analytical,
-                                            self.coordinate_bins,
-                                            fitting=False)
+                ) = self._get_free_energies(
+                    dGevb_analytical,
+                    self.coordinate_bins,
+                    fitting=False,
+                    xi_range=self._reading_ranges.get(name))
 
                 barrier_analytical_unc, free_energy_analytical_unc = (
                     self._propagate_free_energy_uncertainty(
@@ -1199,9 +1383,11 @@ class EvbDataProcessing:
                             erea_ind_sub,
                             epro_ind_sub,
                             ebar_ind_sub,
-                        ) = self._get_free_energies(dGevb_sub,
-                                                    self.coordinate_bins,
-                                                    fitting=False)
+                        ) = self._get_free_energies(
+                            dGevb_sub,
+                            self.coordinate_bins,
+                            fitting=False,
+                            xi_range=self._reading_ranges.get(name))
 
                         barrier_unc_sub, free_energy_unc_sub = (
                             self._propagate_free_energy_uncertainty(
@@ -1235,15 +1421,29 @@ class EvbDataProcessing:
         result.update({'replicas': by_replica})
         self.ostream.flush()
 
-    def _calculate_coordinate_bins(self, Lambda_indices, results, bin_size,
-                                   dens_threshold):
+    def _calculate_coordinate_bins(self,
+                                   Lambda_indices,
+                                   results,
+                                   bin_size,
+                                   dens_threshold,
+                                   store_density=True):
+        """The coordinate bins: bin_size apart over the union of the gap
+        ranges the configurations sample densely enough.
+
+        Each configuration's own range is kept in self._gap_ranges, so that
+        a configuration can be read over the gaps it sampled when the bins
+        span a wider one (see _get_FEP_and_EVB). With store_density=False
+        only those ranges are wanted, and the density data used for plotting
+        are not written into the results.
+        """
 
         assert_msg_critical('scipy' in sys.modules,
                             'scipy is required for EvbDataProcessing.')
 
         dE_min = 0
         dE_max = 0
-        for result in results.values():
+        self._gap_ranges = {}
+        for name, result in results.items():
             dens_max = np.array([])
             dE = result['dE']
             Lambda_indices_arr = np.asarray(Lambda_indices)
@@ -1280,8 +1480,9 @@ class EvbDataProcessing:
                 'states differ and that alpha and H12 are set.')
             dens = scipy.stats.gaussian_kde(xy)(xy)
             dens = dens / np.max(dens)
-            result.update({"dE_dens": dens})
-            if subsampled:
+            if store_density:
+                result.update({"dE_dens": dens})
+            if subsampled and store_density:
                 # Only stored when a genuine subsample was taken, so results
                 # without subsampling keep exactly the same keys as before
                 # (plot_dE_density falls back to the full dE/Lambda_indices
@@ -1333,8 +1534,9 @@ class EvbDataProcessing:
             for i in range(1, len(dens_max) - window_size):
                 dens_max_smooth[i] = np.max(dens_max[i:i + window_size])
             dens_max = dens_max_smooth
-            result.update({"dE_dens_max": dens_max})
-            result.update({"dE_dens_threshold": dens_threshold})
+            if store_density:
+                result.update({"dE_dens_max": dens_max})
+                result.update({"dE_dens_threshold": dens_threshold})
             # dens_max = scipy.signal.savgol_filter(dens_max, 20, 3)
             min_inds = np.where(dens_max[:middle] < dens_threshold)[0]
             max_inds = np.where(dens_max[middle:] < dens_threshold)[0]
@@ -1346,6 +1548,9 @@ class EvbDataProcessing:
 
             dE_min_new = dE_bins[min_inds[-1]].round()
             dE_max_new = dE_bins[max_inds[0] + middle].round()
+            # Like the union below, each range includes 0, so that a single
+            # configuration's range is exactly the span of the bins.
+            self._gap_ranges[name] = (min(dE_min_new, 0), max(dE_max_new, 0))
             if dE_min_new < dE_min:
                 dE_min = dE_min_new
             if dE_max_new > dE_max:

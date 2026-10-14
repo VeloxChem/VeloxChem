@@ -48,18 +48,20 @@ class TestEvbDataProcessing:
         input_results = self._load_canned_input(folder, EVB)
 
         dp = EvbDataProcessing(ostream=OutputStream(None))
-        # evb_reference_results.h5 was generated with the pairwise-BAR
-        # estimator; pin it explicitly rather than relying on whatever
-        # EvbDataProcessing.fep_estimator currently defaults to.
-        comp_results = dp.compute(input_results, 5, 10)
+        # evb_reference_results.h5 was generated with the default estimator
+        # (MBAR) and these targets: a barrier of 5 and a reaction free energy
+        # of -5 kJ/mol for the vacuum (reference) configuration. A barrier
+        # must exceed the reaction free energy, since the transition state
+        # lies above both wells.
+        comp_results = dp.compute(input_results, 5, -5)
 
         reference_results = EVB._load_dict_from_h5(folder /
                                                    "evb_reference_results.h5")
         EvbTestHelper.evb_compare_dict(comp_results, reference_results)
 
     def test_data_processing_mbar_agrees_with_bar(self):
-        # fep_estimator="mbar" is a selectable alternative to the default
-        # pairwise-BAR dGfep estimate (see EvbDataProcessing.fep_estimator).
+        # fep_estimator="bar" (pairwise BAR) is a selectable alternative to
+        # the default MBAR dGfep estimate (see EvbDataProcessing.fep_estimator).
         # There's no separate committed h5 reference for it; instead check it
         # runs cleanly and lands close to the BAR run on the same canned data
         # (both are valid free-energy estimators for the same underlying
@@ -72,12 +74,12 @@ class TestEvbDataProcessing:
         bar_input = self._load_canned_input(folder, EVB)
         dp_bar = EvbDataProcessing(ostream=OutputStream(None))
         dp_bar.fep_estimator = "bar"
-        bar_results = dp_bar.compute(bar_input, 5, 10)
+        bar_results = dp_bar.compute(bar_input, 5, -5)
 
         mbar_input = self._load_canned_input(folder, EVB)
         dp_mbar = EvbDataProcessing(ostream=OutputStream(None))
         dp_mbar.fep_estimator = "mbar"
-        mbar_results = dp_mbar.compute(mbar_input, 5, 10)
+        mbar_results = dp_mbar.compute(mbar_input, 5, -5)
 
         for name in ("vacuum", "water"):
             bar_conf = bar_results["configuration_results"][name]
