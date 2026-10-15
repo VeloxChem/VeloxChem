@@ -249,8 +249,9 @@ def test_interfaces_identical(tmp_path, monkeypatch):
     The A1 writer stores 17 significant digits, so the three inputs hold
     identical energies; values must agree to 1e-9 kJ/mol. The h5 comes
     from EvbDriver.compute_energy_profiles with alpha and H12 fixed, and
-    its stored alpha (2.5) is applied unless overridden. Replicas switch the
-    bootstrap to whole replicas. A multi-step result is refused.
+    its stored alpha (2.5) is applied unless overridden. Replica and
+    direction labels reach the tool from every interface. A multi-step
+    result is refused.
     """
 
     monkeypatch.chdir(tmp_path)
@@ -274,10 +275,50 @@ def test_interfaces_identical(tmp_path, monkeypatch):
         for key in ROUTES + ['dG0']:
             assert values[key] == pytest.approx(ref[key], abs=1e-9), key
 
-    meta = evb_reorg.analyze(from_folder, n_boot=2)['meta']
-    assert meta['bootstrap'] == 'replica'
+    for data in (from_dict, from_folder, from_h5):
+        assert len(np.unique(data['Replica_frame'])) == 2
+        assert len(np.unique(data['Direction_frame'])) == 2
 
     path = make_results(samples, LAMBDAS, name='ENZ')
     path['configuration_results']['ENZ']['steps'] = []
     with pytest.raises(ValueError, match='multi-step'):
         evb_reorg.load(path)
+
+
+def test_decorrelated_bootstrap_and_replica_sem():
+    """Decision 1 (WP-A5): sigma follows time correlation; replica SEM.
+
+    SYM, 1000 frames per window, frames from AR(1) chains (A1 sampler: phi
+    = (tau-1)/(tau+1), each window, replica and direction its own chain).
+    For independent frames sigma(R1_sym) = 0.5 sqrt(2 * 2 lambda_r kT / N)
+    = 0.85 kJ/mol; correlated frames multiply it by sqrt(g). With tau_int =
+    19 the tool's g must be close to 19 (median over blocks in [12, 26]; the
+    estimate is noisy on 500-frame blocks) and its sigma within a factor
+    1.6 of 0.85 sqrt(19); with tau = 1 and 4 replicas g must be close to 1,
+    sigma within a factor 1.6 of 0.85 (10 to 20 bootstrap samples leave
+    ~20% noise), and the replica standard error must be reported.
+    """
+
+    m = make_model('SYM')
+    expected = 0.5 * np.sqrt(2 * 2 * m.lambda_r * m.kT / 1000)
+
+    def run(tau, n_replicas, n_boot):
+        phi = (tau - 1) / (tau + 1)
+        samples = m.sample(LAMBDAS, 1000 // n_replicas,
+                           np.random.default_rng(0), n_replicas=n_replicas,
+                           phi=phi)
+        data = evb_reorg.load(make_results(samples, LAMBDAS, name='SYM'))
+        return evb_reorg.analyze(data, n_boot=n_boot)
+
+    corr = run(19, 1, N_BOOT)
+    assert 12 <= corr['meta']['g_median'] <= 26
+    ratio = corr['sigma']['R1_sym'] / (expected * np.sqrt(19))
+    assert 1 / 1.6 <= ratio <= 1.6, ratio
+
+    indep = run(1, 4, 10)
+    assert indep['meta']['g_median'] <= 1.3
+    ratio = indep['sigma']['R1_sym'] / expected
+    assert 1 / 1.6 <= ratio <= 1.6, ratio
+    assert indep['meta']['n_replicas_sem'] == 4
+    assert np.isfinite(indep['sigma_replica']['R1_sym'])
+    assert indep['sigma_replica']['R1_sym'] > 0
