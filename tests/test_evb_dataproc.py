@@ -8,8 +8,6 @@ from veloxchem.outputstream import OutputStream
 
 from test_evb_helper import EvbTestHelper
 
-pytestmark = [pytest.mark.timeconsuming]
-
 pytest.importorskip('pymbar')
 
 

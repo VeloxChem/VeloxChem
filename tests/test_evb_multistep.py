@@ -406,48 +406,59 @@ class TestMultiStepFep:
         EVB.run_FEP(platform=EvbTestHelper.evb_platform())
         return EVB, EVB.system_confs[0]
 
-    def test_path_runs_and_chains(self):
+    @pytest.fixture(scope="class")
+    @classmethod
+    def path_run(cls):
+        """One FEP run of the synthetic three-state path, shared by the tests
+        that only read its output: the run is most of their cost. The folder
+        lives until the last test of the class has finished."""
+
         states = MultiStepFixtures._synthetic_three_states()
-        with EvbTestHelper.evb_chdir_tmp():
-            EVB, conf = self._run(states)
+        with EvbTestHelper.evb_chdir_tmp() as folder:
+            EVB, conf = cls()._run(states)
+            yield states, EVB, conf, folder
 
-            assert len(conf['steps']) == len(states) - 1
-            root = Path(conf['data_folder'])
+    def test_path_runs_and_chains(self, path_run, monkeypatch):
+        states, EVB, conf, folder = path_run
+        monkeypatch.chdir(folder)
 
-            # One topology and one run folder for the whole path.
-            assert (root / "topology.cif").is_file()
-            run_folder = root / "run"
-            for index in range(len(states)):
-                assert (run_folder / f"state_{index}_sys.xml").is_file()
-            for step in range(len(states) - 1):
-                assert (run_folder / f"step{step}_0.000_sys.xml").is_file()
+        assert len(conf['steps']) == len(states) - 1
+        root = Path(conf['data_folder'])
 
-            for index, step_conf in enumerate(conf['steps']):
-                folder = Path(step_conf['data_folder'])
-                energies = folder / "Energies.csv"
-                assert energies.is_file(), f"missing {energies}"
+        # One topology and one run folder for the whole path.
+        assert (root / "topology.cif").is_file()
+        run_folder = root / "run"
+        for index in range(len(states)):
+            assert (run_folder / f"state_{index}_sys.xml").is_file()
+        for step in range(len(states) - 1):
+            assert (run_folder / f"step{step}_0.000_sys.xml").is_file()
 
-                with open(energies, newline="") as handle:
-                    rows = [row for row in csv.reader(handle) if row]
-                header = [cell.strip() for cell in rows[0]]
-                assert header == [
-                    "Lambda", "step", "state_0 PES", "state_1 PES",
-                    "state_2 PES", "left integration", "right integration",
-                    "Em", "replica", "direction"
-                ]
-                assert len(rows) > 1
-                for row in rows[1:]:
-                    values = [float(cell) for cell in row]
-                    assert all(math.isfinite(value) for value in values)
-                    assert int(values[1]) == index
+        for index, step_conf in enumerate(conf['steps']):
+            folder = Path(step_conf['data_folder'])
+            energies = folder / "Energies.csv"
+            assert energies.is_file(), f"missing {energies}"
 
-                # Every step but the last hands its lambda=1 configuration to
-                # the next one.
-                if index + 1 < len(conf['steps']):
-                    assert (folder / "final_state.xml").is_file()
-                    assert conf['steps'][index + 1]['initial_state'] == str(
-                        folder / "final_state.xml")
-                    assert conf['steps'][index + 1]['skip_initial_equil']
+            with open(energies, newline="") as handle:
+                rows = [row for row in csv.reader(handle) if row]
+            header = [cell.strip() for cell in rows[0]]
+            assert header == [
+                "Lambda", "step", "state_0 PES", "state_1 PES",
+                "state_2 PES", "left integration", "right integration",
+                "Em", "replica", "direction"
+            ]
+            assert len(rows) > 1
+            for row in rows[1:]:
+                values = [float(cell) for cell in row]
+                assert all(math.isfinite(value) for value in values)
+                assert int(values[1]) == index
+
+            # Every step but the last hands its lambda=1 configuration to
+            # the next one.
+            if index + 1 < len(conf['steps']):
+                assert (folder / "final_state.xml").is_file()
+                assert conf['steps'][index + 1]['initial_state'] == str(
+                    folder / "final_state.xml")
+                assert conf['steps'][index + 1]['skip_initial_equil']
 
     def test_adjacent_reporting_narrows_the_columns(self):
         states = MultiStepFixtures._synthetic_three_states()
@@ -469,75 +480,71 @@ class TestMultiStepFep:
                 "direction"
             ]
 
-    def test_reload_rebuilds_the_steps(self):
-        states = MultiStepFixtures._synthetic_three_states()
-        with EvbTestHelper.evb_chdir_tmp():
-            EVB, conf = self._run(states)
-            data_folder = conf['data_folder']
+    def test_reload_rebuilds_the_steps(self, path_run, monkeypatch):
+        states, EVB, conf, folder = path_run
+        monkeypatch.chdir(folder)
+        data_folder = conf['data_folder']
 
-            reloaded = EvbDriver(ostream=OutputStream(None))
-            reloaded.load_initialisation(data_folder,
-                                         load_systems=True,
-                                         load_top=True)
+        reloaded = EvbDriver(ostream=OutputStream(None))
+        reloaded.load_initialisation(data_folder,
+                                     load_systems=True,
+                                     load_top=True)
 
-            assert len(reloaded.system_confs) == 1
-            loaded = reloaded.system_confs[0]
-            assert loaded['n_states'] == len(states)
-            assert len(loaded['steps']) == len(states) - 1
-            assert reloaded.lambda_vec == EVB.lambda_vec
+        assert len(reloaded.system_confs) == 1
+        loaded = reloaded.system_confs[0]
+        assert loaded['n_states'] == len(states)
+        assert len(loaded['steps']) == len(states) - 1
+        assert reloaded.lambda_vec == EVB.lambda_vec
 
-            for step, step_conf in enumerate(loaded['steps']):
-                systems = step_conf['systems']
-                # That step's lambda systems plus every state's PES system.
-                for lam in reloaded.lambda_vec:
-                    assert lam in systems, f"step {step} is missing lambda {lam}"
-                for index in range(len(states)):
-                    assert f"state_{index}" in systems
+        for step, step_conf in enumerate(loaded['steps']):
+            systems = step_conf['systems']
+            # That step's lambda systems plus every state's PES system.
+            for lam in reloaded.lambda_vec:
+                assert lam in systems, f"step {step} is missing lambda {lam}"
+            for index in range(len(states)):
+                assert f"state_{index}" in systems
 
-    def test_output_loads_back_per_step(self):
-        states = MultiStepFixtures._synthetic_three_states()
-        with EvbTestHelper.evb_chdir_tmp():
-            EVB, conf = self._run(states)
+    def test_output_loads_back_per_step(self, path_run, monkeypatch):
+        states, EVB, conf, folder = path_run
+        monkeypatch.chdir(folder)
 
-            results = EVB._load_output_from_folders(1, False, 1)
-            loaded = results["configuration_results"][conf["name"]]
+        results = EVB._load_output_from_folders(1, False, 1)
+        loaded = results["configuration_results"][conf["name"]]
 
-            assert loaded["n_states"] == len(states)
-            assert len(loaded["steps"]) == len(states) - 1
+        assert loaded["n_states"] == len(states)
+        assert len(loaded["steps"]) == len(states) - 1
 
-            for index, step in enumerate(loaded["steps"]):
-                # Every state's surface is read back, not just the two
-                # flanking this step.
-                assert step["E_pes_names"].split(",") == [
-                    f"state_{k}" for k in range(len(states))
-                ]
-                assert step["E_pes"].shape[0] == len(states)
-                assert step["step"] == index
-                assert np.all(step["Step_frame"] == index)
+        for index, step in enumerate(loaded["steps"]):
+            # Every state's surface is read back, not just the two
+            # flanking this step.
+            assert step["E_pes_names"].split(",") == [
+                f"state_{k}" for k in range(len(states))
+            ]
+            assert step["E_pes"].shape[0] == len(states)
+            assert step["step"] == index
+            assert np.all(step["Step_frame"] == index)
 
-                # E1 / E2 are this step's own flanking states, picked by name.
-                assert np.allclose(step["E1_pes"], step["E_pes"][index])
-                assert np.allclose(step["E2_pes"], step["E_pes"][index + 1])
+            # E1 / E2 are this step's own flanking states, picked by name.
+            assert np.allclose(step["E1_pes"], step["E_pes"][index])
+            assert np.allclose(step["E2_pes"], step["E_pes"][index + 1])
 
-                for key in ("E1_int", "E2_int", "E_m_pes", "Ep", "Ek"):
-                    assert np.all(np.isfinite(step[key]))
-                assert len(step["E1_pes"]) == len(results["Lambda_frame"])
+            for key in ("E1_int", "E2_int", "E_m_pes", "Ep", "Ek"):
+                assert np.all(np.isfinite(step[key]))
+            assert len(step["E1_pes"]) == len(results["Lambda_frame"])
 
-            # States 0 and 1 are the same molecule here, so the surfaces they
-            # contribute must agree wherever both were evaluated.
-            for step in loaded["steps"]:
-                assert np.allclose(step["E_pes"][0], step["E_pes"][1])
+        # States 0 and 1 are the same molecule here, so the surfaces they
+        # contribute must agree wherever both were evaluated.
+        for step in loaded["steps"]:
+            assert np.allclose(step["E_pes"][0], step["E_pes"][1])
 
-    def test_energy_profiles_refuse_a_path(self):
-        states = MultiStepFixtures._synthetic_three_states()
-        with EvbTestHelper.evb_chdir_tmp():
-            EVB, _ = self._run(states)
-            with pytest.raises(Exception, match="cannot yet fit"):
-                EVB.compute_energy_profiles(barrier=100.0, free_energy=0.0)
+    def test_energy_profiles_refuse_a_path(self, path_run, monkeypatch):
+        states, EVB, conf, folder = path_run
+        monkeypatch.chdir(folder)
+        with pytest.raises(Exception, match="cannot yet fit"):
+            EVB.compute_energy_profiles(barrier=100.0, free_energy=0.0)
 
-    def test_compute_force_groups_is_refused(self):
-        states = MultiStepFixtures._synthetic_three_states()
-        with EvbTestHelper.evb_chdir_tmp():
-            EVB, _ = self._run(states)
-            with pytest.raises(Exception, match="not available"):
-                EVB.compute_force_groups()
+    def test_compute_force_groups_is_refused(self, path_run, monkeypatch):
+        states, EVB, conf, folder = path_run
+        monkeypatch.chdir(folder)
+        with pytest.raises(Exception, match="not available"):
+            EVB.compute_force_groups()
