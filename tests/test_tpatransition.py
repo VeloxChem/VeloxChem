@@ -41,7 +41,7 @@ class TestTpaTransition:
         return scf_results, molecule, basis
 
     def run_tpatransition(self, xcfun_label, ref_energies, ref_strengths,
-                          ri_coulomb=False):
+                          ri_coulomb=False, ri_jk=False):
 
         tpa_nstates = 2
         tpa_conv_thresh = 1.0e-7
@@ -53,6 +53,9 @@ class TestTpaTransition:
         tpa_drv.xcfun = xcfun_label
         tpa_drv.nstates = tpa_nstates
         tpa_drv.conv_thresh = tpa_conv_thresh
+        tpa_drv.ri_jk = ri_jk
+        if ri_jk:
+            tpa_drv.ri_auxiliary_basis = 'def2-universal-jkfit'
         tpa_drv.ostream.mute()
         tpa_results = tpa_drv.compute(molecule, ao_basis, scf_results)
 
@@ -132,6 +135,15 @@ class TestTpaTransition:
                                ref_energies,
                                ref_strengths,
                                ri_coulomb=True)
+
+    def test_tpatransition_ri_jk_hf(self):
+
+        ref_energies = [0.16568325453033583, 0.21189487407526517]
+        ref_strengths = [4.135539557437213, 15.851159932394099]
+        self.run_tpatransition('hf',
+                               ref_energies,
+                               ref_strengths,
+                               ri_jk=True)
 
     def test_get_spectrum(self):
 

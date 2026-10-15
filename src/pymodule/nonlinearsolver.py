@@ -320,14 +320,10 @@ class NonlinearSolver:
             The dictionary of ERI information.
         """
 
-        # NOTE: only the simd driver has a response path, and only on one rank.
+        # NOTE: only the simd driver has a response path.
         assert_msg_critical(
             (not self.ri_jk) or self.ri_jk_simd,
             f'{type(self).__name__}: RI-JK is supported only with ri_jk_simd')
-
-        assert_msg_critical(
-            (not self.ri_jk) or (self.nodes == 1),
-            f'{type(self).__name__}: the RI-JK response path runs on one rank')
 
         assert_msg_critical(
             (not self.ri_coulomb) or self.ri_coulomb_simd,
@@ -818,6 +814,16 @@ class NonlinearSolver:
             if mode_is_cubic:
                 batch_size_second_order = self.comm.bcast(
                     batch_size_second_order, root=mpi_master())
+
+        # NOTE: **the factors are broadcast as the densities are.** They are built
+        # on the master rank alone, and the response driver sweeps only the share
+        # of the auxiliary basis each rank holds, so every rank has to take the
+        # fitted path for the shares to add up. A rank which found none would take
+        # `use_ri_jk` to be false and build its share of the densities the four
+        # centre way instead, and the reduction below would add that four centre
+        # share to the fitted shares of the other ranks. What came back would be a
+        # Fock matrix of neither method.
+        dens_factors = self.comm.bcast(dens_factors, root=mpi_master())
 
         # go through batches
 
