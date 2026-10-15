@@ -49,12 +49,17 @@ class TestEnsembleParser:
         ],
     )
     def test_mdanalysis_pdb_version_options(
-        self, monkeypatch, mda_version, expected_kwargs
+        self, monkeypatch, tmp_path, mda_version, expected_kwargs
     ):
         class UniverseCalled(Exception):
             pass
 
         universe_kwargs = {}
+
+        # A real file is needed because structures() checks for CONECT
+        # records before creating the (mocked) Universe. This file has none,
+        # so the version-dependent bond-guessing options are exercised.
+        pdb_path = make_simple_tip3_pdb(tmp_path)
 
         def fake_version(distribution_name):
             assert distribution_name == "MDAnalysis"
@@ -76,7 +81,7 @@ class TestEnsembleParser:
 
         with pytest.raises(UniverseCalled):
             ens_parser.structures(
-                pdb_file="structure.pdb",
+                pdb_file=pdb_path,
                 qm_region="resname LIG",
             )
 
