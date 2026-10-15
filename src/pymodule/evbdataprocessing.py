@@ -122,9 +122,9 @@ class EvbDataProcessing:
         self.alpha_guess: float = 0
         self.H12_guess: float = 10
 
-        # "bar": pairwise BAR between adjacent lambda windows (default).
-        # "mbar": joint multistate estimate using every window's overlap with
-        # every other window, not just its neighbors.
+        # "mbar" (default): joint multistate estimate using every window's
+        # overlap with every other window, not just its neighbors.
+        # "bar": pairwise BAR between adjacent lambda windows.
         self.fep_estimator: str = "mbar"
 
         # Boltzmann constant: ca 8.314e-3 kJ/mol/K
