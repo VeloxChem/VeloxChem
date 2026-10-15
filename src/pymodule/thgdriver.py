@@ -452,6 +452,28 @@ class ThgDriver(NonlinearSolver):
 
         return ret_dict
 
+    def _gather_ri_jk_factor_lists(self, local_lists):
+        """
+        Gathers the right factors of the densities each rank computed and
+        concatenates them in rank order, which is the order the density columns
+        were laid out in.
+
+        :param local_lists:
+            The local lists of right factors, in the order of the factors.
+        :return:
+            The concatenated lists on the master rank, None on the others.
+        """
+
+        gathered = self.comm.gather(local_lists, root=mpi_master())
+
+        if self.rank != mpi_master():
+            return None
+
+        return [
+            [x for rank_lists in gathered for x in rank_lists[i]]
+            for i in range(len(local_lists))
+        ]
+
     def get_densities(self, wi, Nx, mo, nocc, norb):
         """
         Computes the compounded densities needed for the compounded Fock
@@ -523,13 +545,13 @@ class ThgDriver(NonlinearSolver):
         mo = self.comm.bcast(mo, root=mpi_master())
 
         # NOTE: the factors of the two orders which reach the Fock build, kept
-        # apart as lists of the occupied and the virtual right factor. The tasks
-        # below are spread over the ranks, but the resolution of the identity
-        # refuses more than one of them, so the columns are filled in task order
-        # on the one rank there is.
+        # apart as lists of the occupied and the virtual right factor. Every rank
+        # builds them for the tasks it was dealt and they are gathered in task
+        # order before the Fock build, as the resolution of the identity sweeps
+        # the densities one batch at a time and the columns have to line up.
         self._ri_jk_factors = None
 
-        if self.rank == mpi_master() and self.ri_jk and self.ri_jk_simd:
+        if self.ri_jk and self.ri_jk_simd:
             self._ri_jk_factors = {
                 'left_occ': mo[:, :nocc],
                 'left_vir': mo[:, nocc:],
@@ -712,6 +734,20 @@ class ThgDriver(NonlinearSolver):
                                                          distribute=False)
             else:
                 distributed_density_3.append(dist_den_3_freq, axis=1)
+
+        if self._ri_jk_factors is not None:
+            lists = self._gather_ri_jk_factor_lists([
+                self._ri_jk_factors['second'][0],
+                self._ri_jk_factors['second'][1],
+                self._ri_jk_factors['third'][0],
+                self._ri_jk_factors['third'][1],
+            ])
+
+            if self.rank == mpi_master():
+                self._ri_jk_factors['second'] = (lists[0], lists[1])
+                self._ri_jk_factors['third'] = (lists[2], lists[3])
+            else:
+                self._ri_jk_factors = None
 
         self.ostream.print_info(f'Time spent in generating densities: {time.time() - dens_t0:.2f} sec')
         self.ostream.print_blank()
@@ -1236,7 +1272,7 @@ class ThgDriver(NonlinearSolver):
         # the general shape and not the two of the pass before.
         self._ri_jk_factors = None
 
-        if self.rank == mpi_master() and self.ri_jk and self.ri_jk_simd:
+        if self.ri_jk and self.ri_jk_simd:
             self._ri_jk_factors = (mo[:, :nocc], [], mo[:, nocc:], [])
 
         for task_id, rank in task_rank_pairs:
@@ -1422,6 +1458,16 @@ class ThgDriver(NonlinearSolver):
                                                          distribute=False)
             else:
                 distributed_density_2.append(dist_den_2_freq, axis=1)
+
+        if self._ri_jk_factors is not None:
+            lists = self._gather_ri_jk_factor_lists(
+                [self._ri_jk_factors[1], self._ri_jk_factors[3]])
+
+            if self.rank == mpi_master():
+                self._ri_jk_factors = (self._ri_jk_factors[0], lists[0],
+                                       self._ri_jk_factors[2], lists[1])
+            else:
+                self._ri_jk_factors = None
 
         self.ostream.print_info(f'Time spent in generating densities: {time.time() - dens_t0:.2f} sec')
         self.ostream.print_blank()
