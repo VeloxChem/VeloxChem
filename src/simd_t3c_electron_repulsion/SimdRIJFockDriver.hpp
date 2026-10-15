@@ -68,9 +68,14 @@ class CSimdRIJFockDriver
                          const double            threshold,
                          const std::vector<int> &aux_atoms = {}) const -> size_t;
 
-    /// @brief Forms the metric of the auxiliary basis, inverted outright.
+    /// @brief Forms the metric of the auxiliary basis, prepared for the fitting.
     /// @param metric_threshold The threshold of the linear dependence.
-    /// @return The inverted metric.
+    /// @return The Cholesky factor of the metric, as a lower triangular matrix, or
+    /// for a metric which is close to singular its pseudo inverse, as a symmetric one.
+    /// @note The factor rather than the inverse, as the fitting solves with it. The
+    /// metric is ill conditioned and an inverse formed outright loses that much of
+    /// the precision: 1e-7 to 1e-6 Hartree of the Coulomb energy of a molecule of
+    /// sixty atoms, against 1e-11 for the solves.
     /// @note Formed once by whoever prepares the calculation and handed to prepare,
     /// so that the ranks of a communicator build with the same matrix rather than
     /// each inverting and risking a different fallback.
@@ -82,7 +87,8 @@ class CSimdRIJFockDriver
     /// @param threshold The screening threshold of the integrals.
     /// @param memory_budget The memory a part's integrals may take, in bytes.
     /// @param mode The way to build. Automatic chooses from the memory.
-    /// @param metric The inverted metric, or an empty matrix to form it here.
+    /// @param metric The metric make_metric answers, or an inverted one (symmetric),
+    /// or an empty matrix to form it here.
     /// @param rank This rank, which decides which parts it owns.
     /// @param nodes The ranks which divide the parts, so that there are at least as
     /// many parts as there are of them.
@@ -108,7 +114,8 @@ class CSimdRIJFockDriver
     /// @brief Gets the way the driver builds, which is never automatic once prepared.
     auto get_mode() const -> rimode;
 
-    /// @brief Gets the inverted metric the driver holds.
+    /// @brief Gets the metric the driver holds: the Cholesky factor of the metric
+    /// (lower triangular) or an inverse of it (symmetric).
     auto get_metric() const -> const CPackedMatrix &;
 
     /// @brief Gets the parts of the auxiliary basis the sweeps take.
@@ -140,12 +147,14 @@ class CSimdRIJFockDriver
     /// basis and needs a right hand side which is complete.
     auto compute_gamma(const CPackedMatrix &density, const std::vector<int> &parts) -> std::vector<double>;
 
-    /// @brief Applies the inverted metric to the right hand side of the fitting.
+    /// @brief Solves the fitting for the right hand side.
     /// @param gamma The right hand side, summed over every part there is.
     /// @return The coefficients of the fitting.
-    /// @note Every rank holds the inverse and solves it, rather than one solving and
-    /// sending: it is one multiply of the square of the auxiliary basis against a
-    /// single right hand side.
+    /// @note With the Cholesky factor this is two triangular solves, and with an
+    /// inverse one multiply, each the square of the auxiliary basis in work.
+    /// @note Every rank holds the metric and solves, rather than one solving and
+    /// sending: it is the square of the auxiliary basis against a single right hand
+    /// side.
     auto solve_fitting(const std::vector<double> &gamma) const -> std::vector<double>;
 
     /// @brief Adds the Coulomb matrix of the given parts to a matrix.
@@ -179,7 +188,7 @@ class CSimdRIJFockDriver
 
     CMolecularBasis _aux_basis;
 
-    /// @brief The metric of the auxiliary basis, inverted outright.
+    /// @brief The metric of the auxiliary basis: its Cholesky factor, or an inverse.
     CPackedMatrix _metric;
 
     /// @brief The sparsity pattern of each part of the auxiliary basis.

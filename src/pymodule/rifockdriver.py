@@ -44,7 +44,8 @@ from .molecularbasis import MolecularBasis
 from .errorhandler import assert_msg_critical
 
 try:
-    from scipy.linalg import lu_factor, lu_solve, sqrtm
+    from scipy.linalg import cho_factor, cho_solve, lu_factor, lu_solve, sqrtm
+    from scipy.linalg import LinAlgError
 except ImportError:
     pass
 
@@ -80,6 +81,9 @@ class RIFockDriver:
         self.ostream = ostream
 
         self._ri_drv = None
+
+        self._mat_j = None
+        self._mat_j_factor = None
 
     def prepare_buffers(self,
                         molecule,
@@ -129,18 +133,30 @@ class RIFockDriver:
 
         ri_prep_t0 = time.time()
 
+        # NOTE: the Coulomb fitting solves with a factor of the metric on every
+        # build rather than multiplying by its inverse. The metric is ill
+        # conditioned, 1e7 for def2-universal-jfit on a molecule of sixty atoms,
+        # and an inverse formed outright loses that much precision: 1e-7 Hartree
+        # of the Coulomb energy there, against 1e-11 for the solve. A metric which
+        # has no Cholesky factor is solved through its LU factorization instead.
+
+        self._mat_j = mat_j_np
+
         if 'scipy' in sys.modules:
+            try:
+                self._mat_j_factor = ('cholesky', cho_factor(mat_j_np))
+            except LinAlgError:
+                self._mat_j_factor = ('lu', lu_factor(mat_j_np))
+        else:
+            self._mat_j_factor = ('numpy', None)
+
+        if k_metric:
+            assert_msg_critical(
+                'scipy' in sys.modules,
+                'RI Fock driver: K metric computation requires scipy module.')
             lu, piv = lu_factor(mat_j_np)
             inv_mat_j_np = lu_solve((lu, piv), np.eye(mat_j_np.shape[0]))
-            if k_metric:
-                inv_mat_k_np = sqrtm(inv_mat_j_np)
-        else:
-            inv_mat_j_np = np.linalg.inv(mat_j_np)
-            if k_metric:
-                assert_msg_critical(
-                    False,
-                    'RI Fock driver: K metric computation requires scipy module.'
-                )
+            inv_mat_k_np = sqrtm(inv_mat_j_np)
 
         if verbose:
             self.ostream.print_info('Metric(s) for RI done in ' +
@@ -149,11 +165,11 @@ class RIFockDriver:
 
         ri_prep_t0 = time.time()
 
-        inv_mat_j = SubMatrix(
-            [0, 0, inv_mat_j_np.shape[0], inv_mat_j_np.shape[1]])
-        inv_mat_j.set_values(inv_mat_j_np)
-
         if k_metric:
+            inv_mat_j = SubMatrix(
+                [0, 0, inv_mat_j_np.shape[0], inv_mat_j_np.shape[1]])
+            inv_mat_j.set_values(inv_mat_j_np)
+
             inv_mat_k = SubMatrix(
                 [0, 0, inv_mat_k_np.shape[0], inv_mat_k_np.shape[1]])
             inv_mat_k.set_values(inv_mat_k_np)
@@ -162,7 +178,7 @@ class RIFockDriver:
         if k_metric:
             self._ri_drv = _RIFockDriver(inv_mat_j, inv_mat_k)
         else:
-            self._ri_drv = _RIFockDriver(inv_mat_j)
+            self._ri_drv = _RIFockDriver()
 
         local_atoms = molecule.partition_atoms(self.comm)
         self._ri_drv.prepare_buffers(molecule, basis, basis_ri_j, local_atoms)
@@ -173,18 +189,39 @@ class RIFockDriver:
             self.ostream.print_blank()
             self.ostream.flush()
 
+    def solve_fitting(self, gamma):
+        """
+        Solves the Coulomb fitting with the factor of the metric.
+
+        :param gamma:
+            The right hand side, summed over the ranks.
+
+        :return:
+            The coefficients of the fitting.
+        """
+
+        kind, factor = self._mat_j_factor
+
+        if kind == 'cholesky':
+            return cho_solve(factor, gamma)
+        elif kind == 'lu':
+            return lu_solve(factor, gamma)
+        else:
+            return np.linalg.solve(self._mat_j, gamma)
+
     def compute_bq_vector(self, den_mat_for_fock):
         """
         Compute bq vector using the RI Fock driver.
         """
 
-        local_gvec = np.array(
-            self._ri_drv.compute_local_bq_vector(den_mat_for_fock))
+        local_gamma = np.array(
+            self._ri_drv.compute_local_gamma_vector(den_mat_for_fock,
+                                                    self._mat_j.shape[0]))
 
-        gvec = np.zeros(local_gvec.shape)
-        self.comm.Allreduce(local_gvec, gvec, op=MPI.SUM)
+        gamma = np.zeros(local_gamma.shape)
+        self.comm.Allreduce(local_gamma, gamma, op=MPI.SUM)
 
-        return gvec
+        return self.solve_fitting(gamma)
 
     def compute(self, den_mat_for_fock, fock_type):
         """

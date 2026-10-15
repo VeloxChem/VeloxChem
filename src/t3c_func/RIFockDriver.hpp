@@ -143,6 +143,24 @@ class CRIFockDriver
     /// @return The transformed Gamma vector.
     auto compute_local_bq_vector(const CMatrix &density) const -> std::vector<double>;
     
+    /// @brief Computes the right hand side of the Coulomb fitting for given density,
+    /// gamma(P) = sum over mn of (P|mn) D(mn), without applying the J metric.
+    /// @param density The density matrix.
+    /// @return The right hand side, one value per auxiliary function of the buffer.
+    /// @note The caller solves the fitting with a factor of the metric. An inverse of
+    /// the metric formed outright loses the precision the condition of the metric
+    /// costs, 1e-7 Hartree of the Coulomb energy of a molecule of sixty atoms.
+    auto compute_gamma_vector(const CMatrix &density) const -> std::vector<double>;
+
+    /// @brief Computes this rank's share of the right hand side of the Coulomb fitting
+    /// for given density, without applying the J metric.
+    /// @param density The density matrix.
+    /// @param naux The number of auxiliary functions of the whole auxiliary basis.
+    /// @return The share, of naux values: those of the auxiliary functions in the
+    /// buffer of this rank at their global indices and zeros elsewhere, so that the
+    /// shares of the ranks add up to the whole right hand side.
+    auto compute_local_gamma_vector(const CMatrix &density, const size_t naux) const -> std::vector<double>;
+
     /// @brief Computes transformed Bq vector with K metric for given similarity transformed MOs.
     /// @param lambda_p The MOs augmented by particle single excitations.
     /// @param lambda_h The MOs augmented by hole single excitations.

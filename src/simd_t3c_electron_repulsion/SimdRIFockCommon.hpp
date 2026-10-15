@@ -134,16 +134,20 @@ auto make_parts(const CMolecule              &molecule,
                 const size_t                  min_parts,
                 const size_t                  budget) -> std::vector<CTripleSparsityPattern>;
 
-/// @brief Inverts the metric of the auxiliary basis outright.
+/// @brief Prepares the metric of the auxiliary basis for a Coulomb only fitting.
 /// @param two_center The two-center integrals of the auxiliary basis.
 /// @param metric_threshold The threshold of the linear dependence.
-/// @return The inverse, as a symmetric matrix.
-/// @note This is what a Coulomb only fitting wants. It applies the metric to a
-/// vector of one value per auxiliary function, twice a build, so the inverse itself
-/// is the cheap thing to hold and one multiply is the cheap thing to do. A driver
-/// which applies the metric to a **tensor** wants a factor of it instead, which is
-/// what invert_metric answers, because a factor halves the work of that.
-auto invert_metric_full(const CPackedMatrix &two_center, const double metric_threshold) -> CPackedMatrix;
+/// @return The Cholesky factor of the metric, as a lower triangular matrix, or, for
+/// a metric which is close to singular, its pseudo inverse, as a symmetric matrix.
+/// @note The factor is what a Coulomb only fitting wants. It solves one vector of
+/// one value per auxiliary function a build, and two triangular solves do that in
+/// the work of one multiply by the inverse, without the precision an inverse formed
+/// outright loses to the condition of the metric. The type of the matrix returned
+/// says which of the two it is, and solve_fitting reads it.
+/// @note A metric with no Cholesky factor, or with a pivot at or under the
+/// threshold, is inverted on the directions the basis spans instead, as a pseudo
+/// inverse, and a warning says so.
+auto factor_metric_full(const CPackedMatrix &two_center, const double metric_threshold) -> CPackedMatrix;
 
 auto invert_metric(const CPackedMatrix &two_center,
                    const double         metric_threshold,

@@ -33,6 +33,7 @@
 #include "RIFockDriver.hpp"
 
 #include "BatchFunc.hpp"
+#include "ErrorHandler.hpp"
 #include "ThreeCenterElectronRepulsionDriver.hpp"
 
 CRIFockDriver::CRIFockDriver()
@@ -183,6 +184,27 @@ CRIFockDriver::compute_local_bq_vector(const CMatrix &density) const -> std::vec
 }
 
 auto
+CRIFockDriver::compute_gamma_vector(const CMatrix &density) const -> std::vector<double>
+{
+    return _comp_gamma_vector(density);
+}
+
+auto
+CRIFockDriver::compute_local_gamma_vector(const CMatrix &density, const size_t naux) const -> std::vector<double>
+{
+    const auto lvec = _comp_gamma_vector(density);
+
+    std::vector<double> gvec(naux, 0.0);
+
+    for (const auto [gidx, lidx] : _eri_buffer.mask_indices())
+    {
+        gvec[gidx] = lvec[lidx];
+    }
+
+    return gvec;
+}
+
+auto
 CRIFockDriver::compute_bq_vector(const CSubMatrix& lambda_p, const CSubMatrix& lambda_h) const -> std::vector<double>
 {
     const auto mask = _eri_buffer.mask_indices();
@@ -236,6 +258,9 @@ CRIFockDriver::_comp_gamma_vector(const CMatrix &density) const -> std::vector<d
 auto
 CRIFockDriver::_trafo_gamma_vector(const std::vector<double>& gvector) const -> std::vector<double>
 {
+    errors::assertMsgCritical(_j_metric != nullptr,
+                              std::string("RIFockDriver: No inverted J metric; solve the fitting of the gamma vector"));
+
     const auto ndim = _eri_buffer.aux_width();
     
     std::vector<double> tvec(ndim, 0.0);
@@ -268,6 +293,9 @@ CRIFockDriver::_trafo_gamma_vector(const std::vector<double>& gvector) const -> 
 auto
 CRIFockDriver::_trafo_local_gamma_vector(const std::vector<double>& gvector) const -> std::vector<double>
 {
+    errors::assertMsgCritical(_j_metric != nullptr,
+                              std::string("RIFockDriver: No inverted J metric; solve the fitting of the gamma vector"));
+
     const auto ndim = _j_metric->number_of_rows();
     
     std::vector<double> tvec(ndim, 0.0);

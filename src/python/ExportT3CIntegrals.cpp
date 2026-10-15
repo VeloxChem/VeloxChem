@@ -101,7 +101,14 @@ export_t3cintegrals(py::module& m)
              "Computes transformed Gamma vector for given density.")
         .def("compute_bq_vector", py::overload_cast<const CSubMatrix&, const CSubMatrix&> (&CRIFockDriver::compute_bq_vector, py::const_),
              "Computes transformed Bq vector for given similarity transformed MOs.")
-        .def("compute_local_bq_vector", &CRIFockDriver::compute_local_bq_vector, "Computes transformed local Gamma vector for given density.");
+        .def("compute_local_bq_vector", &CRIFockDriver::compute_local_bq_vector, "Computes transformed local Gamma vector for given density.")
+        .def("compute_gamma_vector", &CRIFockDriver::compute_gamma_vector,
+             "Computes the right hand side of the Coulomb fitting for given density, without the J metric.",
+             py::arg("density"))
+        .def("compute_local_gamma_vector", &CRIFockDriver::compute_local_gamma_vector,
+             "Computes this rank's share of the right hand side of the Coulomb fitting for given density, without "
+             "the J metric, at the global indices of the auxiliary functions.",
+             py::arg("density"), py::arg("naux"));
     
     // CRIJKFockDriver class
     // Note: RIJKFockDriver is prefixed by an underscore and will be used in rijkfockdriver.py
