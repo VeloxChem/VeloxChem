@@ -154,6 +154,18 @@ class EvbDataProcessing:
         # much faster than "mbar" when fep_estimator="mbar"
         self.per_replica_fep_estimator = 'bar'
 
+        # Reorganization energy lambda_r from the energy gap in the two end
+        # windows, and the diabatic free-energy curves dg1, dg2 on the
+        # coordinate bins, stored per configuration under "reorganization"
+        # (see _calculate_reorganization). Needs a lambda ladder that starts
+        # at 0 and ends at 1.
+        self.calculate_reorganization = True
+        # The largest relative difference between the reactant-side and the
+        # product-side lambda_r that is read as linear response. Above it,
+        # compute() and print_uncertainties note that lambda_r should be
+        # quoted with both one-sided values.
+        self.reorganization_split_tolerance = 0.05
+
         # Warm-start cache for _calculate_dGfep_mbar
         self._mbar_f_k_warm_start = None
         # The Savitzky-Golay filter only locates the extrema of an EVB
@@ -1117,6 +1129,10 @@ class EvbDataProcessing:
             dGfep, dGfep_unc = self._calculate_dGfep(E1, E2_shifted, Temp_set)
 
             result.update({"dGfep": dGfep, "dGfep_unc": dGfep_unc})
+            if self.calculate_reorganization:
+                result["reorganization"] = self._calculate_reorganization(
+                    name, result, E1, E2_shifted, dGfep, dGfep_unc,
+                    Temp_set)
             if self.calculate_discrete:
                 dGevb_discrete, pns, dGcor, dGdens = self._dGevb_discretised(
                     dGfep, result["Eg"], result["V"], result["dE"],
@@ -1231,6 +1247,169 @@ class EvbDataProcessing:
                 self.ostream.flush()
                 self._calculate_fg_profiles(result)
 
+    def _calculate_reorganization(self, name, result, E1, E2_shifted, dGfep,
+                                  dGfep_unc, Temp_set):
+        """Reorganization energy and diabatic free-energy curves of one
+        two-state configuration.
+
+        Conventions, as elsewhere in this class: E2' = E2 + alpha, the gap
+        xi = E1 - E2' (dE), and the vertical energy difference
+        de = E2' - E1 = -xi. Window 0 samples E1, the last window samples E2',
+        and dG0 = G2' - G1 = dGfep[-1].
+
+        lambda_r = (<de>_0 - <de>_1) / 2 is the energy-gap estimate from the
+        two end windows. It is the total reorganization energy of the E1/E2
+        gap, solute and environment together. It compares with total values
+        (Hwang et al. 1988 derive about 68 kcal/mol for their reaction in
+        water), not with solvent-only ones (the 22 and 69 kcal/mol of Olsson
+        and Warshel 2004 are the solvent part). The one-sided values
+        lambda_reactant = <de>_0 - dG0 and lambda_product = dG0 - <de>_1
+        equal lambda_r under linear response (diabatic surfaces of equal
+        curvature). Otherwise lambda_reactant is the energetic
+        reorganization of surface 2 and lambda_product that of surface 1,
+        and lambda_r is their mean. split = |lambda_reactant -
+        lambda_product| / lambda_r; above reorganization_split_tolerance,
+        quote lambda_r with both one-sided values.
+
+        Uncertainty: var(<de>_k) = var(de)_k g_k / N_k for end window k,
+        where N_k / g_k = n_eff_k is the sum of len / g over the window's
+        (replica, direction) blocks, g being the statistical inefficiency of
+        de in a block (pymbar timeseries; frames are taken to be in time
+        order within a block). sigma(lambda_r) = sqrt(var<de>_0 +
+        var<de>_1) / 2, and the one-sided sigmas add dGfep_unc[-1] in
+        quadrature, which itself assumes uncorrelated frames. Correlation
+        between windows is not covered; the replica standard error of
+        lambda_r (replica_average) is the cross-check.
+
+        dg1 and dg2 come from _dGevb_discretised with E1 or E2' in place of
+        Eg (the FEP/US estimate): dg1(s) = -kT ln P1(s) and dg2(s) =
+        -kT ln P2(s) + dG0, with Pi(s) the probability (not the density) of
+        bin s on the pure state i, so dg2 - dg1 is about -xi. They have the
+        layout of the discretised EVB profile: len(coordinate_bins) + 1
+        entries, the first and last collecting the frames outside the bins.
+        Bins without frames are NaN.
+
+        Returns:
+            dict: lambda_r, lambda_reactant, lambda_product and their *_unc,
+            split, split_tolerance, de_mean, de_var, g and n_eff (each for
+            windows 0 and 1), dg1, dg2 and convention. Energies in kJ/mol,
+            de_var in (kJ/mol)^2.
+        """
+
+        Lambda = np.asarray(self.Lambda, dtype=float)
+        assert_msg_critical(
+            np.isclose(Lambda[0], 0.0) and np.isclose(Lambda[-1], 1.0),
+            "EvbDataProcessing: the reorganization energy needs a lambda " +
+            "ladder that starts at 0 and ends at 1; set " +
+            "calculate_reorganization = False otherwise.")
+        lambda_indices = np.asarray(self.Lambda_indices)
+        de = np.asarray(E2_shifted, dtype=float) - np.asarray(E1, dtype=float)
+        labels = [
+            np.asarray(result[key])
+            for key in ("Replica_frame", "Direction_frame")
+            if result.get(key) is not None
+        ]
+
+        de_mean, de_var, g, n_eff = [], [], [], []
+        for window in (0, len(Lambda) - 1):
+            frames = np.flatnonzero(lambda_indices == window)
+            assert_msg_critical(
+                len(frames) >= 2,
+                f"EvbDataProcessing: lambda window {window} of configuration "
+                + f"{name} has fewer than 2 frames, so the reorganization " +
+                "energy cannot be estimated.")
+            de_mean.append(float(np.mean(de[frames])))
+            de_var.append(float(np.var(de[frames], ddof=1)))
+            if labels:
+                keys = np.stack([label[frames] for label in labels], axis=1)
+                _, block_of = np.unique(keys, axis=0, return_inverse=True)
+                block_of = np.ravel(block_of)
+                blocks = [
+                    frames[block_of == b] for b in range(block_of.max() + 1)
+                ]
+            else:
+                blocks = [frames]
+            n_eff.append(
+                float(
+                    sum(
+                        len(block) / self._statistical_inefficiency(de[block])
+                        for block in blocks)))
+            g.append(len(frames) / n_eff[-1])
+
+        var_mean = [var / n for var, n in zip(de_var, n_eff)]
+        dG0 = dGfep[-1]
+        lambda_r = 0.5 * (de_mean[0] - de_mean[1])
+        lambda_reactant = de_mean[0] - dG0
+        lambda_product = dG0 - de_mean[1]
+        split = (abs(lambda_reactant - lambda_product) /
+                 abs(lambda_r) if lambda_r != 0 else float("nan"))
+
+        if split > self.reorganization_split_tolerance:
+            self.ostream.print_info(
+                f"Configuration {name}: the reactant-side and product-side " +
+                f"reorganization energies ({lambda_reactant:.2f} and " +
+                f"{lambda_product:.2f} kJ/mol) differ by {100 * split:.0f}% "
+                + "of lambda_r, so linear response does not hold; quote " +
+                f"lambda_r = {lambda_r:.2f} kJ/mol with both one-sided values.")
+            self.ostream.flush()
+
+        dg1 = self._dGevb_discretised(dGfep, E1, result["V"], result["dE"],
+                                      Temp_set)[0]
+        dg2 = self._dGevb_discretised(dGfep, E2_shifted, result["V"],
+                                      result["dE"], Temp_set)[0]
+
+        return {
+            "lambda_r": lambda_r,
+            "lambda_r_unc": 0.5 * np.sqrt(var_mean[0] + var_mean[1]),
+            "lambda_reactant": lambda_reactant,
+            "lambda_reactant_unc": np.sqrt(var_mean[0] + dGfep_unc[-1]**2),
+            "lambda_product": lambda_product,
+            "lambda_product_unc": np.sqrt(var_mean[1] + dGfep_unc[-1]**2),
+            "split": split,
+            "split_tolerance": self.reorganization_split_tolerance,
+            "de_mean": np.array(de_mean),
+            "de_var": np.array(de_var),
+            "g": np.array(g),
+            "n_eff": np.array(n_eff),
+            "dg1": dg1,
+            "dg2": dg2,
+            "convention": self._reorganization_convention,
+        }
+
+    _reorganization_convention = (
+        "xi = E1 - E2', E2' = E2 + alpha, de = E2' - E1 = -xi, "
+        "dG0 = G2' - G1 = dGfep[-1]; window 0 samples E1, the last window "
+        "E2'; lambda_r = (<de>_0 - <de>_1)/2, lambda_reactant = <de>_0 - dG0, "
+        "lambda_product = dG0 - <de>_1; dg1(s) = -kT ln P1(s), "
+        "dg2(s) = -kT ln P2(s) + dG0 per coordinate bin s")
+
+    @staticmethod
+    def _statistical_inefficiency(series):
+        """Statistical inefficiency g >= 1 of a time series (pymbar
+        timeseries). A series shorter than 10 frames, or one whose estimate
+        fails (e.g. a constant series), counts as uncorrelated."""
+
+        if len(series) < 10:
+            return 1.0
+        try:
+            from pymbar import timeseries
+            return max(1.0,
+                       float(timeseries.statistical_inefficiency(series)))
+        except Exception:
+            return 1.0
+
+    @staticmethod
+    def _end_window_lambda_r(E1, E2_shifted, lambda_indices, n_windows):
+        """lambda_r = (<de>_0 - <de>_1) / 2 of a subset of frames; NaN when
+        the subset lacks an end window."""
+
+        de = np.asarray(E2_shifted) - np.asarray(E1)
+        de0 = de[lambda_indices == 0]
+        de1 = de[lambda_indices == n_windows - 1]
+        if len(de0) == 0 or len(de1) == 0:
+            return float("nan")
+        return float(0.5 * (np.mean(de0) - np.mean(de1)))
+
     def _calculate_replica_average(self, result):
         """Mean and standard error of the mean of barrier/free_energy across replicas.
 
@@ -1276,6 +1455,36 @@ class EvbDataProcessing:
                 "free_energy_sem": free_energy_sem,
             }
         })
+
+        # The reorganization energy, when _calculate_reorganization ran.
+        # With at least 3 replicas, a replica standard error more than 2x
+        # away from the analytic sigma points at correlation between windows,
+        # drift or hysteresis, which the analytic sigma cannot see.
+        lambda_rs = [
+            directions["both"]["lambda_r"]
+            for directions in by_replica.values()
+            if "lambda_r" in directions.get("both", {})
+        ]
+        if not lambda_rs:
+            return
+        lambda_r_mean, lambda_r_sem = self._replica_mean_sem(
+            lambda_rs, "reorganization energy")
+        result["replica_average"].update({
+            "lambda_r_mean": lambda_r_mean,
+            "lambda_r_sem": lambda_r_sem,
+        })
+        reorganization = result.get("reorganization")
+        if reorganization is None or len(lambda_rs) < 3:
+            return
+        ratio = lambda_r_sem / reorganization["lambda_r_unc"]
+        if np.isfinite(ratio) and (ratio > 2 or ratio < 0.5):
+            self.ostream.print_info(
+                f"The replica standard error of lambda_r ({lambda_r_sem:.2f}"
+                + f" kJ/mol over {len(lambda_rs)} replicas) and its analytic "
+                + f"uncertainty ({reorganization['lambda_r_unc']:.2f} kJ/mol) "
+                + "differ by more than 2x; check the hysteresis and the "
+                + "drift between replicas.")
+            self.ostream.flush()
 
     def _replica_mean_sem(self, values, label):
         """Mean and standard error of the mean of one value per replica.
@@ -1509,6 +1718,13 @@ class EvbDataProcessing:
                             "max_arg": max_arg_sub,
                         },
                     }
+                    # The replica's own lambda_r, for the replica standard
+                    # error in _calculate_replica_average.
+                    if label == "both" and self.calculate_reorganization:
+                        by_replica[replica][label]["lambda_r"] = (
+                            self._end_window_lambda_r(
+                                E1[mask], E2_shifted[mask],
+                                lambda_indices[mask], len(self.Lambda)))
         finally:
             self.fep_estimator = saved_estimator
 
@@ -1704,6 +1920,22 @@ class EvbDataProcessing:
                 ostream.print_info(
                     f"{name:<30} {barrier_str:>25} {free_energy_str:>25}")
 
+        reorganized = {
+            name: result["reorganization"]
+            for name, result in results["configuration_results"].items()
+            if "reorganization" in result
+        }
+        if reorganized:
+            ostream.print_info(
+                f"{'Reorganization energy':<30} {'lambda_r (kJ/mol)':>25} {'Split':>25}"
+            )
+            for name, reorganization in reorganized.items():
+                lambda_str = (f"{reorganization['lambda_r']:.2f} +/- " +
+                              f"{reorganization['lambda_r_unc']:.2f}")
+                ostream.print_info(
+                    f"{name:<30} {lambda_str:>25} {reorganization['split']:>25.3f}"
+                )
+
         ostream.flush()
 
     @staticmethod
@@ -1752,6 +1984,51 @@ class EvbDataProcessing:
                 f"{name:<20} {barrier_str:>25} {free_energy_str:>25} {endpoint_str:>18}"
             )
         ostream.print_blank()
+
+        reorganized = {
+            name: result
+            for name, result in results["configuration_results"].items()
+            if "reorganization" in result
+        }
+        if reorganized:
+            ostream.print_header(
+                "Reorganization energy (energy gap in the end windows)")
+            ostream.print_info(
+                "Uncertainties include each end window's statistical " +
+                "inefficiency g; the one-sided ones add the pooled dGfep(l=1) unc."
+            )
+            ostream.print_info(
+                f"{'Configuration':<20} {'lambda_r (kJ/mol)':>25} {'Reactant side':>25} {'Product side':>25} {'g (l=0, 1)':>14}"
+            )
+            for name, result in reorganized.items():
+                reorganization = result["reorganization"]
+                lambda_str = (f"{reorganization['lambda_r']:.2f} +/- " +
+                              f"{reorganization['lambda_r_unc']:.2f}")
+                reactant_str = (
+                    f"{reorganization['lambda_reactant']:.2f} +/- " +
+                    f"{reorganization['lambda_reactant_unc']:.2f}")
+                product_str = (f"{reorganization['lambda_product']:.2f} +/- " +
+                               f"{reorganization['lambda_product_unc']:.2f}")
+                g_str = (f"{reorganization['g'][0]:.1f}, " +
+                         f"{reorganization['g'][1]:.1f}")
+                ostream.print_info(
+                    f"{name:<20} {lambda_str:>25} {reactant_str:>25} {product_str:>25} {g_str:>14}"
+                )
+                replica_average = result.get("replica_average", {})
+                if "lambda_r_mean" in replica_average:
+                    ostream.print_info(
+                        f"{name}: replica average lambda_r " +
+                        f"{replica_average['lambda_r_mean']:.2f} +/- " +
+                        f"{replica_average['lambda_r_sem']:.2f} kJ/mol " +
+                        f"(SEM over {replica_average['n_replicas']} replicas)")
+                split = reorganization["split"]
+                if split > reorganization.get("split_tolerance", 0.05):
+                    ostream.print_info(
+                        f"{name}: the one-sided values differ by " +
+                        f"{100 * split:.0f}% of lambda_r, so linear response " +
+                        "does not hold; quote lambda_r with both one-sided " +
+                        "values.")
+            ostream.print_blank()
 
         has_per_replica = any(
             'replicas' in result

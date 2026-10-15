@@ -175,3 +175,46 @@ def test_smoke_reorg():
                 errors[key].append(values[key] - exact)
         for key, err in errors.items():
             _assert_unbiased(err, label=f'{name} {key}')
+
+
+def test_smoke_reorg_code():
+    """EvbDataProcessing's lambda_r and dG0 against the exact answers (WP-A6).
+
+    EXO (lambda_r 290, Delta -60) and ENZ (lambda_r 92, Delta 0), 1000
+    frames per window, seeds 0-4, alpha 0 and H12 fixed, so there is no fit.
+    For equal curvature lambda_r (and both one-sided values) are the exact
+    lambda_r and dG0 is Delta (WP-A1); the mean error must lie within the
+    phase-A bar plus 3 SE, and the one-sided split below the tolerance. An
+    injected 1% error in lambda_r was caught (WP-A6).
+
+    If this fails, run work/WP-A5/run_sweep.py on the tool, then compare the
+    code against it with tests/test_claude_evb_reorg_code.py.
+    """
+
+    lambdas = default_lambdas()
+    for name in ('EXO', 'ENZ'):
+        model = make_model(name)
+        errors = {key: [] for key in ('lambda_r', 'lambda_reactant',
+                                      'lambda_product', 'dG0')}
+        for seed in range(5):
+            samples = model.sample(lambdas, 1000,
+                                   np.random.default_rng(seed))
+            results = make_results(samples, lambdas, name=name)
+            dp = _processor()
+            dp.calculate_discrete = False
+            dp.calculate_analytical = False
+            # Fixed bins skip the KDE; the curves are not checked here.
+            dp.coordinate_bins = np.arange(-1000.0, 1000.1, 10.0)
+            dp.alpha = 0.0
+            dp.H12 = STANDARD_SETS[name]['H12']
+            dp.compute(results, 0.0, 0.0)
+            result = results['configuration_results'][name]
+            reorganization = result['reorganization']
+            for key in errors:
+                if key == 'dG0':
+                    errors[key].append(result['dGfep'][-1] - model.delta)
+                else:
+                    errors[key].append(reorganization[key] - model.lambda_r)
+            assert reorganization['split'] < reorganization['split_tolerance']
+        for key, err in errors.items():
+            _assert_unbiased(err, label=f'{name} {key}')
