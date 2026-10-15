@@ -82,9 +82,10 @@ class EvbDataProcessing:
         # (state 2) energy, E2' = E2 + alpha, and H12 is the constant
         # off-diagonal coupling; only H12**2 enters. Give both to skip the
         # fit; if either is None, compute() fits both to the target barrier
-        # and reaction free energy of the first configuration.
-        self.alpha: float = None
-        self.H12: float = None
+        # and reaction free energy of the first configuration. Both are
+        # properties, see _caller_set.
+        self._alpha: float = None
+        self._H12: float = None
 
         # Settings of the alpha/H12 fit (scipy.optimize.fsolve).
         # max_iter: about the largest number of evaluations of the fit's
@@ -166,7 +167,8 @@ class EvbDataProcessing:
         # extremum must have to survive the noise filter and the depth over
         # which the parabola that refines an extremum is fitted.
         self.extremum_tolerance = 2.5
-        self.coordinate_bins = np.array([])
+        # A property, like alpha and H12.
+        self._coordinate_bins = np.array([])
         self.bin_size = 10
         self.dens_threshold = 0.1
         self.dens_max_window = 50
@@ -176,17 +178,52 @@ class EvbDataProcessing:
         # in the canned test fixtures, so that regression test is unaffected).
         self.dens_kde_max_samples: int = 8000
         self.kde_seed = 0
-        # What the last compute() call derived from its own data and
-        # targets, kept to tell it apart from values the caller sets.
-        self._fitted_alpha = None
-        self._fitted_H12 = None
-        self._derived_coordinate_bins = None
+        # Which of alpha, H12 and coordinate_bins the caller has assigned
+        # since the last compute(). compute() writes what it fits or derives
+        # to the same attributes, but through the private names, so that an
+        # assignment is always the caller's, even of the very value an
+        # earlier call returned.
+        self._caller_set = set()
         # The gap range each configuration samples, by name; see
         # _calculate_coordinate_bins.
         self._gap_ranges = {}
         # The ranges the current compute() reads each configuration over;
         # empty for a single configuration (see _get_FEP_and_EVB).
         self._reading_ranges = {}
+
+    @property
+    def alpha(self):
+        """The alpha in kJ/mol the caller set, or that compute() fitted."""
+
+        return self._alpha
+
+    @alpha.setter
+    def alpha(self, value):
+        self._alpha = value
+        self._caller_set.add('alpha')
+
+    @property
+    def H12(self):
+        """The H12 in kJ/mol the caller set, or that compute() fitted."""
+
+        return self._H12
+
+    @H12.setter
+    def H12(self, value):
+        self._H12 = value
+        self._caller_set.add('H12')
+
+    @property
+    def coordinate_bins(self):
+        """The energy gap bins in kJ/mol the caller set, or that compute()
+        derived from the sampled gap density."""
+
+        return self._coordinate_bins
+
+    @coordinate_bins.setter
+    def coordinate_bins(self, value):
+        self._coordinate_bins = value
+        self._caller_set.add('coordinate_bins')
 
     def _beta(self, T) -> float:
         return 1 / (self.kb * T)
@@ -205,17 +242,16 @@ class EvbDataProcessing:
         # lifetime). The alpha, H12 and coordinate bins an earlier call
         # derived belong to that call's data and targets, so they are
         # dropped; values the caller has set since are kept.
-        if self.alpha is self._fitted_alpha:
-            self.alpha = None
-        if self.H12 is self._fitted_H12:
-            self.H12 = None
-        if self.coordinate_bins is self._derived_coordinate_bins:
-            self.coordinate_bins = np.array([])
-        self._fitted_alpha = None
-        self._fitted_H12 = None
-        self._derived_coordinate_bins = None
+        if 'alpha' not in self._caller_set:
+            self._alpha = None
+        if 'H12' not in self._caller_set:
+            self._H12 = None
+        if 'coordinate_bins' not in self._caller_set:
+            self._coordinate_bins = np.array([])
+        self._caller_set = set()
 
-        if self.alpha is None or self.H12 is None:
+        fitted = self.alpha is None or self.H12 is None
+        if fitted:
             self.ostream.print_info("Fitting H12 and alpha")
             # Only one parameter was given: the fit needs both free, so the
             # given value is discarded, which the user has to know about.
@@ -228,15 +264,14 @@ class EvbDataProcessing:
                     "Overwriting provided H12. Provide both H12 and alpha to skip fitting"
                 )
             self.ostream.flush()
-            self.alpha, self.H12 = self._fit_EVB_parameters()
-            self._fitted_alpha, self._fitted_H12 = self.alpha, self.H12
+            self._alpha, self._H12 = self._fit_EVB_parameters()
         else:
             self.ostream.print_info("Using provided H12 and alpha")
         results.update({'alpha': self.alpha, 'H12': self.H12})
         self.ostream.print_info("Calculating FEP and EVB curves")
         self.ostream.flush()
         self._get_FEP_and_EVB()
-        if self._fitted_alpha is not None:
+        if fitted:
             self._check_fit_against_report()
         results["coordinate_bins"] = self.coordinate_bins
         return results
@@ -256,11 +291,12 @@ class EvbDataProcessing:
         on the coordinate bins, so a barrier that is narrow next to the bins
         (one about 2*H12 wide) comes out lower in the report. That gets a
         warning, since a smaller bin_size resolves it. The fit grid has a
-        limit of its own: once 2*H12 is no wider than its spacing, the grid
-        points skip over the top of the barrier, the barrier the fit reads
-        falls with H12 instead of rising, and the fit can match the targets
-        with an H12 that has nothing to do with them. Such a fit is not a
-        solution, so it is an error.
+        limit of its own: below an H12 of about twice its spacing, the grid
+        points no longer resolve the top of the barrier, the barrier the fit
+        reads falls with H12 instead of rising, and the fit can match the
+        targets with an H12 that has nothing to do with them. Such a fit,
+        whose report misses the targets, is not a solution, so it is an
+        error.
         """
 
         if not self.calculate_analytical:
@@ -1044,11 +1080,11 @@ class EvbDataProcessing:
                 "dE_avg": dE_avg,
             })
 
-        if self.coordinate_bins.size == 0:
-            self.coordinate_bins = self._calculate_coordinate_bins(
+        derived_bins = self.coordinate_bins.size == 0
+        if derived_bins:
+            self._coordinate_bins = self._calculate_coordinate_bins(
                 self.Lambda_indices, self.results, self.bin_size,
                 self.dens_threshold)
-            self._derived_coordinate_bins = self.coordinate_bins
         else:
             self.ostream.print_info(
                 f"Using provided coordinate bins, min: {self.coordinate_bins[0]}, max: {self.coordinate_bins[-1]}, length: {len(self.coordinate_bins)}"
@@ -1062,7 +1098,7 @@ class EvbDataProcessing:
         # for it.
         self._reading_ranges = {}
         if len(self.results) > 1:
-            if self._derived_coordinate_bins is None:
+            if not derived_bins:
                 self._calculate_coordinate_bins(self.Lambda_indices,
                                                 self.results,
                                                 self.bin_size,
@@ -1226,27 +1262,42 @@ class EvbDataProcessing:
         if not barriers:
             return
 
-        barriers = np.asarray(barriers)
-        free_energies = np.asarray(free_energies)
         n = len(barriers)
-        # SEM needs at least 2 replicas to estimate a spread; report NaN
-        # rather than a misleading 0.0 when there's only one.
-        if n > 1:
-            barrier_sem = float(np.std(barriers, ddof=1) / np.sqrt(n))
-            free_energy_sem = float(np.std(free_energies, ddof=1) / np.sqrt(n))
-        else:
-            barrier_sem = float("nan")
-            free_energy_sem = float("nan")
+        barrier_mean, barrier_sem = self._replica_mean_sem(barriers, "barrier")
+        free_energy_mean, free_energy_sem = self._replica_mean_sem(
+            free_energies, "reaction free energy")
 
         result.update({
             "replica_average": {
                 "n_replicas": n,
-                "barrier_mean": float(np.mean(barriers)),
+                "barrier_mean": barrier_mean,
                 "barrier_sem": barrier_sem,
-                "free_energy_mean": float(np.mean(free_energies)),
+                "free_energy_mean": free_energy_mean,
                 "free_energy_sem": free_energy_sem,
             }
         })
+
+    def _replica_mean_sem(self, values, label):
+        """Mean and standard error of the mean of one value per replica.
+
+        A replica whose profile has no barrier reports NaN (see
+        _get_free_energies), which is a result, not a failure, so it is left
+        out with a warning rather than turning the average into NaN.
+        """
+
+        values = np.asarray(values, dtype=float)
+        n_used = int(np.count_nonzero(np.isfinite(values)))
+        if n_used < len(values):
+            self.ostream.print_warning(
+                f"{len(values) - n_used} of {len(values)} replicas have no " +
+                f"{label} (NaN); the replica average of the {label} uses " +
+                f"the other {n_used}.")
+        mean = float(np.nanmean(values)) if n_used > 0 else float("nan")
+        # SEM needs at least 2 replicas to estimate a spread; report NaN
+        # rather than a misleading 0.0 when there's only one.
+        sem = (float(np.nanstd(values, ddof=1) / np.sqrt(n_used))
+               if n_used > 1 else float("nan"))
+        return mean, sem
 
     def _calculate_hysterisis_data(self, result):
         """Calculate the average, median, min max and std of the hysteresis
@@ -1277,32 +1328,45 @@ class EvbDataProcessing:
 
         hysteresis_summary = {}
         for metric, data in values.items():
-            data = np.asarray(data)
+            data = np.asarray(data, dtype=float)
             metric_replicas = replica_ids[metric]
-            median = float(np.median(data))
+            # The barrier deltas are NaN for a replica whose forward or
+            # backward profile has no barrier (see _get_free_energies). Such
+            # replicas are left out, and a metric none of them has is too.
+            n_used = int(np.count_nonzero(np.isfinite(data)))
+            if n_used < len(data):
+                self.ostream.print_warning(
+                    f"Hysteresis summary: {len(data) - n_used} of " +
+                    f"{len(data)} replicas have no {metric} (NaN) and are " +
+                    "left out" + ("." if n_used > 0 else
+                                  ", so the metric is not summarized."))
+            if n_used == 0:
+                continue
+            median = float(np.nanmedian(data))
             # The median of an even-sized sample isn't necessarily any single
             # replica's value, so report whichever replica sits closest to it.
             median_replica = metric_replicas[int(
-                np.argmin(np.abs(data - median)))]
+                np.nanargmin(np.abs(data - median)))]
             hysteresis_summary[metric] = {
                 "mean":
-                float(np.mean(data)),
+                float(np.nanmean(data)),
                 "median":
                 median,
                 "median_replica":
                 median_replica,
                 "min":
-                float(np.min(data)),
+                float(np.nanmin(data)),
                 "min_replica":
-                metric_replicas[int(np.argmin(data))],
+                metric_replicas[int(np.nanargmin(data))],
                 "max":
-                float(np.max(data)),
+                float(np.nanmax(data)),
                 "max_replica":
-                metric_replicas[int(np.argmax(data))],
+                metric_replicas[int(np.nanargmax(data))],
                 # std needs at least 2 replicas to estimate a spread; report
                 # NaN rather than a misleading 0.0 when there's only one.
                 "std":
-                float(np.std(data, ddof=1)) if len(data) > 1 else float("nan"),
+                float(np.nanstd(data, ddof=1))
+                if n_used > 1 else float("nan"),
             }
 
         result.update({"hysteresis_summary": hysteresis_summary})
@@ -1526,12 +1590,17 @@ class EvbDataProcessing:
 
             minde = np.min(dE)
             maxde = np.max(dE)
+            # A reaction coordinate needs two bins, and the density below two
+            # entries of 2 kJ/mol each, whichever is wider.
+            min_span = max(2 * bin_size, 4)
             assert_msg_critical(
-                maxde - minde >= 2 * bin_size,
+                maxde - minde >= min_span,
                 'EvbDataProcessing: the energy gap spans only ' +
-                f'{maxde - minde:.2f} kJ/mol, less than the two bins of ' +
-                f'{bin_size} kJ/mol a reaction coordinate needs. Check that ' +
-                'the two states differ, and lower bin_size.')
+                f'{maxde - minde:.2f} kJ/mol, less than the {min_span:g} ' +
+                'kJ/mol a reaction coordinate needs (two bins of ' +
+                f'{bin_size} kJ/mol, and at least 4 kJ/mol). Check that ' +
+                'the two states differ' +
+                (', and lower bin_size.' if min_span > 4 else '.'))
             # One entry per 2 kJ/mol of observed gap; the assert above keeps
             # this at two or more.
             steps = int((maxde - minde) // 2)
@@ -1553,7 +1622,6 @@ class EvbDataProcessing:
             # The running maximum below then gets a negative length. Shrink
             # the window to what the range allows instead.
             window_size = min(self.dens_max_window, max(1, len(dens_max) - 2))
-            window_size = min(window_size, len(dens_max))
             if window_size < self.dens_max_window:
                 self.ostream.print_warning(
                     f"The dE range only holds {len(dens_max)} density bins, "
@@ -1905,9 +1973,9 @@ class EvbDataProcessing:
                 if "analytical" in result.keys():
                     EVB = result["analytical"]["EVB"]
                     # The analytical curve is evaluated at the bin edges,
-                    # not at the bin centres the discretised profile uses,
+                    # not at the bin centers the discretised profile uses,
                     # so it is drawn against coordinate_bins. Drawing EVB[1:]
-                    # against the centres shifted it left by half a bin.
+                    # against the centers shifted it left by half a bin.
                     analytical_x = coordinate_bins
                     ax[1].plot(
                         analytical_x,
@@ -2331,8 +2399,6 @@ class EvbDataProcessing:
         conf_keys = results['configuration_results'].keys()
         ref_result = results['configuration_results'][list(conf_keys)[dif_to]]
         fg_names = ref_result['E1_fg_names']
-        max_arg = ref_result['analytical']['max_arg']
-        min_arg = ref_result['analytical']['min_arg']
         ref_evb = ref_result['dGevb_fg']
 
         to_plot = {}

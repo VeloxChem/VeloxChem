@@ -903,7 +903,8 @@ class EvbDriver:
         H12 are fitted so that its analytical EVB profile has the given
         barrier and reaction free energy, and the same alpha and H12 are then
         used for every other configuration. Each call starts afresh: alpha,
-        H12 and coordinate bins that an earlier call derived are not reused.
+        H12 and dE_range apply to this call only, and alpha, H12 and
+        coordinate bins that an earlier call used are not reused.
 
         Args:
             barrier (float): the reaction barrier in kJ/mol of the reference system. Must be positive and larger than free_energy, since the transition state lies above both wells.
@@ -942,10 +943,10 @@ class EvbDriver:
             "sampled output itself loads fine - call "
             "_load_output_from_folders directly to get the per-step energies.")
 
-        if alpha is not None:
-            self.dataprocessing.alpha = alpha
-        if H12 is not None:
-            self.dataprocessing.H12 = H12
+        # alpha, H12 and dE_range belong to this call: None asks for a fit or
+        # for derived bins, whatever an earlier call used.
+        self.dataprocessing.alpha = alpha
+        self.dataprocessing.H12 = H12
         if alpha_guess is not None:
             self.dataprocessing.alpha_guess = alpha_guess
         if H12_guess is not None:
@@ -953,6 +954,8 @@ class EvbDriver:
         if dE_range is not None:
             self.dataprocessing.coordinate_bins = np.linspace(
                 dE_range[0], dE_range[1], 200)
+        else:
+            self.dataprocessing.coordinate_bins = np.array([])
 
         results = self.dataprocessing.compute(results, barrier, free_energy)
         self.results = results
