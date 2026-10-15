@@ -254,7 +254,7 @@ class TestOneStepIsJustAShortPath:
         with EvbTestHelper.evb_chdir_tmp():
             EVB = MultiStepFixtures._seed_driver(states)
             EVB.build_systems(configurations=[config], Lambda=[0.0, 0.5, 1.0])
-            EVB.run_FEP()
+            EVB.run_FEP(platform=EvbTestHelper.evb_platform())
             conf = EVB.system_confs[0]
 
             # One step, and it writes into the configuration folder itself
@@ -403,7 +403,7 @@ class TestMultiStepFep:
         EVB = MultiStepFixtures._seed_driver(states)
         EVB.build_systems(configurations=[self._tiny_config()],
                           Lambda=[0.0, 0.5, 1.0])
-        EVB.run_FEP()
+        EVB.run_FEP(platform=EvbTestHelper.evb_platform())
         return EVB, EVB.system_confs[0]
 
     def test_path_runs_and_chains(self):
@@ -457,7 +457,7 @@ class TestMultiStepFep:
             EVB = MultiStepFixtures._seed_driver(states)
             EVB.build_systems(configurations=[config],
                               Lambda=[0.0, 0.5, 1.0])
-            EVB.run_FEP()
+            EVB.run_FEP(platform=EvbTestHelper.evb_platform())
             conf = EVB.system_confs[0]
 
             folder = Path(conf['steps'][1]['data_folder'])

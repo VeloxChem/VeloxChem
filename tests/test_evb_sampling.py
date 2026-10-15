@@ -63,7 +63,7 @@ class TinyFepFixtures:
     def _run_tiny_fep(ff_pair, config, lambdas=(0.0, 0.5, 1.0)):
         EVB = TinyFepFixtures._seed_driver(ff_pair)
         EVB.build_systems(configurations=[config], Lambda=list(lambdas))
-        EVB.run_FEP()
+        EVB.run_FEP(platform=EvbTestHelper.evb_platform())
         return EVB, Path(EVB.system_confs[0]["data_folder"])
 
     @staticmethod
@@ -122,7 +122,7 @@ class TestTinyFep:
         with EvbTestHelper.evb_chdir_tmp():
             EVB, data_folder = TinyFepFixtures._run_tiny_fep(EvbTestHelper.evb_ff_pair(), config)
 
-            EVB.compute_force_groups()
+            EVB.compute_force_groups(platform=EvbTestHelper.evb_platform())
 
             rea_file = data_folder / "ForceGroups_rea.csv"
             pro_file = data_folder / "ForceGroups_pro.csv"
@@ -152,7 +152,8 @@ class TestTinyFep:
             EVB, data_folder = TinyFepFixtures._run_tiny_fep(EvbTestHelper.evb_ff_pair(), config)
             run_folder = Path(EVB.system_confs[0]["run_folder"])
 
-            EVB.compute_force_groups(decompose_bonded=True)
+            EVB.compute_force_groups(platform=EvbTestHelper.evb_platform(),
+                                     decompose_bonded=True)
 
             for fname in ("bonded_E1_decomp.csv", "bonded_E2_decomp.csv",
                           "bonded_params.csv"):

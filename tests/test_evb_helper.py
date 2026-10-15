@@ -1,3 +1,4 @@
+import functools
 import os
 import shutil
 import tempfile
@@ -227,6 +228,31 @@ class EvbTestHelper:
                 str(data_dir / f"evb_petase_ms_state_{index}.xyz"))
             states.append(state)
         return states
+
+    @staticmethod
+    @functools.cache
+    def evb_platform():
+        """OpenMM platform for the EVB MD tests, decided once per session.
+
+        None (OpenMM picks the fastest platform) when a GPU platform works,
+        'CPU' otherwise. Without an explicit platform OpenMM tries the GPU
+        platforms again for every Context; where CUDA is installed without a
+        device each attempt fails slowly (about 1 s per Context), which used
+        to be most of the runtime of the MD tests.
+        """
+
+        import openmm as mm
+
+        for name in ('CUDA', 'OpenCL', 'HIP'):
+            try:
+                system = mm.System()
+                system.addParticle(1.0)
+                mm.Context(system, mm.VerletIntegrator(0.001),
+                           mm.Platform.getPlatformByName(name))
+            except Exception:
+                continue
+            return None
+        return 'CPU'
 
     @staticmethod
     @contextmanager
