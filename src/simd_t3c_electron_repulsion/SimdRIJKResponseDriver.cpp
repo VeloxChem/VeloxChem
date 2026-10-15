@@ -11,6 +11,7 @@
 #include "SimdRIJKResponseDriver.hpp"
 
 #include <algorithm>
+#include <numeric>
 #include <string>
 
 #include "ErrorHandler.hpp"
@@ -32,6 +33,20 @@ auto
 CSimdRIJKResponseDriver::get_memory_budget() const -> size_t
 {
     return _budget;
+}
+
+auto
+CSimdRIJKResponseDriver::set_aux_functions(const std::vector<size_t> &functions) -> void
+{
+    _aux_functions = functions;
+
+    _functions_are_named = true;
+}
+
+auto
+CSimdRIJKResponseDriver::get_aux_functions() const -> const std::vector<size_t> &
+{
+    return _aux_functions;
 }
 
 auto
@@ -404,11 +419,13 @@ CSimdRIJKResponseDriver::_exchange(const std::vector<std::pair<const CSparseTens
     // transformed and the right factors transformed, which is the basis by the
     // rank and the basis by the rank times the densities.
 
+    const auto nheld = _functions_are_named ? _aux_functions.size() : naux;
+
     const auto per_function = nao * nvec * (1 + ndens) * sizeof(double);
 
     const auto by_memory = _budget / std::max(per_function, size_t{1});
 
-    const auto nbatch = std::min(naux, std::max(_min_batch, by_memory));
+    const auto nbatch = std::min(nheld, std::max(_min_batch, by_memory));
 
     // NOTE: one operator or two, inside one pass over the auxiliary basis and into
     // one set of exchange matrices. Two calls of this would form two sets and add
@@ -417,11 +434,42 @@ CSimdRIJKResponseDriver::_exchange(const std::vector<std::pair<const CSparseTens
     // its own B vectors and so its own transformation of the factors -- that part
     // cannot be shared -- but the batching, the stacking and the output are.
 
-    for (size_t first = 0; first < naux; first += nbatch)
+    for (size_t first = 0; first < nheld; first += nbatch)
     {
-        const auto last = std::min(first + nbatch, naux);
+        const auto last = std::min(first + nbatch, nheld);
 
         const auto count = static_cast<int>(last - first);
+
+        // NOTE: the functions of this batch, which are a range only where the whole
+        // basis is swept. The storage is formed once for the batch and filled again
+        // by each operator, as the transformation sets it rather than adding to it.
+
+        auto batch = std::vector<size_t>(static_cast<size_t>(count));
+
+        if (_functions_are_named)
+        {
+            std::copy(_aux_functions.begin() + static_cast<long>(first),
+                      _aux_functions.begin() + static_cast<long>(last), batch.begin());
+        }
+        else
+        {
+            std::iota(batch.begin(), batch.end(), first);
+        }
+
+        auto uvecs = std::vector<CPackedMatrix>();
+
+        auto pvecs = std::vector<CPackedMatrix>();
+
+        uvecs.reserve(static_cast<size_t>(count));
+
+        pvecs.reserve(static_cast<size_t>(count));
+
+        for (int q = 0; q < count; q++)
+        {
+            uvecs.emplace_back(nao, nvec, mat_t::general);
+
+            pvecs.emplace_back(nao, nwide, mat_t::general);
+        }
 
         for (const auto &op : operators)
         {
@@ -433,9 +481,9 @@ CSimdRIJKResponseDriver::_exchange(const std::vector<std::pair<const CSparseTens
 
             if (scale == 0.0) continue;
 
-            const auto uvecs = _drv.compute_w_vectors(*tensor, basis, aux_basis, left, first, last);
+            _drv.compute_w_vectors(*tensor, basis, aux_basis, left, batch, uvecs);
 
-            const auto pvecs = _drv.compute_w_vectors(*tensor, basis, aux_basis, stacked, first, last);
+            _drv.compute_w_vectors(*tensor, basis, aux_basis, stacked, batch, pvecs);
 
         // NOTE: the densities and not the auxiliary functions are what the threads
         // divide, so that each of them writes into an exchange matrix of its own

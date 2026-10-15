@@ -79,6 +79,25 @@ class CSimdRIJKResponseDriver
     /// @return The memory budget.
     auto get_memory_budget() const -> size_t;
 
+    /// @brief Tells the driver which auxiliary basis functions the B vectors it is
+    /// handed carry, so that it sweeps that set and not the whole basis.
+    /// @param functions The functions, as their dense indices in the auxiliary
+    /// basis. An empty list is a rank which holds nothing, and not the whole basis:
+    /// the two are told apart by whether this was called at all, as the Fock driver
+    /// tells them apart by a flag of its own.
+    /// @note Left uncalled, the whole auxiliary basis is swept, which is what a
+    /// caller holding all of it wants and what this did before it was told
+    /// otherwise. Sweeping a range which covers a share would have the driver form,
+    /// zero and multiply a matrix for every function it holds nothing of, which is
+    /// the work of every other rank done again as zeros and is why the response
+    /// Fock build scaled with nothing.
+    auto set_aux_functions(const std::vector<size_t> &functions) -> void;
+
+    /// @brief Gets the auxiliary functions the driver sweeps, empty where it was
+    /// left to sweep the whole basis.
+    /// @return The functions.
+    auto get_aux_functions() const -> const std::vector<size_t> &;
+
     /// @brief Computes the exchange matrices of densities given as their factors.
     /// @param bq_vectors The B vectors, as CSimdRIJKFockDriver formed them.
     /// @param basis The molecular basis.
@@ -309,6 +328,14 @@ class CSimdRIJKResponseDriver
 
     /// @brief The driver which transforms the B vectors.
     CSimdRIFockDriver _drv;
+
+    /// @brief The auxiliary basis functions the B vectors carry, or none where the
+    /// driver was left to sweep the whole basis.
+    std::vector<size_t> _aux_functions;
+
+    /// @brief Whether the functions above were named, which tells an empty set from
+    /// a driver which was never told.
+    bool _functions_are_named = false;
 };
 
 #endif /* SimdRIJKResponseDriver_hpp */

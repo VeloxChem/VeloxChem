@@ -443,6 +443,10 @@ export_simdintegrals(py::module &m) -> void
         .def("number_of_aux_functions", &CSimdRIJKFockDriver::number_of_aux_functions,
              "Gets the number of auxiliary basis functions a build sweeps, which is what says whether a "
              "division over the ranks divided the work and not only the memory.")
+        .def("get_aux_functions", &CSimdRIJKFockDriver::get_aux_functions,
+             py::return_value_policy::reference_internal,
+             "Gets the auxiliary basis functions this driver's B vectors carry, as their dense indices, "
+             "which is what a consumer of them sweeps rather than the whole basis.")
         .def("number_of_parts", &CSimdRIJKFockDriver::number_of_parts,
              "Gets the number of parts the Coulomb pass of the direct way is divided over, which is what "
              "compute_coulomb indexes into.")
@@ -1063,6 +1067,14 @@ export_simdintegrals(py::module &m) -> void
              py::arg("erf_exchange_scaling_factor"))
         .def("get_threshold", &CSimdRIJKResponseDriver::get_threshold,
              "Gets screening threshold of the integrals.")
+        .def("set_aux_functions", &CSimdRIJKResponseDriver::set_aux_functions,
+             "Tells the driver which auxiliary basis functions the B vectors carry, so that it sweeps "
+             "the share rather than the whole basis with the other ranks' functions in it as zeros. "
+             "An empty list is a rank holding nothing; leaving this uncalled sweeps all of them.",
+             py::arg("functions"))
+        .def("get_aux_functions", &CSimdRIJKResponseDriver::get_aux_functions,
+             py::return_value_policy::reference_internal,
+             "Gets the auxiliary functions the driver sweeps, empty where it was left to sweep all.")
         .def("get_block_size", &CSimdRIJKResponseDriver::get_block_size,
              "Gets target number of atom pairs of a block.")
         .def("get_memory_budget", &CSimdRIJKResponseDriver::get_memory_budget,

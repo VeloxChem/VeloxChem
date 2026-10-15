@@ -217,6 +217,16 @@ def initialize(solver, molecule, basis):
 
     solver._ri_jk_response_drv = SimdRIJKResponseDriver(solver.eri_thresh)
 
+    # NOTE: the B vectors are a share of the auxiliary basis on more than one rank,
+    # and the response driver is told which functions that share carries. Left to
+    # sweep the whole basis it would form, zero and multiply a matrix for every
+    # function another rank holds, which is that rank's work done again as zeros and
+    # is why the response build did not fall with the ranks while the SCF build did.
+    # A rank dealt no atoms is told an empty share, which is not the same as the
+    # whole basis and is why the functions are named rather than counted.
+    solver._ri_jk_response_drv.set_aux_functions(
+        solver._ri_jk_drv.get_aux_functions())
+
     solver.ostream.print_info(
         'Using the SIMD resolution of the identity (RI-JK) for response.')
     if omega > 0.0:

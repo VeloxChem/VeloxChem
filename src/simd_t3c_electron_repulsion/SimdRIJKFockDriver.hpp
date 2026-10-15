@@ -368,6 +368,16 @@ class CSimdRIJKFockDriver
     /// -- so an energy cannot tell the two apart, and this can.
     auto number_of_aux_functions() const -> size_t;
 
+    /// @brief Gets the auxiliary basis functions this driver holds the B vectors
+    /// of, as their dense indices in the auxiliary basis.
+    /// @return The functions, which are all of them unless the atoms were divided
+    /// over the ranks of a communicator.
+    /// @note This is what a caller handed the B vectors needs so that it sweeps the
+    /// share rather than the whole basis with the other ranks' functions in it as
+    /// zeros. The set is not a range, as the dense index is ordered by angular
+    /// momentum across the molecule.
+    auto get_aux_functions() const -> const std::vector<size_t> &;
+
     /// @brief Gets the number of parts the Coulomb pass of the direct mode is
     /// divided over.
     /// @return The number of parts, which is zero in the mode which holds the B

@@ -1354,6 +1354,12 @@ CSimdRIJKFockDriver::number_of_aux_functions() const -> size_t
 }
 
 auto
+CSimdRIJKFockDriver::get_aux_functions() const -> const std::vector<size_t> &
+{
+    return _aux_functions;
+}
+
+auto
 CSimdRIJKFockDriver::_coulomb_patterns() const -> const std::vector<CTripleSparsityPattern> &
 {
     return _coulomb_parts.empty() ? _parts : _coulomb_parts;
