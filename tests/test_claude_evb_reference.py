@@ -527,17 +527,22 @@ class GenericModel1D(_ExactModel):
     def _V(self, lam, x):
         return (1 - lam) * self.h11(x) + lam * self.h22(x)
 
+    def _V_sampled(self, lam, x):
+        # The potential window lam draws from: the mapping potential here,
+        # the integration potential in MismatchedModel.
+        return self._V(lam, x)
+
     def _grid(self, lam):
         if lam not in self._cache:
             coarse = np.linspace(self.x_lo, self.x_hi, 20001)
-            xm = coarse[np.argmin(self._V(lam, coarse))]
+            xm = coarse[np.argmin(self._V_sampled(lam, coarse))]
             h = 1e-4 * (self.x_hi - self.x_lo)
-            curv = (self._V(lam, xm + h) - 2 * self._V(lam, xm)
-                    + self._V(lam, xm - h)) / h**2
+            curv = (self._V_sampled(lam, xm + h) - 2 * self._V_sampled(lam, xm)
+                    + self._V_sampled(lam, xm - h)) / h**2
             w = np.sqrt(self.kT / curv)
             x = np.linspace(xm - self.n_width * w, xm + self.n_width * w,
                             self.n_grid)
-            V = self._V(lam, x)
+            V = self._V_sampled(lam, x)
             p = np.exp(-(V - V.min()) / self.kT)
             cdf = integrate.cumulative_trapezoid(p, x, initial=0.0)
             self._cache[lam] = (x, cdf / cdf[-1])
@@ -570,6 +575,420 @@ def quartic_model(k, a, delta, c4, T=T_DEFAULT, **kwargs):
     return GenericModel1D(h11, h22, -4 * a, 4 * a, delta, T, **kwargs)
 
 
+class MismatchedModel(GenericModel1D):
+    """1-D model whose windows sample v_int(lam, x), not the mapping potential.
+
+    WP-B2. The analysis reads the PES pair h11(x), h22(x) (h22 includes
+    delta): E1 = h11, E2 = h22, V_pes(lam) = (1-lam) h11 + lam h22. Window lam
+    draws x from exp(-v_int(lam, x)/kT) by inverse CDF (the GenericModel1D
+    grid), so the frames come from another ensemble than the one analysed,
+    as in the MD code, which samples the per-lambda integration systems
+    (digest section 1). v_int is any confining callable that broadcasts over
+    lam and x, and may be nonlinear in lam. ep_offset(lam) is an arbitrary
+    per-window constant added to Ep only; a correct reweighting cancels it.
+
+    Optional spectator modes y (n_spec of them) stand for the degrees of
+    freedom a 1-D gap cannot show: both PES states carry S_pes = k_spec/2
+    sum y^2, so they cancel from the gap and from every PES free energy,
+    while window lam samples them with force constant k_spec / (1 +
+    spec_mismatch(lam)). They add mismatch V_pes - v_int that is
+    orthogonal to the gap.
+
+    sample() adds to the base dict: x, Q = sum y^2, E1_int and E2_int (the
+    sampled potential at lam = 0 and 1), Ep (at the frame's own lam, plus
+    ep_offset) and with cross_energies=True U_int (n_frames x K, the sampled
+    potential at every ladder lambda).
+
+    Exact references, by quadrature on one grid of n_quad points over
+    [x_lo, x_hi] (spectator parts in closed form):
+    - dG_map (= dG_map_quadrature): Delta G of the PES mapping, the answer a
+      correct analysis gives.
+    - dG_code_limit: the infinite-sample solution of the code's MBAR
+      equations (u_k = beta V_pes,k) for frames drawn from v_int.
+    - log_gap_density, gap_moments, xi_domain: the PES gap density, summed
+      over the roots of xi(x) = xi. dg1, dg2, dg_ground and stationary come
+      from _ExactModel. lambda_r is the energy-gap value
+      (<xi>_1 - <xi>_0) / 2 of the two PES ends.
+    - delta_v_moments and ess_fraction: mean and std of V_pes - v_int in a
+      window, and the Kish ESS/N of the weights exp(-beta (V_pes - v_int)).
+    """
+
+    def __init__(self, h11, h22, v_int, x_lo, x_hi, delta=0.0, T=T_DEFAULT,
+                 ep_offset=None, n_spec=0, k_spec=0.0, spec_mismatch=None,
+                 n_grid=200_000, n_width=12.0, n_quad=400001):
+        super().__init__(h11, h22, x_lo, x_hi, delta, T, n_grid, n_width)
+        self.v_int = v_int
+        self.ep_offset = ep_offset
+        self.n_spec = int(n_spec)
+        self.k_spec = float(k_spec)
+        self.spec_mismatch = spec_mismatch
+        self.n_dof = 1 + self.n_spec
+        self.n_quad = int(n_quad)
+        self._blocks = None
+        self._pes_cache = {}
+
+    @property
+    def lambda_r(self):
+        return self.lambda_r_gap_means()
+
+    def shifted(self, alpha):
+        """The model whose E2 carries an extra alpha (sampling unchanged)."""
+
+        h22 = self.h22
+        return MismatchedModel(self.h11, lambda x: h22(x) + alpha, self.v_int,
+                               self.x_lo, self.x_hi, self.delta + alpha,
+                               self.T, self.ep_offset, self.n_spec,
+                               self.k_spec, self.spec_mismatch, self.n_grid,
+                               self.n_width, self.n_quad)
+
+    def _V_sampled(self, lam, x):
+        return self.v_int(lam, x)
+
+    def _spec_ratio(self, lam):
+        # k_spec / k_spec_int(lam) - 1
+        if self.spec_mismatch is None:
+            return np.zeros_like(np.asarray(lam, dtype=float))
+        return self.spec_mismatch(lam)
+
+    def sampled_energy(self, lam, x, Q):
+        """The sampled potential at lam for frames (x, Q), spectators
+        included. Broadcasts over lam, x and Q."""
+
+        return (self.v_int(lam, x) + 0.5 * self.k_spec /
+                (1.0 + self._spec_ratio(lam)) * Q)
+
+    def _draw(self, lam, z):
+        x, cdf = self._grid(lam)
+        xs = np.interp(special.ndtr(z[:, 0]), cdf, x)
+        Q = (self.kT * (1.0 + self._spec_ratio(lam)) / self.k_spec *
+             np.sum(z[:, 1:]**2, axis=1) if self.n_spec else
+             np.zeros(len(xs)))
+        if self._blocks is not None:
+            self._blocks.append((xs, Q))
+        if not self.n_spec:
+            return self.h11(xs), self.h22(xs)
+        S = 0.5 * self.k_spec * Q
+        return self.h11(xs) + S, self.h22(xs) + S
+
+    def sample(self,
+               lambdas,
+               n_per_window,
+               rng,
+               n_replicas=1,
+               phi=0.0,
+               bias=None,
+               cross_energies=False):
+        """The base sample dict plus x, Q, E1_int, E2_int, Ep (and U_int)."""
+
+        # The base loop draws the blocks in the order it concatenates them,
+        # so the coordinates collected by _draw line up with the frames.
+        self._blocks = []
+        try:
+            samples = super().sample(lambdas, n_per_window, rng, n_replicas,
+                                     phi, bias)
+            x = np.concatenate([b[0] for b in self._blocks])
+            Q = np.concatenate([b[1] for b in self._blocks])
+        finally:
+            self._blocks = None
+        lam_f = samples['Lambda_frame']
+        samples['x'] = x
+        samples['Q'] = Q
+        samples['E1_int'] = self.sampled_energy(0.0, x, Q)
+        samples['E2_int'] = self.sampled_energy(1.0, x, Q)
+        Ep = self.sampled_energy(lam_f, x, Q)
+        if self.ep_offset is not None:
+            Ep = Ep + self.ep_offset(lam_f)
+        samples['Ep'] = Ep
+        if cross_energies:
+            lam = _as_lambdas(lambdas)
+            samples['U_int'] = self.sampled_energy(lam[None, :], x[:, None],
+                                                   Q[:, None])
+        return samples
+
+    # exact references
+
+    def dG_map(self, lambdas):
+        return self.dG_map_quadrature(lambdas)
+
+    def _quad_grid(self):
+        x = np.linspace(self.x_lo, self.x_hi, self.n_quad)
+        wq = np.full(self.n_quad, x[1] - x[0])
+        wq[0] *= 0.5
+        wq[-1] *= 0.5
+        return x, wq
+
+    def _log_density(self, V, wq):
+        # ln of exp(-V/kT), normalised with the trapezoid weights wq
+        lp = -(V - V.min()) / self.kT
+        return lp - special.logsumexp(lp, b=wq)
+
+    def _pes_window(self, lam):
+        lam = float(lam)
+        if lam not in self._pes_cache:
+            x, wq = self._quad_grid()
+            self._pes_cache[lam] = self._log_density(self._V(lam, x), wq)
+        return self._pes_cache[lam]
+
+    def log_gap_density(self, xi, lam):
+        """ln P_lam(xi) of the PES mapping window lam.
+
+        Sum over the monotone pieces of xi(x) of p_lam(x) / |dxi/dx| at the
+        root in that piece, each piece interpolated in xi on the grid.
+        """
+
+        x, _ = self._quad_grid()
+        logp = self._pes_window(lam)
+        g = self.h11(x) - self.h22(x)
+        dg = np.gradient(g, x)
+        with np.errstate(divide='ignore'):
+            lq = logp - np.log(np.abs(dg))
+        xi = np.asarray(xi, dtype=float)
+        out = np.full(xi.shape, -np.inf)
+        cuts = np.flatnonzero(np.diff(np.sign(dg)) != 0) + 1
+        for seg in np.split(np.arange(len(x)), cuts):
+            if len(seg) < 2:
+                continue
+            gs, ls = g[seg], lq[seg]
+            if gs[0] > gs[-1]:
+                gs, ls = gs[::-1], ls[::-1]
+            inside = (xi >= gs[0]) & (xi <= gs[-1])
+            out[inside] = np.logaddexp(out[inside],
+                                       np.interp(xi[inside], gs, ls))
+        return out
+
+    def gap_moments(self, lam):
+        x, wq = self._quad_grid()
+        p = np.exp(self._pes_window(lam)) * wq
+        g = self.h11(x) - self.h22(x)
+        mean = np.sum(p * g)
+        return mean, np.sqrt(np.sum(p * (g - mean)**2))
+
+    def xi_domain(self):
+        """xi range of the monotone branch of xi(x) holding both PES wells.
+
+        Where xi(x) turns over (an anharmonic gap), the density has an
+        integrable edge, and -kT ln P shows spurious extrema next to it;
+        stationary() searches inside this branch only.
+        """
+
+        x, _ = self._quad_grid()
+        g = self.h11(x) - self.h22(x)
+        dg = np.gradient(g, x)
+        ends = [np.argmax(self._pes_window(l)) for l in (0.0, 1.0)]
+        lo, hi = min(ends), max(ends)
+        assert np.all(np.sign(dg[lo:hi + 1]) == np.sign(dg[lo])), \
+            'xi(x) is not monotone between the two wells'
+        sign = np.sign(dg)
+        while lo > 0 and sign[lo - 1] == sign[lo]:
+            lo -= 1
+        while hi < len(x) - 1 and sign[hi + 1] == sign[hi]:
+            hi += 1
+        return min(g[lo], g[hi]), max(g[lo], g[hi])
+
+    def dG_code_limit(self, lambdas, n_k=None, tol=1e-13, floor=1e-9,
+                      max_iter=100):
+        """Infinite-sample limit of the code's MBAR dGfep on these frames.
+
+        MBAR with u_k = beta V_pes,k and frames from p_int,k converges to the
+        f that solves int p_mix(x) W_k(x) dx = c_k, with p_mix = sum_k c_k
+        p_int,k, W_k = c_k exp(f_k - u_k) / sum_j c_j exp(f_j - u_j) and
+        c_k = N_k / N (equal unless n_k is given). The spectators cancel
+        from W_k, so the x marginals suffice. Solved by Newton, f_0 = 0,
+        halving the step until the largest residual decreases. It stops at
+        tol, or at the rounding floor of the quadrature sums when that is
+        below floor. With v_int = V_pes the solution is dG_map. Returns
+        kJ/mol per window, 0 at lambda = 0.
+        """
+
+        lam = _as_lambdas(lambdas)
+        K = len(lam)
+        c = (np.full(K, 1.0 / K) if n_k is None else
+             np.asarray(n_k, dtype=float) / np.sum(n_k))
+        x, wq = self._quad_grid()
+        log_mix = special.logsumexp(
+            [np.log(ck) + self._log_density(self._V_sampled(l, x), wq)
+             for l, ck in zip(lam, c)], axis=0)
+        mw = np.exp(log_mix) * wq
+        u = self._V(lam[:, None], x[None, :]) / self.kT
+
+        def weights(f):
+            a = np.log(c)[:, None] + f[:, None] - u
+            W = np.exp(a - special.logsumexp(a, axis=0))
+            return W, W @ mw - c
+
+        f = self.dG_map(lam) / self.kT
+        W, r = weights(f)
+        for _ in range(max_iter):
+            res = np.max(np.abs(r))
+            if res < tol:
+                break
+            J = np.diag(W @ mw) - (W * mw) @ W.T
+            step = np.zeros(K)
+            step[1:] = -np.linalg.solve(J[1:, 1:], r[1:])
+            t = 1.0
+            while t > 1e-6:
+                W_new, r_new = weights(f + t * step)
+                if np.max(np.abs(r_new)) < res:
+                    break
+                t *= 0.5
+            else:
+                if res < floor:
+                    break
+                raise RuntimeError('dG_code_limit: Newton stalled at '
+                                   f'residual {res:.3g}')
+            f, W, r = f + t * step, W_new, r_new
+        else:
+            raise RuntimeError('dG_code_limit: Newton did not converge')
+        return (f - f[0]) * self.kT
+
+    def _int_window(self, lam):
+        x, wq = self._quad_grid()
+        lp = self._log_density(self._V_sampled(lam, x), wq)
+        dv = self._V(lam, x) - self._V_sampled(lam, x)
+        return lp, wq, dv
+
+    def delta_v_moments(self, lam):
+        """Mean and std of V_pes,lam - v_int(lam) over the sampled window.
+
+        The spectator part is (kT/2) r chi^2_n with r = spec_mismatch(lam):
+        mean n r kT/2, variance n r^2 kT^2 / 2, independent of x.
+        """
+
+        lp, wq, dv = self._int_window(lam)
+        p = np.exp(lp) * wq
+        mean = np.sum(p * dv)
+        var = np.sum(p * (dv - mean)**2)
+        r = float(self._spec_ratio(lam))
+        mean += 0.5 * self.n_spec * r * self.kT
+        var += 0.5 * self.n_spec * (r * self.kT)**2
+        return mean, np.sqrt(var)
+
+    def ess_fraction(self, lam, cut_kT=30.0):
+        """Kish ESS/N of w = exp(-beta dV) in window lam: E[w]^2 / E[w^2].
+
+        The x part is taken over the region where the sampled density is
+        within cut_kT of its maximum. Where V_pes is softer than v_int (a
+        Morse plateau against a harmonic restraint), E[w^2] over the whole
+        line is dominated by regions no finite sample reaches, and can
+        diverge. The spectator part is exact, [sqrt(1 + 2r) / (1 + r)]^n,
+        finite for r > -1/2.
+        """
+
+        lp, wq, dv = self._int_window(lam)
+        keep = lp > lp.max() - cut_kT
+        lw = -dv[keep] / self.kT
+        lb = np.log(wq[keep])
+        frac = np.exp(2 * special.logsumexp(lp[keep] + lb + lw)
+                      - special.logsumexp(lp[keep] + lb + 2 * lw)
+                      - special.logsumexp(lp[keep] + lb))
+        r = float(self._spec_ratio(lam))
+        if self.n_spec:
+            frac *= (np.sqrt(1.0 + 2.0 * r) / (1.0 + r))**self.n_spec
+        return float(frac)
+
+
+def dynamic_bond(lam, eqA, eqB, fcA, fcB, p=3.25, gamma=0.8):
+    """r0 and fc of a reactive pair's dynamic harmonic bond at lam.
+
+    Copy of the integration-system formula in reactionsystembuilder.py (the
+    dynamic bond block, about line 3018 at 95512a5c3): r0 is interpolated
+    linearly and then pulled towards the shorter end, ((r0 - min) / dif)^p
+    dif + min, with p = dynamic_bond_tightening; fc is interpolated linearly
+    and scaled by 4 (lam - 1/2)^2 (1 - gamma) + gamma, with gamma =
+    dynamic_bond_fc_factor.
+    """
+
+    lam = np.asarray(lam, dtype=float)
+    eq = eqA * (1 - lam) + eqB * lam
+    lo, dif = min(eqA, eqB), abs(eqA - eqB)
+    if dif > 0:
+        eq = ((eq - lo) / dif)**p * dif + lo
+    fc = ((fcA * (1 - lam) + fcB * lam)
+          * (4 * (lam - 0.5)**2 * (1 - gamma) + gamma))
+    return eq, fc
+
+
+# WP-B2 toy cases, T = 300 K, kJ/mol. 'H12' is the coupling at which the
+# exact ground-state profile is read. The sampled potentials are asymmetric
+# on purpose: a mirror-symmetric pair gives a code bias b(lam) = b(1 - lam),
+# hence none at lam = 1.
+# - T0: v_int = V_pes (identity), the EXO set of Model1 (k 145, a 1).
+# - T1: PES as T0; the sampled diabats are harmonic, (k1_int, a1_int) for
+#   state 1 at +a1_int and (k2_int, a2_int) for state 2 at -a2_int, mixed
+#   linearly in lambda.
+# - T2: Morse PES diabats in a bond-difference coordinate x, r1 = re + a - x
+#   (bond of state 1), r2 = re + a + x (bond of state 2), b = sqrt(k / 2D).
+#   The sampled potential is the code's pair of dynamic harmonic bonds
+#   (dynamic_bond), with the dissociated ends at r_far1 and r_far2 and
+#   force constant fc_far * k, plus lambda * delta. Nonlinear in lambda.
+#   D = 2000, not the code's 500: in this coordinate xi(x) turns over about
+#   sqrt(D / 32 kT) gap stds from each well (2.5 at D = 500), and the
+#   density edge there spoils the exact profile; at 2000 it is ~4 stds out.
+# - T3: T2 plus n_spec spectator modes sampled softer than the PES by
+#   spec_mid * 4 lam (1 - lam) (k_spec / k_int - 1), so that the mismatch
+#   peaks in the middle windows. In 1-D the mismatch std cannot grow much
+#   beyond the gap's own fluctuations (stiffer T2 bonds left it at 0.7 kT).
+MISMATCH_CASES = {
+    'T0': dict(kind='harmonic', k=145.0, a=1.0, delta=-60.0, H12=30.0),
+    'T1': dict(kind='harmonic', k=145.0, a=1.0, delta=-60.0, H12=30.0,
+               k1_int=120.0, a1_int=0.95, k2_int=150.0, a2_int=1.0),
+    'T2': dict(kind='bond', k=145.0, a=1.0, delta=-60.0, H12=15.0,
+               D=2000.0, re=1.0, r_far1=2.3, r_far2=3.5, fc_far=0.2, p=3.25,
+               gamma=0.8),
+    'T3': dict(kind='bond', k=145.0, a=1.0, delta=-60.0, H12=15.0,
+               D=2000.0, re=1.0, r_far1=2.3, r_far2=3.5, fc_far=0.2, p=3.25,
+               gamma=0.8, n_spec=20, k_spec=100.0, spec_mid=2.5),
+}
+
+
+def make_mismatched(name, T=T_DEFAULT, ep_offset=None, **overrides):
+    """MismatchedModel for a MISMATCH_CASES name; overrides replace entries.
+
+    T0 (without overrides) samples with v_int = V_pes exactly, the same
+    callable as the mapping.
+    """
+
+    p = dict(MISMATCH_CASES[name], **overrides)
+    k, a, delta = p['k'], p['a'], p['delta']
+    if p['kind'] == 'harmonic':
+        h11 = lambda x: 0.5 * k * (x - a)**2
+        h22 = lambda x: 0.5 * k * (x + a)**2 + delta
+        if 'k1_int' in p:
+            k1, a1, k2, a2 = p['k1_int'], p['a1_int'], p['k2_int'], p['a2_int']
+            v_int = lambda lam, x: ((1 - lam) * 0.5 * k1 * (x - a1)**2
+                                    + lam * (0.5 * k2 * (x + a2)**2 + delta))
+        else:
+            v_int = lambda lam, x: (1 - lam) * h11(x) + lam * h22(x)
+        x_lim = a + 2.5
+    else:
+        D, re = p['D'], p['re']
+        b = np.sqrt(k / (2.0 * D))
+        morse = lambda r: D * (1.0 - np.exp(-b * (r - re)))**2
+        r1 = lambda x: re + a - x
+        r2 = lambda x: re + a + x
+        h11 = lambda x: morse(r1(x))
+        h22 = lambda x: morse(r2(x)) + delta
+        far = p['fc_far'] * k
+
+        def v_int(lam, x):
+            eq1, fc1 = dynamic_bond(lam, re, p['r_far1'], k, far, p['p'],
+                                    p['gamma'])
+            eq2, fc2 = dynamic_bond(lam, p['r_far2'], re, far, k, p['p'],
+                                    p['gamma'])
+            return (0.5 * fc1 * (r1(x) - eq1)**2 + 0.5 * fc2 *
+                    (r2(x) - eq2)**2 + np.asarray(lam) * delta)
+
+        x_lim = a + 2.0
+    spec = {}
+    if p.get('n_spec'):
+        mid = p['spec_mid']
+        spec = dict(n_spec=p['n_spec'], k_spec=p['k_spec'],
+                    spec_mismatch=lambda lam: mid * 4 * np.asarray(lam) *
+                    (1 - np.asarray(lam)))
+    return MismatchedModel(h11, h22, v_int, -x_lim, x_lim, delta, T,
+                           ep_offset, **spec)
+
+
 def make_model(name, kind=1, T=T_DEFAULT, **kwargs):
     """Model1 (a = 1, k1 = lambda_r/2) or Model2 for a STANDARD_SETS name.
 
@@ -589,10 +1008,14 @@ def make_model(name, kind=1, T=T_DEFAULT, **kwargs):
 
 
 def make_results(samples, lambdas, T=T_DEFAULT, name='synthetic'):
-    """The EvbDataProcessing.compute input dict (digest section 1 schema)."""
+    """The EvbDataProcessing.compute input dict (digest section 1 schema).
+
+    Samples from MismatchedModel also carry E1_int, E2_int, Ep and E_m_pes
+    (and U_int when drawn), as the driver's loader returns them.
+    """
 
     lambdas = _as_lambdas(lambdas)
-    return {
+    results = {
         'Lambda': [float(l) for l in lambdas],
         'Lambda_frame': samples['Lambda_frame'].copy(),
         'Lambda_indices': samples['Lambda_indices'].copy(),
@@ -606,13 +1029,22 @@ def make_results(samples, lambdas, T=T_DEFAULT, name='synthetic'):
             }
         },
     }
+    if 'E1_int' in samples:
+        conf = results['configuration_results'][name]
+        for key in ('E1_int', 'E2_int', 'Ep', 'U_int'):
+            if key in samples:
+                conf[key] = samples[key].copy()
+        conf['E_m_pes'] = samples['Em'].copy()
+    return results
 
 
 def write_energy_files(folder, samples, lambdas, T=T_DEFAULT):
     """Write Energies.csv, Data_combined.csv and options.json into folder.
 
-    The integration columns repeat the PES energies and Ep is the sampled
-    mapping energy Em; Ek, Temp, Vol and Dens are placeholders. Floats are
+    The integration columns hold E1_int and E2_int and Ep is the frame's own
+    sampled energy when the samples carry them (MismatchedModel); otherwise
+    they repeat the PES energies and Em. Ek, Temp, Vol and Dens are
+    placeholders. Floats are
     written with 17 significant digits, so they read back exactly.
     Returns the three paths.
     """
@@ -626,8 +1058,10 @@ def write_energy_files(folder, samples, lambdas, T=T_DEFAULT):
     options_file = folder / 'options.json'
 
     energies = np.column_stack([
-        samples['Lambda_frame'], samples['E1'], samples['E2'], samples['E1'],
-        samples['E2'], samples['Em'], samples['Replica_frame'],
+        samples['Lambda_frame'], samples['E1'], samples['E2'],
+        samples.get('E1_int', samples['E1']),
+        samples.get('E2_int', samples['E2']), samples['Em'],
+        samples['Replica_frame'],
         samples['Direction_frame']
     ])
     fmt = ['%.17g'] * 6 + ['%d', '%d']
@@ -635,7 +1069,7 @@ def write_energy_files(folder, samples, lambdas, T=T_DEFAULT):
                header=ENERGIES_HEADER, comments='')
 
     data = np.column_stack([
-        np.arange(n), samples['Em'],
+        np.arange(n), samples.get('Ep', samples['Em']),
         np.zeros(n),
         np.full(n, float(T)),
         np.ones(n),

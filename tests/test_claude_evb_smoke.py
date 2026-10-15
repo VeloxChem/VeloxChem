@@ -218,3 +218,47 @@ def test_smoke_reorg_code():
             assert reorganization['split'] < reorganization['split_tolerance']
         for key, err in errors.items():
             _assert_unbiased(err, label=f'{name} {key}')
+
+
+def test_smoke_reweight():
+    """The reweighting tool recovers the PES dG0 from mismatched frames (WP-B2).
+
+    tools/evb_reweight.py in the validation project, on the T1 toy of
+    MISMATCH_CASES: frames sampled from harmonic diabats other than the
+    analysed PES pair, where the code's dGfep(1) is off by -28 kJ/mol.
+    Route R (importance weights within each window, then BAR) at 1000
+    frames per window, seeds 0-9, and route M (MBAR with exact cross
+    energies) at 300 frames, seeds 0-4, without bootstrap. The exact answer
+    is Delta G_map(1) = -60. The mean error must lie within 3 SE of 0 and
+    within the phase-A bar plus 3 SE (WP-B2 measured R -0.09 +- 0.05 and
+    M -0.02 +- 0.03 over 50 seeds). Flipping the sign of the weights moves
+    R by tens of kJ/mol (work/WP-B2/output/smoke_mutation.out).
+
+    If this fails, run work/WP-B2/run_sweep.py.
+    """
+
+    import sys
+    from pathlib import Path
+
+    from test_claude_evb_reference import make_mismatched
+
+    sys.path.insert(0, str(Path.home() / 'code' / 'Agent_work' /
+                           'EVB validation plan' / 'tools'))
+    import evb_reweight
+
+    lambdas = default_lambdas()
+    model = make_mismatched('T1')
+    errors = {'R': [], 'M': []}
+    for seed in range(10):
+        samples = model.sample(lambdas, 1000, np.random.default_rng(seed))
+        data = evb_reweight.load(make_results(samples, lambdas))
+        errors['R'].append(evb_reweight.route_R_point(data, 0.0)['dG'][-1] +
+                           60.0)
+    for seed in range(5):
+        samples = model.sample(lambdas, 300, np.random.default_rng(seed),
+                               cross_energies=True)
+        data = evb_reweight.load(make_results(samples, lambdas))
+        errors['M'].append(
+            evb_reweight.route_M(data, 0.0, exact=True)['dG'][-1] + 60.0)
+    for key, err in errors.items():
+        _assert_unbiased(err, label=f'T1 route {key}')
