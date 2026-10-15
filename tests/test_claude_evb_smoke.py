@@ -1,4 +1,4 @@
-"""Smoke tests that stand in for the WP-A2 to WP-A4 sweeps.
+"""Smoke tests that stand in for the WP-A2 to WP-A5 sweeps.
 
 Dev-only (test_claude_*): must not reach master. Each test runs a few seeds
 of the cells a sweep's verdict rests on and applies that verdict's
@@ -136,3 +136,42 @@ def test_smoke_fit():
         H12_err.append(dp.H12 - H12_star)
     _assert_unbiased(alpha_err, label='alpha')
     _assert_unbiased(H12_err, label='H12')
+
+
+def test_smoke_reorg():
+    """The lambda_r tool recovers lambda_r and dG0 (WP-A5).
+
+    tools/evb_reorg.py in the validation project, on EXO (lambda_r 290,
+    Delta -60) and ENZ (lambda_r 92, Delta 0), 1000 frames per window,
+    seeds 0-4, no bootstrap. For equal curvature R1 (symmetric), R2 (both
+    sides) and dG0 have exact answers lambda_r and Delta (WP-A1). The mean
+    error must lie within the phase-A bar plus 3 SE. WP-A5 measured R2 low
+    by about 0.5 kJ/mol at this N for lambda_r 290 (a finite-sample bias),
+    inside that bound. Resolution: about 1.5 kJ/mol on EXO (0.5%); a 1%
+    error in R1 was caught, 0.5% at N = 200 was not.
+
+    If this fails, run work/WP-A5/run_sweep.py.
+    """
+
+    import sys
+    from pathlib import Path
+
+    sys.path.insert(0, str(Path.home() / 'code' / 'Agent_work' /
+                           'EVB validation plan' / 'tools'))
+    import evb_reorg
+
+    lambdas = default_lambdas()
+    for name in ('EXO', 'ENZ'):
+        model = make_model(name)
+        errors = {key: [] for key in ('R1_sym', 'R2_left', 'R2_right',
+                                      'dG0')}
+        for seed in range(5):
+            samples = model.sample(lambdas, 1000,
+                                   np.random.default_rng(seed))
+            data = evb_reorg.load(make_results(samples, lambdas, name=name))
+            values = evb_reorg.analyze(data, n_boot=0)['values']
+            for key in errors:
+                exact = model.delta if key == 'dG0' else model.lambda_r
+                errors[key].append(values[key] - exact)
+        for key, err in errors.items():
+            _assert_unbiased(err, label=f'{name} {key}')
