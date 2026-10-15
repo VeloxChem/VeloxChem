@@ -409,3 +409,58 @@ def test_hysteresis_injected_bias():
     summary = res['hysteresis_summary']
     assert summary['endpoint_dGfep_delta']['min_replica'] == biased
     assert summary['max_abs_dGfep_delta']['max_replica'] == biased
+
+
+# The MBAR warm start the fit carried into the stalled solve of A5-1 (WP-A5
+# 1a): SYM, seed 41, N = 1000, fit to the LOWH targets, fsolve call 5.
+A5_1_WARM_F_K = [
+    0.0, 2.275331195154152, 4.458063014605671, 6.548391991023948,
+    8.546552996423877, 10.452652048138384, 13.987782640633034,
+    17.15050755855092, 19.93944748617085, 22.357520760352145,
+    24.406984949098742, 26.085926472733583, 27.392283188333003,
+    28.327711652564517, 28.894691747061145, 29.09225102014863,
+    28.916173764164828, 28.36234901609619, 27.429579780776088,
+    26.11930647171313, 24.43315001734991, 22.37207683027752,
+    19.9381196167215, 17.134851640111425, 13.963530146138504,
+    10.42101863055744, 8.509769664477437, 6.505584313280936,
+    4.409294358208701, 2.2219476505279196, -0.05534322022921767
+]
+A5_1_ALPHA = 0.13838649045272963
+
+
+def test_mbar_solve_at_precision_floor_is_bounded(monkeypatch):
+    """A solve whose dGfep(1) is ~1e-4 kT must not run for half an hour (A5-1).
+
+    pymbar's adaptive solver stops on a relative change in f_k of 1e-12, which
+    rounding cannot reach when one f_k is ~1e-4 kT, so it runs to its
+    iteration limit. MBAR raises that limit to its maximum_iterations
+    (default 10000, about 30 min here) unless the caller bounds it. This
+    exact input stalled in the WP-A4 sweep; whether an input stalls is decided
+    by rounding, so the test pins the bound on every adaptive call and checks
+    that the answer is still the converged one (reference: the same input
+    converged with k_B changed by 2e-9, to 1e-7 kJ/mol).
+    """
+
+    from pymbar import mbar_solvers
+
+    real_adaptive = mbar_solvers.adaptive
+    maxiters = []
+
+    def bounded_adaptive(u_kn, N_k, f_k, tol=1.0e-8, options=None):
+        maxiters.append(options['maxiter'])
+        assert options['maxiter'] <= 200, options['maxiter']
+        return real_adaptive(u_kn, N_k, f_k, tol=tol, options=options)
+
+    monkeypatch.setattr(mbar_solvers, 'adaptive', bounded_adaptive)
+
+    lambdas = default_lambdas()
+    samples = make_model('SYM').sample(lambdas, 1000,
+                                       np.random.default_rng(41))
+    dp = _processor()
+    dp._mbar_f_k_warm_start = np.array(A5_1_WARM_F_K)
+    dG, ddG = _dgfep('mbar', samples, lambdas, alpha=A5_1_ALPHA, dp=dp)
+
+    assert maxiters
+    assert dG[-1] == pytest.approx(0.0003422, abs=1e-6)
+    assert dG[15] == pytest.approx(72.6351238, abs=1e-6)
+    assert np.all(np.isfinite(ddG))

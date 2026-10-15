@@ -114,10 +114,10 @@ def _fit_targets_of_code(dp, results, name, alpha, H12):
     dp.Lambda_frame = results['Lambda_frame']
     dp.Lambda_indices = results['Lambda_indices']
     conf = results['configuration_results'][name]
-    E2_shifted, _, _, _ = dp._calculate_Eg_V_dE(conf['E1_pes'],
-                                                 conf['E2_pes'], alpha, H12)
-    dGfep, _ = dp._calculate_dGfep(conf['E1_pes'], E2_shifted,
+    # The fit estimates dGfep once, unshifted, and adds Lambda * alpha.
+    dGfep, _ = dp._calculate_dGfep(conf['E1_pes'], conf['E2_pes'],
                                    conf['Temp_set'])
+    dGfep = np.asarray(dGfep) + np.asarray(dp.Lambda) * alpha
     xi = np.linspace(-10000, 10000, 20000)
     profile, _, _ = dp._dGevb_analytical(dGfep, dp.Lambda, H12, xi)
     _, barrier, dG0, *_ = dp._get_free_energies(profile, xi, fitting=True)

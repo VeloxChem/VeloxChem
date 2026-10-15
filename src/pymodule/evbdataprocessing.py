@@ -334,12 +334,17 @@ class EvbDataProcessing:
 
         xi = self._fit_xi_grid()
 
+        # Shifting E2 by alpha shifts the mapping free energy by exactly
+        # Lambda * alpha, for MBAR and for BAR alike, so the FEP estimate is
+        # computed once here rather than at every alpha the fit probes.
+        dGfep_unshifted, _ = self._calculate_dGfep(E1_ref, E2_ref, Temp_set)
+        dGfep_unshifted = np.asarray(dGfep_unshifted)
+        Lambda = np.asarray(self.Lambda)
+
         def get_barrier_and_free_energy_difference(x):
             alpha, H12 = x
 
-            E2_shifted, V, dE, Eg = self._calculate_Eg_V_dE(
-                E1_ref, E2_ref, alpha, H12)
-            dGfep, _ = self._calculate_dGfep(E1_ref, E2_shifted, Temp_set)
+            dGfep = dGfep_unshifted + Lambda * alpha
             dGevb_ana, shiftxi, fepxi = self._dGevb_analytical(
                 dGfep, self.Lambda, H12, xi)
             dGevb_smooth, barrier, free_energy, _, _, _, _, _ = self._get_free_energies(
@@ -483,6 +488,30 @@ class EvbDataProcessing:
         # Going straight to the 'robust' protocol (adaptive, then L-BFGS-B)
         # skips the doomed-to-fail hybr attempt: same converged result,
         # faster, and no spurious "failed to reach a solution" warning.
+        #
+        # The adaptive step must be bounded explicitly. It stops on a
+        # relative change in f_k of 1e-12, which rounding cannot reach when
+        # one f_k is close to zero (a fit driving the reaction free energy to
+        # 0 does this), so it then runs to its iteration limit. MBAR raises
+        # that limit to maximum_iterations, 10000 by default, which takes
+        # about half an hour for 31 windows of 1000 frames. Converged solves
+        # need fewer than 20 iterations. L-BFGS-B continues from the adaptive
+        # result. pymbar edits the protocol in place, so it is built per call.
+        solver_protocol = (
+            {
+                'method': 'adaptive',
+                'continuation': True,
+                'options': {
+                    'maxiter': 100
+                }
+            },
+            {
+                'method': 'L-BFGS-B',
+                'options': {
+                    'maxiter': 1000
+                }
+            },
+        )
         initial_f_k = self._mbar_f_k_warm_start
         if initial_f_k is not None and len(initial_f_k) != K:
             # Mismatched state count (different Lambda ladder / caller) --
@@ -490,7 +519,8 @@ class EvbDataProcessing:
             initial_f_k = None
         mbar = pymbar.MBAR(u_kn,
                            N_k,
-                           solver_protocol='robust',
+                           solver_protocol=solver_protocol,
+                           maximum_iterations=100,
                            initial_f_k=initial_f_k)
         mbar_results = mbar.compute_free_energy_differences()
         # Cache for the next call (e.g. the next alpha tried during fitting,
