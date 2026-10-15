@@ -303,3 +303,63 @@ def test_switch_off_leaves_results_unchanged():
             np.testing.assert_array_equal(np.asarray(b), np.asarray(a))
     for key, value in off['replica_average'].items():
         assert on['replica_average'][key] == value
+
+
+def _gaussian_results(lambda_r, n=200, seed=0, T=300.0, lambdas=LAMBDAS):
+    """Linear-response gap model with dG0 = 0: de = E2 - E1 in window l is
+    normal with mean lambda_r (1 - 2l) and variance 2 kT lambda_r; E1 = 0."""
+
+    rng = np.random.default_rng(seed)
+    kT = EvbDataProcessing().kb * T
+    de = np.concatenate([
+        rng.normal(lambda_r * (1 - 2 * lam), np.sqrt(2 * kT * lambda_r), n)
+        for lam in lambdas
+    ])
+    indices = np.repeat(np.arange(len(lambdas)), n)
+    return {
+        'Lambda': list(lambdas),
+        'Lambda_frame': np.asarray(lambdas)[indices],
+        'Lambda_indices': indices,
+        'configuration_results': {
+            'G': {
+                'E1_pes': np.zeros_like(de),
+                'E2_pes': de,
+                'Temp_set': T
+            }
+        },
+    }
+
+
+def test_diabatic_curves_finite_at_large_lambda_r():
+    """dg1, dg2 stay finite at lambda_r = 2500 kJ/mol. There exp(-beta
+    lambda xi) of the end windows underflows; an unshifted log-mean-exp put
+    about 80 of 562 bins at +inf (review of 36161b1d4)."""
+
+    results = _gaussian_results(2500.0)
+    dp = EvbDataProcessing(ostream=OutputStream(None))
+    dp.alpha, dp.H12 = 0.0, 50.0
+    bins = np.arange(-3500.0, 3500.1, 10.0)
+    dp.coordinate_bins = bins
+    dp.compute(results, 0.0, 0.0)
+    reorg = results['configuration_results']['G']['reorganization']
+    dg1, dg2 = np.asarray(reorg['dg1']), np.asarray(reorg['dg2'])
+    assert not np.any(np.isinf(dg1)) and not np.any(np.isinf(dg2))
+    centers = 0.5 * (bins[1:] + bins[:-1])
+    finite = np.isfinite(dg1[1:-1]) & np.isfinite(dg2[1:-1])
+    assert np.count_nonzero(finite) > 300
+    diff = (dg2 - dg1)[1:-1][finite] + centers[finite]
+    assert np.all(np.abs(diff) <= 5.0 + 1e-9)
+
+
+def test_ladder_must_run_from_0_to_1():
+    """compute() refuses a ladder without lambda = 1, with or without the
+    reorganization energy: dG0 is defined there."""
+
+    lambdas = LAMBDAS[:-1]
+    for reorganization in (True, False):
+        dp = EvbDataProcessing(ostream=OutputStream(None))
+        dp.alpha, dp.H12 = 0.0, 50.0
+        dp.calculate_reorganization = reorganization
+        dp.coordinate_bins = FIXED_BINS
+        with pytest.raises(Exception, match='end at 1'):
+            dp.compute(_gaussian_results(300.0, lambdas=lambdas), 0.0, 0.0)

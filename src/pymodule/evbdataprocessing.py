@@ -157,8 +157,7 @@ class EvbDataProcessing:
         # Reorganization energy lambda_r from the energy gap in the two end
         # windows, and the diabatic free-energy curves dg1, dg2 on the
         # coordinate bins, stored per configuration under "reorganization"
-        # (see _calculate_reorganization). Needs a lambda ladder that starts
-        # at 0 and ends at 1.
+        # (see _calculate_reorganization).
         self.calculate_reorganization = True
         # The largest relative difference between the reactant-side and the
         # product-side lambda_r that is read as linear response. Above it,
@@ -249,6 +248,14 @@ class EvbDataProcessing:
         self.Lambda = results["Lambda"]
         self.Lambda_frame = results["Lambda_frame"]
         self.Lambda_indices = results["Lambda_indices"]
+        # dG0 is dGfep at lambda = 1, and lambda_r reads the two end windows,
+        # so a ladder that misses either end has no meaning here. The driver
+        # keeps both ends when it subsamples the ladder.
+        Lambda = np.asarray(self.Lambda, dtype=float)
+        assert_msg_critical(
+            np.isclose(Lambda[0], 0.0) and np.isclose(Lambda[-1], 1.0),
+            "EvbDataProcessing: the lambda ladder must start at 0 and end " +
+            f"at 1, but runs from {Lambda[0]} to {Lambda[-1]}.")
 
         # One instance can serve several calls (EvbDriver keeps one for its
         # lifetime). The alpha, H12 and coordinate bins an earlier call
@@ -690,13 +697,18 @@ class EvbDataProcessing:
         )  # The amount of bins, in between every value of X is a bin, and outside the range are two bins
         hist = [[[] for x in range(S)] for x in range(N)]
         beta_set = self._beta(Temp_set)
-        content = np.exp(-beta_set * (Eg - V))
+        # The exponents are kept and averaged as ln<exp(x)> = logsumexp(x) -
+        # ln(n), which is shifted by the largest exponent. With E1 or E2' in
+        # place of Eg (the diabatic curves) the exponent is of the order of
+        # beta lambda_r, and exp(x) itself underflows to 0 beyond about 745,
+        # which put whole bins at +inf (lambda_r of 1800 kJ/mol at 300 K).
+        exponent = -beta_set * (Eg - V)
 
         Xi = np.searchsorted(bins, dE)
         for i in range(len(li)):
             bin = Xi[i]
             Lambda_index = li[i]
-            hist[Lambda_index][bin].append(content[i])
+            hist[Lambda_index][bin].append(exponent[i])
 
         dGcor = np.zeros((N, S))
         pnscount = np.zeros((N, S))
@@ -704,9 +716,9 @@ class EvbDataProcessing:
         for n in range(N):
             for s in range(S):
                 if len(hist[n][s]) > 0:
-                    dGcor[n, s] = -self.kb * Temp_set * np.log(
-                        np.mean(
-                            hist[n][s]))  # What to do with the temperature here
+                    dGcor[n, s] = -self.kb * Temp_set * (
+                        scipy.special.logsumexp(hist[n][s]) -
+                        np.log(len(hist[n][s])))
                     pnscount[n, s] = len(hist[n][s])
                 else:
                     dGcor[n, s] = 0
@@ -1296,12 +1308,6 @@ class EvbDataProcessing:
             de_var in (kJ/mol)^2.
         """
 
-        Lambda = np.asarray(self.Lambda, dtype=float)
-        assert_msg_critical(
-            np.isclose(Lambda[0], 0.0) and np.isclose(Lambda[-1], 1.0),
-            "EvbDataProcessing: the reorganization energy needs a lambda " +
-            "ladder that starts at 0 and ends at 1; set " +
-            "calculate_reorganization = False otherwise.")
         lambda_indices = np.asarray(self.Lambda_indices)
         de = np.asarray(E2_shifted, dtype=float) - np.asarray(E1, dtype=float)
         labels = [
@@ -1311,7 +1317,7 @@ class EvbDataProcessing:
         ]
 
         de_mean, de_var, g, n_eff = [], [], [], []
-        for window in (0, len(Lambda) - 1):
+        for window in (0, len(self.Lambda) - 1):
             frames = np.flatnonzero(lambda_indices == window)
             assert_msg_critical(
                 len(frames) >= 2,
@@ -1386,16 +1392,16 @@ class EvbDataProcessing:
     @staticmethod
     def _statistical_inefficiency(series):
         """Statistical inefficiency g >= 1 of a time series (pymbar
-        timeseries). A series shorter than 10 frames, or one whose estimate
-        fails (e.g. a constant series), counts as uncorrelated."""
+        timeseries). A series shorter than 10 frames, or one pymbar cannot
+        estimate (a constant series raises ParameterError), counts as
+        uncorrelated."""
 
         if len(series) < 10:
             return 1.0
         try:
-            from pymbar import timeseries
-            return max(1.0,
-                       float(timeseries.statistical_inefficiency(series)))
-        except Exception:
+            return max(
+                1.0, float(pymbar.timeseries.statistical_inefficiency(series)))
+        except pymbar.utils.ParameterError:
             return 1.0
 
     @staticmethod
@@ -1456,35 +1462,37 @@ class EvbDataProcessing:
             }
         })
 
-        # The reorganization energy, when _calculate_reorganization ran.
-        # With at least 3 replicas, a replica standard error more than 2x
-        # away from the analytic sigma points at correlation between windows,
-        # drift or hysteresis, which the analytic sigma cannot see.
-        lambda_rs = [
-            directions["both"]["lambda_r"]
-            for directions in by_replica.values()
-            if "lambda_r" in directions.get("both", {})
-        ]
-        if not lambda_rs:
-            return
-        lambda_r_mean, lambda_r_sem = self._replica_mean_sem(
-            lambda_rs, "reorganization energy")
-        result["replica_average"].update({
-            "lambda_r_mean": lambda_r_mean,
-            "lambda_r_sem": lambda_r_sem,
-        })
-        reorganization = result.get("reorganization")
-        if reorganization is None or len(lambda_rs) < 3:
-            return
-        ratio = lambda_r_sem / reorganization["lambda_r_unc"]
-        if np.isfinite(ratio) and (ratio > 2 or ratio < 0.5):
-            self.ostream.print_info(
-                f"The replica standard error of lambda_r ({lambda_r_sem:.2f}"
-                + f" kJ/mol over {len(lambda_rs)} replicas) and its analytic "
-                + f"uncertainty ({reorganization['lambda_r_unc']:.2f} kJ/mol) "
-                + "differ by more than 2x; check the hysteresis and the "
-                + "drift between replicas.")
-            self.ostream.flush()
+        # Each replica's lambda_r, from _calculate_per_replica_results. With
+        # at least 3 replicas, a replica standard error far from the analytic
+        # sigma can point at correlation between windows, drift or
+        # hysteresis, which the analytic sigma cannot see. The standard error
+        # of a few replicas is itself rough (a factor 2 either way happens
+        # about 1 time in 4 with 3 replicas), so this is only a note.
+        if self.calculate_reorganization:
+            lambda_rs = [
+                directions["both"]["lambda_r"]
+                for directions in by_replica.values()
+                if "both" in directions
+            ]
+            lambda_r_mean, lambda_r_sem = self._replica_mean_sem(
+                lambda_rs, "reorganization energy")
+            result["replica_average"].update({
+                "lambda_r_mean": lambda_r_mean,
+                "lambda_r_sem": lambda_r_sem,
+            })
+            lambda_r_unc = result["reorganization"]["lambda_r_unc"]
+            ratio = lambda_r_sem / lambda_r_unc
+            if (len(lambda_rs) >= 3 and np.isfinite(ratio)
+                    and not 0.5 <= ratio <= 2):
+                self.ostream.print_info(
+                    "Note: the replica standard error of lambda_r " +
+                    f"({lambda_r_sem:.2f} kJ/mol, {len(lambda_rs)} replicas) "
+                    + "and its analytic uncertainty " +
+                    f"({lambda_r_unc:.2f} kJ/mol) differ by more than a " +
+                    "factor of 2. With few replicas this can be chance; a " +
+                    "difference that persists points at drift or " +
+                    "hysteresis between the replicas.")
+                self.ostream.flush()
 
     def _replica_mean_sem(self, values, label):
         """Mean and standard error of the mean of one value per replica.

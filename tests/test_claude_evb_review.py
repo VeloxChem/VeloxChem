@@ -114,6 +114,8 @@ def test_replica_average_skips_nan_barrier(tmp_path):
 
     log = tmp_path / 'r2.log'
     dp = EvbDataProcessing(ostream=OutputStream(str(log)))
+    # The hand-built replicas carry no lambda_r (that needs compute()).
+    dp.calculate_reorganization = False
     result = {
         'replicas': {
             0: {'both': _replica(30.0, -5.0)},
