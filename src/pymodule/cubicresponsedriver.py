@@ -497,10 +497,20 @@ class CubicResponseDriver(NonlinearSolver):
 
         profiler.check_memory_usage('1st densities')
 
+        fock_profiler = Profiler({
+            'timing': self.timing,
+            'profiling': self.profiling,
+            'memory_profiling': self.memory_profiling,
+            'memory_tracing': self.memory_tracing,
+        })
+
         #  computing the compounded first-order Fock matrices
         fock_dict = self.get_fock_dict(freqtriples, density_list1,
                                        density_list2, density_list3, F0, mo,
-                                       molecule, ao_basis, eri_dict, dft_dict)
+                                       molecule, ao_basis, eri_dict, dft_dict,
+                                       fock_profiler)
+
+        fock_profiler.end(self.ostream)
 
         profiler.check_memory_usage('1st Focks')
 
@@ -519,10 +529,19 @@ class CubicResponseDriver(NonlinearSolver):
 
         profiler.check_memory_usage('2nd densities')
 
+        fock_profiler_two = Profiler({
+            'timing': self.timing,
+            'profiling': self.profiling,
+            'memory_profiling': self.memory_profiling,
+            'memory_tracing': self.memory_tracing,
+        })
+
         fock_dict_two = self.get_fock_dict_II(freqtriples, density_list1_two,
                                               density_list2_two, F0, mo,
                                               molecule, ao_basis, eri_dict,
-                                              dft_dict)
+                                              dft_dict, fock_profiler_two)
+
+        fock_profiler_two.end(self.ostream)
 
         profiler.check_memory_usage('2nd Focks')
 
@@ -1175,7 +1194,8 @@ class CubicResponseDriver(NonlinearSolver):
         return distributed_density_1, distributed_density_2
 
     def get_fock_dict(self, wi, density_list1, density_list2, density_list3, F0,
-                      mo, molecule, ao_basis, eri_dict, dft_dict):
+                      mo, molecule, ao_basis, eri_dict, dft_dict,
+                      profiler=None):
         """
         Computes the Fock matrices for a cubic response function
 
@@ -1195,6 +1215,8 @@ class CubicResponseDriver(NonlinearSolver):
             The dictionary containing ERI information
         :param dft_dict:
             The dictionary containing DFT information
+        :param profiler:
+            The profiler.
 
         :return:
             A dictonary of compounded first-order Fock-matrices
@@ -1257,7 +1279,8 @@ class CubicResponseDriver(NonlinearSolver):
                                                  'real_and_imag', eri_dict,
                                                  dft_dict, density_list1,
                                                  density_list2, density_list3,
-                                                 'crf', dens_factors=split)
+                                                 'crf', profiler,
+                                                 dens_factors=split)
             else:
                 density_list_23 = DistributedArray(density_list2.data,
                                                    self.comm,
@@ -1277,7 +1300,7 @@ class CubicResponseDriver(NonlinearSolver):
                 dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
                                                  'real_and_imag', eri_dict,
                                                  None, None, None,
-                                                 density_list_23, 'crf',
+                                                 density_list_23, 'crf', profiler,
                                                  dens_factors=joined)
 
             self._print_fock_time(time.time() - time_start_fock)
@@ -1299,7 +1322,7 @@ class CubicResponseDriver(NonlinearSolver):
         return focks
 
     def get_fock_dict_II(self, wi, density_list1, density_list2, F0, mo,
-                         molecule, ao_basis, eri_dict, dft_dict):
+                         molecule, ao_basis, eri_dict, dft_dict, profiler=None):
         """
         Computes the Fock matrices for a cubic response function
 
@@ -1319,6 +1342,8 @@ class CubicResponseDriver(NonlinearSolver):
             The dictionary containing ERI information
         :param dft_dict:
             The dictionary containing DFT information
+        :param profiler:
+            The profiler.
 
         :return:
             A dictonary of compounded first-order Fock-matrices
@@ -1363,12 +1388,13 @@ class CubicResponseDriver(NonlinearSolver):
                                                  'real_and_imag', eri_dict,
                                                  dft_dict, density_list1,
                                                  density_list2, None, 'crf_ii',
+                                                 profiler,
                                                  dens_factors=self._ri_jk_factors)
             else:
                 dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
                                                  'real_and_imag', eri_dict,
                                                  None, None, density_list2,
-                                                 None, 'crf_ii',
+                                                 None, 'crf_ii', profiler,
                                                  dens_factors=self._ri_jk_factors)
 
             self._print_fock_time(time.time() - time_start_fock)

@@ -422,10 +422,20 @@ class TpaTransitionDriver(NonlinearSolver):
 
         profiler.check_memory_usage('Densities')
 
+        fock_profiler = Profiler({
+            'timing': self.timing,
+            'profiling': self.profiling,
+            'memory_profiling': self.memory_profiling,
+            'memory_tracing': self.memory_tracing,
+        })
+
         # computing the compounded first-order Fock matrices
         fock_dict = self.get_fock_dict(freqs, first_order_dens,
                                        second_order_dens, F0, mo, molecule,
-                                       ao_basis, eri_dict, dft_dict, profiler)
+                                       ao_basis, eri_dict, dft_dict,
+                                       fock_profiler)
+
+        fock_profiler.end(self.ostream)
 
         profiler.check_memory_usage('Focks')
 
@@ -862,6 +872,8 @@ class TpaTransitionDriver(NonlinearSolver):
             The dictionary containing ERI information
         :param dft_dict:
             The dictionary containing DFT information
+        :param profiler:
+            The profiler.
 
         :return:
             A dictonary of compounded first-order Fock-matrices

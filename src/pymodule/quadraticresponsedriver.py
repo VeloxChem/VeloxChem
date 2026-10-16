@@ -456,11 +456,20 @@ class QuadraticResponseDriver(NonlinearSolver):
 
         profiler.check_memory_usage('Densities')
 
+        fock_profiler = Profiler({
+            'timing': self.timing,
+            'profiling': self.profiling,
+            'memory_profiling': self.memory_profiling,
+            'memory_tracing': self.memory_tracing,
+        })
+
         #  computing the compounded first-order Fock matrices
         fock_dict = self.get_fock_dict(freqpairs, first_order_dens,
                                        second_order_dens, F0, mo, molecule,
                                        ao_basis, eri_dict, dft_dict,
-                                       ri_jk_factors)
+                                       ri_jk_factors, fock_profiler)
+
+        fock_profiler.end(self.ostream)
 
         profiler.check_memory_usage('Focks')
 
@@ -692,7 +701,8 @@ class QuadraticResponseDriver(NonlinearSolver):
                       ao_basis,
                       eri_dict,
                       dft_dict=None,
-                      ri_jk_factors=None):
+                      ri_jk_factors=None,
+                      profiler=None):
         """
         Computes the Fock matrices for a quadratic response function
 
@@ -712,6 +722,8 @@ class QuadraticResponseDriver(NonlinearSolver):
             The dictionary containing ERI information
         :param dft_dict:
             The dictionary containing DFT information
+        :param profiler:
+            The profiler.
 
         :return:
             A dictonary of compounded first-order Fock-matrices
@@ -755,6 +767,7 @@ class QuadraticResponseDriver(NonlinearSolver):
                                              'real_and_imag', eri_dict,
                                              dft_dict, first_order_dens,
                                              second_order_dens, None, 'qrf',
+                                             profiler,
                                              dens_factors=ri_jk_factors)
 
             self._print_fock_time(time.time() - time_start_fock)
