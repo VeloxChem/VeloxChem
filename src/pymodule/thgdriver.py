@@ -35,7 +35,7 @@ import numpy as np
 import time
 
 from .oneeints import compute_electric_dipole_integrals
-from .veloxchemlib import mpi_master, hartree_in_wavenumber
+from .veloxchemlib import mpi_master, hartree_in_ev, hartree_in_wavenumber
 from .profiler import Profiler
 from .cppsolver import ComplexResponseSolver
 from .linearsolver import LinearSolver
@@ -430,7 +430,7 @@ class ThgDriver(NonlinearSolver):
                     sum_val += t4_dict[(w, w, w)]
                 for key, val in other_dict.items():
                     sum_val += val[(w, w, w)]
-                THG[(w, w, w)] = sum_val.real
+                THG[(w, w, w)] = sum_val
 
             ret_dict.update(other_dict)
 
@@ -2446,21 +2446,19 @@ class ThgDriver(NonlinearSolver):
 
     def _print_results2(self, rsp_results):
         """
-        Prints the results from the TPA calculation.
-
-        :param rsp_results:
-            A dictionary containing the results of response calculation.
+        Print the THG summary followed by the complex response contributions.
         """
 
-        freqs = rsp_results['frequencies']
-        components = ['THG', 't4_dict', 't3_dict', 'NaX3NyNz', 'NaA3NxNy', 'NaX2Nyz', 'NxA2Nyz']   # list of components to print
+        self._print_results(rsp_results)
 
-        self.ostream.print_blank()
+        frequencies = rsp_results['frequencies']
+        components = ('t4_dict', 't3_dict', 'NaX3NyNz', 'NaA3NxNy',
+                      'NaX2Nyz', 'NxA2Nyz')
+        width = 74
 
-        # Title section
-        w_str = 'Isotropic Average of Re(gamma(-3w; w, w, w)) for Third-Harmonic Generation (THG) intensities'
-        self.ostream.print_header(w_str)
-        self.ostream.print_header('=' * (len(w_str) + 2))
+        title = 'THG Response Contributions (a.u.)'
+        self.ostream.print_header(title.ljust(width))
+        self.ostream.print_header(('=' * len(title)).ljust(width))
         self.ostream.print_blank()
 
         for component in components:
@@ -2468,76 +2466,68 @@ class ThgDriver(NonlinearSolver):
             if tensor is None:
                 continue
 
-            # Header for this component
-            component_title = f'Component: {component}'
-            self.ostream.print_header(component_title)
-            self.ostream.print_header('-' * len(component_title))
-            self.ostream.print_blank()
+            component_title = 'Component: {}'.format(component)
+            self.ostream.print_header(component_title.ljust(width))
+            self.ostream.print_header(('-' * len(component_title)).ljust(width))
 
-            # Column headers
-            title = '{:>12s} {:>25s}'.format('Frequency', f'{component} value (a.u.)')
-            width = len(title)
-            self.ostream.print_header(title.ljust(width))
-            self.ostream.print_header(('-' * len(title)).ljust(width))
+            header = '{:>12s}{:>14s}{:>24s}{:>24s}'.format(
+                'w [a.u.]', 'w [eV]', 'Re(value) [a.u.]', 'Im(value) [a.u.]')
+            self.ostream.print_header(header)
+            self.ostream.print_header('-' * width)
 
-            # Values
-            for w in freqs:
-                key = (w, w, w)
-                val = tensor.get(key)
-                if val is not None:
-                    value = val.real if hasattr(val, 'real') else val
-                    line = '{:>12.4f} {:>25.8f}'.format(w, value)
-                    self.ostream.print_header(line.ljust(width))
+            for w in frequencies:
+                value = tensor.get((w, w, w))
+                if value is None:
+                    line = '{:>12.6f}{:>14.6f}{:>24s}{:>24s}'.format(
+                        w, w * hartree_in_ev(), 'N/A', 'N/A')
                 else:
-                    self.ostream.print_header(f"{w:>12.4f} {'N/A':>25}")
+                    line = '{:>12.6f}{:>14.6f}{:>24.10e}{:>24.10e}'.format(
+                        w, w * hartree_in_ev(), value.real, value.imag)
+                self.ostream.print_header(line)
 
             self.ostream.print_blank()
 
-        # Reference footer
-        self.ostream.print_header('Reference:'.ljust(width))
-        self.ostream.print_blank()
         self.ostream.flush()
+
 
     def _print_results(self, rsp_results):
         """
-        Prints the results from the TPA calculation.
+        Print the isotropic THG response with its real and imaginary parts.
 
-        :param rsp_results:
-            A dictionary containing the results of response calculation.
+        The complex hyperpolarizability is gamma(-3w; w, w, w). Its magnitude
+        is reported for comparison, not as a THG intensity.
         """
 
-        freqs = rsp_results['frequencies']
-        component = 'THG'
+        frequencies = rsp_results['frequencies']
+        thg = rsp_results.get('THG', {})
+        width = 98
 
         self.ostream.print_blank()
-
-        w_str = 'Isotropic Average of Re(gamma(-3w; w, w, w)) for Thid-Harmonic Generation (THG) intensities'
-        self.ostream.print_header(w_str)
-        self.ostream.print_header('=' * (len(w_str) + 2))
-        self.ostream.print_blank()
-
-        # Updated header with only two columns
-        title = '{:>12s} {:>25s}'.format('Frequency', 'THG intensity (a.u.)')
-        width = len(title)
+        title = 'Isotropic Third-Harmonic Generation (THG) Response'
         self.ostream.print_header(title.ljust(width))
-        self.ostream.print_header(('-' * len(title)).ljust(width))
-
-        tensor = rsp_results.get(component)
-        if tensor is not None:
-            for w in freqs:
-                key = (w, w, w)
-                val = tensor.get(key)
-                if val is not None:
-                    intensity = val.real if hasattr(val, 'real') else val
-                    line = '{:>12.4f} {:>25.8f}'.format(w, intensity)
-                    self.ostream.print_header(line.ljust(width))
-                else:
-                    self.ostream.print_header(f"{w:>12.4f} {'N/A':>25}")
-
+        self.ostream.print_header(('=' * len(title)).ljust(width))
+        self.ostream.print_header('gamma(-3w; w, w, w) in atomic units'.ljust(width))
         self.ostream.print_blank()
-        self.ostream.print_header('Reference:'.ljust(width))
+
+        header = '{:>12s}{:>14s}{:>24s}{:>24s}{:>24s}'.format(
+            'w [a.u.]', 'w [eV]', 'Re(gamma) [a.u.]',
+            'Im(gamma) [a.u.]', '|gamma| [a.u.]')
+        self.ostream.print_header(header)
+        self.ostream.print_header('-' * width)
+
+        for w in frequencies:
+            value = thg.get((w, w, w))
+            if value is None:
+                line = '{:>12.6f}{:>14.6f}{:>24s}{:>24s}{:>24s}'.format(
+                    w, w * hartree_in_ev(), 'N/A', 'N/A', 'N/A')
+            else:
+                line = '{:>12.6f}{:>14.6f}{:>24.10e}{:>24.10e}{:>24.10e}'.format(
+                    w, w * hartree_in_ev(), value.real, value.imag, abs(value))
+            self.ostream.print_header(line)
+
         self.ostream.print_blank()
         self.ostream.flush()
+
 
     def get_comp(self, freqs):
         """
