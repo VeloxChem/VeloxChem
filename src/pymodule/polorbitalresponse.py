@@ -2619,7 +2619,7 @@ class PolOrbitalResponse(CphfSolver):
         # ERI information
         eri_dict = self._init_eri(molecule, basis)
         # DFT information
-        dft_dict = self._init_dft(molecule, scf_tensors)
+        dft_dict = self._init_dft(molecule, scf_tensors, silent=True)
         # PE information
         pe_dict = self._init_pe(molecule, basis)
 
@@ -2904,7 +2904,7 @@ class PolOrbitalResponse(CphfSolver):
         # ERI information
         eri_dict = self._init_eri(molecule, basis)
         # DFT information
-        dft_dict = self._init_dft(molecule, scf_tensors)
+        dft_dict = self._init_dft(molecule, scf_tensors, silent=True)
         # PE information
         pe_dict = self._init_pe(molecule, basis)
 
@@ -3179,7 +3179,7 @@ class PolOrbitalResponse(CphfSolver):
         # ERI information
         eri_dict = self._init_eri(molecule, basis)
         # DFT information
-        dft_dict = self._init_dft(molecule, scf_tensors)
+        dft_dict = self._init_dft(molecule, scf_tensors, silent=True)
         # PE information
         pe_dict = self._init_pe(molecule, basis)
 
@@ -3527,7 +3527,7 @@ class PolOrbitalResponse(CphfSolver):
         # ERI information
         eri_dict = self._init_eri(molecule, basis)
         # DFT information
-        dft_dict = self._init_dft(molecule, scf_tensors)
+        dft_dict = self._init_dft(molecule, scf_tensors, silent=True)
         # PE information
         pe_dict = self._init_pe(molecule, basis)
 
