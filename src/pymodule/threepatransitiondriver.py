@@ -387,9 +387,18 @@ class ThreePATransitionDriver(NonlinearSolver):
         profiler.check_memory_usage('Densities')
 
         # computing the compounded first-order Fock matrices
+        fock_profiler = Profiler({
+            'timing': self.timing,
+            'profiling': self.profiling,
+            'memory_profiling': self.memory_profiling,
+            'memory_tracing': self.memory_tracing,
+        })
+
         fock_dict = self.get_fock_dict(freqs, first_order_dens,
                                        second_order_dens, third_order_dens, F0, mo, molecule,
-                                       ao_basis, eri_dict, dft_dict, profiler)
+                                       ao_basis, eri_dict, dft_dict, fock_profiler)
+
+        fock_profiler.end(self.ostream)
 
         profiler.check_memory_usage('Focks')
 
@@ -400,8 +409,17 @@ class ThreePATransitionDriver(NonlinearSolver):
         # Needs tgo be fixed
         density_list1_two, density_list2_two = self.get_densities_II(freqs, Nx, Nxy, mo, nocc, norb,Xf)
 
+        fock_profiler_two = Profiler({
+            'timing': self.timing,
+            'profiling': self.profiling,
+            'memory_profiling': self.memory_profiling,
+            'memory_tracing': self.memory_tracing,
+        })
+
         # Needs tgo be fixed
-        fock_dict_two = self.get_fock_dict_II(freqs, density_list1_two,density_list2_two, F0, mo,molecule, ao_basis, eri_dict,dft_dict)
+        fock_dict_two = self.get_fock_dict_II(freqs, density_list1_two,density_list2_two, F0, mo,molecule, ao_basis, eri_dict,dft_dict, fock_profiler_two)
+
+        fock_profiler_two.end(self.ostream)
 
         e3_dict = self.get_e3(freqs, Nx, Nxy, Focks, fock_dict_two, f_xy, nocc, norb, Xf)
 
@@ -1409,7 +1427,7 @@ class ThreePATransitionDriver(NonlinearSolver):
 
         return distributed_density_1, distributed_density_2, distributed_density_3
 
-    def get_fock_dict_II(self, wi, density_list1, density_list2, F0, mo,molecule, ao_basis, eri_dict, dft_dict):
+    def get_fock_dict_II(self, wi, density_list1, density_list2, F0, mo,molecule, ao_basis, eri_dict, dft_dict, profiler=None):
         """
         Computes the Fock matrices for a cubic response function
 
@@ -1429,6 +1447,8 @@ class ThreePATransitionDriver(NonlinearSolver):
             The dictionary containing ERI information
         :param dft_dict:
             The dictionary containing DFT information
+        :param profiler:
+            The profiler.
 
         :return:
             A dictonary of compounded first-order Fock-matrices
@@ -1471,12 +1491,12 @@ class ThreePATransitionDriver(NonlinearSolver):
             if self._dft:
                 dist_focks = self._comp_nlr_fock(
                     mo, molecule, ao_basis, 'real', eri_dict, dft_dict,
-                    density_list1, density_list2, None, '3pa_ii',
+                    density_list1, density_list2, None, '3pa_ii', profiler,
                     dens_factors=self._ri_jk_factors)
             else:
                 dist_focks = self._comp_nlr_fock(
                     mo, molecule, ao_basis, 'real', eri_dict, None, None,
-                    density_list2, None, '3pa_ii',
+                    density_list2, None, '3pa_ii', profiler,
                     dens_factors=self._ri_jk_factors)
 
             self._print_fock_time(time.time() - time_start_fock)
@@ -1627,7 +1647,7 @@ class ThreePATransitionDriver(NonlinearSolver):
                 dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
                                                  'real', eri_dict,
                                                  None, None, None,
-                                                 density_list_23, '3pa',
+                                                 density_list_23, '3pa', profiler,
                                                  dens_factors=joined)
 
             self._print_fock_time(time.time() - time_start_fock)
