@@ -172,7 +172,6 @@ def initialize(solver, molecule, basis):
                                                      solver.eri_thresh)
         aux_atoms = molecule.partition_atoms_by_weight(solver.comm, weights)
 
-
     needed = solver._ri_jk_drv.required_memory(molecule, basis,
                                                solver._ri_jk_aux_basis,
                                                solver.eri_thresh, aux_atoms,

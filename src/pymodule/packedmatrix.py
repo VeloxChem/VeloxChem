@@ -31,7 +31,6 @@
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from mpi4py import MPI
-import numpy as np
 
 from .veloxchemlib import PackedMatrix
 from .veloxchemlib import mpi_master

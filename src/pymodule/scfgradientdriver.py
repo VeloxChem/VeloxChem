@@ -994,8 +994,7 @@ class ScfGradientDriver(GradientDriver):
 
             mine = self.scf_driver._ri_drv.owned_parts()
 
-            local = np.array(self.scf_driver._ri_drv.compute_gamma(
-                packed_density, mine),
+            local = np.array(self.scf_driver._ri_drv.compute_gamma(packed_density, mine),
                              dtype=np.float64)
 
             total = np.zeros_like(local)
@@ -1367,8 +1366,7 @@ class ScfGradientDriver(GradientDriver):
 
             mine = self.scf_driver._ri_drv.owned_parts()
 
-            local = np.array(self.scf_driver._ri_drv.compute_gamma(
-                packed_density, mine),
+            local = np.array(self.scf_driver._ri_drv.compute_gamma(packed_density, mine),
                              dtype=np.float64)
 
             total = np.zeros_like(local)

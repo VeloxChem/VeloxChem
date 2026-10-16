@@ -47,8 +47,6 @@ from .veloxchemlib import make_matrix, mat_t
 from .matrix import Matrix
 from .distributedarray import DistributedArray
 from .subcommunicators import SubCommunicators
-from .veloxchemlib import SimdRIJKFockDriver
-from .veloxchemlib import SimdRIJKResponseDriver
 from .veloxchemlib import PackedMatrix
 from .veloxchemlib import SimdRIJFockDriver
 from .veloxchemlib import rimode

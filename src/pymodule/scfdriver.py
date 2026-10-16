@@ -2084,7 +2084,6 @@ class ScfDriver:
 
             use_inverse_square_root = routes[self.ri_metric_route]
 
-
             # NOTE: the direct way is divided over the orbitals and not over the
             # auxiliary basis, as the triangular solve of its exchange pass reaches
             # across the whole of it. Every rank therefore holds the whole of the
