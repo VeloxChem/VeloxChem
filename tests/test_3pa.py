@@ -45,10 +45,13 @@ class Test3PA:
 
         return molecule, basis, scf_results
 
+
+
     def run_3pa(self, xcfun_label, basis_set_label, ref_result):
 
-        molecule, ao_basis, scf_results = self.run_scf(xcfun_label,
-                                                       basis_set_label)
+        molecule, ao_basis, scf_results = self.run_scf(
+            xcfun_label, basis_set_label
+        )
 
         rsp_settings = {'nstates': 2, 'conv_thresh': 1.0e-6}
         method_settings = {'xcfun': xcfun_label, 'grid_level': 3}
@@ -57,12 +60,61 @@ class Test3PA:
         three_pa_drv.ostream.mute()
         three_pa_drv.update_settings(rsp_settings, method_settings)
 
-        results_ThreePA = three_pa_drv.compute(molecule, ao_basis, scf_results)
+        results_ThreePA = three_pa_drv.compute(
+            molecule, ao_basis, scf_results
+        )
 
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
-            for key in ref_result:
-                assert abs(abs(results_ThreePA['transition_moments'][key]) -
-                           abs(ref_result[key]).real) < 1.0e-4
+
+            # The 3PA driver now indexes transition moments by
+            # excited-state index rather than rounded photon frequency.
+            photon_energies = results_ThreePA['photon_energies']
+            transition_moments = results_ThreePA['transition_moments']
+
+            reference_frequencies = {
+                freq for _, freq in ref_result
+            }
+
+            assert len(photon_energies) == len(reference_frequencies)
+
+            # Match each old reference frequency to its state index.
+            frequency_to_state = {}
+
+            for ref_freq in reference_frequencies:
+
+                matches = [
+                    state_idx
+                    for state_idx, photon_energy in enumerate(photon_energies)
+                    if abs(photon_energy + ref_freq) < 5.1e-5
+                ]
+
+                assert len(matches) == 1, (
+                    f'Expected one state for photon frequency {ref_freq}, '
+                    f'found {matches}; '
+                    f'calculated energies: {photon_energies}'
+                )
+
+                frequency_to_state[ref_freq] = matches[0]
+
+            # Each reference frequency must identify a different state.
+            assert len(set(frequency_to_state.values())) == len(
+                reference_frequencies
+            )
+
+            # Compare transition moments with existing reference values.
+            for (component, ref_freq), ref_value in ref_result.items():
+
+                state_idx = frequency_to_state[ref_freq]
+                key = (component, state_idx)
+
+                assert key in transition_moments, (
+                    f'Missing 3PA tensor {key}'
+                )
+
+                assert abs(
+                    abs(transition_moments[key]) - abs(ref_value).real
+                ) < 1.0e-4
+
 
     def test_hf_3pa(self):
 
