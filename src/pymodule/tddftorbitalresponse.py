@@ -311,6 +311,27 @@ class TddftOrbitalResponse(CphfSolver):
             # Make a list of unrel. DMs and excittion vectors:
             dm_ao_list = (list(unrel_dm_ao) + list(x_plus_y_ao) +
                           list(x_minus_y_ao))
+            xy_dm_ao = list(x_plus_y_ao) + list(x_minus_y_ao)
+
+            # Factors of the same densities for the resolution of the
+            # identity, where the solver is using RI-JK. The unrelaxed density
+            # is block diagonal in the orbitals, the transition densities are
+            # not, so the two are built in different shapes.
+            ri_jk_factors_1pdm = None
+            ri_jk_factors_xy = None
+
+            if self.ri_jk and self.ri_jk_simd:
+                ri_jk_factors_1pdm = (
+                    mo_occ,
+                    [np.matmul(mo_occ, dm_oo[i].T) for i in range(dof)],
+                    mo_vir,
+                    [np.matmul(mo_vir, dm_vv[i].T) for i in range(dof)],
+                )
+                ri_jk_factors_xy = (
+                    mo_occ,
+                    [np.matmul(mo_vir, x_plus_y[i].T) for i in range(dof)] +
+                    [np.matmul(mo_vir, x_minus_y[i].T) for i in range(dof)],
+                )
 
             # 2) Construct the right-hand side
 
@@ -338,6 +359,9 @@ class TddftOrbitalResponse(CphfSolver):
         else:
             dof = None
             dm_ao_list = None
+            xy_dm_ao = None
+            ri_jk_factors_1pdm = None
+            ri_jk_factors_xy = None
 
             if self._dft:
                 perturbed_dm_ao_list = None
@@ -361,8 +385,26 @@ class TddftOrbitalResponse(CphfSolver):
         molgrid = dft_dict['molgrid']
         gs_density = dft_dict['gs_density']
 
-        fock_ao_rhs = self._comp_lr_fock(dm_ao_list, molecule, basis, eri_dict,
-                                         dft_dict, pe_dict, profiler)
+        if self.ri_jk and self.ri_jk_simd:
+            if self.rank == mpi_master():
+                unrel_dm_ao_list = list(unrel_dm_ao)
+            else:
+                unrel_dm_ao_list = None
+            fock_1pdm = self._comp_lr_fock(unrel_dm_ao_list, molecule, basis,
+                                           eri_dict, dft_dict, pe_dict,
+                                           profiler,
+                                           dens_factors=ri_jk_factors_1pdm)
+            fock_xy = self._comp_lr_fock(xy_dm_ao, molecule, basis, eri_dict,
+                                         dft_dict, pe_dict, profiler,
+                                         dens_factors=ri_jk_factors_xy)
+            if self.rank == mpi_master():
+                fock_ao_rhs = fock_1pdm + fock_xy
+            else:
+                fock_ao_rhs = None
+        else:
+            fock_ao_rhs = self._comp_lr_fock(dm_ao_list, molecule, basis,
+                                             eri_dict, dft_dict, pe_dict,
+                                             profiler)
 
         profiler.start_timer('Kxc')
 
@@ -624,6 +666,7 @@ class TddftOrbitalResponse(CphfSolver):
         dist_cphf_ov = self.cphf_results['dist_cphf_ov']
 
         lambda_ao_list = []
+        lambda_rights = []
         for x in range(dof):
             cphf_ov_x = dist_cphf_ov[x].get_full_vector(0)
             if self.rank == mpi_master():
@@ -631,11 +674,20 @@ class TddftOrbitalResponse(CphfSolver):
                     np.linalg.multi_dot(
                         [mo_occ,
                          cphf_ov_x.reshape(nocc, nvir), mo_vir.T]))
+                lambda_rights.append(
+                    np.matmul(mo_vir, cphf_ov_x.reshape(nocc, nvir).T))
 
         profiler.stop_timer('lambda')
 
+        if self.ri_jk and self.ri_jk_simd:
+            lambda_factors = ((mo_occ, lambda_rights)
+                              if self.rank == mpi_master() else None)
+        else:
+            lambda_factors = None
+
         fock_lambda = self._comp_lr_fock(lambda_ao_list, molecule, basis,
-                                         eri_dict, dft_dict, pe_dict, profiler)
+                                         eri_dict, dft_dict, pe_dict, profiler,
+                                         dens_factors=lambda_factors)
 
         profiler.start_timer('Other')
 
