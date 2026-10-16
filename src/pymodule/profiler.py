@@ -50,10 +50,11 @@ class Profiler:
         - memory_profiling: The flag for printing memory usage.
         - memory_tracing: The flag for tracing memory allocation using
         - start_time: The starting time.
-        - start_avail_mem: The starting available memory.
         - timing_dict: The dictionary containing information about timing.
         - timing_key: The key for the timing dictionary.
-        - memory_usage: The list containing information about memory usage.
+        - memory_usage: The list of tuples with the elapsed time, the
+          resident memory of the current process, the total system memory
+          usage, and the remark at each checkpoint.
         - pr: The Profile object.
     """
 
@@ -71,7 +72,6 @@ class Profiler:
         self.memory_tracing = False
 
         self.start_time = None
-        self.start_avail_mem = None
 
         self.timing_dict = None
         self.timing_key = None
@@ -100,10 +100,15 @@ class Profiler:
             self.memory_tracing = settings['memory_tracing']
 
         self.start_time = tm.time()
-        self.start_avail_mem = psutil.virtual_memory().available
 
         self.timing_dict = {}
         self.memory_usage = []
+
+        if self.memory_profiling:
+            vm = psutil.virtual_memory()
+            proc_mem = psutil.Process().memory_info().rss
+            self.memory_usage.append(
+                (0.0, proc_mem, vm.total - vm.available, 'Profiler starts'))
 
         if self.profiling:
             import cProfile
@@ -123,6 +128,9 @@ class Profiler:
         :param scf_flag:
             The flag for SCF.
         """
+
+        if self.memory_profiling:
+            self.check_memory_usage('Profiler stops')
 
         self.print_timing(ostream, scf_flag)
         self.print_profiling_summary(ostream)
@@ -303,14 +311,24 @@ class Profiler:
         """
 
         if self.memory_profiling:
-            avail_mem = psutil.virtual_memory().available
-            used_mem = max(0, self.start_avail_mem - avail_mem)
+            vm = psutil.virtual_memory()
+            proc_mem = psutil.Process().memory_info().rss
+            total_used_mem = vm.total - vm.available
             self.memory_usage.append(
-                (tm.time() - self.start_time, used_mem, remark))
+                (tm.time() - self.start_time, proc_mem, total_used_mem, remark))
 
     def print_memory_usage(self, ostream, scf_flag=False):
         """
         Prints memory usage.
+
+        The values are sampled at each checkpoint by the rank that prints
+        the table. The 'Process Memory' column is the resident set size
+        (RSS) of that single rank. The 'System Used' column is the
+        system-wide memory usage of the node on which that rank runs,
+        calculated as total memory minus available memory; it includes all
+        processes on the node (including other MPI ranks) but is not summed
+        across nodes. The first and last rows are recorded when the profiler
+        starts and stops.
 
         :param ostream:
             The output stream.
@@ -319,20 +337,22 @@ class Profiler:
         """
 
         if self.memory_profiling:
-            mem_str = 'Estimated memory usage'
+            mem_str = 'Memory usage (sampled on single rank)'
             ostream.print_header(mem_str.ljust(92))
             ostream.print_header(('-' * len(mem_str)).ljust(92))
 
             mem_str = '{:20s}'.format('Elapsed Time')
-            mem_str += ' {:20s}'.format('Memory Usage')
+            mem_str += ' {:20s}'.format('Process Memory')
+            mem_str += ' {:20s}'.format('System Used')
             mem_str += ' {:s}'.format('Remark')
             ostream.print_header(mem_str.ljust(92))
 
-            for dt, mem, remark in self.memory_usage:
+            for dt, proc_mem, sys_mem, remark in self.memory_usage:
                 if scf_flag and remark.lower() == 'iteration 0':
                     continue
                 mem_str = '{:.2f} sec'.format(dt).ljust(20)
-                mem_str += ' {:20s}'.format(self.memory_to_string(mem))
+                mem_str += ' {:20s}'.format(self.memory_to_string(proc_mem))
+                mem_str += ' {:20s}'.format(self.memory_to_string(sys_mem))
                 mem_str += ' {:s}'.format(remark)
                 ostream.print_header(mem_str.ljust(92))
 
