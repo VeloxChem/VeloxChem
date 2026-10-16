@@ -6,6 +6,7 @@ from veloxchem.veloxchemlib import mpi_master
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
+from veloxchem.scfunrestdriver import ScfUnrestrictedDriver
 from veloxchem.errorhandler import VeloxChemError
 from veloxchem.tdaeigensolver import TdaEigenSolver
 from veloxchem.lreigensolver import LinearResponseEigenSolver
@@ -174,6 +175,17 @@ class TestGrad:
                 match='Analytical TDDFT gradient is not supported with '
                       'polarizable embedding'):
             tddft_grad.compute_analytical(molecule, basis, {})
+
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='skip pytest.raises for multiple MPI processes')
+    def test_excited_state_gradient_rejects_unrestricted_reference(self):
+
+        scf_drv = ScfUnrestrictedDriver()
+
+        with pytest.raises(
+                VeloxChemError,
+                match='excited-state gradient not implemented for open-shell'):
+            TddftGradientDriver(scf_drv)
 
     def test_tda_point_charges(self):
         """

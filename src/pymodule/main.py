@@ -491,6 +491,10 @@ def _main_body():
 
         elif run_excited_state_gradient:
 
+            assert_msg_critical(
+                not use_xtb,
+                'Excited-state gradient is not supported with xTB')
+
             rsp_dict = dict(task.input_dict['response'])
             rsp_dict['program_end_time'] = program_end_time
             rsp_dict['filename'] = task.input_dict['filename']
@@ -575,6 +579,10 @@ def _main_body():
                                                        task.ao_basis)
 
         elif run_excited_state_gradient:
+
+            assert_msg_critical(
+                not use_xtb,
+                'Excited-state gradient is not supported with xTB')
 
             grad_dict = (task.input_dict['gradient']
                          if 'gradient' in task.input_dict else {})

@@ -93,6 +93,11 @@ class TddftGradientDriver(GradientDriver):
         self._debug = scf_drv._debug
         self._scf_drv = scf_drv
 
+        # NOTE: only implemented for closed-shell.
+        assert_msg_critical(
+            scf_drv.scf_type == 'restricted',
+            f'{type(self).__name__}: excited-state gradient not implemented for open-shell')
+
         self._rsp_results = None
 
         self._block_size_factor = 4
