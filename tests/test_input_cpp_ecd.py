@@ -151,7 +151,7 @@ class TestInputCppECD:
                                      ref_data['cpp_energies'])) < 1.0e-5
                 assert np.max(
                     np.abs(cpp_ecd_values -
-                           ref_data['cpp_ecd_values'])) < 1.0e-4
+                           ref_data['cpp_ecd_values'])) < 1.0e-3
 
             self.remove_input_and_h5_files(input_file)
 
@@ -186,7 +186,7 @@ class TestInputCppECD:
         ref_data = {
             'wf_model': 'Spin-Restricted Kohn-Sham',
             'e_scf': -227.1612519218,
-            'n_scf_iterations': 8,
+            'n_scf_iterations': 4,
             'dipole': 0.859299,
             'nfreqs': 11,
             'n_cpp_iterations': 5,

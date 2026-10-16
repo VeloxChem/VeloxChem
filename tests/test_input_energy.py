@@ -192,7 +192,7 @@ class TestInputEnergy:
         ref_data = {
             'wf_model': 'Spin-Unrestricted Kohn-Sham',
             'e_scf': -76.0761244587,
-            'n_iterations': 8,
+            'n_iterations': 7,
             'dipole': 0.300483,
         }
 

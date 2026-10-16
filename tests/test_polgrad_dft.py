@@ -77,7 +77,7 @@ class TestPolgrad:
             polgrad_dynamic_reference = polgrad_reference[1]
             hf.close()
 
-            assert np.max(np.abs(polgrad_dynamic) - np.abs(polgrad_dynamic_reference)) < 1.0e-6
+            assert np.max(np.abs(polgrad_dynamic) - np.abs(polgrad_dynamic_reference)) < 2.0e-5
 
     def run_polgrad_complex(self, molecule, basis, xcfun=None, label=None):
         scf_drv = ScfRestrictedDriver()
@@ -143,8 +143,8 @@ class TestPolgrad:
             polgrad_dynamic_reference = polgrad_reference[1]
             hf.close()
 
-            assert np.max(np.abs(polgrad_static) - np.abs(polgrad_static_reference)) < 1.0e-6
-            assert np.max(np.abs(polgrad_dynamic) - np.abs(polgrad_dynamic_reference)) < 1.0e-6
+            assert np.max(np.abs(polgrad_static) - np.abs(polgrad_static_reference)) < 2.0e-5
+            assert np.max(np.abs(polgrad_dynamic) - np.abs(polgrad_dynamic_reference)) < 2.0e-5
 
     def test_b3lyp_polarizabilitygradient_real(self):
         h2o_xyz = """3

@@ -1995,9 +1995,7 @@ class ScfDriver:
             # vectors, the plain operator's and the attenuated one's, each fitted in
             # its own metric. Whether that is what this calculation needs is a
             # property of the functional and not of the iteration, so it is decided
-            # here, once, and not from the parameters of a build -- those say no on
-            # the first step, where the exchange is the plain one whatever the
-            # functional is.
+            # here, once, and not from the parameters of a build.
             range_separated = (self._dft and self.xcfun.is_range_separated())
 
             omega = self.xcfun.get_rs_omega() if range_separated else 0.0
@@ -3325,7 +3323,7 @@ class ScfDriver:
         # determine fock_type and exchange_scaling_factor
         fock_type = '2jk'
         exchange_scaling_factor = 1.0
-        if self._dft and not self._first_step:
+        if self._dft:
             if self.xcfun.is_hybrid():
                 fock_type = '2jkx'
                 exchange_scaling_factor = self.xcfun.get_frac_exact_exchange()
@@ -3334,8 +3332,7 @@ class ScfDriver:
                 exchange_scaling_factor = 0.0
 
         # further determine exchange_scaling_factor, erf_k_coef and omega
-        need_omega = (self._dft and (not self._first_step) and
-                      self.xcfun.is_range_separated())
+        need_omega = (self._dft and self.xcfun.is_range_separated())
         if need_omega:
             exchange_scaling_factor = (self.xcfun.get_rs_alpha() +
                                        self.xcfun.get_rs_beta())
@@ -3614,7 +3611,7 @@ class ScfDriver:
             profiler.add_timing_info('FockERI', tm.time() - eri_t0)
         vxc_t0 = tm.time()
 
-        if self._dft and not self._first_step:
+        if self._dft:
             if self.xcfun.get_func_type() in [
                     xcfun_enum.lda, xcfun_enum.gga, xcfun_enum.mgga
             ]:
@@ -3694,7 +3691,7 @@ class ScfDriver:
         """
 
         xc_ene = 0.0
-        if self._dft and not self._first_step:
+        if self._dft:
             xc_ene = self.comm.reduce(vxc_mat.get_energy(), root=mpi_master())
 
         if self.rank == mpi_master():
@@ -3708,7 +3705,7 @@ class ScfDriver:
             if ecp_mat is not None:
                 e_onee += np.sum(D_total * ecp_mat)
 
-            if self._dft and not self._first_step:
+            if self._dft:
                 e_twoe += xc_ene
 
             if self._has_embedded_potential() and not self._first_step:
@@ -3748,7 +3745,7 @@ class ScfDriver:
         """
 
         np_xcmat_a, np_xcmat_b = None, None
-        if self._dft and not self._first_step:
+        if self._dft:
             np_xcmat_a = self.comm.reduce(vxc_mat.alpha_to_numpy(),
                                           root=mpi_master())
             if self.scf_type != 'restricted':
@@ -3760,7 +3757,7 @@ class ScfDriver:
             if ecp_mat is not None:
                 self._add_onee_contribution(fock_mat, ecp_mat)
 
-            if self._dft and not self._first_step:
+            if self._dft:
                 fock_mat[0] += np_xcmat_a
                 if not self._is_restricted():
                     fock_mat[1] += np_xcmat_b

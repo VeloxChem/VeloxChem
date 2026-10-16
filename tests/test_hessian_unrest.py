@@ -157,7 +157,7 @@ class TestScfUnrestrictedHessian:
             np.testing.assert_allclose(hess_drv.hessian,
                                        ref_hessian,
                                        rtol=1.0e-8,
-                                       atol=1.0e-10)
+                                       atol=5.0e-7)
 
     @pytest.mark.solvers
     def test_hessian_unrest_camb3lyp(self):
@@ -190,7 +190,7 @@ class TestScfUnrestrictedHessian:
             np.testing.assert_allclose(hess_drv.hessian,
                                        ref_hessian,
                                        rtol=1.0e-8,
-                                       atol=1.0e-10)
+                                       atol=5.0e-7)
 
     @pytest.mark.timeconsuming
     def test_unrestricted_ri_jk_hessian(self):

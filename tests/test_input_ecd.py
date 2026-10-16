@@ -226,7 +226,7 @@ class TestInputECD:
         ref_data = {
             'wf_model': 'Spin-Restricted Kohn-Sham',
             'e_scf': -227.1612519218,
-            'n_scf_iterations': 8,
+            'n_scf_iterations': 4,
             'dipole': 0.859299,
             'nstates': 10,
             'n_ecd_iterations': 5,
@@ -256,7 +256,7 @@ class TestInputECD:
         ref_data = {
             'wf_model': 'Spin-Restricted Kohn-Sham',
             'e_scf': -227.1612519218,
-            'n_scf_iterations': 8,
+            'n_scf_iterations': 4,
             'dipole': 0.859299,
             'nstates': 10,
             'n_ecd_iterations': 5,
