@@ -512,7 +512,8 @@ class ThreePATransitionDriver(NonlinearSolver):
                             T_abc += - NaE3NbNcf
                             T_abc += -(NaE4NbNcNf - NaS4NbNcNd)
 
-                            T_tensors[(f"{a_comp}{b_comp}{c_comp}", round(float(w), 4))] = T_abc
+                            # State indices remain unique for nearly degenerate roots.
+                            T_tensors[(f"{a_comp}{b_comp}{c_comp}", w_ind)] = T_abc
 
         # diagonalized_tensors = {}
 
@@ -527,7 +528,8 @@ class ThreePATransitionDriver(NonlinearSolver):
         self.ostream.print_header('=' * (len(w_str) + 2))
         self.ostream.print_blank()
 
-        # conversion factor for 3PA cross-sections in GM
+        # EXPERIMENTAL/UNVALIDATED 3PA conversion: do not report cross sections.
+        # Standard GM units apply to 2PA, not 3PA.
         # a0 in cm, c in cm/s, gamma (0.1 eV) in au
         alpha = fine_structure_constant()
         a0 = bohr_in_angstrom() * 1.0e-8
@@ -540,15 +542,15 @@ class ThreePATransitionDriver(NonlinearSolver):
             tpa_strengths = {'linear': {}, 'circular': {}}
             tpa_cross_sections = {'linear': {}, 'circular': {}}
 
-            for w in freqs:
+            for w_ind, w in enumerate(freqs):
                 Df = 0.0
                 Dg = 0.0
                 for i in 'xyz':
                     for j in 'xyz':
                         for k in 'xyz':
-                            Tiij = T_tensors[(f"{i}{i}{j}", round(float(w), 4))]
-                            Tkkj = T_tensors[(f"{k}{k}{j}", round(float(w), 4))]
-                            Tijk = T_tensors[(f"{i}{j}{k}", round(float(w), 4))]
+                            Tiij = T_tensors[(f"{i}{i}{j}", w_ind)]
+                            Tkkj = T_tensors[(f"{k}{k}{j}", w_ind)]
+                            Tijk = T_tensors[(f"{i}{j}{k}", w_ind)]
 
                             Df += (Tiij * Tkkj).real
                             Dg += (Tijk * Tijk).real
@@ -558,13 +560,15 @@ class ThreePATransitionDriver(NonlinearSolver):
                 D_linear = 2.0 * Dg + 3.0 * Df
                 D_circular = 5.0 * Dg - 3.0 * Df
 
-                tpa_strengths['linear'][w] = D_linear
-                tpa_strengths['circular'][w] = D_circular
+                tpa_strengths['linear'][w_ind] = D_linear
+                tpa_strengths['circular'][w_ind] = D_circular
 
                 # TODO: double check 3PA cross-sections
 
-                tpa_cross_sections['linear'][w] = au2gm * w**3 * D_linear
-                tpa_cross_sections['circular'][w] = au2gm * w**3 * D_circular
+                # Cross-section conversion is not validated or reported yet.
+                # w is negative here; use positive photon energy in the cube.
+                tpa_cross_sections['linear'][w_ind] = au2gm * (-w)**3 * D_linear
+                tpa_cross_sections['circular'][w_ind] = au2gm * (-w)**3 * D_circular
 
             profiler.check_memory_usage('End of 3PA')
 
@@ -1891,8 +1895,7 @@ class ThreePATransitionDriver(NonlinearSolver):
 
         self.ostream.print_header('Three-Photon Absorption (3PA) Transition Moments (a.u.)')
 
-        # Extract unique frequency values directly from stored tensor keys
-        unique_freqs = sorted(set(w for _, w in T_tensors.keys()), reverse=True)
+        # State indices (rather than rounded frequencies) define tensor rows.
 
         xyz_triples = [f'{x}{y}{z}'
                        for i, x in enumerate('xyz')
@@ -1914,11 +1917,11 @@ class ThreePATransitionDriver(NonlinearSolver):
             # Print a separator line with correct spacing
             self.ostream.print_header('-' * len(header_str))
 
-            for w_ind, w in enumerate(unique_freqs):
-                row_values = [f'  {w_ind + 1:<5d}', f'{- 3 * w * hartree_in_ev():>11.5f} eV']
+            for w_ind, w in enumerate(freqs):
+                row_values = [f'  {w_ind + 1:<5d}', f'{3 * w * hartree_in_ev():>11.5f} eV']
 
                 for label in tensor_labels:
-                    tensor_key = (label, w)
+                    tensor_key = (label, w_ind)
 
                     if tensor_key in T_tensors:
                         row_values.append(f'{T_tensors[tensor_key].real:11.4f}')
@@ -1946,8 +1949,8 @@ class ThreePATransitionDriver(NonlinearSolver):
         for w_ind, w in enumerate(freqs):
             exec_str = '  {:<4d}'.format(w_ind + 1)
             exec_str += '{:15.6f} eV'.format(3 * w * hartree_in_ev())
-            exec_str += '{:20.6f} a.u.'.format(tpa_strengths['linear'][-w])
-            # exec_str += '{:20.6f} GM'.format(tpa_cross_sections['linear'][-w])
+            exec_str += '{:20.6f} a.u.'.format(tpa_strengths['linear'][w_ind])
+            # Cross-section conversion requires independent validation.
             self.ostream.print_header(exec_str)
 
         self.ostream.print_blank()
@@ -1966,8 +1969,8 @@ class ThreePATransitionDriver(NonlinearSolver):
         for w_ind, w in enumerate(freqs):
             exec_str = '  {:<4d}'.format(w_ind + 1)
             exec_str += '{:15.6f} eV'.format(3 * w * hartree_in_ev())
-            exec_str += '{:20.6f} a.u.'.format(tpa_strengths['circular'][-w])
-            # exec_str += '{:20.6f} GM'.format(tpa_cross_sections['circular'][-w])
+            exec_str += '{:20.6f} a.u.'.format(tpa_strengths['circular'][w_ind])
+            # Cross-section conversion requires independent validation.
             self.ostream.print_header(exec_str)
         self.ostream.print_blank()
 

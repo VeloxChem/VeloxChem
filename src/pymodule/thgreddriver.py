@@ -36,7 +36,7 @@ import time
 
 from .oneeints import compute_electric_dipole_integrals
 from . import rijkresponse
-from .veloxchemlib import mpi_master, hartree_in_wavenumber
+from .veloxchemlib import mpi_master, hartree_in_ev, hartree_in_wavenumber
 from .profiler import Profiler
 from .cppsolver import ComplexResponseSolver
 from .linearsolver import LinearSolver
@@ -52,7 +52,7 @@ from .checkpoint import write_distributed_focks
 
 class ThgReducedDriver(NonlinearSolver):
     """
-    Implements the isotropic cubic response driver for Third-harmonic gerneration
+    Implements the isotropic cubic response driver for third-harmonic generation
     (thg)
 
     # vlxtag: RHF, thg, CR
@@ -73,8 +73,8 @@ class ThgReducedDriver(NonlinearSolver):
 
     def __init__(self, comm, ostream):
         """
-        Initializes the isotropic cubic response driver for two-photon
-        absorption (thg)
+        Initializes the isotropic cubic response driver for third-harmonic
+        generation (THG)
         """
 
         super().__init__(comm, ostream)
@@ -107,8 +107,8 @@ class ThgReducedDriver(NonlinearSolver):
 
     def compute(self, molecule, ao_basis, scf_tensors):
         """
-        Computes the isotropic cubic response function for two-photon
-        absorption
+        Computes the isotropic cubic response function for third-harmonic
+        generation
 
         :param molecule:
             The molecule.
@@ -434,7 +434,7 @@ class ThgReducedDriver(NonlinearSolver):
                     sum_val += t4_dict[(w, w, w)]
                 for key, val in other_dict.items():
                     sum_val += val[(w, w, w)]
-                THG[(w, w, w)] = sum_val.real
+                THG[(w, w, w)] = sum_val
 
             ret_dict.update(other_dict)
 
@@ -446,7 +446,7 @@ class ThgReducedDriver(NonlinearSolver):
                 'frequencies': list(self.frequencies),
             })
 
-            self._print_results2(ret_dict)
+            self._print_results(ret_dict)
 
         profiler.check_memory_usage('End of thg')
 
@@ -2069,97 +2069,89 @@ class ThgReducedDriver(NonlinearSolver):
 
     def _print_results(self, rsp_results):
         """
-        Prints the results from the TPA calculation.
+        Prints the complex isotropic THG response in a TPA-style summary.
 
-        :param rsp_results:
-            A dictionary containing the results of response calculation.
+        The magnitude |gamma| is included for comparison and is not the
+        third-harmonic generation intensity.
         """
 
-        freqs = rsp_results['frequencies']
-        component = 'THG'
+        width = 82
+        frequencies = rsp_results['frequencies']
+        thg = rsp_results.get('THG', {})
 
         self.ostream.print_blank()
-
-        w_str = 'Isotropic Average of Re(gamma(-3w; w, w, w)) for Thid-Harmonic Generation (THG) intensities'
-        self.ostream.print_header(w_str)
-        self.ostream.print_header('=' * (len(w_str) + 2))
+        title = 'THG Summary'
+        self.ostream.print_header(title)
+        self.ostream.print_header('=' * (len(title) + 2))
+        self.ostream.print_blank()
+        self.ostream.print_header(
+            'Isotropic gamma(-3w; w, w, w) in atomic units')
         self.ostream.print_blank()
 
-        # Updated header with only two columns
-        title = '{:>12s} {:>25s}'.format('Frequency', 'THG intensity (a.u.)')
-        width = len(title)
-        self.ostream.print_header(title.ljust(width))
-        self.ostream.print_header(('-' * len(title)).ljust(width))
+        header = '{:>15s}{:>20s}{:>20s}{:>24s}'.format(
+            'Photon Energy', 'Re(gamma)', 'Im(gamma)', '|gamma|')
+        self.ostream.print_header(header.ljust(width))
+        self.ostream.print_header('-' * width)
 
-        tensor = rsp_results.get(component)
-        if tensor is not None:
-            for w in freqs:
-                key = (w, w, w)
-                val = tensor.get(key)
-                if val is not None:
-                    intensity = val.real if hasattr(val, 'real') else val
-                    line = '{:>12.4f} {:>25.8f}'.format(w, intensity)
-                    self.ostream.print_header(line.ljust(width))
-                else:
-                    self.ostream.print_header(f"{w:>12.4f} {'N/A':>25}")
+        for w in frequencies:
+            energy = '{:.5f} eV'.format(w * hartree_in_ev())
+            value = thg.get((w, w, w))
+            if value is None:
+                line = '{:>15s}{:>20s}{:>20s}{:>24s}'.format(
+                    energy, 'N/A', 'N/A', 'N/A')
+            else:
+                line = '{:>15s}{:>20.8f}{:>20.8f}{:>24.8f}'.format(
+                    energy, value.real, value.imag, abs(value))
+            self.ostream.print_header(line.ljust(width))
 
-        self.ostream.print_blank()
-        self.ostream.print_header('Reference:'.ljust(width))
         self.ostream.print_blank()
         self.ostream.flush()
 
     def _print_results2(self, rsp_results):
         """
-        Prints the results from the TPA calculation.
-
-        :param rsp_results:
-            A dictionary containing the results of response calculation.
+        Prints the THG summary and detailed contributions for debugging.
         """
 
-        freqs = rsp_results['frequencies']
-        components = ['THG', 't4_dict', 't3_dict', 'NaX3NyNz', 'NaA3NxNy', 'NaX2Nyz', 'NxA2Nyz']   # list of components to print
+        self._print_results(rsp_results)
 
+        components = (
+            ('t4_dict', 'T[4]'),
+            ('t3_dict', 'T[3]'),
+            ('NaX3NyNz', 'NaX[3]NyNz'),
+            ('NaA3NxNy', 'NaA[3]NxNy'),
+            ('NaX2Nyz', 'NaX[2]Nyz'),
+            ('NxA2Nyz', 'NxA[2]Nyz'),
+        )
+        available = [(label, rsp_results[key]) for key, label in components
+                     if rsp_results.get(key) is not None]
+        if not available:
+            return
+
+        width = 82
+        title = 'THG Response Contributions (a.u.)'
+        self.ostream.print_header(title)
+        self.ostream.print_header('=' * (len(title) + 2))
         self.ostream.print_blank()
 
-        # Title section
-        w_str = 'Isotropic Average of Re(gamma(-3w; w, w, w)) for Third-Harmonic Generation (THG) intensities'
-        self.ostream.print_header(w_str)
-        self.ostream.print_header('=' * (len(w_str) + 2))
-        self.ostream.print_blank()
+        header = '{:>15s} {:<20s}{:>22s}{:>22s}'.format(
+            'Photon Energy', 'Contribution', 'Re(value)', 'Im(value)')
+        self.ostream.print_header(header.ljust(width))
+        self.ostream.print_header('-' * width)
 
-        for component in components:
-            tensor = rsp_results.get(component)
-            if tensor is None:
-                continue
-
-            # Header for this component
-            component_title = f'Component: {component}'
-            self.ostream.print_header(component_title)
-            self.ostream.print_header('-' * len(component_title))
-            self.ostream.print_blank()
-
-            # Column headers
-            title = '{:>12s} {:>25s}'.format('Frequency', f'{component} value (a.u.)')
-            width = len(title)
-            self.ostream.print_header(title.ljust(width))
-            self.ostream.print_header(('-' * len(title)).ljust(width))
-
-            # Values
-            for w in freqs:
-                key = (w, w, w)
-                val = tensor.get(key)
-                if val is not None:
-                    value = val.real if hasattr(val, 'real') else val
-                    line = '{:>12.4f} {:>25.8f}'.format(w, value)
-                    self.ostream.print_header(line.ljust(width))
+        for w in rsp_results['frequencies']:
+            energy = '{:.5f} eV'.format(w * hartree_in_ev())
+            for index, (label, tensor) in enumerate(available):
+                energy_label = energy if index == 0 else ''
+                value = tensor.get((w, w, w))
+                if value is None:
+                    line = '{:>15s} {:<20s}{:>22s}{:>22s}'.format(
+                        energy_label, label, 'N/A', 'N/A')
                 else:
-                    self.ostream.print_header(f"{w:>12.4f} {'N/A':>25}")
-
+                    line = '{:>15s} {:<20s}{:>22.10e}{:>22.10e}'.format(
+                        energy_label, label, value.real, value.imag)
+                self.ostream.print_header(line.ljust(width))
             self.ostream.print_blank()
 
-        # Reference footer
-        self.ostream.print_header('Reference:'.ljust(width))
-        self.ostream.print_blank()
         self.ostream.flush()
 
     def get_comp(self, freqs):
