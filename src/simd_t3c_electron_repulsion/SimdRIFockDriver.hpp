@@ -237,7 +237,9 @@ class CSimdRIFockDriver
     /// @param functions The auxiliary basis functions to transform, as their dense
     /// indices in the auxiliary basis. One matrix is filled for each, in the order
     /// they are given.
-    /// @param w_vectors The matrices to store the result in, one per function.
+    /// @param w_vectors The matrices to store the result in, at least one per
+    /// function. A caller which reuses one set of them across ranges may pass
+    /// more; only the first functions.size() are written.
     /// @param accumulate True to add to the matrices rather than to set them.
     /// @note A rank of a communicator holds the B vectors of a share of the atoms
     /// of the auxiliary basis, and the functions of an atom are not consecutive in

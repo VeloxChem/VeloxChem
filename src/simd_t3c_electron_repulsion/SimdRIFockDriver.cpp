@@ -1785,8 +1785,8 @@ CSimdRIFockDriver::compute_w_vectors(const CSparseTensor        &bq_vectors,
 
     const auto nrange = functions.size();
 
-    errors::assertMsgCritical(w_vectors.size() == nrange,
-                              std::string("RIJFockDriver: The W matrices do not match the range of the auxiliary basis"));
+    errors::assertMsgCritical(w_vectors.size() >= nrange,
+                              std::string("RIJFockDriver: The W matrices do not cover the range of the auxiliary basis"));
 
     // NOTE: the W matrices are not zeroed here. The way below which scatters into a
     // square hands the square to a product which writes with a factor of zero on

@@ -381,6 +381,8 @@ CSimdRIJKResponseDriver::_exchange(const std::vector<std::pair<const CSparseTens
 
     const auto naux = aux_basis.dimensions_of_basis();
 
+    exchanges.reserve(ndens);
+
     for (size_t idens = 0; idens < ndens; idens++)
     {
         exchanges.push_back(CPackedMatrix(nao, nao, mat_t::general));
@@ -427,6 +429,29 @@ CSimdRIJKResponseDriver::_exchange(const std::vector<std::pair<const CSparseTens
 
     const auto nbatch = std::min(nheld, std::max(_min_batch, by_memory));
 
+    // NOTE: the work arrays are formed once for the call and reused by every
+    // batch. The transformation sets their values rather than adding to them,
+    // so a batch overwrites what the previous one left and nothing has to be
+    // allocated or zeroed again. Freeing gigabytes on every range and taking
+    // them from the allocator again is what leaves the freed memory resident
+    // and lets the process grow across the ranges.
+    const auto workspace = std::min(nbatch, nheld);
+
+    auto uvecs = std::vector<CPackedMatrix>();
+
+    auto pvecs = std::vector<CPackedMatrix>();
+
+    uvecs.reserve(workspace);
+
+    pvecs.reserve(workspace);
+
+    for (size_t q = 0; q < workspace; q++)
+    {
+        uvecs.emplace_back(nao, nvec, mat_t::general);
+
+        pvecs.emplace_back(nao, nwide, mat_t::general);
+    }
+
     // NOTE: one operator or two, inside one pass over the auxiliary basis and into
     // one set of exchange matrices. Two calls of this would form two sets and add
     // them, which for a batch of twenty trial vectors of five hundred functions is
@@ -440,9 +465,9 @@ CSimdRIJKResponseDriver::_exchange(const std::vector<std::pair<const CSparseTens
 
         const auto count = static_cast<int>(last - first);
 
-        // NOTE: the functions of this batch, which are a range only where the whole
-        // basis is swept. The storage is formed once for the batch and filled again
-        // by each operator, as the transformation sets it rather than adding to it.
+        // NOTE: the functions of this batch, which is a range only where the whole
+        // basis is swept. The work arrays are the call's, above, and each operator
+        // fills the first count of them as the transformation sets rather than adds.
 
         auto batch = std::vector<size_t>(static_cast<size_t>(count));
 
@@ -454,21 +479,6 @@ CSimdRIJKResponseDriver::_exchange(const std::vector<std::pair<const CSparseTens
         else
         {
             std::iota(batch.begin(), batch.end(), first);
-        }
-
-        auto uvecs = std::vector<CPackedMatrix>();
-
-        auto pvecs = std::vector<CPackedMatrix>();
-
-        uvecs.reserve(static_cast<size_t>(count));
-
-        pvecs.reserve(static_cast<size_t>(count));
-
-        for (int q = 0; q < count; q++)
-        {
-            uvecs.emplace_back(nao, nvec, mat_t::general);
-
-            pvecs.emplace_back(nao, nwide, mat_t::general);
         }
 
         for (const auto &op : operators)
