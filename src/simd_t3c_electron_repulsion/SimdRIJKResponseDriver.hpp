@@ -314,9 +314,6 @@ class CSimdRIJKResponseDriver
     /// @brief The memory the driver may hold when none is named.
     static constexpr size_t _default_budget = size_t{4} * 1024 * 1024 * 1024;
 
-    /// @brief The smallest batch of auxiliary functions taken at once.
-    static constexpr size_t _min_batch = 16;
-
     /// @brief The screening threshold of the integrals.
     double _threshold;
 

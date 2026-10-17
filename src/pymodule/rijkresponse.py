@@ -182,6 +182,15 @@ def initialize(solver, molecule, basis):
     # is checked here rather than left to the allocator.
     budget = memory_budget(solver)
 
+    # NOTE: the exchange work arrays are a transient on top of the B vectors and
+    # the rest of the live set, so they take a fraction of the rank's share and
+    # not all of it. This keeps the peak from growing with the size of the node
+    # and avoids the driver's fixed 4 GiB default, which is neither derived from
+    # the machine nor from the rank's share. The bounds keep the batches sane on
+    # very small and very large nodes.
+    exchange_budget = min(
+        budget, max(1 * 1024**3, min(8 * 1024**3, budget // 8)))
+
     assert_msg_critical(
         needed <= budget,
         f'{type(solver).__name__}: the B vectors need ' +
@@ -214,7 +223,8 @@ def initialize(solver, molecule, basis):
                               metric_erf,
                               (solver.nodes > 1) and (len(aux_atoms) == 0))
 
-    solver._ri_jk_response_drv = SimdRIJKResponseDriver(solver.eri_thresh)
+    solver._ri_jk_response_drv = SimdRIJKResponseDriver(
+        solver.eri_thresh, 0, exchange_budget)
 
     # NOTE: the B vectors are a share of the auxiliary basis on more than one rank,
     # and the response driver is told which functions that share carries. Left to

@@ -427,14 +427,19 @@ CSimdRIJKResponseDriver::_exchange(const std::vector<std::pair<const CSparseTens
 
     const auto by_memory = _budget / std::max(per_function, size_t{1});
 
-    const auto nbatch = std::min(nheld, std::max(_min_batch, by_memory));
+    // NOTE: one function is the smallest batch, and only when the budget cannot
+    // hold even one. A floor of sixteen, as there used to be, silently took more
+    // than the budget whenever per_function was larger than a sixteenth of it.
+    const auto nbatch = std::min(nheld, std::max(size_t{1}, by_memory));
 
     // NOTE: the work arrays are formed once for the call and reused by every
     // batch. The transformation sets their values rather than adding to them,
     // so a batch overwrites what the previous one left and nothing has to be
     // allocated or zeroed again. Freeing gigabytes on every range and taking
     // them from the allocator again is what leaves the freed memory resident
-    // and lets the process grow across the ranges.
+    // and lets the process grow across the ranges. The workspace is the
+    // largest batch: every count below is min(nbatch, nheld - first), which
+    // cannot exceed min(nbatch, nheld) = workspace.
     const auto workspace = std::min(nbatch, nheld);
 
     auto uvecs = std::vector<CPackedMatrix>();
