@@ -4,7 +4,11 @@ import pytest
 
 from veloxchem.veloxchemlib import (fine_structure_constant,
                                     extinction_coefficient_from_beta,
-                                    hartree_in_ev, hartree_in_inverse_nm)
+                                    hartree_in_ev, hartree_in_inverse_nm,
+                                    mpi_master)
+from veloxchem.molecule import Molecule
+from veloxchem.molecularbasis import MolecularBasis
+from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.tdacppsolver import ComplexResponseTdaSolver
 from veloxchem.errorhandler import VeloxChemError
 
@@ -69,6 +73,61 @@ class TestComplexResponseTdaSolverMisc:
                 match='ComplexResponseTdaSolver.get_spectrum: x_unit should be au, ev or nm'
         ):
             driver.get_spectrum(_build_cpp_results([0.4]), 'cm-1')
+
+    def test_ri_jk_uses_transition_density_factors(self, monkeypatch):
+
+        xyz_string = """3
+        water
+        O  0.000000  0.000000  0.117790
+        H  0.000000  0.755453 -0.471161
+        H  0.000000 -0.755453 -0.471161
+        """
+        molecule = Molecule.read_xyz_string(xyz_string)
+        basis = MolecularBasis.read(molecule, 'sto-3g', ostream=None)
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ostream.mute()
+        scf_results = scf_drv.compute(molecule, basis)
+
+        factor_calls = []
+        original = ComplexResponseTdaSolver._comp_ri_jk_fock
+
+        def spy(instance, *args, **kwargs):
+            factor_calls.append(1)
+            return original(instance, *args, **kwargs)
+
+        monkeypatch.setattr(ComplexResponseTdaSolver, '_comp_ri_jk_fock', spy)
+
+        cpp_drv = ComplexResponseTdaSolver()
+        cpp_drv.ostream.mute()
+        cpp_drv.property = 'absorption'
+        cpp_drv.frequencies = [0.4, 0.5]
+        cpp_drv.conv_thresh = 1.0e-6
+        cpp_drv.max_iter = 100
+        cpp_drv.ri_jk = True
+        cpp_drv.ri_jk_simd = True
+        cpp_drv.ri_auxiliary_basis = 'def2-universal-jkfit'
+
+        if cpp_drv.rank == mpi_master():
+            nocc = molecule.number_of_alpha_occupied_orbitals(basis)
+            nvir = scf_results['C_alpha'].shape[1] - nocc
+            trial_mat = np.arange(nocc * nvir * 2, dtype=float).reshape(-1, 2)
+
+            tdens = cpp_drv._get_trans_densities(trial_mat, scf_results,
+                                                 molecule, basis)
+            left, rights = cpp_drv._get_trans_density_factors(
+                trial_mat, scf_results, molecule, basis)
+
+            for density, right in zip(tdens, rights):
+                assert np.allclose(density, np.matmul(left, right.T))
+
+        cpp_results = cpp_drv.compute(molecule, basis, scf_results)
+
+        assert cpp_drv.is_converged
+        assert factor_calls
+
+        if cpp_drv.rank == mpi_master():
+            assert cpp_results['rsp_type'] == 'tdacpp'
 
     def test_absorption_and_ecd_spectra(self):
 

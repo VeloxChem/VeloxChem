@@ -472,9 +472,12 @@ class ComplexResponseTdaSolver(LinearSolver):
 
             tdens = self._get_trans_densities(bger_loc, scf_results, molecule,
                                               basis)
+            tfactors = self._get_trans_density_factors(
+                bger_loc, scf_results, molecule, basis)
 
             fock = self._comp_lr_fock(tdens, molecule, basis, eri_dict,
-                                      dft_dict, pe_dict)
+                                      dft_dict, pe_dict,
+                                      dens_factors=tfactors)
 
             if self.rank == mpi_master():
                 sig_mat = self._get_sigmas(fock, scf_results, molecule, basis,
@@ -701,9 +704,12 @@ class ComplexResponseTdaSolver(LinearSolver):
 
             tdens = self._get_trans_densities(new_trials_ger_loc, scf_results,
                                               molecule, basis)
+            tfactors = self._get_trans_density_factors(
+                new_trials_ger_loc, scf_results, molecule, basis)
 
             fock = self._comp_lr_fock(tdens, molecule, basis, eri_dict,
-                                      dft_dict, pe_dict)
+                                      dft_dict, pe_dict,
+                                      dens_factors=tfactors)
 
             if self.rank == mpi_master():
                 sig_mat = self._get_sigmas(fock, scf_results, molecule, basis,
@@ -887,6 +893,56 @@ class ComplexResponseTdaSolver(LinearSolver):
             tdens = None
 
         return tdens
+
+    def _get_trans_density_factors(self, trial_mat, tensors, molecule, basis):
+        """
+        Computes the transition densities as the factors they are made from.
+
+        The density of a trial vector is the occupied orbitals times the vector
+        times the virtual orbitals transposed, and the resolution of the identity
+        wants those factors rather than their product: its exchange of a density
+        of rank k costs the basis squared times k where its exchange of the same
+        density as a matrix costs the basis cubed. The occupied orbitals are the
+        left factor of every density of the batch, which is what lets them be
+        transformed once for all of it.
+
+        :param trial_mat:
+            The matrix containing the Z vectors as columns.
+        :param tensors:
+            The dictionary of tensors from converged SCF wavefunction.
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+
+        :return:
+            The left factor and one right factor for each trial vector, or None
+            away from the master rank or where the resolution of the identity
+            will not use them.
+        """
+
+        if self.rank != mpi_master():
+            return None
+
+        # NOTE: the dense path does not take the factors, so they are formed only
+        # where the resolution of the identity will contract them.
+        if not (self.ri_jk and self.ri_jk_simd):
+            return None
+
+        nocc = molecule.number_of_alpha_occupied_orbitals(basis)
+        norb = tensors['C_alpha'].shape[1]
+        nvir = norb - nocc
+
+        mo_occ = tensors['C_alpha'][:, :nocc].copy()
+        mo_vir = tensors['C_alpha'][:, nocc:].copy()
+
+        rights = []
+
+        for k in range(trial_mat.shape[1]):
+            mat = trial_mat[:, k].reshape(nocc, nvir)
+            rights.append(np.matmul(mo_vir, mat.T))
+
+        return (mo_occ, rights)  # D = mo_occ times rights transposed
 
     def _get_sigmas(self, fock, tensors, molecule, basis, trial_mat):
         """
