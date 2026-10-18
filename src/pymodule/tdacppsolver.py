@@ -476,7 +476,7 @@ class ComplexResponseTdaSolver(LinearSolver):
                 bger_loc, scf_results, molecule, basis)
 
             fock = self._comp_lr_fock(tdens, molecule, basis, eri_dict,
-                                      dft_dict, pe_dict,
+                                      dft_dict, pe_dict, profiler,
                                       dens_factors=tfactors)
 
             if self.rank == mpi_master():
@@ -708,7 +708,7 @@ class ComplexResponseTdaSolver(LinearSolver):
                 new_trials_ger_loc, scf_results, molecule, basis)
 
             fock = self._comp_lr_fock(tdens, molecule, basis, eri_dict,
-                                      dft_dict, pe_dict,
+                                      dft_dict, pe_dict, profiler,
                                       dens_factors=tfactors)
 
             if self.rank == mpi_master():
