@@ -758,10 +758,16 @@ class TdaEigenSolver(TdaEigenSolverBase):
 
         :return:
             The left factor and one right factor for each trial vector, or None
-            away from the master rank.
+            away from the master rank or where the resolution of the identity
+            will not use them.
         """
 
         if self.rank != mpi_master():
+            return None
+
+        # NOTE: the dense path does not take the factors, so they are formed only
+        # where the resolution of the identity will contract them.
+        if not (self.ri_jk and self.ri_jk_simd):
             return None
 
         nocc = molecule.number_of_alpha_occupied_orbitals(basis)

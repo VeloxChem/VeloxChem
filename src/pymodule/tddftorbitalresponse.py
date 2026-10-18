@@ -674,8 +674,9 @@ class TddftOrbitalResponse(CphfSolver):
                     np.linalg.multi_dot(
                         [mo_occ,
                          cphf_ov_x.reshape(nocc, nvir), mo_vir.T]))
-                lambda_rights.append(
-                    np.matmul(mo_vir, cphf_ov_x.reshape(nocc, nvir).T))
+                if self.ri_jk and self.ri_jk_simd:
+                    lambda_rights.append(
+                        np.matmul(mo_vir, cphf_ov_x.reshape(nocc, nvir).T))
 
         profiler.stop_timer('lambda')
 
