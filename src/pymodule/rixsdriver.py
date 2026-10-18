@@ -111,6 +111,8 @@ class RixsDriver(LinearSolver):
         # Restricted subspace
         self.restricted_subspace = False
 
+        self.compute_in_mo = False
+
         self.num_core_orbitals = 0
         self.num_virtual_orbitals = 0
         self.num_valence_orbitals = 0
@@ -381,6 +383,7 @@ class RixsDriver(LinearSolver):
         if self.rank == mpi_master():
             mo_occ = scf_results['C_alpha'][:, mo_core_indices + mo_val_indices].copy()
             mo_vir = scf_results['C_alpha'][:, mo_vir_indices].copy()
+            mo = np.hstack((mo_occ, mo_vir))
 
             core_eigvals = core_rsp_results['eigenvalues'][core_states].copy()
             valence_eigvals = rsp_results['eigenvalues'][val_states].copy()
@@ -407,10 +410,23 @@ class RixsDriver(LinearSolver):
                                                   num_valence_orbitals, num_vir_orbitals)
 
         if self.rank == mpi_master():
-            dipole_integrals = compute_electric_dipole_integrals(molecule, basis, [0.0,0.0,0.0])
+            dipole_integrals_ao = compute_electric_dipole_integrals(molecule, basis, [0.0,0.0,0.0])
+            # perhaps this should be parallelized
+            dipole_integrals_mo = np.array([mo.T @ dipole_integrals_ao[i] @ mo for i in range(3)])
+            d_ov = np.array([mo_occ.T @ dipole_integrals_ao[i] @ mo_vir for i in range(3)])
+            d_oo = np.array([mo_occ.T @ dipole_integrals_ao[i] @ mo_occ for i in range(3)])
+            d_vv = np.array([mo_vir.T @ dipole_integrals_ao[i] @ mo_vir for i in range(3)])
         else:
-            dipole_integrals = None
-        dipole_integrals = self.comm.bcast(dipole_integrals, root=mpi_master())
+            dipole_integrals_ao = None
+            dipole_integrals_mo = None
+            d_ov = None
+            d_oo = None
+            d_vv = None
+        dipole_integrals_ao = self.comm.bcast(dipole_integrals_ao, root=mpi_master())
+        dipole_integrals_mo = self.comm.bcast(dipole_integrals_mo, root=mpi_master())
+        # d_ov = self.comm.bcast(d_ov, root=mpi_master())
+        # d_oo = self.comm.bcast(d_oo, root=mpi_master())
+        # d_vv = self.comm.bcast(d_vv, root=mpi_master())
 
         # Store state and orbital information used in computation
         self._orb_and_state_dict = {
@@ -496,14 +512,17 @@ class RixsDriver(LinearSolver):
                                                  num_vir_orbitals, self.tamm_dancoff)
                 for n in range(num_intermediate_states):
                     z_core, y_core = core_mats[n]
-                    gs2core, core2val = self.get_tdms(mo_occ, mo_vir, z_val, y_val, z_core, y_core)
+                    if self.compute_in_mo:
+                        gs2core, core2val = self.get_tdms_mo(z_val, y_val, z_core, y_core)
+                    else:
+                        gs2core, core2val = self.get_tdms(mo_occ, mo_vir, z_val, y_val, z_core, y_core)
 
                     F_inelastic += self.scattering_amplitude_tensor(
-                        omega, core_eigvals[n], valence_eigvals[f], gs2core, core2val, dipole_integrals
+                        omega, core_eigvals[n], valence_eigvals[f], gs2core, core2val, dipole_integrals_mo if self.compute_in_mo else dipole_integrals_ao
                     )
                     if f == 0:
                         F_elastic_local += self.scattering_amplitude_tensor(
-                            omega, core_eigvals[n], None, gs2core, None, dipole_integrals
+                            omega, core_eigvals[n], None, gs2core, None, dipole_integrals_mo if self.compute_in_mo else dipole_integrals_ao
                         )
 
                 emission_energy = omega - valence_eigvals[f]
@@ -918,6 +937,42 @@ class RixsDriver(LinearSolver):
 
         core_to_val = self._get_esa_transition_density(
             z_core, y_core, z_val, y_val, mo_occ, mo_vir)
+
+        return gs_to_core, core_to_val
+
+    def get_tdms_mo(self, z_val, y_val, z_core, y_core):
+        """
+        Get the transition density matrices, both from ground-state
+        to excited state, and between two excited states (here between)
+        core-excited and valence-excited states.
+
+        :param mo_occ:
+            The occupied molecular orbitals.
+        :param mo_vir:
+            The unoccupied/virtual molecular orbitals.
+        :param z_val:
+            The excitation matrix (valence-excited state).
+        :param y_val:
+            The dexcitation matrix (valence-excited state).
+        :param z_core:
+            The excitation matrix (core-excited state).
+        :param y_core:
+            The dexcitation matrix (core-excited state).
+
+        :return:
+            The ground-to-core and core-to-valence transition densities.
+        """
+        nocc, nvir = z_core.shape
+        nmo = nocc + nvir
+
+        gs_to_core = np.zeros((nmo, nmo))
+        gs_to_core[:nocc, nocc:] = np.sqrt(2.0) * (z_core - y_core)
+
+        #core_to_val = self._get_esa_transition_density(
+        #    z_core, y_core, z_val, y_val, mo_occ, mo_vir)
+        core_to_val = np.zeros((nmo, nmo))
+        core_to_val[nocc:, nocc:] = z_core.T @ z_val + y_core.T @ y_val
+        core_to_val[:nocc, :nocc] = -(z_core @ z_val.T + y_core @ y_val.T)
 
         return gs_to_core, core_to_val
 
