@@ -141,10 +141,10 @@ invert_metric(const CPackedMatrix &two_center,
     }
     catch (const std::runtime_error &)
     {
-        errors::msg(std::string("RIJKFockDriver: The ") + what +
-                        std::string(" has no Cholesky factor, so its square root is inverted instead. This is a "
-                                    "nearly linearly dependent fitting basis."),
-                    "Warning");
+        // errors::msg(std::string("RIJKFockDriver: The ") + what +
+        //                 std::string(" has no Cholesky factor, so its square root is inverted instead. This is a "
+        //                             "nearly linearly dependent fitting basis."),
+        //             "Warning");
 
         return packlin::inverse_square_root(two_center, metric_threshold);
     }
@@ -201,10 +201,10 @@ form_metric(const CMolecule       &molecule,
             }
             catch (const std::runtime_error &)
             {
-                errors::msg(std::string("RIJKFockDriver: The metric of the fitting basis has no Cholesky factor, so "
-                                        "its square root is inverted instead and multiplied by. This is a nearly "
-                                        "linearly dependent fitting basis."),
-                            "Warning");
+                // errors::msg(std::string("RIJKFockDriver: The metric of the fitting basis has no Cholesky factor, so "
+                //                         "its square root is inverted instead and multiplied by. This is a nearly "
+                //                         "linearly dependent fitting basis."),
+                //             "Warning");
             }
         }
 

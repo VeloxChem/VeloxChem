@@ -94,7 +94,7 @@ _invert_dense(double *values, const size_t ndim) -> bool
     // matrix, which the Bunch-Kaufman factorization cannot pick up, so the
     // caller expands the matrix again before it factorizes it the other way.
 
-    errors::msg(_indefinite_message, "Warning");
+    // errors::msg(_indefinite_message, "Warning");
 
     return false;
 }
@@ -166,7 +166,7 @@ _invert_dense(double *values, const size_t ndim) -> bool
 
     if (llt.info() != Eigen::Success)
     {
-        errors::msg(_indefinite_message, "Warning");
+        // errors::msg(_indefinite_message, "Warning");
 
         return false;
     }
@@ -471,11 +471,11 @@ inverse_square_root(const CPackedMatrix &matrix, const double threshold) -> CPac
 
     if (ndropped > 0)
     {
-        errors::msg(std::string("PackedMatrix inverse square root: ") + std::to_string(ndropped) + std::string(" of ") +
-                        std::to_string(ndim) +
-                        std::string(" directions of the matrix were dropped. This is a nearly linearly dependent "
-                                    "basis, and the matrix returned is the inverse on the directions which remain."),
-                    "Warning");
+        // errors::msg(std::string("PackedMatrix inverse square root: ") + std::to_string(ndropped) + std::string(" of ") +
+        //                 std::to_string(ndim) +
+        //                 std::string(" directions of the matrix were dropped. This is a nearly linearly dependent "
+        //                             "basis, and the matrix returned is the inverse on the directions which remain."),
+        //             "Warning");
     }
 
     auto result = CPackedMatrix(ndim, ndim, mat_t::symmetric);
@@ -574,11 +574,11 @@ pseudo_inverse(const CPackedMatrix &matrix, const double threshold) -> CPackedMa
 
     if (ndropped > 0)
     {
-        errors::msg(std::string("PackedMatrix pseudo inverse: ") + std::to_string(ndropped) + std::string(" of ") +
-                        std::to_string(ndim) +
-                        std::string(" directions of the matrix were dropped. This is a nearly linearly dependent "
-                                    "basis, and the matrix returned is the inverse on the directions which remain."),
-                    "Warning");
+        // errors::msg(std::string("PackedMatrix pseudo inverse: ") + std::to_string(ndropped) + std::string(" of ") +
+        //                 std::to_string(ndim) +
+        //                 std::string(" directions of the matrix were dropped. This is a nearly linearly dependent "
+        //                             "basis, and the matrix returned is the inverse on the directions which remain."),
+        //             "Warning");
     }
 
     auto result = CPackedMatrix(ndim, ndim, mat_t::symmetric);
