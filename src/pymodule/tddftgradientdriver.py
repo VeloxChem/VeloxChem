@@ -39,6 +39,7 @@ from .veloxchemlib import (OverlapGeom100Driver, KineticEnergyGeom100Driver,
                            NuclearPotentialGeom100Driver,
                            NuclearPotentialGeom010Driver, FockGeom1000Driver)
 from .veloxchemlib import SimdRIJGradientDriver
+from .veloxchemlib import SimdRIJKGradientDriver
 from .veloxchemlib import T4CScreener
 from .veloxchemlib import XCMolecularGradient
 from .veloxchemlib import mpi_master, mat_t
@@ -683,6 +684,91 @@ class TddftGradientDriver(GradientDriver):
                     (grad_plus.to_numpy() - grad_minus.to_numpy()) / 4.0 +
                     grad_xmy.to_numpy())
 
+        elif self._scf_drv.ri_jk:
+
+            assert_msg_critical(
+                self._scf_drv.ri_jk_simd,
+                'TddftGradientDriver: RI-JK is supported only with ' +
+                'ri_jk_simd')
+
+            assert_msg_critical(
+                fock_type != 'j',
+                'TddftGradientDriver: RI-JK is not applicable to pure DFT')
+
+            assert_msg_critical(
+                'jkfit' in str(self._scf_drv.ri_auxiliary_basis).lower(),
+                'TddftGradientDriver: RI-JK needs a jkfit auxiliary basis')
+
+            ri_jk_drv = self._scf_drv._ri_drv
+
+            assert_msg_critical(
+                ri_jk_drv is not None and ri_jk_drv.is_prepared(),
+                'TddftGradientDriver: the RI-JK driver is not prepared')
+
+            assert_msg_critical(
+                'direct' not in str(ri_jk_drv.get_mode()),
+                'TddftGradientDriver: the direct RI-JK mode has no gradient')
+
+            if self.rank == mpi_master():
+                basis_ri_jk = MolecularBasis.read(
+                    molecule, self._scf_drv.ri_auxiliary_basis)
+            else:
+                basis_ri_jk = None
+            basis_ri_jk = self.comm.bcast(basis_ri_jk, root=mpi_master())
+
+            ri_jk_grad_drv = SimdRIJKGradientDriver(
+                self._scf_drv.eri_thresh)
+
+            all_atoms = list(range(molecule.number_of_atoms()))
+
+            if self.nodes == 1:
+                aux_atoms = all_atoms
+            else:
+                aux_atoms = list(self._scf_drv._ri_aux_atoms)
+
+            budget = gs_grad_drv._get_ri_gradient_budget()
+
+            for idx in range(dof):
+
+                relaxed = relaxed_density_ao[idx]
+
+                rho_plus = gs_dm + relaxed
+                rho_minus = gs_dm - relaxed
+
+                x_plus = x_plus_y_ao[idx]
+                x_minus = x_minus_y_ao[idx]
+
+                x_anti = 0.5 * (x_plus - x_plus.T)
+                x_sym = 0.5 * (x_minus + x_minus.T)
+
+                grad_plus = self._compute_rijk_self_gradient(
+                    molecule, basis, basis_ri_jk, ri_jk_grad_drv, rho_plus,
+                    True, exchange_scaling_factor, need_omega, erf_k_coef,
+                    omega, aux_atoms, budget, all_atoms)
+
+                grad_minus = self._compute_rijk_self_gradient(
+                    molecule, basis, basis_ri_jk, ri_jk_grad_drv, rho_minus,
+                    True, exchange_scaling_factor, need_omega, erf_k_coef,
+                    omega, aux_atoms, budget, all_atoms)
+
+                # NOTE: the four centre 2jk exchange of a skew density is the
+                # negative of the natural RI exchange contraction. The x - y
+                # term is the only skew density here, so its sign is restored
+                # here rather than in the general driver, which also serves the
+                # symmetric densities.
+                grad_xpy = -self._compute_rijk_self_gradient(
+                    molecule, basis, basis_ri_jk, ri_jk_grad_drv, x_anti,
+                    False, exchange_scaling_factor, need_omega, erf_k_coef,
+                    omega, aux_atoms, budget, all_atoms)
+
+                grad_xmy = self._compute_rijk_self_gradient(
+                    molecule, basis, basis_ri_jk, ri_jk_grad_drv, x_sym,
+                    True, exchange_scaling_factor, need_omega, erf_k_coef,
+                    omega, aux_atoms, budget, all_atoms)
+
+                self.gradient[idx] += (0.25 * (grad_plus - grad_minus) +
+                                       grad_xpy + grad_xmy)
+
         else:
             den_mat_for_fock_rel = make_matrix(basis, mat_t.general)
 
@@ -891,6 +977,213 @@ class TddftGradientDriver(GradientDriver):
         self.comm.Allreduce(local, total, op=MPI.SUM)
 
         return np.array(ri_drv.solve_fitting(total), dtype=np.float64)
+
+    @staticmethod
+    def _pack_general_density(density):
+        """
+        Packs a general matrix into the form used by the general RI-JK driver.
+
+        :param density:
+            The matrix as a numpy array.
+
+        :return:
+            The packed general matrix.
+        """
+
+        packed = PackedMatrix(density.shape[0], density.shape[1],
+                              mat_t.general)
+        packed.from_numpy(np.ascontiguousarray(density))
+
+        return packed
+
+    @staticmethod
+    def _factorize_rijk_density(density):
+        """
+        Factorizes a density as D = L R transposed.
+
+        A symmetric density is factored through its eigenvalues, with the sign
+        of each eigenvalue carried by the right factor. Any other density is
+        factored through its singular value decomposition. Small eigenvalues
+        and singular values are dropped relative to the largest one, with an
+        absolute floor for densities whose whole scale is numerical noise.
+
+        :param density:
+            The density as a numpy array.
+
+        :return:
+            The left and right factors.
+        """
+
+        nao = density.shape[0]
+
+        absolute_tolerance = 1.0e-12
+        relative_tolerance = 1.0e-12
+
+        if np.allclose(density, density.T, rtol=0.0, atol=1.0e-12):
+
+            values, vectors = np.linalg.eigh(0.5 * (density + density.T))
+
+            scale = float(np.max(np.abs(values)))
+
+            threshold = absolute_tolerance + relative_tolerance * scale
+
+            keep = np.abs(values) > threshold
+
+            if not np.any(keep):
+                return np.zeros((nao, 0)), np.zeros((nao, 0))
+
+            values = values[keep]
+            vectors = vectors[:, keep]
+
+            roots = np.sqrt(np.abs(values))
+            signs = np.where(values < 0.0, -1.0, 1.0)
+
+            return (vectors * roots[None, :],
+                    vectors * (signs * roots)[None, :])
+
+        left, singular, right_t = np.linalg.svd(density, full_matrices=False)
+
+        scale = float(np.max(singular))
+
+        threshold = absolute_tolerance + relative_tolerance * scale
+
+        keep = singular > threshold
+
+        if not np.any(keep):
+            return np.zeros((nao, 0)), np.zeros((nao, 0))
+
+        singular = singular[keep]
+        left = left[:, keep]
+        right = right_t[keep, :].T
+
+        roots = np.sqrt(singular)
+
+        return (left * roots[None, :], right * roots[None, :])
+
+    def _compute_rijk_distributed_fit(self, molecule, basis, basis_ri_jk,
+                                      ri_jk_grad_drv, bq_vectors, metric,
+                                      density_for_coulomb, left, right,
+                                      aux_atoms, budget, with_coulomb,
+                                      exchange_scaling_factor):
+        """
+        Forms this rank's general RI-JK fitted densities and Omega.
+
+        :return:
+            The distributed fit and Omega, the latter on the master rank only.
+        """
+
+        fit = ri_jk_grad_drv.mpi_local_densities_general(
+            molecule, basis, basis_ri_jk, bq_vectors, density_for_coulomb,
+            left, right, aux_atoms, budget, with_coulomb)
+
+        if with_coulomb:
+            local = np.array(fit.fitting(), dtype=np.float64)
+            total = np.zeros_like(local)
+            self.comm.Allreduce(local, total, op=MPI.SUM)
+            ri_jk_grad_drv.mpi_set_fitting_general(fit, metric, total)
+        else:
+            ri_jk_grad_drv.mpi_clear_fitting_general(fit)
+
+        for ipanel in range(fit.panels()):
+            panel = np.ascontiguousarray(
+                ri_jk_grad_drv.mpi_panel_partial_general(
+                    fit, metric, ipanel))
+            self.comm.Allreduce(MPI.IN_PLACE, panel, op=MPI.SUM)
+            ri_jk_grad_drv.mpi_panel_absorb_general(fit, ipanel, panel)
+
+        for ipanel in range(fit.panels()):
+            panel = np.ascontiguousarray(
+                ri_jk_grad_drv.mpi_gram_panel_partial_general(fit, ipanel))
+            self.comm.Allreduce(MPI.IN_PLACE, panel, op=MPI.SUM)
+            ri_jk_grad_drv.mpi_gram_panel_absorb_general(fit, ipanel, panel)
+
+        gram = np.zeros((fit.naux, fit.naux))
+
+        functions = list(fit.functions())
+
+        if functions:
+            gram[np.array(functions), :] = fit.gram_rows()
+
+        self.comm.Allreduce(MPI.IN_PLACE, gram, op=MPI.SUM)
+
+        if self.rank == mpi_master():
+            omega = ri_jk_grad_drv.mpi_omega_general(
+                fit, np.ascontiguousarray(gram), exchange_scaling_factor)
+        else:
+            omega = PackedMatrix()
+
+        return fit, omega
+
+    def _compute_rijk_self_gradient(self, molecule, basis, basis_ri_jk,
+                                    ri_jk_grad_drv, density, with_coulomb,
+                                    exchange_scaling_factor, need_omega,
+                                    erf_k_coef, omega, aux_atoms, budget,
+                                    all_atoms):
+        """
+        Computes this rank's share of the RI-JK self gradient of a density.
+
+        The density is factored as D = L R transposed on the master rank and
+        the factors are broadcast. The returned gradient is a rank share; the
+        caller's final reduction adds the shares.
+        """
+
+        if self.rank == mpi_master():
+            left_np, right_np = self._factorize_rijk_density(density)
+        else:
+            left_np, right_np = None, None
+
+        left_np = self.comm.bcast(left_np, root=mpi_master())
+        right_np = self.comm.bcast(right_np, root=mpi_master())
+
+        if left_np.shape[1] == 0 and not with_coulomb:
+            return np.zeros((molecule.number_of_atoms(), 3))
+
+        left = self._pack_general_density(left_np)
+        right = self._pack_general_density(right_np)
+
+        nao = basis.get_dimensions_of_basis()
+
+        density_for_coulomb = PackedMatrix(nao, nao, mat_t.symmetric)
+
+        if with_coulomb:
+            symmetric_density = 0.5 * (density + density.T)
+            density_for_coulomb.from_numpy(
+                np.ascontiguousarray(symmetric_density))
+
+        if need_omega:
+            fit, omega_plain = self._compute_rijk_distributed_fit(
+                molecule, basis, basis_ri_jk, ri_jk_grad_drv,
+                self._scf_drv._ri_drv.get_bq_vectors(),
+                self._scf_drv._ri_drv.get_metric(), density_for_coulomb,
+                left, right, aux_atoms, budget, with_coulomb,
+                exchange_scaling_factor)
+
+            fit_erf, omega_erf = self._compute_rijk_distributed_fit(
+                molecule, basis, basis_ri_jk, ri_jk_grad_drv,
+                self._scf_drv._ri_drv.get_bq_vectors_erf(),
+                self._scf_drv._ri_drv.get_metric_erf(), density_for_coulomb,
+                left, right, aux_atoms, budget, False, erf_k_coef)
+
+            gradient = ri_jk_grad_drv.mpi_compute_share_rs_general(
+                molecule, basis, basis_ri_jk, fit, fit_erf,
+                density_for_coulomb, left, right, omega_plain, omega_erf,
+                exchange_scaling_factor, erf_k_coef, omega, all_atoms,
+                aux_atoms)
+
+        else:
+            fit, omega_plain = self._compute_rijk_distributed_fit(
+                molecule, basis, basis_ri_jk, ri_jk_grad_drv,
+                self._scf_drv._ri_drv.get_bq_vectors(),
+                self._scf_drv._ri_drv.get_metric(), density_for_coulomb,
+                left, right, aux_atoms, budget, with_coulomb,
+                exchange_scaling_factor)
+
+            gradient = ri_jk_grad_drv.mpi_compute_share_general(
+                molecule, basis, basis_ri_jk, fit, density_for_coulomb,
+                left, right, omega_plain, exchange_scaling_factor, all_atoms,
+                aux_atoms)
+
+        return gradient.to_numpy()
 
     def compute_dipole_moment(self,
                               molecule,

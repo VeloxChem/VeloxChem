@@ -254,6 +254,29 @@ CSimdRIJKGradientDriver::_close_orbitals(const std::vector<double> &transposed,
 }
 
 auto
+CSimdRIJKGradientDriver::_close_general(const std::vector<double> &transposed_right,
+                                        const size_t               nao,
+                                        const size_t               nleft,
+                                        const size_t               nright,
+                                        const CPackedMatrix       &half) const -> CPackedMatrix
+{
+    // NOTE: e(q) = R transposed B(q) L, one full matrix per auxiliary function.
+    // The half transformed vector is B(q) L; closing it with R transposed is one
+    // product of the right factor with the half transformed one.
+
+    auto dense_half = std::vector<double>(nao * nleft, 0.0);
+
+    half.to_dense(dense_half.data());
+
+    auto closed = CPackedMatrix(nright, nleft, mat_t::general);
+
+    tdenblas::threadedMultAB(nright, nleft, nao, 1.0, transposed_right.data(), nao,
+                             dense_half.data(), nleft, 0.0, closed.data(), nleft);
+
+    return closed;
+}
+
+auto
 CSimdRIJKGradientDriver::_check_metric(const CPackedMatrix &metric, const CMolecularBasis &aux_basis) const -> void
 {
     // NOTE: the gradient needs the inverse of the metric applied twice, once as
@@ -549,6 +572,90 @@ CSimdRIJKGradientDriver::_local_densities_for(const CSparseTensor        &bq_vec
 }
 
 auto
+CSimdRIJKGradientDriver::_local_densities_for_general(const CSparseTensor       &bq_vectors,
+                                                      const CMolecularBasis     &basis,
+                                                      const CMolecularBasis     &aux_basis,
+                                                      const CPackedMatrix       &left,
+                                                      const CPackedMatrix       &right,
+                                                      const std::vector<size_t> &functions,
+                                                      const size_t               naux,
+                                                      const size_t               budget,
+                                                      std::vector<CPackedMatrix> &target) const -> void
+{
+    const auto nao = left.number_of_rows();
+
+    const auto nleft = left.number_of_columns();
+
+    const auto nright = right.number_of_columns();
+
+    target.clear();
+
+    if ((nleft == 0) || (nright == 0) || (nleft != nright) || functions.empty()) return;
+
+    target.resize(naux);
+
+    auto transposed_right = std::vector<double>(nright * nao, 0.0);
+
+    {
+        auto dense_right = std::vector<double>(nao * nright, 0.0);
+
+        right.to_dense(dense_right.data());
+
+        for (size_t mu = 0; mu < nao; mu++)
+        {
+            for (size_t ii = 0; ii < nright; ii++) transposed_right[ii * nao + mu] = dense_right[mu * nright + ii];
+        }
+    }
+
+    const auto per_function = nao * nleft * sizeof(double);
+
+    const auto batch_by_memory = std::max(size_t{1}, budget / std::max(per_function, size_t{1}));
+
+    const auto nbatch = std::min(functions.size(), std::max(_min_batch, batch_by_memory));
+
+    auto half = std::vector<CPackedMatrix>();
+
+    for (size_t at = 0; at < nbatch; at++)
+    {
+        half.push_back(CPackedMatrix(nao, nleft, mat_t::general));
+    }
+
+    for (size_t first = 0; first < functions.size(); first += nbatch)
+    {
+        const auto last = std::min(first + nbatch, functions.size());
+
+        const auto count = last - first;
+
+        auto wanted = std::vector<size_t>(functions.begin() + static_cast<long>(first),
+                                          functions.begin() + static_cast<long>(last));
+
+        if (count == nbatch)
+        {
+            _drv.compute_w_vectors(bq_vectors, basis, aux_basis, left, wanted, half);
+        }
+        else
+        {
+            auto tail = std::vector<CPackedMatrix>(half.begin(), half.begin() + static_cast<long>(count));
+
+            _drv.compute_w_vectors(bq_vectors, basis, aux_basis, left, wanted, tail);
+
+            std::copy(tail.begin(), tail.end(), half.begin());
+        }
+
+        const auto nrange = static_cast<int>(count);
+
+#pragma omp parallel for schedule(static) if (nrange > 1)
+        for (int at = 0; at < nrange; at++)
+        {
+            const auto local = static_cast<size_t>(at);
+
+            target[functions[first + local]] =
+                _close_general(transposed_right, nao, nleft, nright, half[local]);
+        }
+    }
+}
+
+auto
 CSimdRIJKGradientDriver::mpi_local_densities(const CMolecule        &molecule,
                                              const CMolecularBasis  &basis,
                                              const CMolecularBasis  &aux_basis,
@@ -660,6 +767,425 @@ auto
 CSimdRIJKGradientDriver::mpi_clear_fitting(TDistributedFit &fit) const -> void
 {
     fit.fitting.clear();
+}
+
+auto
+CSimdRIJKGradientDriver::mpi_local_densities_general(const CMolecule        &molecule,
+                                                     const CMolecularBasis  &basis,
+                                                     const CMolecularBasis  &aux_basis,
+                                                     const CSparseTensor    &bq_vectors,
+                                                     const CPackedMatrix    &density_for_coulomb,
+                                                     const CPackedMatrix    &left,
+                                                     const CPackedMatrix    &right,
+                                                     const std::vector<int> &aux_atoms,
+                                                     const size_t            budget,
+                                                     const bool              with_coulomb) const
+    -> TGeneralDistributedFit
+{
+    auto fit = TGeneralDistributedFit();
+
+    fit.naux = aux_basis.dimensions_of_basis();
+
+    fit.norbs = left.number_of_columns();
+
+    errors::assertMsgCritical(left.number_of_columns() == right.number_of_columns(),
+                              std::string("SimdRIJKGradientDriver: The two factors of a general density have "
+                                          "different ranks"));
+
+    errors::assertMsgCritical(left.number_of_rows() == right.number_of_rows(),
+                              std::string("SimdRIJKGradientDriver: The two factors of a general density have "
+                                          "different basis dimensions"));
+
+    // NOTE: empty means empty here, as in the packed share. A rank dealt no
+    // auxiliary atoms owns no functions, and that is not the whole basis.
+
+    fit.functions = aux_atoms.empty() ? std::vector<size_t>()
+                                      : simdri::aux_functions_of(aux_basis, aux_atoms);
+
+    if (with_coulomb)
+    {
+        fit.fitting = _drv.compute_y_vector(bq_vectors, basis, aux_basis, density_for_coulomb);
+    }
+
+    fit.gram_rows.assign(fit.functions.size() * fit.naux, 0.0);
+
+    if (fit.norbs == 0)
+    {
+        fit.nelements = 0;
+
+        fit.npanel = 0;
+
+        return fit;
+    }
+
+    fit.nelements = fit.norbs * fit.norbs;
+
+    const auto per_element = 2 * fit.naux * sizeof(double);
+
+    const auto by_memory = budget / std::max(per_element, size_t{1});
+
+    fit.npanel = std::min(fit.nelements, std::max(_min_batch, by_memory));
+
+    fit.densities.resize(fit.naux);
+
+    if (fit.functions.empty()) return fit;
+
+    _local_densities_for_general(bq_vectors, basis, aux_basis, left, right, fit.functions,
+                                 fit.naux, budget, fit.densities);
+
+    return fit;
+}
+
+auto
+CSimdRIJKGradientDriver::mpi_set_fitting_general(TGeneralDistributedFit   &fit,
+                                                 const CPackedMatrix       &metric,
+                                                 const std::vector<double> &total) const -> void
+{
+    errors::assertMsgCritical(total.size() == fit.naux,
+                              std::string("SimdRIJKGradientDriver: The summed general fitting is not of "
+                                          "the auxiliary basis"));
+
+    fit.fitting = total;
+
+    _apply_transposed_factor(metric, fit.fitting.data(), 1);
+}
+
+auto
+CSimdRIJKGradientDriver::mpi_clear_fitting_general(TGeneralDistributedFit &fit) const -> void
+{
+    fit.fitting.clear();
+}
+
+auto
+CSimdRIJKGradientDriver::mpi_panel_partial_general(const TGeneralDistributedFit &fit,
+                                                   const CPackedMatrix           &metric,
+                                                   const size_t                   ipanel) const
+    -> std::vector<double>
+{
+    const auto range = fit.panel_range(ipanel);
+
+    const auto first = range.first;
+
+    const auto count = range.second;
+
+    if (count == 0) return {};
+
+    auto partial = std::vector<double>(fit.naux * count, 0.0);
+
+    if (fit.functions.empty() || fit.densities.empty()) return partial;
+
+    auto gathered = std::vector<double>(fit.functions.size() * count, 0.0);
+
+    const auto nowned = static_cast<int>(fit.functions.size());
+
+#pragma omp parallel for schedule(static)
+    for (int at = 0; at < nowned; at++)
+    {
+        const auto k = static_cast<size_t>(at);
+
+        const auto &matrix = fit.densities[fit.functions[k]];
+
+        if (matrix.number_of_elements() == 0) continue;
+
+        std::copy_n(matrix.data() + first, count, gathered.data() + k * count);
+    }
+
+    const auto columns = _transposed_columns(metric, fit.functions, fit.naux);
+
+    tdenblas::threadedMultAB(fit.naux, count, fit.functions.size(), 1.0, columns.data(),
+                             fit.functions.size(), gathered.data(), count, 0.0, partial.data(),
+                             count);
+
+    return partial;
+}
+
+auto
+CSimdRIJKGradientDriver::mpi_panel_absorb_general(TGeneralDistributedFit &fit,
+                                                  const size_t            ipanel,
+                                                  const double           *reduced,
+                                                  const size_t            size) const -> void
+{
+    const auto range = fit.panel_range(ipanel);
+
+    const auto first = range.first;
+
+    const auto count = range.second;
+
+    if (count == 0) return;
+
+    errors::assertMsgCritical(size == fit.naux * count,
+                              std::string("SimdRIJKGradientDriver: The reduced general panel is not of "
+                                          "the auxiliary basis"));
+
+    const auto nowned = static_cast<int>(fit.functions.size());
+
+#pragma omp parallel for schedule(static)
+    for (int at = 0; at < nowned; at++)
+    {
+        const auto k = static_cast<size_t>(at);
+
+        auto &matrix = fit.densities[fit.functions[k]];
+
+        if (matrix.number_of_elements() == 0) continue;
+
+        std::copy_n(reduced + fit.functions[k] * count, count, matrix.data() + first);
+    }
+}
+
+auto
+CSimdRIJKGradientDriver::mpi_gram_panel_partial_general(const TGeneralDistributedFit &fit,
+                                                        const size_t                   ipanel) const
+    -> std::vector<double>
+{
+    const auto range = fit.panel_range(ipanel);
+
+    const auto first = range.first;
+
+    const auto count = range.second;
+
+    if (count == 0) return {};
+
+    auto partial = std::vector<double>(fit.naux * count, 0.0);
+
+    if (fit.functions.empty() || fit.densities.empty() || (fit.norbs == 0)) return partial;
+
+    const auto nowned = static_cast<int>(fit.functions.size());
+
+#pragma omp parallel for schedule(static)
+    for (int at = 0; at < nowned; at++)
+    {
+        const auto k = static_cast<size_t>(at);
+
+        const auto &matrix = fit.densities[fit.functions[k]];
+
+        if (matrix.number_of_elements() == 0) continue;
+
+        for (size_t c = 0; c < count; c++)
+        {
+            const auto element = first + c;
+
+            const auto i = element / fit.norbs;
+
+            const auto j = element % fit.norbs;
+
+            partial[fit.functions[k] * count + c] = matrix.data()[j * fit.norbs + i];
+        }
+    }
+
+    return partial;
+}
+
+auto
+CSimdRIJKGradientDriver::mpi_gram_panel_absorb_general(TGeneralDistributedFit &fit,
+                                                       const size_t            ipanel,
+                                                       const double           *reduced,
+                                                       const size_t            size) const -> void
+{
+    const auto range = fit.panel_range(ipanel);
+
+    const auto first = range.first;
+
+    const auto count = range.second;
+
+    if (count == 0) return;
+
+    errors::assertMsgCritical(size == fit.naux * count,
+                              std::string("SimdRIJKGradientDriver: The reduced general Gram panel is "
+                                          "not of the auxiliary basis"));
+
+    const auto nowned = fit.functions.size();
+
+    if (nowned == 0) return;
+
+    auto local = std::vector<double>(nowned * count, 0.0);
+
+#pragma omp parallel for schedule(static)
+    for (int at = 0; at < static_cast<int>(nowned); at++)
+    {
+        const auto k = static_cast<size_t>(at);
+
+        const auto &matrix = fit.densities[fit.functions[k]];
+
+        if (matrix.number_of_elements() == 0) continue;
+
+        std::copy_n(matrix.data() + first, count, local.data() + k * count);
+    }
+
+    tdenblas::threadedMultABt(nowned, fit.naux, count, 1.0, local.data(), count, reduced, count,
+                              1.0, fit.gram_rows.data(), fit.naux);
+}
+
+auto
+CSimdRIJKGradientDriver::mpi_omega_general(const TGeneralDistributedFit &fit,
+                                           const double                 *gram,
+                                           const size_t                  size,
+                                           const double                  exchange_scaling_factor) const
+    -> CPackedMatrix
+{
+    const auto naux = fit.naux;
+
+    auto omega = CPackedMatrix(naux, naux, mat_t::symmetric);
+
+    omega.zero();
+
+    const auto has_gram = (gram != nullptr) && (size > 0) && (exchange_scaling_factor != 0.0);
+
+    errors::assertMsgCritical((!has_gram) || (size == naux * naux),
+                              std::string("SimdRIJKGradientDriver: The gathered general Gram is not the "
+                                          "square of the auxiliary basis"));
+
+    const auto has_coulomb = (!fit.fitting.empty());
+
+    for (size_t p = 0; p < naux; p++)
+    {
+        for (size_t q = 0; q <= p; q++)
+        {
+            auto value = has_coulomb ? 2.0 * fit.fitting[p] * fit.fitting[q] : 0.0;
+
+            if (has_gram) value -= exchange_scaling_factor * gram[p * naux + q];
+
+            omega.data()[omega.index(p, q)] = value;
+        }
+    }
+
+    return omega;
+}
+
+auto
+CSimdRIJKGradientDriver::mpi_compute_share_general(const CMolecule                &molecule,
+                                                   const CMolecularBasis          &basis,
+                                                   const CMolecularBasis          &aux_basis,
+                                                   const TGeneralDistributedFit   &fit,
+                                                   const CPackedMatrix            &density_for_coulomb,
+                                                   const CPackedMatrix            &left,
+                                                   const CPackedMatrix            &right,
+                                                   const CPackedMatrix            &omega,
+                                                   const double                    exchange_scaling_factor,
+                                                   const std::vector<int>         &atoms,
+                                                   const std::vector<int>         &aux_atoms) const
+    -> CPackedMatrix
+{
+    const auto natoms = molecule.number_of_atoms();
+
+    auto gradient = CPackedMatrix(natoms, 3, mat_t::general);
+
+    gradient.zero();
+
+    auto wanted = std::vector<bool>(natoms, false);
+
+    for (const auto iatom : atoms)
+    {
+        errors::assertMsgCritical((iatom >= 0) && (static_cast<size_t>(iatom) < natoms),
+                                  std::string("SimdRIJKGradientDriver: An atom outside the molecule was "
+                                              "asked for"));
+
+        wanted[static_cast<size_t>(iatom)] = true;
+    }
+
+    const auto spins = std::vector<TExchangeSpin>{{&left, &fit.densities, &right}};
+
+    const auto coulomb_factor = fit.fitting.empty() ? 0.0 : 4.0;
+
+    const auto exchange_factor = -2.0 * exchange_scaling_factor;
+
+    if (!aux_atoms.empty())
+    {
+        _compute_three_center(gradient, molecule, basis, aux_basis, fit.fitting, density_for_coulomb,
+                              spins, coulomb_factor, exchange_factor, wanted, aux_atoms);
+    }
+
+    if (omega.number_of_elements() > 0)
+    {
+        const auto two_center = CSimdTwoCenterElectronRepulsionGradientDriver(_block_size);
+
+        const auto metric_part = two_center.compute(molecule, aux_basis, omega, atoms);
+
+        for (size_t iatom = 0; iatom < natoms; iatom++)
+        {
+            for (size_t c = 0; c < 3; c++)
+            {
+                gradient.data()[gradient.index(iatom, c)] -= metric_part.at(iatom, c);
+            }
+        }
+    }
+
+    return gradient;
+}
+
+auto
+CSimdRIJKGradientDriver::mpi_compute_share_rs_general(const CMolecule                &molecule,
+                                                      const CMolecularBasis          &basis,
+                                                      const CMolecularBasis          &aux_basis,
+                                                      const TGeneralDistributedFit   &fit,
+                                                      const TGeneralDistributedFit   &fit_erf,
+                                                      const CPackedMatrix            &density_for_coulomb,
+                                                      const CPackedMatrix            &left,
+                                                      const CPackedMatrix            &right,
+                                                      const CPackedMatrix            &omega_plain,
+                                                      const CPackedMatrix            &omega_erf,
+                                                      const double                    exchange_scaling_factor,
+                                                      const double                    erf_exchange_scaling_factor,
+                                                      const double                    omega,
+                                                      const std::vector<int>         &atoms,
+                                                      const std::vector<int>         &aux_atoms) const
+    -> CPackedMatrix
+{
+    errors::assertMsgCritical(omega > 0.0,
+                              std::string("SimdRIJKGradientDriver: A range separated general share was "
+                                          "asked for without a range separation parameter"));
+
+    const auto natoms = molecule.number_of_atoms();
+
+    auto gradient = CPackedMatrix(natoms, 3, mat_t::general);
+
+    gradient.zero();
+
+    auto wanted = std::vector<bool>(natoms, false);
+
+    for (const auto iatom : atoms)
+    {
+        errors::assertMsgCritical((iatom >= 0) && (static_cast<size_t>(iatom) < natoms),
+                                  std::string("SimdRIJKGradientDriver: An atom outside the molecule was "
+                                              "asked for"));
+
+        wanted[static_cast<size_t>(iatom)] = true;
+    }
+
+    const auto spins = std::vector<TExchangeSpin>{{&left, &fit.densities, &right}};
+
+    const auto spins_erf = std::vector<TExchangeSpin>{{&left, &fit_erf.densities, &right}};
+
+    const auto coulomb_factor = fit.fitting.empty() ? 0.0 : 4.0;
+
+    const auto exchange_factor = -2.0 * exchange_scaling_factor;
+
+    const auto erf_factor = -2.0 * erf_exchange_scaling_factor;
+
+    if (!aux_atoms.empty())
+    {
+        _compute_three_center(gradient, molecule, basis, aux_basis, fit.fitting, density_for_coulomb,
+                              spins, coulomb_factor, exchange_factor, wanted, aux_atoms, spins_erf,
+                              erf_factor, omega);
+    }
+
+    if (omega_plain.number_of_elements() > 0)
+    {
+        const auto two_center = CSimdTwoCenterElectronRepulsionGradientRsDriver(_block_size);
+
+        const auto parts = two_center.compute(molecule, aux_basis, omega_plain, omega_erf, omega, atoms);
+
+        for (size_t iatom = 0; iatom < natoms; iatom++)
+        {
+            for (size_t c = 0; c < 3; c++)
+            {
+                gradient.data()[gradient.index(iatom, c)] -= parts.first.at(iatom, c);
+
+                gradient.data()[gradient.index(iatom, c)] -= parts.second.at(iatom, c);
+            }
+        }
+    }
+
+    return gradient;
 }
 
 auto
@@ -1806,7 +2332,8 @@ CSimdRIJKGradientDriver::_compute_three_center(CPackedMatrix                    
 
     struct TDenseSpin
     {
-        size_t              norbs;
+        size_t              norbs_left;
+        size_t              norbs_right;
         std::vector<double> dense_c;
         std::vector<double> transposed;
     };
@@ -1826,20 +2353,30 @@ CSimdRIJKGradientDriver::_compute_three_center(CPackedMatrix                    
 
     for (const auto &spin : spins)
     {
-        const auto norbs = spin.coefficients->number_of_columns();
+        const auto norbs_left = spin.coefficients->number_of_columns();
 
-        auto dense_c = std::vector<double>(nao * norbs, 0.0);
+        const auto &right = (spin.right == nullptr) ? *spin.coefficients : *spin.right;
+
+        const auto norbs_right = right.number_of_columns();
+
+        auto dense_c = std::vector<double>(nao * norbs_left, 0.0);
 
         spin.coefficients->to_dense(dense_c.data());
 
-        auto transposed = std::vector<double>(norbs * nao, 0.0);
+        auto dense_right = std::vector<double>(nao * norbs_right, 0.0);
+
+        right.to_dense(dense_right.data());
+
+        auto transposed = std::vector<double>(norbs_right * nao, 0.0);
 
         for (size_t mu = 0; mu < nao; mu++)
         {
-            for (size_t ii = 0; ii < norbs; ii++) transposed[ii * nao + mu] = dense_c[mu * norbs + ii];
+            for (size_t ii = 0; ii < norbs_right; ii++)
+                transposed[ii * nao + mu] = dense_right[mu * norbs_right + ii];
         }
 
-        dense_spins.push_back({norbs, std::move(dense_c), std::move(transposed)});
+        dense_spins.push_back(
+            {norbs_left, norbs_right, std::move(dense_c), std::move(transposed)});
     }
 
     // NOTE: the attenuated operator's spins carry the same orbitals -- a spin
@@ -1851,20 +2388,30 @@ CSimdRIJKGradientDriver::_compute_three_center(CPackedMatrix                    
 
     for (const auto &spin : spins_erf)
     {
-        const auto norbs = spin.coefficients->number_of_columns();
+        const auto norbs_left = spin.coefficients->number_of_columns();
 
-        auto dense_c = std::vector<double>(nao * norbs, 0.0);
+        const auto &right = (spin.right == nullptr) ? *spin.coefficients : *spin.right;
+
+        const auto norbs_right = right.number_of_columns();
+
+        auto dense_c = std::vector<double>(nao * norbs_left, 0.0);
 
         spin.coefficients->to_dense(dense_c.data());
 
-        auto transposed = std::vector<double>(norbs * nao, 0.0);
+        auto dense_right = std::vector<double>(nao * norbs_right, 0.0);
+
+        right.to_dense(dense_right.data());
+
+        auto transposed = std::vector<double>(norbs_right * nao, 0.0);
 
         for (size_t mu = 0; mu < nao; mu++)
         {
-            for (size_t ii = 0; ii < norbs; ii++) transposed[ii * nao + mu] = dense_c[mu * norbs + ii];
+            for (size_t ii = 0; ii < norbs_right; ii++)
+                transposed[ii * nao + mu] = dense_right[mu * norbs_right + ii];
         }
 
-        dense_spins_erf.push_back({norbs, std::move(dense_c), std::move(transposed)});
+        dense_spins_erf.push_back(
+            {norbs_left, norbs_right, std::move(dense_c), std::move(transposed)});
     }
 
     const auto naux = aux_basis.dimensions_of_basis();
@@ -1952,26 +2499,30 @@ CSimdRIJKGradientDriver::_compute_three_center(CPackedMatrix                    
                     {
                         const auto &dense = dense_which[is];
 
-                        const auto norbs = dense.norbs;
+                        const auto norbs_left = dense.norbs_left;
 
-                        if (norbs == 0) continue;
+                        const auto norbs_right = dense.norbs_right;
 
-                        auto dense_q = std::vector<double>(norbs * norbs, 0.0);
+                        if ((norbs_left == 0) || (norbs_right == 0) || (norbs_left != norbs_right)) continue;
+
+                        auto dense_q = std::vector<double>(norbs_left * norbs_right, 0.0);
 
                         (*which[is].orbital_densities)[q].to_dense(dense_q.data());
 
                         // C_o d(q), then that against the transposed orbitals
 
-                        auto half = std::vector<double>(nao * norbs, 0.0);
+                        auto half = std::vector<double>(nao * norbs_left, 0.0);
 
-                        tdenblas::threadedMultAB(nao, norbs, norbs, 1.0, dense.dense_c.data(), norbs,
-                                                 dense_q.data(), norbs, 0.0, half.data(), norbs);
+                        tdenblas::threadedMultAB(nao, norbs_left, norbs_left, 1.0, dense.dense_c.data(),
+                                                 norbs_left, dense_q.data(), norbs_left, 0.0,
+                                                 half.data(), norbs_left);
 
                         // NOTE: added and not assigned. The spins accumulate into
                         // one matrix, and the overwriting product kept only the
                         // last of them.
-                        tdenblas::threadedMultAB(nao, nao, norbs, 1.0, half.data(), norbs, dense.transposed.data(),
-                                                 nao, 1.0, matrix.data(), nao);
+                        tdenblas::threadedMultAB(nao, nao, norbs_left, 1.0, half.data(), norbs_left,
+                                                 dense.transposed.data(), nao, 1.0, matrix.data(),
+                                                 nao);
                     }
 
                     for (auto &value : matrix) value *= factor;
@@ -2090,7 +2641,7 @@ CSimdRIJKGradientDriver::_compute_three_center(CPackedMatrix                    
                                         // exchange part is the back transform of
                                         // the fitted density of the orbitals.
 
-                                        const auto cp = coulomb_factor * fitting[q];
+                                        const auto cp = (coulomb_factor != 0.0 && !fitting.empty()) ? coulomb_factor * fitting[q] : 0.0;
 
                                         const double *exchange =
                                             (exchange_factor != 0.0) ? exchanges[slot_of[q]].data() : nullptr;

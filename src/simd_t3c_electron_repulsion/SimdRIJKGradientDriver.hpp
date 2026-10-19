@@ -127,6 +127,65 @@ struct TExchangeSpin
 {
     const CPackedMatrix              *coefficients;
     const std::vector<CPackedMatrix> *orbital_densities;
+
+    /// @brief The factor on the right of the fitted densities, or null where it is
+    /// the same as the factor on the left. A density D = L R transposed has the
+    /// exchange factor L d(q) R transposed, where d(q) = R transposed B(q) L.
+    const CPackedMatrix *right = nullptr;
+};
+
+/// @brief The fitted densities of one general density divided over the ranks of
+/// a communicator.
+///
+/// @note This is the general companion of TDistributedFit. The density is
+/// factorised as D = L R transposed and its fitted density at an auxiliary
+/// function q is e(q) = R transposed B(q) L, a full r by r matrix. The exchange
+/// contraction is L e(q) R transposed. A symmetric density with L = R reduces to
+/// the packed form the SCF gradient uses, but a transition density does not, and
+/// neither does a relaxed density written as the factors it is made from.
+struct TGeneralDistributedFit
+{
+    /// @brief The auxiliary functions this rank owns, as indices into the whole
+    /// auxiliary basis, ascending.
+    std::vector<size_t> functions;
+
+    /// @brief The fitted densities, the length of the auxiliary basis, with only
+    /// the owned entries allocated. Each is a full r by r matrix.
+    std::vector<CPackedMatrix> densities;
+
+    /// @brief The fitting coefficients. Partial until the ranks have added theirs
+    /// and the transposed factor has been applied to the sum.
+    std::vector<double> fitting;
+
+    /// @brief This rank's rows of the Gram product, its own functions by the whole
+    /// auxiliary basis.
+    std::vector<double> gram_rows;
+
+    /// @brief The dimensions of the auxiliary basis.
+    size_t naux = 0;
+
+    /// @brief The rank of the density factorisation.
+    size_t norbs = 0;
+
+    /// @brief The elements of one fitted density.
+    size_t nelements = 0;
+
+    /// @brief The elements a panel carries.
+    size_t npanel = 0;
+
+    /// @brief The number of panels the elements are divided into.
+    auto panels() const -> size_t
+    {
+        return (npanel == 0) ? 0 : (nelements + npanel - 1) / npanel;
+    }
+
+    /// @brief The first element of a panel and how many it carries.
+    auto panel_range(const size_t ipanel) const -> std::pair<size_t, size_t>
+    {
+        const auto first = ipanel * npanel;
+
+        return {first, std::min(npanel, (first < nelements) ? nelements - first : size_t{0})};
+    }
 };
 
 /// @brief The Coulomb and exchange contributions to the molecular gradient,
@@ -264,6 +323,94 @@ class CSimdRIJKGradientDriver
     auto mpi_set_fitting(TDistributedFit           &fit,
                          const CPackedMatrix       &metric,
                          const std::vector<double> &total) const -> void;
+
+    /// @brief Forms this rank's share of the fitted densities of a general
+    /// density D = L R transposed.
+    /// @param density_for_coulomb The symmetric part of D as a packed matrix, or
+    /// an empty matrix when the density has no Coulomb term.
+    /// @param left The left factor of D.
+    /// @param right The right factor of D, with the same number of columns as
+    /// the left one.
+    /// @param with_coulomb Whether the density contributes a Coulomb term. When
+    /// false no fitting right hand side is formed.
+    auto mpi_local_densities_general(const CMolecule        &molecule,
+                                     const CMolecularBasis  &basis,
+                                     const CMolecularBasis  &aux_basis,
+                                     const CSparseTensor    &bq_vectors,
+                                     const CPackedMatrix    &density_for_coulomb,
+                                     const CPackedMatrix    &left,
+                                     const CPackedMatrix    &right,
+                                     const std::vector<int> &aux_atoms,
+                                     const size_t            budget,
+                                     const bool              with_coulomb) const
+        -> TGeneralDistributedFit;
+
+    /// @brief Applies the transposed factor to the general fitting coefficients.
+    auto mpi_set_fitting_general(TGeneralDistributedFit   &fit,
+                                 const CPackedMatrix       &metric,
+                                 const std::vector<double> &total) const -> void;
+
+    /// @brief Empties the fitting coefficients of a general share.
+    auto mpi_clear_fitting_general(TGeneralDistributedFit &fit) const -> void;
+
+    /// @brief This rank's contribution to one panel of the transposed factor
+    /// applied to the general fitted densities.
+    auto mpi_panel_partial_general(const TGeneralDistributedFit &fit,
+                                   const CPackedMatrix           &metric,
+                                   const size_t                   ipanel) const -> std::vector<double>;
+
+    /// @brief Takes one general panel the ranks have added together.
+    auto mpi_panel_absorb_general(TGeneralDistributedFit &fit,
+                                  const size_t            ipanel,
+                                  const double           *reduced,
+                                  const size_t            size) const -> void;
+
+    /// @brief This rank's transposed panel contribution to the general Gram.
+    auto mpi_gram_panel_partial_general(const TGeneralDistributedFit &fit,
+                                        const size_t                   ipanel) const -> std::vector<double>;
+
+    /// @brief Accumulates one reduced transposed panel into the general Gram.
+    auto mpi_gram_panel_absorb_general(TGeneralDistributedFit &fit,
+                                       const size_t            ipanel,
+                                       const double           *reduced,
+                                       const size_t            size) const -> void;
+
+    /// @brief Assembles the two-index fitted density of a general density.
+    auto mpi_omega_general(const TGeneralDistributedFit &fit,
+                           const double                 *gram,
+                           const size_t                  size,
+                           const double                  exchange_scaling_factor) const -> CPackedMatrix;
+
+    /// @brief This rank's share of the gradient of a general density.
+    auto mpi_compute_share_general(const CMolecule                &molecule,
+                                   const CMolecularBasis          &basis,
+                                   const CMolecularBasis          &aux_basis,
+                                   const TGeneralDistributedFit   &fit,
+                                   const CPackedMatrix            &density_for_coulomb,
+                                   const CPackedMatrix            &left,
+                                   const CPackedMatrix            &right,
+                                   const CPackedMatrix            &omega,
+                                   const double                    exchange_scaling_factor,
+                                   const std::vector<int>         &atoms,
+                                   const std::vector<int>         &aux_atoms) const -> CPackedMatrix;
+
+    /// @brief This rank's share of a range separated gradient of a general
+    /// density, from the plain and attenuated fitted densities.
+    auto mpi_compute_share_rs_general(const CMolecule                &molecule,
+                                      const CMolecularBasis          &basis,
+                                      const CMolecularBasis          &aux_basis,
+                                      const TGeneralDistributedFit   &fit,
+                                      const TGeneralDistributedFit   &fit_erf,
+                                      const CPackedMatrix            &density_for_coulomb,
+                                      const CPackedMatrix            &left,
+                                      const CPackedMatrix            &right,
+                                      const CPackedMatrix            &omega_plain,
+                                      const CPackedMatrix            &omega_erf,
+                                      const double                    exchange_scaling_factor,
+                                      const double                    erf_exchange_scaling_factor,
+                                      const double                    omega,
+                                      const std::vector<int>         &atoms,
+                                      const std::vector<int>         &aux_atoms) const -> CPackedMatrix;
 
     /// @brief Empties the fitting coefficients of a share, which is how the
     /// attenuated operator says it has no Coulomb term.
@@ -586,6 +733,14 @@ class CSimdRIJKGradientDriver
                          const size_t               norbs,
                          const CPackedMatrix       &half) const -> CPackedMatrix;
 
+    /// @brief Closes the right factor of a general density into the half
+    /// transformed B vector of its left factor.
+    auto _close_general(const std::vector<double> &transposed_right,
+                        const size_t               nao,
+                        const size_t               nleft,
+                        const size_t               nright,
+                        const CPackedMatrix       &half) const -> CPackedMatrix;
+
     /// @brief Adds the three-center term to the gradient, one atom of the
     /// auxiliary basis at a time.
     /// @note The derivative integrals of an auxiliary atom are formed, contracted
@@ -618,6 +773,18 @@ class CSimdRIJKGradientDriver
                               const size_t               naux,
                               const size_t               budget,
                               std::vector<CPackedMatrix> &target) const -> void;
+
+    /// @brief Forms one general density's fitted densities for the functions
+    /// this rank owns.
+    auto _local_densities_for_general(const CSparseTensor       &bq_vectors,
+                                      const CMolecularBasis     &basis,
+                                      const CMolecularBasis     &aux_basis,
+                                      const CPackedMatrix       &left,
+                                      const CPackedMatrix       &right,
+                                      const std::vector<size_t> &functions,
+                                      const size_t               naux,
+                                      const size_t               budget,
+                                      std::vector<CPackedMatrix> &target) const -> void;
 
     /// @brief The columns of the transposed factor of the metric which belong to
     /// the given auxiliary functions.

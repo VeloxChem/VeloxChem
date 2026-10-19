@@ -729,6 +729,24 @@ export_simdintegrals(py::module &m) -> void
              },
              "This rank's rows of the Gram product.");
 
+    PyClass<TGeneralDistributedFit>(m, "GeneralDistributedFit")
+        .def_readonly("naux", &TGeneralDistributedFit::naux, "The dimensions of the auxiliary basis.")
+        .def_readonly("norbs", &TGeneralDistributedFit::norbs, "The rank of the density factorisation.")
+        .def_readonly("nelements", &TGeneralDistributedFit::nelements, "The elements of one fitted density.")
+        .def_readonly("npanel", &TGeneralDistributedFit::npanel, "The elements a panel carries.")
+        .def("panels", &TGeneralDistributedFit::panels, "The number of panels the elements are divided into.")
+        .def("functions", [](const TGeneralDistributedFit &self) { return self.functions; },
+             "The auxiliary functions this rank owns.")
+        .def("fitting", [](const TGeneralDistributedFit &self) { return self.fitting; },
+             "The fitting coefficients, partial until the ranks have added theirs.")
+        .def("gram_rows",
+             [](const TGeneralDistributedFit &self) -> py::array_t<double> {
+                 const auto nrows = static_cast<int>(self.functions.size());
+                 return vlx_general::pointer_to_numpy(self.gram_rows.data(),
+                                                      {nrows, static_cast<int>(self.naux)});
+             },
+             "This rank's rows of the Gram product.");
+
     PyClass<CSimdRIJKGradientDriver>(m, "SimdRIJKGradientDriver")
         .def(py::init<>())
         .def(py::init<const double, const size_t, const size_t>(),
@@ -750,6 +768,73 @@ export_simdintegrals(py::module &m) -> void
         .def("mpi_set_fitting", &CSimdRIJKGradientDriver::mpi_set_fitting,
              "Applies the transposed factor to the fitting coefficients the ranks have added together.",
              py::arg("fit"), py::arg("metric"), py::arg("total"))
+        .def("mpi_local_densities_general", &CSimdRIJKGradientDriver::mpi_local_densities_general,
+             "Forms this rank's share of the fitted densities of a general density D = L R transposed.",
+             py::arg("molecule"), py::arg("basis"), py::arg("aux_basis"), py::arg("bq_vectors"),
+             py::arg("density_for_coulomb"), py::arg("left"), py::arg("right"),
+             py::arg("aux_atoms"), py::arg("budget"), py::arg("with_coulomb"))
+        .def("mpi_set_fitting_general", &CSimdRIJKGradientDriver::mpi_set_fitting_general,
+             "Applies the transposed factor to the general fitting coefficients.",
+             py::arg("fit"), py::arg("metric"), py::arg("total"))
+        .def("mpi_clear_fitting_general", &CSimdRIJKGradientDriver::mpi_clear_fitting_general,
+             "Empties the fitting coefficients of a general share.", py::arg("fit"))
+        .def("mpi_panel_partial_general",
+             [](const CSimdRIJKGradientDriver &self, const TGeneralDistributedFit &fit,
+                const CPackedMatrix &metric, const size_t ipanel) -> py::array_t<double> {
+                 auto values = self.mpi_panel_partial_general(fit, metric, ipanel);
+                 const auto count = fit.panel_range(ipanel).second;
+                 return vlx_general::pointer_to_numpy(values.data(),
+                                                      {static_cast<int>(fit.naux), static_cast<int>(count)});
+             },
+             "This rank's contribution to one panel of the transposed factor applied to the general "
+             "fitted densities.",
+             py::arg("fit"), py::arg("metric"), py::arg("ipanel"))
+        .def("mpi_panel_absorb_general",
+             [](const CSimdRIJKGradientDriver &self, TGeneralDistributedFit &fit, const size_t ipanel,
+                const py::array_t<double> &reduced) -> void {
+                 self.mpi_panel_absorb_general(fit, ipanel, reduced.data(),
+                                               static_cast<size_t>(reduced.size()));
+             },
+             "Takes one general panel the ranks have added together.",
+             py::arg("fit"), py::arg("ipanel"), py::arg("reduced"))
+        .def("mpi_gram_panel_partial_general",
+             [](const CSimdRIJKGradientDriver &self, const TGeneralDistributedFit &fit,
+                const size_t ipanel) -> py::array_t<double> {
+                 auto values = self.mpi_gram_panel_partial_general(fit, ipanel);
+                 const auto count = fit.panel_range(ipanel).second;
+                 return vlx_general::pointer_to_numpy(values.data(),
+                                                      {static_cast<int>(fit.naux), static_cast<int>(count)});
+             },
+             "This rank's transposed panel contribution to the general Gram.",
+             py::arg("fit"), py::arg("ipanel"))
+        .def("mpi_gram_panel_absorb_general",
+             [](const CSimdRIJKGradientDriver &self, TGeneralDistributedFit &fit, const size_t ipanel,
+                const py::array_t<double> &reduced) -> void {
+                 self.mpi_gram_panel_absorb_general(fit, ipanel, reduced.data(),
+                                                     static_cast<size_t>(reduced.size()));
+             },
+             "Accumulates one reduced transposed panel into the general Gram.",
+             py::arg("fit"), py::arg("ipanel"), py::arg("reduced"))
+        .def("mpi_omega_general",
+             [](const CSimdRIJKGradientDriver &self, const TGeneralDistributedFit &fit,
+                const py::array_t<double> &gram, const double exchange_scaling_factor) -> CPackedMatrix {
+                 return self.mpi_omega_general(fit, gram.data(), static_cast<size_t>(gram.size()),
+                                               exchange_scaling_factor);
+             },
+             "Assembles the two-index fitted density of a general density.",
+             py::arg("fit"), py::arg("gram"), py::arg("exchange_scaling_factor"))
+        .def("mpi_compute_share_general", &CSimdRIJKGradientDriver::mpi_compute_share_general,
+             "This rank's share of the gradient of a general density.",
+             py::arg("molecule"), py::arg("basis"), py::arg("aux_basis"), py::arg("fit"),
+             py::arg("density_for_coulomb"), py::arg("left"), py::arg("right"), py::arg("omega"),
+             py::arg("exchange_scaling_factor"), py::arg("atoms"), py::arg("aux_atoms"))
+        .def("mpi_compute_share_rs_general", &CSimdRIJKGradientDriver::mpi_compute_share_rs_general,
+             "This rank's share of a range separated gradient of a general density.",
+             py::arg("molecule"), py::arg("basis"), py::arg("aux_basis"), py::arg("fit"),
+             py::arg("fit_erf"), py::arg("density_for_coulomb"), py::arg("left"), py::arg("right"),
+             py::arg("omega_plain"), py::arg("omega_erf"), py::arg("exchange_scaling_factor"),
+             py::arg("erf_exchange_scaling_factor"), py::arg("omega"), py::arg("atoms"),
+             py::arg("aux_atoms"))
         .def("mpi_clear_fitting", &CSimdRIJKGradientDriver::mpi_clear_fitting,
              "Empties the fitting coefficients of a share, which is how the attenuated operator says it "
              "has no Coulomb term.",
