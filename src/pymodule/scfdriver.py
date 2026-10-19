@@ -559,6 +559,28 @@ class ScfDriver:
 
         print_attributes(self._input_keywords, self.ostream)
 
+    def _prepare_fika_embedding(self):
+        """
+        Prepares the fika embedding from an assigned embedding or a potfile.
+        """
+
+        if self.potfile is not None:
+            self.embedding = {
+                'settings': {
+                    'embedding_method': 'fika'
+                },
+                'inputs': {
+                    'potfile': str(self.potfile)
+                },
+            }
+            self.potfile = None
+            return
+
+        if self.embedding is not None:
+            assert_msg_critical(
+                is_fika_embedding(self.embedding),
+                'SCF driver: only the fika embedding is supported')
+
     def update_settings(self, scf_dict, method_dict=None):
         """
         Updates settings in SCF driver.
@@ -594,7 +616,11 @@ class ScfDriver:
 
         dft_sanity_check(self, 'update_settings')
 
+        self._prepare_fika_embedding()
         pe_sanity_check(self, method_dict)
+        assert_msg_critical(
+            not self._pe or is_fika_embedding(self.embedding),
+            'SCF driver: only the fika embedding is supported')
 
         # check solvation model setup
         solvation_model_sanity_check(self)
@@ -770,11 +796,11 @@ class ScfDriver:
         dft_sanity_check(self, 'compute')
 
         # check pe setup
+        self._prepare_fika_embedding()
         pe_sanity_check(self, molecule=molecule)
-
-        # Ensure embedding-object PE also populates the canonical potfile.
-        if self._pe and self.potfile is None:
-            self.potfile = self.pe_options.get('potfile')
+        assert_msg_critical(
+            not self._pe or is_fika_embedding(self.embedding),
+            'SCF driver: only the fika embedding is supported')
 
         # check solvation model setup
         solvation_model_sanity_check(self)
@@ -920,7 +946,18 @@ class ScfDriver:
                 self.ostream.flush()
 
         # set up polarizable embedding through fika
-        if self._pe and is_fika_embedding(self.embedding):
+        if self._pe:
+
+            assert_msg_critical(
+                is_fika_embedding(self.embedding),
+                'SCF driver: only the fika embedding is supported')
+
+            inputs = self.embedding.get('inputs', {})
+            if 'potfile' in inputs:
+                pot_info = 'Reading polarizable embedding: {}'.format(
+                    inputs['potfile'])
+                self.ostream.print_info(pot_info)
+                self.ostream.print_blank()
 
             self._embedding_drv = FikaEmbeddingSCF(molecule=molecule,
                                                    ao_basis=basis,
@@ -930,58 +967,6 @@ class ScfDriver:
 
             for line in self._embedding_drv.get_info():
                 self.ostream.print_info(line)
-            self.ostream.print_blank()
-
-        # set up polarizable embedding
-        elif self._pe:
-
-            # TODO: print PyFraME info
-
-            pot_info = 'Reading polarizable embedding: {}'.format(
-                self.pe_options['potfile'])
-            self.ostream.print_info(pot_info)
-            self.ostream.print_blank()
-
-            assert_msg_critical(
-                self.embedding['settings']['embedding_method'] == 'PE',
-                'PolarizableEmbedding: Invalid embedding_method. Only PE is supported.'
-            )
-
-            settings = self.embedding['settings']
-
-            from .embedding import PolarizableEmbeddingSCF
-
-            self._embedding_drv = PolarizableEmbeddingSCF(
-                molecule=molecule,
-                ao_basis=basis,
-                options=self.embedding,
-                comm=self.comm)
-
-            emb_info = 'Embedding settings:'
-            self.ostream.print_info(emb_info)
-
-            for key in ['embedding_method', 'environment_energy']:
-                if key in settings:
-                    self.ostream.print_info(f'- {key:<15s} : {settings[key]}')
-
-            if 'vdw' in settings:
-                self.ostream.print_info(f'- {"vdw":<15s}')
-                for key in ['method', 'combination_rule']:
-                    self.ostream.print_info(
-                        f'  - {key:<15s} : {settings["vdw"][key]}')
-
-            if 'induced_dipoles' in settings:
-                self.ostream.print_info(f'- {"induced_dipoles":<15s}')
-                default_values = {
-                    'solver': 'jidiis',
-                    'threshold': 1e-8,
-                    'max_iterations': 100,
-                    'mic': False,
-                }
-                for key, default in default_values.items():
-                    value = settings['induced_dipoles'].get(key, default)
-                    self.ostream.print_info(f'  - {key:<15s} : {value}')
-
             self.ostream.print_blank()
 
         # set up point charges without PE
@@ -2708,11 +2693,10 @@ class ScfDriver:
     def _get_pe_potfile_text(self):
         """Returns the text identifying the embedding in checkpoints."""
 
-        if is_fika_embedding(self.embedding):
-            return fika_embedding_text(self.embedding)
-
-        with Path(self.pe_options['potfile']).open('r') as f_pot:
-            return '\n'.join(f_pot.readlines())
+        assert_msg_critical(
+            is_fika_embedding(self.embedding),
+            'SCF driver: only the fika embedding is supported')
+        return fika_embedding_text(self.embedding)
 
     def _get_pe_potfile(self):
         """Returns the PE potfile, falling back to pe_options when unset."""
@@ -2776,12 +2760,8 @@ class ScfDriver:
         density_matrix = self._get_total_density_matrix(den_mat)
 
         if self._pe:
-            if isinstance(self._embedding_drv, FikaEmbeddingSCF):
-                return self._embedding_drv.compute_pe_contributions(
-                    density_matrix=density_matrix)
-            from .embedding import PolarizableEmbeddingSCF
             assert_msg_critical(
-                isinstance(self._embedding_drv, PolarizableEmbeddingSCF),
+                isinstance(self._embedding_drv, FikaEmbeddingSCF),
                 'ScfDriver: Inconsistent embedding driver for SCF')
             return self._embedding_drv.compute_pe_contributions(
                 density_matrix=density_matrix)

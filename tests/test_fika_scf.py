@@ -6,6 +6,7 @@ import pytest
 
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.errorhandler import VeloxChemError
+from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.lrsolver import LinearResponseSolver
@@ -198,7 +199,6 @@ class TestFikaScf:
 
     def test_unrestricted(self, tmp_path):
 
-        from veloxchem.molecule import Molecule
         from veloxchem.scfunrestdriver import ScfUnrestrictedDriver
         from veloxchem.scfrestopendriver import ScfRestrictedOpenDriver
         from veloxchem import (ComplexResponse, ComplexResponseUnrestrictedSolver,
@@ -287,6 +287,58 @@ class TestFikaScf:
                 for a in 'xyz')
             assert np.all(rpa['eigenvalues'] > 0.0)
 
+    def test_fika_embedding_from_potfile(self, tmp_path):
+        molecule = Molecule.read_xyz_string("""3
+            water
+            O  0.000000  0.000000  0.000000
+            H  0.000000  0.757000  0.586000
+            H  0.000000 -0.757000  0.586000
+        """)
+        basis = MolecularBasis.read(molecule, 'sto-3g', ostream=None)
+
+        potfile = tmp_path / 'fika.pot'
+        potfile.write_text("""
+            @environment
+            units: angstrom
+            xyz:
+            O  3.000000  0.000000  0.000000  HOH_pe  1  O
+            H  3.757000  0.000000  0.586000  HOH_pe  1  H1
+            H  2.243000  0.000000  0.586000  HOH_pe  1  H2
+            @end
+            @charges
+            O  -0.66900000  HOH_pe
+            H   0.33450000  HOH_pe
+            H   0.33450000  HOH_pe
+            @end
+            @polarizabilities
+            O  9.718  0.0  0.0  9.718  0.0  9.718  HOH_pe
+            H  0.0    0.0  0.0  0.0    0.0  0.0    HOH_pe
+            H  0.0    0.0  0.0  0.0    0.0  0.0    HOH_pe
+            @end
+        """)
+
+        # A potfile takes priority over an assigned embedding.
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ostream.mute()
+        scf_drv.embedding = {
+            'settings': {
+                'embedding_method': 'PE'
+            },
+            'inputs': {
+                'json_file': 'ignored.json'
+            },
+        }
+        scf_drv.potfile = str(potfile)
+        results = scf_drv.compute(molecule, basis)
+
+        assert scf_drv._pe
+        assert scf_drv.embedding['settings']['embedding_method'] == 'fika'
+        assert scf_drv.embedding['inputs']['potfile'] == str(potfile)
+        assert scf_drv._embedding_drv.classical_system.number_of_residues(
+            True) == 1
+        if MPI.COMM_WORLD.Get_rank() == mpi_master():
+            assert abs(results['E_emb']) > 0.0
+
     def test_damping_and_objects(self, tmp_path):
 
         pdb_file = write_droplet(tmp_path)
@@ -338,7 +390,6 @@ class TestFikaScf:
         # The molecule must be the solute of the PDB file.
         moved = molecule.get_coordinates_in_bohr()
         moved[0, 0] += 0.1
-        from veloxchem.molecule import Molecule
         other = Molecule([int(z) for z in molecule.get_element_ids()], moved,
                          'bohr')
         fails(fika_embedding(pdb_file), 'not the solute of the PDB file',
