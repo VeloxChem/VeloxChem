@@ -94,6 +94,7 @@ def fika_embedding_sanity_check(embedding):
             - pdb_file, solvent, and optionally radius or shells, unit
               ('angstrom' or 'bohr') and solute (residue name, 'MOL'): the QM
               molecule is the solute of the PDB file;
+            - potfile: a potential file with the classical environment;
             - objects: {'classical_system': FikaClassicalSystem}.
 
     :param embedding:
@@ -156,16 +157,20 @@ def fika_embedding_sanity_check(embedding):
                 'multipole')
 
     has_pdb = 'pdb_file' in inputs
+    has_potfile = 'potfile' in inputs
     has_objects = 'objects' in inputs
     assert_msg_critical(
-        has_pdb != has_objects,
-        "fika embedding: inputs need either 'pdb_file' or 'objects'")
+        sum((has_pdb, has_potfile, has_objects)) == 1,
+        "fika embedding: inputs need either 'pdb_file', 'potfile' or " +
+        "'objects'")
     if has_pdb:
         assert_msg_critical('solvent' in inputs,
                             "fika embedding: inputs need 'solvent'")
         unknown = set(inputs) - {
             'pdb_file', 'solvent', 'radius', 'shells', 'unit', 'solute'
         }
+    elif has_potfile:
+        unknown = set(inputs) - {'potfile'}
     else:
         assert_msg_critical(
             isinstance(inputs['objects'], dict) and isinstance(
@@ -181,10 +186,10 @@ def fika_embedding_sanity_check(embedding):
 class FikaEmbedding:
     """
     Polarizable embedding through fika: the classical system (from a PDB
-    file with the fika force-field library, or given as an object) and the
-    options of FikaQmmmEmbeddingDriver. The embedding is computed on the
-    master rank (with its OpenMP threads); the other ranks get no
-    contribution, as the SCF and response drivers use it there only.
+    file with the fika force-field library, a potential file, or given as an
+    object) and the options of FikaQmmmEmbeddingDriver. The embedding is
+    computed on the master rank (with its OpenMP threads); the other ranks
+    get no contribution, as the SCF and response drivers use it there only.
 
     Tolerances follow the convergence threshold of the calling driver: the
     induced-dipole tolerance min(1e-8, conv_thresh / 10), the field accuracy
@@ -233,6 +238,12 @@ class FikaEmbedding:
                 solute=solute,
                 unit=inputs.get('unit', 'angstrom'))
             self._check_molecule(reader.get_solute(residues, solute))
+        elif 'potfile' in inputs:
+            from .fikapotfilereader import FikaPotfileReader
+
+            self.classical_system = FikaPotfileReader(comm).read(
+                inputs['potfile'])
+            self.residues = None
         else:
             self.classical_system = inputs['objects']['classical_system']
             self.residues = None
@@ -345,6 +356,9 @@ class FikaEmbedding:
                 if key in inputs:
                     lines.append(f'- {key:<15s} : {inputs[key]} ' +
                                  inputs.get('unit', 'angstrom'))
+        elif 'potfile' in self.options['inputs']:
+            inputs = self.options['inputs']
+            lines.append(f"- potfile         : {inputs['potfile']}")
         lines.append('- residues        : ' +
                      f'{system.number_of_residues(True)} polarizable, ' +
                      f'{system.number_of_residues(False)} nonpolarizable')

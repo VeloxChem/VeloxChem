@@ -359,7 +359,7 @@ class TestFikaScf:
 
         embedding = fika_embedding(pdb_file)
         embedding['inputs']['objects'] = {}
-        fails(embedding, "either 'pdb_file' or 'objects'")
+        fails(embedding, "either 'pdb_file', 'potfile' or 'objects'")
 
         # Gradients are not available yet.
         from veloxchem.scfgradientdriver import ScfGradientDriver

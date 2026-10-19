@@ -7,7 +7,6 @@ from veloxchem.ensembleparser import EnsembleParser
 from veloxchem.ensembledriver import EnsembleDriver
 
 pytest.importorskip("MDAnalysis")
-pytest.importorskip("pyframe")
 
 
 @pytest.mark.timeconsuming
@@ -18,7 +17,7 @@ class TestEnsembleDriver:
         Regression test for notebook-style ensemble API:
         - compute(..., scf_options=..., property_options=...)
         - property='absorption' + nstates routes to TD-DFT/LR path
-        - PE potfile is frame-specific for each snapshot
+        - the fika potfile is frame-specific for each snapshot
         - compare SCF energies and LR eigenvalues to validated reference output
         - compare generated PE+NPE .pot files against reference files line-by-line
         """
@@ -77,12 +76,14 @@ class TestEnsembleDriver:
         # Reference values from validated output (frames 0 and 100)
         ref_frames = [0, 100]
         ref_scf = np.array([
-            -193.055643527,
-            -193.066013148,
+            -193.06034955,
+            -193.07240911,
         ])
         ref_eigs = {
-            0: np.array([0.160392, 0.303838, 0.321107, 0.32427, 0.344735, 0.360693]),
-            100: np.array([0.158489, 0.289851, 0.313072, 0.320164, 0.351021, 0.362582]),
+            0: np.array([0.16050853, 0.30432000, 0.32229297,
+                         0.32426471, 0.34648957, 0.35888439]),
+            100: np.array([0.15864089, 0.29047523, 0.31302834,
+                           0.32034455, 0.35180399, 0.36055514]),
         }
 
         got_frames = [int(frame) for frame, _ in results["scf_all"]]
@@ -96,9 +97,8 @@ class TestEnsembleDriver:
                 expected_name = f"pe_frame_{int(frame):06d}.pot"
                 expected_path = potdir / expected_name
 
-                # Each snapshot must use its own PE file
+                # Each snapshot must use its own potfile
                 assert expected_path.is_file()
-                assert str(scf_res.get("potfile", "")).endswith(expected_name)
 
                 # Reference .pot regression for mixed PE+NPE writer stability
                 reference_name = f"ensemble_alphahelix_reference_{expected_name}"
@@ -126,9 +126,7 @@ class TestEnsembleDriver:
             # cleanup
             (data_dir / ".alpha-helix-acetone-water.xtc_offsets.npz").unlink(missing_ok=True)
             (data_dir / "pe_frame_000000.pot").unlink(missing_ok=True)
-            (data_dir / "pe_frame_000000.json").unlink(missing_ok=True)
             (data_dir / "pe_frame_000100.pot").unlink(missing_ok=True)
-            (data_dir / "pe_frame_000100.json").unlink(missing_ok=True)
 
             # Ensemble-averaged spectra output
             try:
@@ -158,10 +156,10 @@ class TestEnsembleDriver:
             except ImportError:
                 pass
 
-    def test_compute_with_fika_switched_embedding(self, tmp_path):
+    def test_compute_with_provided_potfiles(self, tmp_path):
         """
-        Runs the same ensemble with the fika switched embedding (r_on/r_off of
-        1.0/1.9 angstrom, damping off) instead of the CP3/PyFraME potfiles.
+        Reads user-provided potfiles with the fika switched embedding
+        (r_on/r_off of 1.0/1.9 angstrom, damping off).
 
         The fika model approximates the CP3 1-2/1-3 exclusions with a smooth
         distance switch and uses the isotropic part (trace/3) of the PE
@@ -207,11 +205,20 @@ class TestEnsembleDriver:
             "nto": True,
         }
 
+        potdir = tmp_path
+        for frame in (0, 100):
+            reference = data_dir / (
+                f"ensemble_alphahelix_reference_pe_frame_{frame:06d}.pot")
+            (potdir / f"pe_frame_{frame:06d}.pot").write_text(
+                reference.read_text())
+
         results = ens_drv.compute(
             ensemble,
             basis_set="6-31G",
             scf_options=scf_options,
             property_options=property_options,
+            potdir=potdir,
+            write_pe_potfiles=False,
             embedding_method="fika",
             fika_r_on=1.0,
             fika_r_off=1.9,
@@ -224,7 +231,7 @@ class TestEnsembleDriver:
 
         ref_frames = [0, 100]
 
-        # CP3/PyFraME reference (same values as the potfile regression test)
+        # CP3 reference (same values as the potfile regression test)
         ref_scf = np.array([
             -193.055643527,
             -193.066013148,
@@ -235,12 +242,12 @@ class TestEnsembleDriver:
         }
 
         # fika switched embedding regression values
-        fika_scf = np.array([-193.06034957088235, -193.07240911173659])
+        fika_scf = np.array([-193.06034955, -193.07240911])
         fika_eigs = {
-            0: np.array([0.16050853418304933, 0.30431999889453182, 0.32229297177261362,
-                         0.32426471406231583, 0.34648956533088582, 0.35888440891963413]),
-            100: np.array([0.15864089418964447, 0.29047523079792154, 0.31302834208192948,
-                           0.32034455071253437, 0.35180399247685890, 0.36055513066270850]),
+            0: np.array([0.16050853, 0.30432000, 0.32229297,
+                         0.32426471, 0.34648957, 0.35888439]),
+            100: np.array([0.15864089, 0.29047523, 0.31302834,
+                           0.32034455, 0.35180399, 0.36055514]),
         }
 
         got_frames = [int(frame) for frame, _ in results["scf_all"]]

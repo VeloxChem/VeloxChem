@@ -1,16 +1,10 @@
 from pathlib import Path
 import numpy as np
 import pytest
-import sys
 
 from veloxchem.mpitask import MpiTask
 from veloxchem.trajectorydriver import TrajectoryDriver
 from veloxchem.veloxchemlib import mpi_master
-
-try:
-    import pyframe
-except ImportError:
-    pass
 
 
 @pytest.mark.solvers
@@ -66,8 +60,6 @@ class TestTrajectoryDriver:
                 np.abs(np.array(osc_strengths) -
                        np.array(ref_osc_strengths))) < 0.01
 
-    @pytest.mark.skipif('pyframe' not in sys.modules,
-                        reason='pyframe not available')
     def test_trajectory_bithio(self):
 
         here = Path(__file__).parent

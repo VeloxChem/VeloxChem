@@ -178,6 +178,7 @@ from .subcommunicators import SubCommunicators
 from .peforcefieldgenerator import PEForceFieldGenerator
 from .fikaforcefield import FikaForceFieldReader
 from .fikapdbreader import FikaPdbReader, FikaPdbResidue
+from .fikapotfilereader import FikaPotfileReader
 from .firstorderpropdriver import FirstOrderPropertyDriver
 from .firstorderprop import FirstOrderProperties
 from .excitedstatemomentdriver import ExcitedStateMomentDriver
