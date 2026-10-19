@@ -216,7 +216,7 @@ class RixsDriver(LinearSolver):
 
         :return:
             Dictionary containing the inelastic and elastic RIXS
-            cross-sections, incoming photon energies, energy losses,
+            cross sections, incoming photon energies, energy losses,
             emission energies, scattering amplitude tensors,
             core-excitation energies and oscillator strengths, the
             lifetime broadening in eV, and the response type.
@@ -555,11 +555,11 @@ class RixsDriver(LinearSolver):
                     self.scattering_amplitudes[start:end, w_ind] = amp_part
 
                 self.ostream.print_info(
-                    f'Computed RIXS cross-sections for {num_final_states} final states '
+                    f'Computed RIXS cross sections for {num_final_states} final states '
                     f'at photon energy: {omega*hartree_in_ev():.2f} eV.'
                 )
                 self.ostream.print_blank()
-                self._print_rixs_data(f'RIXS cross-sections at incident X-ray energy '
+                self._print_rixs_data(f'RIXS cross sections at incident X-ray energy '
                                       f'{omega*hartree_in_ev():.2f} eV, energy-loss mode',
                                       self.ene_losses[:,w_ind], self.cross_sections[:,w_ind], self.elastic_cross_sections[w_ind])
                 self.ostream.print_blank()
@@ -1144,9 +1144,9 @@ class RixsDriver(LinearSolver):
         :param ene_losses:
             The list of energy losses.
         :param cross_sections:
-            The list of cross-sections.
+            The list of cross sections.
         :param elastic_cross_section:
-            The elastic cross-section.
+            The elastic cross section.
         """
 
         spin_str = 'S'
@@ -1157,7 +1157,7 @@ class RixsDriver(LinearSolver):
         valstr = 'Ground State  {:>5s}: '.format(spin_str + str(0))
         valstr += '{:15.8f} a.u. '.format(0)
         valstr += '{:12.5f} eV'.format(0)
-        valstr += '    Cross-section   {:9.2e}'.format(elastic_cross_section)
+        valstr += '    Cross section   {:9.2e}'.format(elastic_cross_section)
         self.ostream.print_header(valstr.ljust(92))
 
         for s, e in enumerate(ene_losses):
@@ -1165,7 +1165,7 @@ class RixsDriver(LinearSolver):
             valstr += '{:15.8f} a.u. '.format(e)
             valstr += '{:12.5f} eV'.format(e * hartree_in_ev())
             f = cross_sections[s]
-            valstr += '    Cross-section   {:9.2e}'.format(f)
+            valstr += '    Cross section   {:9.2e}'.format(f)
             self.ostream.print_header(valstr.ljust(92))
         self.ostream.print_blank()
         self.ostream.flush()
