@@ -2776,10 +2776,12 @@ class ScfDriver:
         density_matrix = self._get_total_density_matrix(den_mat)
 
         if self._pe:
+            if isinstance(self._embedding_drv, FikaEmbeddingSCF):
+                return self._embedding_drv.compute_pe_contributions(
+                    density_matrix=density_matrix)
             from .embedding import PolarizableEmbeddingSCF
             assert_msg_critical(
-                isinstance(self._embedding_drv,
-                           (PolarizableEmbeddingSCF, FikaEmbeddingSCF)),
+                isinstance(self._embedding_drv, PolarizableEmbeddingSCF),
                 'ScfDriver: Inconsistent embedding driver for SCF')
             return self._embedding_drv.compute_pe_contributions(
                 density_matrix=density_matrix)

@@ -1,6 +1,6 @@
 from mpi4py import MPI
 from pathlib import Path
-import json
+import h5py
 import numpy as np
 import pytest
 
@@ -46,73 +46,6 @@ def fika_embedding(pdb_file, damping=None):
     }
 
 
-def pyframe_embedding(residues, molecule, directory):
-    """
-    The same embedding for PyFraME: Ahlstrom charges, polarizabilities (zero
-    on hydrogens) and exclusions within each water, without damping.
-    """
-
-    path = None
-    if MPI.COMM_WORLD.Get_rank() == mpi_master():
-        fragments = []
-        waters = [r for r in residues if r.name == 'HOH']
-        for w, water in enumerate(waters):
-            first = 3 * w + 1
-            atoms = []
-            for k, (element, charge, alpha) in enumerate([('O', -0.669, 9.718),
-                                                          ('H', 0.3345, 0.0),
-                                                          ('H', 0.3345, 0.0)]):
-                atoms.append({
-                    'index': first + k,
-                    'element': element,
-                    'coordinate': list(water.coordinates[k]),
-                    'multipoles': {
-                        'elements': [charge]
-                    },
-                    'exclusions': [first, first + 1, first + 2],
-                    'polarizabilities': {
-                        'elements':
-                            [0.0, 0.0, 0.0, 0.0, alpha, 0.0, 0.0, alpha, 0.0, alpha],
-                        'order': [1, 1]
-                    },
-                })
-            fragments.append({'index': w + 1, 'name': 'HOH', 'atoms': atoms})
-        nuclei = [{
-            'index': i + 1,
-            'element': label,
-            'charge': float(charge),
-            'coordinate': list(xyz)
-        } for i, (label, charge, xyz) in enumerate(
-            zip(molecule.get_labels(), molecule.get_element_ids(),
-                molecule.get_coordinates_in_bohr()))]
-        path = Path(directory) / 'fika_pe.json'
-        path.write_text(
-            json.dumps({
-                'quantum_subsystems': [{
-                    'nuclei': nuclei
-                }],
-                'classical_subsystems': [{
-                    'classical_fragments': fragments
-                }],
-            }))
-        path = str(path)
-    path = MPI.COMM_WORLD.bcast(path, root=mpi_master())
-
-    return {
-        'settings': {
-            'embedding_method': 'PE',
-            'induced_dipoles': {
-                'solver': 'jidiis',
-                'threshold': 1e-10,
-                'max_iterations': 200,
-            },
-        },
-        'inputs': {
-            'json_file': path,
-        },
-    }
-
-
 def run_scf(molecule, basis, embedding):
 
     scf_drv = ScfRestrictedDriver()
@@ -143,9 +76,7 @@ def run_lrs(molecule, basis, embedding, scf_results):
 @pytest.mark.solvers
 class TestFikaScf:
 
-    def test_scf_and_response_against_pyframe(self, tmp_path):
-
-        pytest.importorskip('pyframe')
+    def test_scf_and_response(self, tmp_path):
 
         pdb_file = write_droplet(tmp_path)
         reader = FikaPdbReader()
@@ -153,19 +84,21 @@ class TestFikaScf:
         molecule = reader.get_solute(residues)
         basis = MolecularBasis.read(molecule, 'def2-svp', ostream=None)
 
-        fika = fika_embedding(pdb_file)
-        pe = pyframe_embedding(residues, molecule, tmp_path)
+        ref_file = Path(__file__).parent / 'data' / 'fika_pe_reference.h5'
+        with h5py.File(ref_file, 'r') as hf:
+            ref_f_emb = np.array(hf.get('droplet_f_emb'))
+            ref_response = np.array(hf.get('droplet_response'))
 
+        fika = fika_embedding(pdb_file)
         fika_drv, fika_results = run_scf(molecule, basis, fika)
-        _, pe_results = run_scf(molecule, basis, pe)
 
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
             assert fika_results['scf_energy'] == pytest.approx(
-                pe_results['scf_energy'], abs=1.0e-8)
-            assert fika_results['E_emb'] == pytest.approx(pe_results['E_emb'],
-                                                          abs=1.0e-8)
+                -190.61770854930165, abs=1.0e-8)
+            assert fika_results['E_emb'] == pytest.approx(
+                -0.0032606747801258718, abs=1.0e-8)
             assert np.max(np.abs(fika_results['F_emb'] -
-                                 pe_results['F_emb'])) < 1.0e-7
+                                 ref_f_emb)) < 1.0e-7
 
             # Induced dipoles of the final density, one per oxygen.
             positions, _, _ = fika_polarizable_sites(
@@ -177,14 +110,12 @@ class TestFikaScf:
             assert max(iterations[len(iterations) // 2:]) < iterations[0]
 
         fika_prop = run_lrs(molecule, basis, fika, fika_results)
-        pe_prop = run_lrs(molecule, basis, pe, pe_results)
 
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
-            assert np.max(np.abs(fika_prop - pe_prop)) < 1.0e-6
+            assert np.max(np.abs(fika_prop - ref_response)) < 1.0e-6
 
-    def test_excitations_and_complex_response_against_pyframe(self, tmp_path):
+    def test_excitations_and_complex_response(self, tmp_path):
 
-        pytest.importorskip('pyframe')
         from veloxchem.lreigensolver import LinearResponseEigenSolver
         from veloxchem.tdaeigensolver import TdaEigenSolver
         from veloxchem import ComplexResponse
@@ -195,58 +126,49 @@ class TestFikaScf:
         molecule = reader.get_solute(residues)
         basis = MolecularBasis.read(molecule, 'def2-svp', ostream=None)
 
-        embeddings = {
-            'fika': fika_embedding(pdb_file),
-            'pe': pyframe_embedding(residues, molecule, tmp_path),
-        }
-        scf_results = {
-            name: run_scf(molecule, basis, embedding)[1]
-            for name, embedding in embeddings.items()
-        }
+        ref_file = Path(__file__).parent / 'data' / 'fika_pe_reference.h5'
+        with h5py.File(ref_file, 'r') as hf:
+            ref_lr_eigenvalues = np.array(hf.get('droplet_lr_eigenvalues'))
+            ref_tda_eigenvalues = np.array(hf.get('droplet_tda_eigenvalues'))
+            ref_complex_response = np.array(
+                hf.get('droplet_complex_response'))
 
-        def solve(solver, name, **settings):
+        embedding = fika_embedding(pdb_file)
+        scf_results = run_scf(molecule, basis, embedding)[1]
+
+        def solve(solver, **settings):
             solver.ostream.mute()
             solver.conv_thresh = 1.0e-6
-            solver.embedding = embeddings[name]
+            solver.embedding = embedding
             for key, value in settings.items():
                 setattr(solver, key, value)
-            return solver.compute(molecule, basis, scf_results[name])
+            return solver.compute(molecule, basis, scf_results)
 
         rank_is_master = MPI.COMM_WORLD.Get_rank() == mpi_master()
 
-        for solver_class in [LinearResponseEigenSolver, TdaEigenSolver]:
-            results = {
-                name: solve(solver_class(), name, nstates=4)
-                for name in embeddings
-            }
+        for solver_class, ref_eigenvalues in [
+            (LinearResponseEigenSolver, ref_lr_eigenvalues),
+            (TdaEigenSolver, ref_tda_eigenvalues),
+        ]:
+            results = solve(solver_class(), nstates=4)
             if rank_is_master:
-                assert np.max(
-                    np.abs(results['fika']['eigenvalues'] -
-                           results['pe']['eigenvalues'])) < 1.0e-8
+                assert np.max(np.abs(results['eigenvalues'] -
+                                     ref_eigenvalues)) < 1.0e-8
 
         frequencies = [0.0, 0.1, 0.2]
-        results = {
-            name: solve(ComplexResponse(),
-                        name,
+        results = solve(ComplexResponse(),
                         frequencies=frequencies,
                         damping=0.004)
-            for name in embeddings
-        }
         if rank_is_master:
-            values = {
-                name: np.array([
-                    results[name]['response_functions'][(a, a, w)]
-                    for w in frequencies
-                    for a in 'xyz'
-                ])
-                for name in embeddings
-            }
-            assert np.max(np.abs(values['fika'] - values['pe'])) < (
-                1.0e-7 * np.max(np.abs(values['pe'])))
+            values = np.array([
+                results['response_functions'][(a, a, w)]
+                for w in frequencies
+                for a in 'xyz'
+            ])
+            assert np.max(np.abs(values - ref_complex_response)) < (
+                1.0e-7 * np.max(np.abs(ref_complex_response)))
 
     def test_response_with_subcommunicators(self, tmp_path):
-
-        pytest.importorskip('pyframe')
 
         # With subcommunicators each one embeds its own trial densities.
         from veloxchem.lreigensolver import LinearResponseEigenSolver
@@ -275,8 +197,6 @@ class TestFikaScf:
             assert np.max(np.abs(distributed - reference)) < 1.0e-10
 
     def test_unrestricted(self, tmp_path):
-
-        pytest.importorskip('pyframe')
 
         from veloxchem.molecule import Molecule
         from veloxchem.scfunrestdriver import ScfUnrestrictedDriver
@@ -369,8 +289,6 @@ class TestFikaScf:
 
     def test_damping_and_objects(self, tmp_path):
 
-        pytest.importorskip('pyframe')
-
         pdb_file = write_droplet(tmp_path)
         reader = FikaPdbReader()
         residues = reader.read(pdb_file)
@@ -406,8 +324,6 @@ class TestFikaScf:
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason='input errors abort MPI runs')
     def test_errors(self, tmp_path):
-
-        pytest.importorskip('pyframe')
 
         pdb_file = write_droplet(tmp_path)
         reader = FikaPdbReader()
@@ -457,8 +373,6 @@ class TestFikaScf:
 
     def test_response_on_fika_reference(self, tmp_path):
 
-        pytest.importorskip('pyframe')
-
         pdb_file = write_droplet(tmp_path)
         reader = FikaPdbReader()
         molecule = reader.get_solute(reader.read(pdb_file))
@@ -484,8 +398,6 @@ class TestFikaScf:
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason='skip pytest.raises for multiple MPI processes')
     def test_response_on_fika_reference_errors(self, tmp_path):
-
-        pytest.importorskip('pyframe')
 
         pdb_file = write_droplet(tmp_path)
         reader = FikaPdbReader()

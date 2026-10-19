@@ -1,4 +1,6 @@
 from mpi4py import MPI
+from pathlib import Path
+import h5py
 import numpy as np
 import pytest
 
@@ -84,72 +86,6 @@ def get_classical_system(waters):
                        {0: AHLSTROM_ALPHA}))
     system.add_residues('HOH', 'ahlstrom', [8, 1, 1], waters, True)
     return system
-
-
-def get_pyframe_embedding(molecule, waters, tmp_path):
-    """
-    PyFraME input of the same system: point charges and isotropic
-    polarizabilities (zero on hydrogens, which PyFraME needs) without
-    damping, each water excluded from its own sites.
-    """
-
-    import json
-
-    fragments = []
-    for w, water in enumerate(waters):
-        first = 3 * w + 1
-        atoms = []
-        for k, element in enumerate(['O', 'H', 'H']):
-            alpha = AHLSTROM_ALPHA if element == 'O' else 0.0
-            atoms.append({
-                'index': first + k,
-                'element': element,
-                'coordinate': list(water[k]),
-                'multipoles': {
-                    'elements': [AHLSTROM_CHARGES[k]]
-                },
-                'exclusions': [first, first + 1, first + 2],
-                'polarizabilities': {
-                    'elements':
-                        [0.0, 0.0, 0.0, 0.0, alpha, 0.0, 0.0, alpha, 0.0, alpha],
-                    'order': [1, 1]
-                },
-            })
-        fragments.append({'index': w + 1, 'name': 'HOH', 'atoms': atoms})
-
-    nuclei = [{
-        'index': i + 1,
-        'element': label,
-        'charge': float(charge),
-        'coordinate': list(xyz)
-    } for i, (label, charge, xyz) in enumerate(
-        zip(molecule.get_labels(), molecule.get_element_ids(),
-            molecule.get_coordinates_in_bohr()))]
-
-    json_file = tmp_path / 'fika_pe.json'
-    json_file.write_text(
-        json.dumps({
-            'quantum_subsystems': [{
-                'nuclei': nuclei
-            }],
-            'classical_subsystems': [{
-                'classical_fragments': fragments
-            }],
-        }))
-
-    return {
-        'settings': {
-            'embedding_method': 'PE',
-            'induced_dipoles': {
-                'solver': 'jidiis',
-                'threshold': 1e-10,
-                'max_iterations': 200,
-            },
-        },
-        'inputs': {
-            'json_file': str(json_file),
-        },
-    }
 
 
 def get_hf_density(molecule, basis):
@@ -690,19 +626,18 @@ class TestFikaEmbedding:
         return options
 
     @pytest.mark.solvers
-    def test_ground_state_against_pyframe(self, tmp_path):
-
-        pytest.importorskip('pyframe')
-        from veloxchem.embedding import PolarizableEmbeddingSCF
+    def test_ground_state(self):
 
         molecule = get_acrolein()
         basis = MolecularBasis.read(molecule, 'def2-svp', ostream=None)
         density = get_hf_density(molecule, basis)
         waters = get_water_shell(molecule, 40)
 
-        pe = PolarizableEmbeddingSCF(
-            molecule, basis, get_pyframe_embedding(molecule, waters, tmp_path))
-        e_emb, v_emb = pe.compute_pe_contributions(density)
+        ref_file = Path(__file__).parent / 'data' / 'fika_pe_reference.h5'
+        with h5py.File(ref_file, 'r') as hf:
+            ref_mu = np.array(hf.get('acrolein_mu'))
+            ref_f_elec = np.array(hf.get('acrolein_f_elec'))
+            ref_v_emb = np.array(hf.get('acrolein_v_emb'))
 
         result = FikaQmmmEmbeddingDriver(molecule, basis,
                                          get_classical_system(waters), None,
@@ -710,40 +645,35 @@ class TestFikaEmbedding:
 
         assert result.induced.converged
         assert result.electron_permanent_energy == pytest.approx(
-            np.sum(pe._f_elec_es * density), abs=1.0e-10)
-        assert result.nuclear_permanent_energy == pytest.approx(pe._e_nuc_es,
-                                                                abs=1.0e-10)
-        assert result.polarization_energy == pytest.approx(pe._e_induction,
-                                                           abs=1.0e-9)
-        assert result.energy() == pytest.approx(e_emb, abs=1.0e-9)
+            -0.03903501058147324, abs=1.0e-10)
+        assert result.nuclear_permanent_energy == pytest.approx(
+            0.03590023271653367, abs=1.0e-10)
+        assert result.polarization_energy == pytest.approx(
+            -0.006375170012274301, abs=1.0e-9)
+        assert result.energy() == pytest.approx(-0.009509947877213869,
+                                                abs=1.0e-9)
 
-        # PyFraME stores the induced dipoles as -mu.
-        mu = -np.asarray(
-            pe.classical_subsystem.induced_dipoles.induced_dipoles).reshape(
-                -1, 3)[0::3]
-        assert np.max(np.abs(result.induced.dipoles - mu)) < 1.0e-8
-        assert np.max(np.abs(result.permanent_fock - pe._f_elec_es)) < 1.0e-12
-        assert np.max(np.abs(result.fock() - v_emb)) < 1.0e-9
+        # The reference dipoles are already converted from PyFraME's -mu.
+        assert np.max(np.abs(result.induced.dipoles - ref_mu)) < 1.0e-8
+        assert np.max(np.abs(result.permanent_fock - ref_f_elec)) < 1.0e-12
+        assert np.max(np.abs(result.fock() - ref_v_emb)) < 1.0e-9
 
     @pytest.mark.solvers
-    def test_response_against_pyframe(self, tmp_path):
-
-        pytest.importorskip('pyframe')
-        from veloxchem.embedding import PolarizableEmbeddingLRS
+    def test_response(self):
 
         molecule = get_acrolein()
         basis = MolecularBasis.read(molecule, 'def2-svp', ostream=None)
         waters = get_water_shell(molecule, 40)
+
+        ref_file = Path(__file__).parent / 'data' / 'fika_pe_reference.h5'
+        with h5py.File(ref_file, 'r') as hf:
+            ref = np.array(hf.get('acrolein_response'))
 
         # A non-symmetric perturbed density: only its symmetric part acts.
         rng = np.random.default_rng(4)
         n = basis.get_dimensions_of_basis()
         perturbed = 1.0e-2 * rng.normal(size=(n, n))
         perturbed += 0.3 * perturbed.T
-
-        lrs = PolarizableEmbeddingLRS(
-            molecule, basis, get_pyframe_embedding(molecule, waters, tmp_path))
-        ref = lrs.compute_pe_contributions(0.5 * (perturbed + perturbed.T))
 
         result = FikaQmmmEmbeddingDriver(
             molecule, basis, get_classical_system(waters), None,
