@@ -160,6 +160,18 @@ class TestRIXS:
 
         self.run_rixs('hf', '6-31G*', ref_xsection, 1, 57, nvir=13, nvalence=4, tda=False, cutoff_ene=31.5 / hartree_in_ev())
 
+    def test_b3lyp_svp_rpa_2s_mo(self):
+    
+            ref_xsection = np.array([
+                5419.408540219, 29.654485681, 2022.737567512, 50.138868853,
+                3601.703649966, 15.488104351, 0.513719573, 4.381978513, 1.945222941,
+                3.365520699, 134.695043955, 0.540695855, 2.625666460, 0.008474128,
+                7.481248883, 4.981706022, 0.690424900, 0.003741214, 0.428471086,
+                0.003525553
+            ])
+    
+            self.run_rixs('b3lyp', 'def2-svp', ref_xsection, 1, 20, ncorestates=4, tda=False, compute_in_mo=True)
+
     def test_b3lyp_svp_rpa_rsa_mo(self):
     
             ref_xsection = np.array([

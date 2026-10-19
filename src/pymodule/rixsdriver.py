@@ -1118,6 +1118,8 @@ class RixsDriver(LinearSolver):
                 'Running RIXS calculation in the two-shot approach')
             self.ostream.print_blank()
             self.ostream.print_reference(
+                'J. Chem. Theory Comput. (2021) 17 (5): 3031-3038, DOI: 10.1021/acs.jctc.1c00144')
+            self.ostream.print_reference(
                 'J. Phys. Chem. A, 2025, 129, 8783-8797, DOI: 10.1021/acs.jpca.5c04528')
             self.ostream.print_blank()
         else:
@@ -1125,9 +1127,9 @@ class RixsDriver(LinearSolver):
                 'Running RIXS calculation in the restricted-subspace approach')
             self.ostream.print_blank()
             self.ostream.print_reference(
-                'J. Phys. Chem. A, 2025, 129, 8783-8797, DOI: 10.1021/acs.jpca.5c04528')
-            self.ostream.print_reference(
                 'Phys. Chem. Chem. Phys., 2021, 23, 1835-1848, DOI: 10.1039/D0CP04726K')
+            self.ostream.print_reference(
+                'J. Phys. Chem. A, 2025, 129, 8783-8797, DOI: 10.1021/acs.jpca.5c04528')
             self.ostream.print_blank()
 
         self.ostream.flush()
