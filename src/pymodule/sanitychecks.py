@@ -155,9 +155,9 @@ def scf_results_sanity_check(obj, scf_results):
         if scf_results.get('eri_thresh', None) is not None:
             updated_scf_info['eri_thresh'] = scf_results['eri_thresh']
 
-        if scf_results.get('ri_coulomb', None) is not None:
-            # TODO: consider storing ri_aux_basis_obj in scf_results
-            updated_scf_info['ri_coulomb'] = scf_results['ri_coulomb']
+        updated_scf_info['ri_coulomb'] = scf_results.get('ri_coulomb', False)
+        updated_scf_info['ri_jk'] = scf_results.get('ri_jk', False)
+        if 'ri_auxiliary_basis' in scf_results:
             updated_scf_info['ri_auxiliary_basis'] = scf_results[
                 'ri_auxiliary_basis']
 
@@ -410,10 +410,6 @@ def ri_sanity_check(obj):
 
     if not (ri_coulomb or ri_jk):
         return
-
-    err_msg = f'{type(obj).__name__}: please use either ri_coulomb or ri_jk, '
-    err_msg += 'not both.'
-    assert_msg_critical(not (ri_coulomb and ri_jk), err_msg)
 
     if (ri_coulomb or ri_jk) and hasattr(obj, 'acc_type'):
         # RI uses plain DIIS

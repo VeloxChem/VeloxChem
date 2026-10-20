@@ -20,6 +20,8 @@ class TestCphfSolver:
                        label=None,
                        use_subcomms=False):
         scf_drv = ScfRestrictedDriver()
+        scf_drv.ri_coulomb = False
+        scf_drv.ri_jk = False
         scf_drv.xcfun = xcfun
 
         scf_drv.ostream.mute()
@@ -115,6 +117,8 @@ class TestCphfSolver:
         basis = MolecularBasis.read(molecule, basis_set_label)
 
         scf_drv = ScfRestrictedDriver()
+        scf_drv.ri_coulomb = False
+        scf_drv.ri_jk = False
         scf_drv.ostream.mute()
         scf_results = scf_drv.compute(molecule, basis)
 

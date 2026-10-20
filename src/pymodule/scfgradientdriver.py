@@ -156,6 +156,11 @@ class ScfGradientDriver(GradientDriver):
         if not self.scf_driver.ri_jk:
             return
 
+        xcfun = self.scf_driver.xcfun
+        if (xcfun is not None and not isinstance(xcfun, str) and
+                not xcfun.is_hybrid()):
+            return
+
         advice = ('Set ri_mode to in_memory, raise ri_memory_budget, or use a ' +
                   'smaller auxiliary basis')
 
@@ -917,7 +922,7 @@ class ScfGradientDriver(GradientDriver):
 
         thresh_int = int(-math.log10(self.eri_thresh))
 
-        if self.scf_driver.ri_coulomb:
+        if self.scf_driver.ri_coulomb and fock_type == 'j':
 
             assert_msg_critical(
                 basis.get_label().lower().startswith('def2-'),
@@ -976,7 +981,7 @@ class ScfGradientDriver(GradientDriver):
 
             grad_timing['Fock_grad'] += time.time() - t0
 
-        elif self.scf_driver.ri_jk:
+        elif self.scf_driver.ri_jk and fock_type != 'j':
 
             self._announce_once(
                 'Using the SIMD resolution of the identity (RI-JK) gradient.')
@@ -1220,7 +1225,7 @@ class ScfGradientDriver(GradientDriver):
 
         thresh_int = int(-math.log10(self.eri_thresh))
 
-        if self.scf_driver.ri_jk:
+        if self.scf_driver.ri_jk and fock_type != 'j':
 
             self._announce_once(
                 'Using the SIMD resolution of the identity (RI-JK) gradient.')
@@ -1283,7 +1288,7 @@ class ScfGradientDriver(GradientDriver):
 
             grad_timing['Fock_grad'] += time.time() - t0
 
-        elif self.scf_driver.ri_coulomb:
+        elif self.scf_driver.ri_coulomb and fock_type == 'j':
 
             assert_msg_critical(
                 basis.get_label().lower().startswith('def2-'),

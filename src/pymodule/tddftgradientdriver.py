@@ -282,6 +282,8 @@ class TddftGradientDriver(GradientDriver):
         # compute orbital response
         orbrsp_drv = TddftOrbitalResponse(self.comm, self.ostream)
         orbrsp_drv.update_settings(self.orbrsp_dict, self.method_dict)
+        orbrsp_drv.ri_coulomb = self._scf_drv.ri_coulomb
+        orbrsp_drv.ri_jk = self._scf_drv.ri_jk
 
         # TODO: also check other attributes
         orbrsp_keywords = [
@@ -373,6 +375,8 @@ class TddftGradientDriver(GradientDriver):
         # compute orbital response
         orbrsp_drv = TddftOrbitalResponse(self.comm, self.ostream)
         orbrsp_drv.update_settings(self.orbrsp_dict, self.method_dict)
+        orbrsp_drv.ri_coulomb = self._scf_drv.ri_coulomb
+        orbrsp_drv.ri_jk = self._scf_drv.ri_jk
 
         # TODO: also check other attributes
         orbrsp_keywords = [
@@ -618,7 +622,7 @@ class TddftGradientDriver(GradientDriver):
         den_mat_for_fock_gs = make_matrix(basis, mat_t.symmetric)
         den_mat_for_fock_gs.set_values(gs_dm)
 
-        if self._scf_drv.ri_coulomb:
+        if self._scf_drv.ri_coulomb and fock_type == 'j':
 
             assert_msg_critical(
                 basis.get_label().lower().startswith('def2-'),
@@ -679,7 +683,7 @@ class TddftGradientDriver(GradientDriver):
                     (grad_plus.to_numpy() - grad_minus.to_numpy()) / 4.0 +
                     grad_xmy.to_numpy())
 
-        elif self._scf_drv.ri_jk:
+        elif self._scf_drv.ri_jk and fock_type != 'j':
 
             assert_msg_critical(
                 fock_type != 'j',

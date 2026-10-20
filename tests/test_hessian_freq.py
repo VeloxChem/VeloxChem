@@ -33,6 +33,8 @@ class TestHessianFrequencies:
         bas = MolecularBasis.read(mol, 'sto-3g')
 
         scf_drv = ScfRestrictedDriver()
+        scf_drv.ri_coulomb = False
+        scf_drv.ri_jk = False
         scf_drv.ostream.mute()
         scf_drv.dispersion = dispersion
         scf_drv.compute(mol, bas)
@@ -74,6 +76,8 @@ class TestHessianFrequencies:
         bas = MolecularBasis.read(mol, 'def2-svp')
 
         scf_drv = ScfRestrictedDriver()
+        scf_drv.ri_coulomb = False
+        scf_drv.ri_jk = False
         scf_drv.ostream.mute()
         scf_drv.compute(mol, bas)
 
@@ -105,6 +109,8 @@ class TestHessianFrequencies:
         bas = MolecularBasis.read(mol, 'def2-svp')
 
         scf_drv = ScfRestrictedDriver()
+        scf_drv.ri_coulomb = False
+        scf_drv.ri_jk = False
         scf_drv.ostream.mute()
         scf_drv.compute(mol, bas)
 

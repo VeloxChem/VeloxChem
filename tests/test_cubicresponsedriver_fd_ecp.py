@@ -38,6 +38,8 @@ class TestCrfFDECP:
         method_settings = {'xcfun': 'hf'}
 
         scfdrv = ScfRestrictedDriver(comm, ostream)
+        scfdrv.ri_coulomb = False
+        scfdrv.ri_jk = False
         scfdrv.update_settings(scf_settings, method_settings)
         scf_result = scfdrv.compute(molecule, basis)
 
@@ -137,6 +139,8 @@ class TestCrfFDECP:
         method_dict_minus['electric_field'] = efield_minus
 
         scf_drv_plus = ScfRestrictedDriver(comm, ostream)
+        scf_drv_plus.ri_coulomb = False
+        scf_drv_plus.ri_jk = False
         scf_drv_plus.update_settings(scf_settings, method_dict_plus)
         scf_result_plus = scf_drv_plus.compute(molecule, basis)
 
@@ -145,6 +149,8 @@ class TestCrfFDECP:
         quad_result_plus = qrf_plus.compute(molecule, basis, scf_result_plus)
 
         scf_drv_minus = ScfRestrictedDriver(comm, ostream)
+        scf_drv_minus.ri_coulomb = False
+        scf_drv_minus.ri_jk = False
         scf_drv_minus.update_settings(scf_settings, method_dict_minus)
         scf_result_minus = scf_drv_minus.compute(molecule, basis)
 

@@ -24,6 +24,8 @@ class TestScfHessianDriver:
         task = MpiTask([inpfile, None])
 
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
+        scf_drv.ri_coulomb = False
+        scf_drv.ri_jk = False
         scf_drv.acc_type = 'diis'
         scf_drv.compute(task.molecule, task.ao_basis)
 
@@ -77,6 +79,8 @@ class TestScfHessianDriver:
         filename = task.mpi_comm.bcast(filename, root=mpi_master())
 
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
+        scf_drv.ri_coulomb = False
+        scf_drv.ri_jk = False
         scf_drv.acc_type = 'l2_diis'
         scf_drv.filename = filename
         scf_drv.compute(task.molecule, task.ao_basis)
@@ -115,6 +119,8 @@ class TestScfHessianDriver:
         filename = task.mpi_comm.bcast(filename, root=mpi_master())
 
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
+        scf_drv.ri_coulomb = False
+        scf_drv.ri_jk = False
         scf_drv.acc_type = 'l2_diis'
         scf_drv.filename = filename
         scf_drv.compute(task.molecule, task.ao_basis)
@@ -161,6 +167,8 @@ class TestScfHessianDriver:
 
         task = MpiTask([inpfile, None])
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
+        scf_drv.ri_coulomb = False
+        scf_drv.ri_jk = False
 
         scf_drv.compute(task.molecule, task.ao_basis)
 
@@ -202,6 +210,8 @@ class TestScfHessianDriver:
         method_settings = {'xcfun': 'pbe', 'grid_level': 7}
         scf_settings = {}
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
+        scf_drv.ri_coulomb = False
+        scf_drv.ri_jk = False
         scf_drv.update_settings(scf_settings, method_settings)
         scf_drv.compute(task.molecule, task.ao_basis)
 
@@ -243,6 +253,8 @@ class TestScfHessianDriver:
         method_settings = {'xcfun': 'cam-b3lyp', 'grid_level': 7}
         scf_settings = {}
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
+        scf_drv.ri_coulomb = False
+        scf_drv.ri_jk = False
         scf_drv.update_settings(scf_settings, method_settings)
         scf_drv.compute(task.molecule, task.ao_basis)
 
@@ -287,6 +299,8 @@ class TestScfHessianDriver:
         bas = MolecularBasis.read(mol, 'def2-svp', ostream=None)
 
         scf_ref = ScfRestrictedDriver()
+        scf_ref.ri_coulomb = False
+        scf_ref.ri_jk = False
         scf_ref.ostream.mute()
         scf_ref.xcfun = 'hf'
         scf_ref.compute(mol, bas)
@@ -296,6 +310,8 @@ class TestScfHessianDriver:
         hess_ref.compute(mol, bas)
 
         scf_rijk = ScfRestrictedDriver()
+        scf_rijk.ri_coulomb = False
+        scf_rijk.ri_jk = False
         scf_rijk.ostream.mute()
         scf_rijk.xcfun = 'hf'
         scf_rijk.ri_jk = True

@@ -15,8 +15,12 @@ class TestScfDriverWithRIJK:
 
         if scf_flag == 'restricted':
             scf_drv = ScfRestrictedDriver()
+            scf_drv.ri_coulomb = False
+            scf_drv.ri_jk = False
         elif scf_flag == 'unrestricted':
             scf_drv = ScfUnrestrictedDriver()
+            scf_drv.ri_coulomb = False
+            scf_drv.ri_jk = False
 
         scf_drv.ostream.mute()
         scf_drv.xcfun = xcfun_label
@@ -34,8 +38,12 @@ class TestScfDriverWithRIJK:
 
         if scf_flag == 'restricted':
             scf_drv = ScfRestrictedDriver()
+            scf_drv.ri_coulomb = False
+            scf_drv.ri_jk = False
         elif scf_flag == 'unrestricted':
             scf_drv = ScfUnrestrictedDriver()
+            scf_drv.ri_coulomb = False
+            scf_drv.ri_jk = False
         else:
             raise ValueError(f'unknown scf_flag: {scf_flag}')
 

@@ -30,6 +30,8 @@ class TestScfSetupHeader:
     def run_scf(self, xcfun_label, molecule, basis, grid_level=None):
 
         scf_drv = ScfRestrictedDriver()
+        scf_drv.ri_coulomb = False
+        scf_drv.ri_jk = False
         scf_drv.ostream.mute()
         if xcfun_label is not None:
             scf_drv.xcfun = xcfun_label
@@ -174,6 +176,8 @@ class TestScfSetupHeader:
         basis = MolecularBasis.read(molecule, 'sto-3g')
 
         scf_drv = ScfRestrictedDriver()
+        scf_drv.ri_coulomb = False
+        scf_drv.ri_jk = False
         scf_drv.ostream.mute()
         scf_drv.xcfun = 'b3lyp'
         scf_drv.grid_level = 5

@@ -37,6 +37,8 @@ class Test3PA:
         basis = MolecularBasis.read(molecule, basis_set_label, ostream=None)
 
         scf_drv = ScfRestrictedDriver()
+        scf_drv.ri_coulomb = False
+        scf_drv.ri_jk = False
         scf_drv.ostream.mute()
         scf_drv.conv_thresh = 1.0e-8
         scf_drv.xcfun = xcfun_label

@@ -40,6 +40,8 @@ class TestCrfFD:
         method_settings = {'xcfun': xcfun_label}
 
         scfdrv = ScfRestrictedDriver(comm, ostream)
+        scfdrv.ri_coulomb = False
+        scfdrv.ri_jk = False
         scfdrv.update_settings(scf_settings, method_settings)
         scf_result = scfdrv.compute(molecule, basis)
 
@@ -172,6 +174,8 @@ class TestCrfFD:
         method_dict_minus['electric_field'] = efield_minus
 
         scf_drv_plus = ScfRestrictedDriver(comm, ostream)
+        scf_drv_plus.ri_coulomb = False
+        scf_drv_plus.ri_jk = False
         scf_drv_plus.update_settings(scf_settings, method_dict_plus)
         if point_charges is not None:
             scf_drv_plus.point_charges = point_charges
@@ -182,6 +186,8 @@ class TestCrfFD:
         quad_result_plus = qrf_plus.compute(molecule, basis, scf_result_plus)
 
         scf_drv_minus = ScfRestrictedDriver(comm, ostream)
+        scf_drv_minus.ri_coulomb = False
+        scf_drv_minus.ri_jk = False
         scf_drv_minus.update_settings(scf_settings, method_dict_minus)
         if point_charges is not None:
             scf_drv_minus.point_charges = point_charges

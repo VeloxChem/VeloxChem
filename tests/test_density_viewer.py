@@ -20,6 +20,8 @@ class TestDensityViewer:
 
         task = MpiTask([inpfile, None])
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
+        scf_drv.ri_coulomb = False
+        scf_drv.ri_jk = False
 
         scf_results = scf_drv.compute(task.molecule, task.ao_basis)
 
@@ -54,6 +56,8 @@ class TestDensityViewer:
         bas = MolecularBasis.read(mol, 'aug-cc-pvdz', ostream=None)
 
         scf_drv = ScfRestrictedDriver()
+        scf_drv.ri_coulomb = False
+        scf_drv.ri_jk = False
         scf_drv.ostream.mute()
         scf_results = scf_drv.compute(mol, bas)
 

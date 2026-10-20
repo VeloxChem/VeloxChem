@@ -46,6 +46,8 @@ class TestExcitedStateAbsorption:
     def _get_esa_transition_dipoles(self, mol, bas, nstates, esafrom=None):
 
         scf_drv = ScfRestrictedDriver()
+        scf_drv.ri_coulomb = False
+        scf_drv.ri_jk = False
         scf_drv.ostream.mute()
         scf_results = scf_drv.compute(mol, bas)
 
@@ -81,6 +83,8 @@ class TestExcitedStateAbsorption:
     def _get_unrest_esa_results(self, mol, bas, nstates, esafrom=None):
 
         scf_drv = ScfUnrestrictedDriver()
+        scf_drv.ri_coulomb = False
+        scf_drv.ri_jk = False
         scf_drv.ostream.mute()
         scf_results = scf_drv.compute(mol, bas)
 
@@ -112,6 +116,8 @@ class TestExcitedStateAbsorption:
         mol, bas = self._get_water_and_basis()
 
         scf_drv = ScfRestrictedDriver()
+        scf_drv.ri_coulomb = False
+        scf_drv.ri_jk = False
         scf_drv.ostream.mute()
         scf_results = scf_drv.compute(mol, bas)
 

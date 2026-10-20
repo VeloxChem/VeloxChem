@@ -16,6 +16,8 @@ class TestGradCpcm:
         basis = MolecularBasis.read(molecule, basis_label)
 
         scf_drv = ScfRestrictedDriver()
+        scf_drv.ri_coulomb = False
+        scf_drv.ri_jk = False
         scf_drv.xcfun = xcfun_label
 
         scf_drv.solvation_model = 'cpcm'
@@ -74,6 +76,8 @@ class TestGradCpcm:
         basis = MolecularBasis.read(molecule, basis_label)
 
         scf_drv = ScfRestrictedDriver()
+        scf_drv.ri_coulomb = False
+        scf_drv.ri_jk = False
         scf_drv.solvation_model = 'cpcm'
         scf_drv.ostream.mute()
         scf_results = scf_drv.compute(molecule, basis)

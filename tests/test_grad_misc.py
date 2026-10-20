@@ -66,6 +66,8 @@ class TestScfGradientDriverMiscellaneous:
     def run_restricted_scf(molecule, basis, xcfun='hf'):
 
         scf_drv = ScfRestrictedDriver()
+        scf_drv.ri_coulomb = False
+        scf_drv.ri_jk = False
         scf_drv.ostream.mute()
         scf_drv.xcfun = xcfun
         scf_results = scf_drv.compute(molecule, basis)
@@ -75,6 +77,8 @@ class TestScfGradientDriverMiscellaneous:
     def run_unrestricted_scf(molecule, basis, xcfun='hf', filename=None):
 
         scf_drv = ScfUnrestrictedDriver()
+        scf_drv.ri_coulomb = False
+        scf_drv.ri_jk = False
         scf_drv.ostream.mute()
         scf_drv.xcfun = xcfun
         scf_drv.filename = filename
@@ -121,6 +125,8 @@ class TestScfGradientDriverMiscellaneous:
         molecule, basis = self.get_h2_molecule_and_basis()
 
         scf_drv = ScfRestrictedDriver()
+        scf_drv.ri_coulomb = False
+        scf_drv.ri_jk = False
         scf_drv.ostream.mute()
         scf_drv.xcfun = 'hf'
 
@@ -176,6 +182,8 @@ class TestScfGradientDriverMiscellaneous:
         molecule, basis = self.get_h2o_molecule_and_basis()
 
         scf_drv = ScfRestrictedDriver()
+        scf_drv.ri_coulomb = False
+        scf_drv.ri_jk = False
         scf_drv.ostream.mute()
         scf_drv.xcfun = 'hf'
         scf_drv.ri_jk = True
@@ -191,6 +199,8 @@ class TestScfGradientDriverMiscellaneous:
         molecule, basis = self.get_ch3_molecule_and_basis()
 
         scf_drv = ScfUnrestrictedDriver()
+        scf_drv.ri_coulomb = False
+        scf_drv.ri_jk = False
         scf_drv.ostream.mute()
         scf_drv.xcfun = 'hf'
         scf_drv.ri_jk = True
@@ -290,6 +300,8 @@ class TestScfGradientDriverMiscellaneous:
         ostream = OutputStream.create_mpi_ostream(comm, str(output_file))
 
         scf_drv = ScfUnrestrictedDriver(comm, ostream)
+        scf_drv.ri_coulomb = False
+        scf_drv.ri_jk = False
         scf_drv.xcfun = 'hf'
         scf_drv.solvation_model = 'cpcm'
         scf_drv.cpcm_grid_per_sphere = (110, 110)
@@ -374,6 +386,8 @@ class TestScfGradientDriverMiscellaneous:
         checkpoint_file = f'{filename}_scf.h5'
 
         new_scf_drv = ScfUnrestrictedDriver()
+        new_scf_drv.ri_coulomb = False
+        new_scf_drv.ri_jk = False
         new_grad_drv = ScfGradientDriver(new_scf_drv)
         new_grad_drv.read_settings(checkpoint_file)
 

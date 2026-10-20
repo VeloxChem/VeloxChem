@@ -25,6 +25,8 @@ class TestCppUnrestricted:
     def run_restarted_scf(self, molecule, basis, filename):
 
         scf_drv = ScfUnrestrictedDriver()
+        scf_drv.ri_coulomb = False
+        scf_drv.ri_jk = False
         scf_drv.ostream.mute()
         scf_drv.filename = filename
         scf_drv.compute(molecule, basis)
@@ -71,6 +73,8 @@ class TestCppUnrestricted:
         bas = MolecularBasis.read(mol, basis_label, ostream=None)
 
         scf_drv = ScfUnrestrictedDriver()
+        scf_drv.ri_coulomb = False
+        scf_drv.ri_jk = False
         scf_drv.ostream.mute()
         scf_drv.xcfun = xcfun_label
         scf_drv.acc_type = 'l2_diis'
@@ -138,6 +142,8 @@ class TestCppUnrestricted:
         bas = MolecularBasis.read(mol, basis_label, ostream=None)
 
         scf_drv = ScfUnrestrictedDriver()
+        scf_drv.ri_coulomb = False
+        scf_drv.ri_jk = False
         scf_drv.ostream.mute()
         scf_drv.xcfun = xcfun_label
         scf_results = scf_drv.compute(mol, bas)
@@ -182,6 +188,8 @@ class TestCppUnrestricted:
             MPI.COMM_WORLD, str(tmp_path / 'cpp_unrest_prop_dens_absorption'))
 
         scf_drv = ScfUnrestrictedDriver()
+        scf_drv.ri_coulomb = False
+        scf_drv.ri_jk = False
         scf_drv.ostream.mute()
         scf_drv.filename = filename
         scf_results = scf_drv.compute(mol, bas)
@@ -242,6 +250,8 @@ class TestCppUnrestricted:
         bas = MolecularBasis.read(mol, 'sto-3g', ostream=None)
 
         scf_drv = ScfUnrestrictedDriver()
+        scf_drv.ri_coulomb = False
+        scf_drv.ri_jk = False
         scf_drv.ostream.mute()
         scf_results = scf_drv.compute(mol, bas)
 

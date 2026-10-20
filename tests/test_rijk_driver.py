@@ -63,6 +63,8 @@ class TestRIMODriver:
         mol_h2o, bas_sto3g, bas_aux = self.get_data_h2o()
 
         scf_drv = ScfRestrictedDriver()
+        scf_drv.ri_coulomb = False
+        scf_drv.ri_jk = False
         scf_drv.ostream.mute()
         scf_results = scf_drv.compute(mol_h2o, bas_sto3g)
 
@@ -95,6 +97,8 @@ class TestRIMODriver:
         mol_h2o, bas_sto3g, bas_aux = self.get_data_h2o()
 
         scf_drv = ScfRestrictedDriver()
+        scf_drv.ri_coulomb = False
+        scf_drv.ri_jk = False
         scf_drv.ostream.mute()
         scf_drv.compute(mol_h2o, bas_sto3g)
 

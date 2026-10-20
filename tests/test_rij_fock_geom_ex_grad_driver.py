@@ -27,6 +27,8 @@ class TestRIJFockGeomExGradDriver:
         aux_bas = MolecularBasis.read(mol, 'def2-universal-jfit')
 
         scf_drv = ScfRestrictedDriver()
+        scf_drv.ri_coulomb = False
+        scf_drv.ri_jk = False
         scf_drv.ostream.mute()
         scf_results = scf_drv.compute(mol, bas)
 

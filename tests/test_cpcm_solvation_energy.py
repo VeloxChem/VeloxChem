@@ -27,6 +27,8 @@ class TestCpcmSolvation:
         bas = MolecularBasis.read(mol, basis_label, ostream=None)
 
         scf_drv = ScfRestrictedDriver()
+        scf_drv.ri_coulomb = False
+        scf_drv.ri_jk = False
         scf_drv.xcfun = xcfun_label
 
         scf_drv.solvation_model = 'cpcm'
@@ -66,6 +68,8 @@ class TestCpcmSolvation:
         bas = MolecularBasis.read(mol, basis_label, ostream=None)
 
         scf_drv = ScfRestrictedDriver()
+        scf_drv.ri_coulomb = False
+        scf_drv.ri_jk = False
         scf_drv.solvation_model = 'cpcm'
         scf_drv.ostream.mute()
         scf_drv.compute(mol, bas)

@@ -17,7 +17,7 @@ from veloxchem.tpatransitiondriver import TpaTransitionDriver
 @pytest.mark.solvers
 class TestTpaTransition:
 
-    def run_scf(self, xcfun_label, ri_coulomb=False):
+    def run_scf(self, xcfun_label, ri_coulomb=False, ri_jk=False):
 
         molecule_string = """
             O  0.0           0.0  0.0
@@ -31,8 +31,11 @@ class TestTpaTransition:
         basis = MolecularBasis.read(molecule, basis_set_label, ostream=None)
 
         scf_drv = ScfRestrictedDriver()
+        scf_drv.ri_coulomb = False
+        scf_drv.ri_jk = False
         scf_drv.xcfun = xcfun_label
         scf_drv.ri_coulomb = ri_coulomb
+        scf_drv.ri_jk = ri_jk
         scf_drv.conv_thresh = scf_conv_thresh
         scf_drv.ostream.mute()
         scf_results = scf_drv.compute(molecule, basis)
@@ -46,7 +49,8 @@ class TestTpaTransition:
         tpa_conv_thresh = 1.0e-7
 
         scf_results, molecule, ao_basis = self.run_scf(xcfun_label,
-                                                       ri_coulomb=ri_coulomb)
+                                                       ri_coulomb=ri_coulomb,
+                                                       ri_jk=ri_jk)
 
         tpa_drv = TpaTransitionDriver()
         tpa_drv.xcfun = xcfun_label
@@ -88,6 +92,8 @@ class TestTpaTransition:
                                                     ri_coulomb=ri_coulomb)
 
         scf_drv = ScfRestrictedDriver()
+        scf_drv.ri_coulomb = False
+        scf_drv.ri_jk = False
         scf_drv.xcfun = xcfun_label
         scf_drv.ri_coulomb = ri_coulomb
         scf_drv.conv_thresh = 1.0e-8
@@ -136,8 +142,8 @@ class TestTpaTransition:
 
     def test_tpatransition_ri_jk_hf(self):
 
-        ref_energies = [0.16568325453033583, 0.21189487407526517]
-        ref_strengths = [4.135539557437213, 15.851159932394099]
+        ref_energies = [0.16569606746912344, 0.21191135775840889]
+        ref_strengths = [4.134118567278221, 15.847818280617608]
         self.run_tpatransition('hf',
                                ref_energies,
                                ref_strengths,

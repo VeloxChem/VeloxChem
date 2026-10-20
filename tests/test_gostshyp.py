@@ -63,6 +63,8 @@ class TestGostshyp:
         bas = MolecularBasis.read(mol, 'sto-3g', ostream=None)
 
         scf_drv = ScfRestrictedDriver()
+        scf_drv.ri_coulomb = False
+        scf_drv.ri_jk = False
         scf_drv.ostream.mute()
         scf_drv.pressure = 1.0
         scf_drv.gostshyp_discretization = discretization
@@ -77,6 +79,8 @@ class TestGostshyp:
     def test_rejects_nonpositive_tco_tolerance(self, tco_tol):
 
         scf_drv = ScfRestrictedDriver()
+        scf_drv.ri_coulomb = False
+        scf_drv.ri_jk = False
         scf_drv.ostream.mute()
 
         with pytest.raises(
@@ -94,6 +98,8 @@ class TestGostshyp:
     def test_rejects_invalid_tessellation_scaling_factor(self, tssf):
 
         scf_drv = ScfRestrictedDriver()
+        scf_drv.ri_coulomb = False
+        scf_drv.ri_jk = False
         scf_drv.ostream.mute()
 
         with pytest.raises(
@@ -118,6 +124,8 @@ class TestGostshyp:
         custom_tco_tol = 2.5e-13
 
         scf_drv = ScfRestrictedDriver()
+        scf_drv.ri_coulomb = False
+        scf_drv.ri_jk = False
         scf_drv.ostream.mute()
         scf_drv.update_settings({}, {
             'pressure': 20000.0,
@@ -165,6 +173,8 @@ class TestGostshyp:
             ostream = OutputStream(None)
 
         scf_drv = ScfRestrictedDriver(ostream=ostream)
+        scf_drv.ri_coulomb = False
+        scf_drv.ri_jk = False
         scf_drv.pressure = 50
         scf_drv.pressure_units = 'GPa'
         scf_drv.gostshyp_discretization = 'swig'
@@ -211,6 +221,8 @@ class TestGostshyp:
         basis = MolecularBasis.read(mol, basis_label, ostream=None)
 
         scf_drv = ScfRestrictedDriver()
+        scf_drv.ri_coulomb = False
+        scf_drv.ri_jk = False
         scf_drv.ostream.mute()
         scf_drv.pressure = pressure
         scf_drv.pressure_units = pressure_units

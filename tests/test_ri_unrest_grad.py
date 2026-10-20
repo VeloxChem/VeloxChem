@@ -21,6 +21,8 @@ class TestScfUnrestrictedGradientDriverWithRI:
         bas = MolecularBasis.read(mol, basis_label, ostream=None)
 
         scf_drv = ScfUnrestrictedDriver()
+        scf_drv.ri_coulomb = False
+        scf_drv.ri_jk = False
         scf_drv.ostream.mute()
         scf_drv.ri_coulomb = True
         scf_drv.xcfun = xcfun_label

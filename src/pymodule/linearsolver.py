@@ -595,10 +595,15 @@ class LinearSolver:
             screening = None
         screening = self.comm.bcast(screening, root=mpi_master())
 
-        if self.ri_coulomb:
+        use_ri_coulomb = (self.ri_coulomb and self._dft and
+                          self.xcfun is not None and
+                          not self.xcfun.is_hybrid())
+        use_ri_jk = self.ri_jk and not use_ri_coulomb
+
+        if use_ri_coulomb:
             self._init_simd_ri_j(molecule, basis)
 
-        if self.ri_jk:
+        if use_ri_jk:
             self._init_simd_ri_jk(molecule, basis)
 
         return {
@@ -2290,7 +2295,8 @@ class LinearSolver:
         # NOTE: the resolution of the identity takes the whole batch at once, as
         # the left factor is transformed once for all of it, so it replaces the
         # loop rather than sitting inside it.
-        use_ri_jk = (self.ri_jk and dens_factors is not None)
+        use_ri_jk = (self.ri_jk and fock_type != 'j' and
+                     dens_factors is not None)
 
         # NOTE: the simd Coulomb only driver takes the whole batch too, for a
         # reason of its own: every density is fitted against the same integrals,
@@ -2682,7 +2688,8 @@ class LinearSolver:
         # right hand sides of its fittings are reduced in one collective.
         use_ri_coulomb = (self.ri_coulomb and fock_type == 'j')
 
-        use_ri_jk = (self.ri_jk and dens_factors is not None)
+        use_ri_jk = (self.ri_jk and fock_type != 'j' and
+                     dens_factors is not None)
 
         if use_ri_coulomb:
             fock_arrays = self._comp_simd_ri_j_fock_unrestricted(

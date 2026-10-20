@@ -25,6 +25,8 @@ class TestXCMolHess:
         scf_conv_thresh = 1.0e-8
 
         scf_drv = ScfRestrictedDriver()
+        scf_drv.ri_coulomb = False
+        scf_drv.ri_jk = False
         scf_drv.xcfun = xcfun_label
         scf_drv.grid_level = grid_level
         scf_drv.conv_thresh = scf_conv_thresh

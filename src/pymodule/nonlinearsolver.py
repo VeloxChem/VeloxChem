@@ -325,10 +325,15 @@ class NonlinearSolver:
             screening = None
         screening = self.comm.bcast(screening, root=mpi_master())
 
-        if self.ri_coulomb:
+        use_ri_coulomb = (self.ri_coulomb and self._dft and
+                          self.xcfun is not None and
+                          not self.xcfun.is_hybrid())
+        use_ri_jk = self.ri_jk and not use_ri_coulomb
+
+        if use_ri_coulomb:
             self._init_simd_ri_j(molecule, basis)
 
-        if self.ri_jk:
+        if use_ri_jk:
             rijkresponse.initialize(self, molecule, basis)
 
         return {
@@ -1036,7 +1041,7 @@ class NonlinearSolver:
             # one for each density.
             use_ri_coulomb = (self.ri_coulomb and fock_type == 'j')
 
-            use_ri_jk = (self.ri_jk and
+            use_ri_jk = (self.ri_jk and fock_type != 'j' and
                          dens_factors is not None and
                          (mode_is_quadratic or mode_is_cubic))
 

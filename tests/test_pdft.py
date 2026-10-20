@@ -245,6 +245,8 @@ class TestPDFT:
 
         # Optimize ROHF wavefunction
         scfdrv = ScfRestrictedDriver()
+        scfdrv.ri_coulomb = False
+        scfdrv.ri_jk = False
         scfdrv.ostream.mute()
         scf_results = scfdrv.compute(molecule, basis)
 

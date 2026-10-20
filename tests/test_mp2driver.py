@@ -17,8 +17,12 @@ class TestMp2Driver:
 
         if scf_type.lower() == 'restricted':
             scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
+            scf_drv.ri_coulomb = False
+            scf_drv.ri_jk = False
         else:
             scf_drv = ScfUnrestrictedDriver(task.mpi_comm, task.ostream)
+            scf_drv.ri_coulomb = False
+            scf_drv.ri_jk = False
         scf_results = scf_drv.compute(task.molecule, task.ao_basis)
 
         mp2_drv = Mp2Driver(task.mpi_comm, task.ostream)
@@ -109,6 +113,8 @@ class TestMp2Driver:
 
         task = MpiTask([inpfile, None])
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
+        scf_drv.ri_coulomb = False
+        scf_drv.ri_jk = False
         scf_results = scf_drv.compute(task.molecule, task.ao_basis)
 
         occ_alpha = task.molecule.get_aufbau_alpha_occupation(

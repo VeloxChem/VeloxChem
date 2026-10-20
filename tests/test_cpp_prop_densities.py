@@ -26,6 +26,8 @@ class TestCppPropertyDensities:
         # run SCF
 
         scf_drv = ScfRestrictedDriver()
+        scf_drv.ri_coulomb = False
+        scf_drv.ri_jk = False
         scf_drv.xcfun = xcfun_label
         scf_drv.acc_type = 'l2_diis'
         scf_drv.conv_thresh = 1.0e-8

@@ -226,8 +226,8 @@ class ScfDriver:
         self.guess_unpaired_electrons = ''
 
         # RI
-        self.ri_coulomb = False
-        self.ri_jk = False
+        self.ri_coulomb = True
+        self.ri_jk = True
         self.ri_auxiliary_basis = 'def2-universal-jfit'
         self.ri_metric_threshold = 1.0e-12
         self.ri_metric_route = 'cholesky'
@@ -1858,7 +1858,11 @@ class ScfDriver:
         # builds nor to the rest of them, so it is timed on its own.
         ri_setup_t0 = tm.time()
 
-        if self.ri_coulomb:
+        fock_type = self._get_2e_fock_build_params()[0]
+        use_ri_coulomb = self.ri_coulomb and fock_type == 'j'
+        use_ri_jk = self.ri_jk and fock_type != 'j'
+
+        if use_ri_coulomb:
             if isinstance(self.ri_auxiliary_basis, str):
                 basis_ri = MolecularBasis.read(molecule, self.ri_auxiliary_basis)
             else:
@@ -1913,7 +1917,7 @@ class ScfDriver:
             self.ostream.print_blank()
             self.ostream.flush()
 
-        elif self.ri_jk:
+        elif use_ri_jk:
             if isinstance(self.ri_auxiliary_basis, str):
                 basis_ri = MolecularBasis.read(molecule, self.ri_auxiliary_basis)
             else:
@@ -3225,19 +3229,20 @@ class ScfDriver:
             The requested Fock build type.
         """
 
-        if self.ri_coulomb:
+        if fock_type == 'j':
             assert_msg_critical(
-                fock_type == 'j',
-                'SCF driver: RI-J is only applicable to pure DFT functional')
-        elif self.ri_jk:
-            assert_msg_critical(
-                fock_type != 'j',
+                not self.ri_jk or self.ri_coulomb,
                 'SCF driver: RI-JK is not applicable to pure DFT functional')
+        elif self.ri_jk:
             need_bcast_mo = self.comm.bcast(
                 (not self.molecular_orbitals.is_empty()), root=mpi_master())
             if need_bcast_mo:
                 self._molecular_orbitals = self.molecular_orbitals.broadcast(
                     self.comm, root=mpi_master())
+        else:
+            assert_msg_critical(
+                not self.ri_coulomb,
+                'SCF driver: RI-J is only applicable to pure DFT functional')
 
     def _get_2e_fock_build_params(self):
         """

@@ -35,6 +35,8 @@ class TestRPA:
         bas = MolecularBasis.read(mol, basis_label, ostream=None)
 
         scf_drv = ScfRestrictedDriver()
+        scf_drv.ri_coulomb = False
+        scf_drv.ri_jk = False
         scf_drv.ostream.mute()
         scf_drv.xcfun = xcfun_label
         scf_results = scf_drv.compute(mol, bas)
@@ -168,6 +170,8 @@ class TestRPA:
         bas = MolecularBasis.read(mol, '6-31g', ostream=None)
 
         scf_drv = ScfRestrictedDriver()
+        scf_drv.ri_coulomb = False
+        scf_drv.ri_jk = False
         scf_drv.ostream.mute()
         scf_results = scf_drv.compute(mol, bas)
 
@@ -211,6 +215,8 @@ class TestRPA:
         bas = MolecularBasis.read(mol, '6-31g', ostream=None)
 
         scf_drv = ScfRestrictedDriver()
+        scf_drv.ri_coulomb = False
+        scf_drv.ri_jk = False
         scf_drv.ostream.mute()
         scf_results = scf_drv.compute(mol, bas)
 
@@ -255,6 +261,8 @@ class TestRPA:
         bas = MolecularBasis.read(mol, '6-31g', ostream=None)
 
         scf_drv = ScfRestrictedDriver()
+        scf_drv.ri_coulomb = False
+        scf_drv.ri_jk = False
         scf_drv.ostream.mute()
         scf_results = scf_drv.compute(mol, bas)
 
@@ -313,6 +321,8 @@ class TestRPA:
         bas = MolecularBasis.read(mol, 'def2-svp', ostream=None)
 
         scf_drv = ScfRestrictedDriver()
+        scf_drv.ri_coulomb = False
+        scf_drv.ri_jk = False
         scf_drv.ostream.mute()
         scf_results = scf_drv.compute(mol, bas)
 
@@ -349,6 +359,8 @@ class TestRPA:
         bas = MolecularBasis.read(mol, 'def2-svp', ostream=None)
 
         scf_drv = ScfRestrictedDriver()
+        scf_drv.ri_coulomb = False
+        scf_drv.ri_jk = False
         scf_drv.ostream.mute()
 
         filename = str(tmp_path / "water_restart")
@@ -397,6 +409,8 @@ class TestRPA:
         bas = MolecularBasis.read(mol, 'sto-3g', ostream=None)
 
         scf_drv = ScfRestrictedDriver()
+        scf_drv.ri_coulomb = False
+        scf_drv.ri_jk = False
         scf_drv.ostream.mute()
 
         filename = str(tmp_path / 'restricted_missing_nstates')
@@ -457,6 +471,8 @@ class TestRPA:
         bas = MolecularBasis.read(mol, 'sto-3g', ostream=None)
 
         scf_drv = ScfRestrictedDriver()
+        scf_drv.ri_coulomb = False
+        scf_drv.ri_jk = False
         scf_drv.ostream.mute()
         scf_results = scf_drv.compute(mol, bas)
 
@@ -492,6 +508,8 @@ class TestRPA:
         n_exc = nocc * (norb - nocc)
 
         scf_drv = ScfRestrictedDriver()
+        scf_drv.ri_coulomb = False
+        scf_drv.ri_jk = False
         scf_drv.ostream.mute()
         scf_drv.solvation_model = 'cpcm'
         scf_drv.cpcm_epsilon = 10.0
@@ -546,6 +564,8 @@ class TestRPA:
         n_exc = nocc * (norb - nocc)
 
         scf_drv = ScfRestrictedDriver()
+        scf_drv.ri_coulomb = False
+        scf_drv.ri_jk = False
         scf_drv.ostream.mute()
         scf_drv.pressure = 20000.0
         scf_results = scf_drv.compute(mol, bas)
@@ -588,6 +608,8 @@ class TestRPA:
         bas = MolecularBasis.read(mol, 'sto-3g', ostream=None)
 
         scf_drv = ScfRestrictedDriver()
+        scf_drv.ri_coulomb = False
+        scf_drv.ri_jk = False
         scf_drv.ostream.mute()
         scf_drv.pressure = 20000.0
         scf_results = scf_drv.compute(mol, bas)

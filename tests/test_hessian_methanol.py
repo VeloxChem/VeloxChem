@@ -24,6 +24,8 @@ class TestHessianMethanol:
         bas = MolecularBasis.read(mol, 'def2-svp')
 
         scf_drv = ScfRestrictedDriver()
+        scf_drv.ri_coulomb = False
+        scf_drv.ri_jk = False
         scf_drv.xcfun = 'pbe0'
         scf_drv.ostream.mute()
         scf_drv.compute(mol, bas)

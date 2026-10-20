@@ -91,6 +91,8 @@ def get_classical_system(waters):
 def get_hf_density(molecule, basis):
 
     scf_drv = ScfRestrictedDriver()
+    scf_drv.ri_coulomb = False
+    scf_drv.ri_jk = False
     scf_drv.conv_thresh = 1.0e-8
     scf_drv.ostream.mute()
     results = scf_drv.compute(molecule, basis)

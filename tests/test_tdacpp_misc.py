@@ -86,6 +86,9 @@ class TestComplexResponseTdaSolverMisc:
         basis = MolecularBasis.read(molecule, 'sto-3g', ostream=None)
 
         scf_drv = ScfRestrictedDriver()
+        scf_drv.ri_coulomb = False
+        scf_drv.ri_jk = True
+        scf_drv.ri_auxiliary_basis = 'def2-universal-jkfit'
         scf_drv.ostream.mute()
         scf_results = scf_drv.compute(molecule, basis)
 

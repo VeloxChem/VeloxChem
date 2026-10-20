@@ -40,6 +40,8 @@ class TestScfRiJk:
     def run_scf(self, molecule, basis, **settings):
 
         driver = ScfRestrictedDriver(ostream=OutputStream(None))
+        driver.ri_coulomb = False
+        driver.ri_jk = False
 
         driver.conv_thresh = 1.0e-8
 
@@ -95,11 +97,12 @@ class TestScfRiJk:
         assert abs(simd - plain) > 1.0e-6
         assert abs(simd - plain) < 1.0e-3
 
-    def test_ri_jk_is_off_by_default(self):
+    def test_ri_is_enabled_by_default(self):
 
         driver = ScfRestrictedDriver(ostream=OutputStream(None))
 
-        assert not driver.ri_jk
+        assert driver.ri_coulomb
+        assert driver.ri_jk
         assert driver.ri_memory_budget is None
 
     def test_the_mode_can_be_chosen(self, molecule, basis):
@@ -155,6 +158,8 @@ class TestScfRiJk:
     def test_the_mode_defaults_to_automatic(self):
 
         driver = ScfRestrictedDriver(ostream=OutputStream(None))
+        driver.ri_coulomb = False
+        driver.ri_jk = False
 
         assert driver.ri_mode == 'automatic'
 
@@ -187,6 +192,8 @@ class TestScfRiJk:
         the metric is well conditioned, which is most of the time."""
 
         driver = ScfRestrictedDriver(ostream=OutputStream(None))
+        driver.ri_coulomb = False
+        driver.ri_jk = False
 
         assert driver.ri_metric_route == 'cholesky'
 

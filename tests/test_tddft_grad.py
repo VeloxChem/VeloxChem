@@ -31,6 +31,8 @@ class TestGrad:
         basis = MolecularBasis.read(molecule, basis_set_label, ostream=None)
 
         scf_drv = ScfRestrictedDriver()
+        scf_drv.ri_coulomb = False
+        scf_drv.ri_jk = False
 
         scf_dict = {'conv_thresh': 1e-8}
         method_dict = {'xcfun': xcfun_label, 'grid_level': 5}
@@ -164,6 +166,8 @@ class TestGrad:
         basis = MolecularBasis.read(molecule, 'sto-3g', ostream=None)
 
         scf_drv = ScfRestrictedDriver()
+        scf_drv.ri_coulomb = False
+        scf_drv.ri_jk = False
         # normally set by pe_sanity_check when embedding is configured
         scf_drv._pe = True
 
@@ -180,6 +184,8 @@ class TestGrad:
     def test_excited_state_gradient_rejects_unrestricted_reference(self):
 
         scf_drv = ScfUnrestrictedDriver()
+        scf_drv.ri_coulomb = False
+        scf_drv.ri_jk = False
 
         with pytest.raises(
                 VeloxChemError,
@@ -209,6 +215,8 @@ class TestGrad:
         point_charges[3, 0] = 1.0
 
         scf_drv = ScfRestrictedDriver()
+        scf_drv.ri_coulomb = False
+        scf_drv.ri_jk = False
         scf_drv.point_charges = point_charges
         scf_drv.conv_thresh = 1.0e-10
         scf_drv.ostream.mute()

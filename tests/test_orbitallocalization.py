@@ -24,6 +24,8 @@ class TestOrbitalLocalization:
         molecule = Molecule.from_xyz_string(h2o_xyz)
         basis = MolecularBasis.read(molecule, "def2-svp")
         scf_drv = ScfRestrictedDriver()
+        scf_drv.ri_coulomb = False
+        scf_drv.ri_jk = False
         scf_drv.ostream.mute()
         scf_res = scf_drv.compute(molecule, basis)
 

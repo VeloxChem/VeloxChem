@@ -50,6 +50,8 @@ class TestNonlinearEnvironmentGap:
     def run_scf(self, **env_settings):
 
         scf_drv = ScfRestrictedDriver()
+        scf_drv.ri_coulomb = False
+        scf_drv.ri_jk = False
         scf_drv.ostream.mute()
         for key, value in env_settings.items():
             setattr(scf_drv, key, value)

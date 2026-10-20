@@ -32,6 +32,8 @@ class TestOptimizationDriverCoverage:
     def make_scf_opt_driver(molecule, basis_label="sto-3g", filename=None):
         ostream = OutputStream(None)
         scf_drv = ScfRestrictedDriver(MPI.COMM_WORLD, ostream)
+        scf_drv.ri_coulomb = False
+        scf_drv.ri_jk = False
         scf_drv.filename = filename
         grad_drv = ScfGradientDriver(scf_drv)
         opt_drv = OptimizationDriver(grad_drv)
@@ -188,6 +190,8 @@ class TestOptimizationDriverCoverage:
 
         filename = str(tmp_path / "opt_restart_real")
         scf_drv = ScfRestrictedDriver(MPI.COMM_WORLD, OutputStream(None))
+        scf_drv.ri_coulomb = False
+        scf_drv.ri_jk = False
         scf_drv.filename = filename
         scf_results = scf_drv.compute(checkpoint_molecule, basis)
 
@@ -260,6 +264,8 @@ class TestOptimizationDriverCoverage:
         filename = str(tmp_path / "opt_engine_real")
 
         scf_drv = ScfRestrictedDriver(MPI.COMM_WORLD, OutputStream(None))
+        scf_drv.ri_coulomb = False
+        scf_drv.ri_jk = False
         scf_drv.filename = filename
         scf_results = scf_drv.compute(molecule, basis)
 

@@ -94,6 +94,8 @@ class TestOptimizeMiscellaneous:
                              hessian_stop=False):
 
         scf_drv = ScfUnrestrictedDriver()
+        scf_drv.ri_coulomb = False
+        scf_drv.ri_jk = False
         scf_drv.ostream.mute()
         scf_drv.xcfun = xcfun
         scf_drv.filename = filename
@@ -162,6 +164,8 @@ class TestOptimizeMiscellaneous:
         checkpoint_file = f'{filename}_scf.h5'
 
         new_scf_drv = ScfUnrestrictedDriver()
+        new_scf_drv.ri_coulomb = False
+        new_scf_drv.ri_jk = False
         new_opt_drv = OptimizationDriver(new_scf_drv)
         new_opt_drv.read_settings(checkpoint_file)
 
@@ -313,6 +317,8 @@ class TestOptimizeMiscellaneous:
 
         molecule, basis = self.get_ch3_molecule_and_basis()
         scf_drv = ScfUnrestrictedDriver()
+        scf_drv.ri_coulomb = False
+        scf_drv.ri_jk = False
         scf_drv.ostream.mute()
         scf_drv.filename = str(tmp_path / 'opt_failure')
         opt_drv = OptimizationDriver(scf_drv)
