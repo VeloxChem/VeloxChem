@@ -574,14 +574,16 @@ class EvbDriver:
             )
             self.ostream.flush()
             conf["topology"] = pdb.getTopology()
+            # Angstrom, as build_systems hands them over: run_replicas
+            # converts initial positions to nm with * 0.1.
             conf["initial_positions"] = pdb.getPositions(
-                asNumpy=True).value_in_unit(mmunit.nanometers)
+                asNumpy=True).value_in_unit(mmunit.angstrom)
             conf['skip_initial_equil'] = True
         elif load_top:
             pdb = mmapp.PDBxFile(str(Path(data_folder) / "topology.cif"))
             conf["topology"] = pdb.getTopology()
             conf["initial_positions"] = pdb.getPositions(
-                asNumpy=True).value_in_unit(mmunit.nanometers)
+                asNumpy=True).value_in_unit(mmunit.angstrom)
 
         # The steps recorded in options.json only carry names and folders; give
         # them back the topology and the starting configuration that run_FEP

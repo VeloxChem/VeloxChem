@@ -125,7 +125,9 @@ class EvbDataProcessing:
 
         # "mbar" (default): joint multistate estimate using every window's
         # overlap with every other window, not just its neighbors.
-        # "bar": pairwise BAR between adjacent lambda windows.
+        # "bar": pairwise BAR between adjacent lambda windows. Deprecated for
+        # uncertainties: its cumulative uncertainty under-reports (compute()
+        # warns). An empty window or a failed BAR step is an error.
         self.fep_estimator: str = "mbar"
 
         # Boltzmann constant: ca 8.314e-3 kJ/mol/K
@@ -148,10 +150,11 @@ class EvbDataProcessing:
         # "both" curve used by print_uncertainties/plot_evb_replicas.
         self.calculate_per_replica_pooled = True
         # Estimator used for the per-(replica, direction) subsets in
-        # _calculate_per_replica_results. None (default) reuses whatever
-        # fep_estimator is set to. These per-replica curves are primarily a
-        # diagnostic (uncertainty/hysteresis), so forcing "bar" here can be
-        # much faster than "mbar" when fep_estimator="mbar"
+        # _calculate_per_replica_results. None reuses whatever fep_estimator
+        # is set to. These per-replica curves are primarily a diagnostic
+        # (uncertainty/hysteresis), so forcing "bar" here can be much faster
+        # than "mbar" when fep_estimator="mbar", but BAR is deprecated for
+        # uncertainties, so compute() warns about it.
         self.per_replica_fep_estimator = 'bar'
 
         # Reorganization energy lambda_r from the energy gap in the two end
@@ -287,6 +290,7 @@ class EvbDataProcessing:
         else:
             self.ostream.print_info("Using provided H12 and alpha")
         results.update({'alpha': self.alpha, 'H12': self.H12})
+        self._warn_bar_uncertainty()
         self.ostream.print_info("Calculating FEP and EVB curves")
         self.ostream.flush()
         self._get_FEP_and_EVB()
@@ -294,6 +298,31 @@ class EvbDataProcessing:
             self._check_fit_against_report()
         results["coordinate_bins"] = self.coordinate_bins
         return results
+
+    def _warn_bar_uncertainty(self):
+        """Warns when BAR supplies an uncertainty in this call.
+
+        BAR's cumulative uncertainty adds adjacent steps in quadrature
+        although neighboring steps share a window, so it under-reports (by
+        up to about sqrt(2) along the ladder). BAR is deprecated for
+        uncertainties; MBAR gives calibrated ones.
+        """
+
+        uses = []
+        if self.fep_estimator == "bar":
+            uses.append("fep_estimator='bar'")
+        per_replica = self.per_replica_fep_estimator or self.fep_estimator
+        has_replicas = any(
+            result.get("Replica_frame") is not None
+            for result in self.results.values())
+        if (self.calculate_per_replica and has_replicas
+                and per_replica == "bar"):
+            uses.append("per_replica_fep_estimator='bar'")
+        if uses:
+            self.ostream.print_warning(
+                "BAR is deprecated for uncertainties (" + ", ".join(uses) +
+                "): its cumulative uncertainty under-reports, by up to " +
+                "about sqrt(2). Use 'mbar' for calibrated uncertainties.")
 
     @staticmethod
     def _fit_xi_grid():
@@ -468,6 +497,18 @@ class EvbDataProcessing:
         assert_msg_critical('pymbar' in sys.modules,
                             'pymbar is required for EvbDataProcessing.')
 
+        # A BAR step that cannot be estimated stops the analysis: any finite
+        # stand-in would carry into every later lambda and into the profiles.
+        if lambda_indices is None:
+            lambda_indices = self.Lambda_indices
+        counts = np.bincount(np.asarray(lambda_indices),
+                             minlength=len(self.Lambda))
+        empty = [self.Lambda[k] for k in np.flatnonzero(counts == 0)]
+        assert_msg_critical(
+            len(empty) == 0,
+            f"BAR: no frames in the lambda window(s) {empty}, so the " +
+            "free energy steps that touch them cannot be estimated.")
+
         de_lambda = self._bin(dE, lambda_indices)
         dG_bar = [0.0]
         ddG_bar = [0.0]
@@ -492,15 +533,16 @@ class EvbDataProcessing:
                 ddg_bar = 1 / self._beta(Temp_set) * ddF
             except Exception as e:
                 print_exception_if_debug()
-                self.ostream.print_warning(
-                    f"Error {e} encountered during BAR calculation, setting dG_bar to 0 for lambda {l}"
-                )
-                dg_bar = 0
-                ddg_bar = 0
+                assert_msg_critical(
+                    False, f"BAR failed between lambda {l} and " +
+                    f"{self.Lambda[i + 1]}: {e}")
 
             dG_bar.append(dG_bar[-1] + dg_bar)
-            # Adjacent-window BAR estimates are independent, so their
-            # variances add along the cumulative sum.
+            # Adjacent BAR steps share a window, so they are positively
+            # correlated, and adding their variances in quadrature
+            # under-reports the cumulative uncertainty (by up to about
+            # sqrt(2)). BAR is therefore deprecated for uncertainties; see
+            # _warn_bar_uncertainty.
             ddG_bar.append(np.sqrt(ddG_bar[-1]**2 + ddg_bar**2))
 
         return dG_bar, ddG_bar
@@ -1671,6 +1713,18 @@ class EvbDataProcessing:
                                                              == direction)
 
                     if not np.any(mask):
+                        continue
+
+                    # BAR refuses a ladder with an empty window (it aborts
+                    # under MPI), so a subset that misses one, e.g. from an
+                    # unfinished replica, is skipped here instead.
+                    n_sampled = len(np.unique(lambda_indices[mask]))
+                    if (self.fep_estimator == "bar"
+                            and n_sampled < len(self.Lambda)):
+                        self.ostream.print_warning(
+                            f"Replica {replica} ({label}) of configuration "
+                            f"'{name}' has frames in {n_sampled} of "
+                            f"{len(self.Lambda)} lambda windows, skipping")
                         continue
 
                     try:

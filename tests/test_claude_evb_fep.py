@@ -15,6 +15,7 @@ import pytest
 
 from veloxchem.evbdataprocessing import EvbDataProcessing
 from veloxchem.evbdriver import EvbDriver
+from veloxchem.errorhandler import VeloxChemError
 from veloxchem.outputstream import OutputStream
 
 from test_claude_evb_reference import (KB, T_DEFAULT, STANDARD_SETS, Model1,
@@ -196,7 +197,8 @@ def test_bar_matches_pymbar_convention(counts):
 
 
 @pytest.mark.xfail(strict=True,
-                   reason='defect A2-5 open (WP-A2); remove when fixed')
+                   reason='defect A2-5: BAR sigma deprecated with a warning, '
+                   'not fixed (2026-10-15); remove when fixed')
 def test_bar_cumulative_sigma_calibration():
     """Cumulative BAR sigma at lambda = 1 is calibrated over seeds.
 
@@ -266,7 +268,6 @@ def test_compute_time_subsample_unequal_counts(tmp_path):
     ddG = np.asarray(out['dGfep_unc'])
     assert abs(dG[-1] - model.dG_map(lambdas)[-1]) <= 4.0 * ddG[-1]
 
-
 def _failed_window_ok(dG, ddG, exact):
     """A window is honest if it is non-finite or its sigma covers its error."""
 
@@ -276,19 +277,21 @@ def _failed_window_ok(dG, ddG, exact):
 
 
 @pytest.mark.xfail(strict=True,
-                   reason='defect A2-3 open (WP-A2); remove when fixed')
+                   reason='A2-3 remainder: disjoint windows need an overlap '
+                   'diagnostic (not yet approved); remove when it lands')
 def test_bar_disjoint_windows():
     """Disjoint windows must not give a confident finite answer (Q4).
 
     lambda_r = 4000 kJ/mol, ladder [0, 0.5, 1]: window means a(1 - 2 lambda)
-    are 28 widths apart, so adjacent windows share no configurations. The
-    method requires that a failed window is not reported as a finite number
-    whose sigma does not cover its error (grand plan: silent failure is
-    major). Raising is acceptable. Expected exact values: dG_map = [0, 1000,
-    0]. Baseline (negated works): BAR returns ~[0, 903, 27] with sigma
-    ~2e-8. With pymbar's sign convention (WP-A2 fix): ~[0, 964, -44] with
-    sigma ~[0, 3.0, 4.5], still 12 sigma off. pymbar.bar does not raise
-    here, so only an overlap check could flag it (escalated, WP-A2 memo).
+    are 28 widths apart, so adjacent windows share no configurations.
+    Raising is acceptable. Expected exact values: dG_map = [0, 1000, 0].
+    With pymbar's sign convention (A2-1 fix) BAR gives ~[0, 964, -44] with
+    sigma ~[0, 3.0, 4.5], 12 sigma off. pymbar.bar does not raise here, so
+    the A2-3 hard error (empty window, pymbar failure) does not catch it.
+    A sampled-range test is too strict: SYM on the same ladder has windows
+    whose sampled gaps share no range, yet BAR is calibrated there (WP-A2
+    Q4, |err|/sigma 0.89). Only an overlap diagnostic with a threshold
+    separates the two (WP-A2 memo 1 option c).
     """
 
     model = Model1(2000.0, 2000.0, 1.0, 0.0)
@@ -301,31 +304,127 @@ def test_bar_disjoint_windows():
     assert np.all(_failed_window_ok(dG, ddG, model.dG_map(lambdas)))
 
 
-@pytest.mark.xfail(strict=True,
-                   reason='defect A2-3 open (WP-A2); remove when fixed')
-def test_bar_empty_window():
-    """A window with no frames must not become a finite 0 with sigma 0 (Q4).
+def test_bar_coarse_ladder_is_accepted():
+    """The A2-3 checks do not refuse a coarse but usable ladder.
 
-    Window 5 (lambda = 0.5) of an 11-point ladder has no frames, as in a
-    per-replica subset that misses a window. The two BAR steps that touch it
-    cannot be estimated, so the result from lambda = 0.5 on must be
-    non-finite, raise, or carry a sigma that covers the error. Baseline:
-    pymbar.bar raises on the empty array, the except branch in
-    _calculate_dGfep_bar sets both steps to 0 with sigma 0 (with a
-    print_warning), and dG(0.7) is 30.1 against exact 18.9, sigma 0.2.
-    (An empty last window instead raises IndexError outside the try.)
+    SYM (lambda_r 290), ladder [0, 0.5, 1], 200 frames per window: the
+    sampled gaps of adjacent windows share no range, yet BAR is calibrated
+    (WP-A2 Q4). It must return finite values within 4 sigma of exact.
+    """
+
+    model = make_model('SYM')
+    lambdas = np.array([0.0, 0.5, 1.0])
+    samples = model.sample(lambdas, 200, np.random.default_rng(2))
+    dG, ddG = _dgfep('bar', samples, lambdas)
+    assert np.all(np.isfinite(dG)) and np.all(ddG[1:] > 0)
+    assert np.all(np.abs(dG - model.dG_map(lambdas)) <= 4.0 * ddG)
+
+
+@pytest.mark.parametrize('empty', [5, 10])
+def test_bar_empty_window(empty):
+    """A window with no frames is a hard error naming it (A2-3).
+
+    Window 5 (lambda = 0.5) or the last window of an 11-point ladder has no
+    frames. Before the fix an empty middle window became two BAR steps of 0
+    with sigma 0 (dG(0.7) = 30.1 against exact 18.9) behind a print_warning,
+    and an empty last window raised IndexError outside the try.
     """
 
     model = make_model('EXO')
     lambdas = np.round(np.linspace(0.0, 1.0, 11), 3)
     samples = model.sample(lambdas, 200, np.random.default_rng(1))
-    keep = samples['Lambda_indices'] != 5
+    keep = samples['Lambda_indices'] != empty
     samples = {key: val[keep] for key, val in samples.items()}
-    try:
-        dG, ddG = _dgfep('bar', samples, lambdas)
-    except Exception:
-        return
-    assert np.all(_failed_window_ok(dG, ddG, model.dG_map(lambdas)))
+    with pytest.raises(VeloxChemError, match=f'{lambdas[empty]}'):
+        _dgfep('bar', samples, lambdas)
+
+
+def test_bar_pymbar_failure_raises(monkeypatch):
+    """An exception from pymbar.bar is a hard error, not a step of 0 (A2-3)."""
+
+    def failing_bar(*args, **kwargs):
+        raise pymbar.utils.ConvergenceError('forced failure')
+
+    monkeypatch.setattr(pymbar.other_estimators, 'bar', failing_bar)
+    model = make_model('SYM')
+    lambdas = default_lambdas()
+    samples = model.sample(lambdas, 50, np.random.default_rng(3))
+    with pytest.raises(VeloxChemError, match='forced failure'):
+        _dgfep('bar', samples, lambdas)
+
+
+def _compute_warnings(tmp_path, samples, lambdas, setup):
+    """Run compute() with alpha = 0 and exact SYM H12, return its
+    '* Warning *' lines and the configuration result."""
+
+    log = tmp_path / 'out.txt'
+    ostream = OutputStream(log)
+    dp = EvbDataProcessing(ostream=ostream)
+    setup(dp)
+    dp.alpha = 0.0
+    dp.H12 = STANDARD_SETS['SYM']['H12']
+    out = dp.compute(make_results(samples, lambdas), 31.0, 0.0)
+    ostream.flush()
+    ostream.close()
+    warnings = [line for line in log.read_text().splitlines()
+                if line.startswith('* Warning *')]
+    return warnings, out['configuration_results']['synthetic']
+
+
+@pytest.mark.parametrize('fep, per_replica, warned', [
+    ('bar', None, True),
+    ('mbar', 'bar', True),
+    ('mbar', None, False),
+    ('mbar', 'mbar', False),
+])
+def test_bar_uncertainty_deprecation_warning(tmp_path, fep, per_replica,
+                                             warned):
+    """compute() warns once when BAR supplies an uncertainty (A2-5).
+
+    Two replicas of SYM, so the per-replica curves run. The warning names
+    the setting that selects BAR; MBAR everywhere gives none.
+    """
+
+    model = make_model('SYM')
+    lambdas = default_lambdas()
+    samples = model.sample(lambdas, 50, np.random.default_rng(4),
+                           n_replicas=2)
+
+    def setup(dp):
+        dp.fep_estimator = fep
+        dp.per_replica_fep_estimator = per_replica
+
+    warnings, _ = _compute_warnings(tmp_path, samples, lambdas, setup)
+    deprecated = [line for line in warnings if 'deprecated' in line]
+    assert len(deprecated) == (1 if warned else 0), warnings
+
+
+def test_bar_per_replica_subset_missing_window_skipped(tmp_path):
+    """A replica subset that misses a window is skipped with a warning.
+
+    Replica 1's backward frames in window 7 are removed, as in a replica
+    that did not finish. Per-replica BAR would refuse that subset, so it is
+    skipped (with a warning) instead of stopping compute(): replica 1 keeps
+    its forward curve but has no backward or pooled one, and the pooled
+    MBAR curve is unaffected.
+    """
+
+    model = make_model('SYM')
+    lambdas = default_lambdas()
+    samples = model.sample(lambdas, 50, np.random.default_rng(6),
+                           n_replicas=2)
+    drop = ((samples['Replica_frame'] == 1)
+            & (samples['Direction_frame'] == 1)
+            & (samples['Lambda_indices'] == 7))
+    samples = {key: val[~drop] for key, val in samples.items()}
+
+    warnings, res = _compute_warnings(tmp_path, samples, lambdas,
+                                      lambda dp: None)
+    assert any('Replica 1 (backward)' in line for line in warnings), warnings
+    assert 'forward' in res['replicas'][1]
+    assert 'backward' not in res['replicas'][1]
+    assert set(res['replicas'][0]) >= {'forward', 'backward', 'both'}
+    assert np.all(np.isfinite(res['dGfep']))
 
 
 @pytest.mark.parametrize('ends', [False, True])
