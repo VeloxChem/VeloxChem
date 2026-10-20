@@ -226,6 +226,7 @@ class ScfDriver:
         self.guess_unpaired_electrons = ''
 
         # RI
+        self.ri = True
         self.ri_coulomb = True
         self.ri_jk = True
         self.ri_auxiliary_basis = 'def2-universal-jfit'
@@ -373,6 +374,7 @@ class ScfDriver:
                 'trim_mos': ('bool', 'trim molecular orbitals'),
             },
             'method_settings': {
+                'ri': ('bool', 'use RI approximation'),
                 'ri_coulomb': ('bool', 'use RI-J approximation'),
                 'ri_jk': ('bool', 'use RI-JK approximation'),
                 'ri_auxiliary_basis': ('str', 'RI auxiliary basis set'),
@@ -584,9 +586,9 @@ class ScfDriver:
 
         parse_input(self, method_keywords, method_dict)
 
-        ri_sanity_check(self)
-
         dft_sanity_check(self, 'update_settings')
+
+        ri_sanity_check(self)
 
         pe_sanity_check(self, method_dict)
 
@@ -757,11 +759,11 @@ class ScfDriver:
         # check molecule
         molecule_sanity_check(molecule, self.scf_type)
 
-        # check RI setup
-        ri_sanity_check(self)
-
         # check dft setup
         dft_sanity_check(self, 'compute')
+
+        # check RI setup
+        ri_sanity_check(self)
 
         # check pe setup
         pe_sanity_check(self, molecule=molecule)
@@ -2439,6 +2441,8 @@ class ScfDriver:
                     for key in self.history[0]:
                         self._scf_results[f'scf_history_{key}'] = np.array(
                             [step[key] for step in self.history])
+
+                self._scf_results['ri'] = self.ri
 
                 if self.ri_coulomb or self.ri_jk:
                     # RI info

@@ -15,16 +15,13 @@ class TestScfDriverWithRIJK:
 
         if scf_flag == 'restricted':
             scf_drv = ScfRestrictedDriver()
-            scf_drv.ri_coulomb = False
-            scf_drv.ri_jk = False
+            scf_drv.ri = True
         elif scf_flag == 'unrestricted':
             scf_drv = ScfUnrestrictedDriver()
-            scf_drv.ri_coulomb = False
-            scf_drv.ri_jk = False
+            scf_drv.ri = True
 
         scf_drv.ostream.mute()
         scf_drv.xcfun = xcfun_label
-        scf_drv.ri_jk = True
         scf_results = scf_drv.compute(mol, bas)
 
         if scf_drv.rank == mpi_master():
@@ -38,17 +35,14 @@ class TestScfDriverWithRIJK:
 
         if scf_flag == 'restricted':
             scf_drv = ScfRestrictedDriver()
-            scf_drv.ri_coulomb = False
-            scf_drv.ri_jk = False
+            scf_drv.ri = True
         elif scf_flag == 'unrestricted':
             scf_drv = ScfUnrestrictedDriver()
-            scf_drv.ri_coulomb = False
-            scf_drv.ri_jk = False
+            scf_drv.ri = True
         else:
             raise ValueError(f'unknown scf_flag: {scf_flag}')
 
         scf_drv.ostream.mute()
-        scf_drv.ri_jk = True
         configure(scf_drv)
         scf_results = scf_drv.compute(mol, bas)
 

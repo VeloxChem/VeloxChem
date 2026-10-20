@@ -26,8 +26,7 @@ class TestCpcmVisualization:
         bas = MolecularBasis.read(mol, basis_label, ostream=None)
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri_coulomb = False
-        scf_drv.ri_jk = False
+        scf_drv.ri = False
 
         scf_drv.solvation_model = 'cpcm'
         scf_drv.cpcm_grid_per_sphere = (110, 110)
@@ -58,8 +57,7 @@ class TestCpcmVisualization:
         bas = MolecularBasis.read(mol, basis_label, ostream=None)
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri_coulomb = False
-        scf_drv.ri_jk = False
+        scf_drv.ri = False
 
         scf_drv.solvation_model = 'cpcm'
         scf_drv.cpcm_grid_per_sphere = (110, 110)

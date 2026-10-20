@@ -157,6 +157,9 @@ def scf_results_sanity_check(obj, scf_results):
 
         updated_scf_info['ri_coulomb'] = scf_results.get('ri_coulomb', False)
         updated_scf_info['ri_jk'] = scf_results.get('ri_jk', False)
+        updated_scf_info['ri'] = scf_results.get(
+            'ri', updated_scf_info['ri_coulomb'] or
+            updated_scf_info['ri_jk'])
         if 'ri_auxiliary_basis' in scf_results:
             updated_scf_info['ri_auxiliary_basis'] = scf_results[
                 'ri_auxiliary_basis']
@@ -405,21 +408,30 @@ def ri_sanity_check(obj):
         The object (SCF or response driver) that is being updated.
     """
 
-    ri_coulomb = getattr(obj, 'ri_coulomb', False)
-    ri_jk = getattr(obj, 'ri_jk', False)
+    ri = getattr(obj, 'ri', True)
 
-    if not (ri_coulomb or ri_jk):
+    if not ri:
+        obj.ri_coulomb = False
+        obj.ri_jk = False
         return
 
-    if (ri_coulomb or ri_jk) and hasattr(obj, 'acc_type'):
+    xcfun = getattr(obj, 'xcfun', None)
+    use_ri_jk = (xcfun is None or
+                 (isinstance(xcfun, str) and xcfun.lower() == 'hf') or
+                 (not isinstance(xcfun, str) and xcfun.is_hybrid()))
+
+    obj.ri_coulomb = not use_ri_jk
+    obj.ri_jk = use_ri_jk
+
+    if hasattr(obj, 'acc_type'):
         # RI uses plain DIIS
         if obj.acc_type.upper() == 'L2_DIIS':
             obj.acc_type = 'DIIS'
 
-    if ri_coulomb and obj.ri_auxiliary_basis == 'def2-universal-jkfit':
+    if obj.ri_coulomb and obj.ri_auxiliary_basis == 'def2-universal-jkfit':
         obj.ri_auxiliary_basis = 'def2-universal-jfit'
 
-    if ri_jk and obj.ri_auxiliary_basis == 'def2-universal-jfit':
+    if obj.ri_jk and obj.ri_auxiliary_basis == 'def2-universal-jfit':
         obj.ri_auxiliary_basis = 'def2-universal-jkfit'
 
 

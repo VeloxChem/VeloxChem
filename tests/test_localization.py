@@ -32,8 +32,7 @@ class TestLocalization:
         bas = MolecularBasis.read(mol, 'def2-svp', ostream=None)
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri_coulomb = False
-        scf_drv.ri_jk = False
+        scf_drv.ri = False
         scf_drv.ostream.mute()
         scf_res = scf_drv.compute(mol, bas)
 

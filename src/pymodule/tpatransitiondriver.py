@@ -179,11 +179,11 @@ class TpaTransitionDriver(NonlinearSolver):
         if self.filename is not None and self.checkpoint_file is None:
             self.checkpoint_file = f'{self.filename}_rsp.h5'
 
-        # check RI setup
-        ri_sanity_check(self)
-
         # check dft setup
         dft_sanity_check(self, 'compute', 'nonlinear')
+
+        # check RI setup
+        ri_sanity_check(self)
 
         profiler = Profiler({
             'timing': False,

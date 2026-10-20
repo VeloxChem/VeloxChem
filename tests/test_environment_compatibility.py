@@ -227,8 +227,7 @@ class TestEnvironmentCompatibility:
         molecule, basis = self.get_water_and_basis()
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri_coulomb = False
-        scf_drv.ri_jk = False
+        scf_drv.ri = False
         scf_drv.ostream.mute()
         scf_drv.solvation_model = 'cpcm'
         scf_drv.electric_field = [0.0, 0.0, 1.0e-4]
@@ -246,8 +245,7 @@ class TestEnvironmentCompatibility:
         molecule, basis = self.get_water_and_basis()
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri_coulomb = False
-        scf_drv.ri_jk = False
+        scf_drv.ri = False
         scf_drv.ostream.mute()
         scf_drv.pressure = 100.0
         scf_drv.electric_field = [0.0, 0.0, 1.0e-4]
@@ -268,8 +266,7 @@ class TestEnvironmentCompatibility:
         molecule, basis = self.get_water_and_basis()
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri_coulomb = False
-        scf_drv.ri_jk = False
+        scf_drv.ri = False
         scf_drv.ostream.mute()
         scf_drv.pressure = 100.0
         scf_drv.point_charges = one_point_charge()
@@ -287,8 +284,7 @@ class TestEnvironmentCompatibility:
         potfile.write_text('{}')
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri_coulomb = False
-        scf_drv.ri_jk = False
+        scf_drv.ri = False
         scf_drv.ostream.mute()
         scf_drv.potfile = str(potfile)
         scf_drv.pressure = 100.0
@@ -308,8 +304,7 @@ class TestEnvironmentCompatibility:
         potfile.write_text('{}')
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri_coulomb = False
-        scf_drv.ri_jk = False
+        scf_drv.ri = False
         scf_drv.ostream.mute()
         scf_drv.potfile = str(potfile)
         scf_drv.electric_field = [0.0, 0.0, 1.0e-4]
@@ -328,8 +323,7 @@ class TestEnvironmentCompatibility:
         potfile.write_text('{}')
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri_coulomb = False
-        scf_drv.ri_jk = False
+        scf_drv.ri = False
         scf_drv.ostream.mute()
         scf_drv.potfile = str(potfile)
         scf_drv.point_charges = one_point_charge()
@@ -341,8 +335,7 @@ class TestEnvironmentCompatibility:
     def test_update_settings_allows_gostshyp_with_electric_field(self):
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri_coulomb = False
-        scf_drv.ri_jk = False
+        scf_drv.ri = False
         scf_drv.ostream.mute()
 
         scf_drv.update_settings(
@@ -362,8 +355,7 @@ class TestEnvironmentCompatibility:
         point_charges[3, 0] = 1.0
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri_coulomb = False
-        scf_drv.ri_jk = False
+        scf_drv.ri = False
         scf_drv.ostream.mute()
         scf_drv.electric_field = [0.0, 0.0, 1.0e-4]
         scf_drv.point_charges = point_charges
@@ -424,8 +416,7 @@ class TestEnvironmentCompatibility:
         molecule, basis = self.get_water_and_basis()
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri_coulomb = False
-        scf_drv.ri_jk = False
+        scf_drv.ri = False
         scf_drv.ostream.mute()
         scf_drv.pressure = 100.0
         scf_drv.electric_field = [0.0, 0.0, 1.0e-4]

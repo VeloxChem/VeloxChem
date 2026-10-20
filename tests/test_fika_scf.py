@@ -52,8 +52,7 @@ def fika_embedding(pdb_file, damping=None):
 def run_scf(molecule, basis, embedding):
 
     scf_drv = ScfRestrictedDriver()
-    scf_drv.ri_coulomb = False
-    scf_drv.ri_jk = False
+    scf_drv.ri = False
     scf_drv.ostream.mute()
     scf_drv.conv_thresh = 1.0e-8
     scf_drv.embedding = embedding
@@ -324,8 +323,7 @@ class TestFikaScf:
 
         # A potfile takes priority over an assigned embedding.
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri_coulomb = False
-        scf_drv.ri_jk = False
+        scf_drv.ri = False
         scf_drv.ostream.mute()
         scf_drv.embedding = {
             'settings': {
@@ -382,8 +380,7 @@ class TestFikaScf:
         basis = MolecularBasis.read(molecule, 'def2-svp', ostream=None)
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri_coulomb = False
-        scf_drv.ri_jk = False
+        scf_drv.ri = False
         scf_drv.ostream.mute()
         scf_drv.conv_thresh = 1.0e-8
         scf_drv.potfile = str(potfile)

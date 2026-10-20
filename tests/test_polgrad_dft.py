@@ -17,8 +17,7 @@ class TestPolgrad:
 
     def run_polgrad_real(self, molecule, basis, xcfun=None, label=None):
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri_coulomb = False
-        scf_drv.ri_jk = False
+        scf_drv.ri = False
         scf_drv.xcfun = xcfun
         scf_drv.ostream.mute()
         scf_results = scf_drv.compute(molecule, basis)
@@ -83,8 +82,7 @@ class TestPolgrad:
 
     def run_polgrad_complex(self, molecule, basis, xcfun=None, label=None):
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri_coulomb = False
-        scf_drv.ri_jk = False
+        scf_drv.ri = False
         scf_drv.xcfun = xcfun
         scf_drv.ostream.mute()
         scf_results = scf_drv.compute(molecule, basis)

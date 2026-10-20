@@ -18,8 +18,7 @@ class TestNumericalGradient:
         bas = MolecularBasis.read(mol, bas_label)
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri_coulomb = False
-        scf_drv.ri_jk = False
+        scf_drv.ri = False
         scf_drv.ostream.mute()
         scf_results = scf_drv.compute(mol, bas)
 

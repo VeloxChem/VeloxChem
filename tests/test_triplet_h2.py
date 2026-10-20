@@ -23,8 +23,7 @@ class TestTripletH2:
             task.input_dict['method_settings']['xcfun'] = xcfun_label
 
         scf_drv = ScfUnrestrictedDriver(task.mpi_comm, task.ostream)
-        scf_drv.ri_coulomb = False
-        scf_drv.ri_jk = False
+        scf_drv.ri = False
         scf_drv.update_settings(task.input_dict['scf'],
                                 task.input_dict['method_settings'])
         scf_results = scf_drv.compute(task.molecule, task.ao_basis,

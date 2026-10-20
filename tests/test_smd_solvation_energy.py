@@ -16,8 +16,7 @@ class TestSmdSolvation:
         bas = MolecularBasis.read(mol, basis_label, ostream=None)
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri_coulomb = False
-        scf_drv.ri_jk = False
+        scf_drv.ri = False
         scf_drv.xcfun = xcfun_label
 
         scf_drv.solvation_model = 'smd'

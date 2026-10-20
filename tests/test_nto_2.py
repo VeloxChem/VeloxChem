@@ -26,12 +26,10 @@ class TestNTO2:
 
         if mol.get_multiplicity() == 1:
             scf_drv = ScfRestrictedDriver()
-            scf_drv.ri_coulomb = False
-            scf_drv.ri_jk = False
+            scf_drv.ri = False
         else:
             scf_drv = ScfUnrestrictedDriver()
-            scf_drv.ri_coulomb = False
-            scf_drv.ri_jk = False
+            scf_drv.ri = False
 
         scf_drv.restart = False
 

@@ -42,8 +42,7 @@ class TestCphfPolgrad:
                              solver_cls=PolOrbitalResponse):
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri_coulomb = False
-        scf_drv.ri_jk = False
+        scf_drv.ri = False
         scf_drv.xcfun = xcfun
         scf_drv.ostream.mute()
         scf_results = scf_drv.compute(molecule, basis)
@@ -114,8 +113,7 @@ class TestCphfPolgrad:
                                 solver_cls=PolOrbitalResponse):
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri_coulomb = False
-        scf_drv.ri_jk = False
+        scf_drv.ri = False
         scf_drv.xcfun = xcfun
         scf_drv.ostream.mute()
         scf_results = scf_drv.compute(molecule, basis)

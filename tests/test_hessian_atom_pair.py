@@ -38,8 +38,7 @@ class TestHessianAtomPair:
         atom_pairs = [(9, 6), (0, 3)]
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri_coulomb = False
-        scf_drv.ri_jk = False
+        scf_drv.ri = False
         scf_drv.ostream.mute()
         scf_drv.acc_type = 'l2_diis'
         scf_drv.compute(mol, basis)
@@ -89,8 +88,7 @@ class TestHessianAtomPair:
         def run_hessian_with_dispersion(atom_pairs_input=None):
 
             scf_drv = ScfRestrictedDriver()
-            scf_drv.ri_coulomb = False
-            scf_drv.ri_jk = False
+            scf_drv.ri = False
             scf_drv.ostream.mute()
             scf_drv.dispersion = True
             scf_drv.compute(mol, basis)

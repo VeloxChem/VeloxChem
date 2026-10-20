@@ -93,8 +93,7 @@ class TestPointCharges:
         potfile.write_text('1\ninvalid\nQ 0.0 0.0 0.0\n')
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri_coulomb = False
-        scf_drv.ri_jk = False
+        scf_drv.ri = False
         scf_drv.point_charges = str(potfile)
         scf_drv.ostream.mute()
 
@@ -111,8 +110,7 @@ class TestPointCharges:
         potfile.write_text('')
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri_coulomb = False
-        scf_drv.ri_jk = False
+        scf_drv.ri = False
         scf_drv.point_charges = str(potfile)
         scf_drv.ostream.mute()
 
@@ -131,8 +129,7 @@ class TestPointCharges:
         vdwfile.write_text('1.0 2.0\n3.0\n')
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri_coulomb = False
-        scf_drv.ri_jk = False
+        scf_drv.ri = False
         scf_drv.point_charges = str(potfile)
         scf_drv.qm_vdw_params = str(vdwfile)
         scf_drv.ostream.mute()
@@ -161,15 +158,13 @@ class TestPointCharges:
         method_settings_pc = {'xcfun': 'hf', 'point_charges': potfile}
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri_coulomb = False
-        scf_drv.ri_jk = False
+        scf_drv.ri = False
         scf_drv.update_settings(scf_settings, method_settings)
         scf_drv.ostream.mute()
         scf_results_vac = scf_drv.compute(mol, bas)
 
         scf_drv_pc = ScfRestrictedDriver()
-        scf_drv_pc.ri_coulomb = False
-        scf_drv_pc.ri_jk = False
+        scf_drv_pc.ri = False
         scf_drv_pc.update_settings(scf_settings, method_settings)
         scf_drv_pc.point_charges = potfile
         scf_drv_pc.ostream.mute()
@@ -225,8 +220,7 @@ class TestPointCharges:
         field = [0.0, 0.0, 0.001]
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri_coulomb = False
-        scf_drv.ri_jk = False
+        scf_drv.ri = False
         scf_drv.update_settings(scf_settings, method_settings)
         scf_drv.electric_field = field
         scf_drv.ostream.mute()
@@ -257,8 +251,7 @@ class TestPointCharges:
         other_field = [0.0, 0.001, 0.0]
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri_coulomb = False
-        scf_drv.ri_jk = False
+        scf_drv.ri = False
         scf_drv.update_settings(scf_settings, method_settings)
         scf_drv.electric_field = field
         scf_drv.ostream.mute()

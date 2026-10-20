@@ -61,8 +61,7 @@ def _run_water_rsp_roundtrip(tmp_path, solver_cls, save_solutions=True):
     base = str(Path(tmp_path) / solver_cls.__name__.lower())
 
     scf_drv = ScfRestrictedDriver()
-    scf_drv.ri_coulomb = False
-    scf_drv.ri_jk = False
+    scf_drv.ri = False
     scf_drv.ostream.mute()
     base = scf_drv.comm.bcast(base, root=mpi_master())
     scf_drv.filename = base
@@ -98,8 +97,7 @@ def _run_cpp_rsp_roundtrip(tmp_path, solver_cls):
     base = str(Path(tmp_path) / solver_cls.__name__.lower())
 
     scf_drv = ScfRestrictedDriver()
-    scf_drv.ri_coulomb = False
-    scf_drv.ri_jk = False
+    scf_drv.ri = False
     scf_drv.ostream.mute()
     base = scf_drv.comm.bcast(base, root=mpi_master())
     scf_drv.filename = base
@@ -168,8 +166,7 @@ def _run_c6_rsp_roundtrip(tmp_path):
     base = str(Path(tmp_path) / 'c6driver')
 
     scf_drv = ScfRestrictedDriver()
-    scf_drv.ri_coulomb = False
-    scf_drv.ri_jk = False
+    scf_drv.ri = False
     scf_drv.ostream.mute()
     base = scf_drv.comm.bcast(base, root=mpi_master())
     scf_drv.filename = base
@@ -710,8 +707,7 @@ def test_scf_results_hdf5_roundtrip_with_water_calculation(tmp_path):
     filename = comm.bcast(filename, root=mpi_master())
 
     scf_drv = ScfRestrictedDriver()
-    scf_drv.ri_coulomb = False
-    scf_drv.ri_jk = False
+    scf_drv.ri = False
     scf_drv.ostream.mute()
     scf_drv.filename = filename
     scf_results = scf_drv.compute(molecule, basis)
@@ -784,8 +780,7 @@ def test_opt_results_hdf5_roundtrip_with_nh3_optimization(tmp_path):
     task.ao_basis = task.mpi_comm.bcast(task.ao_basis, root=mpi_master())
 
     scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
-    scf_drv.ri_coulomb = False
-    scf_drv.ri_jk = False
+    scf_drv.ri = False
     scf_drv.update_settings(task.input_dict['scf'],
                             task.input_dict['method_settings'])
     _ = scf_drv.compute(task.molecule, task.ao_basis)
@@ -818,8 +813,7 @@ def test_opt_results_hdf5_roundtrip_with_real_scan(tmp_path):
 
     ostream = OutputStream(None)
     scf_drv = ScfRestrictedDriver(MPI.COMM_WORLD, ostream)
-    scf_drv.ri_coulomb = False
-    scf_drv.ri_jk = False
+    scf_drv.ri = False
     scf_drv.filename = filename
     grad_drv = ScfGradientDriver(scf_drv)
     opt_drv = OptimizationDriver(grad_drv)
@@ -854,8 +848,7 @@ def test_vib_results_hdf5_roundtrip_with_water_calculation(tmp_path):
     filename = task.mpi_comm.bcast(filename, root=mpi_master())
 
     scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
-    scf_drv.ri_coulomb = False
-    scf_drv.ri_jk = False
+    scf_drv.ri = False
     scf_drv.acc_type = 'l2_diis'
     scf_drv.filename = filename
     _ = scf_drv.compute(task.molecule, task.ao_basis)
@@ -887,8 +880,7 @@ def test_rixs_results_hdf5_roundtrip_with_water_calculation(tmp_path):
     filename = task.mpi_comm.bcast(filename, root=mpi_master())
 
     scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
-    scf_drv.ri_coulomb = False
-    scf_drv.ri_jk = False
+    scf_drv.ri = False
     scf_drv.filename = filename
     scf_results = scf_drv.compute(task.molecule, task.ao_basis)
 

@@ -76,10 +76,8 @@ def _run_construction_once(monkeypatch, workdir: Path) -> ConstructionContext:
     mol.set_multiplicity(1)
 
     qm_driver = ScfRestrictedDriver()
-    qm_driver.ri_coulomb = False
-    qm_driver.ri_jk = False
+    qm_driver.ri = True
     qm_driver.xcfun = "pbe"
-    qm_driver.ri_coulomb = True
     qm_driver.dispersion = True
 
     qm_driver.ostream.mute()
@@ -120,8 +118,7 @@ def _run_construction_once(monkeypatch, workdir: Path) -> ConstructionContext:
 
 def _make_setup_only_generator(mute_output=True) -> IMForceFieldGenerator:
     qm_driver = ScfRestrictedDriver()
-    qm_driver.ri_coulomb = False
-    qm_driver.ri_jk = False
+    qm_driver.ri = False
     qm_driver.ostream.mute()
 
     ffg = IMForceFieldGenerator(

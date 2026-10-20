@@ -162,11 +162,11 @@ class TddftOrbitalResponse(CphfSolver):
         # check SCF results
         scf_results_sanity_check(self, scf_tensors)
 
-        # check RI setup
-        ri_sanity_check(self)
-
         # check dft setup
         dft_sanity_check(self, 'compute')
+
+        # check RI setup
+        ri_sanity_check(self)
 
         # check pe setup
         pe_sanity_check(self, molecule=molecule)
@@ -538,11 +538,11 @@ class TddftOrbitalResponse(CphfSolver):
         # check SCF results
         scf_results_sanity_check(self, scf_tensors)
 
-        # check RI setup
-        ri_sanity_check(self)
-
         # check dft setup
         dft_sanity_check(self, 'compute')
+
+        # check RI setup
+        ri_sanity_check(self)
 
         # check pe setup
         pe_sanity_check(self, molecule=molecule)

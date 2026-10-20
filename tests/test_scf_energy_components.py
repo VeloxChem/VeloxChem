@@ -41,8 +41,7 @@ class TestScfEnergyComponents:
         ostream = OutputStream.create_mpi_ostream(comm, fname)
 
         scf_drv = ScfRestrictedDriver(comm, ostream)
-        scf_drv.ri_coulomb = False
-        scf_drv.ri_jk = False
+        scf_drv.ri = False
         scf_drv.solvation_model = solvation_model
         scf_drv.point_charges = potfile
         scf_drv.qm_vdw_params = vdwfile

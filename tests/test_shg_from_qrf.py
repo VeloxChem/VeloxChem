@@ -30,8 +30,7 @@ class TestShgFromQrf:
         method_settings = {'xcfun': xcfun_label, 'grid_level': 1}
 
         scfdrv = ScfRestrictedDriver()
-        scfdrv.ri_coulomb = False
-        scfdrv.ri_jk = False
+        scfdrv.ri = False
         scfdrv.ostream.mute()
         scfdrv.update_settings(scf_settings, method_settings)
         scf_results = scfdrv.compute(molecule, basis)

@@ -31,8 +31,7 @@ class TestCrf:
         basis = MolecularBasis.read(molecule, basis_set_label, ostream=None)
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri_coulomb = False
-        scf_drv.ri_jk = False
+        scf_drv.ri = False
         scf_drv.ostream.mute()
         scf_drv.update_settings(scf_settings)
         scf_results = scf_drv.compute(molecule, basis)

@@ -38,8 +38,7 @@ class TestScfUnrestrictedHessian:
         bas = MolecularBasis.read(mol, 'def2-svp')
 
         scf_drv = ScfUnrestrictedDriver()
-        scf_drv.ri_coulomb = False
-        scf_drv.ri_jk = False
+        scf_drv.ri = False
         scf_drv.ostream.mute()
         scf_drv.xcfun = xcfun_label
         scf_drv.compute(mol, bas)
@@ -112,8 +111,7 @@ class TestScfUnrestrictedHessian:
         bas = MolecularBasis.read(mol, 'def2-svp')
 
         scf_drv = ScfUnrestrictedDriver()
-        scf_drv.ri_coulomb = False
-        scf_drv.ri_jk = False
+        scf_drv.ri = False
         scf_drv.ostream.mute()
         scf_drv.compute(mol, bas)
 
@@ -146,8 +144,7 @@ class TestScfUnrestrictedHessian:
                       'water_analytical_hessian_pointcharges_unrest_b3lyp.txt')
 
         scf_drv = ScfUnrestrictedDriver()
-        scf_drv.ri_coulomb = False
-        scf_drv.ri_jk = False
+        scf_drv.ri = False
         scf_drv.ostream.mute()
         scf_drv.xcfun = 'b3lyp'
         scf_drv.point_charges = potfile
@@ -179,8 +176,7 @@ class TestScfUnrestrictedHessian:
         bas = MolecularBasis.read(mol, 'def2-svp')
 
         scf_drv = ScfUnrestrictedDriver()
-        scf_drv.ri_coulomb = False
-        scf_drv.ri_jk = False
+        scf_drv.ri = False
         scf_drv.ostream.mute()
         scf_drv.xcfun = 'cam-b3lyp'
         scf_drv.compute(mol, bas)
@@ -219,8 +215,7 @@ class TestScfUnrestrictedHessian:
         bas = MolecularBasis.read(mol, 'def2-svp', ostream=None)
 
         scf_ref = ScfUnrestrictedDriver()
-        scf_ref.ri_coulomb = False
-        scf_ref.ri_jk = False
+        scf_ref.ri = False
         scf_ref.ostream.mute()
         scf_ref.xcfun = 'hf'
         scf_ref.compute(mol, bas)
@@ -230,11 +225,9 @@ class TestScfUnrestrictedHessian:
         hess_ref.compute(mol, bas)
 
         scf_rijk = ScfUnrestrictedDriver()
-        scf_rijk.ri_coulomb = False
-        scf_rijk.ri_jk = False
+        scf_rijk.ri = True
         scf_rijk.ostream.mute()
         scf_rijk.xcfun = 'hf'
-        scf_rijk.ri_jk = True
         scf_rijk.compute(mol, bas)
 
         hess_rijk = ScfHessianDriver(scf_rijk)

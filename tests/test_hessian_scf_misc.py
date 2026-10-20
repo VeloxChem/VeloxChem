@@ -111,8 +111,7 @@ class TestScfHessianDriverMiscellaneous:
     def run_restricted_scf(molecule, basis, xcfun='hf'):
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri_coulomb = False
-        scf_drv.ri_jk = False
+        scf_drv.ri = False
         scf_drv.ostream.mute()
         scf_drv.xcfun = xcfun
         scf_drv.compute(molecule, basis)
@@ -133,8 +132,7 @@ class TestScfHessianDriverMiscellaneous:
         molecule, basis = self.get_h2o_molecule_and_basis()
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri_coulomb = False
-        scf_drv.ri_jk = False
+        scf_drv.ri = False
         scf_drv.ostream.mute()
 
         hess_drv = ScfHessianDriver(scf_drv)
@@ -199,8 +197,7 @@ class TestScfHessianDriverMiscellaneous:
         molecule, basis = self.get_h2o_molecule_and_basis()
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri_coulomb = False
-        scf_drv.ri_jk = False
+        scf_drv.ri = False
         scf_drv.ostream.mute()
 
         hess_drv = ScfHessianDriver(scf_drv)
@@ -229,8 +226,7 @@ class TestScfHessianDriverMiscellaneous:
                       'water_analytical_hessian_pointcharges_scf.txt')
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri_coulomb = False
-        scf_drv.ri_jk = False
+        scf_drv.ri = False
         scf_drv.ostream.mute()
         scf_drv.point_charges = potfile
         scf_drv.qm_vdw_params = vdwfile
@@ -250,8 +246,7 @@ class TestScfHessianDriverMiscellaneous:
     def test_determine_xc_hessian_grid_level_promotes_supported_cases(self):
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri_coulomb = False
-        scf_drv.ri_jk = False
+        scf_drv.ri = False
         scf_drv.ostream.mute()
         hess_drv = ScfHessianDriver(scf_drv)
 
@@ -293,8 +288,7 @@ class TestScfHessianDriverMiscellaneous:
             expected_message):
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri_coulomb = False
-        scf_drv.ri_jk = False
+        scf_drv.ri = False
         scf_drv.ostream.mute()
         scf_drv.xcfun = parse_xc_func(xcfun_label)
         hess_drv = ScfHessianDriver(scf_drv)
@@ -315,8 +309,7 @@ class TestScfHessianDriverMiscellaneous:
         au2_molecule, au2_basis = self.get_au2_molecule_and_basis()
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri_coulomb = False
-        scf_drv.ri_jk = False
+        scf_drv.ri = False
         scf_drv.ostream.mute()
         scf_drv.xcfun = parse_xc_func('PBE')
 

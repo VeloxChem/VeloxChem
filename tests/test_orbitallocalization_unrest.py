@@ -24,8 +24,7 @@ class TestOrbitalLocalizationUnrestricted:
         molecule.set_multiplicity(3)
         basis = MolecularBasis.read(molecule, "def2-svp")
         scf_drv = ScfUnrestrictedDriver()
-        scf_drv.ri_coulomb = False
-        scf_drv.ri_jk = False
+        scf_drv.ri = False
         scf_drv.ostream.mute()
         scf_res = scf_drv.compute(molecule, basis)
 

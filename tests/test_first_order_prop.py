@@ -21,12 +21,10 @@ class TestFirstOrderPropertyDriver:
 
         if mol.get_multiplicity() == 1:
             scf_drv = ScfRestrictedDriver()
-            scf_drv.ri_coulomb = False
-            scf_drv.ri_jk = False
+            scf_drv.ri = False
         else:
             scf_drv = ScfUnrestrictedDriver()
-            scf_drv.ri_coulomb = False
-            scf_drv.ri_jk = False
+            scf_drv.ri = False
         scf_drv.ostream.mute()
         scf_drv.xcfun = xcfun_label
         scf_results = scf_drv.compute(mol, bas)
@@ -187,8 +185,7 @@ class TestFirstOrderPropertyDriver:
         bas = MolecularBasis.read(mol, basis_label, ostream=None)
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri_coulomb = False
-        scf_drv.ri_jk = False
+        scf_drv.ri = False
         scf_drv.ostream.mute()
         scf_drv.xcfun = 'hf'
         scf_results = scf_drv.compute(mol, bas)
@@ -250,8 +247,7 @@ class TestFirstOrderPropertyDriver:
         bas = MolecularBasis.read(mol, basis_label, ostream=None)
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri_coulomb = False
-        scf_drv.ri_jk = False
+        scf_drv.ri = False
         scf_drv.ostream.mute()
         scf_drv.xcfun = 'hf'
         scf_results = scf_drv.compute(mol, bas)

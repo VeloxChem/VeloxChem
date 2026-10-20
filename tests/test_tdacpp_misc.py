@@ -11,6 +11,7 @@ from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.tdacppsolver import ComplexResponseTdaSolver
 from veloxchem.errorhandler import VeloxChemError
+from veloxchem.sanitychecks import ri_sanity_check
 
 
 class RecordingOutput:
@@ -86,8 +87,6 @@ class TestComplexResponseTdaSolverMisc:
         basis = MolecularBasis.read(molecule, 'sto-3g', ostream=None)
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri_coulomb = False
-        scf_drv.ri_jk = True
         scf_drv.ri_auxiliary_basis = 'def2-universal-jkfit'
         scf_drv.ostream.mute()
         scf_results = scf_drv.compute(molecule, basis)
@@ -107,8 +106,8 @@ class TestComplexResponseTdaSolverMisc:
         cpp_drv.frequencies = [0.4, 0.5]
         cpp_drv.conv_thresh = 1.0e-6
         cpp_drv.max_iter = 100
-        cpp_drv.ri_jk = True
         cpp_drv.ri_auxiliary_basis = 'def2-universal-jkfit'
+        ri_sanity_check(cpp_drv)
 
         if cpp_drv.rank == mpi_master():
             nocc = molecule.number_of_alpha_occupied_orbitals(basis)

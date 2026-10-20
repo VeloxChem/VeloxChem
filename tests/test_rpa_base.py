@@ -30,8 +30,7 @@ class TestRPABase:
     def run_restricted_scf(self, mol, bas, xcfun_label='hf'):
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri_coulomb = False
-        scf_drv.ri_jk = False
+        scf_drv.ri = False
         scf_drv.ostream.mute()
         scf_drv.xcfun = xcfun_label
 

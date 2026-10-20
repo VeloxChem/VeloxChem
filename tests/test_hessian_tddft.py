@@ -32,8 +32,7 @@ class TestTddftHessianDriver:
         h5file = str(here / 'data' / 'tddft_hessian.h5')
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri_coulomb = False
-        scf_drv.ri_jk = False
+        scf_drv.ri = False
         scf_drv.xcfun = xcfun_label
         scf_drv.grid_level = 6
         scf_drv.conv_thresh = 1e-10

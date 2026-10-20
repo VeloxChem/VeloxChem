@@ -19,13 +19,11 @@ class TestTddftGradientRiJk:
 
         if use_rijk:
             method_dict.update({
-                'ri_jk': True,
                 'ri_auxiliary_basis': 'def2-universal-jkfit',
             })
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri_coulomb = False
-        scf_drv.ri_jk = False
+        scf_drv.ri = use_rijk
         scf_drv.update_settings({'conv_thresh': 1e-8}, method_dict)
         scf_drv.ostream.mute()
         scf_drv.compute(molecule, basis)

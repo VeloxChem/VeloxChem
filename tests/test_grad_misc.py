@@ -63,22 +63,21 @@ class TestScfGradientDriverMiscellaneous:
         return molecule, basis
 
     @staticmethod
-    def run_restricted_scf(molecule, basis, xcfun='hf'):
+    def run_restricted_scf(molecule, basis, xcfun='hf', ri=False):
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri_coulomb = False
-        scf_drv.ri_jk = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_drv.xcfun = xcfun
         scf_results = scf_drv.compute(molecule, basis)
         return scf_drv, scf_results
 
     @staticmethod
-    def run_unrestricted_scf(molecule, basis, xcfun='hf', filename=None):
+    def run_unrestricted_scf(molecule, basis, xcfun='hf', filename=None,
+                             ri=False):
 
         scf_drv = ScfUnrestrictedDriver()
-        scf_drv.ri_coulomb = False
-        scf_drv.ri_jk = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_drv.xcfun = xcfun
         scf_drv.filename = filename
@@ -125,8 +124,7 @@ class TestScfGradientDriverMiscellaneous:
         molecule, basis = self.get_h2_molecule_and_basis()
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri_coulomb = False
-        scf_drv.ri_jk = False
+        scf_drv.ri = False
         scf_drv.ostream.mute()
         scf_drv.xcfun = 'hf'
 
@@ -156,8 +154,9 @@ class TestScfGradientDriverMiscellaneous:
     def test_restricted_ri_gradient_rejects_non_def2_basis(self):
 
         molecule, basis = self.get_h2o_molecule_and_basis()
-        scf_drv, scf_results = self.run_restricted_scf(molecule, basis)
-        scf_drv.ri_coulomb = True
+        scf_drv, scf_results = self.run_restricted_scf(molecule, basis,
+                                                       xcfun='blyp',
+                                                       ri=True)
 
         grad_drv = ScfGradientDriver(scf_drv)
 
@@ -169,8 +168,9 @@ class TestScfGradientDriverMiscellaneous:
     def test_unrestricted_ri_gradient_rejects_non_def2_basis(self):
 
         molecule, basis = self.get_ch3_molecule_and_basis()
-        scf_drv, scf_results = self.run_unrestricted_scf(molecule, basis)
-        scf_drv.ri_coulomb = True
+        scf_drv, scf_results = self.run_unrestricted_scf(molecule, basis,
+                                                         xcfun='blyp',
+                                                         ri=True)
 
         grad_drv = ScfGradientDriver(scf_drv)
 
@@ -182,11 +182,9 @@ class TestScfGradientDriverMiscellaneous:
         molecule, basis = self.get_h2o_molecule_and_basis()
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri_coulomb = False
-        scf_drv.ri_jk = False
+        scf_drv.ri = True
         scf_drv.ostream.mute()
         scf_drv.xcfun = 'hf'
-        scf_drv.ri_jk = True
         scf_results = scf_drv.compute(molecule, basis)
 
         grad_drv = ScfGradientDriver(scf_drv)
@@ -199,11 +197,9 @@ class TestScfGradientDriverMiscellaneous:
         molecule, basis = self.get_ch3_molecule_and_basis()
 
         scf_drv = ScfUnrestrictedDriver()
-        scf_drv.ri_coulomb = False
-        scf_drv.ri_jk = False
+        scf_drv.ri = True
         scf_drv.ostream.mute()
         scf_drv.xcfun = 'hf'
-        scf_drv.ri_jk = True
         scf_results = scf_drv.compute(molecule, basis)
 
         grad_drv = ScfGradientDriver(scf_drv)
@@ -300,8 +296,7 @@ class TestScfGradientDriverMiscellaneous:
         ostream = OutputStream.create_mpi_ostream(comm, str(output_file))
 
         scf_drv = ScfUnrestrictedDriver(comm, ostream)
-        scf_drv.ri_coulomb = False
-        scf_drv.ri_jk = False
+        scf_drv.ri = False
         scf_drv.xcfun = 'hf'
         scf_drv.solvation_model = 'cpcm'
         scf_drv.cpcm_grid_per_sphere = (110, 110)
@@ -386,8 +381,7 @@ class TestScfGradientDriverMiscellaneous:
         checkpoint_file = f'{filename}_scf.h5'
 
         new_scf_drv = ScfUnrestrictedDriver()
-        new_scf_drv.ri_coulomb = False
-        new_scf_drv.ri_jk = False
+        new_scf_drv.ri = False
         new_grad_drv = ScfGradientDriver(new_scf_drv)
         new_grad_drv.read_settings(checkpoint_file)
 

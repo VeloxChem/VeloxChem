@@ -24,8 +24,7 @@ class TestRespCharges:
         task.input_dict['scf']['checkpoint_file'] = None
 
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
-        scf_drv.ri_coulomb = False
-        scf_drv.ri_jk = False
+        scf_drv.ri = False
         scf_drv.filename = task.input_dict['filename']
         scf_drv.update_settings(task.input_dict['scf'],
                                 task.input_dict['method_settings'])

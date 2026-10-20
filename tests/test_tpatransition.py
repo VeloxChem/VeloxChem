@@ -31,11 +31,8 @@ class TestTpaTransition:
         basis = MolecularBasis.read(molecule, basis_set_label, ostream=None)
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri_coulomb = False
-        scf_drv.ri_jk = False
         scf_drv.xcfun = xcfun_label
-        scf_drv.ri_coulomb = ri_coulomb
-        scf_drv.ri_jk = ri_jk
+        scf_drv.ri = ri_coulomb or ri_jk
         scf_drv.conv_thresh = scf_conv_thresh
         scf_drv.ostream.mute()
         scf_results = scf_drv.compute(molecule, basis)
@@ -56,7 +53,6 @@ class TestTpaTransition:
         tpa_drv.xcfun = xcfun_label
         tpa_drv.nstates = tpa_nstates
         tpa_drv.conv_thresh = tpa_conv_thresh
-        tpa_drv.ri_jk = ri_jk
         if ri_jk:
             tpa_drv.ri_auxiliary_basis = 'def2-universal-jkfit'
         tpa_drv.ostream.mute()
@@ -92,10 +88,8 @@ class TestTpaTransition:
                                                     ri_coulomb=ri_coulomb)
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri_coulomb = False
-        scf_drv.ri_jk = False
         scf_drv.xcfun = xcfun_label
-        scf_drv.ri_coulomb = ri_coulomb
+        scf_drv.ri = ri_coulomb
         scf_drv.conv_thresh = 1.0e-8
         scf_drv.filename = filename
         scf_drv.ostream.mute()

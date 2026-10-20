@@ -143,11 +143,11 @@ class LinearResponseEigenSolver(LinearResponseEigenSolverBase):
         if self.filename is not None and self.checkpoint_file is None:
             self.checkpoint_file = f'{self.filename}_rsp.h5'
 
-        # check RI setup
-        ri_sanity_check(self)
-
         # check dft setup
         dft_sanity_check(self, 'compute')
+
+        # check RI setup
+        ri_sanity_check(self)
 
         # check pe setup
         pe_sanity_check(self, molecule=molecule)
@@ -1161,11 +1161,11 @@ class LinearResponseEigenSolver(LinearResponseEigenSolverBase):
         # check SCF results
         scf_results_sanity_check(self, scf_results)
 
-        # check RI setup
-        ri_sanity_check(self)
-
         # check dft setup
         dft_sanity_check(self, 'compute')
+
+        # check RI setup
+        ri_sanity_check(self)
 
         # check pe setup
         pe_sanity_check(self, molecule=molecule)

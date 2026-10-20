@@ -108,6 +108,7 @@ class NonlinearSolver:
         self.batch_size = None
 
         # RI-J
+        self.ri = True
         self.ri_coulomb = False
         self.ri_jk = False
         self.ri_auxiliary_basis = 'def2-universal-jfit'
@@ -193,6 +194,7 @@ class NonlinearSolver:
                 '_block_size_factor': ('int', 'block size factor for ERI'),
             },
             'method_settings': {
+                'ri': ('bool', 'use RI approximation'),
                 'ri_coulomb': ('bool', 'use RI-J approximation'),
                 'ri_jk': ('bool', 'use RI-JK approximation'),
                 'ri_auxiliary_basis': ('str', 'RI auxiliary basis set'),
@@ -297,9 +299,9 @@ class NonlinearSolver:
 
         parse_input(self, method_keywords, method_dict)
 
-        ri_sanity_check(self)
-
         dft_sanity_check(self, 'update_settings', 'nonlinear')
+
+        ri_sanity_check(self)
 
         nonlinear_response_environment_sanity_check(self)
 

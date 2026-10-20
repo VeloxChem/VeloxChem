@@ -154,11 +154,11 @@ class CphfSolver(LinearSolver):
             self.checkpoint_file = (self.checkpoint_file[:-len('_rsp.h5')] +
                                     '_orbrsp.h5')
 
-        # check RI setup
-        ri_sanity_check(self)
-
         # check dft setup
         dft_sanity_check(self, 'compute')
+
+        # check RI setup
+        ri_sanity_check(self)
 
         # check pe setup
         pe_sanity_check(self, molecule=molecule)
@@ -398,11 +398,11 @@ class CphfSolver(LinearSolver):
             self.checkpoint_file = (self.checkpoint_file[:-len('_rsp.h5')] +
                                     '_orbrsp.h5')
 
-        # check RI setup
-        ri_sanity_check(self)
-
         # check dft setup
         dft_sanity_check(self, 'compute')
+
+        # check RI setup
+        ri_sanity_check(self)
 
         # check pe setup
         pe_sanity_check(self, molecule=molecule)

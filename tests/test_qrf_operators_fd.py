@@ -34,8 +34,7 @@ class TestQrfOperatorsFD:
         # SCF
 
         scfdrv = ScfRestrictedDriver(comm, ostream)
-        scfdrv.ri_coulomb = False
-        scfdrv.ri_jk = False
+        scfdrv.ri = False
         scf_result = scfdrv.compute(molecule, basis)
 
         # finite difference prep
@@ -49,14 +48,12 @@ class TestQrfOperatorsFD:
         efield_minus[fd_index] = -delta_ef
 
         scf_drv_plus = ScfRestrictedDriver(comm, ostream)
-        scf_drv_plus.ri_coulomb = False
-        scf_drv_plus.ri_jk = False
+        scf_drv_plus.ri = False
         scf_drv_plus.electric_field = efield_plus
         scf_result_plus = scf_drv_plus.compute(molecule, basis)
 
         scf_drv_minus = ScfRestrictedDriver(comm, ostream)
-        scf_drv_minus.ri_coulomb = False
-        scf_drv_minus.ri_jk = False
+        scf_drv_minus.ri = False
         scf_drv_minus.electric_field = efield_minus
         scf_result_minus = scf_drv_minus.compute(molecule, basis)
 

@@ -51,8 +51,7 @@ def _get_unrestricted_water_cation():
 def _run_restricted_scf(molecule, basis):
 
     scf_drv = ScfRestrictedDriver()
-    scf_drv.ri_coulomb = False
-    scf_drv.ri_jk = False
+    scf_drv.ri = False
     scf_drv.ostream.mute()
 
     return scf_drv.compute(molecule, basis)
@@ -61,8 +60,7 @@ def _run_restricted_scf(molecule, basis):
 def _run_unrestricted_scf(molecule, basis):
 
     scf_drv = ScfUnrestrictedDriver()
-    scf_drv.ri_coulomb = False
-    scf_drv.ri_jk = False
+    scf_drv.ri = False
     scf_drv.ostream.mute()
 
     return scf_drv.compute(molecule, basis)
@@ -71,8 +69,7 @@ def _run_unrestricted_scf(molecule, basis):
 def _run_restarted_restricted_scf(molecule, basis, filename):
 
     scf_drv = ScfRestrictedDriver()
-    scf_drv.ri_coulomb = False
-    scf_drv.ri_jk = False
+    scf_drv.ri = False
     scf_drv.ostream.mute()
     scf_drv.filename = filename
     scf_drv.compute(molecule, basis)

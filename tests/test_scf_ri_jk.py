@@ -8,7 +8,7 @@ from veloxchem.outputstream import OutputStream
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 
 # NOTE: the SIMD RI-JK driver is the path through the closed shell Fock
-# build, selected by ri_jk. It is the same approximation as the conventional
+# build, selected by ri. It is the same approximation as the conventional
 # RI-JK path, with the same auxiliary basis and the same metric threshold, so the
 # two must converge to the same energy. That one number exercises the whole chain,
 # the inverted metric, the B vectors, the Y vector, the Coulomb matrix, the W
@@ -37,11 +37,10 @@ class TestScfRiJk:
 
         return MolecularBasis.read(molecule, 'def2-svp', ostream=None)
 
-    def run_scf(self, molecule, basis, **settings):
+    def run_scf(self, molecule, basis, ri=True, **settings):
 
         driver = ScfRestrictedDriver(ostream=OutputStream(None))
-        driver.ri_coulomb = False
-        driver.ri_jk = False
+        driver.ri = ri
 
         driver.conv_thresh = 1.0e-8
 
@@ -71,7 +70,6 @@ class TestScfRiJk:
         reproduce."""
 
         settings = {
-            'ri_jk': True,
             'ri_auxiliary_basis': 'def2-universal-jkfit',
         }
 
@@ -87,11 +85,10 @@ class TestScfRiJk:
         """The energy has to differ from the one without the approximation, or the
         test above would pass with the path never taken."""
 
-        plain = self.run_scf(molecule, basis)
+        plain = self.run_scf(molecule, basis, ri=False)
 
         simd = self.run_scf(molecule,
                             basis,
-                            ri_jk=True,
                             ri_auxiliary_basis='def2-universal-jkfit')
 
         assert abs(simd - plain) > 1.0e-6
@@ -101,8 +98,7 @@ class TestScfRiJk:
 
         driver = ScfRestrictedDriver(ostream=OutputStream(None))
 
-        assert driver.ri_coulomb
-        assert driver.ri_jk
+        assert driver.ri
         assert driver.ri_memory_budget is None
 
     def test_the_mode_can_be_chosen(self, molecule, basis):
@@ -110,7 +106,6 @@ class TestScfRiJk:
         must reach the same energy."""
 
         settings = {
-            'ri_jk': True,
             'ri_auxiliary_basis': 'def2-universal-jkfit',
         }
 
@@ -128,7 +123,6 @@ class TestScfRiJk:
         molecule too large to hold reachable."""
 
         settings = {
-            'ri_jk': True,
             'ri_auxiliary_basis': 'def2-universal-jkfit',
         }
 
@@ -151,15 +145,12 @@ class TestScfRiJk:
         with pytest.raises(VeloxChemError, match='ri_mode'):
             self.run_scf(molecule,
                          basis,
-                         ri_jk=True,
                          ri_auxiliary_basis='def2-universal-jkfit',
                          ri_mode='sideways')
 
     def test_the_mode_defaults_to_automatic(self):
 
         driver = ScfRestrictedDriver(ostream=OutputStream(None))
-        driver.ri_coulomb = False
-        driver.ri_jk = False
 
         assert driver.ri_mode == 'automatic'
 
@@ -172,7 +163,6 @@ class TestScfRiJk:
         same energy either way."""
 
         settings = {
-            'ri_jk': True,
             'ri_auxiliary_basis': 'def2-universal-jkfit',
             'ri_mode': 'in_memory',
         }
@@ -192,8 +182,7 @@ class TestScfRiJk:
         the metric is well conditioned, which is most of the time."""
 
         driver = ScfRestrictedDriver(ostream=OutputStream(None))
-        driver.ri_coulomb = False
-        driver.ri_jk = False
+        driver.ri = False
 
         assert driver.ri_metric_route == 'cholesky'
 
@@ -206,6 +195,5 @@ class TestScfRiJk:
         with pytest.raises(VeloxChemError, match='ri_metric_route'):
             self.run_scf(molecule,
                          basis,
-                         ri_jk=True,
                          ri_auxiliary_basis='def2-universal-jkfit',
                          ri_metric_route='sideways')

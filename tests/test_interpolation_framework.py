@@ -136,8 +136,7 @@ class TestInterpolationSetup:
         interpolation_datapoint = InterpolationDatapoint(z_matrix)
         interpolation_datapoint.cartesian_coordinates = molecule.get_coordinates_in_bohr()
         qm_driver = ScfRestrictedDriver()
-        qm_driver.ri_coulomb = False
-        qm_driver.ri_jk = False
+        qm_driver.ri = False
         basis = MolecularBasis.read(molecule, 'def2-svp')
         qm_driver.ostream.mute()
         scf_results = qm_driver.compute(molecule, basis)
