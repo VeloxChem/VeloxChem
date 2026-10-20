@@ -51,6 +51,7 @@ class TestEnsembleDriver:
             "max_iter": 150,
             "xcfun": "CAM-B3LYP",
             "grid_level": 4,
+            "ri": False,
         }
 
         property_options = {
@@ -197,6 +198,7 @@ class TestEnsembleDriver:
             "max_iter": 150,
             "xcfun": "CAM-B3LYP",
             "grid_level": 4,
+            "ri": False,
         }
 
         property_options = {

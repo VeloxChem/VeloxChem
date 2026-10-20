@@ -220,6 +220,7 @@ class TestFikaScf:
         def scf(driver_class, mol):
             driver = driver_class()
             driver.ostream.mute()
+            driver.ri = False
             driver.conv_thresh = 1.0e-8
             driver.embedding = embedding
             return driver.compute(mol, basis)

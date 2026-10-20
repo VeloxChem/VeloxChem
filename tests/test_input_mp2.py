@@ -48,6 +48,7 @@ class TestInputMp2:
 
             @method settings
             basis: def2-svp
+            ri: false
             @end
 
             @molecule

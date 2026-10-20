@@ -35,6 +35,7 @@ class TestInputOptVib:
 
             @method settings
             basis: def2-svp
+            ri: false
             @end
 
             @optimize

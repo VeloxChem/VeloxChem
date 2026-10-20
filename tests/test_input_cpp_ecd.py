@@ -52,6 +52,7 @@ class TestInputCppECD:
 
             @method settings
             basis: sto-3g
+            ri: false
             @end
 
             @scf

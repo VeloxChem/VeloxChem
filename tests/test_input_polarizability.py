@@ -53,6 +53,7 @@ class TestInputPolarizability:
 
             @method settings
             basis: aug-cc-pvdz
+            ri: false
             @end
 
             @scf
