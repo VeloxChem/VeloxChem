@@ -41,7 +41,7 @@ from .distributedarray import DistributedArray
 from .dftutils import get_default_grid_level
 from .inputparser import parse_input
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
-                           ri_sanity_check, dft_sanity_check, pe_sanity_check,
+                           dft_and_ri_sanity_check, pe_sanity_check,
                            solvation_model_sanity_check,
                            rsp_results_solvation_sanity_check,
                            gostshyp_sanity_check,
@@ -162,11 +162,8 @@ class TddftOrbitalResponse(CphfSolver):
         # check SCF results
         scf_results_sanity_check(self, scf_tensors)
 
-        # check dft setup
-        dft_sanity_check(self, 'compute')
-
-        # check RI setup
-        ri_sanity_check(self)
+        # check DFT and RI setup
+        dft_and_ri_sanity_check(self, 'compute')
 
         # check pe setup
         pe_sanity_check(self, molecule=molecule)
@@ -538,11 +535,8 @@ class TddftOrbitalResponse(CphfSolver):
         # check SCF results
         scf_results_sanity_check(self, scf_tensors)
 
-        # check dft setup
-        dft_sanity_check(self, 'compute')
-
-        # check RI setup
-        ri_sanity_check(self)
+        # check DFT and RI setup
+        dft_and_ri_sanity_check(self, 'compute')
 
         # check pe setup
         pe_sanity_check(self, molecule=molecule)

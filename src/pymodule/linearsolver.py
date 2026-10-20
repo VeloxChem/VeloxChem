@@ -60,7 +60,7 @@ from .oneeints import (compute_electric_dipole_integrals,
                        compute_quadrupole_integrals,
                        compute_linear_momentum_integrals,
                        compute_angular_momentum_integrals)
-from .sanitychecks import (dft_sanity_check, ri_sanity_check, pe_sanity_check,
+from .sanitychecks import (dft_and_ri_sanity_check, pe_sanity_check,
                            solvation_model_sanity_check,
                            gostshyp_sanity_check,
                            environment_compatibility_sanity_check)
@@ -412,9 +412,7 @@ class LinearSolver:
 
         parse_input(self, method_keywords, method_dict)
 
-        dft_sanity_check(self, 'update_settings')
-
-        ri_sanity_check(self)
+        dft_and_ri_sanity_check(self, 'update_settings')
 
         pe_sanity_check(self, method_dict)
 

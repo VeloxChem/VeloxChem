@@ -41,7 +41,7 @@ from .outputstream import OutputStream
 from .molecule import Molecule
 from .dftutils import get_default_grid_level, get_optimal_grid_box_size
 from .inputparser import parse_input, read_unparsed_input_from_hdf5
-from .sanitychecks import dft_sanity_check
+from .sanitychecks import dft_and_ri_sanity_check
 
 
 class GradientDriver:
@@ -141,7 +141,7 @@ class GradientDriver:
 
         parse_input(self, method_keywords, method_dict)
 
-        dft_sanity_check(self, 'update_settings')
+        dft_and_ri_sanity_check(self, 'update_settings')
 
     def read_settings(self, checkpoint_file):
         """

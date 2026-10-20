@@ -59,7 +59,7 @@ from .oneeints import compute_point_charge_gradient
 from .oneeints import compute_ecp_gradient
 from .errorhandler import assert_msg_critical
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
-                           dft_sanity_check)
+                           dft_and_ri_sanity_check)
 
 
 class ScfGradientDriver(GradientDriver):
@@ -266,7 +266,7 @@ class ScfGradientDriver(GradientDriver):
         # that the DFT state is up to date before the setup header is printed
         molecule_sanity_check(molecule)
         scf_results_sanity_check(self, scf_results)
-        dft_sanity_check(self, 'compute')
+        dft_and_ri_sanity_check(self, 'compute')
 
         start_time = time.time()
         self.print_header()

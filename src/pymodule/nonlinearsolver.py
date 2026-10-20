@@ -49,7 +49,7 @@ from .griddriver import GridDriver
 from .fockdriver import FockDriver
 from .linearsolver import LinearSolver
 from .distributedarray import DistributedArray
-from .sanitychecks import dft_sanity_check, ri_sanity_check
+from .sanitychecks import dft_and_ri_sanity_check
 from .sanitychecks import nonlinear_response_environment_sanity_check
 from .errorhandler import assert_msg_critical
 from . import rijkresponse
@@ -299,9 +299,7 @@ class NonlinearSolver:
 
         parse_input(self, method_keywords, method_dict)
 
-        dft_sanity_check(self, 'update_settings', 'nonlinear')
-
-        ri_sanity_check(self)
+        dft_and_ri_sanity_check(self, 'update_settings', 'nonlinear')
 
         nonlinear_response_environment_sanity_check(self)
 

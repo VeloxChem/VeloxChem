@@ -347,9 +347,10 @@ def rsp_results_solvation_sanity_check(obj, rsp_results):
         setattr(obj, key, val)
 
 
-def dft_sanity_check(obj, method_flag='compute', response_flag='none'):
+def dft_and_ri_sanity_check(obj, method_flag='compute',
+                            response_flag='none'):
     """
-    Checks DFT settings and updates relevant attributes.
+    Checks DFT and RI settings and updates relevant attributes.
 
     :param obj:
         The object (SCF or response driver) that is being updated.
@@ -399,20 +400,15 @@ def dft_sanity_check(obj, method_flag='compute', response_flag='none'):
         assert_msg_critical('scan' not in obj.xcfun.get_func_label().lower(),
                             err_msg_scan)
 
-
-def ri_sanity_check(obj):
-    """
-    Checks RI settings and updates relevant attributes.
-
-    :param obj:
-        The object (SCF or response driver) that is being updated.
-    """
-
     ri = getattr(obj, 'ri', True)
 
     if not ri:
         obj.ri_coulomb = False
         obj.ri_jk = False
+        return
+
+    if not hasattr(obj, 'ri_auxiliary_basis'):
+        # not all drivers carry RI settings (e.g. gradient and Hessian)
         return
 
     xcfun = getattr(obj, 'xcfun', None)

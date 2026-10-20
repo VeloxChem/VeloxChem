@@ -56,7 +56,7 @@ from .firstorderprop import FirstOrderProperties
 from .errorhandler import assert_msg_critical
 from .inputparser import parse_input
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
-                           dft_sanity_check)
+                           dft_and_ri_sanity_check)
 
 
 class TddftGradientDriver(GradientDriver):
@@ -202,7 +202,7 @@ class TddftGradientDriver(GradientDriver):
         # sanity checks
         molecule_sanity_check(molecule)
         scf_results_sanity_check(self, self._scf_drv.scf_tensors)
-        dft_sanity_check(self, 'compute')
+        dft_and_ri_sanity_check(self, 'compute')
 
         # TODO: replace with a sanity check?
         if isinstance(rsp_drv, TdaEigenSolver):

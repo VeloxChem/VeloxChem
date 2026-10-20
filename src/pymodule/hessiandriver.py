@@ -38,7 +38,7 @@ from .veloxchemlib import mpi_master
 from .outputstream import OutputStream
 from .dftutils import get_default_grid_level
 from .inputparser import parse_input
-from .sanitychecks import dft_sanity_check
+from .sanitychecks import dft_and_ri_sanity_check
 from .molecule import Molecule
 
 
@@ -163,7 +163,7 @@ class HessianDriver:
 
         parse_input(self, method_keywords, method_dict)
 
-        dft_sanity_check(self, 'update_settings')
+        dft_and_ri_sanity_check(self, 'update_settings')
 
         self.method_dict = dict(method_dict)
         self.hess_dict = dict(hess_dict)

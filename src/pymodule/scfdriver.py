@@ -78,8 +78,8 @@ from .inputparser import (parse_input, print_keywords, print_attributes,
                           read_unparsed_input_from_hdf5)
 from .dftutils import (get_default_grid_level, get_optimal_grid_box_size,
                        print_xc_reference)
-from .sanitychecks import (molecule_sanity_check, dft_sanity_check,
-                           ri_sanity_check, pe_sanity_check,
+from .sanitychecks import (molecule_sanity_check, dft_and_ri_sanity_check,
+                           pe_sanity_check,
                            solvation_model_sanity_check, gostshyp_sanity_check,
                            environment_compatibility_sanity_check)
 from .errorhandler import assert_msg_critical
@@ -586,9 +586,7 @@ class ScfDriver:
 
         parse_input(self, method_keywords, method_dict)
 
-        dft_sanity_check(self, 'update_settings')
-
-        ri_sanity_check(self)
+        dft_and_ri_sanity_check(self, 'update_settings')
 
         pe_sanity_check(self, method_dict)
 
@@ -759,11 +757,8 @@ class ScfDriver:
         # check molecule
         molecule_sanity_check(molecule, self.scf_type)
 
-        # check dft setup
-        dft_sanity_check(self, 'compute')
-
-        # check RI setup
-        ri_sanity_check(self)
+        # check DFT and RI setup
+        dft_and_ri_sanity_check(self, 'compute')
 
         # check pe setup
         pe_sanity_check(self, molecule=molecule)

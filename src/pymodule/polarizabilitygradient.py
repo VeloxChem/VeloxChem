@@ -55,7 +55,7 @@ from .profiler import Profiler
 from .dftutils import get_default_grid_level
 from .errorhandler import assert_msg_critical
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
-                           dft_sanity_check, polgrad_sanity_check_1, polgrad_sanity_check_2)
+                           dft_and_ri_sanity_check, polgrad_sanity_check_1, polgrad_sanity_check_2)
 
 
 class PolarizabilityGradient:
@@ -184,7 +184,7 @@ class PolarizabilityGradient:
 
         parse_input(self, method_keywords, method_dict)
 
-        dft_sanity_check(self, 'update_settings')
+        dft_and_ri_sanity_check(self, 'update_settings')
 
         self.frequencies = list(self.frequencies)
 
@@ -216,7 +216,7 @@ class PolarizabilityGradient:
         # sanity checks
         molecule_sanity_check(molecule)
         scf_results_sanity_check(self, self._scf_drv.scf_tensors)
-        dft_sanity_check(self, 'compute')
+        dft_and_ri_sanity_check(self, 'compute')
 
         start_time = tm.time()
 

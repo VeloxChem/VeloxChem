@@ -66,7 +66,7 @@ from .dftutils import get_default_grid_level
 from .errorhandler import assert_msg_critical
 from .oneeints import compute_electric_dipole_integrals
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
-                           dft_sanity_check)
+                           dft_and_ri_sanity_check)
 
 
 class ScfHessianDriver(HessianDriver):
@@ -181,7 +181,7 @@ class ScfHessianDriver(HessianDriver):
         # that the DFT state is up to date before the setup header is printed
         molecule_sanity_check(molecule)
         scf_results_sanity_check(self, scf_results)
-        dft_sanity_check(self, 'compute')
+        dft_and_ri_sanity_check(self, 'compute')
 
         if self.rank == mpi_master():
             self.print_header()
@@ -254,7 +254,7 @@ class ScfHessianDriver(HessianDriver):
         # sanity checks
         molecule_sanity_check(molecule)
         scf_results_sanity_check(self, self.scf_driver.scf_results)
-        dft_sanity_check(self, 'compute')
+        dft_and_ri_sanity_check(self, 'compute')
 
         # use _determine_xc_hessian_grid_level here to ensure early exit for
         # unsupported cases
@@ -1016,7 +1016,7 @@ class ScfHessianDriver(HessianDriver):
         # sanity checks
         molecule_sanity_check(molecule)
         scf_results_sanity_check(self, self.scf_driver.scf_results)
-        dft_sanity_check(self, 'compute')
+        dft_and_ri_sanity_check(self, 'compute')
 
         # use _determine_xc_hessian_grid_level here to ensure early exit for
         # unsupported cases
