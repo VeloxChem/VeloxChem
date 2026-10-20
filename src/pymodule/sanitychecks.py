@@ -160,10 +160,6 @@ def scf_results_sanity_check(obj, scf_results):
             updated_scf_info['ri_coulomb'] = scf_results['ri_coulomb']
             updated_scf_info['ri_auxiliary_basis'] = scf_results[
                 'ri_auxiliary_basis']
-            if hasattr(obj, 'ri_coulomb_simd'):
-                # results from before the flag fall back to ri_coulomb
-                updated_scf_info['ri_coulomb_simd'] = scf_results.get(
-                    'ri_coulomb_simd', scf_results['ri_coulomb'])
 
         if scf_results.get('restart', None) is not None:
             # do not restart if scf is not restarted from checkpoint
@@ -411,10 +407,6 @@ def ri_sanity_check(obj):
 
     ri_coulomb = getattr(obj, 'ri_coulomb', False)
     ri_jk = getattr(obj, 'ri_jk', False)
-
-    # NOTE: the simd flag follows ri_coulomb.
-    if hasattr(obj, 'ri_coulomb_simd'):
-        obj.ri_coulomb_simd = ri_coulomb
 
     # NOTE: the simd flag follows ri_jk.
     if hasattr(obj, 'ri_jk_simd'):

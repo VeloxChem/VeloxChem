@@ -152,7 +152,6 @@ class TestScfGradientDriverMiscellaneous:
         molecule, basis = self.get_h2o_molecule_and_basis()
         scf_drv, scf_results = self.run_restricted_scf(molecule, basis)
         scf_drv.ri_coulomb = True
-        scf_drv.ri_coulomb_simd = True
 
         grad_drv = ScfGradientDriver(scf_drv)
 
@@ -166,7 +165,6 @@ class TestScfGradientDriverMiscellaneous:
         molecule, basis = self.get_ch3_molecule_and_basis()
         scf_drv, scf_results = self.run_unrestricted_scf(molecule, basis)
         scf_drv.ri_coulomb = True
-        scf_drv.ri_coulomb_simd = True
 
         grad_drv = ScfGradientDriver(scf_drv)
 

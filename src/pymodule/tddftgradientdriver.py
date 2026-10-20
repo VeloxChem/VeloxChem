@@ -621,11 +621,6 @@ class TddftGradientDriver(GradientDriver):
         if self._scf_drv.ri_coulomb:
 
             assert_msg_critical(
-                self._scf_drv.ri_coulomb_simd,
-                'TddftGradientDriver: RI-J is supported only with ' +
-                'ri_coulomb_simd')
-
-            assert_msg_critical(
                 basis.get_label().lower().startswith('def2-'),
                 'TddftGradientDriver: Invalid basis set for RI-J')
 

@@ -109,7 +109,6 @@ class NonlinearSolver:
 
         # RI-J
         self.ri_coulomb = False
-        self.ri_coulomb_simd = False
         self.ri_jk = False
         self.ri_jk_simd = False
         self.ri_auxiliary_basis = 'def2-universal-jfit'
@@ -196,7 +195,6 @@ class NonlinearSolver:
             },
             'method_settings': {
                 'ri_coulomb': ('bool', 'use RI-J approximation'),
-                'ri_coulomb_simd': ('bool', 'use the simd RI-J driver'),
                 'ri_jk': ('bool', 'use RI-JK approximation'),
                 'ri_jk_simd': ('bool', 'use the simd RI-JK driver'),
                 'ri_auxiliary_basis': ('str', 'RI auxiliary basis set'),
@@ -325,11 +323,6 @@ class NonlinearSolver:
             (not self.ri_jk) or self.ri_jk_simd,
             f'{type(self).__name__}: RI-JK is supported only with ri_jk_simd')
 
-        assert_msg_critical(
-            (not self.ri_coulomb) or self.ri_coulomb_simd,
-            f'{type(self).__name__}: RI-J is supported only with ' +
-            'ri_coulomb_simd')
-
         if self.rank == mpi_master():
             screening = T4CScreener()
             screening.partition(basis, molecule, 'eri')
@@ -337,7 +330,7 @@ class NonlinearSolver:
             screening = None
         screening = self.comm.bcast(screening, root=mpi_master())
 
-        if self.ri_coulomb and self.ri_coulomb_simd:
+        if self.ri_coulomb:
             self._init_simd_ri_j(molecule, basis)
 
         if self.ri_jk:
@@ -1046,8 +1039,7 @@ class NonlinearSolver:
             # density is fitted against the same integrals, and the right hand sides
             # of the fittings are gathered and reduced in one collective rather than
             # one for each density.
-            use_ri_j_simd = (self.ri_coulomb and self.ri_coulomb_simd and
-                             fock_type == 'j')
+            use_ri_coulomb = (self.ri_coulomb and fock_type == 'j')
 
             use_ri_jk = (self.ri_jk and self.ri_jk_simd and
                          dens_factors is not None and
@@ -1063,7 +1055,7 @@ class NonlinearSolver:
             # half its densities and say nothing about it.
             erf_k_factor = erf_k_coef if need_omega else 0.0
 
-            if use_ri_j_simd:
+            if use_ri_coulomb:
                 fock_arrays = self._comp_simd_ri_j_fock(dts_for_fock)
 
             elif use_ri_jk:
@@ -1116,7 +1108,7 @@ class NonlinearSolver:
                                                    batch_start, batch_end),
                         fock_k_factor, erf_k_factor)
 
-            for idx in range(0 if (use_ri_jk or use_ri_j_simd) else len(dts_for_fock)):
+            for idx in range(0 if (use_ri_jk or use_ri_coulomb) else len(dts_for_fock)):
                 if self.ri_coulomb:
                     assert_msg_critical(
                         fock_type == 'j',

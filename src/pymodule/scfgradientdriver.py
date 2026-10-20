@@ -235,12 +235,6 @@ class ScfGradientDriver(GradientDriver):
             f'{type(self).__name__}.compute: RI-JK is supported only with ' +
             'ri_jk_simd')
 
-        assert_msg_critical(
-            (not self.scf_driver.ri_coulomb) or
-            self.scf_driver.ri_coulomb_simd,
-            f'{type(self).__name__}.compute: RI-J is supported only with ' +
-            'ri_coulomb_simd')
-
         # NOTE: the fitting is what forbids this under MPI. The Fock build
         # survives a distributed set of B vectors because the factor of the
         # metric is already folded into them and the Coulomb matrix is a sum over
@@ -937,7 +931,7 @@ class ScfGradientDriver(GradientDriver):
 
         thresh_int = int(-math.log10(self.eri_thresh))
 
-        if self.scf_driver.ri_coulomb and self.scf_driver.ri_coulomb_simd:
+        if self.scf_driver.ri_coulomb:
 
             assert_msg_critical(
                 basis.get_label().lower().startswith('def2-'),
@@ -1311,8 +1305,7 @@ class ScfGradientDriver(GradientDriver):
 
             grad_timing['Fock_grad'] += time.time() - t0
 
-        elif (self.scf_driver.ri_coulomb and
-              self.scf_driver.ri_coulomb_simd):
+        elif self.scf_driver.ri_coulomb:
 
             assert_msg_critical(
                 basis.get_label().lower().startswith('def2-'),

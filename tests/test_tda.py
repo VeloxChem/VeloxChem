@@ -90,7 +90,6 @@ class TestTDA:
         scf_drv.ostream.mute()
         scf_drv.xcfun = xcfun_label
         scf_drv.ri_coulomb = ri_coulomb
-        scf_drv.ri_coulomb_simd = ri_coulomb
         scf_results = scf_drv.compute(mol, bas)
 
         lr_drv = TdaEigenSolver()

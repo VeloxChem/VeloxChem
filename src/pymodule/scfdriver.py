@@ -233,7 +233,6 @@ class ScfDriver:
         self.ri_metric_route = 'cholesky'
         self.ri_dense_threshold = 0.0
         self.ri_jk_simd = False
-        self.ri_coulomb_simd = False
         self.ri_memory_budget = None
         self._ri_aux_atoms = []
         self.ri_mode = 'automatic'
@@ -388,8 +387,6 @@ class ScfDriver:
                      'exchange expands them; 0 expands always, above 1 never'),
                 'ri_jk_simd':
                     ('bool', 'use the SIMD RI-JK driver instead of the conventional one'),
-                'ri_coulomb_simd':
-                    ('bool', 'use the SIMD RI-J driver instead of the conventional one'),
                 'ri_memory_budget':
                     ('float', 'memory the SIMD RI-JK driver may hold, in GB'),
                 'ri_mode':
@@ -1865,14 +1862,10 @@ class ScfDriver:
         ri_setup_t0 = tm.time()
 
         assert_msg_critical(
-            (not self.ri_coulomb) or self.ri_coulomb_simd,
-            'SCF driver: RI-J is supported only with ri_coulomb_simd')
-
-        assert_msg_critical(
             (not self.ri_jk) or self.ri_jk_simd,
             'SCF driver: RI-JK is supported only with ri_jk_simd')
 
-        if self.ri_coulomb and self.ri_coulomb_simd:
+        if self.ri_coulomb:
             if isinstance(self.ri_auxiliary_basis, str):
                 basis_ri = MolecularBasis.read(molecule, self.ri_auxiliary_basis)
             else:
@@ -2453,8 +2446,6 @@ class ScfDriver:
                 if self.ri_coulomb or self.ri_jk:
                     # RI info
                     self._scf_results['ri_coulomb'] = self.ri_coulomb
-                    self._scf_results['ri_coulomb_simd'] = (
-                        self.ri_coulomb_simd)
                     self._scf_results['ri_jk'] = self.ri_jk
                     self._scf_results['ri_jk_simd'] = self.ri_jk_simd
                     self._scf_results[
@@ -3329,7 +3320,7 @@ class ScfDriver:
 
         self._prepare_for_ri_fock_build(fock_type)
 
-        if self.ri_coulomb and self.ri_coulomb_simd and fock_type == 'j':
+        if self.ri_coulomb and fock_type == 'j':
             fock_mat_np = self._simd_ri_j_fock(den_mat[0])
         elif self.ri_jk and self.ri_jk_simd and fock_type != 'j':
             # NOTE: the driver returns twice the Coulomb less the scaled exchange
@@ -3423,7 +3414,7 @@ class ScfDriver:
         if fock_type == 'j':
             # for pure functional
             # den_mat_for_Jab is D_total
-            if self.ri_coulomb and self.ri_coulomb_simd:
+            if self.ri_coulomb:
                 # NOTE: the total density and no factor. A restricted build hands
                 # the density of one spin and doubles what comes back; here the two
                 # spins are already added, and the Coulomb matrix of the total

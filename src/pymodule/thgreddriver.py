@@ -234,7 +234,7 @@ class ThgReducedDriver(NonlinearSolver):
             'conv_thresh', 'max_iter', 'eri_thresh', 'timing',
             'memory_profiling', 'batch_size', 'restart', 'xcfun', 'grid_level',
             'potfile', 'electric_field', 'program_end_time', '_debug',
-            '_block_size_factor', 'ri_coulomb', 'ri_coulomb_simd', 'ri_jk',
+            '_block_size_factor', 'ri_coulomb', 'ri_jk',
             'ri_jk_simd', 'ri_auxiliary_basis'
         }
 
@@ -996,7 +996,7 @@ class ThgReducedDriver(NonlinearSolver):
             'max_iter', 'eri_thresh', 'timing', 'memory_profiling',
             'batch_size', 'restart', 'xcfun', 'grid_level', 'potfile',
             'electric_field', 'program_end_time', '_debug', '_block_size_factor',
-            'ri_coulomb', 'ri_coulomb_simd', 'ri_jk', 'ri_jk_simd',
+            'ri_coulomb', 'ri_jk', 'ri_jk_simd',
             'ri_auxiliary_basis'
         }
 

@@ -33,7 +33,6 @@ class TestTpaTransition:
         scf_drv = ScfRestrictedDriver()
         scf_drv.xcfun = xcfun_label
         scf_drv.ri_coulomb = ri_coulomb
-        scf_drv.ri_coulomb_simd = ri_coulomb
         scf_drv.conv_thresh = scf_conv_thresh
         scf_drv.ostream.mute()
         scf_results = scf_drv.compute(molecule, basis)
@@ -91,7 +90,6 @@ class TestTpaTransition:
         scf_drv = ScfRestrictedDriver()
         scf_drv.xcfun = xcfun_label
         scf_drv.ri_coulomb = ri_coulomb
-        scf_drv.ri_coulomb_simd = ri_coulomb
         scf_drv.conv_thresh = 1.0e-8
         scf_drv.filename = filename
         scf_drv.ostream.mute()

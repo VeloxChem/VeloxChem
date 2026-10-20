@@ -78,7 +78,6 @@ def _run_construction_once(monkeypatch, workdir: Path) -> ConstructionContext:
     qm_driver = ScfRestrictedDriver()
     qm_driver.xcfun = "pbe"
     qm_driver.ri_coulomb = True
-    qm_driver.ri_coulomb_simd = True
     qm_driver.dispersion = True
 
     qm_driver.ostream.mute()

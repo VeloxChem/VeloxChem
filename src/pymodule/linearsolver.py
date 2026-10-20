@@ -140,7 +140,6 @@ class LinearSolver:
 
         # RI-J
         self.ri_coulomb = False
-        self.ri_coulomb_simd = False
         self.ri_jk = False
         self.ri_jk_simd = False
         self.ri_auxiliary_basis = 'def2-universal-jfit'
@@ -289,7 +288,6 @@ class LinearSolver:
             },
             'method_settings': {
                 'ri_coulomb': ('bool', 'use RI-J approximation'),
-                'ri_coulomb_simd': ('bool', 'use the simd RI-J driver'),
                 'ri_jk': ('bool', 'use RI-JK approximation'),
                 'ri_jk_simd': ('bool', 'use the simd RI-JK driver'),
                 'ri_auxiliary_basis': ('str', 'RI auxiliary basis set'),
@@ -595,11 +593,6 @@ class LinearSolver:
             (not self.ri_jk) or self.ri_jk_simd,
             f'{type(self).__name__}: RI-JK is supported only with ri_jk_simd')
 
-        assert_msg_critical(
-            (not self.ri_coulomb) or self.ri_coulomb_simd,
-            f'{type(self).__name__}: RI-J is supported only with ' +
-            'ri_coulomb_simd')
-
         if self.rank == mpi_master():
             screening = T4CScreener()
             screening.partition(basis, molecule, 'eri')
@@ -607,7 +600,7 @@ class LinearSolver:
             screening = None
         screening = self.comm.bcast(screening, root=mpi_master())
 
-        if self.ri_coulomb and self.ri_coulomb_simd:
+        if self.ri_coulomb:
             self._init_simd_ri_j(molecule, basis)
 
         if self.ri_jk:
@@ -2309,10 +2302,9 @@ class LinearSolver:
         # and the one thing the ranks have to exchange is the right hand side of
         # each fitting. Gathered into one array and reduced once, that is a single
         # collective for the batch where a density at a time would be one each.
-        use_ri_j_simd = (self.ri_coulomb and self.ri_coulomb_simd and
-                         fock_type == 'j')
+        use_ri_coulomb = (self.ri_coulomb and fock_type == 'j')
 
-        if use_ri_j_simd:
+        if use_ri_coulomb:
             fock_arrays = self._comp_simd_ri_j_fock(dens, comm)
 
         elif use_ri_jk:
@@ -2325,7 +2317,7 @@ class LinearSolver:
                 basis, dens_factors, exchange_scaling_factor,
                 erf_k_coef if need_omega else 0.0)
 
-        for idx in range(0 if (use_ri_jk or use_ri_j_simd) else num_densities):
+        for idx in range(0 if (use_ri_jk or use_ri_coulomb) else num_densities):
             if self.ri_coulomb:
                 assert_msg_critical(
                     fock_type == 'j',
@@ -2693,12 +2685,11 @@ class LinearSolver:
         # being neither the same orbitals nor the same number of them.
         # NOTE: the simd Coulomb only driver takes the whole batch too, and the
         # right hand sides of its fittings are reduced in one collective.
-        use_ri_j_simd = (self.ri_coulomb and self.ri_coulomb_simd and
-                         fock_type == 'j')
+        use_ri_coulomb = (self.ri_coulomb and fock_type == 'j')
 
         use_ri_jk = (self.ri_jk and self.ri_jk_simd and dens_factors is not None)
 
-        if use_ri_j_simd:
+        if use_ri_coulomb:
             fock_arrays = self._comp_simd_ri_j_fock_unrestricted(
                 dens_a, dens_b, comm)
 
@@ -2713,7 +2704,7 @@ class LinearSolver:
                 self, basis, factors_a, factors_b, exchange_scaling_factor,
                 erf_k_coef if need_omega else 0.0)
 
-        for idx in range(0 if (use_ri_jk or use_ri_j_simd) else num_densities):
+        for idx in range(0 if (use_ri_jk or use_ri_coulomb) else num_densities):
             if self.ri_coulomb:
                 assert_msg_critical(
                     fock_type == 'j',

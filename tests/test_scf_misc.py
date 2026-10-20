@@ -326,7 +326,6 @@ class TestScfDriverMiscellaneous:
             driver.density_damping = True
             driver.xcfun = 'blyp'
             driver.ri_coulomb = True
-            driver.ri_coulomb_simd = True
             driver.ri_auxiliary_basis = 'def2-universal-jkfit'
             driver.ri_metric_threshold = 1.0e-10
             driver.solvation_model = 'cpcm'
@@ -448,7 +447,6 @@ class TestScfDriverMiscellaneous:
             driver.density_damping = True
             driver.xcfun = 'blyp'
             driver.ri_coulomb = True
-            driver.ri_coulomb_simd = True
             driver.ri_auxiliary_basis = 'def2-universal-jkfit'
             driver.ri_metric_threshold = 1.0e-10
 
@@ -482,7 +480,6 @@ class TestScfDriverMiscellaneous:
 
         def configure(driver):
             driver.ri_coulomb = True
-            driver.ri_coulomb_simd = True
             driver.ri_jk = True
             driver.ri_jk_simd = True
 
