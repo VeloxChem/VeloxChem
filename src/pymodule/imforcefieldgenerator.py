@@ -2159,6 +2159,7 @@ class IMForceFieldGenerator:
 
                 imp_int_constraints = {'bonds': [], 'angles': [], 'dihedrals': [], 'impropers': []}
                 for constraint in mol_basis[-1]:
+                    constraint = [int(x) - 1 for x in constraint]
                     if len(constraint) == 2:
                         imp_int_constraints["bonds"].append(constraint)
                     if len(constraint) == 3:
@@ -2207,7 +2208,7 @@ class IMForceFieldGenerator:
 
                     if not mol_basis[5]:
                         label = f'point_{len(sorted_labels) + 1}'
-
+                    print("here is the imp int coordinates", imp_int_constraints)
                     impes_coordinate = InterpolationDatapoint(z_matrix)
                     impes_coordinate.update_settings(interpolation_settings[target_root])
                     impes_coordinate.cartesian_coordinates = mol_basis[0].get_coordinates_in_bohr()

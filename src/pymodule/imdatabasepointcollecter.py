@@ -1388,7 +1388,7 @@ class IMDatabasePointCollecter:
         elapsed_time_days = elapsed_time / (24 * 3600)
         performance = (self.nsteps * timestep / 1e6) / elapsed_time_days
 
-        self.output_file_writer(self.summary_output)
+        # self.output_file_writer(self.summary_output)
         self.print_qmmm_summary(elapsed_time, performance)
 
         return None
@@ -3309,7 +3309,7 @@ class IMDatabasePointCollecter:
             if self.current_state in self.opt_mols_org_mol_swap:
                 self.impes_drivers[self.current_state].compute(self.opt_mols_org_mol_swap[self.current_state])
 
-        self.simulation.saveCheckpoint('checkpoint')
+        self.simulation.saveState('checkpoint.xml') # new checkpoint file creation function used
 
     def _write_sampling_point_from_geometry(self, root, molecule, label, template_point):
         sampling_qm, sampling_grad, sampling_hess = self.sampling_driver['gs']
@@ -3319,13 +3319,22 @@ class IMDatabasePointCollecter:
         )
         h = self._compute_hessian(sampling_hess, molecule, basis=None)
 
-        masses = molecule.get_masses().copy()
-        inv_sqrt = 1.0 / np.sqrt(np.repeat(masses, 3))
+        # masses = molecule.get_masses().copy()
+        # inv_sqrt = 1.0 / np.sqrt(np.repeat(masses, 3))
+        inv_sqrt = None
         grad_vec = g[0].reshape(-1)
         hess_mat = h[0].reshape(grad_vec.size, grad_vec.size)
-        mw_grad = inv_sqrt * grad_vec
-        mw_hess = (inv_sqrt[:, None] * hess_mat) * inv_sqrt[None, :]
-
+        # mw_grad = inv_sqrt * grad_vec
+        # mw_hess = (inv_sqrt[:, None] * hess_mat) * inv_sqrt[None, :]
+        mw_grad = grad_vec
+        mw_hess = hess_mat
+        sampling_settings = self.sampling_interpolation_settings
+        if sampling_settings.get("use_mass_weight", False):
+            masses = molecule.get_masses().copy()
+            inv_sqrt = 1.0 / np.sqrt(np.repeat(masses, 3))
+            mw_grad = inv_sqrt * grad_vec
+            mw_hess = (inv_sqrt[:, None] * hess_mat) * inv_sqrt[None, :]
+        
         dp = InterpolationDatapoint(self.root_z_matrix[root])
         dp.update_settings(self.sampling_interpolation_settings[root])
 
@@ -3359,7 +3368,7 @@ class IMDatabasePointCollecter:
         driver_object = self.sampling_impes_drivers[root]
 
         im_labels, _ = driver_object.read_labels()
-
+        im_labels = sorted(im_labels, key=lambda x: int(x.split('_')[1]))
         self.sampling_qm_data_point_dict[root] = []
 
         for label in im_labels:
@@ -3745,6 +3754,7 @@ class IMDatabasePointCollecter:
                 "callback": _local_minimizer_callback,
                 "options": {"gtol": gtol, "ftol": ftol, "maxls": 10, "maxiter": maxiter},
             }
+            saved_radii = [dp.confidence_radius for dp in dps]
 
             try:
                 _append_history("initial", x0)
@@ -3793,6 +3803,8 @@ class IMDatabasePointCollecter:
                 self.ostream.flush()
                 return res
             finally:
+                for dp, radius in zip(dps, saved_radii):
+                    dp.confidence_radius = radius
                 opt.close()
 
         initial_alphas = np.array(
@@ -4214,151 +4226,151 @@ class IMDatabasePointCollecter:
 
         return potential_energy
 
-    def output_file_writer(self, outputfile):
-        """
-        Writes the current simulation summary data (stored in self.gloabal_sim_informations)
-        into the HDF5 file and then resets the dictionary.
-        """
+    # def output_file_writer(self, outputfile):
+    #     """
+    #     Writes the current simulation summary data (stored in self.gloabal_sim_informations)
+    #     into the HDF5 file and then resets the dictionary.
+    #     """
 
-        valid_checkpoint = (outputfile and isinstance(outputfile, str))
+    #     valid_checkpoint = (outputfile and isinstance(outputfile, str))
 
-        if valid_checkpoint:
-            try:
-                h5f = h5py.File(outputfile, 'a')
-            except IOError:
-                h5f = h5py.File(outputfile, 'w')
+    #     if valid_checkpoint:
+    #         try:
+    #             h5f = h5py.File(outputfile, 'a')
+    #         except IOError:
+    #             h5f = h5py.File(outputfile, 'w')
 
-        # 1. Write temperatures
-        ds_name = 'mol_labels'
-        if ds_name in h5f:
-            self.ostream.print_blank()
-            self.ostream.print_header(f"Dataset '{ds_name}' already exists in the output file. Skipping label writing.")
-            self.ostream.flush()
-        else:
-            # labels = self.molecule.get_labels()
-            dt = h5py.string_dtype(encoding='utf-8')
-            h5f.create_dataset(
-                ds_name,
-                shape=(0,),
-                maxshape=(None,),
-                dtype=dt,
-                chunks=True
-            )
-            # old_size = label_ds.shape[0]
-            # new_size = old_size + labels.shape[0]
-            # label_ds.resize((new_size,))
-            # label_ds[old_size:new_size] = labels
+    #     # 1. Write temperatures
+    #     ds_name = 'mol_labels'
+    #     if ds_name in h5f:
+    #         self.ostream.print_blank()
+    #         self.ostream.print_header(f"Dataset '{ds_name}' already exists in the output file. Skipping label writing.")
+    #         self.ostream.flush()
+    #     else:
+    #         # labels = self.molecule.get_labels()
+    #         dt = h5py.string_dtype(encoding='utf-8')
+    #         h5f.create_dataset(
+    #             ds_name,
+    #             shape=(0,),
+    #             maxshape=(None,),
+    #             dtype=dt,
+    #             chunks=True
+    #         )
+    #         # old_size = label_ds.shape[0]
+    #         # new_size = old_size + labels.shape[0]
+    #         # label_ds.resize((new_size,))
+    #         # label_ds[old_size:new_size] = labels
 
-        ds_name = "temperatures"
-        if ds_name in h5f:
-            temp_ds = h5f[ds_name]
-        else:
-            temp_ds = h5f.create_dataset(
-                ds_name,
-                shape=(0,),
-                maxshape=(None,),
-                dtype='float64',
-                chunks=True
-            )
-        # Convert the list to a NumPy array and append
-        new_temps = np.array(self.gloabal_sim_informations['temperatures'], dtype='float64')
-        old_size = temp_ds.shape[0]
-        new_size = old_size + new_temps.shape[0]
-        temp_ds.resize((new_size,))
-        temp_ds[old_size:new_size] = new_temps
-        # 2. Write state labels
-        ds_name = "state"
-        # Adjust dtype as needed (here assuming integer states; if strings, you'll need a special dtype)
-        if ds_name in h5f:
-            state_ds = h5f[ds_name]
-        else:
-            state_ds = h5f.create_dataset(
-                ds_name,
-                shape=(0,),
-                maxshape=(None,),
-                dtype='int32',
-                chunks=True
-            )
-        new_states = np.array(self.gloabal_sim_informations['state'], dtype='int32')
-        old_size = state_ds.shape[0]
-        new_size = old_size + new_states.shape[0]
-        state_ds.resize((new_size,))
-        state_ds[old_size:new_size] = new_states
+    #     ds_name = "temperatures"
+    #     if ds_name in h5f:
+    #         temp_ds = h5f[ds_name]
+    #     else:
+    #         temp_ds = h5f.create_dataset(
+    #             ds_name,
+    #             shape=(0,),
+    #             maxshape=(None,),
+    #             dtype='float64',
+    #             chunks=True
+    #         )
+    #     # Convert the list to a NumPy array and append
+    #     new_temps = np.array(self.gloabal_sim_informations['temperatures'], dtype='float64')
+    #     old_size = temp_ds.shape[0]
+    #     new_size = old_size + new_temps.shape[0]
+    #     temp_ds.resize((new_size,))
+    #     temp_ds[old_size:new_size] = new_temps
+    #     # 2. Write state labels
+    #     ds_name = "state"
+    #     # Adjust dtype as needed (here assuming integer states; if strings, you'll need a special dtype)
+    #     if ds_name in h5f:
+    #         state_ds = h5f[ds_name]
+    #     else:
+    #         state_ds = h5f.create_dataset(
+    #             ds_name,
+    #             shape=(0,),
+    #             maxshape=(None,),
+    #             dtype='int32',
+    #             chunks=True
+    #         )
+    #     new_states = np.array(self.gloabal_sim_informations['state'], dtype='int32')
+    #     old_size = state_ds.shape[0]
+    #     new_size = old_size + new_states.shape[0]
+    #     state_ds.resize((new_size,))
+    #     state_ds[old_size:new_size] = new_states
 
-        # 3. Write coordinates (assumed to be np.array of shape (n_atoms, 3))
-        ds_name = "coordinates_ang"
-        coord_list = self.gloabal_sim_informations['coordinates_ang']
-        if len(coord_list) > 0:
-            # Determine the number of atoms from the first snapshot.
-            n_atoms = coord_list[0].shape[0]
-            new_coords = np.stack(coord_list, axis=0)  # shape: (n_snapshots, n_atoms, 3)
-            if ds_name in h5f:
-                coord_ds = h5f[ds_name]
-            else:
-                coord_ds = h5f.create_dataset(
-                    ds_name,
-                    data=new_coords,
-                    maxshape=(None, n_atoms, 3),
-                    dtype=new_coords.dtype,
-                    chunks=True
-                )
-                new_coords = None  # Already stored
-            if new_coords is not None:
-                old_size = coord_ds.shape[0]
-                new_size = old_size + new_coords.shape[0]
-                coord_ds.resize((new_size, n_atoms, 3))
-                coord_ds[old_size:new_size, :, :] = new_coords
-        # 4. Write state-specific data (for each state in self.roots_to_follow)
-        for root in self.roots_to_follow:
-            key = f'state_{root}'
-            state_dict = self.gloabal_sim_informations[key]
-            state_group = h5f.require_group(key)
+    #     # 3. Write coordinates (assumed to be np.array of shape (n_atoms, 3))
+    #     ds_name = "coordinates_ang"
+    #     coord_list = self.gloabal_sim_informations['coordinates_ang']
+    #     if len(coord_list) > 0:
+    #         # Determine the number of atoms from the first snapshot.
+    #         n_atoms = coord_list[0].shape[0]
+    #         new_coords = np.stack(coord_list, axis=0)  # shape: (n_snapshots, n_atoms, 3)
+    #         if ds_name in h5f:
+    #             coord_ds = h5f[ds_name]
+    #         else:
+    #             coord_ds = h5f.create_dataset(
+    #                 ds_name,
+    #                 data=new_coords,
+    #                 maxshape=(None, n_atoms, 3),
+    #                 dtype=new_coords.dtype,
+    #                 chunks=True
+    #             )
+    #             new_coords = None  # Already stored
+    #         if new_coords is not None:
+    #             old_size = coord_ds.shape[0]
+    #             new_size = old_size + new_coords.shape[0]
+    #             coord_ds.resize((new_size, n_atoms, 3))
+    #             coord_ds[old_size:new_size, :, :] = new_coords
+    #     # 4. Write state-specific data (for each state in self.roots_to_follow)
+    #     for root in self.roots_to_follow:
+    #         key = f'state_{root}'
+    #         state_dict = self.gloabal_sim_informations[key]
+    #         state_group = h5f.require_group(key)
 
-            # 1. Store potential energies (assumed to be 1D arrays)
-            for subkey in ['pot_energies']:
-                if subkey in state_group:
-                    ds = state_group[subkey]
-                else:
-                    ds = state_group.create_dataset(
-                        subkey,
-                        shape=(0,),
-                        maxshape=(None,),
-                        dtype='float64',
-                        chunks=True
-                    )
-                new_data = np.array(state_dict[subkey], dtype='float64')
-                old_size = ds.shape[0]
-                new_size = old_size + new_data.shape[0]
-                ds.resize((new_size,))
-                ds[old_size:new_size] = new_data
+    #         # 1. Store potential energies (assumed to be 1D arrays)
+    #         for subkey in ['pot_energies']:
+    #             if subkey in state_group:
+    #                 ds = state_group[subkey]
+    #             else:
+    #                 ds = state_group.create_dataset(
+    #                     subkey,
+    #                     shape=(0,),
+    #                     maxshape=(None,),
+    #                     dtype='float64',
+    #                     chunks=True
+    #                 )
+    #             new_data = np.array(state_dict[subkey], dtype='float64')
+    #             old_size = ds.shape[0]
+    #             new_size = old_size + new_data.shape[0]
+    #             ds.resize((new_size,))
+    #             ds[old_size:new_size] = new_data
 
-            # 2. Store gradients (each entry is an array of shape (n_atoms, 3))
-            subkey = 'gradients'
-            new_gradients = state_dict[subkey]
-            if new_gradients:  # Only proceed if there is new data
-                # Determine number of atoms from the first gradient array.
-                n_atoms = new_gradients[0].shape[0]
-                # Stack new gradients along a new axis: shape becomes (n_snapshots, n_atoms, 3)
-                grad_data = np.stack(new_gradients, axis=0)
+    #         # 2. Store gradients (each entry is an array of shape (n_atoms, 3))
+    #         subkey = 'gradients'
+    #         new_gradients = state_dict[subkey]
+    #         if new_gradients:  # Only proceed if there is new data
+    #             # Determine number of atoms from the first gradient array.
+    #             n_atoms = new_gradients[0].shape[0]
+    #             # Stack new gradients along a new axis: shape becomes (n_snapshots, n_atoms, 3)
+    #             grad_data = np.stack(new_gradients, axis=0)
 
-                if subkey in state_group:
-                    ds = state_group[subkey]
-                else:
-                    # Create the dataset with initial data
-                    ds = state_group.create_dataset(
-                        subkey,
-                        data=grad_data,
-                        maxshape=(None, n_atoms, 3),
-                        dtype=grad_data.dtype,
-                        chunks=True
-                    )
-                    grad_data = None  # Already stored
-                # If the dataset already existed, append the new data.
-                if grad_data is not None:
-                    old_size = ds.shape[0]
-                    new_size = old_size + grad_data.shape[0]
-                    ds.resize((new_size, n_atoms, 3))
-                    ds[old_size:new_size, :, :] = grad_data
+    #             if subkey in state_group:
+    #                 ds = state_group[subkey]
+    #             else:
+    #                 # Create the dataset with initial data
+    #                 ds = state_group.create_dataset(
+    #                     subkey,
+    #                     data=grad_data,
+    #                     maxshape=(None, n_atoms, 3),
+    #                     dtype=grad_data.dtype,
+    #                     chunks=True
+    #                 )
+    #                 grad_data = None  # Already stored
+    #             # If the dataset already existed, append the new data.
+    #             if grad_data is not None:
+    #                 old_size = ds.shape[0]
+    #                 new_size = old_size + grad_data.shape[0]
+    #                 ds.resize((new_size, n_atoms, 3))
+    #                 ds[old_size:new_size, :, :] = grad_data
 
             # store information about the checked data with reference calculations
 
