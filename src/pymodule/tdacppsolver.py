@@ -926,7 +926,7 @@ class ComplexResponseTdaSolver(LinearSolver):
 
         # NOTE: the dense path does not take the factors, so they are formed only
         # where the resolution of the identity will contract them.
-        if not (self.ri_jk and self.ri_jk_simd):
+        if not (self.ri_jk):
             return None
 
         nocc = molecule.number_of_alpha_occupied_orbitals(basis)

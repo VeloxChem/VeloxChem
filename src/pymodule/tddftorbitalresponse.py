@@ -320,7 +320,7 @@ class TddftOrbitalResponse(CphfSolver):
             ri_jk_factors_1pdm = None
             ri_jk_factors_xy = None
 
-            if self.ri_jk and self.ri_jk_simd:
+            if self.ri_jk:
                 ri_jk_factors_1pdm = (
                     mo_occ,
                     [np.matmul(mo_occ, dm_oo[i].T) for i in range(dof)],
@@ -385,7 +385,7 @@ class TddftOrbitalResponse(CphfSolver):
         molgrid = dft_dict['molgrid']
         gs_density = dft_dict['gs_density']
 
-        if self.ri_jk and self.ri_jk_simd:
+        if self.ri_jk:
             if self.rank == mpi_master():
                 unrel_dm_ao_list = list(unrel_dm_ao)
             else:
@@ -674,13 +674,13 @@ class TddftOrbitalResponse(CphfSolver):
                     np.linalg.multi_dot(
                         [mo_occ,
                          cphf_ov_x.reshape(nocc, nvir), mo_vir.T]))
-                if self.ri_jk and self.ri_jk_simd:
+                if self.ri_jk:
                     lambda_rights.append(
                         np.matmul(mo_vir, cphf_ov_x.reshape(nocc, nvir).T))
 
         profiler.stop_timer('lambda')
 
-        if self.ri_jk and self.ri_jk_simd:
+        if self.ri_jk:
             lambda_factors = ((mo_occ, lambda_rights)
                               if self.rank == mpi_master() else None)
         else:

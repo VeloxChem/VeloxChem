@@ -893,7 +893,7 @@ class CphfSolver(LinearSolver):
                     # broadcast in _comp_lr_fock sends them to its ranks.
                     ri_jk_factors = (
                         (mo_occ, [np.matmul(mo_vir, vec.T)])
-                        if (self.ri_jk and self.ri_jk_simd) else None)
+                        if self.ri_jk else None)
                 else:
                     dens = None
                     ri_jk_factors = None
@@ -1070,7 +1070,7 @@ class CphfSolver(LinearSolver):
                 # D = C(occ) U C(vir)^T = left right^T.  Built only where the
                 # RI-JK driver will use them.
                 ri_jk_factors = ((mo_occ, [])
-                                 if (self.ri_jk and self.ri_jk_simd) else None)
+                                 if self.ri_jk else None)
             else:
                 vec_list = None
                 ri_jk_factors = None
@@ -1235,7 +1235,7 @@ class CphfSolver(LinearSolver):
                 vec_list_b = []
                 # NOTE: one set of trial-density factors per spin for the
                 # resolution of the identity.
-                if self.ri_jk and self.ri_jk_simd:
+                if self.ri_jk:
                     ri_jk_factors = ((mo_occ_a, []), (mo_occ_b, []))
                 else:
                     ri_jk_factors = None

@@ -223,7 +223,6 @@ class TestScfUnrestrictedHessian:
         scf_rijk.ostream.mute()
         scf_rijk.xcfun = 'hf'
         scf_rijk.ri_jk = True
-        scf_rijk.ri_jk_simd = True
         scf_rijk.compute(mol, bas)
 
         hess_rijk = ScfHessianDriver(scf_rijk)

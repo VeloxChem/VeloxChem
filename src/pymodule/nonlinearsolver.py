@@ -110,7 +110,6 @@ class NonlinearSolver:
         # RI-J
         self.ri_coulomb = False
         self.ri_jk = False
-        self.ri_jk_simd = False
         self.ri_auxiliary_basis = 'def2-universal-jfit'
         self._ri_jk_drv = None
         self._ri_jk_response_drv = None
@@ -196,7 +195,6 @@ class NonlinearSolver:
             'method_settings': {
                 'ri_coulomb': ('bool', 'use RI-J approximation'),
                 'ri_jk': ('bool', 'use RI-JK approximation'),
-                'ri_jk_simd': ('bool', 'use the simd RI-JK driver'),
                 'ri_auxiliary_basis': ('str', 'RI auxiliary basis set'),
                 'xcfun': ('str_upper', 'exchange-correlation functional'),
                 'grid_level': ('int', 'accuracy level of DFT grid'),
@@ -319,9 +317,6 @@ class NonlinearSolver:
         """
 
         # NOTE: only the simd driver has a response path.
-        assert_msg_critical(
-            (not self.ri_jk) or self.ri_jk_simd,
-            f'{type(self).__name__}: RI-JK is supported only with ri_jk_simd')
 
         if self.rank == mpi_master():
             screening = T4CScreener()
@@ -1041,7 +1036,7 @@ class NonlinearSolver:
             # one for each density.
             use_ri_coulomb = (self.ri_coulomb and fock_type == 'j')
 
-            use_ri_jk = (self.ri_jk and self.ri_jk_simd and
+            use_ri_jk = (self.ri_jk and
                          dens_factors is not None and
                          (mode_is_quadratic or mode_is_cubic))
 

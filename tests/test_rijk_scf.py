@@ -21,7 +21,6 @@ class TestScfDriverWithRIJK:
         scf_drv.ostream.mute()
         scf_drv.xcfun = xcfun_label
         scf_drv.ri_jk = True
-        scf_drv.ri_jk_simd = True
         scf_results = scf_drv.compute(mol, bas)
 
         if scf_drv.rank == mpi_master():
@@ -42,7 +41,6 @@ class TestScfDriverWithRIJK:
 
         scf_drv.ostream.mute()
         scf_drv.ri_jk = True
-        scf_drv.ri_jk_simd = True
         configure(scf_drv)
         scf_results = scf_drv.compute(mol, bas)
 

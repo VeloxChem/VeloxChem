@@ -232,7 +232,7 @@ class ThreePATransitionDriver(NonlinearSolver):
             'max_iter', 'eri_thresh', 'timing', 'memory_profiling',
             'batch_size', 'restart', 'xcfun', 'grid_level', 'potfile',
             'electric_field', 'program_end_time', '_debug', '_block_size_factor',
-            'ri_coulomb', 'ri_jk', 'ri_jk_simd',
+            'ri_coulomb', 'ri_jk',
             'ri_auxiliary_basis'
         ]
 
@@ -292,7 +292,7 @@ class ThreePATransitionDriver(NonlinearSolver):
             'max_iter', 'eri_thresh', 'timing', 'memory_profiling',
             'batch_size', 'restart', 'xcfun', 'grid_level', 'potfile',
             'electric_field', 'program_end_time', '_debug', '_block_size_factor',
-            'ri_coulomb', 'ri_jk', 'ri_jk_simd',
+            'ri_coulomb', 'ri_jk',
             'ri_auxiliary_basis'
         }
 
@@ -943,7 +943,7 @@ class ThreePATransitionDriver(NonlinearSolver):
             'max_iter', 'eri_thresh', 'timing', 'memory_profiling',
             'batch_size', 'restart', 'xcfun', 'grid_level', 'potfile',
             'electric_field', 'program_end_time', '_debug', '_block_size_factor',
-            'ri_coulomb', 'ri_jk', 'ri_jk_simd',
+            'ri_coulomb', 'ri_jk',
             'ri_auxiliary_basis'
         }
 
@@ -996,7 +996,7 @@ class ThreePATransitionDriver(NonlinearSolver):
         # the general shape and not the two of the pass before.
         self._ri_jk_factors = None
 
-        if self.rank == mpi_master() and self.ri_jk and self.ri_jk_simd:
+        if self.rank == mpi_master() and self.ri_jk:
             self._ri_jk_factors = (mo[:, :nocc], [], mo[:, nocc:], [])
 
         for w_ind, w in enumerate(freq):
@@ -1249,7 +1249,7 @@ class ThreePATransitionDriver(NonlinearSolver):
         # not the two a complex one is carried by.
         self._ri_jk_factors = None
 
-        if self.rank == mpi_master() and self.ri_jk and self.ri_jk_simd:
+        if self.rank == mpi_master() and self.ri_jk:
             self._ri_jk_factors = {
                 'left_occ': mo[:, :nocc],
                 'left_vir': mo[:, nocc:],

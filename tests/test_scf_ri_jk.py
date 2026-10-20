@@ -7,8 +7,8 @@ from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.outputstream import OutputStream
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 
-# NOTE: the SIMD RI-JK driver is an alternative path through the closed shell Fock
-# build, selected by ri_jk_simd. It is the same approximation as the conventional
+# NOTE: the SIMD RI-JK driver is the path through the closed shell Fock
+# build, selected by ri_jk. It is the same approximation as the conventional
 # RI-JK path, with the same auxiliary basis and the same metric threshold, so the
 # two must converge to the same energy. That one number exercises the whole chain,
 # the inverted metric, the B vectors, the Y vector, the Coulomb matrix, the W
@@ -22,7 +22,7 @@ from veloxchem.scfrestdriver import ScfRestrictedDriver
 # orbitals and over the parts it sweeps -- so both are worth running there.
 
 
-class TestScfRiJkSimd:
+class TestScfRiJk:
 
     @pytest.fixture
     def molecule(self):
@@ -70,7 +70,6 @@ class TestScfRiJkSimd:
 
         settings = {
             'ri_jk': True,
-            'ri_jk_simd': True,
             'ri_auxiliary_basis': 'def2-universal-jkfit',
         }
 
@@ -91,17 +90,16 @@ class TestScfRiJkSimd:
         simd = self.run_scf(molecule,
                             basis,
                             ri_jk=True,
-                            ri_jk_simd=True,
                             ri_auxiliary_basis='def2-universal-jkfit')
 
         assert abs(simd - plain) > 1.0e-6
         assert abs(simd - plain) < 1.0e-3
 
-    def test_the_flag_is_off_by_default(self):
+    def test_ri_jk_is_off_by_default(self):
 
         driver = ScfRestrictedDriver(ostream=OutputStream(None))
 
-        assert not driver.ri_jk_simd
+        assert not driver.ri_jk
         assert driver.ri_memory_budget is None
 
     def test_the_mode_can_be_chosen(self, molecule, basis):
@@ -110,7 +108,6 @@ class TestScfRiJkSimd:
 
         settings = {
             'ri_jk': True,
-            'ri_jk_simd': True,
             'ri_auxiliary_basis': 'def2-universal-jkfit',
         }
 
@@ -129,7 +126,6 @@ class TestScfRiJkSimd:
 
         settings = {
             'ri_jk': True,
-            'ri_jk_simd': True,
             'ri_auxiliary_basis': 'def2-universal-jkfit',
         }
 
@@ -153,7 +149,6 @@ class TestScfRiJkSimd:
             self.run_scf(molecule,
                          basis,
                          ri_jk=True,
-                         ri_jk_simd=True,
                          ri_auxiliary_basis='def2-universal-jkfit',
                          ri_mode='sideways')
 
@@ -173,7 +168,6 @@ class TestScfRiJkSimd:
 
         settings = {
             'ri_jk': True,
-            'ri_jk_simd': True,
             'ri_auxiliary_basis': 'def2-universal-jkfit',
             'ri_mode': 'in_memory',
         }
@@ -206,6 +200,5 @@ class TestScfRiJkSimd:
             self.run_scf(molecule,
                          basis,
                          ri_jk=True,
-                         ri_jk_simd=True,
                          ri_auxiliary_basis='def2-universal-jkfit',
                          ri_metric_route='sideways')

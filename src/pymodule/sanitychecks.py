@@ -408,10 +408,6 @@ def ri_sanity_check(obj):
     ri_coulomb = getattr(obj, 'ri_coulomb', False)
     ri_jk = getattr(obj, 'ri_jk', False)
 
-    # NOTE: the simd flag follows ri_jk.
-    if hasattr(obj, 'ri_jk_simd'):
-        obj.ri_jk_simd = ri_jk
-
     if not (ri_coulomb or ri_jk):
         return
 

@@ -232,7 +232,6 @@ class ScfDriver:
         self.ri_metric_threshold = 1.0e-12
         self.ri_metric_route = 'cholesky'
         self.ri_dense_threshold = 0.0
-        self.ri_jk_simd = False
         self.ri_memory_budget = None
         self._ri_aux_atoms = []
         self.ri_mode = 'automatic'
@@ -385,8 +384,6 @@ class ScfDriver:
                 'ri_dense_threshold':
                     ('float', 'density of the B vectors at which the SIMD RI-JK '
                      'exchange expands them; 0 expands always, above 1 never'),
-                'ri_jk_simd':
-                    ('bool', 'use the SIMD RI-JK driver instead of the conventional one'),
                 'ri_memory_budget':
                     ('float', 'memory the SIMD RI-JK driver may hold, in GB'),
                 'ri_mode':
@@ -1861,10 +1858,6 @@ class ScfDriver:
         # builds nor to the rest of them, so it is timed on its own.
         ri_setup_t0 = tm.time()
 
-        assert_msg_critical(
-            (not self.ri_jk) or self.ri_jk_simd,
-            'SCF driver: RI-JK is supported only with ri_jk_simd')
-
         if self.ri_coulomb:
             if isinstance(self.ri_auxiliary_basis, str):
                 basis_ri = MolecularBasis.read(molecule, self.ri_auxiliary_basis)
@@ -1920,7 +1913,7 @@ class ScfDriver:
             self.ostream.print_blank()
             self.ostream.flush()
 
-        elif self.ri_jk and self.ri_jk_simd:
+        elif self.ri_jk:
             if isinstance(self.ri_auxiliary_basis, str):
                 basis_ri = MolecularBasis.read(molecule, self.ri_auxiliary_basis)
             else:
@@ -2447,7 +2440,6 @@ class ScfDriver:
                     # RI info
                     self._scf_results['ri_coulomb'] = self.ri_coulomb
                     self._scf_results['ri_jk'] = self.ri_jk
-                    self._scf_results['ri_jk_simd'] = self.ri_jk_simd
                     self._scf_results[
                         'ri_auxiliary_basis'] = self.ri_auxiliary_basis
 
@@ -3322,7 +3314,7 @@ class ScfDriver:
 
         if self.ri_coulomb and fock_type == 'j':
             fock_mat_np = self._simd_ri_j_fock(den_mat[0])
-        elif self.ri_jk and self.ri_jk_simd and fock_type != 'j':
+        elif self.ri_jk and fock_type != 'j':
             # NOTE: the driver returns twice the Coulomb less the scaled exchange
             # already, which is the matrix this branch is asked for, so nothing is
             # scaled here. A range-separated functional has its attenuated exchange
@@ -3346,7 +3338,7 @@ class ScfDriver:
         # NOTE: the simd resolution of the identity has already subtracted the
         # attenuated exchange, inside the build rather than after it, so the four
         # centre correction is made for every other way of building but not for it.
-        if need_omega and not (self.ri_jk and self.ri_jk_simd):
+        if need_omega and not self.ri_jk:
             # for range-separated functional
             fock_mat = fock_drv.compute(screener, den_mat_for_fock, 'kx_rs',
                                         erf_k_coef, omega, thresh_int)
@@ -3430,7 +3422,7 @@ class ScfDriver:
             fock_mat_b_np = J_ab_np.copy()
 
         else:
-            if self.ri_jk and self.ri_jk_simd:
+            if self.ri_jk:
                 # NOTE: the Coulomb of the total density and both exchanges in one
                 # call, which is handed a set of coefficients for each spin. Where
                 # there are no orbitals yet the build is handed coefficients which
@@ -3469,13 +3461,13 @@ class ScfDriver:
             # exchanges apart, and is composed here. The simd branch answers with
             # the two matrices already composed, which is what its driver forms,
             # so it is left alone rather than taken apart and put back together.
-            if not (self.ri_jk and self.ri_jk_simd):
+            if not self.ri_jk:
                 fock_mat_a_np = J_ab_np - K_a_np
                 fock_mat_b_np = J_ab_np - K_b_np
 
         # NOTE: as in the restricted build above -- the simd way subtracts both
         # spins' attenuated exchange inside the call and takes no correction here.
-        if need_omega and not (self.ri_jk and self.ri_jk_simd):
+        if need_omega and not self.ri_jk:
             # for range-separated functional
             fock_mat = fock_drv.compute(screener, den_mat_for_Ka, 'kx_rs',
                                         erf_k_coef, omega, thresh_int)

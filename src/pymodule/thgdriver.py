@@ -239,7 +239,7 @@ class ThgDriver(NonlinearSolver):
             'memory_profiling', 'batch_size', 'restart', 'xcfun', 'grid_level',
             'potfile', 'electric_field', 'program_end_time', '_debug',
             '_block_size_factor', 'ri_coulomb', 'ri_jk',
-            'ri_jk_simd', 'ri_auxiliary_basis'
+            'ri_auxiliary_basis'
         }
 
         for key in cpp_keywords:
@@ -551,7 +551,7 @@ class ThgDriver(NonlinearSolver):
         # the densities one batch at a time and the columns have to line up.
         self._ri_jk_factors = None
 
-        if self.ri_jk and self.ri_jk_simd:
+        if self.ri_jk:
             self._ri_jk_factors = {
                 'left_occ': mo[:, :nocc],
                 'left_vir': mo[:, nocc:],
@@ -1165,7 +1165,7 @@ class ThgDriver(NonlinearSolver):
             'max_iter', 'eri_thresh', 'timing', 'memory_profiling',
             'batch_size', 'restart', 'xcfun', 'grid_level', 'potfile',
             'electric_field', 'program_end_time', '_debug', '_block_size_factor',
-            'ri_coulomb', 'ri_jk', 'ri_jk_simd',
+            'ri_coulomb', 'ri_jk',
             'ri_auxiliary_basis'
         }
 
@@ -1272,7 +1272,7 @@ class ThgDriver(NonlinearSolver):
         # the general shape and not the two of the pass before.
         self._ri_jk_factors = None
 
-        if self.ri_jk and self.ri_jk_simd:
+        if self.ri_jk:
             self._ri_jk_factors = (mo[:, :nocc], [], mo[:, nocc:], [])
 
         for task_id, rank in task_rank_pairs:

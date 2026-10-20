@@ -369,7 +369,7 @@ class QuadraticResponseDriver(NonlinearSolver):
             'max_iter', 'eri_thresh', 'timing', 'memory_profiling',
             'batch_size', 'restart', 'xcfun', 'grid_level', 'potfile',
             'electric_field', 'program_end_time', '_debug', '_block_size_factor',
-            'ri_coulomb', 'ri_jk', 'ri_jk_simd',
+            'ri_coulomb', 'ri_jk',
             'ri_auxiliary_basis'
         }
 
@@ -609,7 +609,7 @@ class QuadraticResponseDriver(NonlinearSolver):
         # for them.
         ri_jk_factors = None
 
-        if self.rank == mpi_master() and self.ri_jk and self.ri_jk_simd:
+        if self.rank == mpi_master() and self.ri_jk:
             ri_jk_factors = (mo[:, :nocc], [], mo[:, nocc:], [])
 
         for (wb, wc) in freqpairs:

@@ -267,7 +267,7 @@ class ExcitedStateMomentDriver(NonlinearSolver):
             'batch_size', 'restart', 'xcfun', 'grid_level', 'potfile',
             'electric_field', 'program_end_time', '_debug',
             '_block_size_factor', 'ri_coulomb', 'ri_jk',
-            'ri_jk_simd', 'ri_auxiliary_basis'
+            'ri_auxiliary_basis'
         ]
 
         for key in rpa_keywords:
@@ -329,7 +329,7 @@ class ExcitedStateMomentDriver(NonlinearSolver):
             'batch_size', 'restart', 'xcfun', 'grid_level', 'potfile',
             'electric_field', 'program_end_time', '_debug',
             '_block_size_factor', 'ri_coulomb', 'ri_jk',
-            'ri_jk_simd', 'ri_auxiliary_basis'
+            'ri_auxiliary_basis'
         }
 
         for key in cpp_keywords:
@@ -655,7 +655,7 @@ class ExcitedStateMomentDriver(NonlinearSolver):
         # and an imaginary column, so the factors go the same way.
         self._ri_jk_factors = None
 
-        if self.rank == mpi_master() and self.ri_jk and self.ri_jk_simd:
+        if self.rank == mpi_master() and self.ri_jk:
             self._ri_jk_factors = (mo[:, :nocc], [], mo[:, nocc:], [])
 
         Nf = LinearResponseEigenSolver.get_full_solution_vector(

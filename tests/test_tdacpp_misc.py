@@ -105,7 +105,6 @@ class TestComplexResponseTdaSolverMisc:
         cpp_drv.conv_thresh = 1.0e-6
         cpp_drv.max_iter = 100
         cpp_drv.ri_jk = True
-        cpp_drv.ri_jk_simd = True
         cpp_drv.ri_auxiliary_basis = 'def2-universal-jkfit'
 
         if cpp_drv.rank == mpi_master():

@@ -153,7 +153,7 @@ class ScfGradientDriver(GradientDriver):
             The AO basis set.
         """
 
-        if not (self.scf_driver.ri_jk and self.scf_driver.ri_jk_simd):
+        if not self.scf_driver.ri_jk:
             return
 
         advice = ('Set ri_mode to in_memory, raise ri_memory_budget, or use a ' +
@@ -226,15 +226,6 @@ class ScfGradientDriver(GradientDriver):
             For backward compatibility.
         """
 
-        # NOTE: only the simd RI-JK driver has a gradient. The conventional one
-        # forms its Fock matrices a different way and no derivative of it was
-        # written, so a calculation which used it has no gradient to give rather
-        # than one which is merely approximate.
-        assert_msg_critical(
-            (not self.scf_driver.ri_jk) or self.scf_driver.ri_jk_simd,
-            f'{type(self).__name__}.compute: RI-JK is supported only with ' +
-            'ri_jk_simd')
-
         # NOTE: the fitting is what forbids this under MPI. The Fock build
         # survives a distributed set of B vectors because the factor of the
         # metric is already folded into them and the Coulomb matrix is a sum over
@@ -253,11 +244,6 @@ class ScfGradientDriver(GradientDriver):
         # transposed factor that carries them there reaches across the whole of the
         # auxiliary basis. A rank cannot form them from its share alone -- so the
         # ranks form the part of the sum they own and add it, a panel at a time.
-        assert_msg_critical(
-            (not self.scf_driver.ri_jk) or self.scf_driver.ri_jk_simd or
-            (self.nodes == 1),
-            f'{type(self).__name__}.compute: the conventional RI-JK gradient ' +
-            'runs on one rank')
 
         assert_msg_critical(
             self.scf_driver.electric_field is None,
@@ -990,7 +976,7 @@ class ScfGradientDriver(GradientDriver):
 
             grad_timing['Fock_grad'] += time.time() - t0
 
-        elif self.scf_driver.ri_jk and self.scf_driver.ri_jk_simd:
+        elif self.scf_driver.ri_jk:
 
             self._announce_once(
                 'Using the SIMD resolution of the identity (RI-JK) gradient.')
@@ -1149,14 +1135,6 @@ class ScfGradientDriver(GradientDriver):
             The dictionary containing converged SCF results.
         """
 
-        # NOTE: the conventional RI-JK driver has no open shell gradient. The simd
-        # one does, below, and is the only RI-JK way an unrestricted calculation
-        # has here.
-        assert_msg_critical(
-            (not self.scf_driver.ri_jk) or self.scf_driver.ri_jk_simd,
-            f'{type(self).__name__}: the open shell RI-JK gradient needs ' +
-            'ri_jk_simd')
-
         grad_timing = self._init_grad_timing()
 
         if self.rank == mpi_master():
@@ -1242,7 +1220,7 @@ class ScfGradientDriver(GradientDriver):
 
         thresh_int = int(-math.log10(self.eri_thresh))
 
-        if self.scf_driver.ri_jk and self.scf_driver.ri_jk_simd:
+        if self.scf_driver.ri_jk:
 
             self._announce_once(
                 'Using the SIMD resolution of the identity (RI-JK) gradient.')

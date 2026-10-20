@@ -20,7 +20,6 @@ class TestTddftGradientRiJk:
         if use_rijk:
             method_dict.update({
                 'ri_jk': True,
-                'ri_jk_simd': True,
                 'ri_auxiliary_basis': 'def2-universal-jkfit',
             })
 

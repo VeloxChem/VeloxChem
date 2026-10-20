@@ -481,7 +481,7 @@ class UnrestrictedHessianOrbitalResponse(CphfSolver):
                 # NOTE: one set of oo-density factors per spin for the
                 # resolution of the identity, with the overlap as in the
                 # restricted case.
-                if self.ri_jk and self.ri_jk_simd:
+                if self.ri_jk:
                     ri_jk_factors_uij = ((mo_occ_a, []), (mo_occ_b, []))
                 else:
                     ri_jk_factors_uij = None

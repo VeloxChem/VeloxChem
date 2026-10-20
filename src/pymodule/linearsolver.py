@@ -141,7 +141,6 @@ class LinearSolver:
         # RI-J
         self.ri_coulomb = False
         self.ri_jk = False
-        self.ri_jk_simd = False
         self.ri_auxiliary_basis = 'def2-universal-jfit'
         self.ri_metric_threshold = 1.0e-12
         self._ri_drv = None
@@ -289,7 +288,6 @@ class LinearSolver:
             'method_settings': {
                 'ri_coulomb': ('bool', 'use RI-J approximation'),
                 'ri_jk': ('bool', 'use RI-JK approximation'),
-                'ri_jk_simd': ('bool', 'use the simd RI-JK driver'),
                 'ri_auxiliary_basis': ('str', 'RI auxiliary basis set'),
                 'xcfun': ('str_upper', 'exchange-correlation functional'),
                 'grid_level': ('int', 'accuracy level of DFT grid'),
@@ -589,9 +587,6 @@ class LinearSolver:
         """
 
         # NOTE: only the simd driver has a response path.
-        assert_msg_critical(
-            (not self.ri_jk) or self.ri_jk_simd,
-            f'{type(self).__name__}: RI-JK is supported only with ri_jk_simd')
 
         if self.rank == mpi_master():
             screening = T4CScreener()
@@ -1926,7 +1921,7 @@ class LinearSolver:
             # data to a driver which takes doubles.
             ri_jk_factors = None
 
-            if (self.rank == mpi_master() and self.ri_jk and self.ri_jk_simd and
+            if (self.rank == mpi_master() and self.ri_jk and
                     not getattr(self, 'core_excitation', False) and
                     not getattr(self, 'restricted_subspace', False) and
                     not np.iscomplexobj(vecs_ger.data)):
@@ -2295,7 +2290,7 @@ class LinearSolver:
         # NOTE: the resolution of the identity takes the whole batch at once, as
         # the left factor is transformed once for all of it, so it replaces the
         # loop rather than sitting inside it.
-        use_ri_jk = (self.ri_jk and self.ri_jk_simd and dens_factors is not None)
+        use_ri_jk = (self.ri_jk and dens_factors is not None)
 
         # NOTE: the simd Coulomb only driver takes the whole batch too, for a
         # reason of its own: every density is fitted against the same integrals,
@@ -2687,7 +2682,7 @@ class LinearSolver:
         # right hand sides of its fittings are reduced in one collective.
         use_ri_coulomb = (self.ri_coulomb and fock_type == 'j')
 
-        use_ri_jk = (self.ri_jk and self.ri_jk_simd and dens_factors is not None)
+        use_ri_jk = (self.ri_jk and dens_factors is not None)
 
         if use_ri_coulomb:
             fock_arrays = self._comp_simd_ri_j_fock_unrestricted(
@@ -3007,7 +3002,7 @@ class LinearSolver:
             # describe.
             ri_jk_factors = None
 
-            if (self.rank == mpi_master() and self.ri_jk and self.ri_jk_simd and
+            if (self.rank == mpi_master() and self.ri_jk and
                     not getattr(self, 'core_excitation', False)):
                 ri_jk_factors = ((mo_a[:, :nocc_a], [], []),
                                  (mo_b[:, :nocc_b], [], []))

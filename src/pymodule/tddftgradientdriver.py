@@ -682,11 +682,6 @@ class TddftGradientDriver(GradientDriver):
         elif self._scf_drv.ri_jk:
 
             assert_msg_critical(
-                self._scf_drv.ri_jk_simd,
-                'TddftGradientDriver: RI-JK is supported only with ' +
-                'ri_jk_simd')
-
-            assert_msg_critical(
                 fock_type != 'j',
                 'TddftGradientDriver: RI-JK is not applicable to pure DFT')
 
