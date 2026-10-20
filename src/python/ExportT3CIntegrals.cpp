@@ -35,9 +35,11 @@
 #include <pybind11/operators.h>
 #include <pybind11/stl.h>
 
+#ifdef VLX_USE_OLD_RI
 #include "ThreeCenterElectronRepulsionDriver.hpp"
 #include "ThreeCenterElectronRepulsionGeomX00Driver.hpp"
 #include "ThreeCenterElectronRepulsionGeom0X0Driver.hpp"
+#endif
 #include "ThreeCenterOverlapDriver.hpp"
 #include "T3FlatBuffer.hpp"
 #include "T4CScreener.hpp"
@@ -49,6 +51,7 @@ namespace vlx_t3cintegrals {
 void
 export_t3cintegrals(py::module& m)
 {
+#ifdef VLX_USE_OLD_RI
     // CThreeCenterElectronRepulsionDriver class
     PyClass<CThreeCenterElectronRepulsionDriver>(m, "ThreeCenterElectronRepulsionDriver")
         .def(py::init<>())
@@ -70,6 +73,7 @@ export_t3cintegrals(py::module& m)
                 return eri_drv.compute(screener, aux_basis, molecule, atoms, ithreshold);
             },
             "Computes electron repulsion integrals for given molecule, screener, auxilary basis, and list of atoms.");
+#endif
     
     
     // CThreeCenterOverlapDriver class
@@ -90,6 +94,7 @@ export_t3cintegrals(py::module& m)
             },
             "Computes overlap matrix for given molecule, basis and vector of external scaled Gaussians.");
 
+#ifdef VLX_USE_OLD_RI
     // ThreeCenterElectronRepulsionGeom100Driver class
     PyClass<CThreeCenterElectronRepulsionGeomX00Driver<1>>(m, "ThreeCenterElectronRepulsionGeom100Driver")
         .def(py::init<>())
@@ -109,6 +114,7 @@ export_t3cintegrals(py::module& m)
                 return std::make_shared<CT3RectFlatBuffer<double>>(geom_drv.compute(basis, aux_basis, molecule, iatom));
              },
             "Computes gradient integrals for given molecule, basis, auxilary basis and selected atom.");
+#endif
 }
 
 }  // namespace vlx_t2cintegrals

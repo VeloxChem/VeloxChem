@@ -5,8 +5,19 @@ import pytest
 
 from veloxchem.veloxchemlib import AtomBasis, BasisFunction, MolecularBasis
 from veloxchem.veloxchemlib import SimdThreeCenterElectronRepulsionDriver
-from veloxchem.veloxchemlib import ThreeCenterElectronRepulsionDriver
 from veloxchem.molecule import Molecule
+
+# NOTE: the reference driver is the deprecated non-SIMD implementation, which is
+# only compiled when configured with -DVLX_USE_OLD_RI=YES.
+try:
+    from veloxchem.veloxchemlib import ThreeCenterElectronRepulsionDriver
+except ImportError:
+    ThreeCenterElectronRepulsionDriver = None
+
+has_reference_driver = pytest.mark.skipif(
+    ThreeCenterElectronRepulsionDriver is None,
+    reason="reference driver not built (configure with -DVLX_USE_OLD_RI=YES)",
+)
 
 # NOTE: the reference driver dispatches to angular momentum four on the bra and six
 # on the auxiliary side, and returns zeros without an error above that. Comparing
@@ -23,6 +34,7 @@ MAX_AUX_MOMENTUM = 6
 LABELS = "spdfghikl"
 
 
+@has_reference_driver
 class TestSimdThreeCenterElectronRepulsion:
 
     def one_function_basis(self, angular_momentum, identifier):

@@ -45,6 +45,13 @@ target_link_libraries(vlxobjs
     Boost::headers
   )
 
+if(VLX_USE_OLD_RI)
+  target_compile_definitions(vlxobjs
+    PUBLIC
+      VLX_USE_OLD_RI
+    )
+endif()
+
 add_subdirectory(dft_func)
 add_subdirectory(fika)
 add_subdirectory(general)
