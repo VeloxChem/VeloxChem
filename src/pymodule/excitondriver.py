@@ -91,6 +91,7 @@ class ExcitonModelDriver:
         - natoms: The list containing number of atoms in each monomer.
         - charges: The list containing net charges of each monomer.
         - eri_thresh: The electron repulsion integrals screening threshold.
+        - ri: The flag for using the RI approximation.
         - dft: The flag for running DFT.
         - grid_level: The accuracy level of DFT grid.
         - xcfun: The name of XC functional.
@@ -145,6 +146,7 @@ class ExcitonModelDriver:
 
         # eri settings
         self.eri_thresh = 1.0e-12
+        self.ri = True
 
         # dft settings
         self._dft = False
@@ -199,6 +201,7 @@ class ExcitonModelDriver:
                 'checkpoint_file': ('str', 'name of checkpoint file'),
             },
             'method_settings': {
+                'ri': ('bool', 'use RI approximation'),
                 'xcfun': ('str_upper', 'exchange-correlation functional'),
                 'grid_level': ('int', 'accuracy level of DFT grid'),
             },
@@ -416,6 +419,8 @@ class ExcitonModelDriver:
         else:
             dft_func_label = 'HF'
             method_dict = {}
+
+        method_dict['ri'] = self.ri
 
         rsp_vector_labels = [
             'dimer_indices',

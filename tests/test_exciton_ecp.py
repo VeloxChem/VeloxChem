@@ -86,6 +86,7 @@ class TestExcitonECP:
         exciton_drv.nstates = 2
         exciton_drv.ct_nocc = 1
         exciton_drv.ct_nvir = 1
+        exciton_drv.ri = False
         exciton_drv.scf_conv_thresh = 1.0e-7
         exciton_drv.tda_conv_thresh = 1.0e-5
         exciton_drv.restart = False

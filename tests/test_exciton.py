@@ -128,6 +128,7 @@ class TestExciton:
         exciton_drv.nstates = 2
         exciton_drv.ct_nocc = 1
         exciton_drv.ct_nvir = 1
+        exciton_drv.ri = False
         exciton_drv.filename = exciton_dict['filename']
         if 'xcfun' in method_dict:
             exciton_drv.xcfun = method_dict['xcfun']
@@ -367,6 +368,7 @@ class TestExciton:
         exmod_drv.nstates = 5
         exmod_drv.ct_nocc = 1
         exmod_drv.ct_nvir = 1
+        exmod_drv.ri = False
 
         exmod_drv.ostream.mute()
         exmod_results = exmod_drv.compute(molecule, basis)
