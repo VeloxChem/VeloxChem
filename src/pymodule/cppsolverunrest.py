@@ -43,7 +43,6 @@ from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            solvation_model_sanity_check, gostshyp_sanity_check,
                            environment_compatibility_sanity_check)
 from .errorhandler import assert_msg_critical
-from .fikaembedding import is_fika_embedding
 from .mathutils import safe_solve
 from .checkpoint import check_rsp_hdf5
 from .inputparser import parse_seq_fixed
@@ -246,13 +245,6 @@ class ComplexResponseUnrestrictedSolver(ComplexResponseSolverBase):
         self._init_cpcm(molecule, basis)
         # GOSTSHYP information
         self._init_gostshyp(molecule, basis, scf_results)
-
-        # TODO: enable PE (PyFraME); the fika embedding needs only the total
-        # density and is supported
-        assert_msg_critical(
-            not self._pe or is_fika_embedding(self.embedding),
-            f'{type(self).__name__}: ' +
-            'not yet implemented for polarizable embedding')
 
         # right-hand side (gradient)
         if self.rank == mpi_master():

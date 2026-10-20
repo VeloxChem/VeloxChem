@@ -17,7 +17,6 @@ from veloxchem.dispersionmodel import DispersionModel
 from veloxchem.resultsio import read_molecule_and_basis
 from veloxchem.inputparser import unparse_input, read_unparsed_input_from_hdf5
 from veloxchem.errorhandler import VeloxChemError
-from veloxchem.sanitychecks import pe_sanity_check
 
 
 @pytest.mark.solvers
@@ -33,7 +32,7 @@ class TestScfDriverMiscellaneous:
       tests/test_ri_scf.py, tests/test_rijk_scf.py
     - CPCM, SMD, PE, and point charges:
       tests/test_cpcm_solvation_energy.py, tests/test_smd_solvation_energy.py,
-      tests/test_embedding.py, tests/test_pointcharges.py
+      tests/test_fika_scf.py, tests/test_pointcharges.py
     """
 
     @staticmethod
@@ -532,37 +531,6 @@ class TestScfDriverMiscellaneous:
         assert scf_drv.molecular_orbitals.is_empty()
         assert scf_drv._ref_mol_orbs is None
 
-    def test_pe_potfile_falls_back_to_pe_options(self, monkeypatch):
-
-        scf_drv = ScfRestrictedDriver()
-        scf_drv.ostream.mute()
-
-        # PE configured through an embedding object, as in test_embedding.py.
-        scf_drv.embedding = {
-            'settings': {
-                'embedding_method': 'PE'
-            },
-            'inputs': {
-                'json_file': 'tests/data/acrolein.json'
-            },
-        }
-
-        # pyframe is not required for this state-transition test.
-        monkeypatch.setattr('veloxchem.sanitychecks.embedding_sanity_check',
-                            lambda options: None)
-        pe_sanity_check(scf_drv)
-
-        assert scf_drv._pe
-        assert scf_drv.potfile is None
-        assert scf_drv.pe_options['potfile'] == 'tests/data/acrolein.json'
-        assert scf_drv._get_pe_potfile() == 'tests/data/acrolein.json'
-
-        # This mirrors the fallback performed in compute().
-        if scf_drv._pe and scf_drv.potfile is None:
-            scf_drv.potfile = scf_drv.pe_options.get('potfile')
-
-        assert scf_drv.potfile == 'tests/data/acrolein.json'
-
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason='skip pytest.raises for multiple MPI processes')
     @pytest.mark.parametrize(
@@ -1057,12 +1025,13 @@ class TestScfDriverMiscellaneous:
         driver = ScfRestrictedDriver()
         driver.ostream.mute()
 
-        driver.embedding = {'settings': {'embedding_method': 'PE'}}
+        driver.embedding = {'settings': {'embedding_method': 'fika'}}
         assert driver.get_scf_type_str() == (
-            'Spin-Restricted Hartree-Fock with PE')
+            'Spin-Restricted Hartree-Fock with fika')
 
         driver._dft = True
-        assert driver.get_scf_type_str() == 'Spin-Restricted Kohn-Sham with PE'
+        assert driver.get_scf_type_str() == (
+            'Spin-Restricted Kohn-Sham with fika')
 
     def test_unrestricted_helper_branches_and_natural_orbitals(self):
 
@@ -1104,13 +1073,13 @@ class TestScfDriverMiscellaneous:
             assert np.all(occupations >= -1.0e-12)
             assert np.all(occupations <= 2.0 + 1.0e-12)
 
-        driver.embedding = {'settings': {'embedding_method': 'PE'}}
+        driver.embedding = {'settings': {'embedding_method': 'fika'}}
         assert driver.get_scf_type_str() == (
-            'Spin-Unrestricted Hartree-Fock with PE')
+            'Spin-Unrestricted Hartree-Fock with fika')
 
         driver._dft = True
         assert driver.get_scf_type_str() == (
-            'Spin-Unrestricted Kohn-Sham with PE')
+            'Spin-Unrestricted Kohn-Sham with fika')
 
         copied = deepcopy(driver)
         assert copied.ostream is driver.ostream
@@ -1147,13 +1116,13 @@ class TestScfDriverMiscellaneous:
             assert 0.0 < mol_orbs.occa_to_numpy()[nocc_a] < 1.0
             assert 0.0 < mol_orbs.occb_to_numpy()[nocc_b] < 1.0
 
-        driver.embedding = {'settings': {'embedding_method': 'PE'}}
+        driver.embedding = {'settings': {'embedding_method': 'fika'}}
         assert driver.get_scf_type_str() == (
-            'Spin-Restricted Open-Shell Hartree-Fock with PE')
+            'Spin-Restricted Open-Shell Hartree-Fock with fika')
 
         driver._dft = True
         assert driver.get_scf_type_str() == (
-            'Spin-Restricted Open-Shell Kohn-Sham with PE')
+            'Spin-Restricted Open-Shell Kohn-Sham with fika')
 
         copied = deepcopy(driver)
         assert copied.ostream is driver.ostream

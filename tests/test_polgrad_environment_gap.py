@@ -85,13 +85,30 @@ class TestPolgradEnvironmentGap:
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason='pytest.raises only valid in serial')
-    def test_compute_analytical_rejects_potfile(self):
+    def test_compute_analytical_rejects_potfile(self, tmp_path):
 
-        pytest.importorskip('pyframe')
-        here = Path(__file__).parent
-        potfile = str(here / 'data' / 'pe_water.json')
+        potfile = tmp_path / 'fika_water.pot'
+        potfile.write_text("""
+            @environment
+            units: angstrom
+            xyz:
+            O  3.000000  0.000000  0.000000  HOH_pe  1  O
+            H  3.757000  0.000000  0.586000  HOH_pe  1  H1
+            H  2.243000  0.000000  0.586000  HOH_pe  1  H2
+            @end
+            @charges
+            O  -0.66900000  HOH_pe
+            H   0.33450000  HOH_pe
+            H   0.33450000  HOH_pe
+            @end
+            @polarizabilities
+            O  9.718  0.0  0.0  9.718  0.0  9.718  HOH_pe
+            H  0.0    0.0  0.0  0.0    0.0  0.0    HOH_pe
+            H  0.0    0.0  0.0  0.0    0.0  0.0    HOH_pe
+            @end
+        """)
 
-        scf_drv, lr_results = self.run_scf_and_lr(potfile=potfile)
+        scf_drv, lr_results = self.run_scf_and_lr(potfile=str(potfile))
 
         errmsg = 'Analytical polarizability gradient is not supported '
         errmsg += 'with polarizable embedding'

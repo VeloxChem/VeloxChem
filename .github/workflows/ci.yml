@@ -76,7 +76,6 @@ jobs:
           cd boost-math && test "$(git rev-parse HEAD)" = "e0fcd19f7227d81391770ea46015acc3c80af810" && cd ..
           export EIGEN_INCLUDE_DIR=$(pwd)/eigen
           export BOOST_INCLUDE_DIR=$(pwd)/boost-math/include
-          CXX=g++ python -m pip install git+https://github.com/VeloxChem/PyFraME.git
           python -m pip install dftd4
           python -m pip install openmm rdkit pymbar
           echo "=== VeloxChem build ==="

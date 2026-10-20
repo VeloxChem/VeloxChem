@@ -41,6 +41,9 @@ from .veloxchemlib import (mpi_master, bohr_in_angstroms,
                            FikaTholeDamping)
 from .errorhandler import assert_msg_critical
 
+# Default inner switching function of the fika embedding (angstrom).
+default_fika_switching = {'r_on': 1.0, 'r_off': 1.9}
+
 
 def is_fika_embedding(embedding):
     """
@@ -81,12 +84,15 @@ def fika_embedding_sanity_check(embedding):
 
         settings:
             - embedding_method: 'fika'
-            - damping: 'thole' (default) or None
+            - damping: 'thole' or None (default: None, no damping). Damping
+              and switching are mutually exclusive.
             - thole_a: the Thole parameter (default 2.1304)
             - switching: dictionary with r_on and r_off (default units:
               angstrom) and optionally unit ('angstrom' or 'bohr'), the inner
               switching function of the MM permanent-charge field and the MM
-              dipole coupling of pairs of different residues
+              dipole coupling of pairs of different residues. The default is
+              r_on = 1.0 and r_off = 1.9 angstrom; set switching to None to
+              disable it.
             - induced_dipoles: tolerance, field_accuracy, max_iterations,
               summation ('automatic', 'direct' or 'multipole')
             - fock_threshold, fock_summation
@@ -116,11 +122,16 @@ def fika_embedding_sanity_check(embedding):
     assert_msg_critical(
         not unknown,
         f'fika embedding: unknown settings {sorted(unknown)}')
-    damping = settings.get('damping', 'thole')
+    damping = settings.get('damping')
     assert_msg_critical(
         damping is None or str(damping).lower() in ('thole', 'none'),
         "fika embedding: damping must be 'thole' or None")
     switching = settings.get('switching')
+    damping_enabled = (damping is not None and
+                       str(damping).lower() != 'none')
+    assert_msg_critical(
+        not (damping_enabled and switching is not None),
+        'fika embedding: damping and switching are mutually exclusive')
     if switching is not None:
         assert_msg_critical(
             isinstance(switching, dict),
@@ -248,13 +259,16 @@ class FikaEmbedding:
             self.classical_system = inputs['objects']['classical_system']
             self.residues = None
 
-        damping = settings.get('damping', 'thole')
+        damping = settings.get('damping')
         if damping is None or str(damping).lower() == 'none':
             self.damping = None
         else:
             self.damping = FikaTholeDamping(settings.get('thole_a', 2.1304))
 
         switching = settings.get('switching')
+        if (switching is None and 'switching' not in settings and
+                self.damping is None):
+            switching = default_fika_switching
         if switching is None:
             self.switching = None
         else:

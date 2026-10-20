@@ -65,7 +65,7 @@ from .sanitychecks import (dft_sanity_check, ri_sanity_check, pe_sanity_check,
                            gostshyp_sanity_check,
                            environment_compatibility_sanity_check)
 from .errorhandler import assert_msg_critical
-from .fikaembedding import fika_embedding_text, is_fika_embedding
+from .fikaembedding import fika_embedding_text
 from .inputparser import (parse_input, print_keywords, print_attributes,
                           get_random_string_parallel, unparse_input,
                           write_unparsed_input_to_hdf5,
@@ -781,13 +781,8 @@ class LinearSolver:
             The Fock contribution (on the master rank of the communicator).
         """
 
-        from .fikaembedding import FikaEmbeddingLRS
-
-        if isinstance(self._embedding_drv, FikaEmbeddingLRS):
-            return self._embedding_drv.compute_pe_contributions(
-                density_matrix=density_matrix, comm=comm)
         return self._embedding_drv.compute_pe_contributions(
-            density_matrix=density_matrix)
+            density_matrix=density_matrix, comm=comm)
 
     def _init_pe(self, molecule, basis, silent=False):
         """
@@ -802,7 +797,9 @@ class LinearSolver:
             The dictionary of polarizable embedding information.
         """
 
-        if self._pe and is_fika_embedding(self.embedding):
+        potfile_text = ''
+
+        if self._pe:
             from .fikaembedding import FikaEmbeddingLRS
 
             self._embedding_drv = FikaEmbeddingLRS(molecule=molecule,
@@ -814,34 +811,7 @@ class LinearSolver:
                 for line in self._embedding_drv.get_info():
                     self.ostream.print_info(line)
                 self.ostream.print_blank()
-            return {'potfile_text': fika_embedding_text(self.embedding)}
-
-        if self._pe:
-            assert_msg_critical(
-                self.embedding['settings']['embedding_method'] == 'PE',
-                'PolarizableEmbedding: Invalid embedding_method. Only PE is supported.'
-            )
-
-            from .embedding import PolarizableEmbeddingLRS
-
-            self._embedding_drv = PolarizableEmbeddingLRS(
-                molecule=molecule,
-                ao_basis=basis,
-                options=self.embedding,
-                comm=self.comm)
-
-            # TODO: print PyFraME info
-
-            if not silent:
-                pot_info = 'Reading polarizable embedding: {}'.format(
-                    self.pe_options['potfile'])
-                self.ostream.print_info(pot_info)
-                self.ostream.print_blank()
-
-            with open(str(self.pe_options['potfile']), 'r') as f_pot:
-                potfile_text = '\n'.join(f_pot.readlines())
-        else:
-            potfile_text = ''
+            potfile_text = fika_embedding_text(self.embedding)
 
         return {
             'potfile_text': potfile_text,

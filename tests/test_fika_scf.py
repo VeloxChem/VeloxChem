@@ -37,6 +37,8 @@ def fika_embedding(pdb_file, damping=None):
         'settings': {
             'embedding_method': 'fika',
             'damping': damping,
+            # these regression values use the no-switching embedding
+            'switching': None,
         },
         'inputs': {
             'pdb_file': pdb_file,
@@ -104,7 +106,8 @@ class TestFikaScf:
             # Induced dipoles of the final density, one per oxygen.
             positions, _, _ = fika_polarizable_sites(
                 fika_drv._embedding_drv.classical_system)
-            assert fika_results['induced_dipoles'].shape == positions.shape
+            assert fika_results['embedding_induced_dipoles'].shape == (
+                positions.shape)
 
             # Each SCF step starts the dipoles from those of the previous one.
             iterations = fika_drv._embedding_drv.iterations
@@ -322,10 +325,10 @@ class TestFikaScf:
         scf_drv.ostream.mute()
         scf_drv.embedding = {
             'settings': {
-                'embedding_method': 'PE'
+                'embedding_method': 'invalid'
             },
             'inputs': {
-                'json_file': 'ignored.json'
+                'potfile': 'ignored.pot'
             },
         }
         scf_drv.potfile = str(potfile)
@@ -333,11 +336,89 @@ class TestFikaScf:
 
         assert scf_drv._pe
         assert scf_drv.embedding['settings']['embedding_method'] == 'fika'
-        assert scf_drv.embedding['inputs']['potfile'] == str(potfile)
+        # the potfile path is resolved on the master rank and broadcast
+        assert (Path(scf_drv.embedding['inputs']['potfile']).name ==
+                potfile.name)
+        if MPI.COMM_WORLD.Get_rank() == mpi_master():
+            assert scf_drv.embedding['inputs']['potfile'] == str(potfile)
         assert scf_drv._embedding_drv.classical_system.number_of_residues(
             True) == 1
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
             assert abs(results['E_emb']) > 0.0
+
+    def test_scf_and_linear_response_from_potfile(self, tmp_path):
+
+        potfile = tmp_path / 'fika_water.pot'
+        potfile.write_text("""
+            @environment
+            units: angstrom
+            xyz:
+            O  3.000000  0.000000  0.000000  HOH_pe  1  O
+            H  3.757000  0.000000  0.586000  HOH_pe  1  H1
+            H  2.243000  0.000000  0.586000  HOH_pe  1  H2
+            @end
+            @charges
+            O  -0.66900000  HOH_pe
+            H   0.33450000  HOH_pe
+            H   0.33450000  HOH_pe
+            @end
+            @polarizabilities
+            O  9.718  0.0  0.0  9.718  0.0  9.718  HOH_pe
+            H  0.0    0.0  0.0  0.0    0.0  0.0    HOH_pe
+            H  0.0    0.0  0.0  0.0    0.0  0.0    HOH_pe
+            @end
+        """)
+
+        molecule = Molecule.read_xyz_string("""3
+            water
+            O  0.000000  0.000000  0.000000
+            H  0.000000  0.757000  0.586000
+            H  0.000000 -0.757000  0.586000
+        """)
+        basis = MolecularBasis.read(molecule, 'def2-svp', ostream=None)
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ostream.mute()
+        scf_drv.conv_thresh = 1.0e-8
+        scf_drv.potfile = str(potfile)
+        scf_results = scf_drv.compute(molecule, basis)
+
+        # The response does not receive an embedding: it inherits the SCF
+        # potfile and builds the default fika embedding from it.
+        lrs_drv = LinearResponseSolver()
+        lrs_drv.ostream.mute()
+        lrs_drv.a_operator = 'electric dipole'
+        lrs_drv.b_operator = 'electric dipole'
+        lrs_drv.frequencies = (0.0,)
+        lrs_drv.conv_thresh = 1.0e-8
+        lrs_results = lrs_drv.compute(molecule, basis, scf_results)
+
+        if MPI.COMM_WORLD.Get_rank() == mpi_master():
+            assert scf_results['scf_energy'] == pytest.approx(
+                -75.9588041254, abs=1.0e-8)
+            assert scf_results['E_emb'] == pytest.approx(
+                0.0021369030, abs=1.0e-8)
+            assert scf_results['embedding_method'] == 'fika'
+            assert scf_results['potfile'] == str(potfile)
+
+            assert lrs_drv._pe
+            assert lrs_drv.embedding['settings'] == {
+                'embedding_method': 'fika'
+            }
+            assert lrs_drv.embedding['inputs']['potfile'] == str(potfile)
+            assert lrs_drv._embedding_drv.switching is not None
+
+            ref_response = np.array([
+                [-3.0013483959, 0.0, -0.0056242824],
+                [0.0, -6.8387290055, 0.0],
+                [-0.0056242824, 0.0, -5.0077482764],
+            ])
+            got_response = np.array([[
+                lrs_results['response_functions'][(a, b, 0.0)]
+                for b in 'xyz'
+            ] for a in 'xyz'])
+
+            assert np.max(np.abs(got_response - ref_response)) < 1.0e-8
 
     def test_damping_and_objects(self, tmp_path):
 
@@ -347,17 +428,20 @@ class TestFikaScf:
         molecule = reader.get_solute(residues)
         basis = MolecularBasis.read(molecule, 'sto-3g', ostream=None)
 
-        # Thole damping is the default.
+        # No damping is the default.
+        undamped = fika_embedding(pdb_file)
+        del undamped['settings']['damping']
+        _, undamped_results = run_scf(molecule, basis, undamped)
         thole = fika_embedding(pdb_file)
-        del thole['settings']['damping']
+        thole['settings']['damping'] = 'thole'
         _, thole_results = run_scf(molecule, basis, thole)
-        _, undamped_results = run_scf(molecule, basis, fika_embedding(pdb_file))
 
         # The same classical system given as an object.
         system, _ = reader.get_classical_system(residues, {'HOH': 'ahlstrom'})
         objects = {
             'settings': {
-                'embedding_method': 'FIKA'
+                'embedding_method': 'FIKA',
+                'switching': None,
             },
             'inputs': {
                 'objects': {
@@ -371,7 +455,7 @@ class TestFikaScf:
             assert abs(thole_results['scf_energy'] -
                        undamped_results['scf_energy']) > 1.0e-6
             assert object_results['scf_energy'] == pytest.approx(
-                thole_results['scf_energy'], abs=1.0e-9)
+                undamped_results['scf_energy'], abs=1.0e-9)
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason='input errors abort MPI runs')

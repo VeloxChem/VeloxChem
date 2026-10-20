@@ -559,28 +559,6 @@ class ScfDriver:
 
         print_attributes(self._input_keywords, self.ostream)
 
-    def _prepare_fika_embedding(self):
-        """
-        Prepares the fika embedding from an assigned embedding or a potfile.
-        """
-
-        if self.potfile is not None:
-            self.embedding = {
-                'settings': {
-                    'embedding_method': 'fika'
-                },
-                'inputs': {
-                    'potfile': str(self.potfile)
-                },
-            }
-            self.potfile = None
-            return
-
-        if self.embedding is not None:
-            assert_msg_critical(
-                is_fika_embedding(self.embedding),
-                'SCF driver: only the fika embedding is supported')
-
     def update_settings(self, scf_dict, method_dict=None):
         """
         Updates settings in SCF driver.
@@ -616,11 +594,7 @@ class ScfDriver:
 
         dft_sanity_check(self, 'update_settings')
 
-        self._prepare_fika_embedding()
         pe_sanity_check(self, method_dict)
-        assert_msg_critical(
-            not self._pe or is_fika_embedding(self.embedding),
-            'SCF driver: only the fika embedding is supported')
 
         # check solvation model setup
         solvation_model_sanity_check(self)
@@ -796,11 +770,7 @@ class ScfDriver:
         dft_sanity_check(self, 'compute')
 
         # check pe setup
-        self._prepare_fika_embedding()
         pe_sanity_check(self, molecule=molecule)
-        assert_msg_critical(
-            not self._pe or is_fika_embedding(self.embedding),
-            'SCF driver: only the fika embedding is supported')
 
         # check solvation model setup
         solvation_model_sanity_check(self)
@@ -947,10 +917,6 @@ class ScfDriver:
 
         # set up polarizable embedding through fika
         if self._pe:
-
-            assert_msg_critical(
-                is_fika_embedding(self.embedding),
-                'SCF driver: only the fika embedding is supported')
 
             inputs = self.embedding.get('inputs', {})
             if 'potfile' in inputs:
@@ -1736,10 +1702,6 @@ class ScfDriver:
                 if self._cpcm:
                     write_cpcm_charges(checkpoint_file, self.cpcm_drv.cpcm_q)
 
-                # Set potfile before unparse_input serializes checkpoint settings.
-                if self._pe and self.potfile is None:
-                    self.potfile = self.pe_options.get('potfile')
-
                 scf_keywords = {
                     key: val[0]
                     for key, val in self._input_keywords['scf'].items()
@@ -1749,12 +1711,17 @@ class ScfDriver:
                     self._input_keywords['method_settings'].items()
                 }
 
+                method_input = unparse_input(self, method_keywords)
+                if self._pe and method_input.get('potfile') is None:
+                    fika_potfile = self._get_pe_potfile()
+                    if fika_potfile is not None:
+                        method_input['potfile'] = str(fika_potfile)
+
                 write_unparsed_input_to_hdf5(checkpoint_file,
                                              unparse_input(self, scf_keywords),
                                              group_name='scf_settings')
                 write_unparsed_input_to_hdf5(checkpoint_file,
-                                             unparse_input(
-                                                 self, method_keywords),
+                                             method_input,
                                              group_name='method_settings')
 
                 self.ostream.print_blank()
@@ -2507,11 +2474,10 @@ class ScfDriver:
                     self._scf_results['potfile'] = self._get_pe_potfile()
                     self._scf_results['E_emb'] = e_emb
                     self._scf_results['F_emb'] = V_emb
-                    if isinstance(self._embedding_drv, FikaEmbeddingSCF):
-                        # marks the reference for the response sanity checks
-                        self._scf_results['embedding_method'] = 'fika'
-                        self._scf_results['induced_dipoles'] = (
-                            self._embedding_drv.get_induced_dipoles())
+                    # marks the reference for the response sanity checks
+                    self._scf_results['embedding_method'] = 'fika'
+                    self._scf_results['embedding_induced_dipoles'] = (
+                        self._embedding_drv.get_induced_dipoles())
 
                 if self.point_charges is not None:
                     self._scf_results['point_charges'] = self.point_charges
@@ -2699,12 +2665,10 @@ class ScfDriver:
         return fika_embedding_text(self.embedding)
 
     def _get_pe_potfile(self):
-        """Returns the PE potfile, falling back to pe_options when unset."""
+        """Returns the fika potfile of the embedding, if any."""
 
         if self._pe:
-            if self.potfile is not None:
-                return self.potfile
-            return self.pe_options.get('potfile')
+            return self.embedding.get('inputs', {}).get('potfile')
 
         return self.potfile
 

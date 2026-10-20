@@ -58,7 +58,6 @@ from .oneeints import compute_nuclear_potential_gradient
 from .oneeints import compute_point_charge_gradient
 from .oneeints import compute_ecp_gradient
 from .errorhandler import assert_msg_critical
-from .fikaembedding import is_fika_embedding
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            dft_sanity_check)
 
@@ -682,45 +681,16 @@ class ScfGradientDriver(GradientDriver):
             'omega': omega,
         }
 
-    def _add_embedding_gradient(self, molecule, basis, density_matrix,
-                                grad_timing):
+    def _add_embedding_gradient(self):
         """
-        Adds the polarizable embedding contribution to the gradient.
-
-        :param molecule:
-            The molecule.
-        :param basis:
-            The AO basis set.
-        :param density_matrix:
-            The total density matrix.
-        :param grad_timing:
-            The timing dictionary to update.
+        Rejects the polarizable embedding contribution to the gradient.
         """
-
-        t0 = time.time()
 
         if self.scf_driver._pe:
             assert_msg_critical(
-                not is_fika_embedding(self.scf_driver.embedding),
+                False,
                 'ScfGradientDriver: gradients with the fika embedding are ' +
                 'not available yet')
-
-            from .embedding import PolarizableEmbeddingGrad
-
-            # pass along emb object from scf, or make a new one? -> for ind dipoles.
-            self._embedding_drv = PolarizableEmbeddingGrad(
-                molecule=molecule,
-                ao_basis=basis,
-                options=self.scf_driver.embedding,
-                comm=self.comm)
-
-            pe_grad = self._embedding_drv.compute_pe_contributions(
-                density_matrix=density_matrix)
-
-            if self.rank == mpi_master():
-                self.gradient += pe_grad
-
-            grad_timing['PE_grad'] += time.time() - t0
 
     def _add_cpcm_gradient(self, molecule, basis, density_matrix, grad_timing):
         """
@@ -1144,7 +1114,7 @@ class ScfGradientDriver(GradientDriver):
 
         # Embedding contribution to the gradient
 
-        self._add_embedding_gradient(molecule, basis, 2.0 * D, grad_timing)
+        self._add_embedding_gradient()
 
         # CPCM contribution to gradient
 
@@ -1455,7 +1425,7 @@ class ScfGradientDriver(GradientDriver):
 
         # Embedding contribution to the gradient
 
-        self._add_embedding_gradient(molecule, basis, Da + Db, grad_timing)
+        self._add_embedding_gradient()
 
         # CPCM contribution to gradient
 

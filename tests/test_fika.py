@@ -569,10 +569,6 @@ class TestFikaSwitching:
             'settings': {
                 'embedding_method': 'fika',
                 'damping': None,
-                'switching': {
-                    'r_on': 1.0,
-                    'r_off': 1.9,
-                },
             },
             'inputs': {
                 'objects': {
@@ -583,6 +579,26 @@ class TestFikaSwitching:
         molecule = get_acrolein()
         basis = MolecularBasis.read(molecule, 'sto-3g', ostream=None)
 
+        # The inner switching function defaults to 1.0/1.9 angstrom and
+        # damping defaults to None.
+        fika_embedding_sanity_check(options)
+        embedding = FikaEmbedding(molecule, basis, options)
+        assert embedding.damping is None
+        assert embedding.switching.r_on == pytest.approx(
+            1.0 / bohr_in_angstroms())
+        assert embedding.switching.r_off == pytest.approx(
+            1.9 / bohr_in_angstroms())
+
+        # An explicit None disables the switching function.
+        options['settings']['switching'] = None
+        fika_embedding_sanity_check(options)
+        embedding = FikaEmbedding(molecule, basis, options)
+        assert embedding.switching is None
+
+        options['settings']['switching'] = {
+            'r_on': 1.0,
+            'r_off': 1.9,
+        }
         fika_embedding_sanity_check(options)
         embedding = FikaEmbedding(molecule, basis, options)
         assert embedding.switching.r_on == pytest.approx(
@@ -611,6 +627,22 @@ class TestFikaSwitching:
             options['settings']['switching'] = switching
             with pytest.raises(Exception):
                 fika_embedding_sanity_check(options)
+
+        # Thole damping and switching are mutually exclusive.
+        options['settings']['damping'] = 'thole'
+        options['settings']['switching'] = {
+            'r_on': 1.0,
+            'r_off': 1.9,
+        }
+        with pytest.raises(Exception, match='mutually exclusive'):
+            fika_embedding_sanity_check(options)
+
+        # Thole damping suppresses the default switching function.
+        options['settings'].pop('switching')
+        fika_embedding_sanity_check(options)
+        embedding = FikaEmbedding(molecule, basis, options)
+        assert embedding.damping is not None
+        assert embedding.switching is None
 
 
 class TestFikaEmbedding:
@@ -653,7 +685,7 @@ class TestFikaEmbedding:
         assert result.energy() == pytest.approx(-0.009509947877213869,
                                                 abs=1.0e-9)
 
-        # The reference dipoles are already converted from PyFraME's -mu.
+        # The reference dipoles use the same sign convention as fika.
         assert np.max(np.abs(result.induced.dipoles - ref_mu)) < 1.0e-8
         assert np.max(np.abs(result.permanent_fock - ref_f_elec)) < 1.0e-12
         assert np.max(np.abs(result.fock() - ref_v_emb)) < 1.0e-9

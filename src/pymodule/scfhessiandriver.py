@@ -64,10 +64,9 @@ from .profiler import Profiler
 from .matrices import Matrices
 from .dftutils import get_default_grid_level
 from .errorhandler import assert_msg_critical
-from .fikaembedding import is_fika_embedding
 from .oneeints import compute_electric_dipole_integrals
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
-                           dft_sanity_check, pe_sanity_check)
+                           dft_sanity_check)
 
 
 class ScfHessianDriver(HessianDriver):
@@ -298,25 +297,10 @@ class ScfHessianDriver(HessianDriver):
         cphf_solver = HessianOrbitalResponse(self.comm, self.ostream)
         cphf_solver.update_settings(self.cphf_dict, self.method_dict)
 
-        # TODO: double check analytical Hessian with PE
         assert_msg_critical(
             not self.scf_driver._pe,
-            'ScfHessianDriver: Analytical Hessian with ' +
-            'polarizable embedding (PE) not yet available')
-
-        if self.scf_driver._pe:
-
-            cphf_solver.embedding = self.scf_driver.embedding
-            pe_sanity_check(cphf_solver, molecule=molecule)
-
-            # TODO: double check
-            from .embedding import PolarizableEmbeddingHess
-            cphf_solver._embedding_hess_drv = PolarizableEmbeddingHess(
-                molecule=molecule,
-                ao_basis=ao_basis,
-                options=self.scf_driver.embedding,
-                comm=self.comm,
-                density=density * 2)
+            'ScfHessianDriver: Hessians with the fika embedding are ' +
+            'not available yet')
 
         # TODO: double check propagation of cphf settings
         cphf_keywords = {
@@ -921,22 +905,6 @@ class ScfHessianDriver(HessianDriver):
 
             self.hessian = self.hessian.reshape(natm * 3, natm * 3)
 
-            # add pe contr to hessian
-            if self.scf_driver._pe:
-                assert_msg_critical(
-                    not is_fika_embedding(self.scf_driver.embedding),
-                    'ScfHessianDriver: Hessians with the fika embedding ' +
-                    'are not available yet')
-                from .embedding import PolarizableEmbeddingHess
-                embedding_drv = PolarizableEmbeddingHess(
-                    molecule=molecule,
-                    ao_basis=ao_basis,
-                    options=self.scf_driver.embedding,
-                    density=density * 2,
-                    comm=self.comm)
-                self.hessian += embedding_drv.compute_pe_energy_hess_contributions(
-                    density_matrix=density * 2)
-
             if self._dft:
                 self.hessian += hessian_dft_xc
 
@@ -1103,25 +1071,10 @@ class ScfHessianDriver(HessianDriver):
             self.comm, self.ostream)
         cphf_solver.update_settings(self.cphf_dict, self.method_dict)
 
-        # TODO: double check analytical Hessian with PE
         assert_msg_critical(
             not self.scf_driver._pe,
-            'ScfHessianDriver: Analytical Hessian with ' +
-            'polarizable embedding (PE) not yet available')
-
-        if self.scf_driver._pe:
-
-            cphf_solver.embedding = self.scf_driver.embedding
-            pe_sanity_check(cphf_solver, molecule=molecule)
-
-            # TODO: double check
-            from .embedding import PolarizableEmbeddingHess
-            cphf_solver._embedding_hess_drv = PolarizableEmbeddingHess(
-                molecule=molecule,
-                ao_basis=ao_basis,
-                options=self.scf_driver.embedding,
-                comm=self.comm,
-                density=density_a + density_b)
+            'ScfHessianDriver: Hessians with the fika embedding are ' +
+            'not available yet')
 
         # TODO: double check propagation of cphf settings
         cphf_keywords = {
@@ -1789,22 +1742,6 @@ class ScfHessianDriver(HessianDriver):
                 self.hessian += dftd4_hessian
 
             self.hessian = self.hessian.reshape(natm * 3, natm * 3)
-
-            # add pe contr to hessian
-            if self.scf_driver._pe:
-                assert_msg_critical(
-                    not is_fika_embedding(self.scf_driver.embedding),
-                    'ScfHessianDriver: Hessians with the fika embedding ' +
-                    'are not available yet')
-                from .embedding import PolarizableEmbeddingHess
-                embedding_drv = PolarizableEmbeddingHess(
-                    molecule=molecule,
-                    ao_basis=ao_basis,
-                    options=self.scf_driver.embedding,
-                    density=density_a + density_b,
-                    comm=self.comm)
-                self.hessian += embedding_drv.compute_pe_energy_hess_contributions(
-                    density_matrix=density_a + density_b)
 
             if self._dft:
                 self.hessian += hessian_dft_xc
