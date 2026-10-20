@@ -1031,11 +1031,11 @@ class TestScfDriverMiscellaneous:
 
         driver.embedding = {'settings': {'embedding_method': 'fika'}}
         assert driver.get_scf_type_str() == (
-            'Spin-Restricted Hartree-Fock with fika')
+            'Spin-Restricted Hartree-Fock with PE')
 
         driver._dft = True
         assert driver.get_scf_type_str() == (
-            'Spin-Restricted Kohn-Sham with fika')
+            'Spin-Restricted Kohn-Sham with PE')
 
     def test_unrestricted_helper_branches_and_natural_orbitals(self):
 
@@ -1080,11 +1080,11 @@ class TestScfDriverMiscellaneous:
 
         driver.embedding = {'settings': {'embedding_method': 'fika'}}
         assert driver.get_scf_type_str() == (
-            'Spin-Unrestricted Hartree-Fock with fika')
+            'Spin-Unrestricted Hartree-Fock with PE')
 
         driver._dft = True
         assert driver.get_scf_type_str() == (
-            'Spin-Unrestricted Kohn-Sham with fika')
+            'Spin-Unrestricted Kohn-Sham with PE')
 
         copied = deepcopy(driver)
         assert copied.ostream is driver.ostream
@@ -1123,11 +1123,11 @@ class TestScfDriverMiscellaneous:
 
         driver.embedding = {'settings': {'embedding_method': 'fika'}}
         assert driver.get_scf_type_str() == (
-            'Spin-Restricted Open-Shell Hartree-Fock with fika')
+            'Spin-Restricted Open-Shell Hartree-Fock with PE')
 
         driver._dft = True
         assert driver.get_scf_type_str() == (
-            'Spin-Restricted Open-Shell Kohn-Sham with fika')
+            'Spin-Restricted Open-Shell Kohn-Sham with PE')
 
         copied = deepcopy(driver)
         assert copied.ostream is driver.ostream
