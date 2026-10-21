@@ -411,7 +411,8 @@ class ScfGradientDriver(GradientDriver):
 
             grad_timing['CPCM_grad'] += time.time() - t0
 
-    def _add_gostshyp_gradient(self, molecule, basis, density_matrix, grad_timing):
+    def _add_gostshyp_gradient(self, molecule, basis, density_matrix,
+                               grad_timing):
         """
         Adds the GOSTSHYP contribution to the gradient.
 
@@ -444,11 +445,12 @@ class ScfGradientDriver(GradientDriver):
                 'r_ext': self.scf_driver.gostshyp_r_ext,
             }
 
-            gostshyp_grad = self._gostshyp_drv.gostshyp_grad_contrib(density_matrix, tessellation_settings)
+            gostshyp_grad = self._gostshyp_drv.gostshyp_grad_contrib(
+                density_matrix, tessellation_settings)
 
             self.gradient += gostshyp_grad
 
-        grad_timing['GOSTSHYP_grad'] += time.time() - t0
+            grad_timing['GOSTSHYP_grad'] += time.time() - t0
 
     def _add_nuclear_and_dispersion_gradient(self, molecule, basis,
                                              xcfun_label, grad_timing):
@@ -554,7 +556,7 @@ class ScfGradientDriver(GradientDriver):
 
                 self.gradient += vdw_grad
 
-        grad_timing['Classical'] += time.time() - t0
+            grad_timing['Classical'] += time.time() - t0
 
     def compute_analytical_restricted(self, molecule, basis, scf_results):
         """
@@ -893,21 +895,19 @@ class ScfGradientDriver(GradientDriver):
                     self.gradient[iatom, :] -= 0.5 * np.array(atomgrad_Ka)
                     self.gradient[iatom, :] -= 0.5 * np.array(atomgrad_Kb)
 
-                    if need_omega:
-                        # for range-separated functional
-                        atomgrad_Ka_rs = fock_grad_drv.compute(
-                            basis, screener_atom, screener, Da_for_fock,
-                            Da_for_fock_2, iatom, 'kx_rs', erf_k_coef, omega,
-                            thresh_int)
-                        atomgrad_Kb_rs = fock_grad_drv.compute(
-                            basis, screener_atom, screener, Db_for_fock,
-                            Db_for_fock_2, iatom, 'kx_rs', erf_k_coef, omega,
-                            thresh_int)
+                # for range-separated functional
+                if need_omega:
+                    atomgrad_Ka_rs = fock_grad_drv.compute(
+                        basis, screener_atom, screener, Da_for_fock,
+                        Da_for_fock_2, iatom, 'kx_rs', erf_k_coef, omega,
+                        thresh_int)
+                    atomgrad_Kb_rs = fock_grad_drv.compute(
+                        basis, screener_atom, screener, Db_for_fock,
+                        Db_for_fock_2, iatom, 'kx_rs', erf_k_coef, omega,
+                        thresh_int)
 
-                        self.gradient[
-                            iatom, :] -= 0.5 * np.array(atomgrad_Ka_rs)
-                        self.gradient[
-                            iatom, :] -= 0.5 * np.array(atomgrad_Kb_rs)
+                    self.gradient[iatom, :] -= 0.5 * np.array(atomgrad_Ka_rs)
+                    self.gradient[iatom, :] -= 0.5 * np.array(atomgrad_Kb_rs)
 
                 grad_timing['Fock_grad'] += time.time() - t0
 

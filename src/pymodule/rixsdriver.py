@@ -61,11 +61,20 @@ class RixsDriver(LinearSolver):
         The output stream.
 
     Instance variables:
-        - photon_energy: Incoming photon energy; omega (a.u.)
-        - theta: Angle between incident polarization-
-          and outgoing propagation vectors (rad.)
-        - gamma: Life-time broadening (FWHM) (a.u.)
-        - final_state_cutoff: Energy window of final states to include (a.u.)'),
+        - photon_energy: Incoming photon energies (a.u.).
+        - theta: Angle between incident polarization
+          and outgoing propagation vectors (rad.).
+        - gamma: Life-time broadening (FWHM) (a.u.).
+        - final_state_cutoff: Energy window of final states to include (a.u.).
+        - tamm_dancoff: Use the Tamm-Dancoff approximation.
+        - nstates: Number of valence-excited states.
+        - num_core_states: Number of core-excited states.
+        - restricted_subspace: Use the restricted-subspace approximation.
+        - num_core_orbitals: Number of involved core orbitals.
+        - num_valence_orbitals: Number of involved valence orbitals.
+        - num_virtual_orbitals: Number of involved virtual orbitals.
+        - twoshot: Whether the two-shot approach is used
+          (read-only; derived from restricted_subspace).
     """
 
     def __init__(self, comm=None, ostream=None):
@@ -131,6 +140,17 @@ class RixsDriver(LinearSolver):
                 ('int', 'number of involved virtual orbitals'),
         })
 
+    @property
+    def twoshot(self):
+        """
+        Returns whether the two-shot approach is used.
+
+        :return:
+            Whether the two-shot approach is used.
+        """
+
+        return not self.restricted_subspace
+
     def update_settings(self, rsp_dict, method_dict=None):
         """
         Updates settings in RixsDriver.
@@ -180,11 +200,11 @@ class RixsDriver(LinearSolver):
             The molecule object.
         :param basis:
             The AO basis set.
-        :scf_results:
+        :param scf_results:
             The results dictionary from converged SCF wavefunction.
-        :rsp_results:
+        :param rsp_results:
             The linear-response results dictionary.
-        :core_rsp_results:
+        :param core_rsp_results:
             The core-valence-separated (CVS) linear-response
             results dictionary.
 
@@ -193,9 +213,11 @@ class RixsDriver(LinearSolver):
               indicating which orbitals define the core.
 
         :return:
-            Dictionary with cross-sections, outgoing photon energy
-            in (energy loss and full energy (emission)),
-            and the scattering amplitude tensor.
+            Dictionary containing the inelastic and elastic RIXS
+            cross-sections, incoming photon energies, energy losses,
+            emission energies, scattering amplitude tensors,
+            core-excitation energies and oscillator strengths, the
+            lifetime broadening in eV, and the response type.
         """
 
         assert_msg_critical(
@@ -282,7 +304,6 @@ class RixsDriver(LinearSolver):
 
         nocc = molecule.number_of_alpha_occupied_orbitals(basis)
 
-        self.twoshot = (not self.restricted_subspace)
         init_photon_set = True
 
         if self.rank == mpi_master():
@@ -571,7 +592,7 @@ class RixsDriver(LinearSolver):
 
         :return:
             The energy (float) corresponding to the first
-            state labeled as 'core' in exciitation_details.
+            state labeled as 'core' in excitation_details.
         """
 
         # TODO: implement more robust way of determining core-excited states
@@ -596,7 +617,7 @@ class RixsDriver(LinearSolver):
             Numerical tolerance used for detuning cutoff.
 
         :return:
-            List of core-excited states and array of detuning.
+            List of core-excited state indices.
         """
 
         # TODO: implement more robust way of determining core-excited states
@@ -622,6 +643,9 @@ class RixsDriver(LinearSolver):
         :param detuning:
             Array of detuning values relative
             to the first core-excited state.
+        :param eigenvalues:
+            Array of excitation energies used
+            for the final-state cutoff.
         :param tol:
             Numerical tolerance used for detuning cutoff.
 
@@ -645,10 +669,11 @@ class RixsDriver(LinearSolver):
 
         :param omega:
             Energy of incoming photon.
-        :param f:
-            The final (valence) state index.
-        :param eigenvalue:
-            Energy of intermediate (core) excited state.
+        :param core_eigenvalue:
+            Energy of the intermediate (core) excited state.
+        :param val_eigenvalue:
+            Energy of the final (valence) excited state. If None,
+            the elastic line is computed.
         :param intermediate_tdens:
             Transition density from ground to
             intermediate (core) excited state (AO).
@@ -723,12 +748,13 @@ class RixsDriver(LinearSolver):
         Gets eigenvectors.
 
         :param rsp_results:
-            The dictionay containint response results.
+            The dictionary containing response results.
         :param states:
             The excited states.
 
         :return:
-            The eigenvectors as a list of 1D numpy arrays.
+            The eigenvectors as a 2D numpy array with one row
+            per state.
         """
 
         if not self.tamm_dancoff:
@@ -822,7 +848,7 @@ class RixsDriver(LinearSolver):
             The excitation matrix.
         :param y_mat:
             The deexcitation matrix.
-        :pad_occ:
+        :param pad_occ:
             The number of missing orbitals.
 
         :return:
@@ -834,8 +860,22 @@ class RixsDriver(LinearSolver):
     def _preprocess_core_eigvecs(self, core_eigvecs, occ_core,
                                  num_val_orbs, num_vir_orbs):
         """
-        Split, pad with zeros (if twoshot) and
-        possibly transform core eigenvectors if needed.
+        Splits and, for the two-shot approach, zero-pads the core
+        eigenvectors.
+
+        :param core_eigvecs:
+            The eigenvectors of the core-excited states.
+        :param occ_core:
+            Number of occupied orbitals in the core-excited
+            response calculation.
+        :param num_val_orbs:
+            Number of valence orbitals.
+        :param num_vir_orbs:
+            Number of virtual orbitals.
+
+        :return:
+            The processed core eigenvectors as a list of
+            (excitation, deexcitation) matrix pairs.
         """
         pp_core_eigvecs = []
 
@@ -850,8 +890,7 @@ class RixsDriver(LinearSolver):
 
         return pp_core_eigvecs
 
-    @staticmethod
-    def get_tdms(mo_occ, mo_vir, z_val, y_val, z_core, y_core):
+    def get_tdms(self, mo_occ, mo_vir, z_val, y_val, z_core, y_core):
         """
         Get the transition density matrices, both from ground-state
         to excited state, and between two excited states (here between)
@@ -861,25 +900,25 @@ class RixsDriver(LinearSolver):
             The occupied molecular orbitals.
         :param mo_vir:
             The unoccupied/virtual molecular orbitals.
-        :z_val:
+        :param z_val:
             The excitation matrix (valence-excited state).
-        :y_val:
+        :param y_val:
             The dexcitation matrix (valence-excited state).
-        :z_core:
+        :param z_core:
             The excitation matrix (core-excited state).
-        :y_core:
+        :param y_core:
             The dexcitation matrix (core-excited state).
+
+        :return:
+            The ground-to-core and core-to-valence transition densities.
         """
 
         gs_to_core = np.linalg.multi_dot([mo_occ, z_core - y_core, mo_vir.T])
         gs_to_core *= np.sqrt(2.0)
 
-        core_to_val = (
-            np.linalg.multi_dot([mo_vir, z_val.T, z_core, mo_vir.T]) -
-            np.linalg.multi_dot([mo_occ, z_val, z_core.T, mo_occ.T]) +
-            np.linalg.multi_dot([mo_occ, y_val, y_core.T, mo_occ.T]) -
-            np.linalg.multi_dot([mo_vir, y_val.T, y_core, mo_vir.T])
-        )
+        core_to_val = self._get_esa_transition_density(
+            z_core, y_core, z_val, y_val, mo_occ, mo_vir)
+
         return gs_to_core, core_to_val
 
     def _print_header(self, molecule, basis):

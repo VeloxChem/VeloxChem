@@ -193,12 +193,14 @@ def scf_results_sanity_check(obj, scf_results):
                 for key in [
                         'solvation_model',
                         'cpcm_epsilon',
+                        'cpcm_radii_scaling',
                         'cpcm_grid_per_sphere',
                         'cpcm_cg_thresh',
                         'cpcm_x',
                         'cpcm_custom_vdw_radii',
                 ]:
-                    updated_scf_info[key] = scf_results[key]
+                    if key in scf_results:
+                        updated_scf_info[key] = scf_results[key]
 
         if scf_results.get('pressure', None) is not None:
             # the environment (including GOSTSHYP pressure) is inherited

@@ -164,6 +164,7 @@ class LinearSolver:
         self.cpcm_grid_per_sphere = (194, 110)
         self.cpcm_cg_thresh = 1.0e-8
         self.cpcm_x = 0
+        self.cpcm_radii_scaling = 1.2
         self.cpcm_custom_vdw_radii = None
 
         # gostshyp setup
@@ -281,6 +282,8 @@ class LinearSolver:
                     ('float', 'dielectric constant of solvent (C-PCM)'),
                 'cpcm_optical_epsilon':
                     ('float', 'optical dielectric constant of solvent (C-PCM)'),
+                'cpcm_radii_scaling':
+                    ('float', 'scaling factor for C-PCM vdW radii'),
                 'cpcm_x': ('float', 'parameter for scaling function (C-PCM)'),
                 'cpcm_custom_vdw_radii':
                     ('seq_fixed_str', 'custom vdw radii for C-PCM'),
@@ -705,6 +708,7 @@ class LinearSolver:
             self.cpcm_drv.grid_per_sphere = self.cpcm_grid_per_sphere
             self.cpcm_drv.epsilon = self.cpcm_epsilon
             self.cpcm_drv.optical_epsilon = self.cpcm_optical_epsilon
+            self.cpcm_drv.radii_scaling = self.cpcm_radii_scaling
             self.cpcm_drv.x = self.cpcm_x
             self.cpcm_drv.custom_vdw_radii = self.cpcm_custom_vdw_radii
 
@@ -4215,17 +4219,59 @@ class LinearSolver:
             The MO coefficients of virtual orbitals.
 
         :return:
-            The detachment and attachment densities.
+            The detachment and attachment densities. The detachment density
+            carries a negative sign and the difference density is the sum of
+            the two.
         """
 
         dens_D = -np.linalg.multi_dot([mo_occ, z_mat, z_mat.T, mo_occ.T])
         dens_A = np.linalg.multi_dot([mo_vir, z_mat.T, z_mat, mo_vir.T])
 
         if y_mat is not None:
-            dens_D += np.linalg.multi_dot([mo_occ, y_mat, y_mat.T, mo_occ.T])
-            dens_A -= np.linalg.multi_dot([mo_vir, y_mat.T, y_mat, mo_vir.T])
+            dens_D -= np.linalg.multi_dot([mo_occ, y_mat, y_mat.T, mo_occ.T])
+            dens_A += np.linalg.multi_dot([mo_vir, y_mat.T, y_mat, mo_vir.T])
 
         return dens_D, dens_A
+
+    def _get_esa_transition_density(self, z_mat_1, y_mat_1, z_mat_2, y_mat_2,
+                                    mo_occ, mo_vir):
+        """
+        Gets the transition density between two excited states.
+
+        :param z_mat_1:
+            The excitation vector of the first state in matrix form
+            (N_occ x N_virt).
+        :param y_mat_1:
+            The de-excitation vector of the first state in matrix form
+            (N_occ x N_virt).
+        :param z_mat_2:
+            The excitation vector of the second state in matrix form
+            (N_occ x N_virt).
+        :param y_mat_2:
+            The de-excitation vector of the second state in matrix form
+            (N_occ x N_virt).
+        :param mo_occ:
+            The MO coefficients of occupied orbitals.
+        :param mo_vir:
+            The MO coefficients of virtual orbitals.
+
+        :return:
+            The transition density matrix in the AO basis.
+        """
+
+        esa_trans_dens = (
+            np.linalg.multi_dot(
+                [mo_vir, z_mat_1.T, z_mat_2, mo_vir.T]) -
+            np.linalg.multi_dot(
+                [mo_occ, z_mat_1, z_mat_2.T, mo_occ.T]))
+
+        esa_trans_dens += (
+            np.linalg.multi_dot(
+                [mo_vir, y_mat_1.T, y_mat_2, mo_vir.T]) -
+            np.linalg.multi_dot(
+                [mo_occ, y_mat_1, y_mat_2.T, mo_occ.T]))
+
+        return esa_trans_dens
 
     def write_detach_attach_cubes(self, cubic_grid, molecule, basis, root,
                                   dens_DA):

@@ -248,6 +248,8 @@ class ScfDriver:
 
         # gostshyp setup
         self._gostshyp = False
+        self._gostshyp_drv = None
+        self._e_gostshyp = 0.0
         self.pressure = 0.0
         self.pressure_units = 'MPa'
         self.gostshyp_num_lebedev_points = 110
@@ -271,6 +273,8 @@ class ScfDriver:
         self._smd = False
         self.smd_drv = None
         self.smd_solvent = 'water'
+        self.smd_energy = 0.0
+        self.smd_cds_energy = 0.0
 
         # point charges (in case we want a simple MM environment without PE)
         self.point_charges = None
@@ -663,6 +667,12 @@ class ScfDriver:
         self._scf_results = None
         self._scf_energy = 0.0
         self._num_iter = 0
+        self._history = None
+        self._iter_data = None
+        self._density = None
+        if not self._use_start_orbitals:
+            self._molecular_orbitals = MolecularOrbitals()
+            self._ref_mol_orbs = None
 
         assert_msg_critical(
             isinstance(self.acc_type, str) and self.acc_type.upper() in [
@@ -717,6 +727,10 @@ class ScfDriver:
 
         # check pe setup
         pe_sanity_check(self, molecule=molecule)
+
+        # Ensure embedding-object PE also populates the canonical potfile.
+        if self._pe and self.potfile is None:
+            self.potfile = self.pe_options.get('potfile')
 
         # check solvation model setup
         solvation_model_sanity_check(self)
@@ -778,6 +792,9 @@ class ScfDriver:
             if self.restart and self.rank == mpi_master():
                 self._ref_mol_orbs = MolecularOrbitals.read_hdf5(
                     self.get_checkpoint_file())
+        else:
+            # Clear any MOs left by previous calculation, for RI-JK exchange build
+            self._molecular_orbitals = MolecularOrbitals()
 
         # nuclear repulsion energy
         self._nuc_energy = molecule.effective_nuclear_repulsion_energy(basis)
@@ -931,7 +948,7 @@ class ScfDriver:
                         lines = fh.read().strip().splitlines()
                         try:
                             npoints = int(lines[0].strip())
-                        except (ValueError, TypeError):
+                        except (ValueError, TypeError, IndexError):
                             assert_msg_critical(
                                 False, 'potfile: Invalid number of points')
                         assert_msg_critical(
@@ -1687,6 +1704,10 @@ class ScfDriver:
                 if self._cpcm:
                     write_cpcm_charges(checkpoint_file, self.cpcm_drv.cpcm_q)
 
+                # Set potfile before unparse_input serializes checkpoint settings.
+                if self._pe and self.potfile is None:
+                    self.potfile = self.pe_options.get('potfile')
+
                 scf_keywords = {
                     key: val[0]
                     for key, val in self._input_keywords['scf'].items()
@@ -1727,6 +1748,8 @@ class ScfDriver:
 
         self._history = []
         self._scf_energy = 0.0
+        self._is_converged = False
+        self._num_iter = 0
 
         if not self._first_step:
             profiler.begin({
@@ -1882,8 +1905,16 @@ class ScfDriver:
 
             iter_start_time = tm.time()
 
+            use_density_factor = use_pfon or use_density_damping
+
             fock_mat, vxc_mat, e_emb, V_emb, e_pr, V_pr = self._comp_2e_fock_single_comm(
-                den_mat, molecule, ao_basis, screener, e_grad, profiler)
+                den_mat,
+                molecule,
+                ao_basis,
+                screener,
+                e_grad,
+                profiler,
+                use_density_factor=use_density_factor)
 
             self._e_gostshyp = e_pr
 
@@ -2174,7 +2205,7 @@ class ScfDriver:
 
                 if self._pe:
                     # pe info, energy and potential matrix
-                    self._scf_results['potfile'] = self.potfile
+                    self._scf_results['potfile'] = self._get_pe_potfile()
                     self._scf_results['E_emb'] = e_emb
                     self._scf_results['F_emb'] = V_emb
 
@@ -2189,12 +2220,23 @@ class ScfDriver:
                     for key in [
                             'solvation_model',
                             'cpcm_epsilon',
+                            'cpcm_radii_scaling',
                             'cpcm_grid_per_sphere',
                             'cpcm_cg_thresh',
                             'cpcm_x',
                             'cpcm_custom_vdw_radii',
                     ]:
                         self._scf_results[key] = getattr(self, key)
+
+                    if self._smd:
+                        # SMD overrides the plain CPCM attributes.
+                        self._scf_results['cpcm_epsilon'] = (
+                            self.cpcm_drv.epsilon)
+                        self._scf_results['cpcm_radii_scaling'] = (
+                            self.cpcm_drv.radii_scaling)
+                        self._scf_results['cpcm_custom_vdw_radii'] = (
+                            self.cpcm_drv.custom_vdw_radii)
+                        self._scf_results['smd_solvent'] = self.smd_solvent
 
                 if self._gostshyp:
                     # gostshyp info
@@ -2262,13 +2304,12 @@ class ScfDriver:
         """
         Gracefully exits the program.
 
+        This method writes a checkpoint if needed and then exits the process.
+
         :param molecule:
             The molecule.
         :param basis:
             The basis set.
-
-        :return:
-            The return code.
         """
 
         self.ostream.print_blank()
@@ -2344,6 +2385,16 @@ class ScfDriver:
         """
 
         return self._pe or self.point_charges is not None
+
+    def _get_pe_potfile(self):
+        """Returns the PE potfile, falling back to pe_options when unset."""
+
+        if self._pe:
+            if self.potfile is not None:
+                return self.potfile
+            return self.pe_options.get('potfile')
+
+        return self.potfile
 
     def _parse_point_charge_line(self, content, idx, expect_vdw):
         """
@@ -2627,7 +2678,12 @@ class ScfDriver:
         return (fock_type, exchange_scaling_factor, need_omega, erf_k_coef,
                 omega)
 
-    def _comp_restricted_2e_fock(self, den_mat, basis, screener, thresh_int):
+    def _comp_restricted_2e_fock(self,
+                                 den_mat,
+                                 basis,
+                                 screener,
+                                 thresh_int,
+                                 use_density_factor=False):
         """
         Computes the restricted 2e Fock matrix.
 
@@ -2639,6 +2695,8 @@ class ScfDriver:
             The screening container object.
         :param thresh_int:
             The integral threshold exponent.
+        :param use_density_factor:
+            Whether the exchange should be built from the density.
         :return:
             The restricted Fock matrix list or None on non-master ranks.
         """
@@ -2668,7 +2726,10 @@ class ScfDriver:
                                                               'j',
                                                               verbose=False)
             fock_mat_k = self._ri_drv.compute_screened_k_fock(
-                den_mat_for_fock, self.molecular_orbitals, verbose=False)
+                den_mat_for_fock,
+                self.molecular_orbitals,
+                verbose=False,
+                use_density_factor=use_density_factor)
             fock_mat_np = (fock_mat_j.to_numpy() * 2.0 -
                            fock_mat_k.to_numpy() * exchange_scaling_factor)
         else:
@@ -2701,7 +2762,12 @@ class ScfDriver:
 
         return None
 
-    def _comp_open_shell_2e_fock(self, den_mat, basis, screener, thresh_int):
+    def _comp_open_shell_2e_fock(self,
+                                 den_mat,
+                                 basis,
+                                 screener,
+                                 thresh_int,
+                                 use_density_factor=False):
         """
         Computes the unrestricted/restricted-open-shell 2e Fock matrices.
 
@@ -2713,6 +2779,8 @@ class ScfDriver:
             The screening container object.
         :param thresh_int:
             The integral threshold exponent.
+        :param use_density_factor:
+            Whether the exchange should be built from the density.
         :return:
             The open-shell Fock matrix list or None on non-master ranks.
         """
@@ -2770,7 +2838,8 @@ class ScfDriver:
                     den_mat_for_Ka,
                     self.molecular_orbitals,
                     verbose=False,
-                    spin='alpha')
+                    spin='alpha',
+                    use_density_factor=use_density_factor)
                 K_a_np = fock_mat.to_numpy() * exchange_scaling_factor
                 fock_mat = Matrix()
 
@@ -2778,7 +2847,8 @@ class ScfDriver:
                     den_mat_for_Kb,
                     self.molecular_orbitals,
                     verbose=False,
-                    spin='beta')
+                    spin='beta',
+                    use_density_factor=use_density_factor)
                 K_b_np = fock_mat.to_numpy() * exchange_scaling_factor
                 fock_mat = Matrix()
 
@@ -2839,7 +2909,8 @@ class ScfDriver:
                                   basis,
                                   screener,
                                   e_grad=None,
-                                  profiler=None):
+                                  profiler=None,
+                                  use_density_factor=False):
         """
         Computes Fock/Kohn-Sham matrix on single communicator.
 
@@ -2855,6 +2926,8 @@ class ScfDriver:
             The electronic gradient.
         :param profiler:
             The profiler.
+        :param use_density_factor:
+            Whether the exchange should be built from the density.
 
         :return:
             The Fock matrix, AO Kohn-Sham (Vxc) matrix, etc.
@@ -2870,12 +2943,12 @@ class ScfDriver:
         fock_mat = None
 
         if self.scf_type == 'restricted':
-            fock_mat = self._comp_restricted_2e_fock(den_mat, basis, screener,
-                                                     thresh_int)
+            fock_mat = self._comp_restricted_2e_fock(
+                den_mat, basis, screener, thresh_int, use_density_factor)
 
         else:
-            fock_mat = self._comp_open_shell_2e_fock(den_mat, basis, screener,
-                                                     thresh_int)
+            fock_mat = self._comp_open_shell_2e_fock(
+                den_mat, basis, screener, thresh_int, use_density_factor)
 
         if self.timing:
             profiler.add_timing_info('FockERI', tm.time() - eri_t0)
@@ -2927,8 +3000,8 @@ class ScfDriver:
     def _comp_energy(self, fock_mat, vxc_mat, e_emb, e_pr, kin_mat, npot_mat, ecp_mat,
                      den_mat):
         """
-        Computes the sum of SCF energy components: electronic energy, kinetic
-        energy, and nuclear potential energy.
+        Computes the electronic energy from one- and two-electron contributions,
+        including XC, embedding, and pressure energy when active.
 
         :param fock_mat:
             The Fock/Kohn-Sham matrix (only 2e-part).
@@ -2986,9 +3059,9 @@ class ScfDriver:
     def _comp_full_fock(self, fock_mat, vxc_mat, V_emb, V_pr, kin_mat, npot_mat,
                         ecp_mat):
         """
-        Computes full Fock/Kohn-Sham matrix by adding to 2e-part of
-        Fock/Kohn-Sham matrix the kinetic energy and nuclear potential
-        matrices.
+        Computes the full Fock/Kohn-Sham matrix by adding one-electron,
+        exchange-correlation, embedding, and pressure contributions to the
+        2e-part of the Fock/Kohn-Sham matrix.
 
         :param fock_mat:
             The Fock/Kohn-Sham matrix (2e-part).
@@ -3440,6 +3513,11 @@ class ScfDriver:
         if use_scf_modifier:
             return
 
+        # User-supplied start orbitals have zero placeholder energies until
+        # the first MO diagonalization. Reject first-cycle convergence.
+        if self._use_start_orbitals and self._num_iter == 1:
+            return
+
         if self._num_iter > 0:
 
             e_grad = self._iter_data['gradient_norm']
@@ -3548,6 +3626,9 @@ class ScfDriver:
 
         if self.ri_coulomb:
             cur_str = 'Resolution of the Identity      : RI-J'
+            self.ostream.print_header(cur_str.ljust(str_width))
+        elif self.ri_jk:
+            cur_str = 'Resolution of the Identity      : RI-JK'
             self.ostream.print_header(cur_str.ljust(str_width))
 
         if self._dft:

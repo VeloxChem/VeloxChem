@@ -37,6 +37,7 @@ dependencies:
   - rdkit
   - dftd4-python
   - geometric
+  - networkx<3.7
   - libxc=7.*=cpu_*
   - clang-format
   - yapf
