@@ -225,8 +225,12 @@ class IncrementBank:
 
     def __init__(self, term, members, node_points, node_data, node_orders, transport=None,
                  support_factor=2.5, taper_exponent=4, singular_exponent=2, anchored=True,
-                 coefficient_kinds=None, weight_scheme=None):
+                 coefficient_kinds=None, weight_scheme=None, data_scale=None):
         self.term = canonical_group_key(term)
+        # the magnitude of the cut data the increments were formed from, per coefficient (M3): the anchor-line
+        # defect is relative to it, so that a bank whose increments vanish to rounding (a term the surface does not
+        # have, or the anchor-line banks of the coupling selection) is judged against its data, not its noise
+        self.data_scale = {} if data_scale is None else {k: float(v) for k, v in data_scale.items()}
         self.dim = len(self.term)
         assert_msg_critical(len(members) == self.dim, 'grouped MSI banks: one member record per group of the term.')
         self.images = np.array([int(m['images']) for m in members], dtype=int)
@@ -752,7 +756,17 @@ class IncrementBank:
             mids[-1] = 0.5 * (values[-1] + values[0] + period)
             axes.append(np.concatenate([values, mids]))
         mesh = np.array(np.meshgrid(*axes, indexing='ij')).reshape(self.dim, -1).T
-        return [z for z in mesh if self.coverage(z)[0]]
+        # a sample point at the very edge of every node's support of a member (u close to 1 for all of them, which a
+        # sparse non-uniform grid can produce at a midpoint) carries a total raw weight near zero and normalised weight
+        # derivatives of 1e15, so a rounding residual of the Moebius sum becomes an apparent defect there (review of
+        # M3, D1); the check samples points where every member has a node well inside its support (u <= 0.9)
+        return [z for z in mesh if self.coverage(z)[0] and all(self._member_min_u(k, z[k]) <= 0.9 for k in range(self.dim))]
+
+    def _member_min_u(self, k, z_k):
+        """The smallest u = d^2 / r^2 of member k's nodes at the angle z_k (tensor scheme)."""
+        m = int(self.images[k])
+        r2 = self.member_radius[k] ** 2
+        return min(2.0 * (1.0 - np.cos(m * reduce_angle(z_k - v, m)[0])) / m ** 2 / r2 for v in self.member_nodes[k])
 
     def anchor_line_defect(self):
         """
@@ -778,11 +792,15 @@ class IncrementBank:
                     s_f = max(s_f, float(np.abs(f).max()))
                 if s is not None and self.node_orders[name] >= 2:
                     s_s = max(s_s, float(np.abs(s).max()))
-            scales[name] = (s_v, s_f, s_s)
+            # the cut data behind the increments set the scale where the increments themselves are smaller
+            ds = self.data_scale.get(name, 0.0)
+            scales[name] = (max(s_v, ds), max(s_f, ds), max(s_s, ds))
         worst = {name: [0.0, 0.0, 0.0] for name in self.names}
 
         def rel(err, scale):
-            return err / scale if scale > 0.0 else err
+            # a coefficient whose node data vanish to rounding (every node of an anchor-line bank of the coupling
+            # selection lies on the line, M3) has no relative error: compare absolutely below 1e-20
+            return err / scale if scale > 1.0e-20 else err
 
         for i in range(self.dim):
             along = [k for k in range(self.dim) if k != i]

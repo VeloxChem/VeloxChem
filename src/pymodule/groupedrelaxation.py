@@ -551,13 +551,22 @@ def image_record(model, record, gid, power=1):
     the covariant node data transformed (w -> Pi w + shift, w1 -> Pi w1, the
     soft-mode rows permuted); energy, residual and multipliers unchanged.
     Used for the wrap-around pair of a closed line of a group with images.
+    The other node data (b, C, b1, I1, I2) are returned untransformed: the
+    consumers (the branch diagnostics and the investigation) use only w, w1,
+    the multipliers and the energies. `image_of` links the stored record.
     """
 
     g = model.groups[gid]
     if g.images == 1:
         return record
+    # an image k periods up in angle is the generator raised to sense * k: phi(P^j x) = phi(x) + sense j 2 pi / m (the banks'
+    # data powers follow the same rule). Corrected 2026-10-12 (M3 campaign): the permutation power ignored the sense, so for
+    # a group with sense -1 (methyl acetate's methoxy methyl, melatonin's M) the image's geometry and data lay one period
+    # down while its offsets said up, and the branch diagnostics and the investigation of the wrap-around pair compared
+    # neighbouring nodes with the wrong image (a spurious warning, a false reject)
+    perm_power = int(g.sense) * int(power)
     out = dict(record)
-    pi = model.row_permutation(gid, power)
+    pi = model.row_permutation(gid, perm_power)
     rows = model.response_rows
     position = {int(r): i for i, r in enumerate(rows)}
     pv = np.array([position[int(pi[r])] for r in rows], dtype=int)
@@ -571,7 +580,7 @@ def image_record(model, record, gid, power=1):
     offsets = np.array(record['offsets'], dtype=np.float64)
     offsets[gid] += power * TWO_PI / g.images
     out['offsets'] = offsets
-    p = model.cyclic_permutation(gid, power)
+    p = model.cyclic_permutation(gid, perm_power)
     out['x'] = np.asarray(record['x'])[p]
     wp = dict(record['well_posedness'])
     for key in ('soft_mode_rows', 'mode_rows_all'):

@@ -135,6 +135,58 @@ NUMERICAL_PARAMETERS = {
 }
 
 
+# M3 (PROMPT-M3 decision D4, ADR-004 amendment 13): validation parameters. They judge a built model (the symmetry
+# defect) and the grouping error of the one-chart validation on D2's statistic (|dE| in kcal/mol and the largest
+# per-atom |dF| in kcal/mol/A, within the domain E_v <= E_max). They are persisted with the validation record of a
+# file, never in the policy hash. The grouping tolerances also set the thresholds of the coupling selection
+# (ADR-008 item 7).
+VALIDATION_PARAMETERS = {
+    'symmetry_defect_energy_max_kcal': (0.03, 'positive'),
+    'symmetry_defect_force_max_kcal_per_angstrom': (0.1, 'positive'),
+    'grouping_error_energy_max_kcal': (0.3, 'positive'),
+    'grouping_error_force_max_kcal_per_angstrom': (0.5, 'positive'),
+}
+
+# M3B (PROMPT-M3B decision E4, ADR-009): the tolerances of the validity battery of every computed Hessian, judged
+# against QM values at the record's geometry and level that were not used to compute it (check single points at a
+# tighter SCC accuracy). Validation parameters: persisted with the validation record of a file and on every
+# Hessian's raw record, never in the policy hash or the model identity. Values from the M3B report section 7.
+HESSIAN_VALIDITY_PARAMETERS = {
+    'hessian_validity_energy_max': (1.0e-6, 'positive'),            # V0: |E_record - E_check| in hartree
+    'hessian_validity_gradient_max': (1.0e-5, 'positive'),          # V0: max |g_record - g_check| in hartree/bohr
+    'hessian_validity_asymmetry_max': (1.0e-4, 'positive'),         # V1: max |H - H^T| in hartree/bohr^2
+    # V2: |dg/2s - H d| / |H d| along random directions. E4 proposed 1e-3; the user chose 1e-4 on 2026-10-13 (3 x the
+    # largest robust g-xTB value 3.0e-5 over 321 melatonin Hessians; it also flags the 0.12 % legacy-noise class)
+    'hessian_validity_directional_max': (1.0e-4, 'positive'),
+    'hessian_validity_curvature_abs': (1.0e-4, 'positive'),         # V3: |c_E - d^T H d| <= max(abs, rel |d^T H d|)
+    'hessian_validity_curvature_rel': (1.0e-2, 'positive'),
+    'hessian_validity_curvature_sign_floor': (1.0e-5, 'positive'),  # V3: the signs must agree unless both are below this
+    'hessian_validity_taylor_ratio_min': (3.0, 'positive'),         # V4: r(2a) / r(a), 4 for the right Hessian, 2 otherwise
+    'hessian_validity_taylor_floor': (1.0e-6, 'positive'),          # V4: a remainder below this at the smallest a passes
+    'hessian_validity_pair_factor': (10.0, 'positive'),             # V5: max_k r_k <= factor x median_k r_k (numerical Hessians)
+    'hessian_validity_pair_floor': (1.0e-6, 'positive'),            # V5: ... or below this floor
+}
+
+# M3 (ADR-008): the parameters of the coupling selection. They are persisted in the selection record of a file and
+# enter the model identity when the hypergraph is selected (ADR-006 amendment 9).
+SELECTION_PARAMETERS = {
+    'selection_threshold_factor': (0.25, 'positive'),         # theta: a candidate is retained at theta x the D4 grouping tolerance
+    'selection_probes_per_group': (2, 'int_ge_1'),            # probe phases per group, the singleton nodes with the largest |I|
+    'selection_response_displacements': (4, 'int_ge_1'),      # seeded directions with E_v = E_max per evidence point
+    'selection_seed': (2026, 'int_ge_0'),                     # the seed of the displacement directions
+    'selection_temperature_kelvin': (300.0, 'positive'),      # the scale k_B T of the Hessian screening (a signal only)
+    'selection_max_groups_all_triples': (4, 'int_ge_1'),      # every triple is a candidate up to this many groups
+}
+
+# the symmetry-defect measurement of every build (ADR-004 amendment 13): seeded, no QM
+SYMMETRY_DEFECT_SEED = 20261012
+SYMMETRY_DEFECT_PHASE_SETS = 6
+SYMMETRY_DEFECT_LEVELS = (0.0, 0.25, 0.5, 1.0)
+
+# D1(a): closed hypergraphs are exactly equivariant (absolute energy and gradient; Hessian relative to max(1, max|H|))
+EQUIVARIANCE_TOLERANCES = {'energy': 1.0e-10, 'gradient': 1.0e-9, 'hessian': 1.0e-7}
+
+
 def _check_number(key, value, kind):
     if kind == 'bool':
         assert_msg_critical(
@@ -152,6 +204,14 @@ def _check_number(key, value, kind):
         assert_msg_critical(
             isinstance(value, (int, np.integer)) and value >= 2,
             f'grouped MSI policy: {key} must be an integer of at least 2, got {value!r}.')
+    elif kind == 'int_ge_1':
+        assert_msg_critical(
+            isinstance(value, (int, np.integer)) and value >= 1,
+            f'grouped MSI policy: {key} must be an integer of at least 1, got {value!r}.')
+    elif kind == 'int_ge_0':
+        assert_msg_critical(
+            isinstance(value, (int, np.integer)) and value >= 0,
+            f'grouped MSI policy: {key} must be a non-negative integer, got {value!r}.')
     elif kind == 'degrees_open_60_120':
         assert_msg_critical(
             60.0 < value < 120.0,
@@ -211,6 +271,60 @@ def validate_policy_record(record):
         if kind in ('positive', 'nonnegative', 'degrees_open_60_120', 'fraction'):
             out[key] = float(out[key])
     return out
+
+
+def _validate_parameter_record(record, table, what):
+    """
+    Validates a mapping against a parameter table (defaults, kinds): unknown
+    or missing keys and invalid values are critical errors. Returns the
+    record as a plain dict with floats for the float-kind parameters.
+    """
+
+    unknown = sorted(set(record) - set(table))
+    assert_msg_critical(not unknown, f'grouped MSI {what}: unknown keys {unknown}.')
+    missing = sorted(set(table) - set(record))
+    assert_msg_critical(not missing, f'grouped MSI {what}: missing keys {missing}.')
+    for key, (_, kind) in table.items():
+        _check_number(key, record[key], kind)
+    out = normalize_for_json(dict(record))
+    for key, (_, kind) in table.items():
+        if kind in ('positive', 'nonnegative', 'degrees_open_60_120', 'fraction'):
+            out[key] = float(out[key])
+    return out
+
+
+def validation_parameters(**overrides):
+    """
+    The validation parameters of ADR-004 amendment 13 (the D4 tolerances)
+    as a validated plain dict: the defaults with the given overrides.
+    """
+
+    record = {key: default for key, (default, _) in VALIDATION_PARAMETERS.items()}
+    record.update(overrides)
+    return _validate_parameter_record(record, VALIDATION_PARAMETERS, 'validation parameters')
+
+
+def hessian_validity_parameters(**overrides):
+    """
+    The tolerances of the Hessian validity battery (ADR-009, PROMPT-M3B
+    decision E4) as a validated plain dict: the defaults with the given
+    overrides.
+    """
+
+    record = {key: default for key, (default, _) in HESSIAN_VALIDITY_PARAMETERS.items()}
+    record.update(overrides)
+    return _validate_parameter_record(record, HESSIAN_VALIDITY_PARAMETERS, 'Hessian validity parameters')
+
+
+def selection_parameters(**overrides):
+    """
+    The parameters of the coupling selection (ADR-008) as a validated plain
+    dict: the defaults with the given overrides.
+    """
+
+    record = {key: default for key, (default, _) in SELECTION_PARAMETERS.items()}
+    record.update(overrides)
+    return _validate_parameter_record(record, SELECTION_PARAMETERS, 'selection parameters')
 
 
 @dataclass(frozen=True)

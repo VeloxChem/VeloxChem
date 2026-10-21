@@ -90,11 +90,14 @@ from .groupeddefinitions import (SCHEMA_VERSION, SUPPORTED_POLICY_VALUES, GroupD
 
 LEGACY_PATTERN = 'im_database_*.h5'
 GROUPED_PREFIX = 'im_grouped_'
-SUPPORTED_LEVEL_DRIVERS = ('XtbDriver', 'ScfRestrictedDriver', 'ScfUnrestrictedDriver')
+# M3B (ADR-009): the grouped-owned QM levels of groupedqm.py (the g-xTB binary, xtb-python with SCC accuracy control)
+SUPPORTED_LEVEL_DRIVERS = ('XtbDriver', 'ScfRestrictedDriver', 'ScfUnrestrictedDriver', 'GxtbLevel', 'XtbPythonLevel')
 HESSIAN_KINDS = ('none', 'analytical', 'numerical', 'analytical_numerical_dispersion')
 RAW_KINDS = ('pilot', 'anchor', 'singleton', 'probe', 'pair', 'triple', 'response', 'held_out', 'relaxation', 'noise',
-             'hessian_check')
+             'hessian_check', 'investigation')
 TRANSIENT_KEYS = ('mode_rows_all', 'mode_values_all')
+META_ATTRIBUTE_LIMIT = 48000   # bytes; HDF5 attributes must stay below 64 kB
+BYTES_CHUNK = 1 << 16          # bytes per chunk of the resizable ledger and manifest datasets
 
 
 # ------------------------------------------------------------------ names and dispatch
@@ -188,6 +191,35 @@ def _json_bytes(obj):
     return np.bytes_(canonical_json(obj).encode('utf-8'))
 
 
+def write_bytes_dataset(h5, name, payload):
+    """
+    Writes `payload` (bytes) into the dataset `name` as a resizable 1-D uint8
+    array, resizing an existing one in place (M3). Deleting and recreating a
+    dataset at every commit leaves freed space that HDF5 does not reuse when
+    the sizes grow (the ledger and the manifest did: 90 % of a campaign file
+    was free space, which the whole-file copy of every commit then paid for).
+    A legacy scalar bytes dataset of that name is replaced once.
+    """
+
+    data = np.frombuffer(bytes(payload), dtype=np.uint8)
+    if name in h5:
+        ds = h5[name]
+        if ds.ndim == 1 and ds.maxshape == (None,) and ds.chunks is not None and ds.chunks[0] >= BYTES_CHUNK:
+            ds.resize((data.size,))
+            ds[...] = data
+            return ds
+        # a legacy scalar dataset, or one created with a chunk of its initial length (the first version of this
+        # function: a 2-byte chunk for the empty ledger, hence 3e5 chunks for a 600 kB ledger), is replaced once
+        del h5[name]
+    return h5.create_dataset(name, data=data, maxshape=(None,), chunks=(BYTES_CHUNK,))
+
+
+def read_bytes_dataset(h5, name):
+    """The bytes of a dataset written by write_bytes_dataset or as a legacy scalar bytes dataset."""
+    value = h5[name][()]
+    return bytes(value) if isinstance(value, (bytes, np.bytes_)) else np.asarray(value, dtype=np.uint8).tobytes()
+
+
 def _dataset_hash(dataset):
     value = dataset[()]
     if isinstance(value, (bytes, np.bytes_)):
@@ -224,6 +256,116 @@ def file_hashes(h5):
     return records
 
 
+def file_record_names(h5):
+    """The names of every dataset and attribute set of the file (the keys of file_hashes), without hashing anything."""
+    names = {'/@attrs'}
+
+    def visit(name, obj):
+        path = '/' + name
+        if path == '/manifest':
+            return
+        if isinstance(obj, h5py.Dataset):
+            names.add(path)
+        if len(obj.attrs):
+            names.add(path + '@attrs')
+
+    h5.visititems(visit)
+    return names
+
+
+def _record_hash(h5, path):
+    """The hash of one manifest record: a dataset path, or 'path@attrs' for an attribute set ('/@attrs' for the root)."""
+    if path.endswith('@attrs'):
+        base = path[:-len('@attrs')]
+        return _attrs_hash(h5.attrs if base == '/' else h5[base].attrs)
+    return _dataset_hash(h5[path])
+
+
+# the paths the active writer declares as created or changed (ADR-006 amendment 8), keyed by the open file
+_TOUCHED = {}
+
+
+def touch(h5, path):
+    """
+    Declares a group or dataset path that the writer inside a commit creates
+    or changes (ADR-006 amendment 8). Everything under a touched group is
+    rehashed at the commit (for the root '/', the whole file); untouched
+    records keep their manifest hash. The
+    writer helpers below call it; a writer that changes a record without
+    declaring it leaves a stale manifest entry, which the next full
+    verification reports.
+    """
+
+    touched = _TOUCHED.get(id(h5))
+    if touched is not None:
+        touched.add(path if path.startswith('/') else '/' + path)
+
+
+def _names_under(h5, path):
+    """The record names (datasets and attribute sets) at and under `path`, which may no longer exist."""
+    names = set()
+    if path == '/':
+        return file_record_names(h5)
+    if path not in h5:
+        return names
+    obj = h5[path]
+    if isinstance(obj, h5py.Dataset):
+        names.add(path)
+        if len(obj.attrs):
+            names.add(path + '@attrs')
+        return names
+    if len(obj.attrs):
+        names.add(path + '@attrs')
+
+    def visit(name, sub):
+        full = path.rstrip('/') + '/' + name
+        if isinstance(sub, h5py.Dataset):
+            names.add(full)
+        if len(sub.attrs):
+            names.add(full + '@attrs')
+
+    obj.visititems(visit)
+    return names
+
+
+def incremental_hashes(h5, previous, touched):
+    """
+    The manifest records after a commit (ADR-006 amendment 8): the previous
+    hash of every record that lies under no touched path; a fresh hash of
+    every record at or under a touched path (the writers declare the paths
+    they create, change or remove) and of the root attributes. The names
+    are taken from the previous manifest and from a visit of the touched
+    paths only, so the cost of a commit is that of the records it touched
+    (a visit of every object of a campaign file took seconds). The full
+    verification (`verify`) visits everything. Returns (records, the set of
+    rehashed paths).
+    """
+
+    if not previous:
+        # a new file (or one without a manifest): every record is visited and hashed
+        records = file_hashes(h5)
+        return records, set(records)
+    touched = {t.rstrip('/') or '/' for t in touched}
+    if '/' in touched:
+        # a writer that declares the root declares everything (review of 2026-10-12, second pass, SP-6)
+        records = file_hashes(h5)
+        return records, set(records)
+    prefixes = tuple(t + '/' for t in touched if t != '/')
+    records = {}
+    for path, digest in previous.items():
+        base = path[:-len('@attrs')] if path.endswith('@attrs') else path
+        if path == '/@attrs' or base in touched or base.startswith(prefixes):
+            continue
+        records[path] = digest
+    rehashed = {'/@attrs'}
+    for t in touched:
+        rehashed |= _names_under(h5, t)
+    rehashed.discard('/manifest')
+    for path in sorted(rehashed):
+        records[path] = _record_hash(h5, path)
+    return records, rehashed
+
+
 # ------------------------------------------------------------------ records
 
 def record_to_group(group, record):
@@ -235,6 +377,7 @@ def record_to_group(group, record):
     skipped.
     """
 
+    assert_msg_critical('meta' not in record, "grouped MSI storage: the record key 'meta' is reserved for the record's JSON part.")
     meta = {}
     for key, value in record.items():
         if key in TRANSIENT_KEYS:
@@ -249,7 +392,13 @@ def record_to_group(group, record):
             group.create_dataset(name, data=np.ascontiguousarray(value))
         else:
             meta[name] = normalize_for_json(value)
-    group.attrs['meta'] = _json_bytes(meta)
+    payload = _json_bytes(meta)
+    if len(payload) > META_ATTRIBUTE_LIMIT:
+        # HDF5 attributes are limited to 64 kB; a large JSON part (the selection record's evidence points, M3) is
+        # stored as the dataset 'meta' instead, which the manifest hashes like any dataset
+        group.create_dataset('meta', data=payload)
+    else:
+        group.attrs['meta'] = payload
 
 
 def group_to_record(group):
@@ -257,7 +406,11 @@ def group_to_record(group):
     record = {}
     if 'meta' in group.attrs:
         record.update(json.loads(bytes(group.attrs['meta']).decode('utf-8')))
+    elif 'meta' in group and isinstance(group['meta'], h5py.Dataset):
+        record.update(json.loads(bytes(group['meta'][()]).decode('utf-8')))
     for name, obj in group.items():
+        if name == 'meta' and isinstance(obj, h5py.Dataset):
+            continue
         if isinstance(obj, h5py.Group):
             record[name] = group_to_record(obj)
         else:
@@ -321,7 +474,7 @@ class GroupedInterpolationDatabase:
     def manifest(self):
         with self.read() as h5:
             assert_msg_critical('manifest' in h5, f'grouped MSI storage: {self.path} has no manifest.')
-            return json.loads(bytes(h5['manifest'][()]).decode('utf-8'))
+            return json.loads(read_bytes_dataset(h5, 'manifest').decode('utf-8'))
 
     def verify(self):
         """
@@ -332,7 +485,7 @@ class GroupedInterpolationDatabase:
 
         with self.read() as h5:
             assert_msg_critical('manifest' in h5, f'grouped MSI storage: {self.path} has no manifest.')
-            manifest = json.loads(bytes(h5['manifest'][()]).decode('utf-8'))
+            manifest = json.loads(read_bytes_dataset(h5, 'manifest').decode('utf-8'))
             found = file_hashes(h5)
         assert_msg_critical(manifest.get('state') == 'complete',
                             f'grouped MSI storage: the manifest of {self.path} is not complete.')
@@ -426,21 +579,30 @@ class GroupedInterpolationDatabase:
                 with h5py.File(self.staging_path, 'w', fs_strategy='fsm', fs_persist=True, fs_threshold=1):
                     pass
             with h5py.File(self.staging_path, 'a') as h5:
-                writer(h5)
+                # ADR-006 amendment 8: the manifest is updated incrementally; the writer helpers declare the paths they
+                # create or change (touch), and only those, the new records and the root attributes are rehashed
+                previous = {}
+                if 'manifest' in h5:
+                    previous = json.loads(read_bytes_dataset(h5, 'manifest').decode('utf-8')).get('records', {})
+                _TOUCHED[id(h5)] = set()
+                try:
+                    writer(h5)
+                finally:
+                    touched = _TOUCHED.pop(id(h5), set())
                 h5.attrs['commit'] = int(commit_number)
                 h5.attrs['schema_version'] = np.bytes_(SCHEMA_VERSION.encode('utf-8'))
-                if 'manifest' in h5:
-                    del h5['manifest']
-                records = file_hashes(h5)
+                records, rehashed = incremental_hashes(h5, previous, touched)
                 manifest = {'state': 'complete', 'commit': int(commit_number), 'note': str(note),
                             'written': time.strftime('%Y-%m-%dT%H:%M:%S'), 'records': records}
-                h5.create_dataset('manifest', data=_json_bytes(manifest))
+                write_bytes_dataset(h5, 'manifest', canonical_json(manifest).encode('utf-8'))
                 h5.flush()
-            # verification of the staging file before it is published
+            # verification of the staging file before it is published: the rehashed records against the manifest (the
+            # full verification of every record and of the set of names runs on load and at the end of a construction,
+            # `verify`)
             with h5py.File(self.staging_path, 'r') as h5:
-                found = file_hashes(h5)
-                stored = json.loads(bytes(h5['manifest'][()]).decode('utf-8'))
-            assert_msg_critical(found == stored['records'] and stored['state'] == 'complete',
+                stored = json.loads(read_bytes_dataset(h5, 'manifest').decode('utf-8'))
+                hashes_ok = all(path in stored['records'] and _record_hash(h5, path) == stored['records'][path] for path in rehashed)
+            assert_msg_critical(hashes_ok and stored['state'] == 'complete',
                                 'grouped MSI storage: the staging file failed its verification; nothing was published.')
             self._fsync_path(self.staging_path)
             os.replace(self.staging_path, self.path)
@@ -465,6 +627,8 @@ class GroupedInterpolationDatabase:
         level = level_of_theory_record(level_of_theory['driver'], **{k: v for k, v in level_of_theory.items() if k != 'driver'})
 
         def writer(h5):
+            for name in ('/policy', '/identity', '/level_of_theory', '/molecule', '/registry', '/raw', '/derived', '/validation', '/ledger'):
+                touch(h5, name)
             h5.attrs['schema_version'] = np.bytes_(SCHEMA_VERSION.encode('utf-8'))
             h5.attrs['construction_mode'] = np.bytes_(policy_record['construction_mode'].encode('utf-8'))
             h5.attrs['construction_policy'] = np.bytes_(policy_record['construction_policy'].encode('utf-8'))
@@ -484,7 +648,7 @@ class GroupedInterpolationDatabase:
             record_to_group(reg, registry)
             for name in ('raw', 'derived', 'validation'):
                 h5.create_group(name)
-            h5.create_dataset('ledger', data=_json_bytes([]))
+            write_bytes_dataset(h5, 'ledger', b'[]')
 
         return self.commit(writer, note=note)
 
@@ -516,7 +680,7 @@ class GroupedInterpolationDatabase:
 
     def ledger(self):
         with self.read() as h5:
-            return json.loads(bytes(h5['ledger'][()]).decode('utf-8'))
+            return json.loads(read_bytes_dataset(h5, 'ledger').decode('utf-8'))
 
     def raw_ids(self):
         with self.read() as h5:
@@ -565,6 +729,7 @@ class GroupedInterpolationDatabase:
 
         assert_msg_critical(kind in RAW_KINDS, f'grouped MSI storage: unknown raw record kind {kind!r}.')
         assert_msg_critical(cid not in h5['raw'], f'grouped MSI storage: the raw record {cid} exists already.')
+        touch(h5, f'/raw/{cid}')
         grp = h5['raw'].create_group(cid)
         grp.attrs['kind'] = np.bytes_(kind.encode('utf-8'))
         grp.create_dataset('coordinates', data=np.asarray(coordinates, dtype=np.float64).reshape(-1, 3))
@@ -590,20 +755,46 @@ class GroupedInterpolationDatabase:
                 grp.attrs[key] = np.bytes_(canonical_json(value).encode('utf-8'))
 
     @staticmethod
+    def add_hessian(h5, cid, hessian, attrs, kind=None):
+        """
+        Adds the Hessian to an existing raw record (inside a commit) with its
+        attributes (hessian_kind, hessian_asymmetry, wall_time_hessian,
+        hessian_fd_error); optionally re-labels the record's kind.
+        """
+
+        raw = h5['raw']
+        assert_msg_critical(cid in raw, f'grouped MSI storage: no raw record {cid} to add a Hessian to.')
+        grp = raw[cid]
+        assert_msg_critical('hessian' not in grp, f'grouped MSI storage: the raw record {cid} has a Hessian already.')
+        touch(h5, f'/raw/{cid}')
+        grp.create_dataset('hessian', data=np.asarray(hessian, dtype=np.float64))
+        for key, value in attrs.items():
+            grp.attrs[key] = np.bytes_(value.encode('utf-8')) if isinstance(value, str) else value
+        if kind is not None:
+            assert_msg_critical(kind in RAW_KINDS, f'grouped MSI storage: unknown raw record kind {kind!r}.')
+            grp.attrs['kind'] = np.bytes_(kind.encode('utf-8'))
+
+    @staticmethod
     def write_record(h5, path, record, replace=False):
         """Writes a record under `path` (inside a commit); replaces an existing one only when asked."""
         if path in h5:
             assert_msg_critical(replace, f'grouped MSI storage: the record {path} exists already.')
             del h5[path]
+        touch(h5, path)
         grp = h5.require_group(path)
         record_to_group(grp, record)
 
     @staticmethod
     def append_ledger(h5, row):
-        rows = json.loads(bytes(h5['ledger'][()]).decode('utf-8'))
-        rows.append(normalize_for_json(row))
-        del h5['ledger']
-        h5.create_dataset('ledger', data=_json_bytes(rows))
+        GroupedInterpolationDatabase.append_ledger_rows(h5, [row])
+
+    @staticmethod
+    def append_ledger_rows(h5, rows_to_add):
+        """Appends ledger rows in one rewrite of the ledger (a resizable dataset; the batched relaxation steps of ADR-006 amendment 8)."""
+        rows = json.loads(read_bytes_dataset(h5, 'ledger').decode('utf-8'))
+        rows.extend(normalize_for_json(r) for r in rows_to_add)
+        touch(h5, '/ledger')
+        write_bytes_dataset(h5, 'ledger', canonical_json(rows).encode('utf-8'))
 
 
 # ------------------------------------------------------------------ models
@@ -656,6 +847,7 @@ def store_model(database, model, note='model'):
     def writer(h5):
         if 'derived/cuts' in h5:
             del h5['derived/cuts']
+        touch(h5, '/derived/cuts')
         grp = h5.require_group('derived/cuts')
         for key, rec in cuts.items():
             record_to_group(grp.create_group(key), rec)

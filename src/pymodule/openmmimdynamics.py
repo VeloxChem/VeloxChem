@@ -177,7 +177,11 @@ class OpenMMIMDynamics:
 
         # QM Region parameters
         self.im_drivers = {}
-        self.use_symmetry = True
+        # IMForceFieldGenerator constructs databases with all atoms in the
+        # distance metric. Setting use_symmetry to True removes the atoms of
+        # CX3 rotor groups from the metric and is only consistent with
+        # databases that were constructed in the same way.
+        self.use_symmetry = False
         self.symmetry_information = None
         self.excitation_pulse = (-1, 0)
         self.current_state = None
@@ -457,17 +461,21 @@ class OpenMMIMDynamics:
         self.root_spec_molecules = {root: [] for root in self.roots_to_follow}
         self.im_drivers = {root: None for root in self.roots_to_follow}
         self.interpolation_settings = interpolation_settings_dict
-        masses = self.molecule.get_masses().copy()
-
-        masses_cart = np.repeat(masses, 3)
-        inv_sqrt_masses = 1.0 / np.sqrt(masses_cart)
-        self.inv_sqrt_masses = inv_sqrt_masses
+        self.inv_sqrt_masses = None
         for root in self.roots_to_follow:
             # Dynamically create an attribute name
             attribute_name = f'impes_driver_{root}'
             # Initialize the object
             driver_object = InterpolationDriver(self.roots_z_matrix[root])
             driver_object.update_settings(self.interpolation_settings[root])
+            # mass-weighted coordinates are only used if the database was
+            # constructed with them
+            inv_sqrt_masses = None
+            if self.interpolation_settings[root].get('use_mass_weight', False):
+                masses = self.molecule.get_masses().copy()
+                masses_cart = np.repeat(masses, 3)
+                inv_sqrt_masses = 1.0 / np.sqrt(masses_cart)
+                self.inv_sqrt_masses = inv_sqrt_masses
             # print('Interpolation driver settings updated for root', root, self.eq_bond_force_constants)
             driver_object.impes_coordinate.inv_sqrt_masses = inv_sqrt_masses
             if root == 0:
@@ -494,7 +502,7 @@ class OpenMMIMDynamics:
         self.total_energies = []
         self.dynamic_molecules = []
 
-        save_freq = nsteps // snapshots if snapshots else nsteps
+        save_freq = max(1, nsteps // snapshots) if snapshots else max(1, nsteps)
 
         # Create or update the integrator
         if self.integrator is None:

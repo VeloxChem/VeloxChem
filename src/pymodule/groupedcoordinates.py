@@ -996,6 +996,113 @@ class GroupedCoordinateModel:
             out['grad2_y'] = (hess_phi, b2[self.response_rows])
         return out
 
+    def realise_response_displacement(self, x, dq_v, iterations=30, tol=1.0e-10, max_substeps=16):
+        """
+        x' near x with q_v(x') - q_v(x) = dq_v (wrapped) in the non-rotor
+        rows and every phase unchanged (ADR-005 amendment 7): Gauss-Newton
+        iterations with the pseudo-inverse of [B_v; grad phi] (rigid-body
+        free), with continuation (the displacement is applied in equal
+        sub-steps, doubled until every sub-step converges). The non-rotor
+        rows are redundant (rank 3N - 6 - G), so a target with a component
+        outside the realisable manifold is met in the least-squares sense:
+        convergence is judged by the Cartesian step, and the remaining
+        wrapped mismatch of the rows is reported as the inconsistency.
+        Returns (x', info) with info = {'converged', 'step', 'mismatch',
+        'phase_mismatch', 'substeps'}.
+        """
+
+        x = np.array(x, dtype=np.float64).reshape(self.n_atoms, 3)
+        rows = self.response_rows
+        periodic = self.ic.kinds[rows] >= DIHEDRAL
+        dq_v = np.asarray(dq_v, dtype=np.float64).reshape(len(rows))
+        q0 = self.ic.values(x)
+        phi0 = self.phases(q0, order=0)[0]
+
+        def solve(start, target):
+            y = np.array(start, dtype=np.float64)
+            step_norm = np.inf
+            for _ in range(iterations):
+                q, b_mat = self.ic.values_and_b(y)
+                phi, grad_phi, _, _ = self.phases_cartesian(y, order=1, qbb2=(q, b_mat, None))
+                d = q[rows] - target
+                d[periodic] = wrap_angle(d[periodic])
+                c = np.concatenate([d, wrap_angle(phi - phi0)])
+                jac = np.vstack([b_mat[rows], grad_phi])
+                step = np.linalg.lstsq(jac, c, rcond=1.0e-10)[0]
+                step_norm = float(np.abs(step).max())
+                y = y - step.reshape(y.shape)
+                if step_norm < tol:
+                    break
+            q, _ = self.ic.values_and_b(y)
+            phi = self.phases(q, order=0)[0]
+            d = q[rows] - target
+            d[periodic] = wrap_angle(d[periodic])
+            return y, step_norm < tol, float(np.abs(d).max()), float(np.abs(wrap_angle(phi - phi0)).max()), step_norm
+
+        substeps = 1
+        while True:
+            y = x.copy()
+            ok = True
+            for k in range(1, substeps + 1):
+                target = q0[rows] + dq_v * (k / substeps)
+                y, converged, mismatch, phase_mismatch, step_norm = solve(y, target)
+                if not converged or not np.all(np.isfinite(y)):
+                    ok = False
+                    break
+            if ok or substeps >= max_substeps:
+                return y, {'converged': bool(ok), 'step': step_norm, 'mismatch': mismatch, 'phase_mismatch': phase_mismatch,
+                           'substeps': substeps}
+            substeps *= 2
+
+    def local_rows(self, gid):
+        """
+        The non-rotor rows of group gid for the Hessian screening of ADR-008
+        item 3: every non-rotor row whose atoms all lie in the group's
+        moving atoms together with its axis and attachment atom, minus the
+        rows that a group nested inside gid owns (laminar moving sets: a row
+        belongs to the innermost group).
+        """
+
+        g = self.groups[gid]
+        own = set(g.moving_atoms) | {g.axis_atom, g.attachment_atom}
+        rows = [int(r) for r in self.response_rows if set(int(a) for a in self.ic.rows[r]) <= own]
+        for hid, h in enumerate(self.groups):
+            if hid != gid and set(h.moving_atoms) < set(g.moving_atoms):
+                inner = set(h.moving_atoms) | {h.axis_atom, h.attachment_atom}
+                rows = [r for r in rows if not set(int(a) for a in self.ic.rows[r]) <= inner]
+        return rows
+
+    def assert_closed_under_permutation(self, permutation, label='the automorphism'):
+        """
+        Critical error unless the Z-matrix is closed under the atom
+        permutation (every row maps onto a row of the same kind), the
+        condition for sharing a bank through an automorphism (PROMPT-M3
+        decision D8; STATUS open question 2). Returns the row permutation.
+        """
+
+        p = np.asarray(permutation, dtype=int).reshape(self.n_atoms)
+        row_perm = self.ic.row_permutation(p)
+        if row_perm is None:
+            # name the rows without an image (the same matching as InternalCoordinates.row_permutation: bonds,
+            # angles and proper dihedrals may be reversed, impropers must match exactly)
+            rows_of_kind = {}
+            for r, kind in zip(self.ic.rows, self.ic.kinds):
+                rows_of_kind.setdefault(int(kind), set()).add(tuple(int(a) for a in r))
+            missing = []
+            for i, (r, kind) in enumerate(zip(self.ic.rows, self.ic.kinds)):
+                image = tuple(int(p[a]) for a in r)
+                same = rows_of_kind[int(kind)]
+                if image in same or (int(kind) != IMPROPER and tuple(reversed(image)) in same):
+                    continue
+                missing.append((self.describe_row(i), image))
+            assert_msg_critical(
+                False,
+                f'grouped MSI: the Z-matrix is not closed under {label}: '
+                + '; '.join(f'{name} maps onto the atoms {img}, which is not a row' for name, img in missing[:3])
+                + ('' if len(missing) <= 3 else f' (and {len(missing) - 3} more)')
+                + '. A bank cannot be shared through this permutation (PROMPT-M3 D8); symmetrise the Z-matrix first, or build both banks.')
+        return row_perm
+
     def valley_displacement(self, x):
         """
         w = wrap(q_v(x) - q_v^a): the anchor-relative non-rotor rows of a

@@ -226,6 +226,8 @@ from .groupedmodel import GroupedChartModel
 from .groupedrelaxation import PhaseConstrainedMinimizer
 from .groupeddatabase import GroupedInterpolationDatabase
 from .groupedconstruction import GroupedIMForceFieldGenerator
+from .groupedselection import CouplingSelection, select_couplings
+from .groupedqm import GxtbLevel, XtbPythonLevel
 from .mofbuilder.core.builder import MetalOrganicFrameworkBuilder as MofBuilder
 from .imtrustradiusoptimizer import IMTrustRadiusOptimizer
 from .conformergenerator import ConformerGenerator
