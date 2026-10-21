@@ -1,3 +1,5 @@
+import os
+
 import numpy as np
 import pytest
 
@@ -132,7 +134,8 @@ class TestFikaForceFieldReader:
         (tmp_path / 'tip3p.fff').write_text(
             'fika-force-field 1 tip3p nonpolarizable\n' +
             'residue HOH 3\ncharges\n1 -0.8\n2 0.4\n3 0.4\nend\n')
-        monkeypatch.setenv('VLXFORCEFIELDPATH', f'/no/such/directory:{tmp_path}')
+        monkeypatch.setenv('VLXFORCEFIELDPATH',
+                           f'/no/such/directory{os.pathsep}{tmp_path}')
 
         reader = FikaForceFieldReader()
         assert reader.get_search_path()[1] == tmp_path

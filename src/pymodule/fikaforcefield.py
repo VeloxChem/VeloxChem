@@ -30,7 +30,7 @@
 #  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 from mpi4py import MPI
-from os import environ
+from os import environ, pathsep
 from pathlib import Path
 
 from .veloxchemlib import mpi_master, FikaForceField
@@ -54,8 +54,9 @@ class FikaForceFieldReader:
     Dipoles, quadrupoles, anisotropic polarizabilities and reference
     geometries are part of the format but not supported yet; they are
     rejected. Force fields are looked up by label (case insensitive) as
-    <label>.fff in the directories of VLXFORCEFIELDPATH (separated by ':'),
-    then in the force-field library of VeloxChem.
+    <label>.fff in the directories of VLXFORCEFIELDPATH (separated by the
+    platform path separator, ':' on Unix and ';' on Windows), then in the
+    force-field library of VeloxChem.
 
     Errors in a force field raise ValueError naming the source and line; a
     force field that is not found raises FileNotFoundError.
@@ -102,7 +103,7 @@ class FikaForceFieldReader:
         """
 
         directories = []
-        for entry in environ.get('VLXFORCEFIELDPATH', '').split(':'):
+        for entry in environ.get('VLXFORCEFIELDPATH', '').split(pathsep):
             if entry:
                 directories.append(Path(entry))
         directories.append(self.get_library_path())
