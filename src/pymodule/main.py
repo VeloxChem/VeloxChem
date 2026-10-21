@@ -509,7 +509,9 @@ def _main_body():
 
             rsp_prop = select_rsp_property(task, mol_orbs, rsp_dict,
                                            method_dict)
-            rsp_prop.init_driver(task.mpi_comm, task.ostream)
+            rsp_prop.init_driver(task.mpi_comm,
+                                 task.ostream,
+                                 method_type=scf_drv.scf_type)
             rsp_prop.compute(task.molecule, task.ao_basis, scf_results)
 
             tddftgrad_drv = TddftGradientDriver(scf_drv)
@@ -601,7 +603,9 @@ def _main_body():
 
             rsp_prop = select_rsp_property(task, mol_orbs, rsp_dict,
                                            method_dict)
-            rsp_prop.init_driver(task.mpi_comm, task.ostream)
+            rsp_prop.init_driver(task.mpi_comm,
+                                 task.ostream,
+                                 method_type=scf_drv.scf_type)
             rsp_prop.compute(task.molecule, task.ao_basis, scf_results)
 
             tddftgrad_drv = TddftGradientDriver(scf_drv)
@@ -675,7 +679,9 @@ def _main_body():
 
                 rsp_prop = select_rsp_property(task, mol_orbs, rsp_dict,
                                                method_dict)
-                rsp_prop.init_driver(task.mpi_comm, task.ostream)
+                rsp_prop.init_driver(task.mpi_comm,
+                                     task.ostream,
+                                     method_type=scf_drv.scf_type)
                 rsp_prop.compute(task.molecule, task.ao_basis, scf_results)
 
                 vibrational_drv = VibrationalAnalysis(scf_drv,
