@@ -391,7 +391,7 @@ class NumerovDriver:
 
         f_minimum_found = False
 
-        # initiate unrestricted SCF driver
+        # initiate restricted SCF driver
         scf_drv = ScfRestrictedDriver(self.comm, OutputStream(None))
         scf_drv.update_settings(self.scf_dict, self.method_dict)
 
@@ -432,7 +432,7 @@ class NumerovDriver:
                 # after an avoided crossing
                 while not correct_state_found:
                     # twice the number of excited states to consider
-                    # for unrestricted case
+                    # for restricted case
                     rsp_prop = Absorption(
                         {
                             'nstates': 2 * excited_state - 1,
