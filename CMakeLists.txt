@@ -50,6 +50,10 @@ endmacro()
 # included cmake modules
 include(${PROJECT_SOURCE_DIR}/cmake/downloaded/autocmake_default_build_paths.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/downloaded/autocmake_safeguards.cmake)
+# OpenMP must be found before the compiler flags are set up: the vector math
+# library probe in CXXFlags.cmake links its test program against the
+# OpenMP::OpenMP_CXX imported target.
+find_package(OpenMP 4.5 REQUIRED COMPONENTS CXX)
 include(${PROJECT_SOURCE_DIR}/cmake/compiler_flags/CXXFlags.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/custom/eigen.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/custom/mathlib.cmake)

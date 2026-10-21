@@ -2,7 +2,9 @@
 # This is useful for static analysis tools and linters
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-find_package(OpenMP 4.5 REQUIRED COMPONENTS CXX)
+# OpenMP is found in the top-level CMakeLists.txt, before the compiler flags
+# module, because the vector math library probe links against
+# OpenMP::OpenMP_CXX.
 
 # The non-SIMD three-center electron repulsion drivers (and the momentum
 # transfer relations they are built on) are superseded by the SIMD

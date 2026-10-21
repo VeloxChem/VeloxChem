@@ -19,7 +19,9 @@
 #   vectorization. Default is empty.
 # - ``VECLIB_FLAG`` selects the vector math library, so that the vectorizer can
 #   replace the scalar math calls of the integral kernels, the exponential above
-#   all, with their vector counterparts. Default is empty.
+#   all, with their vector counterparts. Default is empty. The probe links
+#   against ``OpenMP::OpenMP_CXX``, so OpenMP must be found before this module
+#   is included.
 # - ``VLX_CXX_FLAGS`` are VeloxChem-specific flags to be used for all builds.
 #   The defaults are compiler-dependent: have a look at the ``GNU.CXX.cmake``,
 #   ``Clang.CXX.cmake``, and ``Intel.CXX.cmake`` files.
@@ -81,6 +83,13 @@ endif()
 
 set(VECLIB_FLAG "")
 if(ENABLE_VECLIB AND CMAKE_CXX_COMPILER_ID MATCHES Clang AND NOT WIN32)
+  if(NOT TARGET OpenMP::OpenMP_CXX)
+    message(FATAL_ERROR
+      "The vector math library probe links against OpenMP::OpenMP_CXX. "
+      "Call find_package(OpenMP REQUIRED COMPONENTS CXX) before including "
+      "CXXFlags.cmake.")
+  endif()
+
   if(APPLE)
     set(_veclib "Darwin_libsystem_m")
   else()
