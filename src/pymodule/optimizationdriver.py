@@ -593,26 +593,49 @@ class OptimizationDriver:
         else:
             default_tmax = self.tmax
 
-        # redirect geomeTRIC stdout/stderr
+        # Run geomeTRIC on the master rank only.  Non-master ranks run a
+        # worker loop (OptimizationEngine.run_worker) that mirrors the
+        # collective single-point evaluations requested by the master, so the
+        # optimizer state cannot diverge across ranks.
 
-        with redirect_stdout(StringIO()) as fg_out, redirect_stderr(
-                StringIO()) as fg_err:
-            try:
-                m = geometric.optimize.run_optimizer(
-                    customengine=opt_engine,
-                    coordsys=self.coordsys,
-                    check=self.check_interval,
-                    trust=default_trust,
-                    tmax=default_tmax,
-                    maxiter=self.max_iter,
-                    converge=self.conv_flags(),
-                    constraints=constr_filename,
-                    transition=self.transition,
-                    irc=self.irc,
-                    hessian=self.hessian,
-                    input=optinp_filename)
-            except geometric.errors.HessianExit:
-                hessian_exit = True
+        if self.rank == mpi_master():
+            # redirect geomeTRIC stdout/stderr
+            with redirect_stdout(StringIO()) as fg_out, redirect_stderr(
+                    StringIO()) as fg_err:
+                try:
+                    m = geometric.optimize.run_optimizer(
+                        customengine=opt_engine,
+                        coordsys=self.coordsys,
+                        check=self.check_interval,
+                        trust=default_trust,
+                        tmax=default_tmax,
+                        maxiter=self.max_iter,
+                        converge=self.conv_flags(),
+                        constraints=constr_filename,
+                        transition=self.transition,
+                        irc=self.irc,
+                        hessian=self.hessian,
+                        input=optinp_filename)
+                except geometric.errors.HessianExit:
+                    hessian_exit = True
+                # Catch BaseException so a master-only interrupt or exit does
+                # not leave MPI workers blocked in the worker loop.
+                except BaseException as exc:
+                    # In serial, preserve the original exception and traceback.
+                    if self.comm.Get_size() == 1:
+                        raise
+
+                    # In MPI, abort the job because workers may be blocked
+                    # waiting for the next geometry broadcast.
+                    assert_msg_critical(
+                        False,
+                        'OptimizationDriver: geometry optimization failed due '
+                        f'to {type(exc).__name__}: {exc}')
+            opt_engine.comm.bcast('stop', root=mpi_master())
+        else:
+            opt_engine.run_worker()
+
+        hessian_exit = opt_engine.comm.bcast(hessian_exit, root=mpi_master())
 
         # post-process and print results while temp_dir is still available
 
@@ -624,25 +647,26 @@ class OptimizationDriver:
             opt_results = {'final_geometry': final_mol.get_xyz_string()}
 
         else:
-            opt_coords = m.xyzs[-1] / geometric.nifty.bohr2ang
             labels = molecule.get_labels()
             atom_basis_labels = molecule.get_atom_basis_labels()
 
-            if has_frozen and self.frozen_atoms_method == 'reduce':
-                # geomeTRIC only optimized the active atoms; splice them back
-                # into the full geometry, keeping frozen atoms fixed
-                coords = molecule.get_coordinates_in_bohr()
-                coords[active_idx] = opt_coords.reshape(-1, 3)
-            elif has_frozen:
-                # 'zero': full geometry already, but pin frozen atoms to their
-                # exact fixed positions to remove any optimizer drift
-                coords = opt_coords.reshape(-1, 3)
-                coords[frozen_idx] = molecule.get_coordinates_in_bohr(
-                )[frozen_idx]
-            else:
-                coords = opt_coords
-
             if self.rank == mpi_master():
+                opt_coords = m.xyzs[-1] / geometric.nifty.bohr2ang
+
+                if has_frozen and self.frozen_atoms_method == 'reduce':
+                    # geomeTRIC only optimized the active atoms; splice them
+                    # back into the full geometry, keeping frozen atoms fixed
+                    coords = molecule.get_coordinates_in_bohr()
+                    coords[active_idx] = opt_coords.reshape(-1, 3)
+                elif has_frozen:
+                    # 'zero': full geometry already, but pin frozen atoms to
+                    # their exact fixed positions to remove any optimizer drift
+                    coords = opt_coords.reshape(-1, 3)
+                    coords[frozen_idx] = molecule.get_coordinates_in_bohr(
+                    )[frozen_idx]
+                else:
+                    coords = opt_coords
+
                 final_mol = Molecule(labels, coords.reshape(-1, 3), 'au',
                                      atom_basis_labels)
                 final_mol.set_charge(molecule.get_charge())

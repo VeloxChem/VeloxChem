@@ -132,6 +132,12 @@ class ScfGradientDriver(GradientDriver):
             scf_energy_not_used = self.compute_energy(molecule, basis)
             scf_results = self.scf_driver.scf_results
 
+        # sanity checks: inherit method settings from the SCF results so
+        # that the DFT state is up to date before the setup header is printed
+        molecule_sanity_check(molecule)
+        scf_results_sanity_check(self, scf_results)
+        dft_sanity_check(self, 'compute')
+
         start_time = time.time()
         self.print_header()
 
@@ -139,11 +145,6 @@ class ScfGradientDriver(GradientDriver):
             self.compute_numerical(molecule, basis, scf_results)
 
         else:
-            # sanity checks
-            molecule_sanity_check(molecule)
-            scf_results_sanity_check(self, scf_results)
-            dft_sanity_check(self, 'compute')
-
             if self.rank == mpi_master():
                 scf_type = scf_results['scf_type']
             else:
@@ -177,6 +178,18 @@ class ScfGradientDriver(GradientDriver):
             write_unparsed_input_to_hdf5(checkpoint_file,
                                          unparse_input(self, grad_keywords),
                                          group_name='grad_settings')
+
+        # num_neg_amp is reduced to the master rank only, and the information
+        # is checked and printed on the master rank only.
+        if (self.rank == mpi_master() and self.scf_driver._gostshyp
+                and self.scf_driver._gostshyp_drv is not None
+                and self.scf_driver._gostshyp_drv.num_neg_amp > 0):
+            valstr = '*** GOSTSHYP information: A total number of '
+            valstr += ('{} grid points with negative amplitudes were '
+                       'excluded ***'.format(
+                           self.scf_driver._gostshyp_drv.num_neg_amp))
+            self.ostream.print_header(valstr)
+            self.ostream.print_blank()
 
         valstr = '*** Time spent in gradient calculation: '
         valstr += '{:.2f} sec ***'.format(time.time() - start_time)
@@ -278,6 +291,7 @@ class ScfGradientDriver(GradientDriver):
             'XC_grad': 0.0,
             'PE_grad': 0.0,
             'CPCM_grad': 0.0,
+            'GOSTSHYP_grad': 0.0,
             'D4_grad': 0.0,
             'Classical': 0.0,
         }
@@ -397,6 +411,47 @@ class ScfGradientDriver(GradientDriver):
 
             grad_timing['CPCM_grad'] += time.time() - t0
 
+    def _add_gostshyp_gradient(self, molecule, basis, density_matrix,
+                               grad_timing):
+        """
+        Adds the GOSTSHYP contribution to the gradient.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param density_matrix:
+            The total density matrix.
+        :param grad_timing:
+            The timing dictionary to update.
+        """
+
+        t0 = time.time()
+
+        if self.scf_driver._gostshyp:
+            from .gostshypdriver import GostshypDriver
+
+            self._gostshyp_drv = GostshypDriver(self.comm, self.ostream)
+            self._gostshyp_drv.init(molecule, basis,
+                                    self.scf_driver.pressure,
+                                    self.scf_driver.pressure_units,
+                                    self.scf_driver.gostshyp_tco_tol)
+
+            tessellation_settings = {
+                'num_lebedev_points': self.scf_driver.gostshyp_num_lebedev_points,
+                'tssf': self.scf_driver.gostshyp_tssf,
+                'discretization': self.scf_driver.gostshyp_discretization,
+                'switching_thresh': self.scf_driver.gostshyp_switching_thresh,
+                'r_ext': self.scf_driver.gostshyp_r_ext,
+            }
+
+            gostshyp_grad = self._gostshyp_drv.gostshyp_grad_contrib(
+                density_matrix, tessellation_settings)
+
+            self.gradient += gostshyp_grad
+
+            grad_timing['GOSTSHYP_grad'] += time.time() - t0
+
     def _add_nuclear_and_dispersion_gradient(self, molecule, basis,
                                              xcfun_label, grad_timing):
         """
@@ -501,7 +556,7 @@ class ScfGradientDriver(GradientDriver):
 
                 self.gradient += vdw_grad
 
-        grad_timing['Classical'] += time.time() - t0
+            grad_timing['Classical'] += time.time() - t0
 
     def compute_analytical_restricted(self, molecule, basis, scf_results):
         """
@@ -658,6 +713,8 @@ class ScfGradientDriver(GradientDriver):
         # CPCM contribution to gradient
 
         self._add_cpcm_gradient(molecule, basis, 2.0 * D, grad_timing)
+
+        self._add_gostshyp_gradient(molecule, basis, 2.0 * D, grad_timing)
 
         # nuclear contribution to gradient
         # and D4 dispersion correction if requested
@@ -838,21 +895,19 @@ class ScfGradientDriver(GradientDriver):
                     self.gradient[iatom, :] -= 0.5 * np.array(atomgrad_Ka)
                     self.gradient[iatom, :] -= 0.5 * np.array(atomgrad_Kb)
 
-                    if need_omega:
-                        # for range-separated functional
-                        atomgrad_Ka_rs = fock_grad_drv.compute(
-                            basis, screener_atom, screener, Da_for_fock,
-                            Da_for_fock_2, iatom, 'kx_rs', erf_k_coef, omega,
-                            thresh_int)
-                        atomgrad_Kb_rs = fock_grad_drv.compute(
-                            basis, screener_atom, screener, Db_for_fock,
-                            Db_for_fock_2, iatom, 'kx_rs', erf_k_coef, omega,
-                            thresh_int)
+                # for range-separated functional
+                if need_omega:
+                    atomgrad_Ka_rs = fock_grad_drv.compute(
+                        basis, screener_atom, screener, Da_for_fock,
+                        Da_for_fock_2, iatom, 'kx_rs', erf_k_coef, omega,
+                        thresh_int)
+                    atomgrad_Kb_rs = fock_grad_drv.compute(
+                        basis, screener_atom, screener, Db_for_fock,
+                        Db_for_fock_2, iatom, 'kx_rs', erf_k_coef, omega,
+                        thresh_int)
 
-                        self.gradient[
-                            iatom, :] -= 0.5 * np.array(atomgrad_Ka_rs)
-                        self.gradient[
-                            iatom, :] -= 0.5 * np.array(atomgrad_Kb_rs)
+                    self.gradient[iatom, :] -= 0.5 * np.array(atomgrad_Ka_rs)
+                    self.gradient[iatom, :] -= 0.5 * np.array(atomgrad_Kb_rs)
 
                 grad_timing['Fock_grad'] += time.time() - t0
 
@@ -875,6 +930,8 @@ class ScfGradientDriver(GradientDriver):
         # CPCM contribution to gradient
 
         self._add_cpcm_gradient(molecule, basis, Da + Db, grad_timing)
+
+        self._add_gostshyp_gradient(molecule, basis, Da + Db, grad_timing)
 
         # nuclear contribution to gradient
         # and D4 dispersion correction if requested

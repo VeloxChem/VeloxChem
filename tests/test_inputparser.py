@@ -189,6 +189,7 @@ def test_unparsed_input_hdf5_roundtrip(tmpdir):
     input_dictionary = {
         'label': 'checkpoint.h5',
         'constraints': ['bond 1 2', 'angle 1 2 3'],
+        'array': np.arange(6).reshape(2, 3),
         'optional': None,
     }
 
@@ -197,4 +198,45 @@ def test_unparsed_input_hdf5_roundtrip(tmpdir):
     write_unparsed_input_to_hdf5(h5file, input_dictionary, group_name='test')
     recovered = read_unparsed_input_from_hdf5(h5file, group_name='test')
 
-    assert recovered == input_dictionary
+    assert recovered.keys() == input_dictionary.keys()
+
+    for key, val in input_dictionary.items():
+        if isinstance(val, np.ndarray):
+            npt.assert_array_equal(recovered[key], val)
+        else:
+            assert recovered[key] == val
+
+
+def test_raw_keyword_roundtrip():
+
+    if MPI.COMM_WORLD.Get_rank() != mpi_master():
+        return
+
+    class Dummy:
+        pass
+
+    keyword_types = {
+        'label': 'str',
+        'payload': 'raw',
+    }
+
+    input_dictionary = {
+        'label': 'checkpoint.h5',
+        'payload': np.arange(6).reshape(2, 3),
+    }
+
+    parsed = Dummy()
+    parse_input(parsed, keyword_types, input_dictionary)
+
+    assert parsed.label == 'checkpoint.h5'
+    assert parsed.payload is input_dictionary['payload']
+
+    roundtrip_dictionary = unparse_input(parsed, keyword_types)
+
+    assert roundtrip_dictionary['payload'] is parsed.payload
+
+    reparsed = Dummy()
+    parse_input(reparsed, keyword_types, roundtrip_dictionary)
+
+    assert reparsed.label == parsed.label
+    npt.assert_array_equal(reparsed.payload, parsed.payload)

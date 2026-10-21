@@ -5,8 +5,6 @@ from veloxchem import MolecularBasis
 from veloxchem import Molecule
 from veloxchem import FockGeom2000Driver
 from veloxchem import SubMatrix
-from veloxchem import Matrix
-from veloxchem import Matrices
 from veloxchem import make_matrix
 from veloxchem import mat_t
 

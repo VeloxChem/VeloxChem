@@ -386,6 +386,7 @@ def parse_input(obj, keyword_types, input_dictionary):
         - 'int' for integer input, such as 'max_iter: 300'
         - 'float' for floating-point input, such as 'eri_thresh: 1.0e-12'
         - 'bool' for floating-point input, such as 'restart: no'
+        - 'raw' for unprocessed values, such as a file path or a NumPy array
         - 'list' for multi-line input, such as 'constraints'
         - 'seq_fixed_str' for fixed-length string sequence, such as
           'atom_types: c3,c3,hc'
@@ -408,6 +409,9 @@ def parse_input(obj, keyword_types, input_dictionary):
 
         # the value of certain keyword can be set to None
         if val is None:
+            setattr(obj, key, val)
+
+        elif keyword_types[key] == 'raw':
             setattr(obj, key, val)
 
         elif keyword_types[key] == 'str':
@@ -472,11 +476,12 @@ def _format_seq_input(input_seq):
 
 def unparse_input(obj, keyword_types):
     """
-    Converts parsed object attributes back into canonical string input.
+    Converts parsed object attributes back into canonical input.
 
     The resulting dictionary is suitable for passing to ``parse_input`` again.
     Since parsing normalizes some values, this function emits a normalized
-    representation rather than the exact original user formatting.
+    representation rather than the exact original user formatting. Values
+    registered with the ``'raw'`` keyword type are returned unchanged.
 
     :param obj:
         The object holding parsed attributes.
@@ -484,7 +489,7 @@ def unparse_input(obj, keyword_types):
         The data type associated with keyword.
 
     :return:
-        A dictionary containing canonical string input.
+        A dictionary containing canonical input.
     """
 
     input_dictionary = {}
@@ -500,6 +505,9 @@ def unparse_input(obj, keyword_types):
 
         elif isinstance(val, XCFunctional):
             input_dictionary[key] = val.get_func_label()
+
+        elif keyword_type == 'raw':
+            input_dictionary[key] = val
 
         elif keyword_type in ['str', 'str_upper', 'str_lower']:
             input_dictionary[key] = str(val)
@@ -533,7 +541,7 @@ def write_unparsed_input_to_hdf5(fname, input_dictionary, group_name='input'):
     Writes unparsed input dictionary to HDF5 file.
 
     Each entry in the dictionary must be either a string, a list of strings,
-    or ``None``.
+    a NumPy array, or ``None``.
 
     :param fname:
         The HDF5 file name.
@@ -567,6 +575,10 @@ def write_unparsed_input_to_hdf5(fname, input_dictionary, group_name='input'):
                 )
                 dset = group.create_dataset(key, data=val, dtype=string_type)
                 dset.attrs['value_type'] = 'list'
+
+            elif isinstance(val, np.ndarray):
+                dset = group.create_dataset(key, data=val)
+                dset.attrs['value_type'] = 'ndarray'
 
             else:
                 errmsg = f'write_unparsed_input_to_hdf5: invalid value type for \'{key}\''
@@ -610,6 +622,9 @@ def read_unparsed_input_from_hdf5(fname, group_name='input'):
 
             elif value_type == 'list':
                 input_dictionary[key] = list(dset.asstr()[()])
+
+            elif value_type == 'ndarray':
+                input_dictionary[key] = dset[()]
 
             else:
                 errmsg = f'read_unparsed_input_from_hdf5: invalid value type for \'{key}\''
@@ -682,6 +697,7 @@ def get_keyword_type(keyword_type):
         - 'int' -> 'integer'
         - 'float' -> 'float'
         - 'bool' -> 'boolean'
+        - 'raw' -> 'raw'
         - 'list' -> 'multi-line'
         - 'seq_fixed_str', 'seq_fixed_int', 'seq_fixed' -> 'sequence'
         - 'seq_range' -> 'sequence'
@@ -697,6 +713,7 @@ def get_keyword_type(keyword_type):
         'int': 'integer',
         'float': 'float',
         'bool': 'boolean',
+        'raw': 'raw',
         'list': 'multi-line',
         'seq_fixed_str': 'sequence',
         'seq_fixed_int': 'sequence',

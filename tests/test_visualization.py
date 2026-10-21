@@ -22,7 +22,7 @@ class TestVisualization:
         task = MpiTask([inpfile, None])
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
 
-        scf_results = scf_drv.compute(task.molecule, task.ao_basis)
+        scf_results_not_used = scf_drv.compute(task.molecule, task.ao_basis)
 
         mol_orbs = scf_drv.molecular_orbitals
         density = scf_drv.density
@@ -141,7 +141,7 @@ class TestVisualization:
         task = MpiTask([inpfile, None])
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
 
-        scf_results = scf_drv.compute(task.molecule, task.ao_basis)
+        scf_results_not_used = scf_drv.compute(task.molecule, task.ao_basis)
 
         mol_orbs = scf_drv.molecular_orbitals
         density = scf_drv.density

@@ -100,3 +100,34 @@ class TestCphfSolver:
                             "b3lyp",
                             "cpks_coefficients_b3lyp",
                             use_subcomms=True)
+
+    def test_cphf_trial_orthogonality(self):
+        nh3_xyz = """4
+
+        N     0.000000000     0.000000000     0.000000000
+        H    -0.653401663     0.309213352     0.817609879
+        H     0.695693936     0.071283622    -0.702632331
+        H     0.330018952    -0.826347607     0.052270023
+        """
+        basis_set_label = "sto-3g"
+
+        molecule = Molecule.from_xyz_string(nh3_xyz)
+        basis = MolecularBasis.read(molecule, basis_set_label)
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ostream.mute()
+        scf_results = scf_drv.compute(molecule, basis)
+
+        cphf = HessianOrbitalResponse()
+        cphf.update_settings({'conv_thresh': 1.0e-6})
+        cphf.ostream.mute()
+        cphf.compute(molecule, basis, scf_results)
+
+        assert cphf.is_converged
+
+        # matmul_AtB is collective; the Gram matrix is only returned on master.
+        gram = cphf.dist_trials.matmul_AtB(cphf.dist_trials)
+
+        if cphf.rank == mpi_master():
+            assert gram.shape[0] > 0
+            assert np.max(np.abs(gram - np.eye(gram.shape[0]))) < 1.0e-10

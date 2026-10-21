@@ -64,7 +64,7 @@ jobs:
           echo "=== Python dependencies ==="
           python -m pip install --upgrade pip setuptools wheel
           CC=gcc MPICC=mpicc python -m pip install mpi4py --no-binary=mpi4py
-          CC=gcc CXX=g++ python -m pip install MDAnalysis
+          CC=gcc CXX=g++ python -m pip install MDAnalysis "networkx<3.7"
           git config --global --add safe.directory $PWD
           git clone -b 3.4.0 https://gitlab.com/libeigen/eigen.git
           git clone -b boost-1.90.0 https://github.com/boostorg/math.git boost-math

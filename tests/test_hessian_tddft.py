@@ -45,7 +45,7 @@ class TestTddftHessianDriver:
         rsp_drv.conv_thresh = 1e-8
         rsp_drv.nstates = 5
         rsp_drv.ostream.mute()
-        rsp_results = rsp_drv.compute(molecule, basis, scf_results)
+        rsp_results_not_used = rsp_drv.compute(molecule, basis, scf_results)
 
         grad_dict = {}
         cphf_dict = {'conv_thresh': 1e-8, 'use_subspace_solver': 'yes'}
@@ -53,7 +53,7 @@ class TestTddftHessianDriver:
         hessian_drv = TddftHessianDriver(scf_drv,
                                          rsp_drv=rsp_drv)
         hessian_drv.update_settings(method_dict={}, grad_dict=grad_dict,
-                                     cphf_dict=cphf_dict) 
+                                    cphf_dict=cphf_dict)
         hessian_drv.do_dipole_gradient = True
         hessian_drv.ostream.mute()
         hessian_drv.compute(molecule, basis)

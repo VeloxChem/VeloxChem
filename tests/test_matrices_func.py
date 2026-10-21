@@ -1,4 +1,3 @@
-from veloxchem.matrix import Matrix
 from veloxchem.matrices import Matrices
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.molecule import Molecule

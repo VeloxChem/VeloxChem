@@ -381,18 +381,64 @@ class IMForceFieldGenerator:
 
         return zmat
 
-    def set_up_the_system(self, molecule, imforcefieldfiles=None):
+    def set_up_the_system(self, molecule, imforcefieldfiles=None, exclude_rot_bonds=None):
 
         """
         Assign the neccessary variables with respected values.
 
         :param molecule: original molecule
-
-        :param target_dihedrals: is a list of dihedrals that should be scanned during the dynamics
-
-        :param sampling_structures: devides the searchspace around given rotatbale dihedrals
-
         """
+
+        def filter_rotatable_bonds(rotatable_bonds, exclude_rot_bonds):
+            """
+            Removes user-defined bonds from the rotatable bond list.
+
+            :param rotatable_bonds:
+                The 1-based rotatable bond list from MMForceFieldGenerator.
+
+            :return:
+                The filtered 1-based rotatable bond list.
+            """
+
+            if not exclude_rot_bonds:
+                return rotatable_bonds
+
+            excluded_bonds = set()
+            for bond in exclude_rot_bonds:
+                assert_msg_critical(
+                    len(bond) == 2,
+                    'IMForceFieldGenerator.filter_rotatable_bonds: '
+                    'excluded_rotatable_bonds must contain atom-index pairs.')
+
+                atom_i, atom_j = int(bond[0]), int(bond[1])
+
+                assert_msg_critical(
+                    atom_i > 0 and atom_j > 0 and atom_i != atom_j,
+                    'IMForceFieldGenerator.filter_rotatable_bonds: '
+                    'excluded_rotatable_bonds expects 1-based atom indices.')
+
+                excluded_bonds.add(tuple(sorted((atom_i, atom_j))))
+
+            filtered_rotatable_bonds = []
+            excluded_found = set()
+
+            for atom_i, atom_j in rotatable_bonds:
+                bond = tuple(sorted((int(atom_i), int(atom_j))))
+
+                if bond in excluded_bonds:
+                    excluded_found.add(bond)
+                    continue
+
+                filtered_rotatable_bonds.append([int(atom_i), int(atom_j)])
+
+            missing_bonds = excluded_bonds - excluded_found
+            if missing_bonds:
+                self.ostream.print_warning(
+                    'Some user-excluded rotatable bonds were not present in the '
+                    f'MM rotatable bond list: {sorted(missing_bonds)}')
+                self.ostream.flush()
+
+            return filtered_rotatable_bonds
 
         def regroup_by_rotatable_connection(molecule, groups, rotatable_bonds, conn):
             new_groups = {'gs': [], 'es': [], 'non_rotatable': []}
@@ -587,6 +633,9 @@ class IMForceFieldGenerator:
         # determine equivalent atoms within a molecular structure
         symmetry_groups = (list(range(len(molecule.get_labels()))), [], [])
         rotatable_bonds = deepcopy(ff_gen.rotatable_bonds)
+        # add an additional filter to remove rotatable bonds around high energy paths
+        if exclude_rot_bonds is not None:
+            rotatable_bonds = filter_rotatable_bonds(rotatable_bonds, exclude_rot_bonds)
         # Work in zero-based indexing (same convention as z-matrix dihedrals)
         # and remove all symmetry-related rotatable bonds from the scan list.
         rotatable_bonds_zero_based = [tuple(sorted((i - 1, j - 1))) for (i, j) in rotatable_bonds]
@@ -650,6 +699,23 @@ class IMForceFieldGenerator:
                 #         if tuple(sorted(element)) in dihedral_list:
                 #             indices_list.append(i)
                 self.symmetry_information['gs'] = [symmetry_groups[0], rot_groups['gs'], regrouped['gs'], core_atoms, non_core_atoms, rotatable_bonds_zero_based, indices_list, self.symmetry_dihedral_lists, [], [dihedral_start, dihedral_end]]
+
+            imforcefieldfile = self.imforcefieldfiles[self.roots_to_follow[0]]
+            self.states_interpolation_settings[self.roots_to_follow[0]] = {
+                'interpolation_type':self.interpolation_type,
+                'weightfunction_type':self.weightfunction_type,
+                'exponent_p':self.exponent_p,
+                'exponent_q':self.exponent_q,
+                'confidence_radius':self.confidence_radius,
+                'imforcefield_file':imforcefieldfile,
+                'use_inverse_bond_length':self.use_inverse_bond_length,
+                'use_eq_bond_length': self.use_eq_bond_length,
+                'use_tc_weights': self.use_tc_weights,
+                'tc_weight_mode': self.tc_weight_mode,
+                'use_mass_weight': self.use_mass_weight,
+            }
+            self.sampling_states_interpolation_settings[self.roots_to_follow[0]] = self.states_interpolation_settings[self.roots_to_follow[0]].copy()
+            self.sampling_states_interpolation_settings[self.roots_to_follow[0]]['imforcefield_file'] = self.sampling_imforcefieldfiles[self.roots_to_follow[0]]
 
         if self.exclude_non_core:
             new_exclusion = {}
@@ -875,21 +941,6 @@ class IMForceFieldGenerator:
             self.ostream.flush()
 
             imforcefieldfile = self.imforcefieldfiles[self.roots_to_follow[0]]
-            self.states_interpolation_settings[self.roots_to_follow[0]] = {
-                'interpolation_type':self.interpolation_type,
-                'weightfunction_type':self.weightfunction_type,
-                'exponent_p':self.exponent_p,
-                'exponent_q':self.exponent_q,
-                'confidence_radius':self.confidence_radius,
-                'imforcefield_file':imforcefieldfile,
-                'use_inverse_bond_length':self.use_inverse_bond_length,
-                'use_eq_bond_length': self.use_eq_bond_length,
-                'use_tc_weights': self.use_tc_weights,
-                'tc_weight_mode': self.tc_weight_mode,
-                'use_mass_weight': self.use_mass_weight,
-            }
-            self.sampling_states_interpolation_settings[self.roots_to_follow[0]] = self.states_interpolation_settings[self.roots_to_follow[0]].copy()
-            self.sampling_states_interpolation_settings[self.roots_to_follow[0]]['imforcefield_file'] = self.sampling_imforcefieldfiles[self.roots_to_follow[0]]
 
             self.dynamics_settings = {
                 'drivers': self.drivers,

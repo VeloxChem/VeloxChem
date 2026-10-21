@@ -101,6 +101,13 @@ class CpcmDriver:
         self.custom_vdw_radii_verbose = True
         self.radii_scaling = 1.2
 
+        # CPCM grid, switching function, preconditioner, Bz vector, and charges
+        self._cpcm_grid = None
+        self._cpcm_sw_func = None
+        self._cpcm_precond = None
+        self._cpcm_Bzvec = None
+        self._cpcm_q = None
+
         # input keywords
         self.input_keywords = {
             'cpcm': {
@@ -124,6 +131,39 @@ class CpcmDriver:
         self.ostream.print_reference(iswig_ref)
         self.ostream.print_blank()
         self.ostream.flush()
+
+    @property
+    def cpcm_grid(self):
+        """
+        Returns the C-PCM surface grid.
+
+        :return:
+            The C-PCM surface grid.
+        """
+
+        return self._cpcm_grid
+
+    @property
+    def cpcm_q(self):
+        """
+        Returns the C-PCM surface charges.
+
+        :return:
+            The C-PCM surface charges.
+        """
+
+        return self._cpcm_q
+
+    @cpcm_q.setter
+    def cpcm_q(self, value):
+        """
+        Sets the C-PCM surface charges.
+
+        :param value:
+            The C-PCM surface charges.
+        """
+
+        self._cpcm_q = value
 
     def init(self, molecule, basis, do_nuclear=True):
         """
@@ -667,14 +707,14 @@ class CpcmDriver:
 
         return V_es
 
-    def visualize_cpcm_grid(self, molecule, grid):
+    def visualize_cpcm_grid(self, molecule, grid=None):
         """
         Visualizes grid for surface discretization.
 
         :param molecule:
             The molecule.
         :param grid:
-            The grid.
+            The grid. If None, the grid stored in the driver is used.
         """
 
         try:
@@ -682,8 +722,16 @@ class CpcmDriver:
         except ImportError:
             raise ImportError('Unable to import py3Dmol.')
 
-        assert_msg_critical(grid.shape[1] == 6,
-                            'CpcmDriver.visualize_grid: Invalid grid size')
+        if grid is None:
+            grid = self._cpcm_grid
+
+        assert_msg_critical(
+            grid is not None, 'CpcmDriver.visualize_cpcm_grid: '
+            'Grid not available. Driver not initialized.')
+
+        assert_msg_critical(
+            grid.shape[1] == 6,
+            'CpcmDriver.visualize_cpcm_grid: Invalid grid size')
 
         grid_in_angstrom = grid[:, :3] * bohr_in_angstrom()
 
@@ -742,10 +790,11 @@ class CpcmDriver:
         q = self._cpcm_q
 
         assert_msg_critical(grid.shape[1] == 6,
-                            "CpcmDriver.visualize_grid: Invalid grid size")
+                            "CpcmDriver.visualize_cpcm_charges: "
+                            "Invalid grid size")
         assert_msg_critical(
             len(q) == len(grid),
-            "CpcmDriver.visualize_grid: Invalid q-vector size")
+            "CpcmDriver.visualize_cpcm_charges: Invalid q-vector size")
 
         grid_in_angstrom = grid[:, :3] * bohr_in_angstrom()
 

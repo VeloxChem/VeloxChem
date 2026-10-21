@@ -107,6 +107,47 @@ class EnsembleParser:
         return f"{prefix}{resname}"
 
     @staticmethod
+    def _histidine_resname_from_atoms(resname: str, atom_names: set[str]) -> str | None:
+        """
+        Infer CHARMM-style histidine protonation-state residue names from atom names.
+
+        Generic HIS is ambiguous in parameter databases. The presence of HD1
+        identifies delta-protonated histidine (HSD/HID), HE2 identifies
+        epsilon-protonated histidine (HSE/HIE), and both hydrogens identify
+        doubly protonated histidine (HSP/HIP).
+
+        :param resname:
+            Residue name as read from the structure/topology.
+        :param atom_names:
+            Set of atom names in the residue.
+        :return:
+            Refined CHARMM-style histidine residue name, or None if no
+            histidine refinement is needed.
+        """
+        resname = str(resname)
+        prefix = ""
+        core_resname = resname
+
+        if len(resname) == 4 and resname[0] in ("N", "C") and resname[1:] == "HIS":
+            prefix = resname[0]
+            core_resname = resname[1:]
+
+        if core_resname != "HIS":
+            return None
+
+        has_hd1 = "HD1" in atom_names
+        has_he2 = bool({"HE2", "HNE2"} & atom_names)
+
+        if has_hd1 and has_he2:
+            return f"{prefix}HSP"
+        if has_hd1:
+            return f"{prefix}HSD"
+        if has_he2:
+            return f"{prefix}HSE"
+
+        return None
+
+    @staticmethod
     def _looks_like_n_terminal(residue) -> bool:
         """
         Heuristically detect an N-terminal amino-acid residue from its atom names.
@@ -252,6 +293,7 @@ class EnsembleParser:
         - GLU + HE1/HE2 -> GLH
         - ASP + HD1/HD2 -> ASH
         - CYS without HG/HG1 -> CYX
+        - HIS + HD1/HE2 -> HSD/HSE/HSP
 
         :param env_atoms (MDAnalysis.core.groups.AtomGroup)
             AtomGroup corresponding to the environment selection used in
@@ -266,14 +308,23 @@ class EnsembleParser:
         for res in env_atoms.residues:
             resname = str(res.resname)
             atom_names = {str(name) for name in res.atoms.names}
+            prefix = ""
+            core_resname = resname
 
-            if resname == "GLU" and ({"HE1", "HE2"} & atom_names):
-                prot_map[res.resindex] = "GLH"
-            elif resname == "ASP" and ({"HD1", "HD2"} & atom_names):
-                prot_map[res.resindex] = "ASH"
-            elif resname == "CYS" and not ({"HG", "HG1"} & atom_names):
+            if len(resname) == 4 and resname[0] in ("N", "C"):
+                prefix = resname[0]
+                core_resname = resname[1:]
+
+            histidine_resname = self._histidine_resname_from_atoms(resname, atom_names)
+            if histidine_resname is not None:
+                prot_map[res.resindex] = histidine_resname
+            elif core_resname == "GLU" and ({"HE1", "HE2"} & atom_names):
+                prot_map[res.resindex] = f"{prefix}GLH"
+            elif core_resname == "ASP" and ({"HD1", "HD2"} & atom_names):
+                prot_map[res.resindex] = f"{prefix}ASH"
+            elif core_resname == "CYS" and not ({"HG", "HG1"} & atom_names):
                 # Distinguish thiol-less/disulfide cysteine from protonated CYS.
-                prot_map[res.resindex] = "CYX"
+                prot_map[res.resindex] = f"{prefix}CYX"
 
         return prot_map
 
@@ -614,7 +665,14 @@ class EnsembleParser:
                 # Apply terminal residue renaming (NASN/CASN, etc.) if applicable
                 if term_map and len(pe_resnames) > 0:
                     for ridx, newname in term_map.items():
-                        pe_resnames[pe_resindices == ridx] = newname
+                        term_newname = newname
+                        if ridx in prot_map:
+                            prot_newname = str(prot_map[ridx])
+                            term_newname = self._prefixed_resname(
+                                prot_newname,
+                                str(newname)[0],
+                            )
+                        pe_resnames[pe_resindices == ridx] = term_newname
 
                 number_residues_pe = int(pe_region.residues.n_residues)
 
@@ -656,7 +714,14 @@ class EnsembleParser:
                 # Apply terminal residue renaming (NASN/CASN, etc.) if applicable
                 if term_map and len(npe_resnames) > 0:
                     for ridx, newname in term_map.items():
-                        npe_resnames[npe_resindices == ridx] = newname
+                        term_newname = newname
+                        if ridx in prot_map:
+                            prot_newname = str(prot_map[ridx])
+                            term_newname = self._prefixed_resname(
+                                prot_newname,
+                                str(newname)[0],
+                            )
+                        npe_resnames[npe_resindices == ridx] = term_newname
 
                 number_residues_npe = int(npe_region.residues.n_residues)
 

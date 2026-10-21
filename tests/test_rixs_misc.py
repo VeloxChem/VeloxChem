@@ -1,7 +1,4 @@
 from mpi4py import MPI
-from pathlib import Path
-import h5py
-import numpy as np
 import pytest
 
 from veloxchem.rixsdriver import RixsDriver

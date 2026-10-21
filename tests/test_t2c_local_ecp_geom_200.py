@@ -21,28 +21,28 @@ class TestProjectedSECPGeom200Driver:
         bas = MolecularBasis.read(mol, 'def2-svp')
 
         return mol, bas
-        
+
     def test_projected_ecp_auh2_svp_for_au1(self):
 
         mol_auh2, bas_svp = self.get_svp_data()
-        
+
         lpot = BaseCorePotential([4.78982000, 2.39491000],
                                  [30.49008890, 5.17107381],
                                  [2, 2])
-                                 
+
         ecp_drv = LocalECPGeom200Driver()
         ecp_mats = ecp_drv.compute(mol_auh2, bas_svp, lpot, 0)
-        
+
         # load reference overlap data
         here = Path(__file__).parent
         npyfile = str(here / 'data' / 'auh2.def2svp.au.ecp.only.ul.geom.200.au1.au1.npy')
         ref_mat = np.load(npyfile)
-        
-        #print(ref_mat.shape)
+
+        # print(ref_mat.shape)
 
         # dimension of molecular basis
         basdims = [0, 10, 25, 35, 42]
-        
+
         # indices map
         labels = ['XX', 'XY', 'XZ', 'YY', 'YZ', 'ZZ']
         rindex = [0, 1, 2, 4, 5, 8]
@@ -73,24 +73,24 @@ class TestProjectedSECPGeom200Driver:
     def test_projected_ecp_auh2_svp_for_h2(self):
 
         mol_auh2, bas_svp = self.get_svp_data()
-        
+
         lpot = BaseCorePotential([4.78982000, 2.39491000],
                                  [30.49008890, 5.17107381],
                                  [2, 2])
-                                 
+
         ecp_drv = LocalECPGeom200Driver()
         ecp_mats = ecp_drv.compute(mol_auh2, bas_svp, lpot, 1)
-        
+
         # load reference overlap data
         here = Path(__file__).parent
         npyfile = str(here / 'data' / 'auh2.def2svp.au.ecp.only.ul.geom.200.h2.h2.npy')
         ref_mat = np.load(npyfile)
-        
-        #print(ref_mat.shape)
+
+        # print(ref_mat.shape)
 
         # dimension of molecular basis
         basdims = [0, 10, 25, 35, 42]
-        
+
         # indices map
         labels = ['XX', 'XY', 'XZ', 'YY', 'YZ', 'ZZ']
         rindex = [0, 1, 2, 4, 5, 8]

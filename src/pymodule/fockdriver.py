@@ -125,11 +125,11 @@ class FockDriver:
 
         return self._fock_drv._compute_fock_omp(*args)
 
-    def _set_block_size_factor(self, factor):
+    def set_block_size_factor(self, factor):
 
         assert_msg_critical(
             factor in [1, 2, 4, 8, 16, 32, 64, 128],
-            'FockDriver._set_block_size_factor: Invalid factor')
+            'FockDriver.set_block_size_factor: Invalid factor')
 
         total_cores = self.nodes * int(environ['OMP_NUM_THREADS'])
 

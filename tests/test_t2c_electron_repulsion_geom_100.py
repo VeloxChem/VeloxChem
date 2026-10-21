@@ -63,7 +63,7 @@ class TestTwoCenterElectronRepulsionGeom100Driver:
             fref = SubMatrix([0, 0, 24, 24])
             fref.set_values(np.ascontiguousarray(ref_mat[k]))
             assert smat == fref
-            
+
     def test_electron_repulsion_h2o_svp_for_h2(self):
 
         mol, bas = self.get_data()
@@ -105,7 +105,7 @@ class TestTwoCenterElectronRepulsionGeom100Driver:
             fref = SubMatrix([0, 0, 24, 24])
             fref.set_values(np.ascontiguousarray(ref_mat[k]))
             assert smat == fref
-            
+
     def test_electron_repulsion_h2o_svp_for_h3(self):
 
         mol, bas = self.get_data()

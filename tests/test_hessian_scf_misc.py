@@ -188,6 +188,31 @@ class TestScfHessianDriverMiscellaneous:
         else:
             assert dipole_moment is None
 
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='skip pytest.raises for multiple MPI processes')
+    def test_analytical_hessian_rejects_atom_pairs_with_dipole_gradient(self):
+
+        molecule, basis = self.get_h2o_molecule_and_basis()
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ostream.mute()
+
+        hess_drv = ScfHessianDriver(scf_drv)
+        hess_drv.ostream.mute()
+        hess_drv.do_dipole_gradient = True
+        hess_drv.atom_pairs = [(0, 1)]
+
+        with pytest.raises(VeloxChemError,
+                           match='do_dipole_gradient is not supported'):
+            hess_drv.compute(molecule, basis)
+
+        # without atom_pairs, the analytical dipole gradient is available
+        hess_drv.atom_pairs = None
+        hess_drv.compute(molecule, basis)
+
+        if scf_drv.rank == mpi_master():
+            assert hess_drv.dipole_gradient.shape == (3, 9)
+
     def test_analytical_hessian_with_point_charges_and_vdw(self):
 
         molecule, basis = self.get_embedded_water_molecule_and_basis()
