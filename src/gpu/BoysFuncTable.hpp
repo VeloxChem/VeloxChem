@@ -39,17 +39,28 @@
 
 namespace boysfunc {
 
-auto getBoysFuncFactorsSize() -> int64_t;
+constexpr int64_t getBoysFuncFactorsSize()
+{
+    return 28;
+}
 
-auto getBoysFuncFactors() -> std::vector<double>;
+constexpr std::array<double, getBoysFuncFactorsSize()> getBoysFuncFactors()
+{
+    return 
+        {1.0,        1.0 / 3.0,  1.0 / 5.0,  1.0 / 7.0,  1.0 / 9.0,  1.0 / 11.0, 1.0 / 13.0,
+         1.0 / 15.0, 1.0 / 17.0, 1.0 / 19.0, 1.0 / 21.0, 1.0 / 23.0, 1.0 / 25.0, 1.0 / 27.0,
+         1.0 / 29.0, 1.0 / 31.0, 1.0 / 33.0, 1.0 / 35.0, 1.0 / 37.0, 1.0 / 39.0, 1.0 / 41.0,
+         1.0 / 43.0, 1.0 / 45.0, 1.0 / 47.0, 1.0 / 49.0, 1.0 / 51.0, 1.0 / 53.0, 1.0 / 55.0};
+}
 
-auto getFullBoysFuncTableSize() -> int64_t;
+constexpr int64_t getFullBoysFuncTableSize()
+{
+    return (getBoysFuncFactorsSize() + 1) * 121 * 7;
+}
 
-auto getFullBoysFuncTable() -> std::vector<double>;
+const std::array<double, getFullBoysFuncTableSize()> getFullBoysFuncTable();
 
-auto getBoysFuncTable(const int64_t N) -> std::array<std::array<double, 7>, 121>;
-
-auto getBoysFunction(const double fa, const uint32_t N, const double* bf_table, const double* ft) -> std::vector<double>;
+auto getBoysFunction(const double fa, const uint32_t N, const double* bf_table, const double* ft) -> const std::vector<double>;
 
 }  // namespace boysfunc
 

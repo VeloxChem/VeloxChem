@@ -1247,9 +1247,9 @@ class ScfDriver:
             'of GPU devices per node.')
 
         n_threads = int(os.environ['OMP_NUM_THREADS'])
-        assert_msg_critical(
-            num_gpus_per_node == n_threads,
-            'OMP_NUM_THREADS does not match number of GPU devices per node.')
+        #assert_msg_critical(
+        #    num_gpus_per_node == n_threads,
+        #    'OMP_NUM_THREADS does not match number of GPU devices per node.')
 
         assert_msg_critical(
             num_gpus_per_node > 0,

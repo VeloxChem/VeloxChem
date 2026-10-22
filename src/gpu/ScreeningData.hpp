@@ -60,17 +60,6 @@ class CScreeningData
     std::string _timer_summary;
     std::vector<std::string> _gpu_timer_summary;
 
-    // primitive AO data
-    int64_t               _s_prim_count;
-    int64_t               _p_prim_count;
-    int64_t               _d_prim_count;
-    std::vector<double>   _s_prim_info;
-    std::vector<double>   _p_prim_info;
-    std::vector<double>   _d_prim_info;
-    std::vector<uint32_t> _s_prim_aoinds;
-    std::vector<uint32_t> _p_prim_aoinds;
-    std::vector<uint32_t> _d_prim_aoinds;
-
     // cpu data
     CDenseMatrix _Q_matrix_ss;
     CDenseMatrix _Q_matrix_sp;
@@ -216,6 +205,18 @@ class CScreeningData
 
     std::vector<std::vector<uint32_t>> _local_pair_inds_i_for_K_dd;
     std::vector<std::vector<uint32_t>> _local_pair_inds_k_for_K_dd;
+
+    int64_t _s_prim_count{0};
+    int64_t _p_prim_count{0};
+    int64_t _d_prim_count{0};
+
+    std::vector<double>   _s_prim_info;
+    std::vector<double>   _p_prim_info;
+    std::vector<double>   _d_prim_info;
+
+    std::vector<uint32_t> _s_prim_aoinds;
+    std::vector<uint32_t> _p_prim_aoinds;
+    std::vector<uint32_t> _d_prim_aoinds;
 
     auto _computeQMatricesOnGPU(const CMolecule& molecule, const CMolecularBasis& basis) -> void;
 

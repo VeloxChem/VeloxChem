@@ -2567,10 +2567,13 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
     std::unordered_map<int64_t, std::vector<std::pair<int64_t, double>>> cart_sph_map_i, cart_sph_map_j;
 
+#pragma omp parallel for collapse(2) schedule(dynamic)
     for (int64_t i_cgto = 0; i_cgto < naos; i_cgto++)
     {
         for (int64_t j_cgto = 0; j_cgto < naos; j_cgto++)
         {
+            const auto dens_ij = sph_dens_ptr[i_cgto * naos + j_cgto];
+
             for (const auto& i_cgto_cart_ind_coef : sph_cart_map[i_cgto])
             {
                 auto i_cgto_cart = i_cgto_cart_ind_coef.first;
@@ -2581,8 +2584,10 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
                     auto j_cgto_cart = j_cgto_cart_ind_coef.first;
                     auto j_coef_cart = j_cgto_cart_ind_coef.second;
 
-                    cart_dens_ptr[i_cgto_cart * cart_naos + j_cgto_cart] += 
-                        sph_dens_ptr[i_cgto * naos + j_cgto] * i_coef_cart * j_coef_cart;
+                    const auto cart_contrib = dens_ij * i_coef_cart * j_coef_cart;
+
+#pragma omp atomic
+                    cart_dens_ptr[i_cgto_cart * cart_naos + j_cgto_cart] += cart_contrib;
                 }
             }
         }
@@ -2733,36 +2738,7 @@ computeFockGradientOnGPU(const              CMolecule& molecule,
 
     timer.start("GTO block prep.");
 
-    // GTOs blocks and number of AOs
-
-    const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
-
-    const auto naos = gtofunc::getNumberOfAtomicOrbitals(gto_blocks);
-
-    // gto blocks
-
-    int64_t s_prim_count = 0;
-    int64_t p_prim_count = 0;
-    int64_t d_prim_count = 0;
-
-    for (const auto& gto_block : gto_blocks)
-    {
-        const auto ncgtos = gto_block.getNumberOfBasisFunctions();
-        const auto npgtos = gto_block.getNumberOfPrimitives();
-
-        const auto gto_ang = gto_block.getAngularMomentum();
-
-        if (gto_ang == 0) s_prim_count += npgtos * ncgtos;
-        if (gto_ang == 1) p_prim_count += npgtos * ncgtos;
-        if (gto_ang == 2) d_prim_count += npgtos * ncgtos;
-    }
-
-    // S gto block
-
-    std::vector<double>   s_prim_info(5 * s_prim_count);
-    std::vector<uint32_t> s_prim_aoinds(1 * s_prim_count);
-
-    gtoinfo::updatePrimitiveInfoForS(s_prim_info.data(), s_prim_aoinds.data(), s_prim_count, gto_blocks);
+    // Reuse primitive info built serially before the parallel region; upload once per GPU.
 
     // P gto block
 
