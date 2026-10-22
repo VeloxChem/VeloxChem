@@ -3437,8 +3437,8 @@ class ReactionSystemBuilder():
     def _get_couloumb_expression(self, soft_core: bool):
         soft_core_expression = (
             " (1-l) * CoultotA + l  * CoultotB; "
-            "CoultotA   = step(r-rqA) * CoulA + step(rqA-r) * CoullinA;"
-            "CoultotB   = step(r-rqB) * CoulB + step(rqB-r) * CoullinB;"
+            "CoultotA   = step(r-rqA) * CoulA + (1-step(r-rqA)) * CoullinA;"
+            "CoultotB   = step(r-rqB) * CoulB + (1-step(r-rqB)) * CoullinB;"
             "CoullinA   = k * ( ( qqA / rqAdiv^3 ) * r^2 - 3 * ( qqA / rqAdiv^2 ) * r + 3 * ( qqA / rqAdiv ) );"
             "CoullinB   = k * ( ( qqB / rqBdiv^3 ) * r^2 - 3 * ( qqB / rqBdiv^2 ) * r + 3 * ( qqB / rqBdiv ) );"
             "rqAdiv     = select(rqA,rqA,1);"
@@ -3468,8 +3468,8 @@ class ReactionSystemBuilder():
         soft_core_expression = (
             " (1-l) * LjtotA + l * LjtotB; "
             ""
-            "LjtotA     = (step(r - rljA) * LjA + step(rljA - r) * LjlinA);"
-            "LjtotB     = (step(r - rljB) * LjB + step(rljB - r) * LjlinB);"
+            "LjtotA     = (step(r - rljA) * LjA + (1 - step(r - rljA)) * LjlinA);"
+            "LjtotB     = (step(r - rljB) * LjB + (1 - step(r - rljB)) * LjlinB);"
             "LjlinA     = ( (78*A12) / (rljAdiv^14) - (21*A6) / (rljAdiv^8) )*r^2 - ( (168*A12) / (rljAdiv^13) - (48*A6) / (rljAdiv^7) )*r + ( (91*A12) / (rljAdiv^12) - (28*A6) / (rljAdiv^6) );"
             "LjlinB     = ( (78*B12) / (rljBdiv^14) - (21*B6) / (rljBdiv^8) )*r^2 - ( (168*B12) / (rljBdiv^13) - (48*B6) / (rljBdiv^7) )*r + ( (91*B12) / (rljBdiv^12) - (28*B6) / (rljBdiv^6) );"
             # if rljA = 0, returns 1, otherwise returns rljA. Prevents division by 0 while the step factor is already 0
