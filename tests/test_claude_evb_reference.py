@@ -1119,3 +1119,292 @@ def write_energy_files(folder, samples, lambdas, T=T_DEFAULT):
         json.dump({'Lambda': [float(l) for l in lambdas],
                    'temperature': float(T)}, fh)
     return E_file, data_file, options_file
+
+
+# --------------------------------------------------------------------------
+# WP-C3: independent energy evaluator for the PES systems.
+#
+# Written from the textbook definitions in the WP-C3 plan (section 4), not
+# from reactionsystembuilder.py. Pure numpy; units nm, kJ/mol, e, degrees in
+# the JSON.
+# --------------------------------------------------------------------------
+
+_E_CHARGE = 1.602176634e-19  # C (SI, exact)
+_AVOGADRO = 6.02214076e23  # 1/mol (SI, exact)
+_EPSILON0 = 8.8541878128e-12  # F/m (CODATA 2018)
+
+# Coulomb constant in kJ mol^-1 nm e^-2 and the Faraday constant in C/mol
+COULOMB_KE = _E_CHARGE**2 * _AVOGADRO / (4 * np.pi * _EPSILON0) / 1e-9 / 1e3
+FARADAY = _E_CHARGE * _AVOGADRO
+
+FF_TERMS = ('bond', 'morse', 'angle', 'torsion', 'improper', 'coul_static',
+            'lj_static', 'coul_dynamic', 'lj_dynamic', 'nonbonded_force',
+            'efield')
+
+
+def _ff_key(key):
+    """'(0, 1, 2)' -> (0, 1, 2)."""
+
+    return tuple(int(x) for x in key.strip('()').split(','))
+
+
+def _ff_dihedral(p0, p1, p2, p3):
+    """IUPAC dihedral angle (radian) of four points."""
+
+    b1, b2, b3 = p1 - p0, p2 - p1, p3 - p2
+    n1, n2 = np.cross(b1, b2), np.cross(b2, b3)
+    m1 = np.cross(n1, b2 / np.linalg.norm(b2))
+    return np.arctan2(np.dot(m1, n2), np.dot(n1, n2))
+
+
+def _ff_angle(p0, p1, p2):
+    """Angle (radian) at p1."""
+
+    u, v = p0 - p1, p2 - p1
+    c = np.dot(u, v) / (np.linalg.norm(u) * np.linalg.norm(v))
+    return np.arccos(np.clip(c, -1.0, 1.0))
+
+
+def coulomb_pair(r, qq):
+    """k_e qq / r and its first two derivatives."""
+
+    return (COULOMB_KE * qq / r, -COULOMB_KE * qq / r**2,
+            2 * COULOMB_KE * qq / r**3)
+
+
+def lj_pair(r, sigma, epsilon):
+    """4 eps [(s/r)^12 - (s/r)^6] and its first two derivatives."""
+
+    a12, a6 = 4 * epsilon * sigma**12, 4 * epsilon * sigma**6
+    return (a12 / r**12 - a6 / r**6, -12 * a12 / r**13 + 6 * a6 / r**7,
+            156 * a12 / r**14 - 42 * a6 / r**8)
+
+
+def soft_core(pair, r, rc, *params):
+    """The pair potential for r >= rc; below rc its second-order Taylor
+    polynomial about rc. rc <= 0 means the plain potential everywhere."""
+
+    if rc <= 0 or r >= rc:
+        return pair(r, *params)[0]
+    f, f1, f2 = pair(rc, *params)
+    return f + f1 * (r - rc) + 0.5 * f2 * (r - rc)**2
+
+
+class FFEnergyReference:
+    """Force-field energy of one state of a reaction path, term by term.
+
+    The PES system of state k should equal the state-k force field with two
+    by-design changes: reactive bonds are Morse, and the nonbonded terms of
+    reactive pairs may be soft-core. Reactive pairs are the bonds present in
+    one state of a step and not the other, over all steps of the path.
+
+    states: the per-state force-field dicts (the content of the
+    <state>_ff_data.json files) or paths to them, in path order.
+    soft_core_flags: dict with keys coulomb_static, lj_static,
+    coulomb_dynamic, lj_dynamic (defaults: dynamic on, static off).
+    E_field: field in V/m, or None.
+    elements: element symbols per atom; needed when a state has impropers.
+
+    Impropers: the JSON key is (c, a1, a2, a3), centre first, as an OpenMM
+    ffxml <Improper>, which is how MMForceFieldGenerator writes them. The
+    energy is that of the torsion OpenMM's default (AMBER) ordering builds:
+    the dihedral (x, y, c, a3) with {x, y} = {a1, a2}, the lower index first
+    for equal elements, otherwise carbon first, otherwise the heavier first.
+    """
+
+    def __init__(self,
+                 states,
+                 coul14_scale=0.833,
+                 lj14_scale=0.5,
+                 morse_D=500.0,
+                 soft_core_flags=None,
+                 sc_alpha_q=0.3,
+                 sc_sigma_q=1.0,
+                 sc_alpha_lj=0.7,
+                 sc_power=1 / 6,
+                 E_field=None,
+                 elements=None):
+
+        self.states = [
+            json.loads(Path(s).read_text()) if isinstance(s, (str, Path))
+            else s for s in states
+        ]
+        self.coul14_scale = coul14_scale
+        self.lj14_scale = lj14_scale
+        self.morse_D = morse_D
+        self.soft_core_flags = {
+            'coulomb_static': False,
+            'lj_static': False,
+            'coulomb_dynamic': True,
+            'lj_dynamic': True,
+        }
+        if soft_core_flags:
+            self.soft_core_flags.update(soft_core_flags)
+        self.sc_alpha_q = sc_alpha_q
+        self.sc_sigma_q = sc_sigma_q
+        self.sc_alpha_lj = sc_alpha_lj
+        self.sc_power = sc_power
+        self.E_field = None if E_field is None else np.asarray(E_field, float)
+        self.elements = None if elements is None else list(elements)
+
+        self.reactive_pairs = set()
+        for left, right in zip(self.states[:-1], self.states[1:]):
+            self.reactive_pairs |= (self.bonds_of(left) ^ self.bonds_of(right))
+        self._pairs = {}
+
+    @staticmethod
+    def bonds_of(state):
+        return {tuple(sorted(_ff_key(k))) for k in state['bonds']}
+
+    def n_atoms(self):
+        return len(self.states[0]['atoms'])
+
+    def atom(self, k, i):
+        return self.states[k]['atoms'][str(i)]
+
+    def graph_distances(self, k):
+        """Shortest bond-path length between atoms in state k (inf if none)."""
+
+        n = self.n_atoms()
+        dist = np.full((n, n), np.inf)
+        neighbors = [set() for _ in range(n)]
+        for i, j in self.bonds_of(self.states[k]):
+            neighbors[i].add(j)
+            neighbors[j].add(i)
+        for start in range(n):
+            dist[start, start] = 0
+            frontier = [start]
+            while frontier:
+                nxt = []
+                for a in frontier:
+                    for b in neighbors[a]:
+                        if dist[start, b] == np.inf:
+                            dist[start, b] = dist[start, a] + 1
+                            nxt.append(b)
+                frontier = nxt
+        return dist
+
+    def pairs(self, k):
+        """Every atom pair of state k, classified by state k's bond graph.
+
+        Returns {(i, j): dict(cls, reactive, qq, sigma, epsilon)} with cls
+        'excluded' (1-2, 1-3), '1-4' (scaled) or 'full', and the effective
+        (scaled) qq and epsilon; excluded pairs carry qq = epsilon = 0.
+        """
+
+        if k in self._pairs:
+            return self._pairs[k]
+        dist = self.graph_distances(k)
+        out = {}
+        n = self.n_atoms()
+        for i in range(n):
+            for j in range(i + 1, n):
+                ai, aj = self.atom(k, i), self.atom(k, j)
+                qq = ai['charge'] * aj['charge']
+                sigma = 0.5 * (ai['sigma'] + aj['sigma'])
+                epsilon = np.sqrt(ai['epsilon'] * aj['epsilon'])
+                if dist[i, j] <= 2:
+                    cls, qq, epsilon = 'excluded', 0.0, 0.0
+                elif dist[i, j] == 3:
+                    cls = '1-4'
+                    qq *= self.coul14_scale
+                    epsilon *= self.lj14_scale
+                else:
+                    cls = 'full'
+                out[(i, j)] = dict(cls=cls,
+                                   reactive=(i, j) in self.reactive_pairs,
+                                   qq=qq,
+                                   sigma=sigma,
+                                   epsilon=epsilon)
+        self._pairs[k] = out
+        return out
+
+    def improper_atoms(self, k, key):
+        """The dihedral atoms of the improper key (c, a1, a2, a3)."""
+
+        assert self.elements is not None, 'impropers need the elements'
+        c, x, y, a3 = key
+        ex, ey = self.elements[x], self.elements[y]
+        if ex == ey:
+            swap = x > y
+        else:
+            swap = ex != 'C' and (ey == 'C' or self.atom(k, x)['mass'] <
+                                  self.atom(k, y)['mass'])
+        if swap:
+            x, y = y, x
+        return (x, y, c, a3)
+
+    def coulomb_rc(self, qq):
+        return self.sc_alpha_q * (1 + self.sc_sigma_q * qq)
+
+    def lj_rc(self, sigma, epsilon):
+        return self.sc_alpha_lj * ((26 / 7) * 4 * epsilon * sigma**6)**self.sc_power
+
+    def nonbonded(self, k, xyz, kind):
+        """(Coulomb, LJ) of state k over the static (non-reactive) or
+        dynamic (reactive) pairs."""
+
+        xyz = np.asarray(xyz, float)
+        coul = lj = 0.0
+        for (i, j), p in self.pairs(k).items():
+            if p['cls'] == 'excluded' or p['reactive'] != (kind == 'dynamic'):
+                continue
+            r = np.linalg.norm(xyz[i] - xyz[j])
+            rc_q = (self.coulomb_rc(p['qq'])
+                    if self.soft_core_flags[f'coulomb_{kind}'] else 0.0)
+            rc_lj = (self.lj_rc(p['sigma'], p['epsilon'])
+                     if self.soft_core_flags[f'lj_{kind}'] else 0.0)
+            coul += soft_core(coulomb_pair, r, rc_q, p['qq'])
+            if p['epsilon'] != 0.0:
+                lj += soft_core(lj_pair, r, rc_lj, p['sigma'], p['epsilon'])
+        return coul, lj
+
+    def energies(self, k, xyz):
+        """Energy terms (kJ/mol) of state k at coordinates xyz (nm, n x 3)."""
+
+        xyz = np.asarray(xyz, float)
+        state = self.states[k]
+        e = dict.fromkeys(FF_TERMS, 0.0)
+
+        for key, b in state['bonds'].items():
+            i, j = _ff_key(key)
+            r = np.linalg.norm(xyz[i] - xyz[j])
+            r0, fc = b['equilibrium'], b['force_constant']
+            if tuple(sorted((i, j))) in self.reactive_pairs:
+                D = b.get('D', self.morse_D)
+                a = np.sqrt(fc / (2 * D))
+                e['morse'] += D * (1 - np.exp(-a * (r - r0)))**2
+            else:
+                e['bond'] += 0.5 * fc * (r - r0)**2
+
+        for key, ang in state['angles'].items():
+            i, j, l = _ff_key(key)
+            theta = _ff_angle(xyz[i], xyz[j], xyz[l])
+            theta0 = np.deg2rad(ang['equilibrium'])
+            e['angle'] += 0.5 * ang['force_constant'] * (theta - theta0)**2
+
+        for section, term in (('dihedrals', 'torsion'), ('impropers',
+                                                          'improper')):
+            for key, d in state[section].items():
+                idx = _ff_key(key)
+                if section == 'impropers':
+                    idx = self.improper_atoms(k, idx)
+                phi = _ff_dihedral(*(xyz[a] for a in idx))
+                barriers = np.atleast_1d(d['barrier'])
+                phases = np.deg2rad(np.atleast_1d(d['phase']))
+                # A negative periodicity marks a multi-term entry (Amber)
+                ns = np.abs(np.atleast_1d(d['periodicity']))
+                e[term] += float(
+                    np.sum(barriers * (1 + np.cos(ns * phi - phases))))
+
+        for kind in ('static', 'dynamic'):
+            e[f'coul_{kind}'], e[f'lj_{kind}'] = self.nonbonded(k, xyz, kind)
+
+        if self.E_field is not None:
+            q = np.array([self.atom(k, i)['charge'] for i in range(len(xyz))])
+            # q [e] * E [V/m] * x [nm] -> kJ/mol
+            e['efield'] = float(-FARADAY * 1e-12 *
+                                np.sum(q * (xyz @ self.E_field)))
+
+        e['total'] = sum(e[t] for t in FF_TERMS)
+        return e

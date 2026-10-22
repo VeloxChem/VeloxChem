@@ -108,9 +108,7 @@ class TestBuildAndLoad:
     def _seed_driver(self, ff_pair):
         EVB = EvbDriver(ostream=OutputStream(None))
         EVB.water_model = "cspce"
-        EVB.states = [ff_pair.reactant, ff_pair.product]
-        EVB.forming_bonds = [set()]
-        EVB.breaking_bonds = [set()]
+        EvbTestHelper.evb_seed_states(EVB, [ff_pair.reactant, ff_pair.product])
         return EVB
 
     def test_build_then_load(self):

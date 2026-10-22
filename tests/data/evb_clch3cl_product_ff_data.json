@@ -1,0 +1,130 @@
+{
+    "atoms": {
+        "0": {
+            "type": "c3",
+            "name": "C1",
+            "mass": 12.0,
+            "charge": -0.315332,
+            "sigma": 0.3397709531243626,
+            "epsilon": 0.4510352,
+            "equivalent_atom": "c3_00",
+            "comment": "GAFF"
+        },
+        "1": {
+            "type": "h1",
+            "name": "H11",
+            "mass": 1.007825,
+            "charge": 0.161887,
+            "sigma": 0.24219972551363267,
+            "epsilon": 0.0870272,
+            "equivalent_atom": "h1_00",
+            "comment": "GAFF"
+        },
+        "2": {
+            "type": "h1",
+            "name": "H21",
+            "mass": 1.007825,
+            "charge": 0.161887,
+            "sigma": 0.24219972551363267,
+            "epsilon": 0.0870272,
+            "equivalent_atom": "h1_00",
+            "comment": "GAFF"
+        },
+        "3": {
+            "type": "h1",
+            "name": "H31",
+            "mass": 1.007825,
+            "charge": 0.161887,
+            "sigma": 0.24219972551363267,
+            "epsilon": 0.0870272,
+            "equivalent_atom": "h1_00",
+            "comment": "GAFF"
+        },
+        "4": {
+            "type": "cl",
+            "name": "Cl2",
+            "mass": 34.968853,
+            "charge": -1.0,
+            "sigma": 0.3465952373053176,
+            "epsilon": 1.1037392,
+            "equivalent_atom": "cl_00",
+            "comment": "GAFF"
+        },
+        "5": {
+            "type": "cl",
+            "name": "Cl1",
+            "mass": 34.968853,
+            "charge": -0.170329,
+            "sigma": 0.3465952373053176,
+            "epsilon": 1.1037392,
+            "equivalent_atom": "cl_00",
+            "comment": "GAFF"
+        }
+    },
+    "bonds": {
+        "(0, 1)": {
+            "type": "harmonic",
+            "force_constant": 314553.11999999994,
+            "equilibrium": 0.1097,
+            "comment": "c3-h1"
+        },
+        "(0, 2)": {
+            "type": "harmonic",
+            "force_constant": 314553.11999999994,
+            "equilibrium": 0.1097,
+            "comment": "c3-h1"
+        },
+        "(0, 3)": {
+            "type": "harmonic",
+            "force_constant": 314553.11999999994,
+            "equilibrium": 0.1097,
+            "comment": "c3-h1"
+        },
+        "(0, 5)": {
+            "type": "harmonic",
+            "force_constant": 130122.39999999998,
+            "equilibrium": 0.1804,
+            "comment": "c3-cl, formed in reaction"
+        }
+    },
+    "angles": {
+        "(1, 0, 2)": {
+            "type": "harmonic",
+            "force_constant": 324.6784,
+            "equilibrium": 108.46,
+            "comment": "h1-c3-h1"
+        },
+        "(1, 0, 3)": {
+            "type": "harmonic",
+            "force_constant": 324.6784,
+            "equilibrium": 108.46,
+            "comment": "h1-c3-h1"
+        },
+        "(1, 0, 5)": {
+            "type": "harmonic",
+            "force_constant": 409.1952,
+            "equilibrium": 106.78,
+            "comment": "cl-c3-h1"
+        },
+        "(2, 0, 3)": {
+            "type": "harmonic",
+            "force_constant": 324.6784,
+            "equilibrium": 108.46,
+            "comment": "h1-c3-h1"
+        },
+        "(2, 0, 5)": {
+            "type": "harmonic",
+            "force_constant": 409.1952,
+            "equilibrium": 106.78,
+            "comment": "cl-c3-h1"
+        },
+        "(3, 0, 5)": {
+            "type": "harmonic",
+            "force_constant": 409.1952,
+            "equilibrium": 106.78,
+            "comment": "cl-c3-h1"
+        }
+    },
+    "dihedrals": {},
+    "impropers": {}
+}

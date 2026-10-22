@@ -202,6 +202,21 @@ class EvbTestHelper:
         return SimpleNamespace(reactant=reactant, product=product)
 
     @staticmethod
+    def evb_seed_states(evb, states):
+        """Give a driver the states and the bond sets build_ffs_from_molecules
+        would set (forming, breaking and reactive), without building force
+        fields."""
+
+        bonds = [set(state.bonds) for state in states]
+        steps = list(zip(bonds[:-1], bonds[1:]))
+        evb.states = list(states)
+        evb.forming_bonds = [right - left for left, right in steps]
+        evb.breaking_bonds = [left - right for left, right in steps]
+        evb.reactive_bonds = set().union(*(left ^ right
+                                           for left, right in steps))
+        return evb
+
+    @staticmethod
     def evb_petase_ms_states():
         """Load the committed three-state PETase force fields (no QM).
 

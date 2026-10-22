@@ -28,9 +28,7 @@ def built(tmp_path_factory):
         ff_pair = EvbTestHelper.evb_ff_pair()
         EVB = EvbDriver(ostream=OutputStream(None))
         EVB.water_model = "cspce"
-        EVB.states = [ff_pair.reactant, ff_pair.product]
-        EVB.forming_bonds = [set()]
-        EVB.breaking_bonds = [set()]
+        EvbTestHelper.evb_seed_states(EVB, [ff_pair.reactant, ff_pair.product])
         EVB.build_systems(configurations=["vacuum"], Lambda=[0.0, 0.4, 1.0])
         conf = EVB.system_confs[0]
         built_positions = np.array(conf["steps"][0]["initial_positions"])
