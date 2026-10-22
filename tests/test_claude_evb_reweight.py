@@ -2,8 +2,8 @@
 
 Dev-only (test_claude_*): must not reach master. The tool lives outside
 VeloxChem, in the validation project: it is imported from
-~/code/Agent_work/EVB validation plan/tools/evb_reweight.py, so these tests
-need that folder. The toy models are MismatchedModel cases of
+<validation project>/tools/evb_reweight.py, so these tests need that
+folder (found by evb_validation_dir in test_claude_evb_reference). The toy models are MismatchedModel cases of
 test_claude_evb_reference (MISMATCH_CASES): window lambda samples a
 potential v_int that differs from the PES mapping potential the code
 analyses. Energies are in kJ/mol.
@@ -15,7 +15,6 @@ linearised (M-lin).
 """
 
 import shutil
-import sys
 from pathlib import Path
 
 import numpy as np
@@ -27,9 +26,9 @@ from test_claude_evb_reference import (Model1, default_lambdas,
                                        make_mismatched, make_results,
                                        write_energy_files)
 
-sys.path.insert(
-    0, str(Path.home() / 'code' / 'Agent_work' / 'EVB validation plan' /
-           'tools'))
+from test_claude_evb_reference import add_evb_tools_to_path  # noqa: E402
+
+add_evb_tools_to_path()
 import evb_reweight  # noqa: E402
 
 LAMBDAS = default_lambdas()

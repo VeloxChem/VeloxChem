@@ -2,8 +2,8 @@
 
 Dev-only (test_claude_*): must not reach master. The reference
 implementation is the WP-A5 tool, imported from
-~/code/Agent_work/EVB validation plan/tools/evb_reorg.py, so these tests
-need that folder. Exact references come from test_claude_evb_reference
+<validation project>/tools/evb_reorg.py, so these tests need that
+folder (found by evb_validation_dir in test_claude_evb_reference). Exact references come from test_claude_evb_reference
 (WP-A1). Energies are in kJ/mol.
 
 Conventions (reports/WP-A5.md): xi = E1 - E2', de = -xi, dG0 = G2' - G1 =
@@ -11,9 +11,6 @@ dGfep[-1]. lambda_r = (<de>_0 - <de>_1)/2, reactant side <de>_0 - dG0,
 product side dG0 - <de>_1. dg1(s) = -kT ln P1(s) and dg2(s) = -kT ln P2(s)
 + dG0 per bin (bin probabilities; the tool's curves are densities).
 """
-
-import sys
-from pathlib import Path
 
 import numpy as np
 import pytest
@@ -25,9 +22,9 @@ from veloxchem.outputstream import OutputStream
 from test_claude_evb_reference import (STANDARD_SETS, default_lambdas,
                                        make_model, make_results)
 
-sys.path.insert(
-    0, str(Path.home() / 'code' / 'Agent_work' / 'EVB validation plan' /
-           'tools'))
+from test_claude_evb_reference import add_evb_tools_to_path  # noqa: E402
+
+add_evb_tools_to_path()
 import evb_reorg  # noqa: E402
 
 LAMBDAS = default_lambdas()

@@ -3,7 +3,7 @@
 Dev-only (test_claude_*): must not reach master. Each test runs a few seeds
 of the cells a sweep's verdict rests on and applies that verdict's
 acceptance rule with the error bar the few seeds allow. The sweeps under
-~/code/Agent_work/EVB validation plan/work/ are run only when a test here
+<validation project>/work/ are run only when a test here
 fails; each docstring names its sweep.
 
 Exact references come from test_claude_evb_reference (WP-A1). Energies are in
@@ -153,11 +153,8 @@ def test_smoke_reorg():
     If this fails, run work/WP-A5/run_sweep.py.
     """
 
-    import sys
-    from pathlib import Path
-
-    sys.path.insert(0, str(Path.home() / 'code' / 'Agent_work' /
-                           'EVB validation plan' / 'tools'))
+    from test_claude_evb_reference import add_evb_tools_to_path
+    add_evb_tools_to_path()
     import evb_reorg
 
     lambdas = default_lambdas()
@@ -237,13 +234,9 @@ def test_smoke_reweight():
     If this fails, run work/WP-B2/run_sweep.py.
     """
 
-    import sys
-    from pathlib import Path
-
-    from test_claude_evb_reference import make_mismatched
-
-    sys.path.insert(0, str(Path.home() / 'code' / 'Agent_work' /
-                           'EVB validation plan' / 'tools'))
+    from test_claude_evb_reference import (add_evb_tools_to_path,
+                                           make_mismatched)
+    add_evb_tools_to_path()
     import evb_reweight
 
     lambdas = default_lambdas()

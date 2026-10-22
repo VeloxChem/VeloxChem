@@ -2,8 +2,8 @@
 
 Dev-only (test_claude_*): must not reach master. The tool lives outside
 VeloxChem, in the validation project: it is imported from
-~/code/Agent_work/EVB validation plan/tools/evb_reorg.py, so these tests
-need that folder. Exact references come from test_claude_evb_reference
+<validation project>/tools/evb_reorg.py, so these tests need that
+folder (found by evb_validation_dir in test_claude_evb_reference). Exact references come from test_claude_evb_reference
 (WP-A1). Energies are in kJ/mol.
 
 Conventions under test (reports/WP-A5.md): xi = E1 - E2', de = -xi,
@@ -11,9 +11,6 @@ dG0 = G2' - G1. For equal curvature, lambda_r = (<de>_0 - <de>_1)/2
 = <de>_0 - dG0 = dG0 - <de>_1, and dg1(xi2) - dg1(xi1) = dg2(xi1) - dg2(xi2)
 = lambda_r with the dg_i parabolas of curvature 1/(4 lambda_r).
 """
-
-import sys
-from pathlib import Path
 
 import numpy as np
 import pytest
@@ -25,9 +22,9 @@ from veloxchem.outputstream import OutputStream
 from test_claude_evb_reference import (default_lambdas, make_model,
                                        make_results, write_energy_files)
 
-sys.path.insert(
-    0, str(Path.home() / 'code' / 'Agent_work' / 'EVB validation plan' /
-           'tools'))
+from test_claude_evb_reference import add_evb_tools_to_path  # noqa: E402
+
+add_evb_tools_to_path()
 import evb_reorg  # noqa: E402
 
 LAMBDAS = default_lambdas()

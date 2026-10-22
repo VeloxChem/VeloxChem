@@ -26,6 +26,8 @@ are free energies relative to the state-1 partition function.
 """
 
 import json
+import os
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -33,6 +35,41 @@ from scipy import integrate, optimize, signal, special, stats
 
 from veloxchem.veloxchemlib import (boltzmann_in_hartreeperkelvin,
                                     hartree_in_kjpermol)
+
+# The EVB validation project (plans, reports, tools/) lives outside the
+# repository, in a different place on each machine. EVB_VALIDATION_DIR
+# overrides the lookup; otherwise the first candidate that has a tools/
+# folder is used. A new machine gets a new candidate here.
+EVB_VALIDATION_ENV = 'EVB_VALIDATION_DIR'
+EVB_VALIDATION_CANDIDATES = (
+    # Mac: <code_fall_26>/VeloxChem/tests -> <code_fall_26>/Agent_work
+    Path(__file__).resolve().parents[2] / 'Agent_work' /
+    'EVB validation plan',
+    # Linux box: ~/code/Agent_work
+    Path.home() / 'code' / 'Agent_work' / 'EVB validation plan',
+)
+
+
+def evb_validation_dir():
+    """The EVB validation project folder on this machine."""
+
+    override = os.environ.get(EVB_VALIDATION_ENV)
+    candidates = (Path(override), ) if override else EVB_VALIDATION_CANDIDATES
+    for folder in candidates:
+        if (folder / 'tools').is_dir():
+            return folder
+    raise FileNotFoundError(
+        'EVB validation project not found; tried ' +
+        ', '.join(str(c) for c in candidates) +
+        f'. Set {EVB_VALIDATION_ENV} to the folder that holds tools/.')
+
+
+def add_evb_tools_to_path():
+    """Make the project's tools (evb_reorg, evb_reweight) importable."""
+
+    tools = str(evb_validation_dir() / 'tools')
+    if tools not in sys.path:
+        sys.path.insert(0, tools)
 
 KB = boltzmann_in_hartreeperkelvin() * hartree_in_kjpermol()
 T_DEFAULT = 300.0
