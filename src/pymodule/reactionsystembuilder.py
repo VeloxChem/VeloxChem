@@ -3285,19 +3285,16 @@ class ReactionSystemBuilder():
 
         return forces
 
-    # Create a linear switching function that turns the force on only past the lambda-switch
+    # Linear switching: the reactant term is turned off by lambda = 1 - lambda_switch,
+    # the product term is turned on from lambda = lambda_switch
     def _get_lambda_scaling(self, lam, lambda_switch):
-        if lambda_switch == 0:
-            return 1 - lam, lam
-        if lambda_switch == 1:
-            return 0, 0
+        valid_switch = 0 <= lambda_switch < 1
+        assert_msg_critical(
+            valid_switch,
+            f"torsion_lambda_switch must be in [0, 1), got {lambda_switch}")
 
-        a = -1 / lambda_switch
-        b = 1
-        reascale = max(0, a * lam + b)
-        a = 1 / (1 - lambda_switch)
-        b = 1 - a
-        proscale = max(0, a * lam + b)
+        reascale = max(0, 1 - lam / (1 - lambda_switch))
+        proscale = max(0, (lam - lambda_switch) / (1 - lambda_switch))
         return reascale, proscale
 
     def _create_improper_torsion_forces(self, lam):
