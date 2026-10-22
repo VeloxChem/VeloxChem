@@ -31,11 +31,13 @@
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from mpi4py import MPI
+from contextlib import contextmanager
 from pathlib import Path
 import numpy as np
 import time
 import sys
 import gc
+import warnings
 import json
 
 from .veloxchemlib import mpi_master
@@ -55,7 +57,9 @@ except ImportError:
 
 try:
     import MDAnalysis
+    from MDAnalysis.coordinates.DCD import DCDReader
     from MDAnalysis.lib.formats.libmdaxdr import XTCFile
+    from MDAnalysis.lib.mdamath import triclinic_vectors
 except ImportError:
     pass
 
@@ -143,6 +147,11 @@ class EvbFepDriver:
         # a later analysis over the whole path possible. Ignored for an ordinary
         # two-state run.
         self.pes_states_to_report: str = "all"
+
+        # File format of the sampling trajectory that the frames are re-scored
+        # from: "dcd" (trajectory.dcd, float32) or "xtc" (trajectory.xtc,
+        # positions rounded to 0.001 nm).
+        self.trajectory_format: str = "dcd"
 
         self.debug: bool = False
         self.save_frames: int = 1000
@@ -240,6 +249,9 @@ class EvbFepDriver:
             "pes_states_to_report": {
                 "type": str
             },
+            "trajectory_format": {
+                "type": str
+            },
             "debug": {
                 "type": bool
             },
@@ -324,6 +336,11 @@ class EvbFepDriver:
             else:
                 self.ostream.print_info(
                     f"{keyword}: {getattr(self, keyword)} (default)")
+        known_format = self.trajectory_format in ("xtc", "dcd")
+        assert_msg_critical(
+            known_format,
+            f"Unknown trajectory_format '{self.trajectory_format}'. Expected "
+            "'xtc' or 'dcd'.")
         self.forming_bonds = configuration.get("forming_bonds")
         self.breaking_bonds = configuration.get("breaking_bonds")
 
@@ -479,7 +496,7 @@ class EvbFepDriver:
             # Guard combinations that a positions-only trajectory cannot serve.
             assert_msg_critical(
                 not (self.report_velocities or self.debug),
-                "Velocities cannot be reported: they are not stored in the XTC "
+                "Velocities cannot be reported: they are not stored in the "
                 "trajectory that the frames are re-scored from. Set "
                 "report_velocities and debug to False.")
             if self.rank == mpi_master():
@@ -559,11 +576,18 @@ class EvbFepDriver:
         # call, and opening in append mode pays an O(existing frame count) scan
         # (openmm/app/xtcfile.py) exactly once per XTCFile. Recreating the
         # reporter every window would pay that scan again each time against an
-        # ever-growing file.
-        self.traj_roporter = mmapp.XTCReporter(
-            str(self.data_folder / "trajectory.xtc"),
-            self.write_step,
-        )
+        # ever-growing file. DCDReporter opens (and truncates) its file here and
+        # appends every frame after that.
+        if self.trajectory_format == "dcd":
+            self.traj_roporter = mmapp.DCDReporter(
+                str(self._trajectory_path()),
+                self.write_step,
+            )
+        else:
+            self.traj_roporter = mmapp.XTCReporter(
+                str(self._trajectory_path()),
+                self.write_step,
+            )
         # Only the very first written window truncates the output files and
         # writes their headers; everything afterwards appends.
         self._first_write = True
@@ -1195,7 +1219,7 @@ class EvbFepDriver:
     def _recalc_replica(self, replica):
         """Re-score every frame this replica sampled in one batched GPU pass.
 
-        Reads the replica's trajectory frames back from trajectory.xtc and
+        Reads the replica's trajectory frames back from the trajectory and
         hands them, tagged with their per-frame lambda/replica/direction, to the
         recalculator. Each energy system builds a single GPU context that is
         reused across all of the replica's frames (not rebuilt per window), and
@@ -1208,20 +1232,13 @@ class EvbFepDriver:
         windows = self._pending_windows
         total_frames = sum(w[3] for w in windows)
 
-        frames = []
-        with XTCFile(str(self.data_folder / "trajectory.xtc"),
-                     mode='r') as reader:
-            start = max(0, len(reader) - total_frames)
-            reader.seek(start)
-            # None for a non-periodic (vacuum) trajectory; a (3,3) box for a
-            # periodic (solvated) one.
-            periodic = self.topology.getPeriodicBoxVectors() is not None
-            for _ in range(total_frames):
-                frame = reader.read()
-                pos_nm = np.array(frame.x, dtype=np.float64)
-                box_nm = np.array(frame.box,
-                                  dtype=np.float64) if periodic else None
-                frames.append((pos_nm, box_nm))
+        # None for a non-periodic (vacuum) trajectory; a (3,3) box for a
+        # periodic (solvated) one.
+        periodic = self.topology.getPeriodicBoxVectors() is not None
+        with self._open_trajectory(self._trajectory_path(),
+                                   periodic) as (n_frames, read):
+            start = max(0, n_frames - total_frames)
+            frames = list(read(start, total_frames))
 
         assert_msg_critical(
             len(frames) == total_frames,
@@ -1243,28 +1260,73 @@ class EvbFepDriver:
         self._pending_windows = []
         self._accumulate_deferred_recalc_timing(replica, len(frames), t_recalc)
 
+    def _trajectory_path(self):
+        """The sampling trajectory, trajectory.xtc or trajectory.dcd."""
+        return self.data_folder / f"trajectory.{self.trajectory_format}"
+
+    @staticmethod
+    @contextmanager
+    def _open_trajectory(traj_file, periodic):
+        """Open a sampling trajectory (.xtc or .dcd, by its suffix) for the
+        replay paths: _recalc_replica, _iter_trajectory_frames and
+        compute_force_groups.
+
+        Yields (n_frames, read). read(start, count) iterates up to count frames
+        from frame start as (positions_nm, box_nm): float64 (N, 3) positions in
+        nm, and the (3, 3) box vectors in nm, or None when not periodic. A DCD
+        file stores Angstrom and the box as lengths and angles; both are
+        converted here.
+        """
+        if Path(traj_file).suffix == ".dcd":
+            # Every frame is copied out below, so the timestep copying that
+            # this MDAnalysis warning is about does not matter here.
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore",
+                                        message="DCDReader currently makes",
+                                        category=DeprecationWarning)
+                reader = DCDReader(str(traj_file))
+
+            def read(start, count):
+                for ts in reader[start:start + count]:
+                    pos_nm = np.array(ts.positions, dtype=np.float64) * 0.1
+                    box_nm = (triclinic_vectors(ts.dimensions,
+                                                dtype=np.float64) *
+                              0.1 if periodic else None)
+                    yield pos_nm, box_nm
+        else:
+            reader = XTCFile(str(traj_file), mode='r')
+
+            def read(start, count):
+                reader.seek(start)
+                for _ in range(count):
+                    frame = reader.read()
+                    pos_nm = np.array(frame.x, dtype=np.float64)
+                    box_nm = np.array(frame.box,
+                                      dtype=np.float64) if periodic else None
+                    yield pos_nm, box_nm
+
+        try:
+            yield len(reader), read
+        finally:
+            reader.close()
+
     def _iter_trajectory_frames(self, traj_file, periodic, n_frames):
-        """Stream (positions_nm, box_nm) frames from trajectory.xtc from the
+        """Stream (positions_nm, box_nm) frames from the trajectory from the
         start, one at a time. Deliberately does not accumulate frames into a
-        list: trajectory.xtc can be tens of GB for a full run (every replica /
+        list: the trajectory can be tens of GB for a full run (every replica /
         direction / lambda window), so unlike _recalc_replica (which reads one
         replica's frames into memory - bounded by construction), this must
         keep memory flat regardless of how many frames the trajectory holds.
         """
 
-        with XTCFile(str(traj_file), mode='r') as reader:
-            for _ in range(n_frames):
-                frame = reader.read()
-                pos_nm = np.array(frame.x, dtype=np.float64)
-                box_nm = np.array(frame.box,
-                                  dtype=np.float64) if periodic else None
-                yield pos_nm, box_nm
+        with self._open_trajectory(traj_file, periodic) as (_, read):
+            yield from read(0, n_frames)
 
     def _write_force_group_csv(self, traj_file, periodic, n_frames, system,
                                out_path, force_group_map, progress_interval,
                                label):
         """Build one CPU/GPU Simulation for ``system``, stream every frame of
-        trajectory.xtc against it, and write one force-group-energy row per
+        the trajectory against it, and write one force-group-energy row per
         frame.
 
         force_group_map: dict[name -> group value] describing what this
@@ -1495,7 +1557,7 @@ class EvbFepDriver:
                                           progress_interval=1000):
         """Compute reactant/product OpenMM force-group energy decompositions
         from a trajectory already sampled by run_replicas(), by replaying
-        trajectory.xtc.
+        trajectory.xtc or trajectory.dcd (per trajectory_format).
 
         Writes ForceGroups_rea.csv / ForceGroups_pro.csv (one row per
         trajectory frame, one column per force group named in this run's own
@@ -1571,13 +1633,26 @@ class EvbFepDriver:
                 "may not match how this run's systems were originally built.")
             force_group_map = {fg.name: fg.value for fg in EvbForceGroup}
 
-        traj_file = self.data_folder / "trajectory.xtc"
+        traj_file = self._trajectory_path()
         energies_file = self.data_folder / "Energies.csv"
         with open(energies_file) as f:
             n_energy_rows = sum(1 for _ in f) - 1
 
-        with XTCFile(str(traj_file), mode='r') as reader:
-            n_frames = len(reader)
+        # A run sampled before dcd became the default holds only
+        # trajectory.xtc, and its options.json names no format.
+        other_format = "xtc" if self.trajectory_format == "dcd" else "dcd"
+        other_file = self.data_folder / f"trajectory.{other_format}"
+        if not traj_file.is_file() and other_file.is_file():
+            self.ostream.print_info(
+                f"{traj_file.name} not found; reading {other_file.name}.")
+            self.trajectory_format = other_format
+            traj_file = other_file
+        trajectory_found = traj_file.is_file()
+        assert_msg_critical(trajectory_found,
+                            f"No trajectory.dcd or trajectory.xtc in "
+                            f"{self.data_folder}.")
+        with self._open_trajectory(traj_file, False) as (n_frames, _):
+            pass
         assert_msg_critical(
             n_frames == n_energy_rows,
             f"{traj_file} has {n_frames} frames but {energies_file} has "

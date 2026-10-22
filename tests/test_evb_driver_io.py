@@ -131,3 +131,21 @@ class TestBuildAndLoad:
         assert len(EVB2.system_confs) == 1
         assert EVB2.lambda_vec == [0, 0.4, 1]
         assert EVB2.temperature == conf["temperature"]
+
+    def test_reload_keeps_angstrom_positions(self):
+        """Reloaded start positions are in Angstrom, as build_systems gives
+        them, because run_replicas converts them to nm with * 0.1. They used
+        to be loaded in nm, so a reloaded run started 10x shrunk. The cif
+        stores 3-4 decimals, hence the 2e-3 Angstrom tolerance."""
+        with EvbTestHelper.evb_chdir_tmp():
+            EVB = self._seed_driver(EvbTestHelper.evb_ff_pair())
+            EVB.build_systems(configurations=["vacuum"], Lambda=[0, 0.4, 1])
+            conf = EVB.system_confs[0]
+            built = np.array(conf["steps"][0]["initial_positions"])
+
+            for kwargs in ({"load_top": True},
+                           {"restart_pdb": "topology.cif"}):
+                EVB2 = EvbDriver(ostream=OutputStream(None))
+                EVB2.load_initialisation(conf["data_folder"], **kwargs)
+                loaded = EVB2.system_confs[0]["steps"][0]["initial_positions"]
+                assert np.allclose(loaded, built, atol=2e-3)

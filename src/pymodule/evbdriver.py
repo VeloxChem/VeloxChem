@@ -591,7 +591,7 @@ class EvbDriver:
             load_systems (bool, optional): If set to true, the systems will be loaded from the xml files. Used for debugging. Defaults to False.
             load_top (bool, optional): If set to true, the topology will be loaded from the cif file. Used for debugging. Defaults to False.
             restart_pdb (str, optional): If given, the topology and initial positions will be loaded from the given pdb file. Used for restarting an FEP. Defaults to None.
-            rename_data (bool, optional): If set to true, any csv or xtc files in the data folder will be renamed with the prefix OLD_ to avoid overwriting them during the new FEP run. Defaults to False.
+            rename_data (bool, optional): If set to true, any csv, xtc or dcd files in the data folder will be renamed with the prefix OLD_ to avoid overwriting them during the new FEP run. Defaults to False.
         """
 
         assert_msg_critical('openmm' in sys.modules,
@@ -754,19 +754,20 @@ class EvbDriver:
                 self._rename_existing_data(Path(step_conf['data_folder']))
 
     def _rename_existing_data(self, folder: Path):
-        """Move any csv / xtc left over from an earlier run out of the way."""
+        """Move any csv / xtc / dcd left over from an earlier run out of the
+        way."""
         if not folder.is_dir():
             return
-        if not (any(folder.glob("*.csv")) or any(folder.glob("*.xtc"))):
+        suffixes = (".csv", ".xtc", ".dcd")
+        if not any(file.suffix in suffixes for file in folder.iterdir()):
             return
         self.ostream.print_warning(
-            f"Found csv or xtc files in {folder}. These might be from a "
+            f"Found csv, xtc or dcd files in {folder}. These might be from a "
             "previous FEP run using the same folder. The files will be renamed "
             "with the prefix OLD_ to avoid overwriting them during the new FEP "
             "run.")
         for file in folder.iterdir():
-            if file.is_file() and (file.name.endswith(".csv")
-                                   or file.name.endswith(".xtc")):
+            if file.is_file() and file.suffix in suffixes:
                 new_name = file.parent / f"OLD_{file.name}"
                 file.rename(new_name)
                 self.ostream.print_info(
