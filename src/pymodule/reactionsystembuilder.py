@@ -1283,7 +1283,7 @@ class ReactionSystemBuilder():
             self._add_torsion(torsion_force, dihedB, atom_ids, proscale)
 
         for key in self._boundary_improper_keys:
-            atom_ids = self._key_to_id(key, merged)
+            atom_ids = self._improper_key_to_id(key, merged)
             if atom_ids is None:
                 continue
             dihedA = self.reactant.impropers[key]
@@ -1297,13 +1297,11 @@ class ReactionSystemBuilder():
             self._add_torsion(improper_force,
                               dihedA,
                               atom_ids,
-                              reascale,
-                              improper=True)
+                              reascale)
             self._add_torsion(improper_force,
                               dihedB,
                               atom_ids,
-                              proscale,
-                              improper=True)
+                              proscale)
 
         return bond_force, angle_force, torsion_force, improper_force
 
@@ -2081,11 +2079,10 @@ class ReactionSystemBuilder():
             self._add_torsion(carbon_fourier_dihedral_force, dihedral, atom_ids)
 
         for key, improper in impropers.items():
-            atom_ids = self._key_to_id(key, CC_atoms)
+            atom_ids = self._improper_key_to_id(key, CC_atoms)
             self._add_torsion(carbon_fourier_dihedral_force,
                               improper,
-                              atom_ids,
-                              improper=True)
+                              atom_ids)
 
         for i in range(len(carbon_atoms)):
             for j in range(len(carbon_atoms)):
@@ -2223,13 +2220,12 @@ class ReactionSystemBuilder():
                     atom_ids = self._key_to_id(key, local_solvent_atoms)
                     self._add_torsion(fourier_force, dihedral, atom_ids)
                 for key, dihedral in solvent_ff.impropers.items():
-                    atom_ids = self._key_to_id(key, local_solvent_atoms)
+                    atom_ids = self._improper_key_to_id(key,
+                                                        local_solvent_atoms)
                     self._add_torsion(
                         fourier_imp_force,
                         dihedral,
-                        atom_ids,
-                        improper=True,
-                    )
+                        atom_ids)
 
                 exceptions = self._create_exceptions_from_bonds(
                     solvent_ff.atoms, solvent_ff.bonds)
@@ -3317,7 +3313,7 @@ class ReactionSystemBuilder():
         dihedral_keys = list(
             set(self.reactant.impropers) | set(self.product.impropers))
         for key in dihedral_keys:
-            atom_ids = self._key_to_id(key, self.reaction_atoms)
+            atom_ids = self._improper_key_to_id(key, self.reaction_atoms)
             if atom_ids is None:
                 continue
             if (key in self.reactant.impropers.keys()
@@ -3335,13 +3331,11 @@ class ReactionSystemBuilder():
                 self._add_torsion(fourier_force,
                                   dihedA,
                                   atom_ids,
-                                  reascale,
-                                  improper=True)
+                                  reascale)
                 self._add_torsion(fourier_force,
                                   dihedB,
                                   atom_ids,
-                                  proscale,
-                                  improper=True)
+                                  proscale)
             else:
                 reascale, proscale = self._get_lambda_scaling(
                     lam, self.torsion_lambda_switch)
@@ -3355,8 +3349,7 @@ class ReactionSystemBuilder():
                     self._add_torsion(fourier_force,
                                       dihed,
                                       atom_ids,
-                                      scale,
-                                      improper=True)
+                                      scale)
         return fourier_force
 
     def _add_bond(self, bond_force, atom_id, equil, fc):
@@ -3402,11 +3395,8 @@ class ReactionSystemBuilder():
                      fourier_force,
                      torsion_dict,
                      atom_id,
-                     barrier_scaling=1.,
-                     improper=False):
+                     barrier_scaling=1.):
         assert torsion_dict["type"] == "Fourier", "Unknown dihedral type"
-        if improper:
-            atom_id = [atom_id[1], atom_id[0], atom_id[3], atom_id[2]]
         if barrier_scaling > 0:
             if torsion_dict.get("multiple", False):
                 for periodicity, phase, barrier in zip(
@@ -3780,6 +3770,29 @@ class ReactionSystemBuilder():
                     return None
 
         return [atoms[key[i]].index for i in range(len(key))]
+
+    def _improper_key_to_id(self, key: tuple[int, ...],
+                            atoms: dict | list) -> list[int] | None:
+        """Torsion atoms of an improper stored centre first, (c, a1, a2, a3),
+        in the order OpenMM's ForceField gives an ffxml <Improper> (default
+        ordering): (x, y, c, a3), with {x, y} = {a1, a2} ordered by index for
+        equal elements, else carbon first, else heavier first.
+        """
+
+        atom_ids = self._key_to_id(key, atoms)
+        if atom_ids is None:
+            return None
+        c, x, y, a3 = atom_ids
+        ex = atoms[key[1]].element
+        ey = atoms[key[2]].element
+        if ex == ey:
+            swap = x > y
+        else:
+            swap = (ex != mmapp.element.carbon
+                    and (ey == mmapp.element.carbon or ex.mass < ey.mass))
+        if swap:
+            x, y = y, x
+        return [x, y, c, a3]
 
     @staticmethod
     def measure_length(v1, v2):

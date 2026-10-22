@@ -238,8 +238,8 @@
 		</Force>
 		<Force forceGroup="16" name="Reaction improper fourier torsion" type="PeriodicTorsionForce" usesPeriodic="0" version="2">
 			<Torsions>
-				<Torsion k="4.6024" p1="1" p2="0" p3="5" p4="4" periodicity="2" phase="3.141592653589793"/>
-				<Torsion k="4.6024" p1="0" p2="1" p3="7" p4="6" periodicity="2" phase="3.141592653589793"/>
+				<Torsion k="4.6024" p1="1" p2="4" p3="0" p4="5" periodicity="2" phase="3.141592653589793"/>
+				<Torsion k="4.6024" p1="0" p2="6" p3="1" p4="7" periodicity="2" phase="3.141592653589793"/>
 			</Torsions>
 		</Force>
 		<Force forceGroup="17" name="Boundary reaction harmonic bond" type="HarmonicBondForce" usesPeriodic="0" version="2">
