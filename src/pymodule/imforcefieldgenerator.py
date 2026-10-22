@@ -62,7 +62,7 @@ from .optimizationdriver import OptimizationDriver
 from .molecule import Molecule
 from .superimpose import svd_superimpose
 from .errorhandler import assert_msg_critical
-from .veloxchemlib import hartree_in_kcalpermol, bohr_in_angstrom
+from .veloxchemlib import hartree_in_kcalpermol, bohr_in_angstrom, boltzmann_in_hartreeperkelvin
 
 
 with redirect_stderr(StringIO()) as fg_err:
@@ -176,7 +176,9 @@ class IMForceFieldGenerator:
     """
 
     # defaults of seed_network_settings (None thresholds: the collector's energy_threshold and
-    # gradient_rmsd_thrsh are used)
+    # gradient_rmsd_thrsh are used; the energy window, in kcal/mol or in units of k_B T at the
+    # dynamics temperature, drops conformer minima and torsion-scan points above the lowest
+    # minimum + window, None: off)
     _SEED_NETWORK_DEFAULTS = {
         'scan_step_deg': 15.0,
         'state_gap_deg': 30.0,
@@ -186,6 +188,8 @@ class IMForceFieldGenerator:
         'max_rejections_per_path': 3,
         'include_orphan_arcs': False,
         'energy_window_kcal': None,
+        'energy_window_kT': None,
+        'reaction_scan_step_angstrom': 0.05,
     }
 
     def __init__(self, ground_state_driver, roots_to_follow=None, comm=None, ostream=None):
@@ -245,6 +249,9 @@ class IMForceFieldGenerator:
         self.seed_network_settings = dict(self._SEED_NETWORK_DEFAULTS)
         self.seed_conformers = None
         self._network_counters = None
+        # reaction seeds kept for the network stage, which turns the reaction into network
+        # edges (the conformer block of set_up_the_system replaces seed_structures)
+        self.seed_reaction_entries = None
 
         # Here us the driver set up
         self.gs_basis_set_label = 'def2-svp'
@@ -861,6 +868,7 @@ class IMForceFieldGenerator:
                 reaction_root=self.roots_to_follow[0],
                 reaction_key=None,
             )
+            self.seed_reaction_entries = list(self.seed_structures[self.roots_to_follow[0]][None])
 
         if self.add_conformal_structures and 0 in self.roots_to_follow:
 
@@ -2504,7 +2512,7 @@ class IMForceFieldGenerator:
         return spec
 
     @staticmethod
-    def _lowest_frequency_cm1(hessian, masses, coordinates, mass_weighted):
+    def _lowest_frequency_cm1(hessian, masses, coordinates, mass_weighted, return_all=False):
         """
         The lowest harmonic frequency of a Cartesian Hessian after projecting
         out translations and rotations (negative values are imaginary modes).
@@ -2517,9 +2525,12 @@ class IMForceFieldGenerator:
             The Cartesian coordinates (bohr), shape (natoms, 3).
         :param mass_weighted:
             True if the Hessian is already M^-1/2 H M^-1/2.
+        :param return_all:
+            True to return all 3N frequencies sorted (the six projected
+            translations and rotations are near zero).
 
         :return:
-            The lowest frequency in cm^-1.
+            The lowest frequency in cm^-1 (or the sorted array).
         """
 
         masses = np.asarray(masses, dtype=float)
@@ -2546,6 +2557,9 @@ class IMForceFieldGenerator:
         projector = np.eye(3 * natoms) - q @ q.T
         eigenvalues = np.linalg.eigvalsh(projector @ (0.5 * (hess + hess.T)) @ projector)
         frequencies = np.sign(eigenvalues) * np.sqrt(np.abs(eigenvalues)) * 5140.487
+
+        if return_all:
+            return np.sort(frequencies)
 
         return float(frequencies.min())
 
@@ -2587,8 +2601,18 @@ class IMForceFieldGenerator:
         connected by the rotation of one scanned bond, samples the arcs
         between connected minima with relaxed scans from both ends and adds
         scan points one at a time where the current interpolation is worst,
-        re-evaluating the updated database after every addition. Writes the
-        provenance sidecar seed_network_log.json in the working directory.
+        re-evaluating the updated database after every addition. With
+        reaction_structures, the normal reaction structures are minima of the
+        network too, and every pair of consecutive ones that differ in their
+        bonds is a reaction edge: a transition entry between them is searched
+        and kept as an exact datapoint if it is a first-order saddle, the
+        exchanged bonds are driven step-wise from both ends with constrained
+        optimisations, and the same error-driven growth selects the points.
+        An optional energy window (energy_window_kcal, or energy_window_kT
+        at the dynamics temperature) drops conformer minima and torsion-scan
+        points that the dynamics does not reach; reaction structures and
+        reaction paths are never dropped. Writes the provenance sidecar
+        seed_network_log.json in the working directory.
 
         :param molecule:
             The input molecule.
@@ -2608,13 +2632,14 @@ class IMForceFieldGenerator:
         assert_msg_critical(bool(self.use_minimized_structures[0]),
                             'seed_conformer_network: use_minimized_structures[0] must be True '
                             '(the constrained optimisation is the core of the scheme).')
-        assert_msg_critical(self.reaction_structures is None,
-                            'seed_conformer_network: reaction_structures are not supported.')
+        reaction = list(self.seed_reaction_entries or []) if self.reaction_structures is not None else None
+        assert_msg_critical(reaction is None or sum(1 for e in reaction if e[1] == 'normal') >= 2,
+                            'seed_conformer_network: reaction_structures need at least two normal structures.')
         assert_msg_critical(list(self.roots_to_follow) == [0],
                             'seed_conformer_network: only roots_to_follow == [0] is supported.')
         assert_msg_critical(self.seed_duplicate_rmsd_thrsh is not None,
                             'seed_conformer_network: seed_duplicate_rmsd_thrsh (Angstrom) must be set.')
-        assert_msg_critical(self.seed_conformers is not None and len(self.seed_conformers) > 0,
+        assert_msg_critical((self.seed_conformers is not None and len(self.seed_conformers) > 0) or reaction is not None,
                             'seed_conformer_network: no conformers were stored by set_up_the_system.')
 
         root = self.roots_to_follow[0]
@@ -2647,6 +2672,8 @@ class IMForceFieldGenerator:
             'scan_dihedrals': [list(k) for k in dih_keys],
             'minima': [], 'dropped_conformers': [], 'bonds': [], 'orphans': [], 'paths': [], 'summary': {},
         }
+        if reaction is not None:
+            log['reactions'] = []
 
         def _write_log():
             def _default(obj):
@@ -2678,17 +2705,23 @@ class IMForceFieldGenerator:
 
         # stage 1: minima
         t0 = time.time()
-        minima, molecules_to_add_info = self._seed_minima(molecule, states_basis, dih_keys, settings, log)
+        minima, molecules_to_add_info = self._seed_minima(molecule, states_basis, dih_keys, settings, log,
+                                                          reaction=reaction)
         timings['minima'] = time.time() - t0
         _write_log()
 
-        if len(dih_keys) == 0:
+        if len(dih_keys) == 0 and reaction is None:
             self.ostream.print_info('seed_conformer_network: no rotatable bond, only the minimum was added.')
             self.ostream.flush()
             return molecules_to_add_info
 
         # stage 2: the network
         network = self._conformer_network_paths(minima, dih_keys, settings, log)
+        if reaction is not None:
+            # reaction edges after the torsion paths; transition states are written here, before the
+            # in-memory driver is loaded
+            network['paths'] += self._reaction_paths(reaction, minima, states_basis, dih_keys, log,
+                                                     start_index=len(network['paths']))
         _write_log()
 
         # stage 3: error-driven growth along every path
@@ -2697,6 +2730,22 @@ class IMForceFieldGenerator:
         driver = self._load_interpolation_driver(molecule, root, self.states_interpolation_settings, datafile)
         earlier = []
         for path in network['paths']:
+            if path.get('kind') == 'reaction':
+                path_log = {k: path[k] for k in ('index', 'kind', 'A', 'B', 'waypoint')}
+                path_log['formed'] = [[a + 1, b + 1] for a, b in path['formed']]
+                path_log['broken'] = [[a + 1, b + 1] for a, b in path['broken']]
+                self.ostream.print_blank()
+                self.ostream.print_info(
+                    f"path {path['index']}: reaction from minimum {path['A']} to minimum {path['B']}; bonds formed "
+                    f"{path_log['formed']}, broken {path_log['broken']} (1-based)" +
+                    (f"; transition state {path['waypoint']}" if path['waypoint'] is not None else ''))
+                self.ostream.flush()
+                candidates = self._reaction_path_scan(path, minima, states_basis, settings, path_log)
+                self._grow_path(path, candidates, driver, minima, earlier, states_basis, settings, path_log)
+                earlier.append(({path['A'], path['B']}, candidates))
+                log['paths'].append(path_log)
+                _write_log()
+                continue
             path_log = {k: path[k] for k in ('index', 'bond', 'arc', 'A', 'B', 'orphan')}
             path_log['dihedral'] = list(dih_keys[path['bond']])
             self.ostream.print_blank()
@@ -2716,6 +2765,7 @@ class IMForceFieldGenerator:
                 path_log['B'] = end_minimum
                 # the new minimum is a datapoint now: reload it into the in-memory driver
                 driver = self._load_interpolation_driver(molecule, root, self.states_interpolation_settings, datafile)
+            candidates = self._path_energy_window(path, candidates, minima, settings, path_log)
             self._grow_path(path, candidates, driver, minima, earlier, states_basis, settings, path_log)
             earlier.append(({path['A'], path['B']}, candidates))
             log['paths'].append(path_log)
@@ -2733,14 +2783,16 @@ class IMForceFieldGenerator:
 
         return molecules_to_add_info
 
-    def _seed_minima(self, molecule, states_basis, dih_keys, settings, log):
+    def _seed_minima(self, molecule, states_basis, dih_keys, settings, log, reaction=None):
         """
         Stage 1: optimises every stored conformer once (global constraints
         use_minimized_structures[1] only), keeps the converged and distinct
         minima (_is_same_minimum with seed_duplicate_rmsd_thrsh, optional
         energy window) and adds them through add_point without important
         coordinates. Minima with an imaginary frequency below -20 cm^-1 stay
-        datapoints but are no network nodes.
+        datapoints but are no network nodes. With an energy window
+        (_energy_window_kcal), conformer minima more than the window above the
+        lowest minimum are dropped before their Hessian is computed.
 
         :param molecule:
             The input molecule.
@@ -2752,20 +2804,31 @@ class IMForceFieldGenerator:
             The seed_network_settings with defaults filled in.
         :param log:
             The provenance dict.
+        :param reaction:
+            The reaction seed entries (mol, mode, constraints) or None. The
+            normal ones are optimised after the conformers; one that is the
+            same minimum as a kept one is recorded in that minimum's
+            'reaction' list. The energy window never drops a reaction minimum.
 
         :return:
             The list of minima dicts and the molecules_to_add_info list.
         """
 
         global_constraints = list(self.use_minimized_structures[1] or [])
+        starts = [(conformer, 'conformer', ci) for ci, conformer in enumerate(self.seed_conformers or [])]
+        if reaction is not None:
+            # after the conformers: the last structure (usually the product) sets the eq lengths of the
+            # reaction bonds, as in the existing reaction seeding
+            starts += [(entry[0], 'reaction', ri) for ri, entry in enumerate(reaction) if entry[1] == 'normal']
         kept = []
-        for ci, conformer in enumerate(self.seed_conformers):
-            mol = self._copy_molecule(conformer)
+        for start_mol, origin, ci in starts:
+            name = 'conformer' if origin == 'conformer' else 'reaction structure'
+            mol = self._copy_molecule(start_mol)
             try:
                 opt_results = self._network_optimize(mol, global_constraints, states_basis)
             except Exception as exc:
-                log['dropped_conformers'].append({'conformer': ci, 'reason': f'optimisation failed: {exc}'})
-                self.ostream.print_info(f'conformer {ci}: optimisation failed ({exc}); dropped.')
+                log['dropped_conformers'].append({origin: ci, 'reason': f'optimisation failed: {exc}'})
+                self.ostream.print_info(f'{name} {ci}: optimisation failed ({exc}); dropped.')
                 self.ostream.flush()
                 continue
             opt_mol = opt_results['final_molecule']
@@ -2773,28 +2836,55 @@ class IMForceFieldGenerator:
             if 'opt_energies' in opt_results and len(opt_results['opt_energies']) > 0:
                 energy = float(opt_results['opt_energies'][-1])
             if self._is_same_minimum(opt_mol, [m['molecule'] for m in kept]):
-                log['dropped_conformers'].append({'conformer': ci, 'reason': 'same minimum as a kept conformer'})
-                self.ostream.print_info(f'conformer {ci}: same minimum as a kept conformer; dropped.')
+                if origin == 'reaction':
+                    match = next(m for m in kept if self._is_same_minimum(opt_mol, [m['molecule']]))
+                    match.setdefault('reaction', []).append(ci)
+                    log['dropped_conformers'].append({origin: ci, 'reason': 'same minimum as a kept minimum'})
+                    self.ostream.print_info(f'{name} {ci}: same minimum as a kept minimum; recorded there.')
+                else:
+                    log['dropped_conformers'].append({'conformer': ci, 'reason': 'same minimum as a kept conformer'})
+                    self.ostream.print_info(f'conformer {ci}: same minimum as a kept conformer; dropped.')
                 self.ostream.flush()
                 continue
-            kept.append({'conformer': ci, 'molecule': opt_mol, 'energy': energy})
-            self.ostream.print_info(f'conformer {ci}: distinct minimum {len(kept) - 1}' +
+            kept.append({'conformer': ci if origin == 'conformer' else None, 'molecule': opt_mol, 'energy': energy})
+            if origin == 'reaction':
+                kept[-1]['reaction'] = [ci]
+            self.ostream.print_info(f'{name} {ci}: distinct minimum {len(kept) - 1}' +
                                     (f' (E = {energy:.8f} Hartree)' if energy is not None else ''))
             self.ostream.flush()
 
         assert_msg_critical(len(kept) > 0, 'seed_conformer_network: no conformer optimisation converged.')
 
-        window = settings.get('energy_window_kcal')
-        if window is not None and all(m['energy'] is not None for m in kept):
+        window = self._energy_window_kcal(settings)
+        if all(m['energy'] is not None for m in kept):
+            kt = boltzmann_in_hartreeperkelvin() * float(self.temperature) * hartree_in_kcalpermol()
             e_min = min(m['energy'] for m in kept)
-            inside = []
-            for m in kept:
-                if (m['energy'] - e_min) * hartree_in_kcalpermol() > float(window):
-                    log['dropped_conformers'].append({'conformer': m['conformer'], 'reason': 'outside the energy window'})
-                    self.ostream.print_info(f"conformer {m['conformer']}: outside the energy window; dropped.")
-                else:
-                    inside.append(m)
-            kept = inside
+            e_max = (max(m['energy'] for m in kept) - e_min) * hartree_in_kcalpermol()
+            self.ostream.print_info(f'{len(kept)} minima within {e_max:.2f} kcal/mol ({e_max / kt:.1f} k_B T at '
+                                    f'{float(self.temperature):g} K) of the lowest one.')
+            if window is not None:
+                log['energy_window'] = {'kcal_per_mol': window, 'temperature_K': float(self.temperature),
+                                        'kT_kcal_per_mol': kt, 'kT_multiple': window / kt}
+                inside = []
+                for m in kept:
+                    de = (m['energy'] - e_min) * hartree_in_kcalpermol()
+                    if not m.get('reaction') and de > window:
+                        log['dropped_conformers'].append({'conformer': m['conformer'], 'reason': 'outside the energy window',
+                                                          'dE_kcal_per_mol': de})
+                        self.ostream.print_info(f"conformer {m['conformer']}: {de:.2f} kcal/mol ({de / kt:.1f} k_B T) above "
+                                                f"the lowest minimum, outside the energy window; dropped (not reached at "
+                                                f"{float(self.temperature):g} K).")
+                    else:
+                        inside.append(m)
+                n_out = len(kept) - len(inside)
+                kept = inside
+                self.ostream.print_info(f'energy window {window:.2f} kcal/mol = {window / kt:.1f} k_B T at '
+                                        f'{float(self.temperature):g} K: {n_out} conformer minimum(s) dropped. Raise '
+                                        "seed_network_settings['energy_window_kT'] (or set it to None) to include "
+                                        'higher-energy conformers.')
+                if (self.metadynamics_settings or {}).get('enabled', False):
+                    self.ostream.print_info('metadynamics is enabled: the biased dynamics can reach energies above '
+                                            'the thermal window; consider a larger energy_window_kT.')
             self.ostream.flush()
 
         molecules_to_add_info = []
@@ -2821,10 +2911,91 @@ class IMForceFieldGenerator:
                                         'kept as a datapoint, not as a network node.')
             log['minima'].append({k: m[k] for k in ('index', 'conformer', 'energy', 'label', 'angles',
                                                      'lowest_freq_cm1', 'node')})
+            if m.get('reaction'):
+                log['minima'][-1]['reaction'] = list(m['reaction'])
         self.ostream.print_info(f'{len(kept)} distinct minima added as point_1 .. point_{len(kept)}.')
         self.ostream.flush()
 
         return kept, molecules_to_add_info
+
+    def _energy_window_kcal(self, settings):
+        """
+        The energy window of the seed stage: energy_window_kcal, or
+        energy_window_kT times k_B T at the dynamics temperature
+        (self.temperature). A region more than the window above the lowest
+        minimum has a Boltzmann factor below exp(-window / k_B T) and is not
+        reached by the dynamics at that temperature.
+
+        :param settings:
+            The seed_network_settings with defaults filled in.
+
+        :return:
+            The window in kcal/mol, or None (no window).
+        """
+
+        window_kcal = settings.get('energy_window_kcal')
+        window_kt = settings.get('energy_window_kT')
+        assert_msg_critical(window_kcal is None or window_kt is None,
+                            'seed_conformer_network: set energy_window_kcal or energy_window_kT, not both.')
+        if window_kt is not None:
+            kt = boltzmann_in_hartreeperkelvin() * float(self.temperature) * hartree_in_kcalpermol()
+            return float(window_kt) * kt
+        return None if window_kcal is None else float(window_kcal)
+
+    def _path_energy_window(self, path, candidates, minima, settings, path_log):
+        """
+        Barrier check of a torsion path before its growth: logs the highest
+        relaxed-scan point above the lower end minimum (the barrier estimate)
+        and, with an energy window, removes the scan points more than the
+        window above the lowest minimum, which the dynamics does not reach at
+        its temperature. They get no QM single point, no Hessian and are not
+        part of the acceptance test. Reaction paths are not filtered.
+
+        :param path:
+            The path dict.
+        :param candidates:
+            The candidate list of _relaxed_path_scan.
+        :param minima:
+            The minima dicts.
+        :param settings:
+            The seed_network_settings with defaults filled in.
+        :param path_log:
+            The provenance dict of this path.
+
+        :return:
+            The candidates inside the window (all candidates without a window).
+        """
+
+        kcal = hartree_in_kcalpermol()
+        kt = boltzmann_in_hartreeperkelvin() * float(self.temperature) * kcal
+        temperature = float(self.temperature)
+        energies = [c['energy'] for c in candidates if c.get('energy') is not None]
+        ends = [minima[path['A']].get('energy'), minima[path['B']].get('energy')]
+        if len(energies) == 0 or any(e is None for e in ends):
+            return candidates
+
+        barrier = (max(energies) - min(ends)) * kcal
+        path_log['scan_max_above_lower_end_kcal'] = float(barrier)
+        self.ostream.print_info(f'highest scan point {barrier:.2f} kcal/mol ({barrier / kt:.1f} k_B T at '
+                                f'{temperature:g} K) above the lower end minimum.')
+
+        window = self._energy_window_kcal(settings)
+        if window is None:
+            self.ostream.flush()
+            return candidates
+
+        e_min = min(m['energy'] for m in minima if m.get('energy') is not None)
+        inside = [c for c in candidates if c.get('energy') is None or (c['energy'] - e_min) * kcal <= window]
+        inside_ids = {id(c) for c in inside}
+        path_log['above_energy_window'] = [c['index'] for c in candidates if id(c) not in inside_ids]
+        if len(inside) < len(candidates):
+            self.ostream.print_info(f'{len(candidates) - len(inside)} of {len(candidates)} scan points more than '
+                                    f'{window:.2f} kcal/mol ({window / kt:.1f} k_B T) above the lowest minimum are not '
+                                    f'used (not reached at {temperature:g} K). Raise '
+                                    "seed_network_settings['energy_window_kT'] to include them.")
+        self.ostream.flush()
+
+        return inside
 
     def _conformer_network_paths(self, minima, dih_keys, settings, log):
         """
@@ -2853,18 +3024,32 @@ class IMForceFieldGenerator:
 
         gap = float(settings['state_gap_deg'])
         nodes = [m['index'] for m in minima if m['node']]
+        # torsion paths stay within one connectivity (reaction minima may differ in their bonds), and a
+        # scanned dihedral is clustered only over the minima in which it is a chain of bonds
+        conn = {m['index']: np.asarray(m['molecule'].get_connectivity_matrix()) for m in minima
+                if m['index'] in nodes and hasattr(m.get('molecule'), 'get_connectivity_matrix')}
+
+        def _chain(i, key):
+            if i not in conn:
+                return True
+            return all(conn[i][int(key[c]) - 1, int(key[c + 1]) - 1] > 0 for c in range(3))
+
         bonds = []
         state_of = {i: [] for i in nodes}
         for b, key in enumerate(dih_keys):
-            states = self._circular_states([minima[i]['angles'][b] for i in nodes], gap)
+            bond_nodes = [i for i in nodes if _chain(i, key)]
+            states = self._circular_states([minima[i]['angles'][b] for i in bond_nodes], gap)
             for state in states:
-                state['members'] = [nodes[j] for j in state['members']]
+                state['members'] = [bond_nodes[j] for j in state['members']]
             k = len(states)
-            arcs = [(i, (i + 1) % k) for i in range(k)] if k > 1 else [(0, 0)]
+            arcs = [(i, (i + 1) % k) for i in range(k)] if k > 1 else ([(0, 0)] if k == 1 else [])
             bonds.append({'key': key, 'states': states, 'arcs': arcs})
+            state_index = {}
             for si, state in enumerate(states):
                 for m in state['members']:
-                    state_of[m].append(si)
+                    state_index[m] = si
+            for i in nodes:
+                state_of[i].append(state_index.get(i))
             self.ostream.print_info(
                 f"bond {key}: {k} state(s) at {[round(s['centre'], 1) for s in states]} deg, "
                 f"members per state {[len(s['members']) for s in states]}, spread {[round(s['spread'], 1) for s in states]} deg")
@@ -2872,6 +3057,8 @@ class IMForceFieldGenerator:
         self.ostream.flush()
 
         def _same_other_states(a, b, bond):
+            if a in conn and b in conn and not np.array_equal(conn[a], conn[b]):
+                return False
             return all(state_of[a][c] == state_of[b][c] for c in range(len(bonds)) if c != bond)
 
         paths = []
@@ -3022,7 +3209,8 @@ class IMForceFieldGenerator:
                 states_ok = True
                 drift = {}
                 for c, other_bond in enumerate(network['bonds']):
-                    if c == b:
+                    # no state where the dihedral is not a bonded chain (another connectivity class)
+                    if c == b or network['state_of'][start_min['index']][c] is None:
                         continue
                     state = other_bond['states'][network['state_of'][start_min['index']][c]]
                     value = float(mol.get_dihedral_in_degrees(other_bond['key']))
@@ -3111,6 +3299,279 @@ class IMForceFieldGenerator:
 
         return new['index']
 
+    @staticmethod
+    def _bond_changes(conn_a, conn_b):
+        """
+        The bonds formed and broken between two connectivity matrices.
+
+        :param conn_a:
+            The connectivity matrix of the start structure.
+        :param conn_b:
+            The connectivity matrix of the end structure.
+
+        :return:
+            The formed and the broken bonds, each a list of 0-based (i, j)
+            tuples with i < j.
+        """
+
+        conn_a = np.asarray(conn_a)
+        conn_b = np.asarray(conn_b)
+        natoms = conn_a.shape[0]
+        formed = [(i, j) for i in range(natoms) for j in range(i + 1, natoms) if conn_b[i, j] and not conn_a[i, j]]
+        broken = [(i, j) for i in range(natoms) for j in range(i + 1, natoms) if conn_a[i, j] and not conn_b[i, j]]
+
+        return formed, broken
+
+    def _reaction_paths(self, reaction, minima, states_basis, dih_keys, log, start_index):
+        """
+        Builds the reaction edges of the network: every pair of consecutive
+        normal reaction structures whose minima differ in their bonds (at
+        least one formed and one broken). A transition entry between them is
+        searched and, if it is a first-order saddle between the two minima,
+        written as an exact datapoint and used as the meeting point of the
+        two half-scans. Pairs without a bond exchange are conformational and
+        left to the torsion network.
+
+        :param reaction:
+            The reaction seed entries (mol, mode, constraints).
+        :param minima:
+            The minima dicts (each with its 'reaction' entry indices).
+        :param states_basis:
+            The basis-set labels dict.
+        :param dih_keys:
+            The scanned dihedrals (1-based).
+        :param log:
+            The provenance dict.
+        :param start_index:
+            The index of the first reaction path.
+
+        :return:
+            The list of reaction path dicts.
+        """
+
+        nodes = []
+        for ri, entry in enumerate(reaction):
+            if entry[1] == 'normal':
+                index = next((m['index'] for m in minima if ri in (m.get('reaction') or [])), None)
+                nodes.append(('normal', index, ri))
+            elif entry[1] == 'transition':
+                nodes.append(('transition', entry[0], ri))
+            else:
+                log['reactions'].append({'entry': ri, 'skipped': f"mode '{entry[1]}' is not used by the network stage"})
+
+        normals = [(pos, node) for pos, node in enumerate(nodes) if node[0] == 'normal']
+        paths = []
+        for (pa, na), (pb, nb) in zip(normals[:-1], normals[1:]):
+            entry_log = {'from_entry': na[2], 'to_entry': nb[2], 'A': na[1], 'B': nb[1]}
+            log['reactions'].append(entry_log)
+            if na[1] is None or nb[1] is None or na[1] == nb[1]:
+                entry_log['skipped'] = 'no distinct minima at both ends'
+                self.ostream.print_info(f"reaction entries {na[2]} -> {nb[2]}: no distinct minima at both ends; skipped.")
+                continue
+            min_a, min_b = minima[na[1]], minima[nb[1]]
+            formed, broken = self._bond_changes(min_a['molecule'].get_connectivity_matrix(),
+                                                min_b['molecule'].get_connectivity_matrix())
+            entry_log['formed'] = [[a + 1, b + 1] for a, b in formed]
+            entry_log['broken'] = [[a + 1, b + 1] for a, b in broken]
+            if len(formed) == 0 or len(broken) == 0:
+                entry_log['skipped'] = 'no bond formed and broken (conformational: torsion network)'
+                self.ostream.print_info(f"reaction entries {na[2]} -> {nb[2]}: no bond exchange; left to the torsion network.")
+                continue
+            waypoint = None
+            for kind, ts_guess, ri in nodes[pa + 1:pb]:
+                if kind == 'transition' and waypoint is None:
+                    waypoint = self._seed_transition_state(ts_guess, min_a, min_b, formed + broken, minima,
+                                                           states_basis, dih_keys, log, entry_log)
+            entry_log['waypoint'] = waypoint
+            paths.append({'kind': 'reaction', 'A': na[1], 'B': nb[1], 'waypoint': waypoint, 'formed': formed,
+                          'broken': broken, 'orphan': False, 'index': start_index + len(paths)})
+        self.ostream.print_info(f'reaction edges: {len(paths)}')
+        self.ostream.flush()
+
+        return paths
+
+    def _seed_transition_state(self, ts_guess, min_a, min_b, changed, minima, states_basis, dih_keys, log, entry_log):
+        """
+        Transition-state search from a transition reaction entry. The result
+        is kept only if it has exactly one imaginary frequency below
+        -20 cm^-1 and every exchanged bond lies between its lengths in the
+        two end minima; it is then written as a datapoint without important
+        coordinates and appended to the minima as a non-node saddle.
+
+        :return:
+            The index of the saddle in minima, or None.
+        """
+
+        root = self.roots_to_follow[0]
+        try:
+            opt_results = self._network_optimize(self._copy_molecule(ts_guess), [], states_basis, transition=True)
+        except Exception as exc:
+            entry_log['transition'] = {'status': f'TS search failed: {exc}'}
+            self.ostream.print_info(f'transition-state search failed ({exc}); the half-scans meet at equal bond order.')
+            self.ostream.flush()
+            return None
+        ts_mol = opt_results['final_molecule']
+        basis = MolecularBasis.read(ts_mol, states_basis['gs'])
+        energies, gradients, hessians = self._compute_qm_data(self.drivers['gs'], ts_mol, basis, with_hessian=True)
+        self._network_counters['single_points'] += 1
+        self._network_counters['hessians'] += 1
+        masses = np.asarray(ts_mol.get_masses(), dtype=float)
+        frequencies = self._lowest_frequency_cm1(hessians[0], masses, ts_mol.get_coordinates_in_bohr(), False,
+                                                 return_all=True)
+        imaginary = [float(f) for f in frequencies if f < -20.0]
+        between = True
+        for i, j in changed:
+            d_ts = float(ts_mol.get_distance([i + 1, j + 1], 'angstrom'))
+            d_a = float(min_a['molecule'].get_distance([i + 1, j + 1], 'angstrom'))
+            d_b = float(min_b['molecule'].get_distance([i + 1, j + 1], 'angstrom'))
+            if not (min(d_a, d_b) - 0.02 < d_ts < max(d_a, d_b) + 0.02):
+                between = False
+        entry_log['transition'] = {'imaginary_cm1': imaginary, 'between_end_minima': between,
+                                   'energy': float(energies[0])}
+        if len(imaginary) != 1 or not between:
+            entry_log['transition']['status'] = 'rejected'
+            self.ostream.print_info(f'transition-state search: {len(imaginary)} imaginary frequency(ies) '
+                                    f'{[round(f, 1) for f in imaginary]}, between the end minima: {between}; '
+                                    'rejected, the half-scans meet at equal bond order.')
+            self.ostream.flush()
+            return None
+
+        inv_sqrt_masses = None
+        if self.use_mass_weight:
+            inv_sqrt_masses = 1.0 / np.sqrt(np.repeat(masses, 3))
+        natoms = len(ts_mol.get_labels())
+        dp = self._build_interpolation_datapoint(ts_mol, self.roots_z_matrix[root], self.states_interpolation_settings[root],
+                                                 [], float(energies[0]), np.asarray(gradients[0]).reshape(natoms, 3),
+                                                 hessians[0], inv_sqrt_masses)
+        label = self._write_interpolation_datapoint(dp, root, self.states_interpolation_settings)
+        saddle = {'conformer': None, 'molecule': ts_mol, 'energy': float(dp.energy), 'index': len(minima),
+                  'label': label, 'angles': [float(ts_mol.get_dihedral_in_degrees(key)) % 360.0 for key in dih_keys],
+                  'lowest_freq_cm1': float(frequencies.min()), 'node': False, 'kind': 'saddle'}
+        minima.append(saddle)
+        log['minima'].append({k: saddle[k] for k in ('index', 'conformer', 'energy', 'label', 'angles',
+                                                     'lowest_freq_cm1', 'node', 'kind')})
+        entry_log['transition']['status'] = f'accepted as {label}'
+        self.ostream.print_info(f'transition state {saddle["index"]} added as {label} '
+                                f'(imaginary frequency {imaginary[0]:.1f} cm^-1).')
+        self.ostream.flush()
+
+        return saddle['index']
+
+    def _reaction_path_scan(self, path, minima, states_basis, settings, path_log):
+        """
+        Step-wise constrained scans of a reaction edge from both end minima:
+        from A the first formed bond, from B the first broken bond is set
+        reaction_scan_step_angstrom closer to its value in the other minimum
+        at every step (geomeTRIC 'set distance', all other coordinates
+        relaxed, each step starts from the previous point). A half stops one
+        step before the transition state if there is one, otherwise at the
+        first point where the driven bond has at least the Pauling bond order
+        n = exp((r_bonded - r) / 0.3 Angstrom) of the opposing bond (r_bonded:
+        the bond's length in the minimum where it exists), which the two
+        halves then share. Only the exchanged bonds may change connectivity.
+
+        :param path:
+            The reaction path dict.
+        :param minima:
+            The minima dicts.
+        :param states_basis:
+            The basis-set labels dict.
+        :param settings:
+            The seed_network_settings with defaults filled in.
+        :param path_log:
+            The provenance dict of this path.
+
+        :return:
+            The candidate list (the format of _relaxed_path_scan with the
+            driven bond as 'imp' and the distance in Angstrom as 'angle').
+        """
+
+        step = float(settings['reaction_scan_step_angstrom'])
+        a_min = minima[path['A']]
+        b_min = minima[path['B']]
+        waypoint = minima[path['waypoint']]['molecule'] if path.get('waypoint') is not None else None
+        allowed = {tuple(sorted((int(i), int(j)))) for i, j in path['formed'] + path['broken']}
+        zmat_bonds = [tuple(int(x) for x in b) for b in self.roots_z_matrix[self.roots_to_follow[0]]['bonds']]
+        global_constraints = list(self.use_minimized_structures[1] or [])
+
+        def _dist(mol, bond):
+            return float(mol.get_distance([bond[0] + 1, bond[1] + 1], 'angstrom'))
+
+        r_bonded = {}
+        for bond in path['formed']:
+            r_bonded[bond] = _dist(b_min['molecule'], bond)
+        for bond in path['broken']:
+            r_bonded[bond] = _dist(a_min['molecule'], bond)
+
+        def _order(mol, bond):
+            return float(np.exp((r_bonded[bond] - _dist(mol, bond)) / 0.3))
+
+        def _imp(bond):
+            if tuple(bond) in zmat_bonds:
+                return (bond[0] + 1, bond[1] + 1)
+            if tuple(bond[::-1]) in zmat_bonds:
+                return (bond[1] + 1, bond[0] + 1)
+            return None
+
+        path_log['scan_points'] = []
+        path_log['violations'] = []
+        path_log['meeting'] = 'transition state' if waypoint is not None else 'equal Pauling bond order'
+        if len(path['formed']) > 1 or len(path['broken']) > 1:
+            self.ostream.print_info('several bonds change: only the first formed / broken bond is driven, '
+                                    'the others relax.')
+
+        candidates = []
+        for half, start_min, drive, other in (('A', a_min, path['formed'][0], path['broken'][0]),
+                                              ('B', b_min, path['broken'][0], path['formed'][0])):
+            start = start_min['molecule']
+            conn_ref = np.asarray(start.get_connectivity_matrix())
+            r0 = _dist(start, drive)
+            r_end = _dist(waypoint, drive) if waypoint is not None else r_bonded[drive]
+            total = abs(r_end - r0)
+            n_max = int(np.floor(total / step + 1.0e-9))
+            if waypoint is not None and n_max * step > total - 0.5 * step:
+                n_max -= 1
+            sign = 1.0 if r_end > r0 else -1.0
+            previous = start
+            for k in range(1, n_max + 1):
+                target = r0 + sign * k * step
+                constraint = f'set distance {drive[0] + 1} {drive[1] + 1} {target:.4f}'
+                try:
+                    opt_results = self._network_optimize(previous, global_constraints + [constraint], states_basis)
+                except Exception as exc:
+                    path_log['violations'].append({'half': half, 'target': target, 'reason': f'optimisation failed: {exc}'})
+                    break
+                mol = opt_results['final_molecule']
+                energy = float(opt_results['opt_energies'][-1])
+                actual = _dist(mol, drive)
+                conn = np.asarray(mol.get_connectivity_matrix())
+                changed = [(int(i), int(j)) for i, j in zip(*np.nonzero(np.triu(conn != conn_ref)))]
+                connectivity_ok = all(tuple(sorted(c)) in allowed for c in changed)
+                distance_ok = abs(actual - target) <= 0.02
+                crossed = waypoint is None and _order(mol, drive) >= _order(mol, other)
+                path_log['scan_points'].append({'half': half, 'driven': [drive[0] + 1, drive[1] + 1], 'target': target,
+                                                'value': actual, 'opposing': _dist(mol, other), 'energy': energy,
+                                                'connectivity_ok': connectivity_ok, 'distance_ok': distance_ok,
+                                                'crossed': bool(crossed)})
+                if not (connectivity_ok and distance_ok):
+                    reason = 'connectivity' if not connectivity_ok else 'distance'
+                    path_log['violations'].append({'half': half, 'target': target, 'reason': reason})
+                    self.ostream.print_info(f'half {half}: continuity violated at {target:.3f} A ({reason}); half-scan stopped.')
+                    self.ostream.flush()
+                    break
+                candidates.append({'half': half, 'target': target, 'angle': actual, 'unit': 'A', 'energy': energy,
+                                   'molecule': mol, 'imp': _imp(drive), 'index': len(candidates)})
+                previous = mol
+                if crossed:
+                    break
+
+        self.ostream.print_info(f"{len(candidates)} scan point(s) on this reaction path "
+                                f"({sum(1 for c in candidates if c['half'] == 'A')} from A, "
+                                f"{sum(1 for c in candidates if c['half'] == 'B')} from B); meeting: {path_log['meeting']}")
+        self.ostream.flush()
+
+        return candidates
+
     def _grow_path(self, path, candidates, driver, minima, earlier, states_basis, settings, path_log):
         """
         Stage 3b: QM energy and gradient at every candidate (cached), the
@@ -3150,10 +3611,11 @@ class IMForceFieldGenerator:
         e_thr = float(settings['e_thrsh_kcal_per_atom'] if settings['e_thrsh_kcal_per_atom'] is not None else self.energy_threshold)
         g_thr = float(settings['g_rmsd_thrsh'] if settings['g_rmsd_thrsh'] is not None else self.gradient_rmsd_thrsh)
         key_zmat = None
-        zmat_dihedrals = [tuple(int(x) for x in d) for d in self.roots_z_matrix[root]['dihedrals']]
-        key = path_log['dihedral']
-        zero = tuple(int(x) - 1 for x in key)
-        key_zmat = tuple(int(x) for x in key) if zero in zmat_dihedrals else tuple(int(x) for x in key[::-1])
+        if 'dihedral' in path_log:
+            zmat_dihedrals = [tuple(int(x) for x in d) for d in self.roots_z_matrix[root]['dihedrals']]
+            key = path_log['dihedral']
+            zero = tuple(int(x) - 1 for x in key)
+            key_zmat = tuple(int(x) for x in key) if zero in zmat_dihedrals else tuple(int(x) for x in key[::-1])
 
         path_log['iterations'] = []
         path_log['accepted'] = 0
@@ -3174,7 +3636,7 @@ class IMForceFieldGenerator:
         # the end minima must stay exact: their stored QM data are the reference
         sqrt_masses = np.sqrt(np.repeat(np.asarray(minima[path['A']]['molecule'].get_masses(), dtype=float), 3))
         end_entries = []
-        for end in (path['A'], path['B']):
+        for end in (path['A'], path['B']) + ((path['waypoint'],) if path.get('waypoint') is not None else ()):
             label = minima[end]['label']
             dp = None
             for point in driver.qm_data_points:
@@ -3235,7 +3697,8 @@ class IMForceFieldGenerator:
             if self.use_mass_weight:
                 inv_sqrt_masses = 1.0 / np.sqrt(np.repeat(cand['molecule'].get_masses().copy(), 3))
             trial = self._build_interpolation_datapoint(
-                cand['molecule'], self.roots_z_matrix[root], self.states_interpolation_settings[root], [key_zmat],
+                cand['molecule'], self.roots_z_matrix[root], self.states_interpolation_settings[root],
+                [c for c in [cand.get('imp', key_zmat)] if c is not None],
                 cand['E_qm'], cand['G_qm'].reshape(natoms, 3), hessians[0], inv_sqrt_masses)
             driver.qm_data_points.append(trial)
             tested.add(pick)
@@ -3256,8 +3719,10 @@ class IMForceFieldGenerator:
                 path_log['rejected'] += 1
                 consecutive_rejections += 1
             path_log['iterations'].append(iteration)
+            where = (f"{cand['angle']:.1f} deg" if cand.get('unit', 'deg') == 'deg'
+                     else f"{cand['angle']:.3f} {cand['unit']}")
             self.ostream.print_info(
-                f"  trial at {cand['angle']:.1f} deg (half {cand['half']}): s = {s_pick:.3f}; path max "
+                f"  trial at {where} (half {cand['half']}): s = {s_pick:.3f}; path max "
                 f"{path_max:.3f} -> {path_max_after:.3f}; set sum {set_sum:.3f} -> {set_sum_after:.3f}; "
                 f"{'accepted as ' + str(iteration['label']) if accepted else 'rejected'}")
             self.ostream.flush()
