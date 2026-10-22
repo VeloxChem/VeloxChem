@@ -32,7 +32,10 @@
 
 import numpy as np
 import random
+import itertools
 import h5py
+import json
+import time
 from mpi4py import MPI
 from contextlib import redirect_stderr
 from pathlib import Path
@@ -57,6 +60,7 @@ from .mmforcefieldgenerator import MMForceFieldGenerator
 from .conformergenerator import ConformerGenerator
 from .optimizationdriver import OptimizationDriver
 from .molecule import Molecule
+from .superimpose import svd_superimpose
 from .errorhandler import assert_msg_critical
 from .veloxchemlib import hartree_in_kcalpermol, bohr_in_angstrom
 
@@ -171,6 +175,19 @@ class IMForceFieldGenerator:
                                         used when system is not improving without stricter locality constraints!
     """
 
+    # defaults of seed_network_settings (None thresholds: the collector's energy_threshold and
+    # gradient_rmsd_thrsh are used)
+    _SEED_NETWORK_DEFAULTS = {
+        'scan_step_deg': 15.0,
+        'state_gap_deg': 30.0,
+        'e_thrsh_kcal_per_atom': None,
+        'g_rmsd_thrsh': None,
+        'max_points_per_path': 6,
+        'max_rejections_per_path': 3,
+        'include_orphan_arcs': False,
+        'energy_window_kcal': None,
+    }
+
     def __init__(self, ground_state_driver, roots_to_follow=None, comm=None, ostream=None):
 
         if comm is None:
@@ -211,6 +228,23 @@ class IMForceFieldGenerator:
 
         self.reaction_structures = None
         self.seed_structures = None
+
+        # rotate neighbouring rotatable bonds when a scan seed cannot reach
+        # its target dihedral by a rigid rotation (steric clash)
+        self.seed_scan_clash_relief = False
+
+        # optimised conformer seeds with an all-atom RMSD (Angstrom) below this
+        # value are the same minimum and are added only once (None: off)
+        self.seed_duplicate_rmsd_thrsh = None
+
+        # opt-in seed stage: optimise every conformer once, connect the distinct
+        # minima by single-bond rotations and add relaxed-scan points where the
+        # interpolation is worst (_seed_conformer_network); settings in the style
+        # of sampling_settings, the unique conformers are stored by set_up_the_system
+        self.seed_conformer_network = False
+        self.seed_network_settings = dict(self._SEED_NETWORK_DEFAULTS)
+        self.seed_conformers = None
+        self._network_counters = None
 
         # Here us the driver set up
         self.gs_basis_set_label = 'def2-svp'
@@ -345,9 +379,74 @@ class IMForceFieldGenerator:
         self.use_opt_confidence_radius = [False, 'multi_grad', 0.5, 0.3]  # optimize the set of Trust radii of each datapoint given a set of references (energy, gradient))
         self.exclude_non_core = False  # use only core atoms (H exclusion) for the interpolation (seemed to be less stable)
 
+        # Opt-in z-matrix rule: remove the proper dihedrals terminated by a hydrogen that belongs to an improper
+        # (the improper's centre is its first atom and must be bonded to that H). The out-of-plane motion of such
+        # an H is then carried by the improper and the two valence angles at the centre instead of by proper
+        # dihedrals with a 2 sin(delta/2) displacement, which saturate at large wag angles.
+        #   False (default): the z-matrix is unchanged.
+        #   True: apply the rule at every improper centre.
+        #   list of element symbols, e.g. ['N']: apply it only at centres of those elements.
+        # The rule acts only when the z-matrix is built from the molecule; a z-matrix read from an existing
+        # database is never modified.
+        self.drop_improper_h_dihedrals = False
+
         self.imp_int_coordinates = []
 
         self._system_is_set_up = False
+
+    @staticmethod
+    def _drop_improper_h_dihedrals(zmat, labels, centre_elements=None, protected_dihedrals=None):
+        """
+        Removes the proper dihedrals whose terminal atom is a hydrogen that belongs to an improper
+        (the improper's centre is its first atom and must be bonded to the H).
+
+        :param zmat:
+            The z-matrix dict with keys bonds, angles, dihedrals, impropers (0-based tuples).
+        :param labels:
+            The atom labels (element symbols) of the molecule.
+        :param centre_elements:
+            None (every improper centre) or a list of element symbols restricting the centres.
+        :param protected_dihedrals:
+            Optional 0-based dihedral tuples that are never removed (e.g. constraint dihedrals).
+
+        :return:
+            The new z-matrix dict, the removed dihedrals and the hydrogen atoms (0-based).
+        """
+
+        bonds = {tuple(sorted(int(a) for a in b)) for b in zmat['bonds']}
+        protected = set()
+        for d in (protected_dihedrals or []):
+            d = tuple(int(x) for x in d)
+            protected.add(d)
+            protected.add(d[::-1])
+
+        h_atoms = []
+        for imp in zmat['impropers']:
+            imp = [int(a) for a in imp]
+            centre = imp[0]
+            if centre_elements is not None and str(labels[centre]).capitalize() not in centre_elements:
+                continue
+            for a in imp[1:]:
+                if (str(labels[a]).capitalize() == 'H' and tuple(sorted((centre, a))) in bonds and
+                        a not in h_atoms):
+                    h_atoms.append(a)
+
+        removed = []
+        kept = []
+        for d_raw in zmat['dihedrals']:
+            d = tuple(int(x) for x in d_raw)
+            if (d[0] in h_atoms or d[3] in h_atoms) and d not in protected:
+                removed.append(d)
+            else:
+                kept.append(d)
+
+        new_zmat = {
+            key: [tuple(int(x) for x in c) for c in zmat[key]]
+            for key in ('bonds', 'angles', 'dihedrals', 'impropers')
+        }
+        new_zmat['dihedrals'] = kept
+
+        return new_zmat, removed, h_atoms
 
     def define_z_matrix_dict(self, molecule, add_coordinates=None):
         g_molecule = geometric.molecule.Molecule()
@@ -656,6 +755,25 @@ class IMForceFieldGenerator:
 
                 impropers = list(ff_gen.impropers.keys())
                 self.roots_z_matrix[root] = _promote_nonrotatable_ring_torsions_to_impropers(self.roots_z_matrix[root], ff_gen, rotatable_bonds_zero_based, impropers=impropers)
+
+                if self.drop_improper_h_dihedrals:
+                    if self.drop_improper_h_dihedrals is True:
+                        centre_elements = None
+                    else:
+                        centre_elements = [str(e).capitalize() for e in self.drop_improper_h_dihedrals]
+                    protected_dihedrals = []
+                    if isinstance(self.use_minimized_structures, (list, tuple)) and len(self.use_minimized_structures) > 1:
+                        for constraint in (self.use_minimized_structures[1] or []):
+                            if len(constraint) == 4:
+                                protected_dihedrals.append([int(x) - 1 for x in constraint])
+                    self.roots_z_matrix[root], removed_dihedrals, wag_h_atoms = self._drop_improper_h_dihedrals(
+                        self.roots_z_matrix[root], molecule.get_labels(), centre_elements, protected_dihedrals)
+                    self.ostream.print_info(
+                        'drop_improper_h_dihedrals: removed '
+                        f'{len(removed_dihedrals)} proper dihedral(s) terminated by H atom(s) '
+                        f'{[a + 1 for a in wag_h_atoms]} (1-based): '
+                        f'{[tuple(a + 1 for a in d) for d in removed_dihedrals]}')
+                    self.ostream.flush()
             elif root not in self.roots_z_matrix:
                 # generate the z-matrix based for the interpolation database provided
                 int_driver = InterpolationDriver()
@@ -758,6 +876,14 @@ class IMForceFieldGenerator:
             if len(conformal_molecules) == 0:
                 raise RuntimeError('ConformerGenerator returned no conformers.')
 
+            # the unique conformers, stored once for the opt-in conformer-network seed stage
+            self.seed_conformers = []
+            for conf_mol in conformal_molecules:
+                mol_i = Molecule.from_xyz_string(conf_mol.get_xyz_string())
+                mol_i.set_charge(molecule.get_charge())
+                mol_i.set_multiplicity(molecule.get_multiplicity())
+                self.seed_conformers.append(mol_i)
+
             rot_bond_set = {
                 tuple(sorted((int(a), int(b))))
                 for a, b in rotatable_bonds
@@ -771,6 +897,30 @@ class IMForceFieldGenerator:
                     continue
 
                 selected_dihedrals.append(dih_key)
+
+            if self.seed_conformer_network:
+                # the scanned dihedrals become the important coordinates of the scan points and
+                # must be z-matrix coordinates (drop_improper_h_dihedrals may have removed one);
+                # a z-matrix read from an existing database is never changed
+                for root in self.roots_to_follow:
+                    if root_extract_z_matrix[root]:
+                        continue
+                    zmat_dihedrals = [tuple(int(x) for x in d) for d in self.roots_z_matrix[root]['dihedrals']]
+                    restored = []
+                    for dih_key in selected_dihedrals:
+                        dih_zero = tuple(int(x) - 1 for x in dih_key)
+                        if dih_zero not in zmat_dihedrals and dih_zero[::-1] not in zmat_dihedrals:
+                            self.roots_z_matrix[root]['dihedrals'].append(dih_zero)
+                            zmat_dihedrals.append(dih_zero)
+                            restored.append(dih_key)
+                    if len(restored) > 0:
+                        dihedral_start = len(self.roots_z_matrix[root]['bonds']) + len(self.roots_z_matrix[root]['angles'])
+                        dihedral_end = dihedral_start + len(self.roots_z_matrix[root]['dihedrals'])
+                        if root == 0:
+                            self.symmetry_information['gs'][-1] = [dihedral_start, dihedral_end]
+                        self.ostream.print_info(
+                            f'seed_conformer_network: scanned dihedral(s) {restored} (1-based) kept in the z-matrix.')
+                        self.ostream.flush()
 
             if len(selected_dihedrals) > 0:
                 for dih_key in selected_dihedrals:
@@ -962,9 +1112,15 @@ class IMForceFieldGenerator:
             if not Path(self.imforcefieldfiles[self.roots_to_follow[0]]).exists():
                 files_to_add_conf.append(self.roots_to_follow[0])
 
-            if self.seed_structures is not None and not Path(imforcefieldfile).exists():
+            if self.seed_structures is not None and not Path(imforcefieldfile).exists() and self.seed_conformer_network:
+
+                molecules_to_add_info = self._seed_conformer_network(molecule, states_basis)
+
+            elif self.seed_structures is not None and not Path(imforcefieldfile).exists():
 
                 molecules_to_add_info = []
+                # optimised conformers already added as datapoints (all rotatable bonds)
+                added_normal_minima = []
                 for counter, entry in enumerate(self.seed_structures.items()):
 
                     key, molecules_info = entry
@@ -1065,7 +1221,20 @@ class IMForceFieldGenerator:
                                     current_molecule_to_add_info.append((mol, current_basis, self.roots_to_follow, []))
 
                             if mode == "normal" and optimized_molecule_for_scan is not None:
-                                optimized_normal_conformers.append(optimized_molecule_for_scan)
+                                # a conformer that optimised into a minimum found before is not
+                                # added again; it stays a scan minimum only if that minimum came
+                                # from another rotatable bond
+                                if self._is_same_minimum(optimized_molecule_for_scan, optimized_normal_conformers):
+                                    current_molecule_to_add_info.pop()
+                                    self.ostream.print_info(f"Conformer {seed_index} of {dih_key} is a known minimum (same key).")
+                                else:
+                                    if self._is_same_minimum(optimized_molecule_for_scan, added_normal_minima):
+                                        current_molecule_to_add_info.pop()
+                                        self.ostream.print_info(f"Conformer {seed_index} of {dih_key} is a known minimum (earlier key).")
+                                    else:
+                                        added_normal_minima.append(optimized_molecule_for_scan)
+                                    optimized_normal_conformers.append(optimized_molecule_for_scan)
+                                self.ostream.flush()
 
                             if (
                                 not expanded_scan_from_optimized_minima
@@ -1127,6 +1296,31 @@ class IMForceFieldGenerator:
                                         mol_i.set_dihedral_in_degrees(dih_key, target_deg, verbose=False)
 
                                         actual = float(mol_i.get_dihedral_in_degrees(dih_key)) % 360.0
+                                        if _circ_err_deg(actual, target_deg) > 2.0 and self.seed_scan_clash_relief:
+                                            relieved_mol, aux_changes = self._place_scan_seed(
+                                                [base_mol], dih_key, target_deg)
+                                            if relieved_mol is not None:
+                                                mol_i = relieved_mol
+                                                actual = float(mol_i.get_dihedral_in_degrees(dih_key)) % 360.0
+                                                self.ostream.print_info(
+                                                    f"{scan_mode} seed {dih_key} = {target_deg:.2f} deg placed with "
+                                                    f"clash relief: {[(d, round(x, 1)) for d, x in aux_changes]}")
+                                                self.ostream.flush()
+
+                                                # relax the placed geometry with the dihedral frozen,
+                                                # so that the TS search starts from a relaxed structure
+                                                if scan_mode == 'transition':
+                                                    driver = self.drivers['gs'][0]
+                                                    compute_args = None
+                                                    if isinstance(driver, (ScfRestrictedDriver, ScfUnrestrictedDriver)):
+                                                        relax_basis = MolecularBasis.read(mol_i, states_basis['gs'])
+                                                        _, relax_scf_results, _ = self._compute_energy(driver, mol_i, relax_basis)
+                                                        compute_args = (relax_basis, relax_scf_results)
+                                                    mol_i = self._run_optimization(
+                                                        driver, mol_i, constraints=[dih_key], index_offset=0,
+                                                        compute_args=compute_args)['final_molecule']
+                                                    actual = float(mol_i.get_dihedral_in_degrees(dih_key)) % 360.0
+
                                         if _circ_err_deg(actual, target_deg) > 2.0:
                                             raise RuntimeError(
                                                 f"Failed to set dihedral {dih_key} to {target_deg:.2f} deg "
@@ -1954,32 +2148,7 @@ class IMForceFieldGenerator:
                     im_settings[root],
                 )
 
-                masses = molecule.get_masses().copy()
-                masses_cart = np.repeat(masses, 3)
-                inv_sqrt_masses = 1.0 / np.sqrt(masses_cart)
-
-                impes_driver = InterpolationDriver(self.roots_z_matrix[root])
-                impes_driver.update_settings(im_settings[root])
-                impes_driver.impes_coordinate.inv_sqrt_masses = inv_sqrt_masses
-                if root == 0:
-                    impes_driver.symmetry_information = self.symmetry_information['gs']
-                else:
-                    impes_driver.symmetry_information = self.symmetry_information['es']
-
-                im_labels, _ = impes_driver.read_labels()
-                # old_label = None
-                impes_driver.qm_data_points = []
-
-                for label in im_labels:
-                    qm_data_point = InterpolationDatapoint(self.roots_z_matrix[root])
-                    qm_data_point.update_settings(im_settings[root])
-                    qm_data_point.read_hdf5(current_datafile, label)
-
-                    if impes_driver.impes_coordinate.eq_bond_lengths is None:
-                        impes_driver.impes_coordinate.eq_bond_lengths = qm_data_point.eq_bond_lengths
-
-                    # old_label = qm_data_point.point_label
-                    impes_driver.qm_data_points.append(qm_data_point)
+                impes_driver = self._load_interpolation_driver(molecule, root, im_settings, current_datafile)
 
                 qm_energies = []
                 im_energies = []
@@ -2114,6 +2283,8 @@ class IMForceFieldGenerator:
         if len(self.drivers) == 0:
             raise ValueError("No energy driver defined.")
 
+        written_datapoints = []
+
         # define impesdriver to determine if stucture should be added:
 
         # For symmetry groups of periodicty of 3 it is crucial for the interpolation to set the dihedral to the position between 2 extreme points in order to account
@@ -2157,23 +2328,8 @@ class IMForceFieldGenerator:
                 if not mol_basis[5]:
                     label_counter = 0
 
-                imp_int_constraints = {'bonds': [], 'angles': [], 'dihedrals': [], 'impropers': []}
-                for constraint in mol_basis[-1]:
-                    constraint = [int(x) - 1 for x in constraint]
-                    if len(constraint) == 2:
-                        imp_int_constraints["bonds"].append(constraint)
-                    if len(constraint) == 3:
-                        imp_int_constraints["angles"].append(constraint)
-                    if len(constraint) == 4:
-                        imp_int_constraints["dihedrals"].append(constraint)
-
-                energies, scf_results, rsp_results = self._compute_energy(drivers[0], mol_basis[0], mol_basis[1])
-
-                if isinstance(drivers[0], LinearResponseEigenSolver) or isinstance(drivers[0], TdaEigenSolver):
-                    energies = energies[mol_basis[4]]
-
-                gradients = self._compute_gradient(drivers[1], mol_basis[0], mol_basis[1], scf_results, rsp_results)
-                hessians = self._compute_hessian(drivers[2], mol_basis[0], mol_basis[1])
+                energies, gradients, hessians = self._compute_qm_data(drivers, mol_basis[0], mol_basis[1],
+                                                                      states=mol_basis[4])
 
                 inv_sqrt_masses = None
                 if self.use_mass_weight:
@@ -2196,36 +2352,15 @@ class IMForceFieldGenerator:
                         labels = [label for label in org_labels if '_symmetry' not in label]
                         sorted_labels = sorted(labels, key=lambda x: int(x.split('_')[1]))
                     label = None
-                    grad = gradients[number].copy()
-                    hess = hessians[number].copy()
-                    grad_vec = grad.reshape(-1)         # (3N,)
-                    hess_mat = hess.reshape(grad_vec.size, grad_vec.size)
-                    mw_grad_vec = grad_vec
-                    mw_hess_mat = hess_mat
-                    if self.use_mass_weight:
-                        mw_grad_vec = inv_sqrt_masses * grad_vec
-                        mw_hess_mat = (inv_sqrt_masses[:, None] * hess_mat) * inv_sqrt_masses[None, :]
-
                     if not mol_basis[5]:
                         label = f'point_{len(sorted_labels) + 1}'
-                    print("here is the imp int coordinates", imp_int_constraints)
-                    impes_coordinate = InterpolationDatapoint(z_matrix)
-                    impes_coordinate.update_settings(interpolation_settings[target_root])
-                    impes_coordinate.cartesian_coordinates = mol_basis[0].get_coordinates_in_bohr()
-                    impes_coordinate.eq_bond_lengths = self.eq_bond_length
-                    impes_coordinate.imp_int_coordinates = imp_int_constraints
-                    impes_coordinate.inv_sqrt_masses = inv_sqrt_masses
-                    impes_coordinate.energy = energies[number]
-                    impes_coordinate.gradient = mw_grad_vec.reshape(grad.shape)
-                    impes_coordinate.hessian = mw_hess_mat.reshape(hess.shape)
-                    impes_coordinate.transform_gradient_and_hessian()
+                    impes_coordinate = self._build_interpolation_datapoint(
+                        mol_basis[0], z_matrix, interpolation_settings[target_root], mol_basis[-1],
+                        energies[number], gradients[number], hessians[number], inv_sqrt_masses)
+                    print("here is the imp int coordinates", impes_coordinate.imp_int_coordinates)
 
-                    trust_radius = self.use_opt_confidence_radius[2]
-                    impes_coordinate.confidence_radius = trust_radius
-
-                    impes_coordinate.write_hdf5(target_file, label)
-
-                    impes_coordinate.write_hdf5(f'im_database_{target_root}_org.h5', label)
+                    self._write_interpolation_datapoint(impes_coordinate, target_root, interpolation_settings, label)
+                    written_datapoints.append(impes_coordinate)
                     interpolation_driver.imforcefield_file = target_file
 
                     labels, z_matrix = interpolation_driver.read_labels()
@@ -2236,6 +2371,1085 @@ class IMForceFieldGenerator:
                     self.ostream.flush()
 
                 label_counter += 1
+
+        return written_datapoints
+
+    # ------------------------------------------------------------------
+    # Opt-in seed stage: conformer network with error-driven relaxed scans
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _copy_molecule(molecule):
+        """
+        Returns a copy of a molecule with the same charge and multiplicity.
+
+        :param molecule:
+            The molecule.
+
+        :return:
+            The copy.
+        """
+
+        new_mol = Molecule.from_xyz_string(molecule.get_xyz_string())
+        new_mol.set_charge(molecule.get_charge())
+        new_mol.set_multiplicity(molecule.get_multiplicity())
+
+        return new_mol
+
+    @staticmethod
+    def _circular_states(values_deg, gap_deg):
+        """
+        Clusters dihedral values on the circle: the values sorted on [0, 360)
+        are split wherever the gap between circular neighbours exceeds
+        gap_deg (a gap equal to gap_deg does not split).
+
+        :param values_deg:
+            The dihedral values in degree (any range).
+        :param gap_deg:
+            The smallest gap that separates two states, in degree.
+
+        :return:
+            The states sorted by centre, each a dict with the circular mean
+            'centre' (degree, [0, 360)), the 'members' (indices into
+            values_deg) and the largest circular deviation of a member from
+            the centre, 'spread' (degree).
+        """
+
+        vals = np.asarray(values_deg, dtype=float) % 360.0
+        n = int(vals.size)
+        if n == 0:
+            return []
+
+        order = np.argsort(vals, kind='stable')
+        sorted_vals = vals[order]
+        gaps = np.diff(np.append(sorted_vals, sorted_vals[0] + 360.0))
+        splits = [i for i in range(n) if gaps[i] > float(gap_deg)]
+
+        if len(splits) == 0:
+            groups = [list(range(n))]
+        else:
+            groups = []
+            start = (splits[-1] + 1) % n
+            for split in splits:
+                group = []
+                i = start
+                while True:
+                    group.append(i)
+                    if i == split:
+                        break
+                    i = (i + 1) % n
+                groups.append(group)
+                start = (split + 1) % n
+
+        states = []
+        for group in groups:
+            members = [int(order[i]) for i in group]
+            ang = np.deg2rad(vals[members])
+            centre = float(np.rad2deg(np.arctan2(np.sin(ang).mean(), np.cos(ang).mean()))) % 360.0
+            deviation = np.abs(((vals[members] - centre + 180.0) % 360.0) - 180.0)
+            states.append({'centre': centre, 'members': members, 'spread': float(deviation.max())})
+
+        states.sort(key=lambda state: state['centre'])
+
+        return states
+
+    @staticmethod
+    def _path_scan_spec(angle_a_deg, angle_b_deg, step_deg, full_circle=False, single=False):
+        """
+        The half-scan specifications of a path from minimum A to minimum B
+        along the arc that leaves A in the positive direction of the dihedral.
+        Half A runs from A to the arc midpoint in the positive direction,
+        half B from B to the midpoint in the negative direction. The end
+        minima themselves are not scan points.
+
+        :param angle_a_deg:
+            The dihedral of minimum A in degree.
+        :param angle_b_deg:
+            The dihedral of minimum B in degree.
+        :param step_deg:
+            The requested scan step in degree (the actual step divides the
+            half-arc into an integer number of steps).
+        :param full_circle:
+            True for a self-loop arc (one torsion state): the arc is 360 deg.
+        :param single:
+            True for a one-sided scan from A over the whole arc (orphan arcs).
+
+        :return:
+            A dict with the arc 'length', the 'midpoint' (degree, [0, 360)),
+            the actual 'step' and, for 'A' and 'B', the signed 'start' and
+            'end' angles (degree, geomeTRIC scan convention) and the number
+            of scan points 'n'.
+        """
+
+        a = float(angle_a_deg) % 360.0
+        b = float(angle_b_deg) % 360.0
+        length = 360.0 if full_circle else (b - a) % 360.0
+        half = length if single else 0.5 * length
+        n_half = max(1, int(round(half / float(step_deg))))
+        step = half / n_half
+        midpoint = (a + half) % 360.0
+        start_a = a - 360.0 if a > 180.0 else a
+        start_b = b - 360.0 if b > 180.0 else b
+
+        spec = {
+            'length': length,
+            'midpoint': midpoint,
+            'step': step,
+            'A': {'start': start_a + step, 'end': start_a + half, 'n': n_half},
+            'B': {'start': start_b - step, 'end': start_b - half, 'n': n_half},
+        }
+        if single:
+            spec['B'] = {'start': start_b, 'end': start_b, 'n': 0}
+
+        return spec
+
+    @staticmethod
+    def _lowest_frequency_cm1(hessian, masses, coordinates, mass_weighted):
+        """
+        The lowest harmonic frequency of a Cartesian Hessian after projecting
+        out translations and rotations (negative values are imaginary modes).
+
+        :param hessian:
+            The Cartesian Hessian (Hartree/bohr^2), mass-weighted or not.
+        :param masses:
+            The atomic masses (amu).
+        :param coordinates:
+            The Cartesian coordinates (bohr), shape (natoms, 3).
+        :param mass_weighted:
+            True if the Hessian is already M^-1/2 H M^-1/2.
+
+        :return:
+            The lowest frequency in cm^-1.
+        """
+
+        masses = np.asarray(masses, dtype=float)
+        natoms = masses.size
+        hess = np.asarray(hessian, dtype=float).reshape(3 * natoms, 3 * natoms)
+        sqrt_m = np.sqrt(np.repeat(masses, 3))
+        if not mass_weighted:
+            hess = hess / sqrt_m[:, None] / sqrt_m[None, :]
+
+        xyz = np.asarray(coordinates, dtype=float).reshape(natoms, 3)
+        com = (masses[:, None] * xyz).sum(axis=0) / masses.sum()
+        rel = xyz - com
+        vectors = []
+        for k in range(3):
+            v = np.zeros((natoms, 3))
+            v[:, k] = 1.0
+            vectors.append((v * np.sqrt(masses)[:, None]).reshape(-1))
+        for k in range(3):
+            axis = np.zeros(3)
+            axis[k] = 1.0
+            v = np.cross(axis, rel)
+            vectors.append((v * np.sqrt(masses)[:, None]).reshape(-1))
+        q, _ = np.linalg.qr(np.array(vectors).T)
+        projector = np.eye(3 * natoms) - q @ q.T
+        eigenvalues = np.linalg.eigvalsh(projector @ (0.5 * (hess + hess.T)) @ projector)
+        frequencies = np.sign(eigenvalues) * np.sqrt(np.abs(eigenvalues)) * 5140.487
+
+        return float(frequencies.min())
+
+    def _network_optimize(self, molecule, constraints, states_basis, transition=False):
+        """
+        Runs one optimisation of the network stage with the ground-state
+        driver (SCF drivers get a converged single point first, as the
+        existing seed branch does) and counts it.
+
+        :param molecule:
+            The start molecule.
+        :param constraints:
+            The constraint list (1-based tuples or geomeTRIC strings).
+        :param states_basis:
+            The basis-set labels dict.
+        :param transition:
+            True for a transition-state search.
+
+        :return:
+            The optimisation results dict.
+        """
+
+        driver = self.drivers['gs'][0]
+        compute_args = None
+        if isinstance(driver, (ScfRestrictedDriver, ScfUnrestrictedDriver)):
+            basis = MolecularBasis.read(molecule, states_basis['gs'])
+            _, scf_results, _ = self._compute_energy(driver, molecule, basis)
+            compute_args = (basis, scf_results)
+
+        self._network_counters['optimizations'] += 1
+
+        return self._run_optimization(driver, molecule, constraints=list(constraints), transition=transition,
+                                      index_offset=0, compute_args=compute_args)
+
+    def _seed_conformer_network(self, molecule, states_basis):
+        """
+        Opt-in seed stage (seed_conformer_network): optimises every conformer
+        once and adds the distinct minima, builds the network of minima
+        connected by the rotation of one scanned bond, samples the arcs
+        between connected minima with relaxed scans from both ends and adds
+        scan points one at a time where the current interpolation is worst,
+        re-evaluating the updated database after every addition. Writes the
+        provenance sidecar seed_network_log.json in the working directory.
+
+        :param molecule:
+            The input molecule.
+        :param states_basis:
+            The basis-set labels dict.
+
+        :return:
+            The molecules_to_add_info list of compute (first entry: the first
+            minimum, which starts the dynamics).
+        """
+
+        settings = dict(self._SEED_NETWORK_DEFAULTS)
+        settings.update(self.seed_network_settings or {})
+
+        assert_msg_critical(self.nodes == 1,
+                            'seed_conformer_network: only a single MPI rank is supported.')
+        assert_msg_critical(bool(self.use_minimized_structures[0]),
+                            'seed_conformer_network: use_minimized_structures[0] must be True '
+                            '(the constrained optimisation is the core of the scheme).')
+        assert_msg_critical(self.reaction_structures is None,
+                            'seed_conformer_network: reaction_structures are not supported.')
+        assert_msg_critical(list(self.roots_to_follow) == [0],
+                            'seed_conformer_network: only roots_to_follow == [0] is supported.')
+        assert_msg_critical(self.seed_duplicate_rmsd_thrsh is not None,
+                            'seed_conformer_network: seed_duplicate_rmsd_thrsh (Angstrom) must be set.')
+        assert_msg_critical(self.seed_conformers is not None and len(self.seed_conformers) > 0,
+                            'seed_conformer_network: no conformers were stored by set_up_the_system.')
+
+        root = self.roots_to_follow[0]
+        dih_keys = [key for key in self.seed_structures[root].keys() if key is not None]
+
+        # the scanned dihedrals must be z-matrix coordinates (the important coordinate of a
+        # scan point is matched in the orientation stored in the z-matrix)
+        zmat_dihedrals = [tuple(int(x) for x in d) for d in self.roots_z_matrix[root]['dihedrals']]
+        scan_coords = {}
+        for key in dih_keys:
+            zero = tuple(int(x) - 1 for x in key)
+            if zero in zmat_dihedrals:
+                scan_coords[key] = tuple(int(x) for x in key)
+            elif zero[::-1] in zmat_dihedrals:
+                scan_coords[key] = tuple(int(x) for x in key[::-1])
+            else:
+                raise ValueError(f'seed_conformer_network: scanned dihedral {key} (1-based) is not in '
+                                 'the z-matrix; check drop_improper_h_dihedrals.')
+
+        self._network_counters = {'optimizations': 0, 'single_points': 0, 'hessians': 0}
+        timings = {}
+        log = {
+            'settings': {k: v for k, v in settings.items()},
+            'thresholds': {
+                'e_thrsh_kcal_per_atom': float(settings['e_thrsh_kcal_per_atom'] if settings['e_thrsh_kcal_per_atom'] is not None else self.energy_threshold),
+                'g_rmsd_thrsh': float(settings['g_rmsd_thrsh'] if settings['g_rmsd_thrsh'] is not None else self.gradient_rmsd_thrsh),
+                'global_constraints': [list(c) for c in (self.use_minimized_structures[1] or [])],
+                'seed_duplicate_rmsd_thrsh': float(self.seed_duplicate_rmsd_thrsh),
+            },
+            'scan_dihedrals': [list(k) for k in dih_keys],
+            'minima': [], 'dropped_conformers': [], 'bonds': [], 'orphans': [], 'paths': [], 'summary': {},
+        }
+
+        def _write_log():
+            def _default(obj):
+                if isinstance(obj, (np.integer,)):
+                    return int(obj)
+                if isinstance(obj, (np.floating,)):
+                    return float(obj)
+                if isinstance(obj, np.ndarray):
+                    return obj.tolist()
+                if isinstance(obj, (set, tuple)):
+                    return list(obj)
+                return str(obj)
+            log['summary'] = {
+                'qm_calls': dict(self._network_counters),
+                'wall_time_s': {k: round(v, 2) for k, v in timings.items()},
+                'n_minima': len(log['minima']),
+                'n_paths': len(log['paths']),
+                'n_points_written': len(log['minima']) + sum(p.get('accepted', 0) for p in log['paths']),
+            }
+            with open('seed_network_log.json', 'w') as fh:
+                json.dump(log, fh, indent=1, default=_default)
+
+        self.ostream.print_blank()
+        self.ostream.print_header('Seed stage: conformer network (opt-in)')
+        self.ostream.print_header('--------------------------------------')
+        self.ostream.print_info(f'scanned dihedrals (1-based): {dih_keys}')
+        self.ostream.print_info(f'settings: {settings}')
+        self.ostream.flush()
+
+        # stage 1: minima
+        t0 = time.time()
+        minima, molecules_to_add_info = self._seed_minima(molecule, states_basis, dih_keys, settings, log)
+        timings['minima'] = time.time() - t0
+        _write_log()
+
+        if len(dih_keys) == 0:
+            self.ostream.print_info('seed_conformer_network: no rotatable bond, only the minimum was added.')
+            self.ostream.flush()
+            return molecules_to_add_info
+
+        # stage 2: the network
+        network = self._conformer_network_paths(minima, dih_keys, settings, log)
+        _write_log()
+
+        # stage 3: error-driven growth along every path
+        t0 = time.time()
+        datafile = self.states_interpolation_settings[root]['imforcefield_file']
+        driver = self._load_interpolation_driver(molecule, root, self.states_interpolation_settings, datafile)
+        earlier = []
+        for path in network['paths']:
+            path_log = {k: path[k] for k in ('index', 'bond', 'arc', 'A', 'B', 'orphan')}
+            path_log['dihedral'] = list(dih_keys[path['bond']])
+            self.ostream.print_blank()
+            self.ostream.print_info(
+                f"path {path['index']}: bond {dih_keys[path['bond']]} arc {path['arc']} "
+                f"from minimum {path['A']} ({minima[path['A']]['angles'][path['bond']]:.1f} deg) "
+                f"to minimum {path['B']} ({minima[path['B']]['angles'][path['bond']]:.1f} deg)")
+            self.ostream.flush()
+            candidates = self._relaxed_path_scan(path, network, minima, states_basis, settings, path_log)
+            if path['orphan']:
+                end_minimum = self._network_orphan_end(path, candidates, minima, molecule, states_basis, dih_keys, settings, log, path_log)
+                if end_minimum is None:
+                    log['paths'].append(path_log)
+                    _write_log()
+                    continue
+                path['B'] = end_minimum
+                path_log['B'] = end_minimum
+                # the new minimum is a datapoint now: reload it into the in-memory driver
+                driver = self._load_interpolation_driver(molecule, root, self.states_interpolation_settings, datafile)
+            self._grow_path(path, candidates, driver, minima, earlier, states_basis, settings, path_log)
+            earlier.append(({path['A'], path['B']}, candidates))
+            log['paths'].append(path_log)
+            _write_log()
+        timings['growth'] = time.time() - t0
+        _write_log()
+
+        n_written = log['summary']['n_points_written']
+        self.ostream.print_blank()
+        self.ostream.print_header('Seed stage: conformer network summary')
+        self.ostream.print_info(f"minima: {len(minima)}; paths: {len(network['paths'])}; orphan arcs: {len(log['orphans'])}")
+        self.ostream.print_info(f"points written: {n_written}; QM calls: {self._network_counters}")
+        self.ostream.print_info(f"wall time (s): {log['summary']['wall_time_s']}")
+        self.ostream.flush()
+
+        return molecules_to_add_info
+
+    def _seed_minima(self, molecule, states_basis, dih_keys, settings, log):
+        """
+        Stage 1: optimises every stored conformer once (global constraints
+        use_minimized_structures[1] only), keeps the converged and distinct
+        minima (_is_same_minimum with seed_duplicate_rmsd_thrsh, optional
+        energy window) and adds them through add_point without important
+        coordinates. Minima with an imaginary frequency below -20 cm^-1 stay
+        datapoints but are no network nodes.
+
+        :param molecule:
+            The input molecule.
+        :param states_basis:
+            The basis-set labels dict.
+        :param dih_keys:
+            The scanned dihedrals (1-based).
+        :param settings:
+            The seed_network_settings with defaults filled in.
+        :param log:
+            The provenance dict.
+
+        :return:
+            The list of minima dicts and the molecules_to_add_info list.
+        """
+
+        global_constraints = list(self.use_minimized_structures[1] or [])
+        kept = []
+        for ci, conformer in enumerate(self.seed_conformers):
+            mol = self._copy_molecule(conformer)
+            try:
+                opt_results = self._network_optimize(mol, global_constraints, states_basis)
+            except Exception as exc:
+                log['dropped_conformers'].append({'conformer': ci, 'reason': f'optimisation failed: {exc}'})
+                self.ostream.print_info(f'conformer {ci}: optimisation failed ({exc}); dropped.')
+                self.ostream.flush()
+                continue
+            opt_mol = opt_results['final_molecule']
+            energy = None
+            if 'opt_energies' in opt_results and len(opt_results['opt_energies']) > 0:
+                energy = float(opt_results['opt_energies'][-1])
+            if self._is_same_minimum(opt_mol, [m['molecule'] for m in kept]):
+                log['dropped_conformers'].append({'conformer': ci, 'reason': 'same minimum as a kept conformer'})
+                self.ostream.print_info(f'conformer {ci}: same minimum as a kept conformer; dropped.')
+                self.ostream.flush()
+                continue
+            kept.append({'conformer': ci, 'molecule': opt_mol, 'energy': energy})
+            self.ostream.print_info(f'conformer {ci}: distinct minimum {len(kept) - 1}' +
+                                    (f' (E = {energy:.8f} Hartree)' if energy is not None else ''))
+            self.ostream.flush()
+
+        assert_msg_critical(len(kept) > 0, 'seed_conformer_network: no conformer optimisation converged.')
+
+        window = settings.get('energy_window_kcal')
+        if window is not None and all(m['energy'] is not None for m in kept):
+            e_min = min(m['energy'] for m in kept)
+            inside = []
+            for m in kept:
+                if (m['energy'] - e_min) * hartree_in_kcalpermol() > float(window):
+                    log['dropped_conformers'].append({'conformer': m['conformer'], 'reason': 'outside the energy window'})
+                    self.ostream.print_info(f"conformer {m['conformer']}: outside the energy window; dropped.")
+                else:
+                    inside.append(m)
+            kept = inside
+            self.ostream.flush()
+
+        molecules_to_add_info = []
+        for m in kept:
+            basis = MolecularBasis.read(m['molecule'], states_basis['gs'])
+            molecules_to_add_info.append((m['molecule'], basis, self.roots_to_follow, []))
+
+        datapoints = self.add_point(molecules_to_add_info, self.states_interpolation_settings,
+                                    symmetry_information=self.symmetry_information)
+        self._network_counters['single_points'] += len(kept)
+        self._network_counters['hessians'] += len(kept)
+
+        masses = np.asarray(molecule.get_masses(), dtype=float)
+        for index, (m, dp) in enumerate(zip(kept, datapoints)):
+            m['index'] = index
+            m['energy'] = float(dp.energy)
+            m['label'] = dp.point_label if dp.point_label is not None else f'point_{index + 1}'
+            m['angles'] = [float(m['molecule'].get_dihedral_in_degrees(key)) % 360.0 for key in dih_keys]
+            m['lowest_freq_cm1'] = self._lowest_frequency_cm1(dp.hessian, masses, dp.cartesian_coordinates,
+                                                              dp.inv_sqrt_masses is not None)
+            m['node'] = bool(m['lowest_freq_cm1'] > -20.0)
+            if not m['node']:
+                self.ostream.print_info(f"minimum {index}: imaginary frequency {m['lowest_freq_cm1']:.1f} cm^-1; "
+                                        'kept as a datapoint, not as a network node.')
+            log['minima'].append({k: m[k] for k in ('index', 'conformer', 'energy', 'label', 'angles',
+                                                     'lowest_freq_cm1', 'node')})
+        self.ostream.print_info(f'{len(kept)} distinct minima added as point_1 .. point_{len(kept)}.')
+        self.ostream.flush()
+
+        return kept, molecules_to_add_info
+
+    def _conformer_network_paths(self, minima, dih_keys, settings, log):
+        """
+        Stage 2: clusters the minima's dihedrals into torsion states per
+        scanned bond (circular gap state_gap_deg), builds the arcs between
+        circularly adjacent states (a one-state bond gets one full-circle
+        arc) and the paths (bond, arc, A, B) between minima that are in the
+        arc's two states and share the state of every other scanned bond.
+        Minima without a partner are logged as orphans; their arcs are
+        scanned only with include_orphan_arcs.
+
+        :param minima:
+            The minima dicts of _seed_minima.
+        :param dih_keys:
+            The scanned dihedrals (1-based).
+        :param settings:
+            The seed_network_settings with defaults filled in.
+        :param log:
+            The provenance dict.
+
+        :return:
+            A dict with the 'bonds' (states and arcs), the 'state_of' table
+            (minimum index -> list of state indices per bond) and the sorted
+            'paths'.
+        """
+
+        gap = float(settings['state_gap_deg'])
+        nodes = [m['index'] for m in minima if m['node']]
+        bonds = []
+        state_of = {i: [] for i in nodes}
+        for b, key in enumerate(dih_keys):
+            states = self._circular_states([minima[i]['angles'][b] for i in nodes], gap)
+            for state in states:
+                state['members'] = [nodes[j] for j in state['members']]
+            k = len(states)
+            arcs = [(i, (i + 1) % k) for i in range(k)] if k > 1 else [(0, 0)]
+            bonds.append({'key': key, 'states': states, 'arcs': arcs})
+            for si, state in enumerate(states):
+                for m in state['members']:
+                    state_of[m].append(si)
+            self.ostream.print_info(
+                f"bond {key}: {k} state(s) at {[round(s['centre'], 1) for s in states]} deg, "
+                f"members per state {[len(s['members']) for s in states]}, spread {[round(s['spread'], 1) for s in states]} deg")
+            log['bonds'].append({'key': list(key), 'states': [dict(s) for s in states], 'arcs': arcs})
+        self.ostream.flush()
+
+        def _same_other_states(a, b, bond):
+            return all(state_of[a][c] == state_of[b][c] for c in range(len(bonds)) if c != bond)
+
+        paths = []
+        for b, bond in enumerate(bonds):
+            for ai, (s1, s2) in enumerate(bond['arcs']):
+                members1 = bond['states'][s1]['members']
+                members2 = bond['states'][s2]['members']
+                if s1 == s2:
+                    for a in members1:
+                        paths.append({'bond': b, 'arc': ai, 'A': a, 'B': a, 'orphan': False, 'direction': +1})
+                    continue
+                for a in members1:
+                    partners = [p for p in members2 if _same_other_states(a, p, b)]
+                    if len(partners) == 0:
+                        log['orphans'].append({'bond': b, 'arc': ai, 'minimum': a, 'direction': +1, 'scanned': False})
+                        if settings.get('include_orphan_arcs', False):
+                            paths.append({'bond': b, 'arc': ai, 'A': a, 'B': a, 'orphan': True, 'direction': +1})
+                    for p in partners:
+                        paths.append({'bond': b, 'arc': ai, 'A': a, 'B': p, 'orphan': False, 'direction': +1})
+                for p in members2:
+                    if not any(_same_other_states(a, p, b) for a in members1):
+                        log['orphans'].append({'bond': b, 'arc': ai, 'minimum': p, 'direction': -1, 'scanned': False})
+                        if settings.get('include_orphan_arcs', False):
+                            paths.append({'bond': b, 'arc': ai, 'A': p, 'B': p, 'orphan': True, 'direction': -1})
+
+        paths.sort(key=lambda p: (p['bond'], p['arc'], min(minima[p['A']]['energy'], minima[p['B']]['energy']),
+                                  p['A'], p['B'], p['direction']))
+        for index, path in enumerate(paths):
+            path['index'] = index
+
+        n_real = sum(1 for p in paths if not p['orphan'])
+        self.ostream.print_info(f"network: {n_real} path(s) between existing minima, {len(log['orphans'])} orphan "
+                                f"(minimum, arc direction) pair(s)" +
+                                (' (scanned)' if settings.get('include_orphan_arcs', False) else ' (not scanned)'))
+        self.ostream.flush()
+
+        return {'bonds': bonds, 'state_of': state_of, 'paths': paths}
+
+    def _relaxed_path_scan(self, path, network, minima, states_basis, settings, path_log):
+        """
+        Stage 3a: relaxed scans of one path from both end minima to the arc
+        midpoint (geomeTRIC 'scan dihedral', only the scanned dihedral is
+        frozen at each step; step-wise frozen-dihedral optimisations as the
+        fallback). Every scan point is checked for unchanged connectivity and
+        for the other scanned torsions staying in the state of the start
+        minimum (spread plus half the state gap); a half-scan stops at the
+        first violation. The RMSD between the last points of the two halves
+        is logged as the hysteresis.
+
+        :param path:
+            The path dict.
+        :param network:
+            The network dict of _conformer_network_paths.
+        :param minima:
+            The minima dicts.
+        :param states_basis:
+            The basis-set labels dict.
+        :param settings:
+            The seed_network_settings with defaults filled in.
+        :param path_log:
+            The provenance dict of this path.
+
+        :return:
+            The candidate list: dicts with 'half', 'target', 'angle',
+            'energy' (Hartree, from the scan) and 'molecule'.
+        """
+
+        b = path['bond']
+        bond = network['bonds'][b]
+        key = bond['key']
+        s1, s2 = bond['arcs'][path['arc']]
+        step = float(settings['scan_step_deg'])
+        tolerance = 0.5 * float(settings['state_gap_deg'])
+
+        a_min = minima[path['A']]
+        b_min = minima[path['B']]
+        if path['orphan']:
+            # scan from the orphan to the centre of the adjacent state in the arc direction
+            other = bond['states'][s2 if path['direction'] > 0 else s1]['centre']
+            if path['direction'] > 0:
+                spec = self._path_scan_spec(a_min['angles'][b], other, step, single=True)
+            else:
+                # negative direction: the same one-sided scan, mirrored
+                length = (a_min['angles'][b] - other) % 360.0
+                n_half = max(1, int(round(length / step)))
+                start = a_min['angles'][b] - 360.0 if a_min['angles'][b] > 180.0 else a_min['angles'][b]
+                spec = {'length': length, 'midpoint': other, 'step': length / n_half,
+                        'A': {'start': start - length / n_half, 'end': start - length, 'n': n_half},
+                        'B': {'start': start, 'end': start, 'n': 0}}
+        else:
+            spec = self._path_scan_spec(a_min['angles'][b], b_min['angles'][b], step, full_circle=(s1 == s2))
+        path_log['spec'] = spec
+        path_log['scan_points'] = []
+        path_log['violations'] = []
+
+        candidates = []
+        last_points = {}
+        for half in ('A', 'B'):
+            h = spec[half]
+            if h['n'] == 0:
+                continue
+            start_min = a_min if half == 'A' else b_min
+            conn_ref = start_min['molecule'].get_connectivity_matrix()
+            targets = np.linspace(h['start'], h['end'], h['n'])
+            geometries, energies, mode = [], [], 'scan'
+            try:
+                constraint = (f"scan dihedral {key[0]} {key[1]} {key[2]} {key[3]} "
+                              f"{h['start']:.4f} {h['end']:.4f} {h['n']}")
+                opt_results = self._network_optimize(start_min['molecule'], [constraint], states_basis)
+                self._network_counters['optimizations'] += h['n'] - 1
+                for xyz, energy in zip(opt_results['scan_geometries'], opt_results['scan_energies']):
+                    mol = Molecule.from_xyz_string(xyz)
+                    mol.set_charge(start_min['molecule'].get_charge())
+                    mol.set_multiplicity(start_min['molecule'].get_multiplicity())
+                    geometries.append(mol)
+                    energies.append(float(energy))
+            except Exception as exc:
+                mode = 'stepwise'
+                self.ostream.print_info(f"half {half}: relaxed scan failed ({exc}); step-wise fallback.")
+                self.ostream.flush()
+                geometries, energies = [], []
+                previous = start_min['molecule']
+                for target in targets:
+                    trial = self._copy_molecule(previous)
+                    trial.set_dihedral_in_degrees(key, float(target), verbose=False)
+                    err = abs(((trial.get_dihedral_in_degrees(key) - target + 180.0) % 360.0) - 180.0)
+                    if err > 2.0 and self.seed_scan_clash_relief:
+                        trial, _ = self._place_scan_seed([previous, start_min['molecule']], key, float(target) % 360.0)
+                        if trial is not None:
+                            err = abs(((trial.get_dihedral_in_degrees(key) - target + 180.0) % 360.0) - 180.0)
+                    if trial is None or err > 2.0:
+                        path_log['violations'].append({'half': half, 'target': float(target), 'reason': 'placement blocked'})
+                        break
+                    try:
+                        opt_results = self._network_optimize(trial, [key], states_basis)
+                    except Exception as exc2:
+                        path_log['violations'].append({'half': half, 'target': float(target), 'reason': f'optimisation failed: {exc2}'})
+                        break
+                    geometries.append(opt_results['final_molecule'])
+                    energies.append(float(opt_results['opt_energies'][-1]))
+                    previous = opt_results['final_molecule']
+
+            for idx, (mol, energy) in enumerate(zip(geometries, energies)):
+                target = float(targets[idx]) if idx < len(targets) else float(targets[-1])
+                actual = float(mol.get_dihedral_in_degrees(key))
+                dihedral_ok = abs(((actual - target + 180.0) % 360.0) - 180.0) <= 5.0
+                connectivity_ok = bool(np.array_equal(mol.get_connectivity_matrix(), conn_ref))
+                states_ok = True
+                drift = {}
+                for c, other_bond in enumerate(network['bonds']):
+                    if c == b:
+                        continue
+                    state = other_bond['states'][network['state_of'][start_min['index']][c]]
+                    value = float(mol.get_dihedral_in_degrees(other_bond['key']))
+                    deviation = abs(((value - state['centre'] + 180.0) % 360.0) - 180.0)
+                    drift[str(list(other_bond['key']))] = round(deviation, 2)
+                    if deviation > state['spread'] + tolerance:
+                        states_ok = False
+                record = {'half': half, 'mode': mode, 'target': target % 360.0, 'angle': actual % 360.0,
+                          'energy': energy, 'dihedral_ok': dihedral_ok, 'connectivity_ok': connectivity_ok,
+                          'states_ok': states_ok, 'other_torsion_drift_deg': drift}
+                path_log['scan_points'].append(record)
+                if not (dihedral_ok and connectivity_ok and states_ok):
+                    path_log['violations'].append({'half': half, 'target': target % 360.0,
+                                                   'reason': 'dihedral' if not dihedral_ok else
+                                                   ('connectivity' if not connectivity_ok else 'torsion state')})
+                    self.ostream.print_info(f"half {half}: continuity violated at {target % 360.0:.1f} deg "
+                                            f"({path_log['violations'][-1]['reason']}); half-scan stopped.")
+                    self.ostream.flush()
+                    break
+                candidates.append({'half': half, 'target': target % 360.0, 'angle': actual % 360.0,
+                                   'energy': energy, 'molecule': mol, 'index': len(candidates)})
+                last_points[half] = mol
+
+        # the hysteresis is defined only when both halves reached the midpoint
+        path_log['hysteresis_rmsd_angstrom'] = None
+        complete = all(sum(1 for c in candidates if c['half'] == half) == spec[half]['n'] for half in ('A', 'B'))
+        if 'A' in last_points and 'B' in last_points and complete:
+            rmsd, _, _ = svd_superimpose(last_points['A'].get_coordinates_in_angstrom(),
+                                         last_points['B'].get_coordinates_in_angstrom())
+            path_log['hysteresis_rmsd_angstrom'] = float(rmsd)
+            self.ostream.print_info(f'midpoint hysteresis (RMSD between the last points of the halves): {rmsd:.4f} Angstrom')
+        self.ostream.print_info(f"{len(candidates)} scan point(s) on this path "
+                                f"({sum(1 for c in candidates if c['half'] == 'A')} from A, "
+                                f"{sum(1 for c in candidates if c['half'] == 'B')} from B)")
+        self.ostream.flush()
+
+        return candidates
+
+    def _network_orphan_end(self, path, candidates, minima, molecule, states_basis, dih_keys, settings, log, path_log):
+        """
+        Optimises the last scan point of an orphan arc without constraints
+        and screens it like a conformer. A new distinct minimum becomes a
+        minimum datapoint and the end of the path.
+
+        :return:
+            The index of the new minimum, or None (the scan is discarded).
+        """
+
+        for orphan in log['orphans']:
+            if orphan['bond'] == path['bond'] and orphan['arc'] == path['arc'] and orphan['minimum'] == path['A'] \
+                    and orphan['direction'] == path['direction']:
+                orphan['scanned'] = True
+        if len(candidates) == 0:
+            path_log['status'] = 'orphan scan produced no point'
+            return None
+        try:
+            opt_results = self._network_optimize(candidates[-1]['molecule'], list(self.use_minimized_structures[1] or []), states_basis)
+        except Exception as exc:
+            path_log['status'] = f'orphan end optimisation failed: {exc}'
+            return None
+        end_mol = opt_results['final_molecule']
+        if self._is_same_minimum(end_mol, [m['molecule'] for m in minima]):
+            path_log['status'] = 'orphan end is a known minimum; scan discarded'
+            self.ostream.print_info('orphan arc: the end point relaxed into a known minimum; scan discarded.')
+            self.ostream.flush()
+            return None
+
+        basis = MolecularBasis.read(end_mol, states_basis['gs'])
+        datapoints = self.add_point([(end_mol, basis, self.roots_to_follow, [])], self.states_interpolation_settings,
+                                    symmetry_information=self.symmetry_information)
+        self._network_counters['single_points'] += 1
+        self._network_counters['hessians'] += 1
+        dp = datapoints[0]
+        masses = np.asarray(molecule.get_masses(), dtype=float)
+        new = {'conformer': None, 'molecule': end_mol, 'energy': float(dp.energy), 'index': len(minima),
+               'label': dp.point_label if dp.point_label is not None else f'point_{len(minima) + 1}',
+               'angles': [float(end_mol.get_dihedral_in_degrees(key)) % 360.0 for key in dih_keys],
+               'lowest_freq_cm1': self._lowest_frequency_cm1(dp.hessian, masses, dp.cartesian_coordinates,
+                                                             dp.inv_sqrt_masses is not None)}
+        new['node'] = bool(new['lowest_freq_cm1'] > -20.0)
+        minima.append(new)
+        log['minima'].append({k: new[k] for k in ('index', 'conformer', 'energy', 'label', 'angles', 'lowest_freq_cm1', 'node')})
+        candidates.pop()
+        self.ostream.print_info(f"orphan arc: new minimum {new['index']} added as {new['label']}.")
+        self.ostream.flush()
+
+        return new['index']
+
+    def _grow_path(self, path, candidates, driver, minima, earlier, states_basis, settings, path_log):
+        """
+        Stage 3b: QM energy and gradient at every candidate (cached), the
+        normalised acceptance score
+        s = max(|E_MSI - E_QM| / (N e_thr), gRMS(G_MSI - G_QM) / g_thr)
+        with the in-memory driver, then one trial point at a time: the
+        untested candidate with the largest s gets a Hessian and becomes a
+        trial datapoint (important coordinate: the scanned dihedral, radius
+        use_opt_confidence_radius[2]) appended to the in-memory driver only.
+        It is written as point_{n+1} if the path's maximum s and the summed s
+        over the acceptance set (this path, earlier paths sharing an end
+        minimum, the end minima) both decrease; otherwise it is removed from
+        memory. The path stops when all s <= 1, after max_points_per_path
+        accepted points or max_rejections_per_path consecutive rejections.
+
+        :param path:
+            The path dict.
+        :param candidates:
+            The candidate list of _relaxed_path_scan (QM data are cached in it).
+        :param driver:
+            The in-memory InterpolationDriver of the current database.
+        :param minima:
+            The minima dicts.
+        :param earlier:
+            The (end-minima set, candidates) tuples of earlier paths.
+        :param states_basis:
+            The basis-set labels dict.
+        :param settings:
+            The seed_network_settings with defaults filled in.
+        :param path_log:
+            The provenance dict of this path.
+        """
+
+        root = self.roots_to_follow[0]
+        drivers = self.drivers['gs']
+        natoms = len(minima[path['A']]['molecule'].get_labels())
+        e_thr = float(settings['e_thrsh_kcal_per_atom'] if settings['e_thrsh_kcal_per_atom'] is not None else self.energy_threshold)
+        g_thr = float(settings['g_rmsd_thrsh'] if settings['g_rmsd_thrsh'] is not None else self.gradient_rmsd_thrsh)
+        key_zmat = None
+        zmat_dihedrals = [tuple(int(x) for x in d) for d in self.roots_z_matrix[root]['dihedrals']]
+        key = path_log['dihedral']
+        zero = tuple(int(x) - 1 for x in key)
+        key_zmat = tuple(int(x) for x in key) if zero in zmat_dihedrals else tuple(int(x) for x in key[::-1])
+
+        path_log['iterations'] = []
+        path_log['accepted'] = 0
+        path_log['rejected'] = 0
+        if len(candidates) == 0:
+            path_log['status'] = 'no candidates'
+            return
+
+        for cand in candidates:
+            if 'E_qm' not in cand:
+                basis = MolecularBasis.read(cand['molecule'], states_basis['gs'])
+                energies, gradients, _ = self._compute_qm_data(drivers, cand['molecule'], basis, with_hessian=False)
+                cand['E_qm'] = float(energies[0])
+                cand['G_qm'] = np.asarray(gradients[0], dtype=float).reshape(-1)
+                cand['basis'] = basis
+                self._network_counters['single_points'] += 1
+
+        # the end minima must stay exact: their stored QM data are the reference
+        sqrt_masses = np.sqrt(np.repeat(np.asarray(minima[path['A']]['molecule'].get_masses(), dtype=float), 3))
+        end_entries = []
+        for end in (path['A'], path['B']):
+            label = minima[end]['label']
+            dp = None
+            for point in driver.qm_data_points:
+                if str(point.point_label).startswith(label + '_'):
+                    dp = point
+                    break
+            if dp is None:
+                continue
+            grad = np.asarray(dp.gradient, dtype=float).reshape(-1)
+            if self.use_mass_weight:
+                grad = grad * sqrt_masses
+            end_entries.append({'molecule': minima[end]['molecule'], 'E_qm': float(dp.energy), 'G_qm': grad, 'minimum': end})
+
+        acceptance_set = list(candidates)
+        for ends, cands in earlier:
+            if ends & {path['A'], path['B']}:
+                acceptance_set.extend(cands)
+        acceptance_set.extend(end_entries)
+
+        def _score(entry):
+            driver.compute(entry['molecule'])
+            e_msi = float(driver.impes_coordinate.energy)
+            g_msi = np.asarray(driver.impes_coordinate.gradient, dtype=float).reshape(-1)
+            de = abs(e_msi - entry['E_qm']) * hartree_in_kcalpermol() / (natoms * e_thr)
+            grms = np.sqrt(np.mean((g_msi - entry['G_qm'])**2)) * hartree_in_kcalpermol() / bohr_in_angstrom() / g_thr
+            return max(de, grms), de, grms
+
+        def _metrics():
+            scores = [_score(c)[0] for c in candidates]
+            set_scores = [_score(c)[0] for c in acceptance_set]
+            return scores, max(scores), float(np.sum(set_scores))
+
+        tested = set()
+        consecutive_rejections = 0
+        status = 'stopped'
+        while True:
+            scores, path_max, set_sum = _metrics()
+            if path_max <= 1.0:
+                status = 'converged (all s <= 1)'
+                break
+            if path_log['accepted'] >= int(settings['max_points_per_path']):
+                status = 'max_points_per_path reached'
+                break
+            if consecutive_rejections >= int(settings['max_rejections_per_path']):
+                status = 'max_rejections_per_path reached'
+                break
+            untested = [i for i in range(len(candidates)) if i not in tested]
+            if len(untested) == 0:
+                status = 'all candidates tested'
+                break
+            pick = max(untested, key=lambda i: scores[i])
+            cand = candidates[pick]
+            s_pick, de_pick, grms_pick = _score(cand)
+
+            hessians = self._compute_hessian(drivers[2], cand['molecule'], cand['basis'])
+            self._network_counters['hessians'] += 1
+            inv_sqrt_masses = None
+            if self.use_mass_weight:
+                inv_sqrt_masses = 1.0 / np.sqrt(np.repeat(cand['molecule'].get_masses().copy(), 3))
+            trial = self._build_interpolation_datapoint(
+                cand['molecule'], self.roots_z_matrix[root], self.states_interpolation_settings[root], [key_zmat],
+                cand['E_qm'], cand['G_qm'].reshape(natoms, 3), hessians[0], inv_sqrt_masses)
+            driver.qm_data_points.append(trial)
+            tested.add(pick)
+
+            _, path_max_after, set_sum_after = _metrics()
+            accepted = bool(path_max_after < path_max and set_sum_after < set_sum)
+            iteration = {'candidate': pick, 'half': cand['half'], 'angle': cand['angle'], 's_before': s_pick,
+                         'dE_norm': de_pick, 'gRMS_norm': grms_pick, 'path_max_before': path_max,
+                         'set_sum_before': set_sum, 'path_max_after': path_max_after, 'set_sum_after': set_sum_after,
+                         'accepted': accepted, 'label': None}
+            if accepted:
+                label = self._write_interpolation_datapoint(trial, root, self.states_interpolation_settings)
+                iteration['label'] = label
+                path_log['accepted'] += 1
+                consecutive_rejections = 0
+            else:
+                driver.qm_data_points.pop()
+                path_log['rejected'] += 1
+                consecutive_rejections += 1
+            path_log['iterations'].append(iteration)
+            self.ostream.print_info(
+                f"  trial at {cand['angle']:.1f} deg (half {cand['half']}): s = {s_pick:.3f}; path max "
+                f"{path_max:.3f} -> {path_max_after:.3f}; set sum {set_sum:.3f} -> {set_sum_after:.3f}; "
+                f"{'accepted as ' + str(iteration['label']) if accepted else 'rejected'}")
+            self.ostream.flush()
+
+        scores, path_max, set_sum = _metrics()
+        path_log['status'] = status
+        path_log['final_scores'] = [float(s) for s in scores]
+        path_log['final_path_max'] = float(path_max)
+        self.ostream.print_info(f"  path done: {status}; accepted {path_log['accepted']}, rejected "
+                                f"{path_log['rejected']}, final max s = {path_max:.3f}")
+        self.ostream.flush()
+
+    def _load_interpolation_driver(self, molecule, root, im_settings, datafile):
+        """
+        Builds an InterpolationDriver with all datapoints of a database file
+        in memory, set up as the confirmation step does (mass weighting,
+        symmetry information, eq bond lengths from the first point).
+
+        :param molecule:
+            The molecule (for the masses).
+        :param root:
+            The electronic state.
+        :param im_settings:
+            The interpolation settings dicts per root.
+        :param datafile:
+            The database file.
+
+        :return:
+            The driver.
+        """
+
+        masses = molecule.get_masses().copy()
+        masses_cart = np.repeat(masses, 3)
+        inv_sqrt_masses = 1.0 / np.sqrt(masses_cart)
+
+        impes_driver = InterpolationDriver(self.roots_z_matrix[root])
+        impes_driver.update_settings(im_settings[root])
+        impes_driver.impes_coordinate.inv_sqrt_masses = inv_sqrt_masses
+        if root == 0:
+            impes_driver.symmetry_information = self.symmetry_information['gs']
+        else:
+            impes_driver.symmetry_information = self.symmetry_information['es']
+
+        im_labels, _ = impes_driver.read_labels()
+        # old_label = None
+        impes_driver.qm_data_points = []
+
+        for label in im_labels:
+            qm_data_point = InterpolationDatapoint(self.roots_z_matrix[root])
+            qm_data_point.update_settings(im_settings[root])
+            qm_data_point.read_hdf5(datafile, label)
+
+            if impes_driver.impes_coordinate.eq_bond_lengths is None:
+                impes_driver.impes_coordinate.eq_bond_lengths = qm_data_point.eq_bond_lengths
+
+            # old_label = qm_data_point.point_label
+            impes_driver.qm_data_points.append(qm_data_point)
+
+        return impes_driver
+
+    def _compute_qm_data(self, drivers, molecule, basis, states=None, with_hessian=True):
+        """
+        Computes the QM energies, gradients and (optionally) Hessians of a
+        molecule with a driver triple, as add_point does.
+
+        :param drivers:
+            The (energy, gradient, Hessian) drivers.
+        :param molecule:
+            The molecule.
+        :param basis:
+            The basis set.
+        :param states:
+            The states selected from a response solver (None: all).
+        :param with_hessian:
+            False to skip the Hessian (returned as None).
+
+        :return:
+            The energies, gradients and Hessians.
+        """
+
+        energies, scf_results, rsp_results = self._compute_energy(drivers[0], molecule, basis)
+
+        if isinstance(drivers[0], LinearResponseEigenSolver) or isinstance(drivers[0], TdaEigenSolver):
+            energies = energies[states]
+
+        gradients = self._compute_gradient(drivers[1], molecule, basis, scf_results, rsp_results)
+        hessians = self._compute_hessian(drivers[2], molecule, basis) if with_hessian else None
+
+        return energies, gradients, hessians
+
+    def _build_interpolation_datapoint(self, molecule, z_matrix, settings, constraints, energy, gradient, hessian,
+                                       inv_sqrt_masses):
+        """
+        Builds the InterpolationDatapoint of a geometry from its QM data
+        (mass weighting, Cartesian to internal transformation, important
+        coordinates from the 1-based constraint list, confidence radius
+        use_opt_confidence_radius[2]), exactly as add_point does.
+
+        :param molecule:
+            The molecule.
+        :param z_matrix:
+            The z-matrix dict.
+        :param settings:
+            The interpolation settings dict of the root.
+        :param constraints:
+            The 1-based constraint tuples that become the important coordinates.
+        :param energy:
+            The QM energy.
+        :param gradient:
+            The Cartesian QM gradient.
+        :param hessian:
+            The Cartesian QM Hessian.
+        :param inv_sqrt_masses:
+            The inverse square roots of the masses (3N), or None.
+
+        :return:
+            The datapoint.
+        """
+
+        imp_int_constraints = {'bonds': [], 'angles': [], 'dihedrals': [], 'impropers': []}
+        for constraint in constraints:
+            constraint = [int(x) - 1 for x in constraint]
+            if len(constraint) == 2:
+                imp_int_constraints["bonds"].append(constraint)
+            if len(constraint) == 3:
+                imp_int_constraints["angles"].append(constraint)
+            if len(constraint) == 4:
+                imp_int_constraints["dihedrals"].append(constraint)
+
+        grad = gradient.copy()
+        hess = hessian.copy()
+        grad_vec = grad.reshape(-1)         # (3N,)
+        hess_mat = hess.reshape(grad_vec.size, grad_vec.size)
+        mw_grad_vec = grad_vec
+        mw_hess_mat = hess_mat
+        if self.use_mass_weight:
+            mw_grad_vec = inv_sqrt_masses * grad_vec
+            mw_hess_mat = (inv_sqrt_masses[:, None] * hess_mat) * inv_sqrt_masses[None, :]
+
+        impes_coordinate = InterpolationDatapoint(z_matrix)
+        impes_coordinate.update_settings(settings)
+        impes_coordinate.cartesian_coordinates = molecule.get_coordinates_in_bohr()
+        impes_coordinate.eq_bond_lengths = self.eq_bond_length
+        impes_coordinate.imp_int_coordinates = imp_int_constraints
+        impes_coordinate.inv_sqrt_masses = inv_sqrt_masses
+        impes_coordinate.energy = energy
+        impes_coordinate.gradient = mw_grad_vec.reshape(grad.shape)
+        impes_coordinate.hessian = mw_hess_mat.reshape(hess.shape)
+        impes_coordinate.transform_gradient_and_hessian()
+
+        trust_radius = self.use_opt_confidence_radius[2]
+        impes_coordinate.confidence_radius = trust_radius
+
+        return impes_coordinate
+
+    def _write_interpolation_datapoint(self, impes_coordinate, target_root, interpolation_settings, label=None):
+        """
+        Writes a datapoint to the database of a root and to its _org copy, as
+        add_point does. Without a label the next point_{n+1} label is used.
+
+        :param impes_coordinate:
+            The datapoint.
+        :param target_root:
+            The electronic state.
+        :param interpolation_settings:
+            The interpolation settings dicts per root.
+        :param label:
+            The label, or None.
+
+        :return:
+            The label.
+        """
+
+        target_file = interpolation_settings[target_root]['imforcefield_file']
+
+        if label is None:
+            interpolation_driver = InterpolationDriver(self.roots_z_matrix[target_root])
+            interpolation_driver.update_settings(interpolation_settings[target_root])
+            interpolation_driver.imforcefield_file = target_file
+            sorted_labels = []
+            if Path(target_file).exists():
+                org_labels, _ = interpolation_driver.read_labels()
+                labels = [lbl for lbl in org_labels if '_symmetry' not in lbl]
+                sorted_labels = sorted(labels, key=lambda x: int(x.split('_')[1]))
+            label = f'point_{len(sorted_labels) + 1}'
+
+        impes_coordinate.write_hdf5(target_file, label)
+
+        impes_coordinate.write_hdf5(f'im_database_{target_root}_org.h5', label)
+        impes_coordinate.point_label = label
+
+        return label
 
     def _calculate_translation_coordinates(self, cart_coord):
         """Center the molecule by translating its geometric center to (0, 0, 0)."""
@@ -2262,6 +3476,140 @@ class IMForceFieldGenerator:
             opt_constraint_list.append(opt_constraint)
 
         return opt_constraint_list
+
+    def _is_same_minimum(self, molecule, candidates):
+        """
+        Checks whether an optimised structure is one of the candidates, i.e.
+        the all-atom RMSD after superposition is below
+        seed_duplicate_rmsd_thrsh (Angstrom). Always False if that is None.
+
+        :param molecule:
+            The optimised molecule.
+        :param candidates:
+            The molecules to compare with.
+
+        :return:
+            True if the molecule is the same minimum as a candidate.
+        """
+
+        if self.seed_duplicate_rmsd_thrsh is None:
+            return False
+
+        xyz = molecule.get_coordinates_in_angstrom()
+        for candidate in candidates:
+            rmsd, _, _ = svd_superimpose(xyz, candidate.get_coordinates_in_angstrom())
+            if rmsd < self.seed_duplicate_rmsd_thrsh:
+                return True
+
+        return False
+
+    def _place_scan_seed(self, base_molecules, dih_key, target_deg, tol_deg=2.0,
+                         grid_step_deg=30.0, max_aux_bonds=3, max_aux_simultaneous=2):
+        """
+        Places a scan seed with dihedral dih_key at target_deg when a rigid
+        rotation is blocked by a steric clash (Molecule.set_dihedral then
+        stops early without error).
+
+        A rigid rotation is tried from every base molecule first. Otherwise
+        up to max_aux_simultaneous of the max_aux_bonds rotatable bonds
+        closest to the scanned bond are rotated on a grid of grid_step_deg,
+        and the geometry with unchanged connectivity and the largest clearance
+        (shortest distance between atoms four or more bonds apart) is kept.
+
+        :param base_molecules:
+            The molecules to start from, preferred one first.
+        :param dih_key:
+            The scanned dihedral (1-based).
+        :param target_deg:
+            The target value of the dihedral in degree.
+        :param tol_deg:
+            The accepted deviation from the target in degree.
+        :param grid_step_deg:
+            The grid step of the auxiliary rotations in degree.
+        :param max_aux_bonds:
+            The number of nearest rotatable bonds used for relief.
+        :param max_aux_simultaneous:
+            The largest number of auxiliary bonds rotated at once.
+
+        :return:
+            The molecule and the list of (1-based auxiliary dihedral, change in
+            degree), or (None, None) if no clash-free geometry was found.
+        """
+
+        from scipy.sparse.csgraph import shortest_path
+
+        def _circ_err_deg(actual, target):
+            return abs(((actual - target + 180.0) % 360.0) - 180.0)
+
+        def _copy(mol):
+            new_mol = Molecule.from_xyz_string(mol.get_xyz_string())
+            new_mol.set_charge(mol.get_charge())
+            new_mol.set_multiplicity(mol.get_multiplicity())
+            return new_mol
+
+        for base_mol in base_molecules:
+            trial = _copy(base_mol)
+            trial.set_dihedral_in_degrees(dih_key, target_deg, verbose=False)
+            if _circ_err_deg(trial.get_dihedral_in_degrees(dih_key), target_deg) <= tol_deg:
+                return trial, []
+
+        labels = base_molecules[0].get_labels()
+        conn = base_molecules[0].get_connectivity_matrix()
+        bond_dist = shortest_path(conn, unweighted=True)
+        far_pairs = (bond_dist >= 4.0)
+        central = tuple(sorted((dih_key[1] - 1, dih_key[2] - 1)))
+
+        def _clearance(mol):
+            if not np.any(far_pairs):
+                return np.inf
+            xyz = mol.get_coordinates_in_bohr()
+            dist = np.linalg.norm(xyz[:, None, :] - xyz[None, :, :], axis=-1)
+            return float(np.min(dist[far_pairs]))
+
+        def _end_atom(center, exclude):
+            nbrs = [int(x) for x in np.nonzero(conn[center])[0] if x != exclude]
+            heavy = [x for x in nbrs if labels[x] != 'H']
+            pool = heavy if heavy else nbrs
+            return min(pool) if pool else None
+
+        # auxiliary torsions around the rotatable bonds closest to the scanned bond
+        aux_bonds = sorted(
+            {tuple(sorted(bond)) for bond in (self.all_rotatable_bonds or [])} - {central},
+            key=lambda bond: min(bond_dist[a, b] for a in bond for b in central))
+        aux_dihedrals = []
+        for b, c in aux_bonds:
+            a, d = _end_atom(b, c), _end_atom(c, b)
+            if a is not None and d is not None:
+                aux_dihedrals.append((a + 1, b + 1, c + 1, d + 1))
+        aux_dihedrals = aux_dihedrals[:max_aux_bonds]
+
+        n_grid = int(round(360.0 / grid_step_deg))
+        deltas = [k * grid_step_deg for k in range(1, n_grid)]
+
+        for n_aux in range(1, max_aux_simultaneous + 1):
+            best = None
+            for base_mol in base_molecules:
+                for subset in itertools.combinations(aux_dihedrals, n_aux):
+                    for combo in itertools.product(deltas, repeat=n_aux):
+                        trial = _copy(base_mol)
+                        applied = []
+                        for aux, delta in zip(subset, combo):
+                            phi_0 = trial.get_dihedral_in_degrees(aux)
+                            trial.set_dihedral_in_degrees(aux, phi_0 + delta, verbose=False)
+                            phi_1 = trial.get_dihedral_in_degrees(aux)
+                            applied.append((aux, (phi_1 - phi_0 + 180.0) % 360.0 - 180.0))
+                        trial.set_dihedral_in_degrees(dih_key, target_deg, verbose=False)
+                        if _circ_err_deg(trial.get_dihedral_in_degrees(dih_key), target_deg) > tol_deg:
+                            continue
+                        if np.max(np.abs(trial.get_connectivity_matrix() - conn)) > 1.0e-10:
+                            continue
+                        score = (_clearance(trial), -sum(abs(x) for _, x in applied))
+                        if best is None or score > best[0]:
+                            best = (score, trial, applied)
+            if best is not None:
+                return best[1], best[2]
+
+        return None, None
 
     def _run_optimization(self, optimization_driver, molecule, constraints=None, transition=False, index_offset=1, compute_args=None, source_molecule=None):
 
