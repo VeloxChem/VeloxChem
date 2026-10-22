@@ -48,8 +48,10 @@ from .scfunrestdriver import ScfUnrestrictedDriver
 from .lreigensolver import LinearResponseEigenSolver
 from .cppsolver import ComplexResponseSolver
 from .spectrumaverager import SpectrumAverager
+from .ensembleparser import EnsembleParser
 from .environment import get_data_path
 from .errorhandler import assert_msg_critical
+from .inputparser import parse_bool, parse_input, parse_seq_range
 
 
 class EnsembleDriver:
@@ -146,6 +148,28 @@ class EnsembleDriver:
 
         self.pe_model = None
         self.npe_model = None
+
+        # Input-driven state (see update_settings/compute_from_input)
+        self.description = 'N/A'
+        self.trajectory_file = None
+        self.topology_file = None
+        self.pdb_file = None
+        self.qm_region = ''
+        self.qm_charge = 0
+        self.qm_multiplicity = 1
+        self.pe_cutoff = None
+        self.npe_cutoff = None
+        self.start = None
+        self.end = None
+        self.num_snapshots = None
+        self.sampling_times = None
+        self.last_snapshot_only = False
+        self.output_dir = Path('pot_frames')
+
+        self.method_dict = {}
+        self.scf_dict = {}
+        self.rsp_dict = {}
+        self.spectrum_dict = {}
 
     def _load_pe_db(self, csv_path: Path) -> dict:
         """
@@ -475,6 +499,159 @@ class EnsembleDriver:
             }
         else:
             self.npe_model = None
+
+    @staticmethod
+    def _parse_model_names(model_names):
+        """
+        Parse a model selection from an input-file value.
+
+        Accepts a single string, a comma/space-separated string, or a list/tuple
+        of such strings. Returns a list of model names or None when empty.
+        """
+        if model_names is None:
+            return None
+
+        if isinstance(model_names, str):
+            names = model_names.replace(',', ' ').split()
+        else:
+            names = []
+            for item in model_names:
+                names.extend(str(item).replace(',', ' ').split())
+
+        return names or None
+
+    def update_settings(self,
+                        ensemble_dict,
+                        spectrum_dict=None,
+                        scf_dict=None,
+                        rsp_dict=None,
+                        method_dict=None):
+        """
+        Updates settings for an input-file driven ensemble calculation.
+
+        The ``@ensemble`` input section is mapped onto the arguments of
+        :meth:`EnsembleParser.structures`. The ``@scf`` and ``@response``
+        sections are merged with the common ``@method settings`` section to
+        build the SCF and response option dictionaries.
+
+        :param ensemble_dict:
+            The dictionary of ensemble/trajectory input.
+        :param spectrum_dict:
+            The dictionary of spectrum settings.
+        :param scf_dict:
+            The dictionary of SCF settings.
+        :param rsp_dict:
+            The dictionary of response settings.
+        :param method_dict:
+            The dictionary of method settings.
+        """
+        ensemble_dict = dict(ensemble_dict or {})
+
+        self.spectrum_dict = dict(spectrum_dict or {})
+        self.scf_dict = dict(scf_dict or {})
+        self.rsp_dict = dict(rsp_dict or {})
+        self.method_dict = dict(method_dict or {})
+
+        self.description = str(ensemble_dict.get('description', 'N/A'))
+
+        self.trajectory_file = ensemble_dict.get('trajectory_file')
+        self.topology_file = ensemble_dict.get('topology_file')
+        self.pdb_file = ensemble_dict.get('pdb_file')
+
+        self.qm_region = str(ensemble_dict.get('qm_region', '')).strip()
+        self.qm_charge = int(ensemble_dict.get('qm_charge', 0))
+        self.qm_multiplicity = int(ensemble_dict.get('qm_multiplicity', 1))
+
+        self.pe_cutoff = None
+        self.npe_cutoff = None
+        self.start = None
+        self.end = None
+        self.num_snapshots = None
+        self.sampling_times = None
+        self.last_snapshot_only = False
+
+        if 'pe_cutoff' in ensemble_dict:
+            self.pe_cutoff = float(ensemble_dict['pe_cutoff'])
+        if 'npe_cutoff' in ensemble_dict:
+            self.npe_cutoff = float(ensemble_dict['npe_cutoff'])
+
+        if 'start' in ensemble_dict:
+            self.start = float(ensemble_dict['start'])
+        if 'end' in ensemble_dict:
+            self.end = float(ensemble_dict['end'])
+        if 'num_snapshots' in ensemble_dict:
+            self.num_snapshots = int(ensemble_dict['num_snapshots'])
+        if 'sampling_times' in ensemble_dict:
+            self.sampling_times = np.asarray(
+                parse_seq_range(ensemble_dict['sampling_times']), dtype=float)
+        if 'last_snapshot_only' in ensemble_dict:
+            self.last_snapshot_only = parse_bool(
+                ensemble_dict['last_snapshot_only'])
+
+        self.output_dir = Path('pot_frames')
+        if 'output_dir' in ensemble_dict:
+            self.output_dir = Path(str(ensemble_dict['output_dir']))
+        elif 'potdir' in ensemble_dict:
+            self.output_dir = Path(str(ensemble_dict['potdir']))
+        elif 'filename' in ensemble_dict:
+            self.output_dir = Path(str(ensemble_dict['filename']) + '_files')
+
+        pe_model = self._parse_model_names(ensemble_dict.get('pe_model'))
+        npe_model = self._parse_model_names(ensemble_dict.get('npe_model'))
+        if pe_model is not None or npe_model is not None:
+            self.set_env_models(pe_model=pe_model, npe_model=npe_model)
+
+    def compute_from_input(self):
+        """
+        Runs an input-file driven ensemble calculation.
+
+        The trajectory is parsed with :class:`EnsembleParser` using the settings
+        stored by :meth:`update_settings`, followed by :meth:`compute`.
+
+        :return:
+            The results dictionary returned by :meth:`compute`.
+        """
+        basis_set = self.method_dict.get('basis')
+        basis_path = self.method_dict.get('basis_path', '.')
+        if basis_set is None:
+            raise ValueError(
+                "EnsembleDriver: missing 'basis' in @method settings.")
+
+        method_options = {
+            key: val
+            for key, val in self.method_dict.items()
+            if key not in {'basis', 'basis_path', 'pe_options'}
+        }
+
+        # Common method settings take precedence over explicit @scf/@response
+        # settings.
+        scf_options = {**self.scf_dict, **method_options}
+        property_options = {**self.rsp_dict, **method_options}
+
+        snapshots = EnsembleParser(self.comm, self.ostream).structures(
+            trajectory_file=self.trajectory_file,
+            topology_file=self.topology_file,
+            pdb_file=self.pdb_file,
+            qm_region=self.qm_region,
+            qm_charge=self.qm_charge,
+            qm_multiplicity=self.qm_multiplicity,
+            pe_cutoff=self.pe_cutoff,
+            npe_cutoff=self.npe_cutoff,
+            start=self.start,
+            end=self.end,
+            num_snapshots=self.num_snapshots,
+            sampling_times=self.sampling_times,
+            last_snapshot_only=self.last_snapshot_only,
+        )
+
+        return self.compute(
+            snapshots,
+            basis_set=basis_set,
+            scf_options=scf_options,
+            property_options=property_options,
+            potdir=self.output_dir,
+            basis_path=basis_path,
+        )
 
     @staticmethod
     def _first_residue_atom_pattern(atom_names, residue_ids, resnames, target_resname: str) -> list[str]:
@@ -1116,12 +1293,28 @@ class EnsembleDriver:
     @staticmethod
     def _apply_options_to_driver(driver, options: dict, skip_keys: set[str] | None = None):
         """
-        Apply dictionary options to a driver using setattr with key validation.
+        Apply dictionary options to a driver using its input keyword types when
+        available, and setattr with key validation otherwise.
         """
         if skip_keys is None:
             skip_keys = set()
+
+        keyword_types = {}
+        for group, keywords in getattr(driver, '_input_keywords', {}).items():
+            if group in ('scf', 'response', 'method_settings'):
+                keyword_types.update({
+                    key: val[0] for key, val in keywords.items()
+                })
+
+        parsed_options = {
+            key: val
+            for key, val in options.items()
+            if key not in skip_keys and key in keyword_types
+        }
+        parse_input(driver, keyword_types, parsed_options)
+
         for key, val in options.items():
-            if key in skip_keys:
+            if key in skip_keys or key in keyword_types:
                 continue
             if not hasattr(driver, key):
                 raise ValueError(
@@ -1202,6 +1395,7 @@ class EnsembleDriver:
         embedding_method: str = "fika",
         fika_r_on: float = 1.0,
         fika_r_off: float = 1.9,
+        basis_path: str | Path = ".",
     ):
         """
         Drives the computation over the ensemble of snapshots.
@@ -1246,6 +1440,8 @@ class EnsembleDriver:
         :param fika_r_off: (float)
             Outer switching radius (angstrom) of the fika embedding: S(r) = 1
             above it.
+        :param basis_path: (str or Path)
+            Directory containing custom basis-set files.
 
         :return:
             Dictionary with keys:
@@ -1348,7 +1544,7 @@ class EnsembleDriver:
                     f"Incompatible QM charge ({snap_qm_charge}) and multiplicity"
                     f"({snap_qm_multiplicity}) for frame {frame}."
                 )
-            basis = MolecularBasis.read(molecule, basis_set)
+            basis = MolecularBasis.read(molecule, basis_set, str(basis_path))
 
             pe_coords = np.asarray(snap.get("pe_coords", []), dtype=float)
             npe_coords = np.asarray(snap.get("npe_coords", []), dtype=float)

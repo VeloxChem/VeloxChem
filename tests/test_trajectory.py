@@ -3,69 +3,73 @@ import numpy as np
 import pytest
 
 from veloxchem.mpitask import MpiTask
-from veloxchem.trajectorydriver import TrajectoryDriver
-from veloxchem.veloxchemlib import mpi_master
+from veloxchem.ensembledriver import EnsembleDriver
+from veloxchem.veloxchemlib import mpi_master, hartree_in_ev
+
+pytest.importorskip("MDAnalysis")
 
 
 @pytest.mark.solvers
-class TestTrajectoryDriver:
-
-    def run_trajectory(self, filename, ref_exc_energies, ref_osc_strengths):
-
-        inpfile = f'{filename}.inp'
-        xtcfile = f'{filename}.xtc'
-        tprfile = f'{filename}.tpr'
-
-        task = MpiTask([inpfile, None])
-
-        task.input_dict['trajectory']['trajectory_file'] = xtcfile
-        task.input_dict['trajectory']['topology_file'] = tprfile
-        task.input_dict['trajectory']['filename'] = filename
-        task.input_dict['trajectory']['charges'] = task.input_dict['charges']
-        task.input_dict['trajectory']['polarizabilities'] = task.input_dict[
-            'polarizabilities']
-
-        traj_drv = TrajectoryDriver(task.mpi_comm, task.ostream)
-        traj_drv.update_settings(task.input_dict['trajectory'],
-                                 task.input_dict['spectrum_settings'],
-                                 task.input_dict['response'],
-                                 task.input_dict['method_settings'])
-        traj_drv.compute(task.molecule, task.ao_basis)
-
-        if task.mpi_rank == mpi_master():
-            exc_energies = []
-            osc_strengths = []
-
-            dir_path = Path(filename + '_files')
-            files = sorted([x for x in dir_path.iterdir() if x.is_file()])
-            for x in files:
-                if (x.name.startswith(Path(filename).name) and
-                        x.suffix == '.out'):
-                    with x.open() as fh:
-                        for line in fh:
-                            if 'Osc.Str.' in line:
-                                content = line.split()
-                                exc_energies.append(float(content[5]))
-                                osc_strengths.append(float(content[8]))
-                x.unlink()
-
-            npzfile = dir_path.parent / '.bithio.xtc_offsets.npz'
-            if npzfile.is_file():
-                npzfile.unlink()
-
-            assert np.max(
-                np.abs(np.array(exc_energies) -
-                       np.array(ref_exc_energies))) < 0.02
-            assert np.max(
-                np.abs(np.array(osc_strengths) -
-                       np.array(ref_osc_strengths))) < 0.01
+class TestEnsembleDriverInput:
 
     def test_trajectory_bithio(self):
 
         here = Path(__file__).parent
-        filename = str(here / 'data' / 'bithio')
+        data_dir = here / "data"
+        inpfile = data_dir / "bithio.inp"
 
-        ref_exc_energies = [5.790027, 7.172051, 5.628371, 7.199163]
-        ref_osc_strengths = [0.5414, 0.0181, 0.5529, 0.1210]
+        task = MpiTask([str(inpfile), None])
 
-        self.run_trajectory(filename, ref_exc_energies, ref_osc_strengths)
+        ensemble_dict = dict(task.input_dict["ensemble"])
+        ensemble_dict["trajectory_file"] = str(data_dir / "bithio.xtc")
+        ensemble_dict["topology_file"] = str(data_dir / "bithio.tpr")
+        ensemble_dict["output_dir"] = str(data_dir)
+
+        ens_drv = EnsembleDriver(task.mpi_comm, task.ostream)
+        ens_drv.update_settings(
+            ensemble_dict,
+            task.input_dict.get("spectrum_settings"),
+            task.input_dict.get("scf"),
+            task.input_dict.get("response"),
+            task.input_dict.get("method_settings"),
+        )
+
+        try:
+            results = ens_drv.compute_from_input()
+
+            if task.mpi_rank == mpi_master():
+                ref_frames = [6, 8]
+                ref_exc_energies = np.array(
+                    [5.790027, 7.172051, 5.628371, 7.199163])
+                ref_osc_strengths = np.array(
+                    [0.5414, 0.0181, 0.5529, 0.1210])
+
+                got_frames = [
+                    int(frame) for frame, _ in results["rsp_all"]
+                ]
+                assert got_frames == ref_frames
+
+                exc_energies = []
+                osc_strengths = []
+                for _, rsp_res in results["rsp_all"]:
+                    exc_energies.extend(
+                        np.asarray(rsp_res["eigenvalues"], dtype=float) *
+                        hartree_in_ev())
+                    osc_strengths.extend(
+                        np.asarray(rsp_res["oscillator_strengths"],
+                                   dtype=float))
+
+                assert np.max(
+                    np.abs(np.array(exc_energies) -
+                           ref_exc_energies)) < 0.02
+                assert np.max(
+                    np.abs(np.array(osc_strengths) -
+                           ref_osc_strengths)) < 0.01
+
+        finally:
+            if task.mpi_rank == mpi_master():
+                (data_dir / ".bithio.xtc_offsets.npz").unlink(
+                    missing_ok=True)
+                for frame in (6, 8):
+                    (data_dir / f"pe_frame_{frame:06d}.pot").unlink(
+                        missing_ok=True)

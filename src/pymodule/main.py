@@ -74,7 +74,7 @@ from .cppsolver import ComplexResponseSolver
 from .polarizabilitygradient import PolarizabilityGradient
 from .vibrationalanalysis import VibrationalAnalysis
 from .visualizationdriver import VisualizationDriver
-from .trajectorydriver import TrajectoryDriver
+from .ensembledriver import EnsembleDriver
 from .xtbdriver import XtbDriver
 from .xtbgradientdriver import XtbGradientDriver
 from .xtbhessiandriver import XtbHessianDriver
@@ -350,23 +350,22 @@ def _main_body():
         force_field_drv.update_settings(force_field_dict, resp_dict)
         force_field_drv.compute(task.molecule, task.ao_basis)
 
-    # Spectrum from trajectory
+    # Ensemble/trajectory calculation
 
-    if task_type == 'trajectory':
-        traj_dict = (dict(task.input_dict['trajectory'])
-                     if 'trajectory' in task.input_dict else {})
+    if task_type == 'ensemble':
+        ensemble_dict = (dict(task.input_dict['ensemble'])
+                         if 'ensemble' in task.input_dict else {})
         spect_dict = (dict(task.input_dict['spectrum_settings'])
                       if 'spectrum_settings' in task.input_dict else {})
+        scf_dict = (dict(task.input_dict['scf'])
+                    if 'scf' in task.input_dict else {})
         rsp_dict = (dict(task.input_dict['response'])
                     if 'response' in task.input_dict else {})
 
-        traj_dict['filename'] = task.input_dict['filename']
-        traj_dict['charges'] = task.input_dict['charges']
-        traj_dict['polarizabilities'] = task.input_dict['polarizabilities']
-
-        traj_drv = TrajectoryDriver(task.mpi_comm, task.ostream)
-        traj_drv.update_settings(traj_dict, spect_dict, rsp_dict, method_dict)
-        traj_drv.compute(task.molecule, task.ao_basis)
+        ens_drv = EnsembleDriver(task.mpi_comm, task.ostream)
+        ens_drv.update_settings(ensemble_dict, spect_dict, scf_dict, rsp_dict,
+                                method_dict)
+        ens_drv.compute_from_input()
 
     # Diatomic vibronic spectrum using Numerov
 
