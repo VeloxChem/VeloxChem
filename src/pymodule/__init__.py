@@ -234,6 +234,7 @@ from .reactionmatcher import ReactionMatcher
 from .smddriver import SmdDriver
 from .atombdedriver import AtomBdeDriver
 from .orbitallocalization import OrbitalLocalizationDriver
+from .embeddingparser import EmbeddingParser
 from .ensembleparser import EnsembleParser
 from .ensembledriver import EnsembleDriver
 from .spectrumaverager import SpectrumAverager

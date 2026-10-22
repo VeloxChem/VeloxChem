@@ -1,7 +1,7 @@
 import pytest
 import numpy as np
 
-import veloxchem.ensembleparser as ensembleparser_module
+import veloxchem.trajectoryparserbase as trajectoryparserbase_module
 from veloxchem.ensembleparser import EnsembleParser
 
 pytest.importorskip("MDAnalysis")
@@ -69,9 +69,10 @@ class TestEnsembleParser:
             universe_kwargs.update(kwargs)
             raise UniverseCalled
 
-        monkeypatch.setattr(ensembleparser_module, "version", fake_version)
+        monkeypatch.setattr(trajectoryparserbase_module, "version",
+                            fake_version)
         monkeypatch.setattr(
-            ensembleparser_module.mda,
+            trajectoryparserbase_module.mda,
             "Universe",
             fake_universe,
         )
