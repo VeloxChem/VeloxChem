@@ -83,7 +83,12 @@ class RIJKFockDriver:
         self.metric_threshold = 1.0e-12
 
         if _RIJKFockDriver is None:
-            raise ImportError('_RIJKFockDriver is not available')
+            raise ImportError('RIJKFockDriver requires the legacy (non-SIMD) '
+                              "driver '_RIJKFockDriver', which is not included "
+                              'in this build. It is only compiled when '
+                              'VeloxChem is configured with the CMake option '
+                              '-DVLX_USE_OLD_RI=YES; rebuild with that option '
+                              'to use this class.')
 
         self._ri_drv = _RIJKFockDriver()
 
