@@ -38,7 +38,8 @@ import sys
 import csv
 import re
 
-from .veloxchemlib import mpi_master, hartree_in_ev
+from .veloxchemlib import (mpi_master, hartree_in_ev, avogadro_constant,
+                           bohr_in_angstrom)
 from .outputstream import OutputStream
 from .molecule import Molecule
 from .molecularbasis import MolecularBasis
@@ -702,7 +703,8 @@ class EnsembleDriver:
         averaged_spectra_filename: str | Path = "averaged_spectra.csv",
     ):
         """
-        Computes and saves averaged UV/Vis spectra data to a CSV file.
+        Computes and saves averaged absorption or ECD spectra data to a CSV
+        file.
 
         Unlike :meth:`plot_uv_vis_spectra`, this method does not require
         matplotlib.
@@ -740,29 +742,117 @@ class EnsembleDriver:
                 "either 'nstates' or 'frequencies' to EnsembleDriver.compute())."
             )
 
+        if 'property' not in self.rsp_dict:
+            raise ValueError(
+                "A 'property' is required for response calculations.")
+
+        rsp_all = results["rsp_all"]
+        property_name, is_cpp = self._parse_property_type(
+            self.rsp_dict['property'])
+        if is_cpp:
+            return self._save_cpp_spectra(
+                rsp_all, averaged_spectra_filename, property_name)
+
         spec_avg = SpectrumAverager(comm=self.comm, ostream=self.ostream)
         if broadening_type is not None:
             spec_avg.broadening_type = str(broadening_type).lower()
         if broadening_value_ev is not None:
             spec_avg.broadening_value_ev = float(broadening_value_ev)
 
-        spectrum = spec_avg.compute(
-            results["rsp_all"],
-            energy_min_ev=energy_min_ev,
-            energy_max_ev=energy_max_ev,
-        )
+        if property_name == 'absorption' and not is_cpp:
+            spectrum = spec_avg.compute(
+                rsp_all,
+                energy_min_ev=energy_min_ev,
+                energy_max_ev=energy_max_ev,
+            )
+            data = np.column_stack((spectrum["wavelength_nm"],
+                                    spectrum["eps_mean_wl"]))
+            header = "Wavelength [nm],epsilon [L mol^-1 cm^-1]"
+        elif property_name == 'ecd' and not is_cpp:
+            spectrum = spec_avg.compute_ecd(
+                rsp_all,
+                energy_min_ev=energy_min_ev,
+                energy_max_ev=energy_max_ev,
+            )
+            data = np.column_stack((spectrum["wavelength_nm"],
+                                    spectrum["delta_eps_mean_wl"]))
+            header = "Wavelength [nm],Delta epsilon [L mol^-1 cm^-1]"
+        else:
+            raise ValueError(
+                f"Unsupported non-CPP property '{property_name}'.")
 
-        data = np.column_stack(
-            (spectrum["wavelength_nm"], spectrum["eps_mean_wl"]))
         np.savetxt(
             averaged_spectra_filename,
             data,
             delimiter=",",
-            header="Wavelength [nm],epsilon [L mol^-1 cm^-1]",
+            header=header,
             comments="",
         )
 
         return spectrum
+
+    def _save_cpp_spectra(self, rsp_all, averaged_spectra_filename,
+                          property_name):
+        """
+        Averages per-snapshot CPP spectra and saves them to CSV.
+        """
+        cpp_driver = ComplexResponseSolver(self.comm, self.ostream)
+        cpp_driver.set_cpp_property(property_name)
+
+        x_nm = None
+        y_all = []
+        for item in rsp_all:
+            rsp_results = item[1] if isinstance(item, tuple) else item
+            spectrum = cpp_driver.get_spectrum(rsp_results, 'nm')
+
+            x = np.asarray(spectrum['x_data'], dtype=float)[::-1].copy()
+            y = np.asarray(spectrum['y_data'], dtype=float)[::-1].copy()
+
+            if property_name == 'absorption':
+                expected_unit = '[a.u.]'
+                a0 = bohr_in_angstrom() * 1.0e-10
+                NA = avogadro_constant()
+                y = y * a0**2 * 1.0e4 * NA / (np.log(10.0) * 1.0e3)
+            elif property_name == 'ecd':
+                expected_unit = r'[L mol$^{-1}$ cm$^{-1}$]'
+            else:
+                raise ValueError(
+                    f"Unsupported CPP property '{property_name}'.")
+
+            assert_msg_critical(
+                expected_unit in spectrum['y_label'],
+                'EnsembleDriver: unexpected CPP spectrum unit.')
+
+            if x_nm is None:
+                x_nm = x
+            elif not np.allclose(x, x_nm):
+                raise ValueError(
+                    'CPP spectra have inconsistent frequency grids.')
+            y_all.append(y)
+
+        y_mean = np.mean(y_all, axis=0)
+        if property_name == 'absorption':
+            y_label = 'epsilon [L mol^-1 cm^-1]'
+        elif property_name == 'ecd':
+            y_label = 'delta epsilon [L mol^-1 cm^-1]'
+        else:
+            raise ValueError(
+                f"Unsupported CPP property '{property_name}'.")
+
+        data = np.column_stack((x_nm, y_mean))
+        np.savetxt(
+            averaged_spectra_filename,
+            data,
+            delimiter=',',
+            header=f'Wavelength [nm],{y_label}',
+            comments='',
+        )
+
+        return {
+            'wavelength_nm': x_nm,
+            'y_mean': y_mean,
+            'y_all': y_all,
+        }
 
     @staticmethod
     def _first_residue_atom_pattern(atom_names, residue_ids, resnames, target_resname: str) -> list[str]:
@@ -1453,11 +1543,31 @@ class EnsembleDriver:
             "Expected one of: 'restricted', 'unrestricted', 'restricted_openshell'."
         )
 
+    @staticmethod
+    def _parse_property_type(property_name):
+        """
+        Parse a response property into its final calculation decision.
+
+        :return:
+            A tuple ``(property_name, is_cpp)``, where ``property_name`` is
+            either ``'absorption'`` or ``'ecd'``.
+        """
+        prop = str(property_name).lower().strip()
+        is_cpp = '(cpp)' in prop
+
+        if 'absorption' in prop or 'uv-vis' in prop:
+            return 'absorption', is_cpp
+        if 'ecd' in prop or 'circular dichroism' in prop:
+            return 'ecd', is_cpp
+
+        raise ValueError(
+            "Invalid property in property_options. Expected one of: "
+            "'absorption', 'absorption(cpp)', 'ecd', or 'ecd(cpp)'."
+        )
+
     def _build_property_driver(self, property_options: dict):
         """
-        Build response driver from property_options using rules:
-        - property='absorption' or 'ecd' + nstates      -> LinearResponseEigenSolver
-        - property='absorption' or 'ecd' + frequencies  -> ComplexResponse
+        Build a response driver for one of the four supported property types.
         """
         if not property_options:
             return None
@@ -1465,33 +1575,31 @@ class EnsembleDriver:
         if "property" not in property_options:
             raise ValueError("property_options must contain key 'property'.")
 
-        prop = str(property_options["property"]).lower().strip()
+        property_name, is_cpp = self._parse_property_type(
+            property_options["property"])
         has_nstates = "nstates" in property_options
         has_freqs = "frequencies" in property_options
 
-        if prop not in {"absorption", "ecd"}:
-            raise ValueError(
-                "Invalid property in property_options. "
-                "Expected 'absorption' or 'ecd'."
-            )
+        if is_cpp:
+            if not has_freqs:
+                raise ValueError(
+                    "A CPP property requires 'frequencies'.")
+            if has_nstates:
+                raise ValueError(
+                    "A CPP property does not accept 'nstates'.")
 
-        if has_nstates and has_freqs:
-            raise ValueError(
-                "property_options cannot contain both 'nstates' and 'frequencies'."
-            )
-
-        if has_freqs:
             drv = ComplexResponseSolver(self.comm, self.ostream)
-            drv.set_cpp_property("absorption" if prop == "absorption" else "ecd")
+            drv.set_cpp_property(property_name)
             return drv
+        else:
+            if not has_nstates:
+                raise ValueError(
+                    "A non-CPP property requires 'nstates'.")
+            if has_freqs:
+                raise ValueError(
+                    "A non-CPP property does not accept 'frequencies'.")
 
-        if has_nstates:
             return LinearResponseEigenSolver(self.comm, self.ostream)
-
-        raise ValueError(
-            "property_options must define either 'nstates' (TD-DFT) "
-            "or 'frequencies' (CPP)."
-        )
 
     def compute(
         self,
@@ -1524,8 +1632,9 @@ class EnsembleDriver:
             Includes optional key 'scf_type' in {'restricted', 'unrestricted', 'restricted_openshell'}
             to select the SCF driver.
         :param property_options: (dict)
-            Property options dictionary with keys:
-            'property' ('absorption' or 'ecd') + ('nstates' or 'frequencies').
+            Property options dictionary. Supported properties are 'absorption',
+            'absorption (cpp)', 'ecd', and 'ecd (cpp)'. TD-DFT properties use
+            'nstates'; CPP properties use 'frequencies'.
         :param potdir : (str or Path)
             Directory to store/read the per-snapshot potfiles.
         :param write_pe_potfiles: (bool)
@@ -1576,6 +1685,11 @@ class EnsembleDriver:
         if property_options is None:
             property_options = {}
 
+        do_rsp = bool(property_options)
+        if do_rsp and "property" not in property_options:
+            raise ValueError(
+                "property_options must contain key 'property'.")
+
         if qm_charge is not None:
             qm_charge = int(qm_charge)
         if qm_multiplicity is not None:
@@ -1611,8 +1725,6 @@ class EnsembleDriver:
 
         if write_pe_potfiles and (has_any_pe or has_any_npe):
             self.write_pot_files(snapshots, outdir=potdir)
-
-        do_rsp = bool(property_options)
 
         # Guard against open-shell response requests for now:
         if do_rsp:
