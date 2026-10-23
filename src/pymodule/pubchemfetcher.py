@@ -37,7 +37,7 @@ import json
 import re
 
 
-def get_data_from_name(mol_name, verbose=False):
+def get_data_from_name(mol_name, verbose=False, timeout=10):
     """
     Accesses the PubChem database to retrieve data for a given molecule name.
 
@@ -51,6 +51,8 @@ def get_data_from_name(mol_name, verbose=False):
         Molecule name string.
     :param verbose:
         The information printout level.
+    :param timeout:
+        Timeout in seconds for the PubChem request.
 
     :return:
         Accessed data
@@ -75,7 +77,7 @@ def get_data_from_name(mol_name, verbose=False):
         compoundname=mol_name.lower())
 
     try:
-        with urlopen(url) as page:
+        with urlopen(url, timeout=timeout) as page:
             data = json.loads(page.read())
             smiles_str = data['PropertyTable']['Properties'][0]['SMILES']
             title = data['PropertyTable']['Properties'][0]['Title']
@@ -92,19 +94,30 @@ def get_data_from_name(mol_name, verbose=False):
 
             return smiles_str, title, cid
 
+    except TimeoutError as e:
+        raise TimeoutError(
+            f"PubChem request timed out (timeout={timeout} s): {url}. "
+            "Consider using a larger timeout.") from e
+
     except HTTPError as e:
         print(f"HTTP Error: {e.code}. The compound may not exist.")
 
     except URLError as e:
+        if isinstance(e.reason, TimeoutError):
+            raise TimeoutError(
+                f"PubChem request timed out (timeout={timeout} s): {url}. "
+                "Consider using a larger timeout.") from e
         print(f"URL Error: {e.reason}.")
 
 
-def get_all_conformer_IDs(mol_name):
+def get_all_conformer_IDs(mol_name, timeout=10):
     """
     Gets all conformer IDs for the PubChem database for a compound
 
     :param mol_name:
         The molecule name string.
+    :param timeout:
+        Timeout in seconds for the PubChem request.
 
     :return conformerID_list:
         List of conformer IDs
@@ -125,7 +138,7 @@ def get_all_conformer_IDs(mol_name):
         compoundname=mol_name.lower())
 
     try:
-        with urlopen(url_conID) as page:
+        with urlopen(url_conID, timeout=timeout) as page:
             data = json.loads(page.read())
             conformerID_list = data['InformationList']['Information'][0][
                 'ConformerID']
@@ -140,20 +153,31 @@ def get_all_conformer_IDs(mol_name):
 
             return conformerID_list
 
+    except TimeoutError as e:
+        raise TimeoutError(
+            f"PubChem request timed out (timeout={timeout} s): {url_conID}. "
+            "Consider using a larger timeout.") from e
+
     except HTTPError as e:
         print(f"HTTP Error: {e.code}. " +
               "The compound may not have conformers, or it may not exist.")
 
     except URLError as e:
+        if isinstance(e.reason, TimeoutError):
+            raise TimeoutError(
+                f"PubChem request timed out (timeout={timeout} s): {url_conID}. "
+                "Consider using a larger timeout.") from e
         print(f"URL Error: {e.reason}")
 
 
-def get_conformer_data(conformer_ID):
+def get_conformer_data(conformer_ID, timeout=30):
     """
     Gets conformer coordinates from PubChem based on conformer ID.
 
     :param conformer_ID:
         Conformer ID for molecules compound
+    :param timeout:
+        Timeout in seconds for the PubChem request.
 
     :return xyz:
         The xyz-string of the molecule
@@ -175,7 +199,7 @@ def get_conformer_data(conformer_ID):
         conformerID=conformer_ID)
 
     try:
-        with urlopen(url) as page:
+        with urlopen(url, timeout=timeout) as page:
             data = json.loads(page.read())
             elements = data['PC_Compounds'][0]['atoms']['element']
             xcoords = data['PC_Compounds'][0]['coords'][0]['conformers'][0]['x']
@@ -199,11 +223,20 @@ def get_conformer_data(conformer_ID):
 
             return xyz
 
+    except TimeoutError as e:
+        raise TimeoutError(
+            f"PubChem request timed out (timeout={timeout} s): {url}. "
+            "Consider using a larger timeout.") from e
+
     except HTTPError as e:
         print(f"HTTP Error: {e.code}. " +
               "The compound may not have conformers, or it may not exist.")
 
     except URLError as e:
+        if isinstance(e.reason, TimeoutError):
+            raise TimeoutError(
+                f"PubChem request timed out (timeout={timeout} s): {url}. "
+                "Consider using a larger timeout.") from e
         print(f"URL Error: {e.reason}")
 
 

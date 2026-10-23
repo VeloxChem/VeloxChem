@@ -2071,7 +2071,7 @@ def _Molecule_contains_water_molecule(self):
 
 
 @staticmethod
-def _Molecule_read_name(mol_name, verbose=False):
+def _Molecule_read_name(mol_name, verbose=False, timeout=10):
     """
     Reads molecule from its name as a string using PubChem data.
 
@@ -2079,19 +2079,23 @@ def _Molecule_read_name(mol_name, verbose=False):
         The molecule name string.
     :param verbose:
         The information printout level.
+    :param timeout:
+        Timeout in seconds for the PubChem request.
 
     :return:
         The molecule.
     """
 
-    smiles_str = Molecule.name_to_smiles(mol_name, verbose=verbose)
+    smiles_str = Molecule.name_to_smiles(mol_name,
+                                         verbose=verbose,
+                                         timeout=timeout)
     mol = Molecule.read_smiles(smiles_str)
 
     return mol
 
 
 @staticmethod
-def _Molecule_name_to_smiles(mol_name, verbose=False):
+def _Molecule_name_to_smiles(mol_name, verbose=False, timeout=10):
     """
     Returns SMILES-string for a given molecule name using PubChem data.
 
@@ -2099,53 +2103,62 @@ def _Molecule_name_to_smiles(mol_name, verbose=False):
         The molecule name string.
     :param verbose:
         The information printout level.
+    :param timeout:
+        Timeout in seconds for the PubChem request.
 
     :return smiles_str:
         The SMILES-string of the molecule
     """
 
-    smiles_str, title, cid = get_data_from_name(mol_name, verbose=verbose)
+    smiles_str, title, cid = get_data_from_name(mol_name,
+                                                verbose=verbose,
+                                                timeout=timeout)
 
     return smiles_str
 
 
 @staticmethod
-def _Molecule_name_to_xyz(mol_name):
+def _Molecule_name_to_xyz(mol_name, timeout=30):
     """
     Returns xyz-string for the first conformer
     of a given molecule name using Pubchem data.
 
     :param mol_name:
         The molecule name string.
+    :param timeout:
+        Timeout in seconds for the PubChem request.
 
     :return xyz:
         xyz-string of molecule
     """
 
-    conformerID_list = get_all_conformer_IDs(mol_name)
+    conformerID_list = get_all_conformer_IDs(mol_name, timeout=timeout)
     conformer_ID = conformerID_list[0]
-    xyz = get_conformer_data(conformer_ID)
+    xyz = get_conformer_data(conformer_ID, timeout=timeout)
 
     return xyz
 
 
 @staticmethod
-def _Molecule_get_all_conformer_data(mol_name):
+def _Molecule_get_all_conformer_data(mol_name, timeout=30):
     """
     Gets coordinates for all the conformers of a given compound
     Data from PubChem.
 
     :param mol_name:
         The molecule name string.
+    :param timeout:
+        Timeout in seconds for the PubChem request.
 
     :return all_conformer_info:
         The coordinates for all of the conformers of the molecule.
     """
 
-    conformerID_list = get_all_conformer_IDs(mol_name)
+    conformerID_list = get_all_conformer_IDs(mol_name, timeout=timeout)
     all_conformer_info = {}
     for key in conformerID_list:
-        all_conformer_info.update({key: get_conformer_data(key)})
+        all_conformer_info.update(
+            {key: get_conformer_data(key, timeout=timeout)})
     return all_conformer_info
 
 
