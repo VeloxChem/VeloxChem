@@ -64,14 +64,18 @@ static const std::string _indefinite_message =
 /// @return True if the matrix was positive definite and has been inverted,
 /// false if it was not and has been left partly factorized.
 /// @note The array is row major and the math library is column major, so the
-/// upper triangle of the library is the lower triangle of the array. The matrix
-/// is symmetric, so the two hold the same elements and the inverted matrix is
-/// written into the lower triangle of the array, which is the triangle the
-/// packed matrix stores.
+/// lower triangle of the library is the upper triangle of the array. The matrix
+/// is symmetric, so the two hold the same elements; the inverted matrix comes
+/// back in the upper triangle of the array and is copied into the lower one,
+/// which is the triangle the packed matrix stores.
+/// @note The lower triangle of the library and not the upper one. Accelerate of
+/// macOS 27.0.1 fails the upper factorization of positive definite matrices of
+/// about two thousand rows and more, reporting a non-positive pivot at a row
+/// which changes from run to run, while the lower one succeeds.
 static auto
 _invert_dense(double *values, const size_t ndim) -> bool
 {
-    const char uplo = 'U';
+    const char uplo = 'L';
 
     auto ndim_arg = static_cast<lapack_int_t>(ndim);
 
@@ -86,6 +90,14 @@ _invert_dense(double *values, const size_t ndim) -> bool
         dpotri_(&uplo, &ndim_arg, values, &ndim_arg, &info);
 
         errors::assertMsgCritical(info == 0, "PackedMatrix inversion: The matrix is singular");
+
+        for (size_t i = 1; i < ndim; i++)
+        {
+            for (size_t j = 0; j < i; j++)
+            {
+                values[i * ndim + j] = values[j * ndim + i];
+            }
+        }
 
         return true;
     }
@@ -253,13 +265,20 @@ _invert_dense_factor(double *values, const size_t ndim) -> void
 {
 #ifdef VLX_USE_MATHLIB
 
-    // NOTE: the array is row major and the library is column major, so the upper
-    // triangle of the library is the lower triangle of the array. The
-    // factorization of the upper triangle therefore leaves the lower triangle of
-    // the array holding L, with the matrix equal to L L transposed, and the
-    // inversion of that triangle leaves it holding L inverted.
+    // NOTE: the array is row major and the library is column major, so the lower
+    // triangle of the library is the upper triangle of the array. The
+    // factorization of the lower triangle leaves L of the matrix equal to L L
+    // transposed in it, which is L transposed in the upper triangle of the array,
+    // and the inversion of that triangle leaves L inverted, transposed, there. It
+    // is copied into the lower triangle of the array, which the packed matrix
+    // stores.
 
-    const char uplo = 'U';
+    // NOTE: the lower triangle of the library and not the upper one. Accelerate of
+    // macOS 27.0.1 fails the upper factorization of positive definite matrices of
+    // about two thousand rows and more, reporting a non-positive pivot at a row
+    // which changes from run to run, while the lower one succeeds.
+
+    const char uplo = 'L';
 
     const char diag = 'N';
 
@@ -283,6 +302,14 @@ _invert_dense_factor(double *values, const size_t ndim) -> void
     dtrtri_(&uplo, &diag, &ndim_arg, values, &ndim_arg, &info);
 
     errors::assertMsgCritical(info == 0, "PackedMatrix Cholesky inversion: The factor is singular");
+
+    for (size_t i = 1; i < ndim; i++)
+    {
+        for (size_t j = 0; j < i; j++)
+        {
+            values[i * ndim + j] = values[j * ndim + i];
+        }
+    }
 
 #else
 
@@ -645,13 +672,17 @@ cholesky_factor(const CPackedMatrix &matrix) -> CPackedMatrix
 
 #ifdef VLX_USE_MATHLIB
 
-    // NOTE: the array is row major and the library is column major, so the upper
-    // triangle of the library is the lower triangle of the array. Factorizing the
-    // upper triangle therefore leaves the lower triangle of the array holding L,
-    // with the matrix equal to L L transposed, which is the triangle the packed
-    // matrix stores.
+    // NOTE: the lower triangle of the library and not the upper one. Accelerate of
+    // macOS 27.0.1 fails the upper factorization of positive definite matrices of
+    // about two thousand rows and more, reporting a non-positive pivot at a row
+    // which changes from run to run, while the lower one succeeds; the metric of
+    // def2-universal-jfit on sixty atoms (2176 functions) fails it every time.
+    // The array is row major and the library column major, so the lower triangle
+    // of the library is the upper triangle of the array: the factor L comes back
+    // there as L transposed and is copied into the lower triangle, which is the
+    // triangle the packed matrix stores, with the matrix equal to L L transposed.
 
-    const char uplo = 'U';
+    const char uplo = 'L';
 
     auto ndim_arg = static_cast<lapack_int_t>(ndim);
 
@@ -664,6 +695,14 @@ cholesky_factor(const CPackedMatrix &matrix) -> CPackedMatrix
     if (info != 0)
     {
         throw std::runtime_error("PackedMatrix.cholesky_factor: The matrix is not positive definite");
+    }
+
+    for (size_t i = 1; i < ndim; i++)
+    {
+        for (size_t j = 0; j < i; j++)
+        {
+            dense[i * ndim + j] = dense[j * ndim + i];
+        }
     }
 
 #else

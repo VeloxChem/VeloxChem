@@ -361,19 +361,52 @@ make_parts(const CMolecule              &molecule,
 
 
 auto
-invert_metric_full(const CPackedMatrix &two_center, const double metric_threshold) -> CPackedMatrix
+factor_metric_full(const CPackedMatrix &two_center, const double metric_threshold) -> CPackedMatrix
 {
-    // NOTE: the inverse itself and not a factor of it. A Coulomb only fitting applies
-    // the metric to a vector of one value per auxiliary function, twice a build, so
-    // there is nothing to be gained from a factor and one multiply is the whole of it.
-    // The driver which applies the metric to a tensor wants a factor, and asks for one.
+    // NOTE: the factor and not the inverse. A Coulomb only fitting solves one right
+    // hand side a build, which two triangular solves with the factor do in the same
+    // square of the auxiliary basis a multiply by the inverse takes. They are what
+    // keeps the fitting accurate: the metric of a fitting basis is ill conditioned,
+    // its condition number 1e7 for def2-universal-jfit on a molecule of sixty atoms,
+    // and every inverse formed outright loses that much of the precision. On that
+    // molecule the Coulomb energy of an inverse is off by 1e-7 to 1e-6 Hartree
+    // whichever way it is formed (LU, Cholesky, eigenvectors), and that of the
+    // solves by 1e-11.
 
     // NOTE: the directions the fitting basis does not really span are dropped rather
     // than inverted, on the same threshold and by the same construction the inverted
-    // square root uses. A plain factorization would invert them: a metric of
-    // def2-universal-jkfit on thirty-two waters has thirty-three eigenvalues under
-    // 1e-8 of its largest, and dividing by those multiplies numerical noise into
-    // every fitting coefficient the driver forms.
+    // square root uses. A metric with no factor has such directions, and so has one
+    // with a pivot at or under the threshold, as the smallest eigenvalue is no
+    // larger than the smallest pivot: a metric of def2-universal-jkfit on thirty-two
+    // waters has thirty-three eigenvalues under 1e-8 of its largest, and solving
+    // with those multiplies numerical noise into every fitting coefficient.
+
+    try
+    {
+        auto factor = packlin::cholesky_factor(two_center);
+
+        const auto ndim = factor.number_of_rows();
+
+        const auto *values = factor.data();
+
+        double smallest = values[0] * values[0];
+
+        for (size_t i = 1; i < ndim; i++)
+        {
+            const auto pivot = values[i * (i + 1) / 2 + i];
+
+            smallest = std::min(smallest, pivot * pivot);
+        }
+
+        if (smallest > metric_threshold) return factor;
+    }
+    catch (const std::runtime_error &)
+    {
+    }
+
+    errors::msg(std::string("RIJFockDriver: The metric of the auxiliary basis is close to singular, so it is inverted "
+                            "on the directions the basis spans instead of solved with its Cholesky factor."),
+                "Warning");
 
     return packlin::pseudo_inverse(two_center, metric_threshold);
 }

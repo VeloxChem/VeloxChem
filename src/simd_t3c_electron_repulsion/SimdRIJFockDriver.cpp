@@ -34,7 +34,7 @@ CSimdRIJFockDriver::make_metric(const CMolecule       &molecule,
 {
     const CSimdTwoCenterElectronRepulsionDriver t2c_drv;
 
-    return simdri::invert_metric_full(t2c_drv.compute(molecule, aux_basis), metric_threshold);
+    return simdri::factor_metric_full(t2c_drv.compute(molecule, aux_basis), metric_threshold);
 }
 
 auto
@@ -61,6 +61,10 @@ CSimdRIJFockDriver::prepare(const CMolecule       &molecule,
 
     errors::assertMsgCritical((_metric.number_of_rows() == naux) && (_metric.number_of_columns() == naux),
                               std::string("RIJFockDriver: The metric does not match the auxiliary basis"));
+
+    errors::assertMsgCritical(
+        (_metric.get_type() == mat_t::lower_triangular) || (_metric.get_type() == mat_t::symmetric),
+        std::string("RIJFockDriver: The metric must be a Cholesky factor (lower triangular) or an inverse (symmetric)"));
 
     // NOTE: the parts are what a sweep takes one at a time, and the ranks of a
     // communicator take some parts each, so there have to be at least as many parts
@@ -234,25 +238,66 @@ CSimdRIJFockDriver::solve_fitting(const std::vector<double> &gamma) const -> std
                               std::string("RIJFockDriver: The right hand side of the fitting is not one value per "
                                           "auxiliary basis function"));
 
-    // NOTE: the metric is held in the packed format and the multiply wants a square,
-    // so it is expanded here. It is the square of the auxiliary basis, which is small
-    // beside the integrals of any part of it.
-
-    auto dense = std::vector<double>(naux * naux, 0.0);
-
-    _metric.to_dense(dense.data());
+    const auto *metric = _metric.data();
 
     auto fitted = std::vector<double>(naux, 0.0);
 
+    if (_metric.get_type() == mat_t::lower_triangular)
+    {
+        // NOTE: the metric is L L transposed with L held row major in the packed lower
+        // triangle, so the fitting is two triangular solves: L y = gamma forward, then
+        // L transposed c = y backward. Row i of L is contiguous, so the forward solve
+        // reads rows; the backward one subtracts each solved value times its row from
+        // the values before it, which reads the same rows and never a column.
+
+        for (size_t i = 0; i < naux; i++)
+        {
+            const auto *row = metric + i * (i + 1) / 2;
+
+            double sum = gamma[i];
+
+            for (size_t j = 0; j < i; j++) sum -= row[j] * fitted[j];
+
+            fitted[i] = sum / row[i];
+        }
+
+        for (size_t i = naux; i-- > 0;)
+        {
+            const auto *row = metric + i * (i + 1) / 2;
+
+            fitted[i] /= row[i];
+
+            const auto value = fitted[i];
+
+            for (size_t j = 0; j < i; j++) fitted[j] -= row[j] * value;
+        }
+
+        return fitted;
+    }
+
+    errors::assertMsgCritical(_metric.get_type() == mat_t::symmetric,
+                              std::string("RIJFockDriver: The metric is neither a Cholesky factor nor an inverse"));
+
+    // NOTE: a symmetric metric is an inverse, the pseudo inverse of a metric which is
+    // close to singular or one a caller formed, and is multiplied by. Row i of the
+    // packed lower triangle holds the elements up to the diagonal and the rest of
+    // row i of the inverse is column i below it, so each stored element adds to two
+    // values of the product.
+
     for (size_t i = 0; i < naux; i++)
     {
-        double sum = 0.0;
+        const auto *row = metric + i * (i + 1) / 2;
 
-        const auto *row = dense.data() + i * naux;
+        double sum = row[i] * gamma[i];
 
-        for (size_t j = 0; j < naux; j++) sum += row[j] * gamma[j];
+        for (size_t j = 0; j < i; j++)
+        {
+            sum += row[j] * gamma[j];
 
-        fitted[i] = sum;
+            fitted[j] += row[j] * gamma[i];
+        }
+
+        fitted[i] += sum;
     }
 
     return fitted;

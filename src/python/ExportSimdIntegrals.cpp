@@ -489,7 +489,8 @@ export_simdintegrals(py::module &m) -> void
              py::arg("molecule"), py::arg("basis"), py::arg("aux_basis"), py::arg("threshold"),
              py::arg("aux_atoms") = std::vector<int>{})
         .def("make_metric", &CSimdRIJFockDriver::make_metric,
-             "Forms the metric of the auxiliary basis, inverted outright.",
+             "Forms the metric of the auxiliary basis for the fitting: its Cholesky factor (lower triangular), "
+             "or its pseudo inverse (symmetric) when it is close to singular.",
              py::arg("molecule"), py::arg("aux_basis"), py::arg("metric_threshold"))
         .def("prepare", &CSimdRIJFockDriver::prepare,
              "Prepares the driver for a molecule and its bases.",
@@ -499,7 +500,7 @@ export_simdintegrals(py::module &m) -> void
         .def("is_prepared", &CSimdRIJFockDriver::is_prepared, "Checks that the driver has been prepared.")
         .def("get_mode", &CSimdRIJFockDriver::get_mode, "Gets the way the driver builds.")
         .def("get_metric", &CSimdRIJFockDriver::get_metric, py::return_value_policy::reference_internal,
-             "Gets the inverted metric the driver holds.")
+             "Gets the metric the driver holds: its Cholesky factor (lower triangular) or an inverse (symmetric).")
         .def("number_of_parts", &CSimdRIJFockDriver::number_of_parts,
              "Gets the number of parts of the auxiliary basis the sweeps take.")
         .def("owned_parts", &CSimdRIJFockDriver::owned_parts,
@@ -513,7 +514,7 @@ export_simdintegrals(py::module &m) -> void
              "Sweeps the given parts and sums the right hand side of the fitting over them.",
              py::arg("density"), py::arg("parts"))
         .def("solve_fitting", &CSimdRIJFockDriver::solve_fitting,
-             "Applies the inverted metric to the right hand side of the fitting.",
+             "Solves the fitting for its right hand side, with the Cholesky factor or an inverse of the metric.",
              py::arg("gamma"))
         .def("compute_coulomb", &CSimdRIJFockDriver::compute_coulomb,
              "Adds the Coulomb matrix of the given parts to a matrix.",

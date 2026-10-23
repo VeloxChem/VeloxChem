@@ -75,7 +75,6 @@ export_t3cintegrals(py::module& m)
             "Computes electron repulsion integrals for given molecule, screener, auxilary basis, and list of atoms.");
 #endif
     
-    
     // CThreeCenterOverlapDriver class
     PyClass<CThreeCenterOverlapDriver>(m, "ThreeCenterOverlapDriver")
         .def(py::init<>())
