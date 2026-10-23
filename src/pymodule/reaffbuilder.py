@@ -99,6 +99,7 @@ class ReactionForceFieldBuilder:
         self.hessian_basis = 'def2-SV_P_'
 
         self._reaction_matcher_assist_min_depth = None
+        self._reaction_matcher_max_time = None
 
     def build_forcefields(
         self,
@@ -532,6 +533,8 @@ class ReactionForceFieldBuilder:
         rm = ReactionMatcher(ostream=self.ostream)
         if self._reaction_matcher_assist_min_depth is not None:
             rm._assist_min_depth = int(self._reaction_matcher_assist_min_depth)
+        if self._reaction_matcher_max_time is not None:
+            rm.max_time = float(self._reaction_matcher_max_time)
         total_mapping, breaking_bonds, forming_bonds = rm.get_mapping(
             reactant,
             product,
