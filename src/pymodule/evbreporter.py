@@ -515,7 +515,8 @@ class EvbRecalculator:
                  n_states=None,
                  step=None,
                  state_left=0,
-                 pes_states_to_report='all'):
+                 pes_states_to_report='all',
+                 integration_lambdas=None):
         # simulation_factory(system) -> a live mmapp.Simulation on the desired
         # (GPU) platform. The factory owns platform selection; this class only
         # ever builds one context at a time and tears it down before the next.
@@ -525,6 +526,14 @@ class EvbRecalculator:
         self._make_sim = simulation_factory
         self.report_forces = report_forces
         self.step = step
+
+        # With integration_lambdas, every frame is also scored in the
+        # integration system of every lambda of the step's ladder, and
+        # IntegrationEnergies.csv holds those cross energies, row-aligned with
+        # Energies.csv. MBAR needs them to treat the integration systems as the
+        # sampled states.
+        self.integration_lambdas = (None if integration_lambdas is None else
+                                    list(integration_lambdas))
 
         # On a reaction path the potential energy surfaces belong to states, not
         # to steps: 'state_k' is one and the same system whichever step is being
@@ -561,6 +570,7 @@ class EvbRecalculator:
         self._opened = False
         self.E_out = None
         self.F_out = None
+        self.U_out = None
         self.out_streams = []
 
     def _open_outputs(self, append):
@@ -575,7 +585,22 @@ class EvbRecalculator:
             self.out_streams.append(self.F_out)
             if not append:
                 self.F_out.write(EvbReporter.forces_header(self.num_atoms))
+        if self.integration_lambdas is not None:
+            self.U_out = open(self.data_folder / "IntegrationEnergies.csv",
+                              mode)
+            self.out_streams.append(self.U_out)
+            if not append:
+                self.U_out.write(
+                    self.integration_energies_header(self.integration_lambdas))
         self._opened = True
+
+    @staticmethod
+    def integration_energies_header(lambdas):
+        """Header line for IntegrationEnergies.csv: the frame's tags, then one
+        column per lambda of the ladder."""
+        columns = ["Lambda", "replica", "direction"]
+        columns += [f"{lam:.3f}" for lam in lambdas]
+        return ", ".join(columns) + "\n"
 
     def _evaluate_system(self, system, frames, want_forces=False):
         """Evaluate one system over all frames using a single GPU context."""
@@ -618,6 +643,18 @@ class EvbRecalculator:
         for name in self.core_names:
             E[name], _ = self._evaluate_system(self.systems[name], frames)
 
+        U = None
+        if self.integration_lambdas is not None:
+            # The integration endpoints are already among the core systems.
+            U = []
+            for lam in self.integration_lambdas:
+                if lam in E:
+                    U.append(E[lam])
+                else:
+                    energies, _ = self._evaluate_system(self.systems[lam],
+                                                        frames)
+                    U.append(energies)
+
         forces_per_frame = None
         if self.report_forces:
             forces_per_frame = self._evaluate_forces_by_lambda(
@@ -639,6 +676,10 @@ class EvbRecalculator:
                     state_energies=state_energies,
                     step=self.step,
                 ))
+            if U is not None:
+                cells = [f"{lambda_val}", f"{replica}", f"{direction}"]
+                cells += [f"{energies[i]:.10e}" for energies in U]
+                self.U_out.write(", ".join(cells) + "\n")
             if self.report_forces:
                 self.F_out.write(
                     EvbReporter.format_forces_row(lambda_val, replica,

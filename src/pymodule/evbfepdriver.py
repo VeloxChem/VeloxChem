@@ -153,6 +153,13 @@ class EvbFepDriver:
         # positions rounded to 0.001 nm).
         self.trajectory_format: str = "dcd"
 
+        # Whether every frame is also scored in the integration system of every
+        # lambda of the ladder, written to IntegrationEnergies.csv. These cross
+        # energies let the analysis reweight from the sampled integration
+        # systems to the potential energy surfaces. Costs one extra energy
+        # evaluation per frame per lambda.
+        self.report_integration_energies: bool = False
+
         self.debug: bool = False
         self.save_frames: int = 1000
         self.save_crash_pdb: bool = True
@@ -251,6 +258,9 @@ class EvbFepDriver:
             },
             "trajectory_format": {
                 "type": str
+            },
+            "report_integration_energies": {
+                "type": bool
             },
             "debug": {
                 "type": bool
@@ -611,6 +621,9 @@ class EvbFepDriver:
                 step=(configuration.get("step") if n_states > 2 else None),
                 state_left=configuration.get("state_left", 0),
                 pes_states_to_report=self.pes_states_to_report,
+                integration_lambdas=(self.Lambda
+                                     if self.report_integration_energies else
+                                     None),
             )
         self.timer.start()
 

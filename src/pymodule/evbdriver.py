@@ -1176,6 +1176,7 @@ class EvbDriver:
                     time_sub_sample,
                     state_left=step_conf.get("state_left"),
                     state_right=step_conf.get("state_right"),
+                    integration_file=str(folder / "IntegrationEnergies.csv"),
                 )
                 step_results.append(specific)
                 common_results.append(common)
@@ -1220,6 +1221,7 @@ class EvbDriver:
         time_sub_sample=1,
         state_left=None,
         state_right=None,
+        integration_file=None,
     ):
         """Read one step's sampled output.
 
@@ -1340,6 +1342,10 @@ class EvbDriver:
                 "E_pes_names": ",".join(pes_names),
             })
 
+        if integration_file is not None and Path(integration_file).is_file():
+            specific_result["U_int"] = self._load_integration_energies(
+                integration_file, E_data, columns, sub_indices, Lambda)
+
         if "step" in columns:
             specific_result["Step_frame"] = column("step").astype(int)
             specific_result["step"] = int(specific_result["Step_frame"][0])
@@ -1401,6 +1407,42 @@ class EvbDriver:
             "Lambda_indices": lambda_indices,
         }
         return specific_result, common_result
+
+    @staticmethod
+    def _load_integration_energies(path, E_data, columns, sub_indices, Lambda):
+        """Every kept frame's energy in the integration system of every kept
+        lambda, as an (n_frames, len(Lambda)) array.
+
+        IntegrationEnergies.csv is row-aligned with Energies.csv, so the frames
+        are selected with the same indices, and its columns are selected by
+        their lambda so that they follow the kept ladder.
+        """
+        U_data = np.loadtxt(path, skiprows=1, delimiter=',', ndmin=2)
+        with Path(path).open("r") as file:
+            header = [cell.strip() for cell in file.readline().split(",")]
+
+        rows_match = U_data.shape[0] == E_data.shape[1]
+        assert_msg_critical(
+            rows_match,
+            f"{path} has {U_data.shape[0]} rows but Energies.csv has "
+            f"{E_data.shape[1]}")
+        tags_match = all(
+            np.array_equal(U_data[:, header.index(name)], E_data[columns[name]])
+            for name in ("Lambda", "replica", "direction")
+            if name in columns)
+        assert_msg_critical(
+            tags_match,
+            f"The rows of {path} do not match those of Energies.csv")
+
+        lambda_columns = {
+            name: index for index, name in enumerate(header) if index >= 3
+        }
+        missing = [L for L in Lambda if f"{L:.3f}" not in lambda_columns]
+        assert_msg_critical(
+            len(missing) == 0,
+            f"{path} has no column for lambda {missing}")
+        indices = [lambda_columns[f"{L:.3f}"] for L in Lambda]
+        return U_data[np.ix_(sub_indices, indices)]
 
     @staticmethod
     def _parse_energies_header(path, n_columns):
