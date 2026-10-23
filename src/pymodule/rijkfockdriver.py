@@ -36,7 +36,12 @@ import time
 import sys
 
 from .veloxchemlib import mpi_master
-from .veloxchemlib import _RIJKFockDriver
+
+try:
+    from .veloxchemlib import _RIJKFockDriver
+except ImportError:
+    _RIJKFockDriver = None
+
 from .veloxchemlib import TwoCenterElectronRepulsionDriver
 from .veloxchemlib import SubMatrix
 from .outputstream import OutputStream
@@ -76,6 +81,9 @@ class RIJKFockDriver:
 
         self.metric = None
         self.metric_threshold = 1.0e-12
+
+        if _RIJKFockDriver is None:
+            raise ImportError('_RIJKFockDriver is not available')
 
         self._ri_drv = _RIJKFockDriver()
 
