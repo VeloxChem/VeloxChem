@@ -48,7 +48,7 @@ class TestOptimizeXTB:
                 pass
 
     @pytest.mark.skipif(not XtbDriver.is_available(),
-                        reason='xtb-python not available')
+                        reason='tblite-python not available')
     def test_nh3(self):
 
         here = Path(__file__).parent
@@ -57,10 +57,10 @@ class TestOptimizeXTB:
         xtb_method = 'gfn2'
 
         ref_coords = np.array([
-            [-1.981952536628, 1.605526632230, -0.018764716881],
-            [-1.950824053259, 2.616502833048, 0.030950778306],
-            [-2.483737817114, 1.273354861268, 0.795720974820],
-            [-2.523925592999, 1.354865673454, -0.836657036245],
+            [-1.981953435371, 1.605527011766, -0.018764675818],
+            [-1.950823683554, 2.616502867861, 0.030950770964],
+            [-2.483737548809, 1.273354646493, 0.795721110154],
+            [-2.523925332266, 1.354865473881, -0.836657205299],
         ]) / bohr_in_angstrom()
 
         self.run_opt(inpfile, xtb_method, ref_coords)

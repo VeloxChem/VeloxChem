@@ -39,8 +39,7 @@ from .outputstream import OutputStream
 from .errorhandler import assert_msg_critical
 
 try:
-    from xtb.interface import Calculator as XtbCalculator
-    from xtb.utils import get_method as xtb_get_method
+    from tblite.interface import Calculator as XtbCalculator
 except ImportError:
     pass
 
@@ -89,7 +88,7 @@ class XtbDriver:
         Returns if XTB driver is available.
         """
 
-        return ('xtb' in sys.modules)
+        return ('tblite' in sys.modules)
 
     def set_method(self, xtb_method):
         """
@@ -115,7 +114,7 @@ class XtbDriver:
         """
 
         if self.rank == mpi_master() and self._xtb_res is not None:
-            return self._xtb_res.get_energy()
+            return float(self._xtb_res.get('energy'))
         else:
             return None
 
@@ -125,7 +124,7 @@ class XtbDriver:
         """
 
         if self.rank == mpi_master() and self._xtb_res is not None:
-            return self._xtb_res.get_gradient()
+            return self._xtb_res.get('gradient')
         else:
             return None
 
@@ -135,7 +134,7 @@ class XtbDriver:
         """
 
         if self.rank == mpi_master() and self._xtb_res is not None:
-            return self._xtb_res.get_dipole()
+            return self._xtb_res.get('dipole')
         else:
             return None
 
@@ -151,25 +150,24 @@ class XtbDriver:
         """
 
         # sanity check
-        errmsg = 'XtbDriver: xtb-python is not available. '
-        errmsg += 'Please install xtb-python.'
+        errmsg = 'XtbDriver: tblite-python is not available. '
+        errmsg += 'Please install tblite-python.'
         assert_msg_critical(self.is_available(), errmsg)
 
         identifiers = np.array(molecule.get_identifiers())
         coords_in_au = molecule.get_coordinates_in_bohr()
 
         self._xtb_calc = XtbCalculator(
-            xtb_get_method(self.xtb_method.upper() + '-xTB'), identifiers,
-            coords_in_au)
+            self.xtb_method.upper() + '-xTB', identifiers, coords_in_au)
 
         if self.rank == mpi_master():
 
             # set verbosity
 
             if self.ostream.is_muted:
-                self._xtb_calc.set_verbosity('muted')
+                self._xtb_calc.set('verbosity', 0)
             else:
-                self._xtb_calc.set_verbosity('full')
+                self._xtb_calc.set('verbosity', 2)
 
             # run XTB calculation
 
@@ -179,13 +177,13 @@ class XtbDriver:
 
             # process results
 
-            energy = self._xtb_res.get_energy()
-            gradient = self._xtb_res.get_gradient()
-            dipole = self._xtb_res.get_dipole()
-            partial_charges = self._xtb_res.get_charges()
-            bond_orders = self._xtb_res.get_bond_orders()
-            orbital_energies = self._xtb_res.get_orbital_eigenvalues()
-            orbital_occupations = self._xtb_res.get_orbital_occupations()
+            energy = float(self._xtb_res.get('energy'))
+            gradient = self._xtb_res.get('gradient')
+            dipole = self._xtb_res.get('dipole')
+            partial_charges = self._xtb_res.get('charges')
+            bond_orders = self._xtb_res.get('bond-orders')
+            orbital_energies = self._xtb_res.get('orbital-energies')
+            orbital_occupations = self._xtb_res.get('orbital-occupations')
 
             grad2 = np.sum(gradient**2, axis=1)
             rms_grad = np.sqrt(np.mean(grad2))
