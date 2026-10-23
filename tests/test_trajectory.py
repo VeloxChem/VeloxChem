@@ -66,6 +66,9 @@ class TestEnsembleDriverInput:
                     np.abs(np.array(osc_strengths) -
                            ref_osc_strengths)) < 0.01
 
+                assert (data_dir /
+                        'bithio_averaged_spectra.csv').is_file()
+
         finally:
             if task.mpi_rank == mpi_master():
                 (data_dir / ".bithio.xtc_offsets.npz").unlink(
@@ -73,3 +76,5 @@ class TestEnsembleDriverInput:
                 for frame in (6, 8):
                     (data_dir / f"pe_frame_{frame:06d}.pot").unlink(
                         missing_ok=True)
+                (data_dir / 'bithio_averaged_spectra.csv').unlink(
+                    missing_ok=True)

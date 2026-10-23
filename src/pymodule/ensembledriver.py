@@ -38,7 +38,7 @@ import sys
 import csv
 import re
 
-from .veloxchemlib import mpi_master
+from .veloxchemlib import mpi_master, hartree_in_ev
 from .outputstream import OutputStream
 from .molecule import Molecule
 from .molecularbasis import MolecularBasis
@@ -644,7 +644,7 @@ class EnsembleDriver:
             last_snapshot_only=self.last_snapshot_only,
         )
 
-        return self.compute(
+        results = self.compute(
             snapshots,
             basis_set=basis_set,
             scf_options=scf_options,
@@ -652,6 +652,117 @@ class EnsembleDriver:
             potdir=self.output_dir,
             basis_path=basis_path,
         )
+
+        if (self.spectrum_dict and results.get("rsp_all") and
+                self.rank == mpi_master()):
+            self.output_dir.mkdir(parents=True, exist_ok=True)
+
+            broadening_type = None
+            if 'line_profile' in self.spectrum_dict:
+                broadening_type = str(
+                    self.spectrum_dict['line_profile']).strip().lower()
+
+            broadening_value_ev = None
+            if 'broadening_parameter' in self.spectrum_dict:
+                broadening_value = float(
+                    self.spectrum_dict['broadening_parameter'])
+                units = str(
+                    self.spectrum_dict.get('units') or 'ev').strip().lower()
+                if units in ('ev', 'electronvolt', 'electronvolts'):
+                    broadening_value_ev = broadening_value
+                elif units in ('au', 'hartree', 'a.u.'):
+                    broadening_value_ev = broadening_value * hartree_in_ev()
+                else:
+                    raise ValueError(
+                        "EnsembleDriver: unsupported broadening units "
+                        f"'{units}'.")
+
+            source_file = self.trajectory_file or self.pdb_file
+            source_stem = (Path(str(source_file)).stem
+                           if source_file else 'ensemble')
+            spectrum_file = self.output_dir / (
+                f'{source_stem}_averaged_spectra.csv')
+
+            self.save_uv_vis_spectra(
+                results,
+                broadening_type=broadening_type,
+                broadening_value_ev=broadening_value_ev,
+                averaged_spectra_filename=spectrum_file,
+            )
+
+        return results
+
+    def save_uv_vis_spectra(
+        self,
+        results: dict,
+        energy_min_ev=None,
+        energy_max_ev=None,
+        broadening_type: str | None = None,
+        broadening_value_ev: float | None = None,
+        averaged_spectra_filename: str | Path = "averaged_spectra.csv",
+    ):
+        """
+        Computes and saves averaged UV/Vis spectra data to a CSV file.
+
+        Unlike :meth:`plot_uv_vis_spectra`, this method does not require
+        matplotlib.
+
+        :param results:
+            Results dictionary returned by :meth:`compute`.
+        :param energy_min_ev:
+            Minimum photon energy in eV for the common grid. If None, it is set
+            to (min excitation energy - padding).
+        :param energy_max_ev:
+            Maximum photon energy in eV for the common grid. If None, it is set
+            to (max excitation energy + padding).
+        :param broadening_type:
+            Broadening line profile, 'gaussian' or 'lorentzian'. If None, the
+            SpectrumAverager default is used.
+        :param broadening_value_ev:
+            Broadening parameter in eV. If None, the SpectrumAverager default is
+            used.
+        :param averaged_spectra_filename:
+            Filename for saving the averaged spectra CSV.
+        :return:
+            The dictionary of averaged-spectrum data from SpectrumAverager.
+        :raises KeyError:
+            If `rsp_all` is not present in the results dictionary.
+        """
+        if not isinstance(results, dict):
+            raise TypeError(
+                "results must be a dictionary as returned by EnsembleDriver.compute()."
+            )
+
+        if "rsp_all" not in results or results.get("rsp_all", None) is None:
+            raise KeyError(
+                "No 'rsp_all' found in results. Make sure you ran a response "
+                "calculation (e.g., pass property_options with 'property' and "
+                "either 'nstates' or 'frequencies' to EnsembleDriver.compute())."
+            )
+
+        spec_avg = SpectrumAverager(comm=self.comm, ostream=self.ostream)
+        if broadening_type is not None:
+            spec_avg.broadening_type = str(broadening_type).lower()
+        if broadening_value_ev is not None:
+            spec_avg.broadening_value_ev = float(broadening_value_ev)
+
+        spectrum = spec_avg.compute(
+            results["rsp_all"],
+            energy_min_ev=energy_min_ev,
+            energy_max_ev=energy_max_ev,
+        )
+
+        data = np.column_stack(
+            (spectrum["wavelength_nm"], spectrum["eps_mean_wl"]))
+        np.savetxt(
+            averaged_spectra_filename,
+            data,
+            delimiter=",",
+            header="Wavelength [nm],epsilon [L mol^-1 cm^-1]",
+            comments="",
+        )
+
+        return spectrum
 
     @staticmethod
     def _first_residue_atom_pattern(atom_names, residue_ids, resnames, target_resname: str) -> list[str]:
@@ -1604,6 +1715,8 @@ class EnsembleDriver:
         results: dict,
         energy_min_ev=None,
         energy_max_ev=None,
+        broadening_type: str | None = None,
+        broadening_value_ev: float | None = None,
         show_individual: bool = False,
         show_sticks: bool = True,
         show_std: bool = False,
@@ -1628,6 +1741,12 @@ class EnsembleDriver:
         :param energy_max_ev:
             Maximum photon energy in eV for the common grid. If None, it is set to
             (max excitation energy + padding).
+        :param broadening_type:
+            Broadening line profile, 'gaussian' or 'lorentzian'. If None, the
+            SpectrumAverager default is used.
+        :param broadening_value_ev:
+            Broadening parameter in eV. If None, the SpectrumAverager default is
+            used.
         :param show_individual:
             If True, plot individual broadened spectra for each snapshot.
         :param show_sticks:
@@ -1666,6 +1785,10 @@ class EnsembleDriver:
         rsp_all = results["rsp_all"]
 
         spec_avg = SpectrumAverager(comm=self.comm, ostream=self.ostream)
+        if broadening_type is not None:
+            spec_avg.broadening_type = str(broadening_type).lower()
+        if broadening_value_ev is not None:
+            spec_avg.broadening_value_ev = float(broadening_value_ev)
         ax = spec_avg.plot_uv_vis_spectra(
             rsp_all,
             energy_min_ev=energy_min_ev,

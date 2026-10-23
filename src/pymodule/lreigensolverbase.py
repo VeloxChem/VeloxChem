@@ -441,7 +441,10 @@ class LinearResponseEigenSolverBase(LinearSolver):
             y = 0.0
             for e, f in zip(exc_ene_au, osc_str):
                 b_factor = b_au / ((e - x_au)**2 + b_au**2)
-                y += sigma_factor * b_factor * f
+                # The absorption cross-section carries a factor of the
+                # photon energy, while the oscillator strength already
+                # contains the transition energy.
+                y += sigma_factor * (x_au / e) * b_factor * f
             y_data.append(y)
 
         spectrum['x_data'] = list(x_data)
@@ -503,7 +506,8 @@ class LinearResponseEigenSolverBase(LinearSolver):
             y = 0.0
             for e, r in zip(exc_ene_au, rot_str_au):
                 b_factor = b_au / ((e - x_au)**2 + b_au**2)
-                y += delta_eps_factor * b_factor * e * r
+                # The ECD intensity carries a factor of the photon energy.
+                y += delta_eps_factor * b_factor * x_au * r
             y_data.append(y)
 
         spectrum['x_data'] = list(x_data)

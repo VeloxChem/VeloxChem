@@ -355,6 +355,8 @@ def _main_body():
     if task_type == 'ensemble':
         ensemble_dict = (dict(task.input_dict['ensemble'])
                          if 'ensemble' in task.input_dict else {})
+        ensemble_dict['filename'] = task.input_dict['filename']
+
         spect_dict = (dict(task.input_dict['spectrum_settings'])
                       if 'spectrum_settings' in task.input_dict else {})
         scf_dict = (dict(task.input_dict['scf'])
