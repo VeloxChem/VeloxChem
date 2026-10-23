@@ -48,9 +48,13 @@ stages:
   - build
   - test
 
-.monkey:conf:
+.conf:
   variables:
     VLX_NUM_BUILD_JOBS: "12"
+    # cpus reserved for a CI job; OpenMP threads are derived from this in the jobs
+    VLX_CI_THREADS: "12"
+    # MPI ranks used by the distributed test runs
+    VLX_CI_MPI_RANKS: "2"
     OMPI_ALLOW_RUN_AS_ROOT: "1"
     OMPI_ALLOW_RUN_AS_ROOT_CONFIRM: "1"
   before_script:
@@ -68,11 +72,11 @@ stages:
     - mpicc.openmpi --showme:version
     - mpiexec.openmpi --version | head -2
 
-.monkey:setup:
+.setup:
   extends:
-    - .monkey:conf
+    - .conf
   before_script:
-    - !reference [ .monkey:conf, before_script]
+    - !reference [ .conf, before_script]
     - python -m venv --clear venv
     - source venv/bin/activate
     - python -m pip install --upgrade
@@ -80,8 +84,8 @@ stages:
         setuptools
         wheel
 
-monkey:pip_install:
-  extends: .monkey:setup
+pip_install:
+  extends: .setup
   stage: build
   script:
     - CC=gcc MPICC=mpicc.openmpi python -m pip install --no-cache-dir mpi4py --no-binary=mpi4py
@@ -103,17 +107,22 @@ monkey:pip_install:
       - venv
     expire_in: 2 days
 
-monkey:python_tests:
-  extends: .monkey:conf
+python_tests:
+  extends: .conf
   stage: test
-  needs: ["monkey:pip_install"]
-  variables:
-    OMP_NUM_THREADS: "12"
+  needs: ["pip_install"]
   script:
     - source venv/bin/activate
     - python -c "import veloxchem; print(veloxchem.__version__)"
-    - mpiexec.openmpi --bind-to none -n 2 python -c "from mpi4py import MPI; size = MPI.COMM_WORLD.Get_size(); assert size == 2, size"
-    - mpiexec.openmpi --bind-to none -n 2 python -m pytest --capture=no --log-cli-level=INFO
+    # serial steps use the whole allocation, MPI steps share it across the ranks
+    - export OMP_NUM_THREADS="${VLX_CI_THREADS}"
+    - export VLX_MPI_THREADS="$((VLX_CI_THREADS / VLX_CI_MPI_RANKS))"
+    - test "$VLX_MPI_THREADS" -ge 1
+        || { echo "VLX_CI_THREADS ($VLX_CI_THREADS) < VLX_CI_MPI_RANKS ($VLX_CI_MPI_RANKS)"; exit 1; }
+    - OMP_NUM_THREADS="$VLX_MPI_THREADS" mpiexec.openmpi --bind-to none
+        -n "$VLX_CI_MPI_RANKS" python -c "from mpi4py import MPI; size = MPI.COMM_WORLD.Get_size(); assert size == 2, size"
+    - OMP_NUM_THREADS="$VLX_MPI_THREADS" mpiexec.openmpi --bind-to none
+        -n "$VLX_CI_MPI_RANKS" python -m pytest --capture=no --log-cli-level=INFO
         -m "solvers" --durations=10
     - python -m pytest --cov=veloxchem --capture=no --log-cli-level=INFO
         -m "not timeconsuming" --durations=10
