@@ -41,7 +41,7 @@
 #include "ThreeCenterElectronRepulsionGeom0X0Driver.hpp"
 #include "RIJKFockDriver.hpp"
 #endif
-#include "ThreeCenterOverlapDriver.hpp"
+
 #include "T3FlatBuffer.hpp"
 #include "T4CScreener.hpp"
 
@@ -89,27 +89,7 @@ export_t3cintegrals(py::module& m)
         .def("compute_mo_bq_vectors", &CRIJKFockDriver::compute_mo_bq_vectors, "Computes batch of MOs transformed B^Q vectors.")
         .def("estimate_memory_for_bq_vectors", &CRIJKFockDriver::estimate_memory_for_bq_vectors, "Estimates memory required to store B^Q vectors in AO basis.")
         .def("get_indices_of_bq_vectors", &CRIJKFockDriver::get_indices_of_bq_vectors, "Returns the indices of local B^Q vectors."); 
-#endif
     
-    // CThreeCenterOverlapDriver class
-    PyClass<CThreeCenterOverlapDriver>(m, "ThreeCenterOverlapDriver")
-        .def(py::init<>())
-        .def(
-            "compute",
-             [](const CThreeCenterOverlapDriver&         t3ovl_drv,
-               const CMolecule&                          molecule,
-               const CMolecularBasis&                    basis,
-               const std::vector<double>&                exponents,
-               const std::vector<double>&                factors,
-               const std::vector<std::array<double, 3>>& coords) -> CMatrix {
-                auto points = std::vector<TPoint<double>>();
-                points.reserve(coords.size());
-                std::ranges::transform(coords, std::back_inserter(points), [](auto rxyz) { return TPoint<double>(rxyz); });
-                   return t3ovl_drv.compute(exponents, factors, points, basis, molecule);
-            },
-            "Computes overlap matrix for given molecule, basis and vector of external scaled Gaussians.");
-
-#ifdef VLX_USE_OLD_RI
     // ThreeCenterElectronRepulsionGeom100Driver class
     PyClass<CThreeCenterElectronRepulsionGeomX00Driver<1>>(m, "ThreeCenterElectronRepulsionGeom100Driver")
         .def(py::init<>())

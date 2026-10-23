@@ -58,7 +58,6 @@ from .veloxchemlib import NuclearPotentialGeom101Driver
 from .veloxchemlib import NuclearPotentialErfGeom100Driver
 from .veloxchemlib import NuclearPotentialErfGeom010Driver
 from .veloxchemlib import ElectricDipoleMomentGeom100Driver
-from .veloxchemlib import ThreeCenterOverlapDriver
 
 # deprecated non-SIMD three-center electron repulsion drivers, only built when
 # configured with -DVLX_USE_OLD_RI=YES
