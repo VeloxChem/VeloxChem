@@ -39,7 +39,8 @@ import sys
 
 from .oneeints import compute_electric_dipole_integrals
 from .veloxchemlib import (mpi_master, bohr_in_angstrom, hartree_in_ev,
-                           fine_structure_constant, speed_of_light_in_vacuum_in_SI)
+                           fine_structure_constant, speed_of_light_in_vacuum_in_SI,
+                           hartree_in_inverse_nm)
 from .profiler import Profiler
 from .outputstream import OutputStream
 from .cppsolver import ComplexResponseSolver
@@ -53,6 +54,8 @@ from .checkpoint import (check_distributed_focks, read_distributed_focks,
                          write_distributed_focks)
 from .lreigensolver import LinearResponseEigenSolver
 from .firstorderprop import FirstOrderProperties
+from .errorhandler import assert_msg_critical
+from .spectrumplot import plot_threepa_transition_spectrum
 
 
 class ThreePATransitionDriver(NonlinearSolver):
@@ -557,6 +560,151 @@ class ThreePATransitionDriver(NonlinearSolver):
             return ret_dict
         else:
             return None, None, None, None
+
+    def plot_spectrum(self,
+                      rsp_results,
+                      x_data=None,
+                      x_unit='ev',
+                      broadening_value=0.123984,
+                      broadening_unit='ev',
+                      polarization='linear',
+                      ax=None,
+                      show_sticks=True):
+        """
+        Plot the broadened 3PA cross-section and optional strength sticks.
+
+        Parameters and return behavior follow TpaTransitionDriver.plot_spectrum.
+        The x-axis is the incident photon energy ('au', 'ev') or wavelength
+        ('nm'), not the total excitation energy. Broadening is a Lorentzian
+        HWHM in total excitation energy. Cross-sections use the convention
+        documented in get_spectrum and are returned in cm^6 s^2 photon^-2.
+
+        Return the supplied axis, or None if a new figure is created.
+        """
+
+        assert_msg_critical(
+            x_unit.lower() in ['au', 'ev', 'nm'],
+            'ThreePATransitionDriver.plot_spectrum: invalid x_unit')
+        assert_msg_critical(
+            broadening_unit.lower() in ['au', 'ev'],
+            'ThreePATransitionDriver.plot_spectrum: invalid broadening_unit')
+        assert_msg_critical(
+            np.isfinite(broadening_value) and broadening_value > 0.0,
+            'ThreePATransitionDriver.plot_spectrum: broadening must be positive')
+
+        if x_data is None:
+            photon_energies = np.asarray(rsp_results['photon_energies'],
+                                         dtype=float)
+            assert_msg_critical(
+                photon_energies.ndim == 1 and photon_energies.size > 0 and
+                np.all(np.isfinite(photon_energies)) and
+                np.all(photon_energies > 0.0),
+                'ThreePATransitionDriver.plot_spectrum: invalid photon energies')
+
+            gamma = broadening_value
+            if broadening_unit.lower() == 'ev':
+                gamma /= hartree_in_ev()
+            # Extend by five HWHMs in incident photon energy (gamma / 3).
+            emin = max(float(np.min(photon_energies)) * 0.01,
+                       float(np.min(photon_energies)) - 5.0 * gamma / 3.0)
+            emax = float(np.max(photon_energies)) + 5.0 * gamma / 3.0
+            if x_unit.lower() == 'nm':
+                xmin = 1.0 / (hartree_in_inverse_nm() * emax)
+                xmax = 1.0 / (hartree_in_inverse_nm() * emin)
+            elif x_unit.lower() == 'ev':
+                xmin, xmax = emin * hartree_in_ev(), emax * hartree_in_ev()
+            else:
+                xmin, xmax = emin, emax
+            x_data = np.linspace(xmin, xmax, 1000)
+
+        spectrum = self.get_spectrum(rsp_results, x_data, x_unit,
+                                     broadening_value, broadening_unit,
+                                     polarization)
+        plotted_ax = plot_threepa_transition_spectrum(
+            rsp_results, spectrum, x_unit=x_unit, polarization=polarization,
+            ax=ax, show_sticks=show_sticks)
+
+        return plotted_ax if ax is not None else None
+
+    @staticmethod
+    def get_spectrum(rsp_results,
+                     x_data,
+                     x_unit,
+                     b_value,
+                     b_unit,
+                     polarization='linear'):
+        """
+        Return x_data, y_data, x_label and y_label for a broadened 3PA spectrum.
+
+        The grid is in incident photon energies ('au', 'ev') or wavelengths
+        ('nm'). b_value is the Lorentzian HWHM in total excitation energy,
+        with b_unit either 'au' or 'ev'. polarization is 'linear' or 'circular'.
+
+        Use the single-beam photon-loss convention, consistent with the
+        current TPA normalization: sigma = (4*pi**4*alpha*a0**8/(3*c**2))
+        * sum(omega**3 * strength * g), with a unit-area Lorentzian g.
+        See Nobis et al., J. Phys. Chem. Lett. 10, 5008-5012 (2019),
+        DOI: 10.1021/acs.jpclett.9b02108, Supporting Information, Eq. (7).
+        The factor 1/pi from the Lorentzian is included in au2sigma.
+        y_data is directly in cm^6 s^2 photon^-2, without display scaling.
+        Model each transition with constant strength near its resonance.
+        """
+
+        assert_msg_critical(
+            x_unit.lower() in ['au', 'ev', 'nm'],
+            'ThreePATransitionDriver.get_spectrum: invalid x_unit')
+        assert_msg_critical(
+            b_unit.lower() in ['au', 'ev'],
+            'ThreePATransitionDriver.get_spectrum: invalid b_unit')
+        assert_msg_critical(
+            polarization.lower() in ['linear', 'circular'],
+            'ThreePATransitionDriver.get_spectrum: invalid polarization')
+        assert_msg_critical(
+            np.isfinite(b_value) and b_value > 0.0,
+            'ThreePATransitionDriver.get_spectrum: broadening must be positive')
+
+        x = np.asarray(x_data, dtype=float)
+        energies = np.asarray(rsp_results['photon_energies'], dtype=float)
+        assert_msg_critical(
+            x.ndim == 1 and x.size > 0 and np.all(np.isfinite(x)) and
+            np.all(x > 0.0 if x_unit.lower() == 'nm' else x >= 0.0),
+            'ThreePATransitionDriver.get_spectrum: invalid x_data')
+        assert_msg_critical(
+            energies.ndim == 1 and energies.size > 0 and
+            np.all(np.isfinite(energies)) and np.all(energies > 0.0),
+            'ThreePATransitionDriver.get_spectrum: invalid photon energies')
+
+        if x_unit.lower() == 'au':
+            omega = x
+            x_label = 'Photon energy [a.u.]'
+        elif x_unit.lower() == 'ev':
+            omega = x / hartree_in_ev()
+            x_label = 'Photon energy [eV]'
+        else:
+            omega = 1.0 / (hartree_in_inverse_nm() * x)
+            x_label = 'Wavelength [nm]'
+
+        gamma = b_value if b_unit.lower() == 'au' else b_value / hartree_in_ev()
+        alpha = fine_structure_constant()
+        a0_in_cm = bohr_in_angstrom() * 1.0e-8
+        c_in_cm_per_s = speed_of_light_in_vacuum_in_SI() * 100.0
+        au2sigma = (4.0 * np.pi**3 * alpha * a0_in_cm**8 /
+                    (3.0 * c_in_cm_per_s**2))
+
+        strengths = rsp_results['3pa_strengths'][polarization.lower()]
+        y = np.zeros_like(omega)
+        for energy in energies:
+            # Strength dictionaries use negative photon-energy keys.
+            strength = strengths[-float(energy)]
+            lorentzian = gamma / ((3.0 * (energy - omega))**2 + gamma**2)
+            y += au2sigma * omega**3 * strength * lorentzian
+
+        return {
+            'x_data': x.tolist(),
+            'y_data': y.tolist(),
+            'x_label': x_label,
+            'y_label': r'3PA cross-section [cm$^6$ s$^2$ photon$^{-2}$]',
+        }
 
     def get_es4(self, wi, N, fo, fo2, nocc, norb, D0,Xf):
         """

@@ -42,6 +42,7 @@ from .errorhandler import assert_msg_critical
 try:
     import matplotlib.pyplot as plt
     import matplotlib.lines as mlines
+    from matplotlib.ticker import ScalarFormatter
 except ImportError:
     pass
 
@@ -1072,6 +1073,72 @@ def plot_tpa_transition_spectrum(rsp_results,
 
     return ax
 
+def plot_threepa_transition_spectrum(rsp_results,
+                                     spectrum,
+                                     x_unit='ev',
+                                     polarization='linear',
+                                     ax=None,
+                                     show_sticks=True):
+    """
+    Plot a spectrum from ThreePATransitionDriver.get_spectrum.
+
+    x_unit is 'au', 'ev' or 'nm'; polarization is 'linear' or 'circular'.
+    If ax is None, create a new figure. Return the plotting axis.
+    Optional sticks show 3PA transition strengths in atomic units.
+    """
+
+    assert_msg_critical('matplotlib' in sys.modules, 'matplotlib is required.')
+    assert_msg_critical(
+        x_unit.lower() in ['au', 'ev', 'nm'],
+        'plot_threepa_transition_spectrum: invalid x_unit')
+    assert_msg_critical(
+        polarization.lower() in ['linear', 'circular'],
+        'plot_threepa_transition_spectrum: invalid polarization')
+
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(8, 5))
+
+    ax.set_title('3PA Transition Spectrum')
+    ax.set_xlabel(spectrum['x_label'])
+    ax.set_ylabel(spectrum['y_label'])
+    formatter = ScalarFormatter(useOffset=False, useMathText=True)
+    formatter.set_scientific(True)
+    formatter.set_powerlimits((0, 0))
+    ax.yaxis.set_major_formatter(formatter)
+    ax.plot(spectrum['x_data'], spectrum['y_data'],
+            color='black', alpha=0.9, linewidth=2.5,
+            label='Broadened 3PA cross-section')
+
+    if show_sticks:
+        energies = np.asarray(rsp_results['photon_energies'], dtype=float)
+        if x_unit.lower() == 'ev':
+            stick_x = energies * hartree_in_ev()
+        elif x_unit.lower() == 'nm':
+            stick_x = 1.0 / (hartree_in_inverse_nm() * energies)
+        else:
+            stick_x = energies
+
+        strengths = [rsp_results['3pa_strengths'][polarization.lower()][-float(w)]
+                     for w in energies]
+        width = 0.01 * float(np.ptp(stick_x))
+        if width == 0.0:
+            width = max(0.02 * abs(float(stick_x[0])), 0.02)
+
+        ax2 = ax.twinx()
+        bars = ax2.bar(stick_x, strengths, width=width,
+                       alpha=0.45, color='darkcyan',
+                       label=f'{polarization.capitalize()} 3PA strength')
+        ax2.set_ylabel(f'3PA strengths ({polarization.lower()}) [a.u.]')
+        ymax = max(strengths)
+        ax2.set_ylim(0, ymax * 1.1 if ymax > 0.0 else 1.0)
+        ax2.legend(handles=[ax.lines[-1], bars], frameon=False,
+                    loc='center left', bbox_to_anchor=(1.15, 0.5))
+
+    ymax = max(spectrum['y_data'])
+    ax.set_ylim(0, ymax * 1.1 if ymax > 0.0 else 1.0)
+    ax.set_xlim(min(spectrum['x_data']), max(spectrum['x_data']))
+
+    return ax
 
 def plot_tpa_spectrum(spectrum, ax=None, interpolate=True, show_points=True):
     """
