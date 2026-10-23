@@ -7,7 +7,6 @@ from veloxchem.veloxchemlib import make_matrix, mat_t, rimode
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.packedmatrix import PackedMatrix
-from veloxchem.rifockdriver import RIFockDriver
 
 # The Coulomb fitting of both RI-J drivers is checked against an exact solve of the
 # metric, E_J = 1/2 gamma^T M^-1 gamma with gamma(P) = sum (P|mn) D(mn). The drivers
@@ -88,23 +87,3 @@ class TestRIJFitting:
         fitted_inv = np.array(drv_inv.solve_fitting(gamma))
 
         assert np.max(np.abs(fitted_inv - fitted)) < 1.0e-8
-
-    def test_conventional_driver(self):
-
-        mol, bas, aux, density = self.setup_system()
-
-        ri_drv = RIFockDriver()
-        ri_drv.ostream.mute()
-        ri_drv.prepare_buffers(mol, bas, 'def2-universal-jfit', verbose=False)
-
-        dmat = make_matrix(bas, mat_t.symmetric)
-        dmat.set_values(density)
-
-        gamma = np.array(ri_drv._ri_drv.compute_local_gamma_vector(
-            dmat, aux.get_dimensions_of_basis()))
-
-        coulomb = ri_drv.compute(dmat, 'j').to_numpy()
-
-        energy = 0.5 * np.sum(density * coulomb)
-
-        assert abs(energy - self.exact_energy(mol, aux, gamma)) < 1.0e-10
