@@ -276,10 +276,5 @@ class TestEnsembleDriver:
                 dev_eig = eig - ref_eigs[frame]
                 assert np.max(np.abs(dev_eig)) < 5.0e-3
 
-                print(f'fika vs CP3 frame {frame}: '
-                      f'dSCF = {dev_scf[got_frames.index(frame)]:+.6e} Ha, '
-                      f'max |dEig| = {np.max(np.abs(dev_eig)):+.6e} Ha '
-                      f'({np.max(np.abs(dev_eig)) * 27.211386:+.4f} eV)')
-
             (data_dir /
              ".alpha-helix-acetone-water.xtc_offsets.npz").unlink(missing_ok=True)
