@@ -73,6 +73,20 @@ export_t3cintegrals(py::module& m)
                 return eri_drv.compute(screener, aux_basis, molecule, atoms, ithreshold);
             },
             "Computes electron repulsion integrals for given molecule, screener, auxilary basis, and list of atoms.");
+    
+    // CRIJKFockDriver class
+    // Note: RIJKFockDriver is prefixed by an underscore and will be used in rijkfockdriver.py
+    PyClass<CRIJKFockDriver>(m, "_RIJKFockDriver")
+        .def(py::init<>())
+        .def("compute_bq_vectors", &CRIJKFockDriver::compute_bq_vectors, "Computes B^Q vectors in batches.")
+        .def("compute_screened_bq_vectors", &CRIJKFockDriver::compute_screened_bq_vectors, "Computes B^Q vectors in batches.")
+        .def("compute_j_fock", &CRIJKFockDriver::compute_j_fock, "Computes Coulomb Fock matrix.")
+        .def("compute_screened_j_fock", &CRIJKFockDriver::compute_screened_j_fock, "Computes screened Coulomb Fock matrix.")
+        .def("compute_k_fock", &CRIJKFockDriver::compute_k_fock, "Computes exchange Fock matrix.")
+        .def("compute_screened_k_fock", &CRIJKFockDriver::compute_screened_k_fock, "Computes screened exchange Fock matrix.")
+        .def("compute_mo_bq_vectors", &CRIJKFockDriver::compute_mo_bq_vectors, "Computes batch of MOs transformed B^Q vectors.")
+        .def("estimate_memory_for_bq_vectors", &CRIJKFockDriver::estimate_memory_for_bq_vectors, "Estimates memory required to store B^Q vectors in AO basis.")
+        .def("get_indices_of_bq_vectors", &CRIJKFockDriver::get_indices_of_bq_vectors, "Returns the indices of local B^Q vectors."); 
 #endif
     
     // CThreeCenterOverlapDriver class
