@@ -1,14 +1,17 @@
-target_sources(vlxobjs
-  PRIVATE
-    T3CDistributor.cpp
-    T3CGeom010SumDistributor.cpp
-    T3CGeom0X0Distributor.cpp
-    T3CGeom100SumDistributor.cpp
-    T3CGeomX00Distributor.cpp
-    T3CLocalDistributor.cpp
-    T3CUtils.cpp
-    T3CLocalReducedDistributor.cpp
-  )
+if(VLX_USE_OLD_RI)
+  target_sources(vlxobjs
+    PRIVATE
+      RIJKFockDriver.cpp
+      T3CDistributor.cpp
+      T3CGeom010SumDistributor.cpp
+      T3CGeom0X0Distributor.cpp
+      T3CGeom100SumDistributor.cpp
+      T3CGeomX00Distributor.cpp
+      T3CLocalDistributor.cpp
+      T3CUtils.cpp
+      T3CLocalReducedDistributor.cpp
+    )
+endif()
 
 target_include_directories(vlxobjs
   PUBLIC

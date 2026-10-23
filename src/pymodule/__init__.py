@@ -66,6 +66,7 @@ try:
     from .veloxchemlib import ThreeCenterElectronRepulsionDriver
     from .veloxchemlib import ThreeCenterElectronRepulsionGeom100Driver
     from .veloxchemlib import ThreeCenterElectronRepulsionGeom010Driver
+    from .rijkfockdriver import RIJKFockDriver
 except ImportError:
     pass
 

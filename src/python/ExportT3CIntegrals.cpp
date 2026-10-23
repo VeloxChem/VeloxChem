@@ -39,6 +39,7 @@
 #include "ThreeCenterElectronRepulsionDriver.hpp"
 #include "ThreeCenterElectronRepulsionGeomX00Driver.hpp"
 #include "ThreeCenterElectronRepulsionGeom0X0Driver.hpp"
+#include "RIJKFockDriver.hpp"
 #endif
 #include "ThreeCenterOverlapDriver.hpp"
 #include "T3FlatBuffer.hpp"
@@ -80,6 +81,7 @@ export_t3cintegrals(py::module& m)
         .def(py::init<>())
         .def("compute_bq_vectors", &CRIJKFockDriver::compute_bq_vectors, "Computes B^Q vectors in batches.")
         .def("compute_screened_bq_vectors", &CRIJKFockDriver::compute_screened_bq_vectors, "Computes B^Q vectors in batches.")
+        .def("local_compute_screened_bq_vectors", &CRIJKFockDriver::local_compute_screened_bq_vectors, "Computes local B^Q vectors on MPI rank.")
         .def("compute_j_fock", &CRIJKFockDriver::compute_j_fock, "Computes Coulomb Fock matrix.")
         .def("compute_screened_j_fock", &CRIJKFockDriver::compute_screened_j_fock, "Computes screened Coulomb Fock matrix.")
         .def("compute_k_fock", &CRIJKFockDriver::compute_k_fock, "Computes exchange Fock matrix.")

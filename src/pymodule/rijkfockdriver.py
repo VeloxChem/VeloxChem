@@ -39,12 +39,10 @@ from .veloxchemlib import mpi_master
 from .veloxchemlib import _RIJKFockDriver
 from .veloxchemlib import TwoCenterElectronRepulsionDriver
 from .veloxchemlib import SubMatrix
-from .veloxchemlib import Matrix
 from .outputstream import OutputStream
 from .molecularbasis import MolecularBasis
-from .errorhandler import assert_msg_critical
+from .mathutils import screened_eigh
 
-from scipy.linalg import lu_factor, lu_solve, sqrtm
 
 class RIJKFockDriver:
     """
@@ -75,18 +73,16 @@ class RIJKFockDriver:
         self.nodes = self.comm.Get_size()
 
         self.ostream = ostream
-        
+
         self.metric = None
+        self.metric_threshold = 1.0e-12
 
         self._ri_drv = _RIJKFockDriver()
 
-    def compute_metric(self,
-                       molecule,
-                       basis,
-                       verbose=True):
+    def compute_metric(self, molecule, basis, verbose=True):
         """
         Computes Cholesky decomposed J metric for the RI-JK Fock driver.
-        
+
         :param molecule:
             The molecule to compute J metric.
         :param basis:
@@ -94,7 +90,7 @@ class RIJKFockDriver:
         :param verbose:
             The information printout level.
         """
-        
+
         # NOTE: For numerical stability J metric is computed on master node
         # and distributed to worker nodes
         if self.rank == mpi_master():
@@ -130,10 +126,11 @@ class RIJKFockDriver:
 
             ri_prep_t0 = time.time()
 
-            lu, piv = lu_factor(mat_j_np)
-            inv_mat_j_np = lu_solve((lu, piv), np.eye(mat_j_np.shape[0]))
-            metric_np = sqrtm(inv_mat_j_np)
-            
+            # compute J^{-1/2}
+            # for now, use hard-coded threshold
+            eigvals, eigvecs = screened_eigh(mat_j_np, self.metric_threshold)
+            metric_np = eigvecs * (1.0 / np.sqrt(eigvals))
+
             self.metric = SubMatrix(
                 [0, 0, metric_np.shape[0], metric_np.shape[1]])
             self.metric.set_values(metric_np)
@@ -146,7 +143,7 @@ class RIJKFockDriver:
 
         # broadcast Cholesky decomposed J metric
         self.metric = self.comm.bcast(self.metric)
-        
+
     def compute_bq_vectors(self,
                            molecule,
                            basis,
@@ -154,7 +151,7 @@ class RIJKFockDriver:
                            verbose=True):
         """
         Computes B^Q vectors (distributed) for the RI-JK Fock driver.
-        
+
         :param molecule:
             The molecule to compute three-center integrals.
         :param basis:
@@ -164,7 +161,7 @@ class RIJKFockDriver:
         :param verbose:
             The information printout level.
         """
-        
+
         if verbose:
             self.ostream.print_info(
                 'Using the resolution of the identity (RI) approximation.')
@@ -186,17 +183,18 @@ class RIJKFockDriver:
                                     f'{basis_ri.get_dimensions_of_basis()}')
             self.ostream.print_blank()
             self.ostream.flush()
-        
+
         ri_prep_t0 = time.time()
-        
-        self._ri_drv.compute_bq_vectors(molecule, basis, basis_ri, self.metric, self.rank, self.nodes)
-        
+
+        self._ri_drv.compute_bq_vectors(molecule, basis, basis_ri, self.metric,
+                                        self.rank, self.nodes)
+
         if verbose:
             self.ostream.print_info('B^Q vectors for RI done in ' +
                                     f'{time.time() - ri_prep_t0:.2f} sec.')
             self.ostream.print_blank()
             self.ostream.flush()
-            
+
     def compute_screened_bq_vectors(self,
                                     screener,
                                     molecule,
@@ -205,19 +203,19 @@ class RIJKFockDriver:
                                     verbose=True):
         """
         Computes B^Q vectors (sreened, distributed) for the RI-JK Fock driver.
-        
+
         :param screener:
             The two-electron ERI screener data.
         :param molecule:
             The molecule to compute three-center integrals.
         :param auxiliary_basis:
             The auxiliary basis to compute three-center integrals.
-        :param ithreshold: 
+        :param ithreshold:
             The integer threshold of screening important integral pairs.
         :param verbose:
             The information printout level.
         """
-        
+
         if verbose:
             self.ostream.print_info(
                 'Using the resolution of the identity (RI) approximation.')
@@ -239,24 +237,23 @@ class RIJKFockDriver:
                                     f'{basis_ri.get_dimensions_of_basis()}')
             self.ostream.print_blank()
             self.ostream.flush()
-        
+
         ri_prep_t0 = time.time()
-        
-        self._ri_drv.compute_screened_bq_vectors(screener, molecule, basis_ri, self.metric, ithreshold, self.rank, self.nodes)
-        
+
+        self._ri_drv.compute_screened_bq_vectors(screener, molecule, basis_ri,
+                                                 self.metric, ithreshold,
+                                                 self.rank, self.nodes)
+
         if verbose:
             self.ostream.print_info('Screened B^Q vectors for RI done in ' +
                                     f'{time.time() - ri_prep_t0:.2f} sec.')
             self.ostream.print_blank()
             self.ostream.flush()
-        
-    def compute_j_fock(self,
-                       density,
-                       label,
-                       verbose=True):
+
+    def compute_j_fock(self, density, label, verbose=True):
         """
         Computes Coulomb Fock matrix.
-        
+
         :param density:
             The AO density matrix (restricted).
         :param label:
@@ -264,34 +261,31 @@ class RIJKFockDriver:
         :param verbose:
             The information printout level.
         """
-        
+
         if verbose:
             self.ostream.print_info(
                 'Using the resolution of the identity (RI) approximation.')
             self.ostream.print_blank()
             self.ostream.flush()
-            
+
         ri_prep_t0 = time.time()
 
         fmat = self._ri_drv.compute_j_fock(density, label)
-        
-        gmat = Matrix.reduce(fmat, self.comm, mpi_master())
-        
+
+        # No reduction here. Reduction will be done in scfdriver.
+
         if verbose:
             self.ostream.print_info('Coulomb contribution done in ' +
                                     f'{time.time() - ri_prep_t0:.2f} sec.')
             self.ostream.print_blank()
             self.ostream.flush()
-            
-        return gmat
-        
-    def compute_screened_j_fock(self,
-                                density,
-                                label,
-                                verbose=True):
+
+        return fmat
+
+    def compute_screened_j_fock(self, density, label, verbose=True):
         """
         Computes screened Coulomb Fock matrix.
-        
+
         :param density:
             The AO density matrix (restricted).
         :param label:
@@ -299,39 +293,106 @@ class RIJKFockDriver:
         :param verbose:
             The information printout level.
         """
-        
+
         if verbose:
             self.ostream.print_info(
                 'Using the resolution of the identity (RI) approximation.')
             self.ostream.print_blank()
             self.ostream.flush()
-            
+
         ri_prep_t0 = time.time()
 
         fmat = self._ri_drv.compute_screened_j_fock(density, label)
-        
-        gmat = Matrix.reduce(fmat, self.comm, mpi_master())
-        
+
+        # No reduction here. Reduction will be done in scfdriver.
+
         if verbose:
             self.ostream.print_info('Coulomb contribution done in ' +
                                     f'{time.time() - ri_prep_t0:.2f} sec.')
             self.ostream.print_blank()
             self.ostream.flush()
-            
-        return gmat
-        
-    def compute_k_fock(self, density, molorbs, verbose=True):
+
+        return fmat
+
+    @staticmethod
+    def _get_density_factor(density):
+        """
+        Returns a factorization of the density matrix for RI exchange.
+
+        Needed when the density is non-idempotent (pFON or density damping).
+
+        :param density:
+            The AO density matrix.
+
+        :return:
+            A submatrix containing the density factor.
+        """
+
+        if hasattr(density, 'to_numpy'):
+            density_np = density.to_numpy()
+        else:
+            density_np = np.asarray(density)
+
+        density_np = 0.5 * (density_np + density_np.T)
+
+        eigvals, eigvecs = screened_eigh(density_np, 1.0e-12)
+        factor_np = eigvecs * np.sqrt(eigvals)
+
+        if factor_np.shape[1] == 0:
+            factor_np = np.zeros((density_np.shape[0], 1))
+
+        factor = SubMatrix(
+            [0, 0, factor_np.shape[0], factor_np.shape[1]])
+        factor.set_values(factor_np)
+
+        return factor
+
+    @staticmethod
+    def _get_occupied_orbitals(molorbs, spin='alpha'):
+        """
+        Returns the occupied molecular orbital block for the given spin.
+
+        :param molorbs:
+            The molecular orbitals.
+        :param spin:
+            The spin block (alpha or beta).
+
+        :return:
+            A submatrix containing the occupied molecular orbitals.
+        """
+
+        if spin == 'alpha':
+            nocc = int(np.sum(molorbs.occa_to_numpy()))
+            occ_mos = SubMatrix([0, 0, molorbs.number_aos(), nocc])
+            occ_mos.set_values(molorbs.alpha_to_numpy()[:, 0:nocc])
+        elif spin == 'beta':
+            nocc = int(np.sum(molorbs.occb_to_numpy()))
+            occ_mos = SubMatrix([0, 0, molorbs.number_aos(), nocc])
+            occ_mos.set_values(molorbs.beta_to_numpy()[:, 0:nocc])
+
+        return occ_mos
+
+    def compute_k_fock(self,
+                       density,
+                       molorbs,
+                       verbose=True,
+                       spin='alpha',
+                       use_density_factor=False):
         """
         Computes exchange Fock matrix.
-        
+
         :param density:
             The AO density matrix (restricted).
         :param molorbs:
             The molecular orbitals (restricted).
         :param verbose:
             The information printout level.
+        :param spin:
+            The spin block (alpha or beta).
+        :param use_density_factor:
+            Whether the exchange should be built from the density.
         """
-        
+
         if verbose:
             self.ostream.print_info(
                 'Using the resolution of the identity (RI) approximation.')
@@ -339,37 +400,45 @@ class RIJKFockDriver:
             self.ostream.flush()
 
         ri_prep_t0 = time.time()
-        
-        # retrieve occupied orbitals
-        # TODO: make generic version in MolecularOrbitals class
-        nocc = int(np.sum(molorbs.occa_to_numpy()))
-        occ_mos = SubMatrix([0, 0, molorbs.number_aos(), nocc])
-        occ_mos.set_values(molorbs.alpha_to_numpy()[:, 0 : nocc])
-        
+
+        if use_density_factor:
+            occ_mos = self._get_density_factor(density)
+        else:
+            occ_mos = self._get_occupied_orbitals(molorbs, spin)
+
         fmat = self._ri_drv.compute_k_fock(density, occ_mos)
-        
-        gmat = Matrix.reduce(fmat, self.comm, mpi_master())
-    
+
+        # No reduction here. Reduction will be done in scfdriver.
+
         if verbose:
             self.ostream.print_info('Exchange contribution done in ' +
                                     f'{time.time() - ri_prep_t0:.2f} sec.')
             self.ostream.print_blank()
             self.ostream.flush()
-            
-        return gmat
-        
-    def compute_screened_k_fock(self, density, molorbs, verbose=True):
+
+        return fmat
+
+    def compute_screened_k_fock(self,
+                                density,
+                                molorbs,
+                                verbose=True,
+                                spin='alpha',
+                                use_density_factor=False):
         """
         Computes screened exchange Fock matrix.
-        
+
         :param density:
             The AO density matrix (restricted).
         :param molorbs:
             The molecular orbitals (restricted).
         :param verbose:
             The information printout level.
+        :param spin:
+            The spin block (alpha or beta).
+        :param use_density_factor:
+            Whether the exchange should be built from the density.
         """
-        
+
         if verbose:
             self.ostream.print_info(
                 'Using the resolution of the identity (RI) approximation.')
@@ -377,59 +446,59 @@ class RIJKFockDriver:
             self.ostream.flush()
 
         ri_prep_t0 = time.time()
-        
-        # retrieve occupied orbitals
-        # TODO: make generic version in MolecularOrbitals class
-        nocc = int(np.sum(molorbs.occa_to_numpy()))
-        occ_mos = SubMatrix([0, 0, molorbs.number_aos(), nocc])
-        occ_mos.set_values(molorbs.alpha_to_numpy()[:, 0 : nocc])
-        
+
+        if use_density_factor:
+            occ_mos = self._get_density_factor(density)
+        else:
+            occ_mos = self._get_occupied_orbitals(molorbs, spin)
+
         fmat = self._ri_drv.compute_screened_k_fock(density, occ_mos)
-        
-        gmat = Matrix.reduce(fmat, self.comm, mpi_master())
-    
+
+        # No reduction here. Reduction will be done in scfdriver.
+
         if verbose:
             self.ostream.print_info('Exchange contribution done in ' +
                                     f'{time.time() - ri_prep_t0:.2f} sec.')
             self.ostream.print_blank()
             self.ostream.flush()
-            
-        return gmat
+
+        return fmat
 
     def compute_mo_bq_vectors(self, lambda_p, lambda_h, bstart, bend):
         """
         Compute bq vectors in MO basis using the RI Fock driver.
-        
+
         :param lambda_p:
             The particle tranformation matrix for B^Q vectors.
         :param lambda_h:
-            The hole tranformation matrix for B^Q vectors.    
+            The hole tranformation matrix for B^Q vectors.
         :param bstart:
             The batch start position.
         :param bend:
-            The batch end position.    
+            The batch end position.
         """
-        
-        return self._ri_drv.compute_mo_bq_vectors(lambda_p, lambda_h, bstart, bend)
+
+        return self._ri_drv.compute_mo_bq_vectors(lambda_p, lambda_h, bstart,
+                                                  bend)
 
     def estimate_memory_for_bq_vectors(self,
-                                        screener,
-                                        molecule,
-                                        auxiliary_basis,
-                                        ithreshold):
+                                       screener,
+                                       molecule,
+                                       auxiliary_basis,
+                                       ithreshold):
         """
         Computes B^Q vectors (sreened, distributed) for the RI-JK Fock driver.
-        
+
         :param screener:
             The two-electron ERI screener data.
         :param molecule:
             The molecule to compute three-center integrals.
         :param auxiliary_basis:
             The auxiliary basis to compute three-center integrals.
-        :param ithreshold: 
+        :param ithreshold:
             The integer threshold of screening important integral pairs.
         """
-        
+
         if isinstance(auxiliary_basis, str):
             if self.rank == mpi_master():
                 basis_ri = MolecularBasis.read(molecule, auxiliary_basis)
@@ -438,9 +507,9 @@ class RIJKFockDriver:
             basis_ri = self.comm.bcast(basis_ri, root=mpi_master())
         else:
             basis_ri = MolecularBasis(auxiliary_basis)
-            
+
         return self._ri_drv.estimate_memory_for_bq_vectors(screener, molecule, basis_ri, ithreshold, self.rank, self.nodes)
-    
+
     def get_indices_of_bq_vectors(self):
         """
         Returns the indices of local B^Q vectors.
