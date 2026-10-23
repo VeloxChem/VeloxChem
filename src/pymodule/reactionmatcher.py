@@ -42,12 +42,13 @@ import math
 
 from .outputstream import OutputStream
 from .veloxchemlib import mpi_master
+from .errorhandler import assert_msg_critical
 from collections import Counter
 
 
 class _TimeLimitExceeded(Exception):
     """
-    Raised from inside the graph matching once ReactionMatcher.max_time is exceeded.
+    Raised once the deadline of ReactionMatcher.get_mapping has passed.
     """
 
 
@@ -74,6 +75,7 @@ class ReactionMatcher:
         self._iso_count = 0
         self._mono_count = 0
         self._start_time = 0
+        self._deadline = 0
         self._time_limit_active = False
         self.verbose = False
         self.print_starting_index = 1
@@ -97,59 +99,81 @@ class ReactionMatcher:
         breaking_bonds=None,
         forming_bonds=None,
     ):
+        """
+        Find the mapping from the reactant atoms to the product atoms, with the breaking and forming bonds.
+        Returns None for all results if no mapping exists. Exceeding max_time, which bounds the entire search
+        including the retry with hydrogens, is a critical error.
+        """
+        self._start_time = time.monotonic()
+        self._deadline = self._start_time + self.max_time
+        self._time_limit_active = True
+        finished_in_time = True
+        try:
+            map, breaking_edges, forming_edges = self._get_mapping(
+                reactant, product, breaking_bonds, forming_bonds)
+        except _TimeLimitExceeded:
+            finished_in_time = False
+        finally:
+            self._time_limit_active = False
 
-        self.rea_graph, self.pro_graph = self._create_reaction_graphs(
-            reactant, product, breaking_bonds, forming_bonds,
-            self.force_hydrogen_inclusion)
+        assert_msg_critical(
+            finished_in_time,
+            f"ReactionMatcher: time limit of {self.max_time:.3f} s exceeded, "
+            + "the search for a mapping was aborted. This does not mean "
+            + "that no mapping exists. Increase max_time to search longer.")
+        return map, breaking_edges, forming_edges
 
-        self.rea_graph, self.pro_graph, self.assisting_map = self._assign_assist_ids(
-            reactant, product, self.rea_graph, self.pro_graph)
-
-        if len(self.assisting_map) == len(self.rea_graph.nodes):
-            # inverted_map = {v: k for k, v in self.assisting_map.items()}
-            return self.assisting_map, set(), set()
-
-        if self._breaking_depth == -1:
-            self._breaking_depth = self._decide_breaking_depth()
-
-        map, breaking_edges, forming_edges = self._find_mapping_in_time(
-            self.rea_graph.copy(),
-            self.pro_graph.copy(),
+    def _get_mapping(self, reactant, product, breaking_bonds, forming_bonds):
+        map, breaking_edges, forming_edges = self._match_reaction_graphs(
+            reactant,
+            product,
             breaking_bonds,
             forming_bonds,
+            self.force_hydrogen_inclusion,
         )
         if map is None and self._reduce_hydrogen:
             self.ostream.print_info(
                 "No mapping found, retrying with hydrogens included.")
             self.ostream.flush()
-            self._reduce_hydrogen = False
-            self.rea_graph, self.pro_graph = self._create_reaction_graphs(
+            map, breaking_edges, forming_edges = self._match_reaction_graphs(
                 reactant,
                 product,
                 breaking_bonds,
                 forming_bonds,
                 True,
             )
-            self.rea_graph, self.pro_graph, self.assisting_map = self._assign_assist_ids(
-                reactant,
-                product,
-                self.rea_graph,
-                self.pro_graph,
-            )
-            map, breaking_edges, forming_edges = self._find_mapping_in_time(
+
+        self.ostream.print_info(
+            f"Total subgraph isomorphism checks: {self._iso_count}, total subgraph monomorphism checks: {self._mono_count}"
+        )
+        self.ostream.flush()
+        return map, breaking_edges, forming_edges
+
+    def _match_reaction_graphs(self, reactant, product, breaking_bonds,
+                               forming_bonds, force_hydrogen_inclusion):
+        self.rea_graph, self.pro_graph = self._create_reaction_graphs(
+            reactant, product, breaking_bonds, forming_bonds,
+            force_hydrogen_inclusion)
+
+        self.rea_graph, self.pro_graph, self.assisting_map = self._assign_assist_ids(
+            reactant, product, self.rea_graph, self.pro_graph)
+
+        if len(self.assisting_map) == len(self.rea_graph.nodes):
+            map = dict(self.assisting_map)
+            breaking_edges, forming_edges = set(), set()
+        else:
+            if self._breaking_depth == -1:
+                self._breaking_depth = self._decide_breaking_depth()
+
+            map, breaking_edges, forming_edges = self._find_mapping(
                 self.rea_graph.copy(),
                 self.pro_graph.copy(),
                 breaking_bonds,
                 forming_bonds,
             )
 
-        self.ostream.flush()
-        self.ostream.print_info(
-            f"Total subgraph isomorphism checks: {self._iso_count}, total subgraph monomorphism checks: {self._mono_count}"
-        )
-        if self._reduce_hydrogen:
+        if map is not None and self._reduce_hydrogen:
             self._restore_hydrogen(map, self.rea_graph, self.pro_graph)
-
         return map, breaking_edges, forming_edges
 
     def _decide_breaking_depth(self):
@@ -183,6 +207,7 @@ class ReactionMatcher:
 
         pro_graph = self._prepare_graph(product)
 
+        self._reduce_hydrogen = False
         if not force_hydrogen_inclusion:
             self._reduce_hydrogen = self._decide_hydrogen_reduction(
                 rea_graph, pro_graph)
@@ -360,6 +385,12 @@ class ReactionMatcher:
         # isomorphisms depends on the search order of the graph matcher and can be chemically wrong.
         # The hashes include the assist ids, so every assigned atom can make the atoms around it unique.
 
+        min_depth_positive = self._assist_min_depth >= 1
+        assert_msg_critical(
+            min_depth_positive,
+            f"ReactionMatcher: the minimum assist depth must be at least 1, got {self._assist_min_depth}"
+        )
+
         assisting_map = {}
 
         depth = 1
@@ -374,17 +405,22 @@ class ReactionMatcher:
         full_depth = 2 * depth
 
         while depth >= self._assist_min_depth:
+            self._check_time()
             centres = self._find_unique_centres(rea_graph, pro_graph, depth)
             new_count = self._assign_centres(rea_graph, pro_graph, depth,
                                              centres, assisting_map)
 
             # Once no atom is unique anymore, break the symmetry of one set of equivalent atoms by assigning one of
-            # them. This makes the other atoms of the set unique for the next round.
+            # them. This makes the other atoms of the set unique for the next round. Only one set is assigned per
+            # round, because assigning one set can break the symmetry of another.
             if new_count == 0:
-                centres = self._find_symmetric_centres(rea_graph, pro_graph,
-                                                       depth, full_depth)
-                new_count = self._assign_centres(rea_graph, pro_graph, depth,
-                                                 centres, assisting_map)
+                for centre in self._find_symmetric_centres(
+                        rea_graph, pro_graph, depth, full_depth):
+                    new_count = self._assign_centres(rea_graph, pro_graph,
+                                                     depth, [centre],
+                                                     assisting_map)
+                    if new_count > 0:
+                        break
 
             # Lower the range only once no new atoms can be assigned at this one
             if new_count == 0:
@@ -490,6 +526,10 @@ class ReactionMatcher:
                 rea_graph.nodes[rea_node]['assist_id'] = rea_node
                 pro_graph.nodes[pro_node]['assist_id'] = rea_node
                 assisting_map.update({rea_node: pro_node})
+
+                # Reduced hydrogens are not in the graphs, _restore_hydrogen maps them at the end
+                if self._reduce_hydrogen:
+                    continue
                 rea_H_indices = rea_graph.nodes[rea_node].get('H_indices')
                 pro_H_indices = pro_graph.nodes[pro_node].get('H_indices')
                 if rea_H_indices is not None and pro_H_indices is not None:
@@ -504,10 +544,11 @@ class ReactionMatcher:
     def _find_symmetric_centres(self, rea_graph, pro_graph, depth,
                                 full_depth):
         """
-        Find a set of unassigned heavy atoms that are equivalent within the entire reactant and the entire product,
+        Find the sets of unassigned heavy atoms that are equivalent within the entire reactant and the entire product,
         and that are the only atoms with their neighbourhood within depth in both graphs.
-        Returns a list with one (reactant node, product node) pair of that set, or an empty list. Assigning one atom of
-        such a set does not exclude any mapping, because the equivalent atoms can be swapped by a symmetry of the graph.
+        Yields one (reactant node, product node) pair of each set, ordered by the lowest reactant node. Assigning one
+        atom of such a set does not exclude any mapping, because the equivalent atoms can be swapped by a symmetry of
+        the graph.
         """
         rea_groups = self._group_unassigned_by_hash(
             rea_graph, self._get_neighbourhood_hashes(rea_graph, depth))
@@ -535,8 +576,7 @@ class ReactionMatcher:
                 continue
             if not self._are_symmetric(pro_graph, pro_nodes):
                 continue
-            return [(rea_nodes[0], pro_nodes[0])]
-        return []
+            yield rea_nodes[0], pro_nodes[0]
 
     def _are_symmetric(self, graph, nodes):
         """
@@ -593,27 +633,6 @@ class ReactionMatcher:
         """
         groups = ReactionMatcher._group_unassigned_by_hash(graph, hashes)
         return {h: nodes[0] for h, nodes in groups.items() if len(nodes) == 1}
-
-    def _find_mapping_in_time(self, A, B, forced_breaking_edges,
-                              forced_forming_edges):
-        """
-        Run _find_mapping, aborting it once it takes longer than max_time.
-        The time limit is also checked inside every graph matching, because a single subgraph check that fails can
-        take arbitrarily long. Returns None for all results if the time limit was exceeded.
-        """
-        self._start_time = time.time()
-        self._time_limit_active = True
-        try:
-            return self._find_mapping(A, B, forced_breaking_edges,
-                                      forced_forming_edges)
-        except _TimeLimitExceeded:
-            self.ostream.print_warning(
-                f"Spent more then {self.max_time:.3f} s finding mapping, aborting"
-            )
-            self.ostream.flush()
-            return None, None, None
-        finally:
-            self._time_limit_active = False
 
     def _find_mapping(self, A, B, forced_breaking_edges, forced_forming_edges):
         """
@@ -677,7 +696,6 @@ class ReactionMatcher:
                                                   ordered_nodes_A,
                                                   permuted_unassigned_nodes_B)
 
-        self._start_time = time.time()
         breaking_edges = self._find_breaking_edges(
             A,
             A_assist,
@@ -717,7 +735,7 @@ class ReactionMatcher:
         GM = self.get_graph_matcher(A, B)
         map = next(GM.isomorphisms_iter())
 
-        self._check_time("finding mapping.")
+        self._print_elapsed("finding mapping.")
         if swapped:
             # if we swapped A and B, we need to swap the mapping back
             self.ostream.print_info(
@@ -748,6 +766,7 @@ class ReactionMatcher:
 
         # Loop through all permutations
         for perm in permuted_unassigned_nodes_B:
+            self._check_time()
             temp_map = {k: v for k, v in zip(unassigned_nodes_A, perm)}
             skip = False
 
@@ -883,13 +902,12 @@ class ReactionMatcher:
                                 B_composition, forced_forming_edges):
         """
         Search the minimal amount of edges that need to be removed from A so that all connected components of A are subgraphs of B.
-        Searches recursively up to given depth. Returns None if no edges are found at a given depth, or when the time limit is exceeded.
+        Searches recursively up to given depth. Returns None if no edges are found at a given depth.
         In looping, it prioritizes breaking bonds involving combinations of elements that are more abundant in A then in B.
         After that, it prioritizes breaking bonds involving Hydrogen atoms.
         """
 
-        if not self._check_time():
-            return None
+        self._check_time()
 
         if self._connected_components_are_subgraphs(A, B):
             return set()
@@ -1001,12 +1019,11 @@ class ReactionMatcher:
                     if not self._connected_components_are_subgraphs(A, B):
                         A.remove_edge(node_i, node_j)
                         continue
-                    if not self._check_time():
-                        return None
+                    self._check_time()
 
                     edge = (node_i, node_j)
                     forming_edges.append(edge)
-                    self._check_time(
+                    self._print_elapsed(
                         f"finding bond {bond_count}: {self._print_bond(edge)}")
                     self.ostream.flush()
                     break
@@ -1132,9 +1149,7 @@ class ReactionMatcher:
 
         def node_match(a, b):
             # The graph matcher calls this for every candidate pair, which makes it the place to stop a long search
-            if self._time_limit_active and (time.time() - self._start_time
-                                            > self.max_time):
-                raise _TimeLimitExceeded()
+            self._check_time()
 
             # the elem key is always expected, the assist_id key and H_bond_count key are optional
             elem_match = a['elem'] == b['elem']
@@ -1160,20 +1175,18 @@ class ReactionMatcher:
                     map.update({h1: h2})
                 self.ostream.flush()
 
-    def _check_time(self, msg=None):
-        if msg is not None:
-            self.ostream.print_info(
-                f"Total time = {time.time() - self._start_time:.3f} s after {msg}"
-            )
-            self.ostream.flush()
-            return True
+    def _check_time(self):
+        """
+        Raise _TimeLimitExceeded once the deadline of get_mapping has passed.
+        """
+        if self._time_limit_active and time.monotonic() > self._deadline:
+            raise _TimeLimitExceeded()
 
-        if time.time() - self._start_time > self.max_time:
-            self.ostream.print_warning(
-                f"Spent more then {self.max_time:.3f} s finding mapping, aborting"
-            )
-            return False
-        return True
+    def _print_elapsed(self, msg):
+        self.ostream.print_info(
+            f"Total time = {time.monotonic() - self._start_time:.3f} s after {msg}"
+        )
+        self.ostream.flush()
 
     def _print_mapping(self, mapping):
         items = list(mapping.items())
