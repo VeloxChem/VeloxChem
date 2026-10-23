@@ -280,7 +280,7 @@ class RIJKFockDriver:
 
         fmat = self._ri_drv.compute_j_fock(density, label)
 
-        # No reduction here. Reduction will be done in scfdriver.
+        # NOTE: No reduction here.
 
         if verbose:
             self.ostream.print_info('Coulomb contribution done in ' +
@@ -312,7 +312,7 @@ class RIJKFockDriver:
 
         fmat = self._ri_drv.compute_screened_j_fock(density, label)
 
-        # No reduction here. Reduction will be done in scfdriver.
+        # NOTE: No reduction here.
 
         if verbose:
             self.ostream.print_info('Coulomb contribution done in ' +
@@ -416,7 +416,7 @@ class RIJKFockDriver:
 
         fmat = self._ri_drv.compute_k_fock(density, occ_mos)
 
-        # No reduction here. Reduction will be done in scfdriver.
+        # NOTE: No reduction here.
 
         if verbose:
             self.ostream.print_info('Exchange contribution done in ' +
@@ -462,7 +462,7 @@ class RIJKFockDriver:
 
         fmat = self._ri_drv.compute_screened_k_fock(density, occ_mos)
 
-        # No reduction here. Reduction will be done in scfdriver.
+        # NOTE: No reduction here.
 
         if verbose:
             self.ostream.print_info('Exchange contribution done in ' +
