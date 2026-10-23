@@ -97,8 +97,7 @@ class ExcitedStateMomentDriver(NonlinearSolver):
 
         self.property = 'electric dipole moment'
 
-        # tpa transition settings
-
+        # excited state settings
         self.state = 1
         self.nstates = None
         self._initial_state = None
@@ -106,8 +105,7 @@ class ExcitedStateMomentDriver(NonlinearSolver):
 
         # input keywords
         self._input_keywords['response'].update({
-            'initial_state': ('int', 'index state'),
-            'final_state': ('int', 'index of state'),
+            'state': ('int', 'index of the excited state'),
         })
 
     def update_settings(self, rsp_dict, method_dict=None):
