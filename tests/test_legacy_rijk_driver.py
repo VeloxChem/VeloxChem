@@ -1,0 +1,200 @@
+from mpi4py import MPI
+import numpy as np
+import pytest
+
+from veloxchem.veloxchemlib import T4CScreener
+from veloxchem.veloxchemlib import make_matrix, mat_t, mpi_master
+from veloxchem.molecule import Molecule
+from veloxchem.molecularbasis import MolecularBasis
+from veloxchem.rijkfockdriver import RIJKFockDriver
+from veloxchem.scfrestdriver import ScfRestrictedDriver
+from veloxchem.fockdriver import FockDriver
+
+# RIJKFockDriver requires the legacy non-SIMD driver, which is only built when
+# configured with -DVLX_USE_OLD_RI=YES
+try:
+    from veloxchem.veloxchemlib import _RIJKFockDriver
+except ImportError:
+    _RIJKFockDriver = None
+
+pytestmark = pytest.mark.skipif(
+    _RIJKFockDriver is None,
+    reason='legacy non-SIMD RI-JK driver not built',
+)
+
+
+class TestRIMODriver:
+
+    def get_data_h2o(self):
+
+        h2ostr = """
+            O    0.000000000000        0.000000000000        0.000000000000
+            H    0.000000000000        0.740848095288        0.582094932012
+            H    0.000000000000       -0.740848095288        0.582094932012
+        """
+
+        mol = Molecule.read_str(h2ostr, 'angstrom')
+        bas = MolecularBasis.read(mol, 'sto-3g')
+        aux_bas = MolecularBasis.read(mol, 'def2-universal-jkfit')
+
+        return mol, bas, aux_bas
+
+    def get_density_and_orbitals(self):
+
+        mol, bas, aux_bas = self.get_data_h2o()
+        comm = MPI.COMM_WORLD
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ri = False
+        scf_drv.ostream.mute()
+        scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            density = scf_results['D_alpha']
+        else:
+            density = None
+        density = comm.bcast(density, root=mpi_master())
+
+        molorbs = scf_drv.molecular_orbitals.broadcast(comm,
+                                                       root=mpi_master())
+
+        if comm.Get_rank() == mpi_master():
+            t4c_drv = T4CScreener()
+            t4c_drv.partition(bas, mol, 'eri')
+        else:
+            t4c_drv = None
+        t4c_drv = comm.bcast(t4c_drv, root=mpi_master())
+
+        return mol, bas, aux_bas, density, molorbs, t4c_drv
+
+    @pytest.mark.parametrize('screened', [False, True])
+    def test_h2o_compute_fock_parallel(self, screened):
+        """Build J and K from the B^Q vectors owned by each rank and reduce
+        the shares, as the legacy RI-JK SCF driver does."""
+
+        comm = MPI.COMM_WORLD
+        rank = comm.Get_rank()
+
+        (mol_h2o, bas_sto3g, bas_aux, density, molorbs,
+         t4c_drv) = self.get_density_and_orbitals()
+
+        dmat = make_matrix(bas_sto3g, mat_t.symmetric)
+        dmat.set_values(density)
+
+        ri_fock_drv = RIJKFockDriver(comm)
+        ri_fock_drv.compute_metric(mol_h2o, bas_aux, verbose=False)
+
+        if screened:
+            thresh_int = 12
+            ri_fock_drv.compute_screened_bq_vectors(t4c_drv,
+                                                    mol_h2o,
+                                                    bas_aux,
+                                                    thresh_int,
+                                                    verbose=False)
+            jmat = ri_fock_drv.compute_screened_j_fock(dmat,
+                                                       'j',
+                                                       verbose=False)
+            kmat = ri_fock_drv.compute_screened_k_fock(dmat,
+                                                       molorbs,
+                                                       verbose=False)
+        else:
+            ri_fock_drv.compute_bq_vectors(mol_h2o,
+                                           bas_sto3g,
+                                           bas_aux,
+                                           verbose=False)
+            jmat = ri_fock_drv.compute_j_fock(dmat, 'j', verbose=False)
+            kmat = ri_fock_drv.compute_k_fock(dmat, molorbs, verbose=False)
+
+        fock_drv = FockDriver()
+
+        if rank == mpi_master():
+            jmat_ref = fock_drv._compute_fock_omp(t4c_drv, dmat, 'j', 0.0,
+                                                  0.0, 15)
+            kmat_ref = fock_drv._compute_fock_omp(t4c_drv, dmat, 'k', 0.0,
+                                                  0.0, 15)
+
+            j_error = np.max(
+                np.abs(jmat_ref.to_numpy() - jmat.to_numpy()))
+            k_error = np.max(
+                np.abs(kmat_ref.to_numpy() - kmat.to_numpy()))
+
+            assert j_error < 1e-3
+            assert k_error < 1e-3
+
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='single MPI process only')
+    def test_h2o_compute_fock(self):
+
+        mol_h2o, bas_sto3g, bas_aux = self.get_data_h2o()
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ostream.mute()
+        scf_results = scf_drv.compute(mol_h2o, bas_sto3g)
+
+        dmat = make_matrix(bas_sto3g, mat_t.symmetric)
+        dmat.set_values(scf_results['D_alpha'])
+
+        molorbs = scf_drv.molecular_orbitals
+
+        ri_fock_drv = RIJKFockDriver()
+        ri_fock_drv.compute_metric(mol_h2o, bas_aux, verbose=False)
+        ri_fock_drv.compute_bq_vectors(mol_h2o,
+                                       bas_sto3g,
+                                       bas_aux,
+                                       verbose=False)
+
+        jmat = ri_fock_drv.compute_j_fock(dmat, 'j', verbose=False)
+        kmat = ri_fock_drv.compute_k_fock(dmat, molorbs, verbose=False)
+
+        # screen basis function pairs
+        t4c_drv = T4CScreener()
+        t4c_drv.partition(bas_sto3g, mol_h2o, "eri")
+
+        # compute Fock matrix
+        fock_drv = FockDriver()
+        jmat_ref = fock_drv._compute_fock_omp(t4c_drv, dmat, "j", 0.0, 0.0, 15)
+        kmat_ref = fock_drv._compute_fock_omp(t4c_drv, dmat, "k", 0.0, 0.0, 15)
+
+        assert np.max(np.abs(kmat_ref.to_numpy() - kmat.to_numpy())) < 1e-3
+        assert np.max(np.abs(jmat_ref.to_numpy() - jmat.to_numpy())) < 1e-3
+
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='single MPI process only')
+    def test_density_factor_matches_exact_k_for_fractional_density(self):
+
+        mol_h2o, bas_sto3g, bas_aux = self.get_data_h2o()
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ostream.mute()
+        scf_drv.compute(mol_h2o, bas_sto3g)
+
+        C = scf_drv.molecular_orbitals.alpha_to_numpy()
+        occ = np.zeros(C.shape[1])
+        occ[:5] = 0.9
+        occ[5] = 0.1
+        d_np = C @ np.diag(occ) @ C.T
+        d_np = 0.5 * (d_np + d_np.T)
+
+        dmat = make_matrix(bas_sto3g, mat_t.symmetric)
+        dmat.set_values(d_np)
+
+        ri_fock_drv = RIJKFockDriver()
+        ri_fock_drv.compute_metric(mol_h2o, bas_aux, verbose=False)
+        ri_fock_drv.compute_bq_vectors(mol_h2o,
+                                       bas_sto3g,
+                                       bas_aux,
+                                       verbose=False)
+
+        kmat = ri_fock_drv.compute_k_fock(dmat,
+                                          None,
+                                          use_density_factor=True,
+                                          verbose=False)
+
+        t4c_drv = T4CScreener()
+        t4c_drv.partition(bas_sto3g, mol_h2o, "eri")
+
+        fock_drv = FockDriver()
+        kmat_ref = fock_drv._compute_fock_omp(t4c_drv, dmat, "k", 0.0, 0.0,
+                                              15)
+
+        assert np.max(np.abs(kmat_ref.to_numpy() - kmat.to_numpy())) < 1e-3

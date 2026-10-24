@@ -44,6 +44,7 @@ except ImportError:
 
 from .veloxchemlib import TwoCenterElectronRepulsionDriver
 from .veloxchemlib import SubMatrix
+from .matrix import Matrix
 from .outputstream import OutputStream
 from .molecularbasis import MolecularBasis
 from .mathutils import screened_eigh
@@ -94,7 +95,8 @@ class RIJKFockDriver:
 
     def compute_metric(self, molecule, basis, verbose=True):
         """
-        Computes Cholesky decomposed J metric for the RI-JK Fock driver.
+        Computes the inverse square root of the J metric for the RI-JK Fock
+        driver using an eigendecomposition.
 
         :param molecule:
             The molecule to compute J metric.
@@ -139,8 +141,7 @@ class RIJKFockDriver:
 
             ri_prep_t0 = time.time()
 
-            # compute J^{-1/2}
-            # for now, use hard-coded threshold
+            # compute J^{-1/2} with metric_threshold
             eigvals, eigvecs = screened_eigh(mat_j_np, self.metric_threshold)
             metric_np = eigvecs * (1.0 / np.sqrt(eigvals))
 
@@ -154,7 +155,7 @@ class RIJKFockDriver:
                 self.ostream.print_blank()
                 self.ostream.flush()
 
-        # broadcast Cholesky decomposed J metric
+        # broadcast the inverse square root of the J metric
         self.metric = self.comm.bcast(self.metric)
 
     def compute_bq_vectors(self,
@@ -285,7 +286,7 @@ class RIJKFockDriver:
 
         fmat = self._ri_drv.compute_j_fock(density, label)
 
-        # NOTE: No reduction here.
+        gmat = Matrix.reduce(fmat, self.comm, mpi_master())
 
         if verbose:
             self.ostream.print_info('Coulomb contribution done in ' +
@@ -293,7 +294,7 @@ class RIJKFockDriver:
             self.ostream.print_blank()
             self.ostream.flush()
 
-        return fmat
+        return gmat
 
     def compute_screened_j_fock(self, density, label, verbose=True):
         """
@@ -317,7 +318,7 @@ class RIJKFockDriver:
 
         fmat = self._ri_drv.compute_screened_j_fock(density, label)
 
-        # NOTE: No reduction here.
+        gmat = Matrix.reduce(fmat, self.comm, mpi_master())
 
         if verbose:
             self.ostream.print_info('Coulomb contribution done in ' +
@@ -325,7 +326,7 @@ class RIJKFockDriver:
             self.ostream.print_blank()
             self.ostream.flush()
 
-        return fmat
+        return gmat
 
     @staticmethod
     def _get_density_factor(density):
@@ -421,7 +422,7 @@ class RIJKFockDriver:
 
         fmat = self._ri_drv.compute_k_fock(density, occ_mos)
 
-        # NOTE: No reduction here.
+        gmat = Matrix.reduce(fmat, self.comm, mpi_master())
 
         if verbose:
             self.ostream.print_info('Exchange contribution done in ' +
@@ -429,7 +430,7 @@ class RIJKFockDriver:
             self.ostream.print_blank()
             self.ostream.flush()
 
-        return fmat
+        return gmat
 
     def compute_screened_k_fock(self,
                                 density,
@@ -467,7 +468,7 @@ class RIJKFockDriver:
 
         fmat = self._ri_drv.compute_screened_k_fock(density, occ_mos)
 
-        # NOTE: No reduction here.
+        gmat = Matrix.reduce(fmat, self.comm, mpi_master())
 
         if verbose:
             self.ostream.print_info('Exchange contribution done in ' +
@@ -475,7 +476,7 @@ class RIJKFockDriver:
             self.ostream.print_blank()
             self.ostream.flush()
 
-        return fmat
+        return gmat
 
     def compute_mo_bq_vectors(self, lambda_p, lambda_h, bstart, bend):
         """
