@@ -46,6 +46,9 @@ class TestEvbDataProcessing:
         input_results = self._load_canned_input(folder, EVB)
 
         dp = EvbDataProcessing(ostream=OutputStream(None))
+        # The reference holds the discretised profile, which is off by
+        # default.
+        dp.calculate_discrete = True
         # evb_reference_results.h5 was generated with the default estimator
         # (MBAR) and these targets: a barrier of 5 and a reaction free energy
         # of -5 kJ/mol for the vacuum (reference) configuration. A barrier

@@ -3,8 +3,10 @@ integration system of the ladder.
 
 With report_integration_energies, the deferred recalculation also scores each
 frame in the integration system of every lambda of the step and writes
-IntegrationEnergies.csv, row-aligned with Energies.csv. The loader reads it
-into configuration_results[name]["U_int"] (n_frames x len(Lambda)), which MBAR
+IntegrationEnergies.csv, row-aligned with Energies.csv. The loader records
+where it is (configuration_results[name]["integration_energies"]), and
+EvbDataProcessing.load_integration_energies reads it as U_int (n_frames x
+len(Lambda)) when the analysis reweights, which MBAR
 needs to treat the integration systems as the sampled states (B5b).
 
 Checks: the file layout (Q1), the endpoint columns against Energies.csv and the
@@ -13,6 +15,7 @@ h5 round trip (Q3), for a vacuum, a solvated and a multi-step run, plus the
 recalculator alone on the PETase path.
 """
 
+import copy as copy_module
 import json
 import os
 import shutil
@@ -27,6 +30,7 @@ import openmm as mm
 import openmm.app as mmapp
 import openmm.unit as mmunit
 
+from veloxchem.evbdataprocessing import EvbDataProcessing
 from veloxchem.evbdriver import EvbDriver
 from veloxchem.evbreporter import EvbRecalculator
 from veloxchem.outputstream import OutputStream
@@ -229,17 +233,29 @@ def _load(folder, EVB):
                       lambda: EVB._load_output_from_folders(1, False, 1))
 
 
+def _U(results, result):
+    return EvbDataProcessing.load_integration_energies(
+        result, results["Lambda_frame"])
+
+
 @pytest.mark.parametrize("run_name", ["vacuum_run", "water_run"])
 def test_q3_loader(run_name, request):
+    """The loader records where the cross energies are, without reading
+    them; load_integration_energies reads them."""
     folder, EVB, data_folder = request.getfixturevalue(run_name)
     results = _load(folder, EVB)
     result = results["configuration_results"][EVB.system_confs[0]["name"]]
     _, U_rows = _integration(data_folder)
 
-    assert result["U_int"].shape == (len(result["Ep"]), len(results["Lambda"]))
-    assert np.array_equal(result["U_int"], U_rows[:, 3:])
-    assert np.allclose(result["U_int"][:, 0], result["E1_int"], rtol=1e-12)
-    assert np.allclose(result["U_int"][:, -1], result["E2_int"], rtol=1e-12)
+    assert "U_int" not in result
+    reference = result["integration_energies"]
+    assert Path(reference["file"]) == (data_folder /
+                                       "IntegrationEnergies.csv").resolve()
+    U = _U(results, result)
+    assert U.shape == (len(result["Ep"]), len(results["Lambda"]))
+    assert np.array_equal(U, U_rows[:, 3:])
+    assert np.allclose(U[:, 0], result["E1_int"], rtol=1e-12)
+    assert np.allclose(U[:, -1], result["E2_int"], rtol=1e-12)
 
 
 def test_q3_loader_follows_the_kept_ladder(vacuum_run, tmp_path):
@@ -262,45 +278,131 @@ def test_q3_loader_follows_the_kept_ladder(vacuum_run, tmp_path):
     kept = np.isin(U_rows[:, 0], [0.0, 0.7, 1.0])
     columns = [U_header.index(label) for label in ("0.000", "0.700", "1.000")]
 
-    assert specific["U_int"].shape == (kept.sum(), 3)
-    assert np.array_equal(specific["U_int"], U_rows[np.ix_(kept, columns)])
+    U = _U(common, specific)
+    assert U.shape == (kept.sum(), 3)
+    assert np.array_equal(U, U_rows[np.ix_(kept, columns)])
     assert np.array_equal(common["Lambda_frame"], U_rows[kept, 0])
 
 
-def test_q3_mismatched_rows_are_refused(vacuum_run, tmp_path):
+def test_q3_mismatched_rows_are_refused_when_read(vacuum_run, tmp_path):
+    """A file that does not match Energies.csv is refused when it is read,
+    and only an analysis that reweights reads it (review finding 1)."""
     _, EVB, data_folder = vacuum_run
     copy = tmp_path / data_folder.name
     shutil.copytree(data_folder, copy)
     lines = (copy / "IntegrationEnergies.csv").read_text().splitlines()
     (copy / "IntegrationEnergies.csv").write_text("\n".join(lines[:-1]) + "\n")
+    specific, common = EVB._load_output_files(
+        str(copy / "Energies.csv"),
+        str(copy / "Data_combined.csv"),
+        str(copy / "options.json"),
+        integration_file=str(copy / "IntegrationEnergies.csv"),
+    )
     with pytest.raises(Exception, match="rows"):
-        EVB._load_output_files(
-            str(copy / "Energies.csv"),
-            str(copy / "Data_combined.csv"),
-            str(copy / "options.json"),
-            integration_file=str(copy / "IntegrationEnergies.csv"),
-        )
+        _U(common, specific)
+
+    results = dict(common, configuration_results={"run": specific})
+    computed = {}
+    for reweighting in ("none", "auto"):
+        dp = EvbDataProcessing(ostream=OutputStream(None))
+        dp.reweighting = reweighting
+        dp.alpha = 0.0
+        dp.H12 = 50.0
+        if reweighting == "none":
+            computed[reweighting] = dp.compute(copy_module.deepcopy(results),
+                                               np.nan, np.nan)
+        else:
+            with pytest.raises(Exception, match="rows"):
+                dp.compute(copy_module.deepcopy(results), np.nan, np.nan)
+    assert "binless" not in computed["none"]["configuration_results"]["run"]
 
 
-def test_q3_h5_round_trip(vacuum_run, tmp_path):
+def test_q3_h5_keeps_the_reference_not_the_energies(vacuum_run, tmp_path):
+    """U_int stays in IntegrationEnergies.csv: the h5 holds only where it is,
+    and that reference reads back (review finding 8)."""
     folder, EVB, _ = vacuum_run
     results = _load(folder, EVB)
     name = EVB.system_confs[0]["name"]
     _in_folder(tmp_path, lambda: EVB._save_dict_as_h5(results, "cross"))
     loaded = EvbDriver._load_dict_from_h5(tmp_path / "cross.h5")
-    U = loaded["configuration_results"][name]["U_int"]
-    assert U.dtype == np.float64
-    assert np.array_equal(U, results["configuration_results"][name]["U_int"])
+    back = loaded["configuration_results"][name]
+    assert "U_int" not in back
+    assert np.array_equal(
+        _U(loaded, back),
+        _U(results, results["configuration_results"][name]))
 
 
-def test_q3_without_the_keyword_nothing_changes(tmp_path):
-    EVB, data_folder = _run(
-        tmp_path,
-        _config("plain", n_replicas=1, report_integration_energies=False),
-        [0.0, 1.0])
+def test_b5b_reweighted_analysis_of_a_run(vacuum_run):
+    """WP-B5b on real frames: compute_energy_profiles with reweighting="mbar"
+    reads IntegrationEnergies.csv end to end; with the mapping energies in
+    place of U_int (as if the windows had sampled them) it equals "none"."""
+    folder, EVB, _ = vacuum_run
+    name = EVB.system_confs[0]["name"]
+    EVB.ostream = OutputStream(None)
+    EVB.dataprocessing.ostream = OutputStream(None)
+    try:
+        out = _in_folder(
+            folder, lambda: EVB.compute_energy_profiles(
+                np.nan,
+                np.nan,
+                alpha=0.0,
+                H12=50.0,
+                reweighting="mbar",
+                results_filename="b5b_results"))
+    finally:
+        EVB.dataprocessing.reweighting = "none"
+    result = out["configuration_results"][name]
+    assert np.all(np.isfinite(result["dGfep"]))
+    assert "binless" in result and "discrete" not in result
+    assert result["reweighting"]["ess_pes"].shape == (len(LAMBDAS), )
+    assert (folder / "b5b_results.h5").exists()
+
+    results = _load(folder, EVB)
+    conf = results["configuration_results"][name]
+    lam = np.asarray(results["Lambda"])
+    conf["U_int"] = ((1 - lam)[None, :] * conf["E1_pes"][:, None] +
+                     lam[None, :] * conf["E2_pes"][:, None])
+    dGfep = {}
+    for reweighting in ("none", "mbar"):
+        dp = EvbDataProcessing(ostream=OutputStream(None))
+        dp.reweighting = reweighting
+        dp.alpha = 0.0
+        dp.H12 = 50.0
+        computed = dp.compute(copy_module.deepcopy(results), np.nan, np.nan)
+        dGfep[reweighting] = computed["configuration_results"][name]["dGfep"]
+    np.testing.assert_allclose(dGfep["mbar"], dGfep["none"], atol=1e-6)
+
+
+def test_default_records_cross_energies():
+    from veloxchem.evbfepdriver import EvbFepDriver
+    assert EvbFepDriver(ostream=OutputStream(None)).report_integration_energies
+
+
+def test_q3_switched_off_removes_stale_outputs(tmp_path):
+    """A run that does not record the cross energies removes the
+    IntegrationEnergies.csv an earlier run left in its folder, and the
+    trajectory in the other format (review findings 1 and 6), so neither is
+    read as this run's."""
+
+    def run():
+        EVB = _seeded_driver()
+        EVB.build_systems(configurations=[
+            _config("plain", n_replicas=1, report_integration_energies=False)
+        ],
+                          Lambda=[0.0, 1.0])
+        data_folder = tmp_path / EVB.system_confs[0]["data_folder"]
+        (data_folder / "IntegrationEnergies.csv").write_text("stale\n")
+        (data_folder / "trajectory.xtc").write_text("stale\n")
+        EVB.run_FEP(platform=EvbTestHelper.evb_platform())
+        return EVB, data_folder
+
+    EVB, data_folder = _in_folder(tmp_path, run)
     assert not (data_folder / "IntegrationEnergies.csv").exists()
+    assert not (data_folder / "trajectory.xtc").exists()
+    assert (data_folder / "trajectory.dcd").exists()
     results = _load(tmp_path, EVB)
-    assert "U_int" not in results["configuration_results"]["plain"]
+    assert "integration_energies" not in results["configuration_results"][
+        "plain"]
 
 
 def test_multistep_per_step_ladder(path_run):
@@ -315,9 +417,10 @@ def test_multistep_per_step_ladder(path_run):
         U_header, U_rows = _integration(data_folder)
         assert U_header[3:] == [f"{lam:.3f}" for lam in PATH_LAMBDAS]
 
-        assert step["U_int"].shape == (len(step["Ep"]), len(PATH_LAMBDAS))
-        assert np.allclose(step["U_int"][:, 0], step["E1_int"], rtol=1e-12)
-        assert np.allclose(step["U_int"][:, -1], step["E2_int"], rtol=1e-12)
+        U = _U(results, step)
+        assert U.shape == (len(step["Ep"]), len(PATH_LAMBDAS))
+        assert np.allclose(U[:, 0], step["E1_int"], rtol=1e-12)
+        assert np.allclose(U[:, -1], step["E2_int"], rtol=1e-12)
         own = _own_lambda_column(U_header, U_rows)
         assert np.abs(own - _ep(data_folder)).max() <= 1e-3
 

@@ -998,6 +998,7 @@ class EvbDriver:
                                 H12=None,
                                 alpha_guess=None,
                                 H12_guess=None,
+                                reweighting=None,
                                 results_filename="results"):
         """Compute the EVB energy profiles using the FEP results, print the results and save them to an h5 file
 
@@ -1019,6 +1020,7 @@ class EvbDriver:
             H12 (float, optional): the constant coupling between the two states in kJ/mol; only its square enters. Give it together with alpha to skip the fit. Defaults to None.
             alpha_guess (float, optional): starting value of alpha for the fit. Defaults to None, which keeps dataprocessing.alpha_guess (0).
             H12_guess (float, optional): starting value of H12 for the fit. Small values (about 1 kJ/mol or less) can lead the fit into a region its grid cannot resolve. Defaults to None, which keeps dataprocessing.H12_guess (10).
+            reweighting (str, optional): "none" analyses the frames as samples of the mapping potentials; "mbar" reweights them from the integration systems they were sampled in, which needs runs with report_integration_energies (on by default); "auto" does "mbar" when the runs hold those energies and "none" with a warning otherwise. See EvbDataProcessing.reweighting. Defaults to None, which keeps dataprocessing.reweighting ("auto").
             results_filename (str, optional): name of the h5 file the results are written to in the current directory, without extension. Defaults to "results".
 
         Returns:
@@ -1053,6 +1055,8 @@ class EvbDriver:
             self.dataprocessing.alpha_guess = alpha_guess
         if H12_guess is not None:
             self.dataprocessing.H12_guess = H12_guess
+        if reweighting is not None:
+            self.dataprocessing.reweighting = reweighting
         if dE_range is not None:
             self.dataprocessing.coordinate_bins = np.linspace(
                 dE_range[0], dE_range[1], 200)
@@ -1342,9 +1346,18 @@ class EvbDriver:
                 "E_pes_names": ",".join(pes_names),
             })
 
+        # The cross energies are only read when the analysis reweights (see
+        # EvbDataProcessing.load_integration_energies): the file can be as
+        # large as all the other output together, and it stays on disk, so
+        # only where it is and which of its rows and columns belong to the
+        # kept frames and ladder are recorded.
         if integration_file is not None and Path(integration_file).is_file():
-            specific_result["U_int"] = self._load_integration_energies(
-                integration_file, E_data, columns, sub_indices, Lambda)
+            specific_result["integration_energies"] = {
+                "file": str(Path(integration_file).resolve()),
+                "rows": np.asarray(sub_indices, dtype=int),
+                "n_rows": int(E_data.shape[1]),
+                "Lambda": [float(L) for L in Lambda],
+            }
 
         if "step" in columns:
             specific_result["Step_frame"] = column("step").astype(int)
@@ -1407,42 +1420,6 @@ class EvbDriver:
             "Lambda_indices": lambda_indices,
         }
         return specific_result, common_result
-
-    @staticmethod
-    def _load_integration_energies(path, E_data, columns, sub_indices, Lambda):
-        """Every kept frame's energy in the integration system of every kept
-        lambda, as an (n_frames, len(Lambda)) array.
-
-        IntegrationEnergies.csv is row-aligned with Energies.csv, so the frames
-        are selected with the same indices, and its columns are selected by
-        their lambda so that they follow the kept ladder.
-        """
-        U_data = np.loadtxt(path, skiprows=1, delimiter=',', ndmin=2)
-        with Path(path).open("r") as file:
-            header = [cell.strip() for cell in file.readline().split(",")]
-
-        rows_match = U_data.shape[0] == E_data.shape[1]
-        assert_msg_critical(
-            rows_match,
-            f"{path} has {U_data.shape[0]} rows but Energies.csv has "
-            f"{E_data.shape[1]}")
-        tags_match = all(
-            np.array_equal(U_data[:, header.index(name)], E_data[columns[name]])
-            for name in ("Lambda", "replica", "direction")
-            if name in columns)
-        assert_msg_critical(
-            tags_match,
-            f"The rows of {path} do not match those of Energies.csv")
-
-        lambda_columns = {
-            name: index for index, name in enumerate(header) if index >= 3
-        }
-        missing = [L for L in Lambda if f"{L:.3f}" not in lambda_columns]
-        assert_msg_critical(
-            len(missing) == 0,
-            f"{path} has no column for lambda {missing}")
-        indices = [lambda_columns[f"{L:.3f}"] for L in Lambda]
-        return U_data[np.ix_(sub_indices, indices)]
 
     @staticmethod
     def _parse_energies_header(path, n_columns):

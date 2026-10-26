@@ -157,8 +157,9 @@ class EvbFepDriver:
         # lambda of the ladder, written to IntegrationEnergies.csv. These cross
         # energies let the analysis reweight from the sampled integration
         # systems to the potential energy surfaces. Costs one extra energy
-        # evaluation per frame per lambda.
-        self.report_integration_energies: bool = False
+        # evaluation per frame per lambda (about +7 % of the sampling time at
+        # write_step 1000 and 31 lambda).
+        self.report_integration_energies: bool = True
 
         self.debug: bool = False
         self.save_frames: int = 1000
@@ -588,6 +589,20 @@ class EvbFepDriver:
         # reporter every window would pay that scan again each time against an
         # ever-growing file. DCDReporter opens (and truncates) its file here and
         # appends every frame after that.
+        #
+        # Every output file starts afresh here, so files an earlier run left in
+        # this folder that this run does not rewrite would later be read as
+        # its own: the trajectory in the other format, and the cross energies
+        # when this run does not record them.
+        other_format = "xtc" if self.trajectory_format == "dcd" else "dcd"
+        stale = [self.data_folder / f"trajectory.{other_format}"]
+        if not self.report_integration_energies:
+            stale.append(self.data_folder / "IntegrationEnergies.csv")
+        for path in stale:
+            if path.is_file():
+                self.ostream.print_info(
+                    f"Removing {path.name}, left by an earlier run")
+                path.unlink()
         if self.trajectory_format == "dcd":
             self.traj_roporter = mmapp.DCDReporter(
                 str(self._trajectory_path()),
@@ -1651,19 +1666,11 @@ class EvbFepDriver:
         with open(energies_file) as f:
             n_energy_rows = sum(1 for _ in f) - 1
 
-        # A run sampled before dcd became the default holds only
-        # trajectory.xtc, and its options.json names no format.
-        other_format = "xtc" if self.trajectory_format == "dcd" else "dcd"
-        other_file = self.data_folder / f"trajectory.{other_format}"
-        if not traj_file.is_file() and other_file.is_file():
-            self.ostream.print_info(
-                f"{traj_file.name} not found; reading {other_file.name}.")
-            self.trajectory_format = other_format
-            traj_file = other_file
         trajectory_found = traj_file.is_file()
-        assert_msg_critical(trajectory_found,
-                            f"No trajectory.dcd or trajectory.xtc in "
-                            f"{self.data_folder}.")
+        assert_msg_critical(
+            trajectory_found,
+            f"No {traj_file.name} in {self.data_folder} (trajectory_format " +
+            f"'{self.trajectory_format}').")
         with self._open_trajectory(traj_file, False) as (n_frames, _):
             pass
         assert_msg_critical(

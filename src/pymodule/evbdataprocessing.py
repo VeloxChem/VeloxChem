@@ -33,6 +33,7 @@
 from mpi4py import MPI
 from io import StringIO
 from contextlib import redirect_stderr
+from pathlib import Path
 import numpy as np
 import sys
 
@@ -130,11 +131,57 @@ class EvbDataProcessing:
         # warns). An empty window or a failed BAR step is an error.
         self.fep_estimator: str = "mbar"
 
+        # Which ensemble the frames are taken from. The windows sample the
+        # integration systems, which differ from the PES mapping potentials
+        # (1 - Lambda) E1 + Lambda E2' in the reactive bonds and the
+        # reaction-internal nonbonded terms.
+        # "none": the frames are analysed as if they had sampled the mapping
+        # potentials, which carries that difference into every free energy.
+        # "mbar": the integration systems are the sampled states and the
+        # mapping states and E_g are unsampled targets of one MBAR solve
+        # (see _reweight). Needs U_int, every frame's energy in every
+        # lambda's integration system (EvbFepDriver keyword
+        # report_integration_energies, on by default). Replaces
+        # fep_estimator and per_replica_fep_estimator, and adds the binless
+        # profile.
+        # "auto" (default): "mbar" when every configuration holds U_int, and
+        # "none" with a warning otherwise (runs recorded without the cross
+        # energies).
+        self.reweighting: str = "auto"
+        # Whether the current compute() reweights, as resolved from
+        # reweighting and the data (see _check_reweighting_settings), the
+        # integration energies it then reads per configuration, and its
+        # sampled-state solutions (see _reweight).
+        self._reweighted = False
+        self._sampled_energies = {}
+        self._reweighting_cache = {}
+        # Under "mbar", the profile the alpha/H12 fit targets and the report
+        # is checked against: "analytical" (the analytical formula on the
+        # reweighted dGfep) or "binless" (the E_g free energy along the gap,
+        # see _binless_free_energy). Both are computed.
+        self.reweighting_profile: str = "analytical"
+        # Standard deviation in kJ/mol of the Gaussian kernel of the binless
+        # profile. It lowers a barrier by about width^2 / 2 times the
+        # difference in curvature between the wells and the top.
+        self.reweighting_kernel_width: float = 5.0
+        # The binless profile is read over the gap range where the frames,
+        # unweighted, number at least this many per kernel: sum_n
+        # exp(-(xi - xi_n)^2 / (2 width^2)), about 2.5 width times the frames
+        # per kJ/mol (see _binless_setup).
+        self.reweighting_min_count: float = 5
+        # The Kish effective sample size, in frames, below which a reweighted
+        # free energy is warned about.
+        self.reweighting_ess_min: float = 50
+
         # Boltzmann constant: ca 8.314e-3 kJ/mol/K
         self.kb = boltzmann_in_hartreeperkelvin() * hartree_in_kjpermol()
         self.verbose: bool = True
 
-        self.calculate_discrete = True
+        # The discretised (binned) EVB profile, next to the analytical one;
+        # off unless asked for. Without reweighting it is the FEP/US estimate
+        # of _dGevb_discretised, with reweighting the E_g target weights
+        # summed per coordinate bin (_dGevb_discretised_reweighted).
+        self.calculate_discrete = False
         self.calculate_analytical = True
         # Per-(replica, direction) FEP/EVB curves + uncertainty, used for
         # hysteresis analysis and per-replica plotting. Only computed when
@@ -170,6 +217,8 @@ class EvbDataProcessing:
 
         # Warm-start cache for _calculate_dGfep_mbar
         self._mbar_f_k_warm_start = None
+        # and for _reweight
+        self._reweighting_f_k_warm_start = None
         # The Savitzky-Golay filter only locates the extrema of an EVB
         # profile; the reported energies are read from the unsmoothed
         # profile (see _get_free_energies), so a wide window no longer
@@ -259,6 +308,7 @@ class EvbDataProcessing:
             np.isclose(Lambda[0], 0.0) and np.isclose(Lambda[-1], 1.0),
             "EvbDataProcessing: the lambda ladder must start at 0 and end " +
             f"at 1, but runs from {Lambda[0]} to {Lambda[-1]}.")
+        self._check_reweighting_settings()
 
         # One instance can serve several calls (EvbDriver keeps one for its
         # lifetime). The alpha, H12 and coordinate bins an earlier call
@@ -299,6 +349,210 @@ class EvbDataProcessing:
         results["coordinate_bins"] = self.coordinate_bins
         return results
 
+    def _check_reweighting_settings(self):
+        """Decides whether this compute() reweights, reads the integration
+        energies it then needs, and refuses a reweighting the settings or
+        the data cannot do.
+
+        "auto" reweights when every configuration has integration energies
+        (U_int in memory, or the IntegrationEnergies.csv the loader found)
+        and fep_estimator is "mbar", and otherwise falls back to "none" with
+        a warning, so that runs recorded without the cross energies still
+        load. An explicit "mbar" does not fall back. With "none" the file is
+        never read.
+        """
+
+        assert_msg_critical(
+            self.reweighting in ("auto", "none", "mbar"),
+            f"EvbDataProcessing: unknown reweighting '{self.reweighting}'. " +
+            "Expected 'auto', 'none' or 'mbar'.")
+        self._reweighted = False
+        self._sampled_energies = {}
+        self._reweighting_cache = {}
+        if self.reweighting == "none":
+            return
+        if self.reweighting == "auto":
+            missing = [
+                name for name, result in self.results.items()
+                if not self._has_integration_energies(result)
+            ]
+            if missing:
+                self.ostream.print_warning(
+                    "No integration energies (U_int) for configuration(s) " +
+                    ", ".join(f"'{name}'" for name in missing) + ", so " +
+                    "the frames are analysed as if they had sampled the " +
+                    "mapping potentials (reweighting='none'), which biases " +
+                    "the free energies. Sample with " +
+                    "report_integration_energies=True to reweight them.")
+                self.ostream.flush()
+                return
+            if self.fep_estimator != "mbar":
+                self.ostream.print_warning(
+                    "fep_estimator is " + f"'{self.fep_estimator}', which " +
+                    "has no reweighted form, so the frames are not " +
+                    "reweighted (reweighting='none').")
+                self.ostream.flush()
+                return
+        assert_msg_critical(
+            self.reweighting_profile in ("analytical", "binless"),
+            "EvbDataProcessing: unknown reweighting_profile " +
+            f"'{self.reweighting_profile}'. Expected 'analytical' or " +
+            "'binless'.")
+        assert_msg_critical(
+            self.fep_estimator == "mbar",
+            "EvbDataProcessing: reweighting='mbar' is an MBAR estimate and " +
+            "has no BAR form, but fep_estimator is " +
+            f"'{self.fep_estimator}'. Set fep_estimator to 'mbar'.")
+        assert_msg_critical(
+            self.reweighting_kernel_width > 0,
+            "EvbDataProcessing: reweighting_kernel_width must be positive, " +
+            f"not {self.reweighting_kernel_width}.")
+        K = len(self.Lambda)
+        for name, result in self.results.items():
+            assert_msg_critical(
+                self._has_integration_energies(result),
+                "EvbDataProcessing: reweighting='mbar' needs every frame's " +
+                "energy in every lambda's integration system (U_int), and " +
+                f"configuration '{name}' has none. Sample with the " +
+                "EvbFepDriver keyword report_integration_energies=True, or " +
+                "use reweighting='none'.")
+            U_int = self.load_integration_energies(result, self.Lambda_frame)
+            n_frames = len(result["E1_pes"])
+            assert_msg_critical(
+                np.shape(U_int) == (n_frames, K),
+                f"EvbDataProcessing: U_int of configuration '{name}' has " +
+                f"shape {np.shape(U_int)}, but the configuration holds " +
+                f"{n_frames} frames and the ladder {K} lambda values.")
+            self._check_energies(name, result, U_int)
+            self._sampled_energies[name] = U_int
+        self._reweighted = True
+
+    # Larger than the energy of any molecular system in kJ/mol: a frame
+    # beyond it has blown up (an unminimized solvated start sits at ~1e19).
+    _energy_limit = 1e10
+    # Robust z-score (distance from the window median in units of 1.4826
+    # times the median absolute deviation) beyond which a frame's energy in
+    # its own sampled system is called an outlier. Thermal fluctuations do
+    # not reach it, even the heavy-tailed energy of a single degree of
+    # freedom (about 40 at a million frames).
+    _outlier_z = 100.0
+
+    def _check_energies(self, name, result, U_int):
+        """Refuses energies reweighting cannot use, and warns about frames
+        whose sampled energy is far out of line.
+
+        Errors: a non-finite or blown-up (beyond _energy_limit) value in
+        U_int, E1_pes or E2_pes. MBAR does not raise on them, it returns NaN
+        or nonsense. Warning: frames whose energy in their own window's
+        integration system lies more than _outlier_z robust standard
+        deviations from the window median, which a sampled frame does not do
+        unless it is broken (a crashed or exploded frame).
+        """
+
+        for label, values in (("U_int", U_int), ("E1_pes", result["E1_pes"]),
+                              ("E2_pes", result["E2_pes"])):
+            values = np.asarray(values, dtype=float)
+            bad = ~np.isfinite(values) | (np.abs(values) > self._energy_limit)
+            frames = np.flatnonzero(bad.reshape(len(values), -1).any(axis=1))
+            assert_msg_critical(
+                len(frames) == 0,
+                f"EvbDataProcessing: {len(frames)} frame(s) of configuration "
+                + f"'{name}' have non-finite or blown-up energies (beyond " +
+                f"{self._energy_limit:g} kJ/mol) in {label}, the first at " +
+                "lambda " +
+                (f"{self.Lambda[self.Lambda_indices[frames[0]]]}"
+                 if len(frames) else "") + ". MBAR cannot use them; check " +
+                "the trajectory, or leave those frames out.")
+
+        lambda_indices = np.asarray(self.Lambda_indices)
+        own = U_int[np.arange(len(U_int)), lambda_indices]
+        outliers, windows, largest = 0, [], 0.0
+        for k in np.unique(lambda_indices):
+            values = own[lambda_indices == k]
+            median = np.median(values)
+            spread = 1.4826 * np.median(np.abs(values - median))
+            if spread == 0:
+                continue
+            z = np.abs(values - median) / spread
+            far = z > self._outlier_z
+            if np.any(far):
+                outliers += int(np.sum(far))
+                windows.append(self.Lambda[k])
+                largest = max(largest, float(np.max(np.abs(values[far] -
+                                                           median))))
+        if outliers:
+            self.ostream.print_warning(
+                f"Configuration {name}: {outliers} frame(s) in lambda " +
+                f"window(s) {windows} have an energy in their own sampled " +
+                f"system more than {self._outlier_z:g} robust standard " +
+                "deviations from the window median (up to " +
+                f"{largest:.4g} kJ/mol away). Sampled frames do not do " +
+                "that; check the trajectory for broken frames.")
+            self.ostream.flush()
+
+    @staticmethod
+    def _has_integration_energies(result):
+        if result.get("U_int") is not None:
+            return True
+        reference = result.get("integration_energies")
+        return reference is not None and Path(reference["file"]).is_file()
+
+    @staticmethod
+    def load_integration_energies(result, Lambda_frame):
+        """Every frame's energy in the integration system of every lambda of
+        the kept ladder, (n_frames, n_lambda) in kJ/mol, or None when the
+        configuration has none.
+
+        result["U_int"] when it is held in memory; otherwise the
+        IntegrationEnergies.csv that EvbDriver's loader recorded in
+        result["integration_energies"] (file, rows, n_rows, Lambda), which is
+        read here. The file is row-aligned with Energies.csv: it must hold as
+        many rows, and the kept ones must carry the Lambda, replica and
+        direction of the kept frames (Lambda_frame, result's Replica_frame
+        and Direction_frame). Its columns are picked by their lambda label,
+        so they follow the kept ladder. A mismatch is an error.
+        """
+
+        if result.get("U_int") is not None:
+            return np.asarray(result["U_int"], dtype=float)
+        reference = result.get("integration_energies")
+        if reference is None:
+            return None
+        path = Path(reference["file"])
+        assert_msg_critical(path.is_file(),
+                            f"EvbDataProcessing: {path} no longer exists.")
+        U_data = np.loadtxt(path, skiprows=1, delimiter=',', ndmin=2)
+        with path.open("r") as file:
+            header = [cell.strip() for cell in file.readline().split(",")]
+
+        rows_match = U_data.shape[0] == int(reference["n_rows"])
+        assert_msg_critical(
+            rows_match, f"{path} has {U_data.shape[0]} rows but Energies.csv "
+            f"has {reference['n_rows']}")
+        U_data = U_data[np.asarray(reference["rows"], dtype=int)]
+        tags = [("Lambda", Lambda_frame),
+                ("replica", result.get("Replica_frame")),
+                ("direction", result.get("Direction_frame"))]
+        tags_match = all(
+            np.array_equal(U_data[:, header.index(tag)], np.asarray(values))
+            for tag, values in tags
+            if values is not None and tag in header)
+        assert_msg_critical(
+            tags_match,
+            f"The rows of {path} do not match those of Energies.csv")
+
+        lambda_columns = {
+            label: index for index, label in enumerate(header) if index >= 3
+        }
+        missing = [
+            L for L in reference["Lambda"] if f"{L:.3f}" not in lambda_columns
+        ]
+        assert_msg_critical(
+            len(missing) == 0, f"{path} has no column for lambda {missing}")
+        return U_data[:, [
+            lambda_columns[f"{L:.3f}"] for L in reference["Lambda"]
+        ]]
+
     def _warn_bar_uncertainty(self):
         """Warns when BAR supplies an uncertainty in this call.
 
@@ -308,6 +562,9 @@ class EvbDataProcessing:
         uncertainties; MBAR gives calibrated ones.
         """
 
+        # Reweighting is MBAR throughout, per replica too.
+        if self._reweighted:
+            return
         uses = []
         if self.fep_estimator == "bar":
             uses.append("fep_estimator='bar'")
@@ -347,14 +604,31 @@ class EvbDataProcessing:
         error.
         """
 
-        if not self.calculate_analytical:
+        binless = self._fits_binless()
+        if not binless and not self.calculate_analytical:
             return
         reference_key = list(self.results.keys())[0]
-        analytical = self.results[reference_key]["analytical"]
-        reported = np.array(
-            [analytical["barrier"], analytical["free_energy"]], dtype=float)
+        profile = self.results[reference_key][
+            "binless" if binless else "analytical"]
+        reported = np.array([profile["barrier"], profile["free_energy"]],
+                            dtype=float)
         targets = np.array([self.barrier, self.free_energy], dtype=float)
         if np.all(np.abs(reported - targets) <= self.fit_report_tolerance):
+            return
+
+        if binless:
+            # The binless fit reads the same kernel density as the report,
+            # on a finer grid, so it has no grid artefact of its own.
+            self.ostream.print_warning(
+                "After the alpha/H12 fit, the reported binless barrier and " +
+                "reaction free energy of configuration " +
+                f"'{reference_key}' are {reported[0]:.2f} and " +
+                f"{reported[1]:.2f} kJ/mol, against targets of " +
+                f"{targets[0]:.2f} and {targets[1]:.2f} kJ/mol, a " +
+                "difference larger than fit_report_tolerance " +
+                f"({self.fit_report_tolerance} kJ/mol). The report reads " +
+                "the profile on the coordinate bins; lower bin_size.")
+            self.ostream.flush()
             return
 
         fit_xi = self._fit_xi_grid()
@@ -421,18 +695,39 @@ class EvbDataProcessing:
         # Shifting E2 by alpha shifts the mapping free energy by exactly
         # Lambda * alpha, for MBAR and for BAR alike, so the FEP estimate is
         # computed once here rather than at every alpha the fit probes.
-        dGfep_unshifted, _ = self._calculate_dGfep(E1_ref, E2_ref, Temp_set)
+        # Reweighted, the one MBAR solve over the integration states serves
+        # every alpha and H12 the fit probes, and the report after it.
+        if self._reweighted:
+            reweighting = self._reweight(reference_key,
+                                         E1_ref,
+                                         E2_ref,
+                                         Temp_set,
+                                         self.Lambda_indices,
+                                         uncertainty=False)
+            dGfep_unshifted = reweighting["dGfep"]
+        else:
+            dGfep_unshifted, _ = self._calculate_dGfep(E1_ref, E2_ref,
+                                                       Temp_set)
         dGfep_unshifted = np.asarray(dGfep_unshifted)
         Lambda = np.asarray(self.Lambda)
+        binless = self._fits_binless()
+        if binless:
+            density = self._binless_setup(E1_ref, E2_ref,
+                                          reweighting["log_den"], Temp_set)
 
         def get_barrier_and_free_energy_difference(x):
             alpha, H12 = x
 
-            dGfep = dGfep_unshifted + Lambda * alpha
-            dGevb_ana, shiftxi, fepxi = self._dGevb_analytical(
-                dGfep, self.Lambda, H12, xi)
+            if binless:
+                profile = self._binless_free_energy(density, alpha, H12)
+                profile_xi = density["gap"] - alpha
+            else:
+                dGfep = dGfep_unshifted + Lambda * alpha
+                profile, shiftxi, fepxi = self._dGevb_analytical(
+                    dGfep, self.Lambda, H12, xi)
+                profile_xi = xi
             dGevb_smooth, barrier, free_energy, _, _, _, _, _ = self._get_free_energies(
-                dGevb_ana, xi, fitting=True)
+                profile, profile_xi, fitting=True)
             assert_msg_critical(
                 np.isfinite(barrier) and np.isfinite(free_energy),
                 "EvbDataProcessing: the EVB profile has no barrier or no " +
@@ -559,24 +854,8 @@ class EvbDataProcessing:
             lambda_indices = self.Lambda_indices
 
         beta = self._beta(Temp_set)
-        Lambda_indices = np.asarray(lambda_indices)
-        Lambda_arr = np.asarray(self.Lambda)
-        K = len(Lambda_arr)
-
-        # Group frames by originating state, matching pymbar's N_k convention
-        # (the first N_k[0] samples are from state 0, the next N_k[1] from
-        # state 1, and so on).
-        order = np.argsort(Lambda_indices, kind="stable")
-        E1_sorted = np.asarray(E1)[order]
-        E2_sorted = np.asarray(E2_shifted)[order]
-        N_k = np.array([np.sum(Lambda_indices == k) for k in range(K)])
-
-        # u_kn[k, n] = beta * V_k(frame_n). Cheap to get every frame's energy
-        # at every state because V is linear in Lambda (Vi = (1-Lambda_i)*E1 +
-        # Lambda_i*E2_shifted), so no re-evaluation at other windows is
-        # needed, unlike a typical MBAR use case.
-        u_kn = beta * ((1 - Lambda_arr)[:, None] * E1_sorted[None, :] +
-                       Lambda_arr[:, None] * E2_sorted[None, :])
+        K = len(self.Lambda)
+        _, N_k, u_kn = self._mapping_u_kn(E1, E2_shifted, lambda_indices, beta)
 
         # pymbar's default solver protocol tries 'hybr' (scipy's hybrid
         # Powell method) first, which reliably fails to converge once there
@@ -592,12 +871,39 @@ class EvbDataProcessing:
         # 0 does this), so it then runs to its iteration limit. MBAR raises
         # that limit to maximum_iterations, 10000 by default, which takes
         # about half an hour for 31 windows of 1000 frames. Converged solves
-        # need fewer than 20 iterations. L-BFGS-B continues from the adaptive
-        # result. pymbar edits the protocol in place, so it is built per call.
-        solver_protocol = (
+        # need fewer than 20 iterations. L-BFGS-B then starts afresh rather
+        # than from the adaptive result: with pymbar's JAX backend (on by
+        # default) that hand-over passes a JAX array that pymbar's own input
+        # check refuses, a TypeError whenever adaptive stops at its limit
+        # (B5-5). pymbar edits the protocol in place, so it is built per call.
+        initial_f_k = self._mbar_f_k_warm_start
+        if initial_f_k is not None and len(initial_f_k) != K:
+            # Mismatched state count (different Lambda ladder / caller) --
+            # not a valid warm start, fall back to MBAR's own default.
+            initial_f_k = None
+        mbar = pymbar.MBAR(u_kn,
+                           N_k,
+                           solver_protocol=self._mbar_solver_protocol(),
+                           maximum_iterations=100,
+                           initial_f_k=initial_f_k)
+        mbar_results = mbar.compute_free_energy_differences()
+        # Cache for the next call (e.g. the next alpha tried during fitting,
+        # or the next replica/configuration) -- only changes how fast the
+        # solver converges, not what it converges to.
+        self._mbar_f_k_warm_start = mbar.f_k
+        dGfep = (mbar_results['Delta_f'][0, :] / beta).tolist()
+        ddGfep = (mbar_results['dDelta_f'][0, :] / beta).tolist()
+        return dGfep, ddGfep
+
+    @staticmethod
+    def _mbar_solver_protocol():
+        """Adaptive with a bounded step count, then L-BFGS-B; see
+        _calculate_dGfep_mbar."""
+
+        return (
             {
                 'method': 'adaptive',
-                'continuation': True,
+                'continuation': False,
                 'options': {
                     'maxiter': 100
                 }
@@ -609,24 +915,318 @@ class EvbDataProcessing:
                 }
             },
         )
-        initial_f_k = self._mbar_f_k_warm_start
-        if initial_f_k is not None and len(initial_f_k) != K:
-            # Mismatched state count (different Lambda ladder / caller) --
-            # not a valid warm start, fall back to MBAR's own default.
-            initial_f_k = None
-        mbar = pymbar.MBAR(u_kn,
-                           N_k,
-                           solver_protocol=solver_protocol,
-                           maximum_iterations=100,
-                           initial_f_k=initial_f_k)
-        mbar_results = mbar.compute_free_energy_differences()
-        # Cache for the next call (e.g. the next alpha tried during fitting,
-        # or the next replica/configuration) -- only changes how fast the
-        # solver converges, not what it converges to.
-        self._mbar_f_k_warm_start = mbar.f_k
-        dGfep = (mbar_results['Delta_f'][0, :] / beta).tolist()
-        ddGfep = (mbar_results['dDelta_f'][0, :] / beta).tolist()
-        return dGfep, ddGfep
+
+    def _fits_binless(self):
+        return self._reweighted and self.reweighting_profile == "binless"
+
+    def _mapping_u_kn(self, E1, E2_shifted, lambda_indices, beta):
+        """Frames grouped by window and their reduced mapping energies.
+
+        Returns order (the stable sort of the frames by window, pymbar's N_k
+        convention: the first N_k[0] samples come from state 0, and so on),
+        N_k, and u_kn[k, n] = beta V_k(frame n), V_k = (1 - Lambda_k) E1 +
+        Lambda_k E2', for the sorted frames. V is linear in Lambda, so every
+        frame's energy at every mapping state needs no re-evaluation.
+        """
+
+        lambda_indices = np.asarray(lambda_indices)
+        Lambda_arr = np.asarray(self.Lambda, dtype=float)
+        order = np.argsort(lambda_indices, kind="stable")
+        N_k = np.bincount(lambda_indices, minlength=len(Lambda_arr))
+        E1_sorted = np.asarray(E1, dtype=float)[order]
+        E2_sorted = np.asarray(E2_shifted, dtype=float)[order]
+        u_kn = beta * ((1 - Lambda_arr)[:, None] * E1_sorted[None, :] +
+                       Lambda_arr[:, None] * E2_sorted[None, :])
+        return order, N_k, u_kn
+
+    def _mapping_free_energies(self,
+                               name,
+                               E1,
+                               E2_shifted,
+                               Temp_set,
+                               mask=None):
+        """dGfep and dGfep_unc of one configuration's mapping states, from all
+        its frames or from those in mask, and the frames' mixture
+        log-density.
+
+        This is the one place that decides how the frames are read: when this
+        compute() reweights, from the integration systems they were sampled
+        in (_reweight); otherwise as samples of the mapping potentials
+        (_calculate_dGfep), and the log-density is None.
+        """
+
+        lambda_indices = np.asarray(self.Lambda_indices)
+        if mask is not None:
+            E1, E2_shifted = E1[mask], E2_shifted[mask]
+            lambda_indices = lambda_indices[mask]
+        if not self._reweighted:
+            if mask is None:
+                dGfep, dGfep_unc = self._calculate_dGfep(E1, E2_shifted,
+                                                         Temp_set)
+            else:
+                dGfep, dGfep_unc = self._calculate_dGfep(
+                    E1, E2_shifted, Temp_set, lambda_indices)
+            return dGfep, dGfep_unc, None
+        reweighting = self._reweight(name, E1, E2_shifted, Temp_set,
+                                     lambda_indices, mask)
+        return (reweighting["dGfep"], reweighting["dGfep_unc"],
+                reweighting["log_den"])
+
+    def _reweight(self,
+                  name,
+                  E1,
+                  E2_shifted,
+                  Temp_set,
+                  lambda_indices,
+                  mask=None,
+                  uncertainty=True):
+        """MBAR with the integration systems as the sampled states.
+
+        Window k samples its integration system V_int,k, not the mapping
+        potential V_k = (1 - Lambda_k) E1 + Lambda_k E2', so the sampled
+        states are u_int,k = beta U_int[:, k] with N_k frames each, and the K
+        mapping states are unsampled targets (N = 0). The sampled free
+        energies f_int give every frame its mixture log-density, log_den_n =
+        ln sum_k N_k exp(f_int,k - u_int,k(x_n)). A target u then gets the
+        weights exp(-u(x_n) - log_den_n) / sum over frames and the free
+        energy -ln sum_n exp(-u(x_n) - log_den_n) without another solve, so
+        E_g and the diabatic states are served the same way.
+
+        f_int and log_den depend on neither alpha, H12 nor the PES, so the
+        solve over all of a configuration's frames is kept for the whole
+        compute(): the fit (uncertainty=False, a solve over the K sampled
+        states only) and the report share it. The report needs MBAR's
+        uncertainty, which takes pymbar's covariance of the sampled and
+        target states together; that joint solve starts from the kept
+        solution. A subset of the frames (mask) is solved once, jointly.
+
+        E1 and E2_shifted are those of the (masked) frames, lambda_indices
+        their windows. Returns a dict: dGfep relative to the first mapping
+        state, dGfep_unc (None without uncertainty; MBAR's, which assumes
+        uncorrelated frames), log_den in the frame order of E1, and ess_pes,
+        the Kish effective sample size of each mapping state's weights.
+        """
+
+        assert_msg_critical('pymbar' in sys.modules,
+                            'pymbar is required for EvbDataProcessing.')
+
+        beta = self._beta(Temp_set)
+        lambda_indices = np.asarray(lambda_indices)
+        K = len(self.Lambda)
+        order, N_k, u_pes = self._mapping_u_kn(E1, E2_shifted, lambda_indices,
+                                               beta)
+        key = (name, None if mask is None else np.asarray(mask).tobytes())
+        f_int = self._reweighting_cache.get(key)
+        U_int = self._sampled_energies[name]
+        if mask is not None:
+            U_int = U_int[mask]
+        u_int = beta * U_int[order].T
+
+        def mixture_log_density(f_int):
+            sampled = N_k > 0
+            return scipy.special.logsumexp(
+                np.log(N_k[sampled])[:, None] + f_int[sampled][:, None] -
+                u_int[sampled],
+                axis=0)
+
+        dGfep_unc = None
+        if uncertainty:
+            if f_int is not None:
+                log_w = -u_pes - mixture_log_density(f_int)[None, :]
+                initial_f_k = np.concatenate(
+                    [f_int, -scipy.special.logsumexp(log_w, axis=1)])
+            else:
+                initial_f_k = self._reweighting_f_k_warm_start
+                if initial_f_k is not None and len(initial_f_k) != 2 * K:
+                    initial_f_k = None
+            mbar = pymbar.MBAR(np.vstack([u_int, u_pes]),
+                               np.concatenate([N_k,
+                                               np.zeros(K, dtype=int)]),
+                               solver_protocol=self._mbar_solver_protocol(),
+                               maximum_iterations=100,
+                               initial_f_k=initial_f_k)
+            self._reweighting_f_k_warm_start = np.asarray(mbar.f_k)
+            f_int = np.asarray(mbar.f_k)[:K]
+            mbar_results = mbar.compute_free_energy_differences()
+            dGfep_unc = (mbar_results['dDelta_f'][K, K:] / beta).tolist()
+        elif f_int is None:
+            initial_f_k = self._reweighting_f_k_warm_start
+            mbar = pymbar.MBAR(u_int,
+                               N_k,
+                               solver_protocol=self._mbar_solver_protocol(),
+                               maximum_iterations=100,
+                               initial_f_k=(initial_f_k[:K]
+                                            if initial_f_k is not None
+                                            and len(initial_f_k) == 2 * K else
+                                            None))
+            f_int = np.asarray(mbar.f_k)
+        if mask is None:
+            self._reweighting_cache[key] = f_int
+
+        log_den_sorted = mixture_log_density(f_int)
+        log_w = -u_pes - log_den_sorted[None, :]
+        f_pes = -scipy.special.logsumexp(log_w, axis=1)
+        log_den = np.empty(len(order))
+        log_den[order] = log_den_sorted
+        return {
+            "dGfep": ((f_pes - f_pes[0]) / beta).tolist(),
+            "dGfep_unc": dGfep_unc,
+            "log_den": log_den,
+            "ess_pes": self._kish_ess(log_w),
+        }
+
+    @staticmethod
+    def _target_weights(log_den, u_target):
+        """Normalized MBAR weights of the frames for an unsampled target
+        with reduced energies u_target (see _reweight)."""
+
+        log_w = -np.asarray(u_target) - log_den
+        return np.exp(log_w - scipy.special.logsumexp(log_w))
+
+    @staticmethod
+    def _kish_ess(log_w):
+        """(sum w)^2 / sum w^2 along the last axis of log weights."""
+
+        return np.exp(2 * scipy.special.logsumexp(log_w, axis=-1) -
+                      scipy.special.logsumexp(2 * log_w, axis=-1))
+
+    def _binless_setup(self, E1, E2, log_den, Temp_set):
+        """What _binless_free_energy needs for one set of frames.
+
+        The kernel density is summed on a grid of the unshifted gap E1 - E2,
+        a fifth of the kernel width apart, by linear binning of the weights
+        onto the grid and a convolution with the kernel cut at 5 widths.
+        Shifting E2 by alpha moves every frame's xi = E1 - E2 - alpha by the
+        same amount, so on this grid the frames never move, only their
+        weights change, and the profile is smooth in alpha and H12, which
+        the fit needs (hard bins would make its target a staircase).
+
+        The profile is only read where the frames are dense: from the first
+        to the last grid point whose kernel-weighted frame count, unweighted,
+        reaches reweighting_min_count. In the tails a few isolated frames
+        give one bump each, and their dips look like barriers to the
+        extremum search. The range depends on the frames only, not on alpha
+        or H12, so it does not move under the fit.
+        """
+
+        E1 = np.asarray(E1, dtype=float)
+        E2 = np.asarray(E2, dtype=float)
+        gap = E1 - E2
+        width = float(self.reweighting_kernel_width)
+        spacing = width / 5
+        half = 25
+        lo = np.min(gap) - (half + 1) * spacing
+        n_points = int(np.ceil((np.max(gap) - lo) / spacing)) + half + 2
+        assert_msg_critical(
+            np.all(np.isfinite(gap)) and n_points <= 2_000_000,
+            "EvbDataProcessing: the energy gap spans " +
+            f"{np.ptp(gap):.4g} kJ/mol, too wide for a binless profile " +
+            f"with a kernel {width} kJ/mol wide. Check the frames for " +
+            "non-finite or exploded energies, or widen " +
+            "reweighting_kernel_width.")
+        position = (gap - lo) / spacing
+        left = np.floor(position).astype(int)
+        kernel_x = np.arange(-half, half + 1) * spacing / width
+        setup = {
+            "E1": E1,
+            "E2": E2,
+            "log_den": np.asarray(log_den, dtype=float),
+            "beta": self._beta(Temp_set),
+            "gap": lo + spacing * np.arange(n_points),
+            "left": left,
+            "fraction": position - left,
+            "kernel": np.exp(-0.5 * kernel_x**2),
+        }
+        dense = np.flatnonzero(
+            self._kernel_sum(setup, np.ones(len(gap)), setup["kernel"]) >=
+            self.reweighting_min_count)
+        setup["dense"] = ((dense[0], dense[-1]) if len(dense) > 0 else
+                          (n_points, -1))
+        return setup
+
+    @staticmethod
+    def _kernel_sum(setup, values, kernel):
+        """sum_n values_n kernel(gap - gap_n) on the grid of setup."""
+
+        n_points = len(setup["gap"])
+        left, fraction = setup["left"], setup["fraction"]
+        binned = (np.bincount(left, values * (1 - fraction), n_points) +
+                  np.bincount(left + 1, values * fraction, n_points))
+        return np.convolve(binned, kernel, mode='same')
+
+    def _binless_free_energy(self, setup, alpha, H12, xi=None, ess=False):
+        """The E_g free energy along the gap, from the MBAR weights of the
+        E_g target and a Gaussian kernel density of xi.
+
+        G(xi) = -kT ln sum_n w_n K(xi - xi_n), w_n the weights of E_g(alpha,
+        H12) (see _reweight). Unlike the analytical formula this needs no
+        assumption about the shape of the gap distribution; the kernel
+        lowers a barrier by about width^2 / 2 times the curvature
+        difference between the wells and the top. Points without weight, or
+        outside the dense range of _binless_setup, are NaN.
+
+        Without xi the profile is returned on setup["gap"] - alpha. With
+        ess, also the local Kish effective sample size of the kernel-weighted
+        frames, (sum w K)^2 / sum (w K)^2.
+        """
+
+        E1 = setup["E1"]
+        E2_shifted = setup["E2"] + alpha
+        Eg = 0.5 * ((E1 + E2_shifted) - np.sqrt((E1 - E2_shifted)**2 +
+                                                4 * H12**2))
+        log_w = -setup["beta"] * Eg - setup["log_den"]
+        w = np.exp(log_w - np.max(log_w))
+
+        density = self._kernel_sum(setup, w, setup["kernel"])
+        with np.errstate(divide='ignore'):
+            profile = -np.log(density) / setup["beta"]
+        first, last = setup["dense"]
+        profile[:first] = np.inf
+        profile[last + 1:] = np.inf
+        profile[~np.isfinite(profile)] = np.nan
+        if ess:
+            with np.errstate(divide='ignore', invalid='ignore'):
+                local_ess = density**2 / self._kernel_sum(
+                    setup, w**2, setup["kernel"]**2)
+            local_ess[~np.isfinite(local_ess)] = 0.0
+        if xi is not None:
+            at = np.asarray(xi, dtype=float) + alpha
+            profile = np.interp(at,
+                                setup["gap"],
+                                profile,
+                                left=np.nan,
+                                right=np.nan)
+            if ess:
+                local_ess = np.interp(at,
+                                      setup["gap"],
+                                      local_ess,
+                                      left=0.0,
+                                      right=0.0)
+        if ess:
+            return profile, local_ess
+        return profile
+
+    @staticmethod
+    def _reweighted_lambda_r(E1, E2_shifted, log_den, beta, dG0):
+        """R1 lambda_r from the mean of de = E2' - E1 on the mapping end
+        states, weighted as MBAR targets instead of read off the end
+        windows; conventions as in _calculate_reorganization."""
+
+        E1 = np.asarray(E1, dtype=float)
+        E2_shifted = np.asarray(E2_shifted, dtype=float)
+        de = E2_shifted - E1
+        de_mean = [
+            float(
+                np.sum(
+                    EvbDataProcessing._target_weights(log_den, beta * E) *
+                    de)) for E in (E1, E2_shifted)
+        ]
+        return {
+            "lambda_r": 0.5 * (de_mean[0] - de_mean[1]),
+            "lambda_reactant": de_mean[0] - dG0,
+            "lambda_product": dG0 - de_mean[1],
+            "de_mean": np.array(de_mean),
+        }
 
     def _bin(self, data, lambda_indices=None):
         if lambda_indices is None:
@@ -798,6 +1398,32 @@ class EvbDataProcessing:
         dGevb[np.sum(pnscount, axis=0) == 0] = np.nan
 
         return dGevb, pns, dGcor, dGdens
+
+    def _dGevb_discretised_reweighted(self, E1, E2_shifted, log_den,
+                                      Temp_set):
+        """The discretised EVB profile from reweighted frames.
+
+        -kT ln P(s), P(s) the sum of the MBAR weights of the E_g target (see
+        _reweight) over the frames whose gap falls in coordinate bin s: the
+        bin-integrated E_g free energy, in the layout of _dGevb_discretised
+        (len(coordinate_bins) + 1 entries, the first and last collecting
+        the frames outside the bins). Empty bins are NaN.
+        """
+
+        E1 = np.asarray(E1, dtype=float)
+        E2_shifted = np.asarray(E2_shifted, dtype=float)
+        beta = self._beta(Temp_set)
+        Eg = 0.5 * ((E1 + E2_shifted) - np.sqrt((E1 - E2_shifted)**2 +
+                                                4 * self.H12**2))
+        weights = self._target_weights(log_den, beta * Eg)
+        bins = np.searchsorted(self.coordinate_bins, E1 - E2_shifted)
+        probability = np.bincount(bins,
+                                  weights,
+                                  minlength=len(self.coordinate_bins) + 1)
+        with np.errstate(divide='ignore'):
+            profile = -np.log(probability) / beta
+        profile[probability == 0] = np.nan
+        return profile
 
     def _profile_axis(self, n_points, xi):
         """Coordinate of every point of a profile, and the range to search.
@@ -1180,17 +1806,30 @@ class EvbDataProcessing:
             E1 = result["E1_pes"]
             E2_shifted = result["E2_pes"] + self.alpha
 
-            dGfep, dGfep_unc = self._calculate_dGfep(E1, E2_shifted, Temp_set)
+            dGfep, dGfep_unc, log_den = self._mapping_free_energies(
+                name, E1, E2_shifted, Temp_set)
+            # Reweighted, the estimate that treats the frames as sampled from
+            # the mapping states is also kept, under "reweighting", for
+            # comparison. The reorganization block reads the end windows,
+            # which only that estimate matches, so it stays unreweighted; the
+            # reweighted lambda_r is in "reweighting" as well.
+            reweighted = log_den is not None
+            unreweighted = (self._calculate_dGfep(E1, E2_shifted, Temp_set)
+                            if reweighted else (dGfep, dGfep_unc))
 
             result.update({"dGfep": dGfep, "dGfep_unc": dGfep_unc})
             if self.calculate_reorganization:
                 result["reorganization"] = self._calculate_reorganization(
-                    name, result, E1, E2_shifted, dGfep, dGfep_unc,
-                    Temp_set)
+                    name, result, E1, E2_shifted, *unreweighted, Temp_set)
             if self.calculate_discrete:
-                dGevb_discrete, pns, dGcor, dGdens = self._dGevb_discretised(
-                    dGfep, result["Eg"], result["V"], result["dE"],
-                    result["Temp_set"])
+                if reweighted:
+                    dGevb_discrete = self._dGevb_discretised_reweighted(
+                        E1, E2_shifted, log_den, Temp_set)
+                else:
+                    dGevb_discrete, pns, dGcor, dGdens = (
+                        self._dGevb_discretised(dGfep, result["Eg"],
+                                                result["V"], result["dE"],
+                                                result["Temp_set"]))
 
                 (
                     dGevb_discrete,
@@ -1207,21 +1846,24 @@ class EvbDataProcessing:
                     fitting=False,
                     xi_range=self._reading_ranges.get(name))
 
-                result.update({
-                    "discrete": {
-                        "EVB": dGevb_discrete,
-                        "free_energy": reaction_free_energy_discretised,
-                        "barrier": barrier_discretised,
+                result["discrete"] = {
+                    "EVB": dGevb_discrete,
+                    "free_energy": reaction_free_energy_discretised,
+                    "barrier": barrier_discretised,
+                    "min_arg": min_arg,
+                    "max_arg": max_arg,
+                    "reactant_index": erea_ind,
+                    "barrier_index": ebar_ind,
+                    "product_index": epro_ind,
+                }
+                # The FEP/US decomposition (plot_evb_details) exists only
+                # without reweighting.
+                if not reweighted:
+                    result["discrete"].update({
                         "pns": pns,
                         "dGcor": dGcor,
-                        "dGdens": dGdens,
-                        "min_arg": min_arg,
-                        "max_arg": max_arg,
-                        "reactant_index": erea_ind,
-                        "barrier_index": ebar_ind,
-                        "product_index": epro_ind,
-                    }
-                })
+                        "dGdens": dGdens
+                    })
 
             if self.calculate_analytical:
                 self.ostream.print_info(
@@ -1278,6 +1920,11 @@ class EvbDataProcessing:
                     }
                 })
 
+            if reweighted:
+                self._calculate_reweighted_results(name, result, log_den,
+                                                   unreweighted, E1,
+                                                   E2_shifted, Temp_set)
+
             if self.calculate_per_replica and result.get(
                     "Replica_frame") is not None:
                 self.ostream.print_info(
@@ -1300,6 +1947,121 @@ class EvbDataProcessing:
                 )
                 self.ostream.flush()
                 self._calculate_fg_profiles(result)
+
+    def _calculate_reweighted_results(self, name, result, log_den,
+                                      unreweighted, E1, E2_shifted, Temp_set):
+        """The binless profile and the reweighting diagnostics of one
+        configuration, for reweighting='mbar'.
+
+        result["binless"] holds the E_g profile of _binless_free_energy on
+        the coordinate bins, read by _get_free_energies like the analytical
+        one, without an uncertainty (the replica average gives one).
+        result["reweighting"] holds:
+        - dGfep_unreweighted (and _unc): what reweighting='none' gives;
+        - ess_pes: the Kish effective sample size of each mapping state;
+        - ess_eg: the local one of the binless profile at its reactant,
+          transition state and product (see _binless_free_energy);
+        - lambda_r, lambda_reactant, lambda_product and de_mean: R1 from the
+          mapping end states (_reweighted_lambda_r);
+        - the settings method, profile, ess_min and kernel_width.
+        A warning names whatever falls below reweighting_ess_min.
+        """
+
+        self.ostream.print_info(
+            f"Calculating binless EVB curve for configuration {name}")
+        self.ostream.flush()
+        setup = self._binless_setup(E1, result["E2_pes"], log_den, Temp_set)
+        profile, local_ess = self._binless_free_energy(setup,
+                                                       self.alpha,
+                                                       self.H12,
+                                                       self.coordinate_bins,
+                                                       ess=True)
+        (
+            profile,
+            barrier,
+            free_energy,
+            min_arg,
+            max_arg,
+            erea_ind,
+            epro_ind,
+            ebar_ind,
+        ) = self._get_free_energies(profile,
+                                    self.coordinate_bins,
+                                    fitting=False,
+                                    xi_range=self._reading_ranges.get(name))
+        result["binless"] = {
+            "EVB": profile,
+            "free_energy": free_energy,
+            "barrier": barrier,
+            "min_arg": min_arg,
+            "max_arg": max_arg,
+            "reactant_index": erea_ind,
+            "barrier_index": ebar_ind,
+            "product_index": epro_ind,
+        }
+
+        # The sampled-state solve is cached, so this only re-evaluates the
+        # mapping targets.
+        ess_pes = np.asarray(
+            self._reweight(name,
+                           E1,
+                           E2_shifted,
+                           Temp_set,
+                           self.Lambda_indices,
+                           uncertainty=False)["ess_pes"])
+        ess_eg = local_ess[[erea_ind, ebar_ind, epro_ind]]
+        result["reweighting"] = {
+            "method": "mbar",
+            "profile": self.reweighting_profile,
+            "dGfep_unreweighted": unreweighted[0],
+            "dGfep_unreweighted_unc": unreweighted[1],
+            "ess_pes": ess_pes,
+            "ess_eg": ess_eg,
+            "ess_min": self.reweighting_ess_min,
+            "kernel_width": self.reweighting_kernel_width,
+        }
+        result["reweighting"].update(
+            self._reweighted_lambda_r(E1, E2_shifted, log_den,
+                                      self._beta(Temp_set),
+                                      result["dGfep"][-1]))
+
+        low = np.flatnonzero(ess_pes < self.reweighting_ess_min)
+        if len(low) > 0:
+            lowest = low[np.argmin(ess_pes[low])]
+            self.ostream.print_warning(
+                f"Configuration {name}: {len(low)} of {len(ess_pes)} " +
+                "reweighted mapping states have a Kish effective sample " +
+                f"size below {self.reweighting_ess_min} frames, the lowest " +
+                f"{ess_pes[lowest]:.1f} at lambda " +
+                f"{self.Lambda[lowest]}. Their free energies rest on a few " +
+                "frames, because the integration systems rarely visit " +
+                "where the PES puts these states.")
+        labels = ("reactant", "transition state", "product")
+        low = [
+            f"{label} {value:.1f}" for label, value in zip(labels, ess_eg)
+            if value < self.reweighting_ess_min
+        ]
+        if low:
+            self.ostream.print_warning(
+                f"Configuration {name}: the binless EVB profile has a Kish " +
+                f"effective sample size below {self.reweighting_ess_min} " +
+                "frames at the " + ", ".join(low) + ", so its barrier or " +
+                "reaction free energy rests on a few frames.")
+        self.ostream.flush()
+
+    def _binless_subset(self, name, E1, E2, log_den, Temp_set):
+        """Barrier and reaction free energy of the binless profile of a
+        subset of frames (one replica, one direction)."""
+
+        setup = self._binless_setup(E1, E2, log_den, Temp_set)
+        profile = self._binless_free_energy(setup, self.alpha, self.H12,
+                                            self.coordinate_bins)
+        _, barrier, free_energy, _, _, _, _, _ = self._get_free_energies(
+            profile,
+            self.coordinate_bins,
+            fitting=False,
+            xi_range=self._reading_ranges.get(name))
+        return {"barrier": barrier, "free_energy": free_energy}
 
     def _calculate_reorganization(self, name, result, E1, E2_shifted, dGfep,
                                   dGfep_unc, Temp_set):
@@ -1504,6 +2266,33 @@ class EvbDataProcessing:
             }
         })
 
+        # Reweighted, also the binless profile and the reweighted lambda_r.
+        reweighted = [
+            directions["both"] for directions in by_replica.values()
+            if "binless" in directions.get("both", {})
+        ]
+        if reweighted:
+            for key, label in (("barrier", "binless barrier"),
+                               ("free_energy",
+                                "binless reaction free energy")):
+                mean, sem = self._replica_mean_sem(
+                    [both["binless"][key] for both in reweighted], label)
+                result["replica_average"].update({
+                    f"binless_{key}_mean": mean,
+                    f"binless_{key}_sem": sem,
+                })
+            lambda_rs = [
+                both["reweighted_lambda_r"] for both in reweighted
+                if "reweighted_lambda_r" in both
+            ]
+            if lambda_rs:
+                mean, sem = self._replica_mean_sem(lambda_rs,
+                                                   "reweighted lambda_r")
+                result["replica_average"].update({
+                    "reweighted_lambda_r_mean": mean,
+                    "reweighted_lambda_r_sem": sem,
+                })
+
         # Each replica's lambda_r, from _calculate_per_replica_results. With
         # at least 3 replicas, a replica standard error far from the analytic
         # sigma can point at correlation between windows, drift or
@@ -1697,8 +2486,11 @@ class EvbDataProcessing:
         # BAR estimator here even when fep_estimator="mbar" is used for the
         # pooled curve -- MBAR's joint multistate solve is otherwise repeated
         # from scratch for every one of the (up to) 3 * n_replicas subsets.
+        # Reweighted, every subset gets the same reweighting as the pooled
+        # frames, whatever per_replica_fep_estimator says.
+        reweighted = self._reweighted
         saved_estimator = self.fep_estimator
-        if self.per_replica_fep_estimator is not None:
+        if self.per_replica_fep_estimator is not None and not reweighted:
             self.fep_estimator = self.per_replica_fep_estimator
 
         try:
@@ -1728,9 +2520,9 @@ class EvbDataProcessing:
                         continue
 
                     try:
-                        dGfep_sub, dGfep_unc_sub = (self._calculate_dGfep(
-                            E1[mask], E2_shifted[mask], Temp_set,
-                            lambda_indices[mask]))
+                        dGfep_sub, dGfep_unc_sub, log_den_sub = (
+                            self._mapping_free_energies(
+                                name, E1, E2_shifted, Temp_set, mask))
 
                         dGevb_sub, _, _ = self._dGevb_analytical(
                             dGfep_sub, self.Lambda, self.H12,
@@ -1758,6 +2550,10 @@ class EvbDataProcessing:
                             self._propagate_free_energy_uncertainty(
                                 dGevb_unc_sub, erea_ind_sub, ebar_ind_sub,
                                 epro_ind_sub))
+                        if reweighted:
+                            binless_sub = self._binless_subset(
+                                name, E1[mask], result["E2_pes"][mask],
+                                log_den_sub, Temp_set)
                     except Exception as e:
                         print_exception_if_debug()
                         self.ostream.print_warning(
@@ -1787,6 +2583,16 @@ class EvbDataProcessing:
                             self._end_window_lambda_r(
                                 E1[mask], E2_shifted[mask],
                                 lambda_indices[mask], len(self.Lambda)))
+                    if reweighted:
+                        by_replica[replica][label]["binless"] = binless_sub
+                        if label == "both" and self.calculate_reorganization:
+                            by_replica[replica][label][
+                                "reweighted_lambda_r"] = (
+                                    self._reweighted_lambda_r(
+                                        E1[mask], E2_shifted[mask],
+                                        log_den_sub,
+                                        self._beta(Temp_set),
+                                        dGfep_sub[-1])["lambda_r"])
         finally:
             self.fep_estimator = saved_estimator
 
@@ -1982,6 +2788,20 @@ class EvbDataProcessing:
                 ostream.print_info(
                     f"{name:<30} {barrier_str:>25} {free_energy_str:>25}")
 
+        binless = {
+            name: result["binless"]
+            for name, result in results["configuration_results"].items()
+            if "binless" in result
+        }
+        if binless:
+            ostream.print_info(
+                f"{'Binless (reweighted)':<30} {'Barrier (kJ/mol)':>25} {'Free Energy (kJ/mol)':>25}"
+            )
+            for name, profile in binless.items():
+                ostream.print_info(
+                    f"{name:<30} {profile['barrier']:>25.2f} {profile['free_energy']:>25.2f}"
+                )
+
         reorganized = {
             name: result["reorganization"]
             for name, result in results["configuration_results"].items()
@@ -2046,6 +2866,47 @@ class EvbDataProcessing:
                 f"{name:<20} {barrier_str:>25} {free_energy_str:>25} {endpoint_str:>18}"
             )
         ostream.print_blank()
+
+        reweighted = {
+            name: result
+            for name, result in results["configuration_results"].items()
+            if "reweighting" in result
+        }
+        if reweighted:
+            ostream.print_header(
+                "Reweighting (MBAR, integration systems sampled)")
+            ostream.print_info(
+                "ESS: Kish effective sample size in frames, of the mapping " +
+                "states (lowest) and of the binless profile at R/TS/P.")
+            ostream.print_info(
+                f"{'Configuration':<20} {'dGfep(l=1)':>12} {'unreweighted':>13} "
+                + f"{'lowest ESS (lambda)':>20} {'ESS R / TS / P':>22} " +
+                f"{'lambda_r':>10} {'unreweighted':>13}")
+            for name, result in reweighted.items():
+                reweighting = result["reweighting"]
+                ess_pes = np.asarray(reweighting["ess_pes"])
+                lowest = int(np.argmin(ess_pes))
+                lowest_str = (f"{ess_pes[lowest]:.1f} " +
+                              f"({results['Lambda'][lowest]:.3f})")
+                ess_eg_str = " / ".join(
+                    f"{value:.1f}" for value in reweighting["ess_eg"])
+                unreweighted_lambda_r = result.get("reorganization",
+                                                   {}).get("lambda_r",
+                                                           float("nan"))
+                ostream.print_info(
+                    f"{name:<20} {result['dGfep'][-1]:>12.2f} " +
+                    f"{reweighting['dGfep_unreweighted'][-1]:>13.2f} " +
+                    f"{lowest_str:>20} {ess_eg_str:>22} " +
+                    f"{reweighting['lambda_r']:>10.2f} " +
+                    f"{unreweighted_lambda_r:>13.2f}")
+                if (ess_pes[lowest] < reweighting["ess_min"]
+                        or np.min(reweighting["ess_eg"])
+                        < reweighting["ess_min"]):
+                    ostream.print_info(
+                        f"{name}: an ESS below {reweighting['ess_min']:g} " +
+                        "frames; the reweighted values there rest on a few " +
+                        "frames.")
+            ostream.print_blank()
 
         reorganized = {
             name: result
@@ -2127,6 +2988,24 @@ class EvbDataProcessing:
                 ostream.print_info(
                     f"{name:<20} {replica_average['n_replicas']:>4} {barrier_str:>25} {free_energy_str:>25}"
                 )
+                if "binless_barrier_mean" in replica_average:
+                    barrier_str = (
+                        f"{replica_average['binless_barrier_mean']:.2f} +/- "
+                        f"{replica_average['binless_barrier_sem']:.2f}")
+                    free_energy_str = (
+                        f"{replica_average['binless_free_energy_mean']:.2f} "
+                        f"+/- {replica_average['binless_free_energy_sem']:.2f}"
+                    )
+                    binless_name = f"{name} (binless)"
+                    ostream.print_info(
+                        f"{binless_name:<20} {replica_average['n_replicas']:>4} {barrier_str:>25} {free_energy_str:>25}"
+                    )
+                if "reweighted_lambda_r_mean" in replica_average:
+                    ostream.print_info(
+                        f"{name}: replica average reweighted lambda_r " +
+                        f"{replica_average['reweighted_lambda_r_mean']:.2f} " +
+                        f"+/- {replica_average['reweighted_lambda_r_sem']:.2f}"
+                        + " kJ/mol")
 
         has_hysteresis_summary = any(
             "hysteresis_summary" in result
@@ -2299,6 +3178,11 @@ class EvbDataProcessing:
             ax[0].plot(Lambda, result["dGfep"], label=name)
             ax[0].set_xlim(0, 1)
             if plot_discrete:
+                assert_msg_critical(
+                    "discrete" in result,
+                    f"plot_results: configuration '{name}' has no " +
+                    "discretised profile; set calculate_discrete = True " +
+                    "before compute().")
                 if "discrete" in result.keys():
                     ax[1].plot(
                         bin_indicators,
@@ -2638,6 +3522,12 @@ class EvbDataProcessing:
         for i, (name,
                 result) in enumerate(results["configuration_results"].items()):
             dGfep = result["dGfep"]
+            assert_msg_critical(
+                "pns" in result.get("discrete", {}),
+                f"plot_evb_details: configuration '{name}' has no FEP/US " +
+                "decomposition of a discretised profile: set " +
+                "calculate_discrete = True before compute(). Reweighted " +
+                "results have no such decomposition.")
             # discrete curves
             pns = result['discrete']['pns']
             # Both correction terms, as _dGevb_discretised sums them, so the

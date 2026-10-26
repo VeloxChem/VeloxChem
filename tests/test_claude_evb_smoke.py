@@ -255,3 +255,44 @@ def test_smoke_reweight():
             evb_reweight.route_M(data, 0.0, exact=True)['dG'][-1] + 60.0)
     for key, err in errors.items():
         _assert_unbiased(err, label=f'T1 route {key}')
+
+
+def test_smoke_native_reweight():
+    """EvbDataProcessing with reweighting='mbar' recovers the PES dG0 and
+    the E_g barrier from mismatched frames (WP-B5b).
+
+    T1 of MISMATCH_CASES: frames sampled from harmonic diabats other than
+    the analysed PES pair, where reweighting='none' puts dGfep(1) 28 kJ/mol
+    off. 300 frames per window, seeds 0-4, alpha 0 and H12 30 fixed. The
+    errors of dGfep(1) against the exact -60 and of the binless barrier
+    against the exact E_g barrier must be unbiased (WP-B5b measured +0.08
+    +- 0.09 and -0.02 +- 0.07 over 25 seeds). Taking the sampled states'
+    energies from the mapping potentials instead of U_int, or swapping the
+    sampled and the target blocks of the MBAR matrix, fails it
+    (work/WP-B5/smoke_mutation.out).
+
+    If this fails, run work/WP-B5/toy_sweep.py.
+    """
+
+    from test_claude_evb_reference import make_mismatched
+
+    lambdas = default_lambdas()
+    model = make_mismatched('T1')
+    exact = model.stationary(30.0)
+    errors = {'dGfep(1)': [], 'binless barrier': []}
+    for seed in range(5):
+        samples = model.sample(lambdas, 300, np.random.default_rng(seed),
+                               cross_energies=True)
+        dp = _processor()
+        dp.reweighting = 'mbar'
+        dp.calculate_reorganization = False
+        dp.bin_size = 2.0
+        dp.alpha = 0.0
+        dp.H12 = 30.0
+        result = dp.compute(make_results(samples, lambdas), np.nan,
+                            np.nan)['configuration_results']['synthetic']
+        errors['dGfep(1)'].append(result['dGfep'][-1] + 60.0)
+        errors['binless barrier'].append(result['binless']['barrier'] -
+                                         exact['barrier'])
+    for key, err in errors.items():
+        _assert_unbiased(err, label=f'T1 reweighted {key}')

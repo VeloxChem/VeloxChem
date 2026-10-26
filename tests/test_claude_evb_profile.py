@@ -43,6 +43,7 @@ def _processor(H12, alpha=0.0):
     dp.alpha = alpha
     dp.H12 = H12
     dp.calculate_per_replica = False
+    dp.calculate_discrete = True
     return dp
 
 
