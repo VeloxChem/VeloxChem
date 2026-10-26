@@ -314,7 +314,70 @@ class RIJKFockDriver:
 
         return fmat
 
-    def compute_k_fock(self, density, molorbs, verbose=True, spin='alpha'):
+    @staticmethod
+    def _get_density_factor(density):
+        """
+        Returns a factorization of the density matrix for RI exchange.
+
+        Needed when the density is non-idempotent (pFON or density damping).
+
+        :param density:
+            The AO density matrix.
+
+        :return:
+            A submatrix containing the density factor.
+        """
+
+        if hasattr(density, 'to_numpy'):
+            density_np = density.to_numpy()
+        else:
+            density_np = np.asarray(density)
+
+        density_np = 0.5 * (density_np + density_np.T)
+
+        eigvals, eigvecs = screened_eigh(density_np, 1.0e-12)
+        factor_np = eigvecs * np.sqrt(eigvals)
+
+        if factor_np.shape[1] == 0:
+            factor_np = np.zeros((density_np.shape[0], 1))
+
+        factor = SubMatrix(
+            [0, 0, factor_np.shape[0], factor_np.shape[1]])
+        factor.set_values(factor_np)
+
+        return factor
+
+    @staticmethod
+    def _get_occupied_orbitals(molorbs, spin='alpha'):
+        """
+        Returns the occupied molecular orbital block for the given spin.
+
+        :param molorbs:
+            The molecular orbitals.
+        :param spin:
+            The spin block (alpha or beta).
+
+        :return:
+            A submatrix containing the occupied molecular orbitals.
+        """
+
+        if spin == 'alpha':
+            nocc = int(np.sum(molorbs.occa_to_numpy()))
+            occ_mos = SubMatrix([0, 0, molorbs.number_aos(), nocc])
+            occ_mos.set_values(molorbs.alpha_to_numpy()[:, 0:nocc])
+        elif spin == 'beta':
+            nocc = int(np.sum(molorbs.occb_to_numpy()))
+            occ_mos = SubMatrix([0, 0, molorbs.number_aos(), nocc])
+            occ_mos.set_values(molorbs.beta_to_numpy()[:, 0:nocc])
+
+        return occ_mos
+
+    def compute_k_fock(self,
+                       density,
+                       molorbs,
+                       verbose=True,
+                       spin='alpha',
+                       use_density_factor=False):
         """
         Computes exchange Fock matrix.
 
@@ -324,6 +387,10 @@ class RIJKFockDriver:
             The molecular orbitals (restricted).
         :param verbose:
             The information printout level.
+        :param spin:
+            The spin block (alpha or beta).
+        :param use_density_factor:
+            Whether the exchange should be built from the density.
         """
 
         if verbose:
@@ -334,16 +401,10 @@ class RIJKFockDriver:
 
         ri_prep_t0 = time.time()
 
-        # retrieve occupied orbitals
-        # TODO: make generic version in MolecularOrbitals class
-        if spin == 'alpha':
-            nocc = int(np.sum(molorbs.occa_to_numpy()))
-            occ_mos = SubMatrix([0, 0, molorbs.number_aos(), nocc])
-            occ_mos.set_values(molorbs.alpha_to_numpy()[:, 0:nocc])
-        elif spin == 'beta':
-            nocc = int(np.sum(molorbs.occb_to_numpy()))
-            occ_mos = SubMatrix([0, 0, molorbs.number_aos(), nocc])
-            occ_mos.set_values(molorbs.beta_to_numpy()[:, 0:nocc])
+        if use_density_factor:
+            occ_mos = self._get_density_factor(density)
+        else:
+            occ_mos = self._get_occupied_orbitals(molorbs, spin)
 
         fmat = self._ri_drv.compute_k_fock(density, occ_mos)
 
@@ -361,7 +422,8 @@ class RIJKFockDriver:
                                 density,
                                 molorbs,
                                 verbose=True,
-                                spin='alpha'):
+                                spin='alpha',
+                                use_density_factor=False):
         """
         Computes screened exchange Fock matrix.
 
@@ -371,6 +433,10 @@ class RIJKFockDriver:
             The molecular orbitals (restricted).
         :param verbose:
             The information printout level.
+        :param spin:
+            The spin block (alpha or beta).
+        :param use_density_factor:
+            Whether the exchange should be built from the density.
         """
 
         if verbose:
@@ -381,16 +447,10 @@ class RIJKFockDriver:
 
         ri_prep_t0 = time.time()
 
-        # retrieve occupied orbitals
-        # TODO: make generic version in MolecularOrbitals class
-        if spin == 'alpha':
-            nocc = int(np.sum(molorbs.occa_to_numpy()))
-            occ_mos = SubMatrix([0, 0, molorbs.number_aos(), nocc])
-            occ_mos.set_values(molorbs.alpha_to_numpy()[:, 0:nocc])
-        elif spin == 'beta':
-            nocc = int(np.sum(molorbs.occb_to_numpy()))
-            occ_mos = SubMatrix([0, 0, molorbs.number_aos(), nocc])
-            occ_mos.set_values(molorbs.beta_to_numpy()[:, 0:nocc])
+        if use_density_factor:
+            occ_mos = self._get_density_factor(density)
+        else:
+            occ_mos = self._get_occupied_orbitals(molorbs, spin)
 
         fmat = self._ri_drv.compute_screened_k_fock(density, occ_mos)
 

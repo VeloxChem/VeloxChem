@@ -17,6 +17,7 @@ from veloxchem.dispersionmodel import DispersionModel
 from veloxchem.resultsio import read_molecule_and_basis
 from veloxchem.inputparser import unparse_input, read_unparsed_input_from_hdf5
 from veloxchem.errorhandler import VeloxChemError
+from veloxchem.sanitychecks import pe_sanity_check
 
 
 @pytest.mark.solvers
@@ -480,6 +481,22 @@ class TestScfDriverMiscellaneous:
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason='skip pytest.raises for multiple MPI processes')
+    def test_solvation_model_with_pressure_raises(self):
+
+        molecule, basis = self.get_water_and_basis()
+
+        def configure(driver):
+            driver.solvation_model = 'cpcm'
+            driver.pressure = 20000.0
+
+        with pytest.raises(
+                VeloxChemError,
+                match="ScfRestrictedDriver: The 'solvation_model' option "
+                      "is incompatible with GOSTSHYP"):
+            self.run_hf_scf(molecule, basis, configure)
+
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='skip pytest.raises for multiple MPI processes')
     def test_invalid_acc_type_does_not_return_stale_results(self):
 
         molecule, basis = self.get_water_and_basis()
@@ -498,6 +515,42 @@ class TestScfDriverMiscellaneous:
 
         assert not scf_drv.is_converged
         assert scf_drv.scf_results is None
+        assert scf_drv.history is None
+        assert scf_drv._iter_data is None
+        assert scf_drv.density is None
+        assert scf_drv.molecular_orbitals.is_empty()
+        assert scf_drv._ref_mol_orbs is None
+
+    def test_pe_potfile_falls_back_to_pe_options(self, monkeypatch):
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ostream.mute()
+
+        # PE configured through an embedding object, as in test_embedding.py.
+        scf_drv.embedding = {
+            'settings': {
+                'embedding_method': 'PE'
+            },
+            'inputs': {
+                'json_file': 'tests/data/acrolein.json'
+            },
+        }
+
+        # pyframe is not required for this state-transition test.
+        monkeypatch.setattr('veloxchem.sanitychecks.embedding_sanity_check',
+                            lambda options: None)
+        pe_sanity_check(scf_drv)
+
+        assert scf_drv._pe
+        assert scf_drv.potfile is None
+        assert scf_drv.pe_options['potfile'] == 'tests/data/acrolein.json'
+        assert scf_drv._get_pe_potfile() == 'tests/data/acrolein.json'
+
+        # This mirrors the fallback performed in compute().
+        if scf_drv._pe and scf_drv.potfile is None:
+            scf_drv.potfile = scf_drv.pe_options.get('potfile')
+
+        assert scf_drv.potfile == 'tests/data/acrolein.json'
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason='skip pytest.raises for multiple MPI processes')
@@ -905,6 +958,32 @@ class TestScfDriverMiscellaneous:
             assert start_results["scf_energy"] == pytest.approx(
                 ref_results["scf_energy"], abs=1.0e-10)
 
+    def test_user_supplied_converged_orbitals_have_mo_energies(self):
+
+        molecule, basis = self.get_water_and_basis()
+
+        ref_drv, ref_results = self.run_hf_scf(molecule, basis)
+
+        start_drv = ScfRestrictedDriver()
+        start_drv.ostream.mute()
+
+        if self.is_master():
+            start_orbitals = ref_drv.molecular_orbitals.alpha_to_numpy().copy()
+        else:
+            start_orbitals = None
+
+        start_drv.set_start_orbitals(molecule, basis, start_orbitals)
+        start_results = start_drv.compute(molecule, basis)
+
+        if self.is_master():
+            assert not np.allclose(start_results["E_alpha"], 0.0)
+            assert np.max(
+                np.abs(start_results["E_alpha"] -
+                       ref_results["E_alpha"])) < 1.0e-6
+            assert np.max(
+                np.abs(start_drv.molecular_orbitals.ea_to_numpy() -
+                       ref_results["E_alpha"])) < 1.0e-6
+
     def test_clear_start_orbitals_resets_user_start_mode(self):
 
         molecule, basis = self.get_water_and_basis()
@@ -944,6 +1023,23 @@ class TestScfDriverMiscellaneous:
         if self.is_master():
             assert np.allclose(scf_drv_copy.scf_results['D_alpha'],
                                scf_drv.scf_results['D_alpha'])
+
+    def test_environment_state_initialized_in_constructor(self):
+
+        # External consumers such as the gradient driver read
+        # scf_driver._gostshyp_drv, and the energy printout reads smd_energy
+        # and _e_gostshyp. These attributes must exist on a freshly
+        # constructed driver, e.g. when SCF results are restored from a
+        # checkpoint file without running compute() on this instance.
+
+        for driver in (ScfRestrictedDriver(), ScfUnrestrictedDriver(),
+                       ScfRestrictedOpenDriver()):
+            driver.ostream.mute()
+
+            assert driver._gostshyp_drv is None
+            assert driver._e_gostshyp == 0.0
+            assert driver.smd_energy == 0.0
+            assert driver.smd_cds_energy == 0.0
 
     def test_restricted_driver_helper_branches(self):
 

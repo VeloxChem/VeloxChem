@@ -38,6 +38,28 @@ class TestStreams:
         ostream.close()
         assert not ostream.get_state()
 
+    def test_file_uses_utf8(self, tmp_path, monkeypatch):
+
+        outfile = tmp_path / 'unicode.out'
+        builtin_open = open
+        output_encoding = None
+
+        def tracking_open(*args, **kwargs):
+            nonlocal output_encoding
+            output_encoding = kwargs.get('encoding')
+            return builtin_open(*args, **kwargs)
+
+        monkeypatch.setattr('builtins.open', tracking_open)
+
+        ostream = OutputStream(outfile)
+        assert output_encoding == 'utf-8'
+
+        reference = 'SoftwareX 7, 1–5 (2018)'
+        ostream.print_line(reference)
+        ostream.close()
+
+        assert outfile.read_text(encoding='utf-8').rstrip() == reference
+
     def test_stdout(self):
 
         ostream = OutputStream(sys.stdout)

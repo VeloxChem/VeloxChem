@@ -9,6 +9,7 @@ from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.lreigensolver import LinearResponseEigenSolver
+from veloxchem.tddftorbitalresponse import TddftOrbitalResponse
 from veloxchem.errorhandler import VeloxChemError
 
 
@@ -181,20 +182,66 @@ class TestRPA:
             detachment = lr_results['detachment_charges']
             attachment = lr_results['attachment_charges']
             ref_detachment = np.array([
-                [-1.0001863412, 9.31706e-05, 9.31706e-05],
-                [-1.0004727906, 2.363953e-04, 2.363953e-04],
-                [-0.9115710485, -4.42144757e-02, -4.42144758e-02],
+                [-1.0029851374, -0.0000948340, -0.0000948341],
+                [-1.0027814588, -0.0002540890, -0.0002540890],
+                [-0.9143468349, -0.0447074693, -0.0447074695],
             ])
             ref_attachment = np.array([
-                [0.2873499273, 0.3563249945, 0.3563250781],
-                [0.3025686881, 0.3487157020, 0.3487156098],
-                [0.2760202908, 0.3619898252, 0.3619898840],
+                [0.2897746805, 0.3567000207, 0.3567001044],
+                [0.3056100033, 0.3488398628, 0.3488397706],
+                [0.2784322949, 0.3626647099, 0.3626647689],
             ])
 
             assert detachment.shape == (3, mol.number_of_atoms())
             assert attachment.shape == (3, mol.number_of_atoms())
             assert np.max(np.abs(detachment - ref_detachment)) < 1.0e-6
             assert np.max(np.abs(attachment - ref_attachment)) < 1.0e-6
+
+    def test_detach_attach_density_consistency(self):
+
+        # detach + attach must reproduce the unrelaxed difference density
+
+        xyz_string = """3
+        xyz
+        O   -0.1858140  -1.1749469   0.7662596
+        H   -0.1285513  -0.8984365   1.6808606
+        H   -0.0582782  -0.3702550   0.2638279
+        """
+        mol = Molecule.read_xyz_string(xyz_string)
+        bas = MolecularBasis.read(mol, '6-31g', ostream=None)
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ostream.mute()
+        scf_results = scf_drv.compute(mol, bas)
+
+        lr_drv = LinearResponseEigenSolver()
+        lr_drv.ostream.mute()
+        lr_drv.nstates = 1
+        lr_results = lr_drv.compute(mol, bas, scf_results)
+
+        orb_drv = TddftOrbitalResponse()
+        orb_drv.ostream.mute()
+        orb_drv.state_deriv_index = [1]
+        orb_drv.compute(mol, bas, scf_drv.scf_tensors, lr_results)
+
+        eigvec = lr_drv.get_full_solution_vector(
+            lr_results['eigenvectors_distributed'][0])
+
+        if lr_drv.rank == mpi_master():
+            nocc = mol.number_of_alpha_occupied_orbitals(bas)
+            mo_occ, mo_vir = lr_drv._get_mo_occ_and_mo_vir(scf_results, nocc)
+            z_mat, y_mat = lr_drv._get_z_mat_and_y_mat(eigvec, nocc)
+
+            dens_D, dens_A = lr_drv.get_detach_attach_densities(
+                z_mat, y_mat, mo_occ, mo_vir)
+            unrel_dens = orb_drv.cphf_results['unrelaxed_density_ao'][0]
+
+            assert np.max(np.abs(dens_D + dens_A - unrel_dens)) < 1.0e-12
+
+            dens_D_mo = np.linalg.multi_dot([mo_occ.T, dens_D, mo_occ])
+            dens_A_mo = np.linalg.multi_dot([mo_vir.T, dens_A, mo_vir])
+            assert np.max(np.linalg.eigvalsh(dens_D_mo)) < 1.0e-12
+            assert np.min(np.linalg.eigvalsh(dens_A_mo)) > -1.0e-12
 
     def test_esa_water_631g(self):
 
@@ -222,10 +269,10 @@ class TestRPA:
             esa_results = lr_results['esa_results']
 
             ref_excitation_energies = np.array([0.0706309931, 0.0887848965])
-            ref_oscillator_strengths = np.array([0.1379665336, 0.0013975526])
+            ref_oscillator_strengths = np.array([0.1379630687, 0.0013910509])
             ref_transition_dipoles = np.array([
-                [-0.0794559666, -0.5972010928, 1.6022021187],
-                [0.1515690613, -0.0251919303, -0.0018734103],
+                [-0.0794549688, -0.5971935937, 1.6021820000],
+                [0.1512160878, -0.0251332634, -0.0018690476],
             ])
 
             src_states = [item['from_state'] for item in esa_results]
@@ -421,6 +468,193 @@ class TestRPA:
             assert e2_matrix.shape == (20, 20)
             assert np.max(np.abs(e2_matrix - e2_matrix.T)) < 1.0e-10
             assert np.all(np.diag(e2_matrix) > 0.0)
+
+    def test_get_e2_cpcm_matches_rpa(self):
+        """get_e2 must build the same E[2] as the RPA solver when CPCM is on.
+
+        Regression test: get_e2 used to skip the solvation sanity checks, so
+        _init_cpcm was a no-op and the CPCM response-Fock contribution was
+        missing from E[2] (only the solvated MOs entered).  Diagonalizing E[2]
+        then disagreed with the regular RPA by ~1e-2 a.u. in the presence of
+        CPCM.  This test compares the full eigenvalue spectrum.
+        """
+
+        xyz_string = """3
+        xyz
+        O   -0.1858140  -1.1749469   0.7662596
+        H   -0.1285513  -0.8984365   1.6808606
+        H   -0.0582782  -0.3702550   0.2638279
+        """
+        mol = Molecule.read_xyz_string(xyz_string)
+        bas = MolecularBasis.read(mol, 'sto-3g', ostream=None)
+        norb = bas.get_dimensions_of_basis()
+        nocc = mol.number_of_alpha_occupied_orbitals(bas)
+        n_exc = nocc * (norb - nocc)
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ostream.mute()
+        scf_drv.solvation_model = 'cpcm'
+        scf_drv.cpcm_epsilon = 10.0
+        scf_results = scf_drv.compute(mol, bas)
+
+        # regular RPA over the full excitation space (reference)
+        rpa_drv = LinearResponseEigenSolver()
+        rpa_drv.ostream.mute()
+        rpa_drv.nstates = n_exc
+        rpa_drv.max_iter = 200
+        rpa_drv.initial_guess_multiplier = 4
+        rpa_drv.max_subspace_dim = 2 * n_exc + 10
+        rpa_drv.cpcm_optical_epsilon = 5.0
+        rpa_drv.conv_thresh = 1.0e-7
+        rpa_results = rpa_drv.compute(mol, bas, scf_results)
+
+        # E[2] via get_e2 + diagonalization of E2 v = w S v, S = diag(I,-I)
+        lr_drv = LinearResponseEigenSolver()
+        lr_drv.ostream.mute()
+        lr_drv.cpcm_optical_epsilon = 5.0
+        e2_matrix = lr_drv.get_e2(mol, bas, scf_results)
+
+        if lr_drv.rank == mpi_master():
+            S = np.zeros_like(e2_matrix)
+            S[:n_exc, :n_exc] = np.eye(n_exc)
+            S[n_exc:, n_exc:] = -np.eye(n_exc)
+            w_all = np.linalg.eigvals(S @ e2_matrix)
+            assert np.max(np.abs(np.imag(w_all))) < 1.0e-5
+            w_pos = np.sort(np.real(w_all[w_all > 1.0e-6]))
+            w_rpa = np.sort(rpa_results['eigenvalues'])
+            assert w_pos.shape == w_rpa.shape == (n_exc,)
+            assert np.max(np.abs(w_pos - w_rpa)) < 1.0e-6
+
+    def test_get_e2_gostshyp_matches_rpa(self):
+        """get_e2 must build the same E[2] as the RPA solver when GOSTSHYP is on.
+
+        Mirrors test_get_e2_cpcm_matches_rpa for hydrostatic pressure; before
+        the get_e2 sanity-check fix the GOSTSHYP response-Fock contribution was
+        missing and the eigenvalues disagreed with RPA by ~5e-4.
+        """
+
+        xyz_string = """3
+        xyz
+        O   -0.1858140  -1.1749469   0.7662596
+        H   -0.1285513  -0.8984365   1.6808606
+        H   -0.0582782  -0.3702550   0.2638279
+        """
+        mol = Molecule.read_xyz_string(xyz_string)
+        bas = MolecularBasis.read(mol, 'sto-3g', ostream=None)
+        norb = bas.get_dimensions_of_basis()
+        nocc = mol.number_of_alpha_occupied_orbitals(bas)
+        n_exc = nocc * (norb - nocc)
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ostream.mute()
+        scf_drv.pressure = 20000.0
+        scf_results = scf_drv.compute(mol, bas)
+
+        rpa_drv = LinearResponseEigenSolver()
+        rpa_drv.ostream.mute()
+        rpa_drv.nstates = n_exc
+        rpa_drv.max_iter = 200
+        rpa_drv.initial_guess_multiplier = 4
+        rpa_drv.max_subspace_dim = 2 * n_exc + 10
+        rpa_drv.conv_thresh = 1.0e-7
+        rpa_results = rpa_drv.compute(mol, bas, scf_results)
+
+        lr_drv = LinearResponseEigenSolver()
+        lr_drv.ostream.mute()
+        e2_matrix = lr_drv.get_e2(mol, bas, scf_results)
+
+        if lr_drv.rank == mpi_master():
+            S = np.zeros_like(e2_matrix)
+            S[:n_exc, :n_exc] = np.eye(n_exc)
+            S[n_exc:, n_exc:] = -np.eye(n_exc)
+            w_all = np.linalg.eigvals(S @ e2_matrix)
+            assert np.max(np.abs(np.imag(w_all))) < 1.0e-5
+            w_pos = np.sort(np.real(w_all[w_all > 1.0e-6]))
+            w_rpa = np.sort(rpa_results['eigenvalues'])
+            assert w_pos.shape == w_rpa.shape == (n_exc,)
+            assert np.max(np.abs(w_pos - w_rpa)) < 1.0e-6
+
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='skip pytest.raises for multiple MPI processes')
+    def test_compute_rejects_gostshyp_with_subcomms(self):
+
+        xyz_string = """3
+        xyz
+        O   -0.1858140  -1.1749469   0.7662596
+        H   -0.1285513  -0.8984365   1.6808606
+        H   -0.0582782  -0.3702550   0.2638279
+        """
+        mol = Molecule.read_xyz_string(xyz_string)
+        bas = MolecularBasis.read(mol, 'sto-3g', ostream=None)
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ostream.mute()
+        scf_drv.pressure = 20000.0
+        scf_results = scf_drv.compute(mol, bas)
+
+        lr_drv = LinearResponseEigenSolver()
+        lr_drv.ostream.mute()
+        lr_drv.nstates = 1
+        lr_drv.use_subcomms = True
+
+        with pytest.raises(
+                VeloxChemError,
+                match='LinearSolver: Cannot use subcomms with GOSTSHYP'):
+            lr_results_not_used = lr_drv.compute(mol, bas, scf_results)
+
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='skip pytest.raises for multiple MPI processes')
+    def test_compute_rejects_solvation_model_with_pressure(self):
+
+        xyz_string = """3
+        xyz
+        O   -0.1858140  -1.1749469   0.7662596
+        H   -0.1285513  -0.8984365   1.6808606
+        H   -0.0582782  -0.3702550   0.2638279
+        """
+        mol = Molecule.read_xyz_string(xyz_string)
+        bas = MolecularBasis.read(mol, 'sto-3g', ostream=None)
+
+        # empty scf results just for testing
+        scf_results = {}
+
+        lr_drv = LinearResponseEigenSolver()
+        lr_drv.ostream.mute()
+        lr_drv.solvation_model = 'cpcm'
+        lr_drv.pressure = 20000.0
+
+        with pytest.raises(
+                VeloxChemError,
+                match="LinearResponseEigenSolver: The 'solvation_model' option "
+                      "is incompatible with GOSTSHYP"):
+            lr_results_not_used = lr_drv.compute(mol, bas, scf_results)
+
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='skip pytest.raises for multiple MPI processes')
+    def test_get_e2_rejects_solvation_model_with_pressure(self):
+
+        xyz_string = """3
+        xyz
+        O   -0.1858140  -1.1749469   0.7662596
+        H   -0.1285513  -0.8984365   1.6808606
+        H   -0.0582782  -0.3702550   0.2638279
+        """
+        mol = Molecule.read_xyz_string(xyz_string)
+        bas = MolecularBasis.read(mol, 'sto-3g', ostream=None)
+
+        # empty scf results just for testing
+        scf_results = {}
+
+        lr_drv = LinearResponseEigenSolver()
+        lr_drv.ostream.mute()
+        lr_drv.solvation_model = 'smd'
+        lr_drv.pressure = 20000.0
+
+        with pytest.raises(
+                VeloxChemError,
+                match="LinearResponseEigenSolver: The 'solvation_model' option "
+                      "is incompatible with GOSTSHYP"):
+            e2_matrix_not_used = lr_drv.get_e2(mol, bas, scf_results)
 
     def test_guess_and_preconditioner_helpers(self):
 

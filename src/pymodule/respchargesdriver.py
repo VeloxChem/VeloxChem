@@ -706,12 +706,10 @@ class RespChargesDriver(EspChargesDriver):
             return False
         return True
 
-    def get_dipole_moment(self, molecule, charges):
+    def _get_origin_and_charge_dipole(self, molecule, charges):
         """
-        Computes the dipole moment from atom-centered charges.
-
-        The origin is the nuclear charge centroid so that the result is
-        independent of the choice of origin for neutral molecules.
+        Computes the dipole origin (nuclear charge centroid) and the dipole
+        moment from atom-centered charges.
 
         :param molecule:
             The molecule.
@@ -719,7 +717,8 @@ class RespChargesDriver(EspChargesDriver):
             The atom-centered charges in atomic units.
 
         :return:
-            The dipole moment vector in atomic units (e·bohr).
+            A tuple (origin, dipole) with the nuclear charge centroid in
+            bohr and the dipole moment vector in atomic units (e·bohr).
         """
 
         charges = np.asarray(charges).ravel()
@@ -731,7 +730,8 @@ class RespChargesDriver(EspChargesDriver):
         nuclear_charges = molecule.get_element_ids()
         origin = (np.sum(coords.T * nuclear_charges, axis=1) /
                   np.sum(nuclear_charges))
-        return np.sum((coords - origin).T * charges, axis=1)
+        dipole = np.sum((coords - origin).T * charges, axis=1)
+        return origin, dipole
 
     def show(self,
              molecule,
@@ -756,7 +756,8 @@ class RespChargesDriver(EspChargesDriver):
             The atom-centered RESP charges in atomic units.
         :param dipole_moment:
             The dipole moment vector in atomic units (e·bohr). If None, the
-            dipole moment is computed from the RESP charges.
+            point-charge dipole is computed from the RESP charges at the
+            nuclear charge centroid.
         :param cmap:
             The matplotlib colormap name (default: 'viridis').
         :param charge_max:
@@ -784,9 +785,12 @@ class RespChargesDriver(EspChargesDriver):
 
         charges = np.asarray(charges)
 
-        # Compute dipole moment from charges when not provided
+        # Use one helper so the dipole and its origin stay consistent.
+        origin_bohr, charge_dipole = self._get_origin_and_charge_dipole(
+            molecule, charges)
+
         if dipole_moment is None:
-            dipole_moment = self.get_dipole_moment(molecule, charges)
+            dipole_moment = charge_dipole
         dipole_moment = np.asarray(dipole_moment)
 
         # Colormap centered at zero charge (normalization spans [-charge_max, charge_max])
@@ -846,10 +850,8 @@ class RespChargesDriver(EspChargesDriver):
         # Dipole moment arrow — auto-scaled to fit within molecular bounds.
         # The arrow length is capped at 80% of the molecular radius
         # (max distance from the nuclear charge centroid to any atom).
-        nuclear_charges = molecule.get_element_ids()
         coords_ang = molecule.get_coordinates_in_angstrom()
-        origin = (np.sum(coords_ang.T * nuclear_charges, axis=1) /
-                  np.sum(nuclear_charges))
+        origin = origin_bohr * bohr_in_angstrom()  # Angstrom
 
         mol_radius = float(np.max(np.linalg.norm(coords_ang - origin, axis=1)))
         target_length = 0.8 * mol_radius  # Angstrom

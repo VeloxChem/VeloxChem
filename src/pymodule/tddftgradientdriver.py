@@ -49,6 +49,7 @@ from .tdaeigensolver import TdaEigenSolver
 from .tddftorbitalresponse import TddftOrbitalResponse
 from .gradientdriver import GradientDriver
 from .scfgradientdriver import ScfGradientDriver
+from .oneeints import compute_point_charge_gradient
 from .firstorderprop import FirstOrderProperties
 from .errorhandler import assert_msg_critical
 from .inputparser import parse_input
@@ -330,6 +331,26 @@ class TddftGradientDriver(GradientDriver):
             The results of the RPA or TDA calculation.
         """
 
+        assert_msg_critical(
+            not self._scf_drv._cpcm,
+            f'{type(self).__name__}.compute_analytical: ' +
+            'Analytical TDDFT gradient is not supported with CPCM solvation')
+        assert_msg_critical(
+            not self._scf_drv._gostshyp,
+            f'{type(self).__name__}.compute_analytical: ' +
+            'Analytical TDDFT gradient is not supported with GOSTSHYP ' +
+            '(hydrostatic pressure)')
+        assert_msg_critical(
+            not self._scf_drv._pe,
+            f'{type(self).__name__}.compute_analytical: ' +
+            'Analytical TDDFT gradient is not supported with polarizable ' +
+            'embedding')
+        assert_msg_critical(
+            self._scf_drv.electric_field is None,
+            f'{type(self).__name__}.compute_analytical: ' +
+            'Analytical TDDFT gradient is not supported with a static ' +
+            'electric field')
+
         scf_tensors = self._scf_drv.scf_tensors
         if self._rsp_results is None:
             self._rsp_results = rsp_results
@@ -359,6 +380,7 @@ class TddftGradientDriver(GradientDriver):
             'Ground_state_grad': 0.0,
             'Kinetic_energy_grad': 0.0,
             'Nuclear_potential_grad': 0.0,
+            'Point_charges_grad': 0.0,
             'Overlap_grad': 0.0,
             'Fock_prep': 0.0,
             'Fock_grad': 0.0,
@@ -502,6 +524,30 @@ class TddftGradientDriver(GradientDriver):
             gmats_010 = Matrices()
 
         grad_timing['Nuclear_potential_grad'] += time.time() - t0
+
+        # point-charge contribution to gradient
+
+        t0 = time.time()
+
+        if self._scf_drv.point_charges is not None:
+            npoints = self._scf_drv.point_charges.shape[1]
+
+            mm_coords = []
+            mm_charges = []
+            for p in range(npoints):
+                xyz_p = self._scf_drv.point_charges[:3, p]
+                chg_p = self._scf_drv.point_charges[3, p]
+                mm_coords.append(xyz_p.copy())
+                mm_charges.append(chg_p)
+
+            for s in range(dof):
+                # summation of alpha and beta already included
+                # in relaxed_density_ao
+                self.gradient[s] += compute_point_charge_gradient(
+                    molecule, basis, relaxed_density_ao[s], mm_charges,
+                    mm_coords, local_atoms)
+
+        grad_timing['Point_charges_grad'] += time.time() - t0
 
         # orbital response contribution to gradient
 
@@ -905,45 +951,68 @@ class TddftGradientDriver(GradientDriver):
         """
 
         # numerical dipole moment of the excited states
+        assert_msg_critical(
+            scf_drv.electric_field is None,
+            f'{type(self).__name__}.compute_numerical_dipole: ' +
+            'Numerical dipole is not supported with a static ' +
+            'electric field')
+
+        # disable restarting scf and response
+        scf_drv.restart = False
+        rsp_drv.restart = False
+
         n_states = len(self.state_deriv_index)
         dipole_moment = np.zeros((n_states, 3))
         field = [0.0, 0.0, 0.0]
 
-        for s in range(n_states):
+        try:
+            for s in range(n_states):
 
-            self.ostream.print_info(
-                f'Processing excited state {s + 1}/{n_states}...')
-            if s == n_states - 1:
-                self.ostream.print_blank()
-            self.ostream.flush()
+                self.ostream.print_info(
+                    f'Processing excited state {s + 1}/{n_states}...')
+                if s == n_states - 1:
+                    self.ostream.print_blank()
+                self.ostream.flush()
 
-            scf_drv.ostream.mute()
-            rsp_drv.ostream.mute()
+                scf_drv.ostream.mute()
+                rsp_drv.ostream.mute()
 
-            for i in range(3):
-                field[i] = field_strength
-                scf_drv.electric_field = field
-                scf_drv.compute(molecule, ao_basis)
-                scf_tensors = scf_drv.scf_tensors
-                rsp_drv._is_converged = False  # only needed for RPA
-                rsp_results = rsp_drv.compute(molecule, ao_basis, scf_tensors)
-                exc_en_plus = rsp_results['eigenvalues'][s]
-                e_plus = scf_drv.get_scf_energy() + exc_en_plus
+                for i in range(3):
+                    field[i] = field_strength
+                    scf_drv.electric_field = field
+                    scf_drv.compute(molecule, ao_basis)
+                    scf_tensors = scf_drv.scf_tensors
+                    rsp_results = rsp_drv.compute(molecule, ao_basis,
+                                                  scf_tensors)
+                    exc_en_plus = rsp_results['eigenvalues'][s]
+                    e_plus = scf_drv.get_scf_energy() + exc_en_plus
 
-                field[i] = -field_strength
-                scf_drv.compute(molecule, ao_basis)
-                rsp_drv._is_converged = False
-                rsp_results = rsp_drv.compute(molecule, ao_basis,
-                                              scf_drv.scf_tensors)
-                exc_en_minus = rsp_results['eigenvalues'][s]
-                e_minus = scf_drv.get_scf_energy() + exc_en_minus
+                    field[i] = -field_strength
+                    scf_drv.compute(molecule, ao_basis)
+                    rsp_results = rsp_drv.compute(molecule, ao_basis,
+                                                  scf_drv.scf_tensors)
+                    exc_en_minus = rsp_results['eigenvalues'][s]
+                    e_minus = scf_drv.get_scf_energy() + exc_en_minus
 
-                field[i] = 0.0
-                dipole_moment[s, i] = (-(e_plus - e_minus) /
-                                       (2.0 * field_strength))
+                    field[i] = 0.0
+                    dipole_moment[s, i] = (-(e_plus - e_minus) /
+                                           (2.0 * field_strength))
 
-            scf_drv.ostream.unmute()
-            rsp_drv.ostream.unmute()
+                scf_drv.ostream.unmute()
+                rsp_drv.ostream.unmute()
+        finally:
+            # the scan leaves scf_drv.electric_field set; restore it
+            scf_drv.electric_field = None
+
+        # restore the reference (zero-field) state: the last SCF/response
+        # run in the loop above was at a finite field, so scf_drv and rsp_drv
+        # would otherwise keep finite-field results.
+        scf_drv.ostream.mute()
+        rsp_drv.ostream.mute()
+        scf_drv.compute(molecule, ao_basis)
+        rsp_drv.compute(molecule, ao_basis, scf_drv.scf_tensors)
+        scf_drv.ostream.unmute()
+        rsp_drv.ostream.unmute()
 
         return dipole_moment
 
