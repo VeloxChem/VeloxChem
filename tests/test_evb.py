@@ -249,6 +249,9 @@ class TestEvb:
                 # skip the line with openmm version
                 if 'openmmVersion' in sys_line:
                     continue
+                # OpenMM 8.6 writes the default rigidScaling of the barostat, older versions do not
+                sys_line = sys_line.replace(' rigidScaling="1"', '')
+                ref_line = ref_line.replace(' rigidScaling="1"', '')
 
                 if sys_line.startswith('<A x=') and ref_line.startswith(
                         '<A x=') or sys_line.startswith(
