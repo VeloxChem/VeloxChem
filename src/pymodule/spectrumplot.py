@@ -995,20 +995,91 @@ def plot_tpa_transition_spectrum(rsp_results,
         The matplotlib axis object.
     """
 
+    return _plot_multiphoton_transition_spectrum(
+        rsp_results, spectrum, x_unit, polarization, ax, show_sticks,
+        'tpa_strengths', 'TPA')
+
+
+def plot_threepa_transition_spectrum(rsp_results,
+                                     spectrum,
+                                     x_unit='ev',
+                                     polarization='linear',
+                                     ax=None,
+                                     show_sticks=True):
+    """
+    Plot the 3PA transition spectrum from broadened cross sections.
+
+    :param rsp_results:
+        The dictionary containing the 3PA transition results.
+    :param spectrum:
+        The precomputed broadened spectrum dictionary from
+        ``ThreePATransitionDriver.get_spectrum``.
+    :param x_unit:
+        The unit of x-axis. Either 'au', 'ev', or 'nm'.
+    :param polarization:
+        Polarization channel for stick strengths. Either 'linear' or
+        'circular'. The broadened curve is supplied in ``spectrum``.
+    :param ax:
+        The matplotlib axis to plot on.
+    :param show_sticks:
+        If True, overlay 3PA strengths in atomic units on a secondary axis.
+
+    :return:
+        The matplotlib axis object.
+    """
+
+    return _plot_multiphoton_transition_spectrum(
+        rsp_results, spectrum, x_unit, polarization, ax, show_sticks,
+        '3pa_strengths', '3PA')
+
+
+def _plot_multiphoton_transition_spectrum(rsp_results, spectrum, x_unit,
+                                         polarization, ax, show_sticks,
+                                         strength_key, label):
+    """
+    Plot a multiphoton transition spectrum and optional strength sticks.
+
+    :param rsp_results:
+        The dictionary containing the multiphoton transition results.
+    :param spectrum:
+        The precomputed broadened spectrum dictionary containing x and y
+        values and axis labels.
+    :param x_unit:
+        The unit of x-axis. Either 'au', 'ev', or 'nm'.
+    :param polarization:
+        Polarization channel for stick strengths. Either 'linear' or
+        'circular'.
+    :param ax:
+        The matplotlib axis to plot on.
+    :param show_sticks:
+        If True, overlay strengths in atomic units on a secondary axis.
+    :param strength_key:
+        The result dictionary key containing polarization-resolved
+        strengths, either 'tpa_strengths' or '3pa_strengths'. Strength
+        channels can be indexed sequences or dictionaries keyed by
+        negative photon energies in atomic units.
+    :param label:
+        The process name used in the title, strength-axis label, and
+        legend, for example 'TPA' or '3PA'.
+
+    :return:
+        The matplotlib axis object.
+    """
+
     assert_msg_critical('matplotlib' in sys.modules, 'matplotlib is required.')
 
     assert_msg_critical(
         x_unit.lower() in ['au', 'ev', 'nm'],
-        'plot_tpa_transition_spectrum: x_unit should be au, ev or nm')
+        f'{label} transition spectrum: x_unit should be au, ev or nm')
 
     assert_msg_critical(
         polarization.lower() in ['linear', 'circular'],
-        'plot_tpa_transition_spectrum: polarization should be linear or circular')
+        f'{label} transition spectrum: polarization should be linear or circular')
 
     if ax is None:
         fig, ax = plt.subplots(figsize=(8, 5))
 
-    ax.set_title('TPA Transition Spectrum')
+    ax.set_title(f'{label} Transition Spectrum')
     ax.set_xlabel(spectrum['x_label'])
     ax.set_ylabel(spectrum['y_label'])
 
@@ -1027,10 +1098,11 @@ def plot_tpa_transition_spectrum(rsp_results,
         else:
             stick_x = photon_energies
 
-        strengths = [
-            rsp_results['tpa_strengths'][polarization.lower()][idx]
-            for idx in range(len(photon_energies))
-        ]
+        channel = rsp_results[strength_key][polarization.lower()]
+        if isinstance(channel, dict):
+            strengths = [channel[-float(e)] for e in photon_energies]
+        else:
+            strengths = [channel[idx] for idx in range(len(photon_energies))]
 
         ax2 = ax.twinx()
         if len(stick_x) > 1:
@@ -1045,7 +1117,7 @@ def plot_tpa_transition_spectrum(rsp_results,
                 width=width,
                 alpha=0.45,
                 color='darkcyan')
-        ax2.set_ylabel(f'TPA strengths ({polarization.lower()}) [a.u.]')
+        ax2.set_ylabel(f'{label} strengths ({polarization.lower()}) [a.u.]')
         ax2.set_ylim(0, max(strengths) * 1.1 if strengths else 1.0)
         ax2.set_ylim(bottom=0)
 
@@ -1053,12 +1125,12 @@ def plot_tpa_transition_spectrum(rsp_results,
                                     color='darkcyan',
                                     alpha=0.7,
                                     linewidth=2,
-                                    label=f'{polarization.capitalize()} TPA strength')
+                                    label=f'{polarization.capitalize()} {label} strength')
         legend_spectrum = mlines.Line2D([], [],
                                         color='black',
                                         linestyle='-',
                                         linewidth=2.5,
-                                        label='Broadened TPA cross-section')
+                                        label=f'Broadened {label} cross-section')
         ax2.legend(handles=[legend_bars, legend_spectrum],
                    frameon=False,
                    borderaxespad=0.,

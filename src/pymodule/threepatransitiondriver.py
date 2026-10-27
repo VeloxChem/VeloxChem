@@ -38,7 +38,8 @@ import sys
 
 
 from .oneeints import compute_electric_dipole_integrals
-from .veloxchemlib import (mpi_master, bohr_in_angstrom, hartree_in_ev,
+from .veloxchemlib import (mpi_master, bohr_in_angstrom,
+                           hartree_in_ev, hartree_in_inverse_nm,
                            fine_structure_constant, speed_of_light_in_vacuum_in_SI)
 from .profiler import Profiler
 from .outputstream import OutputStream
@@ -53,7 +54,8 @@ from .checkpoint import (check_distributed_focks, read_distributed_focks,
                          write_distributed_focks)
 from .lreigensolver import LinearResponseEigenSolver
 from .firstorderprop import FirstOrderProperties
-
+from .errorhandler import assert_msg_critical
+from .spectrumplot import plot_threepa_transition_spectrum
 
 class ThreePATransitionDriver(NonlinearSolver):
     """
@@ -495,19 +497,8 @@ class ThreePATransitionDriver(NonlinearSolver):
         self.ostream.print_header('=' * (len(w_str) + 2))
         self.ostream.print_blank()
 
-        # conversion factor for 3PA cross-sections in GM
-        # a0 in cm, c in cm/s, gamma (0.1 eV) in au
-        alpha = fine_structure_constant()
-        a0 = bohr_in_angstrom() * 1.0e-8
-        c = speed_of_light_in_vacuum_in_SI() * 100.0
-        gamma = 0.1 / hartree_in_ev()
-        # TODO: double check au2gm for 3PA
-        au2gm = (4.0 * np.pi**3 * alpha * a0**8) / (3.0 * c**2 * gamma) * 1.0e+50
-
         if self.rank == mpi_master():
             tpa_strengths = {'linear': {}, 'circular': {}}
-            tpa_cross_sections = {'linear': {}, 'circular': {}}
-
             for w in freqs:
                 Df = 0.0
                 Dg = 0.0
@@ -529,11 +520,6 @@ class ThreePATransitionDriver(NonlinearSolver):
                 tpa_strengths['linear'][w] = D_linear
                 tpa_strengths['circular'][w] = D_circular
 
-                # TODO: double check 3PA cross-sections
-
-                tpa_cross_sections['linear'][w] = au2gm * w**3 * D_linear
-                tpa_cross_sections['circular'][w] = au2gm * w**3 * D_circular
-
             profiler.check_memory_usage('End of 3PA')
 
             # a_target, b_target, c_target = 'z', 'z', 'y'
@@ -547,7 +533,6 @@ class ThreePATransitionDriver(NonlinearSolver):
             ret_dict = {
                 'photon_energies': [float(-w) for w in freqs],
                 'transition_moments': T_tensors,
-                # 'cross_sections': tpa_cross_sections,
                 '3pa_strengths': tpa_strengths,
                 'ground_state_dipole_moments':scf_prop.get_property('dipole moment')
             }
@@ -1749,6 +1734,195 @@ class ThreePATransitionDriver(NonlinearSolver):
             'z', value[2][0].real, value[2][1].real, value[2][2].real)
         self.ostream.print_header(w_str.ljust(width))
 
+    def plot_spectrum(self,
+                      rsp_results,
+                      x_data=None,
+                      x_unit='eV',
+                      broadening_value=0.123984,
+                      broadening_unit='eV',
+                      polarization='linear',
+                      ax=None,
+                      show_sticks=True):
+        """
+        Plot the 3PA transition spectrum on the master MPI rank.
+
+        Cross sections are rported in units of
+        10^-80 cm^6 s^2 photon^-2. Stick strengths are in atomic units.
+
+        :param rsp_results:
+            A dictionary containing the results of the 3PA transition calculation.
+        :param x_data:
+            Optional incident photon-energy or wavelength grid. If None,
+            a default grid is constructed.
+        :param x_unit:
+           The unit of the x-axis data. Either 'au', 'ev' or 'nm'.
+        :param broadening_value:
+            The half-width at half-maximum in total excitation energy
+        :param broadening_unit:
+            The unit of the broadening parameter. Either 'au' or 'ev'.
+        :param polarization:
+            Polarization channel for the cross sections and stick strengths.
+            Either 'linear' or 'circular'.
+        :param ax:
+            The matplotlib axis to plot on. If None, a new figure is created.
+        :param show_sticks:
+            If True, overlay 3PA strengths in atomic units on a secondary axis.
+
+        :return:
+            The matplotlib axis object.
+        """
+
+        if self.rank != mpi_master():
+            return None
+
+        assert_msg_critical(
+            x_unit.lower() in ['au', 'ev', 'nm'],
+            'ThreePATransitionDriver.plot_spectrum: x_unit should be au, ev, or nm')
+        assert_msg_critical(
+            broadening_unit.lower() in ['au', 'ev'],
+            'ThreePATransitionDriver.plot_spectrum: broadening_unit should be au or ev')
+        assert_msg_critical(
+            np.isfinite(broadening_value) and broadening_value > 0.0,
+            'ThreePATransitionDriver.plot_spectrum: broadening_value should be a positive finite number')
+
+        if x_data is None:
+            energies = np.asarray(rsp_results['photon_energies'], dtype=float)
+            assert_msg_critical(
+                energies.ndim == 1 and energies.size > 0
+                and np.all(np.isfinite(energies)) and np.all(energies > 0.0),
+                'ThreePATransitionDriver.plot_spectrum: photon energies must be positive and finite')
+
+            gamma = (broadening_value if broadening_unit.lower() == 'au'
+                     else broadening_value / hartree_in_ev())
+            # A total-energy HWHM gamma corresponds to photon-energy gamma/3.
+            margin = 5.0 * gamma / 3.0
+            xmin = max(0.01 * float(np.min(energies)),
+                       float(np.min(energies)) - margin)
+            xmax = float(np.max(energies)) + margin
+            x_data = np.linspace(xmin, xmax, 1000)
+
+            if x_unit.lower() == 'ev':
+                x_data = x_data * hartree_in_ev()
+            elif x_unit.lower() == 'nm':
+                x_data = 1.0 / (hartree_in_inverse_nm() * x_data[::-1])
+
+        spectrum = self.get_spectrum(rsp_results, x_data, x_unit,
+                                     broadening_value, broadening_unit,
+                                     polarization)
+        plotted_ax = plot_threepa_transition_spectrum(
+            rsp_results, spectrum, x_unit=x_unit, polarization=polarization,
+            ax=ax, show_sticks=show_sticks)
+
+        return plotted_ax if ax is not None else None
+
+    @staticmethod
+    def get_spectrum(rsp_results,
+                     x_data,
+                     x_unit,
+                     b_value,
+                     b_unit,
+                     polarization='linear'):
+        """
+        Gets the Lorentzian-broadened three-photon absorption spectrum.
+
+        The spectrum uses the single beam convention and a
+        Lorentzian line shape normalized in total excitation energy.
+
+        :param rsp_results:
+            A dictionary containing the results of the 3PA transition
+            calculation. The results must be available on the calling rank.
+        :param x_data:
+            The list or array of incident photon energies or wavelengths.
+        :param x_unit:
+            The unit of x values. Either 'au', 'ev', or 'nm'.
+        :param b_value:
+            The half-width at half-maximum in total excitation energy.
+        :param b_unit:
+            The unit of the broadening parameter. Either 'au' or 'ev'.
+        :param polarization:
+            Polarization channel for the 3PA strengths. Either 'linear' or
+            'circular'.
+
+        :return:
+            A dictionary containing ``x_data``, ``y_data``, ``x_label``, and
+            ``y_label``. The x and y values are returned as lists. Each y value
+            is the numerical cross section in units of
+            10^-80 cm^6 s^2 photon^-2; multiplying it by 10^-80 gives the
+            physical cross section in cm^6 s^2 photon^-2.
+        """
+
+        x_unit = x_unit.lower()
+        b_unit = b_unit.lower()
+        polarization = polarization.lower()
+        assert_msg_critical(
+            x_unit in ['au', 'ev', 'nm'],
+            'ThreePATransitionDriver.get_spectrum: x_unit should be au, ev or nm')
+        assert_msg_critical(
+            b_unit in ['au', 'ev'],
+            'ThreePATransitionDriver.get_spectrum: broadening unit should be au or ev')
+        assert_msg_critical(
+            polarization in ['linear', 'circular'],
+            'ThreePATransitionDriver.get_spectrum: polarization should be linear or circular')
+        assert_msg_critical(
+            np.isfinite(b_value) and b_value > 0.0,
+            'ThreePATransitionDriver.get_spectrum: broadening must be positive and finite')
+
+        x_data = np.asarray(x_data, dtype=float)
+        assert_msg_critical(
+            x_data.ndim == 1 and np.all(np.isfinite(x_data)),
+            'ThreePATransitionDriver.get_spectrum: x_data must be a finite one-dimensional grid')
+        assert_msg_critical(
+            np.all(x_data > 0.0) if x_unit == 'nm' else np.all(x_data >= 0.0),
+            'ThreePATransitionDriver.get_spectrum: wavelengths must be positive and photon energies non-negative')
+
+        energies = np.asarray(rsp_results['photon_energies'], dtype=float)
+        assert_msg_critical(
+            energies.ndim == 1 and energies.size > 0
+            and np.all(np.isfinite(energies)) and np.all(energies > 0.0),
+            'ThreePATransitionDriver.get_spectrum: photon energies must be positive and finite')
+        channel = rsp_results['3pa_strengths'][polarization]
+        # Strengths use the original negative frequencies, without rounding.
+        strengths = np.asarray([channel[-float(e)] for e in energies], dtype=float)
+        assert_msg_critical(
+            np.all(np.isfinite(strengths)),
+            'ThreePATransitionDriver.get_spectrum: strengths must be finite')
+
+        if x_unit == 'au':
+            x_au = x_data
+            x_label = 'Photon energy [a.u.]'
+        elif x_unit == 'ev':
+            x_au = x_data / hartree_in_ev()
+            x_label = 'Photon energy [eV]'
+        else:
+            x_au = 1.0 / (hartree_in_inverse_nm() * x_data)
+            x_label = 'Wavelength [nm]'
+
+        gamma = b_value if b_unit == 'au' else b_value / hartree_in_ev()
+        alpha = fine_structure_constant()
+        a0_in_cm = bohr_in_angstrom() * 1.0e-8
+        c_in_cm_per_s = speed_of_light_in_vacuum_in_SI() * 100.0
+        # The molecular inputs are numerical atomic-unit values.
+        # Unit conversion: alpha**3 * a0**6 * t0**2 = alpha * a0**8 / c**2.
+        # Reporting unit: 10^-80 cm^6 s^2 photon^-2.
+        prefactor = (4.0 * np.pi**4 * alpha * a0_in_cm**8
+                     / (3.0 * c_in_cm_per_s**2) * 1.0e80)
+
+        y_data = np.zeros_like(x_au)
+        for energy, strength in zip(energies, strengths):
+            # Normalized in total excitation energy, with HWHM gamma.
+            line_shape = gamma / (np.pi *
+                ((3.0 * energy - 3.0 * x_au)**2 + gamma**2))
+            y_data += prefactor * x_au**3 * strength * line_shape
+
+        return {
+            'x_data': x_data.tolist(),
+            'y_data': y_data.tolist(),
+            'x_label': x_label,
+            'y_label': (r'3PA cross-section [$10^{-80}$ cm$^6$ s$^2$ '
+                        r'photon$^{-2}$]'),
+        }
+
+
     def _print_results(self, rsp_results):
         """
         Prints the results of 3PA calculation for a rank-3 tensor in three separate tables.
@@ -1800,12 +1974,10 @@ class ThreePATransitionDriver(NonlinearSolver):
                 self.ostream.print_header(' '.join(row_values))  # Print row data
 
         tpa_strengths = rsp_results['3pa_strengths']
-        # tpa_cross_sections = rsp_results['cross_sections']
 
         self.ostream.print_blank()
         self.ostream.print_blank()
 
-        # title = '3PA Strength and Cross-Section (Linear Polarization)'
         title = '3PA Strength (Linear Polarization)'
         self.ostream.print_header(title)
         self.ostream.print_header('-' * width)
@@ -1819,13 +1991,11 @@ class ThreePATransitionDriver(NonlinearSolver):
             exec_str = '  {:<4d}'.format(w_ind + 1)
             exec_str += '{:15.6f} eV'.format(3 * w * hartree_in_ev())
             exec_str += '{:20.6f} a.u.'.format(tpa_strengths['linear'][-w])
-            # exec_str += '{:20.6f} GM'.format(tpa_cross_sections['linear'][-w])
             self.ostream.print_header(exec_str)
 
         self.ostream.print_blank()
         self.ostream.print_blank()
 
-        # title = '3PA Strength and Cross-Section (Circular Polarization)'
         title = '3PA Strength (Circular Polarization)'
         self.ostream.print_header(title)
         self.ostream.print_header('-' * width)
@@ -1839,7 +2009,6 @@ class ThreePATransitionDriver(NonlinearSolver):
             exec_str = '  {:<4d}'.format(w_ind + 1)
             exec_str += '{:15.6f} eV'.format(3 * w * hartree_in_ev())
             exec_str += '{:20.6f} a.u.'.format(tpa_strengths['circular'][-w])
-            # exec_str += '{:20.6f} GM'.format(tpa_cross_sections['circular'][-w])
             self.ostream.print_header(exec_str)
         self.ostream.print_blank()
 
