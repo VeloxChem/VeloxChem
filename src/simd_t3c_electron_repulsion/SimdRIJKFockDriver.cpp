@@ -42,6 +42,10 @@
 #include <stdexcept>
 #include <string>
 
+#ifdef __GLIBC__
+#include <malloc.h>
+#endif
+
 #include "DenseIndexFunc.hpp"
 #include "ErrorHandler.hpp"
 #include "PackedLinearAlgebra.hpp"
@@ -199,6 +203,55 @@ CSimdRIJKFockDriver::required_memory(const CMolecule        &molecule,
     // memory this driver will actually hold.
 
     return (range_separated ? 2 : 1) * simdri::pattern_memory(molecule, basis, aux_basis, threshold, aux_atoms);
+}
+
+auto
+CSimdRIJKFockDriver::peak_memory(const CMolecule        &molecule,
+                                 const CMolecularBasis  &basis,
+                                 const CMolecularBasis  &aux_basis,
+                                 const double            threshold,
+                                 const std::vector<int> &aux_atoms,
+                                 const bool              range_separated,
+                                 const size_t            memory_budget,
+                                 const size_t            norbitals) const -> size_t
+{
+    const size_t nops = range_separated ? 2 : 1;
+
+    const auto nao = basis.dimensions_of_basis();
+
+    const auto naux = aux_basis.dimensions_of_basis();
+
+    const auto bq = _drv.bq_vectors_memory(molecule, basis, aux_basis, threshold, aux_atoms, nops);
+
+    // NOTE: the inverted metrics are packed triangles. While the B vectors are
+    // formed, the caller's metrics and the copies the driver keeps are both alive.
+
+    const auto metric = nops * naux * (naux + 1) / 2 * sizeof(double);
+
+    const auto forming = bq.held + bq.pattern + bq.forming + 2 * metric;
+
+    // NOTE: the range of the W matrices is taken as a build takes it, and the
+    // exchange of an open shell is bounded by the orbitals of both spins rather than
+    // by those of the larger one.
+
+    const auto nheld = simdri::aux_functions_of(aux_basis, aux_atoms).size();
+
+    const auto nbatch = _w_range(nheld, nao * norbitals * sizeof(double), memory_budget);
+
+    const auto w_vectors = nbatch * nao * norbitals * sizeof(double);
+
+    // NOTE: the last range of a build is shorter than the others, and its W
+    // matrices are copied out of the storage to be handed over as a range of their
+    // own, so they are held twice while it is formed.
+
+    const auto tail = (nheld % nbatch) * nao * norbitals * sizeof(double);
+
+    const auto build = bq.held + bq.pattern + metric + w_vectors + tail + bq.index +
+                       _drv.build_memory(nao, naux, norbitals, nbatch);
+
+    const auto peak = std::max(forming, build);
+
+    return peak + peak / _peak_margin_divisor;
 }
 
 
@@ -523,6 +576,16 @@ CSimdRIJKFockDriver::prepare(const CMolecule       &molecule,
 
     _drv.release_squares();
 
+    // NOTE: forming the B vectors frees a batch of integrals and the buffers of
+    // every thread, in blocks small enough that the allocator keeps them rather
+    // than handing them back. Kept, they stayed resident under the W matrices of
+    // the first build, a sizeable part of the integrals of a batch, and the peak
+    // was no longer what peak_memory answers. They are returned here.
+
+#ifdef __GLIBC__
+    malloc_trim(0);
+#endif
+
     _prepared = true;
 
     profile.total = prof_since(profile_start);
@@ -635,18 +698,9 @@ CSimdRIJKFockDriver::compute(const CPackedMatrix &density,
 
     const auto per_function = nao * norbitals * sizeof(double);
 
-    // NOTE: the bound is the smaller of the constant and a share of the budget of
-    // this driver, which is the share of a rank of whatever machine it is on. The
-    // constant alone is a bound on a process, and a node given to several of them
-    // would be promised its memory several times over.
-
-    const auto allowance = std::min(_w_batch_memory, std::max(_budget / _w_batch_divisor, size_t{1}));
-
-    const auto by_memory = std::max(size_t{1}, allowance / std::max(per_function, size_t{1}));
-
     const auto nheld = _aux_functions.size();
 
-    const auto nbatch = std::min(nheld, std::max(_w_batch, by_memory));
+    const auto nbatch = _w_range(nheld, per_function, _budget);
 
     const auto mark_allocate = prof_clock::now();
 
@@ -822,13 +876,9 @@ CSimdRIJKFockDriver::compute(const CPackedMatrix &density,
 
     const auto per_function = nao * (norb_alpha + norb_beta) * sizeof(double);
 
-    const auto allowance = std::min(_w_batch_memory, std::max(_budget / _w_batch_divisor, size_t{1}));
-
-    const auto by_memory = std::max(size_t{1}, allowance / std::max(per_function, size_t{1}));
-
     const auto nheld = _aux_functions.size();
 
-    const auto nbatch = std::min(nheld, std::max(_w_batch, by_memory));
+    const auto nbatch = _w_range(nheld, per_function, _budget);
 
     const auto mark_allocate = prof_clock::now();
 
@@ -1444,4 +1494,19 @@ CSimdRIJKFockDriver::_apply_metric(double *values, const size_t nrows, const siz
     // asks for the solve against its transpose rather than against it.
 
     tdenblas::threadedSolveTriangular(nrows, ncols, dense.data(), nrows, values, ncols, transposed);
+}
+
+auto
+CSimdRIJKFockDriver::_w_range(const size_t nheld, const size_t per_function, const size_t budget) -> size_t
+{
+    // NOTE: the bound is the smaller of the constant and a share of the budget of
+    // this driver, which is the share of a rank of whatever machine it is on. The
+    // constant alone is a bound on a process, and a node given to several of them
+    // would be promised its memory several times over.
+
+    const auto allowance = std::min(_w_batch_memory, std::max(budget / _w_batch_divisor, size_t{1}));
+
+    const auto by_memory = std::max(size_t{1}, allowance / std::max(per_function, size_t{1}));
+
+    return std::min(nheld, std::max(_w_batch, by_memory));
 }

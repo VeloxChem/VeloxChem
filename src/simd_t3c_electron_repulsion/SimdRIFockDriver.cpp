@@ -2243,28 +2243,18 @@ CSimdRIFockDriver::compute_exchange_matrix(const std::vector<CPackedMatrix> &w_v
     // every function. The chunk is chosen from what a thread may stage, and the
     // number of triangles from what they may hold together.
 
-    const auto row_bytes = nocc * nao * sizeof(double);
-
-    const auto nthreads = static_cast<size_t>(omp::get_number_of_threads());
-
     // NOTE: the chunk is the smaller of what a thread may stage and what leaves a
     // chunk for every thread. Taking the staging alone would give a caller with few
     // W matrices, as the way which holds the B vectors has, fewer chunks than
     // threads and leave most of them with nothing to do.
 
-    const auto staged_limit = std::max(size_t{1}, _syrk_staging / std::max(row_bytes, size_t{1}));
+    const auto shape = _exchange_shape(nao, nocc, w_vectors.size());
 
-    const auto shared_limit = std::max(size_t{1}, (w_vectors.size() + nthreads - 1) / nthreads);
+    const auto nchunk = shape.first;
 
-    const auto nchunk = std::max(size_t{1}, std::min({w_vectors.size(), staged_limit, shared_limit}));
+    const auto ntriangles = shape.second;
 
     const auto nchunks = (w_vectors.size() + nchunk - 1) / nchunk;
-
-    const auto square_bytes = nao * nao * sizeof(double);
-
-    const auto ntriangles =
-        std::max(size_t{1},
-                 std::min({nthreads, nchunks, _syrk_triangles / std::max(square_bytes, size_t{1})}));
 
     std::vector<std::vector<double>> triangles(ntriangles);
 
@@ -2381,4 +2371,204 @@ auto
 CSimdRIFockDriver::get_dense_threshold() const -> double
 {
     return _dense_threshold;
+}
+
+auto
+CSimdRIFockDriver::bq_vectors_memory(const CMolecule        &molecule,
+                                     const CMolecularBasis  &basis,
+                                     const CMolecularBasis  &aux_basis,
+                                     const double            threshold,
+                                     const std::vector<int> &aux_atoms,
+                                     const size_t            nops) const -> CBqMemory
+{
+    // NOTE: the blocks are those _compute_bq_vectors describes, of the default size
+    // and not of the size the integral driver chooses for itself, as the values of a
+    // block run to its last surviving atom pair and the two sizes do not hold the
+    // same number of them.
+
+    auto groups = basis.basis_pair_groups();
+
+    const auto ab_blocks = sparsity::make_triple_blocks(molecule, groups, 0);
+
+    std::vector<int> all_atoms(static_cast<size_t>(molecule.number_of_atoms()));
+
+    std::iota(all_atoms.begin(), all_atoms.end(), 0);
+
+    const auto in_groups = sparsity::select_aux_groups(molecule, aux_basis, all_atoms);
+
+    const auto out_groups = sparsity::select_aux_groups(molecule, aux_basis, aux_atoms.empty() ? all_atoms : aux_atoms);
+
+    const auto aux_indices = denseidx::index_functions(aux_basis);
+
+    size_t nrows = 0, ncols = 0;
+
+    _make_aux_functions(out_groups, aux_indices, nrows);
+
+    _make_aux_functions(in_groups, aux_indices, ncols);
+
+    const auto &bound = screenfunc::three_center_electron_repulsion_bound;
+
+    const auto nab = ab_blocks.size();
+
+    CBqMemory memory;
+
+    // the B vectors, and the entries of the index of the half transformation, which
+    // is one entry for every auxiliary function of every block
+
+    size_t nentries = 0;
+
+    auto hold = [&](const CAtomBasisTripleSparsity &block) {
+        memory.held += nops * block.number_of_elements() * sizeof(double);
+
+        if (block.a_atoms().empty()) return;
+
+        for (const auto [lc, kc] : aux_indices[static_cast<size_t>(block.c_index())])
+        {
+            nentries += static_cast<size_t>(2 * lc + 1) * block.c_atoms().size();
+        }
+    };
+
+    // the integrals of every block of atom pairs, which the batches are cut from.
+    // A driver which holds every atom holds the blocks of the integrals, which are
+    // counted in the same pass rather than described a second time.
+
+    std::vector<CAtomBasisTripleSparsity> in_blocks;
+
+    std::vector<size_t> in_elements(nab, 0);
+
+    for (size_t i = 0; i < nab; i++)
+    {
+        for (const auto &group : in_groups)
+        {
+            auto block = CAtomBasisTripleSparsity(ab_blocks[i], group, bound, threshold);
+
+            if (block.number_of_pairs() == 0) continue;
+
+            if (aux_atoms.empty()) hold(block);
+
+            in_elements[i] += block.number_of_elements();
+
+            in_blocks.push_back(std::move(block));
+        }
+    }
+
+    if (!aux_atoms.empty())
+    {
+        for (size_t i = 0; i < nab; i++)
+        {
+            for (const auto &group : out_groups)
+            {
+                const auto block = CAtomBasisTripleSparsity(ab_blocks[i], group, bound, threshold);
+
+                if (block.number_of_pairs() > 0) hold(block);
+            }
+        }
+    }
+
+    // NOTE: the entries of a function are pushed one at a time, so the vector which
+    // holds them may have reached twice what it holds.
+
+    memory.index = 2 * nentries * sizeof(TAuxEntry);
+
+    // NOTE: the largest batch, cut as _compute_bq_vectors cuts them: blocks are
+    // added while the batch stays within the budget, and a block over the budget on
+    // its own is a batch of one.
+
+    size_t nbatch = 0;
+
+    for (size_t first = 0; first < nab;)
+    {
+        auto last = first;
+
+        size_t batch = 0;
+
+        while ((last < nab) && ((last == first) || ((batch + in_elements[last]) * sizeof(double) <= _batch_budget)))
+        {
+            batch += in_elements[last];
+
+            last++;
+        }
+
+        nbatch = std::max(nbatch, batch);
+
+        first = last;
+    }
+
+    // NOTE: every thread holds the arena of the integral driver while a batch is
+    // formed, and the gathered integrals and their product with the metric while it
+    // is contracted. The two are not held at once, but they are added rather than
+    // the larger taken: the arena is freed into the allocator of its thread, which
+    // keeps it, and the buffers of the contraction are not carved out of it, so the
+    // larger alone would fall short of the resident peak.
+
+    const auto nthreads = static_cast<size_t>(omp::get_number_of_threads());
+
+    const auto in_pattern = CTripleSparsityPattern(std::move(in_blocks), mat_t::symmetric, threshold);
+
+    const auto arena = (nops == 1)
+                           ? CSimdThreeCenterElectronRepulsionDriver::arena_memory(in_pattern, basis, aux_basis)
+                           : CSimdThreeCenterElectronRepulsionRsDriver::arena_memory(in_pattern, basis, aux_basis);
+
+    const auto per_column = nops * (nrows + ncols) * sizeof(double);
+
+    const auto nchunk = std::max(size_t{1}, _bq_columns / std::max(per_column, size_t{1}));
+
+    const auto metric = nops * nrows * ncols * sizeof(double);
+
+    memory.forming =
+        metric + nops * nbatch * sizeof(double) + nthreads * (arena + nchunk * per_column + _thread_allowance);
+
+    memory.pattern = memory.held / _pattern_divisor;
+
+    return memory;
+}
+
+auto
+CSimdRIFockDriver::build_memory(const size_t nao, const size_t naux, const size_t norbitals, const size_t nfunctions)
+    const -> size_t
+{
+    const auto nthreads = static_cast<size_t>(omp::get_number_of_threads());
+
+    const auto square = nao * nao * sizeof(double);
+
+    // NOTE: the squares of the half transformation are kept between calls, and the
+    // buffers of the Coulomb matrix are one row of the auxiliary basis a thread.
+
+    const auto squares = nthreads * square;
+
+    const auto coulomb = (nthreads + 1) * naux * sizeof(double);
+
+    const auto [nchunk, ntriangles] = _exchange_shape(nao, norbitals, nfunctions);
+
+    const auto exchange = ntriangles * (square + nchunk * norbitals * nao * sizeof(double));
+
+    // the Fock matrix of a build and the copy the caller expands it into
+
+    const auto fock = 2 * square;
+
+    return squares + coulomb + exchange + fock + nthreads * _thread_allowance;
+}
+
+auto
+CSimdRIFockDriver::_exchange_shape(const size_t nao, const size_t nocc, const size_t nfunctions) const
+    -> std::pair<size_t, size_t>
+{
+    const auto row_bytes = nocc * nao * sizeof(double);
+
+    const auto nthreads = static_cast<size_t>(omp::get_number_of_threads());
+
+    const auto staged_limit = std::max(size_t{1}, _syrk_staging / std::max(row_bytes, size_t{1}));
+
+    const auto shared_limit = std::max(size_t{1}, (nfunctions + nthreads - 1) / nthreads);
+
+    const auto nchunk = std::max(size_t{1}, std::min({nfunctions, staged_limit, shared_limit}));
+
+    const auto nchunks = (nfunctions + nchunk - 1) / nchunk;
+
+    const auto square_bytes = nao * nao * sizeof(double);
+
+    const auto ntriangles =
+        std::max(size_t{1}, std::min({nthreads, nchunks, _syrk_triangles / std::max(square_bytes, size_t{1})}));
+
+    return {nchunk, ntriangles};
 }

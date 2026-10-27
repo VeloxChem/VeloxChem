@@ -110,8 +110,8 @@ class CSimdRIJKFockDriver
     /// @note The sparsity pattern of the B vectors is described to answer this,
     /// which is what the driver would do anyway and is a small part of forming
     /// them, so the answer is the memory they will take rather than an estimate of
-    /// it. The W matrices are not counted, as one range of them is held at a time
-    /// and is small beside the B vectors.
+    /// it. It is the B vectors alone, which is what the choice of the way is taken
+    /// from; peak_memory below is the most the way which holds them reaches.
     /// @param range_separated True for a hybrid range separated functional, whose
     /// build holds a second set of B vectors of the attenuated operator. The two
     /// sets are on one sparsity pattern, so the memory is twice the one set.
@@ -121,6 +121,40 @@ class CSimdRIJKFockDriver
                          const double            threshold,
                          const std::vector<int> &aux_atoms       = {},
                          const bool              range_separated = false) const -> size_t;
+
+    /// @brief Gets the most memory the way which holds the B vectors reaches.
+    /// @param molecule The molecule to compute the Fock matrices of.
+    /// @param basis The molecular basis.
+    /// @param aux_basis The auxiliary molecular basis.
+    /// @param threshold The screening threshold.
+    /// @param aux_atoms The atoms of the auxiliary basis this driver holds, as for
+    /// required_memory.
+    /// @param range_separated True for a hybrid range separated functional.
+    /// @param memory_budget The budget the driver will be prepared with, which sets
+    /// the range of the W matrices.
+    /// @param norbitals The most orbitals the exchange of a build is formed from,
+    /// of both spins together for an open shell.
+    /// @return The memory in bytes, for the number of threads of the caller.
+    /// @note It is the larger of two peaks. Forming the B vectors holds them beside
+    /// the integrals of a batch, the permuted metrics and the buffers of the
+    /// threads; a Fock build holds them beside the W matrices of a range, the copy
+    /// of the last and shorter range, the index of the half transformation, and the
+    /// squares, triangles and staging of the threads. The W matrices of a range are as many as the budget allows, which
+    /// is the whole auxiliary basis for a calculation with memory to spare, so they
+    /// can be a large part of the peak and are not a small addition to it.
+    /// @note A margin of a tenth is added to what is counted, so that the answer is
+    /// above the peak and a calculation it says fits does not run out of memory.
+    /// @note The memory is that of the driver alone, and not of the process: what a
+    /// calculation holds outside it, such as the grid of the exchange-correlation
+    /// functional, is not counted.
+    auto peak_memory(const CMolecule        &molecule,
+                     const CMolecularBasis  &basis,
+                     const CMolecularBasis  &aux_basis,
+                     const double            threshold,
+                     const std::vector<int> &aux_atoms,
+                     const bool              range_separated,
+                     const size_t            memory_budget,
+                     const size_t            norbitals) const -> size_t;
 
     /// @brief Forms the metric a way of building asks for, and the way it is for.
     /// @param molecule The molecule to compute the metric of.
@@ -517,6 +551,13 @@ class CSimdRIJKFockDriver
                      const CTripleSparsityPattern &pattern,
                      const size_t                  min_parts) const -> std::vector<CTripleSparsityPattern>;
 
+    /// @brief Gets the auxiliary functions of a range of the W matrices.
+    /// @param nheld The auxiliary functions this driver holds.
+    /// @param per_function The memory of the W matrices of one auxiliary function.
+    /// @param budget The memory budget of the driver.
+    /// @return The number of auxiliary functions of a range.
+    static auto _w_range(const size_t nheld, const size_t per_function, const size_t budget) -> size_t;
+
     /// @brief The fewest auxiliary functions a range of the W matrices holds.
     /// @note The range is what the transformation divides over the threads, and a
     /// range fixed at sixty four -- four times the sixteen cores it was chosen on --
@@ -556,6 +597,14 @@ class CSimdRIJKFockDriver
     /// where the constant above does not. A quarter leaves the B vectors, which the
     /// budget was measured against, the room they were given.
     static constexpr size_t _w_batch_divisor = 4;
+
+    /// @brief The margin peak_memory adds to the memory it counts, as the divisor
+    /// of it.
+    /// @note What is counted follows the allocations of the driver, but the
+    /// allocator and the libraries it calls hold some memory beside them which is
+    /// allowed for rather than counted. A tenth keeps the answer above the peak
+    /// with room to spare, at the cost of a slightly pessimistic answer.
+    static constexpr size_t _peak_margin_divisor = 10;
 
     /// @brief The memory the direct mode is allowed to reach, taken from the budget
     /// the driver was prepared with.

@@ -2028,9 +2028,40 @@ class ScfDriver:
             if mode == rimode.direct:
                 self._ri_aux_atoms = []
 
+            # NOTE: the B vectors are what the choice of the way is taken from, but
+            # they are not the most the way which holds them reaches. Forming them
+            # holds a batch of the integrals beside them, and a Fock build holds the
+            # W matrices of a range, which is the whole auxiliary basis where the
+            # budget allows it. What is printed is that peak, so that it can be
+            # held against the memory of the machine; the memory the rest of the
+            # calculation holds outside the driver is not in it.
             self.ostream.print_info(
                 'Using the SIMD resolution of the identity (RI-JK) driver.')
-            if self.nodes == 1:
+            if mode == rimode.in_memory:
+                holds_nothing = ((self.nodes > 1) and
+                                 (len(self._ri_aux_atoms) == 0))
+                if holds_nothing:
+                    peak = 0
+                else:
+                    peak = self._ri_drv.peak_memory(
+                        molecule, ao_basis, basis_ri, self.eri_thresh,
+                        self._ri_aux_atoms, range_separated, budget,
+                        self._get_ri_jk_max_orbitals(molecule, ao_basis,
+                                                     den_mat))
+                peaks = self.comm.allgather(peak)
+                if self.nodes == 1:
+                    self.ostream.print_info(
+                        f'RI-JK needs at most {max(peaks) / (1024**3):.2f} ' +
+                        f'GB of {budget / (1024**3):.2f} GB available ' +
+                        f'(B vectors {largest / (1024**3):.2f} GB).')
+                else:
+                    self.ostream.print_info(
+                        f'RI-JK needs at most {sum(peaks) / (1024**3):.2f} ' +
+                        f'GB over {self.nodes:d} ranks, at most ' +
+                        f'{max(peaks) / (1024**3):.2f} GB of ' +
+                        f'{budget / (1024**3):.2f} GB on a rank ' +
+                        f'(B vectors {largest / (1024**3):.2f} GB).')
+            elif self.nodes == 1:
                 self.ostream.print_info(
                     f'B vectors need {largest / (1024**3):.2f} GB of ' +
                     f'{budget / (1024**3):.2f} GB available.')
@@ -3182,6 +3213,53 @@ class ScfDriver:
         self._ri_drv.compute_coulomb(gamma, parts[self.rank::self.nodes], fock)
 
         return fock
+
+    def _get_ri_jk_max_orbitals(self, molecule, ao_basis, den_mat):
+        """
+        Gets the most orbitals the exchange of a SIMD RI-JK build is formed
+        from, of both spins together for an open shell.
+
+        :param molecule:
+            The molecule.
+        :param ao_basis:
+            The AO basis set.
+        :param den_mat:
+            The initial guess density matrices.
+
+        :return:
+            The number of orbitals.
+        """
+
+        nspins = 1 if self.scf_type == 'restricted' else 2
+
+        # NOTE: pFON and density damping hand the build a density which is not
+        # idempotent, and its factor may have as many columns as the basis.
+        if self.pfon or self.density_damping:
+            return nspins * ao_basis.get_dimensions_of_basis()
+
+        nocc = [molecule.number_of_alpha_occupied_orbitals(ao_basis)]
+        if nspins == 2:
+            nocc.append(molecule.number_of_beta_occupied_orbitals(ao_basis))
+
+        # NOTE: the first build has no orbitals and factors the guess density
+        # instead, keeping the eigenvalues _simd_ri_jk_occupied keeps. The guess
+        # is a sum of atomic densities, whose rank is about half again the
+        # occupied orbitals of the molecule.
+        if self.molecular_orbitals.is_empty():
+            if self.rank == mpi_master():
+                guess = []
+                for density in den_mat[:nspins]:
+                    occupation = np.linalg.eigvalsh(density)
+                    guess.append(
+                        int(
+                            np.sum(occupation > self.ri_guess_thresh *
+                                   max(occupation[-1], 1.0))))
+            else:
+                guess = None
+            guess = self.comm.bcast(guess, root=mpi_master())
+            nocc = [max(n, g) for n, g in zip(nocc, guess)]
+
+        return sum(nocc)
 
     def _get_ri_memory_budget(self):
         """

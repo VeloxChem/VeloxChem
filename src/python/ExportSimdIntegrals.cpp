@@ -357,6 +357,18 @@ export_simdintegrals(py::module &m) -> void
              py::arg("threshold"),
              py::arg("aux_atoms") = std::vector<int>{},
              py::arg("range_separated") = false)
+        .def("peak_memory",
+             &CSimdRIJKFockDriver::peak_memory,
+             "Gets the most memory in bytes the driver reaches when it holds the B vectors, while forming them or "
+             "in a Fock build, for the number of threads of the caller.",
+             py::arg("molecule"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("threshold"),
+             py::arg("aux_atoms"),
+             py::arg("range_separated"),
+             py::arg("memory_budget"),
+             py::arg("norbitals"))
         .def("make_metric",
              &CSimdRIJKFockDriver::make_metric,
              "Forms the metric a way of building asks for, and answers the way it is for, "

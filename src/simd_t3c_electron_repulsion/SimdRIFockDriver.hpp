@@ -35,12 +35,33 @@
 #define SimdRIFockDriver_hpp
 
 #include <cstddef>
+#include <utility>
 #include <vector>
 
 #include "MolecularBasis.hpp"
 #include "Molecule.hpp"
 #include "PackedMatrix.hpp"
 #include "SparseTensor.hpp"
+
+/// @brief The memory of the B vectors of a calculation, and what forming and using
+/// them holds beside them, in bytes.
+struct CBqMemory
+{
+    /// @brief The values of the B vectors of every operator.
+    size_t held = 0;
+
+    /// @brief What forming the B vectors holds beside them at its peak: the
+    /// permuted metrics, the integrals of one batch, and the buffers of the threads.
+    size_t forming = 0;
+
+    /// @brief The index of the auxiliary functions of the blocks, which the half
+    /// transformation of a Fock build forms over the B vectors.
+    size_t index = 0;
+
+    /// @brief The descriptions of the blocks the B vectors carry beside their
+    /// values, which are allowed for rather than counted.
+    size_t pattern = 0;
+};
 
 /// @brief Class CSimdRIFockDriver computes the B vectors of the resolution of the
 /// identity approximation of the Coulomb interaction.
@@ -313,6 +334,40 @@ class CSimdRIFockDriver
                                  CPackedMatrix                    &matrix,
                                  const double                      factor = 1.0) const -> void;
 
+    /// @brief Gets the memory of the B vectors and what forming them reaches.
+    /// @param molecule The molecule to form the B vectors of.
+    /// @param basis The molecular basis on a and b sides.
+    /// @param aux_basis The auxiliary molecular basis.
+    /// @param threshold The screening threshold.
+    /// @param aux_atoms The atoms whose auxiliary functions the B vectors are formed
+    /// for, or empty for all of them.
+    /// @param nops The number of operators, one for the Coulomb operator alone and
+    /// two for a hybrid range separated functional.
+    /// @return The memory in bytes, for the number of threads of the caller.
+    /// @note The blocks and the batches are described as compute_bq_vectors
+    /// describes them, so this is what that call will hold rather than an estimate
+    /// of it. It costs the description of the sparsity pattern, which is a small
+    /// part of forming the B vectors.
+    auto bq_vectors_memory(const CMolecule        &molecule,
+                           const CMolecularBasis  &basis,
+                           const CMolecularBasis  &aux_basis,
+                           const double            threshold,
+                           const std::vector<int> &aux_atoms,
+                           const size_t            nops) const -> CBqMemory;
+
+    /// @brief Gets the memory a Fock build holds beside the B vectors and the W
+    /// matrices of a range.
+    /// @param nao The number of basis functions of the molecular basis.
+    /// @param naux The number of basis functions of the auxiliary basis.
+    /// @param norbitals The occupied orbitals the exchange is formed from.
+    /// @param nfunctions The auxiliary functions of a range of the W matrices.
+    /// @return The memory in bytes, for the number of threads of the caller: the
+    /// squares of the half transformation, the buffers of the Coulomb matrix, the
+    /// triangles and the staging of the exchange, the Fock matrices, and an
+    /// allowance for each thread.
+    auto build_memory(const size_t nao, const size_t naux, const size_t norbitals, const size_t nfunctions) const
+        -> size_t;
+
    private:
     /// @brief Computes the B vectors of one operator or of two.
     /// @param molecule The molecule to compute the B vectors of.
@@ -338,6 +393,15 @@ class CSimdRIFockDriver
                              const double                              threshold,
                              const double                              omega,
                              const std::vector<int>                   &aux_atoms) const -> std::vector<CSparseTensor>;
+
+    /// @brief Gets the shape of the work of the exchange of a range.
+    /// @param nao The number of basis functions of the molecular basis.
+    /// @param nocc The occupied orbitals of the W matrices.
+    /// @param nfunctions The W matrices of the range.
+    /// @return The auxiliary functions one rank k update takes, and the triangles
+    /// the updates are summed into, one for each thread which takes a part.
+    auto _exchange_shape(const size_t nao, const size_t nocc, const size_t nfunctions) const
+        -> std::pair<size_t, size_t>;
 
     /// @brief The density of the B vectors at which the transformation expands
     /// them into a square rather than walking their values.
@@ -405,6 +469,22 @@ class CSimdRIFockDriver
     /// of buffers this many bytes and the count follows from it rather than from
     /// the block, which has no bound of its own.
     static constexpr size_t _bq_columns = size_t{32} * 1024 * 1024;
+
+    /// @brief The memory a thread holds beyond the buffers counted for it, which
+    /// is allowed for rather than counted.
+    /// @note It is the scratch of the integral kernels and of the linear algebra
+    /// library, and what the allocator of a thread keeps of it, none of which is
+    /// visible from here. It does not grow with the molecule or the basis, so a
+    /// fixed amount a thread, somewhat above what was observed, allows for it.
+    static constexpr size_t _thread_allowance = size_t{8} * 1024 * 1024;
+
+    /// @brief The share of the values of the B vectors their descriptions are
+    /// allowed, as the divisor of the values.
+    /// @note The descriptions are a few counts and offsets for every combination
+    /// of basis functions of a block, against the values of every atom pair and
+    /// auxiliary atom of it, so they are a small share of the values. The divisor
+    /// allows about twice the share observed.
+    static constexpr size_t _pattern_divisor = 32;
 
 };
 

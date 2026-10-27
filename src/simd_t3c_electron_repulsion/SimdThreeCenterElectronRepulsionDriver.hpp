@@ -39,6 +39,7 @@
 #include <cstddef>
 #include <map>
 #include <ranges>
+#include <utility>
 #include <vector>
 
 #include "AtomBasisTripleSparsity.hpp"
@@ -218,7 +219,38 @@ class CSimdThreeCenterElectronRepulsionDriver
                  const double            threshold,
                  const std::vector<int> &atoms) const -> CSparseTensor;
 
+    /// @brief Gets the memory of the arena one thread holds while computing the
+    /// integrals of a sparsity pattern.
+    /// @param pattern The sparsity pattern the integrals would be computed in.
+    /// @param basis The molecular basis on a and b sides.
+    /// @param aux_basis The auxiliary molecular basis on c side.
+    /// @return The memory in bytes, which every thread of a call holds at once.
+    /// @note The arena is the largest combination of the pattern by its widest
+    /// block, so this is what a caller adds for every thread to the memory of the
+    /// integrals themselves to know the peak of a call.
+    static auto
+    arena_memory(const CTripleSparsityPattern &pattern, const CMolecularBasis &basis, const CMolecularBasis &aux_basis)
+        -> size_t
+    {
+        const auto [rows, cols] = _arena_shape(pattern, basis, aux_basis);
+
+        return rows * simd::pitch_of(cols) * sizeof(double);
+    }
+
    private:
+    /// @brief Gets the shape of the arena one thread holds for a sparsity pattern.
+    /// @param pattern The sparsity pattern of the integrals.
+    /// @param basis The molecular basis on a and b sides.
+    /// @param aux_basis The auxiliary molecular basis on c side.
+    /// @return The rows of the largest combination any block carries and the atom
+    /// pairs of the widest block.
+    /// @note The rows are those of the highest angular momenta of the three atom
+    /// bases of a block, as the rows a combination needs do not decrease with any
+    /// of them.
+    static auto _arena_shape(const CTripleSparsityPattern &pattern,
+                             const CMolecularBasis        &basis,
+                             const CMolecularBasis        &aux_basis) -> std::pair<size_t, size_t>;
+
     /// @brief Creates the coordinates of the atoms on c side of a block.
     /// @param block The sparsity pattern of the block.
     /// @param molecule The molecule to take the atomic coordinates from.
@@ -229,6 +261,30 @@ class CSimdThreeCenterElectronRepulsionDriver
     /// the pairs.
     static auto _make_c_coordinates(const CAtomBasisTripleSparsity &block, const CMolecule &molecule) -> CSimdMatrix;
 };
+
+inline auto
+CSimdThreeCenterElectronRepulsionDriver::_arena_shape(const CTripleSparsityPattern &pattern,
+                                                     const CMolecularBasis        &basis,
+                                                     const CMolecularBasis        &aux_basis) -> std::pair<size_t, size_t>
+{
+    auto arena_rows = size_t{0};
+
+    auto arena_cols = size_t{0};
+
+    for (size_t iblk = 0; iblk < static_cast<size_t>(pattern.number_of_blocks()); iblk++)
+    {
+        const auto &block = pattern.block(iblk);
+
+        arena_rows = std::max(arena_rows,
+                              simdt3ceri::number_of_buffer_rows(basis.basis_set(block.a_index()).max_angular_momentum(),
+                                                                basis.basis_set(block.b_index()).max_angular_momentum(),
+                                                                aux_basis.basis_set(block.c_index()).max_angular_momentum()));
+
+        arena_cols = std::max(arena_cols, block.number_of_pairs());
+    }
+
+    return {arena_rows, arena_cols};
+}
 
 template <class D>
 auto
@@ -271,21 +327,15 @@ CSimdThreeCenterElectronRepulsionDriver::compute(const CTripleSparsityPattern &p
     // combination needs do not decrease with any of them. It is formed once per
     // thread and the combinations work over a view of it. See the overlap driver.
 
-    auto arena_rows = size_t{0};
+    // NOTE: plain names rather than a structured binding, as the arena is formed
+    // inside the parallel region below and a binding is not a variable OpenMP
+    // can share.
 
-    auto arena_cols = size_t{0};
+    const auto arena_shape = _arena_shape(pattern, basis, aux_basis);
 
-    for (size_t iblk = 0; iblk < nblocks; iblk++)
-    {
-        const auto &block = pattern.block(iblk);
+    const auto arena_rows = arena_shape.first;
 
-        arena_rows = std::max(arena_rows,
-                              simdt3ceri::number_of_buffer_rows(basis.basis_set(block.a_index()).max_angular_momentum(),
-                                                                basis.basis_set(block.b_index()).max_angular_momentum(),
-                                                                aux_basis.basis_set(block.c_index()).max_angular_momentum()));
-
-        arena_cols = std::max(arena_cols, block.number_of_pairs());
-    }
+    const auto arena_cols = arena_shape.second;
 
     std::vector<size_t> border(nblocks);
 
