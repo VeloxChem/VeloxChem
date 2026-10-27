@@ -2038,6 +2038,12 @@ class ScfDriver:
             self.ostream.print_info(
                 'Using the SIMD resolution of the identity (RI-JK) driver.')
             if mode == rimode.in_memory:
+                # NOTE: the orbitals are counted on every rank, including one
+                # which holds nothing, as the count broadcasts from the master
+                # and a rank which skipped it would meet the next collective
+                # out of step.
+                norbitals = self._get_ri_jk_max_orbitals(
+                    molecule, ao_basis, den_mat)
                 holds_nothing = ((self.nodes > 1) and
                                  (len(self._ri_aux_atoms) == 0))
                 if holds_nothing:
@@ -2046,8 +2052,7 @@ class ScfDriver:
                     peak = self._ri_drv.peak_memory(
                         molecule, ao_basis, basis_ri, self.eri_thresh,
                         self._ri_aux_atoms, range_separated, budget,
-                        self._get_ri_jk_max_orbitals(molecule, ao_basis,
-                                                     den_mat))
+                        norbitals)
                 peaks = self.comm.allgather(peak)
                 if self.nodes == 1:
                     self.ostream.print_info(
@@ -2125,6 +2130,11 @@ class ScfDriver:
                                  omega, metric_erf,
                                  (self.nodes > 1) and
                                  (len(self._ri_aux_atoms) == 0))
+
+            # NOTE: the driver keeps copies of its own, and these would otherwise
+            # stay alive through every iteration below, a second set of the
+            # metrics which peak_memory counts only while the B vectors are formed.
+            del metric, metric_erf
 
             if range_separated:
                 # NOTE: the attenuated metric is the worse conditioned of the two
