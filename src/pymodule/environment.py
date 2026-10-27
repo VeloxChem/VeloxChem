@@ -90,3 +90,125 @@ def set_omp_num_threads(ncores=None):
             if ncores is None:
                 ncores = 1
             environ['OMP_NUM_THREADS'] = str(ncores)
+
+
+def get_available_memory():
+    """
+    Gets the memory this process may still take, in bytes.
+
+    :return:
+        The free memory of the node, or less where a control group the process
+        is in leaves less of its limit free.
+    """
+
+    try:
+        import psutil
+        available = psutil.virtual_memory().available
+    except ImportError:
+        available = 8 * 1024**3
+
+    # NOTE: a batch system which shares a node between jobs confines each of
+    # them to a control group, and the free memory of the node says nothing of
+    # that limit: a job given a share of a node was promised the whole of it,
+    # and the kernel killed it on reaching its share.
+    confined = _get_cgroup_available_memory()
+
+    if confined is not None:
+        available = min(available, confined)
+
+    return available
+
+
+def _get_cgroup_available_memory():
+    """
+    Gets the memory the control groups of this process leave free, in bytes.
+
+    :return:
+        The least any of them leaves free, or None where none of them has a
+        memory limit.
+    """
+
+    try:
+        lines = Path('/proc/self/cgroup').read_text().splitlines()
+    except OSError:
+        return None
+
+    least = None
+
+    for line in lines:
+        parts = line.split(':', 2)
+        if len(parts) != 3:
+            continue
+        hierarchy, controllers, path = parts
+
+        # NOTE: version 2 is the one hierarchy numbered 0 with no controllers
+        # named, and version 1 names memory among its own. A node may mount
+        # both, and only the one which carries the memory controller has the
+        # files read below; the other is passed over for want of them.
+        if hierarchy == '0' and controllers == '':
+            root = Path('/sys/fs/cgroup')
+            names = ('memory.max', 'memory.current', 'inactive_file')
+        elif 'memory' in controllers.split(','):
+            root = Path('/sys/fs/cgroup/memory')
+            names = ('memory.limit_in_bytes', 'memory.usage_in_bytes',
+                     'total_inactive_file')
+        else:
+            continue
+
+        # NOTE: the limit may be set on any group above this one, and Slurm sets
+        # it on the job and the step rather than on the task the process is in,
+        # so the groups are walked up to the root and the least is taken.
+        group = root / path.lstrip('/')
+
+        while True:
+            free = _get_cgroup_free_memory(group, *names)
+            if free is not None:
+                least = free if least is None else min(least, free)
+            if group == root or root not in group.parents:
+                break
+            group = group.parent
+
+    return least
+
+
+def _get_cgroup_free_memory(group, limit_name, usage_name, inactive_name):
+    """
+    Gets the memory one control group leaves free, in bytes.
+
+    :param group:
+        The directory of the group.
+    :param limit_name:
+        The file of its limit.
+    :param usage_name:
+        The file of its usage.
+    :param inactive_name:
+        The entry of memory.stat which counts its inactive file cache.
+
+    :return:
+        The memory free under its limit, or None where it has no limit.
+    """
+
+    try:
+        limit = (group / limit_name).read_text().strip()
+        usage = int((group / usage_name).read_text())
+    except (OSError, ValueError):
+        return None
+
+    # NOTE: no limit is written as max by version 2, and as a number near the
+    # largest a 64-bit signed integer holds by version 1.
+    if limit == 'max' or int(limit) >= 2**62:
+        return None
+
+    # NOTE: the usage counts the file cache, of which the inactive part is
+    # given back before the kernel kills anything, so it is not taken as used.
+    inactive = 0
+    try:
+        for entry in (group / 'memory.stat').read_text().splitlines():
+            name, value = entry.split()
+            if name == inactive_name:
+                inactive = int(value)
+                break
+    except (OSError, ValueError):
+        pass
+
+    return max(int(limit) - max(usage - inactive, 0), 0)

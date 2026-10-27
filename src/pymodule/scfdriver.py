@@ -84,6 +84,7 @@ from .sanitychecks import (molecule_sanity_check, dft_and_ri_sanity_check,
                            environment_compatibility_sanity_check)
 from .errorhandler import assert_msg_critical
 from .mathutils import screened_eigh
+from .environment import get_available_memory
 from .checkpoint import write_cpcm_charges, read_cpcm_charges
 from .resultsio import create_hdf5, write_scf_results_to_hdf5
 
@@ -3313,14 +3314,13 @@ class ScfDriver:
         # free. The B vectors are the one thing which has to stay resident for the
         # whole calculation, and everything else the iteration needs is a few
         # gigabytes, so halving the free memory refuses calculations which fit.
-        # Since a budget which is too small now selects the direct mode rather than
-        # refusing, too tight a default costs speed silently instead of loudly.
+        # Since a budget which is too small falls back to the four-center
+        # integrals rather than refusing, too tight a default costs speed silently
+        # instead of loudly.
 
-        try:
-            import psutil
-            available = psutil.virtual_memory().available
-        except ImportError:
-            available = 8 * 1024**3
+        # NOTE: what is free to this process, which is less than what is free on
+        # the node where a batch system confines the job to a share of it.
+        available = get_available_memory()
 
         reserve = 4 * 1024**3
 
