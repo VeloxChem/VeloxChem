@@ -84,12 +84,23 @@ class TestEvb:
         self._compare_dict(reactant.bonds, reactant_ref.bonds)
         self._compare_dict(reactant.angles, reactant_ref.angles)
         self._compare_dict(reactant.dihedrals, reactant_ref.dihedrals)
-        self._compare_dict(reactant.impropers, reactant_ref.impropers)
+        self._compare_dict(self._sort_improper_keys(reactant.impropers),
+                           self._sort_improper_keys(reactant_ref.impropers))
 
         self._compare_dict(product.bonds, product_ref.bonds)
         self._compare_dict(product.angles, product_ref.angles)
         self._compare_dict(product.dihedrals, product_ref.dihedrals)
-        self._compare_dict(product.impropers, product_ref.impropers)
+        self._compare_dict(self._sort_improper_keys(product.impropers),
+                           self._sort_improper_keys(product_ref.impropers))
+
+    @staticmethod
+    def _sort_improper_keys(impropers):
+        # The order of the outer atoms of an improper follows the mapping of equivalent atoms, such as the hydrogens
+        # of ethene, which depends on the networkx version. Only the central atom, which comes first, is fixed.
+        sorted_impropers = {(k[0], ) + tuple(sorted(k[1:])): v
+                            for k, v in impropers.items()}
+        assert len(sorted_impropers) == len(impropers)
+        return sorted_impropers
 
     def _compare_dict(self, dict1, dict2, float_tol=1e-2):
 
