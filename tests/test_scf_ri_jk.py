@@ -6,6 +6,7 @@ from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.outputstream import OutputStream
 from veloxchem.scfrestdriver import ScfRestrictedDriver
+from veloxchem.scfunrestdriver import ScfUnrestrictedDriver
 
 # NOTE: the SIMD RI-JK driver is the path through the closed shell Fock
 # build, selected by ri. It is the same approximation as the conventional
@@ -116,29 +117,65 @@ class TestScfRiJk:
 
         assert abs(energies['in_memory'] - energies['direct']) < 1.0e-10
 
-    def test_a_budget_which_does_not_hold_the_b_vectors_goes_direct(self, molecule,
-                                                                    basis):
-        """A budget below what the B vectors need selects the way which does not
-        hold them, and the energy is the same either way. This is what makes a
-        molecule too large to hold reachable."""
+    @pytest.mark.parametrize('unrestricted, xcfun', [
+        (False, None),
+        (False, 'CAM-B3LYP'),
+        (True, None),
+    ])
+    def test_a_budget_below_the_peak_falls_back_to_four_center(
+            self, molecule, basis, unrestricted, xcfun):
+        """A budget below the peak RI-JK is predicted to reach has the Fock
+        matrices formed from the four-center integrals, which gives the energy
+        without the approximation rather than the direct way. The settings which
+        asked for the approximation are left as they were set. The closed shell,
+        the range separated and the open shell builds each take the fallback
+        apart, so each is run."""
 
-        settings = {
-            'ri_auxiliary_basis': 'def2-universal-jkfit',
-        }
+        if unrestricted:
+            molecule.set_charge(1)
+            molecule.set_multiplicity(2)
 
-        roomy = self.run_scf(molecule, basis, ri_memory_budget=1.0, **settings)
+        def run(ri, budget=None):
+            driver_type = (ScfUnrestrictedDriver
+                           if unrestricted else ScfRestrictedDriver)
+            driver = driver_type(ostream=OutputStream(None))
+            driver.ri = ri
+            driver.conv_thresh = 1.0e-8
+            driver.ri_auxiliary_basis = 'def2-universal-jkfit'
+            driver.ri_memory_budget = budget
+            if xcfun is not None:
+                driver.xcfun = xcfun
+            results = driver.compute(molecule, basis)
+            energy = (results['scf_energy']
+                      if driver.rank == mpi_master() else None)
+            return driver, driver.comm.bcast(energy, root=mpi_master())
 
-        # ten kilobytes, which the B vectors of any molecule exceed
+        _, plain = run(ri=False)
 
-        cramped = self.run_scf(molecule, basis, ri_memory_budget=1.0e-5, **settings)
+        # ten kilobytes, which the peak of any molecule exceeds
 
-        assert abs(roomy - cramped) < 1.0e-10
+        driver, cramped = run(ri=True, budget=1.0e-5)
+
+        assert abs(cramped - plain) < 1.0e-9, (
+            f"{cramped:.12f} against {plain:.12f}")
+
+        assert driver.ri
+        assert driver.ri_jk
+        assert not driver.ri_coulomb
+        assert driver.ri_mode == 'in_memory'
+        assert driver._ri_drv is None
+
+        _, roomy = run(ri=True, budget=1.0)
+
+        assert abs(roomy - plain) > 1.0e-6
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason="pytest.raises only valid in serial")
-    def test_an_unknown_mode_is_refused(self, molecule, basis):
+    @pytest.mark.parametrize('mode', ['sideways', 'automatic'])
+    def test_an_unknown_mode_is_refused(self, molecule, basis, mode):
         """A name which is not one of the two ways has to be caught, not quietly
-        treated as one of them."""
+        treated as one of them. The way is no longer chosen from the memory, so
+        automatic is not one of them either."""
 
         from veloxchem.errorhandler import VeloxChemError
 
@@ -146,13 +183,13 @@ class TestScfRiJk:
             self.run_scf(molecule,
                          basis,
                          ri_auxiliary_basis='def2-universal-jkfit',
-                         ri_mode='sideways')
+                         ri_mode=mode)
 
-    def test_the_mode_defaults_to_automatic(self):
+    def test_the_mode_defaults_to_in_memory(self):
 
         driver = ScfRestrictedDriver(ostream=OutputStream(None))
 
-        assert driver.ri_mode == 'automatic'
+        assert driver.ri_mode == 'in_memory'
 
     def test_the_metric_route_is_a_setting(self, molecule, basis):
         """The metric may be inverted through its Cholesky factor or through its

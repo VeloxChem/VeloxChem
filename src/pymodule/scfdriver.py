@@ -235,8 +235,9 @@ class ScfDriver:
         self.ri_dense_threshold = 0.0
         self.ri_memory_budget = None
         self._ri_aux_atoms = []
-        self.ri_mode = 'automatic'
+        self.ri_mode = 'in_memory'
         self._ri_drv = None
+        self._ri_jk_fallback = False
 
         # dft
         self.xcfun = None
@@ -389,7 +390,7 @@ class ScfDriver:
                 'ri_memory_budget':
                     ('float', 'memory the SIMD RI-JK driver may hold, in GB'),
                 'ri_mode':
-                    ('str_lower', 'SIMD RI-JK mode: automatic, in_memory or direct'),
+                    ('str_lower', 'SIMD RI-JK mode: in_memory or direct'),
                 'dispersion': ('bool', 'use D4 dispersion correction'),
                 'xcfun': ('str_upper', 'exchange-correlation functional'),
                 'grid_level': ('int', 'accuracy level of DFT grid (1-8)'),
@@ -1855,6 +1856,11 @@ class ScfDriver:
         # builds nor to the rest of them, so it is timed on its own.
         ri_setup_t0 = tm.time()
 
+        # NOTE: whether RI-JK fell back to the four-center integrals is decided
+        # again for every calculation, as the molecule and the memory can differ
+        # between two calls of one driver.
+        self._ri_jk_fallback = False
+
         fock_type = self._get_2e_fock_build_params()[0]
         use_ri_coulomb = self.ri_coulomb and fock_type == 'j'
         use_ri_jk = self.ri_jk and fock_type != 'j'
@@ -1879,15 +1885,18 @@ class ScfDriver:
 
             metric = metric.broadcast(self.comm, root=mpi_master())
 
+            # NOTE: the RI-J driver keeps its own choice from the memory until it
+            # is given the fallback the RI-JK path has below: in_memory, the
+            # default, lets it go direct where its integrals do not fit, and direct
+            # asks for that way outright.
             modes = {
-                'automatic': rimode.automatic,
-                'in_memory': rimode.in_memory,
+                'in_memory': rimode.automatic,
                 'direct': rimode.direct,
             }
 
             assert_msg_critical(
                 self.ri_mode in modes,
-                'SCF driver: ri_mode must be automatic, in_memory or direct')
+                'SCF driver: ri_mode must be in_memory or direct')
 
             # NOTE: the parts are what the ranks divide, so there have to be at
             # least as many of them as there are ranks. Unlike the RI-JK path the
@@ -1940,14 +1949,13 @@ class ScfDriver:
             omega = self.xcfun.get_rs_omega() if range_separated else 0.0
 
             modes = {
-                'automatic': rimode.automatic,
                 'in_memory': rimode.in_memory,
                 'direct': rimode.direct,
             }
 
             assert_msg_critical(
                 self.ri_mode in modes,
-                'SCF driver: ri_mode must be automatic, in_memory or direct')
+                'SCF driver: ri_mode must be in_memory or direct')
 
             # NOTE: every term of the Coulomb and of the exchange is a sum over the
             # auxiliary basis, so a rank given a share of its atoms forms a share of
@@ -1977,34 +1985,30 @@ class ScfDriver:
                                                   self._ri_aux_atoms,
                                                   range_separated)
 
-            # NOTE: the way of building has to be the same on every rank, as the
-            # metric it is formed with differs between the two. The shares are not
-            # equal, so the decision is taken from the largest of them against the
-            # smallest budget rather than from each rank's own.
+            # NOTE: whether RI-JK is used at all has to be decided the same on
+            # every rank, as the ranks add shares of one Fock matrix. The shares
+            # are not equal, so the decision is taken from the largest of them
+            # against the smallest budget rather than from each rank's own.
             largest = max(self.comm.allgather(needed))
             budget = min(self.comm.allgather(budget))
 
+            # NOTE: the way of building is the one ri_mode names, and is not
+            # chosen from the memory. The direct way is several times slower than
+            # holding the B vectors, so it is taken only where it is asked for; a
+            # calculation whose B vectors do not fit falls back to the
+            # four-center integrals below instead.
             mode = modes[self.ri_mode]
-
-            if mode == rimode.automatic:
-                mode = (rimode.direct
-                        if largest > budget else rimode.in_memory)
 
             # NOTE: the way which forms the integrals again on every call has one
             # sweep and one fitting, and two operators do not fit in it. It is
             # refused here rather than at the first build, so a calculation which
-            # cannot be served says so before it forms anything. The message covers
-            # both ways of arriving: asked for outright, or chosen because two sets
-            # of B vectors do not fit where one would have.
+            # cannot be served says so before it forms anything.
             if range_separated:
                 assert_msg_critical(
                     mode == rimode.in_memory,
                     'SCF driver: a hybrid range-separated functional is ' +
                     'served only by the way which holds the B vectors, and ' +
-                    'this calculation is on the direct way -- either because ' +
-                    'ri_mode asked for it, or because the two sets need ' +
-                    f'{largest / (1024**3):.2f} GB of ' +
-                    f'{budget / (1024**3):.2f} GB available')
+                    'ri_mode asks for the direct way')
 
             # NOTE: the metric may be inverted through its Cholesky factor, which
             # is an order of magnitude cheaper, or through its eigenvalues, which
@@ -2028,15 +2032,18 @@ class ScfDriver:
             if mode == rimode.direct:
                 self._ri_aux_atoms = []
 
-            # NOTE: the B vectors are what the choice of the way is taken from, but
-            # they are not the most the way which holds them reaches. Forming them
-            # holds a batch of the integrals beside them, and a Fock build holds the
-            # W matrices of a range, which is the whole auxiliary basis where the
-            # budget allows it. What is printed is that peak, so that it can be
-            # held against the memory of the machine; the memory the rest of the
+            # NOTE: the B vectors are not the most the way which holds them
+            # reaches. Forming them holds a batch of the integrals beside them, and
+            # a Fock build holds the W matrices of a range, which is the whole
+            # auxiliary basis where the budget allows it. It is that peak which is
+            # held against the budget and printed; the memory the rest of the
             # calculation holds outside the driver is not in it.
-            self.ostream.print_info(
-                'Using the SIMD resolution of the identity (RI-JK) driver.')
+
+            # NOTE: a calculation whose peak exceeds the budget falls back to the
+            # four-center integrals, which hold nothing beside the Fock matrices.
+            # ri, ri_coulomb and ri_jk are left as they were set: they are what
+            # was asked for, and the fallback is what this calculation could
+            # serve, which the next one on the same driver may not share.
             if mode == rimode.in_memory:
                 # NOTE: the orbitals are counted on every rank, including one
                 # which holds nothing, as the count broadcasts from the master
@@ -2054,32 +2061,52 @@ class ScfDriver:
                         self._ri_aux_atoms, range_separated, budget,
                         norbitals)
                 peaks = self.comm.allgather(peak)
-                if self.nodes == 1:
+                self._ri_jk_fallback = (max(peaks) > budget)
+
+            if self._ri_jk_fallback:
+                where = 'available' if self.nodes == 1 else 'on a rank'
+                self.ostream.print_warning(
+                    f'RI-JK would need {max(peaks) / (1024**3):.2f} GB of ' +
+                    f'{budget / (1024**3):.2f} GB {where}, so the Fock ' +
+                    'matrices are formed from the four-center integrals.')
+            else:
+                self.ostream.print_info(
+                    'Using the SIMD resolution of the identity (RI-JK) driver.')
+                if mode == rimode.in_memory and self.nodes == 1:
                     self.ostream.print_info(
                         f'RI-JK needs at most {max(peaks) / (1024**3):.2f} ' +
                         f'GB of {budget / (1024**3):.2f} GB available ' +
                         f'(B vectors {largest / (1024**3):.2f} GB).')
-                else:
+                elif mode == rimode.in_memory:
                     self.ostream.print_info(
                         f'RI-JK needs at most {sum(peaks) / (1024**3):.2f} ' +
                         f'GB over {self.nodes:d} ranks, at most ' +
                         f'{max(peaks) / (1024**3):.2f} GB of ' +
                         f'{budget / (1024**3):.2f} GB on a rank ' +
                         f'(B vectors {largest / (1024**3):.2f} GB).')
-            elif self.nodes == 1:
-                self.ostream.print_info(
-                    f'B vectors need {largest / (1024**3):.2f} GB of ' +
-                    f'{budget / (1024**3):.2f} GB available.')
-            else:
-                total = sum(self.comm.allgather(needed))
-                self.ostream.print_info(
-                    f'B vectors need {total / (1024**3):.2f} GB over ' +
-                    f'{self.nodes:d} ranks, at most ' +
-                    f'{largest / (1024**3):.2f} GB of ' +
-                    f'{budget / (1024**3):.2f} GB on a rank.')
+                elif self.nodes == 1:
+                    self.ostream.print_info(
+                        f'B vectors need {largest / (1024**3):.2f} GB of ' +
+                        f'{budget / (1024**3):.2f} GB available.')
+                else:
+                    total = sum(self.comm.allgather(needed))
+                    self.ostream.print_info(
+                        f'B vectors need {total / (1024**3):.2f} GB over ' +
+                        f'{self.nodes:d} ranks, at most ' +
+                        f'{largest / (1024**3):.2f} GB of ' +
+                        f'{budget / (1024**3):.2f} GB on a rank.')
             self.ostream.print_blank()
             self.ostream.flush()
 
+            # NOTE: the driver is not kept unprepared, as what reads it after the
+            # SCF would take it for the one the Fock matrices were formed with.
+            if self._ri_jk_fallback:
+                self._ri_drv = None
+                self._ri_aux_atoms = []
+
+        # NOTE: the metric and the B vectors, which a calculation which fell back
+        # to the four-center integrals does not form.
+        if use_ri_jk and not self._ri_jk_fallback:
             ri_prep_t0 = tm.time()
 
             # NOTE: the metric is inverted once on the master and handed to the
@@ -3307,6 +3334,18 @@ class ScfDriver:
 
         return int(max(available - reserve, 0.25 * available) / on_this_node)
 
+    def _uses_ri_jk(self):
+        """
+        Checks whether the Fock matrices are formed with the SIMD RI-JK driver,
+        which is what ri_jk asks for unless the calculation fell back to the
+        four-center integrals for want of memory.
+
+        :return:
+            True if the SIMD RI-JK driver forms the Fock matrices.
+        """
+
+        return self.ri_jk and not self._ri_jk_fallback
+
     def _prepare_for_ri_fock_build(self, fock_type):
         """
         Performs RI-specific SCF checks and broadcasts molecular orbitals when
@@ -3320,7 +3359,7 @@ class ScfDriver:
             assert_msg_critical(
                 not self.ri_jk or self.ri_coulomb,
                 'SCF driver: RI-JK is not applicable to pure DFT functional')
-        elif self.ri_jk:
+        elif self._uses_ri_jk():
             need_bcast_mo = self.comm.bcast(
                 (not self.molecular_orbitals.is_empty()), root=mpi_master())
             if need_bcast_mo:
@@ -3406,7 +3445,7 @@ class ScfDriver:
 
         if self.ri_coulomb and fock_type == 'j':
             fock_mat_np = self._simd_ri_j_fock(den_mat[0])
-        elif self.ri_jk and fock_type != 'j':
+        elif self._uses_ri_jk() and fock_type != 'j':
             # NOTE: the driver returns twice the Coulomb less the scaled exchange
             # already, which is the matrix this branch is asked for, so nothing is
             # scaled here. A range-separated functional has its attenuated exchange
@@ -3430,7 +3469,7 @@ class ScfDriver:
         # NOTE: the simd resolution of the identity has already subtracted the
         # attenuated exchange, inside the build rather than after it, so the four
         # centre correction is made for every other way of building but not for it.
-        if need_omega and not self.ri_jk:
+        if need_omega and not self._uses_ri_jk():
             # for range-separated functional
             fock_mat = fock_drv.compute(screener, den_mat_for_fock, 'kx_rs',
                                         erf_k_coef, omega, thresh_int)
@@ -3514,7 +3553,7 @@ class ScfDriver:
             fock_mat_b_np = J_ab_np.copy()
 
         else:
-            if self.ri_jk:
+            if self._uses_ri_jk():
                 # NOTE: the Coulomb of the total density and both exchanges in one
                 # call, which is handed a set of coefficients for each spin. Where
                 # there are no orbitals yet the build is handed coefficients which
@@ -3553,13 +3592,13 @@ class ScfDriver:
             # exchanges apart, and is composed here. The simd branch answers with
             # the two matrices already composed, which is what its driver forms,
             # so it is left alone rather than taken apart and put back together.
-            if not self.ri_jk:
+            if not self._uses_ri_jk():
                 fock_mat_a_np = J_ab_np - K_a_np
                 fock_mat_b_np = J_ab_np - K_b_np
 
         # NOTE: as in the restricted build above -- the simd way subtracts both
         # spins' attenuated exchange inside the call and takes no correction here.
-        if need_omega and not self.ri_jk:
+        if need_omega and not self._uses_ri_jk():
             # for range-separated functional
             fock_mat = fock_drv.compute(screener, den_mat_for_Ka, 'kx_rs',
                                         erf_k_coef, omega, thresh_int)
