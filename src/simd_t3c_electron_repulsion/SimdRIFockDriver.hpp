@@ -368,6 +368,33 @@ class CSimdRIFockDriver
     auto build_memory(const size_t nao, const size_t naux, const size_t norbitals, const size_t nfunctions) const
         -> size_t;
 
+    /// @brief Gets the memory forming the integrals of a sparsity pattern holds
+    /// beside the integrals themselves.
+    /// @param pattern The sparsity pattern the integrals are formed in.
+    /// @param basis The molecular basis on a and b sides.
+    /// @param aux_basis The auxiliary molecular basis.
+    /// @return The memory in bytes, for the number of threads of the caller: the
+    /// arena of the integral driver and an allowance for each thread.
+    auto integrals_memory(const CTripleSparsityPattern &pattern,
+                          const CMolecularBasis        &basis,
+                          const CMolecularBasis        &aux_basis) const -> size_t;
+
+    /// @brief Gets the memory a Coulomb build holds beside the integrals it reads
+    /// and the metric.
+    /// @param nao The number of basis functions of the molecular basis.
+    /// @param naux The number of basis functions of the auxiliary basis.
+    /// @return The memory in bytes, for the number of threads of the caller: the
+    /// buffers of the right hand side of the fitting and of the Coulomb matrix, the
+    /// density and the Coulomb matrix the caller hands over and expands, and an
+    /// allowance for each thread.
+    auto coulomb_build_memory(const size_t nao, const size_t naux) const -> size_t;
+
+    /// @brief Gets the allowance for the descriptions of the blocks of a sparsity
+    /// pattern, which are allowed for rather than counted.
+    /// @param values The memory of the values the pattern describes, in bytes.
+    /// @return The allowance in bytes.
+    auto pattern_allowance(const size_t values) const -> size_t;
+
    private:
     /// @brief Computes the B vectors of one operator or of two.
     /// @param molecule The molecule to compute the B vectors of.

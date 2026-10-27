@@ -2550,6 +2550,45 @@ CSimdRIFockDriver::build_memory(const size_t nao, const size_t naux, const size_
 }
 
 auto
+CSimdRIFockDriver::integrals_memory(const CTripleSparsityPattern &pattern,
+                                    const CMolecularBasis        &basis,
+                                    const CMolecularBasis        &aux_basis) const -> size_t
+{
+    const auto nthreads = static_cast<size_t>(omp::get_number_of_threads());
+
+    const auto arena = CSimdThreeCenterElectronRepulsionDriver::arena_memory(pattern, basis, aux_basis);
+
+    return nthreads * (arena + _thread_allowance);
+}
+
+auto
+CSimdRIFockDriver::coulomb_build_memory(const size_t nao, const size_t naux) const -> size_t
+{
+    const auto nthreads = static_cast<size_t>(omp::get_number_of_threads());
+
+    const auto triangle = nao * (nao + 1) / 2 * sizeof(double);
+
+    // NOTE: a row of the auxiliary basis a thread and the sum of them for the right
+    // hand side, and a triangle a thread and the sum of them for the Coulomb matrix
+    // of a part.
+
+    const auto sweeps = (nthreads + 1) * (naux * sizeof(double) + triangle);
+
+    // NOTE: the caller hands over the density and the matrix the parts are added
+    // into, both packed, and expands the result into a square.
+
+    const auto caller = 2 * triangle + nao * nao * sizeof(double);
+
+    return sweeps + caller + nthreads * _thread_allowance;
+}
+
+auto
+CSimdRIFockDriver::pattern_allowance(const size_t values) const -> size_t
+{
+    return values / _pattern_divisor;
+}
+
+auto
 CSimdRIFockDriver::_exchange_shape(const size_t nao, const size_t nocc, const size_t nfunctions) const
     -> std::pair<size_t, size_t>
 {

@@ -500,6 +500,11 @@ export_simdintegrals(py::module &m) -> void
              "no transformation of the integrals to keep.",
              py::arg("molecule"), py::arg("basis"), py::arg("aux_basis"), py::arg("threshold"),
              py::arg("aux_atoms") = std::vector<int>{})
+        .def("peak_memory", &CSimdRIJFockDriver::peak_memory,
+             "Gets the most memory in bytes the driver reaches on this rank when it holds the integrals, while "
+             "forming them or in a build, for the number of threads of the caller.",
+             py::arg("molecule"), py::arg("basis"), py::arg("aux_basis"), py::arg("threshold"),
+             py::arg("memory_budget"), py::arg("rank"), py::arg("nodes"))
         .def("make_metric", &CSimdRIJFockDriver::make_metric,
              "Forms the metric of the auxiliary basis for the fitting: its Cholesky factor (lower triangular), "
              "or its pseudo inverse (symmetric) when it is close to singular.",

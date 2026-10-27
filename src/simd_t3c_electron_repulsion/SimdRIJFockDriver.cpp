@@ -13,6 +13,10 @@
 #include <algorithm>
 #include <string>
 
+#ifdef __GLIBC__
+#include <malloc.h>
+#endif
+
 #include "ErrorHandler.hpp"
 #include "SimdThreeCenterElectronRepulsionDriver.hpp"
 #include "SimdTwoCenterElectronRepulsionDriver.hpp"
@@ -25,6 +29,75 @@ CSimdRIJFockDriver::required_memory(const CMolecule        &molecule,
                                     const std::vector<int> &aux_atoms) const -> size_t
 {
     return simdri::pattern_memory(molecule, basis, aux_basis, threshold, aux_atoms);
+}
+
+auto
+CSimdRIJFockDriver::peak_memory(const CMolecule       &molecule,
+                                const CMolecularBasis &basis,
+                                const CMolecularBasis &aux_basis,
+                                const double           threshold,
+                                const size_t           memory_budget,
+                                const size_t           rank,
+                                const size_t           nodes) const -> size_t
+{
+    const CSimdThreeCenterElectronRepulsionDriver eri_drv;
+
+    const auto pattern = eri_drv.make_pattern(molecule, basis, aux_basis, threshold);
+
+    const auto parts =
+        simdri::make_parts(molecule, basis, aux_basis, threshold, pattern, std::max(nodes, size_t{1}), memory_budget);
+
+    // NOTE: the integrals of the parts this rank holds, and the most the threads
+    // hold beside them while one part is formed, which is the part with the widest
+    // arena rather than the last one.
+
+    size_t held = 0, threads = 0;
+
+    for (const auto index : _deal_parts(parts.size(), rank, nodes))
+    {
+        const auto &part = parts[static_cast<size_t>(index)];
+
+        held += simdri::pattern_memory(part);
+
+        threads = std::max(threads, _drv.integrals_memory(part, basis, aux_basis));
+    }
+
+    // NOTE: every rank keeps the descriptions of every part, and each tensor it
+    // holds a copy of its own part's; while the parts are cut, the description of
+    // the whole pattern they are cut from is alive as well.
+
+    const auto total = simdri::pattern_memory(pattern);
+
+    const auto described = _drv.pattern_allowance(total + held);
+
+    const auto cutting = _drv.pattern_allowance(total);
+
+    // NOTE: the metric is a packed triangle. While the integrals are formed, the
+    // caller's metric and the copy the driver keeps are both alive.
+
+    const auto naux = aux_basis.dimensions_of_basis();
+
+    const auto metric = naux * (naux + 1) / 2 * sizeof(double);
+
+    const auto forming = held + threads + described + cutting + 2 * metric;
+
+    const auto build = held + described + metric + _drv.coulomb_build_memory(basis.dimensions_of_basis(), naux);
+
+    const auto peak = std::max(forming, build);
+
+    return peak + peak / _peak_margin_divisor;
+}
+
+auto
+CSimdRIJFockDriver::_deal_parts(const size_t nparts, const size_t rank, const size_t nodes) -> std::vector<int>
+{
+    std::vector<int> owned;
+
+    const auto stride = std::max(nodes, size_t{1});
+
+    for (size_t i = rank; i < nparts; i += stride) owned.push_back(static_cast<int>(i));
+
+    return owned;
 }
 
 auto
@@ -83,11 +156,7 @@ CSimdRIJFockDriver::prepare(const CMolecule       &molecule,
     // part it did not hold would form the integrals again and be right, silently,
     // at the price of the memory it was meant to save.
 
-    _owned.clear();
-
-    const auto stride = std::max(nodes, size_t{1});
-
-    for (size_t i = rank; i < _parts.size(); i += stride) _owned.push_back(static_cast<int>(i));
+    _owned = _deal_parts(_parts.size(), rank, nodes);
 
     // NOTE: holding the integrals is a choice about memory and nothing else. Either
     // way the same sweeps run over the same parts; the way which holds them forms
@@ -130,6 +199,15 @@ CSimdRIJFockDriver::prepare(const CMolecule       &molecule,
             _integrals[i] = simdri::integrals_of_part(_parts[i], _molecule, _basis, _aux_basis);
         }
     }
+
+    // NOTE: forming the integrals frees the arena of every thread in blocks small
+    // enough that the allocator keeps them rather than handing them back, and kept
+    // they would stay resident under every build, which peak_memory does not count.
+    // They are returned here, as the driver which also forms the exchange does.
+
+#ifdef __GLIBC__
+    malloc_trim(0);
+#endif
 
     _prepared = true;
 }

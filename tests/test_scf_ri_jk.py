@@ -102,13 +102,18 @@ class TestScfRiJk:
         assert driver.ri
         assert driver.ri_memory_budget is None
 
-    def test_the_mode_can_be_chosen(self, molecule, basis):
+    @pytest.mark.parametrize('xcfun', [None, 'BLYP'])
+    def test_the_mode_can_be_chosen(self, molecule, basis, xcfun):
         """The way the Fock matrices are formed is an input setting, and both ways
-        must reach the same energy."""
+        must reach the same energy. A pure functional takes RI-J and the others
+        RI-JK, and each has both ways."""
 
         settings = {
             'ri_auxiliary_basis': 'def2-universal-jkfit',
         }
+
+        if xcfun is not None:
+            settings['xcfun'] = xcfun
 
         energies = {}
 
@@ -121,15 +126,18 @@ class TestScfRiJk:
         (False, None),
         (False, 'CAM-B3LYP'),
         (True, None),
+        (False, 'BLYP'),
+        (True, 'BLYP'),
     ])
     def test_a_budget_below_the_peak_falls_back_to_four_center(
             self, molecule, basis, unrestricted, xcfun):
-        """A budget below the peak RI-JK is predicted to reach has the Fock
+        """A budget below the peak RI is predicted to reach has the Fock
         matrices formed from the four-center integrals, which gives the energy
         without the approximation rather than the direct way. The settings which
         asked for the approximation are left as they were set. The closed shell,
         the range separated and the open shell builds each take the fallback
-        apart, so each is run."""
+        apart, and a pure functional takes it through RI-J rather than RI-JK, so
+        each is run."""
 
         if unrestricted:
             molecule.set_charge(1)
@@ -159,9 +167,11 @@ class TestScfRiJk:
         assert abs(cramped - plain) < 1.0e-9, (
             f"{cramped:.12f} against {plain:.12f}")
 
+        pure = (xcfun == 'BLYP')
+
         assert driver.ri
-        assert driver.ri_jk
-        assert not driver.ri_coulomb
+        assert driver.ri_jk == (not pure)
+        assert driver.ri_coulomb == pure
         assert driver.ri_mode == 'in_memory'
         assert driver._ri_drv is None
 

@@ -238,7 +238,7 @@ class ScfDriver:
         self._ri_aux_atoms = []
         self.ri_mode = 'in_memory'
         self._ri_drv = None
-        self._ri_jk_fallback = False
+        self._ri_fallback = False
 
         # dft
         self.xcfun = None
@@ -1857,10 +1857,11 @@ class ScfDriver:
         # builds nor to the rest of them, so it is timed on its own.
         ri_setup_t0 = tm.time()
 
-        # NOTE: whether RI-JK fell back to the four-center integrals is decided
-        # again for every calculation, as the molecule and the memory can differ
-        # between two calls of one driver.
-        self._ri_jk_fallback = False
+        # NOTE: whether RI fell back to the four-center integrals is decided again
+        # for every calculation, as the molecule and the memory can differ between
+        # two calls of one driver. One flag serves RI-J and RI-JK, as a calculation
+        # takes one of them or neither.
+        self._ri_fallback = False
 
         fock_type = self._get_2e_fock_build_params()[0]
         use_ri_coulomb = self.ri_coulomb and fock_type == 'j'
@@ -1874,24 +1875,8 @@ class ScfDriver:
 
             self._ri_drv = SimdRIJFockDriver()
 
-            # NOTE: the metric is inverted once on the master and handed to the
-            # ranks, for the reason the RI-JK path does it: the inversion picks its
-            # own fallback from the matrix, and two ranks choosing differently would
-            # build with metrics which are not the same.
-            metric = PackedMatrix()
-
-            if self.rank == mpi_master():
-                metric = self._ri_drv.make_metric(molecule, basis_ri,
-                                                  self.ri_metric_threshold)
-
-            metric = metric.broadcast(self.comm, root=mpi_master())
-
-            # NOTE: the RI-J driver keeps its own choice from the memory until it
-            # is given the fallback the RI-JK path has below: in_memory, the
-            # default, lets it go direct where its integrals do not fit, and direct
-            # asks for that way outright.
             modes = {
-                'in_memory': rimode.automatic,
+                'in_memory': rimode.in_memory,
                 'direct': rimode.direct,
             }
 
@@ -1899,30 +1884,90 @@ class ScfDriver:
                 self.ri_mode in modes,
                 'SCF driver: ri_mode must be in_memory or direct')
 
-            # NOTE: the parts are what the ranks divide, so there have to be at
-            # least as many of them as there are ranks. Unlike the RI-JK path the
-            # auxiliary basis is not divided between the ranks by atom: both sweeps
-            # here run over parts, and a part is the unit either of them takes.
-            self._ri_drv.prepare(molecule, ao_basis, basis_ri, self.eri_thresh,
-                                 self._get_ri_memory_budget(),
-                                 self.ri_metric_threshold, modes[self.ri_mode],
-                                 metric, self.rank, self.nodes)
+            mode = modes[self.ri_mode]
 
-            taken = ('held in memory'
-                     if self._ri_drv.get_mode() == rimode.in_memory else
-                     'formed again on every Fock build')
+            # NOTE: the parts are cut from the budget, and every rank has to cut
+            # the same ones or a rank would sweep a part no other rank knows of. The
+            # budget is therefore the smallest of the ranks' and not each one's own.
+            budget = min(self.comm.allgather(self._get_ri_memory_budget()))
 
-            self.ostream.print_info(
-                'Using the SIMD resolution of the identity (RI-J).')
-            self.ostream.print_info(
-                'Dimension of RI auxiliary basis set ' +
-                f'({basis_ri.get_label().upper()}): ' +
-                f'{basis_ri.get_dimensions_of_basis()}')
-            self.ostream.print_info(
-                f'Three-center integrals are {taken}, in ' +
-                f'{self._ri_drv.number_of_parts()} parts.')
-            self.ostream.print_blank()
-            self.ostream.flush()
+            # NOTE: as for RI-JK below, the way of building is the one ri_mode
+            # names and is not chosen from the memory. A calculation whose peak in
+            # the way which holds the integrals exceeds the budget falls back to the
+            # four-center integrals, and ri, ri_coulomb and ri_jk are left as they
+            # were set.
+            if mode == rimode.in_memory:
+                peak = self._ri_drv.peak_memory(molecule, ao_basis, basis_ri,
+                                                self.eri_thresh, budget,
+                                                self.rank, self.nodes)
+                peaks = self.comm.allgather(peak)
+                self._ri_fallback = (max(peaks) > budget)
+
+            if self._ri_fallback:
+                where = 'available' if self.nodes == 1 else 'on a rank'
+                self.ostream.print_warning(
+                    f'RI-J would need {max(peaks) / (1024**3):.2f} GB of ' +
+                    f'{budget / (1024**3):.2f} GB {where}, so the Coulomb ' +
+                    'matrices are formed from the four-center integrals.')
+                self.ostream.print_blank()
+                self.ostream.flush()
+
+                # NOTE: the driver is not kept unprepared, as what reads it after
+                # the SCF would take it for the one the matrices were formed with.
+                self._ri_drv = None
+
+            else:
+                # NOTE: the metric is inverted once on the master and handed to
+                # the ranks, for the reason the RI-JK path does it: the inversion
+                # picks its own fallback from the matrix, and two ranks choosing
+                # differently would build with metrics which are not the same.
+                metric = PackedMatrix()
+
+                if self.rank == mpi_master():
+                    metric = self._ri_drv.make_metric(molecule, basis_ri,
+                                                      self.ri_metric_threshold)
+
+                metric = metric.broadcast(self.comm, root=mpi_master())
+
+                # NOTE: the parts are what the ranks divide, so there have to be
+                # at least as many of them as there are ranks. Unlike the RI-JK
+                # path the auxiliary basis is not divided between the ranks by
+                # atom: both sweeps here run over parts, and a part is the unit
+                # either of them takes.
+                self._ri_drv.prepare(molecule, ao_basis, basis_ri,
+                                     self.eri_thresh, budget,
+                                     self.ri_metric_threshold, mode, metric,
+                                     self.rank, self.nodes)
+
+                # NOTE: the driver keeps a copy of its own, and this one would
+                # otherwise stay alive through every iteration below.
+                del metric
+
+                taken = ('held in memory'
+                         if self._ri_drv.get_mode() == rimode.in_memory else
+                         'formed again on every Fock build')
+
+                self.ostream.print_info(
+                    'Using the SIMD resolution of the identity (RI-J).')
+                self.ostream.print_info(
+                    'Dimension of RI auxiliary basis set ' +
+                    f'({basis_ri.get_label().upper()}): ' +
+                    f'{basis_ri.get_dimensions_of_basis()}')
+                if mode == rimode.in_memory and self.nodes == 1:
+                    self.ostream.print_info(
+                        f'RI-J needs at most {max(peaks) / (1024**3):.2f} ' +
+                        f'GB of {budget / (1024**3):.2f} GB available.')
+                elif mode == rimode.in_memory:
+                    self.ostream.print_info(
+                        f'RI-J needs at most {sum(peaks) / (1024**3):.2f} ' +
+                        f'GB over {self.nodes:d} ranks, at most ' +
+                        f'{max(peaks) / (1024**3):.2f} GB of ' +
+                        f'{budget / (1024**3):.2f} GB on a rank.')
+                self.ostream.print_info(
+                    f'Three-center integrals are {taken}, in ' +
+                    f'{self._ri_drv.number_of_parts()} parts.')
+                self.ostream.print_blank()
+                self.ostream.flush()
 
         elif use_ri_jk:
             if isinstance(self.ri_auxiliary_basis, str):
@@ -2062,9 +2107,9 @@ class ScfDriver:
                         self._ri_aux_atoms, range_separated, budget,
                         norbitals)
                 peaks = self.comm.allgather(peak)
-                self._ri_jk_fallback = (max(peaks) > budget)
+                self._ri_fallback = (max(peaks) > budget)
 
-            if self._ri_jk_fallback:
+            if self._ri_fallback:
                 where = 'available' if self.nodes == 1 else 'on a rank'
                 self.ostream.print_warning(
                     f'RI-JK would need {max(peaks) / (1024**3):.2f} GB of ' +
@@ -2101,13 +2146,13 @@ class ScfDriver:
 
             # NOTE: the driver is not kept unprepared, as what reads it after the
             # SCF would take it for the one the Fock matrices were formed with.
-            if self._ri_jk_fallback:
+            if self._ri_fallback:
                 self._ri_drv = None
                 self._ri_aux_atoms = []
 
         # NOTE: the metric and the B vectors, which a calculation which fell back
         # to the four-center integrals does not form.
-        if use_ri_jk and not self._ri_jk_fallback:
+        if use_ri_jk and not self._ri_fallback:
             ri_prep_t0 = tm.time()
 
             # NOTE: the metric is inverted once on the master and handed to the
@@ -3344,7 +3389,19 @@ class ScfDriver:
             True if the SIMD RI-JK driver forms the Fock matrices.
         """
 
-        return self.ri_jk and not self._ri_jk_fallback
+        return self.ri_jk and not self._ri_fallback
+
+    def _uses_ri_coulomb(self):
+        """
+        Checks whether the Coulomb matrices are formed with the SIMD RI-J driver,
+        which is what ri_coulomb asks for unless the calculation fell back to the
+        four-center integrals for want of memory.
+
+        :return:
+            True if the SIMD RI-J driver forms the Coulomb matrices.
+        """
+
+        return self.ri_coulomb and not self._ri_fallback
 
     def _prepare_for_ri_fock_build(self, fock_type):
         """
@@ -3443,7 +3500,7 @@ class ScfDriver:
 
         self._prepare_for_ri_fock_build(fock_type)
 
-        if self.ri_coulomb and fock_type == 'j':
+        if self._uses_ri_coulomb() and fock_type == 'j':
             fock_mat_np = self._simd_ri_j_fock(den_mat[0])
         elif self._uses_ri_jk() and fock_type != 'j':
             # NOTE: the driver returns twice the Coulomb less the scaled exchange
@@ -3537,7 +3594,7 @@ class ScfDriver:
         if fock_type == 'j':
             # for pure functional
             # den_mat_for_Jab is D_total
-            if self.ri_coulomb:
+            if self._uses_ri_coulomb():
                 # NOTE: the total density and no factor. A restricted build hands
                 # the density of one spin and doubles what comes back; here the two
                 # spins are already added, and the Coulomb matrix of the total

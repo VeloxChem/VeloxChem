@@ -68,6 +68,33 @@ class CSimdRIJFockDriver
                          const double            threshold,
                          const std::vector<int> &aux_atoms = {}) const -> size_t;
 
+    /// @brief Gets the most memory the way which holds the integrals reaches on
+    /// this rank.
+    /// @param threshold The screening threshold of the integrals.
+    /// @param memory_budget The budget the driver will be prepared with, which sets
+    /// the parts.
+    /// @param rank This rank, which decides which parts it holds.
+    /// @param nodes The ranks which divide the parts.
+    /// @return The memory in bytes, for the number of threads of the caller.
+    /// @note The parts are cut and dealt as prepare cuts and deals them, so what is
+    /// counted is what this rank will hold rather than an estimate of it. It is the
+    /// larger of two peaks. Forming the integrals holds those of the parts formed so
+    /// far beside the arena of each thread and two copies of the metric, the
+    /// caller's and the driver's; a build holds them beside the buffers of the two
+    /// sweeps and the matrices the caller hands over and expands.
+    /// @note A margin of a tenth is added to what is counted, so that the answer is
+    /// above the peak and a calculation it says fits does not run out of memory.
+    /// @note The memory is that of the driver alone, and not of the process: what a
+    /// calculation holds outside it, such as the grid of the exchange-correlation
+    /// functional, is not counted.
+    auto peak_memory(const CMolecule       &molecule,
+                     const CMolecularBasis &basis,
+                     const CMolecularBasis &aux_basis,
+                     const double           threshold,
+                     const size_t           memory_budget,
+                     const size_t           rank,
+                     const size_t           nodes) const -> size_t;
+
     /// @brief Forms the metric of the auxiliary basis, prepared for the fitting.
     /// @param metric_threshold The threshold of the linear dependence.
     /// @return The Cholesky factor of the metric, as a lower triangular matrix, or
@@ -177,6 +204,17 @@ class CSimdRIJFockDriver
 
     /// @brief Checks that an index names a part this driver sweeps.
     auto _check_part(const int index) const -> void;
+
+    /// @brief Gets the parts this rank owns, dealt round robin over the ranks.
+    /// @param nparts The parts there are.
+    /// @param rank This rank.
+    /// @param nodes The ranks which divide the parts.
+    /// @return The indices of the parts this rank owns.
+    static auto _deal_parts(const size_t nparts, const size_t rank, const size_t nodes) -> std::vector<int>;
+
+    /// @brief The margin peak_memory adds to the memory it counts, as the divisor
+    /// of it, as for the driver which also forms the exchange.
+    static constexpr size_t _peak_margin_divisor = 10;
 
     bool _prepared = false;
 
