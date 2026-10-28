@@ -395,12 +395,6 @@ class CSimdRIFockDriver
     /// allowance for each thread.
     auto coulomb_build_memory(const size_t nao, const size_t naux) const -> size_t;
 
-    /// @brief Gets the allowance for the descriptions of the blocks of a sparsity
-    /// pattern, which are allowed for rather than counted.
-    /// @param values The memory of the values the pattern describes, in bytes.
-    /// @return The allowance in bytes.
-    auto pattern_allowance(const size_t values) const -> size_t;
-
    private:
     /// @brief Computes the B vectors of one operator or of two.
     /// @param molecule The molecule to compute the B vectors of.

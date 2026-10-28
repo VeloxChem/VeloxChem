@@ -2593,12 +2593,6 @@ CSimdRIFockDriver::coulomb_build_memory(const size_t nao, const size_t naux) con
 }
 
 auto
-CSimdRIFockDriver::pattern_allowance(const size_t values) const -> size_t
-{
-    return values / _pattern_divisor;
-}
-
-auto
 CSimdRIFockDriver::_exchange_shape(const size_t nao, const size_t nocc, const size_t nfunctions) const
     -> std::pair<size_t, size_t>
 {

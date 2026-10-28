@@ -11,6 +11,8 @@
 #include "SimdRIJFockDriver.hpp"
 
 #include <algorithm>
+#include <cstdio>
+#include <cstdlib>
 #include <string>
 
 #ifdef __GLIBC__
@@ -51,26 +53,33 @@ CSimdRIJFockDriver::peak_memory(const CMolecule       &molecule,
     // hold beside them while one part is formed, which is the part with the widest
     // arena rather than the last one.
 
-    size_t held = 0, threads = 0;
+    const auto owned = _deal_parts(parts.size(), rank, nodes);
 
-    for (const auto index : _deal_parts(parts.size(), rank, nodes))
+    size_t held = 0, threads = 0, tensors = 0;
+
+    for (const auto index : owned)
     {
         const auto &part = parts[static_cast<size_t>(index)];
 
         held += simdri::pattern_memory(part);
 
         threads = std::max(threads, _drv.integrals_memory(part, basis, aux_basis));
+
+        tensors += part.description_memory();
     }
 
-    // NOTE: every rank keeps the descriptions of every part, and each tensor it
-    // holds a copy of its own part's; while the parts are cut, the description of
-    // the whole pattern they are cut from is alive as well.
+    // NOTE: the descriptions are counted, not allowed for. Every rank keeps the
+    // descriptions of every part, and each tensor it holds a copy of its own part's;
+    // while the parts are cut, the description of the whole pattern they are cut
+    // from is alive as well. An allowance of a share of the values charged every
+    // rank for the descriptions of the whole molecule at that share: 7.5 GB on a
+    // rank of 228 waters in def2-SVPD over sixteen ranks, against 0.2 GB measured.
 
-    const auto total = simdri::pattern_memory(pattern);
+    size_t described = tensors;
 
-    const auto described = _drv.pattern_allowance(total + held);
+    for (const auto &part : parts) described += part.description_memory();
 
-    const auto cutting = _drv.pattern_allowance(total);
+    const auto cutting = pattern.description_memory();
 
     // NOTE: the metric is a packed triangle. While the integrals are formed, the
     // caller's metric and the copy the driver keeps are both alive.
@@ -84,6 +93,22 @@ CSimdRIJFockDriver::peak_memory(const CMolecule       &molecule,
     const auto build = held + described + metric + _drv.coulomb_build_memory(basis.dimensions_of_basis(), naux);
 
     const auto peak = std::max(forming, build);
+
+    if (std::getenv("VLX_RIJK_PROFILE") != nullptr)
+    {
+        const auto gb = [](const size_t n) { return static_cast<double>(n) / (1024.0 * 1024.0 * 1024.0); };
+
+        std::printf("RIJ memory peak: %zu of %zu parts held, integrals %.3f GB of %.3f, descriptions %.3f, cutting "
+                    "%.3f, metric %.3f GB\n",
+                    owned.size(), parts.size(), gb(held), gb(simdri::pattern_memory(pattern)), gb(described),
+                    gb(cutting), gb(metric));
+
+        std::printf("RIJ memory peak: forming %.3f GB (threads %.3f), build %.3f GB (buffers %.3f), %.3f GB with the "
+                    "margin\n",
+                    gb(forming), gb(threads), gb(build),
+                    gb(_drv.coulomb_build_memory(basis.dimensions_of_basis(), naux)),
+                    gb(peak + peak / _peak_margin_divisor));
+    }
 
     return peak + peak / _peak_margin_divisor;
 }

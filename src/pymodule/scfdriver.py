@@ -3384,18 +3384,23 @@ class ScfDriver:
         on_this_node = max(self.comm.allgather(here).count(here), 1)
 
         # NOTE: two reserves. The node keeps a few gigabytes for itself, and every
-        # rank keeps what the rest of the SCF allocates after this is measured:
-        # the Fock, density and DIIS matrices and the exchange-correlation work,
-        # which go as the square of the basis. On two nodes of eight ranks each
-        # that was 17 to 22 matrices of the basis on a rank (0.4 to 1.4 GB, 1824
-        # to 2964 functions); a reserve of the node alone gave each rank 0.5 GB of
-        # it. The reserve is half again the most observed, and twice that for an
-        # open shell, which holds every matrix for each spin.
+        # rank keeps what the rest of the SCF allocates after this is measured,
+        # which goes as the square of the basis. It comes in two parts:
+        # - what the first build holds, the Fock and density matrices and the
+        #   exchange-correlation work: 18 matrices of the basis on a rank, the
+        #   same for RI-J and RI-JK (2964 functions, two nodes of eight ranks);
+        # - the DIIS history, which grows by 3 matrices an iteration until it
+        #   holds max_err_vecs of them and then stays (768 functions, 21
+        #   iterations).
+        # The first is reserved at a third again what was observed and the second
+        # as observed, each for each spin of an open shell. A reserve of the node
+        # alone gave a rank 0.5 GB of the 1.2 to 3.1 GB this comes to.
         node_reserve = 4 * 1024**3
 
         nao = ao_basis.get_dimensions_of_basis()
         nspins = 1 if self.scf_type == 'restricted' else 2
-        rank_reserve = max(32 * nspins * nao * nao * 8, 512 * 1024**2)
+        nmatrices = (24 + 3 * self.max_err_vecs) * nspins
+        rank_reserve = max(nmatrices * nao * nao * 8, 512 * 1024**2)
 
         free = available - node_reserve - on_this_node * rank_reserve
 

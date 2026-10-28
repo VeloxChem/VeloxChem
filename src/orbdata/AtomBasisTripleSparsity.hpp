@@ -261,6 +261,23 @@ class CAtomBasisTripleSparsity
                         const int    c_angular_momentum,
                         const size_t c_index) const -> size_t;
 
+    /// @brief Gets the memory the description of the block holds on the heap.
+    /// @return The memory in bytes of the atoms, counts and offsets the block
+    /// describes its values with, which a tensor or a pattern holding the block
+    /// holds beside the block itself and beside the values.
+    /// @note Each vector is counted at its capacity and with a word for its
+    /// allocation, which is what the allocator holds for it.
+    auto
+    description_memory() const -> size_t
+    {
+        const auto ints = _a_atoms.capacity() + _b_atoms.capacity() + _c_atoms.capacity();
+
+        const auto sizes = _counts.capacity() + _a_offsets.capacity() + _b_offsets.capacity() +
+                           _c_offsets.capacity() + _value_offsets.capacity();
+
+        return ints * sizeof(int) + sizes * sizeof(size_t) + 8 * 2 * sizeof(size_t);
+    }
+
     /// @brief Gets number of values required to store the integrals of all
     /// combinations of basis functions, i.e. the size of the values block.
     /// @return The number of values.

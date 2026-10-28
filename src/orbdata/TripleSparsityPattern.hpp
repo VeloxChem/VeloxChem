@@ -101,6 +101,22 @@ class CTripleSparsityPattern
         return _blocks;
     }
 
+    /// @brief Gets the memory the description of the blocks takes, beside the
+    /// values they describe.
+    /// @return The memory in bytes of the blocks and of what each of them holds on
+    /// the heap.
+    /// @note A tensor built on a pattern copies its blocks, so this is also what the
+    /// description of such a tensor takes.
+    auto
+    description_memory() const -> size_t
+    {
+        auto memory = _blocks.capacity() * sizeof(CAtomBasisTripleSparsity);
+
+        for (const auto &block : _blocks) memory += block.description_memory();
+
+        return memory;
+    }
+
     /// @brief Gets sparsity pattern of the block with specific index.
     /// @param index The index of block.
     /// @return The constant reference to the sparsity pattern.
