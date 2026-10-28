@@ -782,27 +782,36 @@ class RixsDriver(LinearSolver):
 
             # eta[(a, b)] = -[mu_b, A_a]: RHS of the second leg and bra of M
             eta = {}
-            B = {}
             for a in self.components:
                 grads = self._eff_excited_grad(
                     A[a], dip_ints_mo, nocc, norb, components=self.components
                 )
-                
+
                 for b, grad in zip(self.components, grads):
                     eta[(a, b)] = grad
 
-            vec_grad = {(f'{a}{b}', w): eta[(a, b)] 
-                        for (a, b) in pairs for w in rsp_drv.frequencies}
-            #{
-            #    (y, w): eta[x][y]
-            #    for y in self.components
-            #    for w in rsp_drv.frequencies
-            #}
-            # solve for all pairs (incident, outgoing) and all energy-loss frequencies
+            B = {}
+            for a in self.components:
+                vec_grad = {(b, w): eta[(a, b)]
+                            for b in self.components 
+                            for w in rsp_drv.frequencies
+                            }
+
+                B[a] = rsp_drv.compute(
+                    molecule, basis, scf_results, v_grad=vec_grad
+                )
+                solver_convergence.append(rsp_drv.is_converged)
+                
+            """
+            # slower but cleaner alternative to the above
+            #vec_grad = {(f'{a}{b}', w): eta[(a, b)] 
+            #            for (a, b) in pairs for w in rsp_drv.frequencies}
+
             B = rsp_drv.compute(
                 molecule, basis, scf_results, v_grad=vec_grad
             )
             solver_convergence.append(rsp_drv.is_converged)
+            """
 
             # (9,n)
             eta_mat = np.array([eta[ab] for ab in pairs])
@@ -817,7 +826,7 @@ class RixsDriver(LinearSolver):
 
                 B_mat = [
                     ComplexResponseSolver.get_full_solution_vector(
-                        B['solutions'][(f'{a}{b}', w)])
+                        B[a]['solutions'][(b, w)])
                     for (a, b) in pairs
                 ]
 
