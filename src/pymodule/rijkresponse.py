@@ -168,7 +168,8 @@ def initialize(solver, molecule, basis):
 
     solver._ri_jk_aux_basis = MolecularBasis.read(molecule,
                                                   solver.ri_auxiliary_basis,
-                                                  ostream=None)
+                                                  ostream=None,
+                                                  auxiliary_basis=True)
 
     solver._ri_jk_drv = SimdRIJKFockDriver()
 

@@ -630,7 +630,9 @@ class TddftGradientDriver(GradientDriver):
 
             if self.rank == mpi_master():
                 basis_ri_j = MolecularBasis.read(
-                    molecule, self._scf_drv.ri_auxiliary_basis)
+                    molecule,
+                    self._scf_drv.ri_auxiliary_basis,
+                    auxiliary_basis=True)
             else:
                 basis_ri_j = None
             basis_ri_j = self.comm.bcast(basis_ri_j, root=mpi_master())
@@ -705,7 +707,9 @@ class TddftGradientDriver(GradientDriver):
 
             if self.rank == mpi_master():
                 basis_ri_jk = MolecularBasis.read(
-                    molecule, self._scf_drv.ri_auxiliary_basis)
+                    molecule,
+                    self._scf_drv.ri_auxiliary_basis,
+                    auxiliary_basis=True)
             else:
                 basis_ri_jk = None
             basis_ri_jk = self.comm.bcast(basis_ri_jk, root=mpi_master())

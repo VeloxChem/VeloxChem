@@ -184,8 +184,10 @@ class ScfGradientDriver(GradientDriver):
                 f'mode, which has no gradient. {advice}')
             return
 
-        aux_basis = MolecularBasis.read(
-            molecule, self.scf_driver.ri_auxiliary_basis, ostream=None)
+        aux_basis = MolecularBasis.read(molecule,
+                                        self.scf_driver.ri_auxiliary_basis,
+                                        ostream=None,
+                                        auxiliary_basis=True)
 
         # NOTE: the whole molecule is a list of every atom. An empty list is no
         # atoms, which needs no memory.
@@ -935,7 +937,9 @@ class ScfGradientDriver(GradientDriver):
                 'Using the SIMD resolution of the identity (RI-J) gradient.')
 
             basis_ri_j = MolecularBasis.read(
-                molecule, self.scf_driver.ri_auxiliary_basis)
+                molecule,
+                self.scf_driver.ri_auxiliary_basis,
+                auxiliary_basis=True)
 
             t0 = time.time()
 
@@ -990,7 +994,9 @@ class ScfGradientDriver(GradientDriver):
                 'Using the SIMD resolution of the identity (RI-JK) gradient.')
 
             basis_ri_jk = MolecularBasis.read(
-                molecule, self.scf_driver.ri_auxiliary_basis)
+                molecule,
+                self.scf_driver.ri_auxiliary_basis,
+                auxiliary_basis=True)
 
             nao = D.shape[0]
 
@@ -1234,7 +1240,9 @@ class ScfGradientDriver(GradientDriver):
                 'Using the SIMD resolution of the identity (RI-JK) gradient.')
 
             basis_ri_jk = MolecularBasis.read(
-                molecule, self.scf_driver.ri_auxiliary_basis)
+                molecule,
+                self.scf_driver.ri_auxiliary_basis,
+                auxiliary_basis=True)
 
             nao = Da.shape[0]
 
@@ -1301,7 +1309,9 @@ class ScfGradientDriver(GradientDriver):
                 'Using the SIMD resolution of the identity (RI-J) gradient.')
 
             basis_ri_j = MolecularBasis.read(
-                molecule, self.scf_driver.ri_auxiliary_basis)
+                molecule,
+                self.scf_driver.ri_auxiliary_basis,
+                auxiliary_basis=True)
 
             t0 = time.time()
 

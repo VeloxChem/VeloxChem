@@ -9,13 +9,13 @@ from veloxchem.scfrestdriver import ScfRestrictedDriver
 @pytest.mark.solvers
 class TestGhostAtom:
 
-    def run_scf(self, molstr, molstr_units, basis_label):
+    def run_scf(self, molstr, molstr_units, basis_label, ri):
 
         molecule = Molecule.read_molecule_string(molstr, units=molstr_units)
         basis = MolecularBasis.read(molecule, basis_label, ostream=None)
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_results = scf_drv.compute(molecule, basis)
 
@@ -27,7 +27,12 @@ class TestGhostAtom:
 
         return scf_energy
 
-    def test_ghost_atom(self):
+    # NOTE: with RI, Hartree-Fock runs RI-JK and is compared with the
+    # four-center reference within the error of the fitting. The basis set
+    # labels of the atoms in the mixed basis test once became the fitting basis
+    # of those atoms as well, which was off by a quarter of a hartree.
+    @pytest.mark.parametrize('ri, tol', [(False, 1.0e-8), (True, 1.0e-4)])
+    def test_ghost_atom(self, ri, tol):
 
         nh3_str = """
         N   -3.710    3.019   -0.037
@@ -57,12 +62,11 @@ class TestGhostAtom:
 
         molstr_units = 'bohr'
         basis_label = 'def2-svp'
-        tol = 1.0e-8
 
         e_nh3_in_dimer = self.run_scf(nh3_str + '\n' + ch4_bq_str, molstr_units,
-                                      basis_label)
+                                      basis_label, ri)
         e_ch4_in_dimer = self.run_scf(nh3_bq_str + '\n' + ch4_str, molstr_units,
-                                      basis_label)
+                                      basis_label, ri)
 
         calc_energies = {
             'nh3_in_dimer': e_nh3_in_dimer,
@@ -72,7 +76,8 @@ class TestGhostAtom:
         for key in calc_energies:
             assert abs(calc_energies[key] - ref_energies[key]) < tol
 
-    def test_ghost_atom_mixed_basis(self):
+    @pytest.mark.parametrize('ri, tol', [(False, 1.0e-8), (True, 1.0e-4)])
+    def test_ghost_atom_mixed_basis(self, ri, tol):
 
         nh3_str = """
         N   -3.710    3.019   -0.037  def2-svpd
@@ -102,12 +107,11 @@ class TestGhostAtom:
 
         molstr_units = 'bohr'
         basis_label = 'sto-3g'
-        tol = 1.0e-8
 
         e_nh3_in_dimer = self.run_scf(nh3_str + '\n' + ch4_bq_str, molstr_units,
-                                      basis_label)
+                                      basis_label, ri)
         e_ch4_in_dimer = self.run_scf(nh3_bq_str + '\n' + ch4_str, molstr_units,
-                                      basis_label)
+                                      basis_label, ri)
 
         calc_energies = {
             'nh3_in_dimer': e_nh3_in_dimer,

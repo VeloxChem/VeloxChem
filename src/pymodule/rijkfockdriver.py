@@ -117,7 +117,9 @@ class RIJKFockDriver:
                 self.ostream.flush()
 
             if isinstance(basis, str):
-                basis_ri = MolecularBasis.read(molecule, basis)
+                basis_ri = MolecularBasis.read(molecule,
+                                               basis,
+                                               auxiliary_basis=True)
             else:
                 basis_ri = MolecularBasis(basis)
 
@@ -184,7 +186,9 @@ class RIJKFockDriver:
 
         if isinstance(auxiliary_basis, str):
             if self.rank == mpi_master():
-                basis_ri = MolecularBasis.read(molecule, auxiliary_basis)
+                basis_ri = MolecularBasis.read(molecule,
+                                               auxiliary_basis,
+                                               auxiliary_basis=True)
             else:
                 basis_ri = None
             basis_ri = self.comm.bcast(basis_ri, root=mpi_master())
@@ -238,7 +242,9 @@ class RIJKFockDriver:
 
         if isinstance(auxiliary_basis, str):
             if self.rank == mpi_master():
-                basis_ri = MolecularBasis.read(molecule, auxiliary_basis)
+                basis_ri = MolecularBasis.read(molecule,
+                                               auxiliary_basis,
+                                               auxiliary_basis=True)
             else:
                 basis_ri = None
             basis_ri = self.comm.bcast(basis_ri, root=mpi_master())
@@ -515,7 +521,9 @@ class RIJKFockDriver:
 
         if isinstance(auxiliary_basis, str):
             if self.rank == mpi_master():
-                basis_ri = MolecularBasis.read(molecule, auxiliary_basis)
+                basis_ri = MolecularBasis.read(molecule,
+                                               auxiliary_basis,
+                                               auxiliary_basis=True)
             else:
                 basis_ri = None
             basis_ri = self.comm.bcast(basis_ri, root=mpi_master())

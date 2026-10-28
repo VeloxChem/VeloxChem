@@ -317,7 +317,10 @@ def _gen_basis_key(elem_name, basis_dict):
     return basis_key
 
 
-def _get_atom_bas_label(basis_name, atom_basis_labels, idx):
+def _get_atom_bas_label(basis_name,
+                        atom_basis_labels,
+                        idx,
+                        auxiliary_basis=False):
     """
     Gets atom basis label.
 
@@ -327,11 +330,20 @@ def _get_atom_bas_label(basis_name, atom_basis_labels, idx):
         The list of atom basis labels.
     :param idx:
         The index of the atom.
+    :param auxiliary_basis:
+        Whether the basis set is an auxiliary (fitting) basis set, which the
+        basis set labels of the atoms do not apply to.
     :return:
         The atom basis label.
     """
 
-    if basis_name.upper() in ['AO-START-GUESS', 'AO-START-GUESS-FOR-ECP']:
+    # NOTE: the basis set label given to an atom in the molecule names its
+    # orbital basis set. It does not apply to the basis set of the starting
+    # guess, nor to an auxiliary basis set, which would otherwise take that
+    # orbital basis set as its fitting functions.
+    if auxiliary_basis or basis_name.upper() in [
+            'AO-START-GUESS', 'AO-START-GUESS-FOR-ECP'
+    ]:
         atom_bas_label = basis_name.upper()
     else:
         atom_bas_label = atom_basis_labels[idx].upper()
@@ -346,7 +358,8 @@ def _MolecularBasis_read(molecule,
                          basis_name,
                          basis_path='.',
                          ostream=None,
-                         verbose=False):
+                         verbose=False,
+                         auxiliary_basis=False):
     """
     Reads AO basis set from file for given molecule.
 
@@ -358,6 +371,11 @@ def _MolecularBasis_read(molecule,
         Path to the basis set.
     :param ostream:
         The output stream.
+    :param auxiliary_basis:
+        Whether the basis set is an auxiliary (fitting) basis set, such as the
+        one of the resolution of the identity. Every atom is then given the
+        named basis set, and the basis set labels of the atoms in the molecule,
+        which name their orbital basis sets, are not applied.
 
     :return:
         The molecular basis set.
@@ -383,7 +401,8 @@ def _MolecularBasis_read(molecule,
     need_def2_ecp = False
     ecp_elem_id_mininum = 37
     for idx, elem_id in enumerate(molecule.get_identifiers()):
-        atom_bas_label = _get_atom_bas_label(basis_name, atom_basis_labels, idx)
+        atom_bas_label = _get_atom_bas_label(basis_name, atom_basis_labels, idx,
+                                             auxiliary_basis)
         if (elem_id >= ecp_elem_id_mininum) and (
                 atom_bas_label.startswith('DEF2-')):
             need_def2_ecp = True
@@ -391,7 +410,7 @@ def _MolecularBasis_read(molecule,
 
     # read atom basis sets defined in molecule
     for atom_bas_label in set(atom_basis_labels):
-        if atom_bas_label != '':
+        if atom_bas_label != '' and not auxiliary_basis:
             basis_dict[atom_bas_label.upper()] = _read_basis_file(
                 atom_bas_label, basis_path, ostream)
 
@@ -408,7 +427,8 @@ def _MolecularBasis_read(molecule,
     mol_basis = MolecularBasis()
 
     for idx, elem_id in enumerate(molecule.get_identifiers()):
-        atom_bas_label = _get_atom_bas_label(basis_name, atom_basis_labels, idx)
+        atom_bas_label = _get_atom_bas_label(basis_name, atom_basis_labels, idx,
+                                             auxiliary_basis)
 
         basis_key = _gen_basis_key(atom_basis_elements[idx],
                                    basis_dict[atom_bas_label])

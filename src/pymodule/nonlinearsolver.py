@@ -350,8 +350,10 @@ class NonlinearSolver:
             The AO basis set.
         """
 
-        basis_ri = MolecularBasis.read(molecule, self.ri_auxiliary_basis,
-                                       ostream=None)
+        basis_ri = MolecularBasis.read(molecule,
+                                       self.ri_auxiliary_basis,
+                                       ostream=None,
+                                       auxiliary_basis=True)
 
         self._ri_drv = SimdRIJFockDriver()
 

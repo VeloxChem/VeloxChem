@@ -9,13 +9,13 @@ from veloxchem.scfrestdriver import ScfRestrictedDriver
 @pytest.mark.solvers
 class TestMixedBasis:
 
-    def run_scf(self, molstr, molstr_units, basis_label):
+    def run_scf(self, molstr, molstr_units, basis_label, ri):
 
         molecule = Molecule.read_molecule_string(molstr, units=molstr_units)
         basis = MolecularBasis.read(molecule, basis_label, ostream=None)
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_results = scf_drv.compute(molecule, basis)
 
@@ -27,7 +27,12 @@ class TestMixedBasis:
 
         return scf_energy
 
-    def test_mixed_basis(self):
+    # NOTE: with RI, Hartree-Fock runs RI-JK and is compared with the
+    # four-center reference within the error of the fitting. The basis set
+    # labels of the atoms once became the fitting basis of those atoms as well,
+    # which was off by half a hartree.
+    @pytest.mark.parametrize('ri, tol', [(False, 1.0e-7), (True, 1.0e-4)])
+    def test_mixed_basis(self, ri, tol):
 
         nh3_str = """
         N   -3.710    3.019   -0.037   def2-svpd
@@ -48,9 +53,8 @@ class TestMixedBasis:
 
         molstr_units = 'bohr'
         basis_label = 'sto-3g'
-        tol = 1.0e-7
 
         e_mixed_basis = self.run_scf(nh3_str + '\n' + ch4_str, molstr_units,
-                                     basis_label)
+                                     basis_label, ri)
 
         assert abs(e_mixed_basis - (-96.27701050)) < tol

@@ -1881,10 +1881,9 @@ class ScfDriver:
         use_ri_jk = self.ri_jk and fock_type != 'j'
 
         if use_ri_coulomb:
-            if isinstance(self.ri_auxiliary_basis, str):
-                basis_ri = MolecularBasis.read(molecule, self.ri_auxiliary_basis)
-            else:
-                basis_ri = MolecularBasis(self.ri_auxiliary_basis)
+            basis_ri = MolecularBasis.read(molecule,
+                                           self.ri_auxiliary_basis,
+                                           auxiliary_basis=True)
 
             self._ri_drv = SimdRIJFockDriver()
 
@@ -1990,10 +1989,9 @@ class ScfDriver:
                 self.ostream.flush()
 
         elif use_ri_jk:
-            if isinstance(self.ri_auxiliary_basis, str):
-                basis_ri = MolecularBasis.read(molecule, self.ri_auxiliary_basis)
-            else:
-                basis_ri = MolecularBasis(self.ri_auxiliary_basis)
+            basis_ri = MolecularBasis.read(molecule,
+                                           self.ri_auxiliary_basis,
+                                           auxiliary_basis=True)
 
             self._ri_drv = SimdRIJKFockDriver()
 
