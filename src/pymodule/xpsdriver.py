@@ -117,7 +117,7 @@ class XPSDriver:
         self.density_damping = True
 
         self.shake_ups = False
-        # Temporarily only enabled w/ TDA, but might be preferred for stability over RPA as well
+        # Only enabled w/ TDA, for stability over RPA
         self.tamm_dancoff = True
         # Number of TOTAL states to compute per core ionization (if shake_ups is True)
         # TODO: change so that nstates refers only to shake-ups and exclude emission
@@ -622,9 +622,8 @@ class XPSDriver:
             The shake-up intensity (float).
         """
 
-        assert_msg_critical(
-                        tda,
-                        'Only enabled in the TDA approximation currently.')
+        assert_msg_critical(tda,
+                        'Only enabled in the TDA approximation.')
         
         S = gs_scf_results['S']
         norb = gs_scf_results['C_alpha'].shape[1]
