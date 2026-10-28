@@ -1,9 +1,11 @@
 import pytest
 
-from veloxchem.veloxchemlib import mpi_master
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
+
+pytest.importorskip('py3Dmol')
+
 
 @pytest.mark.solvers
 class TestCpcmVisualization:
@@ -31,9 +33,14 @@ class TestCpcmVisualization:
         scf_drv.ostream.mute()
         scf_drv.compute(mol, bas)
 
+        assert scf_drv.cpcm_drv.cpcm_grid is not None
+        assert scf_drv.cpcm_drv.cpcm_grid.shape[1] == 6
+
         scf_drv.cpcm_drv.visualize_cpcm_grid(mol)
 
     def test_cpcm_visualize_cpcm_charges(self):
+        pytest.importorskip('matplotlib.pyplot')
+
         xyz_string = """6
         xyz
         O   -0.1858140  -1.1749469   0.7662596
@@ -55,6 +62,11 @@ class TestCpcmVisualization:
 
         scf_drv.ostream.mute()
         scf_drv.compute(mol, bas)
+
+        assert scf_drv.cpcm_drv.cpcm_grid is not None
+        assert scf_drv.cpcm_drv.cpcm_q is not None
+        assert (scf_drv.cpcm_drv.cpcm_q.shape[0] ==
+                scf_drv.cpcm_drv.cpcm_grid.shape[0])
 
         scf_drv.cpcm_drv.visualize_cpcm_charges(mol)
 

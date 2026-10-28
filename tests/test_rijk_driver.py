@@ -63,3 +63,44 @@ class TestRIMODriver:
 
         assert np.max(np.abs(kmat_ref.to_numpy() - kmat.to_numpy())) < 1e-3
         assert np.max(np.abs(jmat_ref.to_numpy() - jmat.to_numpy())) < 1e-3
+
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='single MPI process only')
+    def test_density_factor_matches_exact_k_for_fractional_density(self):
+
+        mol_h2o, bas_sto3g, bas_aux = self.get_data_h2o()
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ostream.mute()
+        scf_drv.compute(mol_h2o, bas_sto3g)
+
+        C = scf_drv.molecular_orbitals.alpha_to_numpy()
+        occ = np.zeros(C.shape[1])
+        occ[:5] = 0.9
+        occ[5] = 0.1
+        d_np = C @ np.diag(occ) @ C.T
+        d_np = 0.5 * (d_np + d_np.T)
+
+        dmat = make_matrix(bas_sto3g, mat_t.symmetric)
+        dmat.set_values(d_np)
+
+        ri_fock_drv = RIJKFockDriver()
+        ri_fock_drv.compute_metric(mol_h2o, bas_aux, verbose=False)
+        ri_fock_drv.compute_bq_vectors(mol_h2o,
+                                       bas_sto3g,
+                                       bas_aux,
+                                       verbose=False)
+
+        kmat = ri_fock_drv.compute_k_fock(dmat,
+                                          None,
+                                          use_density_factor=True,
+                                          verbose=False)
+
+        t4c_drv = T4CScreener()
+        t4c_drv.partition(bas_sto3g, mol_h2o, "eri")
+
+        fock_drv = FockDriver()
+        kmat_ref = fock_drv._compute_fock_omp(t4c_drv, dmat, "k", 0.0, 0.0,
+                                              15)
+
+        assert np.max(np.abs(kmat_ref.to_numpy() - kmat.to_numpy())) < 1e-3
