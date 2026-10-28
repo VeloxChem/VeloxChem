@@ -90,7 +90,7 @@ class RixsDriver(LinearSolver):
 
         self.tamm_dancoff = False
 
-        self.old_tdms = True
+        self.old_tdms = False
         # method settings
         self.photon_energy = None
         self.core_resonances = None
@@ -321,6 +321,8 @@ class RixsDriver(LinearSolver):
             cvs_rsp_results = core_rsp_drv.compute(molecule, basis, scf_results)
             self.ostream.print_info('...done.')
 
+        n_comp = len(self.components)
+        
         num_final_xsections         = len(self.energyloss_frequencies)
         self.ene_losses             = np.zeros((num_final_xsections, len(self.photon_energy)))
         self.emission_enes          = np.zeros((num_final_xsections, len(self.photon_energy)))
@@ -328,16 +330,13 @@ class RixsDriver(LinearSolver):
         self.elastic_cross_sections = np.zeros((len(self.photon_energy)))
         #self.scattering_amplitudes  = np.zeros((num_final_xsections, len(self.photon_energy),
         #                                       3, 3), dtype=complex)
+        self.rsp_tensor = np.zeros((num_final_xsections, len(self.photon_energy), n_comp, n_comp, n_comp, n_comp), dtype=complex)
 
-        n_comp = len(self.components)
         C = scf_results['C_alpha']
         dip = compute_electric_dipole_integrals(molecule, basis, [0.0, 0.0, 0.0])
         #dip_ints_mo = [C.T @ dip_x_ao.T @ C for comp, dip_x_ao in dip_ints.items()]
         dip_ints_mo = {comp: C.T @ dip_x_ao.T @ C for comp, dip_x_ao in zip(self.components, dip)}
 
-        N_w = len(self.photon_energy)
-        N_em = len(self.energyloss_frequencies)
-        rsp_tensor = np.zeros((N_w, N_em, n_comp, n_comp, n_comp, n_comp), dtype=complex)
         # TODO: make stable for len(self.photon_energy) = 1
         for n_ind, w_ex in enumerate(self.photon_energy):
             self.ostream.print_info(
@@ -382,50 +381,46 @@ class RixsDriver(LinearSolver):
                     molecule, basis, scf_results, v_grad=vec_grad
                 )
             
+            # (9,n)
+            eta_mat = np.array([
+                eta[x][y] 
+                for y in self.components 
+                for x in self.components
+            ])
+
             for f_ind, w in enumerate(rsp_drv.frequencies):
                 w_em = w_ex - w
-                
-                #rsp_func = 0.0
 
-                # (9,n)
-                eta_mat = np.array([
-                    eta[x][y] 
-                    for y in self.components 
+                B_mat = np.array([
+                    rsp_drv.get_full_solution_vector(B[x]['solutions'][(y, w)])
+                    for y in self.components
                     for x in self.components
                 ])
 
-                for ind_x, x in enumerate(self.components):
-                    #A_x = A_adv[x]
-                    #lam_solutions = B_xy[x]['solutions']
+                # T[(x', y'), (x, y)] = -Im < eta_{y'x'} | B_{yx} >
+                M = (np.conjugate(eta_mat) @ B_mat.T).reshape(n_comp, n_comp, n_comp, n_comp)
+                T = M.imag
 
-                    for ind_y, y in enumerate(self.components):
-                        B_yx = rsp_drv.get_full_solution_vector(
-                            B[x]['solutions'][(y, w)]
-                        )
-                        # <eta_yx | B_yx> = eta^dagger B
-                        #A_xy_sol = self.eff_excited_grad(
-                        #    molecule,
-                        #    basis,
-                        #    scf_results,
-                        #    A_x,
-                        #    dip_ints_mo=dip_ints_mo,
-                        #    components=y,
-                        #)[0]
-
-                        #B_rho_lam = rsp_drv.get_full_solution_vector(
-                        #    lam_solutions[(rho, w)]
-                        #)
-                        #for rho in self.components:
-                        #rsp_func -= np.dot(A_x, mu_rho_B).imag
-                        #rsp_func -= np.dot(A_xy_sol, B_xy_sol).imag
-                        rsp_tensor[ind_x, ind_y] = -1.0 * np.vdot(eta[x][y], B_yx).imag
+                # TODO: rewrite without einsum
+                # sum_xy |F_xy|^2
+                T1 = np.einsum('xyxy ->', T)
+                # sum_xy F_xy F^*_yx
+                T2 = np.einsum('xyyx ->', T)
+                # sum_xy F_xx F^*_yy
+                T3 = np.einsum('xxyy ->', T)
 
                 # TODO: fix correct constants
-                pref = -16.0 * np.pi * w_em**3 * w_ex * fine_structure_constant()**2
+                #pref = -16.0 * np.pi * w_em**3 * w_ex * fine_structure_constant()**2
+                pref = fine_structure_constant()**4 * w_em**3 * w_ex / np.pi
+                sigma = pref * (1.0/15.0) * (
+                            (2.0 - 0.5 * np.sin(self.theta)**2) * T1 +
+                            (0.75 * np.sin(self.theta)**2 - 0.5) * (T2 + T3)
+                            )
 
                 self.ene_losses[f_ind, n_ind] = w
                 self.emission_enes[f_ind, n_ind] = w_em
-                self.cross_sections[f_ind, n_ind] = pref * rsp_func
+                self.cross_sections[f_ind, n_ind] = sigma
+                self.rsp_tensor[f_ind, n_ind] = M
 
             if self.rank == mpi_master():
                 #self.elastic_cross_sections[w_ind] = self.cross_section(F_elastic).real
@@ -1264,7 +1259,7 @@ class RixsDriver(LinearSolver):
 
         Z = self.lrvec2mat(response_vec, nocc, norb)
 
-        sqrt_2 = np.sqrt(2.0)
+        #sqrt_2 = np.sqrt(2.0)
         grads = []
         for comp in components:
             #dip_x_ao = dip_ints[comp]
@@ -1273,7 +1268,7 @@ class RixsDriver(LinearSolver):
             # dip_x_mo @ Z - Z @ dip_x_mo
             grad = self.commut(dip_ints_mo[comp], Z)
 
-            grad_vec = -1.0 * sqrt_2 * self.lrmat2vec(grad, nocc, norb)
+            grad_vec = -1.0 * self.lrmat2vec(grad, nocc, norb)
             grads.append(grad_vec)
 
         return tuple(grads)
