@@ -43,7 +43,8 @@ class TestRIMODriver:
         packed_coeffs.from_numpy(np.ascontiguousarray(coeffs))
 
         ri_fock_drv = SimdRIJKFockDriver()
-        ri_fock_drv.prepare(mol, bas, aux_bas, 0.0, 1 << 30)
+        ri_fock_drv.prepare(mol, bas, aux_bas, 0.0, 1 << 30,
+                            aux_atoms=list(range(mol.number_of_atoms())))
 
         # NOTE: the driver answers with twice the Coulomb less the scaled
         # exchange, so a factor of zero leaves twice the Coulomb and a factor of

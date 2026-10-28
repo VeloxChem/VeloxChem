@@ -236,6 +236,8 @@ class ScfDriver:
         self.ri_metric_route = 'cholesky'
         self.ri_dense_threshold = 0.0
         self.ri_memory_budget = None
+        # NOTE: the auxiliary atoms this rank holds. An empty list is none of them,
+        # and the whole molecule is a list of every atom.
         self._ri_aux_atoms = []
         self.ri_mode = 'in_memory'
         self._ri_drv = None
@@ -2033,8 +2035,17 @@ class ScfDriver:
             # when the last rank ends: at fourteen ranks the slowest transform was
             # 3.3 times the quickest, while every rank's own share had fallen with
             # the ranks exactly as it should.
+            # NOTE: **a list of atoms is those atoms, and an empty list is none.**
+            # One rank is given every atom by name. A rank of more ranks than the
+            # molecule has atoms of any weight is dealt none of them, and the
+            # driver reads its empty share as such: it holds no B vectors and
+            # answers zeros. An empty list once meant the whole molecule as well,
+            # and such a rank formed the whole molecule's B vectors and added a
+            # whole Fock matrix to the others' shares.
+            all_atoms = list(range(molecule.number_of_atoms()))
+
             if self.nodes == 1:
-                self._ri_aux_atoms = []
+                self._ri_aux_atoms = all_atoms
             else:
                 weights = self._ri_drv.aux_atom_weights(molecule, ao_basis,
                                                         basis_ri,
@@ -2042,20 +2053,12 @@ class ScfDriver:
                 self._ri_aux_atoms = molecule.partition_atoms_by_weight(
                     self.comm, weights)
 
-            # NOTE: a rank which was dealt no auxiliary atoms holds none of them,
-            # and its list is empty, which the driver reads as the whole molecule
-            # wherever it takes a list of atoms. It is told apart here, once, and
-            # every call below is given the answer rather than the empty list: the
-            # B vectors such a rank was said to need were those of the molecule,
-            # and the largest over the ranks printed them for a molecule of fewer
-            # atoms than ranks.
-            holds_nothing = (self.nodes > 1) and (len(self._ri_aux_atoms) == 0)
-
             budget = self._get_ri_memory_budget(ao_basis)
 
-            needed = (0 if holds_nothing else self._ri_drv.required_memory(
-                molecule, ao_basis, basis_ri, self.eri_thresh,
-                self._ri_aux_atoms, range_separated))
+            needed = self._ri_drv.required_memory(molecule, ao_basis, basis_ri,
+                                                  self.eri_thresh,
+                                                  self._ri_aux_atoms,
+                                                  range_separated)
 
             # NOTE: whether RI-JK is used at all has to be decided the same on
             # every rank, as the ranks add shares of one Fock matrix. The shares
@@ -2102,8 +2105,7 @@ class ScfDriver:
             # across the whole of it. Every rank therefore holds the whole of the
             # auxiliary basis, and the division is made in the build.
             if mode == rimode.direct:
-                self._ri_aux_atoms = []
-                holds_nothing = False
+                self._ri_aux_atoms = all_atoms
 
             # NOTE: the B vectors are not the most the way which holds them
             # reaches. Forming them holds a batch of the integrals beside them, and
@@ -2124,13 +2126,11 @@ class ScfDriver:
                 # out of step.
                 norbitals = self._get_ri_jk_max_orbitals(
                     molecule, ao_basis, den_mat)
-                if holds_nothing:
-                    peak = 0
-                else:
-                    peak = self._ri_drv.peak_memory(
-                        molecule, ao_basis, basis_ri, self.eri_thresh,
-                        self._ri_aux_atoms, range_separated, budget,
-                        norbitals)
+                peak = self._ri_drv.peak_memory(molecule, ao_basis, basis_ri,
+                                                self.eri_thresh,
+                                                self._ri_aux_atoms,
+                                                range_separated, budget,
+                                                norbitals)
                 peaks = self.comm.allgather(peak)
                 self._ri_fallback = (max(peaks) > budget)
                 if not self._ri_fallback:
@@ -2227,15 +2227,20 @@ class ScfDriver:
             # a build, measured on two nodes. At least one part per rank is asked for
             # so there is something for each of them to take.
             # NOTE: an empty share of the auxiliary atoms means this rank was dealt
-            # none of them, and not that it should take all of them. The driver
-            # cannot tell the two apart from its arguments, so it is told, by the
-            # flag set where the atoms were dealt. The direct way sweeps the whole
-            # auxiliary basis on every rank, so no rank of it holds nothing.
+            # none of them. The direct way sweeps the whole auxiliary basis on
+            # every rank, so every rank of it is given every atom.
             self._ri_drv.prepare(molecule, ao_basis, basis_ri, self.eri_thresh,
                                  budget, self.ri_metric_threshold,
                                  use_inverse_square_root, mode,
                                  self._ri_aux_atoms, metric, self.nodes,
-                                 omega, metric_erf, holds_nothing)
+                                 omega, metric_erf)
+
+            # NOTE: the ranks' shares have to cover the auxiliary basis between
+            # them, once, or the Fock matrix they add up to is not the whole
+            # one. prepare takes no atoms by default, and a call which left them
+            # out would build every Fock matrix without the two-electron part
+            # and say nothing.
+            self._check_ri_aux_functions(self._ri_drv, basis_ri, self.comm)
 
             # NOTE: the driver keeps copies of its own, and these would otherwise
             # stay alive through every iteration below, a second set of the
@@ -3420,6 +3425,35 @@ class ScfDriver:
         free = available - node_reserve - on_this_node * rank_reserve
 
         return int(max(free, 0.25 * available) / on_this_node)
+
+    @staticmethod
+    def _check_ri_aux_functions(ri_drv, basis_ri, comm):
+        """
+        Checks that the ranks of a prepared SIMD RI-JK driver hold the auxiliary
+        basis between them: every function once over the ranks in the way which
+        holds the B vectors, and every function on every rank in the direct way.
+
+        :param ri_drv:
+            The prepared SIMD RI-JK driver.
+        :param basis_ri:
+            The auxiliary basis.
+        :param comm:
+            The communicator the driver's ranks are on.
+        """
+
+        naux = basis_ri.get_dimensions_of_basis()
+
+        held = comm.allgather(ri_drv.number_of_aux_functions())
+
+        if ri_drv.get_mode() == rimode.direct:
+            covered = all(nheld == naux for nheld in held)
+        else:
+            covered = (sum(held) == naux)
+
+        assert_msg_critical(
+            covered, 'SCF driver: the ranks hold ' +
+            f'{held} of {naux} auxiliary functions, which is not the ' +
+            'auxiliary basis once over the ranks')
 
     def _get_ri_rank_reserve(self, ao_basis):
         """

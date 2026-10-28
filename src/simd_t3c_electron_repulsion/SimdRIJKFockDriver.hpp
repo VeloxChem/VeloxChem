@@ -102,10 +102,11 @@ class CSimdRIJKFockDriver
     /// @param basis The molecular basis.
     /// @param aux_basis The auxiliary molecular basis.
     /// @param threshold The screening threshold.
-    /// @param aux_atoms The atoms of the auxiliary basis to answer for, or none of
-    /// them to answer for all of them. A rank of a communicator asks for its own
+    /// @param aux_atoms The atoms of the auxiliary basis to answer for, a list of
+    /// every atom for the whole molecule. A rank of a communicator asks for its own
     /// share, as answering the memory of the whole molecule would put every rank on
-    /// the direct way for a calculation each of them holds a fitting share of.
+    /// the direct way for a calculation each of them holds a fitting share of. An
+    /// empty share holds nothing and answers zero.
     /// @return The memory of the B vectors in bytes.
     /// @note The sparsity pattern of the B vectors is described to answer this,
     /// which is what the driver would do anyway and is a small part of forming
@@ -119,7 +120,7 @@ class CSimdRIJKFockDriver
                          const CMolecularBasis  &basis,
                          const CMolecularBasis  &aux_basis,
                          const double            threshold,
-                         const std::vector<int> &aux_atoms       = {},
+                         const std::vector<int> &aux_atoms,
                          const bool              range_separated = false) const -> size_t;
 
     /// @brief Gets the most memory the way which holds the B vectors reaches.
@@ -128,7 +129,8 @@ class CSimdRIJKFockDriver
     /// @param aux_basis The auxiliary molecular basis.
     /// @param threshold The screening threshold.
     /// @param aux_atoms The atoms of the auxiliary basis this driver holds, as for
-    /// required_memory.
+    /// required_memory. An empty share forms no B vectors and builds nothing, and
+    /// answers the metrics it is handed and keeps.
     /// @param range_separated True for a hybrid range separated functional.
     /// @param memory_budget The budget the driver will be prepared with, which sets
     /// the range of the W matrices.
@@ -223,10 +225,15 @@ class CSimdRIJKFockDriver
     /// dependent has no Cholesky factor to invert, and the square root is inverted
     /// instead, with a warning. Setting the flag takes that way from the start.
     /// @param aux_atoms The atoms of the auxiliary basis this driver forms the B
-    /// vectors of, or none of them for all of them. This is how the work is divided
-    /// over a communicator: each rank is given a share of the atoms and answers a
-    /// share of the Fock matrix, which the ranks sum. The direct way refuses a
-    /// division, as its triangular solve reaches across the whole auxiliary basis.
+    /// vectors of, a list of every atom for the whole molecule. This is how the work
+    /// is divided over a communicator: each rank is given a share of the atoms and
+    /// answers a share of the Fock matrix, which the ranks sum. A rank dealt none of
+    /// the atoms is given an empty share, holds no B vectors and answers zeros. The
+    /// direct way refuses a division, as its triangular solve reaches across the
+    /// whole auxiliary basis, and so takes every atom.
+    /// @note **The default is no atoms, and not the whole molecule.** It is a default
+    /// only because the arguments before it have theirs. A caller over the whole
+    /// molecule names every atom.
     /// @param min_parts The fewest parts the direct way is to sweep the auxiliary
     /// basis in. The parts are cut to fit the memory of a build, and a machine with
     /// memory to spare gives one of them -- which one rank then sweeps for the
@@ -247,20 +254,19 @@ class CSimdRIJKFockDriver
     /// for the Coulomb matrix, so it is several times slower for each Fock matrix
     /// and asks for a hundredth of the memory. The automatic choice takes the held
     /// form wherever it fits.
-    auto prepare(const CMolecule       &molecule,
-                 const CMolecularBasis &basis,
-                 const CMolecularBasis &aux_basis,
-                 const double           threshold,
-                 const size_t           memory_budget,
-                 const double           metric_threshold        = 1.0e-12,
-                 const bool             use_inverse_square_root = false,
-                 const rimode           mode                    = rimode::automatic,
-                 const std::vector<int> &aux_atoms              = {},
-                 const CPackedMatrix    &metric                 = CPackedMatrix(),
-                 const size_t            min_parts              = 1,
-                 const double            omega                  = 0.0,
-                 const CPackedMatrix    &metric_erf             = CPackedMatrix(),
-                 const bool              holds_nothing          = false) -> void;
+    auto prepare(const CMolecule        &molecule,
+                 const CMolecularBasis  &basis,
+                 const CMolecularBasis  &aux_basis,
+                 const double            threshold,
+                 const size_t            memory_budget,
+                 const double            metric_threshold        = 1.0e-12,
+                 const bool              use_inverse_square_root = false,
+                 const rimode            mode                    = rimode::automatic,
+                 const std::vector<int> &aux_atoms               = {},
+                 const CPackedMatrix    &metric                  = CPackedMatrix(),
+                 const size_t            min_parts               = 1,
+                 const double            omega                   = 0.0,
+                 const CPackedMatrix    &metric_erf              = CPackedMatrix()) -> void;
 
     /// @brief Computes the Fock matrix of a density and a set of orbitals.
     /// @param density The density matrix, in the packed format, symmetric for a
@@ -715,10 +721,8 @@ class CSimdRIJKFockDriver
 
     /// @brief Whether this rank was dealt no atoms of the auxiliary basis.
     /// @note Such a rank holds no B vectors and its share of every sum over the
-    /// auxiliary basis is zero, so it answers matrices of zeros. It is not the same
-    /// as a driver which was asked for the whole molecule: that one is handed an
-    /// empty list of atoms too, and the two are told apart by how many ranks are
-    /// dividing the work.
+    /// auxiliary basis is zero, so it answers matrices of zeros. It was given an
+    /// empty share.
     bool _holds_nothing = false;
 };
 

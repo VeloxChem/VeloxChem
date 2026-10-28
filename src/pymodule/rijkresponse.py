@@ -186,8 +186,12 @@ def initialize(solver, molecule, basis):
     # build divides them: dealing them round robin gave the ranks equal counts of
     # auxiliary functions and unequal counts of values, and a build ends when its
     # last rank ends.
+    #
+    # NOTE: a list of atoms is those atoms. One rank is given every atom by name,
+    # and a rank dealt none of them has an empty list, which holds nothing and needs
+    # no memory for it.
     if solver.nodes == 1:
-        aux_atoms = []
+        aux_atoms = list(range(molecule.number_of_atoms()))
     else:
         weights = solver._ri_jk_drv.aux_atom_weights(molecule, basis,
                                                      solver._ri_jk_aux_basis,
@@ -236,14 +240,25 @@ def initialize(solver, molecule, basis):
                                                      False, rimode.in_memory)
 
     # NOTE: an empty share means this rank was dealt no auxiliary atoms, and not
-    # that it should take all of them. The driver is told which, for the reason the
-    # Fock build's own call gives.
+    # that it should take all of them, as in the Fock build's own call.
     solver._ri_jk_drv.prepare(molecule, basis, solver._ri_jk_aux_basis,
                               solver.eri_thresh, budget,
                               solver.ri_metric_threshold, False, mode,
                               aux_atoms, metric, solver.nodes, omega,
-                              metric_erf,
-                              (solver.nodes > 1) and (len(aux_atoms) == 0))
+                              metric_erf)
+
+    # NOTE: the ranks' shares have to cover the auxiliary basis once between them,
+    # as in the SCF. prepare takes no atoms by default, and a call which left them
+    # out would answer every exchange as zero and say nothing.
+    naux = solver._ri_jk_aux_basis.get_dimensions_of_basis()
+
+    held = solver.comm.allgather(solver._ri_jk_drv.number_of_aux_functions())
+
+    assert_msg_critical(
+        sum(held) == naux,
+        f'{type(solver).__name__}: the ranks hold {held} of {naux} ' +
+        'auxiliary functions, which is not the auxiliary basis once over ' +
+        'the ranks')
 
     solver._ri_jk_response_drv = SimdRIJKResponseDriver(
         solver.eri_thresh, 0, exchange_budget)

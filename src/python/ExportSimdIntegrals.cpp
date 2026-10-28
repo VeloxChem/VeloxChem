@@ -273,7 +273,7 @@ export_simdintegrals(py::module &m) -> void
              py::arg("aux_basis"),
              py::arg("inverse_metric"),
              py::arg("threshold"),
-             py::arg("aux_atoms") = std::vector<int>{})
+             py::arg("aux_atoms"))
         .def("compute_bq_vectors_rs",
              &CSimdRIFockDriver::compute_bq_vectors_rs,
              "Computes the B vectors of the Coulomb operator and of the attenuated one, on one pattern.",
@@ -284,7 +284,7 @@ export_simdintegrals(py::module &m) -> void
              py::arg("inverse_metric_erf"),
              py::arg("threshold"),
              py::arg("omega"),
-             py::arg("aux_atoms") = std::vector<int>{})
+             py::arg("aux_atoms"))
         .def("compute_y_vector",
              &CSimdRIFockDriver::compute_y_vector,
              "Contracts the B vectors with a density matrix.",
@@ -351,12 +351,13 @@ export_simdintegrals(py::module &m) -> void
         .def(py::init<>())
         .def("required_memory",
              &CSimdRIJKFockDriver::required_memory,
-             "Gets the memory of the B vectors of the given auxiliary atoms in bytes, or of all of them.",
+             "Gets the memory of the B vectors of the given auxiliary atoms in bytes. The whole molecule is a "
+             "list of every atom, and an empty list holds nothing.",
              py::arg("molecule"),
              py::arg("basis"),
              py::arg("aux_basis"),
              py::arg("threshold"),
-             py::arg("aux_atoms") = std::vector<int>{},
+             py::arg("aux_atoms"),
              py::arg("range_separated") = false)
         .def("peak_memory",
              &CSimdRIJKFockDriver::peak_memory,
@@ -391,7 +392,9 @@ export_simdintegrals(py::module &m) -> void
              py::arg("omega"))
         .def("prepare",
              &CSimdRIJKFockDriver::prepare,
-             "Forms the inverted factor of the metric and the B vectors.",
+             "Forms the inverted factor of the metric and the B vectors. aux_atoms are the atoms of the "
+             "auxiliary basis this driver holds, a list of every atom for the whole molecule; the default "
+             "is no atoms.",
              py::arg("molecule"),
              py::arg("basis"),
              py::arg("aux_basis"),
@@ -404,8 +407,7 @@ export_simdintegrals(py::module &m) -> void
              py::arg("metric") = CPackedMatrix(),
              py::arg("min_parts") = 1,
              py::arg("omega") = 0.0,
-             py::arg("metric_erf") = CPackedMatrix(),
-             py::arg("holds_nothing") = false)
+             py::arg("metric_erf") = CPackedMatrix())
         .def("compute",
              py::overload_cast<const CPackedMatrix &, const CPackedMatrix &, const double, const double>(
                  &CSimdRIJKFockDriver::compute),
@@ -500,7 +502,7 @@ export_simdintegrals(py::module &m) -> void
              "Gets the memory the driver would hold, in bytes. One tensor and nothing else: there is "
              "no transformation of the integrals to keep.",
              py::arg("molecule"), py::arg("basis"), py::arg("aux_basis"), py::arg("threshold"),
-             py::arg("aux_atoms") = std::vector<int>{})
+             py::arg("aux_atoms"))
         .def("peak_memory", &CSimdRIJFockDriver::peak_memory,
              "Gets the most memory in bytes the driver reaches on this rank when it holds the integrals, while "
              "forming them or in a build, for the number of threads of the caller.",
@@ -674,14 +676,15 @@ export_simdintegrals(py::module &m) -> void
              "Computes the Coulomb contribution to the gradient of the given atoms, from the fitting "
              "coefficients a Coulomb only Fock driver solved for. The rows of the atoms not asked for are "
              "zero. aux_atoms names the share of the auxiliary basis this rank holds, which makes the "
-             "gradient a partial one the ranks reduce.",
+             "gradient a partial one the ranks reduce: a list of every atom for the whole molecule, and an "
+             "empty list for none.",
              py::arg("molecule"),
              py::arg("basis"),
              py::arg("aux_basis"),
              py::arg("fitting"),
              py::arg("density"),
              py::arg("atoms"),
-             py::arg("aux_atoms")   = std::vector<int>{},
+             py::arg("aux_atoms"),
              py::arg("with_metric") = true)
         .def("compute",
              py::overload_cast<const CMolecule &,
@@ -712,7 +715,7 @@ export_simdintegrals(py::module &m) -> void
              py::arg("fitting"),
              py::arg("density"),
              py::arg("atoms"),
-             py::arg("aux_atoms")   = std::vector<int>{},
+             py::arg("aux_atoms"),
              py::arg("with_metric") = true)
         .def("compute_open_shell",
              py::overload_cast<const CMolecule &,
@@ -920,7 +923,8 @@ export_simdintegrals(py::module &m) -> void
              "Computes the Coulomb and exchange contributions to the gradient of the given atoms, from the "
              "B vectors and the metric a Fock driver holds. The rows of the atoms not asked for are zero. "
              "aux_atoms names the share of the auxiliary basis the B vectors span, which under MPI makes "
-             "the gradient a partial one for the ranks to reduce.",
+             "the gradient a partial one for the ranks to reduce: a list of every atom for the whole "
+             "molecule, and an empty list for none.",
              py::arg("molecule"),
              py::arg("basis"),
              py::arg("aux_basis"),
@@ -930,7 +934,7 @@ export_simdintegrals(py::module &m) -> void
              py::arg("coefficients"),
              py::arg("exchange_scaling_factor"),
              py::arg("atoms"),
-             py::arg("aux_atoms") = std::vector<int>{})
+             py::arg("aux_atoms"))
         .def("compute",
              py::overload_cast<const CMolecule &,
                                const CMolecularBasis &,
@@ -974,7 +978,7 @@ export_simdintegrals(py::module &m) -> void
              py::arg("coefficients_beta"),
              py::arg("exchange_scaling_factor"),
              py::arg("atoms"),
-             py::arg("aux_atoms") = std::vector<int>{})
+             py::arg("aux_atoms"))
         .def("compute_open_shell",
              py::overload_cast<const CMolecule &,
                                const CMolecularBasis &,
@@ -1021,7 +1025,7 @@ export_simdintegrals(py::module &m) -> void
              py::arg("bq_vectors_erf"), py::arg("metric"), py::arg("metric_erf"), py::arg("density"),
              py::arg("coefficients"), py::arg("exchange_scaling_factor"),
              py::arg("erf_exchange_scaling_factor"), py::arg("omega"), py::arg("atoms"),
-             py::arg("aux_atoms") = std::vector<int>{})
+             py::arg("aux_atoms"))
         .def("compute_rs",
              py::overload_cast<const CMolecule &, const CMolecularBasis &, const CMolecularBasis &,
                                const CSparseTensor &, const CSparseTensor &, const CPackedMatrix &,
@@ -1040,7 +1044,7 @@ export_simdintegrals(py::module &m) -> void
              py::arg("bq_vectors_erf"), py::arg("metric"), py::arg("metric_erf"), py::arg("density"),
              py::arg("coefficients_alpha"), py::arg("coefficients_beta"),
              py::arg("exchange_scaling_factor"), py::arg("erf_exchange_scaling_factor"),
-             py::arg("omega"), py::arg("atoms"), py::arg("aux_atoms") = std::vector<int>{})
+             py::arg("omega"), py::arg("atoms"), py::arg("aux_atoms"))
         .def("fitted_densities_rs",
              &CSimdRIJKGradientDriver::fitted_densities_rs,
              "Forms the fitted densities of the attenuated operator. The fitting coefficients come "

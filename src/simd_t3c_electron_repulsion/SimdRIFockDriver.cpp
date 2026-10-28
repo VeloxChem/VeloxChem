@@ -49,6 +49,7 @@
 #include "ErrorHandler.hpp"
 #include "OpenMPFunc.hpp"
 #include "ScreeningFunc.hpp"
+#include "SimdRIFockCommon.hpp"
 #include "SimdT3CDistributor.hpp"
 #include "SimdT3CRsDistributor.hpp"
 #include "SimdThreeCenterElectronRepulsionDriver.hpp"
@@ -480,6 +481,10 @@ CSimdRIFockDriver::_compute_bq_vectors(const CMolecule                          
                                   std::string("RIJFockDriver: The inverse metric must be symmetric or lower triangular"));
     }
 
+    // a share of no atoms holds no B vectors, of either operator
+
+    if (aux_atoms.empty()) return std::vector<CSparseTensor>(nops);
+
     // the blocks of atom pairs, which both the integrals and the B vectors carry
 
     auto groups = basis.basis_pair_groups();
@@ -495,7 +500,7 @@ CSimdRIFockDriver::_compute_bq_vectors(const CMolecule                          
 
     const auto in_groups = sparsity::select_aux_groups(molecule, aux_basis, all_atoms);
 
-    const auto out_groups = sparsity::select_aux_groups(molecule, aux_basis, aux_atoms.empty() ? all_atoms : aux_atoms);
+    const auto out_groups = sparsity::select_aux_groups(molecule, aux_basis, aux_atoms);
 
     CBqProfile profile;
 
@@ -2381,6 +2386,16 @@ CSimdRIFockDriver::bq_vectors_memory(const CMolecule        &molecule,
                                      const std::vector<int> &aux_atoms,
                                      const size_t            nops) const -> CBqMemory
 {
+    // a share of no atoms forms nothing and holds nothing
+
+    if (aux_atoms.empty()) return CBqMemory();
+
+    // NOTE: the B vectors of the whole molecule have the blocks of the integrals,
+    // so they are counted from those rather than described a second time. The
+    // order the atoms are named in changes neither count.
+
+    const auto holds_all = simdri::names_every_atom(aux_atoms, static_cast<size_t>(molecule.number_of_atoms()));
+
     // NOTE: the blocks are those _compute_bq_vectors describes, of the default size
     // and not of the size the integral driver chooses for itself, as the values of a
     // block run to its last surviving atom pair and the two sizes do not hold the
@@ -2396,7 +2411,7 @@ CSimdRIFockDriver::bq_vectors_memory(const CMolecule        &molecule,
 
     const auto in_groups = sparsity::select_aux_groups(molecule, aux_basis, all_atoms);
 
-    const auto out_groups = sparsity::select_aux_groups(molecule, aux_basis, aux_atoms.empty() ? all_atoms : aux_atoms);
+    const auto out_groups = sparsity::select_aux_groups(molecule, aux_basis, aux_atoms);
 
     const auto aux_indices = denseidx::index_functions(aux_basis);
 
@@ -2458,7 +2473,7 @@ CSimdRIFockDriver::bq_vectors_memory(const CMolecule        &molecule,
 
             if (block.number_of_pairs() == 0) continue;
 
-            if (aux_atoms.empty()) hold(block);
+            if (holds_all) hold(block);
 
             in_elements[i] += block.number_of_elements();
 
@@ -2468,7 +2483,7 @@ CSimdRIFockDriver::bq_vectors_memory(const CMolecule        &molecule,
         }
     }
 
-    if (!aux_atoms.empty())
+    if (!holds_all)
     {
         for (size_t i = 0; i < nab; i++)
         {

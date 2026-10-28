@@ -672,18 +672,12 @@ CSimdRIJKGradientDriver::mpi_local_densities(const CMolecule        &molecule,
 
     const auto norbs = coefficients.number_of_columns();
 
-    // NOTE: **empty means empty here.** aux_functions_of reads a list of no atoms
-    // as every atom, which is right for a caller asking about a whole molecule and
-    // wrong for every caller of this routine: these are the atoms a rank was dealt,
-    // and a rank dealt none owns no functions. Expanded instead, such a rank asked
-    // the transformation for every auxiliary function in the molecule while holding
-    // the B vectors of none of them.
-    //
-    // NOTE: the third place this same convention has bitten -- the Coulomb only
-    // gradient driver, the fitted Fock driver, and here.
+    // NOTE: these are the atoms a rank was dealt, and a rank dealt none owns no
+    // functions. When an empty list still meant every atom to aux_functions_of,
+    // such a rank asked the transformation for every auxiliary function in the
+    // molecule while holding the B vectors of none of them.
 
-    fit.functions = aux_atoms.empty() ? std::vector<size_t>()
-                                      : simdri::aux_functions_of(aux_basis, aux_atoms);
+    fit.functions = simdri::aux_functions_of(aux_basis, aux_atoms);
 
     // the right hand side of the fitting, summed over this rank's B vectors alone.
     // The caller adds the ranks' and hands the sum back to mpi_set_fitting.
@@ -796,11 +790,10 @@ CSimdRIJKGradientDriver::mpi_local_densities_general(const CMolecule        &mol
                               std::string("SimdRIJKGradientDriver: The two factors of a general density have "
                                           "different basis dimensions"));
 
-    // NOTE: empty means empty here, as in the packed share. A rank dealt no
-    // auxiliary atoms owns no functions, and that is not the whole basis.
+    // NOTE: a rank dealt no auxiliary atoms owns no functions, as in the packed
+    // share.
 
-    fit.functions = aux_atoms.empty() ? std::vector<size_t>()
-                                      : simdri::aux_functions_of(aux_basis, aux_atoms);
+    fit.functions = simdri::aux_functions_of(aux_basis, aux_atoms);
 
     if (with_coulomb)
     {
@@ -1088,11 +1081,8 @@ CSimdRIJKGradientDriver::mpi_compute_share_general(const CMolecule              
 
     const auto exchange_factor = -2.0 * exchange_scaling_factor;
 
-    if (!aux_atoms.empty())
-    {
-        _compute_three_center(gradient, molecule, basis, aux_basis, fit.fitting, density_for_coulomb,
-                              spins, coulomb_factor, exchange_factor, wanted, aux_atoms);
-    }
+    _compute_three_center(gradient, molecule, basis, aux_basis, fit.fitting, density_for_coulomb, spins,
+                          coulomb_factor, exchange_factor, wanted, aux_atoms);
 
     if (omega.number_of_elements() > 0)
     {
@@ -1161,12 +1151,8 @@ CSimdRIJKGradientDriver::mpi_compute_share_rs_general(const CMolecule           
 
     const auto erf_factor = -2.0 * erf_exchange_scaling_factor;
 
-    if (!aux_atoms.empty())
-    {
-        _compute_three_center(gradient, molecule, basis, aux_basis, fit.fitting, density_for_coulomb,
-                              spins, coulomb_factor, exchange_factor, wanted, aux_atoms, spins_erf,
-                              erf_factor, omega);
-    }
+    _compute_three_center(gradient, molecule, basis, aux_basis, fit.fitting, density_for_coulomb, spins,
+                          coulomb_factor, exchange_factor, wanted, aux_atoms, spins_erf, erf_factor, omega);
 
     if (omega_plain.number_of_elements() > 0)
     {
@@ -1487,14 +1473,11 @@ CSimdRIJKGradientDriver::mpi_compute_share(const CMolecule        &molecule,
 
     const auto exchange_factor = open_shell ? -exchange_scaling_factor : -2.0 * exchange_scaling_factor;
 
-    // NOTE: a rank dealt no auxiliary atoms adds no three-center term. It is not
-    // passed on to the contraction, which reads an empty list as every atom.
+    // NOTE: a rank dealt no auxiliary atoms adds no three-center term, which is
+    // what the contraction answers for an empty list.
 
-    if (!aux_atoms.empty())
-    {
-        _compute_three_center(gradient, molecule, basis, aux_basis, fit.fitting, density, spins,
-                              coulomb_factor, exchange_factor, wanted, aux_atoms);
-    }
+    _compute_three_center(gradient, molecule, basis, aux_basis, fit.fitting, density, spins, coulomb_factor,
+                          exchange_factor, wanted, aux_atoms);
 
     // NOTE: the two-center term is asked of one rank alone. Omega is of the whole
     // auxiliary basis on every rank, so every rank could form it and the ranks would
@@ -1580,12 +1563,8 @@ CSimdRIJKGradientDriver::mpi_compute_share_rs(const CMolecule        &molecule,
 
     const auto erf_factor = open_shell ? -erf_exchange_scaling_factor : -2.0 * erf_exchange_scaling_factor;
 
-    if (!aux_atoms.empty())
-    {
-        _compute_three_center(gradient, molecule, basis, aux_basis, fit.fitting, density, spins,
-                              coulomb_factor, exchange_factor, wanted, aux_atoms, spins_erf, erf_factor,
-                              omega);
-    }
+    _compute_three_center(gradient, molecule, basis, aux_basis, fit.fitting, density, spins, coulomb_factor,
+                          exchange_factor, wanted, aux_atoms, spins_erf, erf_factor, omega);
 
     if (omega_plain.number_of_elements() > 0)
     {
@@ -1798,7 +1777,7 @@ CSimdRIJKGradientDriver::compute_rs(const CMolecule       &molecule,
     std::iota(atoms.begin(), atoms.end(), 0);
 
     return compute_rs(molecule, basis, aux_basis, bq_vectors, bq_vectors_erf, metric, metric_erf, density,
-                      coefficients, exchange_scaling_factor, erf_exchange_scaling_factor, omega, atoms, {});
+                      coefficients, exchange_scaling_factor, erf_exchange_scaling_factor, omega, atoms, atoms);
 }
 
 auto
@@ -2180,7 +2159,7 @@ CSimdRIJKGradientDriver::compute_open_shell(const CMolecule       &molecule,
 
     return compute_open_shell(molecule, basis, aux_basis, bq_vectors, metric, density,
                               coefficients_alpha, coefficients_beta, exchange_scaling_factor,
-                              atoms, {});
+                              atoms, atoms);
 }
 
 auto
@@ -2283,7 +2262,7 @@ CSimdRIJKGradientDriver::compute(const CMolecule       &molecule,
     std::iota(atoms.begin(), atoms.end(), 0);
 
     return compute(molecule, basis, aux_basis, bq_vectors, metric, density, coefficients,
-                   exchange_scaling_factor, atoms, {});
+                   exchange_scaling_factor, atoms, atoms);
 }
 
 auto
@@ -2302,6 +2281,10 @@ CSimdRIJKGradientDriver::_compute_three_center(CPackedMatrix                    
                                                const double                      erf_exchange_factor,
                                                const double                      omega) const -> void
 {
+    // a rank dealt no auxiliary atoms adds no three-center term
+
+    if (aux_atoms.empty()) return;
+
     const auto nao = basis.dimensions_of_basis();
 
     const auto indices = denseidx::index_functions(basis);
@@ -2418,16 +2401,9 @@ CSimdRIJKGradientDriver::_compute_three_center(CPackedMatrix                    
 
     const auto aux_sets = aux_basis.basis_sets_indices();
 
-    // every atom of the auxiliary basis, or the share the caller holds
+    // the atoms of the auxiliary basis the caller holds
 
-    auto atoms = aux_atoms;
-
-    if (atoms.empty())
-    {
-        atoms.resize(molecule.number_of_atoms());
-
-        std::iota(atoms.begin(), atoms.end(), 0);
-    }
+    const auto &atoms = aux_atoms;
 
     const auto eri_drv = CSimdThreeCenterElectronRepulsionDriver();
 

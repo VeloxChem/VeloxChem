@@ -222,12 +222,23 @@ CSimdRIJKFockDriver::peak_memory(const CMolecule        &molecule,
 
     const auto naux = aux_basis.dimensions_of_basis();
 
-    const auto bq = _drv.bq_vectors_memory(molecule, basis, aux_basis, threshold, aux_atoms, nops);
-
     // NOTE: the inverted metrics are packed triangles. While the B vectors are
     // formed, the caller's metrics and the copies the driver keeps are both alive.
 
     const auto metric = nops * naux * (naux + 1) / 2 * sizeof(double);
+
+    // NOTE: a rank dealt no atoms forms no B vectors and builds nothing, as its
+    // builds answer zeros, but it is handed the metrics and keeps a copy of them
+    // like every other rank.
+
+    if (aux_atoms.empty())
+    {
+        const auto peak = 2 * metric;
+
+        return peak + peak / _peak_margin_divisor;
+    }
+
+    const auto bq = _drv.bq_vectors_memory(molecule, basis, aux_basis, threshold, aux_atoms, nops);
 
     const auto forming = bq.held + bq.pattern + bq.forming + 2 * metric;
 
@@ -346,20 +357,19 @@ CSimdRIJKFockDriver::make_metric_rs(const CMolecule       &molecule,
 }
 
 auto
-CSimdRIJKFockDriver::prepare(const CMolecule       &molecule,
-                             const CMolecularBasis &basis,
-                             const CMolecularBasis &aux_basis,
-                             const double           threshold,
-                             const size_t           memory_budget,
-                             const double           metric_threshold,
-                             const bool             use_inverse_square_root,
-                             const rimode           mode,
+CSimdRIJKFockDriver::prepare(const CMolecule        &molecule,
+                             const CMolecularBasis  &basis,
+                             const CMolecularBasis  &aux_basis,
+                             const double            threshold,
+                             const size_t            memory_budget,
+                             const double            metric_threshold,
+                             const bool              use_inverse_square_root,
+                             const rimode            mode,
                              const std::vector<int> &aux_atoms,
-                             const CPackedMatrix   &metric,
-                             const size_t           min_parts,
-                             const double           omega,
-                             const CPackedMatrix   &metric_erf,
-                             const bool             holds_nothing) -> void
+                             const CPackedMatrix    &metric,
+                             const size_t            min_parts,
+                             const double            omega,
+                             const CPackedMatrix    &metric_erf) -> void
 {
     CPrepareProfile profile;
 
@@ -374,26 +384,16 @@ CSimdRIJKFockDriver::prepare(const CMolecule       &molecule,
 
     const auto range_separated = (omega > 0.0);
 
-    // NOTE: **an empty share is not the same as the whole molecule, and only the
-    // caller knows which it means.** A list of no atoms means every atom to the
-    // routines below, which is what a caller asking about a whole molecule wants and
-    // is the opposite of what a rank dealt nothing wants. Nothing in the arguments
-    // tells the two apart -- min_parts is how finely the direct way cuts its sweep
-    // and a single rank asks for several of those quite legitimately -- so the
-    // caller says which it means and is believed.
-    //
-    // NOTE: left to be guessed at, this converged and said nothing. Water on four
-    // ranks came back at -43.08 hartree against -76.36 on three, because the rank
-    // holding no atoms formed the whole set of B vectors and its whole Fock matrix
-    // was added to every other rank's share. Three ranks and fewer were right,
-    // which is why it had never been seen: a molecule usually has more atoms than
-    // the job has ranks.
+    // NOTE: **an empty share is not the whole molecule.** The whole molecule is a
+    // list of every atom, and an empty one is a rank dealt none of them. An empty
+    // list once meant both, and only the caller knew which: left to be guessed at,
+    // water on four ranks came back at -43.08 hartree against -76.36 on three,
+    // because the rank holding no atoms formed the whole set of B vectors and its
+    // whole Fock matrix was added to every other rank's share.
 
-    _holds_nothing = holds_nothing;
+    _holds_nothing = aux_atoms.empty();
 
-    const auto memory = holds_nothing
-                            ? size_t{0}
-                            : required_memory(molecule, basis, aux_basis, threshold, aux_atoms, range_separated);
+    const auto memory = required_memory(molecule, basis, aux_basis, threshold, aux_atoms, range_separated);
 
     _budget = memory_budget;
 
@@ -496,9 +496,10 @@ CSimdRIJKFockDriver::prepare(const CMolecule       &molecule,
         // which is not a share of anything. Dividing this way over a communicator
         // is refused here rather than silently answered wrongly.
 
-        errors::assertMsgCritical(aux_atoms.empty(),
+        errors::assertMsgCritical(simdri::names_every_atom(aux_atoms, static_cast<size_t>(molecule.number_of_atoms())),
                                   std::string("RIJKFockDriver: The direct way cannot be divided over the atoms of the "
-                                              "auxiliary basis, as its triangular solve reaches across all of them"));
+                                              "auxiliary basis, as its triangular solve reaches across all of them, so "
+                                              "it is given every atom"));
 
 
         const auto mark_pattern = prof_clock::now();
@@ -528,7 +529,7 @@ CSimdRIJKFockDriver::prepare(const CMolecule       &molecule,
         // NOTE: the direct way holds no B vectors and refuses a division of the
         // atoms, so it sweeps the whole auxiliary basis and says so.
 
-        _aux_functions = simdri::aux_functions_of(aux_basis, {});
+        _aux_functions = simdri::aux_functions_of(aux_basis, aux_atoms);
 
         _bq_vectors = CSparseTensor();
 
@@ -559,12 +560,11 @@ CSimdRIJKFockDriver::prepare(const CMolecule       &molecule,
 
     _coulomb_parts.clear();
 
-    _aux_functions = holds_nothing ? std::vector<size_t>()
-                                   : simdri::aux_functions_of(aux_basis, aux_atoms);
+    _aux_functions = simdri::aux_functions_of(aux_basis, aux_atoms);
 
     const auto mark_bq_vectors = prof_clock::now();
 
-    if (holds_nothing)
+    if (_holds_nothing)
     {
         // a rank with no auxiliary atoms holds no B vectors and answers a Fock
         // matrix of zeros, which is its share of the sum and is what the ranks add.

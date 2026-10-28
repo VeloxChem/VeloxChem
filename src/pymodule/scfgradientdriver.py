@@ -187,8 +187,11 @@ class ScfGradientDriver(GradientDriver):
         aux_basis = MolecularBasis.read(
             molecule, self.scf_driver.ri_auxiliary_basis, ostream=None)
 
+        # NOTE: the whole molecule is a list of every atom. An empty list is no
+        # atoms, which needs no memory.
         needed = SimdRIJKFockDriver().required_memory(
-            molecule, basis, aux_basis, self.scf_driver.eri_thresh, [])
+            molecule, basis, aux_basis, self.scf_driver.eri_thresh,
+            list(range(molecule.number_of_atoms())))
 
         budget = self.scf_driver._get_ri_memory_budget(basis)
 

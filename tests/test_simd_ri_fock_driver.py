@@ -19,6 +19,13 @@ from veloxchem.molecule import Molecule
 LABELS = "spdfghikl"
 
 
+def every_atom(molecule):
+    """The whole molecule, as the drivers take it: a list of every atom. An empty
+    list is no atoms."""
+
+    return list(range(molecule.number_of_atoms()))
+
+
 class TestSimdRIFockDriver:
 
     def one_function_basis(self, angular_momentum, identifier):
@@ -136,7 +143,7 @@ class TestSimdRIFockDriver:
         # the B vectors
 
         bq = SimdRIFockDriver().compute_bq_vectors(
-            molecule, basis, aux_basis, inverse, 0.0)
+            molecule, basis, aux_basis, inverse, 0.0, every_atom(molecule))
 
         computed, visited = self.expand(bq, basis, aux_basis, maps, aux_maps, nao, naux)
 
@@ -205,7 +212,7 @@ class TestSimdRIFockDriver:
         inverse = SimdTwoCenterElectronRepulsionDriver().compute(molecule, aux_basis).invert()
 
         drv = SimdRIFockDriver()
-        bq = drv.compute_bq_vectors(molecule, basis, aux_basis, inverse, 0.0)
+        bq = drv.compute_bq_vectors(molecule, basis, aux_basis, inverse, 0.0, every_atom(molecule))
 
         dense_bq, visited = self.expand(bq, basis, aux_basis, maps, aux_maps, nao, naux)
 
@@ -289,7 +296,7 @@ class TestSimdRIFockDriver:
         inverse = SimdTwoCenterElectronRepulsionDriver().compute(molecule, aux_basis).invert()
 
         drv = SimdRIFockDriver()
-        bq = drv.compute_bq_vectors(molecule, basis, aux_basis, inverse, 0.0)
+        bq = drv.compute_bq_vectors(molecule, basis, aux_basis, inverse, 0.0, every_atom(molecule))
 
         rng = np.random.default_rng(5)
         raw = rng.standard_normal((nao, nao))
@@ -358,7 +365,7 @@ class TestSimdRIFockDriver:
                                   metric.inverse_square_root(1.0e-12)):
 
                 bq = drv.compute_bq_vectors(molecule, basis, aux_basis,
-                                            metric_matrix, 0.0)
+                                            metric_matrix, 0.0, every_atom(molecule))
 
                 dense_bq, visited = self.expand(bq, basis, aux_basis, maps, aux_maps,
                                                 nao, naux)
@@ -373,7 +380,7 @@ class TestSimdRIFockDriver:
             # the full inverse is the wrong matrix here, and wrong by order one
             # rather than subtly, which is what makes this worth asserting
 
-            wrong = drv.compute_bq_vectors(molecule, basis, aux_basis, metric.invert(), 0.0)
+            wrong = drv.compute_bq_vectors(molecule, basis, aux_basis, metric.invert(), 0.0, every_atom(molecule))
 
             dense_wrong, _ = self.expand(wrong, basis, aux_basis, maps, aux_maps, nao, naux)
 
@@ -422,7 +429,7 @@ class TestSimdRIFockDriver:
         drv = SimdRIFockDriver()
 
         bq = drv.compute_bq_vectors(molecule, basis, aux_basis,
-                                    metric.cholesky_inverse(), 0.0)
+                                    metric.cholesky_inverse(), 0.0, every_atom(molecule))
 
         dense_bq, visited = self.expand(bq, basis, aux_basis, maps, aux_maps, nao, naux)
 
@@ -505,7 +512,7 @@ class TestSimdRIFockDriver:
 
         drv = SimdRIFockDriver()
         bq = drv.compute_bq_vectors(molecule, basis, aux_basis,
-                                    metric.cholesky_inverse(), 0.0)
+                                    metric.cholesky_inverse(), 0.0, every_atom(molecule))
 
         rng = np.random.default_rng(31)
         raw = rng.standard_normal((nao, nao))
@@ -550,7 +557,7 @@ class TestSimdRIFockDriver:
         drv = SimdRIFockDriver()
 
         bq = drv.compute_bq_vectors(molecule, basis, aux_basis,
-                                    metric.cholesky_inverse(), 0.0)
+                                    metric.cholesky_inverse(), 0.0, every_atom(molecule))
 
         dense_bq, _ = self.expand(bq, basis, aux_basis, maps, aux_maps, nao, naux)
 
@@ -623,7 +630,7 @@ class TestSimdRIFockDriver:
 
         drv = SimdRIFockDriver()
         bq = drv.compute_bq_vectors(molecule, basis, aux_basis,
-                                    metric.cholesky_inverse(), 0.0)
+                                    metric.cholesky_inverse(), 0.0, every_atom(molecule))
 
         rng = np.random.default_rng(7)
         cmat = np.ascontiguousarray(rng.standard_normal((nao, 4)))
@@ -662,7 +669,7 @@ class TestSimdRIFockDriver:
         drv = SimdRIFockDriver()
 
         bq = drv.compute_bq_vectors(molecule, basis, aux_basis,
-                                    metric.cholesky_inverse(), 0.0)
+                                    metric.cholesky_inverse(), 0.0, every_atom(molecule))
 
         rng = np.random.default_rng(53 + nao)
         cmat = np.ascontiguousarray(rng.standard_normal((nao, nocc)))
@@ -726,7 +733,7 @@ class TestSimdRIFockDriver:
 
         drv = SimdRIFockDriver()
         bq = drv.compute_bq_vectors(molecule, basis, aux_basis,
-                                    metric.cholesky_inverse(), 0.0)
+                                    metric.cholesky_inverse(), 0.0, every_atom(molecule))
 
         rng = np.random.default_rng(61)
         cmat = np.ascontiguousarray(rng.standard_normal((nao, 3)))
@@ -786,7 +793,7 @@ class TestSimdRIFockDriver:
 
         drv = SimdRIFockDriver()
         bq = drv.compute_bq_vectors(molecule, basis, aux_basis,
-                                    metric.cholesky_inverse(), 0.0)
+                                    metric.cholesky_inverse(), 0.0, every_atom(molecule))
 
         nocc = 3
         rng = np.random.default_rng(67)
@@ -850,7 +857,7 @@ class TestSimdRIFockDriver:
             assert drv.get_dense_threshold() == 0.0
 
             bq = drv.compute_bq_vectors(molecule, basis, aux_basis,
-                                        metric.cholesky_inverse(), 0.0)
+                                        metric.cholesky_inverse(), 0.0, every_atom(molecule))
 
             rng = np.random.default_rng(89 + nao)
             cmat = np.ascontiguousarray(rng.standard_normal((nao, 4)))

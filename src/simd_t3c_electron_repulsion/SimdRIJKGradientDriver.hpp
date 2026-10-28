@@ -259,8 +259,9 @@ class CSimdRIJKGradientDriver
     /// @param exchange_scaling_factor The fraction of exact exchange: one for
     /// Hartree-Fock, the fraction of a hybrid, zero for a pure functional.
     /// @param atoms The atoms to compute the gradient of.
-    /// @param aux_atoms The atoms of the auxiliary basis the B vectors span, or
-    /// an empty list for all of them.
+    /// @param aux_atoms The atoms of the auxiliary basis the B vectors span, a list
+    /// of every atom for the whole molecule. An empty list is a share of no atoms,
+    /// which adds no three-center term.
     /// @return The gradient, a general matrix of one row of three components per
     /// atom of the molecule, with the rows of the atoms not asked for left zero.
     /// @note The rows not asked for are zero rather than absent, so that a caller
@@ -276,7 +277,7 @@ class CSimdRIJKGradientDriver
                  const CPackedMatrix    &coefficients,
                  const double            exchange_scaling_factor,
                  const std::vector<int> &atoms,
-                 const std::vector<int> &aux_atoms = {}) const -> CPackedMatrix;
+                 const std::vector<int> &aux_atoms) const -> CPackedMatrix;
 
     /// @brief Computes the Coulomb and exchange contributions to the gradient of
     /// every atom of the molecule.
@@ -540,7 +541,8 @@ class CSimdRIJKGradientDriver
     /// a number of its own.
     /// @param exchange_scaling_factor The fraction of exact exchange.
     /// @param atoms The atoms to compute the gradient of.
-    /// @param aux_atoms The atoms of the auxiliary basis the B vectors span.
+    /// @param aux_atoms The atoms of the auxiliary basis the B vectors span, as for
+    /// compute.
     /// @return The gradient, one row per atom.
     /// @note A separate routine and not an overload of the one above: the two
     /// differ in which density the Coulomb half is of, and a caller which passed
@@ -632,7 +634,7 @@ class CSimdRIJKGradientDriver
                     const double            erf_exchange_scaling_factor,
                     const double            omega,
                     const std::vector<int> &atoms,
-                    const std::vector<int> &aux_atoms = {}) const -> CPackedMatrix;
+                    const std::vector<int> &aux_atoms) const -> CPackedMatrix;
 
     /// @brief Computes it for every atom of the molecule.
     auto compute_rs(const CMolecule       &molecule,
@@ -671,7 +673,7 @@ class CSimdRIJKGradientDriver
                                const double            erf_exchange_scaling_factor,
                                const double            omega,
                                const std::vector<int> &atoms,
-                               const std::vector<int> &aux_atoms = {}) const -> CPackedMatrix;
+                               const std::vector<int> &aux_atoms) const -> CPackedMatrix;
 
     /// @brief The fitted densities of the attenuated operator, for a hybrid range
     /// separated functional.

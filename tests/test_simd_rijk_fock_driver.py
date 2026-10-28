@@ -3,7 +3,8 @@ import pytest
 
 from veloxchem.veloxchemlib import AtomBasis, BasisFunction, MolecularBasis
 from veloxchem.veloxchemlib import PackedMatrix, mat_t
-from veloxchem.veloxchemlib import SimdRIFockDriver, SimdRIJKFockDriver
+from veloxchem.veloxchemlib import SimdRIFockDriver, SimdRIJKFockDriver, SimdRIJFockDriver
+from veloxchem.veloxchemlib import SimdRIJGradientDriver, SimdRIJKGradientDriver
 from veloxchem.veloxchemlib import rimode
 from veloxchem.veloxchemlib import SimdTwoCenterElectronRepulsionDriver
 from veloxchem.molecule import Molecule
@@ -31,6 +32,13 @@ def one_function_basis(angular_momentum, identifier):
     atom_basis.add(basis_function)
 
     return atom_basis
+
+
+def every_atom(molecule):
+    """The whole molecule, as the drivers take it: a list of every atom. An empty
+    list is no atoms."""
+
+    return list(range(molecule.number_of_atoms()))
 
 
 class TestSimdRIJKFockDriver:
@@ -89,7 +97,7 @@ class TestSimdRIJKFockDriver:
         drv = SimdRIFockDriver()
 
         bq = drv.compute_bq_vectors(molecule, basis, aux_basis,
-                                    metric.cholesky_inverse(), threshold)
+                                    metric.cholesky_inverse(), threshold, every_atom(molecule))
 
         fock = drv.compute_fock_matrix(bq, basis, aux_basis, density)
 
@@ -115,7 +123,7 @@ class TestSimdRIJKFockDriver:
             coeffs, density = self.orbitals(nao, 3, 13 + nao)
 
             driver = SimdRIJKFockDriver()
-            driver.prepare(molecule, basis, aux_basis, 0.0, 1 << 30)
+            driver.prepare(molecule, basis, aux_basis, 0.0, 1 << 30, aux_atoms=every_atom(molecule))
 
             assert driver.is_prepared()
 
@@ -144,7 +152,7 @@ class TestSimdRIJKFockDriver:
         coeffs, density = self.orbitals(nao, 3, 29)
 
         driver = SimdRIJKFockDriver()
-        driver.prepare(molecule, basis, aux_basis, 0.0, 1 << 30)
+        driver.prepare(molecule, basis, aux_basis, 0.0, 1 << 30, aux_atoms=every_atom(molecule))
 
         coulomb = driver.compute(density, coeffs, 0.0).to_numpy(max_memory=8.0)
         full = driver.compute(density, coeffs, 1.0).to_numpy(max_memory=8.0)
@@ -174,7 +182,8 @@ class TestSimdRIJKFockDriver:
         coeffs, density = self.orbitals(nao, 4, 37)
 
         driver = SimdRIJKFockDriver()
-        driver.prepare(chain, basis, aux_basis, 0.0, 1 << 14, mode=rimode.in_memory)
+        driver.prepare(chain, basis, aux_basis, 0.0, 1 << 14, mode=rimode.in_memory,
+                       aux_atoms=every_atom(chain))
 
         computed = driver.compute(density, coeffs, 1.0).to_numpy(max_memory=8.0)
 
@@ -208,7 +217,8 @@ class TestSimdRIJKFockDriver:
         coeffs, density = self.orbitals(nao, 4, 37)
 
         whole = SimdRIJKFockDriver()
-        whole.prepare(chain, basis, aux_basis, 0.0, 1 << 30, mode=rimode.in_memory)
+        whole.prepare(chain, basis, aux_basis, 0.0, 1 << 30, mode=rimode.in_memory,
+                      aux_atoms=every_atom(chain))
 
         expected = whole.compute(density, coeffs, 1.0).to_numpy(max_memory=8.0)
 
@@ -216,7 +226,8 @@ class TestSimdRIJKFockDriver:
         total.from_numpy(2.0 * density.to_numpy(max_memory=8.0))
 
         wrapped = SimdRIJKFockDriver()
-        wrapped.prepare(chain, basis, aux_basis, 0.0, 1 << 14, mode=rimode.in_memory)
+        wrapped.prepare(chain, basis, aux_basis, 0.0, 1 << 14, mode=rimode.in_memory,
+                        aux_atoms=every_atom(chain))
 
         scale = float(np.max(np.abs(expected)))
 
@@ -236,9 +247,9 @@ class TestSimdRIJKFockDriver:
 
         driver = SimdRIJKFockDriver()
 
-        needed = driver.required_memory(molecule, basis, aux_basis, 0.0)
+        needed = driver.required_memory(molecule, basis, aux_basis, 0.0, every_atom(molecule))
 
-        driver.prepare(molecule, basis, aux_basis, 0.0, 1 << 30)
+        driver.prepare(molecule, basis, aux_basis, 0.0, 1 << 30, aux_atoms=every_atom(molecule))
 
         assert needed == driver.get_bq_vectors().number_of_elements() * 8
 
@@ -253,12 +264,12 @@ class TestSimdRIJKFockDriver:
         coeffs, density = self.orbitals(nao, 3, 101)
 
         roomy = SimdRIJKFockDriver()
-        roomy.prepare(molecule, basis, aux_basis, 0.0, 1 << 30)
+        roomy.prepare(molecule, basis, aux_basis, 0.0, 1 << 30, aux_atoms=every_atom(molecule))
 
         assert roomy.get_mode() == rimode.in_memory
 
         cramped = SimdRIJKFockDriver()
-        cramped.prepare(molecule, basis, aux_basis, 0.0, 8)
+        cramped.prepare(molecule, basis, aux_basis, 0.0, 8, aux_atoms=every_atom(molecule))
 
         assert cramped.is_prepared()
         assert cramped.get_mode() == rimode.direct
@@ -292,7 +303,8 @@ class TestSimdRIJKFockDriver:
 
             for mode in (rimode.in_memory, rimode.direct):
                 driver = SimdRIJKFockDriver()
-                driver.prepare(molecule, basis, aux_basis, 0.0, 1 << 30, 1.0e-12, False, mode)
+                driver.prepare(molecule, basis, aux_basis, 0.0, 1 << 30, 1.0e-12, False, mode,
+                               aux_atoms=every_atom(molecule))
 
                 assert driver.get_mode() == mode
 
@@ -333,7 +345,7 @@ class TestSimdRIJKFockDriver:
             driver = SimdRIJKFockDriver()
             driver.prepare(molecule, basis, aux_basis, 0.0, 1 << 30,
                            metric_threshold=1.0e-12,
-                           use_inverse_square_root=use_root)
+                           use_inverse_square_root=use_root, aux_atoms=every_atom(molecule))
 
             matrices.append(driver.compute(density, coeffs, 1.0).to_numpy(max_memory=8.0))
 
@@ -359,7 +371,8 @@ class TestSimdRIJKFockDriver:
         for mode in (rimode.in_memory, rimode.direct):
 
             inside = SimdRIJKFockDriver()
-            inside.prepare(molecule, basis, aux_basis, 0.0, 1 << 30, 1.0e-12, False, mode)
+            inside.prepare(molecule, basis, aux_basis, 0.0, 1 << 30, 1.0e-12, False, mode,
+                           aux_atoms=every_atom(molecule))
 
             outside = SimdRIJKFockDriver()
 
@@ -369,7 +382,7 @@ class TestSimdRIJKFockDriver:
             assert metric.number_of_elements() > 0
 
             outside.prepare(molecule, basis, aux_basis, 0.0, 1 << 30, 1.0e-12, False,
-                            answered, metric=metric)
+                            answered, metric=metric, aux_atoms=every_atom(molecule))
 
             assert outside.get_mode() == mode
 
@@ -396,7 +409,7 @@ class TestSimdRIJKFockDriver:
 
         whole = SimdRIJKFockDriver()
         whole.prepare(molecule, basis, aux_basis, 0.0, 1 << 30, 1.0e-12, False,
-                      rimode.in_memory)
+                      rimode.in_memory, aux_atoms=every_atom(molecule))
 
         expected = whole.compute(density, coeffs, 1.0).to_numpy(max_memory=8.0)
 
@@ -435,10 +448,7 @@ class TestSimdRIJKFockDriver:
 
         natoms = molecule.number_of_atoms()
 
-        whole = driver.required_memory(molecule, basis, aux_basis, 0.0)
-
-        assert whole == driver.required_memory(molecule, basis, aux_basis, 0.0,
-                                               list(range(natoms)))
+        whole = driver.required_memory(molecule, basis, aux_basis, 0.0, list(range(natoms)))
 
         shares = [
             driver.required_memory(molecule, basis, aux_basis, 0.0,
@@ -447,6 +457,210 @@ class TestSimdRIJKFockDriver:
 
         assert all(share > 0 for share in shares)
         assert sum(shares) == whole
+
+    def test_an_empty_share_is_no_atoms(self, molecule):
+        """A list of atoms is those atoms, so an empty one is none of them, and the
+        whole molecule is a list of every atom. A rank of more ranks than atoms is
+        dealt none of them; when an empty list meant the whole molecule as well, such
+        a rank formed the whole molecule's B vectors and added a whole Fock matrix to
+        everybody else's share."""
+
+        basis, aux_basis = self.bases((8, 1, 7, 6), (1, 1, 0, 0), 2)
+
+        nao = basis.get_dimensions_of_basis()
+
+        naux = aux_basis.get_dimensions_of_basis()
+
+        everything = every_atom(molecule)
+
+        backwards = everything[::-1]
+
+        driver = SimdRIJKFockDriver()
+
+        # the atoms are asked for, and nothing stands for the whole molecule
+
+        with pytest.raises(TypeError):
+            driver.required_memory(molecule, basis, aux_basis, 0.0)
+
+        with pytest.raises(TypeError):
+            driver.required_memory(molecule, basis, aux_basis, 0.0, None)
+
+        whole = driver.required_memory(molecule, basis, aux_basis, 0.0, everything)
+
+        assert whole > 0
+        assert driver.required_memory(molecule, basis, aux_basis, 0.0, backwards) == whole
+        assert driver.required_memory(molecule, basis, aux_basis, 0.0, []) == 0
+        assert driver.required_memory(molecule, basis, aux_basis, 0.0, [], True) == 0
+
+        # an empty share builds nothing and holds the metrics alone: the caller's
+        # and its own copy while the others form their B vectors
+
+        for range_separated, nops in ((False, 1), (True, 2)):
+
+            metric = nops * naux * (naux + 1) // 2 * 8
+
+            peak = driver.peak_memory(molecule, basis, aux_basis, 0.0, [], range_separated,
+                                      1 << 30, 3)
+
+            assert peak == 2 * metric + (2 * metric) // 20
+
+            assert peak < driver.peak_memory(molecule, basis, aux_basis, 0.0, everything,
+                                             range_separated, 1 << 30, 3)
+
+        # every atom in any order is the whole molecule
+
+        ordered = driver.peak_memory(molecule, basis, aux_basis, 0.0, everything, False, 1 << 30, 3)
+
+        assert ordered == driver.peak_memory(molecule, basis, aux_basis, 0.0, backwards, False,
+                                             1 << 30, 3)
+
+        coeffs, density = self.orbitals(nao, 3, 113)
+
+        _, beta = self.orbitals(nao, 2, 127)
+
+        # prepare takes no atoms by default, which is an empty share
+
+        unnamed = SimdRIJKFockDriver()
+        unnamed.prepare(molecule, basis, aux_basis, 0.0, 1 << 30, 1.0e-12, False,
+                        rimode.in_memory)
+
+        named = SimdRIJKFockDriver()
+        named.prepare(molecule, basis, aux_basis, 0.0, 1 << 30, 1.0e-12, False,
+                      rimode.in_memory, aux_atoms=[])
+
+        for empty in (unnamed, named):
+
+            assert empty.get_mode() == rimode.in_memory
+            assert empty.number_of_aux_functions() == 0
+
+            closed = empty.compute(density, coeffs, 1.0).to_numpy(max_memory=8.0)
+
+            assert np.max(np.abs(closed)) == 0.0
+
+            fock_a, fock_b = empty.compute(density, coeffs, beta, 1.0)
+
+            assert np.max(np.abs(fock_a.to_numpy(max_memory=8.0))) == 0.0
+            assert np.max(np.abs(fock_b.to_numpy(max_memory=8.0))) == 0.0
+
+        ordered = SimdRIJKFockDriver()
+        ordered.prepare(molecule, basis, aux_basis, 0.0, 1 << 30, 1.0e-12, False,
+                        rimode.in_memory, aux_atoms=everything)
+
+        reordered = SimdRIJKFockDriver()
+        reordered.prepare(molecule, basis, aux_basis, 0.0, 1 << 30, 1.0e-12, False,
+                          rimode.in_memory, aux_atoms=backwards)
+
+        assert ordered.number_of_aux_functions() == naux
+        assert reordered.number_of_aux_functions() == naux
+
+        expected = ordered.compute(density, coeffs, 1.0).to_numpy(max_memory=8.0)
+
+        got = reordered.compute(density, coeffs, 1.0).to_numpy(max_memory=8.0)
+
+        scale = float(np.max(np.abs(expected)))
+
+        assert scale > 0.0
+        assert np.max(np.abs(got - expected)) / scale < 1.0e-14
+
+    def test_an_empty_share_forms_no_b_vectors(self, molecule):
+
+        basis, aux_basis = self.bases((8, 1, 7, 6), (1, 1, 0, 0), 2)
+
+        metric = SimdTwoCenterElectronRepulsionDriver().compute(molecule, aux_basis)
+
+        inverse = metric.cholesky_inverse()
+
+        drv = SimdRIFockDriver()
+
+        everything = every_atom(molecule)
+
+        with pytest.raises(TypeError):
+            drv.compute_bq_vectors(molecule, basis, aux_basis, inverse, 0.0)
+
+        whole = drv.compute_bq_vectors(molecule, basis, aux_basis, inverse, 0.0, everything)
+
+        assert whole.number_of_elements() > 0
+
+        backwards = drv.compute_bq_vectors(molecule, basis, aux_basis, inverse, 0.0,
+                                           everything[::-1])
+
+        assert backwards.number_of_elements() == whole.number_of_elements()
+
+        empty = drv.compute_bq_vectors(molecule, basis, aux_basis, inverse, 0.0, [])
+
+        assert empty.number_of_elements() == 0
+
+    def test_an_empty_share_adds_no_three_center_gradient(self, molecule):
+        """The gradient drivers read an empty share as no atoms, as the Fock drivers
+        do. Each call adds the two-center term whatever its share, so the gradients
+        of two shares add up to the whole one and that of an empty share, which is
+        the two-center term alone."""
+
+        basis, aux_basis = self.bases((8, 1, 7, 6), (1, 1, 0, 0), 2)
+
+        nao = basis.get_dimensions_of_basis()
+
+        atoms = every_atom(molecule)
+
+        coeffs, density = self.orbitals(nao, 3, 131)
+
+        fock_drv = SimdRIJKFockDriver()
+        fock_drv.prepare(molecule, basis, aux_basis, 1.0e-12, 1 << 30, 1.0e-12, False,
+                         rimode.in_memory, aux_atoms=atoms)
+
+        bq, metric = fock_drv.get_bq_vectors(), fock_drv.get_metric()
+
+        grad_drv = SimdRIJKGradientDriver(1.0e-12)
+
+        def gradient(aux_atoms):
+            return grad_drv.compute(molecule, basis, aux_basis, bq, metric, density, coeffs, 1.0,
+                                    atoms, aux_atoms).to_numpy()
+
+        with pytest.raises(TypeError):
+            grad_drv.compute(molecule, basis, aux_basis, bq, metric, density, coeffs, 1.0, atoms)
+
+        whole = grad_drv.compute(molecule, basis, aux_basis, bq, metric, density, coeffs,
+                                 1.0).to_numpy()
+
+        empty = gradient([])
+
+        scale = float(np.max(np.abs(whole)))
+
+        assert scale > 0.0
+        assert np.max(np.abs(gradient(atoms) - whole)) / scale < 1.0e-14
+        assert np.max(np.abs(empty - whole)) / scale > 1.0e-6
+
+        summed = gradient(atoms[0::2]) + gradient(atoms[1::2])
+
+        assert np.max(np.abs(summed - (whole + empty))) / scale < 1.0e-12
+
+        # the Coulomb only driver, with the two-center term left out: an empty
+        # share is then nothing at all
+
+        ri_drv = SimdRIJFockDriver()
+        ri_drv.prepare(molecule, basis, aux_basis, 1.0e-12, 1 << 30, 1.0e-12, rimode.in_memory,
+                       ri_drv.make_metric(molecule, aux_basis, 1.0e-12), 0, 1)
+
+        gamma = ri_drv.solve_fitting(ri_drv.compute_gamma(density, ri_drv.owned_parts()))
+
+        rij_drv = SimdRIJGradientDriver(1.0e-12)
+
+        with pytest.raises(TypeError):
+            rij_drv.compute(molecule, basis, aux_basis, gamma, density, atoms)
+
+        whole_j = rij_drv.compute(molecule, basis, aux_basis, gamma, density).to_numpy()
+
+        scale_j = float(np.max(np.abs(whole_j)))
+
+        assert scale_j > 0.0
+
+        got = rij_drv.compute(molecule, basis, aux_basis, gamma, density, atoms, atoms).to_numpy()
+
+        assert np.max(np.abs(got - whole_j)) / scale_j < 1.0e-14
+
+        nothing = rij_drv.compute(molecule, basis, aux_basis, gamma, density, atoms, [], False)
+
+        assert np.max(np.abs(nothing.to_numpy())) == 0.0
 
     def test_the_direct_way_in_three_calls_is_the_direct_way_in_one(self, molecule):
         """The direct build is two sweeps of the integrals with the fitting between
@@ -462,7 +676,7 @@ class TestSimdRIJKFockDriver:
 
         driver = SimdRIJKFockDriver()
         driver.prepare(molecule, basis, aux_basis, 0.0, 1 << 30, 1.0e-12, False,
-                       rimode.direct)
+                       rimode.direct, aux_atoms=every_atom(molecule))
 
         expected = driver.compute(density, coeffs, 1.0).to_numpy(max_memory=8.0)
 
@@ -500,7 +714,7 @@ class TestSimdRIJKFockDriver:
 
         whole = SimdRIJKFockDriver()
         whole.prepare(chain, basis, aux_basis, 0.0, budget, 1.0e-12, False,
-                      rimode.direct)
+                      rimode.direct, aux_atoms=every_atom(chain))
 
         nparts = whole.number_of_parts()
 
@@ -521,7 +735,7 @@ class TestSimdRIJKFockDriver:
 
                 part = SimdRIJKFockDriver()
                 part.prepare(chain, basis, aux_basis, 0.0, budget, 1.0e-12, False,
-                             rimode.direct)
+                             rimode.direct, aux_atoms=every_atom(chain))
 
                 ofirst = (norbitals * rank) // nranks
                 olast = (norbitals * (rank + 1)) // nranks
@@ -564,7 +778,7 @@ class TestSimdRIJKFockDriver:
 
         driver = SimdRIJKFockDriver()
         driver.prepare(molecule, basis, aux_basis, 0.0, 1 << 30, 1.0e-12, False,
-                       rimode.direct)
+                       rimode.direct, aux_atoms=every_atom(molecule))
 
         fock, gamma = driver.compute_exchange(coeffs, 1.0, 2, 2)
 
@@ -590,7 +804,7 @@ class TestSimdRIJKFockDriver:
 
         whole = SimdRIJKFockDriver()
         whole.prepare(molecule, basis, aux_basis, 0.0, 1 << 30, 1.0e-12, False,
-                      rimode.in_memory)
+                      rimode.in_memory, aux_atoms=every_atom(molecule))
 
         assert whole.number_of_aux_functions() == naux
 
@@ -624,7 +838,7 @@ class TestSimdRIJKFockDriver:
 
         driver = SimdRIJKFockDriver()
         driver.prepare(molecule, basis, aux_basis, 0.0, 1 << 30, 1.0e-12, False,
-                       rimode.direct)
+                       rimode.direct, aux_atoms=every_atom(molecule))
 
         assert driver.number_of_aux_functions() == aux_basis.get_dimensions_of_basis()
 
@@ -645,7 +859,7 @@ class TestSimdRIJKFockDriver:
 
         whole = SimdRIJKFockDriver()
         whole.prepare(chain, basis, aux_basis, 0.0, roomy, 1.0e-12, False,
-                      rimode.direct)
+                      rimode.direct, aux_atoms=every_atom(chain))
 
         assert whole.number_of_parts() == 1, (
             "a budget of a gigabyte should hold this molecule in one part")
@@ -656,7 +870,7 @@ class TestSimdRIJKFockDriver:
 
             driver = SimdRIJKFockDriver()
             driver.prepare(chain, basis, aux_basis, 0.0, roomy, 1.0e-12, False,
-                           rimode.direct, min_parts=asked)
+                           rimode.direct, min_parts=asked, aux_atoms=every_atom(chain))
 
             assert driver.number_of_parts() >= asked, (
                 f"asked for {asked} parts and got {driver.number_of_parts()}")
@@ -714,7 +928,8 @@ class TestSimdRIJKFockDriver:
                 assert metric.is_triangular()
 
                 driver.prepare(molecule, basis, aux_basis, 0.0, 1 << 30, 1.0e-12,
-                               use_root, rimode.direct, metric=metric)
+                               use_root, rimode.direct, metric=metric,
+                               aux_atoms=every_atom(molecule))
 
                 assert driver.get_mode() == rimode.direct
 

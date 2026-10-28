@@ -56,8 +56,8 @@ class CSimdRIJFockDriver
     auto operator=(CSimdRIJFockDriver &&) noexcept -> CSimdRIJFockDriver & = delete;
 
     /// @brief Gets the memory the driver would hold for a molecule and its bases.
-    /// @param aux_atoms The atoms of the auxiliary side this rank holds, or none of
-    /// them for the whole molecule.
+    /// @param aux_atoms The atoms of the auxiliary side this rank holds, a list of
+    /// every atom for the whole molecule. An empty list holds nothing.
     /// @return The memory, in bytes.
     /// @note One tensor, where the driver which forms the exchange holds one or two
     /// of them and says so. Nothing else is held: there is no transformation of the
@@ -66,7 +66,7 @@ class CSimdRIJFockDriver
                          const CMolecularBasis  &basis,
                          const CMolecularBasis  &aux_basis,
                          const double            threshold,
-                         const std::vector<int> &aux_atoms = {}) const -> size_t;
+                         const std::vector<int> &aux_atoms) const -> size_t;
 
     /// @brief Gets the most memory the way which holds the integrals reaches on
     /// this rank.

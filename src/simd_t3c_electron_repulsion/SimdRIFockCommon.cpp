@@ -65,10 +65,30 @@ atom_shares(const CTripleSparsityPattern &pattern, const size_t natoms) -> std::
     return shares;
 }
 
+auto
+names_every_atom(const std::vector<int> &atoms, const size_t natoms) -> bool
+{
+    if (atoms.size() != natoms) return false;
+
+    // NOTE: the count alone is not enough, as a list which names one atom twice and
+    // another not at all has the right length.
+
+    std::vector<bool> seen(natoms, false);
+
+    for (const auto atom : atoms)
+    {
+        if ((atom < 0) || (static_cast<size_t>(atom) >= natoms) || seen[static_cast<size_t>(atom)]) return false;
+
+        seen[static_cast<size_t>(atom)] = true;
+    }
+
+    return true;
+}
+
 /// @brief Gets the dense indices of the auxiliary basis functions of given atoms.
 /// @param aux_basis The auxiliary molecular basis.
-/// @param atoms The atoms, as their indices in the molecule, or none of them for all
-/// of them.
+/// @param atoms The atoms, as their indices in the molecule. An empty list has no
+/// functions.
 /// @return The indices, in ascending order.
 /// @note The dense index runs over the angular momenta of the whole molecule before
 /// it runs over the atoms, so the functions of one atom are scattered through it and
@@ -78,8 +98,6 @@ aux_functions_of(const CMolecularBasis &aux_basis, const std::vector<int> &atoms
 {
     const auto set_indices = aux_basis.basis_sets_indices();
 
-    const auto natoms = set_indices.size();
-
     const auto indices = denseidx::index_functions(aux_basis);
 
     const auto starts = denseidx::make_dense_starts(aux_basis);
@@ -88,18 +106,9 @@ aux_functions_of(const CMolecularBasis &aux_basis, const std::vector<int> &atoms
 
     const auto nmoms = static_cast<size_t>(aux_basis.max_angular_momentum() + 1);
 
-    std::vector<int> all_atoms;
-
-    if (atoms.empty())
-    {
-        all_atoms.reserve(natoms);
-
-        for (size_t atom = 0; atom < natoms; atom++) all_atoms.push_back(static_cast<int>(atom));
-    }
-
     std::vector<size_t> functions;
 
-    for (const auto atom : (atoms.empty() ? all_atoms : atoms))
+    for (const auto atom : atoms)
     {
         const auto index = static_cast<size_t>(atom);
 
@@ -253,14 +262,18 @@ pattern_memory(const CMolecule        &molecule,
                const double            threshold,
                const std::vector<int> &aux_atoms) -> size_t
 {
+    // a share of no atoms describes no pattern, and the pattern of the atoms named
+    // is refused one of none
+
+    if (aux_atoms.empty()) return 0;
+
     // NOTE: the pattern of what a sweep leaves is the pattern of the three-center
     // integrals. The metric is dense and the transformation of the auxiliary side
     // keeps every atom which survives, so neither of them makes it sparser.
 
     const CSimdThreeCenterElectronRepulsionDriver eri_drv;
 
-    const auto pattern = aux_atoms.empty() ? eri_drv.make_pattern(molecule, basis, aux_basis, threshold)
-                                           : eri_drv.make_pattern(molecule, basis, aux_basis, threshold, aux_atoms);
+    const auto pattern = eri_drv.make_pattern(molecule, basis, aux_basis, threshold, aux_atoms);
 
     return pattern_memory(pattern);
 }

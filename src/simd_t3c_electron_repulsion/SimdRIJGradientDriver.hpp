@@ -91,10 +91,10 @@ class CSimdRIJGradientDriver
     /// @param density The density matrix of one spin, which is the density the
     /// fitting coefficients were solved from.
     /// @param atoms The atoms to compute the gradient of.
-    /// @param aux_atoms The atoms of the auxiliary basis this rank holds. An empty
-    /// list is an empty share and not every atom: a caller which wants every atom
-    /// says so, or takes the overload which does it for them. See the note in
-    /// SimdRIJGradientDriver::_three_center for what reading it the other way cost.
+    /// @param aux_atoms The atoms of the auxiliary basis this rank holds, a list of
+    /// every atom for the whole molecule. An empty list is an empty share and not
+    /// every atom. See the note in SimdRIJGradientDriver::_three_center for what
+    /// reading it the other way cost.
     /// @param with_metric Whether to add the two-center term.
     /// @return The gradient, a general matrix of one row of three components per
     /// atom of the molecule, with the rows of the atoms not asked for left zero.
@@ -114,7 +114,7 @@ class CSimdRIJGradientDriver
                  const std::vector<double> &fitting,
                  const CPackedMatrix       &density,
                  const std::vector<int>    &atoms,
-                 const std::vector<int>    &aux_atoms  = {},
+                 const std::vector<int>    &aux_atoms,
                  const bool                 with_metric = true) const -> CPackedMatrix;
 
     /// @brief Computes the Coulomb contribution to the gradient of every atom.
@@ -130,8 +130,8 @@ class CSimdRIJGradientDriver
     /// density an open shell fits and the one its coefficients are of.
     /// @param fitting The fitting coefficients of that total density.
     /// @param atoms The atoms to compute the gradient of.
-    /// @param aux_atoms The atoms of the auxiliary basis this rank holds, an empty
-    /// list being an empty share.
+    /// @param aux_atoms The atoms of the auxiliary basis this rank holds, as for
+    /// compute.
     /// @param with_metric Whether to add the two-center term.
     /// @return The gradient, one row per atom.
     /// @note A separate routine and not a flag on the one above. The two differ in
@@ -144,7 +144,7 @@ class CSimdRIJGradientDriver
                             const std::vector<double> &fitting,
                             const CPackedMatrix       &density,
                             const std::vector<int>    &atoms,
-                            const std::vector<int>    &aux_atoms  = {},
+                            const std::vector<int>    &aux_atoms,
                             const bool                 with_metric = true) const -> CPackedMatrix;
 
     /// @brief Computes the Coulomb contribution to an open shell's gradient over

@@ -99,16 +99,18 @@ class CSimdRIFockDriver
     /// format, as packlin::invert returns it.
     /// @param threshold The screening threshold.
     /// @param aux_atoms The atoms whose auxiliary functions the B vectors are formed
-    /// for, as their indices in the molecule and without repetition, or empty for all
-    /// of them.
+    /// for, as their indices in the molecule and without repetition. The whole
+    /// molecule is a list of every atom, and an empty list is a share of no atoms,
+    /// which forms no B vectors.
     /// @return The sparse tensor of the B vectors, whose blocks hold the auxiliary
-    /// functions of q in the place the three-center integrals hold those of p.
+    /// functions of q in the place the three-center integrals hold those of p, or
+    /// an empty tensor for a share of no atoms.
     auto compute_bq_vectors(const CMolecule        &molecule,
                             const CMolecularBasis  &basis,
                             const CMolecularBasis  &aux_basis,
                             const CPackedMatrix    &inverse_metric,
                             const double            threshold,
-                            const std::vector<int> &aux_atoms = {}) const -> CSparseTensor;
+                            const std::vector<int> &aux_atoms) const -> CSparseTensor;
 
     /// @brief Computes the B vectors of the Coulomb operator and of the attenuated
     /// one, for a hybrid range separated functional.
@@ -123,7 +125,7 @@ class CSimdRIFockDriver
     /// @param threshold The screening threshold.
     /// @param omega The range separation parameter, which must be positive.
     /// @param aux_atoms The atoms whose auxiliary functions the B vectors are formed
-    /// for, or empty for all of them.
+    /// for, as for compute_bq_vectors. An empty list forms none.
     /// @return The B vectors of the Coulomb operator and those of the attenuated
     /// one, on one sparsity pattern.
     /// @note The pattern is the Coulomb bound for both, as the attenuated operator
@@ -141,7 +143,7 @@ class CSimdRIFockDriver
                                const CPackedMatrix    &inverse_metric_erf,
                                const double            threshold,
                                const double            omega,
-                               const std::vector<int> &aux_atoms = {}) const
+                               const std::vector<int> &aux_atoms) const
         -> std::pair<CSparseTensor, CSparseTensor>;
 
     /// @brief Contracts the B vectors with a density matrix.
@@ -347,10 +349,11 @@ class CSimdRIFockDriver
     /// @param aux_basis The auxiliary molecular basis.
     /// @param threshold The screening threshold.
     /// @param aux_atoms The atoms whose auxiliary functions the B vectors are formed
-    /// for, or empty for all of them.
+    /// for, as for compute_bq_vectors.
     /// @param nops The number of operators, one for the Coulomb operator alone and
     /// two for a hybrid range separated functional.
-    /// @return The memory in bytes, for the number of threads of the caller.
+    /// @return The memory in bytes, for the number of threads of the caller, which
+    /// is none of anything for a share of no atoms: nothing is formed for it.
     /// @note The blocks and the batches are described as compute_bq_vectors
     /// describes them, so this is what that call will hold rather than an estimate
     /// of it. It costs the description of the sparsity pattern, which is a small
@@ -408,8 +411,9 @@ class CSimdRIFockDriver
     /// @param omega The range separation parameter, or zero for the Coulomb operator
     /// alone. It must be positive exactly when there are two metrics.
     /// @param aux_atoms The atoms whose auxiliary functions the B vectors are formed
-    /// for, or empty for all of them.
-    /// @return One tensor per operator, all on one sparsity pattern.
+    /// for, as for compute_bq_vectors. An empty list forms none.
+    /// @return One tensor per operator, all on one sparsity pattern, or empty
+    /// tensors for a share of no atoms.
     /// @note Both public entries are written in terms of this, so the one operator
     /// case is the same code as the two operator one and not a copy of it which
     /// drifts. It carries the pattern, the blocks and the indices once whatever the

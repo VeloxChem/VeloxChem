@@ -53,10 +53,21 @@ namespace simdri {
 /// @return The memory of the values of each atom, in bytes.
 auto atom_shares(const CTripleSparsityPattern &pattern, const size_t natoms) -> std::vector<double>;
 
+/// @brief Whether a list of atoms names every atom of a molecule, each once.
+/// @param atoms The atoms, as their indices in the molecule.
+/// @param natoms The number of atoms of the molecule.
+/// @return True if every atom is named exactly once, in any order.
+/// @note **A list of atoms means those atoms and no others, and an empty list is no
+/// atoms.** The whole molecule is a list which names every atom. An empty list once
+/// meant the whole molecule as well, and a rank dealt none of the atoms, whose list
+/// is empty too, was charged and formed as the whole molecule. What needs to know
+/// that it was given the whole molecule asks this of the list.
+auto names_every_atom(const std::vector<int> &atoms, const size_t natoms) -> bool;
+
 /// @brief Gets the dense indices of the auxiliary basis functions of given atoms.
 /// @param aux_basis The auxiliary molecular basis.
-/// @param atoms The atoms, as their indices in the molecule, or none of them for all
-/// of them.
+/// @param atoms The atoms, as their indices in the molecule. An empty list has no
+/// functions.
 /// @return The indices, in ascending order.
 auto aux_functions_of(const CMolecularBasis &aux_basis, const std::vector<int> &atoms) -> std::vector<size_t>;
 
@@ -71,8 +82,8 @@ auto aux_functions_of(const CMolecularBasis &aux_basis, const std::vector<int> &
 /// @param basis The molecular basis.
 /// @param aux_basis The auxiliary molecular basis.
 /// @param threshold The screening threshold.
-/// @param aux_atoms The atoms of the auxiliary side to count, or none of them for
-/// the whole molecule.
+/// @param aux_atoms The atoms of the auxiliary side to count. An empty list is a
+/// share of no atoms, which holds nothing.
 /// @return The memory of one tensor of that pattern, in bytes.
 /// @note One tensor. A driver which holds more than one of them -- a hybrid range
 /// separated functional holds two, on the same pattern -- multiplies this itself, so
