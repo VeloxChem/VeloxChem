@@ -4,7 +4,7 @@ import pytest
 
 from veloxchem.veloxchemlib import T4CScreener
 from veloxchem.veloxchemlib import PackedMatrix, make_matrix, mat_t
-from veloxchem.veloxchemlib import SimdRIJKFockDriver
+from veloxchem.veloxchemlib import SimdRIJKFockDriver, rimode
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
@@ -43,8 +43,9 @@ class TestRIMODriver:
         packed_coeffs.from_numpy(np.ascontiguousarray(coeffs))
 
         ri_fock_drv = SimdRIJKFockDriver()
-        ri_fock_drv.prepare(mol, bas, aux_bas, 0.0, 1 << 30,
-                            aux_atoms=list(range(mol.number_of_atoms())))
+        ri_fock_drv.prepare(mol, bas, aux_bas, 0.0, 1 << 30, 1.0e-12, False,
+                            rimode.automatic,
+                            list(range(mol.number_of_atoms())))
 
         # NOTE: the driver answers with twice the Coulomb less the scaled
         # exchange, so a factor of zero leaves twice the Coulomb and a factor of

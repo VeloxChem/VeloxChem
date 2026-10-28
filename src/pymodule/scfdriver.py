@@ -2237,9 +2237,8 @@ class ScfDriver:
 
             # NOTE: the ranks' shares have to cover the auxiliary basis between
             # them, once, or the Fock matrix they add up to is not the whole
-            # one. prepare takes no atoms by default, and a call which left them
-            # out would build every Fock matrix without the two-electron part
-            # and say nothing.
+            # one. A share which missed atoms, or named one on two ranks, would
+            # converge to a wrong energy and say nothing.
             self._check_ri_aux_functions(self._ri_drv, basis_ri, self.comm)
 
             # NOTE: the driver keeps copies of its own, and these would otherwise

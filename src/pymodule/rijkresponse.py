@@ -248,8 +248,8 @@ def initialize(solver, molecule, basis):
                               metric_erf)
 
     # NOTE: the ranks' shares have to cover the auxiliary basis once between them,
-    # as in the SCF. prepare takes no atoms by default, and a call which left them
-    # out would answer every exchange as zero and say nothing.
+    # as in the SCF, or the exchange the ranks add up is not the whole one and
+    # nothing says so.
     naux = solver._ri_jk_aux_basis.get_dimensions_of_basis()
 
     held = solver.comm.allgather(solver._ri_jk_drv.number_of_aux_functions())

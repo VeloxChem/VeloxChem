@@ -393,17 +393,17 @@ export_simdintegrals(py::module &m) -> void
         .def("prepare",
              &CSimdRIJKFockDriver::prepare,
              "Forms the inverted factor of the metric and the B vectors. aux_atoms are the atoms of the "
-             "auxiliary basis this driver holds, a list of every atom for the whole molecule; the default "
-             "is no atoms.",
+             "auxiliary basis this driver holds, a list of every atom for the whole molecule and an empty "
+             "list for none. They have no default, and neither have the arguments before them.",
              py::arg("molecule"),
              py::arg("basis"),
              py::arg("aux_basis"),
              py::arg("threshold"),
              py::arg("memory_budget"),
-             py::arg("metric_threshold") = 1.0e-12,
-             py::arg("use_inverse_square_root") = false,
-             py::arg("mode") = rimode::automatic,
-             py::arg("aux_atoms") = std::vector<int>{},
+             py::arg("metric_threshold"),
+             py::arg("use_inverse_square_root"),
+             py::arg("mode"),
+             py::arg("aux_atoms"),
              py::arg("metric") = CPackedMatrix(),
              py::arg("min_parts") = 1,
              py::arg("omega") = 0.0,

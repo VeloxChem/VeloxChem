@@ -231,9 +231,11 @@ class CSimdRIJKFockDriver
     /// the atoms is given an empty share, holds no B vectors and answers zeros. The
     /// direct way refuses a division, as its triangular solve reaches across the
     /// whole auxiliary basis, and so takes every atom.
-    /// @note **The default is no atoms, and not the whole molecule.** It is a default
-    /// only because the arguments before it have theirs. A caller over the whole
-    /// molecule names every atom.
+    /// @note **The atoms have no default.** An empty list is a share of no atoms,
+    /// which builds every Fock matrix without its two-electron part, so a default
+    /// of it would let a caller who forgot the atoms build that and be told nothing.
+    /// The arguments before it have no defaults either, as none may come before an
+    /// argument without one.
     /// @param min_parts The fewest parts the direct way is to sweep the auxiliary
     /// basis in. The parts are cut to fit the memory of a build, and a machine with
     /// memory to spare gives one of them -- which one rank then sweeps for the
@@ -259,14 +261,14 @@ class CSimdRIJKFockDriver
                  const CMolecularBasis  &aux_basis,
                  const double            threshold,
                  const size_t            memory_budget,
-                 const double            metric_threshold        = 1.0e-12,
-                 const bool              use_inverse_square_root = false,
-                 const rimode            mode                    = rimode::automatic,
-                 const std::vector<int> &aux_atoms               = {},
-                 const CPackedMatrix    &metric                  = CPackedMatrix(),
-                 const size_t            min_parts               = 1,
-                 const double            omega                   = 0.0,
-                 const CPackedMatrix    &metric_erf              = CPackedMatrix()) -> void;
+                 const double            metric_threshold,
+                 const bool              use_inverse_square_root,
+                 const rimode            mode,
+                 const std::vector<int> &aux_atoms,
+                 const CPackedMatrix    &metric     = CPackedMatrix(),
+                 const size_t            min_parts  = 1,
+                 const double            omega      = 0.0,
+                 const CPackedMatrix    &metric_erf = CPackedMatrix()) -> void;
 
     /// @brief Computes the Fock matrix of a density and a set of orbitals.
     /// @param density The density matrix, in the packed format, symmetric for a
