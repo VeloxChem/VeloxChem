@@ -2042,12 +2042,20 @@ class ScfDriver:
                 self._ri_aux_atoms = molecule.partition_atoms_by_weight(
                     self.comm, weights)
 
+            # NOTE: a rank which was dealt no auxiliary atoms holds none of them,
+            # and its list is empty, which the driver reads as the whole molecule
+            # wherever it takes a list of atoms. It is told apart here, once, and
+            # every call below is given the answer rather than the empty list: the
+            # B vectors such a rank was said to need were those of the molecule,
+            # and the largest over the ranks printed them for a molecule of fewer
+            # atoms than ranks.
+            holds_nothing = (self.nodes > 1) and (len(self._ri_aux_atoms) == 0)
+
             budget = self._get_ri_memory_budget(ao_basis)
 
-            needed = self._ri_drv.required_memory(molecule, ao_basis, basis_ri,
-                                                  self.eri_thresh,
-                                                  self._ri_aux_atoms,
-                                                  range_separated)
+            needed = (0 if holds_nothing else self._ri_drv.required_memory(
+                molecule, ao_basis, basis_ri, self.eri_thresh,
+                self._ri_aux_atoms, range_separated))
 
             # NOTE: whether RI-JK is used at all has to be decided the same on
             # every rank, as the ranks add shares of one Fock matrix. The shares
@@ -2095,6 +2103,7 @@ class ScfDriver:
             # auxiliary basis, and the division is made in the build.
             if mode == rimode.direct:
                 self._ri_aux_atoms = []
+                holds_nothing = False
 
             # NOTE: the B vectors are not the most the way which holds them
             # reaches. Forming them holds a batch of the integrals beside them, and
@@ -2115,8 +2124,6 @@ class ScfDriver:
                 # out of step.
                 norbitals = self._get_ri_jk_max_orbitals(
                     molecule, ao_basis, den_mat)
-                holds_nothing = ((self.nodes > 1) and
-                                 (len(self._ri_aux_atoms) == 0))
                 if holds_nothing:
                     peak = 0
                 else:
@@ -2142,6 +2149,10 @@ class ScfDriver:
             else:
                 self.ostream.print_info(
                     'Using the SIMD resolution of the identity (RI-JK) driver.')
+                self.ostream.print_info(
+                    'Dimension of RI auxiliary basis set ' +
+                    f'({basis_ri.get_label().upper()}): ' +
+                    f'{basis_ri.get_dimensions_of_basis()}')
                 if mode == rimode.in_memory and self.nodes == 1:
                     self.ostream.print_info(
                         f'RI-JK needs roughly {max(peaks) / (1024**3):.2f} ' +
@@ -2217,16 +2228,14 @@ class ScfDriver:
             # so there is something for each of them to take.
             # NOTE: an empty share of the auxiliary atoms means this rank was dealt
             # none of them, and not that it should take all of them. The driver
-            # cannot tell the two apart from its arguments, so it is told: a run on
-            # one rank asks for the whole molecule with an empty list, and a rank
-            # which came out of the deal empty says so here.
+            # cannot tell the two apart from its arguments, so it is told, by the
+            # flag set where the atoms were dealt. The direct way sweeps the whole
+            # auxiliary basis on every rank, so no rank of it holds nothing.
             self._ri_drv.prepare(molecule, ao_basis, basis_ri, self.eri_thresh,
                                  budget, self.ri_metric_threshold,
                                  use_inverse_square_root, mode,
                                  self._ri_aux_atoms, metric, self.nodes,
-                                 omega, metric_erf,
-                                 (self.nodes > 1) and
-                                 (len(self._ri_aux_atoms) == 0))
+                                 omega, metric_erf, holds_nothing)
 
             # NOTE: the driver keeps copies of its own, and these would otherwise
             # stay alive through every iteration below, a second set of the
