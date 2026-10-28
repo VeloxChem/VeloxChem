@@ -45,12 +45,14 @@ from .visualizationdriver import VisualizationDriver
 from .cubicgrid import CubicGrid
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            ri_sanity_check, dft_sanity_check, pe_sanity_check,
-                           solvation_model_sanity_check)
+                           solvation_model_sanity_check, gostshyp_sanity_check,
+                           environment_compatibility_sanity_check)
 from .errorhandler import assert_msg_critical
 from .mathutils import screened_eigh, symmetric_matrix_function
-from .checkpoint import (check_rsp_hdf5, write_rsp_solution,
-                         write_lr_rsp_results_to_hdf5,
-                         write_detach_attach_to_hdf5)
+from .checkpoint import check_rsp_hdf5
+from .resultsio import (write_rsp_results_to_hdf5,
+                        write_detach_attach_to_hdf5, clear_group_in_hdf5,
+                        write_rsp_full_solution_to_hdf5)
 
 
 class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
@@ -134,8 +136,14 @@ class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
         # check pe setup
         pe_sanity_check(self, molecule=molecule)
 
-        # check solvation
+        # check solvation model setup
         solvation_model_sanity_check(self)
+
+        # check GOSTSHYP setup
+        gostshyp_sanity_check(self)
+
+        # check pairwise compatibility of the environment settings
+        environment_compatibility_sanity_check(self)
 
         # check print level (verbosity of output)
         self.print_level = max(1, min(self.print_level, 3))
@@ -187,6 +195,10 @@ class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
                 False,
                 f'{type(self).__name__}: restricted_subspace not implemented')
 
+        self._check_mpi_oversubscription(
+            self._get_excitation_space_dimension_unrestricted(
+                nocc_a, nocc_b, norb), 'excitation space')
+
         # ERI information
         eri_dict = self._init_eri(molecule, basis)
 
@@ -196,8 +208,11 @@ class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
         # PE information
         pe_dict = self._init_pe(molecule, basis)
 
-        # CPCM_information
-        self._init_cpcm(molecule)
+        # CPCM information
+        self._init_cpcm(molecule, basis)
+
+        # GOSTSHYP information
+        self._init_gostshyp(molecule, basis, scf_results)
 
         # For now, 'nonlinear' is not supported for unrestricted case.
         assert_msg_critical(
@@ -226,6 +241,8 @@ class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
                 self.restart = check_rsp_hdf5(self.checkpoint_file,
                                               rsp_vector_labels, molecule,
                                               basis, dft_dict, pe_dict)
+                if self.restart:
+                    self.restart = self.match_settings(self.checkpoint_file)
             self.restart = self.comm.bcast(self.restart, root=mpi_master())
 
         # read initial guess from restart file
@@ -234,8 +251,11 @@ class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
 
             checkpoint_nstates = self._read_nstates_from_checkpoint()
 
+            # Note that we only handle the restart with additional nstates when
+            # `self.nonlinear` is inactive
+
             # print warning if nstates is not present in the restart file
-            if checkpoint_nstates is None:
+            if checkpoint_nstates is None and not self.nonlinear:
                 self.ostream.print_warning(
                     'Could not find the nstates key in the checkpoint file.')
                 self.ostream.print_blank()
@@ -247,7 +267,7 @@ class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
 
             # generate necessary initial guesses if more states are requested
             # in a restart calculation
-            elif checkpoint_nstates < self.nstates:
+            elif checkpoint_nstates < self.nstates and not self.nonlinear:
                 self.ostream.print_info(
                     'Generating initial guesses for ' +
                     f'{self.nstates - checkpoint_nstates} more states...')
@@ -402,6 +422,8 @@ class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
                 profiler.print_memory_tracing(self.ostream)
 
                 self._print_iteration(relative_residual_norm, wn)
+
+                self._print_gostshyp_neg_amp_info()
 
             profiler.stop_timer('ReducedSpace')
 
@@ -559,6 +581,8 @@ class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
                 # final h5 file for response solutions
                 if self.filename is not None:
                     final_h5_fname = f'{self.filename}.h5'
+                    # clear stale group in final h5
+                    clear_group_in_hdf5(final_h5_fname, 'rsp')
                 else:
                     final_h5_fname = None
 
@@ -570,16 +594,16 @@ class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
 
             excitation_details = []
 
+            if self.rank == mpi_master():
+                (mo_occ_a, mo_occ_b), (mo_vir_a, mo_vir_b) = self._get_mo_occ_and_mo_vir_unrestricted(
+                    scf_results, nocc_a, nocc_b)
+
             for s in range(self.nstates):
                 eigvec_full = self.get_full_solution_vector(exc_solutions[s])
 
                 if self.rank == mpi_master():
-                    if self.core_excitation:
-                        n_ov_a = self.num_core_orbitals * (norb - nocc_a)
-                        n_ov_b = self.num_core_orbitals * (norb - nocc_b)
-                    else:
-                        n_ov_a = nocc_a * (norb - nocc_a)
-                        n_ov_b = nocc_b * (norb - nocc_b)
+                    n_ov_a = mo_occ_a.shape[1] * mo_vir_a.shape[1]
+                    n_ov_b = mo_occ_b.shape[1] * mo_vir_b.shape[1]
 
                     eigvec_a = np.hstack((
                         eigvec_full[:n_ov_a],
@@ -590,36 +614,8 @@ class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
                         eigvec_full[n_ov_a + n_ov_b + n_ov_a:],
                     ))
 
-                    if self.core_excitation:
-                        mo_occ_a = scf_results[
-                            'C_alpha'][:, :self.num_core_orbitals].copy()
-                        mo_vir_a = scf_results['C_alpha'][:, nocc_a:].copy()
-                        z_mat_a = eigvec_a[:eigvec_a.size // 2].reshape(
-                            self.num_core_orbitals, -1)
-                        y_mat_a = eigvec_a[eigvec_a.size // 2:].reshape(
-                            self.num_core_orbitals, -1)
-
-                        mo_occ_b = scf_results[
-                            'C_beta'][:, :self.num_core_orbitals].copy()
-                        mo_vir_b = scf_results['C_beta'][:, nocc_b:].copy()
-                        z_mat_b = eigvec_b[:eigvec_b.size // 2].reshape(
-                            self.num_core_orbitals, -1)
-                        y_mat_b = eigvec_b[eigvec_b.size // 2:].reshape(
-                            self.num_core_orbitals, -1)
-                    else:
-                        mo_occ_a = scf_results['C_alpha'][:, :nocc_a].copy()
-                        mo_vir_a = scf_results['C_alpha'][:, nocc_a:].copy()
-                        z_mat_a = eigvec_a[:eigvec_a.size // 2].reshape(
-                            nocc_a, -1)
-                        y_mat_a = eigvec_a[eigvec_a.size // 2:].reshape(
-                            nocc_a, -1)
-
-                        mo_occ_b = scf_results['C_beta'][:, :nocc_b].copy()
-                        mo_vir_b = scf_results['C_beta'][:, nocc_b:].copy()
-                        z_mat_b = eigvec_b[:eigvec_b.size // 2].reshape(
-                            nocc_b, -1)
-                        y_mat_b = eigvec_b[eigvec_b.size // 2:].reshape(
-                            nocc_b, -1)
+                    (z_mat_a, z_mat_b), (y_mat_a, y_mat_b) = self._get_z_mat_and_y_mat_unrestricted(
+                        eigvec_a, eigvec_b, nocc_a, nocc_b)
 
                 if self.nto or self.detach_attach:
                     vis_drv = VisualizationDriver(self.comm)
@@ -637,7 +633,7 @@ class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
                     self.ostream.flush()
 
                     if self.rank == mpi_master():
-                        nto_mo = self.get_nto_unrestricted(
+                        nto_mo = self._compute_nto_unrestricted(
                             (z_mat_a - y_mat_a, z_mat_b - y_mat_b),
                             (mo_occ_a, mo_occ_b), (mo_vir_a, mo_vir_b))
 
@@ -722,74 +718,6 @@ class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
                         if self.rank == mpi_master():
                             dens_cube_files.append(dens_cube_fnames)
 
-                # TODO: enable esa
-                assert_msg_critical(
-                    not self.esa, f'{type(self).__name__}: ' +
-                    'not yet implemented for excited state absorption')
-
-                if self.esa:
-                    if self.rank == mpi_master():
-                        esa_results = []
-                    """
-                    if self.esa_from_state is None:
-                        source_states = list(range(self.nstates))
-                    else:
-                        source_states = [self.esa_from_state - 1]
-
-                    esa_pairs = [(s_1, s_2)
-                                 for s_1 in source_states
-                                 for s_2 in range(s_1 + 1, self.nstates)]
-
-                    if self.rank == mpi_master():
-                        esa_results = []
-                        dipole_integrals = compute_electric_dipole_integrals(
-                            molecule, basis, [0.0, 0.0, 0.0])
-
-                    for s_1, s_2 in esa_pairs:
-                        eigvec_1 = self.get_full_solution_vector(
-                            exc_solutions[s_1])
-                        eigvec_2 = self.get_full_solution_vector(
-                            exc_solutions[s_2])
-
-                        if self.rank == mpi_master():
-                            half_size = eigvec_1.shape[0] // 2
-
-                            z_mat_1 = eigvec_1[:half_size].reshape(nocc, -1)
-                            y_mat_1 = eigvec_1[half_size:].reshape(nocc, -1)
-
-                            z_mat_2 = eigvec_2[:half_size].reshape(nocc, -1)
-                            y_mat_2 = eigvec_2[half_size:].reshape(nocc, -1)
-
-                            esa_trans_dens = (
-                                np.linalg.multi_dot(
-                                    [mo_vir, z_mat_1.T, z_mat_2, mo_vir.T]) -
-                                np.linalg.multi_dot(
-                                    [mo_occ, z_mat_1, z_mat_2.T, mo_occ.T]))
-
-                            esa_trans_dens += (
-                                np.linalg.multi_dot(
-                                    [mo_occ, y_mat_1, y_mat_2.T, mo_occ.T]) -
-                                np.linalg.multi_dot(
-                                    [mo_vir, y_mat_1.T, y_mat_2, mo_vir.T]))
-
-                            esa_trans_dipole = np.array([
-                                np.sum(esa_trans_dens * dipole_integrals[i])
-                                for i in range(3)
-                            ])
-
-                            esa_exc_ene = exc_energies[s_2] - exc_energies[s_1]
-                            esa_osc_str = (2.0 / 3.0) * esa_exc_ene * np.sum(
-                                esa_trans_dipole**2)
-
-                            esa_results.append({
-                                'from_state': f'S{s_1 + 1}',
-                                'to_state': f'S{s_2 + 1}',
-                                'excitation_energy': esa_exc_ene,
-                                'oscillator_strength': esa_osc_str,
-                                'transition_dipole': esa_trans_dipole,
-                            })
-                    """
-
                 if self.rank == mpi_master():
                     for ind, comp in enumerate('xyz'):
                         elec_trans_dipoles[s, ind] = np.vdot(
@@ -806,12 +734,10 @@ class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
                         magn_trans_dipoles[s, ind] += np.vdot(
                             mdip_grad_b[ind], eigvec_b)
 
-                    # write to h5 file for response solutions
+                    # write response solutions to h5 file
                     if (self.save_solutions and final_h5_fname is not None):
-                        write_rsp_solution(final_h5_fname,
-                                           'S{:d}(a)'.format(s + 1), eigvec_a)
-                        write_rsp_solution(final_h5_fname,
-                                           'S{:d}(a)'.format(s + 1), eigvec_b)
+                        write_rsp_full_solution_to_hdf5(
+                            final_h5_fname, eigvec_full, s, self.nstates)
 
                     # save excitation details
                     excitation_details.append(
@@ -819,6 +745,79 @@ class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
                             (eigvec_a, eigvec_b),
                             (mo_occ_a.shape[1], mo_occ_b.shape[1]),
                             (mo_vir_a.shape[1], mo_vir_b.shape[1])))
+
+            if self.esa:
+                if self.esa_from_state is None:
+                    source_states = list(range(self.nstates))
+                else:
+                    source_states = [self.esa_from_state - 1]
+
+                esa_pairs = [(s_1, s_2)
+                             for s_1 in source_states
+                             for s_2 in range(s_1 + 1, self.nstates)]
+
+                if self.rank == mpi_master():
+                    esa_results = []
+                    dipole_integrals = compute_electric_dipole_integrals(
+                        molecule, basis, [0.0, 0.0, 0.0])
+
+                for s_1, s_2 in esa_pairs:
+                    eigvec_full_1 = self.get_full_solution_vector(
+                        exc_solutions[s_1])
+                    eigvec_full_2 = self.get_full_solution_vector(
+                        exc_solutions[s_2])
+
+                    if self.rank == mpi_master():
+                        n_ov_a = mo_occ_a.shape[1] * mo_vir_a.shape[1]
+                        n_ov_b = mo_occ_b.shape[1] * mo_vir_b.shape[1]
+
+                        eigvec_a_1 = np.hstack((
+                            eigvec_full_1[:n_ov_a],
+                            eigvec_full_1[n_ov_a + n_ov_b:n_ov_a +
+                                          n_ov_b + n_ov_a],
+                        ))
+                        eigvec_b_1 = np.hstack((
+                            eigvec_full_1[n_ov_a:n_ov_a + n_ov_b],
+                            eigvec_full_1[n_ov_a + n_ov_b + n_ov_a:],
+                        ))
+                        eigvec_a_2 = np.hstack((
+                            eigvec_full_2[:n_ov_a],
+                            eigvec_full_2[n_ov_a + n_ov_b:n_ov_a +
+                                          n_ov_b + n_ov_a],
+                        ))
+                        eigvec_b_2 = np.hstack((
+                            eigvec_full_2[n_ov_a:n_ov_a + n_ov_b],
+                            eigvec_full_2[n_ov_a + n_ov_b + n_ov_a:],
+                        ))
+
+                        (z_mat_a_1, z_mat_b_1), (y_mat_a_1, y_mat_b_1) = self._get_z_mat_and_y_mat_unrestricted(
+                            eigvec_a_1, eigvec_b_1, nocc_a, nocc_b)
+                        (z_mat_a_2, z_mat_b_2), (y_mat_a_2, y_mat_b_2) = self._get_z_mat_and_y_mat_unrestricted(
+                            eigvec_a_2, eigvec_b_2, nocc_a, nocc_b)
+
+                        esa_trans_dens = self._get_esa_transition_density(
+                            z_mat_a_1, y_mat_a_1, z_mat_a_2, y_mat_a_2,
+                            mo_occ_a, mo_vir_a)
+                        esa_trans_dens += self._get_esa_transition_density(
+                            z_mat_b_1, y_mat_b_1, z_mat_b_2, y_mat_b_2,
+                            mo_occ_b, mo_vir_b)
+
+                        esa_trans_dipole = np.array([
+                            np.sum(esa_trans_dens * dipole_integrals[i])
+                            for i in range(3)
+                        ])
+
+                        esa_exc_ene = exc_energies[s_2] - exc_energies[s_1]
+                        esa_osc_str = (2.0 / 3.0) * esa_exc_ene * np.sum(
+                            esa_trans_dipole**2)
+
+                        esa_results.append({
+                            'from_state': f'S{s_1 + 1}',
+                            'to_state': f'S{s_2 + 1}',
+                            'excitation_energy': esa_exc_ene,
+                            'oscillator_strength': esa_osc_str,
+                            'transition_dipole': esa_trans_dipole,
+                        })
 
             if self.nto or self.detach_attach:
                 self.ostream.print_blank()
@@ -844,6 +843,19 @@ class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
                         'number_of_states': self.nstates,
                     }
 
+                    if (self.save_solutions and
+                            final_h5_fname is not None):
+                        full_solutions_keys = [
+                            'S{:d}'.format(s + 1)
+                            for s in range(self.nstates)
+                        ]
+                        write_rsp_results_to_hdf5(
+                            final_h5_fname,
+                            {'full_solutions_keys': full_solutions_keys})
+
+                    # add rsp type
+                    ret_dict.update({'rsp_type': 'rpa'})
+
                     if self.nto:
                         ret_dict['nto_lambdas_a'] = nto_lambdas_a
                         ret_dict['nto_lambdas_b'] = nto_lambdas_b
@@ -862,9 +874,15 @@ class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
                             'Response solution vectors written to file: ' +
                             final_h5_fname)
                         self.ostream.print_blank()
+                        self.ostream.flush()
 
-                        # Write the response results to the final checkpoint file
-                        write_lr_rsp_results_to_hdf5(final_h5_fname, ret_dict)
+                    if final_h5_fname is not None:
+                        h5_ret_dict = {
+                            key: value
+                            for key, value in ret_dict.items()
+                            if key != 'eigenvectors_distributed'
+                        }
+                        write_rsp_results_to_hdf5(final_h5_fname, h5_ret_dict)
 
                     self._print_results(ret_dict)
 
@@ -884,6 +902,74 @@ class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
         else:
             # not converged
             return {}
+
+    def _get_mo_occ_and_mo_vir_unrestricted(self, scf_results, nocc_a, nocc_b):
+        """
+        Gets occupied MO coefficients and virtual MO coefficients that are
+        involved in response calculation.
+
+        :param scf_results:
+            The dictionary containing SCF results.
+        :param nocc_a:
+            The number of spin-alpha occupied orbitals.
+        :param nocc_b:
+            The number of spin-beta occupied orbitals.
+        :return:
+            The involved occupied MO coefficients and virtual MO coefficients.
+        """
+
+        if self.core_excitation:
+            mo_occ_a = scf_results['C_alpha'][:, :self.num_core_orbitals].copy()
+            mo_vir_a = scf_results['C_alpha'][:, nocc_a:].copy()
+
+            mo_occ_b = scf_results['C_beta'][:, :self.num_core_orbitals].copy()
+            mo_vir_b = scf_results['C_beta'][:, nocc_b:].copy()
+
+        else:
+            mo_occ_a = scf_results['C_alpha'][:, :nocc_a].copy()
+            mo_vir_a = scf_results['C_alpha'][:, nocc_a:].copy()
+
+            mo_occ_b = scf_results['C_beta'][:, :nocc_b].copy()
+            mo_vir_b = scf_results['C_beta'][:, nocc_b:].copy()
+
+        return (mo_occ_a, mo_occ_b), (mo_vir_a, mo_vir_b)
+
+    def _get_z_mat_and_y_mat_unrestricted(self, eigvec_a, eigvec_b, nocc_a,
+                                          nocc_b):
+        """
+        Gets excitation and de-excitation vectors in matrix form.
+
+        :param eigvec_a:
+            The spin-alpha part of the eigen vector.
+        :param eigvec_b:
+            The spin-beta part of the eigen vector.
+        :param nocc_a:
+            The number of spin-alpha occupied orbitals.
+        :param nocc_b:
+            The number of spin-beta occupied orbitals.
+        :return:
+            The excitation and de-excitation vectors in matrix form.
+        """
+
+        if self.core_excitation:
+            z_mat_a = eigvec_a[:eigvec_a.size // 2].reshape(
+                self.num_core_orbitals, -1)
+            y_mat_a = eigvec_a[eigvec_a.size // 2:].reshape(
+                self.num_core_orbitals, -1)
+
+            z_mat_b = eigvec_b[:eigvec_b.size // 2].reshape(
+                self.num_core_orbitals, -1)
+            y_mat_b = eigvec_b[eigvec_b.size // 2:].reshape(
+                self.num_core_orbitals, -1)
+
+        else:
+            z_mat_a = eigvec_a[:eigvec_a.size // 2].reshape(nocc_a, -1)
+            y_mat_a = eigvec_a[eigvec_a.size // 2:].reshape(nocc_a, -1)
+
+            z_mat_b = eigvec_b[:eigvec_b.size // 2].reshape(nocc_b, -1)
+            y_mat_b = eigvec_b[eigvec_b.size // 2:].reshape(nocc_b, -1)
+
+        return (z_mat_a, z_mat_b), (y_mat_a, y_mat_b)
 
     def _solve_reduced_space(self, nroots):
         """
@@ -1162,3 +1248,77 @@ class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
         p_mat = np.vstack((p_mat_alpha, p_mat_beta))
 
         return DistributedArray(p_mat, self.comm)
+
+    def get_nto(self, molecule, basis, scf_results, rsp_results, state_label):
+        """
+        Computes natural transition orbitals for a given excited state.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param scf_results:
+            The dictionary of tensors from converged SCF wavefunction.
+        :param rsp_results:
+            The dictionary of results from a linear response calculation.
+        :param state_label:
+            A string label identifying the state, e.g. 'S1', 'S2'.
+
+        :return:
+            The NTOs as a MolecularOrbitals object.
+        """
+
+        # Extract 1-based state index from label (e.g. 'S1' -> 1)
+        state_index = int(state_label[1:])
+
+        if self.rank == mpi_master():
+            # Get MO coefficients and orbital information
+            nocc_a = molecule.number_of_alpha_occupied_orbitals(basis)
+            nocc_b = molecule.number_of_beta_occupied_orbitals(basis)
+            (mo_occ_a, mo_occ_b), (mo_vir_a, mo_vir_b) = self._get_mo_occ_and_mo_vir_unrestricted(
+                scf_results, nocc_a, nocc_b)
+
+        # Extract eigenvector from rsp_results
+        if 'eigenvectors_distributed' in rsp_results:
+            eigvec_full = self.get_full_solution_vector(
+                rsp_results['eigenvectors_distributed'][state_index - 1])
+        else:
+            if self.rank == mpi_master():
+                # for rsp_results read from h5 file
+                assert_msg_critical(
+                    state_label in rsp_results,
+                    f'{type(self).__name__}: No eigenvector found for {state_label}'
+                )
+                eigvec_full = rsp_results[state_label].copy()
+            else:
+                eigvec_full = None
+
+        if self.rank == mpi_master():
+            # Split eigenvector into alpha and beta components
+            n_ov_a = mo_occ_a.shape[1] * mo_vir_a.shape[1]
+            n_ov_b = mo_occ_b.shape[1] * mo_vir_b.shape[1]
+            eigvec_a = np.hstack((
+                eigvec_full[:n_ov_a],
+                eigvec_full[n_ov_a + n_ov_b:n_ov_a + n_ov_b + n_ov_a],
+            ))
+            eigvec_b = np.hstack((
+                eigvec_full[n_ov_a:n_ov_a + n_ov_b],
+                eigvec_full[n_ov_a + n_ov_b + n_ov_a:],
+            ))
+        else:
+            eigvec_a = None
+            eigvec_b = None
+
+        if self.rank == mpi_master():
+            # Build transition density matrices in MO basis (RPA)
+            (z_mat_a, z_mat_b), (y_mat_a, y_mat_b) = self._get_z_mat_and_y_mat_unrestricted(
+                eigvec_a, eigvec_b, nocc_a, nocc_b)
+
+            nto_mo = self._compute_nto_unrestricted(
+                (z_mat_a - y_mat_a, z_mat_b - y_mat_b), (mo_occ_a, mo_occ_b),
+                (mo_vir_a, mo_vir_b))
+        else:
+            nto_mo = MolecularOrbitals()
+        nto_mo = nto_mo.broadcast(self.comm, root=mpi_master())
+
+        return nto_mo

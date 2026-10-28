@@ -80,6 +80,7 @@ class SymmetryAnalyzer:
         self._primary_axis = [1., 0., 0.]
         self._secondary_axis = [0., 1., 0.]
         self._molecule_type = ''
+        self._atom_basis_labels = None
 
         # Define tolerance parameters
         self._tolerance_params = {
@@ -139,7 +140,7 @@ class SymmetryAnalyzer:
             "C4h": ["E", "2C4", "C2", "i", "2S4", "sigma_h"],
             "C5h": ["E", "4C5", "4S5", "sigma_h"],
             "C6h": ["E", "2C6", "2C3", "C2", "i", "2S3", "2S6", "sigma_h"],
-            "C7h": ["E", "6C5", "6S7", "sigma_h"],
+            "C7h": ["E", "6C7", "6S7", "sigma_h"],
             "C8h": ["E", "4C8", "2C4", "C2", "i", "2S4", "4S8", "sigma_h"],
             "D2h": ["E", "3C2", "i", "sigma_h", "sigma_v", "sigma_d"],
             "D3h": ["E", "2C3", "3C2", "2S3", "sigma_h", "3sigma_v"],
@@ -210,6 +211,7 @@ class SymmetryAnalyzer:
         # in Molecule module
         coordinates = molecule.get_coordinates_in_bohr()
         self._symbols = molecule.get_labels()
+        self._atom_basis_labels = molecule.get_atom_basis_labels()
         self._natoms = molecule.number_of_atoms()
         center_of_mass = molecule.center_of_mass_in_bohr()
         self._centered_coords = coordinates - center_of_mass
@@ -608,7 +610,8 @@ class SymmetryAnalyzer:
         if point_group is None:
             point_group = symmetry_data['point_group']
 
-        centered_mol = Molecule(self._symbols, self._centered_coords, 'au')
+        centered_mol = Molecule(self._symbols, self._centered_coords, 'au',
+                                self._atom_basis_labels)
 
         if self._natoms == 1:
             return centered_mol
@@ -822,7 +825,7 @@ class SymmetryAnalyzer:
                 if not is_idealized[sym_idx]:
                     continue
 
-                if isinstance(sym_op, (Rotation, ImproperRotation)):
+                if isinstance(sym_op, Rotation):
                     axis = np.array(sym_op._axis)
 
                     dot = np.dot(u_vec_a, axis)
@@ -833,7 +836,7 @@ class SymmetryAnalyzer:
                         atoms[a] = np.array(factor * axis * vec_a_norm)
                         break
 
-                elif isinstance(sym_op, (Reflection, ImproperRotation)):
+                elif isinstance(sym_op, Reflection):
                     axis = np.array(sym_op._axis)
 
                     dot = np.dot(u_vec_a, axis)
@@ -844,6 +847,11 @@ class SymmetryAnalyzer:
                         y_axis /= np.linalg.norm(y_axis)
                         atoms[a] = np.array(np.cross(y_axis, axis) * vec_a_norm)
                         break
+
+                elif isinstance(sym_op, ImproperRotation):
+                    # General-position atoms in Sn groups should usually not be
+                    # snapped to the axis or perpendicular plane here.
+                    continue
 
         # generate molecule from unique atoms
 
@@ -902,6 +910,14 @@ class SymmetryAnalyzer:
 
         for i in range(self._natoms):
             centered_mol.set_atom_coordinates(i, rot_coords[i])
+
+        # Recenter after idealization/reorientation to remove residual
+        # mass-center drift from symmetry-orbit reconstruction.
+        center_of_mass = centered_mol.center_of_mass_in_bohr()
+        recentered_coords = centered_mol.get_coordinates_in_bohr() - center_of_mass
+
+        for i in range(self._natoms):
+            centered_mol.set_atom_coordinates(i, recentered_coords[i])
 
         return centered_mol
 
@@ -1544,7 +1560,8 @@ class SymmetryAnalyzer:
             List of points.
         """
 
-        centered_mol = Molecule(self._symbols, self._centered_coords, 'au')
+        centered_mol = Molecule(self._symbols, self._centered_coords, 'au',
+                                self._atom_basis_labels)
         connectivity_matrix = centered_mol.get_connectivity_matrix()
         Ivals, Ivecs = centered_mol.moments_of_inertia(principal_axes=True)
 

@@ -99,6 +99,10 @@ class PEForceFieldGenerator:
             basis.get_label().upper().startswith('ANO-'),
             'PEForceFieldGenerator (LoProp): Expecting ANO basis set')
 
+        assert_msg_critical(
+            not basis.has_ecp(),
+            'PEForceFieldGenerator (LoProp): ECP is not supported')
+
         if self.rank == mpi_master():
 
             assert_msg_critical(

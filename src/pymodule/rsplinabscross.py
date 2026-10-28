@@ -58,7 +58,7 @@ class LinearAbsorptionCrossSection(ResponseProperty):
         else:
             method_dict = dict(method_dict)
 
-        rsp_dict['property'] = 'linear absorption cross-section'
+        rsp_dict['property'] = 'absorption (cpp)'
         rsp_dict['order'] = 'linear'
         rsp_dict['residue'] = 'none'
         rsp_dict['onlystatic'] = 'no'

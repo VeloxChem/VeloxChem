@@ -21,18 +21,18 @@ class TestProjectedSECPGeom010Driver:
         bas = MolecularBasis.read(mol, 'def2-svp')
 
         return mol, bas
-        
+
     def test_projected_ecp_auh2_svp_for_au1(self):
 
         mol_auh2, bas_svp = self.get_svp_data()
-        
+
         lpot = BaseCorePotential([4.78982000, 2.39491000],
                                  [30.49008890, 5.17107381],
                                  [2, 2])
-                                 
+
         ecp_drv = LocalECPGeom010Driver()
         ecp_mats = ecp_drv.compute(mol_auh2, bas_svp, lpot)
-        
+
         # load reference overlap data
         here = Path(__file__).parent
         npyfile = str(here / 'data' / 'auh2.def2svp.au.ecp.only.ul.geom.010.au1.npy')
@@ -41,7 +41,7 @@ class TestProjectedSECPGeom010Driver:
         # dimension of molecular basis
         indexes = np.triu_indices(4)
         basdims = [0, 10, 25, 35, 42]
-        
+
         # indices map
         labels = ['X', 'Y', 'Z']
 

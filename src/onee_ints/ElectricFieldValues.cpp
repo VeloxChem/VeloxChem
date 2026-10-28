@@ -356,19 +356,6 @@ computeElectricFieldValues(const CMolecule& molecule, const CMolecularBasis& bas
     const auto df_prim_pair_count = static_cast<int>(pair_inds_df.size());
     const auto ff_prim_pair_count = static_cast<int>(pair_inds_ff.size());
 
-    const auto max_prim_pair_count = std::max({
-            ss_prim_pair_count,
-            sp_prim_pair_count,
-            sd_prim_pair_count,
-            sf_prim_pair_count,
-            pp_prim_pair_count,
-            pd_prim_pair_count,
-            pf_prim_pair_count,
-            dd_prim_pair_count,
-            df_prim_pair_count,
-            ff_prim_pair_count
-    });
-
     const double delta[3][3] = {{1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 0.0, 1.0}};
 
     const int d_cart_inds[6][2] = {

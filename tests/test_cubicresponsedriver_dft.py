@@ -80,6 +80,6 @@ class TestCrf:
 
     def test_mgga_hyb_crf(self):
 
-        ref_result = {'crf': -654.3981600270447 + 59.90488055447197j}
+        ref_result = {'crf': -554.03621714552764 + 44.932696554117825j}
 
-        self.run_crf('tpssh', 'def2-svpd', ref_result)
+        self.run_crf('m06-2x', 'def2-svpd', ref_result)

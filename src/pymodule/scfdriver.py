@@ -34,18 +34,19 @@ from pathlib import Path
 from datetime import datetime
 from collections import deque
 from copy import deepcopy
-import numpy as np
 import time as tm
 import math
 import sys
 import re
+
+import numpy as np
 
 from .oneeints import compute_nuclear_potential_integrals
 from .oneeints import compute_electric_dipole_integrals
 from .veloxchemlib import OverlapDriver, KineticEnergyDriver
 from .veloxchemlib import T4CScreener
 from .veloxchemlib import XCIntegrator
-from .veloxchemlib import ECPDriver
+from .veloxchemlib import EcpDriver
 from .veloxchemlib import mpi_master
 from .veloxchemlib import bohr_in_angstrom, hartree_in_kjpermol
 from .veloxchemlib import xcfun as xcfun_enum
@@ -64,19 +65,20 @@ from .sadguessdriver import SadGuessDriver
 from .firstorderprop import FirstOrderProperties
 from .cpcmdriver import CpcmDriver
 from .smddriver import SmdDriver
+from .gostshypdriver import GostshypDriver
 from .dispersionmodel import DispersionModel
 from .inputparser import (parse_input, print_keywords, print_attributes,
-                          get_random_string_parallel, unparse_input,
-                          write_unparsed_input_to_hdf5,
+                          unparse_input, write_unparsed_input_to_hdf5,
                           read_unparsed_input_from_hdf5)
 from .dftutils import get_default_grid_level, print_xc_reference
 from .sanitychecks import (molecule_sanity_check, dft_sanity_check,
                            ri_sanity_check, pe_sanity_check,
-                           solvation_model_sanity_check)
+                           solvation_model_sanity_check, gostshyp_sanity_check,
+                           environment_compatibility_sanity_check)
 from .errorhandler import assert_msg_critical
 from .mathutils import screened_eigh
-from .checkpoint import (create_hdf5, write_scf_results_to_hdf5,
-                         write_cpcm_charges, read_cpcm_charges)
+from .checkpoint import write_cpcm_charges, read_cpcm_charges
+from .resultsio import create_hdf5, write_scf_results_to_hdf5
 
 
 class ScfDriver:
@@ -97,54 +99,41 @@ class ScfDriver:
         The output stream.
 
     Instance variables
-        - den_guess: The initial density guess driver.
         - acc_type: The type of SCF convergence accelerator.
         - max_err_vecs: The maximum number of error vectors.
         - max_iter: The maximum number of SCF iterations.
-        - first_step: The flag for first step in two-level DIIS convergence
-          acceleration.
         - conv_thresh: The SCF convergence threshold.
         - eri_thresh: The electron repulsion integrals screening threshold.
+        - eri_thresh_tight: The tightened ERI screening threshold.
         - ovl_thresh: The atomic orbitals linear dependency threshold.
-        - diis_thresh: The DIIS switch on threshold.
-        - iter_data: The dictionary of SCF iteration data (scf energy, scf
-          energy change, gradient, density change, etc.).
-        - is_converged: The flag for SCF convergence.
-        - scf_energy: The SCF energy.
-        - num_iter: The current number of SCF iterations.
-        - fock_matrices: The list of stored Fock/Kohn-Sham matrices.
-        - den_matrices: The list of stored density matrices.
-        - density: The current density matrix.
-        - mol_orbs: The current molecular orbitals.
-        - nuc_energy: The nuclear repulsion energy of molecule.
-        - comm: The MPI communicator.
-        - rank: The rank of MPI process.
-        - nodes: The number of MPI processes.
+        - diis_thresh: The DIIS switch-on threshold.
         - restart: The flag for restarting from checkpoint file.
         - checkpoint_file: The name of checkpoint file.
-        - ref_mol_orbs: The reference molecular orbitals read from checkpoint
-          file.
-        - scf_type: The type of SCF calculation (restricted, unrestricted, or
-          restricted_openshell).
-        - dft: The flag for running DFT.
-        - grid_level: The accuracy level of DFT grid.
         - xcfun: The XC functional.
-        - molgrid: The molecular grid.
-        - pe: The flag for running polarizable embedding calculation.
+        - grid_level: The accuracy level of DFT grid.
         - pe_options: The dictionary with options for polarizable embedding.
-        - pe_summary: The summary string for polarizable embedding.
+        - pressure: The applied hydrostatic pressure.
+        - pressure_units: The units of the applied pressure.
+        - gostshyp_num_lebedev_points: The number of Lebedev points per van der Waals sphere.
+        - gostshyp_tssf: The tessellation sphere scaling factor.
+        - gostshyp_discretization: The surface discretization method.
+        - gostshyp_switching_thresh: The (I)SWIG switching function threshold.
+        - gostshyp_r_ext: The extension radius for the outer cavity correction in angstrom.
+        - gostshyp_tco_tol: The screening threshold for three-center overlap integrals.
         - dispersion: The flag for calculating D4 dispersion correction.
-        - d4_energy: The D4 dispersion correction to energy.
         - electric_field: The static electric field.
-        - ef_nuc_energy: The electric potential energy of the nuclei in the
-          static electric field.
-        - dipole_origin: The origin of the dipole operator.
         - timing: The flag for printing timing information.
         - profiling: The flag for printing profiling information.
         - memory_profiling: The flag for printing memory usage.
-        - memory_tracing: The flag for tracing memory allocation using
+        - memory_tracing: The flag for tracing memory allocation.
+        - print_level: The verbosity level.
         - program_end_time: The end time of the program.
         - filename: The filename.
+
+        The ``scf_type``, ``comm``, ``rank``, ``nodes``, ``ostream``,
+        ``num_iter``, ``is_converged``, ``scf_energy``, ``density``,
+        ``molecular_orbitals``, ``scf_results``, and ``history`` properties
+        provide read-only access to calculation state.
     """
 
     def __init__(self, comm, ostream):
@@ -171,6 +160,12 @@ class ScfDriver:
         # Int. J. Quantum Chem. 7, 699-705 (1973).
         self.level_shifting = 0.0
         self.level_shifting_delta = 0.01
+
+        # level-shift smoothing (exponential moving average)
+        self.level_shift_smoothing = 0.7
+
+        self._level_shift_smooth_alpha = None
+        self._level_shift_smooth_beta = None
 
         # density damping
         self.density_damping = False
@@ -216,6 +211,7 @@ class ScfDriver:
         self.restart = True
         self.checkpoint_file = None
         self._ref_mol_orbs = None
+        self._use_start_orbitals = False
 
         # Maximum overlap constraint
         self._mom = None
@@ -250,6 +246,19 @@ class ScfDriver:
         self.embedding = None
         self._embedding_drv = None
 
+        # gostshyp setup
+        self._gostshyp = False
+        self._gostshyp_drv = None
+        self._e_gostshyp = 0.0
+        self.pressure = 0.0
+        self.pressure_units = 'MPa'
+        self.gostshyp_num_lebedev_points = 110
+        self.gostshyp_tssf = 1.2
+        self.gostshyp_discretization = 'swig'
+        self.gostshyp_switching_thresh = 1.0e-8
+        self.gostshyp_r_ext = 0.25
+        self.gostshyp_tco_tol = 1.0e-14
+
         # solvation model
         self.solvation_model = None
         self._cpcm = False
@@ -264,6 +273,8 @@ class ScfDriver:
         self._smd = False
         self.smd_drv = None
         self.smd_solvent = 'water'
+        self.smd_energy = 0.0
+        self.smd_cds_energy = 0.0
 
         # point charges (in case we want a simple MM environment without PE)
         self.point_charges = None
@@ -300,6 +311,7 @@ class ScfDriver:
         self._debug = False
         self._block_size_factor = 8
         self._xcfun_ldstaging = 1024
+        self.trim_mos = True
 
         # may be used in rare cases when user wants to skip the writing of h5
         self._skip_writing_h5 = False
@@ -319,12 +331,15 @@ class ScfDriver:
                 'pfon_nvir': ('int', 'number of virtual orbitals used in pFON'),
                 'level_shifting': ('float', 'level shifting parameter'),
                 'level_shifting_delta': ('float', 'level shifting delta'),
+                'level_shift_smoothing':
+                    ('float', 'level shift smoothing coefficient (0 <= smoothing < 1)'),
                 'density_damping': ('bool', 'use density damping'),
                 'conv_thresh': ('float', 'SCF convergence threshold'),
                 'eri_thresh': ('float', 'ERI screening threshold'),
                 'eri_thresh_tight':
                     ('float', 'tightened ERI screening threshold'),
                 'ovl_thresh': ('float', 'AO linear dependency threshold'),
+                'diis_thresh': ('float', 'DIIS switch-on threshold'),
                 'restart': ('bool', 'restart from checkpoint file'),
                 'filename': ('str', 'base name of output files'),
                 'checkpoint_file': ('str', 'name of checkpoint file'),
@@ -334,12 +349,14 @@ class ScfDriver:
                 'memory_tracing': ('bool', 'trace memory allocation'),
                 'print_level': ('int', 'verbosity of output (1-3)'),
                 'guess_unpaired_electrons':
-                    ('str', 'unpaired electrons for initila guess'),
-                'point_charges': ('str', 'potential file for point charges'),
-                'qm_vdw_params': ('str', 'vdw parameter file for QM atoms'),
+                    ('str', 'unpaired electrons for initial guess'),
+                'point_charges': ('raw', 'point-charge file path or array'),
+                'qm_vdw_params':
+                    ('raw', 'QM vdW parameter file path or array'),
                 '_debug': ('bool', 'print debug info'),
                 '_block_size_factor': ('int', 'block size factor for ERI'),
                 '_xcfun_ldstaging': ('int', 'max batch size for DFT grid'),
+                'trim_mos': ('bool', 'trim molecular orbitals'),
             },
             'method_settings': {
                 'ri_coulomb': ('bool', 'use RI-J approximation'),
@@ -351,9 +368,21 @@ class ScfDriver:
                 'xcfun': ('str_upper', 'exchange-correlation functional'),
                 'grid_level': ('int', 'accuracy level of DFT grid (1-8)'),
                 'potfile': ('str', 'potential file for polarizable embedding'),
+                'pressure': ('float', 'applied hydrostatic pressure'),
+                'pressure_units': ('str', 'units of the applied pressure'),
+                'gostshyp_num_lebedev_points': ('int', 'number of grid points per sphere'),
+                'gostshyp_tssf': ('float', 'tessellation sphere scaling factor'),
+                'gostshyp_discretization': ('str', 'surface discretization method'),
+                'gostshyp_switching_thresh': ('float', 'switching function threshold'),
+                'gostshyp_r_ext':
+                    ('float', 'extension radius for outer cavity correction in angstrom'),
+                'gostshyp_tco_tol':
+                    ('float', 'three-center overlap integral screening threshold'),
                 'solvation_model': ('str', 'solvation model'),
                 'cpcm_grid_per_sphere':
                     ('seq_fixed_int', 'number of C-PCM grid points per sphere'),
+                'cpcm_radii_scaling':
+                    ('float', 'scaling factor for C-PCM vdW radii'),
                 'cpcm_cg_thresh':
                     ('float', 'threshold for solving C-PCM charges'),
                 'cpcm_epsilon':
@@ -507,7 +536,7 @@ class ScfDriver:
         :param scf_dict:
             The dictionary of scf input.
         :param method_dict:
-            The dicitonary of method settings.
+            The dictionary of method settings.
         """
 
         if method_dict is None:
@@ -523,8 +552,6 @@ class ScfDriver:
             self.program_end_time = scf_dict['program_end_time']
         if 'filename' in scf_dict:
             self.filename = scf_dict['filename']
-            if 'checkpoint_file' not in scf_dict:
-                self.checkpoint_file = f'{self.filename}_scf.h5'
 
         method_keywords = {
             key: val[0]
@@ -539,6 +566,12 @@ class ScfDriver:
 
         pe_sanity_check(self, method_dict)
 
+        # check solvation model setup
+        solvation_model_sanity_check(self)
+
+        # check GOSTSHYP setup
+        gostshyp_sanity_check(self)
+
         if self.electric_field is not None:
             assert_msg_critical(
                 len(self.electric_field) == 3,
@@ -547,10 +580,6 @@ class ScfDriver:
                 not self._pe,
                 'SCF driver: \'electric field\' input is incompatible with ' +
                 'polarizable embedding')
-            # disable restart of calculation with static electric field since
-            # checkpoint file does not contain information about the electric
-            # field
-            self.restart = False
 
         if self.point_charges is not None:
             assert_msg_critical(
@@ -559,7 +588,56 @@ class ScfDriver:
                 'with polarizable embedding')
             # Note: we allow restarting SCF with point charges
 
-    def compute(self, molecule, basis, min_basis=None, restart_exact=False):
+        # check pairwise compatibility of the environment settings
+        environment_compatibility_sanity_check(self)
+
+    def read_settings(self, checkpoint_file):
+        """
+        Reads SCF and method settings from checkpoint file.
+
+        :param checkpoint_file:
+            The checkpoint file to read settings from.
+        """
+
+        if self.rank == mpi_master():
+            checkpoint_scf_input = read_unparsed_input_from_hdf5(
+                checkpoint_file, group_name='scf_settings')
+            checkpoint_method_input = read_unparsed_input_from_hdf5(
+                checkpoint_file, group_name='method_settings')
+        else:
+            checkpoint_scf_input = None
+            checkpoint_method_input = None
+
+        checkpoint_scf_input = self.comm.bcast(checkpoint_scf_input,
+                                               root=mpi_master())
+        checkpoint_method_input = self.comm.bcast(checkpoint_method_input,
+                                                  root=mpi_master())
+
+        # Avoid importing restart state or checkpoint/output targets when
+        # copying settings from an external file.
+        checkpoint_scf_input.pop('restart', None)
+        checkpoint_scf_input.pop('checkpoint_file', None)
+        checkpoint_scf_input.pop('filename', None)
+
+        self.update_settings(checkpoint_scf_input, checkpoint_method_input)
+
+    def get_checkpoint_file(self):
+        """
+        Gets the effective checkpoint file path.
+
+        :return:
+            The effective checkpoint file path, or None if unavailable.
+        """
+
+        if isinstance(self.checkpoint_file, str):
+            return self.checkpoint_file
+
+        if self.filename is not None:
+            return f'{self.filename}_scf.h5'
+
+        return None
+
+    def compute(self, molecule, basis, min_basis=None):
         """
         Performs SCF calculation using molecular data.
 
@@ -569,9 +647,52 @@ class ScfDriver:
             The AO basis set.
         :param min_basis:
             The minimal AO basis set.
+
+        :return:
+            The dictionary of SCF results if SCF converges, None otherwise.
+            The dictionary is populated only on the master rank; other ranks
+            receive an empty dictionary.
         """
 
         profiler = Profiler()
+
+        # Reset per-calculation state. This makes repeated compute() calls
+        # on the same driver safe when point charges or the static electric
+        # field are removed between calculations, and prevents a skipped SCF
+        # from returning stale converged results.
+        self._nuc_mm_energy = 0.0
+        self._ef_nuc_energy = 0.0
+        self._e_gostshyp = 0.0
+        self._is_converged = False
+        self._scf_results = None
+        self._scf_energy = 0.0
+        self._num_iter = 0
+        self._history = None
+        self._iter_data = None
+        self._density = None
+        if not self._use_start_orbitals:
+            self._molecular_orbitals = MolecularOrbitals()
+            self._ref_mol_orbs = None
+
+        assert_msg_critical(
+            isinstance(self.acc_type, str) and self.acc_type.upper() in [
+                'C2DIIS', 'DIIS', 'L2_C2DIIS', 'L2_DIIS'
+            ],
+            f'SCF driver: Invalid acceleration type: {self.acc_type}')
+
+        for name in [
+                'max_iter', 'max_err_vecs', 'conv_thresh', 'eri_thresh',
+                'eri_thresh_tight', 'ovl_thresh'
+        ]:
+            assert_msg_critical(
+                getattr(self, name) > 0,
+                f'SCF driver: \'{name}\' must be greater than zero')
+
+        if self.pfon:
+            for name in ['pfon_nocc', 'pfon_nvir']:
+                assert_msg_critical(
+                    getattr(self, name) > 0,
+                    f'SCF driver: \'{name}\' must be greater than zero')
 
         if min_basis is None:
             if basis.has_ecp():
@@ -587,33 +708,13 @@ class ScfDriver:
                 min_basis = None
             min_basis = self.comm.bcast(min_basis, root=mpi_master())
 
-        if self.filename is not None and self.checkpoint_file is None:
-            self.checkpoint_file = f'{self.filename}_scf.h5'
-
         # validate checkpoint file
+        if not self._use_start_orbitals:
+            self._ref_mol_orbs = None
         if self.restart:
             self.restart = self.validate_checkpoint(molecule.get_element_ids(),
                                                     basis.get_label(),
                                                     self.scf_type)
-
-        # read SCF and method settings, if restart_exact is requested
-        if self.restart and restart_exact:
-            if self.rank == mpi_master():
-                checkpoint_scf_input = read_unparsed_input_from_hdf5(
-                    self.checkpoint_file, group_name="scf_settings")
-                checkpoint_method_input = read_unparsed_input_from_hdf5(
-                    self.checkpoint_file, group_name="method_settings")
-            else:
-                checkpoint_scf_input = None
-                checkpoint_method_input = None
-            checkpoint_scf_input = self.comm.bcast(checkpoint_scf_input,
-                                                   root=mpi_master())
-            checkpoint_method_input = self.comm.bcast(checkpoint_method_input,
-                                                      root=mpi_master())
-            # remove restart option from checkpoint_scf_input before calling
-            # update_settings, since we are already doing restart
-            checkpoint_scf_input.pop('restart', None)
-            self.update_settings(checkpoint_scf_input, checkpoint_method_input)
 
         # check molecule
         molecule_sanity_check(molecule, self.scf_type)
@@ -627,9 +728,26 @@ class ScfDriver:
         # check pe setup
         pe_sanity_check(self, molecule=molecule)
 
+        # Ensure embedding-object PE also populates the canonical potfile.
+        if self._pe and self.potfile is None:
+            self.potfile = self.pe_options.get('potfile')
+
         # check solvation model setup
         solvation_model_sanity_check(self)
+
+        # check GOSTSHYP setup
+        gostshyp_sanity_check(self, basis)
+
+        # check pairwise compatibility of the environment settings
+        environment_compatibility_sanity_check(self)
+
         if self._cpcm:
+            assert_msg_critical(
+                len(self.cpcm_grid_per_sphere) == 2 and
+                self.cpcm_grid_per_sphere[0] > 0 and
+                self.cpcm_grid_per_sphere[1] > 0,
+                'SCF driver: \'cpcm_grid_per_sphere\' must contain two ' +
+                'positive integers')
             self.cpcm_drv = CpcmDriver(self.comm, self.ostream)
             self.cpcm_drv.grid_per_sphere = self.cpcm_grid_per_sphere
             self.cpcm_drv.epsilon = self.cpcm_epsilon
@@ -643,11 +761,13 @@ class ScfDriver:
         # set up SMD Solvation Model
         # note that SMD also uses CPCM, but with a different scaling factor for radii
         if self._smd:
+            assert_msg_critical(
+                self._cpcm, f'{type(self).__name__}: CPCM is needed by SMD')
             self.smd_drv = SmdDriver(self.comm, self.ostream)
             self.smd_drv.solute = molecule
             self.smd_drv.solvent = self.smd_solvent
             self.smd_cds_energy = self.smd_drv.get_CDS_contribution()
-            self.smd_energy = self.smd_cds_energy
+            self.smd_energy = 0.0
             self.cpcm_drv.epsilon = self.smd_drv.epsilon
             # apply intrinsic Coulomb radii for SMD
             self.cpcm_drv.custom_vdw_radii = self.smd_drv.get_intrinsic_coulomb_radii(
@@ -658,17 +778,26 @@ class ScfDriver:
         # check print level (verbosity of output)
         self.print_level = max(1, min(self.print_level, 3))
 
-        if self.restart:
+        # Use the corresponding single-level DIIS variant for custom start
+        # orbitals or convergence modifiers such as level shifting, pFON, and
+        # density damping.
+        if (self._uses_custom_initial_guess() or self.level_shifting > 0.0 or
+                self.pfon or self.density_damping):
             if self.acc_type.upper() == 'L2_C2DIIS':
                 self.acc_type = 'C2DIIS'
             elif self.acc_type.upper() == 'L2_DIIS':
                 self.acc_type = 'DIIS'
-            if self.rank == mpi_master():
+
+        if self._uses_custom_initial_guess():
+            if self.restart and self.rank == mpi_master():
                 self._ref_mol_orbs = MolecularOrbitals.read_hdf5(
-                    self.checkpoint_file)
+                    self.get_checkpoint_file())
+        else:
+            # Clear any MOs left by previous calculation, for RI-JK exchange build
+            self._molecular_orbitals = MolecularOrbitals()
 
         # nuclear repulsion energy
-        self._nuc_energy = molecule.nuclear_repulsion_energy(basis)
+        self._nuc_energy = molecule.effective_nuclear_repulsion_energy(basis)
 
         if self.rank == mpi_master():
             self._print_header()
@@ -739,11 +868,11 @@ class ScfDriver:
             cpcm_grid_t0 = tm.time()
 
             self.cpcm_drv.print_cpcm_info()
-            self.cpcm_drv.init(molecule, do_nuclear=True)
+            self.cpcm_drv.init(molecule, basis, do_nuclear=True)
 
             if self.print_level > 1:
                 self.ostream.print_info(
-                    f'C-PCM grid with {self.cpcm_drv._cpcm_grid.shape[0]} points '
+                    f'C-PCM grid with {self.cpcm_drv.cpcm_grid.shape[0]} points '
                     + f'generated in {tm.time() - cpcm_grid_t0:.2f} sec.')
                 self.ostream.print_blank()
                 self.ostream.flush()
@@ -819,7 +948,7 @@ class ScfDriver:
                         lines = fh.read().strip().splitlines()
                         try:
                             npoints = int(lines[0].strip())
-                        except (ValueError, TypeError):
+                        except (ValueError, TypeError, IndexError):
                             assert_msg_critical(
                                 False, 'potfile: Invalid number of points')
                         assert_msg_critical(
@@ -828,7 +957,9 @@ class ScfDriver:
                         self.point_charges = np.zeros((6, npoints))
                         for idx, line in enumerate(lines[2:]):
                             content = line.split()
-                            label, x, y, z, q = content[:5]
+                            expect_vdw = (self.qm_vdw_params is not None)
+                            label, x, y, z, q, sigma, epsilon = self._parse_point_charge_line(
+                                content, idx, expect_vdw)
                             self.point_charges[0, idx] = (float(x) /
                                                           bohr_in_angstrom())
                             self.point_charges[1, idx] = (float(y) /
@@ -839,7 +970,6 @@ class ScfDriver:
                             if self.qm_vdw_params is not None:
                                 # Note: read MM vdw parameters only when QM vdw
                                 # parameters are present
-                                sigma, epsilon = content[5:7]
                                 self.point_charges[4, idx] = float(sigma)
                                 self.point_charges[5, idx] = float(epsilon)
                 else:
@@ -860,9 +990,19 @@ class ScfDriver:
                     self.qm_vdw_params = np.zeros((natoms, 2))
                     with Path(vdw_param_file).open('r') as fh:
                         for a in range(natoms):
-                            sigma, epsilon = fh.readline().split()
-                            self.qm_vdw_params[a, 0] = float(sigma)
-                            self.qm_vdw_params[a, 1] = float(epsilon)
+                            content = fh.readline().split()
+                            assert_msg_critical(
+                                len(content) == 2,
+                                f'qm_vdw_params: Invalid data on line {a + 1}')
+                            try:
+                                sigma, epsilon = map(float, content)
+                            except ValueError:
+                                assert_msg_critical(
+                                    False,
+                                    f'qm_vdw_params: Invalid numeric data on line {a + 1}'
+                                )
+                            self.qm_vdw_params[a, 0] = sigma
+                            self.qm_vdw_params[a, 1] = epsilon
                 else:
                     self.qm_vdw_params = None
                 self.qm_vdw_params = self.comm.bcast(self.qm_vdw_params,
@@ -873,7 +1013,7 @@ class ScfDriver:
 
             natoms = molecule.number_of_atoms()
             coords = molecule.get_coordinates_in_bohr()
-            nuclear_charges = molecule.get_element_ids()
+            nuclear_charges = molecule.get_effective_nuclear_charges(basis)
             npoints = self.point_charges.shape[1]
 
             for a in range(self.rank, natoms, self.nodes):
@@ -919,62 +1059,95 @@ class ScfDriver:
 
             self._nuc_mm_energy = self.comm.allreduce(self._nuc_mm_energy)
 
+        # set up gostshyp method by creating a surface tessellation
+        if self._gostshyp:
+            self._gostshyp_drv = GostshypDriver(self.comm, self.ostream)
+            self._gostshyp_drv.print_gostshyp_references()
+            self._gostshyp_drv.init(molecule, basis, self.pressure,
+                                    self.pressure_units, self.gostshyp_tco_tol)
+
+            tessellation_settings = {
+                'num_lebedev_points': self.gostshyp_num_lebedev_points,
+                'tssf': self.gostshyp_tssf,
+                'discretization': self.gostshyp_discretization,
+                'switching_thresh': self.gostshyp_switching_thresh,
+                'r_ext': self.gostshyp_r_ext,
+            }
+
+            tess_t0 = tm.time()
+            tessellation = self._gostshyp_drv.generate_tessellation(
+                tessellation_settings)
+
+            if self.print_level > 1:
+                tess_info = 'Van der Waals cavity with '
+                tess_info += '{0:d} grid points generated in {1:.2f} sec.'.format(
+                    tessellation.shape[1], tm.time() - tess_t0)
+                self.ostream.print_info(tess_info)
+                self.ostream.print_blank()
+
+                if self.gostshyp_r_ext > 0:
+                    occ_info = 'Using the Outer Cavity Correction with exterior radius of '
+                    occ_info += '{:.2f} angstrom.'.format(self.gostshyp_r_ext)
+                    self.ostream.print_info(occ_info)
+                    self.ostream.print_blank()
+
+                area_info = 'The total surface area of the van der Waals cavity is '
+                area_info += '{:.2f} Angstrom^2.'.format(
+                    np.sum(np.sum(tessellation[3, :]) * bohr_in_angstrom()**2))
+                self.ostream.print_info(area_info)
+                self.ostream.print_blank()
+
+                neg_amp_info = 'GOSTSHYP grid points with negative amplitudes '
+                neg_amp_info += 'are excluded from the pressure potential.'
+                self.ostream.print_info(neg_amp_info)
+                self.ostream.print_blank()
+
         # DIIS method
         if self.acc_type.upper() in ['C2DIIS', 'DIIS']:
-            if self.rank == mpi_master():
-                if self.restart:
-                    den_mat = self.gen_initial_density_restart(molecule)
-                else:
-                    den_mat = self.gen_initial_density_sad(
-                        molecule, basis, min_basis)
-            else:
-                den_mat = None
-            den_mat = self.comm.bcast(den_mat, root=mpi_master())
+            den_mat = self._prepare_initial_density(
+                self._gen_single_step_initial_density, molecule, basis,
+                min_basis)
 
             if self._cpcm:
-                if self.restart and self.rank == mpi_master():
-                    self.cpcm_drv._cpcm_q = read_cpcm_charges(
-                        self.checkpoint_file)
-                self.cpcm_drv._cpcm_q = self.comm.bcast(self.cpcm_drv._cpcm_q,
-                                                        root=mpi_master())
+                self._load_cpcm_restart_charges()
 
-            self._comp_diis(molecule, basis, min_basis, den_mat, profiler)
+            self._comp_diis(molecule, basis, den_mat, profiler)
 
         # two level DIIS method
-        if self.acc_type.upper() in ['L2_C2DIIS', 'L2_DIIS']:
+        elif self.acc_type.upper() in ['L2_C2DIIS', 'L2_DIIS']:
 
-            # first step
-            self._first_step = True
-
+            # first step: temporarily use a looser threshold and fewer
+            # iterations for the reduced-basis calculation. Restore the
+            # user-facing settings even if this stage raises, so that the
+            # driver remains safe to reuse.
             old_thresh = self.conv_thresh
-            self.conv_thresh = 1.0e-3
-
             old_max_iter = self.max_iter
-            self.max_iter = 5
 
-            val_basis = basis.reduce_to_valence_basis()
-            if self.rank == mpi_master():
-                den_mat = self.gen_initial_density_sad(molecule, val_basis,
-                                                       min_basis)
-            else:
-                den_mat = None
-            den_mat = self.comm.bcast(den_mat, root=mpi_master())
-            self._comp_diis(molecule, val_basis, min_basis, den_mat, profiler)
+            try:
+                self._first_step = True
+                self.conv_thresh = 1.0e-3
+                self.max_iter = 5
+
+                val_basis = basis.reduce_to_valence_basis()
+                den_mat = self._prepare_initial_density(
+                    self._gen_l2_first_step_initial_density, molecule,
+                    val_basis, min_basis)
+                self._comp_diis(molecule, val_basis, den_mat, profiler)
+            finally:
+                self._first_step = False
+                self.conv_thresh = old_thresh
+                self.max_iter = old_max_iter
 
             # second step
-            self._first_step = False
+            den_mat = self._prepare_initial_density(
+                self._gen_l2_second_step_initial_density, molecule, basis,
+                val_basis, self._molecular_orbitals)
+            self._comp_diis(molecule, basis, den_mat, profiler)
 
-            self.diis_thresh = 1000.0
-            self.conv_thresh = old_thresh
-            self.max_iter = old_max_iter
-
-            if self.rank == mpi_master():
-                den_mat = self.gen_initial_density_proj(
-                    molecule, basis, val_basis, self._molecular_orbitals)
-            else:
-                den_mat = None
-            den_mat = self.comm.bcast(den_mat, root=mpi_master())
-            self._comp_diis(molecule, basis, val_basis, den_mat, profiler)
+        else:
+            assert_msg_critical(
+                False,
+                f'SCF driver: Invalid acceleration type: {self.acc_type}')
 
         self._fock_matrices_alpha.clear()
         self._fock_matrices_beta.clear()
@@ -982,6 +1155,9 @@ class ScfDriver:
 
         self._density_matrices_alpha.clear()
         self._density_matrices_beta.clear()
+
+        self._level_shift_smooth_alpha = None
+        self._level_shift_smooth_beta = None
 
         profiler.end(self.ostream, scf_flag=True)
 
@@ -1053,6 +1229,10 @@ class ScfDriver:
                     'Initial Guess: Invalid input for unpaired electrons')
                 atom_index = int(m.group(1).strip()) - 1
                 num_unpaired_elec = float(m.group(2).strip())
+                assert_msg_critical(
+                    0 <= atom_index < natoms,
+                    f'Initial Guess: Invalid atom number {atom_index + 1} ' +
+                    f'for unpaired electrons (expecting 1-{natoms})')
                 unpaired_electrons_on_atoms[atom_index] = num_unpaired_elec
 
             sad_drv.set_number_of_unpaired_electrons_on_atoms(
@@ -1164,20 +1344,136 @@ class ScfDriver:
             The AO density matrix.
         """
 
-        self._molecular_orbitals = MolecularOrbitals.read_hdf5(
-            self.checkpoint_file)
+        checkpoint_file = self.get_checkpoint_file()
+        self._molecular_orbitals = MolecularOrbitals.read_hdf5(checkpoint_file)
         den_mat = self._molecular_orbitals.get_density(molecule, self.scf_type)
 
         restart_text = 'Restarting from checkpoint file: '
-        restart_text += self.checkpoint_file
+        restart_text += checkpoint_file
         self.ostream.print_info(restart_text)
         self.ostream.print_blank()
 
         return den_mat
 
+    def gen_initial_density_start_orbitals(self, molecule):
+        """
+        Generates initial AO density from user-supplied orbitals.
+
+        :param molecule:
+            The molecule.
+
+        :return:
+            The AO density matrix.
+        """
+
+        den_mat = self._molecular_orbitals.get_density(molecule, self.scf_type)
+
+        self.ostream.print_info('Starting from user supplied orbitals')
+        self.ostream.print_blank()
+
+        return den_mat
+
+    def _prepare_initial_density(self, generator, *args):
+        """
+        Generates the initial density matrix and makes it available on all
+        ranks.
+
+        :param generator:
+            The density generator method.
+        :param args:
+            Positional arguments passed to the generator.
+
+        :return:
+            The broadcast density matrix.
+        """
+
+        if self.rank == mpi_master():
+            den_mat = generator(*args)
+        else:
+            den_mat = None
+
+        return self.comm.bcast(den_mat, root=mpi_master())
+
+    def _gen_single_step_initial_density(self, molecule, ao_basis, min_basis):
+        """
+        Generates the initial density used for single-step DIIS.
+
+        :param molecule:
+            The molecule.
+        :param ao_basis:
+            The AO basis set.
+        :param min_basis:
+            The minimal AO basis set.
+
+        :return:
+            The AO density matrix.
+        """
+
+        if self.restart:
+            return self.gen_initial_density_restart(molecule)
+
+        if self._use_start_orbitals:
+            return self.gen_initial_density_start_orbitals(molecule)
+
+        return self.gen_initial_density_sad(molecule, ao_basis, min_basis)
+
+    def _gen_l2_first_step_initial_density(self, molecule, ao_basis, min_basis):
+        """
+        Generates the initial density used in the first L2-DIIS step.
+
+        :param molecule:
+            The molecule.
+        :param ao_basis:
+            The AO basis set.
+        :param min_basis:
+            The minimal AO basis set.
+
+        :return:
+            The AO density matrix.
+        """
+
+        return self.gen_initial_density_sad(molecule, ao_basis, min_basis)
+
+    def _gen_l2_second_step_initial_density(self, molecule, ao_basis,
+                                            valence_basis, valence_mo):
+        """
+        Generates the initial density used in the second L2-DIIS step.
+
+        :param molecule:
+            The molecule.
+        :param ao_basis:
+            The AO basis set.
+        :param valence_basis:
+            The valence AO basis set.
+        :param valence_mo:
+            The molecular orbitals obtained in the first L2-DIIS step.
+
+        :return:
+            The AO density matrix.
+        """
+
+        return self.gen_initial_density_proj(molecule, ao_basis, valence_basis,
+                                             valence_mo)
+
+    def _load_cpcm_restart_charges(self):
+        """
+        Loads CPCM charges from checkpoint on the master rank and broadcasts
+        them to all ranks.
+        """
+
+        if self.restart and self.rank == mpi_master():
+            self.cpcm_drv.cpcm_q = read_cpcm_charges(self.get_checkpoint_file())
+
+        self.cpcm_drv.cpcm_q = self.comm.bcast(self.cpcm_drv.cpcm_q,
+                                               root=mpi_master())
+
     def validate_checkpoint(self, nuclear_charges, basis_set, scf_type):
         """
-        Validates the checkpoint file by checking nuclear charges and basis set.
+        Validates the checkpoint file by checking nuclear charges, basis set,
+        and SCF type.
+
+        Method and environment settings are intentionally ignored because the
+        checkpoint orbitals only provide the initial guess.
 
         :param nuclear_charges:
             Numpy array of the nuclear charges.
@@ -1192,11 +1488,12 @@ class ScfDriver:
         """
 
         valid = False
+        checkpoint_file = self.get_checkpoint_file()
 
         if self.rank == mpi_master():
-            if (isinstance(self.checkpoint_file, str) and
-                    Path(self.checkpoint_file).is_file()):
-                valid = MolecularOrbitals.match_hdf5(self.checkpoint_file,
+            if (isinstance(checkpoint_file, str) and
+                    Path(checkpoint_file).is_file()):
+                valid = MolecularOrbitals.match_hdf5(checkpoint_file,
                                                      nuclear_charges, basis_set,
                                                      scf_type)
 
@@ -1204,9 +1501,16 @@ class ScfDriver:
 
         return valid
 
+    def _uses_custom_initial_guess(self):
+        """
+        Returns whether SCF starts from checkpoint or user supplied orbitals.
+        """
+
+        return self.restart or self._use_start_orbitals
+
     def maximum_overlap(self, molecule, basis, orbitals, alpha_list, beta_list):
         """
-        Constraint the SCF calculation to find orbitals that maximize overlap
+        Constrains the SCF calculation to find orbitals that maximize overlap
         with a reference set.
 
         :param molecule:
@@ -1226,6 +1530,18 @@ class ScfDriver:
         if self.rank == mpi_master():
             n_alpha = molecule.number_of_alpha_occupied_orbitals(basis)
             n_beta = molecule.number_of_beta_occupied_orbitals(basis)
+            n_mo = orbitals.number_of_mos()
+
+            for spin, occupation_list in [('alpha', alpha_list),
+                                          ('beta', beta_list)]:
+                error_prefix = f'ScfDriver.maximum_overlap: {spin} occupation list '
+                assert_msg_critical(
+                    len(set(occupation_list)) == len(occupation_list),
+                    error_prefix + 'contains duplicate orbital indices')
+                assert_msg_critical(
+                    all(0 <= index < n_mo for index in occupation_list),
+                    error_prefix +
+                    f'indices must be in the range [0, {n_mo})')
 
             # Reorder alpha to match beta
             if self.scf_type == 'restricted_openshell':
@@ -1240,7 +1556,6 @@ class ScfDriver:
             if self.scf_type == 'restricted':
                 assert_msg_critical(alpha_list == beta_list, err_excitations)
 
-            n_mo = orbitals.number_of_mos()
             mo_a = orbitals.alpha_to_numpy()
             mo_b = orbitals.beta_to_numpy()
 
@@ -1262,7 +1577,8 @@ class ScfDriver:
 
     def set_start_orbitals(self, molecule, basis, array):
         """
-        Creates checkpoint file from numpy array containing starting orbitals.
+        Sets molecular orbitals from a numpy array and enables start-orbital
+        mode for the SCF calculation.
 
         :param molecule:
             The molecule.
@@ -1334,19 +1650,23 @@ class ScfDriver:
         else:
             self._molecular_orbitals = MolecularOrbitals()
 
-        # write checkpoint file and sychronize MPI processes
+        # Record that SCF should start from the supplied orbitals without
+        # forcing checkpoint I/O.
 
-        self.restart = True
-        if self.checkpoint_file is None:
-            if self.filename is not None:
-                base_fname = self.filename
-            else:
-                name_string = get_random_string_parallel(self.comm)
-                base_fname = 'vlx_' + name_string
-            self.checkpoint_file = f'{base_fname}_scf.h5'
-        self.write_checkpoint(molecule, basis)
+        self.restart = False
+        self._use_start_orbitals = True
+        if self.rank == mpi_master():
+            self._ref_mol_orbs = deepcopy(self._molecular_orbitals)
+        else:
+            self._ref_mol_orbs = None
 
-        self.comm.barrier()
+    def clear_start_orbitals(self):
+        """
+        Clears the user-supplied start orbitals mode.
+        """
+
+        self._use_start_orbitals = False
+        self._mom = None
 
     def write_checkpoint(self, molecule, basis):
         """
@@ -1361,25 +1681,32 @@ class ScfDriver:
         if self._skip_writing_h5:
             return
 
+        checkpoint_file = self.get_checkpoint_file()
+        if checkpoint_file is None:
+            return
+
         if self.rank == mpi_master():
-            if self.checkpoint_file and isinstance(self.checkpoint_file, str):
+            if checkpoint_file and isinstance(checkpoint_file, str):
                 if self._dft:
                     xc_label = self.xcfun.get_func_label()
                 else:
                     xc_label = 'HF'
 
                 if self._pe:
-                    with open(str(self.pe_options['potfile']), 'r') as f_pot:
+                    with Path(self.pe_options['potfile']).open('r') as f_pot:
                         potfile_text = '\n'.join(f_pot.readlines())
                 else:
                     potfile_text = ''
 
-                create_hdf5(self.checkpoint_file, molecule, basis, xc_label,
+                create_hdf5(checkpoint_file, molecule, basis, xc_label,
                             potfile_text)
-                self.molecular_orbitals.write_hdf5(self.checkpoint_file)
+                self.molecular_orbitals.write_hdf5(checkpoint_file)
                 if self._cpcm:
-                    write_cpcm_charges(self.checkpoint_file,
-                                       self.cpcm_drv._cpcm_q)
+                    write_cpcm_charges(checkpoint_file, self.cpcm_drv.cpcm_q)
+
+                # Set potfile before unparse_input serializes checkpoint settings.
+                if self._pe and self.potfile is None:
+                    self.potfile = self.pe_options.get('potfile')
 
                 scf_keywords = {
                     key: val[0]
@@ -1390,19 +1717,20 @@ class ScfDriver:
                     self._input_keywords['method_settings'].items()
                 }
 
-                write_unparsed_input_to_hdf5(self.checkpoint_file,
+                write_unparsed_input_to_hdf5(checkpoint_file,
                                              unparse_input(self, scf_keywords),
                                              group_name='scf_settings')
-                write_unparsed_input_to_hdf5(self.checkpoint_file,
+                write_unparsed_input_to_hdf5(checkpoint_file,
                                              unparse_input(
                                                  self, method_keywords),
                                              group_name='method_settings')
 
                 self.ostream.print_blank()
                 self.ostream.print_info('Checkpoint written to file: ' +
-                                        self.checkpoint_file)
+                                        checkpoint_file)
+                self.ostream.flush()
 
-    def _comp_diis(self, molecule, ao_basis, min_basis, den_mat, profiler):
+    def _comp_diis(self, molecule, ao_basis, den_mat, profiler):
         """
         Performs SCF calculation with DIIS acceleration.
 
@@ -1410,8 +1738,6 @@ class ScfDriver:
             The molecule.
         :param ao_basis:
             The AO basis set.
-        :param min_basis:
-            The minimal AO basis set.
         :param profiler:
             The profiler.
         """
@@ -1421,6 +1747,9 @@ class ScfDriver:
         self._scf_prop = FirstOrderProperties(self.comm, self.ostream)
 
         self._history = []
+        self._scf_energy = 0.0
+        self._is_converged = False
+        self._num_iter = 0
 
         if not self._first_step:
             profiler.begin({
@@ -1439,7 +1768,17 @@ class ScfDriver:
         self._density_matrices_alpha.clear()
         self._density_matrices_beta.clear()
 
-        ovl_mat, kin_mat, npot_mat, dipole_mats = self._comp_one_ints(
+        self._level_shift_smooth_alpha = None
+        self._level_shift_smooth_beta = None
+
+        if self.level_shifting > 0.0:
+            assert_msg_critical(
+                self.level_shift_smoothing is not None and
+                0.0 <= self.level_shift_smoothing < 1.0,
+                'SCF driver: \'level_shift_smoothing\' must satisfy '
+                '0 <= smoothing < 1')
+
+        ovl_mat, kin_mat, npot_mat, dipole_mats, ecp_mat = self._comp_one_ints(
             molecule, ao_basis)
 
         if self.rank == mpi_master() and self.electric_field is not None:
@@ -1544,33 +1883,11 @@ class ScfDriver:
                                                      thresh_int,
                                                      verbose=False)
 
-        if ao_basis.has_ecp():
-            ecp_drv = ECPDriver()
-            core_electrons = ao_basis.get_number_of_ecp_core_electrons()
-            ecp_atom_inds = [
-                idx for idx, nelec in enumerate(core_electrons) if nelec > 0
-            ]
-
-            ave, res = divmod(len(ecp_atom_inds), self.nodes)
-            counts = [ave + 1 if p < res else ave for p in range(self.nodes)]
-            start = sum(counts[:self.rank])
-            end = sum(counts[:self.rank + 1])
-            local_ecp_atom_inds = ecp_atom_inds[start:end]
-
-            ecp_t0 = tm.time()
-            ecp_mat = ecp_drv.compute(molecule, ao_basis, local_ecp_atom_inds)
-            ecp_mat = self.comm.reduce(ecp_mat.to_numpy(), root=mpi_master())
-
-            if self.print_level > 1:
-                self.ostream.print_info(
-                    'Effective core potential matrix computed in ' +
-                    f'{(tm.time() - ecp_t0):.2f} sec.')
-                self.ostream.print_blank()
-                self.ostream.flush()
-        else:
-            ecp_mat = None
-
         e_grad = None
+
+        use_level_shift = False
+        use_pfon = False
+        use_density_damping = False
 
         if self.rank == mpi_master():
             self._print_scf_title()
@@ -1579,7 +1896,7 @@ class ScfDriver:
 
             # set the current number of SCF iterations
             # (note the extra SCF cycle when starting from scratch)
-            if self.restart:
+            if self._uses_custom_initial_guess():
                 self._num_iter = i + 1
             else:
                 self._num_iter = i
@@ -1588,67 +1905,44 @@ class ScfDriver:
 
             iter_start_time = tm.time()
 
-            fock_mat, vxc_mat, e_emb, V_emb = self._comp_2e_fock(
-                den_mat, molecule, ao_basis, screener, e_grad, profiler)
+            use_density_factor = use_pfon or use_density_damping
+
+            fock_mat, vxc_mat, e_emb, V_emb, e_pr, V_pr = self._comp_2e_fock_single_comm(
+                den_mat,
+                molecule,
+                ao_basis,
+                screener,
+                e_grad,
+                profiler,
+                use_density_factor=use_density_factor)
+
+            self._e_gostshyp = e_pr
 
             profiler.start_timer('ErrVec')
 
-            e_el = self._comp_energy(fock_mat, vxc_mat, e_emb, kin_mat,
+            e_el = self._comp_energy(fock_mat, vxc_mat, e_emb, e_pr, kin_mat,
                                      npot_mat, ecp_mat, den_mat)
 
-            self._comp_full_fock(fock_mat, vxc_mat, V_emb, kin_mat, npot_mat,
+            self._comp_full_fock(fock_mat, vxc_mat, V_emb, V_pr, kin_mat, npot_mat,
                                  ecp_mat)
 
             profiler.stop_timer('ErrVec')
             profiler.start_timer('CPCM')
 
             if self._cpcm:
-                if self.scf_type == 'restricted':
-                    e_sol, Fock_sol = self.cpcm_drv.compute_gs_fock(
-                        molecule, ao_basis, den_mat[0] * 2.0,
-                        self.cpcm_cg_thresh)
-                else:
-                    e_sol, Fock_sol = self.cpcm_drv.compute_gs_fock(
-                        molecule, ao_basis, den_mat[0] + den_mat[1],
-                        self.cpcm_cg_thresh)
+                e_sol, Fock_sol = self.cpcm_drv.compute_gs_fock(
+                    molecule, ao_basis, self._get_total_density_matrix(den_mat),
+                    self.cpcm_cg_thresh)
 
                 if self.rank == mpi_master():
                     e_el += e_sol
+                    self._add_onee_contribution(fock_mat, Fock_sol)
 
-                    fock_mat[0] += Fock_sol
-                    if self.scf_type != 'restricted':
-                        fock_mat[1] += Fock_sol
+                    if self._smd:
+                        self.smd_energy = self.smd_cds_energy + e_sol
 
             profiler.stop_timer('CPCM')
             profiler.start_timer('ErrVec')
-
-            if (self.rank == mpi_master() and i > 0 and
-                    self.level_shifting > 0.0):
-
-                self.ostream.print_info(
-                    f'Applying level-shifting ({self.level_shifting:.2f}au)')
-
-                C_alpha = self.molecular_orbitals.alpha_to_numpy()
-                nocc_a = molecule.number_of_alpha_occupied_orbitals(ao_basis)
-                fmo_a = np.linalg.multi_dot([C_alpha.T, fock_mat[0], C_alpha])
-                for idx in range(nocc_a, fmo_a.shape[0]):
-                    fmo_a[idx, idx] += self.level_shifting
-                fock_mat[0] = np.linalg.multi_dot(
-                    [S, C_alpha, fmo_a, C_alpha.T, S])
-
-                if self.scf_type != 'restricted':
-
-                    C_beta = self.molecular_orbitals.beta_to_numpy()
-                    nocc_b = molecule.number_of_beta_occupied_orbitals(ao_basis)
-                    fmo_b = np.linalg.multi_dot([C_beta.T, fock_mat[1], C_beta])
-                    for idx in range(nocc_b, fmo_b.shape[0]):
-                        fmo_b[idx, idx] += self.level_shifting
-                    fock_mat[1] = np.linalg.multi_dot(
-                        [S, C_beta, fmo_b, C_beta.T, S])
-
-                self.level_shifting -= self.level_shifting_delta
-                if self.level_shifting < 0.0:
-                    self.level_shifting = 0.0
 
             if self.rank == mpi_master() and self.electric_field is not None:
                 efpot = sum([
@@ -1656,28 +1950,24 @@ class ScfDriver:
                     for ef, mat in zip(self.electric_field, dipole_ints)
                 ])
 
-                if self.scf_type == 'restricted':
-                    e_el += 2.0 * np.trace(np.matmul(efpot, den_mat[0]))
-                    fock_mat[0] += efpot
-                else:
-                    e_el += np.trace(np.matmul(efpot,
-                                               (den_mat[0] + den_mat[1])))
-                    fock_mat[0] += efpot
-                    fock_mat[1] += efpot
+                e_el += np.trace(
+                    np.matmul(efpot, self._get_total_density_matrix(den_mat)))
+                self._add_onee_contribution(fock_mat, efpot)
 
                 self._ef_nuc_energy = 0.0
                 coords = molecule.get_coordinates_in_bohr()
-                elem_ids = molecule.get_element_ids()
-                for i in range(molecule.number_of_atoms()):
+                elem_ids = molecule.get_effective_nuclear_charges(ao_basis)
+                for atom_idx in range(molecule.number_of_atoms()):
                     self._ef_nuc_energy -= np.dot(
-                        elem_ids[i] * (coords[i] - self._dipole_origin),
+                        elem_ids[atom_idx] *
+                        (coords[atom_idx] - self._dipole_origin),
                         self.electric_field)
 
             e_grad, max_grad = self._comp_gradient(fock_mat, ovl_mat, den_mat,
                                                    oao_mat)
 
             # threshold for deactivating pseudo-FON and level-shifting
-            if e_grad < 1.0e-4:
+            if e_grad < 1.0e-4 or e_grad < (10.0 * self.conv_thresh):
                 if self.pfon:
                     self.pfon_temperature = 0
                 if self.level_shifting > 0.0:
@@ -1690,9 +1980,19 @@ class ScfDriver:
             e_scf = (e_el + self._nuc_energy + self._nuc_mm_energy +
                      self._d4_energy + self._ef_nuc_energy)
 
+            if self._smd and self.rank == mpi_master():
+                # do not double count e_sol
+                e_scf += self.smd_cds_energy
+
             e_scf = self.comm.bcast(e_scf, root=mpi_master())
 
             diff_e_scf = e_scf - self.scf_energy
+
+            if self._num_iter == 1:
+                # The first printed SCF iteration always reports zero energy
+                # and density changes. Store the same values in the history.
+                diff_e_scf = 0.0
+                diff_den = 0.0
 
             self._iter_data = {
                 'energy': e_scf,
@@ -1702,7 +2002,8 @@ class ScfDriver:
                 'diff_energy': diff_e_scf,
             }
 
-            self._history.append(self._iter_data)
+            if not self._first_step and self._num_iter > 0:
+                self._history.append(self._iter_data)
 
             # update density and energy
 
@@ -1718,7 +2019,11 @@ class ScfDriver:
 
             self._print_iter_data(i)
 
-            self._check_convergence(molecule, ao_basis, ovl_mat)
+            use_scf_modifier = (
+                use_level_shift or use_pfon or use_density_damping)
+
+            self._check_convergence(molecule, ao_basis, ovl_mat,
+                                    use_scf_modifier)
 
             if self.is_converged:
                 break
@@ -1731,9 +2036,38 @@ class ScfDriver:
 
             eff_fock_mat = self._get_effective_fock(fock_mat, ovl_mat, oao_mat)
 
+            # Note: skip level-shifting only for the initial fresh guess (first
+            # SCF cycle, _num_iter == 0). For restart or user-supplied start
+            # orbitals, _num_iter starts at 1 and level shifting applies from
+            # the first iteration.
+            use_level_shift = (self._num_iter > 0 and self.level_shifting > 0.0)
+
+            if self.rank == mpi_master() and use_level_shift:
+
+                self.ostream.print_info(
+                    f'Applying level-shifting ({self.level_shifting:.2f}au)')
+
+                if self.level_shift_smoothing == 0.0:
+                    # Preserve the original level-shifting implementation
+                    eff_fock_mat = self._apply_level_shifting(
+                        molecule, ao_basis, eff_fock_mat, ovl_mat)
+                else:
+                    level_shift = self._build_level_shift(molecule, ao_basis,
+                                                          ovl_mat)
+                    level_shift_eff = self._smooth_level_shift(level_shift)
+                    eff_fock_mat = self._add_level_shift(eff_fock_mat,
+                                                         level_shift_eff)
+
+            if use_level_shift:
+                self.level_shifting -= self.level_shifting_delta
+                if self.level_shifting < 0.0:
+                    self.level_shifting = 0.0
+
             profiler.stop_timer('EffFock')
 
             profiler.start_timer('NewMO')
+
+            use_pfon = (self.pfon and self.pfon_temperature > 0)
 
             self._molecular_orbitals = self._gen_molecular_orbitals(
                 molecule, ao_basis, eff_fock_mat, oao_mat)
@@ -1759,6 +2093,9 @@ class ScfDriver:
             den_mat = self.comm.bcast(den_mat, root=mpi_master())
 
             # Note: skip density_damping for iteration 0
+            # Track whether density damping actually modified the density;
+            # this is used to skip the next convergence check.
+            use_density_damping = False
             if self.density_damping and self._num_iter > 0:
                 if e_grad < 1.0e-2:
                     den_damp = 1.0
@@ -1776,6 +2113,7 @@ class ScfDriver:
                                               self._density[idx] +
                                               den_damp * den_mat[idx])
                     den_mat = tuple(damped_den_mat)
+                    use_density_damping = True
 
             profiler.stop_timer('NewDens')
 
@@ -1825,6 +2163,7 @@ class ScfDriver:
                     'eri_thresh': self.eri_thresh,
                     # scf info
                     'scf_type': self.scf_type,
+                    'conv_thresh': self.conv_thresh,
                     'scf_energy': self.scf_energy,
                     'restart': self.restart,
                     'filename': self.filename,
@@ -1845,6 +2184,12 @@ class ScfDriver:
                 # for backward compatibility only
                 self._scf_results['F'] = (F_alpha, F_beta)
 
+                # save SCF history
+                if self.history:
+                    for key in self.history[0]:
+                        self._scf_results[f'scf_history_{key}'] = np.array(
+                            [step[key] for step in self.history])
+
                 if self.ri_coulomb or self.ri_jk:
                     # RI info
                     self._scf_results['ri_coulomb'] = self.ri_coulomb
@@ -1860,7 +2205,7 @@ class ScfDriver:
 
                 if self._pe:
                     # pe info, energy and potential matrix
-                    self._scf_results['potfile'] = self.potfile
+                    self._scf_results['potfile'] = self._get_pe_potfile()
                     self._scf_results['E_emb'] = e_emb
                     self._scf_results['F_emb'] = V_emb
 
@@ -1868,15 +2213,42 @@ class ScfDriver:
                     self._scf_results['point_charges'] = self.point_charges
                 if self.qm_vdw_params is not None:
                     self._scf_results['qm_vdw_params'] = self.qm_vdw_params
+                if self.electric_field is not None:
+                    self._scf_results['electric_field'] = self.electric_field
 
                 if self.solvation_model is not None:
                     for key in [
                             'solvation_model',
                             'cpcm_epsilon',
+                            'cpcm_radii_scaling',
                             'cpcm_grid_per_sphere',
                             'cpcm_cg_thresh',
                             'cpcm_x',
                             'cpcm_custom_vdw_radii',
+                    ]:
+                        self._scf_results[key] = getattr(self, key)
+
+                    if self._smd:
+                        # SMD overrides the plain CPCM attributes.
+                        self._scf_results['cpcm_epsilon'] = (
+                            self.cpcm_drv.epsilon)
+                        self._scf_results['cpcm_radii_scaling'] = (
+                            self.cpcm_drv.radii_scaling)
+                        self._scf_results['cpcm_custom_vdw_radii'] = (
+                            self.cpcm_drv.custom_vdw_radii)
+                        self._scf_results['smd_solvent'] = self.smd_solvent
+
+                if self._gostshyp:
+                    # gostshyp info
+                    for key in [
+                            'pressure',
+                            'pressure_units',
+                            'gostshyp_num_lebedev_points',
+                            'gostshyp_tssf',
+                            'gostshyp_discretization',
+                            'gostshyp_switching_thresh',
+                            'gostshyp_r_ext',
+                            'gostshyp_tco_tol',
                     ]:
                         self._scf_results[key] = getattr(self, key)
 
@@ -1932,13 +2304,12 @@ class ScfDriver:
         """
         Gracefully exits the program.
 
+        This method writes a checkpoint if needed and then exits the process.
+
         :param molecule:
             The molecule.
         :param basis:
             The basis set.
-
-        :return:
-            The return code.
         """
 
         self.ostream.print_blank()
@@ -1956,19 +2327,155 @@ class ScfDriver:
 
         sys.exit(0)
 
+    def _is_restricted(self):
+        """
+        Returns whether the current SCF calculation is spin-restricted.
+        """
+
+        return self.scf_type == 'restricted'
+
+    def _get_spin_matrices(self, matrices):
+        """
+        Returns alpha and beta matrices for the current SCF type.
+
+        :param matrices:
+            The matrix tuple/list.
+
+        :return:
+            The alpha and beta matrices.
+        """
+
+        alpha_matrix = matrices[0]
+        beta_matrix = matrices[0] if self._is_restricted() else matrices[1]
+
+        return alpha_matrix, beta_matrix
+
+    def _get_total_density_matrix(self, den_mat):
+        """
+        Returns the total AO density matrix.
+
+        :param den_mat:
+            The density matrix tuple.
+
+        :return:
+            The total AO density matrix.
+        """
+
+        d_alpha, d_beta = self._get_spin_matrices(den_mat)
+
+        return d_alpha + d_beta
+
+    def _add_onee_contribution(self, matrices, contribution):
+        """
+        Adds the same one-electron contribution to all spin-specific Fock
+        matrices.
+
+        :param matrices:
+            The list of Fock matrices.
+        :param contribution:
+            The matrix contribution to add.
+        """
+
+        for matrix in matrices:
+            matrix += contribution
+
+    def _has_embedded_potential(self):
+        """
+        Returns whether an external one-electron potential is active.
+        """
+
+        return self._pe or self.point_charges is not None
+
+    def _get_pe_potfile(self):
+        """Returns the PE potfile, falling back to pe_options when unset."""
+
+        if self._pe:
+            if self.potfile is not None:
+                return self.potfile
+            return self.pe_options.get('potfile')
+
+        return self.potfile
+
+    def _parse_point_charge_line(self, content, idx, expect_vdw):
+        """
+        Parses one point-charge line with explicit validation.
+
+        :param content:
+            Tokenized point-charge line.
+        :param idx:
+            Zero-based point-charge index.
+        :param expect_vdw:
+            Whether MM vdW parameters are required.
+        :return:
+            Parsed label, coordinates, charge, and optional vdW values.
+        """
+
+        min_fields = 7 if expect_vdw else 5
+        assert_msg_critical(
+            len(content) >= min_fields,
+            f'potfile: Invalid data on point charge line {idx + 3}')
+
+        label = content[0]
+
+        try:
+            x = float(content[1])
+            y = float(content[2])
+            z = float(content[3])
+            q = float(content[4])
+            if expect_vdw:
+                sigma = float(content[5])
+                epsilon = float(content[6])
+            else:
+                sigma, epsilon = None, None
+        except ValueError:
+            assert_msg_critical(
+                False,
+                f'potfile: Invalid numeric data on point charge line {idx + 3}')
+
+        return label, x, y, z, q, sigma, epsilon
+
+    def _compute_embedded_potential(self, den_mat):
+        """
+        Computes external one-electron potential contributions.
+
+        :param den_mat:
+            The density matrix tuple.
+
+        :return:
+            The embedding energy and matrix contribution.
+        """
+
+        density_matrix = self._get_total_density_matrix(den_mat)
+
+        if self._pe:
+            from .embedding import PolarizableEmbeddingSCF
+            assert_msg_critical(
+                isinstance(self._embedding_drv, PolarizableEmbeddingSCF),
+                'ScfDriver: Inconsistent embedding driver for SCF')
+            return self._embedding_drv.compute_pe_contributions(
+                density_matrix=density_matrix)
+
+        if self.point_charges is not None:
+            return np.sum(density_matrix * self._V_es), self._V_es
+
+        return 0.0, None
+
     def _comp_one_ints(self, molecule, basis):
         """
-        Computes one-electron integrals (overlap, kinetic energy and nuclear
-        potential) using molecular data.
+        Computes one-electron integrals (overlap, kinetic energy, nuclear
+        potential and effective core potential) using molecular data.
 
         :param molecule:
             The molecule.
-        :param ao_basis:
+        :param basis:
             The AO basis set.
 
         :return:
-            The one-electron integrals.
+            The one-electron integrals: overlap, kinetic energy,
+            nuclear potential, electric dipole (if any), and ECP matrices.
         """
+
+        # overlap and kinetic energy
 
         if self.rank == mpi_master():
             t0 = tm.time()
@@ -1990,40 +2497,70 @@ class ScfDriver:
             kin_mat = None
 
         ovl_mat = self.comm.bcast(ovl_mat, root=mpi_master())
-        kin_mat = self.comm.bcast(kin_mat, root=mpi_master())
+
+        # nuclear potential
 
         t0 = tm.time()
 
         if molecule.number_of_atoms() >= self.nodes and self.nodes > 1:
             npot_mat = self._comp_npot_mat_parallel(molecule, basis)
         else:
-            mol_charges = molecule.get_element_ids()
-            mol_charges -= basis.get_number_of_ecp_core_electrons()
+            mol_charges = molecule.get_effective_nuclear_charges(basis)
             mol_coords = molecule.get_coordinates_in_bohr()
-            npot_mat = compute_nuclear_potential_integrals(
-                molecule, basis, mol_charges, mol_coords)
+            if self.rank == mpi_master():
+                npot_mat = compute_nuclear_potential_integrals(
+                    molecule, basis, mol_charges, mol_coords)
+            else:
+                npot_mat = None
 
         npot_dt = tm.time() - t0
 
-        npot_mat = self.comm.bcast(npot_mat, root=mpi_master())
+        # dipole moment (if electric field is present)
 
         t0 = tm.time()
+
+        dipole_mats = None
 
         if self.electric_field is not None:
             if molecule.get_charge() != 0:
                 coords = molecule.get_coordinates_in_bohr()
-                nuclear_charges = molecule.get_element_ids()
+                nuclear_charges = molecule.get_effective_nuclear_charges(basis)
                 self._dipole_origin = np.sum(coords.T * nuclear_charges,
                                              axis=1) / np.sum(nuclear_charges)
             else:
                 self._dipole_origin = np.zeros(3)
 
-            dipole_mats = compute_electric_dipole_integrals(
-                molecule, basis, list(self._dipole_origin))
-        else:
-            dipole_mats = None
+            if self.rank == mpi_master():
+                dipole_mats = compute_electric_dipole_integrals(
+                    molecule, basis, list(self._dipole_origin))
 
         dipole_dt = tm.time() - t0
+
+        # ECP
+
+        t0 = tm.time()
+
+        ecp_mat = None
+
+        if basis.has_ecp():
+            ecp_drv = EcpDriver()
+            core_electrons = basis.get_number_of_ecp_core_electrons()
+            ecp_atom_inds = [
+                idx for idx, nelec in enumerate(core_electrons) if nelec > 0
+            ]
+
+            ave, res = divmod(len(ecp_atom_inds), self.nodes)
+            counts = [ave + 1 if p < res else ave for p in range(self.nodes)]
+            start = sum(counts[:self.rank])
+            end = sum(counts[:self.rank + 1])
+            local_ecp_atom_inds = ecp_atom_inds[start:end]
+
+            ecp_mat = ecp_drv.compute(molecule, basis, local_ecp_atom_inds)
+            ecp_mat = self.comm.reduce(ecp_mat.to_numpy(), root=mpi_master())
+
+        ecp_dt = tm.time() - t0
+
+        # timing printout
 
         if self.rank == mpi_master() and self.print_level > 1:
 
@@ -2044,9 +2581,15 @@ class ScfDriver:
                                         ' {:.2f} sec.'.format(dipole_dt))
                 self.ostream.print_blank()
 
+            if basis.has_ecp():
+                self.ostream.print_info(
+                    'Effective core potential matrix computed in ' +
+                    '{:.2f} sec.'.format(ecp_dt))
+                self.ostream.print_blank()
+
             self.ostream.flush()
 
-        return ovl_mat, kin_mat, npot_mat, dipole_mats
+        return ovl_mat, kin_mat, npot_mat, dipole_mats, ecp_mat
 
     def _comp_npot_mat_parallel(self, molecule, basis):
         """
@@ -2054,7 +2597,7 @@ class ScfDriver:
 
         :param molecule:
             The molecule.
-        :param ao_basis:
+        :param basis:
             The AO basis set.
 
         :return:
@@ -2067,8 +2610,7 @@ class ScfDriver:
         start = sum(counts[:self.rank])
         end = sum(counts[:self.rank + 1])
 
-        charges = molecule.get_element_ids()[start:end]
-        charges -= basis.get_number_of_ecp_core_electrons()[start:end]
+        charges = molecule.get_effective_nuclear_charges(basis)[start:end]
         coords = molecule.get_coordinates_in_bohr()[start:end, :]
 
         npot_mat = compute_nuclear_potential_integrals(molecule, basis, charges,
@@ -2078,105 +2620,38 @@ class ScfDriver:
 
         return npot_mat
 
-    def _comp_2e_fock(self,
-                      den_mat,
-                      molecule,
-                      basis,
-                      screener,
-                      e_grad=None,
-                      profiler=None):
+    def _prepare_for_ri_fock_build(self, fock_type):
         """
-        Computes Fock/Kohn-Sham matrix (only 2e part).
+        Performs RI-specific SCF checks and broadcasts molecular orbitals when
+        RI-JK needs them on all ranks.
 
-        :param den_mat:
-            The AO density matrix.
-        :param molecule:
-            The molecule.
-        :param basis:
-            The basis set.
-        :param screener:
-            The screening container object.
-        :param e_grad:
-            The electronic gradient.
-        :param profiler:
-            The profiler.
+        :param fock_type:
+            The requested Fock build type.
+        """
+
+        if self.ri_coulomb:
+            assert_msg_critical(
+                fock_type == 'j',
+                'SCF driver: RI-J is only applicable to pure DFT functional')
+        elif self.ri_jk:
+            assert_msg_critical(
+                fock_type != 'j',
+                'SCF driver: RI-JK is not applicable to pure DFT functional')
+            need_bcast_mo = self.comm.bcast(
+                (not self.molecular_orbitals.is_empty()), root=mpi_master())
+            if need_bcast_mo:
+                self._molecular_orbitals = self.molecular_orbitals.broadcast(
+                    self.comm, root=mpi_master())
+
+    def _get_2e_fock_build_params(self):
+        """
+        Determines common parameters for the 2e Fock build.
 
         :return:
-            The Fock matrix, AO Kohn-Sham (Vxc) matrix, etc.
+            The Fock build type, exchange scaling factor, whether
+            range-separated exchange is needed, the error-function exchange
+            coefficient, and the range-separation parameter.
         """
-
-        fock_mat, vxc_mat, e_emb, V_emb = self._comp_2e_fock_single_comm(
-            den_mat, molecule, basis, screener, e_grad, profiler)
-
-        return fock_mat, vxc_mat, e_emb, V_emb
-
-    def _comp_2e_fock_single_comm(self,
-                                  den_mat,
-                                  molecule,
-                                  basis,
-                                  screener,
-                                  e_grad=None,
-                                  profiler=None):
-        """
-        Computes Fock/Kohn-Sham matrix on single communicator.
-
-        :param den_mat:
-            The AO density matrix.
-        :param molecule:
-            The molecule.
-        :param basis:
-            The basis set.
-        :param screener:
-            The screening container object.
-        :param e_grad:
-            The electronic gradient.
-        :param profiler:
-            The profiler.
-
-        :return:
-            The Fock matrix, AO Kohn-Sham (Vxc) matrix, etc.
-        """
-
-        if self.scf_type == 'restricted':
-            if self.rank == mpi_master():
-                den_mat_for_fock = make_matrix(basis, mat_t.symmetric)
-                den_mat_for_fock.set_values(den_mat[0])
-            else:
-                den_mat_for_fock = None
-
-            den_mat_for_fock = self.comm.bcast(den_mat_for_fock,
-                                               root=mpi_master())
-
-        else:
-            if self.rank == mpi_master():
-                # for now we calculate Ka, Kb and Jab separately for open-shell
-                den_mat_for_Ka = make_matrix(basis, mat_t.symmetric)
-                den_mat_for_Ka.set_values(den_mat[0])
-
-                den_mat_for_Kb = make_matrix(basis, mat_t.symmetric)
-                den_mat_for_Kb.set_values(den_mat[1])
-
-                den_mat_for_Jab = make_matrix(basis, mat_t.symmetric)
-                den_mat_for_Jab.set_values(den_mat[0] + den_mat[1])
-            else:
-                den_mat_for_Ka = None
-                den_mat_for_Kb = None
-                den_mat_for_Jab = None
-
-            den_mat_for_Ka = self.comm.bcast(den_mat_for_Ka, root=mpi_master())
-            den_mat_for_Kb = self.comm.bcast(den_mat_for_Kb, root=mpi_master())
-            den_mat_for_Jab = self.comm.bcast(den_mat_for_Jab,
-                                              root=mpi_master())
-
-        if e_grad is None:
-            thresh_int = int(-math.log10(self.eri_thresh))
-        else:
-            thresh_int = int(-math.log10(self._get_dyn_threshold(e_grad)))
-
-        eri_t0 = tm.time()
-
-        fock_drv = FockDriver(self.comm)
-        fock_drv._set_block_size_factor(self._block_size_factor)
 
         # determine fock_type and exchange_scaling_factor
         fock_type = '2jk'
@@ -2200,186 +2675,280 @@ class ScfDriver:
         else:
             erf_k_coef, omega = None, None
 
-        fock_mat = None
+        return (fock_type, exchange_scaling_factor, need_omega, erf_k_coef,
+                omega)
 
-        if self.scf_type == 'restricted':
-            # restricted SCF
-            if self.ri_coulomb:
-                assert_msg_critical(
-                    fock_type == 'j',
-                    'SCF driver: RI-J is only applicable to pure DFT functional'
-                )
-            elif self.ri_jk:
-                assert_msg_critical(
-                    fock_type != 'j',
-                    'SCF driver: RI-JK is not applicable to pure DFT functional'
-                )
-                # ri_jk needs molecular_orbitals on all ranks
-                need_bcast_mo = self.comm.bcast(
-                    (not self.molecular_orbitals.is_empty()), root=mpi_master())
-                if need_bcast_mo:
-                    self._molecular_orbitals = self.molecular_orbitals.broadcast(
-                        self.comm, root=mpi_master())
+    def _comp_restricted_2e_fock(self,
+                                 den_mat,
+                                 basis,
+                                 screener,
+                                 thresh_int,
+                                 use_density_factor=False):
+        """
+        Computes the restricted 2e Fock matrix.
 
-            if self.ri_coulomb and fock_type == 'j':
-                fock_mat = self._ri_drv.compute(den_mat_for_fock, 'j')
-                fock_mat_np = fock_mat.to_numpy()
-            elif self.ri_jk and fock_type != 'j' and (
-                    self.molecular_orbitals._orbitals is not None):
-                fock_mat_j = self._ri_drv.compute_screened_j_fock(
-                    den_mat_for_fock, 'j', verbose=False)
-                fock_mat_k = self._ri_drv.compute_screened_k_fock(
-                    den_mat_for_fock, self.molecular_orbitals, verbose=False)
-                fock_mat_np = (fock_mat_j.to_numpy() * 2.0 -
-                               fock_mat_k.to_numpy() * exchange_scaling_factor)
-            else:
-                fock_mat = fock_drv.compute(screener, den_mat_for_fock,
-                                            fock_type, exchange_scaling_factor,
-                                            0.0, thresh_int)
-                fock_mat_np = fock_mat.to_numpy()
+        :param den_mat:
+            The AO density matrix tuple.
+        :param basis:
+            The basis set.
+        :param screener:
+            The screening container object.
+        :param thresh_int:
+            The integral threshold exponent.
+        :param use_density_factor:
+            Whether the exchange should be built from the density.
+        :return:
+            The restricted Fock matrix list or None on non-master ranks.
+        """
+
+        if self.rank == mpi_master():
+            den_mat_for_fock = make_matrix(basis, mat_t.symmetric)
+            den_mat_for_fock.set_values(den_mat[0])
+        else:
+            den_mat_for_fock = None
+
+        den_mat_for_fock = self.comm.bcast(den_mat_for_fock, root=mpi_master())
+
+        fock_drv = FockDriver(self.comm)
+        fock_drv.set_block_size_factor(self._block_size_factor)
+
+        (fock_type, exchange_scaling_factor, need_omega, erf_k_coef,
+         omega) = self._get_2e_fock_build_params()
+
+        self._prepare_for_ri_fock_build(fock_type)
+
+        if self.ri_coulomb and fock_type == 'j':
+            fock_mat = self._ri_drv.compute(den_mat_for_fock, 'j')
+            fock_mat_np = fock_mat.to_numpy()
+        elif self.ri_jk and fock_type != 'j' and (
+                not self.molecular_orbitals.is_empty()):
+            fock_mat_j = self._ri_drv.compute_screened_j_fock(den_mat_for_fock,
+                                                              'j',
+                                                              verbose=False)
+            fock_mat_k = self._ri_drv.compute_screened_k_fock(
+                den_mat_for_fock,
+                self.molecular_orbitals,
+                verbose=False,
+                use_density_factor=use_density_factor)
+            fock_mat_np = (fock_mat_j.to_numpy() * 2.0 -
+                           fock_mat_k.to_numpy() * exchange_scaling_factor)
+        else:
+            fock_mat = fock_drv.compute(screener, den_mat_for_fock, fock_type,
+                                        exchange_scaling_factor, 0.0,
+                                        thresh_int)
+            fock_mat_np = fock_mat.to_numpy()
+        fock_mat = Matrix()
+
+        if fock_type == 'j':
+            # for pure functional
+            fock_mat_np *= 2.0
+
+        if need_omega:
+            assert_msg_critical(
+                not self.ri_jk, 'SCF driver: RI-JK not yet implemented for ' +
+                'range-separated functional')
+
+            # for range-separated functional
+            fock_mat = fock_drv.compute(screener, den_mat_for_fock, 'kx_rs',
+                                        erf_k_coef, omega, thresh_int)
+
+            fock_mat_np -= fock_mat.to_numpy()
             fock_mat = Matrix()
 
-            if fock_type == 'j':
-                # for pure functional
-                fock_mat_np *= 2.0
+        fock_mat_np = self.comm.reduce(fock_mat_np, root=mpi_master())
 
-            if need_omega:
-                assert_msg_critical(
-                    not self.ri_jk,
-                    'SCF driver: RI-JK not yet implemented for ' +
-                    'range-separated functional')
+        if self.rank == mpi_master():
+            return [fock_mat_np]
 
-                # for range-separated functional
-                fock_mat = fock_drv.compute(screener, den_mat_for_fock, 'kx_rs',
-                                            erf_k_coef, omega, thresh_int)
+        return None
 
-                fock_mat_np -= fock_mat.to_numpy()
-                fock_mat = Matrix()
+    def _comp_open_shell_2e_fock(self,
+                                 den_mat,
+                                 basis,
+                                 screener,
+                                 thresh_int,
+                                 use_density_factor=False):
+        """
+        Computes the unrestricted/restricted-open-shell 2e Fock matrices.
 
-            fock_mat_np = self.comm.reduce(fock_mat_np, root=mpi_master())
+        :param den_mat:
+            The AO density matrix tuple.
+        :param basis:
+            The basis set.
+        :param screener:
+            The screening container object.
+        :param thresh_int:
+            The integral threshold exponent.
+        :param use_density_factor:
+            Whether the exchange should be built from the density.
+        :return:
+            The open-shell Fock matrix list or None on non-master ranks.
+        """
 
-            den_mat_for_fock = Matrix()
+        if self.rank == mpi_master():
+            # for now we calculate Ka, Kb and Jab separately for open-shell
+            den_mat_for_Ka = make_matrix(basis, mat_t.symmetric)
+            den_mat_for_Ka.set_values(den_mat[0])
 
-            if self.rank == mpi_master():
-                # Note: make fock_mat a list
-                fock_mat = [fock_mat_np]
+            den_mat_for_Kb = make_matrix(basis, mat_t.symmetric)
+            den_mat_for_Kb.set_values(den_mat[1])
+
+            den_mat_for_Jab = make_matrix(basis, mat_t.symmetric)
+            den_mat_for_Jab.set_values(den_mat[0] + den_mat[1])
+        else:
+            den_mat_for_Ka = None
+            den_mat_for_Kb = None
+            den_mat_for_Jab = None
+
+        den_mat_for_Ka = self.comm.bcast(den_mat_for_Ka, root=mpi_master())
+        den_mat_for_Kb = self.comm.bcast(den_mat_for_Kb, root=mpi_master())
+        den_mat_for_Jab = self.comm.bcast(den_mat_for_Jab, root=mpi_master())
+
+        fock_drv = FockDriver(self.comm)
+        fock_drv.set_block_size_factor(self._block_size_factor)
+
+        (fock_type, exchange_scaling_factor, need_omega, erf_k_coef,
+         omega) = self._get_2e_fock_build_params()
+
+        self._prepare_for_ri_fock_build(fock_type)
+
+        if fock_type == 'j':
+            # for pure functional
+            # den_mat_for_Jab is D_total
+            if self.ri_coulomb:
+                fock_mat = self._ri_drv.compute(den_mat_for_Jab, 'j')
             else:
-                fock_mat = None
+                fock_mat = fock_drv.compute(screener, den_mat_for_Jab, 'j', 0.0,
+                                            0.0, thresh_int)
+            J_ab_np = fock_mat.to_numpy()
+            fock_mat = Matrix()
+
+            fock_mat_a_np = J_ab_np
+            fock_mat_b_np = J_ab_np.copy()
 
         else:
-            # unrestricted SCF or restricted open-shell SCF
-
-            if self.ri_coulomb:
-                assert_msg_critical(
-                    fock_type == 'j',
-                    'SCF driver: RI-J is only applicable to pure DFT functional'
-                )
-            elif self.ri_jk:
-                assert_msg_critical(
-                    fock_type != 'j',
-                    'SCF driver: RI-JK is not applicable to pure DFT functional'
-                )
-                # ri_jk needs molecular_orbitals on all ranks
-                need_bcast_mo = self.comm.bcast(
-                    (not self.molecular_orbitals.is_empty()), root=mpi_master())
-                if need_bcast_mo:
-                    self._molecular_orbitals = self.molecular_orbitals.broadcast(
-                        self.comm, root=mpi_master())
-
-            if fock_type == 'j':
-                # for pure functional
-                # den_mat_for_Jab is D_total
-                if self.ri_coulomb:
-                    fock_mat = self._ri_drv.compute(den_mat_for_Jab, 'j')
-                else:
-                    fock_mat = fock_drv.compute(screener, den_mat_for_Jab, 'j',
-                                                0.0, 0.0, thresh_int)
+            if self.ri_jk and (not self.molecular_orbitals.is_empty()):
+                fock_mat = self._ri_drv.compute_screened_j_fock(den_mat_for_Jab,
+                                                                'j',
+                                                                verbose=False)
                 J_ab_np = fock_mat.to_numpy()
                 fock_mat = Matrix()
 
-                fock_mat_a_np = J_ab_np
-                fock_mat_b_np = J_ab_np.copy()
-
-            else:
-                if self.ri_jk and (self.molecular_orbitals._orbitals
-                                   is not None):
-                    fock_mat = self._ri_drv.compute_screened_j_fock(
-                        den_mat_for_Jab, 'j', verbose=False)
-                    J_ab_np = fock_mat.to_numpy()
-                    fock_mat = Matrix()
-
-                    fock_mat = self._ri_drv.compute_screened_k_fock(
-                        den_mat_for_Ka,
-                        self.molecular_orbitals,
-                        verbose=False,
-                        spin='alpha')
-                    K_a_np = fock_mat.to_numpy() * exchange_scaling_factor
-                    fock_mat = Matrix()
-
-                    fock_mat = self._ri_drv.compute_screened_k_fock(
-                        den_mat_for_Kb,
-                        self.molecular_orbitals,
-                        verbose=False,
-                        spin='beta')
-                    K_b_np = fock_mat.to_numpy() * exchange_scaling_factor
-                    fock_mat = Matrix()
-
-                else:
-                    fock_mat = fock_drv.compute(screener, den_mat_for_Ka, 'kx',
-                                                exchange_scaling_factor, 0.0,
-                                                thresh_int)
-
-                    K_a_np = fock_mat.to_numpy()
-                    fock_mat = Matrix()
-
-                    fock_mat = fock_drv.compute(screener, den_mat_for_Kb, 'kx',
-                                                exchange_scaling_factor, 0.0,
-                                                thresh_int)
-
-                    K_b_np = fock_mat.to_numpy()
-                    fock_mat = Matrix()
-
-                    fock_mat = fock_drv.compute(screener, den_mat_for_Jab, 'j',
-                                                exchange_scaling_factor, 0.0,
-                                                thresh_int)
-
-                    J_ab_np = fock_mat.to_numpy()
-                    fock_mat = Matrix()
-
-                fock_mat_a_np = J_ab_np - K_a_np
-                fock_mat_b_np = J_ab_np - K_b_np
-
-            if need_omega:
-                assert_msg_critical(
-                    not self.ri_jk,
-                    'SCF driver: RI-JK not yet implemented for ' +
-                    'range-separated functional')
-
-                # for range-separated functional
-                fock_mat = fock_drv.compute(screener, den_mat_for_Ka, 'kx_rs',
-                                            erf_k_coef, omega, thresh_int)
-
-                fock_mat_a_np -= fock_mat.to_numpy()
+                fock_mat = self._ri_drv.compute_screened_k_fock(
+                    den_mat_for_Ka,
+                    self.molecular_orbitals,
+                    verbose=False,
+                    spin='alpha',
+                    use_density_factor=use_density_factor)
+                K_a_np = fock_mat.to_numpy() * exchange_scaling_factor
                 fock_mat = Matrix()
 
-                fock_mat = fock_drv.compute(screener, den_mat_for_Kb, 'kx_rs',
-                                            erf_k_coef, omega, thresh_int)
-
-                fock_mat_b_np -= fock_mat.to_numpy()
+                fock_mat = self._ri_drv.compute_screened_k_fock(
+                    den_mat_for_Kb,
+                    self.molecular_orbitals,
+                    verbose=False,
+                    spin='beta',
+                    use_density_factor=use_density_factor)
+                K_b_np = fock_mat.to_numpy() * exchange_scaling_factor
                 fock_mat = Matrix()
 
-            fock_mat_a_np = self.comm.reduce(fock_mat_a_np, root=mpi_master())
-            fock_mat_b_np = self.comm.reduce(fock_mat_b_np, root=mpi_master())
-
-            den_mat_for_Ka = Matrix()
-            den_mat_for_Kb = Matrix()
-            den_mat_for_Jab = Matrix()
-
-            if self.rank == mpi_master():
-                # Note: make fock_mat a list
-                fock_mat = [fock_mat_a_np, fock_mat_b_np]
             else:
-                fock_mat = None
+                fock_mat = fock_drv.compute(screener, den_mat_for_Ka, 'kx',
+                                            exchange_scaling_factor, 0.0,
+                                            thresh_int)
+
+                K_a_np = fock_mat.to_numpy()
+                fock_mat = Matrix()
+
+                fock_mat = fock_drv.compute(screener, den_mat_for_Kb, 'kx',
+                                            exchange_scaling_factor, 0.0,
+                                            thresh_int)
+
+                K_b_np = fock_mat.to_numpy()
+                fock_mat = Matrix()
+
+                fock_mat = fock_drv.compute(screener, den_mat_for_Jab, 'j',
+                                            exchange_scaling_factor, 0.0,
+                                            thresh_int)
+
+                J_ab_np = fock_mat.to_numpy()
+                fock_mat = Matrix()
+
+            fock_mat_a_np = J_ab_np - K_a_np
+            fock_mat_b_np = J_ab_np - K_b_np
+
+        if need_omega:
+            assert_msg_critical(
+                not self.ri_jk, 'SCF driver: RI-JK not yet implemented for ' +
+                'range-separated functional')
+
+            # for range-separated functional
+            fock_mat = fock_drv.compute(screener, den_mat_for_Ka, 'kx_rs',
+                                        erf_k_coef, omega, thresh_int)
+
+            fock_mat_a_np -= fock_mat.to_numpy()
+            fock_mat = Matrix()
+
+            fock_mat = fock_drv.compute(screener, den_mat_for_Kb, 'kx_rs',
+                                        erf_k_coef, omega, thresh_int)
+
+            fock_mat_b_np -= fock_mat.to_numpy()
+            fock_mat = Matrix()
+
+        fock_mat_a_np = self.comm.reduce(fock_mat_a_np, root=mpi_master())
+        fock_mat_b_np = self.comm.reduce(fock_mat_b_np, root=mpi_master())
+
+        if self.rank == mpi_master():
+            return [fock_mat_a_np, fock_mat_b_np]
+
+        return None
+
+    def _comp_2e_fock_single_comm(self,
+                                  den_mat,
+                                  molecule,
+                                  basis,
+                                  screener,
+                                  e_grad=None,
+                                  profiler=None,
+                                  use_density_factor=False):
+        """
+        Computes Fock/Kohn-Sham matrix on single communicator.
+
+        :param den_mat:
+            The AO density matrix.
+        :param molecule:
+            The molecule.
+        :param basis:
+            The basis set.
+        :param screener:
+            The screening container object.
+        :param e_grad:
+            The electronic gradient.
+        :param profiler:
+            The profiler.
+        :param use_density_factor:
+            Whether the exchange should be built from the density.
+
+        :return:
+            The Fock matrix, AO Kohn-Sham (Vxc) matrix, etc.
+        """
+
+        if e_grad is None:
+            thresh_int = int(-math.log10(self.eri_thresh))
+        else:
+            thresh_int = int(-math.log10(self._get_dyn_threshold(e_grad)))
+
+        eri_t0 = tm.time()
+
+        fock_mat = None
+
+        if self.scf_type == 'restricted':
+            fock_mat = self._comp_restricted_2e_fock(
+                den_mat, basis, screener, thresh_int, use_density_factor)
+
+        else:
+            fock_mat = self._comp_open_shell_2e_fock(
+                den_mat, basis, screener, thresh_int, use_density_factor)
 
         if self.timing:
             profiler.add_timing_info('FockERI', tm.time() - eri_t0)
@@ -2405,37 +2974,34 @@ class ScfDriver:
             profiler.add_timing_info('FockXC', tm.time() - vxc_t0)
         pe_t0 = tm.time()
 
-        if self._pe and not self._first_step:
-            if self.scf_type == 'restricted':
-                density_matrix = 2.0 * den_mat[0]
-            else:
-                density_matrix = den_mat[0] + den_mat[1]
-            from .embedding import PolarizableEmbeddingSCF
-            assert_msg_critical(
-                isinstance(self._embedding_drv, PolarizableEmbeddingSCF),
-                'ScfDriver: Inconsistent embedding driver for SCF')
-            e_emb, V_emb = self._embedding_drv.compute_pe_contributions(
-                density_matrix=density_matrix)
-        elif self.point_charges is not None and not self._first_step:
-            if self.scf_type == 'restricted':
-                density_matrix = 2.0 * den_mat[0]
-            else:
-                density_matrix = den_mat[0] + den_mat[1]
-            e_emb = np.sum(density_matrix * self._V_es)
-            V_emb = self._V_es
+        if self._has_embedded_potential() and not self._first_step:
+            e_emb, V_emb = self._compute_embedded_potential(den_mat)
         else:
             e_emb, V_emb = 0.0, None
 
         if self.timing and self._pe:
             profiler.add_timing_info('FockPE', tm.time() - pe_t0)
 
-        return fock_mat, vxc_mat, e_emb, V_emb
+        gostshyp_t0 = tm.time()
+        if self._gostshyp and not self._first_step:
+            if self.scf_type == 'restricted':
+                density_matrix = 2.0 * den_mat[0]
+            else:
+                density_matrix = den_mat[0] + den_mat[1]
+            e_pr, V_pr = self._gostshyp_drv.gostshyp_contrib(density_matrix)
+        else:
+            e_pr, V_pr = 0.0, None
 
-    def _comp_energy(self, fock_mat, vxc_mat, e_emb, kin_mat, npot_mat, ecp_mat,
+        if self.timing and self._gostshyp and not self._first_step:
+            profiler.add_timing_info('GOSTSHYP', tm.time() - gostshyp_t0)
+
+        return fock_mat, vxc_mat, e_emb, V_emb, e_pr, V_pr
+
+    def _comp_energy(self, fock_mat, vxc_mat, e_emb, e_pr, kin_mat, npot_mat, ecp_mat,
                      den_mat):
         """
-        Computes the sum of SCF energy components: electronic energy, kinetic
-        energy, and nuclear potential energy.
+        Computes the electronic energy from one- and two-electron contributions,
+        including XC, embedding, and pressure energy when active.
 
         :param fock_mat:
             The Fock/Kohn-Sham matrix (only 2e-part).
@@ -2443,6 +3009,8 @@ class ScfDriver:
             The Vxc matrix.
         :param e_emb:
             The embedding energy.
+        :param e_pr:
+            The pressure energy.
         :param kin_mat:
             The kinetic energy matrix.
         :param npot_mat:
@@ -2462,45 +3030,38 @@ class ScfDriver:
             xc_ene = self.comm.reduce(vxc_mat.get_energy(), root=mpi_master())
 
         if self.rank == mpi_master():
-            # electronic, kinetic, nuclear energy
-            D = den_mat
-            F = fock_mat
-            T = kin_mat
-            V = npot_mat
-            if self.scf_type == 'restricted':
-                e_ee = np.sum(D[0] * F[0])
-                e_kin = 2.0 * np.sum(D[0] * T)
-                e_en = 2.0 * np.sum(D[0] * V)
-                if ecp_mat is not None:
-                    e_en += 2.0 * np.sum(D[0] * ecp_mat)
-            else:
-                e_ee = 0.5 * (np.sum(D[0] * F[0]) + np.sum(D[1] * F[1]))
-                e_kin = np.sum((D[0] + D[1]) * T)
-                e_en = np.sum((D[0] + D[1]) * V)
-                if ecp_mat is not None:
-                    e_en += np.sum((D[0] + D[1]) * ecp_mat)
+            D_alpha, D_beta = self._get_spin_matrices(den_mat)
+            fock_alpha, fock_beta = self._get_spin_matrices(fock_mat)
+            D_total = D_alpha + D_beta
+
+            e_twoe = 0.5 * np.sum(D_alpha * fock_alpha)
+            e_twoe += 0.5 * np.sum(D_beta * fock_beta)
+            e_onee = np.sum(D_total * (kin_mat + npot_mat))
+            if ecp_mat is not None:
+                e_onee += np.sum(D_total * ecp_mat)
 
             if self._dft and not self._first_step:
-                e_ee += xc_ene
+                e_twoe += xc_ene
 
-            if self._pe and not self._first_step:
-                e_ee += e_emb
-            elif self.point_charges is not None and not self._first_step:
-                e_ee += e_emb
+            if self._has_embedded_potential() and not self._first_step:
+                e_onee += e_emb
 
-            e_sum = e_ee + e_kin + e_en
+            if self._gostshyp and not self._first_step:
+                e_onee += e_pr
+
+            e_sum = e_twoe + e_onee
         else:
             e_sum = 0.0
         e_sum = self.comm.bcast(e_sum, root=mpi_master())
 
         return e_sum
 
-    def _comp_full_fock(self, fock_mat, vxc_mat, V_emb, kin_mat, npot_mat,
+    def _comp_full_fock(self, fock_mat, vxc_mat, V_emb, V_pr, kin_mat, npot_mat,
                         ecp_mat):
         """
-        Computes full Fock/Kohn-Sham matrix by adding to 2e-part of
-        Fock/Kohn-Sham matrix the kinetic energy and nuclear potential
-        matrices.
+        Computes the full Fock/Kohn-Sham matrix by adding one-electron,
+        exchange-correlation, embedding, and pressure contributions to the
+        2e-part of the Fock/Kohn-Sham matrix.
 
         :param fock_mat:
             The Fock/Kohn-Sham matrix (2e-part).
@@ -2508,6 +3069,8 @@ class ScfDriver:
             The Vxc matrix.
         :param V_emb:
             The embedding Fock matrix contributions.
+        :param V_pr:
+            The pressure Fock matrix contributions.
         :param kin_mat:
             The kinetic energy matrix.
         :param npot_mat:
@@ -2525,33 +3088,27 @@ class ScfDriver:
                                               root=mpi_master())
 
         if self.rank == mpi_master():
-            T = kin_mat
-            V = npot_mat
-            fock_mat[0] += (T + V)
+            self._add_onee_contribution(fock_mat, kin_mat + npot_mat)
             if ecp_mat is not None:
-                fock_mat[0] += ecp_mat
-            if self.scf_type != 'restricted':
-                fock_mat[1] += (T + V)
-                if ecp_mat is not None:
-                    fock_mat[1] += ecp_mat
+                self._add_onee_contribution(fock_mat, ecp_mat)
 
             if self._dft and not self._first_step:
                 fock_mat[0] += np_xcmat_a
-                if self.scf_type != 'restricted':
+                if not self._is_restricted():
                     fock_mat[1] += np_xcmat_b
 
-            if self._pe and not self._first_step:
-                fock_mat[0] += V_emb
-                if self.scf_type != 'restricted':
-                    fock_mat[1] += V_emb
-            elif self.point_charges is not None and not self._first_step:
-                fock_mat[0] += V_emb
-                if self.scf_type != 'restricted':
-                    fock_mat[1] += V_emb
+            if self._has_embedded_potential() and not self._first_step:
+                self._add_onee_contribution(fock_mat, V_emb)
+
+            if self._gostshyp and not self._first_step:
+                self._add_onee_contribution(fock_mat, V_pr)
 
     def _comp_gradient(self, fock_mat, ovl_mat, den_mat, oao_mat):
         """
         Computes electronic gradient using Fock/Kohn-Sham matrix.
+
+        Base-class placeholder; must be overridden by a concrete SCF driver
+        subclass.
 
         :param fock_mat:
             The Fock/Kohn-Sham matrix.
@@ -2566,11 +3123,16 @@ class ScfDriver:
             The electronic gradient.
         """
 
-        return 0.0
+        raise NotImplementedError(
+            'ScfDriver._comp_gradient must be implemented by a concrete SCF ' +
+            'driver subclass')
 
     def _comp_density_change(self, den_mat, old_den_mat):
         """
         Computes norm of density change between two density matrices.
+
+        Base-class placeholder; must be overridden by a concrete SCF driver
+        subclass.
 
         :param den_mat:
             The current density matrix.
@@ -2581,11 +3143,16 @@ class ScfDriver:
             The norm of change between two density matrices.
         """
 
-        return 0.0
+        raise NotImplementedError(
+            'ScfDriver._comp_density_change must be implemented by a ' +
+            'concrete SCF driver subclass')
 
     def _store_diis_data(self, fock_mat, den_mat, ovl_mat, e_grad):
         """
         Stores Fock/Kohn-Sham and density matrices for current iteration.
+
+        Base-class placeholder; must be overridden by a concrete SCF driver
+        subclass.
 
         :param fock_mat:
             The Fock/Kohn-Sham matrix.
@@ -2597,12 +3164,17 @@ class ScfDriver:
             The electronic gradient.
         """
 
-        return
+        raise NotImplementedError(
+            'ScfDriver._store_diis_data must be implemented by a concrete ' +
+            'SCF driver subclass')
 
     def _get_effective_fock(self, fock_mat, ovl_mat, oao_mat):
         """
-        Computes effective Fock/Kohn-Sham matrix in OAO basis by applying
-        Lowdin or canonical orthogonalization to AO Fock/Kohn-Sham matrix.
+        Computes effective Fock/Kohn-Sham matrix in the AO basis (e.g., by
+        DIIS extrapolation of stored AO Fock/Kohn-Sham matrices).
+
+        Base-class placeholder; must be overridden by a concrete SCF driver
+        subclass.
 
         :param fock_mat:
             The Fock/Kohn-Sham matrix.
@@ -2615,11 +3187,154 @@ class ScfDriver:
             The effective Fock/Kohn-Sham matrix.
         """
 
-        return None
+        raise NotImplementedError(
+            'ScfDriver._get_effective_fock must be implemented by a concrete ' +
+            'SCF driver subclass')
+
+    def _build_level_shift(self, molecule, ao_basis, ovl_mat):
+        """
+        Builds the level-shift correction matrix in the AO basis.
+
+        The orbital energies of the virtual orbitals are raised by
+        ``level_shifting``, while the occupied orbital energies are left
+        unchanged. The shifting is performed in the molecular orbital basis and
+        the resulting correction is transformed back to the AO basis.
+
+        :param molecule:
+            The molecule.
+        :param ao_basis:
+            The AO basis set.
+        :param ovl_mat:
+            The overlap matrix.
+
+        :return:
+            The level-shift correction matrix (or alpha/beta tuple).
+        """
+
+        S = ovl_mat
+
+        C_alpha = self.molecular_orbitals.alpha_to_numpy()
+        nocc_a = molecule.number_of_alpha_occupied_orbitals(ao_basis)
+        nmo_a = C_alpha.shape[1]
+        lmo_a = np.zeros((nmo_a, nmo_a))
+        for idx in range(nocc_a, nmo_a):
+            lmo_a[idx, idx] += self.level_shifting
+        L_alpha = np.linalg.multi_dot([S, C_alpha, lmo_a, C_alpha.T, S])
+
+        if self.scf_type == 'unrestricted':
+
+            C_beta = self.molecular_orbitals.beta_to_numpy()
+            nocc_b = molecule.number_of_beta_occupied_orbitals(ao_basis)
+            nmo_b = C_beta.shape[1]
+            lmo_b = np.zeros((nmo_b, nmo_b))
+            for idx in range(nocc_b, nmo_b):
+                lmo_b[idx, idx] += self.level_shifting
+            L_beta = np.linalg.multi_dot([S, C_beta, lmo_b, C_beta.T, S])
+
+            return (L_alpha, L_beta)
+
+        return (L_alpha,)
+
+    def _add_level_shift(self, fock_mat, level_shift):
+        """
+        Adds a level-shift correction to an effective Fock/Kohn-Sham matrix.
+
+        :param fock_mat:
+            The effective Fock/Kohn-Sham matrix tuple.
+        :param level_shift:
+            The level-shift correction matrix tuple.
+
+        :return:
+            The level-shifted Fock/Kohn-Sham matrix tuple.
+        """
+
+        return tuple(f + L for f, L in zip(fock_mat, level_shift))
+
+    def _apply_level_shifting(self, molecule, ao_basis, fock_mat, ovl_mat):
+        """
+        Applies level shifting to the effective Fock/Kohn-Sham matrix.
+
+        The orbital energies of the virtual orbitals are raised by
+        ``level_shifting``, while the occupied orbital energies are left
+        unchanged. The shifting is performed in the molecular orbital basis and
+        the Fock/Kohn-Sham matrix is transformed back to the AO basis.
+
+        :param molecule:
+            The molecule.
+        :param ao_basis:
+            The AO basis set.
+        :param fock_mat:
+            The effective Fock/Kohn-Sham matrix.
+        :param ovl_mat:
+            The overlap matrix.
+
+        :return:
+            The level-shifted Fock/Kohn-Sham matrix.
+        """
+
+        fock_mat = list(fock_mat)
+        S = ovl_mat
+
+        C_alpha = self.molecular_orbitals.alpha_to_numpy()
+        nocc_a = molecule.number_of_alpha_occupied_orbitals(ao_basis)
+        fmo_a = np.linalg.multi_dot([C_alpha.T, fock_mat[0], C_alpha])
+        for idx in range(nocc_a, fmo_a.shape[0]):
+            fmo_a[idx, idx] += self.level_shifting
+        fock_mat[0] = np.linalg.multi_dot([S, C_alpha, fmo_a, C_alpha.T, S])
+
+        if self.scf_type == 'unrestricted':
+
+            C_beta = self.molecular_orbitals.beta_to_numpy()
+            nocc_b = molecule.number_of_beta_occupied_orbitals(ao_basis)
+            fmo_b = np.linalg.multi_dot([C_beta.T, fock_mat[1], C_beta])
+            for idx in range(nocc_b, fmo_b.shape[0]):
+                fmo_b[idx, idx] += self.level_shifting
+            fock_mat[1] = np.linalg.multi_dot([S, C_beta, fmo_b, C_beta.T, S])
+
+        return tuple(fock_mat)
+
+    def _smooth_level_shift(self, level_shift):
+        """
+        Smooths the level-shift correction with an exponential moving average.
+
+        :param level_shift:
+            The current level-shift correction matrix tuple.
+
+        :return:
+            The smoothed level-shift correction matrix tuple.
+        """
+
+        smoothing = self.level_shift_smoothing
+
+        L_alpha = level_shift[0]
+
+        if self._level_shift_smooth_alpha is None:
+            L_smooth_alpha = L_alpha.copy()
+        else:
+            L_smooth_alpha = ((1.0 - smoothing) * L_alpha +
+                              smoothing * self._level_shift_smooth_alpha)
+        self._level_shift_smooth_alpha = L_smooth_alpha
+
+        if self.scf_type == 'unrestricted':
+            L_beta = level_shift[1]
+
+            if self._level_shift_smooth_beta is None:
+                L_smooth_beta = L_beta.copy()
+            else:
+                L_smooth_beta = ((1.0 - smoothing) * L_beta +
+                                 smoothing * self._level_shift_smooth_beta)
+            self._level_shift_smooth_beta = L_smooth_beta
+
+            return (L_smooth_alpha, L_smooth_beta)
+
+        return (L_smooth_alpha,)
 
     def _gen_molecular_orbitals(self, molecule, ao_basis, fock_mat, oao_mat):
         """
         Generates molecular orbital by diagonalizing Fock/Kohn-Sham matrix.
+
+        Base-class placeholder; must be overridden by a concrete SCF driver
+        subclass.
 
         :param molecule:
             The molecule.
@@ -2634,7 +3349,9 @@ class ScfDriver:
             The molecular orbitals.
         """
 
-        return MolecularOrbitals()
+        raise NotImplementedError(
+            'ScfDriver._gen_molecular_orbitals must be implemented by a ' +
+            'concrete SCF driver subclass')
 
     def _apply_mom(self, molecule, ao_basis, ovl_mat):
         """
@@ -2645,7 +3362,7 @@ class ScfDriver:
         :param ao_basis:
             The AO basis set.
         :param ovl_mat:
-            The overlap matrix..
+            The overlap matrix.
         """
 
         if self.rank == mpi_master():
@@ -2730,7 +3447,7 @@ class ScfDriver:
                 e_b = self.molecular_orbitals.eb_to_numpy()
                 occ_b = self.molecular_orbitals.occb_to_numpy()
 
-                for col in range(mo_b.shape[1]):
+                for col in range(min(mo_b.shape[1], ref_mo_b.shape[1])):
                     if np.dot(mo_b[:, col], ref_mo_b[:, col]) < 0.0:
                         mo_b[:, col] *= -1.0
 
@@ -2772,10 +3489,11 @@ class ScfDriver:
 
         return nteri
 
-    def _check_convergence(self, molecule, ao_basis, ovl_mat):
+    def _check_convergence(self, molecule, ao_basis, ovl_mat,
+                           use_scf_modifier):
         """
         Sets SCF convergence flag by checking if convergence condition for
-        electronic gradient is fullfiled.
+        electronic gradient is fulfilled.
 
         :param molecule:
             The molecule.
@@ -2783,18 +3501,31 @@ class ScfDriver:
             The AO basis set.
         :param ovl_mat:
             The overlap matrix.
+        :param use_scf_modifier:
+            True when the Fock matrix, orbitals, or density entering the
+            convergence metric was modified by level shifting, pFON, or
+            density damping; the check is then skipped (the metric is not
+            trustworthy) and the SCF is not declared converged.
         """
 
         self._is_converged = False
+
+        if use_scf_modifier:
+            return
+
+        # User-supplied start orbitals have zero placeholder energies until
+        # the first MO diagonalization. Reject first-cycle convergence.
+        if self._use_start_orbitals and self._num_iter == 1:
+            return
 
         if self._num_iter > 0:
 
             e_grad = self._iter_data['gradient_norm']
 
             if e_grad < self.conv_thresh:
-                if self.restart:
-                    # Note: when restarting from checkpoint, double check that the
-                    # number of electrons are reasonable
+                if self._uses_custom_initial_guess():
+                    # Double check that the number of electrons are reasonable
+                    # when starting from externally provided orbitals.
                     nalpha = molecule.number_of_alpha_occupied_orbitals(
                         ao_basis)
                     nbeta = molecule.number_of_beta_occupied_orbitals(ao_basis)
@@ -2818,12 +3549,7 @@ class ScfDriver:
         """
 
         if self.rank == mpi_master():
-            if self.scf_type == 'restricted':
-                D_alpha = self._density[0]
-                D_beta = self._density[0]
-            else:
-                D_alpha = self._density[0]
-                D_beta = self._density[1]
+            D_alpha, D_beta = self._get_spin_matrices(self._density)
             S = ovl_mat
             calc_nelec = (np.sum(D_alpha * S), np.sum(D_beta * S))
         else:
@@ -2843,6 +3569,8 @@ class ScfDriver:
         # set the maximum number of SCF iterations
         # (note the extra SCF cycle when starting from scratch)
         if self.restart:
+            return range(self.max_iter)
+        elif self._use_start_orbitals:
             return range(self.max_iter)
         else:
             return range(self.max_iter + 1)
@@ -2865,7 +3593,7 @@ class ScfDriver:
 
     def _print_header(self):
         """
-        Prints SCF calculation setup details to output stream,
+        Prints SCF calculation setup details to the output stream.
         """
 
         self.ostream.print_blank()
@@ -2899,6 +3627,9 @@ class ScfDriver:
         if self.ri_coulomb:
             cur_str = 'Resolution of the Identity      : RI-J'
             self.ostream.print_header(cur_str.ljust(str_width))
+        elif self.ri_jk:
+            cur_str = 'Resolution of the Identity      : RI-JK'
+            self.ostream.print_header(cur_str.ljust(str_width))
 
         if self._dft:
             cur_str = 'Exchange-Correlation Functional : '
@@ -2931,6 +3662,27 @@ class ScfDriver:
             cur_str += f'{self.cpcm_drv.grid_per_sphere[0]}'
             self.ostream.print_header(cur_str.ljust(str_width))
 
+        if self._gostshyp:
+            cur_str = 'Pressure Model                  : '
+            cur_str += 'GOSTSHYP'
+            self.ostream.print_header(cur_str.ljust(str_width))
+            cur_str = 'Input Pressure                  : '
+            cur_str += f'{self.pressure} '
+            cur_str += self.pressure_units
+            self.ostream.print_header(cur_str.ljust(str_width))
+            cur_str = 'vDW Cavity Switching Function   : '
+            cur_str += self.gostshyp_discretization.upper()
+            self.ostream.print_header(cur_str.ljust(str_width))
+            cur_str = 'vdW Sphere Scaling Factor       : '
+            cur_str += f'{self.gostshyp_tssf}'
+            self.ostream.print_header(cur_str.ljust(str_width))
+            cur_str = 'Grid Points per vdW Sphere      : '
+            cur_str += f'{self.gostshyp_num_lebedev_points}'
+            self.ostream.print_header(cur_str.ljust(str_width))
+            cur_str = 'Extension radius for OCC        : '
+            cur_str += f'{self.gostshyp_r_ext}'
+            self.ostream.print_header(cur_str.ljust(str_width))
+
         if self.electric_field is not None:
             cur_str = 'Static Electric Field           : '
             cur_str += str(self.electric_field)
@@ -2949,20 +3701,45 @@ class ScfDriver:
         else:
             self.ostream.print_blank()
             if self._dft:
-                valstr = '{} | {} | {} | {} | {} | {}'.format(
-                    'Iter.', '   Kohn-Sham Energy', 'Energy Change',
-                    'Gradient Norm', 'Max. Gradient', 'Density Change')
-                self.ostream.print_header(valstr)
+                ename = '   Kohn-Sham Energy'
             else:
-                valstr = '{} | {} | {} | {} | {} | {}'.format(
-                    'Iter.', 'Hartree-Fock Energy', 'Energy Change',
-                    'Gradient Norm', 'Max. Gradient', 'Density Change')
-                self.ostream.print_header(valstr)
-            self.ostream.print_header(92 * '-')
+                ename = 'Hartree-Fock Energy'
+
+            valstr = '{} | {} | {} | {} | {} | {}'.format(
+                'Iter.', ename, 'Energy Change',
+                'Gradient Norm', 'Max. Gradient', 'Density Change')
+
+            if self._gostshyp:
+                valstr += ' | Neg. Amp. Points'
+
+            self.ostream.print_header(valstr)
+            self.ostream.print_header(len(valstr) * '-')
+
+    def _print_gostshyp_neg_amp_info(self):
+        """
+        Prints information about grid points with negative amplitudes
+        excluded in the GOSTSHYP calculation, provided that any grid
+        points were excluded.
+
+        The number of excluded grid points is read from the GOSTSHYP
+        driver; it is determined from the ground state density the first
+        time the GOSTSHYP contribution to the Fock matrix is computed.
+        The count is reduced to the master rank only, and the
+        information is checked and printed on the master rank only.
+        """
+
+        if (self.rank == mpi_master() and self._gostshyp
+                and self._gostshyp_drv is not None
+                and self._gostshyp_drv.num_neg_amp > 0):
+            valstr = '*** GOSTSHYP information: A total number of '
+            valstr += ('{} grid points with negative amplitudes were '
+                       'excluded ***'.format(self._gostshyp_drv.num_neg_amp))
+            self.ostream.print_header(valstr)
+            self.ostream.print_blank()
 
     def _print_scf_finish(self, start_time):
         """
-        Prints SCF calculation finish message to output stream,
+        Prints SCF calculation finish message to the output stream.
 
         :param start_time:
             The start time of SCF calculation.
@@ -2989,11 +3766,13 @@ class ScfDriver:
             self.ostream.print_header(valstr.ljust(92))
             self.ostream.print_blank()
 
+            self._print_gostshyp_neg_amp_info()
+
         self.ostream.flush()
 
     def _print_iter_data(self, i):
         """
-        Prints SCF iteration data to output stream,
+        Prints SCF iteration data to the output stream.
 
         :param i:
             The current SCF iteration.
@@ -3007,12 +3786,11 @@ class ScfDriver:
             # DIIS or second step in two level DIIS
             if self._num_iter > 0:
 
-                if self._iter_data:
-                    te = self._iter_data['energy']
-                    diff_te = self._iter_data['diff_energy']
-                    e_grad = self._iter_data['gradient_norm']
-                    max_grad = self._iter_data['max_gradient']
-                    diff_den = self._iter_data['diff_density']
+                te = self._iter_data['energy']
+                diff_te = self._iter_data['diff_energy']
+                e_grad = self._iter_data['gradient_norm']
+                max_grad = self._iter_data['max_gradient']
+                diff_den = self._iter_data['diff_density']
 
                 if self._num_iter == 1:
                     diff_te = 0.0
@@ -3023,7 +3801,11 @@ class ScfDriver:
                 valstr += '{:15.8f} {:15.8f} {:15.8f} '.format(
                     e_grad, max_grad, diff_den)
 
+                if self._gostshyp:
+                    valstr += '{:18d} '.format(self._gostshyp_drv.num_neg_amp)
+
                 self.ostream.print_header(valstr)
+
                 self.ostream.flush()
 
     def get_scf_energy(self):
@@ -3038,7 +3820,7 @@ class ScfDriver:
 
     def get_scf_type_str(self):
         """
-        Gets string with type of SCF calculation (defined in derrived classes).
+        Gets string with type of SCF calculation (defined in derived classes).
 
         :return:
             The string with type of SCF calculation.
@@ -3057,6 +3839,8 @@ class ScfDriver:
 
         if self.restart:
             return 'Restart from Checkpoint'
+        elif self._use_start_orbitals:
+            return 'User Supplied Orbitals'
         else:
             return 'Superposition of Atomic Densities'
 
@@ -3085,7 +3869,7 @@ class ScfDriver:
 
     def _delete_mos(self, mol_orbs, mol_eigs):
         """
-        Generates trimmed molecular orbital by deleting MOs with coeficients
+        Generates trimmed molecular orbital by deleting MOs with coefficients
         exceeding 1.0 / sqrt(ovl_thresh).
 
         :param mol_orbs:
@@ -3107,6 +3891,75 @@ class ScfDriver:
                 molist.append(i)
 
         return (mol_orbs[:, molist], mol_eigs[molist])
+
+    def _delete_mos_unrest(self, mol_orbs_a, mol_orbs_b, mol_eigs_a,
+                           mol_eigs_b):
+        """
+        Generates trimmed unrestricted molecular orbitals by deleting MOs with
+        coefficients exceeding 1.0 / sqrt(ovl_thresh).
+
+        The alpha and beta trimming lists are kept independently. If they have
+        different lengths, the highest-energy retained orbitals are removed
+        from the longer list so that both spin blocks have the same number of
+        MOs. A warning is printed when this additional trimming is performed.
+
+        :param mol_orbs_a:
+            The alpha molecular orbitals.
+        :param mol_orbs_b:
+            The beta molecular orbitals.
+        :param mol_eigs_a:
+            The alpha eigenvalues of molecular orbitals.
+        :param mol_eigs_b:
+            The beta eigenvalues of molecular orbitals.
+
+        :return:
+            The tuple (trimmed alpha orbitals, trimmed beta orbitals, trimmed
+            alpha eigenvalues, trimmed beta eigenvalues).
+        """
+
+        fmax = 1.0 / math.sqrt(self.ovl_thresh)
+
+        mvec_a = np.amax(np.abs(mol_orbs_a), axis=0)
+        mvec_b = np.amax(np.abs(mol_orbs_b), axis=0)
+
+        assert_msg_critical(
+            mvec_a.shape[0] == mvec_b.shape[0],
+            'ScfDriver: alpha and beta orbital arrays have different numbers '
+            f'of MOs ({mvec_a.shape[0]} and {mvec_b.shape[0]})')
+
+        molist_a = []
+        for i in range(mvec_a.shape[0]):
+            if mvec_a[i] < fmax:
+                molist_a.append(i)
+
+        molist_b = []
+        for i in range(mvec_b.shape[0]):
+            if mvec_b[i] < fmax:
+                molist_b.append(i)
+
+        if len(molist_a) != len(molist_b):
+            target_count = min(len(molist_a), len(molist_b))
+
+            if len(molist_a) > len(molist_b):
+                # Eigenvalues from eigh are in ascending order, so trimming
+                # the tail removes the highest-energy retained orbitals.
+                removed = molist_a[target_count:]
+                molist_a = molist_a[:target_count]
+                spin = 'alpha'
+            else:
+                removed = molist_b[target_count:]
+                molist_b = molist_b[:target_count]
+                spin = 'beta'
+
+            warn_msg = f'ScfDriver: {spin} orbital trimming list is longer '
+            warn_msg += f'by {len(removed)}; removing highest-energy retained '
+            warn_msg += f'MO{"s" if len(removed) != 1 else ""} '
+            warn_msg += ', '.join(str(i + 1) for i in removed) + '.'
+            self.ostream.print_warning(warn_msg)
+            self.ostream.print_blank()
+
+        return (mol_orbs_a[:, molist_a], mol_orbs_b[:, molist_b],
+                mol_eigs_a[molist_a], mol_eigs_b[molist_b])
 
     def compute_s2(self, molecule, ao_basis, scf_results):
         """
@@ -3190,12 +4043,14 @@ class ScfDriver:
 
         e_el = etot - enuc - enuc_mm - e_d4 - e_ef_nuc
 
-        # note: handle e_el differently for SMD and CPCM
+        # note: exclude solvation energies since they will be printed separately
         if self._smd:
-            self.smd_energy += self.cpcm_drv.cpcm_epol
             e_el -= self.smd_energy
         elif self._cpcm:
             e_el -= self.cpcm_drv.cpcm_epol
+
+        if self._gostshyp:
+            e_el -= self._e_gostshyp
 
         valstr = f'Total Energy                       :{etot:20.10f} a.u.'
         self.ostream.print_header(valstr.ljust(92))
@@ -3217,6 +4072,11 @@ class ScfDriver:
         elif self._cpcm:
             valstr = 'Electrostatic Solvation Energy     :'
             valstr += f'{self.cpcm_drv.cpcm_epol:20.10f} a.u.'
+            self.ostream.print_header(valstr.ljust(92))
+
+        if self._gostshyp:
+            valstr = 'GOSTSHYP Pressure Energy           :'
+            valstr += f'{self._e_gostshyp:20.10f} a.u.'
             self.ostream.print_header(valstr.ljust(92))
 
         valstr = f'Nuclear Repulsion Energy           :{enuc:20.10f} a.u.'
@@ -3270,14 +4130,13 @@ class ScfDriver:
             xc_label = 'HF'
 
         if self._pe:
-            with open(str(self.pe_options['potfile']), 'r') as f_pot:
+            with Path(self.pe_options['potfile']).open('r') as f_pot:
                 potfile_text = '\n'.join(f_pot.readlines())
         else:
             potfile_text = ''
 
         create_hdf5(final_h5_fname, molecule, ao_basis, xc_label, potfile_text)
-        write_scf_results_to_hdf5(final_h5_fname, self.scf_results,
-                                  self.history)
+        write_scf_results_to_hdf5(final_h5_fname, self.scf_results)
 
         self.ostream.print_blank()
         self.ostream.print_info('SCF results written to file: ' +

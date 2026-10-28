@@ -6,7 +6,6 @@ import numpy as np
 import pickle
 import pytest
 import math
-import sys
 from unittest.mock import Mock
 
 from veloxchem.veloxchemlib import Point
@@ -15,14 +14,11 @@ from veloxchem.veloxchemlib import get_vdw_radii_data_in_bohr
 from veloxchem.veloxchemlib import chemical_element_identifier
 from veloxchem.mpitask import MpiTask
 from veloxchem.molecule import Molecule
+from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.dispersionmodel import DispersionModel
 from veloxchem.optimizationdriver import OptimizationDriver
 from veloxchem.inputparser import get_random_string_serial
-
-try:
-    import rdkit
-except ImportError:
-    pass
+from veloxchem.errorhandler import VeloxChemError
 
 
 class FakeBasis:
@@ -192,13 +188,13 @@ class TestMolecule:
                         reason='skip pytest.raises for multiple MPI processes')
     def test_read_xyz_string_validation(self):
 
-        with pytest.raises(AssertionError,
+        with pytest.raises(VeloxChemError,
                            match='Invalid number of atoms in XYZ input'):
             Molecule.read_xyz_string("""not-an-int
                                         comment
                                         H 0.0 0.0 0.0""")
 
-        with pytest.raises(AssertionError,
+        with pytest.raises(VeloxChemError,
                            match='Inconsistent number of atoms in XYZ input'):
             Molecule.read_xyz_string("""2
                                         comment
@@ -227,7 +223,7 @@ class TestMolecule:
         # Note: use re.escape to avoid "incomplete escape \U" error on Windows
         missing_path = tmp_path / 'missing.xyz'
         with pytest.raises(
-                AssertionError,
+                VeloxChemError,
                 match=re.escape(f'xyzfile {missing_path} does not exist')):
             Molecule.read_xyz_file(missing_path)
 
@@ -460,17 +456,39 @@ class TestMolecule:
         assert mol.atom_indices('N') == [0]
         assert mol.atom_indices('H') == [1, 2, 3]
 
-    def test_nuclear_repulsion_energy(self):
+    def test_effective_nuclear_repulsion_energy(self):
 
         tol = 1.0e-12
 
         mol = Molecule.read_str(self.h2o_xyzstr(), 'au')
-        assert math.isclose(mol.nuclear_repulsion_energy(),
+        basis = MolecularBasis.read(mol, 'sto-3g', ostream=None)
+        assert math.isclose(mol.effective_nuclear_repulsion_energy(basis),
                             9.34363815797054450919,
                             rel_tol=tol,
                             abs_tol=tol)
 
-    def test_nuclear_repulsion_energy_with_ecp_basis(self):
+    def test_nuclear_repulsion_energy_backward_compatibility(self):
+
+        tol = 1.0e-12
+
+        mol = Molecule.read_str(self.h2o_xyzstr(), 'au')
+        basis = MolecularBasis.read(mol, 'sto-3g', ostream=None)
+        ecp_basis = FakeBasis([2, 0, 0])
+
+        assert math.isclose(mol.nuclear_repulsion_energy(),
+                            9.34363815797054450919,
+                            rel_tol=tol,
+                            abs_tol=tol)
+        assert math.isclose(mol.nuclear_repulsion_energy(basis),
+                            mol.effective_nuclear_repulsion_energy(basis),
+                            rel_tol=tol,
+                            abs_tol=tol)
+        assert math.isclose(mol.nuclear_repulsion_energy(ecp_basis),
+                            mol.effective_nuclear_repulsion_energy(ecp_basis),
+                            rel_tol=tol,
+                            abs_tol=tol)
+
+    def test_effective_nuclear_repulsion_energy_with_ecp_basis(self):
 
         tol = 1.0e-12
 
@@ -486,31 +504,31 @@ class TestMolecule:
                 distance = np.linalg.norm(coords[j] - coords[i])
                 ref_energy += charges[i] * charges[j] / distance
 
-        assert math.isclose(mol.nuclear_repulsion_energy(basis),
+        assert math.isclose(mol.effective_nuclear_repulsion_energy(basis),
                             ref_energy,
                             rel_tol=tol,
                             abs_tol=tol)
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason='skip pytest.raises for multiple MPI processes')
-    def test_nuclear_repulsion_energy_rejects_ecp_length_mismatch(self):
+    def test_effective_nuclear_repulsion_energy_rejects_ecp_length_mismatch(self):
 
         mol = Molecule.read_str(self.h2o_xyzstr(), 'au')
 
         with pytest.raises(
-                AssertionError,
+                VeloxChemError,
                 match='ECP core electron list must match number of atoms'):
-            mol.nuclear_repulsion_energy(FakeBasis([2, 0]))
+            mol.effective_nuclear_repulsion_energy(FakeBasis([2, 0]))
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason='skip pytest.raises for multiple MPI processes')
-    def test_nuclear_repulsion_energy_rejects_negative_ecp_electrons(self):
+    def test_effective_nuclear_repulsion_energy_rejects_negative_ecp_electrons(self):
 
         mol = Molecule.read_str(self.h2o_xyzstr(), 'au')
 
-        with pytest.raises(AssertionError,
+        with pytest.raises(VeloxChemError,
                            match='ECP core electrons must be non-negative'):
-            mol.nuclear_repulsion_energy(FakeBasis([2, -1, 0]))
+            mol.effective_nuclear_repulsion_energy(FakeBasis([2, -1, 0]))
 
     def test_check_proximity(self):
 
@@ -624,7 +642,7 @@ class TestMolecule:
                 H  0.0 -1.4  -2.1
                 """).lstrip())
 
-        with pytest.raises(AssertionError,
+        with pytest.raises(VeloxChemError,
                            match='Cannot have both "xyz" and "xyzfile" input'):
             Molecule.from_input_dict({
                 "xyz": ['H 0.0 0.0 0.0'],
@@ -646,7 +664,7 @@ class TestMolecule:
                 """).lstrip())
 
         with pytest.raises(
-                AssertionError,
+                VeloxChemError,
                 match='Cannot have both "units" and "xyzfile" input'):
             Molecule.from_input_dict({"xyzfile": str(xyz_path), "units": "au"})
 
@@ -655,7 +673,7 @@ class TestMolecule:
     def test_read_dict_rejects_invalid_multiplicity_parity(self):
 
         with pytest.raises(
-                AssertionError,
+                VeloxChemError,
                 match='Incompatible multiplicity and number of electrons'):
             Molecule.from_input_dict({
                 "xyz": [
@@ -669,7 +687,7 @@ class TestMolecule:
                         reason='skip pytest.raises for multiple MPI processes')
     def test_read_dict_rejects_close_atoms(self):
 
-        with pytest.raises(AssertionError, match='Atoms too close'):
+        with pytest.raises(VeloxChemError, match='Atoms too close'):
             Molecule.from_input_dict(
                 {"xyz": ['H  0.0  0.0  0.0', 'H  0.0  0.0  0.05']})
 
@@ -721,7 +739,7 @@ class TestMolecule:
     def test_is_linear_rejects_less_than_two_atoms(self):
 
         mol = Molecule.read_molecule_string('He 0.0 0.0 0.0')
-        with pytest.raises(AssertionError,
+        with pytest.raises(VeloxChemError,
                            match='Molecule.is_linear: Need at least two atoms'):
             mol.is_linear()
 
@@ -842,7 +860,7 @@ class TestMolecule:
         mol = self.nh3_molecule()
         basis = FakeBasis([2, 0, 0, 0])
 
-        with pytest.raises(AssertionError,
+        with pytest.raises(VeloxChemError,
                            match='Number of molecular orbitals is too small ' +
                            'for explicit alpha electrons'):
             mol.get_aufbau_alpha_occupation(3, basis)
@@ -877,7 +895,7 @@ class TestMolecule:
         mol = self.nh3_molecule()
         basis = FakeBasis([2, 0, 0, 0])
 
-        with pytest.raises(AssertionError,
+        with pytest.raises(VeloxChemError,
                            match='Number of molecular orbitals is too small ' +
                            'for explicit beta electrons'):
             mol.get_aufbau_beta_occupation(3, basis)
@@ -925,13 +943,13 @@ class TestMolecule:
         assert np.array_equal(mol.get_connectivity_matrix(H2_factor=1.3),
                               np.array([[0, 0], [0, 0]]))
 
-    def test_find_connected_atoms(self):
+    def testfind_connected_atoms(self):
 
         mol = Molecule.read_str(self.nh3_h2o_xyzstr(), 'au')
         connectivity = mol.get_connectivity_matrix()
 
-        assert mol._find_connected_atoms(0, connectivity) == {0, 1, 2, 3}
-        assert mol._find_connected_atoms(4, connectivity) == {4, 5, 6}
+        assert mol.find_connected_atoms(0, connectivity) == {0, 1, 2, 3}
+        assert mol.find_connected_atoms(4, connectivity) == {4, 5, 6}
 
     def test_coordinates_in_bohr(self):
 
@@ -1259,58 +1277,58 @@ class TestMolecule:
         mol = Molecule.read_molecule_string(self.nh3_xyzstr(), 'angstrom')
 
         with pytest.raises(
-                AssertionError,
+                VeloxChemError,
                 match='Molecule.get_distance: Expecting two atom indices'):
             mol.get_distance((1,), 'angstrom')
 
         with pytest.raises(
-                AssertionError,
+                VeloxChemError,
                 match='Molecule.get_distance: Invalid distance unit'):
             mol.get_distance((1, 2), 'nanometer')
 
         with pytest.raises(
-                AssertionError,
+                VeloxChemError,
                 match='Molecule.set_distance: Expecting two atom indices'):
             mol.set_distance((1,), 1.1, 'angstrom')
 
         with pytest.raises(
-                AssertionError,
+                VeloxChemError,
                 match='Molecule.set_distance: Invalid distance unit'):
             mol.set_distance((1, 2), 1.1, 'nanometer')
 
-        with pytest.raises(AssertionError,
+        with pytest.raises(VeloxChemError,
                            match='Molecule.get_angle: Expecting three atom '
                            'indices'):
             mol.get_angle((1, 2), 'degree')
 
-        with pytest.raises(AssertionError,
+        with pytest.raises(VeloxChemError,
                            match='Molecule.get_angle: Invalid angle unit'):
             mol.get_angle((1, 2, 3), 'gradian')
 
-        with pytest.raises(AssertionError,
+        with pytest.raises(VeloxChemError,
                            match='Molecule.set_angle: Expecting three atom '
                            'indices'):
             mol.set_angle((1, 2), 100.0, 'degree')
 
-        with pytest.raises(AssertionError,
+        with pytest.raises(VeloxChemError,
                            match='Molecule.set_angle: Invalid angle unit'):
             mol.set_angle((1, 2, 3), 100.0, 'gradian')
 
-        with pytest.raises(AssertionError,
+        with pytest.raises(VeloxChemError,
                            match='Molecule.get_dihedral: Expecting four atom '
                            'indices'):
             mol.get_dihedral((1, 2, 3), 'degree')
 
-        with pytest.raises(AssertionError,
+        with pytest.raises(VeloxChemError,
                            match='Molecule.get_dihedral: Invalid angle unit'):
             mol.get_dihedral((1, 2, 3, 4), 'gradian')
 
-        with pytest.raises(AssertionError,
+        with pytest.raises(VeloxChemError,
                            match='Molecule.set_dihedral: Expecting four atom '
                            'indices'):
             mol.set_dihedral((1, 2, 3), 120.0, 'degree')
 
-        with pytest.raises(AssertionError,
+        with pytest.raises(VeloxChemError,
                            match='Molecule.set_dihedral: Invalid angle unit'):
             mol.set_dihedral((1, 2, 3, 4), 120.0, 'gradian')
 
@@ -1321,19 +1339,19 @@ class TestMolecule:
         cyclopropane = Molecule.read_molecule_string(self.cyclopropane_xyzstr(),
                                                      'angstrom')
 
-        with pytest.raises(AssertionError,
+        with pytest.raises(VeloxChemError,
                            match='Molecule.set_distance: Cannot set '
                            'distance'):
             cyclopropane.set_distance((1, 2), 1.6, 'angstrom')
 
-        with pytest.raises(AssertionError,
+        with pytest.raises(VeloxChemError,
                            match='Molecule.set_angle: Cannot set angle'):
             cyclopropane.set_angle((1, 2, 3), 70.0, 'degree')
 
         cyclobutane = Molecule.read_molecule_string(self.cyclobutane_xyzstr(),
                                                     'angstrom')
 
-        with pytest.raises(AssertionError,
+        with pytest.raises(VeloxChemError,
                            match='Molecule.set_dihedral: Cannot set '
                            'dihedral'):
             cyclobutane.set_dihedral((1, 2, 3, 4), 30.0, 'degree')
@@ -1370,9 +1388,9 @@ class TestMolecule:
         assert abs(mol.get_dihedral((2, 3, 4, 5), 'radian') -
                    math.pi / 2.0) < 1e-4
 
-    @pytest.mark.skipif("rdkit" not in sys.modules,
-                        reason="rdkit not available")
     def test_is_water_molecule(self):
+
+        pytest.importorskip('rdkit')
 
         mol = Molecule.read_smiles('O')
         assert mol.is_water_molecule()
@@ -1383,9 +1401,9 @@ class TestMolecule:
         mol = Molecule.read_smiles('OO')
         assert not mol.is_water_molecule()
 
-    @pytest.mark.skipif("rdkit" not in sys.modules,
-                        reason="rdkit not available")
     def test_smiles_to_xyz_returns_xyz_for_both_hydrogen_options(self):
+
+        pytest.importorskip('rdkit')
 
         xyz_with_hydrogen = Molecule.smiles_to_xyz('O', hydrogen=True)
         xyz_without_hydrogen = Molecule.smiles_to_xyz('O', hydrogen=False)
@@ -1395,9 +1413,34 @@ class TestMolecule:
         assert int(xyz_with_hydrogen.splitlines()[0]) == 3
         assert int(xyz_without_hydrogen.splitlines()[0]) == 1
 
-    @pytest.mark.skipif("rdkit" not in sys.modules,
-                        reason="rdkit not available")
+    def test_read_smiles_with_multi_components(self):
+
+        pytest.importorskip('rdkit')
+
+        mol = Molecule.read_smiles('CCO.C1CCCC1.c1ccccc1')
+        assert mol.number_of_atoms() == 36
+
+    def test_read_smiles_with_reorder_hydrogens(self):
+
+        pytest.importorskip('rdkit')
+
+        # with reorder_hydrogens, the first atom will be C and
+        # the second atom will be H
+        mol = Molecule.read_smiles('CCO', reorder_hydrogens=True)
+        labels = mol.get_labels()
+        assert labels[0] != 'H'
+        assert labels[1] == 'H'
+        assert labels[2] == 'H'
+
+        # H2 molecule
+        mol = Molecule.read_smiles('[H][H]', reorder_hydrogens=True)
+        labels = mol.get_labels()
+        assert labels[0] == 'H'
+        assert labels[1] == 'H'
+
     def test_draw_2d_uses_display(self, monkeypatch):
+
+        pytest.importorskip('rdkit')
 
         ipython_display = pytest.importorskip("IPython.display")
         display_mock = Mock()

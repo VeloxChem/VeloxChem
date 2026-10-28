@@ -70,43 +70,29 @@ comp_prim_projected_core_potential_if_d(CSimdArray<double>& pbuffer,
 
     auto tg_xxxy_xxx_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 10);
 
-    auto tg_xxxy_xxy_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 11);
 
     auto tg_xxxy_xxz_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 12);
 
-    auto tg_xxxy_xyy_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 13);
 
-    auto tg_xxxy_xyz_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 14);
 
     auto tg_xxxy_xzz_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 15);
 
-    auto tg_xxxy_yyy_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 16);
 
-    auto tg_xxxy_yyz_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 17);
 
-    auto tg_xxxy_yzz_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 18);
 
-    auto tg_xxxy_zzz_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 19);
 
     auto tg_xxxz_xxx_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 20);
 
     auto tg_xxxz_xxy_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 21);
 
-    auto tg_xxxz_xxz_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 22);
 
     auto tg_xxxz_xyy_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 23);
 
-    auto tg_xxxz_xyz_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 24);
 
-    auto tg_xxxz_xzz_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 25);
 
-    auto tg_xxxz_yyy_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 26);
 
-    auto tg_xxxz_yyz_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 27);
 
-    auto tg_xxxz_yzz_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 28);
 
-    auto tg_xxxz_zzz_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 29);
 
     auto tg_xxyy_xxx_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 30);
 
@@ -128,25 +114,15 @@ comp_prim_projected_core_potential_if_d(CSimdArray<double>& pbuffer,
 
     auto tg_xxyy_zzz_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 39);
 
-    auto tg_xxyz_xxx_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 40);
 
-    auto tg_xxyz_xxy_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 41);
 
-    auto tg_xxyz_xxz_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 42);
 
-    auto tg_xxyz_xyy_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 43);
 
-    auto tg_xxyz_xyz_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 44);
 
-    auto tg_xxyz_xzz_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 45);
 
-    auto tg_xxyz_yyy_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 46);
 
-    auto tg_xxyz_yyz_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 47);
 
-    auto tg_xxyz_yzz_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 48);
 
-    auto tg_xxyz_zzz_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 49);
 
     auto tg_xxzz_xxx_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 50);
 
@@ -168,17 +144,14 @@ comp_prim_projected_core_potential_if_d(CSimdArray<double>& pbuffer,
 
     auto tg_xxzz_zzz_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 59);
 
-    auto tg_xyyy_xxx_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 60);
 
     auto tg_xyyy_xxy_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 61);
 
-    auto tg_xyyy_xxz_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 62);
 
     auto tg_xyyy_xyy_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 63);
 
     auto tg_xyyy_xyz_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 64);
 
-    auto tg_xyyy_xzz_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 65);
 
     auto tg_xyyy_yyy_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 66);
 
@@ -188,53 +161,30 @@ comp_prim_projected_core_potential_if_d(CSimdArray<double>& pbuffer,
 
     auto tg_xyyy_zzz_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 69);
 
-    auto tg_xyyz_xxx_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 70);
 
-    auto tg_xyyz_xxy_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 71);
 
-    auto tg_xyyz_xxz_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 72);
 
-    auto tg_xyyz_xyy_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 73);
 
-    auto tg_xyyz_xyz_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 74);
 
-    auto tg_xyyz_xzz_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 75);
 
-    auto tg_xyyz_yyy_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 76);
 
-    auto tg_xyyz_yyz_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 77);
 
-    auto tg_xyyz_yzz_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 78);
 
-    auto tg_xyyz_zzz_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 79);
 
-    auto tg_xyzz_xxx_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 80);
 
-    auto tg_xyzz_xxy_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 81);
 
-    auto tg_xyzz_xxz_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 82);
 
-    auto tg_xyzz_xyy_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 83);
 
-    auto tg_xyzz_xyz_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 84);
 
-    auto tg_xyzz_xzz_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 85);
 
-    auto tg_xyzz_yyy_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 86);
 
-    auto tg_xyzz_yyz_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 87);
 
-    auto tg_xyzz_yzz_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 88);
 
-    auto tg_xyzz_zzz_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 89);
 
-    auto tg_xzzz_xxx_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 90);
 
-    auto tg_xzzz_xxy_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 91);
 
     auto tg_xzzz_xxz_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 92);
 
-    auto tg_xzzz_xyy_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 93);
 
     auto tg_xzzz_xyz_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 94);
 
@@ -268,25 +218,18 @@ comp_prim_projected_core_potential_if_d(CSimdArray<double>& pbuffer,
 
     auto tg_yyyy_zzz_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 109);
 
-    auto tg_yyyz_xxx_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 110);
 
     auto tg_yyyz_xxy_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 111);
 
-    auto tg_yyyz_xxz_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 112);
 
     auto tg_yyyz_xyy_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 113);
 
-    auto tg_yyyz_xyz_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 114);
 
-    auto tg_yyyz_xzz_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 115);
 
     auto tg_yyyz_yyy_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 116);
 
-    auto tg_yyyz_yyz_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 117);
 
-    auto tg_yyyz_yzz_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 118);
 
-    auto tg_yyyz_zzz_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 119);
 
     auto tg_yyzz_xxx_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 120);
 
@@ -310,17 +253,14 @@ comp_prim_projected_core_potential_if_d(CSimdArray<double>& pbuffer,
 
     auto tg_yzzz_xxx_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 130);
 
-    auto tg_yzzz_xxy_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 131);
 
     auto tg_yzzz_xxz_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 132);
 
-    auto tg_yzzz_xyy_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 133);
 
     auto tg_yzzz_xyz_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 134);
 
     auto tg_yzzz_xzz_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 135);
 
-    auto tg_yzzz_yyy_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 136);
 
     auto tg_yzzz_yyz_d_0_0_0 = pbuffer.data(idx_gf_d_0_0_0 + 137);
 
@@ -378,17 +318,13 @@ comp_prim_projected_core_potential_if_d(CSimdArray<double>& pbuffer,
 
     auto tg_xxxxy_xyy_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 13);
 
-    auto tg_xxxxy_xyz_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 14);
 
     auto tg_xxxxy_xzz_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 15);
 
     auto tg_xxxxy_yyy_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 16);
 
-    auto tg_xxxxy_yyz_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 17);
 
-    auto tg_xxxxy_yzz_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 18);
 
-    auto tg_xxxxy_zzz_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 19);
 
     auto tg_xxxxz_xxx_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 20);
 
@@ -402,7 +338,6 @@ comp_prim_projected_core_potential_if_d(CSimdArray<double>& pbuffer,
 
     auto tg_xxxxz_xzz_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 25);
 
-    auto tg_xxxxz_yyy_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 26);
 
     auto tg_xxxxz_yyz_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 27);
 
@@ -430,25 +365,15 @@ comp_prim_projected_core_potential_if_d(CSimdArray<double>& pbuffer,
 
     auto tg_xxxyy_zzz_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 39);
 
-    auto tg_xxxyz_xxx_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 40);
 
-    auto tg_xxxyz_xxy_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 41);
 
-    auto tg_xxxyz_xxz_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 42);
 
-    auto tg_xxxyz_xyy_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 43);
 
-    auto tg_xxxyz_xyz_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 44);
 
-    auto tg_xxxyz_xzz_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 45);
 
-    auto tg_xxxyz_yyy_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 46);
 
-    auto tg_xxxyz_yyz_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 47);
 
-    auto tg_xxxyz_yzz_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 48);
 
-    auto tg_xxxyz_zzz_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 49);
 
     auto tg_xxxzz_xxx_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 50);
 
@@ -490,45 +415,30 @@ comp_prim_projected_core_potential_if_d(CSimdArray<double>& pbuffer,
 
     auto tg_xxyyy_zzz_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 69);
 
-    auto tg_xxyyz_xxx_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 70);
 
     auto tg_xxyyz_xxy_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 71);
 
-    auto tg_xxyyz_xxz_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 72);
 
     auto tg_xxyyz_xyy_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 73);
 
-    auto tg_xxyyz_xyz_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 74);
 
-    auto tg_xxyyz_xzz_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 75);
 
-    auto tg_xxyyz_yyy_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 76);
 
-    auto tg_xxyyz_yyz_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 77);
 
-    auto tg_xxyyz_yzz_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 78);
 
-    auto tg_xxyyz_zzz_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 79);
 
     auto tg_xxyzz_xxx_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 80);
 
-    auto tg_xxyzz_xxy_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 81);
 
     auto tg_xxyzz_xxz_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 82);
 
-    auto tg_xxyzz_xyy_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 83);
 
-    auto tg_xxyzz_xyz_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 84);
 
     auto tg_xxyzz_xzz_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 85);
 
-    auto tg_xxyzz_yyy_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 86);
 
-    auto tg_xxyzz_yyz_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 87);
 
-    auto tg_xxyzz_yzz_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 88);
 
-    auto tg_xxyzz_zzz_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 89);
 
     auto tg_xxzzz_xxx_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 90);
 
@@ -554,13 +464,11 @@ comp_prim_projected_core_potential_if_d(CSimdArray<double>& pbuffer,
 
     auto tg_xyyyy_xxy_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 101);
 
-    auto tg_xyyyy_xxz_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 102);
 
     auto tg_xyyyy_xyy_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 103);
 
     auto tg_xyyyy_xyz_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 104);
 
-    auto tg_xyyyy_xzz_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 105);
 
     auto tg_xyyyy_yyy_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 106);
 
@@ -570,37 +478,22 @@ comp_prim_projected_core_potential_if_d(CSimdArray<double>& pbuffer,
 
     auto tg_xyyyy_zzz_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 109);
 
-    auto tg_xyyyz_xxx_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 110);
 
-    auto tg_xyyyz_xxy_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 111);
 
-    auto tg_xyyyz_xxz_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 112);
 
-    auto tg_xyyyz_xyy_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 113);
 
-    auto tg_xyyyz_xyz_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 114);
 
-    auto tg_xyyyz_xzz_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 115);
 
-    auto tg_xyyyz_yyy_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 116);
 
-    auto tg_xyyyz_yyz_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 117);
 
-    auto tg_xyyyz_yzz_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 118);
 
-    auto tg_xyyyz_zzz_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 119);
 
-    auto tg_xyyzz_xxx_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 120);
 
-    auto tg_xyyzz_xxy_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 121);
 
-    auto tg_xyyzz_xxz_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 122);
 
-    auto tg_xyyzz_xyy_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 123);
 
     auto tg_xyyzz_xyz_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 124);
 
-    auto tg_xyyzz_xzz_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 125);
 
     auto tg_xyyzz_yyy_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 126);
 
@@ -610,33 +503,21 @@ comp_prim_projected_core_potential_if_d(CSimdArray<double>& pbuffer,
 
     auto tg_xyyzz_zzz_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 129);
 
-    auto tg_xyzzz_xxx_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 130);
 
-    auto tg_xyzzz_xxy_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 131);
 
-    auto tg_xyzzz_xxz_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 132);
 
-    auto tg_xyzzz_xyy_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 133);
 
-    auto tg_xyzzz_xyz_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 134);
 
-    auto tg_xyzzz_xzz_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 135);
 
-    auto tg_xyzzz_yyy_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 136);
 
-    auto tg_xyzzz_yyz_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 137);
 
-    auto tg_xyzzz_yzz_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 138);
 
-    auto tg_xyzzz_zzz_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 139);
 
     auto tg_xzzzz_xxx_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 140);
 
-    auto tg_xzzzz_xxy_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 141);
 
     auto tg_xzzzz_xxz_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 142);
 
-    auto tg_xzzzz_xyy_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 143);
 
     auto tg_xzzzz_xyz_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 144);
 
@@ -670,7 +551,6 @@ comp_prim_projected_core_potential_if_d(CSimdArray<double>& pbuffer,
 
     auto tg_yyyyy_zzz_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 159);
 
-    auto tg_yyyyz_xxx_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 160);
 
     auto tg_yyyyz_xxy_d_0_0_0 = pbuffer.data(idx_hf_d_0_0_0 + 161);
 
@@ -784,25 +664,16 @@ comp_prim_projected_core_potential_if_d(CSimdArray<double>& pbuffer,
 
     auto tg_xxxxx_zz_p_0_0_1 = pbuffer.data(idx_hd_p_0_0_1 + 5);
 
-    auto tg_xxxxy_xx_p_0_0_1 = pbuffer.data(idx_hd_p_0_0_1 + 6);
 
-    auto tg_xxxxy_xy_p_0_0_1 = pbuffer.data(idx_hd_p_0_0_1 + 7);
 
-    auto tg_xxxxy_xz_p_0_0_1 = pbuffer.data(idx_hd_p_0_0_1 + 8);
 
-    auto tg_xxxxy_yy_p_0_0_1 = pbuffer.data(idx_hd_p_0_0_1 + 9);
 
-    auto tg_xxxxy_yz_p_0_0_1 = pbuffer.data(idx_hd_p_0_0_1 + 10);
 
-    auto tg_xxxxy_zz_p_0_0_1 = pbuffer.data(idx_hd_p_0_0_1 + 11);
 
-    auto tg_xxxxz_xx_p_0_0_1 = pbuffer.data(idx_hd_p_0_0_1 + 12);
 
-    auto tg_xxxxz_xy_p_0_0_1 = pbuffer.data(idx_hd_p_0_0_1 + 13);
 
     auto tg_xxxxz_xz_p_0_0_1 = pbuffer.data(idx_hd_p_0_0_1 + 14);
 
-    auto tg_xxxxz_yy_p_0_0_1 = pbuffer.data(idx_hd_p_0_0_1 + 15);
 
     auto tg_xxxxz_yz_p_0_0_1 = pbuffer.data(idx_hd_p_0_0_1 + 16);
 
@@ -820,17 +691,11 @@ comp_prim_projected_core_potential_if_d(CSimdArray<double>& pbuffer,
 
     auto tg_xxxyy_zz_p_0_0_1 = pbuffer.data(idx_hd_p_0_0_1 + 23);
 
-    auto tg_xxxyz_xx_p_0_0_1 = pbuffer.data(idx_hd_p_0_0_1 + 24);
 
-    auto tg_xxxyz_xy_p_0_0_1 = pbuffer.data(idx_hd_p_0_0_1 + 25);
 
-    auto tg_xxxyz_xz_p_0_0_1 = pbuffer.data(idx_hd_p_0_0_1 + 26);
 
-    auto tg_xxxyz_yy_p_0_0_1 = pbuffer.data(idx_hd_p_0_0_1 + 27);
 
-    auto tg_xxxyz_yz_p_0_0_1 = pbuffer.data(idx_hd_p_0_0_1 + 28);
 
-    auto tg_xxxyz_zz_p_0_0_1 = pbuffer.data(idx_hd_p_0_0_1 + 29);
 
     auto tg_xxxzz_xx_p_0_0_1 = pbuffer.data(idx_hd_p_0_0_1 + 30);
 
@@ -856,29 +721,17 @@ comp_prim_projected_core_potential_if_d(CSimdArray<double>& pbuffer,
 
     auto tg_xxyyy_zz_p_0_0_1 = pbuffer.data(idx_hd_p_0_0_1 + 41);
 
-    auto tg_xxyyz_xx_p_0_0_1 = pbuffer.data(idx_hd_p_0_0_1 + 42);
 
-    auto tg_xxyyz_xy_p_0_0_1 = pbuffer.data(idx_hd_p_0_0_1 + 43);
 
-    auto tg_xxyyz_xz_p_0_0_1 = pbuffer.data(idx_hd_p_0_0_1 + 44);
 
-    auto tg_xxyyz_yy_p_0_0_1 = pbuffer.data(idx_hd_p_0_0_1 + 45);
 
-    auto tg_xxyyz_yz_p_0_0_1 = pbuffer.data(idx_hd_p_0_0_1 + 46);
 
-    auto tg_xxyyz_zz_p_0_0_1 = pbuffer.data(idx_hd_p_0_0_1 + 47);
 
-    auto tg_xxyzz_xx_p_0_0_1 = pbuffer.data(idx_hd_p_0_0_1 + 48);
 
-    auto tg_xxyzz_xy_p_0_0_1 = pbuffer.data(idx_hd_p_0_0_1 + 49);
 
-    auto tg_xxyzz_xz_p_0_0_1 = pbuffer.data(idx_hd_p_0_0_1 + 50);
 
-    auto tg_xxyzz_yy_p_0_0_1 = pbuffer.data(idx_hd_p_0_0_1 + 51);
 
-    auto tg_xxyzz_yz_p_0_0_1 = pbuffer.data(idx_hd_p_0_0_1 + 52);
 
-    auto tg_xxyzz_zz_p_0_0_1 = pbuffer.data(idx_hd_p_0_0_1 + 53);
 
     auto tg_xxzzz_xx_p_0_0_1 = pbuffer.data(idx_hd_p_0_0_1 + 54);
 
@@ -892,61 +745,38 @@ comp_prim_projected_core_potential_if_d(CSimdArray<double>& pbuffer,
 
     auto tg_xxzzz_zz_p_0_0_1 = pbuffer.data(idx_hd_p_0_0_1 + 59);
 
-    auto tg_xyyyy_xx_p_0_0_1 = pbuffer.data(idx_hd_p_0_0_1 + 60);
 
     auto tg_xyyyy_xy_p_0_0_1 = pbuffer.data(idx_hd_p_0_0_1 + 61);
 
-    auto tg_xyyyy_xz_p_0_0_1 = pbuffer.data(idx_hd_p_0_0_1 + 62);
 
     auto tg_xyyyy_yy_p_0_0_1 = pbuffer.data(idx_hd_p_0_0_1 + 63);
 
     auto tg_xyyyy_yz_p_0_0_1 = pbuffer.data(idx_hd_p_0_0_1 + 64);
 
-    auto tg_xyyyy_zz_p_0_0_1 = pbuffer.data(idx_hd_p_0_0_1 + 65);
 
-    auto tg_xyyyz_xx_p_0_0_1 = pbuffer.data(idx_hd_p_0_0_1 + 66);
 
-    auto tg_xyyyz_xy_p_0_0_1 = pbuffer.data(idx_hd_p_0_0_1 + 67);
 
-    auto tg_xyyyz_xz_p_0_0_1 = pbuffer.data(idx_hd_p_0_0_1 + 68);
 
-    auto tg_xyyyz_yy_p_0_0_1 = pbuffer.data(idx_hd_p_0_0_1 + 69);
 
-    auto tg_xyyyz_yz_p_0_0_1 = pbuffer.data(idx_hd_p_0_0_1 + 70);
 
-    auto tg_xyyyz_zz_p_0_0_1 = pbuffer.data(idx_hd_p_0_0_1 + 71);
 
-    auto tg_xyyzz_xx_p_0_0_1 = pbuffer.data(idx_hd_p_0_0_1 + 72);
 
-    auto tg_xyyzz_xy_p_0_0_1 = pbuffer.data(idx_hd_p_0_0_1 + 73);
 
-    auto tg_xyyzz_xz_p_0_0_1 = pbuffer.data(idx_hd_p_0_0_1 + 74);
 
-    auto tg_xyyzz_yy_p_0_0_1 = pbuffer.data(idx_hd_p_0_0_1 + 75);
 
     auto tg_xyyzz_yz_p_0_0_1 = pbuffer.data(idx_hd_p_0_0_1 + 76);
 
-    auto tg_xyyzz_zz_p_0_0_1 = pbuffer.data(idx_hd_p_0_0_1 + 77);
 
-    auto tg_xyzzz_xx_p_0_0_1 = pbuffer.data(idx_hd_p_0_0_1 + 78);
 
-    auto tg_xyzzz_xy_p_0_0_1 = pbuffer.data(idx_hd_p_0_0_1 + 79);
 
-    auto tg_xyzzz_xz_p_0_0_1 = pbuffer.data(idx_hd_p_0_0_1 + 80);
 
-    auto tg_xyzzz_yy_p_0_0_1 = pbuffer.data(idx_hd_p_0_0_1 + 81);
 
-    auto tg_xyzzz_yz_p_0_0_1 = pbuffer.data(idx_hd_p_0_0_1 + 82);
 
-    auto tg_xyzzz_zz_p_0_0_1 = pbuffer.data(idx_hd_p_0_0_1 + 83);
 
-    auto tg_xzzzz_xx_p_0_0_1 = pbuffer.data(idx_hd_p_0_0_1 + 84);
 
-    auto tg_xzzzz_xy_p_0_0_1 = pbuffer.data(idx_hd_p_0_0_1 + 85);
 
     auto tg_xzzzz_xz_p_0_0_1 = pbuffer.data(idx_hd_p_0_0_1 + 86);
 
-    auto tg_xzzzz_yy_p_0_0_1 = pbuffer.data(idx_hd_p_0_0_1 + 87);
 
     auto tg_xzzzz_yz_p_0_0_1 = pbuffer.data(idx_hd_p_0_0_1 + 88);
 
@@ -964,13 +794,10 @@ comp_prim_projected_core_potential_if_d(CSimdArray<double>& pbuffer,
 
     auto tg_yyyyy_zz_p_0_0_1 = pbuffer.data(idx_hd_p_0_0_1 + 95);
 
-    auto tg_yyyyz_xx_p_0_0_1 = pbuffer.data(idx_hd_p_0_0_1 + 96);
 
-    auto tg_yyyyz_xy_p_0_0_1 = pbuffer.data(idx_hd_p_0_0_1 + 97);
 
     auto tg_yyyyz_xz_p_0_0_1 = pbuffer.data(idx_hd_p_0_0_1 + 98);
 
-    auto tg_yyyyz_yy_p_0_0_1 = pbuffer.data(idx_hd_p_0_0_1 + 99);
 
     auto tg_yyyyz_yz_p_0_0_1 = pbuffer.data(idx_hd_p_0_0_1 + 100);
 
@@ -1000,7 +827,6 @@ comp_prim_projected_core_potential_if_d(CSimdArray<double>& pbuffer,
 
     auto tg_yyzzz_zz_p_0_0_1 = pbuffer.data(idx_hd_p_0_0_1 + 113);
 
-    auto tg_yzzzz_xx_p_0_0_1 = pbuffer.data(idx_hd_p_0_0_1 + 114);
 
     auto tg_yzzzz_xy_p_0_0_1 = pbuffer.data(idx_hd_p_0_0_1 + 115);
 
@@ -1054,17 +880,13 @@ comp_prim_projected_core_potential_if_d(CSimdArray<double>& pbuffer,
 
     auto tg_xxxxy_xyy_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 13);
 
-    auto tg_xxxxy_xyz_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 14);
 
     auto tg_xxxxy_xzz_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 15);
 
     auto tg_xxxxy_yyy_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 16);
 
-    auto tg_xxxxy_yyz_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 17);
 
-    auto tg_xxxxy_yzz_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 18);
 
-    auto tg_xxxxy_zzz_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 19);
 
     auto tg_xxxxz_xxx_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 20);
 
@@ -1078,7 +900,6 @@ comp_prim_projected_core_potential_if_d(CSimdArray<double>& pbuffer,
 
     auto tg_xxxxz_xzz_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 25);
 
-    auto tg_xxxxz_yyy_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 26);
 
     auto tg_xxxxz_yyz_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 27);
 
@@ -1106,25 +927,15 @@ comp_prim_projected_core_potential_if_d(CSimdArray<double>& pbuffer,
 
     auto tg_xxxyy_zzz_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 39);
 
-    auto tg_xxxyz_xxx_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 40);
 
-    auto tg_xxxyz_xxy_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 41);
 
-    auto tg_xxxyz_xxz_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 42);
 
-    auto tg_xxxyz_xyy_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 43);
 
-    auto tg_xxxyz_xyz_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 44);
 
-    auto tg_xxxyz_xzz_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 45);
 
-    auto tg_xxxyz_yyy_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 46);
 
-    auto tg_xxxyz_yyz_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 47);
 
-    auto tg_xxxyz_yzz_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 48);
 
-    auto tg_xxxyz_zzz_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 49);
 
     auto tg_xxxzz_xxx_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 50);
 
@@ -1166,45 +977,30 @@ comp_prim_projected_core_potential_if_d(CSimdArray<double>& pbuffer,
 
     auto tg_xxyyy_zzz_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 69);
 
-    auto tg_xxyyz_xxx_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 70);
 
     auto tg_xxyyz_xxy_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 71);
 
-    auto tg_xxyyz_xxz_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 72);
 
     auto tg_xxyyz_xyy_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 73);
 
-    auto tg_xxyyz_xyz_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 74);
 
-    auto tg_xxyyz_xzz_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 75);
 
-    auto tg_xxyyz_yyy_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 76);
 
-    auto tg_xxyyz_yyz_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 77);
 
-    auto tg_xxyyz_yzz_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 78);
 
-    auto tg_xxyyz_zzz_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 79);
 
     auto tg_xxyzz_xxx_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 80);
 
-    auto tg_xxyzz_xxy_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 81);
 
     auto tg_xxyzz_xxz_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 82);
 
-    auto tg_xxyzz_xyy_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 83);
 
-    auto tg_xxyzz_xyz_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 84);
 
     auto tg_xxyzz_xzz_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 85);
 
-    auto tg_xxyzz_yyy_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 86);
 
-    auto tg_xxyzz_yyz_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 87);
 
-    auto tg_xxyzz_yzz_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 88);
 
-    auto tg_xxyzz_zzz_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 89);
 
     auto tg_xxzzz_xxx_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 90);
 
@@ -1230,13 +1026,11 @@ comp_prim_projected_core_potential_if_d(CSimdArray<double>& pbuffer,
 
     auto tg_xyyyy_xxy_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 101);
 
-    auto tg_xyyyy_xxz_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 102);
 
     auto tg_xyyyy_xyy_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 103);
 
     auto tg_xyyyy_xyz_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 104);
 
-    auto tg_xyyyy_xzz_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 105);
 
     auto tg_xyyyy_yyy_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 106);
 
@@ -1246,37 +1040,22 @@ comp_prim_projected_core_potential_if_d(CSimdArray<double>& pbuffer,
 
     auto tg_xyyyy_zzz_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 109);
 
-    auto tg_xyyyz_xxx_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 110);
 
-    auto tg_xyyyz_xxy_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 111);
 
-    auto tg_xyyyz_xxz_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 112);
 
-    auto tg_xyyyz_xyy_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 113);
 
-    auto tg_xyyyz_xyz_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 114);
 
-    auto tg_xyyyz_xzz_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 115);
 
-    auto tg_xyyyz_yyy_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 116);
 
-    auto tg_xyyyz_yyz_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 117);
 
-    auto tg_xyyyz_yzz_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 118);
 
-    auto tg_xyyyz_zzz_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 119);
 
-    auto tg_xyyzz_xxx_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 120);
 
-    auto tg_xyyzz_xxy_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 121);
 
-    auto tg_xyyzz_xxz_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 122);
 
-    auto tg_xyyzz_xyy_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 123);
 
     auto tg_xyyzz_xyz_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 124);
 
-    auto tg_xyyzz_xzz_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 125);
 
     auto tg_xyyzz_yyy_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 126);
 
@@ -1286,33 +1065,21 @@ comp_prim_projected_core_potential_if_d(CSimdArray<double>& pbuffer,
 
     auto tg_xyyzz_zzz_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 129);
 
-    auto tg_xyzzz_xxx_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 130);
 
-    auto tg_xyzzz_xxy_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 131);
 
-    auto tg_xyzzz_xxz_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 132);
 
-    auto tg_xyzzz_xyy_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 133);
 
-    auto tg_xyzzz_xyz_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 134);
 
-    auto tg_xyzzz_xzz_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 135);
 
-    auto tg_xyzzz_yyy_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 136);
 
-    auto tg_xyzzz_yyz_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 137);
 
-    auto tg_xyzzz_yzz_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 138);
 
-    auto tg_xyzzz_zzz_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 139);
 
     auto tg_xzzzz_xxx_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 140);
 
-    auto tg_xzzzz_xxy_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 141);
 
     auto tg_xzzzz_xxz_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 142);
 
-    auto tg_xzzzz_xyy_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 143);
 
     auto tg_xzzzz_xyz_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 144);
 
@@ -1346,7 +1113,6 @@ comp_prim_projected_core_potential_if_d(CSimdArray<double>& pbuffer,
 
     auto tg_yyyyy_zzz_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 159);
 
-    auto tg_yyyyz_xxx_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 160);
 
     auto tg_yyyyz_xxy_p_0_0_1 = pbuffer.data(idx_hf_p_0_0_1 + 161);
 
@@ -1470,43 +1236,29 @@ comp_prim_projected_core_potential_if_d(CSimdArray<double>& pbuffer,
 
     auto tg_xxxy_xxx_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 10);
 
-    auto tg_xxxy_xxy_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 11);
 
     auto tg_xxxy_xxz_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 12);
 
-    auto tg_xxxy_xyy_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 13);
 
-    auto tg_xxxy_xyz_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 14);
 
     auto tg_xxxy_xzz_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 15);
 
-    auto tg_xxxy_yyy_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 16);
 
-    auto tg_xxxy_yyz_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 17);
 
-    auto tg_xxxy_yzz_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 18);
 
-    auto tg_xxxy_zzz_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 19);
 
     auto tg_xxxz_xxx_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 20);
 
     auto tg_xxxz_xxy_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 21);
 
-    auto tg_xxxz_xxz_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 22);
 
     auto tg_xxxz_xyy_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 23);
 
-    auto tg_xxxz_xyz_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 24);
 
-    auto tg_xxxz_xzz_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 25);
 
-    auto tg_xxxz_yyy_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 26);
 
-    auto tg_xxxz_yyz_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 27);
 
-    auto tg_xxxz_yzz_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 28);
 
-    auto tg_xxxz_zzz_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 29);
 
     auto tg_xxyy_xxx_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 30);
 
@@ -1528,25 +1280,15 @@ comp_prim_projected_core_potential_if_d(CSimdArray<double>& pbuffer,
 
     auto tg_xxyy_zzz_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 39);
 
-    auto tg_xxyz_xxx_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 40);
 
-    auto tg_xxyz_xxy_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 41);
 
-    auto tg_xxyz_xxz_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 42);
 
-    auto tg_xxyz_xyy_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 43);
 
-    auto tg_xxyz_xyz_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 44);
 
-    auto tg_xxyz_xzz_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 45);
 
-    auto tg_xxyz_yyy_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 46);
 
-    auto tg_xxyz_yyz_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 47);
 
-    auto tg_xxyz_yzz_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 48);
 
-    auto tg_xxyz_zzz_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 49);
 
     auto tg_xxzz_xxx_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 50);
 
@@ -1568,17 +1310,14 @@ comp_prim_projected_core_potential_if_d(CSimdArray<double>& pbuffer,
 
     auto tg_xxzz_zzz_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 59);
 
-    auto tg_xyyy_xxx_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 60);
 
     auto tg_xyyy_xxy_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 61);
 
-    auto tg_xyyy_xxz_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 62);
 
     auto tg_xyyy_xyy_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 63);
 
     auto tg_xyyy_xyz_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 64);
 
-    auto tg_xyyy_xzz_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 65);
 
     auto tg_xyyy_yyy_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 66);
 
@@ -1588,53 +1327,30 @@ comp_prim_projected_core_potential_if_d(CSimdArray<double>& pbuffer,
 
     auto tg_xyyy_zzz_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 69);
 
-    auto tg_xyyz_xxx_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 70);
 
-    auto tg_xyyz_xxy_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 71);
 
-    auto tg_xyyz_xxz_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 72);
 
-    auto tg_xyyz_xyy_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 73);
 
-    auto tg_xyyz_xyz_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 74);
 
-    auto tg_xyyz_xzz_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 75);
 
-    auto tg_xyyz_yyy_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 76);
 
-    auto tg_xyyz_yyz_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 77);
 
-    auto tg_xyyz_yzz_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 78);
 
-    auto tg_xyyz_zzz_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 79);
 
-    auto tg_xyzz_xxx_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 80);
 
-    auto tg_xyzz_xxy_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 81);
 
-    auto tg_xyzz_xxz_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 82);
 
-    auto tg_xyzz_xyy_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 83);
 
-    auto tg_xyzz_xyz_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 84);
 
-    auto tg_xyzz_xzz_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 85);
 
-    auto tg_xyzz_yyy_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 86);
 
-    auto tg_xyzz_yyz_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 87);
 
-    auto tg_xyzz_yzz_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 88);
 
-    auto tg_xyzz_zzz_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 89);
 
-    auto tg_xzzz_xxx_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 90);
 
-    auto tg_xzzz_xxy_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 91);
 
     auto tg_xzzz_xxz_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 92);
 
-    auto tg_xzzz_xyy_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 93);
 
     auto tg_xzzz_xyz_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 94);
 
@@ -1668,25 +1384,18 @@ comp_prim_projected_core_potential_if_d(CSimdArray<double>& pbuffer,
 
     auto tg_yyyy_zzz_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 109);
 
-    auto tg_yyyz_xxx_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 110);
 
     auto tg_yyyz_xxy_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 111);
 
-    auto tg_yyyz_xxz_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 112);
 
     auto tg_yyyz_xyy_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 113);
 
-    auto tg_yyyz_xyz_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 114);
 
-    auto tg_yyyz_xzz_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 115);
 
     auto tg_yyyz_yyy_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 116);
 
-    auto tg_yyyz_yyz_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 117);
 
-    auto tg_yyyz_yzz_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 118);
 
-    auto tg_yyyz_zzz_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 119);
 
     auto tg_yyzz_xxx_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 120);
 
@@ -1710,17 +1419,14 @@ comp_prim_projected_core_potential_if_d(CSimdArray<double>& pbuffer,
 
     auto tg_yzzz_xxx_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 130);
 
-    auto tg_yzzz_xxy_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 131);
 
     auto tg_yzzz_xxz_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 132);
 
-    auto tg_yzzz_xyy_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 133);
 
     auto tg_yzzz_xyz_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 134);
 
     auto tg_yzzz_xzz_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 135);
 
-    auto tg_yzzz_yyy_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 136);
 
     auto tg_yzzz_yyz_d_1_0_0 = pbuffer.data(idx_gf_d_1_0_0 + 137);
 
@@ -1778,17 +1484,13 @@ comp_prim_projected_core_potential_if_d(CSimdArray<double>& pbuffer,
 
     auto tg_xxxxy_xyy_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 13);
 
-    auto tg_xxxxy_xyz_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 14);
 
     auto tg_xxxxy_xzz_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 15);
 
     auto tg_xxxxy_yyy_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 16);
 
-    auto tg_xxxxy_yyz_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 17);
 
-    auto tg_xxxxy_yzz_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 18);
 
-    auto tg_xxxxy_zzz_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 19);
 
     auto tg_xxxxz_xxx_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 20);
 
@@ -1802,7 +1504,6 @@ comp_prim_projected_core_potential_if_d(CSimdArray<double>& pbuffer,
 
     auto tg_xxxxz_xzz_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 25);
 
-    auto tg_xxxxz_yyy_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 26);
 
     auto tg_xxxxz_yyz_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 27);
 
@@ -1830,25 +1531,15 @@ comp_prim_projected_core_potential_if_d(CSimdArray<double>& pbuffer,
 
     auto tg_xxxyy_zzz_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 39);
 
-    auto tg_xxxyz_xxx_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 40);
 
-    auto tg_xxxyz_xxy_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 41);
 
-    auto tg_xxxyz_xxz_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 42);
 
-    auto tg_xxxyz_xyy_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 43);
 
-    auto tg_xxxyz_xyz_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 44);
 
-    auto tg_xxxyz_xzz_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 45);
 
-    auto tg_xxxyz_yyy_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 46);
 
-    auto tg_xxxyz_yyz_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 47);
 
-    auto tg_xxxyz_yzz_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 48);
 
-    auto tg_xxxyz_zzz_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 49);
 
     auto tg_xxxzz_xxx_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 50);
 
@@ -1890,45 +1581,30 @@ comp_prim_projected_core_potential_if_d(CSimdArray<double>& pbuffer,
 
     auto tg_xxyyy_zzz_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 69);
 
-    auto tg_xxyyz_xxx_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 70);
 
     auto tg_xxyyz_xxy_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 71);
 
-    auto tg_xxyyz_xxz_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 72);
 
     auto tg_xxyyz_xyy_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 73);
 
-    auto tg_xxyyz_xyz_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 74);
 
-    auto tg_xxyyz_xzz_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 75);
 
-    auto tg_xxyyz_yyy_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 76);
 
-    auto tg_xxyyz_yyz_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 77);
 
-    auto tg_xxyyz_yzz_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 78);
 
-    auto tg_xxyyz_zzz_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 79);
 
     auto tg_xxyzz_xxx_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 80);
 
-    auto tg_xxyzz_xxy_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 81);
 
     auto tg_xxyzz_xxz_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 82);
 
-    auto tg_xxyzz_xyy_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 83);
 
-    auto tg_xxyzz_xyz_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 84);
 
     auto tg_xxyzz_xzz_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 85);
 
-    auto tg_xxyzz_yyy_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 86);
 
-    auto tg_xxyzz_yyz_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 87);
 
-    auto tg_xxyzz_yzz_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 88);
 
-    auto tg_xxyzz_zzz_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 89);
 
     auto tg_xxzzz_xxx_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 90);
 
@@ -1954,13 +1630,11 @@ comp_prim_projected_core_potential_if_d(CSimdArray<double>& pbuffer,
 
     auto tg_xyyyy_xxy_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 101);
 
-    auto tg_xyyyy_xxz_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 102);
 
     auto tg_xyyyy_xyy_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 103);
 
     auto tg_xyyyy_xyz_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 104);
 
-    auto tg_xyyyy_xzz_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 105);
 
     auto tg_xyyyy_yyy_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 106);
 
@@ -1970,37 +1644,22 @@ comp_prim_projected_core_potential_if_d(CSimdArray<double>& pbuffer,
 
     auto tg_xyyyy_zzz_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 109);
 
-    auto tg_xyyyz_xxx_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 110);
 
-    auto tg_xyyyz_xxy_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 111);
 
-    auto tg_xyyyz_xxz_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 112);
 
-    auto tg_xyyyz_xyy_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 113);
 
-    auto tg_xyyyz_xyz_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 114);
 
-    auto tg_xyyyz_xzz_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 115);
 
-    auto tg_xyyyz_yyy_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 116);
 
-    auto tg_xyyyz_yyz_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 117);
 
-    auto tg_xyyyz_yzz_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 118);
 
-    auto tg_xyyyz_zzz_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 119);
 
-    auto tg_xyyzz_xxx_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 120);
 
-    auto tg_xyyzz_xxy_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 121);
 
-    auto tg_xyyzz_xxz_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 122);
 
-    auto tg_xyyzz_xyy_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 123);
 
     auto tg_xyyzz_xyz_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 124);
 
-    auto tg_xyyzz_xzz_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 125);
 
     auto tg_xyyzz_yyy_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 126);
 
@@ -2010,33 +1669,21 @@ comp_prim_projected_core_potential_if_d(CSimdArray<double>& pbuffer,
 
     auto tg_xyyzz_zzz_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 129);
 
-    auto tg_xyzzz_xxx_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 130);
 
-    auto tg_xyzzz_xxy_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 131);
 
-    auto tg_xyzzz_xxz_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 132);
 
-    auto tg_xyzzz_xyy_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 133);
 
-    auto tg_xyzzz_xyz_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 134);
 
-    auto tg_xyzzz_xzz_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 135);
 
-    auto tg_xyzzz_yyy_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 136);
 
-    auto tg_xyzzz_yyz_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 137);
 
-    auto tg_xyzzz_yzz_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 138);
 
-    auto tg_xyzzz_zzz_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 139);
 
     auto tg_xzzzz_xxx_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 140);
 
-    auto tg_xzzzz_xxy_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 141);
 
     auto tg_xzzzz_xxz_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 142);
 
-    auto tg_xzzzz_xyy_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 143);
 
     auto tg_xzzzz_xyz_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 144);
 
@@ -2070,7 +1717,6 @@ comp_prim_projected_core_potential_if_d(CSimdArray<double>& pbuffer,
 
     auto tg_yyyyy_zzz_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 159);
 
-    auto tg_yyyyz_xxx_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 160);
 
     auto tg_yyyyz_xxy_d_1_0_0 = pbuffer.data(idx_hf_d_1_0_0 + 161);
 
@@ -2194,43 +1840,29 @@ comp_prim_projected_core_potential_if_d(CSimdArray<double>& pbuffer,
 
     auto tg_xxxy_xxx_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 10);
 
-    auto tg_xxxy_xxy_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 11);
 
     auto tg_xxxy_xxz_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 12);
 
-    auto tg_xxxy_xyy_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 13);
 
-    auto tg_xxxy_xyz_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 14);
 
     auto tg_xxxy_xzz_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 15);
 
-    auto tg_xxxy_yyy_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 16);
 
-    auto tg_xxxy_yyz_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 17);
 
-    auto tg_xxxy_yzz_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 18);
 
-    auto tg_xxxy_zzz_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 19);
 
     auto tg_xxxz_xxx_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 20);
 
     auto tg_xxxz_xxy_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 21);
 
-    auto tg_xxxz_xxz_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 22);
 
     auto tg_xxxz_xyy_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 23);
 
-    auto tg_xxxz_xyz_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 24);
 
-    auto tg_xxxz_xzz_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 25);
 
-    auto tg_xxxz_yyy_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 26);
 
-    auto tg_xxxz_yyz_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 27);
 
-    auto tg_xxxz_yzz_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 28);
 
-    auto tg_xxxz_zzz_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 29);
 
     auto tg_xxyy_xxx_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 30);
 
@@ -2252,25 +1884,15 @@ comp_prim_projected_core_potential_if_d(CSimdArray<double>& pbuffer,
 
     auto tg_xxyy_zzz_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 39);
 
-    auto tg_xxyz_xxx_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 40);
 
-    auto tg_xxyz_xxy_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 41);
 
-    auto tg_xxyz_xxz_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 42);
 
-    auto tg_xxyz_xyy_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 43);
 
-    auto tg_xxyz_xyz_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 44);
 
-    auto tg_xxyz_xzz_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 45);
 
-    auto tg_xxyz_yyy_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 46);
 
-    auto tg_xxyz_yyz_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 47);
 
-    auto tg_xxyz_yzz_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 48);
 
-    auto tg_xxyz_zzz_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 49);
 
     auto tg_xxzz_xxx_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 50);
 
@@ -2292,17 +1914,14 @@ comp_prim_projected_core_potential_if_d(CSimdArray<double>& pbuffer,
 
     auto tg_xxzz_zzz_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 59);
 
-    auto tg_xyyy_xxx_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 60);
 
     auto tg_xyyy_xxy_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 61);
 
-    auto tg_xyyy_xxz_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 62);
 
     auto tg_xyyy_xyy_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 63);
 
     auto tg_xyyy_xyz_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 64);
 
-    auto tg_xyyy_xzz_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 65);
 
     auto tg_xyyy_yyy_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 66);
 
@@ -2312,53 +1931,30 @@ comp_prim_projected_core_potential_if_d(CSimdArray<double>& pbuffer,
 
     auto tg_xyyy_zzz_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 69);
 
-    auto tg_xyyz_xxx_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 70);
 
-    auto tg_xyyz_xxy_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 71);
 
-    auto tg_xyyz_xxz_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 72);
 
-    auto tg_xyyz_xyy_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 73);
 
-    auto tg_xyyz_xyz_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 74);
 
-    auto tg_xyyz_xzz_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 75);
 
-    auto tg_xyyz_yyy_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 76);
 
-    auto tg_xyyz_yyz_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 77);
 
-    auto tg_xyyz_yzz_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 78);
 
-    auto tg_xyyz_zzz_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 79);
 
-    auto tg_xyzz_xxx_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 80);
 
-    auto tg_xyzz_xxy_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 81);
 
-    auto tg_xyzz_xxz_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 82);
 
-    auto tg_xyzz_xyy_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 83);
 
-    auto tg_xyzz_xyz_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 84);
 
-    auto tg_xyzz_xzz_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 85);
 
-    auto tg_xyzz_yyy_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 86);
 
-    auto tg_xyzz_yyz_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 87);
 
-    auto tg_xyzz_yzz_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 88);
 
-    auto tg_xyzz_zzz_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 89);
 
-    auto tg_xzzz_xxx_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 90);
 
-    auto tg_xzzz_xxy_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 91);
 
     auto tg_xzzz_xxz_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 92);
 
-    auto tg_xzzz_xyy_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 93);
 
     auto tg_xzzz_xyz_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 94);
 
@@ -2392,25 +1988,18 @@ comp_prim_projected_core_potential_if_d(CSimdArray<double>& pbuffer,
 
     auto tg_yyyy_zzz_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 109);
 
-    auto tg_yyyz_xxx_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 110);
 
     auto tg_yyyz_xxy_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 111);
 
-    auto tg_yyyz_xxz_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 112);
 
     auto tg_yyyz_xyy_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 113);
 
-    auto tg_yyyz_xyz_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 114);
 
-    auto tg_yyyz_xzz_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 115);
 
     auto tg_yyyz_yyy_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 116);
 
-    auto tg_yyyz_yyz_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 117);
 
-    auto tg_yyyz_yzz_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 118);
 
-    auto tg_yyyz_zzz_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 119);
 
     auto tg_yyzz_xxx_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 120);
 
@@ -2434,17 +2023,14 @@ comp_prim_projected_core_potential_if_d(CSimdArray<double>& pbuffer,
 
     auto tg_yzzz_xxx_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 130);
 
-    auto tg_yzzz_xxy_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 131);
 
     auto tg_yzzz_xxz_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 132);
 
-    auto tg_yzzz_xyy_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 133);
 
     auto tg_yzzz_xyz_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 134);
 
     auto tg_yzzz_xzz_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 135);
 
-    auto tg_yzzz_yyy_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 136);
 
     auto tg_yzzz_yyz_s_1_0_1 = pbuffer.data(idx_gf_s_1_0_1 + 137);
 
@@ -2502,17 +2088,13 @@ comp_prim_projected_core_potential_if_d(CSimdArray<double>& pbuffer,
 
     auto tg_xxxxy_xyy_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 13);
 
-    auto tg_xxxxy_xyz_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 14);
 
     auto tg_xxxxy_xzz_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 15);
 
     auto tg_xxxxy_yyy_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 16);
 
-    auto tg_xxxxy_yyz_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 17);
 
-    auto tg_xxxxy_yzz_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 18);
 
-    auto tg_xxxxy_zzz_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 19);
 
     auto tg_xxxxz_xxx_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 20);
 
@@ -2526,7 +2108,6 @@ comp_prim_projected_core_potential_if_d(CSimdArray<double>& pbuffer,
 
     auto tg_xxxxz_xzz_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 25);
 
-    auto tg_xxxxz_yyy_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 26);
 
     auto tg_xxxxz_yyz_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 27);
 
@@ -2554,25 +2135,15 @@ comp_prim_projected_core_potential_if_d(CSimdArray<double>& pbuffer,
 
     auto tg_xxxyy_zzz_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 39);
 
-    auto tg_xxxyz_xxx_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 40);
 
-    auto tg_xxxyz_xxy_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 41);
 
-    auto tg_xxxyz_xxz_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 42);
 
-    auto tg_xxxyz_xyy_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 43);
 
-    auto tg_xxxyz_xyz_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 44);
 
-    auto tg_xxxyz_xzz_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 45);
 
-    auto tg_xxxyz_yyy_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 46);
 
-    auto tg_xxxyz_yyz_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 47);
 
-    auto tg_xxxyz_yzz_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 48);
 
-    auto tg_xxxyz_zzz_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 49);
 
     auto tg_xxxzz_xxx_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 50);
 
@@ -2614,45 +2185,30 @@ comp_prim_projected_core_potential_if_d(CSimdArray<double>& pbuffer,
 
     auto tg_xxyyy_zzz_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 69);
 
-    auto tg_xxyyz_xxx_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 70);
 
     auto tg_xxyyz_xxy_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 71);
 
-    auto tg_xxyyz_xxz_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 72);
 
     auto tg_xxyyz_xyy_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 73);
 
-    auto tg_xxyyz_xyz_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 74);
 
-    auto tg_xxyyz_xzz_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 75);
 
-    auto tg_xxyyz_yyy_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 76);
 
-    auto tg_xxyyz_yyz_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 77);
 
-    auto tg_xxyyz_yzz_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 78);
 
-    auto tg_xxyyz_zzz_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 79);
 
     auto tg_xxyzz_xxx_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 80);
 
-    auto tg_xxyzz_xxy_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 81);
 
     auto tg_xxyzz_xxz_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 82);
 
-    auto tg_xxyzz_xyy_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 83);
 
-    auto tg_xxyzz_xyz_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 84);
 
     auto tg_xxyzz_xzz_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 85);
 
-    auto tg_xxyzz_yyy_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 86);
 
-    auto tg_xxyzz_yyz_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 87);
 
-    auto tg_xxyzz_yzz_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 88);
 
-    auto tg_xxyzz_zzz_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 89);
 
     auto tg_xxzzz_xxx_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 90);
 
@@ -2678,13 +2234,11 @@ comp_prim_projected_core_potential_if_d(CSimdArray<double>& pbuffer,
 
     auto tg_xyyyy_xxy_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 101);
 
-    auto tg_xyyyy_xxz_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 102);
 
     auto tg_xyyyy_xyy_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 103);
 
     auto tg_xyyyy_xyz_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 104);
 
-    auto tg_xyyyy_xzz_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 105);
 
     auto tg_xyyyy_yyy_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 106);
 
@@ -2694,37 +2248,22 @@ comp_prim_projected_core_potential_if_d(CSimdArray<double>& pbuffer,
 
     auto tg_xyyyy_zzz_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 109);
 
-    auto tg_xyyyz_xxx_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 110);
 
-    auto tg_xyyyz_xxy_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 111);
 
-    auto tg_xyyyz_xxz_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 112);
 
-    auto tg_xyyyz_xyy_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 113);
 
-    auto tg_xyyyz_xyz_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 114);
 
-    auto tg_xyyyz_xzz_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 115);
 
-    auto tg_xyyyz_yyy_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 116);
 
-    auto tg_xyyyz_yyz_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 117);
 
-    auto tg_xyyyz_yzz_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 118);
 
-    auto tg_xyyyz_zzz_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 119);
 
-    auto tg_xyyzz_xxx_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 120);
 
-    auto tg_xyyzz_xxy_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 121);
 
-    auto tg_xyyzz_xxz_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 122);
 
-    auto tg_xyyzz_xyy_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 123);
 
     auto tg_xyyzz_xyz_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 124);
 
-    auto tg_xyyzz_xzz_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 125);
 
     auto tg_xyyzz_yyy_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 126);
 
@@ -2734,33 +2273,21 @@ comp_prim_projected_core_potential_if_d(CSimdArray<double>& pbuffer,
 
     auto tg_xyyzz_zzz_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 129);
 
-    auto tg_xyzzz_xxx_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 130);
 
-    auto tg_xyzzz_xxy_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 131);
 
-    auto tg_xyzzz_xxz_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 132);
 
-    auto tg_xyzzz_xyy_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 133);
 
-    auto tg_xyzzz_xyz_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 134);
 
-    auto tg_xyzzz_xzz_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 135);
 
-    auto tg_xyzzz_yyy_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 136);
 
-    auto tg_xyzzz_yyz_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 137);
 
-    auto tg_xyzzz_yzz_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 138);
 
-    auto tg_xyzzz_zzz_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 139);
 
     auto tg_xzzzz_xxx_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 140);
 
-    auto tg_xzzzz_xxy_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 141);
 
     auto tg_xzzzz_xxz_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 142);
 
-    auto tg_xzzzz_xyy_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 143);
 
     auto tg_xzzzz_xyz_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 144);
 
@@ -2794,7 +2321,6 @@ comp_prim_projected_core_potential_if_d(CSimdArray<double>& pbuffer,
 
     auto tg_yyyyy_zzz_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 159);
 
-    auto tg_yyyyz_xxx_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 160);
 
     auto tg_yyyyz_xxy_s_1_0_1 = pbuffer.data(idx_hf_s_1_0_1 + 161);
 
@@ -4058,45 +3584,25 @@ comp_prim_projected_core_potential_if_d(CSimdArray<double>& pbuffer,
 
         auto tg_xxxx_zzz_d_0_0_1 = pbuffer.data(idx_gf_d_0_0_1 + 9);
 
-        auto tg_xxxy_xxx_d_0_0_1 = pbuffer.data(idx_gf_d_0_0_1 + 10);
 
-        auto tg_xxxy_xxy_d_0_0_1 = pbuffer.data(idx_gf_d_0_0_1 + 11);
 
-        auto tg_xxxy_xxz_d_0_0_1 = pbuffer.data(idx_gf_d_0_0_1 + 12);
 
-        auto tg_xxxy_xyy_d_0_0_1 = pbuffer.data(idx_gf_d_0_0_1 + 13);
 
-        auto tg_xxxy_xyz_d_0_0_1 = pbuffer.data(idx_gf_d_0_0_1 + 14);
 
-        auto tg_xxxy_xzz_d_0_0_1 = pbuffer.data(idx_gf_d_0_0_1 + 15);
 
-        auto tg_xxxy_yyy_d_0_0_1 = pbuffer.data(idx_gf_d_0_0_1 + 16);
 
-        auto tg_xxxy_yyz_d_0_0_1 = pbuffer.data(idx_gf_d_0_0_1 + 17);
 
-        auto tg_xxxy_yzz_d_0_0_1 = pbuffer.data(idx_gf_d_0_0_1 + 18);
 
-        auto tg_xxxy_zzz_d_0_0_1 = pbuffer.data(idx_gf_d_0_0_1 + 19);
 
-        auto tg_xxxz_xxx_d_0_0_1 = pbuffer.data(idx_gf_d_0_0_1 + 20);
 
-        auto tg_xxxz_xxy_d_0_0_1 = pbuffer.data(idx_gf_d_0_0_1 + 21);
 
-        auto tg_xxxz_xxz_d_0_0_1 = pbuffer.data(idx_gf_d_0_0_1 + 22);
 
-        auto tg_xxxz_xyy_d_0_0_1 = pbuffer.data(idx_gf_d_0_0_1 + 23);
 
-        auto tg_xxxz_xyz_d_0_0_1 = pbuffer.data(idx_gf_d_0_0_1 + 24);
 
-        auto tg_xxxz_xzz_d_0_0_1 = pbuffer.data(idx_gf_d_0_0_1 + 25);
 
-        auto tg_xxxz_yyy_d_0_0_1 = pbuffer.data(idx_gf_d_0_0_1 + 26);
 
-        auto tg_xxxz_yyz_d_0_0_1 = pbuffer.data(idx_gf_d_0_0_1 + 27);
 
-        auto tg_xxxz_yzz_d_0_0_1 = pbuffer.data(idx_gf_d_0_0_1 + 28);
 
-        auto tg_xxxz_zzz_d_0_0_1 = pbuffer.data(idx_gf_d_0_0_1 + 29);
 
         auto tg_xxyy_xxx_d_0_0_1 = pbuffer.data(idx_gf_d_0_0_1 + 30);
 
@@ -4118,25 +3624,15 @@ comp_prim_projected_core_potential_if_d(CSimdArray<double>& pbuffer,
 
         auto tg_xxyy_zzz_d_0_0_1 = pbuffer.data(idx_gf_d_0_0_1 + 39);
 
-        auto tg_xxyz_xxx_d_0_0_1 = pbuffer.data(idx_gf_d_0_0_1 + 40);
 
-        auto tg_xxyz_xxy_d_0_0_1 = pbuffer.data(idx_gf_d_0_0_1 + 41);
 
-        auto tg_xxyz_xxz_d_0_0_1 = pbuffer.data(idx_gf_d_0_0_1 + 42);
 
-        auto tg_xxyz_xyy_d_0_0_1 = pbuffer.data(idx_gf_d_0_0_1 + 43);
 
-        auto tg_xxyz_xyz_d_0_0_1 = pbuffer.data(idx_gf_d_0_0_1 + 44);
 
-        auto tg_xxyz_xzz_d_0_0_1 = pbuffer.data(idx_gf_d_0_0_1 + 45);
 
-        auto tg_xxyz_yyy_d_0_0_1 = pbuffer.data(idx_gf_d_0_0_1 + 46);
 
-        auto tg_xxyz_yyz_d_0_0_1 = pbuffer.data(idx_gf_d_0_0_1 + 47);
 
-        auto tg_xxyz_yzz_d_0_0_1 = pbuffer.data(idx_gf_d_0_0_1 + 48);
 
-        auto tg_xxyz_zzz_d_0_0_1 = pbuffer.data(idx_gf_d_0_0_1 + 49);
 
         auto tg_xxzz_xxx_d_0_0_1 = pbuffer.data(idx_gf_d_0_0_1 + 50);
 
@@ -4178,45 +3674,25 @@ comp_prim_projected_core_potential_if_d(CSimdArray<double>& pbuffer,
 
         auto tg_xyyy_zzz_d_0_0_1 = pbuffer.data(idx_gf_d_0_0_1 + 69);
 
-        auto tg_xyyz_xxx_d_0_0_1 = pbuffer.data(idx_gf_d_0_0_1 + 70);
 
-        auto tg_xyyz_xxy_d_0_0_1 = pbuffer.data(idx_gf_d_0_0_1 + 71);
 
-        auto tg_xyyz_xxz_d_0_0_1 = pbuffer.data(idx_gf_d_0_0_1 + 72);
 
-        auto tg_xyyz_xyy_d_0_0_1 = pbuffer.data(idx_gf_d_0_0_1 + 73);
 
-        auto tg_xyyz_xyz_d_0_0_1 = pbuffer.data(idx_gf_d_0_0_1 + 74);
 
-        auto tg_xyyz_xzz_d_0_0_1 = pbuffer.data(idx_gf_d_0_0_1 + 75);
 
-        auto tg_xyyz_yyy_d_0_0_1 = pbuffer.data(idx_gf_d_0_0_1 + 76);
 
-        auto tg_xyyz_yyz_d_0_0_1 = pbuffer.data(idx_gf_d_0_0_1 + 77);
 
-        auto tg_xyyz_yzz_d_0_0_1 = pbuffer.data(idx_gf_d_0_0_1 + 78);
 
-        auto tg_xyyz_zzz_d_0_0_1 = pbuffer.data(idx_gf_d_0_0_1 + 79);
 
-        auto tg_xyzz_xxx_d_0_0_1 = pbuffer.data(idx_gf_d_0_0_1 + 80);
 
-        auto tg_xyzz_xxy_d_0_0_1 = pbuffer.data(idx_gf_d_0_0_1 + 81);
 
-        auto tg_xyzz_xxz_d_0_0_1 = pbuffer.data(idx_gf_d_0_0_1 + 82);
 
-        auto tg_xyzz_xyy_d_0_0_1 = pbuffer.data(idx_gf_d_0_0_1 + 83);
 
-        auto tg_xyzz_xyz_d_0_0_1 = pbuffer.data(idx_gf_d_0_0_1 + 84);
 
-        auto tg_xyzz_xzz_d_0_0_1 = pbuffer.data(idx_gf_d_0_0_1 + 85);
 
-        auto tg_xyzz_yyy_d_0_0_1 = pbuffer.data(idx_gf_d_0_0_1 + 86);
 
-        auto tg_xyzz_yyz_d_0_0_1 = pbuffer.data(idx_gf_d_0_0_1 + 87);
 
-        auto tg_xyzz_yzz_d_0_0_1 = pbuffer.data(idx_gf_d_0_0_1 + 88);
 
-        auto tg_xyzz_zzz_d_0_0_1 = pbuffer.data(idx_gf_d_0_0_1 + 89);
 
         auto tg_xzzz_xxx_d_0_0_1 = pbuffer.data(idx_gf_d_0_0_1 + 90);
 
@@ -4258,25 +3734,15 @@ comp_prim_projected_core_potential_if_d(CSimdArray<double>& pbuffer,
 
         auto tg_yyyy_zzz_d_0_0_1 = pbuffer.data(idx_gf_d_0_0_1 + 109);
 
-        auto tg_yyyz_xxx_d_0_0_1 = pbuffer.data(idx_gf_d_0_0_1 + 110);
 
-        auto tg_yyyz_xxy_d_0_0_1 = pbuffer.data(idx_gf_d_0_0_1 + 111);
 
-        auto tg_yyyz_xxz_d_0_0_1 = pbuffer.data(idx_gf_d_0_0_1 + 112);
 
-        auto tg_yyyz_xyy_d_0_0_1 = pbuffer.data(idx_gf_d_0_0_1 + 113);
 
-        auto tg_yyyz_xyz_d_0_0_1 = pbuffer.data(idx_gf_d_0_0_1 + 114);
 
-        auto tg_yyyz_xzz_d_0_0_1 = pbuffer.data(idx_gf_d_0_0_1 + 115);
 
-        auto tg_yyyz_yyy_d_0_0_1 = pbuffer.data(idx_gf_d_0_0_1 + 116);
 
-        auto tg_yyyz_yyz_d_0_0_1 = pbuffer.data(idx_gf_d_0_0_1 + 117);
 
-        auto tg_yyyz_yzz_d_0_0_1 = pbuffer.data(idx_gf_d_0_0_1 + 118);
 
-        auto tg_yyyz_zzz_d_0_0_1 = pbuffer.data(idx_gf_d_0_0_1 + 119);
 
         auto tg_yyzz_xxx_d_0_0_1 = pbuffer.data(idx_gf_d_0_0_1 + 120);
 
@@ -4360,25 +3826,15 @@ comp_prim_projected_core_potential_if_d(CSimdArray<double>& pbuffer,
 
         auto tg_xxxxx_zzz_d_0_0_1 = pbuffer.data(idx_hf_d_0_0_1 + 9);
 
-        auto tg_xxxxy_xxx_d_0_0_1 = pbuffer.data(idx_hf_d_0_0_1 + 10);
 
-        auto tg_xxxxy_xxy_d_0_0_1 = pbuffer.data(idx_hf_d_0_0_1 + 11);
 
-        auto tg_xxxxy_xxz_d_0_0_1 = pbuffer.data(idx_hf_d_0_0_1 + 12);
 
-        auto tg_xxxxy_xyy_d_0_0_1 = pbuffer.data(idx_hf_d_0_0_1 + 13);
 
-        auto tg_xxxxy_xyz_d_0_0_1 = pbuffer.data(idx_hf_d_0_0_1 + 14);
 
-        auto tg_xxxxy_xzz_d_0_0_1 = pbuffer.data(idx_hf_d_0_0_1 + 15);
 
-        auto tg_xxxxy_yyy_d_0_0_1 = pbuffer.data(idx_hf_d_0_0_1 + 16);
 
-        auto tg_xxxxy_yyz_d_0_0_1 = pbuffer.data(idx_hf_d_0_0_1 + 17);
 
-        auto tg_xxxxy_yzz_d_0_0_1 = pbuffer.data(idx_hf_d_0_0_1 + 18);
 
-        auto tg_xxxxy_zzz_d_0_0_1 = pbuffer.data(idx_hf_d_0_0_1 + 19);
 
         auto tg_xxxxz_xxx_d_0_0_1 = pbuffer.data(idx_hf_d_0_0_1 + 20);
 
@@ -4420,25 +3876,15 @@ comp_prim_projected_core_potential_if_d(CSimdArray<double>& pbuffer,
 
         auto tg_xxxyy_zzz_d_0_0_1 = pbuffer.data(idx_hf_d_0_0_1 + 39);
 
-        auto tg_xxxyz_xxx_d_0_0_1 = pbuffer.data(idx_hf_d_0_0_1 + 40);
 
-        auto tg_xxxyz_xxy_d_0_0_1 = pbuffer.data(idx_hf_d_0_0_1 + 41);
 
-        auto tg_xxxyz_xxz_d_0_0_1 = pbuffer.data(idx_hf_d_0_0_1 + 42);
 
-        auto tg_xxxyz_xyy_d_0_0_1 = pbuffer.data(idx_hf_d_0_0_1 + 43);
 
-        auto tg_xxxyz_xyz_d_0_0_1 = pbuffer.data(idx_hf_d_0_0_1 + 44);
 
-        auto tg_xxxyz_xzz_d_0_0_1 = pbuffer.data(idx_hf_d_0_0_1 + 45);
 
-        auto tg_xxxyz_yyy_d_0_0_1 = pbuffer.data(idx_hf_d_0_0_1 + 46);
 
-        auto tg_xxxyz_yyz_d_0_0_1 = pbuffer.data(idx_hf_d_0_0_1 + 47);
 
-        auto tg_xxxyz_yzz_d_0_0_1 = pbuffer.data(idx_hf_d_0_0_1 + 48);
 
-        auto tg_xxxyz_zzz_d_0_0_1 = pbuffer.data(idx_hf_d_0_0_1 + 49);
 
         auto tg_xxxzz_xxx_d_0_0_1 = pbuffer.data(idx_hf_d_0_0_1 + 50);
 
@@ -4480,45 +3926,25 @@ comp_prim_projected_core_potential_if_d(CSimdArray<double>& pbuffer,
 
         auto tg_xxyyy_zzz_d_0_0_1 = pbuffer.data(idx_hf_d_0_0_1 + 69);
 
-        auto tg_xxyyz_xxx_d_0_0_1 = pbuffer.data(idx_hf_d_0_0_1 + 70);
 
-        auto tg_xxyyz_xxy_d_0_0_1 = pbuffer.data(idx_hf_d_0_0_1 + 71);
 
-        auto tg_xxyyz_xxz_d_0_0_1 = pbuffer.data(idx_hf_d_0_0_1 + 72);
 
-        auto tg_xxyyz_xyy_d_0_0_1 = pbuffer.data(idx_hf_d_0_0_1 + 73);
 
-        auto tg_xxyyz_xyz_d_0_0_1 = pbuffer.data(idx_hf_d_0_0_1 + 74);
 
-        auto tg_xxyyz_xzz_d_0_0_1 = pbuffer.data(idx_hf_d_0_0_1 + 75);
 
-        auto tg_xxyyz_yyy_d_0_0_1 = pbuffer.data(idx_hf_d_0_0_1 + 76);
 
-        auto tg_xxyyz_yyz_d_0_0_1 = pbuffer.data(idx_hf_d_0_0_1 + 77);
 
-        auto tg_xxyyz_yzz_d_0_0_1 = pbuffer.data(idx_hf_d_0_0_1 + 78);
 
-        auto tg_xxyyz_zzz_d_0_0_1 = pbuffer.data(idx_hf_d_0_0_1 + 79);
 
-        auto tg_xxyzz_xxx_d_0_0_1 = pbuffer.data(idx_hf_d_0_0_1 + 80);
 
-        auto tg_xxyzz_xxy_d_0_0_1 = pbuffer.data(idx_hf_d_0_0_1 + 81);
 
-        auto tg_xxyzz_xxz_d_0_0_1 = pbuffer.data(idx_hf_d_0_0_1 + 82);
 
-        auto tg_xxyzz_xyy_d_0_0_1 = pbuffer.data(idx_hf_d_0_0_1 + 83);
 
-        auto tg_xxyzz_xyz_d_0_0_1 = pbuffer.data(idx_hf_d_0_0_1 + 84);
 
-        auto tg_xxyzz_xzz_d_0_0_1 = pbuffer.data(idx_hf_d_0_0_1 + 85);
 
-        auto tg_xxyzz_yyy_d_0_0_1 = pbuffer.data(idx_hf_d_0_0_1 + 86);
 
-        auto tg_xxyzz_yyz_d_0_0_1 = pbuffer.data(idx_hf_d_0_0_1 + 87);
 
-        auto tg_xxyzz_yzz_d_0_0_1 = pbuffer.data(idx_hf_d_0_0_1 + 88);
 
-        auto tg_xxyzz_zzz_d_0_0_1 = pbuffer.data(idx_hf_d_0_0_1 + 89);
 
         auto tg_xxzzz_xxx_d_0_0_1 = pbuffer.data(idx_hf_d_0_0_1 + 90);
 
@@ -4560,25 +3986,15 @@ comp_prim_projected_core_potential_if_d(CSimdArray<double>& pbuffer,
 
         auto tg_xyyyy_zzz_d_0_0_1 = pbuffer.data(idx_hf_d_0_0_1 + 109);
 
-        auto tg_xyyyz_xxx_d_0_0_1 = pbuffer.data(idx_hf_d_0_0_1 + 110);
 
-        auto tg_xyyyz_xxy_d_0_0_1 = pbuffer.data(idx_hf_d_0_0_1 + 111);
 
-        auto tg_xyyyz_xxz_d_0_0_1 = pbuffer.data(idx_hf_d_0_0_1 + 112);
 
-        auto tg_xyyyz_xyy_d_0_0_1 = pbuffer.data(idx_hf_d_0_0_1 + 113);
 
-        auto tg_xyyyz_xyz_d_0_0_1 = pbuffer.data(idx_hf_d_0_0_1 + 114);
 
-        auto tg_xyyyz_xzz_d_0_0_1 = pbuffer.data(idx_hf_d_0_0_1 + 115);
 
-        auto tg_xyyyz_yyy_d_0_0_1 = pbuffer.data(idx_hf_d_0_0_1 + 116);
 
-        auto tg_xyyyz_yyz_d_0_0_1 = pbuffer.data(idx_hf_d_0_0_1 + 117);
 
-        auto tg_xyyyz_yzz_d_0_0_1 = pbuffer.data(idx_hf_d_0_0_1 + 118);
 
-        auto tg_xyyyz_zzz_d_0_0_1 = pbuffer.data(idx_hf_d_0_0_1 + 119);
 
         auto tg_xyyzz_xxx_d_0_0_1 = pbuffer.data(idx_hf_d_0_0_1 + 120);
 
@@ -4600,25 +4016,15 @@ comp_prim_projected_core_potential_if_d(CSimdArray<double>& pbuffer,
 
         auto tg_xyyzz_zzz_d_0_0_1 = pbuffer.data(idx_hf_d_0_0_1 + 129);
 
-        auto tg_xyzzz_xxx_d_0_0_1 = pbuffer.data(idx_hf_d_0_0_1 + 130);
 
-        auto tg_xyzzz_xxy_d_0_0_1 = pbuffer.data(idx_hf_d_0_0_1 + 131);
 
-        auto tg_xyzzz_xxz_d_0_0_1 = pbuffer.data(idx_hf_d_0_0_1 + 132);
 
-        auto tg_xyzzz_xyy_d_0_0_1 = pbuffer.data(idx_hf_d_0_0_1 + 133);
 
-        auto tg_xyzzz_xyz_d_0_0_1 = pbuffer.data(idx_hf_d_0_0_1 + 134);
 
-        auto tg_xyzzz_xzz_d_0_0_1 = pbuffer.data(idx_hf_d_0_0_1 + 135);
 
-        auto tg_xyzzz_yyy_d_0_0_1 = pbuffer.data(idx_hf_d_0_0_1 + 136);
 
-        auto tg_xyzzz_yyz_d_0_0_1 = pbuffer.data(idx_hf_d_0_0_1 + 137);
 
-        auto tg_xyzzz_yzz_d_0_0_1 = pbuffer.data(idx_hf_d_0_0_1 + 138);
 
-        auto tg_xyzzz_zzz_d_0_0_1 = pbuffer.data(idx_hf_d_0_0_1 + 139);
 
         auto tg_xzzzz_xxx_d_0_0_1 = pbuffer.data(idx_hf_d_0_0_1 + 140);
 

@@ -366,26 +366,9 @@ computeOverlapHessian101(const CMolecule& molecule,
     const auto ss_prim_pair_count = static_cast<int>(pair_inds_ss.size());
     const auto sp_prim_pair_count = static_cast<int>(pair_inds_sp.size());
     const auto sd_prim_pair_count = static_cast<int>(pair_inds_sd.size());
-    const auto sf_prim_pair_count = static_cast<int>(pair_inds_sf.size());
     const auto pp_prim_pair_count = static_cast<int>(pair_inds_pp.size());
     const auto pd_prim_pair_count = static_cast<int>(pair_inds_pd.size());
-    const auto pf_prim_pair_count = static_cast<int>(pair_inds_pf.size());
     const auto dd_prim_pair_count = static_cast<int>(pair_inds_dd.size());
-    const auto df_prim_pair_count = static_cast<int>(pair_inds_df.size());
-    const auto ff_prim_pair_count = static_cast<int>(pair_inds_ff.size());
-
-    const auto max_prim_pair_count = std::max({
-            ss_prim_pair_count,
-            sp_prim_pair_count,
-            sd_prim_pair_count,
-            sf_prim_pair_count,
-            pp_prim_pair_count,
-            pd_prim_pair_count,
-            pf_prim_pair_count,
-            dd_prim_pair_count,
-            df_prim_pair_count,
-            ff_prim_pair_count
-    });
 
     const double delta[3][3] = {{1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 0.0, 1.0}};
 
@@ -393,12 +376,6 @@ computeOverlapHessian101(const CMolecule& molecule,
         {0,0}, {0,1}, {0,2},
         {1,1}, {1,2},
         {2,2}
-    };
-
-    const int f_cart_inds[10][3] = {
-        {0,0,0}, {0,0,1}, {0,0,2}, {0,1,1}, {0,1,2}, {0,2,2},
-        {1,1,1}, {1,1,2}, {1,2,2},
-        {2,2,2}
     };
 
     // auto-generated code begins here

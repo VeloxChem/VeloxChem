@@ -95,8 +95,7 @@ class TestComplexResponse:
 
         # Setup the Task parameters
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
-        scf_results = scf_drv.compute(task.molecule, task.ao_basis,
-                                      task.min_basis)
+        scf_results = scf_drv.compute(task.molecule, task.ao_basis)
 
         # Run the pulsed response computation
         pulsed_response = PulsedResponse(task.mpi_comm, task.ostream)

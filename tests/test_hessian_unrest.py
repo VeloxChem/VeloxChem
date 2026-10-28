@@ -1,5 +1,6 @@
 import numpy as np
 import pytest
+from pathlib import Path
 
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.molecule import Molecule
@@ -10,6 +11,18 @@ from veloxchem.vibrationalanalysis import VibrationalAnalysis
 
 
 class TestScfUnrestrictedHessian:
+
+    @staticmethod
+    def get_embedded_water_molecule_and_basis():
+
+        mol = Molecule.read_xyz_string("""3
+        xyz
+        O    1.2361419   1.0137761  -0.0612424
+        H    0.5104418   0.8944555   0.5514190
+        H    1.9926927   1.1973129   0.4956931
+        """)
+        bas = MolecularBasis.read(mol, 'def2-svp', ostream=None)
+        return mol, bas
 
     def run_hessian_unrest(self, xcfun_label, ref_vib_freqs):
 
@@ -116,3 +129,65 @@ class TestScfUnrestrictedHessian:
         ref_vib_freqs = np.array([1949.51])
         ref_ir_intens = np.array([278.8583])
         self.run_hessian_unrest_with_ecp(ref_vib_freqs, ref_ir_intens)
+
+    @pytest.mark.solvers
+    def test_hessian_unrest_with_point_charges_and_vdw(self):
+
+        mol, bas = self.get_embedded_water_molecule_and_basis()
+
+        here = Path(__file__).parent
+        potfile = str(here / 'data' / 'pe_water.pot')
+        vdwfile = str(here / 'data' / 'pe_water.qm_vdw_params.txt')
+        reffile = str(here / 'data' /
+                      'water_analytical_hessian_pointcharges_unrest_b3lyp.txt')
+
+        scf_drv = ScfUnrestrictedDriver()
+        scf_drv.ostream.mute()
+        scf_drv.xcfun = 'b3lyp'
+        scf_drv.point_charges = potfile
+        scf_drv.qm_vdw_params = vdwfile
+        scf_drv.compute(mol, bas)
+
+        hess_drv = ScfHessianDriver(scf_drv)
+        hess_drv.ostream.mute()
+        hess_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            ref_hessian = np.loadtxt(reffile)
+            np.testing.assert_allclose(hess_drv.hessian,
+                                       ref_hessian,
+                                       rtol=1.0e-8,
+                                       atol=1.0e-10)
+
+    @pytest.mark.solvers
+    def test_hessian_unrest_camb3lyp(self):
+        mol = Molecule.read_xyz_string("""4
+        xyz
+        C       -0.8246083505   -2.6364102075   -0.0255277471
+        H       -0.4137775504   -3.6364807662   -0.1702755824
+        H       -1.8972335969   -2.4672317696   -0.1290827158
+        H       -0.1628531453   -1.8055908756    0.2228478391
+        """)
+        mol.set_multiplicity(2)
+
+        bas = MolecularBasis.read(mol, 'def2-svp')
+
+        scf_drv = ScfUnrestrictedDriver()
+        scf_drv.ostream.mute()
+        scf_drv.xcfun = 'cam-b3lyp'
+        scf_drv.compute(mol, bas)
+
+        hess_drv = ScfHessianDriver(scf_drv)
+        hess_drv.ostream.mute()
+        hess_drv.update_settings({'xcfun': 'cam-b3lyp'})
+        hess_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            here = Path(__file__).parent
+            reffile = str(here / 'data' /
+                          'methyl_analytical_hessian_unrest_camb3lyp.txt')
+            ref_hessian = np.loadtxt(reffile)
+            np.testing.assert_allclose(hess_drv.hessian,
+                                       ref_hessian,
+                                       rtol=1.0e-8,
+                                       atol=1.0e-10)

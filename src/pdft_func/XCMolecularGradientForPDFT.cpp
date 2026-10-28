@@ -105,21 +105,16 @@ integrateVxcPDFTGradientForLDA(const CMolecule&                molecule,
 
     // set up pointers to OMP data
 
-    auto ptr_counts = counts.data();
-
-    auto ptr_displacements = displacements.data();
-
     auto ptr_gto_blocks = gto_blocks.data();
 
-    auto ptr_twoBodyDensityMatrix = &twoBodyDensityMatrix;
     auto ptr_activeMOs = &activeMOs;
 
     auto ptr_xcFunctional = &xcFunctional;
 
     auto ptr_molgrad_threads = &molgrad_threads;
 
-#pragma omp parallel shared(ptr_counts, ptr_displacements, xcoords, ycoords, zcoords, \
-                            ptr_gto_blocks, densityMatrixPointer, ptr_twoBodyDensityMatrix, \
+#pragma omp parallel shared(displacements, xcoords, ycoords, zcoords, \
+                            ptr_gto_blocks, densityMatrixPointer, twoBodyDensityMatrix, \
                             ptr_activeMOs, ptr_xcFunctional, ptr_molgrad_threads, \
                             n_boxes, n_gto_blocks, naos)
     {
@@ -206,7 +201,7 @@ integrateVxcPDFTGradientForLDA(const CMolecule&                molecule,
 
             // go through GTO blocks
 
-            for (size_t i_block = 0, idx = 0; i_block < n_gto_blocks; i_block++)
+            for (int i_block = 0, idx = 0; i_block < static_cast<int>(n_gto_blocks); i_block++)
             {
                 const auto& gto_block = ptr_gto_blocks[i_block];
 
@@ -539,21 +534,16 @@ integrateVxcPDFTGradientForGGA(const CMolecule&                molecule,
 
     // set up pointers to OMP data
 
-    auto ptr_counts = counts.data();
-
-    auto ptr_displacements = displacements.data();
-
     auto ptr_gto_blocks = gto_blocks.data();
 
-    auto ptr_twoBodyDensityMatrix = &twoBodyDensityMatrix;
     auto ptr_activeMOs = &activeMOs;
 
     auto ptr_xcFunctional = &xcFunctional;
 
     auto ptr_molgrad_threads = &molgrad_threads;
 
-#pragma omp parallel shared(ptr_counts, ptr_displacements, xcoords, ycoords, zcoords, \
-                            ptr_gto_blocks, densityMatrixPointer, ptr_twoBodyDensityMatrix, \
+#pragma omp parallel shared(displacements, xcoords, ycoords, zcoords, \
+                            ptr_gto_blocks, densityMatrixPointer, twoBodyDensityMatrix, \
                             ptr_activeMOs, ptr_xcFunctional, ptr_molgrad_threads, \
                             n_boxes, n_gto_blocks, naos)
     {
@@ -648,7 +638,7 @@ integrateVxcPDFTGradientForGGA(const CMolecule&                molecule,
 
             // go through GTO blocks
 
-            for (size_t i_block = 0, idx = 0; i_block < n_gto_blocks; i_block++)
+            for (int i_block = 0, idx = 0; i_block < static_cast<int>(n_gto_blocks); i_block++)
             {
                 const auto& gto_block = ptr_gto_blocks[i_block];
 

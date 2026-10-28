@@ -41,7 +41,7 @@ class TestRIJFockGeomExGradDriver:
             density = scf_res['D_alpha']
 
             mo = scf_res['C_alpha']
-            nocc = mol.number_of_alpha_electrons()
+            nocc = mol.number_of_alpha_occupied_orbitals(bas)
             mo_occ = mo[:, :nocc]
             mo_vir = mo[:, nocc:]
             nvir = mo_vir.shape[1]

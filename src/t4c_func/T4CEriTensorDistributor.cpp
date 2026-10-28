@@ -82,20 +82,6 @@ CT4CEriTensorDistributor::set_indices(const CGtoPairBlock& bra_gto_pair_block, c
     _c_glob_indices = t4cfunc::compresed_indices(ket_gto_pair_block.bra_orbital_indices());
 
     _d_glob_indices = t4cfunc::compresed_indices(ket_gto_pair_block.ket_orbital_indices());
-
-    // set up local matrices
-
-    const auto bra_ang_moms = bra_gto_pair_block.angular_momentums();
-
-    const auto ket_ang_moms = ket_gto_pair_block.angular_momentums();
-
-    const auto a_dims = _a_loc_indices[0] * tensor::number_of_spherical_components(std::array<int, 1>{bra_ang_moms.first});
-
-    const auto b_dims = _b_loc_indices[0] * tensor::number_of_spherical_components(std::array<int, 1>{bra_ang_moms.second});
-
-    const auto c_dims = _c_loc_indices[0] * tensor::number_of_spherical_components(std::array<int, 1>{ket_ang_moms.first});
-
-    const auto d_dims = _d_loc_indices[0] * tensor::number_of_spherical_components(std::array<int, 1>{ket_ang_moms.second});
 }
 
 auto

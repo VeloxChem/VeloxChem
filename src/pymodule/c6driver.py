@@ -43,10 +43,13 @@ from .distributedarray import DistributedArray
 from .linearsolver import LinearSolver
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            ri_sanity_check, dft_sanity_check, pe_sanity_check,
-                           solvation_model_sanity_check)
+                           solvation_model_sanity_check, gostshyp_sanity_check,
+                           environment_compatibility_sanity_check)
 from .errorhandler import assert_msg_critical
 from .mathutils import safe_solve
-from .checkpoint import (check_rsp_hdf5, write_rsp_solution_with_multiple_keys)
+from .checkpoint import check_rsp_hdf5
+from .resultsio import (clear_group_in_hdf5, write_rsp_full_solution_to_hdf5,
+                        write_rsp_results_to_hdf5)
 
 
 class C6Driver(LinearSolver):
@@ -239,11 +242,6 @@ class C6Driver(LinearSolver):
             A dictionary containing response functions and solutions.
         """
 
-        # TODO: enable ECP
-        assert_msg_critical(
-            not basis.has_ecp(),
-            f'{type(self).__name__}.compute: ECP is not yet supported')
-
         if self.norm_thresh is None:
             self.norm_thresh = self.conv_thresh * 1.0e-6
         if self.lindep_thresh is None:
@@ -255,7 +253,7 @@ class C6Driver(LinearSolver):
         self._dist_e2bung = None
 
         # check molecule
-        molecule_sanity_check(molecule, 'restricted')
+        molecule_sanity_check(molecule, 'restricted', type(self).__name__)
 
         # check SCF results
         scf_results_sanity_check(self, scf_results)
@@ -273,8 +271,14 @@ class C6Driver(LinearSolver):
         # check pe setup
         pe_sanity_check(self, molecule=molecule)
 
-        # check solvation setup
+        # check solvation model setup
         solvation_model_sanity_check(self)
+
+        # check GOSTSHYP setup
+        gostshyp_sanity_check(self)
+
+        # check pairwise compatibility of the environment settings
+        environment_compatibility_sanity_check(self)
 
         # check solvation model setup
         if self.rank == mpi_master():
@@ -304,7 +308,7 @@ class C6Driver(LinearSolver):
             orb_ene = None
         orb_ene = self.comm.bcast(orb_ene, root=mpi_master())
         norb = orb_ene.shape[0]
-        nocc = molecule.number_of_alpha_electrons()
+        nocc = molecule.number_of_alpha_occupied_orbitals(basis)
 
         # ERI information
         eri_dict = self._init_eri(molecule, basis)
@@ -316,7 +320,10 @@ class C6Driver(LinearSolver):
         pe_dict = self._init_pe(molecule, basis)
 
         # CPCM information
-        self._init_cpcm(molecule)
+        self._init_cpcm(molecule, basis)
+
+        # GOSTSHYP information
+        self._init_gostshyp(molecule, basis, scf_results)
 
         # right-hand side (gradient)
         b_grad = self.get_complex_prop_grad(self.b_operator, self.b_components,
@@ -381,6 +388,8 @@ class C6Driver(LinearSolver):
                 self.restart = check_rsp_hdf5(self.checkpoint_file,
                                               rsp_vector_labels, molecule,
                                               basis, dft_dict, pe_dict)
+                if self.restart:
+                    self.restart = self.match_settings(self.checkpoint_file)
             self.restart = self.comm.bcast(self.restart, root=mpi_master())
 
         # read initial guess from restart file
@@ -554,6 +563,8 @@ class C6Driver(LinearSolver):
 
                 self._print_iteration(relative_residual_norm, xvs)
 
+                self._print_gostshyp_neg_amp_info()
+
             profiler.stop_timer('ReducedSpace')
 
             # check convergence
@@ -632,24 +643,22 @@ class C6Driver(LinearSolver):
                 # final h5 file for response solutions
                 if self.filename is not None:
                     final_h5_fname = f'{self.filename}.h5'
+                    # clear stale group in final h5
+                    clear_group_in_hdf5(final_h5_fname, 'rsp')
                 else:
                     final_h5_fname = None
 
-            for bop, iw in solutions:
+            for op_iw_ind, (bop, iw) in enumerate(solutions):
                 x = self.get_full_solution_vector(solutions[(bop, iw)])
 
                 if self.rank == mpi_master():
                     for aop in self.a_components:
                         rsp_funcs[(aop, bop, iw)] = -np.dot(va[aop], x)
 
-                    # write to h5 file for response solutions
+                    # write solutions to h5 file
                     if (self.save_solutions and final_h5_fname is not None):
-                        solution_keys = [
-                            '{:s}_{:s}_{:.8f}'.format(aop, bop, iw)
-                            for aop in self.a_components
-                        ]
-                        write_rsp_solution_with_multiple_keys(
-                            final_h5_fname, solution_keys, x)
+                        write_rsp_full_solution_to_hdf5(
+                            final_h5_fname, x, op_iw_ind, len(solutions))
 
             if self.rank == mpi_master():
                 # print information about h5 file for response solutions
@@ -658,17 +667,42 @@ class C6Driver(LinearSolver):
                         'Response solution vectors written to file: ' +
                         final_h5_fname)
                     self.ostream.print_blank()
+                    self.ostream.flush()
 
                 c6 = self._integrate_c6(self.w0, points, weights, imagfreqs,
                                         rsp_funcs)
 
                 self._print_results(c6, rsp_funcs, self.ostream)
 
-                return {
+                ret_dict = {
                     'c6': c6,
+                    'n_points': self.n_points,
                     'response_functions': rsp_funcs,
-                    'solutions': solutions
+                    'solutions': solutions,
+                    'w0': self.w0,
                 }
+
+                if self.save_solutions and final_h5_fname is not None:
+                    full_solutions_keys = [
+                        '{:s}_{:.8f}'.format(bop, iw)
+                        for bop, iw in solutions
+                    ]
+                    write_rsp_results_to_hdf5(
+                        final_h5_fname,
+                        {'full_solutions_keys': full_solutions_keys})
+
+                # add rsp type
+                ret_dict.update({'rsp_type': 'c6'})
+
+                if final_h5_fname is not None:
+                    h5_ret_dict = {
+                        key: value
+                        for key, value in ret_dict.items()
+                        if key != 'solutions'
+                    }
+                    write_rsp_results_to_hdf5(final_h5_fname, h5_ret_dict)
+
+                return ret_dict
             else:
                 # non-master rank
                 return {'solutions': solutions}

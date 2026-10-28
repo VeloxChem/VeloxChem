@@ -488,7 +488,7 @@ export_t2cintegrals(py::module& m)
              "Computes projected ECP matrix for given molecule, basis, base core potential.");
     
     // CCorePotentialDriver class
-    PyClass<CCorePotentialDriver>(m, "ECPDriver")
+    PyClass<CCorePotentialDriver>(m, "EcpDriver")
         .def(py::init<>())
         .def(
             "compute",
@@ -670,7 +670,7 @@ export_t2cintegrals(py::module& m)
             "Computes projected core potential first derivatives matrices for given molecule, basis and selected atoms.");
     
     // CCorePotentialGradientDriver class
-    PyClass<CCorePotentialGradientDriver>(m, "ECPGradientDriver")
+    PyClass<CCorePotentialGradientDriver>(m, "EcpGradientDriver")
         .def(py::init<>())
         .def(
             "compute_bra_grad",
@@ -712,7 +712,7 @@ export_t2cintegrals(py::module& m)
              "Computes ECP matrix for given molecule, basis, vector of atoms.");
     
     // CCorePotentialHessianDriver class
-    PyClass<CCorePotentialHessianDriver>(m, "ECPHessianDriver")
+    PyClass<CCorePotentialHessianDriver>(m, "EcpHessianDriver")
         .def(py::init<>())
         .def(
             "compute_geom_200",

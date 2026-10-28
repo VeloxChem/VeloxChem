@@ -30,6 +30,8 @@
 #  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+from mpi4py import MPI
+from pathlib import Path
 from datetime import datetime
 import numpy as np
 import time as tm
@@ -55,15 +57,20 @@ from .oneeints import (compute_electric_dipole_integrals,
                        compute_linear_momentum_integrals,
                        compute_angular_momentum_integrals)
 from .sanitychecks import (dft_sanity_check, ri_sanity_check, pe_sanity_check,
-                           solvation_model_sanity_check)
+                           solvation_model_sanity_check,
+                           gostshyp_sanity_check,
+                           environment_compatibility_sanity_check)
 from .errorhandler import assert_msg_critical
 from .inputparser import (parse_input, print_keywords, print_attributes,
-                          get_random_string_parallel)
+                          get_random_string_parallel, unparse_input,
+                          write_unparsed_input_to_hdf5,
+                          read_unparsed_input_from_hdf5)
 from .dftutils import get_default_grid_level, print_xc_reference
 from .checkpoint import write_rsp_hdf5
 from .batchsize import get_batch_size
 from .batchsize import get_number_of_batches
 from .cpcmdriver import CpcmDriver
+from .gostshypdriver import GostshypDriver
 
 
 class LinearSolver:
@@ -145,9 +152,6 @@ class LinearSolver:
         # static electric field
         self.electric_field = None
 
-        # point charges
-        self.point_charges = None
-
         # solvation model
         self.solvation_model = None
         self.non_equilibrium_solv = True
@@ -160,7 +164,22 @@ class LinearSolver:
         self.cpcm_grid_per_sphere = (194, 110)
         self.cpcm_cg_thresh = 1.0e-8
         self.cpcm_x = 0
+        self.cpcm_radii_scaling = 1.2
         self.cpcm_custom_vdw_radii = None
+
+        # gostshyp setup
+        self._gostshyp = False
+        self._gostshyp_drv = None
+        self.pressure = 0.0
+        self.pressure_units = 'MPa'
+        self.gostshyp_num_lebedev_points = 110
+        self.gostshyp_tssf = 1.2
+        self.gostshyp_discretization = 'swig'
+        self.gostshyp_switching_thresh = 1.0e-8
+        self.gostshyp_r_ext = 0.25
+        self.gostshyp_tco_tol = 1.0e-14
+        self._gostshyp_tess_info = None
+        self._gostshyp_gs_density = None
 
         # solver setup
         self.conv_thresh = 1.0e-4
@@ -218,9 +237,6 @@ class LinearSolver:
         self.serial_ratio = 0.05
         self.use_subcomms = False
 
-        # group label used to save the response results in a checkpoint file
-        self.group_label = 'rsp'
-
         # input keywords
         self._input_keywords = {
             'response': {
@@ -266,9 +282,21 @@ class LinearSolver:
                     ('float', 'dielectric constant of solvent (C-PCM)'),
                 'cpcm_optical_epsilon':
                     ('float', 'optical dielectric constant of solvent (C-PCM)'),
+                'cpcm_radii_scaling':
+                    ('float', 'scaling factor for C-PCM vdW radii'),
                 'cpcm_x': ('float', 'parameter for scaling function (C-PCM)'),
                 'cpcm_custom_vdw_radii':
                     ('seq_fixed_str', 'custom vdw radii for C-PCM'),
+                'pressure': ('float', 'applied hydrostatic pressure'),
+                'pressure_units': ('str', 'units of the applied pressure'),
+                'gostshyp_num_lebedev_points': ('int', 'number of grid points per sphere'),
+                'gostshyp_tssf': ('float', 'tessellation sphere scaling factor'),
+                'gostshyp_discretization': ('str', 'surface discretization method'),
+                'gostshyp_switching_thresh': ('float', 'switching function threshold'),
+                'gostshyp_r_ext':
+                    ('float', 'extension radius for outer cavity correction in angstrom'),
+                'gostshyp_tco_tol':
+                    ('float', 'three-center overlap integral screening threshold')
             },
         }
 
@@ -347,9 +375,7 @@ class LinearSolver:
         if method_dict is None:
             method_dict = {}
 
-        rsp_keywords = {
-            key: val[0] for key, val in self._input_keywords['response'].items()
-        }
+        rsp_keywords = self._get_response_keywords()
 
         parse_input(self, rsp_keywords, rsp_dict)
 
@@ -360,10 +386,7 @@ class LinearSolver:
             if 'checkpoint_file' not in rsp_dict:
                 self.checkpoint_file = f'{self.filename}_rsp.h5'
 
-        method_keywords = {
-            key: val[0]
-            for key, val in self._input_keywords['method_settings'].items()
-        }
+        method_keywords = self._get_method_keywords()
 
         parse_input(self, method_keywords, method_dict)
 
@@ -373,7 +396,11 @@ class LinearSolver:
 
         pe_sanity_check(self, method_dict)
 
+        # check solvation model setup
         solvation_model_sanity_check(self)
+
+        # check GOSTSHYP setup
+        gostshyp_sanity_check(self)
 
         assert_msg_critical(not self._smd,
                             'Cannot use SMD in response calculation')
@@ -386,10 +413,145 @@ class LinearSolver:
                 not self._pe,
                 'LinearSolver: \'electric field\' input is incompatible ' +
                 'with polarizable embedding')
-            # disable restart of calculation with static electric field since
-            # checkpoint file does not contain information about the electric
-            # field
-            self.restart = False
+
+        # check pairwise compatibility of the environment settings
+        environment_compatibility_sanity_check(self)
+
+    def _get_response_keywords(self):
+        """
+        Gets response keyword types.
+
+        :return:
+            The response keyword types.
+        """
+
+        return {
+            key: val[0] for key, val in self._input_keywords['response'].items()
+        }
+
+    def _get_method_keywords(self):
+        """
+        Gets method keyword types.
+
+        :return:
+            The method keyword types.
+        """
+
+        return {
+            key: val[0]
+            for key, val in self._input_keywords['method_settings'].items()
+        }
+
+    def read_settings(self, checkpoint_file):
+        """
+        Reads response and method settings from checkpoint file.
+
+        :param checkpoint_file:
+            The checkpoint file to read settings from.
+        """
+
+        if self.rank == mpi_master():
+            checkpoint_rsp_input = read_unparsed_input_from_hdf5(
+                checkpoint_file, group_name='response_settings')
+            checkpoint_method_input = read_unparsed_input_from_hdf5(
+                checkpoint_file, group_name='method_settings')
+        else:
+            checkpoint_rsp_input = None
+            checkpoint_method_input = None
+
+        checkpoint_rsp_input = self.comm.bcast(checkpoint_rsp_input,
+                                               root=mpi_master())
+        checkpoint_method_input = self.comm.bcast(checkpoint_method_input,
+                                                  root=mpi_master())
+
+        # Avoid importing restart state or checkpoint/output targets when
+        # copying settings from an external file.
+        checkpoint_rsp_input.pop('restart', None)
+        checkpoint_rsp_input.pop('checkpoint_file', None)
+        checkpoint_rsp_input.pop('filename', None)
+
+        self.update_settings(checkpoint_rsp_input, checkpoint_method_input)
+
+    def _write_settings_to_checkpoint(self, checkpoint_file=None):
+        """
+        Writes response and method settings to checkpoint file.
+
+        :param checkpoint_file:
+            The checkpoint file name.
+        """
+
+        if checkpoint_file is None:
+            checkpoint_file = self.checkpoint_file
+
+        if checkpoint_file is None:
+            return
+
+        if self.rank == mpi_master():
+            write_unparsed_input_to_hdf5(checkpoint_file,
+                                         unparse_input(
+                                             self,
+                                             self._get_response_keywords()),
+                                         group_name='response_settings')
+            write_unparsed_input_to_hdf5(checkpoint_file,
+                                         unparse_input(
+                                             self, self._get_method_keywords()),
+                                         group_name='method_settings')
+
+    def match_settings(self, checkpoint_file):
+        """
+        Checks whether response and method settings match a checkpoint file.
+
+        Missing settings groups are treated as a match for backward
+        compatibility.
+
+        :param checkpoint_file:
+            The checkpoint file to validate.
+
+        :return:
+            True if settings match or are unavailable, False otherwise.
+        """
+
+        valid_checkpoint = (checkpoint_file and
+                            isinstance(checkpoint_file, str) and
+                            Path(checkpoint_file).is_file())
+
+        if not valid_checkpoint:
+            return False
+
+        # Avoid comparing:
+        # 1) restart state or checkpoint/output targets
+        # 2) nstates or frequencies (to allow restarting with more states/frequencies)
+        # 3) print_level (can differ between input-file and python script)
+        # 4) tamm_dancoff (not needed since rsp_vector_labels are different)
+        excluded_rsp_keys = {
+            'restart',
+            'filename',
+            'checkpoint_file',
+            'nstates',
+            'frequencies',
+            'print_level',
+            'tamm_dancoff',
+        }
+
+        # for backward compatibility
+        with h5py.File(checkpoint_file, 'r') as h5f:
+            if ('response_settings' not in h5f or 'method_settings' not in h5f):
+                return True
+
+        checkpoint_rsp_input = read_unparsed_input_from_hdf5(
+            checkpoint_file, group_name='response_settings')
+        checkpoint_method_input = read_unparsed_input_from_hdf5(
+            checkpoint_file, group_name='method_settings')
+
+        current_rsp_input = unparse_input(self, self._get_response_keywords())
+        current_method_input = unparse_input(self, self._get_method_keywords())
+
+        for key in excluded_rsp_keys:
+            checkpoint_rsp_input.pop(key, None)
+            current_rsp_input.pop(key, None)
+
+        return (checkpoint_rsp_input == current_rsp_input and
+                checkpoint_method_input == current_method_input)
 
     def _init_eri(self, molecule, basis):
         """
@@ -527,12 +689,14 @@ class LinearSolver:
             'potfile_text': potfile_text,
         }
 
-    def _init_cpcm(self, molecule):
+    def _init_cpcm(self, molecule, basis):
         """
         Initializes C-PCM.
 
         :param molecule:
             The molecule.
+        :param basis:
+            The AO basis set.
         """
 
         # C-PCM setup
@@ -544,19 +708,86 @@ class LinearSolver:
             self.cpcm_drv.grid_per_sphere = self.cpcm_grid_per_sphere
             self.cpcm_drv.epsilon = self.cpcm_epsilon
             self.cpcm_drv.optical_epsilon = self.cpcm_optical_epsilon
+            self.cpcm_drv.radii_scaling = self.cpcm_radii_scaling
             self.cpcm_drv.x = self.cpcm_x
             self.cpcm_drv.custom_vdw_radii = self.cpcm_custom_vdw_radii
 
             cpcm_grid_t0 = tm.time()
 
-            self.cpcm_drv.init(molecule, do_nuclear=False)
+            self.cpcm_drv.init(molecule, basis, do_nuclear=False)
 
             if self.print_level > 1:
                 self.ostream.print_info(
-                    f'C-PCM grid with {self.cpcm_drv._cpcm_grid.shape[0]} points '
+                    f'C-PCM grid with {self.cpcm_drv.cpcm_grid.shape[0]} points '
                     + f'generated in {tm.time() - cpcm_grid_t0:.2f} sec.')
                 self.ostream.print_blank()
                 self.ostream.flush()
+
+    def _init_gostshyp(self, molecule, basis, scf_results):
+        """
+        Initializes GOSTSHYP.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param scf_results:
+            The dictionary of tensors from converged SCF wavefunction.
+        """
+
+        if self._gostshyp:
+            self._gostshyp_drv = GostshypDriver(self.comm, self.ostream)
+            self._gostshyp_drv.print_gostshyp_references()
+            self._gostshyp_drv.init(molecule, basis, self.pressure,
+                                    self.pressure_units,
+                                    self.gostshyp_tco_tol)
+
+            self._gostshyp_tess_info = {
+                'num_lebedev_points': self.gostshyp_num_lebedev_points,
+                'tssf': self.gostshyp_tssf,
+                'discretization': self.gostshyp_discretization,
+                'switching_thresh': self.gostshyp_switching_thresh,
+                'r_ext': self.gostshyp_r_ext,
+            }
+
+            if self.rank == mpi_master():
+                # Note: make gs_density a tuple
+                if scf_results['scf_type'] == 'restricted':
+                    gs_density = (scf_results['D_alpha'].copy(),)
+                else:
+                    gs_density = (scf_results['D_alpha'].copy(),
+                                  scf_results['D_beta'].copy())
+            else:
+                gs_density = None
+            # TODO: bcast D_alpha and D_beta separately
+            self._gostshyp_gs_density = self.comm.bcast(
+                gs_density, root=mpi_master())
+
+        else:
+            self._gostshyp_tess_info = None
+            self._gostshyp_gs_density = None
+
+    def _print_gostshyp_neg_amp_info(self):
+        """
+        Prints information about grid points with negative amplitudes
+        excluded in the GOSTSHYP calculation, provided that any grid
+        points were excluded.
+
+        The number of excluded grid points is read from the GOSTSHYP
+        driver; it is determined from the ground state density the first
+        time the GOSTSHYP contribution to the response Fock matrix is
+        computed. The count is reduced to the master rank only, and the
+        information is checked and printed on the master rank only.
+        """
+
+        if (self.rank == mpi_master() and self._gostshyp
+                and self._gostshyp_drv is not None
+                and self._gostshyp_drv.num_neg_amp > 0):
+            valstr = '*** GOSTSHYP information: A total number of '
+            valstr += ('{} grid points with negative amplitudes were '
+                       'excluded ***'.format(self._gostshyp_drv.num_neg_amp))
+            self.ostream.print_header(valstr)
+            self.ostream.print_blank()
 
     def _read_checkpoint(self, rsp_vector_labels):
         """
@@ -691,6 +922,70 @@ class LinearSolver:
                 self.guess_scaling_threshold * self.initial_guess_multiplier +
                 (nstates - self.guess_scaling_threshold))
 
+    def _get_excitation_space_dimension_restricted(self, nocc, norb):
+        """
+        Gets the excitation-space dimension for restricted methods.
+
+        :param nocc:
+            Number of occupied orbitals.
+        :param norb:
+            Number of orbitals.
+
+        :return:
+            The excitation-space dimension.
+        """
+
+        if getattr(self, 'core_excitation', False):
+            return self.num_core_orbitals * (norb - nocc)
+
+        if getattr(self, 'restricted_subspace', False):
+            return ((self.num_core_orbitals + self.num_valence_orbitals) *
+                    self.num_virtual_orbitals)
+
+        return nocc * (norb - nocc)
+
+    def _get_excitation_space_dimension_unrestricted(self, nocc_a, nocc_b,
+                                                     norb):
+        """
+        Gets the excitation-space dimension for unrestricted methods.
+
+        :param nocc_a:
+            Number of alpha occupied orbitals.
+        :param nocc_b:
+            Number of beta occupied orbitals.
+        :param norb:
+            Number of orbitals.
+
+        :return:
+            The excitation-space dimension.
+        """
+
+        if getattr(self, 'core_excitation', False):
+            return (self.num_core_orbitals * (norb - nocc_a) +
+                    self.num_core_orbitals * (norb - nocc_b))
+
+        return (nocc_a * (norb - nocc_a) + nocc_b * (norb - nocc_b))
+
+    def _check_mpi_oversubscription(self, dimension, label):
+        """
+        Fails fast if the distributed space would assign zero rows to one or
+        more MPI ranks.
+
+        :param dimension:
+            The number of distributed rows.
+        :param label:
+            A short label for the distributed space.
+        """
+
+        assert_msg_critical(
+            dimension > 0,
+            f'{type(self).__name__}: invalid {label} dimension')
+        assert_msg_critical(
+            self.nodes <= dimension,
+            f'{type(self).__name__}: {self.nodes} MPI ranks exceed the '
+            f'{label} dimension ({dimension}). Please use at most {dimension} '
+            + 'MPI ranks for this calculation.')
+
     def _add_nstates_to_checkpoint(self):
         """
         Add nstates to checkpoint file.
@@ -737,6 +1032,53 @@ class LinearSolver:
 
         return nstates
 
+    def _add_frequencies_to_checkpoint(self):
+        """
+        Add frequencies to checkpoint file.
+        """
+
+        # For LR/CPP
+
+        if self.checkpoint_file is None:
+            return
+
+        if self.rank == mpi_master():
+            hf = h5py.File(self.checkpoint_file, 'a')
+            key = 'frequencies'
+            if key in hf:
+                del hf[key]
+            hf.create_dataset(key, data=np.array(self.frequencies))
+            hf.close()
+
+        self.comm.barrier()
+
+    def _read_frequencies_from_checkpoint(self):
+        """
+        Read frequencies from checkpoint file.
+
+        :return:
+            The frequencies.
+        """
+
+        # For LR/CPP
+
+        if self.checkpoint_file is None:
+            return None
+
+        frequencies = None
+
+        if self.rank == mpi_master():
+            hf = h5py.File(self.checkpoint_file, 'r')
+            key = 'frequencies'
+            if key in hf:
+                frequencies = np.array(hf.get(key))
+                frequencies = [float(x) for x in frequencies]
+            hf.close()
+
+        frequencies = self.comm.bcast(frequencies, root=mpi_master())
+
+        return frequencies
+
     def compute(self, molecule, basis, scf_results, v_grad=None):
         """
         Solves for the linear equations.
@@ -768,6 +1110,11 @@ class LinearSolver:
                        pe_dict,
                        profiler=None,
                        method_type='restricted'):
+
+        # TODO: support GOSTSHYP with communicator-local drivers in subcomms.
+        assert_msg_critical(
+            not (self.use_subcomms and self._gostshyp),
+            'LinearSolver: Cannot use subcomms with GOSTSHYP')
 
         if self.use_subcomms and self.ri_coulomb:
             self.use_subcomms = False
@@ -1713,6 +2060,8 @@ class LinearSolver:
 
         molgrid = dft_dict['molgrid']
         gs_density = dft_dict['gs_density']
+        gs_dm_gost = self._gostshyp_gs_density
+        tessellation_settings = self._gostshyp_tess_info
 
         if comm_rank == mpi_master():
             num_densities = len(dens)
@@ -1731,7 +2080,7 @@ class LinearSolver:
         t0 = tm.time()
 
         fock_drv = FockDriver(comm)
-        fock_drv._set_block_size_factor(self._block_size_factor)
+        fock_drv.set_block_size_factor(self._block_size_factor)
 
         # determine fock_type and exchange_scaling_factor
         fock_type = '2jk'
@@ -1840,6 +2189,26 @@ class LinearSolver:
             if profiler is not None:
                 profiler.add_timing_info('FockCPCM', tm.time() - t0)
 
+        if self._gostshyp:
+
+            t0 = tm.time()
+            gs_dm = gs_dm_gost[0]
+
+            for idx in range(num_densities):
+
+                dm = dens[idx]
+
+                # Note: only closed shell density for now
+                fock_gost = self._gostshyp_drv.gostshyp_rsp_contrib(gs_dm * 2.0,
+                                                                    dm * 2.0,
+                                                                    tessellation_settings)
+
+                if comm_rank == mpi_master():
+                    fock_arrays[idx] += fock_gost
+
+            if profiler is not None:
+                profiler.add_timing_info('FockGOST', tm.time() - t0)
+
         for idx in range(len(fock_arrays)):
             fock_arrays[idx] = comm.reduce(fock_arrays[idx], root=mpi_master())
 
@@ -1894,6 +2263,8 @@ class LinearSolver:
 
         molgrid = dft_dict['molgrid']
         gs_density = dft_dict['gs_density']
+        gs_dm_gost = self._gostshyp_gs_density
+        tessellation_settings = self._gostshyp_tess_info
 
         if comm_rank == mpi_master():
             num_densities = len(dens_a)
@@ -1914,7 +2285,7 @@ class LinearSolver:
         t0 = tm.time()
 
         fock_drv = FockDriver(comm)
-        fock_drv._set_block_size_factor(self._block_size_factor)
+        fock_drv.set_block_size_factor(self._block_size_factor)
 
         # determine fock_type and exchange_scaling_factor
         fock_type = '2jk'
@@ -1954,6 +2325,9 @@ class LinearSolver:
                 den_mat_for_ri_j.set_values(0.5 * (dens_Jab + dens_Jab.T))
 
                 fock_mat = self._ri_drv.compute(den_mat_for_ri_j, 'j')
+
+                fock_mat_a_np = fock_mat.to_numpy()
+                fock_mat_b_np = fock_mat.to_numpy()
             else:
                 # for now we calculate Ka, Kb and Jab separately for open-shell
                 den_mat_for_Ka = make_matrix(basis, mat_t.general)
@@ -2058,6 +2432,31 @@ class LinearSolver:
 
             if profiler is not None:
                 profiler.add_timing_info('FockCPCM', tm.time() - t0)
+
+        # TODO: validate GOSTSHYP implementation for unrestricted case
+        assert_msg_critical(
+            not self._gostshyp,
+            'LinearSolver: GOSTSHYP is not supported for unrestricted case yet')
+
+        if self._gostshyp:
+
+            t0 = tm.time()
+
+            gs_dm_a = gs_dm_gost[0]
+            gs_dm_b = gs_dm_gost[1]
+
+            for idx in range(num_densities):
+
+                fock_gost = self._gostshyp_drv.gostshyp_rsp_contrib(gs_dm_a + gs_dm_b,
+                                                                    dens_a[idx] + dens_b[idx],
+                                                                    tessellation_settings)
+
+                if comm_rank == mpi_master():
+                    fock_arrays[idx * 2 + 0] += fock_gost
+                    fock_arrays[idx * 2 + 1] += fock_gost
+
+            if profiler is not None:
+                profiler.add_timing_info('FockGOST', tm.time() - t0)
 
         for idx in range(num_densities):
             fock_arrays[idx * 2 + 0] = comm.reduce(fock_arrays[idx * 2 + 0],
@@ -2546,6 +2945,8 @@ class LinearSolver:
         success = self.comm.bcast(success, root=mpi_master())
 
         if success:
+            self._write_settings_to_checkpoint(self.checkpoint_file)
+
             if self.nonlinear:
                 dist_arrays = [
                     self._dist_bger, self._dist_bung, self._dist_e2bger,
@@ -2703,6 +3104,27 @@ class LinearSolver:
                 cur_str += f'{self.cpcm_optical_epsilon}'
                 self.ostream.print_header(cur_str.ljust(str_width))
 
+        if self._gostshyp:
+            cur_str = 'Pressure Model                  : '
+            cur_str += 'GOSTSHYP'
+            self.ostream.print_header(cur_str.ljust(str_width))
+            cur_str = 'Input Pressure                  : '
+            cur_str += f'{self.pressure} '
+            cur_str += self.pressure_units
+            self.ostream.print_header(cur_str.ljust(str_width))
+            cur_str = 'vDW Cavity Switching Function   : '
+            cur_str += self.gostshyp_discretization.upper()
+            self.ostream.print_header(cur_str.ljust(str_width))
+            cur_str = 'vdW Sphere Scaling Factor       : '
+            cur_str += f'{self.gostshyp_tssf}'
+            self.ostream.print_header(cur_str.ljust(str_width))
+            cur_str = 'Grid Points per vdW Sphere      : '
+            cur_str += f'{self.gostshyp_num_lebedev_points}'
+            self.ostream.print_header(cur_str.ljust(str_width))
+            cur_str = 'Extension radius for OCC        : '
+            cur_str += f'{self.gostshyp_r_ext}'
+            self.ostream.print_header(cur_str.ljust(str_width))
+
         self.ostream.print_blank()
         self.ostream.flush()
 
@@ -2828,6 +3250,11 @@ class LinearSolver:
 
         dist_new_ger, dist_new_ung = self._precond_trials(vectors, precond)
 
+        if self.rank == mpi_master():
+            assert_msg_critical(
+                dist_new_ger.data.size > 0 or dist_new_ung.data.size > 0,
+                'LinearSolver: trial vectors are empty')
+
         if dist_new_ger.data.size == 0:
             dist_new_ger.data = np.zeros((dist_new_ung.shape(0), 0))
 
@@ -2847,24 +3274,25 @@ class LinearSolver:
             dist_new_ung.data -= dist_new_ung_proj.data
 
         if renormalize:
-            if dist_new_ger.data.ndim > 0 and dist_new_ger.shape(0) > 0:
+            has_global_ger_rows = self.comm.allreduce(
+                int(dist_new_ger.data.ndim > 0 and dist_new_ger.shape(0) > 0),
+                op=MPI.SUM) > 0
+            if has_global_ger_rows:
                 dist_new_ger = self._remove_linear_dependence_half_size(
                     dist_new_ger, self.lindep_thresh)
                 dist_new_ger = self._orthogonalize_gram_schmidt_half_size(
                     dist_new_ger)
                 dist_new_ger = self._normalize_half_size(dist_new_ger)
 
-            if dist_new_ung.data.ndim > 0 and dist_new_ung.shape(0) > 0:
+            has_global_ung_rows = self.comm.allreduce(
+                int(dist_new_ung.data.ndim > 0 and dist_new_ung.shape(0) > 0),
+                op=MPI.SUM) > 0
+            if has_global_ung_rows:
                 dist_new_ung = self._remove_linear_dependence_half_size(
                     dist_new_ung, self.lindep_thresh)
                 dist_new_ung = self._orthogonalize_gram_schmidt_half_size(
                     dist_new_ung)
                 dist_new_ung = self._normalize_half_size(dist_new_ung)
-
-        if self.rank == mpi_master():
-            assert_msg_critical(
-                dist_new_ger.data.size > 0 or dist_new_ung.data.size > 0,
-                'LinearSolver: trial vectors are empty')
 
         return dist_new_ger, dist_new_ung
 
@@ -3358,6 +3786,32 @@ class LinearSolver:
 
         return basis.matmul_AB_no_gather(Tmask)
 
+    def _remove_linear_dependence_full_size(self, basis, threshold):
+        """
+        Removes linear dependence in a set of full-size vectors.
+
+        :param basis:
+            The set of vectors.
+        :param threshold:
+            The threshold for removing linear dependence.
+
+        :return:
+            The new set of vectors.
+        """
+
+        Sb = basis.matmul_AtB(basis)
+
+        if self.rank == mpi_master():
+            l, T = np.linalg.eigh(Sb)
+            b_norm = np.sqrt(Sb.diagonal())
+            mask = l > b_norm * threshold
+            Tmask = T[:, mask].copy()
+        else:
+            Tmask = None
+        Tmask = self.comm.bcast(Tmask, root=mpi_master())
+
+        return basis.matmul_AB_no_gather(Tmask)
+
     @staticmethod
     def orthogonalize_gram_schmidt(tvecs):
         """
@@ -3417,6 +3871,35 @@ class LinearSolver:
         return tvecs
 
     @staticmethod
+    def _orthogonalize_gram_schmidt_full_size(tvecs):
+        """
+        Applies modified Gram Schmidt orthogonalization to full-size trial
+        vectors.
+
+        :param tvecs:
+            The trial vectors.
+
+        :return:
+            The orthogonalized trial vectors.
+        """
+
+        if tvecs.shape(1) > 0:
+
+            n2 = tvecs.dot(0, tvecs, 0)
+            tvecs.data[:, 0] *= 1.0 / np.sqrt(n2)
+
+            for i in range(1, tvecs.shape(1)):
+                for j in range(i):
+                    dot_ij = tvecs.dot(i, tvecs, j)
+                    dot_jj = tvecs.dot(j, tvecs, j)
+                    tvecs.data[:, i] -= (dot_ij / dot_jj) * tvecs.data[:, j]
+
+                n2 = tvecs.dot(i, tvecs, i)
+                tvecs.data[:, i] *= 1.0 / np.sqrt(n2)
+
+        return tvecs
+
+    @staticmethod
     def normalize(vecs):
         """
         Normalizes vectors by dividing by vector norm.
@@ -3452,6 +3935,24 @@ class LinearSolver:
         invsqrt2 = 1.0 / np.sqrt(2.0)
 
         invnorm = invsqrt2 / vecs.norm(axis=0)
+
+        vecs.data *= invnorm
+
+        return vecs
+
+    @staticmethod
+    def _normalize_full_size(vecs):
+        """
+        Normalizes full-size vectors by dividing by vector norm.
+
+        :param vecs:
+            The vectors.
+
+        :return:
+            The normalized vectors.
+        """
+
+        invnorm = 1.0 / vecs.norm(axis=0)
 
         vecs.data *= invnorm
 
@@ -3504,7 +4005,7 @@ class LinearSolver:
 
         return ediag, sdiag
 
-    def get_nto(self, t_mat, mo_occ, mo_vir):
+    def _compute_nto(self, t_mat, mo_occ, mo_vir):
         """
         Gets the natural transition orbitals.
 
@@ -3542,7 +4043,7 @@ class LinearSolver:
 
         return nto_mo
 
-    def get_nto_unrestricted(self, t_mat, mo_occ, mo_vir):
+    def _compute_nto_unrestricted(self, t_mat, mo_occ, mo_vir):
         """
         Gets the natural transition orbitals.
 
@@ -3718,17 +4219,59 @@ class LinearSolver:
             The MO coefficients of virtual orbitals.
 
         :return:
-            The detachment and attachment densities.
+            The detachment and attachment densities. The detachment density
+            carries a negative sign and the difference density is the sum of
+            the two.
         """
 
         dens_D = -np.linalg.multi_dot([mo_occ, z_mat, z_mat.T, mo_occ.T])
         dens_A = np.linalg.multi_dot([mo_vir, z_mat.T, z_mat, mo_vir.T])
 
         if y_mat is not None:
-            dens_D += np.linalg.multi_dot([mo_occ, y_mat, y_mat.T, mo_occ.T])
-            dens_A -= np.linalg.multi_dot([mo_vir, y_mat.T, y_mat, mo_vir.T])
+            dens_D -= np.linalg.multi_dot([mo_occ, y_mat, y_mat.T, mo_occ.T])
+            dens_A += np.linalg.multi_dot([mo_vir, y_mat.T, y_mat, mo_vir.T])
 
         return dens_D, dens_A
+
+    def _get_esa_transition_density(self, z_mat_1, y_mat_1, z_mat_2, y_mat_2,
+                                    mo_occ, mo_vir):
+        """
+        Gets the transition density between two excited states.
+
+        :param z_mat_1:
+            The excitation vector of the first state in matrix form
+            (N_occ x N_virt).
+        :param y_mat_1:
+            The de-excitation vector of the first state in matrix form
+            (N_occ x N_virt).
+        :param z_mat_2:
+            The excitation vector of the second state in matrix form
+            (N_occ x N_virt).
+        :param y_mat_2:
+            The de-excitation vector of the second state in matrix form
+            (N_occ x N_virt).
+        :param mo_occ:
+            The MO coefficients of occupied orbitals.
+        :param mo_vir:
+            The MO coefficients of virtual orbitals.
+
+        :return:
+            The transition density matrix in the AO basis.
+        """
+
+        esa_trans_dens = (
+            np.linalg.multi_dot(
+                [mo_vir, z_mat_1.T, z_mat_2, mo_vir.T]) -
+            np.linalg.multi_dot(
+                [mo_occ, z_mat_1, z_mat_2.T, mo_occ.T]))
+
+        esa_trans_dens += (
+            np.linalg.multi_dot(
+                [mo_vir, y_mat_1.T, y_mat_2, mo_vir.T]) -
+            np.linalg.multi_dot(
+                [mo_occ, y_mat_1, y_mat_2.T, mo_occ.T]))
+
+        return esa_trans_dens
 
     def write_detach_attach_cubes(self, cubic_grid, molecule, basis, root,
                                   dens_DA):

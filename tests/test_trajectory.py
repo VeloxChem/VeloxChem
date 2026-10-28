@@ -36,7 +36,7 @@ class TestTrajectoryDriver:
                                  task.input_dict['spectrum_settings'],
                                  task.input_dict['response'],
                                  task.input_dict['method_settings'])
-        traj_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+        traj_drv.compute(task.molecule, task.ao_basis)
 
         if task.mpi_rank == mpi_master():
             exc_energies = []

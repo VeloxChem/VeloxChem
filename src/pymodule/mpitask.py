@@ -121,6 +121,7 @@ class MpiTask:
 
             self.ostream.print_info(
                 'Reading input file {}...'.format(input_fname))
+            self.ostream.flush()
 
             # read input file
 

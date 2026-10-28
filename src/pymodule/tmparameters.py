@@ -33,29 +33,26 @@
 
 def get_tm_parameters():
     """
-    Initialize transition metal (TM) parameters. Reference: F. Šebesta, V. Sláma, J. Melcr, 
+    Initialize transition metal (TM) parameters. Reference: F. Šebesta, V. Sláma, J. Melcr,
     Z. Futera, and J. V. Burda. J. Chem. Theory Comput. 2016 12 (8), 3681-3688.
 
     :return:
-        A dictionary containing TM parameters. When multiple oxidation states available in the reference, 
-        parameters are chosen for the lower oxidation state. 
+        A dictionary containing TM parameters. When multiple oxidation states available in the reference,
+        parameters are chosen for the lower oxidation state.
     """
 
     tm_elements = [
-        'Sc','Ti','V','Cr','Mn',
-        'Fe','Co','Ni','Cu','Zn',
-        'Ru','Rh','Pt','Hg'
-    ]   
-    
+        'Sc', 'Ti', 'V', 'Cr', 'Mn', 'Fe', 'Co', 'Ni', 'Cu', 'Zn', 'Ru', 'Rh',
+        'Pt', 'Hg'
+    ]
+
     sigma_values = [
-        3.330, 2.869, 2.767, 2.734, 2.904,
-        2.969, 2.805, 2.720, 2.668, 2.847, 
+        3.330, 2.869, 2.767, 2.734, 2.904, 2.969, 2.805, 2.720, 2.668, 2.847,
         2.939, 2.715, 2.670, 2.801
     ]
-    
+
     epsilon_values = [
-        0.110, 0.917, 1.904, 1.518, 1.089,
-        0.698, 1.196, 2.650, 2.148, 1.095, 
+        0.110, 0.917, 1.904, 1.518, 1.089, 0.698, 1.196, 2.650, 2.148, 1.095,
         0.418, 3.946, 5.073, 1.955
     ]
 
@@ -65,9 +62,8 @@ def get_tm_parameters():
         key = tm_elements[idx]
 
         sigma = 0.1 * s * 2.0
-        epsilon = e * 4.184  
+        epsilon = e * 4.184
 
         tm_parameters[key] = {'sigma': sigma, 'epsilon': epsilon}
-
 
     return tm_parameters

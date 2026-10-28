@@ -51,7 +51,7 @@ class TestReactionMatcher:
             pro_charges.append(q)
 
         evb = EvbDriver()
-        # evb.ostream.mute()
+        evb.ostream.mute()
         evb.ffbuilder.reparameterize_bonds = False
         evb.ffbuilder.optimize_ff = False
         evb.build_ff_from_molecules(
@@ -69,11 +69,15 @@ class TestReactionMatcher:
             ['CCO'],
             ['O', 'C=C'],
         )
+        # The three hydrogens on the terminal carbon (atom 0) of 'CCO'
+        # are symmetry equivalent and can each be the transferred hydrogen.
         option1 = breaking_bonds == {(1, 2),
                                      (0, 3)} and forming_bonds == {(2, 3)}
         option2 = breaking_bonds == {(1, 2),
                                      (0, 4)} and forming_bonds == {(2, 4)}
-        assert option1 or option2
+        option3 = breaking_bonds == {(1, 2),
+                                     (0, 5)} and forming_bonds == {(2, 5)}
+        assert option1 or option2 or option3
 
         breaking_bonds, forming_bonds = self.run_graph_matcher(
             ['[Cl-]', 'CCBr'],
@@ -118,9 +122,13 @@ class TestReactionMatcher:
             ['CCCCC=N'],
             ['CC3CCCN3'],
         )
-        assert breaking_bonds == {(1, 9)}
-        assert forming_bonds == {(4, 9), (1, 5)}
-
+        option1 = breaking_bonds == {(1, 9)} and forming_bonds == {(4, 9),
+                                                                   (1, 5)}
+        option2 = breaking_bonds == {(1, 10)} and forming_bonds == {(4, 10),
+                                                                    (1, 5)}
+        option3 = breaking_bonds == {(0, 1)} and forming_bonds == {(0, 4),
+                                                                   (1, 5)}
+        assert option1 or option2 or option3
         # load forcefields
 
     @pytest.mark.timeconsuming

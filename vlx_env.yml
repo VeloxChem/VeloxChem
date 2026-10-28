@@ -8,9 +8,12 @@ dependencies:
   - cxx-compiler
   - eigen
   - libboost-headers
-  - mpich
   - mpi4py
   - numpy
+
+  # choose MPI backend
+  - openmpi
+  # - mpich
 
   # choose NumPy backend
   # option 1: use OpenBLAS with OpenMP
@@ -27,13 +30,15 @@ dependencies:
   - python>=3.10
   - psutil
   - pytest
+  - pytest-cov
   - mdanalysis
   - openmm
   - scipy
   - rdkit
   - dftd4-python
   - geometric
-  - libxc>=7.0.0
+  - networkx<3.7
+  - libxc=7.*=cpu_*
   - clang-format
   - yapf
   - toml

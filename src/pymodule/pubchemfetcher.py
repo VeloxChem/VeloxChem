@@ -37,7 +37,7 @@ import json
 import re
 
 
-def get_data_from_name(mol_name):
+def get_data_from_name(mol_name, verbose=False):
     """
     Accesses the PubChem database to retrieve data for a given molecule name.
 
@@ -49,6 +49,8 @@ def get_data_from_name(mol_name):
 
     :param mol_name:
         Molecule name string.
+    :param verbose:
+        The information printout level.
 
     :return:
         Accessed data
@@ -82,10 +84,11 @@ def get_data_from_name(mol_name):
             # avoid frequent request
             sleep(0.2)
 
-            print(f"Reading {mol_name} from PubChem...\n")
-            print("Reference: " + get_pubchem_reference() + "\n")
-            print("Please double-check the compound since names may" +
-                  " refer to more than one record.\n")
+            if verbose:
+                print(f"Reading {mol_name} from PubChem...\n")
+                print("Reference: " + get_pubchem_reference() + "\n")
+                print("Please double-check the compound since names may" +
+                      " refer to more than one record.\n")
 
             return smiles_str, title, cid
 

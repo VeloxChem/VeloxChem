@@ -236,7 +236,7 @@ CDensityGridData2D::pitched_size(const int iBlock) const
 int
 CDensityGridData2D::blocks() const
 {
-    return _originalSizes.size();
+    return static_cast<int>(_originalSizes.size());
 }
 
 void

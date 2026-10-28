@@ -58,31 +58,11 @@ local_distribute_eri_tensor(CDense4DTensor*                  eri_tensor,
                             const size_t                     bra_igto,
                             const std::pair<size_t, size_t>& ket_range) -> void
 {
-    // set up angular pairs
-
-    const auto pq_pair = std::pair<int, int>({a_angmom, b_angmom});
-
-    const auto rs_pair = std::pair<int, int>({c_angmom, d_angmom});
-
-    const auto pr_pair = std::pair<int, int>({a_angmom, c_angmom});
-
-    const auto ps_pair = std::pair<int, int>({a_angmom, d_angmom});
-
-    const auto qr_pair = std::pair<int, int>({b_angmom, c_angmom});
-
-    const auto qs_pair = std::pair<int, int>({b_angmom, d_angmom});
-
     // reference indexes on bra side
 
     const auto refp = a_indices[bra_igto + 1];
 
     const auto refq = b_indices[bra_igto + 1];
-
-    // reference local indexes on bra side
-
-    const auto loc_refp = a_loc_indices[bra_igto + 1];
-
-    const auto loc_refq = b_loc_indices[bra_igto + 1];
 
     // dimensions of bra and ket orbital indexes
 
@@ -93,16 +73,6 @@ local_distribute_eri_tensor(CDense4DTensor*                  eri_tensor,
     const auto cdim = c_indices[0];
 
     const auto ddim = d_indices[0];
-
-    // dimensions of local bra and ket orbital indexes
-
-    const auto alocdim = a_loc_indices[0];
-
-    const auto blocdim = b_loc_indices[0];
-
-    const auto clocdim = c_loc_indices[0];
-
-    const auto dlocdim = d_loc_indices[0];
 
     // set up angular components
 
@@ -116,15 +86,11 @@ local_distribute_eri_tensor(CDense4DTensor*                  eri_tensor,
 
     for (int i = 0; i < acomps; i++)
     {
-        const auto p = i * adim + refp;
-
-        const auto loc_p = i * alocdim + loc_refp;
+        const auto p = static_cast<int>(i * adim + refp);
 
         for (int j = 0; j < bcomps; j++)
         {
-            const auto q = j * bdim + refq;
-
-            const auto loc_q = j * blocdim + loc_refq;
+            const auto q = static_cast<int>(j * bdim + refq);
 
             for (int k = 0; k < ccomps; k++)
             {
@@ -140,12 +106,6 @@ local_distribute_eri_tensor(CDense4DTensor*                  eri_tensor,
 
                         const auto refs = d_indices[m + 1];
 
-                        // reference local indexes on ket side
-
-                        const auto loc_refr = c_loc_indices[m + 1];
-
-                        const auto loc_refs = d_loc_indices[m + 1];
-
                         // impose angular symmetry on ket side
 
                         if (refr == refs)
@@ -155,13 +115,9 @@ local_distribute_eri_tensor(CDense4DTensor*                  eri_tensor,
 
                         // compute r and s indexes
 
-                        const auto r = k * cdim + refr;
+                        const auto r = static_cast<int>(k * cdim + refr);
 
-                        const auto loc_r = k * clocdim + loc_refr;
-
-                        const auto s = l * ddim + refs;
-
-                        const auto loc_s = l * dlocdim + loc_refs;
+                        const auto s = static_cast<int>(l * ddim + refs);
 
                         // prescale integral for accumulation to Fock matrix
 

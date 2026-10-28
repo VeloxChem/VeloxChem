@@ -38,10 +38,11 @@ import numpy as np
 import time as tm
 
 from .veloxchemlib import mpi_master
-from .veloxchemlib import XCFunctional, MolecularGrid
 from .outputstream import OutputStream
+from .scfgradientdriver import ScfGradientDriver
 from .molecule import Molecule
-from .profiler import Profiler
+from .inputparser import write_unparsed_input_to_hdf5
+from .errorhandler import assert_msg_critical
 
 with redirect_stderr(StringIO()) as fg_err:
     import geometric
@@ -86,7 +87,8 @@ class OptimizationEngine(geometric.engine.Engine):
         self.comm = grad_drv.comm
         self.rank = grad_drv.comm.Get_rank()
 
-        self._debug = False
+        self.opt_unparsed_input = None
+        self.opt_current_step = 0
 
     def lower(self):
         """
@@ -95,17 +97,50 @@ class OptimizationEngine(geometric.engine.Engine):
 
         return 'custom engine'
 
+    def _validate_step_results(self, energy, gradient, natoms):
+        """Validates optimizer step results before returning to geomeTRIC.
+
+        :param energy:
+            The energy returned by the driver stack.
+        :param gradient:
+            The gradient returned by the driver stack.
+        :param natoms:
+            Number of atoms in the current molecule.
+        """
+
+        assert_msg_critical(
+            np.isscalar(energy),
+            'OptimizationEngine.calc_new: expected scalar energy after MPI '
+            'synchronization')
+
+        try:
+            gradient = np.asarray(gradient, dtype=float)
+        except (TypeError, ValueError):
+            gradient = None
+
+        assert_msg_critical(
+            gradient is not None,
+            'OptimizationEngine.calc_new: expected array-like gradient after '
+            'MPI synchronization')
+
+        return float(energy), gradient
+
     def calc_new(self, coords, dirname):
         """
         Implements calc_new method for the engine.
 
         :param coords:
-            The coordinates.
+            The coordinates.  Not used on worker ranks in a master-driven
+            run: the geometry is received via the broadcast inside this
+            method.
         :param dirname:
-            The relative path.
+            The relative path.  Not used on worker ranks in a master-driven
+            run.
 
         :return:
-            A dictionary containing energy and gradient.
+            A dictionary containing energy and gradient.  On worker ranks in a
+            master-driven run this method may instead return the 'stop'
+            control string; see run_worker().
         """
 
         start_time = tm.time()
@@ -122,36 +157,40 @@ class OptimizationEngine(geometric.engine.Engine):
             new_mol = Molecule()
         new_mol = self.comm.bcast(new_mol, root=mpi_master())
 
-        title_txt = 'Optimization Step'
+        # Worker-side control channel.  When only the master rank drives
+        # geomeTRIC (see OptimizationDriver.compute), the master broadcasts
+        # the 'stop' string through this geometry broadcast once the
+        # optimization has finished.  This branch never fires on the master
+        # rank, where new_mol is always a Molecule.
+        if isinstance(new_mol, str):
+            return new_mol  # 'stop'
+
+        title_txt = f'Optimization Step {self.opt_current_step}'
         self.grad_drv.ostream.print_header(title_txt)
         self.grad_drv.ostream.print_header('=' * (len(title_txt) + 2))
         self.grad_drv.ostream.print_blank()
         self.grad_drv.ostream.print_info('Computing energy and gradient...')
         self.grad_drv.ostream.flush()
 
-        if self._debug:
-            profiler = Profiler()
-            self.grad_drv.ostream.print_blank()
-            self.grad_drv.ostream.print_info(
-                '==DEBUG==   available memory before gradient: ' +
-                profiler.get_available_memory())
-            self.grad_drv.ostream.print_blank()
-            self.grad_drv.ostream.flush()
-
-        if not self._debug:
-            #self.grad_drv.ostream.mute()
-            pass
-
         energy = self.grad_drv.compute_energy(new_mol, *self.args)
         self.grad_drv.compute(new_mol, *self.args)
         gradient = self.grad_drv.get_gradient()
 
-        if not self._debug:
-            #self.grad_drv.ostream.unmute()
-            pass
+        if hasattr(self.grad_drv, "scf_driver") and isinstance(
+                self.grad_drv, ScfGradientDriver):
+            checkpoint_file = self.grad_drv.scf_driver.get_checkpoint_file()
+            if checkpoint_file is not None and self.opt_unparsed_input is not None:
+                if self.rank == mpi_master():
+                    write_unparsed_input_to_hdf5(checkpoint_file,
+                                                 self.opt_unparsed_input,
+                                                 group_name='opt_settings')
 
         energy = self.comm.bcast(energy, root=mpi_master())
         gradient = self.comm.bcast(gradient, root=mpi_master())
+        energy, gradient = self._validate_step_results(
+            energy, gradient, new_mol.number_of_atoms())
+
+        self.opt_current_step += 1
 
         if self.rank == mpi_master():
             grad2 = np.sum(gradient**2, axis=1)
@@ -168,18 +207,25 @@ class OptimizationEngine(geometric.engine.Engine):
             self.grad_drv.ostream.print_blank()
             self.grad_drv.ostream.flush()
 
-        if self._debug:
-            profiler = Profiler()
-            self.grad_drv.ostream.print_info(
-                '==DEBUG==   available memory after  gradient: ' +
-                profiler.get_available_memory())
-            self.grad_drv.ostream.print_blank()
-            self.grad_drv.ostream.flush()
-
         return {
             'energy': energy,
             'gradient': gradient.flatten(),
         }
+
+    def run_worker(self):
+        """
+        Runs on non-master ranks while the master rank drives geomeTRIC.
+
+        Each call blocks inside calc_new until the master broadcasts the next
+        geometry (or the 'stop' control string), so every collective
+        single-point evaluation requested by the master is mirrored on all
+        ranks.  Returns when the master signals 'stop'.
+        """
+
+        while True:
+            msg = self.calc_new(None, None)
+            if msg == 'stop':
+                return
 
     def copy_scratch(self, src, dest):
         """
@@ -206,16 +252,11 @@ class OptimizationEngine(geometric.engine.Engine):
 
         new_engine = OptimizationEngine(deepcopy(self.grad_drv),
                                         deepcopy(self.molecule),
-                                        deepcopy(self.args))
+                                        *deepcopy(self.args))
 
         for key, val in vars(self).items():
             if isinstance(val, (MPI.Intracomm, OutputStream)):
-                pass
-            elif isinstance(val, XCFunctional):
-                new_engine.key = XCFunctional(val)
-            elif isinstance(val, MolecularGrid):
-                new_engine.key = MolecularGrid(val)
-            else:
-                new_engine.key = deepcopy(val)
+                continue
+            setattr(new_engine, key, deepcopy(val))
 
         return new_engine

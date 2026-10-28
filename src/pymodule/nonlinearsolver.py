@@ -47,6 +47,7 @@ from .fockdriver import FockDriver
 from .linearsolver import LinearSolver
 from .distributedarray import DistributedArray
 from .sanitychecks import dft_sanity_check, ri_sanity_check
+from .sanitychecks import nonlinear_response_environment_sanity_check
 from .errorhandler import assert_msg_critical
 from .inputparser import parse_input, print_keywords, print_attributes
 from .dftutils import get_default_grid_level
@@ -118,6 +119,12 @@ class NonlinearSolver:
         # static electric field
         self.electric_field = None
 
+        # pressure
+        self.pressure = 0.0
+
+        # solvation model
+        self.solvation_model = None
+
         # solver setup
         self.conv_thresh = 1.0e-4
         self.max_iter = 150
@@ -178,6 +185,7 @@ class NonlinearSolver:
                 'ri_auxiliary_basis': ('str', 'RI-J auxiliary basis set'),
                 'xcfun': ('str_upper', 'exchange-correlation functional'),
                 'grid_level': ('int', 'accuracy level of DFT grid'),
+                'electric_field': ('seq_fixed', 'static electric field'),
             },
         }
 
@@ -280,17 +288,7 @@ class NonlinearSolver:
 
         dft_sanity_check(self, 'update_settings', 'nonlinear')
 
-        if self.potfile is not None:
-            errmsg = 'NonlinearSolver: The \'potfile\' keyword is not supported '
-            errmsg += 'in nonlinear response calculation.'
-            if self.rank == mpi_master():
-                assert_msg_critical(False, errmsg)
-
-        if self.electric_field is not None:
-            errmsg = 'NonlinearSolver: The \'electric field\' keyword is not '
-            errmsg += 'supported in nonlinear response calculation.'
-            if self.rank == mpi_master():
-                assert_msg_critical(False, errmsg)
+        nonlinear_response_environment_sanity_check(self)
 
     def _init_eri(self, molecule, basis):
         """
@@ -304,11 +302,6 @@ class NonlinearSolver:
         :return:
             The dictionary of ERI information.
         """
-
-        # TODO: enable ECP
-        assert_msg_critical(
-            not basis.has_ecp(),
-            f'{type(self).__name__}.compute: ECP is not yet supported')
 
         # TODO: enable RI-JK
         assert_msg_critical(
@@ -494,7 +487,7 @@ class NonlinearSolver:
             profiler.set_timing_key('Nonlinear Fock')
 
         fock_drv = FockDriver(self.comm)
-        fock_drv._set_block_size_factor(self._block_size_factor)
+        fock_drv.set_block_size_factor(self._block_size_factor)
 
         screening = eri_dict['screening']
 
@@ -502,15 +495,15 @@ class NonlinearSolver:
 
         mode_is_valid = mode.lower() in [
             'crf', 'tpa', 'crf_ii', 'tpa_ii', 'redtpa_i', 'redtpa_ii', 'qrf',
-            'shg', 'shg_red', 'tpa_quad', '3pa', '3pa_ii'
+            'shg', 'shg_red', 'tpa_quad', '3pa', '3pa_ii', 'thg', 'thg_ii', 'thgred', 'thgred_ii'
         ]
         assert_msg_critical(mode_is_valid,
                             'NonlinearSolver: Invalid mode ' + mode.lower())
 
-        mode_is_cubic = mode.lower() in ['crf', 'tpa', '3pa']
+        mode_is_cubic = mode.lower() in ['crf', 'tpa', '3pa', 'thg', 'thgred']
         mode_is_quadratic = mode.lower() in [
             'crf_ii', 'tpa_ii', 'redtpa_i', 'redtpa_ii', 'qrf', 'shg',
-            'shg_red', 'tpa_quad', '3pa_ii'
+            'shg_red', 'tpa_quad', '3pa_ii', 'thg_ii', 'thgred_ii'
         ]
 
         # determine number of batches
@@ -550,6 +543,18 @@ class NonlinearSolver:
                     # 6 third-order densities per frequency
                     size_1, size_2, size_3 = 12, 24, 6
 
+                elif mode.lower() == 'thg':
+                    # 12 first-order densities per frequency
+                    # 24 second-order densities per frequency
+                    # 6 third-order densities per frequency
+                    size_1, size_2, size_3 = 6, 12, 6
+
+                elif mode.lower() == 'thgred':
+                    # 12 first-order densities per frequency
+                    # 24 second-order densities per frequency
+                    # 6 third-order densities per frequency
+                    size_1, size_2, size_3 = 3, 6, 3
+
                 elif mode.lower() == '3pa':
                     # 4 first-order densities per frequency
                     # 9 second-order densities per frequency
@@ -570,6 +575,16 @@ class NonlinearSolver:
                     # 36 first-order densities per frequency
                     # 6 second-order densities per frequency
                     size_1, size_2 = 36, 6
+
+                elif mode.lower() == 'thg_ii':
+                    # 36 first-order densities per frequency
+                    # 6 second-order densities per frequency
+                    size_1, size_2 = 18, 6
+
+                elif mode.lower() == 'thgred_ii':
+                    # 36 first-order densities per frequency
+                    # 6 second-order densities per frequency
+                    size_1, size_2 = 9, 3
 
                 elif mode.lower() == 'redtpa_i':
                     # 6 first-order densities per frequency
@@ -1183,7 +1198,7 @@ class NonlinearSolver:
 
         return S4_123
 
-    def _collect_vectors_in_columns(self, sendbuf):
+    def _collect_vectors_in_columns(self, sendbuf, root=mpi_master()):
         """
         Collects vectors into 2d array (column-wise).
 
@@ -1194,8 +1209,8 @@ class NonlinearSolver:
             A 2d array containing the full vectors in columns.
         """
 
-        counts = self.comm.gather(sendbuf.size, root=mpi_master())
-        if self.rank == mpi_master():
+        counts = self.comm.gather(sendbuf.size, root=root)
+        if self.rank == root:
             displacements = [sum(counts[:p]) for p in range(self.nodes)]
             recvbuf = np.zeros(sum(counts), dtype=sendbuf.dtype).reshape(
                 -1, sendbuf.shape[1])
@@ -1210,7 +1225,7 @@ class NonlinearSolver:
 
         self.comm.Gatherv(sendbuf,
                           [recvbuf, counts, displacements, mpi_data_type],
-                          root=mpi_master())
+                          root=root)
 
         return recvbuf
 
@@ -1220,7 +1235,7 @@ class NonlinearSolver:
         Transform a matrix to molecular basis
 
         :param mo:
-            molecular orbital coefficent matrix
+            molecular orbital coefficients matrix
         :param A:
             The matrix in AO basis that is the converted to MO basis
 

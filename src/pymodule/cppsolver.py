@@ -40,11 +40,14 @@ from .distributedarray import DistributedArray
 from .cppsolverbase import ComplexResponseSolverBase
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            ri_sanity_check, dft_sanity_check, pe_sanity_check,
-                           solvation_model_sanity_check)
+                           solvation_model_sanity_check, gostshyp_sanity_check,
+                           environment_compatibility_sanity_check)
 from .errorhandler import assert_msg_critical
 from .mathutils import safe_solve
-from .checkpoint import (check_rsp_hdf5, write_rsp_solution_with_multiple_keys)
+from .checkpoint import check_rsp_hdf5
 from .inputparser import parse_seq_fixed
+from .resultsio import (clear_group_in_hdf5, write_rsp_full_solution_to_hdf5,
+                        write_rsp_results_to_hdf5)
 
 
 class ComplexResponseSolver(ComplexResponseSolverBase):
@@ -98,11 +101,6 @@ class ComplexResponseSolver(ComplexResponseSolverBase):
         for convergence.
         """
 
-        # TODO: enable ECP
-        assert_msg_critical(
-            not basis.has_ecp(),
-            f'{type(self).__name__}.compute: ECP is not yet supported')
-
         # take care of quadrupole components
         if self.is_quadrupole(self.a_operator):
             if isinstance(self.a_components, str):
@@ -140,7 +138,7 @@ class ComplexResponseSolver(ComplexResponseSolverBase):
             self.set_cpp_property(self.property)
 
         # check molecule
-        molecule_sanity_check(molecule, 'restricted')
+        molecule_sanity_check(molecule, 'restricted', type(self).__name__)
         # check SCF results
         scf_results_sanity_check(self, scf_results)
 
@@ -154,8 +152,14 @@ class ComplexResponseSolver(ComplexResponseSolverBase):
         dft_sanity_check(self, 'compute')
         # check pe setup
         pe_sanity_check(self, molecule=molecule)
-        # check solvation setup
+        # check solvation model setup
         solvation_model_sanity_check(self)
+
+        # check GOSTSHYP setup
+        gostshyp_sanity_check(self)
+
+        # check pairwise compatibility of the environment settings
+        environment_compatibility_sanity_check(self)
 
         # check print level (verbosity of output)
         self.print_level = max(1, min(self.print_level, 3))
@@ -179,7 +183,11 @@ class ComplexResponseSolver(ComplexResponseSolverBase):
             orb_ene = None
         orb_ene = self.comm.bcast(orb_ene, root=mpi_master())
         norb = orb_ene.shape[0]
-        nocc = molecule.number_of_alpha_electrons()
+        nocc = molecule.number_of_alpha_occupied_orbitals(basis)
+
+        self._check_mpi_oversubscription(
+            self._get_excitation_space_dimension_restricted(nocc, norb),
+            'response space')
 
         # ERI information
         eri_dict = self._init_eri(molecule, basis)
@@ -188,7 +196,9 @@ class ComplexResponseSolver(ComplexResponseSolverBase):
         # PE information
         pe_dict = self._init_pe(molecule, basis)
         # CPCM information
-        self._init_cpcm(molecule)
+        self._init_cpcm(molecule, basis)
+        # GOSTSHYP information
+        self._init_gostshyp(molecule, basis, scf_results)
 
         # right-hand side (gradient)
         if self.rank == mpi_master():
@@ -268,14 +278,97 @@ class ComplexResponseSolver(ComplexResponseSolverBase):
                 self.restart = check_rsp_hdf5(self.checkpoint_file,
                                               rsp_vector_labels, molecule,
                                               basis, dft_dict, pe_dict)
+                if self.restart:
+                    self.restart = self.match_settings(self.checkpoint_file)
             self.restart = self.comm.bcast(self.restart, root=mpi_master())
 
+        # read initial guess from restart file
         if self.restart:
-            # read initial guess from restart file
             self._read_checkpoint(rsp_vector_labels)
-            # TODO: handle restarting with different frequencies
+
+            checkpoint_frequencies = self._read_frequencies_from_checkpoint()
+
+            # Note that we only handle the restart with additional frequencies when
+            # `self.nonlinear` is inactive
+
+            # print warning if frequencies is not present in the restart file
+            if checkpoint_frequencies is None and not self.nonlinear:
+                self.ostream.print_warning(
+                    'Could not find the frequencies key in the checkpoint file.'
+                )
+                self.ostream.print_blank()
+                self.ostream.print_info(
+                    'Assuming that frequencies is not changed before and after '
+                    + 'the restart.')
+                self.ostream.print_blank()
+                self.ostream.flush()
+
+            # generate necessary initial guesses if more frequencies are requested
+            # in a restart calculation
+            elif not self.nonlinear:
+                extra_freqs = []
+                for w in self.frequencies:
+                    if w not in checkpoint_frequencies:
+                        extra_freqs.append(w)
+
+                if extra_freqs:
+                    self.ostream.print_info(
+                        f'Generating initial guesses for {len(extra_freqs)} ' +
+                        'more frequencies...')
+                    self.ostream.print_blank()
+
+                    if self.rank == mpi_master():
+                        extra_v_grad = {
+                            (op, w): v
+                            for op, v in zip(self.b_components, b_grad)
+                            for w in extra_freqs
+                        }
+                        extra_op_freq_keys = list(extra_v_grad.keys())
+                    else:
+                        extra_op_freq_keys = None
+                    extra_op_freq_keys = self.comm.bcast(extra_op_freq_keys,
+                                                         root=mpi_master())
+
+                    extra_precond = {
+                        w: self._get_precond(orb_ene, nocc, norb, w, d)
+                        for w in extra_freqs
+                    }
+
+                    extra_dist_rhs = {}
+                    for key in extra_op_freq_keys:
+                        if self.rank == mpi_master():
+                            gradger, gradung = self._decomp_grad(
+                                extra_v_grad[key])
+                            grad_mat = np.hstack((
+                                gradger.real.reshape(-1, 1),
+                                gradung.real.reshape(-1, 1),
+                                gradung.imag.reshape(-1, 1),
+                                gradger.imag.reshape(-1, 1),
+                            ))
+                            rhs_mat = np.hstack((
+                                gradger.real.reshape(-1, 1),
+                                gradung.real.reshape(-1, 1),
+                                -gradung.imag.reshape(-1, 1),
+                                -gradger.imag.reshape(-1, 1),
+                            ))
+                        else:
+                            grad_mat = None
+                            rhs_mat = None
+                        dist_grad[key] = DistributedArray(grad_mat, self.comm)
+                        extra_dist_rhs[key] = DistributedArray(
+                            rhs_mat, self.comm)
+
+                    bger, bung = self._setup_trials(extra_dist_rhs,
+                                                    extra_precond)
+
+                    profiler.set_timing_key('Preparation')
+
+                    self._e2n_half_size(bger, bung, molecule, basis,
+                                        scf_results, eri_dict, dft_dict,
+                                        pe_dict, profiler)
+
+        # generate initial guess from scratch
         else:
-            # generate initial guess from scratch
             bger, bung = self._setup_trials(dist_rhs, precond)
 
             profiler.set_timing_key('Preparation')
@@ -374,6 +467,8 @@ class ComplexResponseSolver(ComplexResponseSolverBase):
                 profiler.print_memory_tracing(self.ostream)
                 self._print_iteration(relative_residual_norm, xvs)
 
+                self._print_gostshyp_neg_amp_info()
+
             profiler.stop_timer('ReducedSpace')
 
             # check convergence
@@ -424,6 +519,7 @@ class ComplexResponseSolver(ComplexResponseSolverBase):
             if self.force_checkpoint:
                 self._write_checkpoint(molecule, basis, dft_dict, pe_dict,
                                        rsp_vector_labels)
+                self._add_frequencies_to_checkpoint()
 
             # creating new sigma and rho linear transformations
             self._e2n_half_size(new_trials_ger, new_trials_ung, molecule, basis,
@@ -438,6 +534,7 @@ class ComplexResponseSolver(ComplexResponseSolverBase):
 
         self._write_checkpoint(molecule, basis, dft_dict, pe_dict,
                                rsp_vector_labels)
+        self._add_frequencies_to_checkpoint()
 
         # converged?
         if self.rank == mpi_master():
@@ -471,10 +568,12 @@ class ComplexResponseSolver(ComplexResponseSolverBase):
                     # final h5 file for response solutions
                     if self.filename is not None:
                         final_h5_fname = f'{self.filename}.h5'
+                        # clear stale group in final h5
+                        clear_group_in_hdf5(final_h5_fname, 'rsp')
                     else:
                         final_h5_fname = None
 
-                for bop, w in solutions:
+                for op_w_ind, (bop, w) in enumerate(solutions):
                     x = self.get_full_solution_vector(solutions[(bop, w)])
 
                     if self.rank == mpi_master():
@@ -485,15 +584,10 @@ class ComplexResponseSolver(ComplexResponseSolverBase):
                             if self.is_imag(self.a_operator):
                                 rsp_funcs[(aop, bop, w)] *= -1.0
 
-                        # write to h5 file for response solutions
+                        # write solutions to h5 file
                         if (self.save_solutions and final_h5_fname is not None):
-                            solution_keys = [
-                                '{:s}_{:s}_{:.8f}'.format(aop, bop, w)
-                                for aop in self.a_components
-                            ]
-                            write_rsp_solution_with_multiple_keys(
-                                final_h5_fname, solution_keys, x,
-                                self.group_label)
+                            write_rsp_full_solution_to_hdf5(
+                                final_h5_fname, x, op_w_ind, len(solutions))
 
                 if self.rank == mpi_master():
                     # print information about h5 file for response solutions
@@ -502,23 +596,43 @@ class ComplexResponseSolver(ComplexResponseSolverBase):
                             'Response solution vectors written to file: ' +
                             final_h5_fname)
                         self.ostream.print_blank()
+                        self.ostream.flush()
 
                     ret_dict = {
                         'a_operator': self.a_operator,
                         'a_components': self.a_components,
                         'b_operator': self.b_operator,
                         'b_components': self.b_components,
-                        'frequencies': list(self.frequencies),
+                        'frequencies': np.array(self.frequencies),
                         'response_functions': rsp_funcs,
                         'solutions': solutions,
+                        'molecular_mass_amu': float(sum(molecule.get_masses())),
                     }
+
+                    if (self.save_solutions and
+                            final_h5_fname is not None):
+                        full_solutions_keys = [
+                            '{:s}_{:.8f}'.format(bop, w)
+                            for bop, w in solutions
+                        ]
+                        write_rsp_results_to_hdf5(
+                            final_h5_fname,
+                            {'full_solutions_keys': full_solutions_keys})
+
+                    # add rsp type
+                    ret_dict.update({'rsp_type': 'cpp'})
 
                     self._print_results(ret_dict)
 
                     # write spectrum to h5 file
                     if final_h5_fname is not None:
+                        h5_ret_dict = {
+                            key: value
+                            for key, value in ret_dict.items()
+                            if key != 'solutions'
+                        }
                         self.write_cpp_rsp_results_to_hdf5(
-                            final_h5_fname, ret_dict)
+                            final_h5_fname, h5_ret_dict)
 
                     return ret_dict
                 else:
@@ -726,20 +840,39 @@ class ComplexResponseSolver(ComplexResponseSolverBase):
         assert_msg_critical(self.property in ['absorption', 'ecd'],
                             'get_cpp_property_densities: Invalid CPP property')
 
-        assert_msg_critical(
-            ('x', w) in cpp_results['solutions'] and
-            ('y', w) in cpp_results['solutions'] and
-            ('z', w) in cpp_results['solutions'],
-            f'get_cpp_property_densities: Could not find frequency {w} in ' +
-            'CPP results')
+        if 'solutions' in cpp_results:
+            assert_msg_critical(
+                ('x', w) in cpp_results['solutions'] and
+                ('y', w) in cpp_results['solutions'] and
+                ('z', w) in cpp_results['solutions'],
+                f'get_cpp_property_densities: Could not find frequency {w} in ' +
+                'CPP results')
 
-        # solution vectors
-        cpp_solution_vector_x = self.get_full_solution_vector(
-            cpp_results['solutions'][('x', w)])
-        cpp_solution_vector_y = self.get_full_solution_vector(
-            cpp_results['solutions'][('y', w)])
-        cpp_solution_vector_z = self.get_full_solution_vector(
-            cpp_results['solutions'][('z', w)])
+            # solution vectors
+            cpp_solution_vector_x = self.get_full_solution_vector(
+                cpp_results['solutions'][('x', w)])
+            cpp_solution_vector_y = self.get_full_solution_vector(
+                cpp_results['solutions'][('y', w)])
+            cpp_solution_vector_z = self.get_full_solution_vector(
+                cpp_results['solutions'][('z', w)])
+
+        else:
+            if self.rank == mpi_master():
+                assert_msg_critical(
+                    f'x_{w:.8f}' in cpp_results and
+                    f'y_{w:.8f}' in cpp_results and
+                    f'z_{w:.8f}' in cpp_results,
+                    f'get_cpp_property_densities: Could not find frequency {w} in ' +
+                    'CPP results')
+
+                # solution vectors
+                cpp_solution_vector_x = cpp_results[f'x_{w:.8f}']
+                cpp_solution_vector_y = cpp_results[f'y_{w:.8f}']
+                cpp_solution_vector_z = cpp_results[f'z_{w:.8f}']
+            else:
+                cpp_solution_vector_x = None
+                cpp_solution_vector_y = None
+                cpp_solution_vector_z = None
 
         # property gradient for a operator
         a_prop_grad = self.get_complex_prop_grad(self.a_operator,
@@ -747,7 +880,7 @@ class ComplexResponseSolver(ComplexResponseSolverBase):
                                                  basis, scf_results)
 
         if self.rank == mpi_master():
-            nocc = molecule.number_of_alpha_electrons()
+            nocc = molecule.number_of_alpha_occupied_orbitals(basis)
             norb = scf_results['E_alpha'].shape[0]
             nvir = norb - nocc
             n_ov = nocc * nvir

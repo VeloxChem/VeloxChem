@@ -35,6 +35,7 @@
 #include "ErrorHandler.hpp"
 #include "GtoValuesRecD.hpp"
 #include "GtoValuesRecF.hpp"
+#include "GtoValuesRecG.hpp"
 #include "GtoValuesRecP.hpp"
 #include "GtoValuesRecS.hpp"
 #include "Matrix.hpp"
@@ -66,8 +67,12 @@ get_gto_values_for_lda(const CGtoBlock&            gto_block,
     {
         return gtoval::get_lda_values_rec_f(gto_block, grid_coords_x, grid_coords_y, grid_coords_z, gtos_mask);
     }
+    else if (gto_ang == 4)
+    {
+        return gtoval::get_lda_values_rec_g(gto_block, grid_coords_x, grid_coords_y, grid_coords_z, gtos_mask);
+    }
 
-    std::string errangmom("get_gto_values_for_lda: Only implemented up to f-orbitals");
+    std::string errangmom("get_gto_values_for_lda: Only implemented up to g-orbitals");
 
     errors::assertMsgCritical(false, errangmom);
 
@@ -99,8 +104,12 @@ get_gto_values_for_gga(const CGtoBlock&            gto_block,
     {
         return gtoval::get_gga_values_rec_f(gto_block, grid_coords_x, grid_coords_y, grid_coords_z, gtos_mask);
     }
+    else if (gto_ang == 4)
+    {
+        return gtoval::get_gga_values_rec_g(gto_block, grid_coords_x, grid_coords_y, grid_coords_z, gtos_mask);
+    }
 
-    std::string errangmom("get_gto_values_for_gga: Only implemented up to f-orbitals");
+    std::string errangmom("get_gto_values_for_gga: Only implemented up to g-orbitals");
 
     errors::assertMsgCritical(false, errangmom);
 

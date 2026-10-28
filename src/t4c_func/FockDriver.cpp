@@ -264,9 +264,10 @@ CFockDriver::compute_mixpre(const CT4CScreener &screener,
             std::ranges::for_each(std::views::reverse(work_tasks), [&](const auto& task) {
                 const auto bra_gpairs = gto_pair_blocks[task[0]].gto_pair_block(static_cast<int>(task[2]));
                 const auto ket_gpairs = gto_pair_blocks[task[1]].gto_pair_block(static_cast<int>(task[3]));
-                const auto bra_range  = std::pair<size_t, size_t>{task[4], task[5]};
-                const auto ket_range  = std::pair<size_t, size_t>{task[6], task[7]};
-#pragma omp task firstprivate(bra_gpairs, ket_gpairs, bra_range, ket_range)
+                //const auto bra_range  = std::pair<size_t, size_t>{task[4], task[5]};
+                //const auto ket_range  = std::pair<size_t, size_t>{task[6], task[7]};
+//#pragma omp task firstprivate(bra_gpairs, ket_gpairs, bra_range, ket_range)
+                #pragma omp task firstprivate(bra_gpairs, ket_gpairs)
                 {
                     CT4CMatrixDistributor distributor(ptr_fock, ptr_density, label, exchange_factor, omega);
                     distributor.set_indices(bra_gpairs, ket_gpairs);
@@ -473,7 +474,7 @@ CFockDriver::set_block_size_factor(const int factor) -> void
 auto
 CFockDriver::_get_nao(const CMatrix& mat) const -> int
 {
-    return mat.number_of_rows();
+    return static_cast<int>(mat.number_of_rows());
 }
 
 auto
@@ -483,7 +484,7 @@ CFockDriver::_get_nao(const CMatrices& mats) const -> int
 
     auto mat_ptr = mats.matrix(keys[0]);
 
-    return mat_ptr->number_of_rows();
+    return static_cast<int>(mat_ptr->number_of_rows());
 }
 
 auto

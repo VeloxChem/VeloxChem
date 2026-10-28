@@ -46,11 +46,13 @@ from .distributedarray import DistributedArray
 from .linearsolver import LinearSolver
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            ri_sanity_check, dft_sanity_check, pe_sanity_check,
-                           solvation_model_sanity_check)
+                           solvation_model_sanity_check, gostshyp_sanity_check,
+                           environment_compatibility_sanity_check)
 from .errorhandler import assert_msg_critical
-from .checkpoint import (check_rsp_hdf5, write_rsp_hdf5,
-                         write_rsp_solution_with_multiple_keys)
+from .checkpoint import check_rsp_hdf5, write_rsp_hdf5
 from .inputparser import parse_seq_fixed
+from .resultsio import (clear_group_in_hdf5, write_rsp_full_solution_to_hdf5,
+                        write_rsp_results_to_hdf5)
 
 try:
     import matplotlib.pyplot as plt
@@ -59,7 +61,7 @@ except ImportError:
     pass
 
 
-class ComplexResponseTDA(LinearSolver):
+class ComplexResponseTdaSolver(LinearSolver):
     """
     Implements the complex linear response solver using the Tamm-Dancoff approximation.
 
@@ -276,11 +278,6 @@ class ComplexResponseTDA(LinearSolver):
             a non-linear response module.
         """
 
-        # TODO: enable ECP
-        assert_msg_critical(
-            not basis.has_ecp(),
-            f'{type(self).__name__}.compute: ECP is not yet supported')
-
         # take care of quadrupole components
         if self.is_quadrupole(self.a_operator):
             if isinstance(self.a_components, str):
@@ -315,7 +312,7 @@ class ComplexResponseTDA(LinearSolver):
             self.set_cpp_property(self.property)
 
         # check molecule
-        molecule_sanity_check(molecule, 'restricted')
+        molecule_sanity_check(molecule, 'restricted', type(self).__name__)
 
         # check SCF results
         scf_results_sanity_check(self, scf_results)
@@ -333,8 +330,14 @@ class ComplexResponseTDA(LinearSolver):
         # check pe setup
         pe_sanity_check(self, molecule=molecule)
 
-        # check solvation setup
+        # check solvation model setup
         solvation_model_sanity_check(self)
+
+        # check GOSTSHYP setup
+        gostshyp_sanity_check(self)
+
+        # check pairwise compatibility of the environment settings
+        environment_compatibility_sanity_check(self)
 
         # check print level (verbosity of output)
         self.print_level = max(1, min(self.print_level, 3))
@@ -358,7 +361,11 @@ class ComplexResponseTDA(LinearSolver):
             orb_ene = None
         orb_ene = self.comm.bcast(orb_ene, root=mpi_master())
         norb = orb_ene.shape[0]
-        nocc = molecule.number_of_alpha_electrons()
+        nocc = molecule.number_of_alpha_occupied_orbitals(basis)
+
+        self._check_mpi_oversubscription(
+            self._get_excitation_space_dimension_restricted(nocc, norb),
+            'response space')
 
         # ERI information
         eri_dict = self._init_eri(molecule, basis)
@@ -370,7 +377,10 @@ class ComplexResponseTDA(LinearSolver):
         pe_dict = self._init_pe(molecule, basis)
 
         # CPCM information
-        self._init_cpcm(molecule)
+        self._init_cpcm(molecule, basis)
+
+        # GOSTSHYP information
+        self._init_gostshyp(molecule, basis, scf_results)
 
         # right-hand side (gradient)
         if self.rank == mpi_master():
@@ -442,6 +452,8 @@ class ComplexResponseTDA(LinearSolver):
                 self.restart = check_rsp_hdf5(self.checkpoint_file,
                                               rsp_vector_labels, molecule,
                                               basis, dft_dict, pe_dict)
+                if self.restart:
+                    self.restart = self.match_settings(self.checkpoint_file)
             self.restart = self.comm.bcast(self.restart, root=mpi_master())
 
         # read initial guess from restart file
@@ -458,13 +470,14 @@ class ComplexResponseTDA(LinearSolver):
 
             bger_loc = bger.get_full_matrix(root=mpi_master())
 
-            tdens = self._get_trans_densities(bger_loc, scf_results, molecule)
+            tdens = self._get_trans_densities(bger_loc, scf_results, molecule,
+                                              basis)
 
             fock = self._comp_lr_fock(tdens, molecule, basis, eri_dict,
                                       dft_dict, pe_dict)
 
             if self.rank == mpi_master():
-                sig_mat = self._get_sigmas(fock, scf_results, molecule,
+                sig_mat = self._get_sigmas(fock, scf_results, molecule, basis,
                                            bger_loc)
             else:
                 sig_mat = None
@@ -641,6 +654,8 @@ class ComplexResponseTDA(LinearSolver):
 
                 self._print_iteration(relative_residual_norm, xvs)
 
+                self._print_gostshyp_neg_amp_info()
+
             profiler.stop_timer('ReducedSpace')
 
             # check convergence
@@ -685,13 +700,13 @@ class ComplexResponseTDA(LinearSolver):
                 root=mpi_master())
 
             tdens = self._get_trans_densities(new_trials_ger_loc, scf_results,
-                                              molecule)
+                                              molecule, basis)
 
             fock = self._comp_lr_fock(tdens, molecule, basis, eri_dict,
                                       dft_dict, pe_dict)
 
             if self.rank == mpi_master():
-                sig_mat = self._get_sigmas(fock, scf_results, molecule,
+                sig_mat = self._get_sigmas(fock, scf_results, molecule, basis,
                                            new_trials_ger_loc)
             else:
                 sig_mat = None
@@ -738,10 +753,12 @@ class ComplexResponseTDA(LinearSolver):
                     # final h5 file for response solutions
                     if self.filename is not None:
                         final_h5_fname = f'{self.filename}.h5'
+                        # clear stale group in final h5
+                        clear_group_in_hdf5(final_h5_fname, 'rsp')
                     else:
                         final_h5_fname = None
 
-                for bop, w in solutions:
+                for op_w_ind, (bop, w) in enumerate(solutions):
                     x = self.get_full_solution_vector(solutions[(bop, w)])
 
                     if self.rank == mpi_master():
@@ -752,14 +769,10 @@ class ComplexResponseTDA(LinearSolver):
                             if self.is_imag(self.a_operator):
                                 rsp_funcs[(aop, bop, w)] *= -1.0
 
-                        # write to h5 file for response solutions
+                        # write solutions to h5 file
                         if (self.save_solutions and final_h5_fname is not None):
-                            solution_keys = [
-                                '{:s}_{:s}_{:.8f}'.format(aop, bop, w)
-                                for aop in self.a_components
-                            ]
-                            write_rsp_solution_with_multiple_keys(
-                                final_h5_fname, solution_keys, x)
+                            write_rsp_full_solution_to_hdf5(
+                                final_h5_fname, x, op_w_ind, len(solutions))
 
                 if self.rank == mpi_master():
                     # print information about h5 file for response solutions
@@ -768,6 +781,7 @@ class ComplexResponseTDA(LinearSolver):
                             'Response solution vectors written to file: ' +
                             final_h5_fname)
                         self.ostream.print_blank()
+                        self.ostream.flush()
 
                     ret_dict = {
                         'a_operator': self.a_operator,
@@ -779,7 +793,30 @@ class ComplexResponseTDA(LinearSolver):
                         'solutions': solutions,
                     }
 
+                    if (self.save_solutions and
+                            final_h5_fname is not None):
+                        full_solutions_keys = [
+                            '{:s}_{:.8f}'.format(bop, w)
+                            for bop, w in solutions
+                        ]
+                        write_rsp_results_to_hdf5(
+                            final_h5_fname,
+                            {'full_solutions_keys': full_solutions_keys})
+
+                    # add rsp type
+                    ret_dict.update({'rsp_type': 'tdacpp'})
+
                     self._print_results(ret_dict)
+
+                    # write spectrum to h5 file
+                    if final_h5_fname is not None:
+                        h5_ret_dict = {
+                            key: value
+                            for key, value in ret_dict.items()
+                            if key != 'solutions'
+                        }
+                        self.write_cpp_rsp_results_to_hdf5(
+                            final_h5_fname, h5_ret_dict)
 
                     return ret_dict
                 else:
@@ -816,7 +853,7 @@ class ComplexResponseTDA(LinearSolver):
         else:
             return None
 
-    def _get_trans_densities(self, trial_mat, tensors, molecule):
+    def _get_trans_densities(self, trial_mat, tensors, molecule, basis):
         """
         Computes the transition densities.
 
@@ -834,7 +871,7 @@ class ComplexResponseTDA(LinearSolver):
         # form transition densities
 
         if self.rank == mpi_master():
-            nocc = molecule.number_of_alpha_electrons()
+            nocc = molecule.number_of_alpha_occupied_orbitals(basis)
             norb = tensors['C_alpha'].shape[1]
             nvir = norb - nocc
 
@@ -851,7 +888,7 @@ class ComplexResponseTDA(LinearSolver):
 
         return tdens
 
-    def _get_sigmas(self, fock, tensors, molecule, trial_mat):
+    def _get_sigmas(self, fock, tensors, molecule, basis, trial_mat):
         """
         Computes the sigma vectors.
 
@@ -868,7 +905,7 @@ class ComplexResponseTDA(LinearSolver):
             The sigma vectors as 2D Numpy array.
         """
 
-        nocc = molecule.number_of_alpha_electrons()
+        nocc = molecule.number_of_alpha_occupied_orbitals(basis)
         norb = tensors['C_alpha'].shape[1]
         nvir = norb - nocc
 
@@ -976,6 +1013,29 @@ class ComplexResponseTDA(LinearSolver):
             return self._get_ecd_spectrum(rsp_results, x_unit)
 
         return None
+
+    def write_cpp_rsp_results_to_hdf5(self, fname, rsp_results):
+        """
+        Writes the results of a linear response calculation to HDF5 file.
+        """
+
+        h5_rsp_results = dict(rsp_results)
+
+        spectrum = self.get_spectrum(rsp_results, 'au')
+
+        if spectrum is not None:
+            y_data = np.array(spectrum['y_data'])
+
+            if self.property == 'absorption':
+                assert_msg_critical(
+                    '[a.u.]' in spectrum['y_label'],
+                    f'{type(self).__name__}.write_cpp_rsp_results_to_hdf5: '
+                    + 'In valid unit in y_label')
+                h5_rsp_results['sigma'] = y_data
+            elif self.property == 'ecd':
+                h5_rsp_results['delta-epsilon'] = y_data
+
+        write_rsp_results_to_hdf5(fname, h5_rsp_results)
 
     def _get_absorption_spectrum(self, rsp_results, x_unit):
         """
@@ -1205,17 +1265,21 @@ class ComplexResponseTDA(LinearSolver):
             dist_new_b.data -= dist_new_proj.data
 
         if renormalize:
-            if dist_new_b.data.ndim > 0 and dist_new_b.shape(0) > 0:
-                dist_new_b = self.remove_linear_dependence(
+            has_global_rows = self.comm.allreduce(
+                int(dist_new_b.data.ndim > 0 and dist_new_b.shape(0) > 0),
+                op=MPI.SUM) > 0
+            if has_global_rows:
+                dist_new_b = self._remove_linear_dependence_full_size(
                     dist_new_b, self.lindep_thresh)
 
-                dist_new_b = self.orthogonalize_gram_schmidt(dist_new_b)
+                dist_new_b = self._orthogonalize_gram_schmidt_full_size(
+                    dist_new_b)
 
-                dist_new_b = self.normalize(dist_new_b)
+                dist_new_b = self._normalize_full_size(dist_new_b)
 
         if self.rank == mpi_master():
             assert_msg_critical(dist_new_b.data.size > 0,
-                                'LinearSolver: trial vectors are empty')
+                                'ComplexResponseTdaSolver: trial vectors are empty')
 
         return dist_new_b
 
@@ -1476,6 +1540,8 @@ class ComplexResponseTDA(LinearSolver):
         success = self.comm.bcast(success, root=mpi_master())
 
         if success:
+            self._write_settings_to_checkpoint(self.checkpoint_file)
+
             if self.nonlinear:
                 dist_arrays = [
                     self._dist_bger, self._dist_e2bger, self._dist_fock_ger
@@ -1516,86 +1582,6 @@ class ComplexResponseTDA(LinearSolver):
         checkpoint_text += self.checkpoint_file
         self.ostream.print_info(checkpoint_text)
         self.ostream.print_blank()
-
-    def remove_linear_dependence(self, basis, threshold):
-        """
-        Removes linear dependence in a set of vectors.
-        Based on the function in linearsolver.py, modified to work with full size
-        distributed arrays.
-
-        :param basis:
-            The set of vectors.
-        :param threshold:
-            The threshold for removing linear dependence.
-
-        :return:
-            The new set of vectors.
-        """
-
-        Sb = basis.matmul_AtB(basis)
-        if self.rank == mpi_master():
-            l, T = np.linalg.eigh(Sb)
-            b_norm = np.sqrt(Sb.diagonal())
-            mask = l > b_norm * threshold
-            Tmask = T[:, mask].copy()
-        else:
-            Tmask = None
-        Tmask = self.comm.bcast(Tmask, root=mpi_master())
-
-        return basis.matmul_AB_no_gather(Tmask)
-
-    @staticmethod
-    def orthogonalize_gram_schmidt(tvecs):
-        """
-        Applies modified Gram Schmidt orthogonalization to trial vectors.
-        Based on the function in linearsolver.py, modified to work with full size
-        distributed arrays.
-
-        :param tvecs:
-            The trial vectors.
-
-        :return:
-            The orthogonalized trial vectors.
-        """
-
-        if tvecs.shape(1) > 0:
-
-            n2 = tvecs.dot(0, tvecs, 0)
-            f = 1.0 / n2
-            tvecs.data[:, 0] *= f
-
-            for i in range(1, tvecs.shape(1)):
-                for j in range(i):
-                    dot_ij = tvecs.dot(i, tvecs, j)
-                    dot_jj = tvecs.dot(j, tvecs, j)
-                    f = dot_ij / dot_jj
-                    tvecs.data[:, i] -= f * tvecs.data[:, j]
-
-                n2 = tvecs.dot(i, tvecs, i)
-                f = 1.0 / n2
-                tvecs.data[:, i] *= f
-
-        return tvecs
-
-    @staticmethod
-    def normalize(vecs):
-        """
-        Normalizes vectors by dividing by vector norm.
-        Based on the function in linearsolver.py, modified to work with full size
-        distributed arrays.
-
-        :param vecs:
-            The vectors.
-
-        :param Retruns:
-            The normalized vectors.
-        """
-
-        invnorm = 1 / vecs.norm(axis=0)
-
-        vecs.data *= invnorm
-
-        return vecs
 
     def get_cpp_property_densities(self,
                                    molecule,
@@ -1648,7 +1634,7 @@ class ComplexResponseTDA(LinearSolver):
                                                  basis, scf_results)
 
         if self.rank == mpi_master():
-            nocc = molecule.number_of_alpha_electrons()
+            nocc = molecule.number_of_alpha_occupied_orbitals(basis)
             norb = scf_results['E_alpha'].shape[0]
             nvir = norb - nocc
 

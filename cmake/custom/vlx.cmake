@@ -16,27 +16,9 @@ message(STATUS "   User-appended          : ${EXTRA_CXXFLAGS}")
 message(STATUS "   OpenMP parallelization : ${OpenMP_CXX_FLAGS}")
 
 # transform VLX_CXX_FLAGS and EXTRA_CXXFLAGS to ;-separated lists
-string(REPLACE " " ";" VLX_CXX_FLAGS ${VLX_CXX_FLAGS})
+string(REPLACE " " ";" VLX_CXX_FLAGS "${VLX_CXX_FLAGS}")
 if(DEFINED EXTRA_CXXFLAGS)
-  string(REPLACE " " ";" EXTRA_CXXFLAGS ${EXTRA_CXXFLAGS})
-endif()
-
-# option for using higher order geometric derivatives
-option(USE_4TH_GEOM_DERIV "Use 4th-order geometric derivatives" OFF)
-option(USE_3RD_GEOM_DERIV "Use 3rd-order geometric derivatives" OFF)
-option(USE_2ND_GEOM_DERIV "Use 2nd-order geometric derivatives" ON)
-if(USE_4TH_GEOM_DERIV)
-  # print_option(USE_4TH_GEOM_DERIV "${USE_4TH_GEOM_DERIV}")
-  add_compile_definitions(USE_4TH_GEOM_DERIV)
-  add_compile_definitions(USE_3RD_GEOM_DERIV)
-  add_compile_definitions(USE_2ND_GEOM_DERIV)
-elseif(USE_3RD_GEOM_DERIV)
-  # print_option(USE_3RD_GEOM_DERIV "${USE_3RD_GEOM_DERIV}")
-  add_compile_definitions(USE_3RD_GEOM_DERIV)
-  add_compile_definitions(USE_2ND_GEOM_DERIV)
-elseif(USE_2ND_GEOM_DERIV)
-  # print_option(USE_2ND_GEOM_DERIV "${USE_2ND_GEOM_DERIV}")
-  add_compile_definitions(USE_2ND_GEOM_DERIV)
+  string(REPLACE " " ";" EXTRA_CXXFLAGS "${EXTRA_CXXFLAGS}")
 endif()
 
 # figure out where to put the Python module

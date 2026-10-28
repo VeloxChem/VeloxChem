@@ -51,3 +51,28 @@ class TestCpcmSolvation:
 
         self.run_cpcm_solvation('b3lyp', -0.00214350811184457, ['O', 3.0],
                                 1.0e-6)
+
+    def run_cpcm_solvation_with_ecp(self, ref_solv_energy, tol):
+
+        xyz_string = """3
+        xyz
+        Hg   0.00  0.00  0.00
+        Cl   0.00  0.00  2.35
+        Cl   0.00  0.10 -2.40
+        """
+        mol = Molecule.read_xyz_string(xyz_string)
+
+        basis_label = 'def2-svp'
+        bas = MolecularBasis.read(mol, basis_label, ostream=None)
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.solvation_model = 'cpcm'
+        scf_drv.ostream.mute()
+        scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            assert abs(ref_solv_energy - scf_drv.cpcm_drv.cpcm_epol) < tol
+
+    def test_hf_with_ecp(self):
+
+        self.run_cpcm_solvation_with_ecp(-0.0465435704, 1.0e-8)

@@ -268,6 +268,7 @@ class RespChargesDriver(EspChargesDriver):
 
         if self.rank == mpi_master():
             q = self.compute_resp_charges([molecule], [grid_m], [esp_m], [1.0])
+            self._write_esp_results_to_hdf5('resp', 'resp_charges', q)
         else:
             q = None
 
@@ -704,3 +705,195 @@ class RespChargesDriver(EspChargesDriver):
         if self.strong_restraint != 0.001:
             return False
         return True
+
+    def _get_origin_and_charge_dipole(self, molecule, charges):
+        """
+        Computes the dipole origin (nuclear charge centroid) and the dipole
+        moment from atom-centered charges.
+
+        :param molecule:
+            The molecule.
+        :param charges:
+            The atom-centered charges in atomic units.
+
+        :return:
+            A tuple (origin, dipole) with the nuclear charge centroid in
+            bohr and the dipole moment vector in atomic units (e·bohr).
+        """
+
+        charges = np.asarray(charges).ravel()
+        if charges.size != molecule.number_of_atoms():
+            raise ValueError(
+                f'Expected {molecule.number_of_atoms()} charges but got '
+                f'{charges.size}.')
+        coords = molecule.get_coordinates_in_bohr()
+        nuclear_charges = molecule.get_element_ids()
+        origin = (np.sum(coords.T * nuclear_charges, axis=1) /
+                  np.sum(nuclear_charges))
+        dipole = np.sum((coords - origin).T * charges, axis=1)
+        return origin, dipole
+
+    def show(self,
+             molecule,
+             charges,
+             dipole_moment=None,
+             cmap='viridis',
+             charge_max=None,
+             width=500,
+             height=400,
+             show_colorbar=True):
+        """
+        Displays atoms colored by RESP charges with an optional dipole moment
+        arrow and colorbar.
+
+        The dipole moment arrow is automatically scaled so that it fits within
+        the molecular bounding sphere (80% of the radius from the nuclear
+        charge centroid to the farthest atom).
+
+        :param molecule:
+            The molecule.
+        :param charges:
+            The atom-centered RESP charges in atomic units.
+        :param dipole_moment:
+            The dipole moment vector in atomic units (e·bohr). If None, the
+            point-charge dipole is computed from the RESP charges at the
+            nuclear charge centroid.
+        :param cmap:
+            The matplotlib colormap name (default: 'viridis').
+        :param charge_max:
+            The charge value mapped to the extremes of the colormap. If None,
+            the maximum absolute charge is used.
+        :param width:
+            The viewer width in pixels.
+        :param height:
+            The viewer height in pixels.
+        :param show_colorbar:
+            If True, a matplotlib colorbar is displayed alongside the viewer.
+        """
+
+        if self.rank != mpi_master():
+            return
+
+        try:
+            import json
+            import py3Dmol
+            from matplotlib import colormaps
+            from matplotlib import colors as mcolors
+        except ImportError:
+            raise ImportError(
+                'py3Dmol and matplotlib are required for this functionality.')
+
+        charges = np.asarray(charges)
+
+        # Use one helper so the dipole and its origin stay consistent.
+        origin_bohr, charge_dipole = self._get_origin_and_charge_dipole(
+            molecule, charges)
+
+        if dipole_moment is None:
+            dipole_moment = charge_dipole
+        dipole_moment = np.asarray(dipole_moment)
+
+        # Colormap centered at zero charge (normalization spans [-charge_max, charge_max])
+        if charge_max is None:
+            charge_max = float(np.max(np.abs(charges)))
+            if charge_max < 1e-6:
+                charge_max = 1.0
+        else:
+            charge_max = float(charge_max)
+            if charge_max <= 0.0:
+                raise ValueError(
+                    'charge_max must be a positive number when provided '
+                    'explicitly.')
+        norm = mcolors.TwoSlopeNorm(vmin=-charge_max,
+                                    vcenter=0.0,
+                                    vmax=charge_max)
+        try:
+            colormap = colormaps[cmap]
+        except KeyError:
+            raise ValueError(
+                f"'{cmap}' is not a valid colormap name. "
+                'See list(matplotlib.colormaps) for available options.')
+
+        atom_colors = [
+            mcolors.to_hex(colormap(norm(float(q))), keep_alpha=False)
+            for q in charges
+        ]
+        atom_colors_js = json.dumps(atom_colors)
+
+        # Build py3Dmol viewer with per-atom charge coloring
+        view = py3Dmol.view(width=width, height=height)
+        view.addModel(molecule.get_xyz_string(), 'xyz')
+
+        view.startjs += f"""
+    var atom_colors = {atom_colors_js};
+
+    function chargeColor(atom) {{
+        var c = atom_colors[atom.index];
+        return c !== undefined ? c : '#B0B0B0';
+    }}
+    """
+
+        view.setViewStyle({'style': 'outline', 'width': 0.05})
+        view.setStyle({}, {
+            'stick': {
+                'radius': 0.25,
+                'colorfunc': 'chargeColor'
+            },
+            'sphere': {
+                'scale': 0.25,
+                'colorfunc': 'chargeColor'
+            },
+        })
+        # Replace the quoted function name string with the actual JS reference
+        view.startjs = view.startjs.replace('"chargeColor"', 'chargeColor')
+
+        # Dipole moment arrow — auto-scaled to fit within molecular bounds.
+        # The arrow length is capped at 80% of the molecular radius
+        # (max distance from the nuclear charge centroid to any atom).
+        coords_ang = molecule.get_coordinates_in_angstrom()
+        origin = origin_bohr * bohr_in_angstrom()  # Angstrom
+
+        mol_radius = float(np.max(np.linalg.norm(coords_ang - origin, axis=1)))
+        target_length = 0.8 * mol_radius  # Angstrom
+
+        # dipole_moment is in a.u. (e·bohr); convert to Angstrom for display
+        dip_ang = dipole_moment * bohr_in_angstrom()
+        dip_length = float(np.linalg.norm(dip_ang))
+        if dip_length > 1e-6:
+            scaled_dip = dip_ang * (target_length / dip_length)
+        else:
+            scaled_dip = dip_ang
+
+        view.addArrow({
+            'start': {
+                'x': float(origin[0]),
+                'y': float(origin[1]),
+                'z': float(origin[2])
+            },
+            'end': {
+                'x': float(origin[0] + scaled_dip[0]),
+                'y': float(origin[1] + scaled_dip[1]),
+                'z': float(origin[2] + scaled_dip[2])
+            },
+            'radius': 0.08,
+            'radiusRatio': 2.5,
+            'color': 'dimgray',
+        })
+
+        view.zoomTo()
+        view.show()
+
+        # Colorbar
+        if show_colorbar:
+            from matplotlib import pyplot as plt
+            from matplotlib.colorbar import ColorbarBase
+
+            fig, ax = plt.subplots(figsize=(0.6, 3.5))
+            cb = ColorbarBase(ax,
+                              cmap=colormap,
+                              norm=norm,
+                              orientation='vertical')
+            cb.set_label('Charge (a.u.)', rotation=90, labelpad=10)
+            cb.ax.tick_params(labelsize=9)
+            plt.tight_layout()
+            plt.show()
