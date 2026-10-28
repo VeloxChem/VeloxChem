@@ -120,8 +120,6 @@ class XPSDriver:
         # Only enabled w/ TDA, for stability over RPA
         self.tamm_dancoff = True
         # Number of TOTAL states to compute per core ionization (if shake_ups is True)
-        # TODO: change so that nstates refers only to shake-ups and exclude emission
-        # nstates = nocc_beta + n_shakeups
         # TODO: add the emission energies as separate result entries since these are computed anyway
         # i.e., the ones that we skip in the XPS
         self.nstates = 5
@@ -599,7 +597,7 @@ class XPSDriver:
         return intensity
 
     def _compute_shakeup_intensities(self, gs_scf_results, ion_scf_results, 
-                                     rsp_results, unrel_occ_b, nalpha, tda=False):
+                                     rsp_results, unrel_occ_b, nalpha, tda=True):
         """
         Computes the intensity of shake-up satellites in the sudden approximation.
 
@@ -867,7 +865,10 @@ class XPSDriver:
                     #ionization_energies.append((mo_index, atom_index, ie, contribution, mainline_intensity))
                     ionization_energies.append({'mo_index': mo_index,
                                                 'atom_index': atom_index,
+                                                'state': 'mainline',
+                                                'state_index': 0,
                                                 'ionization_energy_ev': ie,
+                                                'excitation_energy_ev': 0.0,
                                                 'intensity': mainline_intensity,
                                                 'contribution': contribution,
                                                 'is_delocalized': bool(contribution < self.localization_threshold),})
@@ -885,8 +886,7 @@ class XPSDriver:
                     if self.tamm_dancoff:
                         rsp_drv = TdaUnrestrictedEigenSolver(self.comm, self.ostream)
                     else:
-                        assert_msg_critical(False, 'Only enabled in the TDA approximation currently.')
-                        rsp_drv = LinearResponseUnrestrictedEigenSolver(self.comm, self.ostream)
+                        assert_msg_critical(False, 'Only enabled in the TDA approximation.')
 
                     rsp_drv.update_settings({'nstates': self.nstates})
 
@@ -911,7 +911,7 @@ class XPSDriver:
                             scf_results, scf_ion_results, rsp_results, O_Rb,
                             nalpha, tda=self.tamm_dancoff)
 
-                        for n in range(first_shakeup, first_shakeup + self.nstates):
+                        for k, n in enumerate(range(first_shakeup, first_shakeup + self.nstates), start=1):
                             energy = eigvals[n] * hartree_in_ev()
                             # Approximate shake-up IE as mainline IE + excitation energy
                             shakeup_energy = ie + energy  
@@ -919,7 +919,10 @@ class XPSDriver:
                             ionization_energies.append({
                                 'mo_index': mo_index,
                                 'atom_index': atom_index,
+                                'state': 'shake-up',
+                                'state_index': k,
                                 'ionization_energy_ev': shakeup_energy,
+                                'excitation_energy_ev': energy,
                                 'intensity': shakeup_intensities[n],
                                 'contribution': contribution,
                                 'is_delocalized': bool(contribution < self.localization_threshold),
@@ -965,22 +968,31 @@ class XPSDriver:
         for element, ionization_data in results.items():
             self.ostream.print_header(f'Element: {element}'.ljust(width))
             self.ostream.print_header(('-' * width).ljust(width))
-            header = (f'{"Atom":<8} {"MO Index":<12} '
-                      f'{"IE (eV)":<15}  {"Intensity":<14}  {"Localization":<15}')
+            header = (f'{"Atom":<6} {"MO":<4} {"State":<11} {"IE (eV)":>9} '
+                      f'{"dE (eV)":>8} {"Intensity":>10} {"I/I_main":>9} {"Localization":>13}')
             self.ostream.print_header(header.ljust(width))
             self.ostream.print_header(('-' * width).ljust(width))
 
             # Sort by atom index for better readability
-            sorted_data = sorted(ionization_data, key=lambda x: x['atom_index'])
+            sorted_data = sorted(ionization_data,
+                                 key=lambda x: (x['atom_index'], x['ionization_energy_ev']))
 
             for record in sorted_data:
                 mo_idx = record['mo_index']
                 atom_idx = record['atom_index']
+                state = record['state']
+                state_idx = record['state_index']
+                exc = record['excitation_energy_ev']
                 ie = record['ionization_energy_ev']
                 contribution = record['contribution']
                 intensity = record['intensity']
-                line = (f'{atom_idx+1:<8} {mo_idx:<12} '
-                        f'{ie:>12.2f}   {intensity:>13.2f}   {contribution:>13.1%}')
+                if state == 'mainline':
+                    mainline_intensity = intensity
+                    line = (f'{atom_idx+1:<6} {mo_idx:<4} {state:<11} {ie:>9.2f} '
+                            f'{"":>8} {intensity:>10.4f} {1.0:>9.3f} {contribution:>13.1%}')
+                else:
+                    line = (f'{"":<6} {"":<4} {state + " " + str(state_idx):<11} {ie:>9.2f} '
+                            f'{exc:>8.2f} {intensity:>10.2e} {intensity / mainline_intensity:>9.2e} {"":>13}')
                 self.ostream.print_header(line.ljust(width))
 
             self.ostream.print_blank()
