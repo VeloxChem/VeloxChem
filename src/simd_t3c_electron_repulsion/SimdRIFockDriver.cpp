@@ -2518,6 +2518,16 @@ CSimdRIFockDriver::bq_vectors_memory(const CMolecule        &molecule,
     memory.forming =
         metric + nops * nbatch * sizeof(double) + nthreads * (arena + nchunk * per_column + _thread_allowance);
 
+    if (std::getenv("VLX_RIJK_PROFILE") != nullptr)
+    {
+        const auto gb = [](const size_t n) { return static_cast<double>(n) / (1024.0 * 1024.0 * 1024.0); };
+
+        std::printf("RIJK memory forming: permuted metric %.3f GB, batch %.3f GB, threads %zu x (arena %.3f + "
+                    "chunk %.3f + allowance %.3f) GB\n",
+                    gb(metric), gb(nops * nbatch * sizeof(double)), nthreads, gb(arena), gb(nchunk * per_column),
+                    gb(_thread_allowance));
+    }
+
     memory.pattern = memory.held / _pattern_divisor;
 
     return memory;

@@ -137,9 +137,9 @@ class CSimdRIJKFockDriver
     /// @return The memory in bytes, for the number of threads of the caller.
     /// @note It is the larger of two peaks. Forming the B vectors holds them beside
     /// the integrals of a batch, the permuted metrics and the buffers of the
-    /// threads; a Fock build holds them beside the W matrices of a range, the copy
-    /// of the last and shorter range, the index of the half transformation, and the
-    /// squares, triangles and staging of the threads. The W matrices of a range are as many as the budget allows, which
+    /// threads; a Fock build holds them beside the W matrices of a range, the index
+    /// of the half transformation, and the squares, triangles and staging of the
+    /// threads. The W matrices of a range are as many as the budget allows, which
     /// is the whole auxiliary basis for a calculation with memory to spare, so they
     /// can be a large part of the peak and are not a small addition to it.
     /// @note A margin of a tenth is added to what is counted, so that the answer is
@@ -550,6 +550,24 @@ class CSimdRIJKFockDriver
                      const double                  threshold,
                      const CTripleSparsityPattern &pattern,
                      const size_t                  min_parts) const -> std::vector<CTripleSparsityPattern>;
+
+    /// @brief Takes the first matrices of the storage of the W matrices as a range
+    /// of their own, for the last range of a build, which is shorter than the
+    /// others.
+    /// @param storage The storage of the W matrices, whose first matrices are left
+    /// empty until they are returned.
+    /// @param nrange The matrices of the range.
+    /// @return The range.
+    /// @note Moved and not copied. A copy held the matrices of the range twice while
+    /// it was formed, which is up to a whole range of the W matrices beside what a
+    /// build otherwise holds: 4.7 GB on a rank of 417 waters in def2-SVP, and the
+    /// difference between that calculation fitting and falling back.
+    static auto _take_range(std::vector<CPackedMatrix> &storage, const size_t nrange) -> std::vector<CPackedMatrix>;
+
+    /// @brief Returns a range taken by _take_range to the storage it came from.
+    /// @param range The range, which is left empty.
+    /// @param storage The storage of the W matrices.
+    static auto _return_range(std::vector<CPackedMatrix> &range, std::vector<CPackedMatrix> &storage) -> void;
 
     /// @brief Gets the auxiliary functions of a range of the W matrices.
     /// @param nheld The auxiliary functions this driver holds.

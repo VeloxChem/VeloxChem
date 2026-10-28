@@ -37,6 +37,7 @@
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
+#include <iterator>
 #include <memory>
 #include <numeric>
 #include <stdexcept>
@@ -241,15 +242,29 @@ CSimdRIJKFockDriver::peak_memory(const CMolecule        &molecule,
     const auto w_vectors = nbatch * nao * norbitals * sizeof(double);
 
     // NOTE: the last range of a build is shorter than the others, and its W
-    // matrices are copied out of the storage to be handed over as a range of their
-    // own, so they are held twice while it is formed.
+    // matrices are moved out of the storage and back rather than copied, so it
+    // holds nothing beside the storage.
 
-    const auto tail = (nheld % nbatch) * nao * norbitals * sizeof(double);
-
-    const auto build = bq.held + bq.pattern + metric + w_vectors + tail + bq.index +
+    const auto build = bq.held + bq.pattern + metric + w_vectors + bq.index +
                        _drv.build_memory(nao, naux, norbitals, nbatch);
 
     const auto peak = std::max(forming, build);
+
+    if (prof_wanted())
+    {
+        const auto gb = [](const size_t n) { return static_cast<double>(n) / (1024.0 * 1024.0 * 1024.0); };
+
+        std::printf("RIJK memory peak: B vectors %.3f, descriptions %.3f, metric %.3f, index %.3f GB\n", gb(bq.held),
+                    gb(bq.pattern), gb(metric), gb(bq.index));
+
+        std::printf("RIJK memory peak: forming %.3f GB (B vectors, descriptions, two metrics, %.3f beside)\n",
+                    gb(forming), gb(bq.forming));
+
+        std::printf("RIJK memory peak: build %.3f GB (W range %zu of %zu functions %.3f, buffers %.3f)\n", gb(build),
+                    nbatch, nheld, gb(w_vectors), gb(_drv.build_memory(nao, naux, norbitals, nbatch)));
+
+        std::printf("RIJK memory peak: %.3f GB with the margin\n", gb(peak + peak / _peak_margin_divisor));
+    }
 
     return peak + peak / _peak_margin_divisor;
 }
@@ -748,8 +763,7 @@ CSimdRIJKFockDriver::compute(const CPackedMatrix &density,
         }
         else
         {
-            auto tail =
-                std::vector<CPackedMatrix>(_w_vectors.begin(), _w_vectors.begin() + static_cast<long>(batch.size()));
+            auto tail = _take_range(_w_vectors, batch.size());
 
             _drv.compute_w_vectors(bq_vectors, _basis, _aux_basis, coefficients, batch, tail);
 
@@ -760,6 +774,8 @@ CSimdRIJKFockDriver::compute(const CPackedMatrix &density,
             _drv.compute_exchange_matrix(tail, fock, -factor);
 
             profile.exchange += prof_since(mark_exchange);
+
+            _return_range(tail, _w_vectors);
         }
     };
 
@@ -938,8 +954,7 @@ CSimdRIJKFockDriver::compute(const CPackedMatrix &density,
         {
             // NOTE: the last range is shorter than the others, and the storage is
             // handed to the transformation as the range it is asked to fill.
-            auto tail = std::vector<CPackedMatrix>(storage.begin(),
-                                                   storage.begin() + static_cast<long>(batch.size()));
+            auto tail = _take_range(storage, batch.size());
 
             _drv.compute_w_vectors(bq_vectors, _basis, _aux_basis, coefficients, batch, tail);
 
@@ -950,6 +965,8 @@ CSimdRIJKFockDriver::compute(const CPackedMatrix &density,
             _drv.compute_exchange_matrix(tail, fock, -factor);
 
             profile.exchange += prof_since(mark_exchange);
+
+            _return_range(tail, storage);
         }
     };
 
@@ -1494,6 +1511,22 @@ CSimdRIJKFockDriver::_apply_metric(double *values, const size_t nrows, const siz
     // asks for the solve against its transpose rather than against it.
 
     tdenblas::threadedSolveTriangular(nrows, ncols, dense.data(), nrows, values, ncols, transposed);
+}
+
+auto
+CSimdRIJKFockDriver::_take_range(std::vector<CPackedMatrix> &storage, const size_t nrange) -> std::vector<CPackedMatrix>
+{
+    const auto last = storage.begin() + static_cast<long>(nrange);
+
+    return std::vector<CPackedMatrix>(std::make_move_iterator(storage.begin()), std::make_move_iterator(last));
+}
+
+auto
+CSimdRIJKFockDriver::_return_range(std::vector<CPackedMatrix> &range, std::vector<CPackedMatrix> &storage) -> void
+{
+    std::move(range.begin(), range.end(), storage.begin());
+
+    range.clear();
 }
 
 auto

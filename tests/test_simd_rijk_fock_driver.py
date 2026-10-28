@@ -159,8 +159,10 @@ class TestSimdRIJKFockDriver:
 
     def test_ranges_of_w_do_not_change_the_answer(self, chain):
         """The W matrices are formed a range at a time. With ten atoms and an f shell
-        on the auxiliary side there are seventy of them, so the ranges wrap and the
-        last one is shorter than the others."""
+        on the auxiliary side there are seventy of them, and a budget of sixteen
+        kilobytes holds the fewest a range takes, sixty four, so the ranges wrap and
+        the last one is shorter than the others. A budget with room to spare holds
+        all seventy in one range and would not reach the shorter one."""
 
         basis, aux_basis = self.bases(tuple([1] * 10), tuple([0] * 10), 3)
 
@@ -172,9 +174,16 @@ class TestSimdRIJKFockDriver:
         coeffs, density = self.orbitals(nao, 4, 37)
 
         driver = SimdRIJKFockDriver()
-        driver.prepare(chain, basis, aux_basis, 0.0, 1 << 30)
+        driver.prepare(chain, basis, aux_basis, 0.0, 1 << 14, mode=rimode.in_memory)
 
         computed = driver.compute(density, coeffs, 1.0).to_numpy(max_memory=8.0)
+
+        # NOTE: twice, as the shorter range is taken out of the storage the
+        # driver keeps between builds and has to be put back whole.
+
+        again = driver.compute(density, coeffs, 1.0).to_numpy(max_memory=8.0)
+
+        assert np.max(np.abs(again - computed)) == 0.0
 
         expected = self.by_hand(chain, basis, aux_basis, density, coeffs, 1.0, 0.0)
 
@@ -182,6 +191,38 @@ class TestSimdRIJKFockDriver:
 
         assert scale > 0.0
         assert np.max(np.abs(computed - expected)) / scale < 1.0e-12
+
+    def test_ranges_of_w_do_not_change_the_open_shell_answer(self, chain):
+        """The open shell build takes the shorter last range apart from the closed
+        shell one. Both spins given the orbitals of the closed shell, and the total
+        density twice its density, answer the closed shell matrix for each spin."""
+
+        basis, aux_basis = self.bases(tuple([1] * 10), tuple([0] * 10), 3)
+
+        nao = basis.get_dimensions_of_basis()
+
+        coeffs, density = self.orbitals(nao, 4, 37)
+
+        whole = SimdRIJKFockDriver()
+        whole.prepare(chain, basis, aux_basis, 0.0, 1 << 30, mode=rimode.in_memory)
+
+        expected = whole.compute(density, coeffs, 1.0).to_numpy(max_memory=8.0)
+
+        total = PackedMatrix(nao, nao, mat_t.symmetric)
+        total.from_numpy(2.0 * density.to_numpy(max_memory=8.0))
+
+        wrapped = SimdRIJKFockDriver()
+        wrapped.prepare(chain, basis, aux_basis, 0.0, 1 << 14, mode=rimode.in_memory)
+
+        scale = float(np.max(np.abs(expected)))
+
+        for _ in range(2):
+            fock_a, fock_b = wrapped.compute(total, coeffs, coeffs, 1.0)
+
+            for fock in (fock_a, fock_b):
+                computed = fock.to_numpy(max_memory=8.0)
+
+                assert np.max(np.abs(computed - expected)) / scale < 1.0e-12
 
     def test_required_memory_is_what_is_held(self, molecule):
         """The check is worth nothing if it is an estimate, so it is the count of the

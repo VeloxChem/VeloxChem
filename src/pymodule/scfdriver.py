@@ -1904,9 +1904,11 @@ class ScfDriver:
                 self._ri_fallback = (max(peaks) > budget)
 
             if self._ri_fallback:
-                where = 'available' if self.nodes == 1 else 'on a rank'
+                where = ('available'
+                         if self.nodes == 1 else 'on the largest rank')
                 self.ostream.print_warning(
-                    f'RI-J would need {max(peaks) / (1024**3):.2f} GB of ' +
+                    f'RI-J would need roughly {max(peaks) / (1024**3):.2f} ' +
+                    'GB of ' +
                     f'{budget / (1024**3):.2f} GB {where}, so the Coulomb ' +
                     'matrices are formed from the four-center integrals.')
                 self.ostream.print_blank()
@@ -1955,14 +1957,14 @@ class ScfDriver:
                     f'{basis_ri.get_dimensions_of_basis()}')
                 if mode == rimode.in_memory and self.nodes == 1:
                     self.ostream.print_info(
-                        f'RI-J needs at most {max(peaks) / (1024**3):.2f} ' +
+                        f'RI-J needs roughly {max(peaks) / (1024**3):.2f} ' +
                         f'GB of {budget / (1024**3):.2f} GB available.')
                 elif mode == rimode.in_memory:
                     self.ostream.print_info(
-                        f'RI-J needs at most {sum(peaks) / (1024**3):.2f} ' +
-                        f'GB over {self.nodes:d} ranks, at most ' +
+                        f'RI-J needs roughly {sum(peaks) / (1024**3):.2f} ' +
+                        f'GB over {self.nodes:d} ranks, ' +
                         f'{max(peaks) / (1024**3):.2f} GB of ' +
-                        f'{budget / (1024**3):.2f} GB on a rank.')
+                        f'{budget / (1024**3):.2f} GB on the largest rank.')
                 self.ostream.print_info(
                     f'Three-center integrals are {taken}, in ' +
                     f'{self._ri_drv.number_of_parts()} parts.')
@@ -2110,9 +2112,11 @@ class ScfDriver:
                 self._ri_fallback = (max(peaks) > budget)
 
             if self._ri_fallback:
-                where = 'available' if self.nodes == 1 else 'on a rank'
+                where = ('available'
+                         if self.nodes == 1 else 'on the largest rank')
                 self.ostream.print_warning(
-                    f'RI-JK would need {max(peaks) / (1024**3):.2f} GB of ' +
+                    f'RI-JK would need roughly {max(peaks) / (1024**3):.2f} ' +
+                    'GB of ' +
                     f'{budget / (1024**3):.2f} GB {where}, so the Fock ' +
                     'matrices are formed from the four-center integrals.')
             else:
@@ -2120,15 +2124,15 @@ class ScfDriver:
                     'Using the SIMD resolution of the identity (RI-JK) driver.')
                 if mode == rimode.in_memory and self.nodes == 1:
                     self.ostream.print_info(
-                        f'RI-JK needs at most {max(peaks) / (1024**3):.2f} ' +
+                        f'RI-JK needs roughly {max(peaks) / (1024**3):.2f} ' +
                         f'GB of {budget / (1024**3):.2f} GB available ' +
                         f'(B vectors {largest / (1024**3):.2f} GB).')
                 elif mode == rimode.in_memory:
                     self.ostream.print_info(
-                        f'RI-JK needs at most {sum(peaks) / (1024**3):.2f} ' +
-                        f'GB over {self.nodes:d} ranks, at most ' +
+                        f'RI-JK needs roughly {sum(peaks) / (1024**3):.2f} ' +
+                        f'GB over {self.nodes:d} ranks, ' +
                         f'{max(peaks) / (1024**3):.2f} GB of ' +
-                        f'{budget / (1024**3):.2f} GB on a rank ' +
+                        f'{budget / (1024**3):.2f} GB on the largest rank ' +
                         f'(B vectors {largest / (1024**3):.2f} GB).')
                 elif self.nodes == 1:
                     self.ostream.print_info(
