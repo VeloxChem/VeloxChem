@@ -328,7 +328,16 @@ class RixsDriver(LinearSolver):
         self.elastic_cross_sections = np.zeros((len(self.photon_energy)))
         #self.scattering_amplitudes  = np.zeros((num_final_xsections, len(self.photon_energy),
         #                                       3, 3), dtype=complex)
-        
+
+        n_comp = len(self.components)
+        C = scf_results['C_alpha']
+        dip = compute_electric_dipole_integrals(molecule, basis, [0.0, 0.0, 0.0])
+        #dip_ints_mo = [C.T @ dip_x_ao.T @ C for comp, dip_x_ao in dip_ints.items()]
+        dip_ints_mo = {comp: C.T @ dip_x_ao.T @ C for comp, dip_x_ao in zip(self.components, dip)}
+
+        N_w = len(self.photon_energy)
+        N_em = len(self.energyloss_frequencies)
+        rsp_tensor = np.zeros((N_w, N_em, n_comp, n_comp, n_comp, n_comp), dtype=complex)
         # TODO: make stable for len(self.photon_energy) = 1
         for n_ind, w_ex in enumerate(self.photon_energy):
             self.ostream.print_info(
@@ -343,57 +352,73 @@ class RixsDriver(LinearSolver):
             #ret_cpp_solution_vector_y = core_rsp_drv.get_full_solution_vector(cvs_rsp_results['solutions'][('y', w_ex)])
             #ret_cpp_solution_vector_z = core_rsp_drv.get_full_solution_vector(cvs_rsp_results['solutions'][('z', w_ex)])
             A_ret = {
-                comp: core_rsp_drv.get_full_solution_vector(
-                    cvs_rsp_results['solutions'][(comp, w_ex)]
+                x: core_rsp_drv.get_full_solution_vector(
+                    cvs_rsp_results['solutions'][(x, w_ex)]
                 )
-                for comp in self.components
+                for x in self.components
             }
-            A_adv = {comp: np.conjugate(vec) for comp, vec in A_ret.items()}
+            #A_adv = {comp: np.conjugate(vec) for comp, vec in A_ret.items()}
 
-            B_lambda = {}
-            for lam in self.components:
-                rsp_grads = self.eff_excited_grad(
-                    molecule, basis, scf_results, A_ret[lam], components=self.components
+            # eta[x][y] = g_y[A_x], i.e., RHS for B_{yx}
+            eta = {}
+            B = {}
+            for x in self.components:
+                grads = self.eff_excited_grad(
+                    molecule, basis, scf_results, A_ret[x], dip_ints_mo, components=self.components
                 )
+                eta[x] = dict(zip(self.components, grads))
 
-                exc_grad = {
-                    (op, w): g
-                    for op, g in zip(core_rsp_drv.b_components, rsp_grads)
+                #exc_grad = {
+                #    (op, w): g
+                #    for op, g in zip(self.components, grads)
+                #    for w in rsp_drv.frequencies
+                #}
+                vec_grad = {
+                    (y, w): eta[x][y]
+                    for y in self.components
                     for w in rsp_drv.frequencies
                 }
-
-                B_lambda[lam] = rsp_drv.compute(
-                    molecule, basis, scf_results, v_grad=exc_grad
+                B[x] = rsp_drv.compute(
+                    molecule, basis, scf_results, v_grad=vec_grad
                 )
             
             for f_ind, w in enumerate(rsp_drv.frequencies):
                 w_em = w_ex - w
                 
-                rsp_func = 0.0
+                #rsp_func = 0.0
 
-                for lam in self.components:
-                    for rho in self.components:
-                        B_rho_lam = rsp_drv.get_full_solution_vector(
-                            B_lambda[lam]['solutions'][(rho, w)]
+                # (9,n)
+                eta_mat = np.array([
+                    eta[x][y] 
+                    for y in self.components 
+                    for x in self.components
+                ])
+
+                for ind_x, x in enumerate(self.components):
+                    #A_x = A_adv[x]
+                    #lam_solutions = B_xy[x]['solutions']
+
+                    for ind_y, y in enumerate(self.components):
+                        B_yx = rsp_drv.get_full_solution_vector(
+                            B[x]['solutions'][(y, w)]
                         )
+                        # <eta_yx | B_yx> = eta^dagger B
+                        #A_xy_sol = self.eff_excited_grad(
+                        #    molecule,
+                        #    basis,
+                        #    scf_results,
+                        #    A_x,
+                        #    dip_ints_mo=dip_ints_mo,
+                        #    components=y,
+                        #)[0]
 
-                        A_lam = A_adv[lam]
-                        lam_solutions = B_lambda[lam]['solutions']
-
-                        for rho in self.components:
-                            B_rho_lam = rsp_drv.get_full_solution_vector(
-                                lam_solutions[(rho, w)]
-                            )
-
-                            mu_rho_B = self.eff_excited_grad(
-                                molecule,
-                                basis,
-                                scf_results,
-                                B_rho_lam,
-                                components=rho,
-                            )[0]
-
-                            rsp_func -= np.dot(mu_rho_B, A_lam).imag
+                        #B_rho_lam = rsp_drv.get_full_solution_vector(
+                        #    lam_solutions[(rho, w)]
+                        #)
+                        #for rho in self.components:
+                        #rsp_func -= np.dot(A_x, mu_rho_B).imag
+                        #rsp_func -= np.dot(A_xy_sol, B_xy_sol).imag
+                        rsp_tensor[ind_x, ind_y] = -1.0 * np.vdot(eta[x][y], B_yx).imag
 
                 # TODO: fix correct constants
                 pref = -16.0 * np.pi * w_em**3 * w_ex * fine_structure_constant()**2
@@ -1223,15 +1248,15 @@ class RixsDriver(LinearSolver):
                 vecs.append(full_v)
             return np.array(vecs)
         
-    def eff_excited_grad(self, molecule, basis, scf_results, response_vec, components='xyz'):
+    def eff_excited_grad(self, molecule, basis, scf_results, response_vec, dip_ints_mo, components='xyz'):
         """
-        Get effective RHS/gradient vectors of a previous LR calculation.
+        Get effective RHS/gradient vectors of a LR calculation.
 
         :return: 
             Excited state gradient (tuple)
         """
-        dip = compute_electric_dipole_integrals(molecule, basis, [0.0, 0.0, 0.0])
-        dip_ints = {'x': dip[0], 'y': dip[1], 'z': dip[2]}
+        #dip = compute_electric_dipole_integrals(molecule, basis, [0.0, 0.0, 0.0])
+        #dip_ints = {'x': dip[0], 'y': dip[1], 'z': dip[2]}
 
         C = scf_results['C_alpha']
         nocc = molecule.number_of_alpha_occupied_orbitals(basis)
@@ -1242,11 +1267,11 @@ class RixsDriver(LinearSolver):
         sqrt_2 = np.sqrt(2.0)
         grads = []
         for comp in components:
-            dip_x_ao = dip_ints[comp]
-            dip_x_mo = C.T @ dip_x_ao.T @ C
+            #dip_x_ao = dip_ints[comp]
+            #dip_x_mo = C.T @ dip_x_ao.T @ C
 
             # dip_x_mo @ Z - Z @ dip_x_mo
-            grad = self.commut(dip_x_mo, Z)
+            grad = self.commut(dip_ints_mo[comp], Z)
 
             grad_vec = -1.0 * sqrt_2 * self.lrmat2vec(grad, nocc, norb)
             grads.append(grad_vec)
