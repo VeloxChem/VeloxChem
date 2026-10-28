@@ -2201,9 +2201,9 @@ CSimdRIFockDriver::compute_w_vectors(const CSparseTensor   &bq_vectors,
 }
 
 auto
-CSimdRIFockDriver::compute_exchange_matrix(const std::vector<CPackedMatrix> &w_vectors,
-                                            CPackedMatrix                    &matrix,
-                                            const double                      factor) const -> void
+CSimdRIFockDriver::compute_exchange_matrix(std::span<const CPackedMatrix> w_vectors,
+                                            CPackedMatrix                 &matrix,
+                                            const double                   factor) const -> void
 {
     if (w_vectors.empty()) return;
 

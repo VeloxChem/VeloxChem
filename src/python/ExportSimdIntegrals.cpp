@@ -331,7 +331,8 @@ export_simdintegrals(py::module &m) -> void
              "The fraction of the B vectors which is actually filled.",
              py::arg("bq_vectors"), py::arg("basis"), py::arg("aux_basis"), py::arg("held") = 0)
         .def("compute_exchange_matrix",
-             &CSimdRIFockDriver::compute_exchange_matrix,
+             [](const CSimdRIFockDriver &self, const std::vector<CPackedMatrix> &w_vectors, CPackedMatrix &matrix,
+                const double factor) { self.compute_exchange_matrix(w_vectors, matrix, factor); },
              "Adds the exchange contribution of a range of the auxiliary basis to a matrix.",
              py::arg("w_vectors"),
              py::arg("matrix"),

@@ -37,9 +37,9 @@
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
-#include <iterator>
 #include <memory>
 #include <numeric>
+#include <span>
 #include <stdexcept>
 #include <string>
 
@@ -241,9 +241,9 @@ CSimdRIJKFockDriver::peak_memory(const CMolecule        &molecule,
 
     const auto w_vectors = nbatch * nao * norbitals * sizeof(double);
 
-    // NOTE: the last range of a build is shorter than the others, and its W
-    // matrices are moved out of the storage and back rather than copied, so it
-    // holds nothing beside the storage.
+    // NOTE: the last range of a build is shorter than the others, and is the first
+    // of the storage rather than a copy of it, so it holds nothing beside the
+    // storage.
 
     const auto build = bq.held + bq.pattern + metric + w_vectors + bq.index +
                        _drv.build_memory(nao, naux, norbitals, nbatch);
@@ -746,37 +746,20 @@ CSimdRIJKFockDriver::compute(const CPackedMatrix &density,
 
         const auto mark_transform = prof_clock::now();
 
-        // NOTE: the last range is shorter than the others, and the storage is
-        // handed to the transformation as the range it is asked to fill.
+        // NOTE: the last range is shorter than the others. The transformation
+        // fills the first of the storage, as many as the range asks for, and the
+        // exchange is handed a view of those, so a shorter range holds nothing
+        // beside the storage.
 
-        if (batch.size() == _w_vectors.size())
-        {
-            _drv.compute_w_vectors(bq_vectors, _basis, _aux_basis, coefficients, batch, _w_vectors);
+        _drv.compute_w_vectors(bq_vectors, _basis, _aux_basis, coefficients, batch, _w_vectors);
 
-            profile.transform += prof_since(mark_transform);
+        profile.transform += prof_since(mark_transform);
 
-            const auto mark_exchange = prof_clock::now();
+        const auto mark_exchange = prof_clock::now();
 
-            _drv.compute_exchange_matrix(_w_vectors, fock, -factor);
+        _drv.compute_exchange_matrix(std::span<const CPackedMatrix>(_w_vectors).first(batch.size()), fock, -factor);
 
-            profile.exchange += prof_since(mark_exchange);
-        }
-        else
-        {
-            auto tail = _take_range(_w_vectors, batch.size());
-
-            _drv.compute_w_vectors(bq_vectors, _basis, _aux_basis, coefficients, batch, tail);
-
-            profile.transform += prof_since(mark_transform);
-
-            const auto mark_exchange = prof_clock::now();
-
-            _drv.compute_exchange_matrix(tail, fock, -factor);
-
-            profile.exchange += prof_since(mark_exchange);
-
-            _return_range(tail, _w_vectors);
-        }
+        profile.exchange += prof_since(mark_exchange);
     };
 
     for (size_t first = 0; first < nheld; first += nbatch)
@@ -938,36 +921,18 @@ CSimdRIJKFockDriver::compute(const CPackedMatrix &density,
 
         const auto mark_transform = prof_clock::now();
 
-        if (batch.size() == storage.size())
-        {
-            _drv.compute_w_vectors(bq_vectors, _basis, _aux_basis, coefficients, batch, storage);
+        // NOTE: as in the closed shell call, a shorter last range is the first of
+        // the storage, and the exchange is handed a view of those.
 
-            profile.transform += prof_since(mark_transform);
+        _drv.compute_w_vectors(bq_vectors, _basis, _aux_basis, coefficients, batch, storage);
 
-            const auto mark_exchange = prof_clock::now();
+        profile.transform += prof_since(mark_transform);
 
-            _drv.compute_exchange_matrix(storage, fock, -factor);
+        const auto mark_exchange = prof_clock::now();
 
-            profile.exchange += prof_since(mark_exchange);
-        }
-        else
-        {
-            // NOTE: the last range is shorter than the others, and the storage is
-            // handed to the transformation as the range it is asked to fill.
-            auto tail = _take_range(storage, batch.size());
+        _drv.compute_exchange_matrix(std::span<const CPackedMatrix>(storage).first(batch.size()), fock, -factor);
 
-            _drv.compute_w_vectors(bq_vectors, _basis, _aux_basis, coefficients, batch, tail);
-
-            profile.transform += prof_since(mark_transform);
-
-            const auto mark_exchange = prof_clock::now();
-
-            _drv.compute_exchange_matrix(tail, fock, -factor);
-
-            profile.exchange += prof_since(mark_exchange);
-
-            _return_range(tail, storage);
-        }
+        profile.exchange += prof_since(mark_exchange);
     };
 
     for (size_t first = 0; first < nheld; first += nbatch)
@@ -1511,22 +1476,6 @@ CSimdRIJKFockDriver::_apply_metric(double *values, const size_t nrows, const siz
     // asks for the solve against its transpose rather than against it.
 
     tdenblas::threadedSolveTriangular(nrows, ncols, dense.data(), nrows, values, ncols, transposed);
-}
-
-auto
-CSimdRIJKFockDriver::_take_range(std::vector<CPackedMatrix> &storage, const size_t nrange) -> std::vector<CPackedMatrix>
-{
-    const auto last = storage.begin() + static_cast<long>(nrange);
-
-    return std::vector<CPackedMatrix>(std::make_move_iterator(storage.begin()), std::make_move_iterator(last));
-}
-
-auto
-CSimdRIJKFockDriver::_return_range(std::vector<CPackedMatrix> &range, std::vector<CPackedMatrix> &storage) -> void
-{
-    std::move(range.begin(), range.end(), storage.begin());
-
-    range.clear();
 }
 
 auto

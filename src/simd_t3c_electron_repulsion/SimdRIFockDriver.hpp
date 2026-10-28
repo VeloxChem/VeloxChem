@@ -35,6 +35,7 @@
 #define SimdRIFockDriver_hpp
 
 #include <cstddef>
+#include <span>
 #include <utility>
 #include <vector>
 
@@ -318,7 +319,8 @@ class CSimdRIFockDriver
     /// @brief Adds the exchange contribution of a range of the auxiliary basis to
     /// a matrix.
     /// @param w_vectors The W matrices of the range, as compute_w_vectors returns
-    /// them.
+    /// them, or the first of the storage compute_w_vectors filled for a range
+    /// shorter than it.
     /// @param matrix The symmetric matrix to add the contribution to, in the packed
     /// format, which the Coulomb matrix of the same calculation has been formed in.
     /// @param factor The factor the contribution is added with.
@@ -330,9 +332,13 @@ class CSimdRIFockDriver
     /// @note No sign is applied. The exchange enters a Fock matrix with a sign and
     /// a factor which depend on the convention of the caller, which passes them as
     /// the factor rather than having them built in here.
-    auto compute_exchange_matrix(const std::vector<CPackedMatrix> &w_vectors,
-                                 CPackedMatrix                    &matrix,
-                                 const double                      factor = 1.0) const -> void;
+    /// @note A view and not a vector, so that a caller which keeps storage for a
+    /// range of W matrices hands over a shorter range as the first of them rather
+    /// than as a vector of its own, which would have to be copied or moved out of
+    /// the storage and back.
+    auto compute_exchange_matrix(std::span<const CPackedMatrix> w_vectors,
+                                 CPackedMatrix                 &matrix,
+                                 const double                   factor = 1.0) const -> void;
 
     /// @brief Gets the memory of the B vectors and what forming them reaches.
     /// @param molecule The molecule to form the B vectors of.
