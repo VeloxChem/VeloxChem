@@ -142,8 +142,8 @@ class CSimdRIJKFockDriver
     /// threads. The W matrices of a range are as many as the budget allows, which
     /// is the whole auxiliary basis for a calculation with memory to spare, so they
     /// can be a large part of the peak and are not a small addition to it.
-    /// @note A margin of a tenth is added to what is counted, so that the answer is
-    /// above the peak and a calculation it says fits does not run out of memory.
+    /// @note A margin of a twentieth is added to what is counted, so that the answer
+    /// is above the peak and a calculation it says fits does not run out of memory.
     /// @note The memory is that of the driver alone, and not of the process: what a
     /// calculation holds outside it, such as the grid of the exchange-correlation
     /// functional, is not counted.
@@ -620,9 +620,13 @@ class CSimdRIJKFockDriver
     /// of it.
     /// @note What is counted follows the allocations of the driver, but the
     /// allocator and the libraries it calls hold some memory beside them which is
-    /// allowed for rather than counted. A tenth keeps the answer above the peak
-    /// with room to spare, at the cost of a slightly pessimistic answer.
-    static constexpr size_t _peak_margin_divisor = 10;
+    /// allowed for rather than counted. Held against the measured peak of a rank of
+    /// 228 to 300 waters, what is counted was 0.4 to 2.4 per cent above it in each of
+    /// six comparisons, and never below. A twentieth keeps the answer above the peak
+    /// with room to spare. It covers the driver alone: what the rest of the SCF
+    /// allocates after the budget is taken is reserved apart, by the caller, and a
+    /// margin which also covered that would count it twice.
+    static constexpr size_t _peak_margin_divisor = 20;
 
     /// @brief The memory the direct mode is allowed to reach, taken from the budget
     /// the driver was prepared with.

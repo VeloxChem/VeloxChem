@@ -1889,7 +1889,8 @@ class ScfDriver:
             # NOTE: the parts are cut from the budget, and every rank has to cut
             # the same ones or a rank would sweep a part no other rank knows of. The
             # budget is therefore the smallest of the ranks' and not each one's own.
-            budget = min(self.comm.allgather(self._get_ri_memory_budget()))
+            budget = min(
+                self.comm.allgather(self._get_ri_memory_budget(ao_basis)))
 
             # NOTE: as for RI-JK below, the way of building is the one ri_mode
             # names and is not chosen from the memory. A calculation whose peak in
@@ -2026,7 +2027,7 @@ class ScfDriver:
                 self._ri_aux_atoms = molecule.partition_atoms_by_weight(
                     self.comm, weights)
 
-            budget = self._get_ri_memory_budget()
+            budget = self._get_ri_memory_budget(ao_basis)
 
             needed = self._ri_drv.required_memory(molecule, ao_basis, basis_ri,
                                                   self.eri_thresh,
@@ -3348,9 +3349,12 @@ class ScfDriver:
 
         return sum(nocc)
 
-    def _get_ri_memory_budget(self):
+    def _get_ri_memory_budget(self, ao_basis):
         """
-        Gets the memory the SIMD RI-JK driver may hold, in bytes.
+        Gets the memory the SIMD RI driver of a rank may hold, in bytes.
+
+        :param ao_basis:
+            The AO basis set, which sets what the rest of the SCF holds.
 
         :return:
             The memory budget in bytes.
@@ -3361,17 +3365,15 @@ class ScfDriver:
 
         # NOTE: what is free less a reserve, rather than a fraction of what is
         # free. The B vectors are the one thing which has to stay resident for the
-        # whole calculation, and everything else the iteration needs is a few
-        # gigabytes, so halving the free memory refuses calculations which fit.
-        # Since a budget which is too small falls back to the four-center
+        # whole calculation, so halving the free memory refuses calculations which
+        # fit. Since a budget which is too small falls back to the four-center
         # integrals rather than refusing, too tight a default costs speed silently
         # instead of loudly.
 
         # NOTE: what is free to this process, which is less than what is free on
-        # the node where a batch system confines the job to a share of it.
+        # the node where a batch system confines the job to a share of it. What
+        # the process already holds is not free, so it needs no reserve.
         available = get_available_memory()
-
-        reserve = 4 * 1024**3
 
         # NOTE: the ranks of one node see the same free memory and would each claim
         # the whole of it, so the node would be promised several times over. The
@@ -3381,7 +3383,23 @@ class ScfDriver:
         here = platform.node()
         on_this_node = max(self.comm.allgather(here).count(here), 1)
 
-        return int(max(available - reserve, 0.25 * available) / on_this_node)
+        # NOTE: two reserves. The node keeps a few gigabytes for itself, and every
+        # rank keeps what the rest of the SCF allocates after this is measured:
+        # the Fock, density and DIIS matrices and the exchange-correlation work,
+        # which go as the square of the basis. On two nodes of eight ranks each
+        # that was 17 to 22 matrices of the basis on a rank (0.4 to 1.4 GB, 1824
+        # to 2964 functions); a reserve of the node alone gave each rank 0.5 GB of
+        # it. The reserve is half again the most observed, and twice that for an
+        # open shell, which holds every matrix for each spin.
+        node_reserve = 4 * 1024**3
+
+        nao = ao_basis.get_dimensions_of_basis()
+        nspins = 1 if self.scf_type == 'restricted' else 2
+        rank_reserve = max(32 * nspins * nao * nao * 8, 512 * 1024**2)
+
+        free = available - node_reserve - on_this_node * rank_reserve
+
+        return int(max(free, 0.25 * available) / on_this_node)
 
     def _uses_ri_jk(self):
         """

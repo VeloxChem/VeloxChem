@@ -213,7 +213,10 @@ class CSimdRIJFockDriver
     static auto _deal_parts(const size_t nparts, const size_t rank, const size_t nodes) -> std::vector<int>;
 
     /// @brief The margin peak_memory adds to the memory it counts, as the divisor
-    /// of it, as for the driver which also forms the exchange.
+    /// of it.
+    /// @note A tenth, twice that of the driver which also forms the exchange, as
+    /// what is counted here has not been held against the measured peak of a
+    /// calculation on a cluster.
     static constexpr size_t _peak_margin_divisor = 10;
 
     bool _prepared = false;

@@ -179,11 +179,15 @@ class TestSimdRIJKFockDriver:
         computed = driver.compute(density, coeffs, 1.0).to_numpy(max_memory=8.0)
 
         # NOTE: twice, as the shorter range is taken out of the storage the
-        # driver keeps between builds and has to be put back whole.
+        # driver keeps between builds and has to be put back whole. A storage
+        # put back broken fails the second build outright; the two agree to the
+        # rounding of the exchange, whose sum over the threads is not in a fixed
+        # order, and not bit for bit.
 
         again = driver.compute(density, coeffs, 1.0).to_numpy(max_memory=8.0)
 
-        assert np.max(np.abs(again - computed)) == 0.0
+        assert (np.max(np.abs(again - computed)) /
+                float(np.max(np.abs(computed))) < 1.0e-12)
 
         expected = self.by_hand(chain, basis, aux_basis, density, coeffs, 1.0, 0.0)
 

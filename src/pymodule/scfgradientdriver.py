@@ -190,7 +190,7 @@ class ScfGradientDriver(GradientDriver):
         needed = SimdRIJKFockDriver().required_memory(
             molecule, basis, aux_basis, self.scf_driver.eri_thresh, [])
 
-        budget = self.scf_driver._get_ri_memory_budget()
+        budget = self.scf_driver._get_ri_memory_budget(basis)
 
         # NOTE: in the unit the number is actually in. A budget set small enough
         # to force the direct mode is megabytes, and a message which rounds both
