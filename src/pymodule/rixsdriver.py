@@ -272,6 +272,10 @@ class RixsDriver(LinearSolver):
         if isinstance(self.photon_energy, (float, int, np.floating)):
             self.photon_energy = [self.photon_energy]
 
+        if self.static_relaxation or self.dynamic_relaxation:
+            assert_msg_critical(self.cpp and self.energyloss_frequencies is not None, 
+                                'Relaxation is only implemented for the double-CPP approach.')
+
         if self.cpp and (self.energyloss_frequencies is not None or self.emission_frequencies is not None):
             return self.compute_cpp(molecule, basis, scf_results,
                              rsp_results=rsp_results, core_rsp_results=core_rsp_results)
