@@ -409,8 +409,6 @@ class RixsDriver(LinearSolver):
                 # sum_xy F_xx F^*_yy
                 T3 = np.einsum('xxyy ->', T)
 
-                # TODO: fix correct constants
-                #pref = -16.0 * np.pi * w_em**3 * w_ex * fine_structure_constant()**2
                 pref = fine_structure_constant()**4 * w_em**3 * w_ex / np.pi
                 sigma = pref * (1.0/15.0) * (
                             (2.0 - 0.5 * np.sin(self.theta)**2) * T1 +
