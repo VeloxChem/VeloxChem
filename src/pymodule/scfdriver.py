@@ -35,6 +35,7 @@ from datetime import datetime
 from copy import deepcopy
 import time as tm
 import math
+import psutil
 import sys
 import re
 
@@ -239,6 +240,8 @@ class ScfDriver:
         self.ri_mode = 'in_memory'
         self._ri_drv = None
         self._ri_fallback = False
+        self._ri_rss_at_setup = 0
+        self._ri_memory_check = None
 
         # dft
         self.xcfun = None
@@ -389,7 +392,7 @@ class ScfDriver:
                     ('float', 'density of the B vectors at which the SIMD RI-JK '
                      'exchange expands them; 0 expands always, above 1 never'),
                 'ri_memory_budget':
-                    ('float', 'memory the SIMD RI-JK driver may hold, in GB'),
+                    ('float', 'memory the SIMD RI driver may hold, in GiB'),
                 'ri_mode':
                     ('str_lower', 'SIMD RI-JK mode: in_memory or direct'),
                 'dispersion': ('bool', 'use D4 dispersion correction'),
@@ -1151,7 +1154,9 @@ class ScfDriver:
         self._level_shift_smooth_alpha = None
         self._level_shift_smooth_beta = None
 
-        profiler.end(self.ostream, scf_flag=True)
+        profiler.end(self.ostream, scf_flag=True, comm=self.comm)
+
+        self._print_ri_memory_check()
 
         if not self.is_converged:
             self.ostream.print_header(
@@ -1863,6 +1868,12 @@ class ScfDriver:
         # takes one of them or neither.
         self._ri_fallback = False
 
+        # NOTE: what this rank holds before the setup, against which its peak is
+        # held after the SCF when memory is profiled, and what was predicted for
+        # it, which is set only where the driver holds what it predicted.
+        self._ri_rss_at_setup = psutil.Process().memory_info().rss
+        self._ri_memory_check = None
+
         fock_type = self._get_2e_fock_build_params()[0]
         use_ri_coulomb = self.ri_coulomb and fock_type == 'j'
         use_ri_jk = self.ri_jk and fock_type != 'j'
@@ -1903,14 +1914,18 @@ class ScfDriver:
                                                 self.rank, self.nodes)
                 peaks = self.comm.allgather(peak)
                 self._ri_fallback = (max(peaks) > budget)
+                if not self._ri_fallback:
+                    self._ri_memory_check = (
+                        'RI-J', max(peaks),
+                        self._get_ri_rank_reserve(ao_basis))
 
             if self._ri_fallback:
                 where = ('available'
                          if self.nodes == 1 else 'on the largest rank')
                 self.ostream.print_warning(
                     f'RI-J would need roughly {max(peaks) / (1024**3):.2f} ' +
-                    'GB of ' +
-                    f'{budget / (1024**3):.2f} GB {where}, so the Coulomb ' +
+                    'GiB of ' +
+                    f'{budget / (1024**3):.2f} GiB {where}, so the Coulomb ' +
                     'matrices are formed from the four-center integrals.')
                 self.ostream.print_blank()
                 self.ostream.flush()
@@ -1959,13 +1974,13 @@ class ScfDriver:
                 if mode == rimode.in_memory and self.nodes == 1:
                     self.ostream.print_info(
                         f'RI-J needs roughly {max(peaks) / (1024**3):.2f} ' +
-                        f'GB of {budget / (1024**3):.2f} GB available.')
+                        f'GiB of {budget / (1024**3):.2f} GiB available.')
                 elif mode == rimode.in_memory:
                     self.ostream.print_info(
                         f'RI-J needs roughly {sum(peaks) / (1024**3):.2f} ' +
-                        f'GB over {self.nodes:d} ranks, ' +
-                        f'{max(peaks) / (1024**3):.2f} GB of ' +
-                        f'{budget / (1024**3):.2f} GB on the largest rank.')
+                        f'GiB over {self.nodes:d} ranks, ' +
+                        f'{max(peaks) / (1024**3):.2f} GiB of ' +
+                        f'{budget / (1024**3):.2f} GiB on the largest rank.')
                 self.ostream.print_info(
                     f'Three-center integrals are {taken}, in ' +
                     f'{self._ri_drv.number_of_parts()} parts.')
@@ -2111,14 +2126,18 @@ class ScfDriver:
                         norbitals)
                 peaks = self.comm.allgather(peak)
                 self._ri_fallback = (max(peaks) > budget)
+                if not self._ri_fallback:
+                    self._ri_memory_check = (
+                        'RI-JK', max(peaks),
+                        self._get_ri_rank_reserve(ao_basis))
 
             if self._ri_fallback:
                 where = ('available'
                          if self.nodes == 1 else 'on the largest rank')
                 self.ostream.print_warning(
                     f'RI-JK would need roughly {max(peaks) / (1024**3):.2f} ' +
-                    'GB of ' +
-                    f'{budget / (1024**3):.2f} GB {where}, so the Fock ' +
+                    'GiB of ' +
+                    f'{budget / (1024**3):.2f} GiB {where}, so the Fock ' +
                     'matrices are formed from the four-center integrals.')
             else:
                 self.ostream.print_info(
@@ -2126,26 +2145,26 @@ class ScfDriver:
                 if mode == rimode.in_memory and self.nodes == 1:
                     self.ostream.print_info(
                         f'RI-JK needs roughly {max(peaks) / (1024**3):.2f} ' +
-                        f'GB of {budget / (1024**3):.2f} GB available ' +
-                        f'(B vectors {largest / (1024**3):.2f} GB).')
+                        f'GiB of {budget / (1024**3):.2f} GiB available ' +
+                        f'(B vectors {largest / (1024**3):.2f} GiB).')
                 elif mode == rimode.in_memory:
                     self.ostream.print_info(
                         f'RI-JK needs roughly {sum(peaks) / (1024**3):.2f} ' +
-                        f'GB over {self.nodes:d} ranks, ' +
-                        f'{max(peaks) / (1024**3):.2f} GB of ' +
-                        f'{budget / (1024**3):.2f} GB on the largest rank ' +
-                        f'(B vectors {largest / (1024**3):.2f} GB).')
+                        f'GiB over {self.nodes:d} ranks, ' +
+                        f'{max(peaks) / (1024**3):.2f} GiB of ' +
+                        f'{budget / (1024**3):.2f} GiB on the largest rank ' +
+                        f'(B vectors {largest / (1024**3):.2f} GiB).')
                 elif self.nodes == 1:
                     self.ostream.print_info(
-                        f'B vectors need {largest / (1024**3):.2f} GB of ' +
-                        f'{budget / (1024**3):.2f} GB available.')
+                        f'B vectors need {largest / (1024**3):.2f} GiB of ' +
+                        f'{budget / (1024**3):.2f} GiB available.')
                 else:
                     total = sum(self.comm.allgather(needed))
                     self.ostream.print_info(
-                        f'B vectors need {total / (1024**3):.2f} GB over ' +
+                        f'B vectors need {total / (1024**3):.2f} GiB over ' +
                         f'{self.nodes:d} ranks, at most ' +
-                        f'{largest / (1024**3):.2f} GB of ' +
-                        f'{budget / (1024**3):.2f} GB on a rank.')
+                        f'{largest / (1024**3):.2f} GiB of ' +
+                        f'{budget / (1024**3):.2f} GiB on a rank.')
             self.ostream.print_blank()
             self.ostream.flush()
 
@@ -3384,27 +3403,87 @@ class ScfDriver:
         on_this_node = max(self.comm.allgather(here).count(here), 1)
 
         # NOTE: two reserves. The node keeps a few gigabytes for itself, and every
-        # rank keeps what the rest of the SCF allocates after this is measured,
-        # which goes as the square of the basis. It comes in two parts:
-        # - what the first build holds, the Fock and density matrices and the
-        #   exchange-correlation work: 18 matrices of the basis on a rank, the
-        #   same for RI-J and RI-JK (2964 functions, two nodes of eight ranks);
-        # - the DIIS history, which grows by 3 matrices an iteration until it
-        #   holds max_err_vecs of them and then stays (768 functions, 21
-        #   iterations).
-        # The first is reserved at a third again what was observed and the second
-        # as observed, each for each spin of an open shell. A reserve of the node
-        # alone gave a rank 0.5 GB of the 1.2 to 3.1 GB this comes to.
+        # rank keeps what the rest of the SCF allocates after this is measured.
         node_reserve = 4 * 1024**3
 
-        nao = ao_basis.get_dimensions_of_basis()
-        nspins = 1 if self.scf_type == 'restricted' else 2
-        nmatrices = (24 + 3 * self.max_err_vecs) * nspins
-        rank_reserve = max(nmatrices * nao * nao * 8, 512 * 1024**2)
+        rank_reserve = self._get_ri_rank_reserve(ao_basis)
 
         free = available - node_reserve - on_this_node * rank_reserve
 
         return int(max(free, 0.25 * available) / on_this_node)
+
+    def _get_ri_rank_reserve(self, ao_basis):
+        """
+        Gets the memory a rank keeps back from the SIMD RI driver for what the
+        rest of the SCF allocates after the budget is taken, in bytes.
+
+        :param ao_basis:
+            The AO basis set.
+
+        :return:
+            The reserve in bytes, or zero where ri_memory_budget is set, which
+            is then the budget as it stands.
+        """
+
+        if self.ri_memory_budget is not None:
+            return 0
+
+        # NOTE: what the rest of the SCF allocates goes as the square of the
+        # basis. It comes in two parts:
+        # - what the first build holds beside the driver, the Fock and density
+        #   matrices and the exchange-correlation work: up to 3 matrices of the
+        #   basis on a rank (RI-J and RI-JK, 1824 to 2964 functions, two nodes
+        #   of eight ranks);
+        # - the DIIS history, which grows by 3 matrices an iteration until it
+        #   holds max_err_vecs of them and then stays (768 functions, 21
+        #   iterations).
+        # The first is reserved at twice what was observed and the second as
+        # observed, each for each spin of an open shell: 36 matrices for a closed
+        # shell, 0.9 to 2.4 GiB at those sizes, where a reserve of the node alone
+        # gave a rank 0.5 GiB.
+        # NOTE: the first part was once read as 18 matrices, from samples of the
+        # memory profile in decimal gigabytes held against measurements in
+        # binary ones. The units of the two differ by 7 per cent.
+        nao = ao_basis.get_dimensions_of_basis()
+        nspins = 1 if self.scf_type == 'restricted' else 2
+        nmatrices = (6 + 3 * self.max_err_vecs) * nspins
+
+        return max(nmatrices * nao * nao * 8, 512 * 1024**2)
+
+    def _print_ri_memory_check(self):
+        """
+        Prints, with memory profiling, the memory the SIMD RI driver was
+        predicted to need against what each rank's peak grew by after the
+        driver was set up. Every rank must call this.
+        """
+
+        if (not self.memory_profiling) or (self._ri_memory_check is None):
+            return
+
+        label, predicted, reserve = self._ri_memory_check
+
+        # NOTE: the growth of the peak and not the peak itself. What a rank held
+        # before the setup was not free when the budget was taken, so it is not
+        # what the prediction and the reserve were held against. The growth is
+        # the driver and the rest of the SCF together, which is why the two are
+        # printed beside it.
+        grown = Profiler.get_peak_memory() - self._ri_rss_at_setup
+        grown_all = self.comm.allgather(grown)
+        largest = max(grown_all)
+
+        where = ('' if self.nodes == 1 else
+                 f' on rank {grown_all.index(largest):d}, the largest of ' +
+                 f'{self.nodes:d}')
+
+        self.ostream.print_info(
+            f'{label} was predicted to need roughly ' +
+            f'{predicted / (1024**3):.2f} GiB, with ' +
+            f'{reserve / (1024**3):.2f} GiB reserved for the rest of the SCF.')
+        self.ostream.print_info(
+            f'Peak memory grew by {largest / (1024**3):.2f} GiB after the ' +
+            f'{label} setup{where}.')
+        self.ostream.print_blank()
+        self.ostream.flush()
 
     def _uses_ri_jk(self):
         """

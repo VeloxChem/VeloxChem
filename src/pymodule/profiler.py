@@ -53,8 +53,9 @@ class Profiler:
         - timing_dict: The dictionary containing information about timing.
         - timing_key: The key for the timing dictionary.
         - memory_usage: The list of tuples with the elapsed time, the
-          resident memory of the current process, the total system memory
-          usage, and the remark at each checkpoint.
+          resident memory of the current process, the peak resident memory
+          of the current process so far, the total system memory usage, and
+          the remark at each checkpoint.
         - pr: The Profile object.
     """
 
@@ -108,7 +109,8 @@ class Profiler:
             vm = psutil.virtual_memory()
             proc_mem = psutil.Process().memory_info().rss
             self.memory_usage.append(
-                (0.0, proc_mem, vm.total - vm.available, 'Profiler starts'))
+                (0.0, proc_mem, self.get_peak_memory(),
+                 vm.total - vm.available, 'Profiler starts'))
 
         if self.profiling:
             import cProfile
@@ -119,7 +121,7 @@ class Profiler:
             import tracemalloc
             tracemalloc.start()
 
-    def end(self, ostream, scf_flag=False):
+    def end(self, ostream, scf_flag=False, comm=None):
         """
         Stops the profiler and print the output.
 
@@ -127,6 +129,10 @@ class Profiler:
             The output stream.
         :param scf_flag:
             The flag for SCF.
+        :param comm:
+            The communicator whose ranks the peak memory is gathered over, or
+            None for the rank that prints alone. Every rank of it must call
+            this.
         """
 
         if self.memory_profiling:
@@ -135,6 +141,7 @@ class Profiler:
         self.print_timing(ostream, scf_flag)
         self.print_profiling_summary(ostream)
         self.print_memory_usage(ostream, scf_flag)
+        self.print_peak_memory_over_ranks(ostream, comm)
         self.print_memory_tracing(ostream)
 
     def print_profiling_summary(self, ostream):
@@ -315,7 +322,36 @@ class Profiler:
             proc_mem = psutil.Process().memory_info().rss
             total_used_mem = vm.total - vm.available
             self.memory_usage.append(
-                (tm.time() - self.start_time, proc_mem, total_used_mem, remark))
+                (tm.time() - self.start_time, proc_mem,
+                 self.get_peak_memory(), total_used_mem, remark))
+
+    @staticmethod
+    def get_peak_memory():
+        """
+        Gets the peak resident memory of the current process so far.
+
+        :return:
+            The peak resident memory in bytes, or the current resident memory
+            where the peak cannot be read.
+        """
+
+        # NOTE: the peak and not only the memory at the moment of a checkpoint.
+        # What a call allocates and frees between two checkpoints shows in no
+        # checkpoint, and that is where the peak of a calculation usually is.
+        current = psutil.Process().memory_info().rss
+
+        try:
+            import resource
+            peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        except (ImportError, OSError):
+            return current
+
+        # ru_maxrss is in kilobytes on Linux and in bytes on macOS
+        peak = peak if sys.platform == 'darwin' else peak * 1024
+
+        # NOTE: the kernel updates the peak lazily, so it can trail the memory
+        # held at the moment by a little.
+        return max(peak, current)
 
     def print_memory_usage(self, ostream, scf_flag=False):
         """
@@ -323,7 +359,9 @@ class Profiler:
 
         The values are sampled at each checkpoint by the rank that prints
         the table. The 'Process Memory' column is the resident set size
-        (RSS) of that single rank. The 'System Used' column is the
+        (RSS) of that single rank, and the 'Peak Memory' column the largest it
+        has been since the process started, including between checkpoints.
+        The 'System Used' column is the
         system-wide memory usage of the node on which that rank runs,
         calculated as total memory minus available memory; it includes all
         processes on the node (including other MPI ranks) but is not summed
@@ -341,24 +379,63 @@ class Profiler:
             ostream.print_header(mem_str.ljust(92))
             ostream.print_header(('-' * len(mem_str)).ljust(92))
 
-            mem_str = '{:20s}'.format('Elapsed Time')
-            mem_str += ' {:20s}'.format('Process Memory')
-            mem_str += ' {:20s}'.format('System Used')
+            mem_str = '{:14s}'.format('Elapsed Time')
+            mem_str += ' {:16s}'.format('Process Memory')
+            mem_str += ' {:16s}'.format('Peak Memory')
+            mem_str += ' {:16s}'.format('System Used')
             mem_str += ' {:s}'.format('Remark')
             ostream.print_header(mem_str.ljust(92))
 
-            for dt, proc_mem, sys_mem, remark in self.memory_usage:
+            for dt, proc_mem, peak_mem, sys_mem, remark in self.memory_usage:
                 if scf_flag and remark.lower() == 'iteration 0':
                     continue
-                mem_str = '{:.2f} sec'.format(dt).ljust(20)
-                mem_str += ' {:20s}'.format(self.memory_to_string(proc_mem))
-                mem_str += ' {:20s}'.format(self.memory_to_string(sys_mem))
+                mem_str = '{:.2f} sec'.format(dt).ljust(14)
+                mem_str += ' {:16s}'.format(self.memory_to_string(proc_mem))
+                mem_str += ' {:16s}'.format(self.memory_to_string(peak_mem))
+                mem_str += ' {:16s}'.format(self.memory_to_string(sys_mem))
                 mem_str += ' {:s}'.format(remark)
                 ostream.print_header(mem_str.ljust(92))
 
             ostream.print_blank()
             ostream.print_blank()
             ostream.flush()
+
+    def print_peak_memory_over_ranks(self, ostream, comm):
+        """
+        Prints the largest and the smallest peak memory over the ranks of a
+        communicator, as the table above is of one rank alone.
+
+        :param ostream:
+            The output stream.
+        :param comm:
+            The communicator, or None to print nothing. Every rank of it must
+            call this.
+        """
+
+        if (not self.memory_profiling) or (comm is None):
+            return
+
+        # one rank has nothing to add to the table it printed
+        if comm.Get_size() == 1:
+            return
+
+        import platform
+
+        peaks = comm.allgather(
+            (self.get_peak_memory(), comm.Get_rank(), platform.node()))
+
+        largest, smallest = max(peaks), min(peaks)
+
+        ostream.print_header(
+            f'Peak memory over {len(peaks):d} MPI processes'.ljust(92))
+        ostream.print_header(
+            (f'Largest : {self.memory_to_string(largest[0])} on rank ' +
+             f'{largest[1]:d} ({largest[2]})').ljust(92))
+        ostream.print_header(
+            (f'Smallest: {self.memory_to_string(smallest[0])} on rank ' +
+             f'{smallest[1]:d} ({smallest[2]})').ljust(92))
+        ostream.print_blank()
+        ostream.flush()
 
     def comp_memory_object(self, obj, counted_ids=None):
         """

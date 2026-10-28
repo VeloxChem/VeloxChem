@@ -2417,8 +2417,20 @@ CSimdRIFockDriver::bq_vectors_memory(const CMolecule        &molecule,
 
     size_t nentries = 0;
 
+    // NOTE: the descriptions of the blocks are counted beside their values: a
+    // block itself, which a pattern or a tensor holds in a vector, and its atoms,
+    // counts and offsets on the heap.
+
+    const auto described = [](const CAtomBasisTripleSparsity &block) {
+        return sizeof(CAtomBasisTripleSparsity) + block.description_memory();
+    };
+
+    size_t out_described = 0;
+
     auto hold = [&](const CAtomBasisTripleSparsity &block) {
         memory.held += nops * block.number_of_elements() * sizeof(double);
+
+        out_described += described(block);
 
         if (block.a_atoms().empty()) return;
 
@@ -2436,6 +2448,8 @@ CSimdRIFockDriver::bq_vectors_memory(const CMolecule        &molecule,
 
     std::vector<size_t> in_elements(nab, 0);
 
+    std::vector<size_t> in_described(nab, 0);
+
     for (size_t i = 0; i < nab; i++)
     {
         for (const auto &group : in_groups)
@@ -2447,6 +2461,8 @@ CSimdRIFockDriver::bq_vectors_memory(const CMolecule        &molecule,
             if (aux_atoms.empty()) hold(block);
 
             in_elements[i] += block.number_of_elements();
+
+            in_described[i] += described(block);
 
             in_blocks.push_back(std::move(block));
         }
@@ -2474,22 +2490,26 @@ CSimdRIFockDriver::bq_vectors_memory(const CMolecule        &molecule,
     // added while the batch stays within the budget, and a block over the budget on
     // its own is a batch of one.
 
-    size_t nbatch = 0;
+    size_t nbatch = 0, batch_described = 0;
 
     for (size_t first = 0; first < nab;)
     {
         auto last = first;
 
-        size_t batch = 0;
+        size_t batch = 0, batch_blocks = 0;
 
         while ((last < nab) && ((last == first) || ((batch + in_elements[last]) * sizeof(double) <= _batch_budget)))
         {
             batch += in_elements[last];
 
+            batch_blocks += in_described[last];
+
             last++;
         }
 
         nbatch = std::max(nbatch, batch);
+
+        batch_described = std::max(batch_described, batch_blocks);
 
         first = last;
     }
@@ -2515,20 +2535,32 @@ CSimdRIFockDriver::bq_vectors_memory(const CMolecule        &molecule,
 
     const auto metric = nops * nrows * ncols * sizeof(double);
 
-    memory.forming =
-        metric + nops * nbatch * sizeof(double) + nthreads * (arena + nchunk * per_column + _thread_allowance);
+    // NOTE: while the B vectors are formed, the descriptions alive beside their own
+    // are those of the pattern they are built on, of every block of the integrals,
+    // and of the batch, which is described once by its pattern and once by the
+    // integrals of each operator.
+
+    const auto all_described = std::accumulate(in_described.begin(), in_described.end(), size_t{0});
+
+    const auto forming_described = out_described + all_described + (1 + nops) * batch_described;
+
+    memory.forming = metric + nops * nbatch * sizeof(double) + forming_described +
+                     nthreads * (arena + nchunk * per_column + _thread_allowance);
 
     if (std::getenv("VLX_RIJK_PROFILE") != nullptr)
     {
         const auto gb = [](const size_t n) { return static_cast<double>(n) / (1024.0 * 1024.0 * 1024.0); };
 
-        std::printf("RIJK memory forming: permuted metric %.3f GB, batch %.3f GB, threads %zu x (arena %.3f + "
-                    "chunk %.3f + allowance %.3f) GB\n",
-                    gb(metric), gb(nops * nbatch * sizeof(double)), nthreads, gb(arena), gb(nchunk * per_column),
-                    gb(_thread_allowance));
+        std::printf("RIJK memory forming: permuted metric %.3f GiB, batch %.3f GiB, descriptions %.3f GiB, threads %zu "
+                    "x (arena %.3f + chunk %.3f + allowance %.3f) GiB\n",
+                    gb(metric), gb(nops * nbatch * sizeof(double)), gb(forming_described), nthreads, gb(arena),
+                    gb(nchunk * per_column), gb(_thread_allowance));
     }
 
-    memory.pattern = memory.held / _pattern_divisor;
+    // NOTE: each operator's B vectors are a tensor which holds a copy of the
+    // blocks of the pattern they were built on.
+
+    memory.pattern = nops * out_described;
 
     return memory;
 }
@@ -2556,7 +2588,12 @@ CSimdRIFockDriver::build_memory(const size_t nao, const size_t naux, const size_
 
     const auto fock = 2 * square;
 
-    return squares + coulomb + exchange + fock + nthreads * _thread_allowance;
+    // NOTE: the caller hands over the density, packed, and the orbitals the
+    // exchange is formed from, which it holds twice, as an array and packed.
+
+    const auto handed = nao * (nao + 1) / 2 * sizeof(double) + 2 * nao * norbitals * sizeof(double);
+
+    return squares + coulomb + exchange + fock + handed + nthreads * _thread_allowance;
 }
 
 auto

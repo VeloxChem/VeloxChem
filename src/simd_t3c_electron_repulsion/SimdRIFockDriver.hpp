@@ -52,7 +52,8 @@ struct CBqMemory
     size_t held = 0;
 
     /// @brief What forming the B vectors holds beside them at its peak: the
-    /// permuted metrics, the integrals of one batch, and the buffers of the threads.
+    /// permuted metrics, the integrals of one batch, the descriptions of the blocks
+    /// of the integrals and of the pattern, and the buffers of the threads.
     size_t forming = 0;
 
     /// @brief The index of the auxiliary functions of the blocks, which the half
@@ -60,7 +61,7 @@ struct CBqMemory
     size_t index = 0;
 
     /// @brief The descriptions of the blocks the B vectors carry beside their
-    /// values, which are allowed for rather than counted.
+    /// values, counted from what each block holds.
     size_t pattern = 0;
 };
 
@@ -369,8 +370,8 @@ class CSimdRIFockDriver
     /// @param nfunctions The auxiliary functions of a range of the W matrices.
     /// @return The memory in bytes, for the number of threads of the caller: the
     /// squares of the half transformation, the buffers of the Coulomb matrix, the
-    /// triangles and the staging of the exchange, the Fock matrices, and an
-    /// allowance for each thread.
+    /// triangles and the staging of the exchange, the Fock matrices, the density
+    /// and orbitals the caller hands over, and an allowance for each thread.
     auto build_memory(const size_t nao, const size_t naux, const size_t norbitals, const size_t nfunctions) const
         -> size_t;
 
@@ -505,13 +506,6 @@ class CSimdRIFockDriver
     /// fixed amount a thread, somewhat above what was observed, allows for it.
     static constexpr size_t _thread_allowance = size_t{8} * 1024 * 1024;
 
-    /// @brief The share of the values of the B vectors their descriptions are
-    /// allowed, as the divisor of the values.
-    /// @note The descriptions are a few counts and offsets for every combination
-    /// of basis functions of a block, against the values of every atom pair and
-    /// auxiliary atom of it, so they are a small share of the values. The divisor
-    /// allows about twice the share observed.
-    static constexpr size_t _pattern_divisor = 32;
 
 };
 

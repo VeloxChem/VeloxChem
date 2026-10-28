@@ -254,16 +254,16 @@ CSimdRIJKFockDriver::peak_memory(const CMolecule        &molecule,
     {
         const auto gb = [](const size_t n) { return static_cast<double>(n) / (1024.0 * 1024.0 * 1024.0); };
 
-        std::printf("RIJK memory peak: B vectors %.3f, descriptions %.3f, metric %.3f, index %.3f GB\n", gb(bq.held),
+        std::printf("RIJK memory peak: B vectors %.3f, descriptions %.3f, metric %.3f, index %.3f GiB\n", gb(bq.held),
                     gb(bq.pattern), gb(metric), gb(bq.index));
 
-        std::printf("RIJK memory peak: forming %.3f GB (B vectors, descriptions, two metrics, %.3f beside)\n",
+        std::printf("RIJK memory peak: forming %.3f GiB (B vectors, descriptions, two metrics, %.3f beside)\n",
                     gb(forming), gb(bq.forming));
 
-        std::printf("RIJK memory peak: build %.3f GB (W range %zu of %zu functions %.3f, buffers %.3f)\n", gb(build),
+        std::printf("RIJK memory peak: build %.3f GiB (W range %zu of %zu functions %.3f, buffers %.3f)\n", gb(build),
                     nbatch, nheld, gb(w_vectors), gb(_drv.build_memory(nao, naux, norbitals, nbatch)));
 
-        std::printf("RIJK memory peak: %.3f GB with the margin\n", gb(peak + peak / _peak_margin_divisor));
+        std::printf("RIJK memory peak: %.3f GiB with the margin\n", gb(peak + peak / _peak_margin_divisor));
     }
 
     return peak + peak / _peak_margin_divisor;
