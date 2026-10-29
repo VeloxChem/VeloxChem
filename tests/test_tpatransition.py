@@ -321,7 +321,7 @@ class TestTpaTransition:
         tpa_drv.ostream.mute()
         tpa_drv._write_final_hdf5(str(h5file), tpa_results)
 
-        recovered = read_results(str(h5file), 'rsp')
+        recovered = read_results(str(h5file), 'tpa')
 
         assert recovered['photon_energies'] == pytest.approx(
             tpa_results['photon_energies'])
@@ -371,7 +371,7 @@ class TestTpaTransition:
         tpa_drv.ostream.mute()
         tpa_drv._write_final_hdf5(str(h5stem), tpa_results)
 
-        recovered = read_results(str(h5file), 'rsp')
+        recovered = read_results(str(h5file), 'tpa')
 
         assert recovered['photon_energies'] == pytest.approx(
             tpa_results['photon_energies'])

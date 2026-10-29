@@ -1,5 +1,6 @@
 from mpi4py import MPI
 from types import SimpleNamespace
+from pathlib import Path
 import numpy as np
 import pytest
 
@@ -9,6 +10,9 @@ from veloxchem.veloxchemlib import (mpi_master, hartree_in_ev,
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
+from veloxchem.lreigensolver import LinearResponseEigenSolver
+from veloxchem.tpatransitiondriver import TpaTransitionDriver
+from veloxchem.resultsio import read_results
 from veloxchem.threepatransitiondriver import ThreePATransitionDriver
 
 
@@ -16,7 +20,7 @@ from veloxchem.threepatransitiondriver import ThreePATransitionDriver
 class TestThreePATransition:
 
     @staticmethod
-    def run_scf(xcfun_label):
+    def run_scf(xcfun_label, filename=None):
 
         molecule_string = """
             O  0.0           0.0  0.0
@@ -31,6 +35,7 @@ class TestThreePATransition:
 
         scf_drv = ScfRestrictedDriver()
         scf_drv.xcfun = xcfun_label
+        scf_drv.filename = filename
         scf_drv.conv_thresh = scf_conv_thresh
         scf_drv.ostream.mute()
         scf_results = scf_drv.compute(molecule, basis)
@@ -260,3 +265,89 @@ class TestThreePATransition:
 
         driver = SimpleNamespace(rank=mpi_master() + 1)
         assert ThreePATransitionDriver.plot_spectrum(driver, None) is None
+
+    @classmethod
+    def assert_results_equal(cls, actual, expected):
+        """
+        Checks equality of nested results, including arrays and dictionary keys.
+
+        :param actual:
+            The results read from HDF5.
+        :param expected:
+            The reference results.
+        """
+
+        if isinstance(expected, dict):
+            assert actual.keys() == expected.keys()
+            for key in expected:
+                cls.assert_results_equal(actual[key], expected[key])
+        elif isinstance(expected, np.ndarray):
+            np.testing.assert_array_equal(actual, expected)
+        elif isinstance(expected, (list, tuple)):
+            assert type(actual) is type(expected)
+            assert len(actual) == len(expected)
+            for value, reference in zip(actual, expected):
+                cls.assert_results_equal(value, reference)
+        else:
+            assert actual == expected
+
+    def test_results_hdf5_preserves_scf_opa_tpa_threepa(self, tmp_path):
+        """
+        Checks that sequential absorption calculations preserve earlier results.
+
+        :param tmp_path:
+            The temporary directory provided by pytest.
+        """
+
+        comm = MPI.COMM_WORLD
+        filename = comm.bcast(str(tmp_path / 'water'), root=mpi_master())
+        h5file = filename + '.h5'
+        scf_results, molecule, basis = self.run_scf('hf', filename=filename)
+
+        saved_results = {}
+        if comm.Get_rank() == mpi_master():
+            saved_results['scf'] = read_results(h5file, 'scf')
+
+        for driver_class, label in [
+                (LinearResponseEigenSolver, 'rsp'),
+                (TpaTransitionDriver, 'tpa'),
+                (ThreePATransitionDriver, '3pa')]:
+            driver = driver_class()
+            driver.nstates = 2
+            driver.conv_thresh = 1.0e-7
+            driver.ostream.mute()
+            results = driver.compute(molecule, basis, scf_results)
+
+            if comm.Get_rank() == mpi_master():
+                assert driver.filename == filename
+                assert scf_results['filename'] == filename
+                for saved_label, reference in saved_results.items():
+                    self.assert_results_equal(
+                        read_results(h5file, saved_label), reference)
+
+                recovered = read_results(h5file, label)
+                saved_results[label] = recovered
+                if label == 'rsp':
+                    np.testing.assert_array_equal(
+                        recovered['eigenvalues'], results['eigenvalues'])
+                else:
+                    self.assert_results_equal(recovered, results)
+                    grid = results['photon_energies']
+                    original = driver.get_spectrum(
+                        results, grid, 'au', 0.004, 'au')
+                    reloaded = driver.get_spectrum(
+                        recovered, grid, 'au', 0.004, 'au')
+                    assert reloaded['y_data'] == pytest.approx(
+                        original['y_data'], rel=1.0e-12, abs=0.0)
+
+        if comm.Get_rank() == mpi_master():
+            assert set(saved_results) == {'scf', 'rsp', 'tpa', '3pa'}
+            assert saved_results['tpa']['rsp_type'] == 'tpa_transition'
+            assert saved_results['3pa']['rsp_type'] == 'threepa_transition'
+            for suffix in [
+                    '_rsp_3patrans_1_rpa.h5',
+                    '_rsp_3patrans_1_cpp.h5',
+                    '_rsp_3patrans_2.h5',
+                    '_rsp_3patrans_fock_1.h5',
+                    '_rsp_3patrans_fock_2.h5']:
+                assert Path(filename + suffix).is_file()

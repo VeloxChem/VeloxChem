@@ -54,6 +54,7 @@ from .checkpoint import (check_distributed_focks, read_distributed_focks,
                          write_distributed_focks)
 from .lreigensolver import LinearResponseEigenSolver
 from .firstorderprop import FirstOrderProperties
+from .resultsio import write_results_to_hdf5
 from .errorhandler import assert_msg_critical
 from .spectrumplot import plot_threepa_transition_spectrum
 
@@ -103,6 +104,31 @@ class ThreePATransitionDriver(NonlinearSolver):
         self._input_keywords['response'].update({
             'nstates': ('int', 'number of excited states'),
         })
+
+    def _write_final_hdf5(self, fname, results):
+        """
+        Writes 3PA transition results to the specified HDF5 file.
+
+        :param fname:
+            Name of the HDF5 file.
+        :param results:
+            The results dictionary returned by compute().
+        """
+
+        if not fname:
+            return
+
+        fpath = Path(fname)
+        if fpath.suffix != '.h5':
+            fpath = fpath.with_suffix('.h5')
+
+        if not fpath.is_file():
+            return
+
+        write_results_to_hdf5(str(fpath),
+                              '3pa',
+                              results,
+                              value_label='response result')
 
     def update_settings(self, rsp_dict, method_dict=None):
         """
@@ -237,7 +263,17 @@ class ThreePATransitionDriver(NonlinearSolver):
             fpath = fpath.with_name(fpath.stem)
             rpa_drv.checkpoint_file = str(fpath) + '_3patrans_1_rpa.h5'
 
-        rpa_results = rpa_drv.compute(molecule, ao_basis, scf_results)
+        # In an OPA -> TPA -> 3PA workflow sharing one HDF5 file, 3PA writes
+        # its final results to /3pa. Its internal RPA solver still targets /rsp
+        # and would otherwise clear the saved OPA results. Disable only its
+        # final-file output using a shallow copy of the SCF results; retain
+        # the original filename and the separate RPA restart checkpoint.
+        rpa_scf_results = scf_results
+        if self.rank == mpi_master():
+            rpa_scf_results = scf_results.copy()
+            rpa_scf_results['filename'] = None
+
+        rpa_results = rpa_drv.compute(molecule, ao_basis, rpa_scf_results)
 
         excitation_details = rpa_results['excitation_details']
         oscillator_strengths = rpa_results['oscillator_strengths']
@@ -322,6 +358,10 @@ class ThreePATransitionDriver(NonlinearSolver):
                 'elec_trans_dipoles': elec_trans_dipoles,
                 'excitation_details': excitation_details,
             })
+            ret_dict.update({'rsp_type': 'threepa_transition'})
+
+            if self.filename is not None:
+                self._write_final_hdf5(self.filename, ret_dict)
 
         return ret_dict
 
