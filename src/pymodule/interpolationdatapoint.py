@@ -33,6 +33,7 @@
 from mpi4py import MPI
 from contextlib import redirect_stderr
 from io import StringIO
+import os
 import numpy as np
 import h5py
 from time import time
@@ -48,42 +49,85 @@ with redirect_stderr(StringIO()) as fg_err:
     import geometric
 
 
+
 class InterpolationDatapoint:
     """
-    Implements routines for the coordinates required for potential energy
-    surface interpolation.
+    Implements a datapoint of the interpolated potential energy surface: a
+    geometry with its energy, gradient and Hessian transformed to the
+    internal coordinates of a z-matrix, and its storage in the HDF5
+    database. InterpolationDriver uses the same class for the current
+    geometry (impes_coordinate), where only the internal coordinates and
+    the B-matrix are needed.
 
+    Internal coordinates, one per z-matrix entry in the flat order bonds,
+    angles, proper dihedrals, impropers:
+        - bonds: 1/r in 1/bohr (use_inverse_bond_length, the default),
+          r_eq - r_eq^2/r in bohr (use_eq_bond_length, with eq_bond_lengths
+          r_eq in bohr), or r in bohr (both flags False). A settings
+          dictionary that gives only one of the flags as True sets the other
+          one to False; both True raises.
+        - angles, proper and improper dihedrals: radians (geomeTRIC Angle and
+          Dihedral; there are no cosine dihedrals).
+
+    Metric: if inv_sqrt_masses (1/sqrt(m), one entry per Cartesian
+    component) is set, b_matrix and b2_matrix are derivatives with respect
+    to the mass-weighted coordinates Q = sqrt(m) x, and gradient and
+    hessian must be given in the same metric (m^-1/2 g and
+    m^-1/2 H m^-1/2), as IMForceFieldGenerator does for use_mass_weight=True.
+
+    :param z_matrix:
+        The z-matrix dictionary {'bonds', 'angles', 'dihedrals',
+        'impropers'} of 0-based atom-index tuples, or None (read_hdf5 then
+        takes the z-matrix from the file).
+    :param atom_labels:
+        Optional atom labels; written to and read from the HDF5 file.
     :param comm:
         The MPI communicator.
     :param ostream:
         The output stream.
 
     Instance variables
-        - hessian: The Cartesian Hessian in Hartree per Bohr**2.
-        - energy: the total energy of the groound or excited state in Hartree
-        - gradient: The Cartesian gradient in Hartree per Bohr
-        - z_matrix: The Z-matrix (a list of tuples with indices of the atoms
-          which define bonds, bond angles and dihedral angles).
-        - internal_gradient: The gradient in internal coordinates.
-        - internal_hessian: The Hessian in internal coordinates.
-        - b_matrix: The Wilson B-matrix.
-        - b2_matrix: The matrix of second order deriatives of
-          internal coordinates with respect to Cartesian coordinates.
-        - use_inverse_bond_length: Flag for using the inverse bond length
-          instead of the bond length.
-        - internal_coordinates: A list of geomeTRIC internal coordinate objects.
-        - internal_coordinates_values: A numpy array with the values of the
-          internal coordinates: in angstroms (bond lengths), 1/angstroms
-          (if inverse bond lengths are used), radians (bond angles), radians or
-          cosine of radians (dihedral angles).
+        - z_matrix_dict: the z-matrix dictionary; z_matrix: its flat list.
+        - point_label: after read_hdf5 the dataset prefix of the point,
+          including the bond-mode suffix (e.g. 'point_1_eq_dihedral').
+        - energy: the energy in Hartree.
+        - gradient, hessian: the Cartesian gradient (natoms, 3) in
+          Hartree/bohr and Hessian (3N, 3N) in Hartree/bohr**2, in the build
+          metric (mass-weighted if inv_sqrt_masses was set; the HDF5
+          datasets record it in the attribute 'mass_weighted').
+        - internal_gradient, internal_hessian: the gradient and Hessian in
+          the internal coordinates.
+        - internal_coordinates: the geomeTRIC primitives;
+          internal_coordinates_values: their values (units above).
+        - cartesian_coordinates: the geometry in bohr, (natoms, 3).
+        - b_matrix: the Wilson B-matrix dq/dx (or dq/dQ); b2_matrix: the
+          second derivatives of q; original_b_matrix: the unscaled rows of
+          the last B-matrix (dr/dx for bonds; no longer used by this class,
+          kept for subclasses).
+        - inv_sqrt_masses: 1/sqrt(m) per Cartesian component, or None.
+        - use_inverse_bond_length, use_eq_bond_length: the bond mode.
+        - eq_bond_lengths: r_eq per bond in bohr (eq mode).
+        - confidence_radius: the confidence radius R in bohr.
+        - imp_int_coordinates: the important coordinates, a dictionary
+          {'bonds', 'angles', 'dihedrals', 'impropers'} of 0-based tuples in
+          z-matrix orientation, used by the target-customised weights.
+        - identify_imp_int_coord: write and read imp_int_coordinates.
+        - atom_labels: the atom labels, or None.
     """
 
     def __init__(self, z_matrix=None, atom_labels=None, comm=None, ostream=None):
         """
         Initializes the InterpolationDatapoint object.
 
-        :param z_matrix: a list of tuples with atom indices (starting at 0)
-        that define bonds, bond angles, and dihedral angles.
+        :param z_matrix:
+            The z-matrix dictionary {'bonds', 'angles', 'dihedrals',
+            'impropers'} of 0-based atom-index tuples, or None.
+        :param atom_labels:
+            Optional atom labels.
+        :param comm:
+            The MPI communicator (default MPI.COMM_WORLD).
+        :param ostream:
+            The output stream (default: stdout on the master rank).
         """
         if comm is None:
             comm = MPI.COMM_WORLD
@@ -94,7 +138,7 @@ class InterpolationDatapoint:
             else:
                 ostream = OutputStream(None)
 
-        self.comm = None
+        self.comm = comm
         self.ostream = ostream
 
         self.point_label = None
@@ -106,6 +150,8 @@ class InterpolationDatapoint:
         if z_matrix is not None:
             z_matrix_flat = self.flatten_z_matrix(z_matrix)
             self.z_matrix = z_matrix_flat
+        else:
+            self.z_matrix = None
         self.atom_labels = atom_labels
         self.internal_gradient = None
         self.internal_hessian = None
@@ -113,16 +159,14 @@ class InterpolationDatapoint:
 
         self.b_matrix = None
 
-        # copy of Willson B matrix in r and phi
-        # (needed for converting the b2_matrix in 1/r and/or cos(phi)).
+        # unscaled rows of the last B-matrix (dr/dx for bonds); not used by
+        # this class any more, kept for subclasses
         self.original_b_matrix = None
         self.b2_matrix = None
 
         self.confidence_radius = None
         self.use_inverse_bond_length = True
         self.use_eq_bond_length = False
-        self.use_vectorized_b_matrix = True
-        self.use_vectorized_internal_coordinates_values = True
         self.identify_imp_int_coord = True
 
         self.eq_bond_lengths = None
@@ -130,7 +174,12 @@ class InterpolationDatapoint:
         # internal_coordinates is a list of geomeTRIC objects which represent
         # different types of internal coordinates (distances, angles, dihedrals)
         self.internal_coordinates = None
-        self.imp_int_coordinates = []
+        self.imp_int_coordinates = {
+            'bonds': [],
+            'angles': [],
+            'dihedrals': [],
+            'impropers': [],
+        }
 
         # internal_coordinates_values is a numpy array with the values of the
         # geomeTRIC internal coordinates. It is used in InterpolationDriver to
@@ -147,19 +196,16 @@ class InterpolationDatapoint:
                      'use the inverse bond lengths'),
                 'use_eq_bond_length':
                     ('bool',
-                     'use the log bond lengths'),
-                'use_vectorized_b_matrix':
-                    ('bool', 'use vectorized Wilson B-matrix construction'
-                     ),
-                'use_vectorized_internal_coordinates_values':
-                    ('bool', 'use vectorized internal-coordinate value evaluation'
-                     ),
+                     'use the bond coordinate r_eq - r_eq^2/r'),
             }
         }
 
     @staticmethod
     def flatten_z_matrix(zm_dict):
-        """Flatten canonical dict to legacy ordered list representation."""
+        """
+        Returns the flat z-matrix list (bonds, angles, dihedrals, impropers)
+        of a z-matrix dictionary.
+        """
         return (
             list(zm_dict["bonds"]) +
             list(zm_dict["angles"]) +
@@ -199,6 +245,16 @@ class InterpolationDatapoint:
 
         parse_input(self, im_keywords, impes_dict)
 
+        if self.use_eq_bond_length and not self.use_inverse_bond_length:
+            self.use_inverse_bond_length = False
+        elif self.use_inverse_bond_length and not self.use_eq_bond_length:
+            self.use_eq_bond_length = False
+        elif self.use_eq_bond_length and self.use_inverse_bond_length:
+            assert_msg_critical(
+                False, 'use_inverse_bond_length and use_eq_bond_length '
+                'cannot both be True. Set exactly one of them (or neither, for '
+                'plain bond lengths in bohr).')
+
     def define_internal_coordinates(self):
         """
         Defines the internal coordinates from the Z-matrix.
@@ -220,10 +276,14 @@ class InterpolationDatapoint:
 
     def _get_b_matrix_row_cache(self):
         """
-        Builds/caches static row metadata for vectorized B-matrix assembly.
+        Returns the row metadata (the bond rows) of the z-matrix, cached
+        until the z-matrix changes.
         """
 
-        if self._b_matrix_row_cache is not None:
+        # The cache is only valid for the z-matrix it was built from.
+        z_matrix_key = tuple(tuple(int(i) for i in z) for z in self.z_matrix)
+        if (self._b_matrix_row_cache is not None and
+                self._b_matrix_row_cache['z_matrix'] == z_matrix_key):
             return self._b_matrix_row_cache
 
         n_rows = len(self.z_matrix)
@@ -231,24 +291,10 @@ class InterpolationDatapoint:
                                 dtype=np.int8,
                                 count=n_rows)
         bond_rows = np.flatnonzero(row_sizes == 2)
-        dihedral_rows = np.flatnonzero(row_sizes == 4)
-
-        dihedral_first = np.zeros(dihedral_rows.shape[0], dtype=bool)
-        prev_dihedral = None
-        dihedral_counter = 0
-        for z in self.z_matrix:
-            if len(z) != 4:
-                continue
-            if prev_dihedral != z:
-                prev_dihedral = z
-                dihedral_first[dihedral_counter] = True
-            dihedral_counter += 1
 
         self._b_matrix_row_cache = {
-            'row_sizes': row_sizes,
+            'z_matrix': z_matrix_key,
             'bond_rows': bond_rows,
-            'dihedral_rows': dihedral_rows,
-            'dihedral_first': dihedral_first,
         }
 
         return self._b_matrix_row_cache
@@ -316,18 +362,20 @@ class InterpolationDatapoint:
 
         if self.inv_sqrt_masses is not None:
             self.b_matrix = self.b_matrix * self.inv_sqrt_masses
-            if self.use_inverse_bond_length or self.use_eq_bond_length:
-                self.original_b_matrix = self.original_b_matrix
 
     def calculate_b_matrix(self):
         """
-        Calculates the Wilson B-matrix.
+        Calculates the Wilson B-matrix at cartesian_coordinates (bond rows
+        scaled by dq/dr of the bond mode; mass-weighted if inv_sqrt_masses
+        is set).
         """
         self._calculate_b_matrix_vectorized()
 
     def calculate_b2_matrix(self):
         """
-        Calculates the second derivative matrix of the internal coordinates
+        Calculates the second derivatives of the internal coordinates with
+        respect to the Cartesian (or mass-weighted) coordinates at
+        cartesian_coordinates.
         """
 
         assert_msg_critical(self.internal_coordinates is not None, 'InterpolationDatapoint: No internal coordinates are defined.')
@@ -336,7 +384,6 @@ class InterpolationDatapoint:
         n_atoms = self.cartesian_coordinates.shape[0]
         coords = self.cartesian_coordinates.reshape((n_atoms * 3))
 
-        # self.b2_matrix = np.zeros((len(self.z_matrix), n_atoms * 3, n_atoms * 3))
         self.b2_matrix = np.zeros((len(self.z_matrix), n_atoms * 3, n_atoms * 3))
 
         eq_bond_values = None
@@ -344,13 +391,15 @@ class InterpolationDatapoint:
             bond_rows = self._get_b_matrix_row_cache()['bond_rows']
             eq_bond_values = self._get_eq_bond_lengths_array(bond_rows.size)
 
-        # prev_dihedral = None
         bond_counter = 0
         for i, z in enumerate(self.z_matrix):
             q = self.internal_coordinates[i]
             second_derivative = q.second_derivative(coords).reshape(-1, n_atoms * 3)
 
             if len(z) == 2:
+                # dr/dx at the current geometry (original_b_matrix may stem
+                # from an earlier calculate_b_matrix call at another geometry)
+                dr_dx = q.derivative(coords).reshape(-1)
                 if self.use_inverse_bond_length:
 
                     r = q.value(coords)
@@ -360,16 +409,16 @@ class InterpolationDatapoint:
 
                     for m in range(n_atoms):
                         for n in range(n_atoms):
-                            self.b2_matrix[i, m*3:(m+1)*3, n*3:(n+1)*3] += 2 * r_inv_3 * np.outer(self.original_b_matrix[i, m*3:(m+1)*3], self.original_b_matrix[i, n*3:(n+1)*3])
+                            self.b2_matrix[i, m*3:(m+1)*3, n*3:(n+1)*3] += 2 * r_inv_3 * np.outer(dr_dx[m*3:(m+1)*3], dr_dx[n*3:(n+1)*3])
 
                 elif self.use_eq_bond_length:
                     r = q.value(coords)
-                    _, r_deriv_2, r_deriv_3 = self._bond_transform(
+                    _, dq_dr, d2q_dr2 = self._bond_transform(
                         r, eq_bond_values[bond_counter])
-                    self.b2_matrix[i] = r_deriv_2 * second_derivative
+                    self.b2_matrix[i] = dq_dr * second_derivative
                     for m in range(n_atoms):
                         for n in range(n_atoms):
-                            self.b2_matrix[i, m*3:(m+1)*3, n*3:(n+1)*3] += r_deriv_3 * np.outer(self.original_b_matrix[i, m*3:(m+1)*3], self.original_b_matrix[i, n*3:(n+1)*3])
+                            self.b2_matrix[i, m*3:(m+1)*3, n*3:(n+1)*3] += d2q_dr2 * np.outer(dr_dx[m*3:(m+1)*3], dr_dx[n*3:(n+1)*3])
 
                 else:
                     self.b2_matrix[i] = second_derivative
@@ -386,21 +435,18 @@ class InterpolationDatapoint:
 
     def transform_gradient_to_internal_coordinates(self, tol=1e-6):
         """
-        Transforms the gradient from Cartesian to internal coordinates.
+        Transforms the gradient to internal coordinates,
+        g_q = G^- B g with G = B B^T and G^- its pseudo-inverse keeping the
+        singular values above tol (absolute).
 
         :param tol:
-            Tolerance for the singular values of the B matrix.
-
+            Tolerance for the singular values of G.
         """
 
-        dimension = self.gradient.shape[0] * 3 - 6
-        if self.gradient.shape[0] == 2:
-            dimension += 1
+        assert_msg_critical(self.gradient is not None, 'InterpolationDatapoint: No gradient is defined.')
 
         if self.b_matrix is None:
             self.calculate_b_matrix()
-
-        assert_msg_critical(self.gradient is not None, 'InterpolationDatapoint: No gradient is defined.')
 
         g_matrix = np.dot(self.b_matrix, self.b_matrix.T)
 
@@ -416,11 +462,11 @@ class InterpolationDatapoint:
 
     def transform_hessian_to_internal_coordinates(self, tol=1e-6):
         """
-        Transforms the Hessian from Cartesian to internal coordinates.
+        Transforms the Hessian to internal coordinates,
+        H_q = G^- B (H - sum_k (g_q)_k B2_k) B^T G^-, symmetrised.
 
         :param tol:
-            Tolerance for the singular values of the B matrix.
-
+            Tolerance for the singular values of G.
         """
 
         if self.internal_gradient is None:
@@ -429,19 +475,12 @@ class InterpolationDatapoint:
         if self.b2_matrix is None:
             self.calculate_b2_matrix()
 
-        dimension = self.gradient.shape[0] * 3 - 6
-
-        if self.gradient.shape[0] == 2:
-            dimension += 1
-
         g_matrix = np.dot(self.b_matrix, self.b_matrix.T)
 
         U, s, Vt = np.linalg.svd(g_matrix)
 
         # Make zero the values of s_inv that are smaller than tol
         s_inv = np.array([1 / s_i if s_i > tol else 0.0 for s_i in s])
-
-        # number_of_positive_values = np.count_nonzero(s_inv)
 
         g_minus_matrix = np.dot(U, np.dot(np.diag(s_inv), Vt))
 
@@ -481,41 +520,11 @@ class InterpolationDatapoint:
 
         return cartesian_hessian
 
-    def backtransform_gradient_and_hessian(self):
-        """
-        Performs all steps required to transform from internal coordinates
-        to the Cartesian coordinates.
-
-        """
-        assert_msg_critical(self.internal_gradient is not None, 'InterpolationDatapoint: No internal gradient is defined.')
-        assert_msg_critical(self.internal_hessian is not None, 'InterpolationDatapoint: No internal hessian is defined.')
-
-        # Transform the gradient and Hessian to internal coordinates
-        self.backtransform_internal_gradient_to_cartesian_coordinates()
-        self.backtransform_internal_hessian_to_cartesian_coordinates()
-
-    def transform_gradient(self):
-        """
-        Performs all steps required to transform from Cartesian coordinates
-        to the internal coordinates defined in the Z-matrix.
-
-        """
-
-        # Create the internal coordinates through geomeTRIC
-        if self.internal_coordinates is None:
-            self.define_internal_coordinates()
-
-        # Transform the gradient and Hessian to internal coordinates
-        self.transform_gradient_to_internal_coordinates()
-
-        # Save the values of the internal coordinates as a numpy array
-        self.compute_internal_coordinates_values()
-
     def transform_gradient_and_hessian(self):
         """
-        Performs all steps required to transform from Cartesian coordinates
-        to the internal coordinates defined in the Z-matrix.
-
+        Transforms gradient and hessian to internal_gradient and
+        internal_hessian and computes the internal coordinate values, at
+        cartesian_coordinates.
         """
 
         # Create the internal coordinates through geomeTRIC
@@ -531,10 +540,16 @@ class InterpolationDatapoint:
 
     def reset_coordinates_impes_driver(self, cartesian_coordinates, timing_info=None):
         """
-        Resets the Cartesian coordinates for the InterpolationDriver.
+        Sets new Cartesian coordinates for the geometry of an
+        InterpolationDriver and recomputes the B-matrix and the internal
+        coordinate values. B2 is not needed at runtime and is reset.
 
         :param cartesian_coordinates:
-                a numpy array of the new Cartesian coordinates.
+            The new Cartesian coordinates in bohr, (natoms, 3).
+        :param timing_info:
+            Optional dictionary; the time spent in
+            define_internal_coordinates, calculate_b_matrix and
+            compute_internal_coordinates_values is added to its entries.
         """
         self.cartesian_coordinates = cartesian_coordinates
 
@@ -543,7 +558,7 @@ class InterpolationDatapoint:
         # must be redifined.
         self.internal_coordinates_values = None
         self.b_matrix = None
-        self.g_minus = None
+        self.b2_matrix = None
 
         if self.internal_coordinates is None:
             define_t0 = time() if timing_info is not None else None
@@ -553,10 +568,8 @@ class InterpolationDatapoint:
                     timing_info.get('define_internal_coordinates', 0.0) +
                     (time() - define_t0))
 
-        # The B matrix is required for the transformation of the
-        # gradient, while B2 is required for the transformation of
-        # the Hessian from Cartesian to internal coordinates and
-        # vice-versa.
+        # Only B is needed here: the model gradient is B^T dT/dq. B2 is
+        # needed only to transform a Hessian (see reset_coordinates).
 
         b_t0 = time() if timing_info is not None else None
         self.calculate_b_matrix()
@@ -580,10 +593,11 @@ class InterpolationDatapoint:
 
     def reset_coordinates(self, cartesian_coordinates):
         """
-        Resets the Cartesian coordinates.
+        Sets new Cartesian coordinates and recomputes B, B2 and the internal
+        coordinate values (used when a datapoint is built).
 
         :param cartesian_coordinates:
-                a numpy array of the new Cartesian coordinates.
+            The new Cartesian coordinates in bohr, (natoms, 3).
         """
 
         self.cartesian_coordinates = cartesian_coordinates
@@ -594,7 +608,6 @@ class InterpolationDatapoint:
         self.internal_coordinates_values = None
         self.b_matrix = None
         self.b2_matrix = None
-        self.g_minus = None
 
         if self.internal_coordinates is None:
             self.define_internal_coordinates()
@@ -654,8 +667,19 @@ class InterpolationDatapoint:
 
     def _bond_transform(self, r, r_eq):
         """
-        Returns q(r), dq/dr, d2q/dr2 for a bond coordinate that is
-        smoothly switched from local r behavior near equilibrium to 1/r outside.
+        Returns q(r), dq/dr, d2q/dr2 for the equilibrium-scaled inverse
+        bond coordinate
+
+            q(r) = -r_eq^2 (1/r - 1/r_eq) = r_eq - r_eq^2 / r.
+
+        q is affine in 1/r everywhere (there is no switching function). It
+        is normalized such that q(r_eq) = 0 and dq/dr(r_eq) = 1, so that
+        q = (r - r_eq) + O((r - r_eq)^2) near r_eq. r_eq must be positive.
+
+        :param r:
+            The bond length(s) in bohr.
+        :param r_eq:
+            The equilibrium bond length(s) in bohr.
         """
         r_input = np.asarray(r, dtype=np.float64)
         r_eq_input = np.asarray(r_eq, dtype=np.float64)
@@ -665,6 +689,11 @@ class InterpolationDatapoint:
                                               np.atleast_1d(r_eq_input))
         r_arr = r_arr.astype(np.float64, copy=False)
         r_eq_arr = r_eq_arr.astype(np.float64, copy=False)
+
+        assert_msg_critical(
+            np.all(r_eq_arr > 0.0),
+            'InterpolationDatapoint: Equilibrium bond lengths must be '
+            'positive for use_eq_bond_length.')
 
         R = - np.square(r_eq_arr) * (1.0 / r_arr - 1.0 / r_eq_arr)
         dR = np.square(r_eq_arr) / np.square(r_arr)
@@ -687,6 +716,10 @@ class InterpolationDatapoint:
         self._compute_internal_coordinates_values_vectorized()
 
     def get_z_matrix_as_np_arrays(self):
+        """
+        Returns the z-matrix as integer arrays with the keys bonds, angles,
+        dihedrals and impropers (2, 3, 4 and 4 atom indices per row).
+        """
 
         zmat = self.z_matrix_dict
         return {
@@ -698,286 +731,358 @@ class InterpolationDatapoint:
 
     def get_imp_int_coord_as_np_arrays(self):
         """
-        Returns a dictionary with the numpy arrays corresponding to the bonds,
-        bond angles, and dihedral angles defined by the Z-matrix.
+        Returns the important internal coordinates as integer arrays with
+        the keys imp_bonds, imp_angles, imp_dihedrals and imp_impropers (2, 3,
+        4 and 4 atom indices per row). An empty list or missing keys give
+        empty arrays.
         """
         assert_msg_critical(self.imp_int_coordinates is not None,
-                            'InterpolationDatapoint: No Z-matrix is defined.')
+                            'InterpolationDatapoint: No important internal coordinates are defined.')
 
         imp_coords = self.imp_int_coordinates
+        if not isinstance(imp_coords, dict):
+            # an empty sequence (the former default) means "no important
+            # coordinates"; anything else cannot be stored
+            assert_msg_critical(
+                isinstance(imp_coords, (list, tuple)) and len(imp_coords) == 0,
+                'InterpolationDatapoint: imp_int_coordinates must be a '
+                'dictionary with the keys bonds, angles, dihedrals and '
+                'impropers.')
+            imp_coords = {}
+
         return {
-            "imp_bonds": np.array(imp_coords["bonds"], dtype=np.int64),
-            "imp_angles": np.array(imp_coords["angles"], dtype=np.int64),
-            "imp_dihedrals": np.array(imp_coords["dihedrals"], dtype=np.int64),
-            "imp_impropers": np.array(imp_coords["impropers"], dtype=np.int64),
+            "imp_bonds": np.array(imp_coords.get("bonds", []), dtype=np.int64),
+            "imp_angles": np.array(imp_coords.get("angles", []), dtype=np.int64),
+            "imp_dihedrals": np.array(imp_coords.get("dihedrals", []), dtype=np.int64),
+            "imp_impropers": np.array(imp_coords.get("impropers", []), dtype=np.int64),
         }
 
     def calculate_translation_coordinates(self):
-        """Center the molecule by translating its geometric center to (0, 0, 0)."""
+        """
+        Returns cartesian_coordinates translated to their geometric centre.
+        """
         center = np.mean(self.cartesian_coordinates, axis=0)
         translated_coordinates = self.cartesian_coordinates - center
 
         return translated_coordinates
 
-    def _write_string_dataset(self, h5f, name, value):
-        if value is None:
-            return
-        dt = h5py.string_dtype(encoding="utf-8")
-        h5f.create_dataset(name, data=np.array(value, dtype=object), dtype=dt)
-
     def _write_optional_array(self, h5f, name, value):
+        """
+        Writes value as dataset name (gzip-compressed unless it is a
+        scalar) and returns the dataset; does nothing for None.
+        """
         if value is None:
-            return
+            return None
         array_value = np.asarray(value)
         if array_value.ndim == 0:
-            h5f.create_dataset(name, data=array_value)
+            return h5f.create_dataset(name, data=array_value)
         else:
-            h5f.create_dataset(name, data=array_value, compression="gzip")
+            return h5f.create_dataset(name, data=array_value, compression="gzip")
+
+    @staticmethod
+    def _bond_mode_suffix_from_flags(use_inverse_bond_length, use_eq_bond_length):
+        """
+        Returns the label suffix of a bond-coordinate mode.
+        """
+
+        if use_inverse_bond_length:
+            return '_rinv'
+        elif use_eq_bond_length:
+            return '_eq'
+        return '_r'
+
+    def _full_point_label(self, label):
+        """
+        Returns the HDF5 dataset prefix of a datapoint label for the current
+        bond-coordinate mode, e.g. 'point_1' -> 'point_1_eq_dihedral'.
+        """
+
+        return label + self._bond_mode_suffix_from_flags(
+            self.use_inverse_bond_length,
+            self.use_eq_bond_length) + '_dihedral'
+
+    @staticmethod
+    def _checked_file_name(fname, caller):
+        """
+        Returns fname as str; raises for anything that is not a non-empty
+        str or os.PathLike.
+        """
+
+        assert_msg_critical(
+            isinstance(fname, (str, os.PathLike)),
+            f'InterpolationDatapoint.{caller}: the file name must be a str '
+            f'or os.PathLike, got {type(fname).__name__}.')
+        fname = os.fspath(fname)
+        assert_msg_critical(
+            isinstance(fname, str) and fname != '',
+            f'InterpolationDatapoint.{caller}: invalid file name {fname!r}.')
+        return fname
+
+    def _missing_point_message(self, h5f, fname, full_label):
+        """
+        Builds the error message for a datapoint that is not in the file,
+        including the bond-mode suffixes that the file does contain.
+        """
+
+        found = set()
+        tail = '_dihedral_energy'
+        for key in h5f.keys():
+            if key.endswith(tail):
+                found.add('_' + key[:-len(tail)].rsplit('_', 1)[-1] +
+                          '_dihedral')
+        found_txt = ', '.join(sorted(found)) if found else 'none'
+        suffix = self._bond_mode_suffix_from_flags(
+            self.use_inverse_bond_length,
+            self.use_eq_bond_length) + '_dihedral'
+
+        msg = f'InterpolationDatapoint.read_hdf5: datapoint {full_label} '
+        msg += f'is not in {fname}. With use_inverse_bond_length='
+        msg += f'{self.use_inverse_bond_length} and use_eq_bond_length='
+        msg += f'{self.use_eq_bond_length} the datasets must be named '
+        msg += f'<label>{suffix}_*; the file contains datapoints with the '
+        msg += f'suffix(es): {found_txt}.'
+        return msg
 
     def write_hdf5(self, fname, label):
         """
-        Writes the energy, internal coordinates, internal gradient, and
-        internal Hessian to a checkpoint file.
+        Writes the datapoint to an HDF5 database.
+
+        The datasets are named <label><suffix>_dihedral_<name> with the
+        bond-mode suffix '_rinv', '_eq' or '_r', and <name> one of energy,
+        gradient and hessian (internal), cartesian_gradient and
+        cartesian_hessian (in the build metric, recorded in the attributes
+        'mass_weighted' and 'bond_mode'), internal_coordinates,
+        eq_bond_lengths (if set), confidence_radius, cartesian_coordinates,
+        the z-matrix (bonds, angles, dihedrals, impropers), the important
+        coordinates (imp_bonds, ...) and atom_labels (if set).
+
+        All inputs are checked before the file is opened. The file is
+        created if it does not exist and is never truncated. A label that
+        exists already raises, and a failing write removes the datasets it
+        wrote, so the database stays readable.
 
         :param fname:
-            Name of the checkpoint file to be written.
+            The HDF5 file name (str or os.PathLike).
         :param label:
-            A string describing the coordinate.
-        :param write_zmat:
-            flag to determine if the Z-matrix should be writen to the
-            checkpoint file. False by default.
+            The datapoint label without suffix, e.g. 'point_12'.
         """
-        valid_checkpoint = (fname and isinstance(fname, str))
 
-        if valid_checkpoint:
+        fname = self._checked_file_name(fname, 'write_hdf5')
+        label = self._full_point_label(label)
+
+        # Validate every input before the file is opened, so that a failed
+        # write can not leave a partial datapoint behind.
+        assert_msg_critical(self.energy is not None,
+                            'InterpolationDatapoint: No energy is defined.')
+
+        assert_msg_critical(
+            self.internal_gradient is not None,
+            'InterpolationDatapoint: No internal gradient is defined.')
+
+        assert_msg_critical(
+            self.internal_hessian is not None,
+            'InterpolationDatapoint: No internal Hessian is defined.')
+
+        assert_msg_critical(
+            self.gradient is not None,
+            'InterpolationDatapoint: No Cartesian gradient is defined.')
+
+        assert_msg_critical(
+            self.hessian is not None,
+            'InterpolationDatapoint: No Cartesian Hessian is defined.')
+
+        if self.use_eq_bond_length:
+            assert_msg_critical(
+                self.eq_bond_lengths is not None,
+                'InterpolationDatapoint: No eq bond lengths are defined.')
+
+        assert_msg_critical(
+            self.confidence_radius is not None,
+            'InterpolationDatapoint: No confidence radius is defined.')
+
+        assert_msg_critical(
+            self.cartesian_coordinates is not None,
+            'InterpolationDatapoint: No Cartesian coordinates are defined.')
+
+        assert_msg_critical(
+            self.z_matrix is not None and self.z_matrix_dict is not None,
+            'InterpolationDatapoint: No Z-matrix is defined.')
+
+        if self.internal_coordinates is None:
+            assert_msg_critical(
+                self.internal_coordinates_values is not None,
+                'InterpolationDatapoint: No internal coordinates are defined.')
+        else:
+            self.compute_internal_coordinates_values()
+
+        # Bonds, angles, dihedrals and impropers of the Z-matrix, one array
+        # per type with 2, 3 or 4 atom indices per row.
+        zmat_dict = self.get_z_matrix_as_np_arrays()
+
+        imp_int_coord_dict = {}
+        if self.identify_imp_int_coord:
+            assert_msg_critical(
+                self.imp_int_coordinates is not None,
+                'InterpolationDatapoint: No important internal coordinates are defined.')
+            imp_int_coord_dict = self.get_imp_int_coord_as_np_arrays()
+
+        # Metric of the stored Cartesian gradient and Hessian: they are
+        # written as given, i.e. mass-weighted if the point was built with a
+        # mass-weighted B-matrix (inv_sqrt_masses set).
+        cartesian_attrs = {
+            'mass_weighted': bool(self.inv_sqrt_masses is not None),
+            'bond_mode': self._bond_mode_suffix_from_flags(
+                self.use_inverse_bond_length, self.use_eq_bond_length)[1:],
+        }
+
+        datasets = [
+            (label + '_energy', np.float64(self.energy), None),
+            (label + '_gradient', self.internal_gradient, None),
+            (label + '_cartesian_gradient', self.gradient, cartesian_attrs),
+            (label + '_hessian', self.internal_hessian, None),
+            (label + '_cartesian_hessian', self.hessian, cartesian_attrs),
+            (label + '_internal_coordinates',
+             self.internal_coordinates_values, None),
+            (label + '_eq_bond_lengths', self.eq_bond_lengths, None),
+            (label + '_confidence_radius', np.float64(self.confidence_radius),
+             None),
+            (label + '_cartesian_coordinates', self.cartesian_coordinates,
+             None),
+        ]
+        for key, value in zmat_dict.items():
+            datasets.append((label + '_' + key, value, None))
+        for key, value in imp_int_coord_dict.items():
+            datasets.append((label + '_' + key, value, None))
+
+        names = [name for name, value, _ in datasets if value is not None]
+        if self.atom_labels is not None:
+            names.insert(0, label + '_atom_labels')
+
+        with h5py.File(fname, 'a') as h5f:
+            # Mode 'a' creates the file if it does not exist. There is no
+            # fallback to mode 'w': that would truncate an existing database
+            # that is locked, corrupted or not writable.
+
+            existing = [name for name in names if name in h5f]
+            assert_msg_critical(
+                not existing,
+                f'InterpolationDatapoint.write_hdf5: datapoint {label} '
+                f'already exists in {fname} ({len(existing)} of its '
+                'datasets are present).')
+
+            written = []
             try:
-                h5f = h5py.File(fname, 'a')
-            except IOError:
-                h5f = h5py.File(fname, 'w')
+                if self.atom_labels is not None:
+                    string_type = h5py.string_dtype(encoding='utf-8')
+                    h5f.create_dataset(label + '_atom_labels',
+                                       data=self.atom_labels,
+                                       dtype=string_type)
+                    written.append(label + '_atom_labels')
 
-            if self.use_inverse_bond_length:
-                label += "_rinv"
-            elif self.use_eq_bond_length:
-                label += "_eq"
-            else:
-                label += "_r"
+                for name, value, attrs in datasets:
+                    dataset = self._write_optional_array(h5f, name, value)
+                    if dataset is None:
+                        continue
+                    written.append(name)
+                    if attrs:
+                        for key, attr_value in attrs.items():
+                            dataset.attrs[key] = attr_value
 
-            label += "_dihedral"
-
-            assert_msg_critical(self.energy is not None,
-                                'InterpolationDatapoint: No energy is defined.')
-
-            assert_msg_critical(
-                self.internal_gradient is not None,
-                'InterpolationDatapoint: No internal gradient is defined.')
-
-            assert_msg_critical(
-                self.internal_hessian is not None,
-                'InterpolationDatapoint: No internal Hessian is defined.')
-
-            if self.atom_labels is not None:
-                full_label = label + '_atom_labels'
-                string_type = h5py.string_dtype(encoding='utf-8')
-                h5f.create_dataset(full_label, data=self.atom_labels, dtype=string_type)
-
-            full_label = label + "_energy"
-            h5f.create_dataset(full_label, data=np.float64(self.energy))
-
-            # write gradient in internal coordinates
-            full_label = label + "_gradient"
-            h5f.create_dataset(full_label,
-                               data=self.internal_gradient,
-                               compression='gzip')
-
-            full_label = label + "_cartesian_gradient"
-            h5f.create_dataset(full_label,
-                               data=self.gradient,
-                               compression='gzip')
-            # write Hessian in internal coordinates
-            full_label = label + "_hessian"
-            h5f.create_dataset(full_label,
-                               data=self.internal_hessian,
-                               compression='gzip')
-
-            full_label = label + "_cartesian_hessian"
-            h5f.create_dataset(full_label,
-                               data=self.hessian,
-                               compression='gzip')
-
-            if self.internal_coordinates is None:
-                assert_msg_critical(
-                    self.internal_coordinates_values is not None,
-                    'InterpolationDatapoint: No internal coordinates are defined.')
-
-                # write internal coordinates
-                full_label = label + "_internal_coordinates"
-                h5f.create_dataset(full_label,
-                                   data=self.internal_coordinates_values,
-                                   compression='gzip')
-            else:
-                # write internal coordinates
-                full_label = label + "_internal_coordinates"
-                self.compute_internal_coordinates_values()
-                h5f.create_dataset(full_label,
-                                   data=self.internal_coordinates_values,
-                                   compression='gzip')
-
-            if not self.use_eq_bond_length and self.eq_bond_lengths is None:
-                assert_msg_critical(
-                    self.eq_bond_lengths is not None,
-                    'InterpolationDatapoint: No eq bond lenths are defined.')
-
-            else:
-                # write internal coordinates
-                full_label = label + "_eq_bond_lengths"
-                h5f.create_dataset(full_label,
-                                   data=self.eq_bond_lengths,
-                                   compression='gzip')
-
-            assert_msg_critical(
-                self.confidence_radius is not None,
-                'InterpolationDatapoint: No confidence radius is defined.')
-            # write internal coordinates
-            full_label = label + "_confidence_radius"
-            h5f.create_dataset(full_label, data=np.float64(self.confidence_radius))
-
-            assert_msg_critical(
-                self.cartesian_coordinates is not None,
-                'InterpolationDatapoint: No Cartesian coordinates are defined.')
-            # write Cartesian coordinates
-            full_label = label + "_cartesian_coordinates"
-            h5f.create_dataset(full_label,
-                               data=self.cartesian_coordinates,
-                               compression='gzip')
-
-            assert_msg_critical(
-                self.z_matrix is not None,
-                'InterpolationDatapoint: No Z-matrix is defined.')
-            # Write the bonds, angles and dihedrals defined in the Z-matrix.
-            # Bonds are saved in an array with two atoms indices per row.
-            # Angles are saved in an array with three atom indices per row.
-            # Dihedrals are saved in an array with four atom indices per row.
-            zmat_dict = self.get_z_matrix_as_np_arrays()
-
-            for key in zmat_dict.keys():
-                h5f.create_dataset(label + '_' + key,
-                                   data=zmat_dict[key],
-                                   compression='gzip')
-
-            if self.identify_imp_int_coord:
-                assert_msg_critical(
-                    self.imp_int_coordinates is not None,
-                    'InterpolationDatapoint: No important internal coordinates are defined.')
-                # Write the bonds, angles and dihedrals defined in the Z-matrix.
-                # Bonds are saved in an array with two atoms indices per row.
-                # Angles are saved in an array with three atom indices per row.
-                # Dihedrals are saved in an array with four atom indices per row.
-                imp_int_coord_dict = self.get_imp_int_coord_as_np_arrays()
-                for key in imp_int_coord_dict.keys():
-                    h5f.create_dataset(label + '_' + key,
-                                       data=imp_int_coord_dict[key],
-                                       compression='gzip')
-
-            h5f.close()
+            except BaseException:
+                # remove what was written of this datapoint, so that the
+                # database stays readable, then re-raise
+                for name in written:
+                    if name in h5f:
+                        del h5f[name]
+                raise
 
     def read_hdf5(self, fname, label):
         """
-        Reads the energy, internal coordinates, gradient, and Hessian from
-        a checkpoint file,
+        Reads a datapoint written by write_hdf5.
+
+        The bond-mode settings select the label suffix and must be those of
+        the database; a missing label raises with the suffixes found in the
+        file. Missing datasets give None. The stored z-matrix replaces
+        z_matrix and z_matrix_dict, the important coordinates and the atom
+        labels are read if present, and point_label is set to the dataset
+        prefix.
 
         :param fname:
-            Name of the checkpoint file.
-            The file must exist before calling this routine.
+            The HDF5 file name (str or os.PathLike).
         :param label:
-            The label of the selected coordinates.
+            The datapoint label without suffix, e.g. 'point_12'.
         """
 
-        def _read_scalar_string(ds):
-            if ds is None:
-                return None
-            val = ds[()]
-            if isinstance(val, bytes):
-                return val.decode("utf-8")
-            return str(val)
+        fname = self._checked_file_name(fname, 'read_hdf5')
+        label = self._full_point_label(label)
 
-        valid_checkpoint = (fname and isinstance(fname, str))
-
-        if valid_checkpoint:
-            h5f = h5py.File(fname, 'r')
-
-            if self.use_inverse_bond_length:
-                label += "_rinv"
-            elif self.use_eq_bond_length:
-                label += "_eq"
-            else:
-                label += "_r"
-
-            label += "_dihedral"
+        with h5py.File(fname, 'r') as h5f:
 
             energy_label = label + "_energy"
-            gradient_label = label + "_gradient"
-            hessian_label = label + "_hessian"
-            cart_hess_label = label + "_cartesian_hessian"
-            cart_grad_label = label + "_cartesian_gradient"
-            coords_label = label + "_internal_coordinates"
-            eq_bond_length_label = label + "_eq_bond_lengths"
-            cart_coords_label = label + "_cartesian_coordinates"
-            confidence_radius_label = label + "_confidence_radius"
+            if energy_label not in h5f:
+                assert_msg_critical(
+                    False, self._missing_point_message(h5f, fname, label))
 
-            z_matrix_bonds = label + '_bonds'
-            z_matrix_angles = label + '_angles'
-            z_matrix_dihedrals = label + '_dihedrals'
-            z_matrix_impropers = label + '_impropers'
-
-            imp_int_coord_bonds = label + '_imp_bonds'
-            imp_int_coord_angles = label + '_imp_angles'
-            imp_int_coord_dihedrals = label + '_imp_dihedrals'
-            imp_int_coord_impropers = label + '_imp_impropers'
+            def _read_array(name):
+                # a missing dataset gives None, not array(None, dtype=object)
+                dataset = h5f.get(name)
+                return None if dataset is None else np.array(dataset)
 
             self.point_label = label
-            self.energy = np.array(h5f.get(energy_label))
-            self.internal_gradient = np.array(h5f.get(gradient_label))
-            self.gradient = np.array(h5f.get(cart_grad_label))
-            self.internal_hessian = np.array(h5f.get(hessian_label))
-            self.hessian = np.array(h5f.get(cart_hess_label))
-            self.internal_coordinates_values = np.array(h5f.get(coords_label))
-            self.eq_bond_lengths = np.array(h5f.get(eq_bond_length_label))
-            self.cartesian_coordinates = np.array(h5f.get(cart_coords_label))
-            self.confidence_radius = np.array(h5f.get(confidence_radius_label))
+            self.energy = _read_array(energy_label)
+            self.internal_gradient = _read_array(label + "_gradient")
+            self.gradient = _read_array(label + "_cartesian_gradient")
+            self.internal_hessian = _read_array(label + "_hessian")
+            self.hessian = _read_array(label + "_cartesian_hessian")
+            self.internal_coordinates_values = _read_array(
+                label + "_internal_coordinates")
+            self.eq_bond_lengths = _read_array(label + "_eq_bond_lengths")
+            self.cartesian_coordinates = _read_array(
+                label + "_cartesian_coordinates")
+            self.confidence_radius = _read_array(label + "_confidence_radius")
 
+            atom_labels = h5f.get(label + '_atom_labels')
+            if atom_labels is not None:
+                self.atom_labels = [
+                    x.decode('utf-8') if isinstance(x, bytes) else str(x)
+                    for x in atom_labels[()]
+                ]
+
+            # The Z-matrix of the point replaces the constructor Z-matrix
+            # (both the dictionary and the flat list).
             z_matrix_dict = {}
-            for kname, key in [
-                (z_matrix_bonds, "bonds"),
-                (z_matrix_angles, "angles"),
-                (z_matrix_dihedrals, "dihedrals"),
-                (z_matrix_impropers, "impropers")
-            ]:
-                ds = h5f.get(kname)
+            for key in ("bonds", "angles", "dihedrals", "impropers"):
+                ds = h5f.get(label + '_' + key)
                 if ds is not None:
                     z_matrix_dict[key] = [tuple(x.tolist()) for x in ds]
-            self.z_matrix = self.flatten_z_matrix(z_matrix_dict)
+            if z_matrix_dict:
+                for key in ("bonds", "angles", "dihedrals", "impropers"):
+                    z_matrix_dict.setdefault(key, [])
+                self.z_matrix_dict = z_matrix_dict
+                self.z_matrix = self.flatten_z_matrix(z_matrix_dict)
             self._b_matrix_row_cache = None
 
             if self.identify_imp_int_coord:
                 self.imp_int_coordinates = {}
-                for kname, key in [
-                    (imp_int_coord_bonds, "bonds"),
-                    (imp_int_coord_angles, "angles"),
-                    (imp_int_coord_dihedrals, "dihedrals"),
-                    (imp_int_coord_impropers, "impropers")
-                ]:
-                    ds = h5f.get(kname)
+                for key in ("bonds", "angles", "dihedrals", "impropers"):
+                    ds = h5f.get(label + '_imp_' + key)
                     if ds is not None:
                         self.imp_int_coordinates[key] = [tuple(x.tolist()) for x in ds]
-
-            h5f.close()
+                    else:
+                        self.imp_int_coordinates[key] = []
 
     def cartesian_distance_vector(self, data_point):
-        """Calculates and returns the cartesian distance between
-           self and data_point.
+        """
+        Returns the displacement between this datapoint and data_point after
+        centring and rotating data_point onto this geometry (Kabsch over all
+        atoms; the driver weights use only the atoms of
+        symmetry_information[3]).
 
-           :param data_point:
-                InterpolationDatapoint object
+        :param data_point:
+            The InterpolationDatapoint.
+
+        :return:
+            The displacement (natoms, 3) in bohr.
         """
         # First, translate the cartesian coordinates to zero
         target_coordinates = data_point.calculate_translation_coordinates()
@@ -999,19 +1104,21 @@ class InterpolationDatapoint:
 
     def remove_point_from_hdf5(self, fname, label, use_inverse_bond_length=False, use_eq_bond_length=False):
         """
-        Removes a point (i.e., corresponding datasets) from an HDF5 file based on label and internal settings.
+        Removes all datasets of a datapoint from an HDF5 file.
 
-        :param fname: HDF5 filename
-        :param label: base label for the data
-        :param use_inverse_bond_length: whether to append '_rinv' or '_r'
+        :param fname:
+            The HDF5 file name (str or os.PathLike).
+        :param label:
+            The datapoint label without suffix, e.g. 'point_12'.
+        :param use_inverse_bond_length:
+            The bond mode of the label (suffix '_rinv'; takes precedence).
+        :param use_eq_bond_length:
+            The bond mode of the label (suffix '_eq'); both False: '_r'.
         """
-        if use_inverse_bond_length:
-            label += "_rinv"
-        if use_eq_bond_length:
-            label += "_eq"
-        else:
-            label += "_r"
 
+        fname = self._checked_file_name(fname, 'remove_point_from_hdf5')
+        label += self._bond_mode_suffix_from_flags(use_inverse_bond_length,
+                                                   use_eq_bond_length)
         label += "_dihedral"
 
         keys_to_remove = [
@@ -1019,7 +1126,7 @@ class InterpolationDatapoint:
             label + "_gradient",
             label + "_hessian",
             label + "_internal_coordinates",
-            label + "eq_bond_lengths",
+            label + "_eq_bond_lengths",
             label + "_cartesian_coordinates",
             label + "_cartesian_gradient",
             label + "_cartesian_hessian",
@@ -1031,34 +1138,42 @@ class InterpolationDatapoint:
             label + "_imp_bonds",
             label + "_imp_angles",
             label + "_imp_dihedrals",
-            label + "_imp_impropers"
+            label + "_imp_impropers",
+            label + "_atom_labels"
         ]
 
+        deleted = []
         with h5py.File(fname, 'r+') as h5f:
             for key in keys_to_remove:
                 if key in h5f:
                     del h5f[key]
-                    print(f"Deleted: {key}")
-                else:
-                    print(f"Key not found (skipped): {key}")
+                    deleted.append(key)
+
+        skipped = [key[len(label) + 1:] for key in keys_to_remove
+                   if key not in deleted]
+        msg = f'Removed {len(deleted)} datasets of {label} from {fname}'
+        if skipped:
+            msg += f' (not present: {", ".join(skipped)})'
+        self.ostream.print_info(msg + '.')
+        self.ostream.flush()
 
     def update_confidence_radius(self, fname, label, new_confidence_radius):
         """
-        Updates the confidence radius in the HDF5 file.
+        Updates the confidence radius of a datapoint in the HDF5 file (bond
+        mode of this datapoint).
 
-        :param fname: HDF5 filename
-        :param label: base label for dataset lookup
-        :param new_confidence_radius: new value(s) to store
+        :param fname:
+            The HDF5 file name (str or os.PathLike).
+        :param label:
+            The datapoint label without suffix, e.g. 'point_12'.
+        :param new_confidence_radius:
+            The new radius in bohr (same shape as the stored value).
         """
-        with h5py.File(fname, 'r+') as h5f:
-            if self.use_inverse_bond_length:
-                label += "_rinv"
-            elif self.use_eq_bond_length:
-                label += "_eq"
-            else:
-                label += "_r"
 
-            label += "_dihedral"
+        fname = self._checked_file_name(fname, 'update_confidence_radius')
+
+        with h5py.File(fname, 'r+') as h5f:
+            label = self._full_point_label(label)
 
             confidence_radius_label = label + "_confidence_radius"
 
