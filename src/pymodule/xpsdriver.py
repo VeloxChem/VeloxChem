@@ -39,7 +39,6 @@ import sys
 from .veloxchemlib import hartree_in_ev, mpi_master
 from .outputstream import OutputStream
 from .scfunrestdriver import ScfUnrestrictedDriver
-from .lreigensolverunrest import LinearResponseUnrestrictedEigenSolver
 from .tdaeigensolverunrest import TdaUnrestrictedEigenSolver
 from .orbitallocalization import OrbitalLocalizationDriver
 from .molecularorbitals import MolecularOrbitals, molorb
@@ -689,7 +688,7 @@ class XPSDriver:
                             f'  MO {mo_idx} -> Atom {atom_idx+1} ({elem}) with {contrib:.1%} contribution')
                         if contrib < self.localization_threshold:
                             delocalized.append(mo_idx)
-                    if len(delocalized) > 1:
+                    if delocalized:
                         n_deloc = len(delocalized)
 
                         warning = f' The molecule contains {n_deloc} delocalized core orbitals.'
