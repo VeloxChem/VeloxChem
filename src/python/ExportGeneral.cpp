@@ -37,6 +37,10 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
+#ifdef __GLIBC__
+#include <malloc.h>
+#endif
+
 #include "AtomicRadii.hpp"
 #include "BatchFunc.hpp"
 #include "Codata.hpp"
@@ -125,6 +129,31 @@ export_general(py::module &m) -> void
         "mpi_size_limit",
         []() -> int { return static_cast<int>(1 << 30) / 5 * 9; },
         "Gets the size limit in MPI communication (below 2^31-1).");
+
+    // NOTE: the same call the RI Fock drivers make at the end of prepare. Memory
+    // freed in blocks below the allocator's mapping threshold, as the buffers of
+    // every thread are, is kept by the allocator for reuse and stays resident
+    // until it is returned this way.
+    //
+    // NOTE: **where to trim.** At the end of a phase, by the code which owns that
+    // end. When the memory freed and the peak it would raise belong to one C++
+    // driver, the driver trims itself, as the RI Fock drivers do after forming
+    // their B vectors or integrals, so that every caller of prepare is covered.
+    // When the memory spans several drivers or arrays held in Python, or what
+    // matters is what the next calculation finds free, the Python driver which
+    // runs the phases trims once, through this function, as the SCF gradient
+    // does after its RI term. Either way the call is made from C++, where the
+    // allocator is known, rather than through ctypes.
+    m.def(
+        "release_free_memory",
+        []() -> bool {
+#ifdef __GLIBC__
+            return malloc_trim(0) != 0;
+#else
+            return false;
+#endif
+        },
+        "Returns memory the allocator holds free to the system, and tells whether any was returned.");
 
     /// exposing functions from StringFormat.hpp
     m.def("upper_case", &format::upper_case, "Creates upper cased copy of given string.");

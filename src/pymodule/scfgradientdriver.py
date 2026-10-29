@@ -43,7 +43,7 @@ from .veloxchemlib import T4CScreener
 from .veloxchemlib import SimdRIJGradientDriver
 from .veloxchemlib import SimdRIJKGradientDriver
 from .veloxchemlib import PackedMatrix
-from .veloxchemlib import mpi_master, mat_t
+from .veloxchemlib import mpi_master, mat_t, release_free_memory
 from .veloxchemlib import make_matrix
 from .veloxchemlib import parse_xc_func
 from .veloxchemlib import bohr_in_angstrom, hartree_in_kjpermol
@@ -1334,6 +1334,14 @@ class ScfGradientDriver(GradientDriver):
 
         self._mark_ri_memory_peak()
 
+        # NOTE: the RI term frees its per-thread buffers, the derivative blocks of
+        # each auxiliary atom and the panels in pieces the allocator keeps rather
+        # than returns. Kept, they stay resident after the gradient, and in an
+        # optimization the next SCF reads them as memory in use and takes a
+        # smaller RI budget. They are returned here, after the RI term only.
+        if ri_label is not None:
+            release_free_memory()
+
         self._profiler.check_memory_usage('Two-electron gradient')
 
         # XC contribution to gradient
@@ -1653,6 +1661,14 @@ class ScfGradientDriver(GradientDriver):
                 grad_timing['Fock_grad'] += time.time() - t0
 
         self._mark_ri_memory_peak()
+
+        # NOTE: the RI term frees its per-thread buffers, the derivative blocks of
+        # each auxiliary atom and the panels in pieces the allocator keeps rather
+        # than returns. Kept, they stay resident after the gradient, and in an
+        # optimization the next SCF reads them as memory in use and takes a
+        # smaller RI budget. They are returned here, after the RI term only.
+        if ri_label is not None:
+            release_free_memory()
 
         self._profiler.check_memory_usage('Two-electron gradient')
 
