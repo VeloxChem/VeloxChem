@@ -134,28 +134,6 @@ class ScfGradientDriver(GradientDriver):
         # D4 dispersion correction
         self.dispersion = scf_drv.dispersion
 
-        # NOTE: one driver serves a whole geometry optimization, so a line which
-        # says how the two-electron part is built is the same line at every step.
-        # What has been said once is remembered here and not said again.
-        self._announced = set()
-
-    def _announce_once(self, message):
-        """
-        Writes a line the first time it is asked for, and not again.
-
-        :param message:
-            The line to write.
-        """
-
-        if message in self._announced:
-            return
-
-        self._announced.add(message)
-
-        self.ostream.print_info(message)
-        self.ostream.print_blank()
-        self.ostream.flush()
-
     def _check_ri_gradient_mode(self, molecule, basis):
         """
         Checks that the way the SCF resolves the identity can give a gradient.
@@ -603,10 +581,11 @@ class ScfGradientDriver(GradientDriver):
         # four-center integrals holds no RI driver to differentiate, and the RI
         # gradient of its energy would be the gradient of a different one.
         if asked and not used:
-            self._announce_once(
+            self.ostream.print_info(
                 f'The SCF formed its Fock matrices without {label}, so the ' +
-                'two-electron gradient is formed from the four-center ' +
-                'integrals.')
+                'gradient is formed from the four-center integrals.')
+            self.ostream.print_blank()
+            self.ostream.flush()
 
         if not used:
             return None
@@ -651,17 +630,19 @@ class ScfGradientDriver(GradientDriver):
         where = ('available' if self.nodes == 1 else 'on the largest rank')
 
         if self._ri_fallback:
-            self._announce_once(
+            self.ostream.print_warning(
                 f'{label} gradient would need roughly ' +
                 f'{Profiler.memory_to_string(max(peaks))} of ' +
                 f'{Profiler.memory_to_string(budget)} {where}, so the ' +
-                'two-electron gradient is formed from the four-center ' +
-                f'integrals. It differs from the gradient of the {label} ' +
-                'energy by the fitting error.')
+                'gradient is formed from the four-center integrals.')
+            self.ostream.print_blank()
+            self.ostream.flush()
             return None
 
-        self._announce_once(
+        self.ostream.print_info(
             f'Using the SIMD resolution of the identity ({label}) gradient.')
+        self.ostream.print_blank()
+        self.ostream.flush()
 
         if self.nodes == 1:
             needs = (f'{label} gradient needs roughly ' +
@@ -675,8 +656,6 @@ class ScfGradientDriver(GradientDriver):
                      f'{Profiler.memory_to_string(budget)} on the largest ' +
                      'rank.')
 
-        # NOTE: not said once only, as the memory free differs from one step of
-        # an optimization to the next.
         self.ostream.print_info(needs)
         self.ostream.print_blank()
         self.ostream.flush()
