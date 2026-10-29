@@ -80,6 +80,7 @@ from .veloxchemlib import mat_t
 from .veloxchemlib import rimode
 from .molecularbasis import MolecularBasis
 from .errorhandler import assert_msg_critical
+from .profiler import Profiler
 
 
 def memory_budget(solver):
@@ -221,7 +222,8 @@ def initialize(solver, molecule, basis):
     assert_msg_critical(
         needed <= budget,
         f'{type(solver).__name__}: the B vectors need ' +
-        f'{needed / 1024**3:.2f} GB of {budget / 1024**3:.2f} GB available')
+        f'{Profiler.memory_to_string(needed)} of ' +
+        f'{Profiler.memory_to_string(budget)} available')
 
     metric_erf = PackedMatrix()
 
@@ -286,8 +288,8 @@ def initialize(solver, molecule, basis):
             f'The auxiliary basis is divided over {solver.nodes} ranks.')
 
     solver.ostream.print_info(
-        f'B vectors need {needed / 1024**3:.2f} GB of ' +
-        f'{budget / 1024**3:.2f} GB available, a rank.')
+        f'B vectors need {Profiler.memory_to_string(needed)} of ' +
+        f'{Profiler.memory_to_string(budget)} available, a rank.')
     solver.ostream.print_blank()
     solver.ostream.flush()
 

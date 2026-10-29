@@ -551,12 +551,13 @@ class Profiler:
 
         return self.memory_to_string(psutil.virtual_memory().available)
 
-    def memory_to_string(self, memsize):
+    @staticmethod
+    def memory_to_string(memsize):
         """
-        Gets memory size as text string.
+        Gets memory size as text string, in decimal units (1 GB = 10^9 bytes).
 
         :param memsize:
-            The memory size.
+            The memory size in bytes.
         :return:
             The text string for memory size.
         """

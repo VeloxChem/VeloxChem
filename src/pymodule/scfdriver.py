@@ -394,7 +394,7 @@ class ScfDriver:
                     ('float', 'density of the B vectors at which the SIMD RI-JK '
                      'exchange expands them; 0 expands always, above 1 never'),
                 'ri_memory_budget':
-                    ('float', 'memory the SIMD RI driver may hold, in GiB'),
+                    ('float', 'memory the SIMD RI driver may hold, in GB'),
                 'ri_mode':
                     ('str_lower', 'SIMD RI-JK mode: in_memory or direct'),
                 'dispersion': ('bool', 'use D4 dispersion correction'),
@@ -1924,10 +1924,11 @@ class ScfDriver:
                 where = ('available'
                          if self.nodes == 1 else 'on the largest rank')
                 self.ostream.print_warning(
-                    f'RI-J would need roughly {max(peaks) / (1024**3):.2f} ' +
-                    'GiB of ' +
-                    f'{budget / (1024**3):.2f} GiB {where}, so the Coulomb ' +
-                    'matrices are formed from the four-center integrals.')
+                    'RI-J would need roughly ' +
+                    f'{Profiler.memory_to_string(max(peaks))} of ' +
+                    f'{Profiler.memory_to_string(budget)} {where}, so the ' +
+                    'Coulomb matrices are formed from the four-center ' +
+                    'integrals.')
                 self.ostream.print_blank()
                 self.ostream.flush()
 
@@ -1974,14 +1975,17 @@ class ScfDriver:
                     f'{basis_ri.get_dimensions_of_basis()}')
                 if mode == rimode.in_memory and self.nodes == 1:
                     self.ostream.print_info(
-                        f'RI-J needs roughly {max(peaks) / (1024**3):.2f} ' +
-                        f'GiB of {budget / (1024**3):.2f} GiB available.')
+                        'RI-J needs roughly ' +
+                        f'{Profiler.memory_to_string(max(peaks))} of ' +
+                        f'{Profiler.memory_to_string(budget)} available.')
                 elif mode == rimode.in_memory:
                     self.ostream.print_info(
-                        f'RI-J needs roughly {sum(peaks) / (1024**3):.2f} ' +
-                        f'GiB over {self.nodes:d} ranks, ' +
-                        f'{max(peaks) / (1024**3):.2f} GiB of ' +
-                        f'{budget / (1024**3):.2f} GiB on the largest rank.')
+                        'RI-J needs roughly ' +
+                        f'{Profiler.memory_to_string(sum(peaks))} over ' +
+                        f'{self.nodes:d} ranks, ' +
+                        f'{Profiler.memory_to_string(max(peaks))} of ' +
+                        f'{Profiler.memory_to_string(budget)} on the ' +
+                        'largest rank.')
                 self.ostream.print_info(
                     f'Three-center integrals are {taken}, in ' +
                     f'{self._ri_drv.number_of_parts()} parts.')
@@ -2140,10 +2144,10 @@ class ScfDriver:
                 where = ('available'
                          if self.nodes == 1 else 'on the largest rank')
                 self.ostream.print_warning(
-                    f'RI-JK would need roughly {max(peaks) / (1024**3):.2f} ' +
-                    'GiB of ' +
-                    f'{budget / (1024**3):.2f} GiB {where}, so the Fock ' +
-                    'matrices are formed from the four-center integrals.')
+                    'RI-JK would need roughly ' +
+                    f'{Profiler.memory_to_string(max(peaks))} of ' +
+                    f'{Profiler.memory_to_string(budget)} {where}, so the ' +
+                    'Fock matrices are formed from the four-center integrals.')
             else:
                 self.ostream.print_info(
                     'Using the SIMD resolution of the identity (RI-JK) driver.')
@@ -2153,27 +2157,33 @@ class ScfDriver:
                     f'{basis_ri.get_dimensions_of_basis()}')
                 if mode == rimode.in_memory and self.nodes == 1:
                     self.ostream.print_info(
-                        f'RI-JK needs roughly {max(peaks) / (1024**3):.2f} ' +
-                        f'GiB of {budget / (1024**3):.2f} GiB available ' +
-                        f'(B vectors {largest / (1024**3):.2f} GiB).')
+                        'RI-JK needs roughly ' +
+                        f'{Profiler.memory_to_string(max(peaks))} of ' +
+                        f'{Profiler.memory_to_string(budget)} available ' +
+                        '(B vectors ' +
+                        f'{Profiler.memory_to_string(largest)}).')
                 elif mode == rimode.in_memory:
                     self.ostream.print_info(
-                        f'RI-JK needs roughly {sum(peaks) / (1024**3):.2f} ' +
-                        f'GiB over {self.nodes:d} ranks, ' +
-                        f'{max(peaks) / (1024**3):.2f} GiB of ' +
-                        f'{budget / (1024**3):.2f} GiB on the largest rank ' +
-                        f'(B vectors {largest / (1024**3):.2f} GiB).')
+                        'RI-JK needs roughly ' +
+                        f'{Profiler.memory_to_string(sum(peaks))} over ' +
+                        f'{self.nodes:d} ranks, ' +
+                        f'{Profiler.memory_to_string(max(peaks))} of ' +
+                        f'{Profiler.memory_to_string(budget)} on the ' +
+                        'largest rank (B vectors ' +
+                        f'{Profiler.memory_to_string(largest)}).')
                 elif self.nodes == 1:
                     self.ostream.print_info(
-                        f'B vectors need {largest / (1024**3):.2f} GiB of ' +
-                        f'{budget / (1024**3):.2f} GiB available.')
+                        'B vectors need ' +
+                        f'{Profiler.memory_to_string(largest)} of ' +
+                        f'{Profiler.memory_to_string(budget)} available.')
                 else:
                     total = sum(self.comm.allgather(needed))
                     self.ostream.print_info(
-                        f'B vectors need {total / (1024**3):.2f} GiB over ' +
+                        'B vectors need ' +
+                        f'{Profiler.memory_to_string(total)} over ' +
                         f'{self.nodes:d} ranks, at most ' +
-                        f'{largest / (1024**3):.2f} GiB of ' +
-                        f'{budget / (1024**3):.2f} GiB on a rank.')
+                        f'{Profiler.memory_to_string(largest)} of ' +
+                        f'{Profiler.memory_to_string(budget)} on a rank.')
             self.ostream.print_blank()
             self.ostream.flush()
 
@@ -3391,7 +3401,7 @@ class ScfDriver:
         """
 
         if self.ri_memory_budget is not None:
-            return int(self.ri_memory_budget * 1024**3)
+            return int(self.ri_memory_budget * 1.0e9)
 
         # NOTE: what is free less a reserve, rather than a fraction of what is
         # free. The B vectors are the one thing which has to stay resident for the
@@ -3518,11 +3528,13 @@ class ScfDriver:
 
         self.ostream.print_info(
             f'{label} was predicted to need roughly ' +
-            f'{predicted / (1024**3):.2f} GiB, with ' +
-            f'{reserve / (1024**3):.2f} GiB reserved for the rest of the SCF.')
+            f'{Profiler.memory_to_string(predicted)}, with ' +
+            f'{Profiler.memory_to_string(reserve)} reserved for the rest of ' +
+            'the SCF.')
         self.ostream.print_info(
-            f'Peak memory grew by {largest / (1024**3):.2f} GiB after the ' +
-            f'{label} setup{where}.')
+            'Peak memory grew by ' +
+            f'{Profiler.memory_to_string(largest)} after the {label} ' +
+            f'setup{where}.')
         self.ostream.print_blank()
         self.ostream.flush()
 

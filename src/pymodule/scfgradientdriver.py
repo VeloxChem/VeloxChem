@@ -58,6 +58,7 @@ from .oneeints import compute_nuclear_potential_gradient
 from .oneeints import compute_point_charge_gradient
 from .oneeints import compute_ecp_gradient
 from .errorhandler import assert_msg_critical
+from .profiler import Profiler
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            dft_and_ri_sanity_check)
 
@@ -96,7 +97,7 @@ class ScfGradientDriver(GradientDriver):
         self._block_size_factor = 4
 
         # NOTE: the memory the distributed RI-JK gradient may hold for its panels
-        # and its half transformed vectors, per rank, in gigabytes. None works it
+        # and its half transformed vectors, per rank, in GB. None works it
         # out from what the machine has and how many ranks are sharing it.
         #
         # NOTE: this was a bare two gigabytes, with a comment which said the ranks
@@ -200,17 +201,13 @@ class ScfGradientDriver(GradientDriver):
         # NOTE: in the unit the number is actually in. A budget set small enough
         # to force the direct mode is megabytes, and a message which rounds both
         # sides to "0.00 GB" says nothing about why it refused.
-        def _size(nbytes):
-            for unit, scale in (('GB', 1024**3), ('MB', 1024**2), ('kB', 1024)):
-                if nbytes >= scale:
-                    return f'{nbytes / scale:.2f} {unit}'
-            return f'{nbytes} B'
-
         assert_msg_critical(
             needed <= budget,
-            f'{type(self).__name__}: the B vectors need {_size(needed)} of ' +
-            f'{_size(budget)} available, so the SCF would be given the ' +
-            f'direct RI-JK mode, which has no gradient. {advice}')
+            f'{type(self).__name__}: the B vectors need ' +
+            f'{Profiler.memory_to_string(needed)} of ' +
+            f'{Profiler.memory_to_string(budget)} available, so the SCF ' +
+            'would be given the direct RI-JK mode, which has no gradient. ' +
+            f'{advice}')
 
     def read_settings(self, checkpoint_file):
         """
@@ -489,7 +486,7 @@ class ScfGradientDriver(GradientDriver):
         """
 
         if self.ri_gradient_mpi_budget is not None:
-            return int(self.ri_gradient_mpi_budget * 1024**3)
+            return int(self.ri_gradient_mpi_budget * 1.0e9)
 
         try:
             import psutil

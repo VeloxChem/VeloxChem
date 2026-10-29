@@ -96,14 +96,14 @@ CSimdRIJFockDriver::peak_memory(const CMolecule       &molecule,
 
     if (std::getenv("VLX_RIJK_PROFILE") != nullptr)
     {
-        const auto gb = [](const size_t n) { return static_cast<double>(n) / (1024.0 * 1024.0 * 1024.0); };
+        const auto gb = [](const size_t n) { return static_cast<double>(n) / 1.0e9; };
 
-        std::printf("RIJ memory peak: %zu of %zu parts held, integrals %.3f GiB of %.3f, descriptions %.3f, cutting "
-                    "%.3f, metric %.3f GiB\n",
+        std::printf("RIJ memory peak: %zu of %zu parts held, integrals %.3f GB of %.3f, descriptions %.3f, cutting "
+                    "%.3f, metric %.3f GB\n",
                     owned.size(), parts.size(), gb(held), gb(simdri::pattern_memory(pattern)), gb(described),
                     gb(cutting), gb(metric));
 
-        std::printf("RIJ memory peak: forming %.3f GiB (threads %.3f), build %.3f GiB (buffers %.3f), %.3f GiB with "
+        std::printf("RIJ memory peak: forming %.3f GB (threads %.3f), build %.3f GB (buffers %.3f), %.3f GB with "
                     "the margin\n",
                     gb(forming), gb(threads), gb(build),
                     gb(_drv.coulomb_build_memory(basis.dimensions_of_basis(), naux)),

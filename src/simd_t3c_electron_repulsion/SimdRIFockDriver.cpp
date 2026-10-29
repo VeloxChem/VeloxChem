@@ -347,8 +347,7 @@ struct CBqProfile
 
         const double times[] = {metric, pattern, allocate, integrals, contract, total - accounted};
 
-        std::printf("RIJK b vectors of %.2f GB on %d threads, %.3f s\n",
-                    static_cast<double>(nbytes) / (1024.0 * 1024.0 * 1024.0), omp::get_number_of_threads(), total);
+        std::printf("RIJK b vectors of %.2f GB on %d threads, %.3f s\n", static_cast<double>(nbytes) / 1.0e9, omp::get_number_of_threads(), total);
 
         for (size_t i = 0; i < 6; i++)
         {
@@ -356,7 +355,7 @@ struct CBqProfile
                         (total > 0.0) ? 100.0 * times[i] / total : 0.0);
         }
 
-        const auto gb = [](const size_t bytes) { return static_cast<double>(bytes) / (1024.0 * 1024.0 * 1024.0); };
+        const auto gb = [](const size_t bytes) { return static_cast<double>(bytes) / 1.0e9; };
 
         std::printf("RIJK   %zu rows in %zu entries, %zu columns in %zu entries\n", nrows, out_entries, ncols,
                     in_entries);
@@ -1730,8 +1729,7 @@ struct CWProfile
                         (total > 0.0) ? 100.0 * times[i] / total : 0.0);
         }
 
-        std::printf("RIJK   %.2f GB scattered\n", static_cast<double>(nvalues * sizeof(double)) /
-                                                       (1024.0 * 1024.0 * 1024.0));
+        std::printf("RIJK   %.2f GB scattered\n", static_cast<double>(nvalues * sizeof(double)) / 1.0e9);
 
         std::fflush(stdout);
     }
@@ -2564,10 +2562,10 @@ CSimdRIFockDriver::bq_vectors_memory(const CMolecule        &molecule,
 
     if (std::getenv("VLX_RIJK_PROFILE") != nullptr)
     {
-        const auto gb = [](const size_t n) { return static_cast<double>(n) / (1024.0 * 1024.0 * 1024.0); };
+        const auto gb = [](const size_t n) { return static_cast<double>(n) / 1.0e9; };
 
-        std::printf("RIJK memory forming: permuted metric %.3f GiB, batch %.3f GiB, descriptions %.3f GiB, threads %zu "
-                    "x (arena %.3f + chunk %.3f + allowance %.3f) GiB\n",
+        std::printf("RIJK memory forming: permuted metric %.3f GB, batch %.3f GB, descriptions %.3f GB, threads %zu "
+                    "x (arena %.3f + chunk %.3f + allowance %.3f) GB\n",
                     gb(metric), gb(nops * nbatch * sizeof(double)), gb(forming_described), nthreads, gb(arena),
                     gb(nchunk * per_column), gb(_thread_allowance));
     }
