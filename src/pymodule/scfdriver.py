@@ -3470,23 +3470,24 @@ class ScfDriver:
 
         # NOTE: what the rest of the SCF allocates goes as the square of the
         # basis. It comes in two parts:
-        # - what the first build holds beside the driver, the Fock and density
-        #   matrices and the exchange-correlation work: up to 3 matrices of the
-        #   basis on a rank (RI-J and RI-JK, 1824 to 2964 functions, two nodes
-        #   of eight ranks);
-        # - the DIIS history, which grows by 3 matrices an iteration until it
-        #   holds max_err_vecs of them and then stays (768 functions, 21
-        #   iterations).
-        # The first is reserved at twice what was observed and the second as
-        # observed, each for each spin of an open shell: 36 matrices for a closed
-        # shell, 0.9 to 2.4 GiB at those sizes, where a reserve of the node alone
-        # gave a rank 0.5 GiB.
-        # NOTE: the first part was once read as 18 matrices, from samples of the
-        # memory profile in decimal gigabytes held against measurements in
-        # binary ones. The units of the two differ by 7 per cent.
+        # - what the builds hold beside the driver, the Fock and density
+        #   matrices, the exchange-correlation work, and the transients of DIIS
+        #   and the diagonalization between builds;
+        # - the DIIS history, which grows by 2 to 3 matrices an iteration until
+        #   it holds max_err_vecs of them and then stays.
+        # Both together, measured on rank 0 of full-length RI-J SCFs on two
+        # nodes of eight ranks as its growth less its driver measured alone,
+        # took 25 to 55 matrices (780 to 3336 functions); the most was at the
+        # smaller sizes, where the 0.5 GiB floor applies. The first part is
+        # reserved at 18 and the second at 3 a vector, each for each spin of an
+        # open shell: 48 matrices for a closed shell.
+        # NOTE: the first part was once 6 matrices, from the first build alone.
+        # RI-JK did not show the rest, as its driver peaks during the build
+        # while the SCF peaks between builds, but the RI-J driver holds nearly
+        # its whole peak throughout.
         nao = ao_basis.get_dimensions_of_basis()
         nspins = 1 if self.scf_type == 'restricted' else 2
-        nmatrices = (6 + 3 * self.max_err_vecs) * nspins
+        nmatrices = (18 + 3 * self.max_err_vecs) * nspins
 
         return max(nmatrices * nao * nao * 8, 512 * 1024**2)
 

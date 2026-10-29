@@ -214,9 +214,13 @@ class CSimdRIJFockDriver
 
     /// @brief The margin peak_memory adds to the memory it counts, as the divisor
     /// of it.
-    /// @note A tenth, twice that of the driver which also forms the exchange, as
-    /// what is counted here has not been held against the measured peak of a
-    /// calculation on a cluster.
+    /// @note A tenth, twice that of the driver which also forms the exchange.
+    /// Held against the measured peak of the largest rank of eight cluster runs
+    /// (780 to 3336 functions), what is counted was 0.6 to 4 per cent above it
+    /// from 1824 functions up, 19 to 25 per cent above it under that, and never
+    /// below it.
+    /// The rest of the SCF took up to 55 nao^2 on that rank, a little more than
+    /// the caller reserves for it, and this margin covers the difference.
     static constexpr size_t _peak_margin_divisor = 10;
 
     bool _prepared = false;
