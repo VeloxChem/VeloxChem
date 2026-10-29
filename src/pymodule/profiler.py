@@ -353,6 +353,30 @@ class Profiler:
         # held at the moment by a little.
         return max(peak, current)
 
+    @staticmethod
+    def reset_peak_memory():
+        """
+        Resets the peak resident memory of the current process to the memory it
+        holds now, so that get_peak_memory reads the peak of what follows.
+
+        :return:
+            True if the peak was reset, and False where it cannot be, as on a
+            system other than Linux.
+        """
+
+        # NOTE: writing 5 to clear_refs resets the high-water mark of the
+        # resident memory the kernel keeps for the process, which ru_maxrss
+        # reads as well. A calculation which follows another, as a gradient
+        # follows its SCF, would otherwise read the earlier calculation's peak as
+        # its own.
+        try:
+            with open('/proc/self/clear_refs', 'w') as f:
+                f.write('5')
+        except OSError:
+            return False
+
+        return True
+
     def print_memory_usage(self, ostream, scf_flag=False):
         """
         Prints memory usage.
@@ -360,7 +384,8 @@ class Profiler:
         The values are sampled at each checkpoint by the rank that prints
         the table. The 'Process Memory' column is the resident set size
         (RSS) of that single rank, and the 'Peak Memory' column the largest it
-        has been since the process started, including between checkpoints.
+        has been since the process started, or since reset_peak_memory last
+        reset it, including between checkpoints.
         The 'System Used' column is the
         system-wide memory usage of the node on which that rank runs,
         calculated as total memory minus available memory; it includes all

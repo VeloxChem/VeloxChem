@@ -399,6 +399,52 @@ class CSimdRIFockDriver
     /// allowance for each thread.
     auto coulomb_build_memory(const size_t nao, const size_t naux) const -> size_t;
 
+    /// @brief Gets the most memory the three-center term of a gradient holds for
+    /// one atom of the auxiliary basis, of the atoms it sweeps.
+    /// @param molecule The molecule.
+    /// @param basis The molecular basis on a and b sides.
+    /// @param aux_basis The auxiliary molecular basis.
+    /// @param threshold The screening threshold the pattern of an atom is described
+    /// with, which is the one the gradient describes it with.
+    /// @param aux_atoms The atoms of the auxiliary basis the term sweeps, one at a
+    /// time. An empty list sweeps none and holds nothing.
+    /// @param nops One for the Coulomb operator, and two for a hybrid range
+    /// separated functional, whose derivative is two tensors.
+    /// @param per_function What the caller holds for each auxiliary function of the
+    /// atom being swept while its derivative is contracted, in bytes: the exchange
+    /// back transformed into a square of the basis, for each operator.
+    /// @return The memory in bytes, for the number of threads of the caller: the
+    /// description of the pattern of the atom, its derivative tensors, the arena of
+    /// the derivative driver and an allowance for each thread, and what the caller
+    /// holds for its functions.
+    /// @note The patterns are described as the gradient describes them, one atom at a
+    /// time, so this is what the sweep will hold rather than an estimate of it. It
+    /// costs the description of every pattern of the sweep, which the gradient pays
+    /// again and which is a small part of computing the derivatives over them.
+    auto derivative_memory(const CMolecule        &molecule,
+                           const CMolecularBasis  &basis,
+                           const CMolecularBasis  &aux_basis,
+                           const double            threshold,
+                           const std::vector<int> &aux_atoms,
+                           const size_t            nops,
+                           const size_t            per_function) const -> size_t;
+
+    /// @brief Gets the memory the two-center term of a gradient holds beside the
+    /// two-index fitted density it is handed.
+    /// @param aux_basis The auxiliary molecular basis.
+    /// @param natoms The atoms of the molecule, each of which a thread holds a row
+    /// of the gradient for.
+    /// @param nops One for the Coulomb operator and two for a hybrid range separated
+    /// functional.
+    /// @return The memory in bytes, for the number of threads of the caller: the
+    /// arena of the derivative driver, the rows of the gradient and an allowance for
+    /// each thread.
+    /// @note The arena is taken for the highest angular momentum of the auxiliary
+    /// basis on both sides and for the most atom pairs a block of the derivative
+    /// driver can take, which is a bound on what it holds rather than its value.
+    auto metric_derivative_memory(const CMolecularBasis &aux_basis, const size_t natoms, const size_t nops) const
+        -> size_t;
+
    private:
     /// @brief Computes the B vectors of one operator or of two.
     /// @param molecule The molecule to compute the B vectors of.

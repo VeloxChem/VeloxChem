@@ -3410,6 +3410,20 @@ class ScfDriver:
         # integrals rather than refusing, too tight a default costs speed silently
         # instead of loudly.
 
+        return self._get_ri_free_memory(self._get_ri_rank_reserve(ao_basis))
+
+    def _get_ri_free_memory(self, rank_reserve):
+        """
+        Gets the memory free to a rank, less a reserve for the node and one for
+        each rank on it, in bytes. Every rank must call this.
+
+        :param rank_reserve:
+            The memory each rank keeps back, in bytes.
+
+        :return:
+            The memory in bytes.
+        """
+
         # NOTE: what is free to this process, which is less than what is free on
         # the node where a batch system confines the job to a share of it. What
         # the process already holds is not free, so it needs no reserve.
@@ -3424,10 +3438,9 @@ class ScfDriver:
         on_this_node = max(self.comm.allgather(here).count(here), 1)
 
         # NOTE: two reserves. The node keeps a few gigabytes for itself, and every
-        # rank keeps what the rest of the SCF allocates after this is measured.
+        # rank keeps what the rest of the calculation allocates after this is
+        # measured.
         node_reserve = 4 * 1024**3
-
-        rank_reserve = self._get_ri_rank_reserve(ao_basis)
 
         free = available - node_reserve - on_this_node * rank_reserve
 

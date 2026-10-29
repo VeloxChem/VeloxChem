@@ -16,6 +16,7 @@
 
 #include "DenseIndexFunc.hpp"
 #include "ErrorHandler.hpp"
+#include "SimdAlign.hpp"
 #include "SimdCoordinates.hpp"
 #include "SimdMatrix.hpp"
 // NOTE: both tables in one translation unit, which the shared name they used to
@@ -66,6 +67,59 @@ _make_c_coordinates(const CAtomBasisTripleSparsity &block, const CMolecule &mole
 }  // namespace
 
 auto
+CSimdThreeCenterElectronRepulsionGradientRsDriver::_arena_shape(const CTripleSparsityPattern &pattern,
+                                                                const CMolecularBasis        &basis,
+                                                                const CMolecularBasis        &aux_basis) -> std::pair<size_t, size_t>
+{
+    // NOTE: the arena spans the largest combination any block carries. The
+    // derivative raises the momentum of the differentiated center by one and
+    // writes six components, so it is larger than the integral's and may force a
+    // smaller block than the energy driver uses. That is a measurement to make
+    // once the kernels exist.
+
+    auto rows = size_t{0};
+
+    auto cols = size_t{0};
+
+    const auto nblocks = static_cast<size_t>(pattern.number_of_blocks());
+
+    for (size_t iblk = 0; iblk < nblocks; iblk++)
+    {
+        const auto &block = pattern.block(iblk);
+
+        if ((block.number_of_pairs() == 0) || (block.number_of_c_atoms() == 0)) continue;
+
+        const auto la = basis.basis_set(block.a_index()).max_angular_momentum();
+
+        const auto lb = basis.basis_set(block.b_index()).max_angular_momentum();
+
+        const auto lc = aux_basis.basis_set(block.c_index()).max_angular_momentum();
+
+        // NOTE: the two sets have a table each and the arena serves both, so it
+        // takes the larger. They differ: differentiating the first center and the
+        // second raise a different shell by one.
+
+        rows = std::max(rows,
+                        std::max(simdt3ceri::number_of_geom_100_rs_buffer_rows(la, lb, lc),
+                                 simdt3ceri::number_of_geom_010_rs_buffer_rows(la, lb, lc)));
+
+        cols = std::max(cols, block.number_of_pairs() * block.number_of_c_atoms());
+    }
+
+    return {rows, cols};
+}
+
+auto
+CSimdThreeCenterElectronRepulsionGradientRsDriver::arena_memory(const CTripleSparsityPattern &pattern,
+                                                                const CMolecularBasis        &basis,
+                                                                const CMolecularBasis        &aux_basis) -> size_t
+{
+    const auto [rows, cols] = _arena_shape(pattern, basis, aux_basis);
+
+    return rows * simd::pitch_of(cols) * sizeof(double);
+}
+
+auto
 CSimdThreeCenterElectronRepulsionGradientRsDriver::compute(const CTripleSparsityPattern &pattern,
                                                          const CMolecule              &molecule,
                                                          const CMolecularBasis        &basis,
@@ -102,38 +156,14 @@ CSimdThreeCenterElectronRepulsionGradientRsDriver::compute(const CTripleSparsity
 
     if (nblocks == 0) return {std::move(tensor), std::move(tensor_attenuated)};
 
-    // NOTE: the arena spans the largest combination any block carries. The
-    // derivative raises the momentum of the differentiated center by one and
-    // writes six components, so it is larger than the integral's and may force a
-    // smaller block than the energy driver uses. That is a measurement to make
-    // once the kernels exist.
+    // NOTE: plain names and not a structured binding, as the threads below read
+    // them and a structured binding cannot be named in an OpenMP region.
 
-    auto arena_rows = size_t{0};
+    const auto arena_shape = _arena_shape(pattern, basis, aux_basis);
 
-    auto arena_cols = size_t{0};
+    const auto arena_rows = arena_shape.first;
 
-    for (size_t iblk = 0; iblk < nblocks; iblk++)
-    {
-        const auto &block = pattern.block(iblk);
-
-        if ((block.number_of_pairs() == 0) || (block.number_of_c_atoms() == 0)) continue;
-
-        const auto la = basis.basis_set(block.a_index()).max_angular_momentum();
-
-        const auto lb = basis.basis_set(block.b_index()).max_angular_momentum();
-
-        const auto lc = aux_basis.basis_set(block.c_index()).max_angular_momentum();
-
-        // NOTE: the two sets have a table each and the arena serves both, so it
-        // takes the larger. They differ: differentiating the first center and the
-        // second raise a different shell by one.
-
-        arena_rows = std::max(arena_rows,
-                              std::max(simdt3ceri::number_of_geom_100_rs_buffer_rows(la, lb, lc),
-                                       simdt3ceri::number_of_geom_010_rs_buffer_rows(la, lb, lc)));
-
-        arena_cols = std::max(arena_cols, block.number_of_pairs() * block.number_of_c_atoms());
-    }
+    const auto arena_cols = arena_shape.second;
 
     std::vector<TTripleTask> tasks;
 

@@ -12,6 +12,7 @@
 #define SimdThreeCenterElectronRepulsionGradientDriver_hpp
 
 #include <cstddef>
+#include <utility>
 #include <vector>
 
 #include "MolecularBasis.hpp"
@@ -74,7 +75,28 @@ class CSimdThreeCenterElectronRepulsionGradientDriver
                  const CMolecularBasis        &basis,
                  const CMolecularBasis        &aux_basis) const -> CSparseTensor;
 
+    /// @brief Gets the memory of the arena one thread holds while computing the
+    /// derivative of the integrals of a sparsity pattern.
+    /// @param pattern The sparsity pattern the derivative would be computed over.
+    /// @param basis The molecular basis on a and b sides.
+    /// @param aux_basis The auxiliary molecular basis on c side.
+    /// @return The memory in bytes, which every thread of a call holds at once.
+    /// @note The arena is the largest combination of the pattern by its widest
+    /// block, as compute sizes it, so a caller adds this for every thread to the
+    /// memory of the derivative itself to know the peak of a call.
+    static auto arena_memory(const CTripleSparsityPattern &pattern,
+                             const CMolecularBasis        &basis,
+                             const CMolecularBasis        &aux_basis) -> size_t;
+
    private:
+    /// @brief Gets the shape of the arena one thread holds for a sparsity pattern.
+    /// @return The rows of the largest combination any block carries, of either
+    /// differentiated center, and the atom pairs by the auxiliary atoms of the
+    /// widest block.
+    static auto _arena_shape(const CTripleSparsityPattern &pattern,
+                             const CMolecularBasis        &basis,
+                             const CMolecularBasis        &aux_basis) -> std::pair<size_t, size_t>;
+
     /// @brief The target number of atom pairs of a block.
     size_t _block_size;
 };

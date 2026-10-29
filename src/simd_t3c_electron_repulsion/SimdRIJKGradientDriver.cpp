@@ -12,12 +12,15 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
+#include <cstdlib>
 #include <numeric>
 #include <set>
 #include <string>
 
 #include "DenseIndexFunc.hpp"
 #include "ErrorHandler.hpp"
+#include "OpenMPFunc.hpp"
 #include "SimdRIFockCommon.hpp"
 #include "SimdThreeCenterElectronRepulsionDriver.hpp"
 #include "SimdThreeCenterElectronRepulsionGradientDriver.hpp"
@@ -2166,6 +2169,246 @@ auto
 CSimdRIJKGradientDriver::get_memory_budget() const -> size_t
 {
     return _budget;
+}
+
+auto
+CSimdRIJKGradientDriver::peak_memory(const CMolecule           &molecule,
+                                     const CMolecularBasis     &basis,
+                                     const CMolecularBasis     &aux_basis,
+                                     const std::vector<int>    &aux_atoms,
+                                     const std::vector<size_t> &norbitals,
+                                     const bool                 range_separated,
+                                     const bool                 distributed,
+                                     const size_t               panel_budget,
+                                     const bool                 with_metric) const -> size_t
+{
+    constexpr auto dsize = sizeof(double);
+
+    const auto nthreads = static_cast<size_t>(omp::get_number_of_threads());
+
+    const auto nao = basis.dimensions_of_basis();
+
+    const auto naux = aux_basis.dimensions_of_basis();
+
+    const auto natoms = static_cast<size_t>(molecule.number_of_atoms());
+
+    const size_t nops = range_separated ? 2 : 1;
+
+    // NOTE: the serial phases hold the whole auxiliary basis and the distributed
+    // ones the functions of this rank's atoms, but both size what they hold of it
+    // from a budget: the driver's own for the first and the one handed over for the
+    // second.
+
+    const auto nheld = simdri::aux_functions_of(aux_basis, aux_atoms).size();
+
+    const auto budget = distributed ? panel_budget : _budget;
+
+    const auto square = naux * naux * dsize;
+
+    const auto spare = (budget > square) ? budget - square : size_t{0};
+
+    // NOTE: the squares of the half transformation, one of the basis a thread,
+    // which the driver of the B vectors keeps from the first transformation to the
+    // end of this driver. They are counted from the start.
+
+    size_t held = nthreads * nao * nao * dsize;
+
+    size_t peak = held;
+
+    const auto reach = [&](const size_t extra) { peak = std::max(peak, held + extra); };
+
+    // NOTE: the index the transformation forms over the B vectors, at most every
+    // entry of the functions held, with a vector for each function and the table of
+    // where each function goes.
+
+    const auto index = (nheld == 0) ? size_t{0}
+                                    : _drv.bq_vectors_memory(molecule, basis, aux_basis, _threshold, aux_atoms, 1).index +
+                                          nheld * sizeof(std::vector<int>) + naux * sizeof(long);
+
+    // the half transformation of the B vectors of the functions held into the
+    // orbitals of one spin, and the closing of it into fitted densities
+
+    const auto transform = [&](const size_t norbs, const size_t nfunctions, const size_t ndensities) {
+        if ((norbs == 0) || (nfunctions == 0)) return;
+
+        const auto per_function = nao * norbs * dsize;
+
+        const auto nbatch = std::min(nfunctions, std::max(_min_batch, std::max(size_t{1}, budget / per_function)));
+
+        const auto half = nbatch * (per_function + sizeof(CPackedMatrix));
+
+        // NOTE: the last batch is copied out of the storage and back when it is
+        // shorter than the others.
+
+        const auto rest = nfunctions % nbatch;
+
+        const auto tail = ((nfunctions > nbatch) && (rest > 0)) ? rest * (per_function + sizeof(CPackedMatrix)) : 0;
+
+        // NOTE: a thread closes one function at a time, into a square of the
+        // orbitals and the triangle it keeps, from the half transformed one it
+        // expands.
+
+        const auto nelements = norbs * (norbs + 1) / 2;
+
+        const auto close = nthreads * (per_function + norbs * norbs * dsize + nelements * dsize);
+
+        // the orbitals and their transpose
+
+        const auto orbitals = 2 * per_function;
+
+        const auto densities = ndensities * nelements * dsize;
+
+        reach(densities + orbitals + half + tail + index + close + nthreads * _thread_allowance);
+
+        // NOTE: the serial phase applies the transposed factor of the metric to the
+        // fitted densities while the batch is still held: the factor and its
+        // transpose, and then the transpose beside two panels of the elements.
+
+        if (!distributed)
+        {
+            const auto npanel = std::min(nelements, std::max(_min_batch, spare / (2 * naux * dsize)));
+
+            reach(densities + orbitals + half + std::max(2 * square, square + 2 * naux * npanel * dsize));
+        }
+    };
+
+    for (size_t iop = 0; iop < nops; iop++)
+    {
+        // NOTE: only the plain operator is fitted. The right hand side of the
+        // fitting is summed in a row of the auxiliary basis a thread, and the
+        // factor is applied to it from a square.
+
+        const auto coulomb = (iop == 0);
+
+        // NOTE: the distributed phases sum the right hand side for the attenuated
+        // operator as well, and empty it afterwards.
+
+        if (coulomb || distributed) reach(std::max((nthreads + 1) * naux, 2 * naux + naux * naux) * dsize);
+
+        if (coulomb) held += naux * dsize;
+
+        if (!distributed)
+        {
+            // NOTE: the fitted densities of each spin, for the whole auxiliary
+            // basis, held as they are formed; then the two-index fitted density and,
+            // beside it, the Gram product of each spin, which an open shell adds into
+            // the first.
+
+            for (const auto norbs : norbitals)
+            {
+                transform(norbs, naux, naux);
+
+                if (norbs > 0) held += naux * (norbs * (norbs + 1) / 2 * dsize + sizeof(CPackedMatrix));
+            }
+
+            held += naux * (naux + 1) / 2 * dsize;
+
+            size_t ngrams = 0;
+
+            for (const auto norbs : norbitals)
+            {
+                if (norbs == 0) continue;
+
+                const auto nelements = norbs * (norbs + 1) / 2;
+
+                const auto npanel = std::min(nelements, std::max(_min_batch, spare / (naux * dsize)));
+
+                ngrams = std::min(ngrams + 1, size_t{2});
+
+                reach(ngrams * square + nelements * dsize + naux * npanel * dsize);
+            }
+        }
+        else
+        {
+            // NOTE: the fitted densities of the functions this rank owns, in a vector
+            // of the whole auxiliary basis for each spin, and its rows of the Gram.
+
+            held += naux * norbitals.size() * sizeof(CPackedMatrix) + nheld * naux * dsize;
+
+            for (const auto norbs : norbitals)
+            {
+                transform(norbs, nheld, nheld);
+
+                held += nheld * norbs * (norbs + 1) / 2 * dsize;
+            }
+
+            // NOTE: the caller adds the right hand sides of the ranks, and the factor
+            // is applied to the sum.
+
+            if (coulomb) reach(square + 3 * naux * dsize);
+
+            // NOTE: a panel of every spin in turn. A rank forms its partial of the
+            // panel from the columns of the factor it owns, which are cut from the
+            // whole factor, and the caller copies it to reduce it; the panel the ranks
+            // add up is then held beside its weighted copy while this rank's rows of
+            // the Gram are taken from it.
+
+            for (const auto norbs : norbitals)
+            {
+                if (norbs == 0) continue;
+
+                const auto nelements = norbs * (norbs + 1) / 2;
+
+                const auto npanel = std::min(nelements, std::max(_min_batch, budget / (2 * naux * dsize)));
+
+                const auto panel = naux * npanel * dsize;
+
+                const auto owned = nheld * npanel * dsize;
+
+                reach(panel + owned + nheld * naux * dsize + std::max(square, panel));
+
+                reach(2 * panel + owned + nelements * dsize);
+            }
+
+            // NOTE: the caller gathers the Gram as a square, from a copy of the rows,
+            // and the rank which forms the two-index fitted density forms it beside
+            // the square.
+
+            const auto omega = with_metric ? naux * (naux + 1) / 2 * dsize : size_t{0};
+
+            reach(square + nheld * naux * dsize + omega);
+
+            held += omega;
+        }
+    }
+
+    // NOTE: the three-center term. The density as a square, the orbitals of each
+    // spin and their transpose for each operator, and the most one auxiliary atom
+    // holds: its derivative and, for each of its functions, the exchange of every
+    // operator back transformed into a square of the basis, formed from a square of
+    // the orbitals and a half transformed one.
+
+    size_t orbitals = 0, nmax = 0;
+
+    for (const auto norbs : norbitals)
+    {
+        orbitals += nops * 2 * nao * norbs * dsize;
+
+        nmax = std::max(nmax, norbs);
+    }
+
+    const auto exchange = nops * nao * nao * dsize;
+
+    const auto per_atom = _drv.derivative_memory(molecule, basis, aux_basis, _threshold, aux_atoms, nops, exchange);
+
+    if (!aux_atoms.empty())
+    {
+        reach(nao * nao * dsize + orbitals + nao * nmax * dsize + per_atom + (nmax * nmax + nao * nmax) * dsize);
+    }
+
+    // the two-center term, of the rank which forms the two-index fitted density
+
+    if (with_metric) reach(_drv.metric_derivative_memory(aux_basis, natoms, nops));
+
+    if (std::getenv("VLX_RIJK_PROFILE") != nullptr)
+    {
+        const auto gb = [](const size_t n) { return static_cast<double>(n) / 1.0e9; };
+
+        std::printf("RIJK gradient memory: held %.3f GB, one auxiliary atom %.3f GB, peak %.3f GB with the margin\n",
+                    gb(held), gb(per_atom), gb(peak + peak / _peak_margin_divisor));
+    }
+
+    return peak + peak / _peak_margin_divisor;
 }
 
 auto

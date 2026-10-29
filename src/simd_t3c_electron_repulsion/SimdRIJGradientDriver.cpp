@@ -16,6 +16,7 @@
 
 #include "DenseIndexFunc.hpp"
 #include "ErrorHandler.hpp"
+#include "SimdRIFockDriver.hpp"
 #include "SimdThreeCenterElectronRepulsionDriver.hpp"
 #include "SimdThreeCenterElectronRepulsionGradientDriver.hpp"
 #include "SimdTwoCenterElectronRepulsionGradientDriver.hpp"
@@ -32,6 +33,37 @@ auto
 CSimdRIJGradientDriver::get_block_size() const -> size_t
 {
     return _block_size;
+}
+
+auto
+CSimdRIJGradientDriver::peak_memory(const CMolecule        &molecule,
+                                    const CMolecularBasis  &basis,
+                                    const CMolecularBasis  &aux_basis,
+                                    const std::vector<int> &aux_atoms,
+                                    const bool              with_metric) const -> size_t
+{
+    const auto nao = basis.dimensions_of_basis();
+
+    const auto naux = aux_basis.dimensions_of_basis();
+
+    const auto natoms = static_cast<size_t>(molecule.number_of_atoms());
+
+    const auto drv = CSimdRIFockDriver();
+
+    // NOTE: the density as a square is formed for the sweep whether or not this rank
+    // holds any auxiliary atoms, and is freed before the two-center term.
+
+    const auto three_center = nao * nao * sizeof(double) +
+                              drv.derivative_memory(molecule, basis, aux_basis, _threshold, aux_atoms, 1, 0);
+
+    // the two-index fitted density and what the derivative of the metric holds
+
+    const auto two_center =
+        with_metric ? naux * (naux + 1) / 2 * sizeof(double) + drv.metric_derivative_memory(aux_basis, natoms, 1) : 0;
+
+    const auto peak = std::max(three_center, two_center);
+
+    return peak + peak / _peak_margin_divisor;
 }
 
 auto

@@ -34,6 +34,7 @@
 #include "SimdRIFockDriver.hpp"
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
@@ -49,11 +50,17 @@
 #include "ErrorHandler.hpp"
 #include "OpenMPFunc.hpp"
 #include "ScreeningFunc.hpp"
+#include "SimdAlign.hpp"
 #include "SimdRIFockCommon.hpp"
 #include "SimdT3CDistributor.hpp"
 #include "SimdT3CRsDistributor.hpp"
 #include "SimdThreeCenterElectronRepulsionDriver.hpp"
+#include "SimdThreeCenterElectronRepulsionGradientDriver.hpp"
+#include "SimdThreeCenterElectronRepulsionGradientRsDriver.hpp"
 #include "SimdThreeCenterElectronRepulsionRsDriver.hpp"
+#include "SimdTwoCenterElectronRepulsionGeom10BufferRows.hpp"
+#include "SimdTwoCenterElectronRepulsionGeom10RsBufferRows.hpp"
+#include "SimdTwoCenterElectronRepulsionGradientDriver.hpp"
 #include "ThreadedDenseLinearAlgebra.hpp"
 #include "TripleSparsityPattern.hpp"
 
@@ -2640,6 +2647,101 @@ CSimdRIFockDriver::coulomb_build_memory(const size_t nao, const size_t naux) con
     const auto caller = 2 * triangle + nao * nao * sizeof(double);
 
     return sweeps + caller + nthreads * _thread_allowance;
+}
+
+auto
+CSimdRIFockDriver::derivative_memory(const CMolecule        &molecule,
+                                     const CMolecularBasis  &basis,
+                                     const CMolecularBasis  &aux_basis,
+                                     const double            threshold,
+                                     const std::vector<int> &aux_atoms,
+                                     const size_t            nops,
+                                     const size_t            per_function) const -> size_t
+{
+    const auto nthreads = static_cast<size_t>(omp::get_number_of_threads());
+
+    const CSimdThreeCenterElectronRepulsionDriver eri_drv;
+
+    size_t peak = 0;
+
+    // the atom, its functions, and its pattern, derivative and arena, of the largest
+
+    std::array<size_t, 5> largest{};
+
+    for (const auto iaux : aux_atoms)
+    {
+        // NOTE: the pattern of this atom alone, as the gradient describes it, so the
+        // derivative counted is over the atom pairs it will be formed over.
+
+        const auto pattern = eri_drv.make_pattern(molecule, basis, aux_basis, threshold, {iaux});
+
+        const auto described = sizeof(CTripleSparsityPattern) + pattern.description_memory();
+
+        // NOTE: six values an element, and each tensor holds a copy of the blocks of
+        // the pattern. The attenuated tensor of a range separated derivative is a
+        // copy of the plain one.
+
+        const auto derivatives = nops * (6 * simdri::pattern_memory(pattern) + pattern.description_memory());
+
+        // NOTE: the arena is freed into the allocator of its thread before the
+        // exchange is back transformed, and is added rather than the larger taken,
+        // for the reason bq_vectors_memory gives.
+
+        const auto arena =
+            (nops == 1) ? CSimdThreeCenterElectronRepulsionGradientDriver::arena_memory(pattern, basis, aux_basis)
+                        : CSimdThreeCenterElectronRepulsionGradientRsDriver::arena_memory(pattern, basis, aux_basis);
+
+        const auto nfunctions = simdri::aux_functions_of(aux_basis, {iaux}).size();
+
+        const auto atom = described + derivatives + nthreads * (arena + _thread_allowance) + nfunctions * per_function;
+
+        if (atom > peak)
+        {
+            peak = atom;
+
+            largest = {static_cast<size_t>(iaux), nfunctions, described, derivatives, arena};
+        }
+    }
+
+    if ((std::getenv("VLX_RIJK_PROFILE") != nullptr) && (peak > 0))
+    {
+        const auto gb = [](const size_t n) { return static_cast<double>(n) / 1.0e9; };
+
+        const auto [iaux, nfunctions, described, derivatives, arena] = largest;
+
+        std::printf("RI derivative memory: atom %zu of %zu functions, pattern %.3f, derivative %.3f, threads %zu x "
+                    "(arena %.3f + allowance %.3f), functions %.3f GB\n",
+                    iaux, nfunctions, gb(described), gb(derivatives), nthreads, gb(arena), gb(_thread_allowance),
+                    gb(nfunctions * per_function));
+    }
+
+    return peak;
+}
+
+auto
+CSimdRIFockDriver::metric_derivative_memory(const CMolecularBasis &aux_basis, const size_t natoms, const size_t nops)
+    const -> size_t
+{
+    const auto nthreads = static_cast<size_t>(omp::get_number_of_threads());
+
+    const auto lmax = aux_basis.max_angular_momentum();
+
+    const auto rows = (nops == 1) ? simdt2ceri::number_of_geom_10_buffer_rows(lmax, lmax)
+                                  : simdt2ceri::number_of_geom_10_rs_buffer_rows(lmax, lmax);
+
+    // NOTE: a block is a group of atom pairs divided to at most the largest size
+    // the derivative driver chooses, and a single thread leaves the groups whole.
+
+    size_t npairs = 0;
+
+    for (const auto &group : aux_basis.basis_pair_groups()) npairs = std::max(npairs, group.number_of_pairs());
+
+    const auto ncols = (nthreads < 2) ? npairs
+                                      : std::min(npairs, CSimdTwoCenterElectronRepulsionGradientDriver::max_block_size);
+
+    const auto arena = rows * simd::pitch_of(ncols) * sizeof(double);
+
+    return nthreads * (arena + natoms * 3 * sizeof(double) + _thread_allowance);
 }
 
 auto

@@ -207,6 +207,178 @@ class TestScfGradientDriverMiscellaneous:
 
         assert np.max(np.abs(grad_drv.get_gradient())) > 0.0
 
+    def get_h2o_def2_molecule_and_basis(self):
+
+        molecule, _ = self.get_h2o_molecule_and_basis()
+        basis = MolecularBasis.read(molecule, 'def2-svp', ostream=None)
+        return molecule, basis
+
+    @pytest.mark.parametrize('xcfun', ['hf', 'blyp', 'cam-b3lyp'])
+    def test_ri_gradient_falls_back_to_four_center(self, xcfun):
+        """A gradient budget below the peak the RI gradient is predicted to reach
+        has the two-electron gradient formed from the four-center integrals, of
+        the same density. RI-JK, RI-J and the range separated RI-JK each take
+        the fallback apart, so each is run."""
+
+        molecule, basis = self.get_h2o_def2_molecule_and_basis()
+        scf_drv, scf_results = self.run_restricted_scf(molecule, basis,
+                                                       xcfun=xcfun, ri=True)
+
+        # ten kilobytes, which the peak of any molecule exceeds
+        cramped = ScfGradientDriver(scf_drv)
+        cramped.ri_gradient_memory_budget = 1.0e-5
+        cramped.compute(molecule, basis, scf_results)
+
+        assert cramped._ri_fallback
+
+        roomy = ScfGradientDriver(scf_drv)
+        roomy.compute(molecule, basis, scf_results)
+
+        assert not roomy._ri_fallback
+
+        # NOTE: the same density, with the gradient told the SCF formed its
+        # Fock matrices without RI, which is the four-center gradient of it.
+        scf_drv.ri_jk = False
+        scf_drv.ri_coulomb = False
+
+        plain = ScfGradientDriver(scf_drv)
+        plain.compute(molecule, basis, scf_results)
+
+        diff = np.max(np.abs(cramped.get_gradient() - plain.get_gradient()))
+        assert diff < 1.0e-10
+
+        diff = np.max(np.abs(roomy.get_gradient() - plain.get_gradient()))
+        assert diff > 1.0e-8
+        assert diff < 1.0e-3
+
+    @pytest.mark.parametrize('unrestricted, xcfun', [
+        (False, 'hf'),
+        (False, 'blyp'),
+        (True, 'b3lyp'),
+    ])
+    def test_gradient_follows_an_scf_fallback(self, unrestricted, xcfun):
+        """An SCF which fell back to the four-center integrals holds no RI
+        driver, and its gradient is the four-center one."""
+
+        if unrestricted:
+            molecule, _ = self.get_ch3_molecule_and_basis()
+        else:
+            molecule, _ = self.get_h2o_molecule_and_basis()
+        basis = MolecularBasis.read(molecule, 'def2-svp', ostream=None)
+
+        def run(ri, budget=None):
+            driver_type = (ScfUnrestrictedDriver
+                           if unrestricted else ScfRestrictedDriver)
+            scf_drv = driver_type()
+            scf_drv.ostream.mute()
+            scf_drv.ri = ri
+            scf_drv.xcfun = xcfun
+            scf_drv.conv_thresh = 1.0e-8
+            scf_drv.ri_memory_budget = budget
+            scf_results = scf_drv.compute(molecule, basis)
+            grad_drv = ScfGradientDriver(scf_drv)
+            grad_drv.compute(molecule, basis, scf_results)
+            return scf_drv, grad_drv
+
+        scf_drv, fallen = run(ri=True, budget=1.0e-5)
+
+        assert scf_drv._ri_fallback
+        assert not fallen._ri_fallback
+
+        _, plain = run(ri=False)
+
+        diff = np.max(np.abs(fallen.get_gradient() - plain.get_gradient()))
+        assert diff < 1.0e-6
+
+    def test_unrestricted_range_separated_ri_jk_gradient(self):
+        """The open shell range separated RI-JK gradient on one rank names the
+        auxiliary atoms, which have no default. It once named the atoms alone and
+        was refused by the binding."""
+
+        molecule, _ = self.get_ch3_molecule_and_basis()
+        basis = MolecularBasis.read(molecule, 'def2-svp', ostream=None)
+
+        scf_drv, scf_results = self.run_unrestricted_scf(molecule, basis,
+                                                         xcfun='cam-b3lyp',
+                                                         ri=True)
+
+        ri_drv = ScfGradientDriver(scf_drv)
+        ri_drv.compute(molecule, basis, scf_results)
+
+        assert not ri_drv._ri_fallback
+
+        scf_drv.ri_jk = False
+        scf_drv.ri_coulomb = False
+
+        plain = ScfGradientDriver(scf_drv)
+        plain.compute(molecule, basis, scf_results)
+
+        diff = np.max(np.abs(ri_drv.get_gradient() - plain.get_gradient()))
+        assert diff > 1.0e-8
+        assert diff < 1.0e-3
+
+    @pytest.mark.parametrize('xcfun', ['hf', 'blyp'])
+    def test_ri_gradient_memory_profiling(self, xcfun):
+        """With memory profiling the gradient keeps what was predicted for the
+        RI term and what the peak grew by over it."""
+
+        molecule, basis = self.get_h2o_def2_molecule_and_basis()
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ri = True
+        scf_drv.ostream.mute()
+        scf_drv.xcfun = xcfun
+        scf_drv.memory_profiling = True
+        scf_results = scf_drv.compute(molecule, basis)
+
+        grad_drv = ScfGradientDriver(scf_drv)
+        grad_drv.compute(molecule, basis, scf_results)
+
+        label, predicted, reserve, rss_before, grown = grad_drv._ri_memory_check
+
+        assert label == ('RI-J' if xcfun == 'blyp' else 'RI-JK')
+        assert predicted > 0
+        assert reserve > 0
+        assert rss_before > 0
+        assert grown is not None
+
+    def test_ri_gradient_peak_memory(self):
+        """The prediction grows with what the gradient forms: a second set of
+        fitted densities for a range separated functional, and a second spin."""
+
+        from veloxchem.veloxchemlib import SimdRIJKGradientDriver
+        from veloxchem.veloxchemlib import SimdRIJGradientDriver
+
+        molecule, basis = self.get_h2o_def2_molecule_and_basis()
+        aux_basis = MolecularBasis.read(molecule,
+                                        'def2-universal-jkfit',
+                                        ostream=None,
+                                        auxiliary_basis=True)
+        atoms = list(range(molecule.number_of_atoms()))
+
+        drv = SimdRIJKGradientDriver(1.0e-12)
+
+        def peak(norbitals, range_separated, distributed=False):
+            return drv.peak_memory(molecule, basis, aux_basis, atoms,
+                                   norbitals, range_separated, distributed,
+                                   256 * 1024**2, True)
+
+        closed = peak([5], False)
+
+        assert closed > 0
+        assert peak([5], True) > closed
+        assert peak([5, 4], False) > closed
+        assert peak([5], False, distributed=True) > 0
+
+        # a rank which holds no auxiliary atoms and forms no two-center term
+        # holds the squares of the transformation alone
+        assert drv.peak_memory(molecule, basis, aux_basis, [], [5], False,
+                               True, 256 * 1024**2, False) < closed
+
+        rij = SimdRIJGradientDriver(1.0e-12)
+
+        assert rij.peak_memory(molecule, basis, aux_basis, atoms, True) > 0
+
     def test_restricted_gradient_timing_output_path(self):
 
         molecule, basis = self.get_h2_molecule_and_basis()

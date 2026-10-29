@@ -155,6 +155,31 @@ class CSimdRIJGradientDriver
                             const std::vector<double> &fitting,
                             const CPackedMatrix       &density) const -> CPackedMatrix;
 
+    /// @brief Gets the most memory a gradient reaches beside the fitting
+    /// coefficients and the density it is handed.
+    /// @param molecule The molecule.
+    /// @param basis The molecular basis.
+    /// @param aux_basis The auxiliary molecular basis.
+    /// @param aux_atoms The atoms of the auxiliary basis this rank sweeps, as for
+    /// compute. An empty list sweeps none.
+    /// @param with_metric Whether this rank adds the two-center term.
+    /// @return The memory in bytes, for the number of threads of the caller.
+    /// @note It is the larger of two peaks. The three-center term holds the density
+    /// as a square beside the derivative of one auxiliary atom at a time, its
+    /// pattern and the arena of each thread; the two-center term holds the
+    /// two-index fitted density beside the arena of each thread. The patterns are
+    /// described as the gradient describes them, so this costs a description of the
+    /// sparsity pattern of the atoms swept.
+    /// @note A margin of a tenth is added to what is counted, as for the Fock
+    /// driver of the same fitting.
+    /// @note The memory is that of the driver alone. The integrals and the metric
+    /// the Fock driver holds, and what the caller holds beside them, are not in it.
+    auto peak_memory(const CMolecule        &molecule,
+                     const CMolecularBasis  &basis,
+                     const CMolecularBasis  &aux_basis,
+                     const std::vector<int> &aux_atoms,
+                     const bool              with_metric) const -> size_t;
+
    private:
     /// @brief Adds the three-center term to the gradient, one atom of the
     /// auxiliary basis at a time.
@@ -198,6 +223,13 @@ class CSimdRIJGradientDriver
 
     /// @brief The target number of atom pairs of a block.
     size_t _block_size;
+
+    /// @brief The margin peak_memory adds to the memory it counts, as the divisor
+    /// of it.
+    /// @note A tenth, as the Fock driver of the same fitting adds. What is counted
+    /// is small beside the integrals the Fock driver holds, and the per-thread
+    /// buffers are counted at their full size.
+    static constexpr size_t _peak_margin_divisor = 10;
 };
 
 #endif /* SimdRIJGradientDriver_hpp */

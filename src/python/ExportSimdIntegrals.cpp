@@ -664,6 +664,14 @@ export_simdintegrals(py::module &m) -> void
              py::arg("block_size") = 0)
         .def("get_threshold", &CSimdRIJGradientDriver::get_threshold, "Gets the screening threshold of the integrals.")
         .def("get_block_size", &CSimdRIJGradientDriver::get_block_size, "Gets the target number of atom pairs of a block.")
+        .def("peak_memory", &CSimdRIJGradientDriver::peak_memory,
+             "Gets the most memory a gradient reaches beside the fitting coefficients and the density it is "
+             "handed, in bytes, for the number of threads of the caller and with a margin of a tenth.",
+             py::arg("molecule"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("aux_atoms"),
+             py::arg("with_metric"))
         .def("compute",
              py::overload_cast<const CMolecule &,
                                const CMolecularBasis &,
@@ -780,6 +788,21 @@ export_simdintegrals(py::module &m) -> void
              py::arg("memory_budget") = size_t{4} * 1024 * 1024 * 1024)
         .def("get_memory_budget", &CSimdRIJKGradientDriver::get_memory_budget,
              "Gets the memory the driver may hold, in bytes.")
+        .def("peak_memory", &CSimdRIJKGradientDriver::peak_memory,
+             "Gets the most memory a gradient reaches beside the B vectors, the metrics and the densities it "
+             "is handed, in bytes, for the number of threads of the caller and with a margin of a tenth. "
+             "norbitals is the occupied orbitals of each spin, one number for a closed shell and two for an "
+             "open one. distributed follows the phases of the mpi_* entries, sized from panel_budget, and "
+             "otherwise those of compute, sized from the driver's own budget.",
+             py::arg("molecule"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("aux_atoms"),
+             py::arg("norbitals"),
+             py::arg("range_separated"),
+             py::arg("distributed"),
+             py::arg("panel_budget"),
+             py::arg("with_metric"))
         .def("mpi_local_densities", &CSimdRIJKGradientDriver::mpi_local_densities,
              "Forms this rank's share of the fitted densities, with no metric applied and nothing "
              "communicated. The `fitting` of what comes back is this rank's partial sum of the right "

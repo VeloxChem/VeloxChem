@@ -246,6 +246,46 @@ class CSimdRIJKGradientDriver
     /// @return The memory budget.
     auto get_memory_budget() const -> size_t;
 
+    /// @brief Gets the most memory a gradient reaches beside the B vectors, the
+    /// metrics and the densities it is handed.
+    /// @param molecule The molecule.
+    /// @param basis The molecular basis.
+    /// @param aux_basis The auxiliary molecular basis.
+    /// @param aux_atoms The atoms of the auxiliary basis this rank holds the B
+    /// vectors of, as for compute.
+    /// @param norbitals The occupied orbitals of each spin: one number for a
+    /// closed shell and two for an open one.
+    /// @param range_separated True for a hybrid range separated functional, which
+    /// forms a second set of fitted densities from the attenuated B vectors.
+    /// @param distributed True for the distributed phases a communicator of more
+    /// than one rank takes, and false for compute and its variants.
+    /// @param panel_budget The budget the distributed phases are given, which sets
+    /// their batches and panels. The serial phases take the driver's own.
+    /// @param with_metric Whether this rank forms the two-index fitted density and
+    /// adds the two-center term. The serial phases always do.
+    /// @return The memory in bytes, for the number of threads of the caller.
+    /// @note The phases are followed as the gradient takes them, and the most any of
+    /// them holds is the answer. The fitted densities of every operator are held
+    /// from when they are formed to the end. Forming them holds the batch of half
+    /// transformed B vectors, the squares the transformation keeps, and the factor
+    /// of the metric or the Gram product; the distributed phases hold a panel
+    /// instead of the factor. The three-center term holds the density as a square
+    /// and, for one auxiliary atom at a time, its derivative and its exchange back
+    /// transformed into a square of the basis for each of its functions, which is
+    /// the largest thing it holds for a basis of any size.
+    /// @note A margin of a tenth is added to what is counted.
+    /// @note The memory is that of the driver alone. The B vectors and the metrics
+    /// the Fock driver holds, and what the caller holds beside them, are not in it.
+    auto peak_memory(const CMolecule           &molecule,
+                     const CMolecularBasis     &basis,
+                     const CMolecularBasis     &aux_basis,
+                     const std::vector<int>    &aux_atoms,
+                     const std::vector<size_t> &norbitals,
+                     const bool                 range_separated,
+                     const bool                 distributed,
+                     const size_t               panel_budget,
+                     const bool                 with_metric) const -> size_t;
+
     /// @brief Computes the Coulomb and exchange contributions to the gradient of
     /// the atoms it is asked for.
     /// @param molecule The molecule.
@@ -826,6 +866,20 @@ class CSimdRIJKGradientDriver
     /// is what the test which checks the batching does not change the answer asks
     /// for, so the floor is not applied when the budget names something smaller.
     static constexpr size_t _min_batch = 16;
+
+    /// @brief The margin peak_memory adds to the memory it counts, as the divisor
+    /// of it.
+    /// @note A tenth, twice that of the Fock driver which forms the B vectors, as
+    /// what is counted here has not yet been held against a measured peak on a
+    /// cluster.
+    static constexpr size_t _peak_margin_divisor = 10;
+
+    /// @brief The memory a thread holds beyond the buffers peak_memory counts for
+    /// it, which is allowed for rather than counted.
+    /// @note The same allowance the driver of the B vectors makes for its threads,
+    /// for the scratch of the linear algebra library and what the allocator of a
+    /// thread keeps.
+    static constexpr size_t _thread_allowance = size_t{8} * 1024 * 1024;
 };
 
 #endif /* SimdRIJKGradientDriver_hpp */
