@@ -14,6 +14,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <map>
 #include <numeric>
 #include <set>
 #include <string>
@@ -696,9 +697,7 @@ CSimdRIJKGradientDriver::mpi_local_densities(const CMolecule        &molecule,
     // rather than from the driver's. Under a communicator the ranks share a node and
     // the budget of one of them is not the budget of the machine.
 
-    const auto per_element = 2 * fit.naux * sizeof(double);
-
-    const auto by_memory = budget / std::max(per_element, size_t{1});
+    const auto by_memory = _panel_elements(fit.naux, budget);
 
     fit.npanel = std::min(fit.nelements, std::max(_min_batch, by_memory));
 
@@ -816,9 +815,7 @@ CSimdRIJKGradientDriver::mpi_local_densities_general(const CMolecule        &mol
 
     fit.nelements = fit.norbs * fit.norbs;
 
-    const auto per_element = 2 * fit.naux * sizeof(double);
-
-    const auto by_memory = budget / std::max(per_element, size_t{1});
+    const auto by_memory = _panel_elements(fit.naux, budget);
 
     fit.npanel = std::min(fit.nelements, std::max(_min_batch, by_memory));
 
@@ -886,9 +883,11 @@ CSimdRIJKGradientDriver::mpi_panel_partial_general(const TGeneralDistributedFit 
         std::copy_n(matrix.data() + first, count, gathered.data() + k * count);
     }
 
-    const auto columns = _transposed_columns(metric, fit.functions, fit.naux);
+    // NOTE: the columns are cut from the whole factor at the first panel and kept,
+    // as every panel reads the same ones.
+    if (fit.columns.empty()) fit.columns = _transposed_columns(metric, fit.functions, fit.naux);
 
-    tdenblas::threadedMultAB(fit.naux, count, fit.functions.size(), 1.0, columns.data(),
+    tdenblas::threadedMultAB(fit.naux, count, fit.functions.size(), 1.0, fit.columns.data(),
                              fit.functions.size(), gathered.data(), count, 0.0, partial.data(),
                              count);
 
@@ -1178,6 +1177,21 @@ CSimdRIJKGradientDriver::mpi_compute_share_rs_general(const CMolecule           
 }
 
 auto
+CSimdRIJKGradientDriver::_panel_elements(const size_t naux, const size_t budget) -> size_t
+{
+    // NOTE: a panel and the copy of it which goes to the reduction are what the
+    // budget bounds, hence the two. The cap holds the panel itself to a size which
+    // is small beside the rest of the gradient: the reduction of it takes scratch
+    // of its own size, and a panel of half the budget was several gigabytes.
+
+    const auto by_memory = budget / std::max(2 * naux * sizeof(double), size_t{1});
+
+    const auto by_cap = _max_panel / std::max(naux * sizeof(double), size_t{1});
+
+    return std::min(by_memory, by_cap);
+}
+
+auto
 CSimdRIJKGradientDriver::_transposed_columns(const CPackedMatrix       &metric,
                                              const std::vector<size_t> &columns,
                                              const size_t               naux) const -> std::vector<double>
@@ -1257,9 +1271,14 @@ CSimdRIJKGradientDriver::mpi_panel_partial(const TDistributedFit &fit,
         std::copy_n(matrix.data() + first, count, gathered.data() + k * count);
     }
 
-    const auto columns = _transposed_columns(metric, fit.functions, fit.naux);
+    // NOTE: the columns are cut from the whole factor at the first panel and kept.
+    // Cutting them again for every panel expanded the whole factor every time, which
+    // the cap on a panel would have multiplied: 417 atoms of water in def2-SVP over
+    // sixteen ranks take 29 panels under the cap against eight without it, and
+    // the factor of their auxiliary basis is two gigabytes.
+    if (fit.columns.empty()) fit.columns = _transposed_columns(metric, fit.functions, fit.naux);
 
-    tdenblas::threadedMultAB(fit.naux, count, fit.functions.size(), 1.0, columns.data(), fit.functions.size(),
+    tdenblas::threadedMultAB(fit.naux, count, fit.functions.size(), 1.0, fit.columns.data(), fit.functions.size(),
                              gathered.data(), count, 0.0, partial.data(), count);
 
     return partial;
@@ -2215,7 +2234,15 @@ CSimdRIJKGradientDriver::peak_memory(const CMolecule           &molecule,
 
     size_t peak = held;
 
-    const auto reach = [&](const size_t extra) { peak = std::max(peak, held + extra); };
+    // NOTE: the most each phase reaches, which the profile prints.
+
+    std::map<std::string, size_t> phases;
+
+    const auto reach = [&](const char *phase, const size_t extra) {
+        peak = std::max(peak, held + extra);
+
+        phases[phase] = std::max(phases[phase], held + extra);
+    };
 
     // NOTE: the index the transformation forms over the B vectors, at most every
     // entry of the functions held, with a vector for each function and the table of
@@ -2258,7 +2285,7 @@ CSimdRIJKGradientDriver::peak_memory(const CMolecule           &molecule,
 
         const auto densities = ndensities * nelements * dsize;
 
-        reach(densities + orbitals + half + tail + index + close + nthreads * _thread_allowance);
+        reach("transform", densities + orbitals + half + tail + index + close + nthreads * _thread_allowance);
 
         // NOTE: the serial phase applies the transposed factor of the metric to the
         // fitted densities while the batch is still held: the factor and its
@@ -2268,7 +2295,7 @@ CSimdRIJKGradientDriver::peak_memory(const CMolecule           &molecule,
         {
             const auto npanel = std::min(nelements, std::max(_min_batch, spare / (2 * naux * dsize)));
 
-            reach(densities + orbitals + half + std::max(2 * square, square + 2 * naux * npanel * dsize));
+            reach("factor", densities + orbitals + half + std::max(2 * square, square + 2 * naux * npanel * dsize));
         }
     };
 
@@ -2283,7 +2310,7 @@ CSimdRIJKGradientDriver::peak_memory(const CMolecule           &molecule,
         // NOTE: the distributed phases sum the right hand side for the attenuated
         // operator as well, and empty it afterwards.
 
-        if (coulomb || distributed) reach(std::max((nthreads + 1) * naux, 2 * naux + naux * naux) * dsize);
+        if (coulomb || distributed) reach("fitting", std::max((nthreads + 1) * naux, 2 * naux + naux * naux) * dsize);
 
         if (coulomb) held += naux * dsize;
 
@@ -2315,7 +2342,7 @@ CSimdRIJKGradientDriver::peak_memory(const CMolecule           &molecule,
 
                 ngrams = std::min(ngrams + 1, size_t{2});
 
-                reach(ngrams * square + nelements * dsize + naux * npanel * dsize);
+                reach("gram", ngrams * square + nelements * dsize + naux * npanel * dsize);
             }
         }
         else
@@ -2335,13 +2362,24 @@ CSimdRIJKGradientDriver::peak_memory(const CMolecule           &molecule,
             // NOTE: the caller adds the right hand sides of the ranks, and the factor
             // is applied to the sum.
 
-            if (coulomb) reach(square + 3 * naux * dsize);
+            if (coulomb) reach("fitting", square + 3 * naux * dsize);
 
             // NOTE: a panel of every spin in turn. A rank forms its partial of the
             // panel from the columns of the factor it owns, which are cut from the
-            // whole factor, and the caller copies it to reduce it; the panel the ranks
-            // add up is then held beside its weighted copy while this rank's rows of
-            // the Gram are taken from it.
+            // whole factor at the first panel and kept, and the caller copies it to
+            // reduce it; the panel the ranks add up is then held beside its weighted
+            // copy while this rank's rows of the Gram are taken from it.
+            //
+            // NOTE: the reduction in place of a panel takes scratch of the panel's
+            // size, which is counted for as long as panels are reduced. Water
+            // clusters of 228 to 417 atoms in def2-SVP over two nodes of eight ranks
+            // reached up to a panel more in this phase than the panels held could
+            // account for, which is what the scratch of the reduction kept between
+            // panels would be.
+
+            const auto columns = nheld * naux * dsize;
+
+            bool reduced = false;
 
             for (const auto norbs : norbitals)
             {
@@ -2349,24 +2387,45 @@ CSimdRIJKGradientDriver::peak_memory(const CMolecule           &molecule,
 
                 const auto nelements = norbs * (norbs + 1) / 2;
 
-                const auto npanel = std::min(nelements, std::max(_min_batch, budget / (2 * naux * dsize)));
+                const auto npanel = std::min(nelements, std::max(_min_batch, _panel_elements(naux, budget)));
 
                 const auto panel = naux * npanel * dsize;
 
                 const auto owned = nheld * npanel * dsize;
 
-                reach(panel + owned + nheld * naux * dsize + std::max(square, panel));
+                const auto scratch = panel;
 
-                reach(2 * panel + owned + nelements * dsize);
+                // NOTE: the first panel cuts the columns from the whole factor and
+                // holds no scratch yet; the others reuse the columns beside the scratch
+                // of the reduction before them. Either way the partial is copied for
+                // the reduction.
+
+                if (reduced)
+                {
+                    reach("panel partial", 2 * panel + owned + scratch);
+                }
+                else
+                {
+                    reach("panel partial", panel + owned + columns + std::max(square, panel));
+                }
+
+                reach("panel reduce", panel + scratch);
+
+                reach("panel absorb", 2 * panel + owned + nelements * dsize + scratch);
+
+                if (!reduced) held += columns;
+
+                reduced = true;
             }
 
             // NOTE: the caller gathers the Gram as a square, from a copy of the rows,
-            // and the rank which forms the two-index fitted density forms it beside
-            // the square.
+            // and reduces it in place, which takes scratch of the square's size. The
+            // rank which forms the two-index fitted density forms it beside the
+            // square.
 
             const auto omega = with_metric ? naux * (naux + 1) / 2 * dsize : size_t{0};
 
-            reach(square + nheld * naux * dsize + omega);
+            reach("gram", 2 * square + nheld * naux * dsize + omega);
 
             held += omega;
         }
@@ -2393,12 +2452,12 @@ CSimdRIJKGradientDriver::peak_memory(const CMolecule           &molecule,
 
     if (!aux_atoms.empty())
     {
-        reach(nao * nao * dsize + orbitals + nao * nmax * dsize + per_atom + (nmax * nmax + nao * nmax) * dsize);
+        reach("three-center", nao * nao * dsize + orbitals + nao * nmax * dsize + per_atom + (nmax * nmax + nao * nmax) * dsize);
     }
 
     // the two-center term, of the rank which forms the two-index fitted density
 
-    if (with_metric) reach(_drv.metric_derivative_memory(aux_basis, natoms, nops));
+    if (with_metric) reach("two-center", _drv.metric_derivative_memory(aux_basis, natoms, nops));
 
     if (std::getenv("VLX_RIJK_PROFILE") != nullptr)
     {
@@ -2406,6 +2465,11 @@ CSimdRIJKGradientDriver::peak_memory(const CMolecule           &molecule,
 
         std::printf("RIJK gradient memory: held %.3f GB, one auxiliary atom %.3f GB, peak %.3f GB with the margin\n",
                     gb(held), gb(per_atom), gb(peak + peak / _peak_margin_divisor));
+
+        for (const auto &[phase, memory] : phases)
+        {
+            std::printf("RIJK gradient memory: %s %.3f GB\n", phase.c_str(), gb(memory));
+        }
     }
 
     return peak + peak / _peak_margin_divisor;

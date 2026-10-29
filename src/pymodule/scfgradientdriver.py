@@ -796,6 +796,14 @@ class ScfGradientDriver(GradientDriver):
                 self.comm.Allreduce(MPI.IN_PLACE, panel, op=MPI.SUM)
                 drv.mpi_panel_absorb(fit, ipanel, panel, beta)
 
+                # NOTE: released before the next panel is formed. Rebinding the
+                # name freed it only once the next one existed, so the partial of
+                # the next panel and its copy were formed beside it: three panels
+                # where two were counted. On 300 atoms of water in def2-SVP over
+                # sixteen ranks a panel was 5.9 GB, and a rank grew by 22.3 GB
+                # against 15.1 GB predicted.
+                del panel
+
         # the Gram, whose rows the ranks hold disjointly, gathered by adding them:
         # a rank writes its own rows into a matrix of zeros and the sum is the whole.
 

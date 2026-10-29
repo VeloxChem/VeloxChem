@@ -1089,11 +1089,18 @@ class TddftGradientDriver(GradientDriver):
             self.comm.Allreduce(MPI.IN_PLACE, panel, op=MPI.SUM)
             ri_jk_grad_drv.mpi_panel_absorb_general(fit, ipanel, panel)
 
+            # NOTE: released before the next panel is formed, for the reason the
+            # SCF gradient gives.
+            del panel
+
         for ipanel in range(fit.panels()):
             panel = np.ascontiguousarray(
                 ri_jk_grad_drv.mpi_gram_panel_partial_general(fit, ipanel))
             self.comm.Allreduce(MPI.IN_PLACE, panel, op=MPI.SUM)
             ri_jk_grad_drv.mpi_gram_panel_absorb_general(fit, ipanel, panel)
+
+            # NOTE: released before the next panel is formed.
+            del panel
 
         gram = np.zeros((fit.naux, fit.naux))
 

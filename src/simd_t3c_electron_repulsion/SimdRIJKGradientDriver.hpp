@@ -77,6 +77,13 @@ struct TDistributedFit
     /// auxiliary basis, accumulated one panel at a time.
     std::vector<double> gram_rows;
 
+    /// @brief The columns of the transposed factor of the metric of the functions
+    /// this rank owns, the whole auxiliary basis by them, cut at the first panel and
+    /// kept for the others.
+    /// @note Mutable, as the panel which cuts them reads the fit and is otherwise
+    /// const; they are a cache of what the metric gives and not a part of the fit.
+    mutable std::vector<double> columns;
+
     /// @brief The dimensions of the auxiliary basis.
     size_t naux = 0;
 
@@ -160,6 +167,11 @@ struct TGeneralDistributedFit
     /// @brief This rank's rows of the Gram product, its own functions by the whole
     /// auxiliary basis.
     std::vector<double> gram_rows;
+
+    /// @brief The columns of the transposed factor of the metric of the functions
+    /// this rank owns, cut at the first panel and kept for the others.
+    /// @note Mutable for the reason the closed shell fit gives.
+    mutable std::vector<double> columns;
 
     /// @brief The dimensions of the auxiliary basis.
     size_t naux = 0;
@@ -834,6 +846,13 @@ class CSimdRIJKGradientDriver
     /// @param columns The auxiliary functions whose columns are wanted.
     /// @param naux The dimensions of the auxiliary basis.
     /// @return The whole auxiliary basis by those columns, row major.
+    /// @brief Gets the elements a panel of the distributed phases carries.
+    /// @param naux The dimensions of the auxiliary basis.
+    /// @param budget The budget the distributed phases were given.
+    /// @return The elements, before the floor of _min_batch and the cap of the
+    /// elements there are.
+    static auto _panel_elements(const size_t naux, const size_t budget) -> size_t;
+
     auto _transposed_columns(const CPackedMatrix       &metric,
                              const std::vector<size_t> &columns,
                              const size_t               naux) const -> std::vector<double>;
@@ -866,6 +885,16 @@ class CSimdRIJKGradientDriver
     /// is what the test which checks the batching does not change the answer asks
     /// for, so the floor is not applied when the budget names something smaller.
     static constexpr size_t _min_batch = 16;
+
+    /// @brief The most memory a panel of the distributed phases may hold, in bytes.
+    /// @note Without it a panel was half of the budget of the phase, which is a
+    /// quarter of a rank's share of the node: up to 5.9 GB for water clusters of 228
+    /// to 417 atoms in def2-SVP over two nodes of eight ranks. The reduction of a
+    /// panel takes scratch of its size, and the panel of the previous turn was still
+    /// held while the next was formed, so the panel phase reached up to four panels
+    /// and was the peak of the gradient. A gibibyte keeps it small beside the
+    /// three-center term.
+    static constexpr size_t _max_panel = size_t{1} * 1024 * 1024 * 1024;
 
     /// @brief The margin peak_memory adds to the memory it counts, as the divisor
     /// of it.
