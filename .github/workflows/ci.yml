@@ -70,10 +70,17 @@ jobs:
           mpiexec.openmpi --bind-to none -n 2 python -c "from mpi4py import MPI; size = MPI.COMM_WORLD.Get_size(); assert size == 2, size"
           CC=gcc CXX=g++ python -m pip install MDAnalysis
           git config --global --add safe.directory $PWD
-          git clone -b 3.4.0 https://gitlab.com/libeigen/eigen.git
-          git clone -b boost-1.90.0 https://github.com/boostorg/math.git boost-math
-          cd eigen && test "$(git rev-parse HEAD)" = "3147391d946bb4b6c68edd901f2add6ac1f31f8c" && cd ..
-          cd boost-math && test "$(git rev-parse HEAD)" = "e0fcd19f7227d81391770ea46015acc3c80af810" && cd ..
+          # retry with backoff, cloning into a fresh directory each attempt and renaming on success
+          for i in 1 2 3 4 5; do
+            git clone --depth 1 -b 3.4.0 https://gitlab.com/libeigen/eigen.git eigen-$i && mv eigen-$i eigen && break
+            sleep $((i * 30))
+          done
+          for i in 1 2 3 4 5; do
+            git clone --depth 1 -b boost-1.90.0 https://github.com/boostorg/math.git boost-math-$i && mv boost-math-$i boost-math && break
+            sleep $((i * 30))
+          done
+          test "$(git -C eigen rev-parse HEAD)" = "3147391d946bb4b6c68edd901f2add6ac1f31f8c"
+          test "$(git -C boost-math rev-parse HEAD)" = "e0fcd19f7227d81391770ea46015acc3c80af810"
           export EIGEN_INCLUDE_DIR=$(pwd)/eigen
           export BOOST_INCLUDE_DIR=$(pwd)/boost-math/include
           python -m pip install dftd4
