@@ -31,7 +31,6 @@
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from mpi4py import MPI
-from pathlib import Path
 from time import time
 from xml.dom import minidom
 import xml.etree.ElementTree as ET
@@ -51,13 +50,7 @@ from .solvationbuilder import SolvationBuilder
 from .interpolationdatapoint import InterpolationDatapoint
 from .interpolationdriver import InterpolationDriver
 
-# from .atommapper import AtomMapper
 from .errorhandler import assert_msg_critical
-from contextlib import redirect_stderr
-from io import StringIO
-
-with redirect_stderr(StringIO()) as fg_err:
-    import geometric
 
 try:
     import openmm as mm
@@ -69,49 +62,49 @@ except ImportError:
 
 class OpenMMIMDynamics:
     """
-    Implements the OpenMMDynamics.
-    Performs classical MD and QM/MM simulations.
+    Runs molecular dynamics on a frozen (not extended) MSI database: the
+    QM region is driven by InterpolationDriver energies and gradients read
+    from the HDF5 database of IMForceFieldGenerator, the rest of the system
+    by an OpenMM force field. Only the ground state (roots_to_follow = [0])
+    and a single MPI rank are supported.
+
+    Warning: use_symmetry defaults to True, which excludes the hydrogens of
+    CX3 groups (X = H, F, Cl, Br) from the interpolation weights.
+    IMForceFieldGenerator builds databases without this exclusion, so the
+    default evaluates a different PES than the one constructed; set
+    use_symmetry = False to reproduce the construction PES.
 
     :param comm:
         The MPI communicator.
     :param ostream:
         The output stream.
 
-    Instance variables:
-        - platform: The platform for OpenMM. Default is 'reference'
-                    Options are 'CPU', 'CUDA' and 'OpenCL'.
-        - ensemble: The thermodynamic ensemble used in the simulation.
-                    Options are: 'NVE', 'NVT' and 'NPT'.
-        - temperature: The temperature.
-        - friction: The friction coefficient which couples the system to the heat bath.
-        - timestep: The timestep for the integrator in fs.
-        - nsteps: The number of steps.
-        - parent_ff: The Force Field to be used in standard residues.
-        - water_ff: The Force Field to be used for water.
-        - box_size: The size of the box for periodic simulations.
-        - padding: The padding for the box in nm.
-        - cutoff: The cutoff for nonbonded interactions in nm.
-        - integrator: The integrator object.
-        - system: The OpenMM system object.
-        - topology: The OpenMM topology object.
-        - simulation: The OpenMM simulation object.
-        - constraints: The constraints for the system.
-        - pdb: The PDB file object.
-        - modeller: The modeller object.
-        - labels: The atom labels.
-        - molecule: The VeloxChem molecule object.
-        - unique_residues: The list of unique residues in the system.
-        - unique_molecules: The list of unique molecules in the system.
-        - im_driver: The VeloxChem driver object. Options are XtbDriver or an ScfDriver.
-        - basis: The basis set for the QM region if an SCF driver is used.
-        - grad_driver: The VeloxChem gradient driver object.
-        - qm_atoms: The list of atom indices for the QM region.
-        - mm_subregion: The list of atom indices for the MM subregion (part of a molecule).
-        - linking_atoms: The list of atom indices for the linking atoms.
-        - qm_force_index: The index of the QM force in the system.
-        - driver_flag: The flag to determine the driver to be used.
-        - scaling_factor: The scaling factor for the QM stabilizer.
-        - linking_atom_distance: The distance between the QM and MM regions in angstroms.
+    Instance variables (set before create_system_from_molecule / run_immm)
+        - platform: OpenMM platform name ('Reference', 'CPU', 'CUDA',
+          'OpenCL'); None (default) lets OpenMM choose the fastest one.
+        - use_symmetry: exclude CX3 hydrogens from the weights (see above).
+        - parent_ff: the force field of standard residues (solvated runs).
+        - water_ff: the force field of water.
+        - padding: the solvation padding in nm.
+        - cutoff: the nonbonded cutoff in nm (periodic systems).
+        - linking_atom_distance: the C-H distance of linking atoms in
+          angstrom (QM/MM partition inside the molecule).
+
+    Set by create_system_from_molecule and run_immm
+        - molecule, labels: the molecule and its atom labels.
+        - interpolation_settings: the interpolation settings per root.
+        - roots_z_matrix: the z-matrix per root, read from the database.
+        - symmetry_information: the symmetry data per state ('gs', 'es').
+        - im_drivers: the InterpolationDriver per root.
+        - system, topology, simulation, pdb: the OpenMM objects.
+        - qm_atoms, mm_subregion, linking_atoms, qm_force_index: the QM/MM
+          partition.
+        - ensemble, temperature, pressure, friction, timestep, nsteps: the
+          run parameters with OpenMM units.
+        - qm_potentials, mm_potentials, qm_mm_interaction_energies,
+          total_potentials, kinetic_energies, temperatures, total_energies:
+          per-step observables in kJ/mol and K.
+        - dynamic_molecules: the QM-region molecules of the saved frames.
     """
 
     def __init__(self, comm=None, ostream=None):
@@ -143,7 +136,9 @@ class OpenMMIMDynamics:
 
         # Instance variables
         # Simulation parameters
-        self.platform = 'reference'
+        # OpenMM platform name ('Reference', 'CPU', 'CUDA', 'OpenCL');
+        # None lets OpenMM choose the fastest available platform.
+        self.platform = None
         self.ensemble = 'NVE'
         self.temperature = 298.15
         self.friction = 1.0
@@ -189,7 +184,6 @@ class OpenMMIMDynamics:
         self.qm_data_point_dict = None
 
         self.sorted_state_spec_im_labels = None
-        self.root_spec_molecules = None
         self.interpolation_settings = None
         self.dihedrals_dict = None
         self.basis_set_label = 'def2-svp'
@@ -204,9 +198,6 @@ class OpenMMIMDynamics:
         self.qm_force_index = None
         self.driver_flag = None
 
-        # QM stabilizer parameters
-        self.scaling_factor = 0.01
-
         # Default value for the C-H linker distance
         self.linking_atom_distance = 1.0705
 
@@ -220,10 +211,17 @@ class OpenMMIMDynamics:
                                     filename='residue',
                                     residue_name='MOL'):
         """
-        Creates an OpenMM system from a VeloxChem molecule and a forcefield generator.
+        Creates an OpenMM system from a VeloxChem molecule and a forcefield
+        generator and sets up the interpolation (z-matrix and symmetry
+        information from the database).
 
         :param molecule:
             VeloxChem molecule object.
+        :param interpol_settings:
+            The interpolation settings per root, {0: settings}, with the keys
+            of InterpolationDriver.update_settings including
+            imforcefield_file and the bond flags and use_mass_weight of the
+            construction.
         :param ff_gen:
             VeloxChem forcefield generator object.
         :param solvent:
@@ -334,7 +332,6 @@ class OpenMMIMDynamics:
         if qm_atoms:
             self.set_qm_mm_system(phase,
                                   ff_gen)
-            # self.qm_stabilizer(ff_gen)
 
         # Write the system to a xml file (for debugging purposes)
         with open(f'{filename}_system.xml', 'w') as f:
@@ -404,22 +401,23 @@ class OpenMMIMDynamics:
                  state_file='output.xml',
                  output_file='output'):
         """
-        Runs a QM/MM simulation using OpenMM, storing the trajectory and simulation data.
+        Runs MD with the QM region on the frozen interpolated PES, storing
+        the trajectory and the simulation data.
 
-        :param im_driver:
-            QM driver object from VeloxChem.
-        :param grad_driver:
-            Gradient driver object from VeloxChem.
-        :param basis:
-            Molecular basis string.
+        :param roots_to_follow:
+            The roots; only [0] (ground state) is supported.
         :param restart_file:
-            Last state of the simulation to restart from. Default is None.
+            OpenMM state (XML) to restart from (positions and velocities).
+            Default is None.
         :param ensemble:
-            Type of ensemble. Options are 'NVE', 'NVT', 'NPT'. Default is 'NVE'.
+            Type of ensemble. Options are 'NVE', 'NVT', 'NPT'. Default is
+            'NVE'. Without restart_file, NVE starts from zero velocities;
+            NVT and NPT draw velocities at temperature. NPT needs a
+            periodic (solvated) system.
         :param temperature:
             Temperature of the system in Kelvin. Default is 298.15 K.
         :param pressure:
-            Pressure of the system in atmospheres. Default is 1.0 atm.
+            Pressure of the system in atmospheres (NPT). Default is 1.0 atm.
         :param friction:
             Friction coefficient in 1/ps. Default is 1.0.
         :param timestep:
@@ -427,11 +425,15 @@ class OpenMMIMDynamics:
         :param nsteps:
             Number of steps in the simulation. Default is 1000.
         :param snapshots:
-            Frequency of snapshots. Default is 100.
+            Number of saved frames (every max(1, nsteps // snapshots) steps),
+            not a frequency. Default is 100.
         :param traj_file:
             Output file name for the trajectory. Default is 'trajectory.pdb'.
         :param state_file:
             Output file name for the simulation state. Default is 'output.xml'.
+        :param output_file:
+            Base name of the energy report (<output_file>.out). Default is
+            'output'.
         """
         if self.system is None:
             raise RuntimeError('System has not been created!')
@@ -439,6 +441,7 @@ class OpenMMIMDynamics:
             raise RuntimeError('Currently Interpolation is restricted to ground state dynamics!')
         self.ensemble = ensemble
         self.temperature = temperature * unit.kelvin
+        self.pressure = pressure * unit.atmospheres
         self.friction = friction / unit.picosecond
         self.timestep = timestep * unit.femtoseconds
         self.nsteps = nsteps
@@ -454,7 +457,6 @@ class OpenMMIMDynamics:
         self.qm_symmetry_datapoint_dict = {root: {} for root in self.roots_to_follow}
         self.qm_data_point_dict = {root: [] for root in self.roots_to_follow}
         self.sorted_state_spec_im_labels = {root: [] for root in self.roots_to_follow}
-        self.root_spec_molecules = {root: [] for root in self.roots_to_follow}
         self.im_drivers = {root: None for root in self.roots_to_follow}
         self.interpolation_settings = interpolation_settings_dict
         masses = self.molecule.get_masses().copy()
@@ -468,15 +470,21 @@ class OpenMMIMDynamics:
             # Initialize the object
             driver_object = InterpolationDriver(self.roots_z_matrix[root])
             driver_object.update_settings(self.interpolation_settings[root])
-            # print('Interpolation driver settings updated for root', root, self.eq_bond_force_constants)
-            driver_object.impes_coordinate.inv_sqrt_masses = inv_sqrt_masses
+            # Mass-weight the coordinates only if the driver also converts
+            # the gradient back (use_mass_weight), as done in
+            # IMDatabasePointCollecter. Otherwise the force is not -dE/dx.
+            if driver_object.use_mass_weight:
+                mw_inv_sqrt_masses = inv_sqrt_masses
+            else:
+                mw_inv_sqrt_masses = None
+            driver_object.impes_coordinate.inv_sqrt_masses = mw_inv_sqrt_masses
             if root == 0:
                 driver_object.symmetry_information = self.symmetry_information['gs']
             else:
                 driver_object.symmetry_information = self.symmetry_information['es']
 
             self.im_drivers[root] = driver_object
-            self._reload_interpolation_root_from_hdf5(root, inv_sqrt_masses)
+            self._reload_interpolation_root_from_hdf5(root, mw_inv_sqrt_masses)
 
             # Set the object as an attribute of the instance
             setattr(self, attribute_name, driver_object)
@@ -494,7 +502,7 @@ class OpenMMIMDynamics:
         self.total_energies = []
         self.dynamic_molecules = []
 
-        save_freq = nsteps // snapshots if snapshots else nsteps
+        save_freq = max(1, nsteps // snapshots) if snapshots else max(1, nsteps)
 
         # Create or update the integrator
         if self.integrator is None:
@@ -506,7 +514,14 @@ class OpenMMIMDynamics:
 
         self.positions = self.pdb.positions
 
-        self.simulation = app.Simulation(self.topology, self.system, new_integrator)
+        platform = None
+        if self.platform is not None:
+            platform = mm.Platform.getPlatformByName(str(self.platform))
+
+        self.simulation = app.Simulation(self.topology,
+                                         self.system,
+                                         new_integrator,
+                                         platform=platform)
 
         # Load the state if a restart file is provided
         if restart_file is not None:
@@ -518,8 +533,6 @@ class OpenMMIMDynamics:
             # Set initial velocities if the ensemble is NVT or NPT
             if self.ensemble in ['NVT', 'NPT']:
                 self.simulation.context.setVelocitiesToTemperature(self.temperature)
-            # else:
-            #     self.simulation.context.setVelocitiesToTemperature(10 * unit.kelvin)
 
         # There is no minimization step for QM/MM simulations
         # It causes instabilities in the MM region!
@@ -529,19 +542,22 @@ class OpenMMIMDynamics:
         self.simulation.reporters.append(app.PDBReporter(traj_file, save_freq))
 
         # Print header
-        print('QM/MM Simulation Parameters')
-        print('=' * 60)
-        print('QM Driver:', self.driver_flag)
-        print('Ensemble:', ensemble)
-        print('Integration method:', new_integrator.__class__.__name__)
+        self.ostream.print_line('QM/MM Simulation Parameters')
+        self.ostream.print_line('=' * 60)
+        self.ostream.print_line(f'QM Driver: {self.driver_flag}')
+        self.ostream.print_line(f'Ensemble: {ensemble}')
+        self.ostream.print_line(
+            f'Integration method: {new_integrator.__class__.__name__}')
         if ensemble in ['NVT', 'NPT']:
-            print('Temperature:', temperature, 'K')
+            self.ostream.print_line(f'Temperature: {temperature} K')
             if ensemble == 'NPT':
-                print('Pressure:', pressure, 'atm')
-        print('Friction:', friction, '1/ps')
-        print('Timestep:', timestep, 'fs')
-        print('Total simulation time in ns:', nsteps * timestep / 1e6)
-        print('=' * 60)
+                self.ostream.print_line(f'Pressure: {pressure} atm')
+        self.ostream.print_line(f'Friction: {friction} 1/ps')
+        self.ostream.print_line(f'Timestep: {timestep} fs')
+        self.ostream.print_line(
+            f'Total simulation time in ns: {nsteps * timestep / 1e6}')
+        self.ostream.print_line('=' * 60)
+        self.ostream.flush()
 
         start_time = time()
         self.step = 0
@@ -567,27 +583,35 @@ class OpenMMIMDynamics:
         elapsed_time_days = elapsed_time / (24 * 3600)
         performance = (nsteps * timestep / 1e6) / elapsed_time_days
 
-        print('QM/MM simulation completed!')
-        print(f'Number of steps: {nsteps}')
-        print(f'Trajectory saved as {traj_file}')
-        print('=' * 60)
-        print('Simulation Averages:')
-        print('=' * 60)
-        print('QM Potential Energy:', np.mean(self.qm_potentials), '±', np.std(self.qm_potentials), 'kJ/mol')
-        print('QM/MM Interaction Energy:', np.mean(self.qm_mm_interaction_energies), '±', np.std(self.qm_mm_interaction_energies), 'kJ/mol')
-        print('MM Potential Energy:', np.mean(self.mm_potentials), '±', np.std(self.mm_potentials), 'kJ/mol')
-        print('Total Potential Energy:', np.mean(self.total_potentials), '±', np.std(self.total_potentials), 'kJ/mol')
-        print('Kinetic Energy:', np.mean(self.kinetic_energies), '±', np.std(self.kinetic_energies), 'kJ/mol')
-        print('Temperature:', np.mean(self.temperatures), '±', np.std(self.temperatures), 'K')
-        print('Total Energy:', np.mean(self.total_energies), '±', np.std(self.total_energies), 'kJ/mol')
-        print('=' * 60)
-        print(f'Elapsed time: {int(elapsed_time // 60)} minutes, {int(elapsed_time % 60)} seconds')
-        print(f'Performance: {performance:.2f} ns/day')
-        print(f'Trajectory saved as {traj_file}')
+        self.ostream.print_line('QM/MM simulation completed!')
+        self.ostream.print_line(f'Number of steps: {nsteps}')
+        self.ostream.print_line(f'Trajectory saved as {traj_file}')
+        self.ostream.print_line('=' * 60)
+        self.ostream.print_line('Simulation Averages:')
+        self.ostream.print_line('=' * 60)
+        for name, values, unit_label in [
+            ('QM Potential Energy', self.qm_potentials, 'kJ/mol'),
+            ('QM/MM Interaction Energy', self.qm_mm_interaction_energies, 'kJ/mol'),
+            ('MM Potential Energy', self.mm_potentials, 'kJ/mol'),
+            ('Total Potential Energy', self.total_potentials, 'kJ/mol'),
+            ('Kinetic Energy', self.kinetic_energies, 'kJ/mol'),
+            ('Temperature', self.temperatures, 'K'),
+            ('Total Energy', self.total_energies, 'kJ/mol'),
+        ]:
+            self.ostream.print_line(
+                f'{name}: {np.mean(values)} ± {np.std(values)} {unit_label}')
+        self.ostream.print_line('=' * 60)
+        self.ostream.print_line(
+            f'Elapsed time: {int(elapsed_time // 60)} minutes, '
+            f'{int(elapsed_time % 60)} seconds')
+        self.ostream.print_line(f'Performance: {performance:.2f} ns/day')
+        self.ostream.print_line(f'Trajectory saved as {traj_file}')
+        self.ostream.flush()
 
         # Save the simulation data
         self.simulation.saveState(state_file)
-        print(f'Simulation state saved as {state_file}')
+        self.ostream.print_info(f'Simulation state saved as {state_file}')
+        self.ostream.flush()
 
         # Write the output to a file
         self._save_output(output_file)
@@ -651,16 +675,26 @@ class OpenMMIMDynamics:
             return
 
         self.dynamic_molecules.append(self.current_molecule)
-        print(f"Step: {step} / {self.nsteps} Time: {round((step * timestep) / 1000, 2)} ps")
-        print('Potential Energy QM region:', observables['qm'], 'kJ/mol')
-        print('Potential Energy MM region:', observables['mm'])
-        print('QM/MM Interaction Energy:', observables['qm_mm'])
-        print('Total Potential Energy:', observables['potential'])
-        print('Kinetic Energy:', observables['kinetic'])
-        print('Temperature:', observables['temperature'], 'K')
-        print('Total Energy:', observables['total'], '±', np.std(self.total_energies), 'kJ/mol')
-        print('Current State (PES):', self.current_state)
-        print('-' * 60)
+        self.ostream.print_line(
+            f"Step: {step} / {self.nsteps} "
+            f"Time: {round((step * timestep) / 1000, 2)} ps")
+        self.ostream.print_line(
+            f"Potential Energy QM region: {observables['qm']} kJ/mol")
+        self.ostream.print_line(
+            f"Potential Energy MM region: {observables['mm']}")
+        self.ostream.print_line(
+            f"QM/MM Interaction Energy: {observables['qm_mm']}")
+        self.ostream.print_line(
+            f"Total Potential Energy: {observables['potential']}")
+        self.ostream.print_line(f"Kinetic Energy: {observables['kinetic']}")
+        self.ostream.print_line(
+            f"Temperature: {observables['temperature']} K")
+        self.ostream.print_line(
+            f"Total Energy: {observables['total']} ± "
+            f"{np.std(self.total_energies)} kJ/mol")
+        self.ostream.print_line(f'Current State (PES): {self.current_state}')
+        self.ostream.print_line('-' * 60)
+        self.ostream.flush()
 
     def _build_run_qmmm_runtime_cache(self):
         """
@@ -773,76 +807,6 @@ class OpenMMIMDynamics:
             out.write(f'Average Total Energy (kJ/mol): {np.mean(self.total_energies):.4f} ± {np.std(self.total_energies):.4f}\n')
             out.write('=' * 60 + '\n')
 
-    def _format_PDB_file(self, filename):
-        """
-        Check the format of the PDB file and correct it if necessary.
-
-        :param pdb_file:
-            Path to the PDB file to be checked.
-        :return:
-            Path to the corrected PDB file.
-        """
-
-        pdb_path = Path(filename)
-        if not pdb_path.is_file():
-            raise FileNotFoundError(f"{filename} does not exist.")
-
-        pdbstr = pdb_path.read_text()
-
-        # Formatting issues flags
-        label_guess_warning = False
-        conect_warning = False
-
-        for line in pdbstr.strip().splitlines():
-            if line.startswith(('ATOM', 'HETATM')):
-                atom_label = line[76:78].strip()
-                if not atom_label:
-                    label_guess_warning = True
-
-            # Check if the CONECT records are present and skip them
-            # If they are not present activate the warning flag
-            if line.startswith('CONECT'):
-                conect_warning = False
-            else:
-                conect_warning = True
-
-        # Overwrite the PDB file with the guessed atom labels in columns 77-78
-        # if the labels are missing
-        if label_guess_warning:
-
-            with open(filename, 'w') as f:
-                for line in pdbstr.strip().splitlines():
-                    if line.startswith(('ATOM', 'HETATM')):
-                        atom_name = line[12:16].strip()
-                        atom_label = atom_name[0]
-                        new_line = line[:76] + f"{atom_label:>2}" + line[78:] + '\n'
-                        f.write(new_line)
-                    else:
-                        f.write(line + '\n')
-
-            print('Warning: Atom labels were guessed based on atom names (first character).')
-            print(f'Please verify the atom labels in the {filename} PDB file.')
-
-        if conect_warning:
-
-            # Create a molecule from the PDB file
-            molecule = Molecule.read_pdb_file(filename)
-            connectivity_matrix = molecule.get_connectivity_matrix()
-            # Determine all the bonds in the molecule
-            with open(filename, 'a') as f:
-                for i in range(connectivity_matrix.shape[0]):
-                    for j in range(i + 1, connectivity_matrix.shape[1]):
-                        if connectivity_matrix[i, j] == 1:
-                            # Convert indices to 1-based index for PDB format and ensure proper column alignment
-                            i_index = i + 1
-                            j_index = j + 1
-                            # Align to the right
-                            con_string = "{:6s}{:>5d}{:>5d}".format('CONECT', i_index, j_index)
-                            f.write(con_string + '\n')
-
-            print('The CONECT records were not found in the PDB file.')
-            print('The connectivity matrix was used to determine the bonds.')
-
     def _create_integrator(self):
         """
         Creates an OpenMM integrator object based on the specified ensemble type.
@@ -855,9 +819,24 @@ class OpenMMIMDynamics:
             integrator = mm.LangevinIntegrator(self.temperature, self.friction, self.timestep)
             integrator.setConstraintTolerance(1e-5)
             if self.ensemble == 'NPT':
-                # Add a barostat for pressure control in NPT ensemble
-                barostat = mm.MonteCarloBarostat(1 * unit.atmospheres, self.temperature, 25)
-                self.system.addForce(barostat)
+                assert_msg_critical(
+                    getattr(self, 'phase', None) != 'gas',
+                    'OpenMMIMDynamics: NPT needs a periodic (solvated) '
+                    'system; a barostat cannot be used in the gas phase.')
+                # Add a barostat for pressure control in NPT ensemble, or
+                # update the one added by an earlier NPT run
+                barostat = None
+                for force in self.system.getForces():
+                    if isinstance(force, mm.MonteCarloBarostat):
+                        barostat = force
+                        break
+                if barostat is None:
+                    barostat = mm.MonteCarloBarostat(self.pressure,
+                                                     self.temperature, 25)
+                    self.system.addForce(barostat)
+                else:
+                    barostat.setDefaultPressure(self.pressure)
+                    barostat.setDefaultTemperature(self.temperature)
         elif self.ensemble == 'NVE':
             integrator = mm.VerletIntegrator(self.timestep)
 
@@ -926,7 +905,6 @@ class OpenMMIMDynamics:
             ET.SubElement(NonbondedForce, "Atom", **attributes)
 
         # Generate the tree and write to file
-        # tree = ET.ElementTree(ForceField)
         rough_string = ET.tostring(ForceField, 'utf-8')
         reparsed = minidom.parseString(rough_string)
         indented_string = reparsed.toprettyxml(indent="    ")
@@ -967,7 +945,7 @@ class OpenMMIMDynamics:
             qm_connected.extend(np.where(connectivity_matrix[i])[0])
         qm_connected = list(set(qm_connected) - set(qm_atoms))
         self.linking_atoms = qm_connected
-        print('Linking atoms indices:', qm_connected)
+        self.ostream.print_info(f'Linking atoms indices: {qm_connected}')
 
         # Get the broken bonds between the QM and MM regions
         self.broken_bonds = []
@@ -985,9 +963,11 @@ class OpenMMIMDynamics:
         # Order the atoms
         qm_atoms.sort()
         self.qm_atoms = qm_atoms
-        print('QM subregion (self.qm_atoms):', self.qm_atoms)
+        self.ostream.print_info(f'QM subregion (self.qm_atoms): {self.qm_atoms}')
         self.mm_subregion = mm_atoms
-        print('MM subregion:(self.mm_subregion)', self.mm_subregion)
+        self.ostream.print_info(
+            f'MM subregion (self.mm_subregion): {self.mm_subregion}')
+        self.ostream.flush()
 
         atoms = ff_gen.atoms
         bonds = ff_gen.bonds
@@ -1133,7 +1113,6 @@ class OpenMMIMDynamics:
                 ET.SubElement(ImproperForce, "Torsion", **attributes)
 
         # Generate the tree and write to file
-        # tree = ET.ElementTree(ForceField)
         rough_string = ET.tostring(ForceField, 'utf-8')
         reparsed = minidom.parseString(rough_string)
         indented_string = reparsed.toprettyxml(indent="    ")
@@ -1287,70 +1266,6 @@ class OpenMMIMDynamics:
                 self.qm_force_index = i
                 break
 
-    def qm_stabilizer(self, ff_gen_qm):
-
-        """
-        Implements a MM potential to stabilize the QM region.
-        The forces are 1% of the regular MM forces.
-
-        :param qm_atoms:
-            List of atom indices to be included in the QM region.
-        :param ff_gen_qm:
-            MMForceFieldGenerator object from VeloxChem.
-        """
-
-        # Harmonic bond contribution. Parameters are read from ff_gen_qm
-        bonds = ff_gen_qm.bonds
-        bond_force = mm.HarmonicBondForce()
-        for bond, params in bonds.items():
-            bond_force.addBond(
-                *bond,
-                params['equilibrium'] * unit.nanometer,
-                params['force_constant'] * unit.kilojoule_per_mole / unit.nanometer**2 * self.scaling_factor)
-        self.system.addForce(bond_force)
-
-        # Harmonic angle contribution. Parameters are read from ff_gen_qm
-        angles = ff_gen_qm.angles
-        angle_force = mm.HarmonicAngleForce()
-        for angle, params in angles.items():
-            angle_force.addAngle(
-                *angle,
-                params['equilibrium'] * np.pi / 180 * unit.radian,
-                params['force_constant'] * unit.kilojoule_per_mole / unit.radian**2 * self.scaling_factor)
-        self.system.addForce(angle_force)
-
-        # Periodic torsion contribution. Parameters are read from ff_gen_qm
-        torsions = ff_gen_qm.dihedrals
-        torsion_force = mm.PeriodicTorsionForce()
-        rb_torsion_force = mm.RBTorsionForce()
-        for torsion, params in torsions.items():
-            if params['type'] == 'Fourier':
-                torsion_force.addTorsion(*torsion,
-                                         params['periodicity'],
-                                         params['phase'] * np.pi / 180 * unit.radian,
-                                         params['barrier'] * unit.kilojoule_per_mole * self.scaling_factor)
-            elif params['type'] == 'RB':
-                rb_torsion_force.addTorsion(*torsion,
-                                            params['RB_coefficients'][0] * unit.kilojoule_per_mole * self.scaling_factor,
-                                            params['RB_coefficients'][1] * unit.kilojoule_per_mole * self.scaling_factor,
-                                            params['RB_coefficients'][2] * unit.kilojoule_per_mole * self.scaling_factor,
-                                            params['RB_coefficients'][3] * unit.kilojoule_per_mole * self.scaling_factor,
-                                            params['RB_coefficients'][4] * unit.kilojoule_per_mole * self.scaling_factor,
-                                            params['RB_coefficients'][5] * unit.kilojoule_per_mole * self.scaling_factor)
-        self.system.addForce(torsion_force)
-        self.system.addForce(rb_torsion_force)
-
-        # Improper torsion contribution. Parameters are read from ff_gen_qm
-        impropers = ff_gen_qm.impropers
-        improper_force = mm.PeriodicTorsionForce()
-        for improper, params in impropers.items():
-            improper_force.addTorsion(
-                *improper,
-                params['periodicity'],
-                params['phase'] * np.pi / 180 * unit.radian,
-                params['barrier'] * unit.kilojoule_per_mole * self.scaling_factor)
-        self.system.addForce(improper_force)
-
     def update_gradient_and_energy(self, new_positions):
         """
         Updates and returns the gradient and potential energy of the QM region.
@@ -1411,14 +1326,12 @@ class OpenMMIMDynamics:
                     potential_kjmol = self.im_drivers[self.roots_to_follow[root_1]].impes_coordinate.energy * hartree_in_kjpermol()
                     potential_kjmol_2 = self.im_drivers[self.roots_to_follow[root_2]].impes_coordinate.energy * hartree_in_kjpermol()
                     transitions.append((self.roots_to_follow[root_1], self.roots_to_follow[root_2], potential_kjmol - potential_kjmol_2))
-                    print(f'compare the energies between roots: {self.roots_to_follow[root_1]} -> {self.roots_to_follow[root_2]}', potential_kjmol_2 - potential_kjmol)
-
-                    if 1 == 2 and np.linalg.norm(self.velocities_np[-1]) > 0.0:
-                        current_NAC = self.im_drivers[self.roots_to_follow[root_1]].impes_coordinate.NAC.flatten()
-                        current_velocitites = self.velocities_np[-1].flatten() * 4.566180e-4
-
-                        hopping_potential = np.exp(-abs((np.pi/(4)) * ((self.im_drivers[self.roots_to_follow[root_2]].impes_coordinate.energy - self.im_drivers[self.roots_to_follow[root_1]].impes_coordinate.energy) / np.linalg.multi_dot([current_NAC, current_velocitites]))))
-                        print('#######################', '\n\n', hopping_potential, potential_kjmol_2 - potential_kjmol, '\n\n', '#######################')
+                    self.ostream.print_info(
+                        'Energy difference between roots '
+                        f'{self.roots_to_follow[root_1]} -> '
+                        f'{self.roots_to_follow[root_2]}: '
+                        f'{potential_kjmol_2 - potential_kjmol} kJ/mol')
+                    self.ostream.flush()
 
                     if abs(potential_kjmol_2 - potential_kjmol) < 20:
                         # Choose a random integer between 0 and 1
@@ -1434,8 +1347,6 @@ class OpenMMIMDynamics:
 
         if len(self.roots_to_follow) > 1 and self.step == self.excitation_pulse[0]:
             self.current_state = self.excitation_pulse[1]
-
-        self.root_spec_molecules[self.current_state].append(new_molecule)
 
         potential_kjmol = self.im_drivers[self.current_state].impes_coordinate.energy * hartree_in_kjpermol()
         self.current_gradient = self.im_drivers[self.current_state].impes_coordinate.gradient
@@ -1487,9 +1398,6 @@ class OpenMMIMDynamics:
         gradient = self.update_gradient(qm_positions)
         force = -np.array(gradient) * conversion_factor
 
-        # Construct a set from the list of tuples self.broken_bonds
-        # broken_bond_atoms = set([atom for bond in self.broken_bonds for atom in bond])
-
         for i, atom_idx in enumerate(self.qm_atoms):
 
             self.system.getForce(self.qm_force_index).setParticleParameters(i, atom_idx, force[i])
@@ -1507,7 +1415,7 @@ class OpenMMIMDynamics:
 
         return potential_energy
 
-    def database_extracter(self, datafile, mol_labels):
+    def database_extracter(self, datafile, mol_labels, im_settings=None):
         """Extracts molecular structures from a given database file.
 
         :param datafile:
@@ -1516,12 +1424,19 @@ class OpenMMIMDynamics:
         :param mol_labels:
             List of molecular labels.
 
+        :param im_settings:
+            Interpolation settings of the database (at least the bond
+            flags use_inverse_bond_length/use_eq_bond_length). Default None
+            uses the InterpolationDriver defaults (inverse bond lengths).
+
         :returns:
             A list of VeloxChem Molecule objects extracted from the database.
 
         """
 
         im_driver = InterpolationDriver()  # -> implemented Class in VeloxChem that is capable to perform interpolation calculations for a given molecule and provided z_matrix and database
+        if im_settings is not None:
+            im_driver.update_settings(im_settings)
         im_driver.imforcefield_file = datafile
         labels, z_matrix = im_driver.read_labels()
         sorted_labels = sorted(labels, key=lambda x: int(x.split('_')[1]))
@@ -1532,6 +1447,8 @@ class OpenMMIMDynamics:
 
         for label in sorted_labels:
             impes_coordinate = InterpolationDatapoint(z_matrix)
+            if im_settings is not None:
+                impes_coordinate.update_settings(im_settings)
             impes_coordinate.read_hdf5(datafile, label)  # -> read in function from the ImpesDriver object
             coordinates_in_angstrom = impes_coordinate.cartesian_coordinates * bohr_in_angstrom()
             current_molecule = Molecule(mol_labels, coordinates_in_angstrom, 'angstrom')  # -> creates a VeloxChem Molecule object
@@ -1540,47 +1457,6 @@ class OpenMMIMDynamics:
             data_point_molecules.append(current_molecule)
 
         return data_point_molecules, datapoints
-
-    def calculate_translation_coordinates(self, given_coordinates):
-        """Center the molecule by translating its geometric center to (0, 0, 0)."""
-        center = np.mean(given_coordinates, axis=0)
-        translated_coordinates = given_coordinates - center
-
-        return translated_coordinates
-
-    def calculate_distance_to_ref(self, current_coordinates, datapoint_coordinate):
-        """Calculates and returns the cartesian distance between
-           self.coordinates and data_point coordinates.
-           Besides the distance, it also returns the weight gradient,
-           which requires the distance vector to be computed.
-
-           :param current_coordinates:
-                current molecular coordinates.
-
-           :param data_point:
-                InterpolationDatapoint object.
-
-           :returns:
-              Norm of the distance between 2 structures.
-        """
-
-        # First, translate the cartesian coordinates to zero
-        target_coordinates = self.calculate_translation_coordinates(datapoint_coordinate)
-        reference_coordinates = self.calculate_translation_coordinates(current_coordinates)
-
-        # Then, determine the rotation matrix which
-        # aligns data_point (target_coordinates)
-        # to self.impes_coordinate (reference_coordinates)
-        rotation_matrix_core = geometric.rotate.get_rot(target_coordinates,
-                                                        reference_coordinates)
-
-        # Rotate the data point
-        rotated_coordinates_core = np.dot(rotation_matrix_core, target_coordinates.T).T
-        # Calculate the Cartesian distance
-        ref_structure_check = reference_coordinates.copy()
-        distance_core = (np.linalg.norm(rotated_coordinates_core - ref_structure_check))
-
-        return distance_core
 
     def structures_to_xyz_file(self, molecules_for_xyz, structure_filename, im_energies=None, qm_energies=None):
         """Writes molecular structures to an XYZ file.
@@ -1620,14 +1496,15 @@ class OpenMMIMDynamics:
     def set_up_the_system(self, molecule, interpolation_settings):
 
         """
-        Assign the neccessary variables with respected values.
+        Reads the z-matrix of every root from its database and builds the
+        symmetry information (CX3 groups, rotatable bonds, the atoms
+        excluded from the weights if use_symmetry is True).
 
-        :param molecule: original molecule
-
-        :param target_dihedrals: is a list of dihedrals that should be scanned during the dynamics
-
-        :param sampling_structures: devides the searchspace around given rotatbale dihedrals
-
+        :param molecule:
+            The molecule.
+        :param interpolation_settings:
+            The interpolation settings per root (with imforcefield_file and
+            the bond flags of the database).
         """
         def _determine_cX_symmetry_groups(molecule):
             """
@@ -1743,66 +1620,10 @@ class OpenMMIMDynamics:
                     for (state, _), subgroup in connected_subgroups.items():
                         subgroup = list(set(subgroup))
                         if len(subgroup) > 1 and subgroup not in rot_groups[state]:
-                            for atom in subgroup:
-                                print(molecule.get_labels()[atom], sum(conn[atom]))
                             rot_groups[state].append(sorted(subgroup))
                             new_groups[state].append(sorted(subgroup))
 
             return new_groups, rot_groups
-
-        def _promote_nonrotatable_ring_torsions_to_impropers(zmat, ff_gen, rotatable_bonds_zero_based):
-            """
-            Promote proper ring torsions around non-rotatable bonds to impropers.
-
-            Matching by full 4-atom set is too strict (and often fails), so we match
-            by the middle bond of the proper torsion and collect impropers touching
-            the same bond.
-            """
-            rot_set = {frozenset((int(i), int(j))) for i, j in rotatable_bonds_zero_based}
-
-            # Existing impropers from z-matrix (if any)
-            impropers = [tuple(int(x) for x in imp) for imp in zmat.get("impropers", [])]
-            impropers_seen = set(impropers)
-
-            # Build non-rotatable ring bond -> impropers map from MM impropers.
-            impropers_ff = [tuple(int(x) for x in t) for t in ff_gen.impropers.keys()]
-            bond_to_impropers = {}
-            for imp in impropers_ff:
-                center = int(imp[0])
-                for neigh in imp[1:]:
-                    neigh = int(neigh)
-                    bond = frozenset((center, neigh))
-                    if bond in rot_set:
-                        continue
-                    if not ff_gen.is_bond_in_ring(center, neigh):
-                        continue
-                    bond_to_impropers.setdefault(bond, []).append(imp)
-
-            kept_dihedrals = []
-            for dih_raw in zmat["dihedrals"]:
-                dih = tuple(int(x) for x in dih_raw)
-                mid = frozenset((dih[1], dih[2]))
-
-                # Keep proper terms for rotatable or non-ring bonds.
-                if mid in rot_set or ff_gen.is_bond_in_ring(dih[0], dih[1]) and ff_gen.is_bond_in_ring(dih[1], dih[2]) and ff_gen.is_bond_in_ring(dih[2], dih[3]):
-                    kept_dihedrals.append(dih)
-                    continue
-
-                # Non-rotatable ring bond: attach any corresponding impropers.
-                promoted = False
-                for imp in bond_to_impropers.get(mid, []):
-                    if imp not in impropers_seen:
-                        impropers.append(imp)
-                        impropers_seen.add(imp)
-                    promoted = True
-
-                # If no improper was found for this bond, keep the dihedral.
-                if not promoted:
-                    kept_dihedrals.append(dih)
-
-            zmat["dihedrals"] = kept_dihedrals
-            zmat["impropers"] = impropers
-            return zmat
 
         # define global symmetry information object for gs and es
         # used in all other classes for the construction
@@ -1828,15 +1649,17 @@ class OpenMMIMDynamics:
             _, z_matrix = int_driver.read_labels()
             self.roots_z_matrix[root] = z_matrix
 
-            # The AtomMapper class is based on Turtlemap program which is used to
-            # determine equivalent atoms within a molecular structure
-            # atom_mapper = AtomMapper(molecule, molecule)
-            # symmetry_groups = atom_mapper.determine_symmetry_group()
-
             symmetry_groups = _determine_cX_symmetry_groups(molecule)
 
             if not self.use_symmetry:
                 symmetry_groups = (symmetry_groups[0], [], symmetry_groups[2])
+            elif symmetry_groups[1]:
+                msg = 'use_symmetry=True: CX3 hydrogens are excluded from '
+                msg += 'the interpolation weights. IMForceFieldGenerator '
+                msg += 'does not exclude them; set use_symmetry=False to '
+                msg += 'reproduce the PES used during construction.'
+                self.ostream.print_warning(msg)
+                self.ostream.flush()
 
             ff_gen = MMForceFieldGenerator()
             ff_gen.ostream.mute()
@@ -1899,37 +1722,6 @@ class OpenMMIMDynamics:
                             indices_list.append(i)
                 self.symmetry_information['es'] = [symmetry_groups[0], rot_groups['es'], regrouped['es'], core_atoms, non_core_atoms, rotatable_bonds_zero_based, indices_list, self.symmetry_dihedral_lists, dihedrals_to_set, [dihedral_start, dihedral_end]]
 
-    def define_z_matrix(self, molecule):
-        """
-        Creates the z-matrix of redundant internal coordinates based on the
-        topology from geomeTRIC.
-
-        :return:
-            a list of 2-tuples, 3-tuples, and 4-tuples corresponding to all bonds,
-            bond agles, and respectively dihedral angles in the molecule.
-        """
-
-        g_molecule = geometric.molecule.Molecule()
-        g_molecule.elem = molecule.get_labels()
-        g_molecule.xyzs = [molecule.get_coordinates_in_bohr() * geometric.nifty.bohr2ang]
-
-        g_molecule.build_topology()
-        g_molecule.build_bonds()
-
-        bonds = g_molecule.Data['bonds']
-        angles = g_molecule.find_angles()
-        dihedrals = g_molecule.find_dihedrals()
-
-        z_matrix = []
-        for bond in bonds:
-            z_matrix.append(bond)
-        for angle in angles:
-            z_matrix.append(angle)
-        for dihedral in dihedrals:
-            z_matrix.append(dihedral)
-
-        return z_matrix
-
     def _adjust_symmetry_dihedrals(self, molecule, symmetry_groups, rot_bonds, z_matrix):
 
         def symmetry_group_dihedral(reference_set, dihedrals, rot_bonds):
@@ -1962,7 +1754,6 @@ class OpenMMIMDynamics:
 
             if len(symmetry_group) == 3:
                 center = tuple(int(x) for x in symmetry_group_dihedral_list[0][1:3])
-                # atom_group = tuple(int(x) for x in symmetry_group)
 
                 angles_to_set[tuple(symmetry_group_dihedral_list[0])] = (
                     [0.0, np.pi / 6.0, np.pi / 3.0, np.pi / 2.0]
@@ -1984,7 +1775,6 @@ class OpenMMIMDynamics:
 
             elif len(symmetry_group) == 2:
 
-                # angles_to_set[symmetry_group_dihedral_list[0]] = ([0.0, np.pi/3.0])
                 angles_to_set[tuple(symmetry_group_dihedral_list[0])] = ([0.0, np.pi/2.0])
 
                 periodicities[tuple(symmetry_group_dihedral_list[0])] = 2
