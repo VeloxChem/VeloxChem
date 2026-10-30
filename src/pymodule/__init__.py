@@ -204,6 +204,11 @@ from .symmetryanalyzer import SymmetryAnalyzer
 from .solvationbuilder import SolvationBuilder
 from .solvationfepdriver import SolvationFepDriver
 from .openmmdynamics import OpenMMDynamics
+from .macedriver import MACEDriver
+from .potential import PotentialResult
+from .referencepotential import ReferencePotential
+from .potentialdataset import PotentialDataset, DatasetRecorder
+from .potentialdatasetgenerator import PotentialDatasetGenerator
 from .excitedstateanalysisdriver import ExcitedStateAnalysisDriver
 from .valetanalyzer import ValetAnalyzer
 from .evbdriver import EvbDriver

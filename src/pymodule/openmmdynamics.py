@@ -160,6 +160,7 @@ class OpenMMDynamics:
         self.topology = None
         self.integrator = None
         self.simulation = None
+        self._potential_bridge = None
         self.constraints = None
         self.pdb = None
         self.modeller = None
@@ -208,6 +209,10 @@ class OpenMMDynamics:
         pdb_path = Path(filename)
         if not pdb_path.is_file():
             raise FileNotFoundError(f"{filename} does not exist.")
+
+        if self._potential_bridge is not None:
+            self.integrator = None
+            self._potential_bridge = None
 
         pdbstr = pdb_path.read_text()
         residues = {}
@@ -349,6 +354,9 @@ class OpenMMDynamics:
         :param system_pdb:
             PDB file containing the system coordinates.
         """
+        if self._potential_bridge is not None:
+            self.integrator = None
+            self._potential_bridge = None
         self.pdb = app.PDBFile(system_pdb)
 
         with open(system_xml, 'r') as file:
@@ -409,6 +417,9 @@ class OpenMMDynamics:
         """
 
         # Store the molecule object and generate OpenMM compatible files
+        if self._potential_bridge is not None:
+            self.integrator = None
+            self._potential_bridge = None
         self.molecule = molecule
         self.positions = molecule.get_coordinates_in_angstrom()
         self.labels = molecule.get_labels()
@@ -1258,6 +1269,17 @@ class OpenMMDynamics:
             self.conformer_dict["molecules"][i].show(
                 atom_indices=atom_indices, atom_labels=atom_labels)
 
+    def create_system_from_potential(self, molecule, potential, *, masses=None,
+                                     pbc=False, cell=None):
+        """Create an isolated, unconstrained system driven by a full potential.
+
+        No MM parameters or basis are required. Optional masses are in dalton.
+        See run_md for physical initial velocities and restart conventions.
+        """
+        from .openmmpotential import create_system_from_potential
+        return create_system_from_potential(self, molecule, potential,
+                                            masses=masses, pbc=pbc, cell=cell)
+
     def run_md(self,
                restart_file=None,
                ensemble='NVE',
@@ -1270,7 +1292,11 @@ class OpenMMDynamics:
                traj_file='trajectory.pdb',
                state_file='output.xml',
                save_last_frame=True,
-               output_file='output'):
+               output_file='output',
+               minimize=None,
+               initial_velocities=None,
+               seed=None,
+               step_callback=None):
         """
         Runs an MD simulation using OpenMM, storing the trajectory and simulation data.
 
@@ -1294,7 +1320,38 @@ class OpenMMDynamics:
             Output file name for the trajectory. Default is 'trajectory.pdb'.
         :param state_file:
             Output file name for the simulation state. Default is 'output.xml'.
+        :param minimize:
+            Potential systems only: explicitly minimize before initialization;
+            None/False skips minimization. Incompatible with prescribed velocities
+            or restart. Existing force-field setup paths retain their behavior.
+        :param initial_velocities:
+            Potential NVE systems only: physical velocities at the position time,
+            shape (N, 3), in nm/ps. Converted once to stored Verlet velocities.
+        :param seed:
+            Potential systems only: positive integer for thermal initialization
+            (and the NVT thermostat). A restart cannot be reseeded.
+        :param step_callback:
+            callable(step, state), invoked initially and after each completed
+            step with full-precision OpenMM diagnostics. Also available for MM.
+            DatasetRecorder uses positions only, to avoid labeling biased energy.
         """
+
+        if self._potential_bridge is not None:
+            from .openmmpotential import run_potential_md
+            return run_potential_md(
+                self, restart_file=restart_file, ensemble=ensemble,
+                temperature=temperature, pressure=pressure, friction=friction,
+                timestep=timestep, nsteps=nsteps, snapshots=snapshots,
+                traj_file=traj_file, state_file=state_file,
+                save_last_frame=save_last_frame, output_file=output_file,
+                minimize=minimize, initial_velocities=initial_velocities,
+                seed=seed, step_callback=step_callback)
+
+        if any(value is not None for value in (minimize, initial_velocities, seed)):
+            raise ValueError('The new initialization options require create_system_from_potential.')
+
+        if step_callback is not None and not callable(step_callback):
+            raise TypeError('step_callback must be callable.')
 
         if self.system is None:
             raise RuntimeError('System has not been created!')
@@ -1360,8 +1417,14 @@ class OpenMMDynamics:
         print('=' * 50)
 
         start_time = time()
+        if step_callback is not None:
+            step_callback(0, self.simulation.context.getState(
+                getPositions=True, getEnergy=True, getVelocities=True, getForces=True))
         for step in range(nsteps):
             self.simulation.step(1)
+            if step_callback is not None:
+                step_callback(step + 1, self.simulation.context.getState(
+                    getPositions=True, getEnergy=True, getVelocities=True, getForces=True))
             if step % save_freq == 0:
                 state = self.simulation.context.getState(getEnergy=True)
                 print(f"Step: {step} / {nsteps} Time: {round((step * timestep)/1000, 2)} ps")
