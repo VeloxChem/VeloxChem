@@ -3440,11 +3440,20 @@ class ScfDriver:
         # NOTE: two reserves. The node keeps a few gigabytes for itself, and every
         # rank keeps what the rest of the calculation allocates after this is
         # measured.
-        node_reserve = 4 * 1024**3
+        #
+        # NOTE: the node's reserve is a guess at what is used outside the
+        # calculation, and what the operating system holds is already not counted
+        # as available, so on a small machine it is kept to a quarter of what is
+        # free rather than a fixed amount which would leave nothing. The ranks'
+        # reserves are what the calculation itself will allocate and are never
+        # cut: where they leave nothing, the budget is zero and the build falls
+        # back to the four-center integrals, rather than RI being handed memory
+        # the rest of the calculation needs.
+        node_reserve = min(4 * 1024**3, available // 4)
 
         free = available - node_reserve - on_this_node * rank_reserve
 
-        return int(max(free, 0.25 * available) / on_this_node)
+        return int(max(free, 0) / on_this_node)
 
     @staticmethod
     def _check_ri_aux_functions(ri_drv, basis_ri, comm):
