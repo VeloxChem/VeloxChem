@@ -126,7 +126,7 @@ class TpaTransitionDriver(NonlinearSolver):
             return
 
         write_results_to_hdf5(str(fpath),
-                              'rsp',
+                              'tpa',
                               results,
                               value_label='response result')
 
@@ -263,7 +263,17 @@ class TpaTransitionDriver(NonlinearSolver):
             fpath = fpath.with_name(fpath.stem)
             rpa_drv.checkpoint_file = str(fpath) + '_tpatrans_rpa.h5'
 
-        rpa_results = rpa_drv.compute(molecule, ao_basis, scf_results)
+        # In an OPA -> TPA -> 3PA workflow sharing one HDF5 file, TPA writes
+        # its final results to /tpa. Its internal RPA solver still targets /rsp
+        # and would otherwise clear the saved OPA results. Disable only its
+        # final-file output using a shallow copy of the SCF results; retain
+        # the original filename and the separate RPA restart checkpoint.
+        rpa_scf_results = scf_results
+        if self.rank == mpi_master():
+            rpa_scf_results = scf_results.copy()
+            rpa_scf_results['filename'] = None
+
+        rpa_results = rpa_drv.compute(molecule, ao_basis, rpa_scf_results)
 
         excitation_details = rpa_results['excitation_details']
         oscillator_strengths = rpa_results['oscillator_strengths']
