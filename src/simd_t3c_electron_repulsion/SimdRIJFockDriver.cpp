@@ -94,6 +94,8 @@ CSimdRIJFockDriver::peak_memory(const CMolecule       &molecule,
 
     const auto peak = std::max(forming, build);
 
+    const auto margin = std::max(peak / _peak_margin_divisor, _peak_margin_floor);
+
     if (std::getenv("VLX_RIJK_PROFILE") != nullptr)
     {
         const auto gb = [](const size_t n) { return static_cast<double>(n) / 1.0e9; };
@@ -107,10 +109,10 @@ CSimdRIJFockDriver::peak_memory(const CMolecule       &molecule,
                     "the margin\n",
                     gb(forming), gb(threads), gb(build),
                     gb(_drv.coulomb_build_memory(basis.dimensions_of_basis(), naux)),
-                    gb(peak + peak / _peak_margin_divisor));
+                    gb(peak + margin));
     }
 
-    return peak + peak / _peak_margin_divisor;
+    return peak + margin;
 }
 
 auto

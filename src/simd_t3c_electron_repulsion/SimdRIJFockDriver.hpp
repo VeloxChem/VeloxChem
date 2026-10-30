@@ -223,6 +223,17 @@ class CSimdRIJFockDriver
     /// the caller reserves for it, and this margin covers the difference.
     static constexpr size_t _peak_margin_divisor = 10;
 
+    /// @brief The least margin peak_memory adds, whatever a tenth of the peak is.
+    /// @note The driver holds its integrals for the whole SCF, so what the rest of
+    /// the SCF allocates between builds lands on top of them on the rank which also
+    /// does the master's work. Where a tenth of the peak is under half a gigabyte it
+    /// is too little to cover that: for water clusters in def2-SVPD with BLYP (closed shell, two
+    /// nodes of eight ranks with sixteen threads each), at 1248 functions that rank
+    /// grew 0.43 GB past the prediction with a margin of 0.11 GB, and prediction and
+    /// reserve together were 0.17 to 0.21 GB above the growth. With this floor, every
+    /// such run from 120 to 4560 functions keeps at least 0.5 GB above its growth.
+    static constexpr size_t _peak_margin_floor = size_t{512} * 1024 * 1024;
+
     bool _prepared = false;
 
     rimode _mode = rimode::automatic;
