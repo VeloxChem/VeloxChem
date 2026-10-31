@@ -3604,6 +3604,16 @@ class LinearSolver:
                     dist_new_ung)
                 dist_new_ung = self._normalize_half_size(dist_new_ung)
 
+        # The preconditioned vectors can all be removed above when what is
+        # left of them after the projection is too small, for example when the
+        # residuals lie inside the reduced space. The callers would then form
+        # no sigma vectors, so stop here.
+        if self.rank == mpi_master():
+            assert_msg_critical(
+                dist_new_ger.shape(1) + dist_new_ung.shape(1) > 0,
+                'LinearSolver: No new trial vectors can be added to the '
+                'reduced space. The remaining equations cannot be converged.')
+
         return dist_new_ger, dist_new_ung
 
     def get_prop_grad(self,

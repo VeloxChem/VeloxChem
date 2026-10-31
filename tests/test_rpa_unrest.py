@@ -486,3 +486,26 @@ class TestUnrestrictedRPA:
             rotation, lowest = found[1.5][0]
             assert rotation == 'real'
             assert lowest < -0.1
+
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='skip pytest.raises for multiple MPI processes')
+    def test_no_new_trial_vectors_is_an_error(self):
+
+        # H2 at 1.5 Angstrom in def2-SVP: the initial guess for three states
+        # spans the whole excitation space, and the spin-symmetric UHF solution
+        # is unstable, so the unconverged residuals lie inside the reduced space
+
+        mol = Molecule.read_xyz_string('2\n\nH 0.0 0.0 0.0\nH 0.0 0.0 1.5')
+        bas = MolecularBasis.read(mol, 'def2-svp', ostream=None)
+
+        scf_drv = ScfUnrestrictedDriver()
+        scf_drv.ri = False
+        scf_drv.ostream.mute()
+        scf_results = scf_drv.compute(mol, bas)
+
+        lr_drv = LinearResponseUnrestrictedEigenSolver()
+        lr_drv.ostream.mute()
+        lr_drv.nstates = 3
+
+        with pytest.raises(VeloxChemError, match='No new trial vectors'):
+            lr_drv.compute(mol, bas, scf_results)

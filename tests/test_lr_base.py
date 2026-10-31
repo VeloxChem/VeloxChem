@@ -126,6 +126,49 @@ class TestLRBaseUtilities:
             assert np.allclose(full_new_ung,
                                np.arange(101.0, 101.0 + nrows).reshape(-1, 1))
 
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='skip pytest.raises for multiple MPI processes')
+    def test_setup_trials_rejects_residuals_inside_reduced_space(self):
+
+        lr_drv = LinearResponseSolver()
+        lr_drv.norm_thresh = 1.0e-10
+        lr_drv.lindep_thresh = 1.0e-6
+
+        nrows = 16
+
+        # reduced space of two half-size vectors, normalized as 2 b^T b = 1
+        basis = np.zeros((nrows, 2))
+        basis[0, 0] = 1.0 / np.sqrt(2.0)
+        basis[1, 1] = 1.0 / np.sqrt(2.0)
+        dist_bger = DistributedArray(basis.copy(), lr_drv.comm)
+        dist_bung = DistributedArray(basis.copy(), lr_drv.comm)
+
+        precond = {
+            0.0:
+                DistributedArray(
+                    np.column_stack((np.ones(nrows), np.zeros(nrows))),
+                    lr_drv.comm)
+        }
+
+        # a residual with a component outside the reduced space gives one
+        # new vector in each block
+        resid = np.zeros((nrows, 2))
+        resid[0, :] = 0.3
+        resid[1, :] = -0.2
+        resid[2, :] = 0.1
+        new_ger, new_ung = lr_drv._setup_trials(
+            {('x', 0.0): DistributedArray(resid, lr_drv.comm)}, precond,
+            dist_bger, dist_bung)
+        assert new_ger.shape(1) == 1
+        assert new_ung.shape(1) == 1
+
+        # a residual inside the reduced space leaves nothing to add
+        resid[2, :] = 0.0
+        with pytest.raises(VeloxChemError, match='No new trial vectors'):
+            lr_drv._setup_trials(
+                {('x', 0.0): DistributedArray(resid, lr_drv.comm)}, precond,
+                dist_bger, dist_bung)
+
     def test_print_helpers_emit_polarizability_output(self, monkeypatch):
 
         lr_drv = LinearResponseSolver()
