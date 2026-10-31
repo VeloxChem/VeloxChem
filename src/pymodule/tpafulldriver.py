@@ -132,7 +132,7 @@ class TpaFullDriver(TpaDriverBase):
         # apart as lists of the occupied and the virtual right factor.
         self._ri_jk_factors = None
 
-        if self.rank == mpi_master() and self.ri_jk:
+        if self.rank == mpi_master() and self._uses_ri_jk():
             # NOTE: the shared halves are kept with the right factors rather than
             # formed again where they are used, so the two cannot be built from
             # different orbitals.
@@ -993,7 +993,7 @@ class TpaFullDriver(TpaDriverBase):
         # the general shape and not the two of the pass before.
         self._ri_jk_factors = None
 
-        if self.rank == mpi_master() and self.ri_jk:
+        if self.rank == mpi_master() and self._uses_ri_jk():
             self._ri_jk_factors = (mo[:, :nocc], [], mo[:, nocc:], [])
 
         for w in wi:

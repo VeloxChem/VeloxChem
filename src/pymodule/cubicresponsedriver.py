@@ -395,7 +395,7 @@ class CubicResponseDriver(NonlinearSolver):
         # its own. The screening and the rest of the integral setup stay where
         # they were, in the method which uses them; forming these again there
         # costs nothing, the driver holding them already.
-        if self.ri_jk:
+        if self._uses_ri_jk():
             rijkresponse.initialize(self, molecule, ao_basis)
 
         # Computing the first-order response vectors (3 per frequency)
@@ -908,7 +908,7 @@ class CubicResponseDriver(NonlinearSolver):
         # apart as lists of the occupied and the virtual right factor.
         self._ri_jk_factors = None
 
-        if self.rank == mpi_master() and self.ri_jk:
+        if self.rank == mpi_master() and self._uses_ri_jk():
             # NOTE: the shared halves are kept with the right factors rather than
             # formed again where they are used, so the two cannot be built from
             # different orbitals.
@@ -1076,7 +1076,7 @@ class CubicResponseDriver(NonlinearSolver):
         # two-time perturbed densities do.
         self._ri_jk_factors = None
 
-        if self.rank == mpi_master() and self.ri_jk:
+        if self.rank == mpi_master() and self._uses_ri_jk():
             self._ri_jk_factors = (mo[:, :nocc], [], mo[:, nocc:], [])
 
         for (wb, wc, wd) in freqtriples:

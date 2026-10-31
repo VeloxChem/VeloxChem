@@ -163,6 +163,11 @@ def scf_results_sanity_check(obj, scf_results):
         if 'ri_auxiliary_basis' in scf_results:
             updated_scf_info['ri_auxiliary_basis'] = scf_results[
                 'ri_auxiliary_basis']
+        # whether the SCF fell back from RI to the four-center integrals for
+        # want of memory; always updated, so that a reused driver does not keep
+        # a stale value, and ri, ri_coulomb and ri_jk stay what was asked for
+        updated_scf_info['_ri_fallback'] = bool(
+            scf_results.get('ri_fallback', False))
 
         if scf_results.get('restart', None) is not None:
             # do not restart if scf is not restarted from checkpoint

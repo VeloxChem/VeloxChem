@@ -548,7 +548,7 @@ class ThgDriver(NonlinearSolver):
         # the densities one batch at a time and the columns have to line up.
         self._ri_jk_factors = None
 
-        if self.ri_jk:
+        if self._uses_ri_jk():
             self._ri_jk_factors = {
                 'left_occ': mo[:, :nocc],
                 'left_vir': mo[:, nocc:],
@@ -1269,7 +1269,7 @@ class ThgDriver(NonlinearSolver):
         # the general shape and not the two of the pass before.
         self._ri_jk_factors = None
 
-        if self.ri_jk:
+        if self._uses_ri_jk():
             self._ri_jk_factors = (mo[:, :nocc], [], mo[:, nocc:], [])
 
         for task_id, rank in task_rank_pairs:

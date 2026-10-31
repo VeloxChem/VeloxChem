@@ -4336,10 +4336,10 @@ class PolOrbitalResponse(CphfSolver):
         cur_str = f'Convergence Threshold           : {self.conv_thresh:.1e}'
         self.ostream.print_header(cur_str.ljust(str_width))
 
-        if self.ri_coulomb:
+        if self._uses_ri_coulomb():
             cur_str = 'Resolution of the Identity      : RI-J'
             self.ostream.print_header(cur_str.ljust(str_width))
-        elif self.ri_jk:
+        elif self._uses_ri_jk():
             cur_str = 'Resolution of the Identity      : RI-JK'
             self.ostream.print_header(cur_str.ljust(str_width))
 

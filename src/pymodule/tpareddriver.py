@@ -134,7 +134,7 @@ class TpaReducedDriver(TpaDriverBase):
         # virtual ones, which is the shape the driver takes as four factors.
         self._ri_jk_factors = None
 
-        if self.rank == mpi_master() and self.ri_jk:
+        if self.rank == mpi_master() and self._uses_ri_jk():
             self._ri_jk_factors = (mo[:, :nocc], [], mo[:, nocc:], [])
 
         for w in wi:
@@ -569,7 +569,7 @@ class TpaReducedDriver(TpaDriverBase):
         # built by the time this runs, so the two passes share the attribute.
         self._ri_jk_factors = None
 
-        if self.rank == mpi_master() and self.ri_jk:
+        if self.rank == mpi_master() and self._uses_ri_jk():
             self._ri_jk_factors = (mo[:, :nocc], [], mo[:, nocc:], [])
 
         for w in wi:

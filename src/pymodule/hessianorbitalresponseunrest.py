@@ -481,7 +481,7 @@ class UnrestrictedHessianOrbitalResponse(CphfSolver):
                 # NOTE: one set of oo-density factors per spin for the
                 # resolution of the identity, with the overlap as in the
                 # restricted case.
-                if self.ri_jk:
+                if self._uses_ri_jk():
                     ri_jk_factors_uij = ((mo_occ_a, []), (mo_occ_b, []))
                 else:
                     ri_jk_factors_uij = None
@@ -926,10 +926,10 @@ class UnrestrictedHessianOrbitalResponse(CphfSolver):
             self.conv_thresh)
         self.ostream.print_header(cur_str.ljust(str_width))
 
-        if self.ri_coulomb:
+        if self._uses_ri_coulomb():
             cur_str = 'Resolution of the Identity      : RI-J'
             self.ostream.print_header(cur_str.ljust(str_width))
-        elif self.ri_jk:
+        elif self._uses_ri_jk():
             cur_str = 'Resolution of the Identity      : RI-JK'
             self.ostream.print_header(cur_str.ljust(str_width))
 

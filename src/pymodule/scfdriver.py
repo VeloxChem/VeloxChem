@@ -2604,6 +2604,12 @@ class ScfDriver:
                     self._scf_results['ri_jk'] = self.ri_jk
                     self._scf_results[
                         'ri_auxiliary_basis'] = self.ri_auxiliary_basis
+                    # NOTE: ri_coulomb and ri_jk above are what was asked for.
+                    # Whether the Fock matrices were in fact formed from the
+                    # four-center integrals for want of memory is kept beside
+                    # them, so that a calculation which takes these results
+                    # (response) follows the ground state it was handed.
+                    self._scf_results['ri_fallback'] = bool(self._ri_fallback)
 
                 if self._dft:
                     # dft info

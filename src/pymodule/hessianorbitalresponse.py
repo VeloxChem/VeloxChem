@@ -408,7 +408,7 @@ class HessianOrbitalResponse(CphfSolver):
                 # MOs are orthonormal in the S metric, so the X that reproduces
                 # uij_ao is C(occ)^T S uij_ao S C(occ).
                 ri_jk_factors_uij = ((mo_occ, [])
-                                     if self.ri_jk
+                                     if self._uses_ri_jk()
                                      else None)
             else:
                 uij_ao_list = None
@@ -764,10 +764,10 @@ class HessianOrbitalResponse(CphfSolver):
             self.conv_thresh)
         self.ostream.print_header(cur_str.ljust(str_width))
 
-        if self.ri_coulomb:
+        if self._uses_ri_coulomb():
             cur_str = 'Resolution of the Identity      : RI-J'
             self.ostream.print_header(cur_str.ljust(str_width))
-        elif self.ri_jk:
+        elif self._uses_ri_jk():
             cur_str = 'Resolution of the Identity      : RI-JK'
             self.ostream.print_header(cur_str.ljust(str_width))
 

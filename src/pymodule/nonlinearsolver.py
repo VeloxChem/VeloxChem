@@ -118,6 +118,11 @@ class NonlinearSolver:
         self.ri_metric_threshold = 1.0e-12
         self._ri_drv = None
 
+        # NOTE: whether the SCF this response is formed on fell back from RI to
+        # the four-center integrals for want of memory. It is read from the SCF
+        # results, and ri, ri_coulomb and ri_jk are left as they were set.
+        self._ri_fallback = False
+
         # dft
         self._dft = False
         self.xcfun = None
@@ -325,20 +330,70 @@ class NonlinearSolver:
             screening = None
         screening = self.comm.bcast(screening, root=mpi_master())
 
-        use_ri_coulomb = (self.ri_coulomb and self._dft and
-                          self.xcfun is not None and
-                          not self.xcfun.is_hybrid())
-        use_ri_jk = self.ri_jk and not use_ri_coulomb
+        asks_ri_coulomb = (self.ri_coulomb and self._dft and
+                           self.xcfun is not None and
+                           not self.xcfun.is_hybrid())
+        asks_ri_jk = self.ri_jk and not asks_ri_coulomb
 
-        if use_ri_coulomb:
+        self._print_ri_fallback_info(asks_ri_coulomb, asks_ri_jk)
+
+        if asks_ri_coulomb and self._uses_ri_coulomb():
             self._init_simd_ri_j(molecule, basis)
 
-        if use_ri_jk:
+        if asks_ri_jk and self._uses_ri_jk():
             rijkresponse.initialize(self, molecule, basis)
 
         return {
             'screening': screening,
         }
+
+    def _uses_ri_jk(self):
+        """
+        Checks whether the Fock matrices are formed with the SIMD RI-JK driver,
+        which is what ri_jk asks for unless the SCF fell back to the
+        four-center integrals for want of memory.
+
+        :return:
+            True if the SIMD RI-JK driver forms the Fock matrices.
+        """
+
+        return self.ri_jk and not self._ri_fallback
+
+    def _uses_ri_coulomb(self):
+        """
+        Checks whether the Coulomb matrices are formed with the SIMD RI-J
+        driver, which is what ri_coulomb asks for unless the SCF fell back to
+        the four-center integrals for want of memory.
+
+        :return:
+            True if the SIMD RI-J driver forms the Coulomb matrices.
+        """
+
+        return self.ri_coulomb and not self._ri_fallback
+
+    def _print_ri_fallback_info(self, asks_ri_coulomb, asks_ri_jk):
+        """
+        Prints that response follows the SCF to the four-center integrals,
+        where RI was asked for and the SCF fell back.
+
+        :param asks_ri_coulomb:
+            Whether the settings ask for RI-J.
+        :param asks_ri_jk:
+            Whether the settings ask for RI-JK.
+        """
+
+        if not self._ri_fallback or not (asks_ri_coulomb or asks_ri_jk):
+            return
+
+        # NOTE: response follows the ground state it is handed. RI on top of a
+        # four-center SCF would be the response of a different energy. The SCF
+        # has already warned, so this is an info line.
+        label = 'RI-J' if asks_ri_coulomb else 'RI-JK'
+        self.ostream.print_info(
+            f'The SCF formed its Fock matrices without {label}, so the ' +
+            'response Fock matrices are formed from the four-center integrals.')
+        self.ostream.print_blank()
+        self.ostream.flush()
 
     def _init_simd_ri_j(self, molecule, basis):
         """
@@ -1041,9 +1096,9 @@ class NonlinearSolver:
             # density is fitted against the same integrals, and the right hand sides
             # of the fittings are gathered and reduced in one collective rather than
             # one for each density.
-            use_ri_coulomb = (self.ri_coulomb and fock_type == 'j')
+            use_ri_coulomb = (self._uses_ri_coulomb() and fock_type == 'j')
 
-            use_ri_jk = (self.ri_jk and fock_type != 'j' and
+            use_ri_jk = (self._uses_ri_jk() and fock_type != 'j' and
                          dens_factors is not None and
                          (mode_is_quadratic or mode_is_cubic))
 
@@ -1321,10 +1376,10 @@ class NonlinearSolver:
             self.damping)
         self.ostream.print_header(cur_str.ljust(width))
 
-        if self.ri_coulomb:
+        if self._uses_ri_coulomb():
             cur_str = 'Resolution of the Identity      : RI-J'
             self.ostream.print_header(cur_str.ljust(width))
-        elif self.ri_jk:
+        elif self._uses_ri_jk():
             cur_str = 'Resolution of the Identity      : RI-JK'
             self.ostream.print_header(cur_str.ljust(width))
 

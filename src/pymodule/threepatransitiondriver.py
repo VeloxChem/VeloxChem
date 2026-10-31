@@ -218,7 +218,7 @@ class ThreePATransitionDriver(NonlinearSolver):
         # are made, so that each of them is handed the same ones rather than
         # forming its own. Forming them again where the integrals are set up
         # costs nothing, the driver holding them already.
-        if self.ri_jk:
+        if self._uses_ri_jk():
             rijkresponse.initialize(self, molecule, ao_basis)
 
         rpa_drv = LinearResponseEigenSolver(self.comm, self.ostream)
@@ -993,7 +993,7 @@ class ThreePATransitionDriver(NonlinearSolver):
         # the general shape and not the two of the pass before.
         self._ri_jk_factors = None
 
-        if self.rank == mpi_master() and self.ri_jk:
+        if self.rank == mpi_master() and self._uses_ri_jk():
             self._ri_jk_factors = (mo[:, :nocc], [], mo[:, nocc:], [])
 
         for w_ind, w in enumerate(freq):
@@ -1246,7 +1246,7 @@ class ThreePATransitionDriver(NonlinearSolver):
         # not the two a complex one is carried by.
         self._ri_jk_factors = None
 
-        if self.rank == mpi_master() and self.ri_jk:
+        if self.rank == mpi_master() and self._uses_ri_jk():
             self._ri_jk_factors = {
                 'left_occ': mo[:, :nocc],
                 'left_vir': mo[:, nocc:],
