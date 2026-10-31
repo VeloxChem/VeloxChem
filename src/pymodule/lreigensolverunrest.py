@@ -501,6 +501,7 @@ class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
 
         profiler.check_memory_usage('End of LR eigensolver')
         profiler.print_memory_usage(self.ostream)
+        self._print_ri_memory_check()
 
         # for unrestricted
         sqrt_2 = np.sqrt(2.0)

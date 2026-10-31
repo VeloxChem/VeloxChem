@@ -12,10 +12,12 @@
 #define SimdRIJKResponseDriver_hpp
 
 #include <cstddef>
+#include <tuple>
 #include <utility>
 #include <vector>
 
 #include "MolecularBasis.hpp"
+#include "Molecule.hpp"
 #include "PackedMatrix.hpp"
 #include "SimdRIFockDriver.hpp"
 #include "SparseTensor.hpp"
@@ -97,6 +99,96 @@ class CSimdRIJKResponseDriver
     /// left to sweep the whole basis.
     /// @return The functions.
     auto get_aux_functions() const -> const std::vector<size_t> &;
+
+    /// @brief Gets the memory the B vectors and a build hold on this rank before
+    /// any density of the build is counted.
+    /// @param molecule The molecule.
+    /// @param basis The molecular basis.
+    /// @param aux_basis The auxiliary molecular basis.
+    /// @param threshold The screening threshold of the integrals.
+    /// @param aux_atoms The atoms of the auxiliary basis this rank holds, a list of
+    /// every atom for the whole molecule. An empty list holds no B vectors.
+    /// @param range_separated True for a hybrid range separated functional, whose B
+    /// vectors are two sets.
+    /// @return What forming the B vectors reaches and what a build holds beside
+    /// its densities, in bytes, for the number of threads of the caller and
+    /// without a margin, and the auxiliary functions this rank holds, which
+    /// chunk_memory takes.
+    /// @note Forming is counted as the Fock driver counts it: the B vectors, the
+    /// descriptions of their blocks, the integrals of a batch and the buffers of
+    /// the threads, and two copies of the metrics. A build holds the B vectors,
+    /// their descriptions and the index of their auxiliary functions, one copy of
+    /// the metrics, the square each thread keeps for the transformation, the
+    /// buffers of the Coulomb sweeps, the density, the Coulomb matrix and its
+    /// expansion, and an allowance for each thread. What depends on the densities
+    /// of a call, the transformed factors among it, is counted by chunk_memory.
+    auto fixed_memory(const CMolecule        &molecule,
+                      const CMolecularBasis  &basis,
+                      const CMolecularBasis  &aux_basis,
+                      const double            threshold,
+                      const std::vector<int> &aux_atoms,
+                      const bool              range_separated) const -> std::tuple<size_t, size_t, size_t>;
+
+    /// @brief Gets the memory one call of a build holds for its densities.
+    /// @param nao The number of basis functions.
+    /// @param nvec The columns of the largest left factor of the call.
+    /// @param nterms One for densities of one term, two for densities of two
+    /// terms (a linear response trial vector), whose exchange is formed for each
+    /// term.
+    /// @param ncalls One, or two for a block diagonal density, which is formed as
+    /// two calls whose results are added: the matrices of the first are held
+    /// while the second runs.
+    /// @param nspins One for a restricted reference, two for an unrestricted one.
+    /// @param ndens The densities of the call.
+    /// @param nheld The auxiliary functions this rank holds, from fixed_memory.
+    /// @return The memory in bytes, without a margin.
+    /// @note For each density and spin: the exchange of each term and the Fock
+    /// matrix as squares of the basis, the copy the caller takes of the Fock
+    /// matrix, and the Fock matrices of a first call; the right factors as the
+    /// caller hands them over, the copy taken of them and the stacked factors, for
+    /// each term, and the summed factor of two terms. Once for the call: the left
+    /// factors, and the transformed factors of a batch of auxiliary functions, cut
+    /// as the exchange cuts it from the memory budget of this driver (at least one
+    /// function, at most those held).
+    auto chunk_memory(const size_t nao,
+                      const size_t nvec,
+                      const size_t nterms,
+                      const size_t ncalls,
+                      const size_t nspins,
+                      const size_t ndens,
+                      const size_t nheld) const -> size_t;
+
+    /// @brief Gets the most memory a build of a number of densities reaches.
+    /// @param forming What forming the B vectors reaches, from fixed_memory.
+    /// @param build What a build holds beside its densities, from fixed_memory.
+    /// @return The larger of forming and the build, with a margin, in bytes.
+    /// @note The other parameters are those of chunk_memory.
+    auto peak_memory(const size_t forming,
+                     const size_t build,
+                     const size_t nao,
+                     const size_t nvec,
+                     const size_t nterms,
+                     const size_t ncalls,
+                     const size_t nspins,
+                     const size_t ndens,
+                     const size_t nheld) const -> size_t;
+
+    /// @brief Gets the most densities one call of a build may take within a
+    /// memory budget.
+    /// @param memory_budget The memory this rank may hold, in bytes.
+    /// @return The largest number of densities whose peak_memory is within the
+    /// budget, or zero where not even one fits, or where forming the B vectors
+    /// does not.
+    /// @note The other parameters are those of peak_memory.
+    auto max_densities(const size_t memory_budget,
+                       const size_t forming,
+                       const size_t build,
+                       const size_t nao,
+                       const size_t nvec,
+                       const size_t nterms,
+                       const size_t ncalls,
+                       const size_t nspins,
+                       const size_t nheld) const -> size_t;
 
     /// @brief Computes the exchange matrices of densities given as their factors.
     /// @param bq_vectors The B vectors, as CSimdRIJKFockDriver formed them.
@@ -313,6 +405,18 @@ class CSimdRIJKResponseDriver
 
     /// @brief The memory the driver may hold when none is named.
     static constexpr size_t _default_budget = size_t{4} * 1024 * 1024 * 1024;
+
+    /// @brief The margin peak_memory adds to the memory it counts, as the divisor
+    /// of it.
+    /// @note A twentieth, as the Fock driver which forms the B vectors adds: the
+    /// B vectors and what forming them reaches are counted the same way here. It
+    /// covers the driver alone; what the rest of the response allocates after the
+    /// budget is taken is reserved apart by the caller.
+    static constexpr size_t _peak_margin_divisor = 20;
+
+    /// @brief The memory allowed for each thread beyond the buffers counted, as
+    /// the driver which forms the B vectors allows it.
+    static constexpr size_t _thread_allowance = size_t{8} * 1024 * 1024;
 
     /// @brief The screening threshold of the integrals.
     double _threshold;

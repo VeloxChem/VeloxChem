@@ -380,6 +380,7 @@ class TdaEigenSolver(TdaEigenSolverBase):
 
         profiler.check_memory_usage('End of TDA eigensolver')
         profiler.print_memory_usage(self.ostream)
+        self._print_ri_memory_check()
 
         # compute 1e dipole integrals
 

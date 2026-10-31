@@ -736,6 +736,7 @@ class ComplexResponseTdaSolver(LinearSolver):
 
         profiler.check_memory_usage('End of CPP solver')
         profiler.print_memory_usage(self.ostream)
+        self._print_ri_memory_check()
 
         self._dist_bger = None
         self._dist_e2bger = None

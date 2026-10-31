@@ -608,6 +608,7 @@ class CphfSolver(LinearSolver):
         profiler.check_memory_usage(
             'End of ComputeCPHF iterative subspace algorithm')
         profiler.print_memory_usage(self.ostream)
+        self._print_ri_memory_check()
 
         # converged?
         if self.rank == mpi_master():

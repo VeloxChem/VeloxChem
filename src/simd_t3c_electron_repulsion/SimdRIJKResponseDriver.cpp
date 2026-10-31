@@ -11,10 +11,14 @@
 #include "SimdRIJKResponseDriver.hpp"
 
 #include <algorithm>
+#include <cstdio>
+#include <cstdlib>
 #include <numeric>
 #include <string>
 
 #include "ErrorHandler.hpp"
+#include "OpenMPFunc.hpp"
+#include "SimdRIFockCommon.hpp"
 #include "ThreadedDenseLinearAlgebra.hpp"
 
 auto
@@ -47,6 +51,186 @@ auto
 CSimdRIJKResponseDriver::get_aux_functions() const -> const std::vector<size_t> &
 {
     return _aux_functions;
+}
+
+auto
+CSimdRIJKResponseDriver::fixed_memory(const CMolecule        &molecule,
+                                      const CMolecularBasis  &basis,
+                                      const CMolecularBasis  &aux_basis,
+                                      const double            threshold,
+                                      const std::vector<int> &aux_atoms,
+                                      const bool              range_separated) const
+    -> std::tuple<size_t, size_t, size_t>
+{
+    const auto nops = size_t{range_separated ? 2u : 1u};
+
+    const auto nao = basis.dimensions_of_basis();
+
+    const auto naux = aux_basis.dimensions_of_basis();
+
+    const auto nthreads = static_cast<size_t>(omp::get_number_of_threads());
+
+    const auto square = nao * nao * sizeof(double);
+
+    const auto triangle = nao * (nao + 1) / 2 * sizeof(double);
+
+    // NOTE: the metric of each operator is a packed triangle. While the B vectors
+    // are formed the caller's metrics and the copies the Fock driver keeps are both
+    // alive; a build holds the kept copies alone. A share of no atoms answers zero
+    // for the B vectors and is left with the metrics and the buffers of a build,
+    // which a rank dealt nothing still runs over its empty share.
+
+    const auto metric = nops * naux * (naux + 1) / 2 * sizeof(double);
+
+    const auto bq = _drv.bq_vectors_memory(molecule, basis, aux_basis, threshold, aux_atoms, nops);
+
+    const auto forming = bq.held + bq.pattern + bq.forming + 2 * metric;
+
+    // NOTE: the transformation keeps a square of the basis for each thread between
+    // calls, so it is held from the first build on.
+
+    const auto squares = nthreads * square;
+
+    // NOTE: the auxiliary functions this rank holds, which the batches of the
+    // transformation are cut from. The transformed factors depend on the densities
+    // of a call and are counted by chunk_memory.
+
+    const auto nheld = simdri::aux_functions_of(aux_basis, aux_atoms).size();
+
+    // NOTE: the Coulomb of a density: a row of the auxiliary basis a thread and
+    // their sum for the right hand side, a triangle a thread and their sum for the
+    // Coulomb matrix, the density formed from its factors, the Coulomb matrix and
+    // the square it is expanded into.
+
+    const auto coulomb = (nthreads + 1) * (naux * sizeof(double) + triangle) + 2 * square + triangle;
+
+    const auto build = bq.held + bq.pattern + bq.index + metric + squares + coulomb + nthreads * _thread_allowance;
+
+    if (std::getenv("VLX_RIJK_PROFILE") != nullptr)
+    {
+        const auto gb = [](const size_t n) { return static_cast<double>(n) / 1.0e9; };
+
+        std::printf("RIJK response memory: forming %.3f GB (B vectors %.3f, beside %.3f, metrics %.3f)\n",
+                    gb(forming), gb(bq.held), gb(bq.forming), gb(metric));
+
+        std::printf("RIJK response memory: build without densities %.3f GB (squares %.3f, Coulomb %.3f, index "
+                    "%.3f), %zu auxiliary functions held\n",
+                    gb(build), gb(squares), gb(coulomb), gb(bq.index), nheld);
+    }
+
+    return {forming, build, nheld};
+}
+
+auto
+CSimdRIJKResponseDriver::chunk_memory(const size_t nao,
+                                      const size_t nvec,
+                                      const size_t nterms,
+                                      const size_t ncalls,
+                                      const size_t nspins,
+                                      const size_t ndens,
+                                      const size_t nheld) const -> size_t
+{
+    const auto square = nao * nao * sizeof(double);
+
+    const auto factor = nao * nvec * sizeof(double);
+
+    // NOTE: the squares of one density and spin: the exchange of each term and the
+    // Fock matrix while they are assembled, the copy the caller takes of the Fock
+    // matrix as it is returned, and for a block diagonal density the Fock matrix of
+    // the first call while the second runs.
+
+    const auto squares = (nterms + 2 + (ncalls - 1)) * square;
+
+    // NOTE: the factors of one density and spin, for each term: as the caller hands
+    // them over, the copy the exchange takes of them and their columns in the
+    // stacked matrix; and the summed factor the Coulomb of two terms is taken with.
+
+    const auto factors = (3 * nterms + (nterms > 1 ? 1 : 0)) * factor;
+
+    // NOTE: the left factor of each spin as the caller hands it over. The calls of
+    // a block diagonal density run one after the other, each with its own.
+
+    const auto left = nspins * factor;
+
+    // NOTE: the transformed factors of a batch of auxiliary functions, cut as the
+    // exchange cuts them: as many functions as the memory budget of this driver
+    // holds, but at least one, and no more than this rank holds. The spins and the
+    // calls each form and free their own, one after the other.
+
+    const auto per_function = factor * (1 + nterms * ndens);
+
+    const auto nbatch = (nheld == 0) ? size_t{0}
+                                     : std::min(nheld, std::max(size_t{1}, _budget / std::max(per_function, size_t{1})));
+
+    const auto work = nbatch * per_function;
+
+    return left + work + ndens * nspins * (squares + factors);
+}
+
+auto
+CSimdRIJKResponseDriver::peak_memory(const size_t forming,
+                                     const size_t build,
+                                     const size_t nao,
+                                     const size_t nvec,
+                                     const size_t nterms,
+                                     const size_t ncalls,
+                                     const size_t nspins,
+                                     const size_t ndens,
+                                     const size_t nheld) const -> size_t
+{
+    const auto peak = std::max(forming, build + chunk_memory(nao, nvec, nterms, ncalls, nspins, ndens, nheld));
+
+    return peak + peak / _peak_margin_divisor;
+}
+
+auto
+CSimdRIJKResponseDriver::max_densities(const size_t memory_budget,
+                                       const size_t forming,
+                                       const size_t build,
+                                       const size_t nao,
+                                       const size_t nvec,
+                                       const size_t nterms,
+                                       const size_t ncalls,
+                                       const size_t nspins,
+                                       const size_t nheld) const -> size_t
+{
+    const auto fits = [&](const size_t ndens) {
+        return peak_memory(forming, build, nao, nvec, nterms, ncalls, nspins, ndens, nheld) <= memory_budget;
+    };
+
+    if (!fits(1)) return 0;
+
+    // NOTE: the largest count which fits is found by doubling and then halving the
+    // step, rather than by inverting the margin. Only a count which fits is ever
+    // kept, so the answer fits even where the batches of the transformation make
+    // the peak rise unevenly with the densities.
+
+    size_t low = 1, high = 2;
+
+    while (fits(high))
+    {
+        low = high;
+
+        if (high > (size_t{1} << 40)) return high;
+
+        high *= 2;
+    }
+
+    while (high - low > 1)
+    {
+        const auto mid = low + (high - low) / 2;
+
+        if (fits(mid))
+        {
+            low = mid;
+        }
+        else
+        {
+            high = mid;
+        }
+    }
+
+    return low;
 }
 
 auto

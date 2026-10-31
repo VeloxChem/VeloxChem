@@ -57,7 +57,7 @@ from .oneeints import compute_overlap_gradient
 from .oneeints import compute_nuclear_potential_gradient
 from .oneeints import compute_point_charge_gradient
 from .oneeints import compute_ecp_gradient
-from .environment import get_available_memory
+from .environment import get_available_memory, get_ri_free_memory
 from .errorhandler import assert_msg_critical
 from .profiler import Profiler
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
@@ -506,8 +506,8 @@ class ScfGradientDriver(GradientDriver):
         if self.ri_gradient_memory_budget is not None:
             return int(self.ri_gradient_memory_budget * 1.0e9)
 
-        return self.scf_driver._get_ri_free_memory(
-            self._get_ri_gradient_rank_reserve(basis, nspins))
+        return get_ri_free_memory(
+            self.comm, self._get_ri_gradient_rank_reserve(basis, nspins))
 
     def _get_ri_gradient_rank_reserve(self, basis, nspins):
         """

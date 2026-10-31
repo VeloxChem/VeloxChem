@@ -72,6 +72,7 @@ twice rather than this module learning about batches it cannot see.
 """
 
 import numpy as np
+import psutil
 
 from .veloxchemlib import SimdRIJKFockDriver
 from .veloxchemlib import SimdRIJKResponseDriver
@@ -79,40 +80,163 @@ from .veloxchemlib import PackedMatrix
 from .veloxchemlib import mat_t
 from .veloxchemlib import rimode
 from .molecularbasis import MolecularBasis
+from .environment import get_ri_free_memory
 from .errorhandler import assert_msg_critical
 from .profiler import Profiler
 
 
-def memory_budget(solver):
+def memory_budget(solver, molecule, basis):
     """
-    Gets the memory the simd RI-JK driver may hold, per rank, in bytes.
+    Gets the memory the simd RI driver of a response solver may hold, per rank,
+    in bytes. Every rank must call this. RI-J and RI-JK both take it.
 
     :param solver:
-        The solver, whose communicator says how many ranks share this machine.
+        The solver.
+    :param molecule:
+        The molecule, whose open shell doubles the rank reserve.
+    :param basis:
+        The AO basis set.
 
     :return:
-        The memory budget in bytes.
+        The memory budget in bytes: ri_memory_budget where the solver sets it
+        (in GB, taken as it is), and otherwise the memory free to this rank less
+        the reserves of the node and of the rank. The rank's reserve is kept on
+        the solver, for memory profiling to report.
     """
 
-    try:
-        import psutil
-        available = psutil.virtual_memory().available
-    except ImportError:
-        available = 8 * 1024**3
+    ri_memory_budget = getattr(solver, 'ri_memory_budget', None)
 
-    reserve = 4 * 1024**3
+    if ri_memory_budget is not None:
+        solver._ri_memory_reserve = 0
+        return int(ri_memory_budget * 1.0e9)
 
-    # NOTE: the ranks of one node see the same free memory and would each claim the
-    # whole of it, so the node would be promised several times over. The ranks
-    # sharing a node are counted by their host name, as the Fock build counts them,
-    # and the memory is divided between them. This asked for the whole of it on
-    # every rank, which on eight ranks of a node promised that node its memory eight
-    # times.
-    import platform
-    here = platform.node()
-    on_this_node = max(solver.comm.allgather(here).count(here), 1)
+    # NOTE: the rank's reserve is taken from what is free to the rank after the
+    # node's reserve, so it is worked out here and not in get_ri_free_memory,
+    # which the SCF and its gradient share with a fixed reserve.
+    free = get_ri_free_memory(solver.comm, 0)
 
-    return int(max(available - reserve, 0.25 * available) / on_this_node)
+    reserve = rank_reserve(molecule, basis, free)
+
+    solver._ri_memory_reserve = reserve
+
+    return max(free - reserve, 0)
+
+
+def rank_reserve(molecule, basis, free):
+    """
+    Gets the memory a rank keeps back from the simd RI driver of a response
+    solver, for what the response allocates after the budget is taken, in bytes.
+
+    :param molecule:
+        The molecule.
+    :param basis:
+        The AO basis set.
+    :param free:
+        The memory free to this rank after the node's reserve, in bytes.
+
+    :return:
+        The reserve in bytes.
+    """
+
+    # NOTE: part of what the response allocates after the budget is taken goes
+    # as the square of the basis: the quadrature of the functional and its
+    # ground state density, the densities of a build broadcast to every rank
+    # and the Fock matrices formed from them, and their reduction. Each spin of
+    # an open shell carries its own.
+    nao = basis.get_dimensions_of_basis()
+    nspins = (1 if molecule.number_of_alpha_electrons()
+              == molecule.number_of_beta_electrons() else 2)
+
+    matrices = _RANK_RESERVE_MATRICES * nspins * nao * nao * 8
+
+    # NOTE: the larger part does not go as the square of the basis: the
+    # solver's reduced space (trial and sigma vectors, each of the size of the
+    # occupied times the virtual orbitals, growing with the states or
+    # frequencies and with the iterations) and a nonlinear driver's batch of
+    # second-order densities. Neither is known when the budget is taken, so a
+    # share of the free memory is kept for them, which grows with the machine
+    # as a calculation asking for more of them does. For noradrenaline in
+    # def2-TZVPD (552 basis functions), B3LYP, on one rank with 12 threads,
+    # this part was about 0.4 GB for 5 RPA states, 1.2 GB for 40 complex
+    # polarizability frequencies and 2.1 GB for 50 RPA states.
+    share = free // _RANK_RESERVE_SHARE_DIVISOR
+
+    return max(matrices, share, 512 * 1024**2)
+
+
+# NOTE: the matrices of the basis squared the rank reserve keeps for each spin;
+# see rank_reserve.
+_RANK_RESERVE_MATRICES = 12
+
+# NOTE: the rank reserve keeps at least this fraction (its inverse) of what is
+# free to the rank; see rank_reserve.
+_RANK_RESERVE_SHARE_DIVISOR = 4
+
+
+def mark_setup(solver):
+    """
+    Records what a rank holds before the simd RI driver of a response solver is
+    set up, against which memory profiling holds its peak after the response.
+    With memory profiling, the peak is reset here, so that what follows is not
+    read against the SCF's peak.
+
+    :param solver:
+        The solver.
+    """
+
+    if not getattr(solver, 'memory_profiling', False):
+        return
+
+    Profiler.reset_peak_memory()
+
+    solver._ri_rss_at_setup = psutil.Process().memory_info().rss
+
+
+def print_memory_check(solver):
+    """
+    Prints, with memory profiling, the most the simd RI driver of a response
+    solver was predicted to reach against what each rank's peak grew by after
+    it was set up. Every rank must call this.
+
+    :param solver:
+        The solver.
+    """
+
+    if (not getattr(solver, 'memory_profiling', False) or
+            getattr(solver, '_ri_rss_at_setup', None) is None):
+        return
+
+    if solver._uses_ri_jk() and solver._ri_jk_memory is not None:
+        label = 'RI-JK'
+        predicted = getattr(solver, '_ri_jk_predicted_peak', 0)
+    elif solver._uses_ri_coulomb() and solver._ri_j_memory is not None:
+        label = 'RI-J'
+        predicted = solver._ri_j_memory[1]
+    else:
+        return
+
+    predicted = max(solver.comm.allgather(predicted))
+
+    # NOTE: the growth of the peak and not the peak itself, as in the SCF: what
+    # a rank held before the setup was not free when the budget was taken.
+    grown = Profiler.get_peak_memory() - solver._ri_rss_at_setup
+    grown_all = solver.comm.allgather(grown)
+    largest = max(grown_all)
+
+    where = ('' if solver.nodes == 1 else
+             f' on rank {grown_all.index(largest):d}, the largest of ' +
+             f'{solver.nodes:d}')
+
+    solver.ostream.print_info(
+        f'{label} was predicted to need roughly ' +
+        f'{Profiler.memory_to_string(predicted)} at its largest build, with ' +
+        f'{Profiler.memory_to_string(solver._ri_memory_reserve)} reserved ' +
+        'for the rest of the response.')
+    solver.ostream.print_info('Peak memory grew by ' +
+                              f'{Profiler.memory_to_string(largest)} after ' +
+                              f'the {label} setup{where}.')
+    solver.ostream.print_blank()
+    solver.ostream.flush()
 
 
 def range_separation(solver):
@@ -159,8 +283,10 @@ def initialize(solver, molecule, basis):
     # solvers of its own hands them down with share below, and each of those
     # solvers initializes itself in turn, so this is reached again with the work
     # already done. Doing it again would cost what it cost the first time.
-    if is_prepared(solver):
+    if is_prepared(solver) or getattr(solver, '_ri_jk_fallback', False):
         return
+
+    mark_setup(solver)
 
     assert_msg_critical(
         'jkfit' in solver.ri_auxiliary_basis.lower(),
@@ -200,15 +326,12 @@ def initialize(solver, molecule, basis):
                                                      solver.eri_thresh)
         aux_atoms = molecule.partition_atoms_by_weight(solver.comm, weights)
 
-    needed = solver._ri_jk_drv.required_memory(molecule, basis,
-                                               solver._ri_jk_aux_basis,
-                                               solver.eri_thresh, aux_atoms,
-                                               omega > 0.0)
-
     # NOTE: the response driver contracts the B vectors and cannot form them
-    # again, so the mode which holds them is the only one it can use. The memory
-    # is checked here rather than left to the allocator.
-    budget = memory_budget(solver)
+    # again, so the mode which holds them is the only one it can use.
+    #
+    # NOTE: the budget is the smallest of the ranks', so that every rank takes
+    # the same decision against the largest of their peaks.
+    budget = min(solver.comm.allgather(memory_budget(solver, molecule, basis)))
 
     # NOTE: the exchange work arrays are a transient on top of the B vectors and
     # the rest of the live set, so they take a fraction of the rank's share and
@@ -219,11 +342,45 @@ def initialize(solver, molecule, basis):
     exchange_budget = min(
         budget, max(1 * 1024**3, min(8 * 1024**3, budget // 8)))
 
-    assert_msg_critical(
-        needed <= budget,
-        f'{type(solver).__name__}: the B vectors need ' +
-        f'{Profiler.memory_to_string(needed)} of ' +
-        f'{Profiler.memory_to_string(budget)} available')
+    response_drv = SimdRIJKResponseDriver(solver.eri_thresh, 0,
+                                          exchange_budget)
+
+    # NOTE: the peak is not the B vectors alone. Forming them holds the
+    # integrals of a batch beside them, and a build holds the transformed
+    # factors, the Coulomb buffers and its densities. The densities of a build
+    # are taken in chunks small enough to fit (see _max_densities), so the
+    # check here is that forming fits and that a build of one density of the
+    # largest shape the solvers hand over does.
+    forming, build, nheld = response_drv.fixed_memory(molecule, basis,
+                                                      solver._ri_jk_aux_basis,
+                                                      solver.eri_thresh,
+                                                      aux_atoms, omega > 0.0)
+
+    peak = max(
+        response_drv.peak_memory(forming, build, *shape, 1, nheld)
+        for shape in _worst_shapes(molecule, basis))
+
+    peaks = solver.comm.allgather(peak)
+
+    if max(peaks) > budget:
+        # NOTE: the solver falls back to the four-center integrals, and so does
+        # every solver this one hands its B vectors to (see share). ri, ri_jk
+        # and ri_coulomb are left as they were set.
+        solver._ri_jk_fallback = True
+        solver._ri_jk_drv = None
+        solver._ri_jk_response_drv = None
+        solver._ri_jk_aux_basis = None
+        solver._ri_jk_memory = None
+
+        where = ('available' if solver.nodes == 1 else 'on the largest rank')
+        solver.ostream.print_warning(
+            'RI-JK would need roughly ' +
+            f'{Profiler.memory_to_string(max(peaks))} of ' +
+            f'{Profiler.memory_to_string(budget)} {where}, so the response ' +
+            'Fock matrices are formed from the four-center integrals.')
+        solver.ostream.print_blank()
+        solver.ostream.flush()
+        return
 
     metric_erf = PackedMatrix()
 
@@ -263,8 +420,14 @@ def initialize(solver, molecule, basis):
         'auxiliary functions, which is not the auxiliary basis once over ' +
         'the ranks')
 
-    solver._ri_jk_response_drv = SimdRIJKResponseDriver(
-        solver.eri_thresh, 0, exchange_budget)
+    solver._ri_jk_response_drv = response_drv
+
+    # NOTE: what a build may take, which _max_densities cuts its densities by.
+    solver._ri_jk_memory = (budget, forming, build, nheld)
+
+    # NOTE: the most this rank was predicted to reach so far, which the builds
+    # raise as they take more densities (see _note_peak).
+    solver._ri_jk_predicted_peak = peak
 
     # NOTE: the B vectors are a share of the auxiliary basis on more than one rank,
     # and the response driver is told which functions that share carries. Left to
@@ -287,11 +450,135 @@ def initialize(solver, molecule, basis):
         solver.ostream.print_info(
             f'The auxiliary basis is divided over {solver.nodes} ranks.')
 
+    where = ('available' if solver.nodes == 1 else 'on the largest rank')
     solver.ostream.print_info(
-        f'B vectors need {Profiler.memory_to_string(needed)} of ' +
-        f'{Profiler.memory_to_string(budget)} available, a rank.')
+        'RI-JK needs roughly ' +
+        f'{Profiler.memory_to_string(max(peaks))} of ' +
+        f'{Profiler.memory_to_string(budget)} {where} for a build of one ' +
+        'density; larger batches are cut to fit.')
     solver.ostream.print_blank()
     solver.ostream.flush()
+
+
+def _worst_shapes(molecule, basis):
+    """The shapes of a build of one density which the setup checks.
+
+    :param molecule:
+        The molecule.
+    :param basis:
+        The AO basis set.
+
+    :return:
+        The arguments of the response driver's peak_memory after forming and
+        build, as (nao, nvec, nterms, ncalls, nspins), for each shape a solver
+        may hand over.
+
+    .. note::
+        A linear response trial vector has two terms over the occupied orbitals;
+        a block diagonal density is two calls, the second over the virtual
+        orbitals, which may be nearly as many as the basis; an open shell has
+        two spins of two terms. The virtual orbitals are bounded by the basis
+        less the occupied ones, as the orbitals may be fewer than the basis.
+    """
+
+    nao = basis.get_dimensions_of_basis()
+    nalpha = molecule.number_of_alpha_occupied_orbitals(basis)
+    nbeta = molecule.number_of_beta_occupied_orbitals(basis)
+
+    shapes = [
+        (nao, nalpha, 2, 1, 1),
+        (nao, max(nalpha, nao - nbeta), 1, 2, 1),
+    ]
+
+    if nalpha != nbeta:
+        shapes.append((nao, max(nalpha, nbeta), 2, 1, 2))
+
+    return shapes
+
+
+def _max_densities(solver, nao, nvec, nterms, ncalls, nspins):
+    """The most densities one call of a build may take within the budget.
+
+    :param solver:
+        The solver holding the B vectors and the memory they were checked with.
+    :param nao:
+        The number of basis functions.
+    :param nvec:
+        The columns of the largest left factor of the call.
+    :param nterms:
+        One for densities of one term, two for densities of two terms.
+    :param ncalls:
+        One, or two for a block diagonal density.
+    :param nspins:
+        One for a restricted reference, two for an unrestricted one.
+
+    :return:
+        The number of densities, at least one, or None where the solver was
+        handed B vectors without the memory they were checked with and nothing
+        is cut.
+    """
+
+    memory = getattr(solver, '_ri_jk_memory', None)
+
+    if memory is None:
+        return None
+
+    budget, forming, build, nheld = memory
+
+    drv = solver._ri_jk_response_drv
+
+    # NOTE: at least one. The setup checked that one density of every shape a
+    # solver hands over fits, so this is a bound that holds and not a guess.
+    count = max(
+        drv.max_densities(budget, forming, build, nao, nvec, nterms, ncalls,
+                          nspins, nheld), 1)
+
+    return count
+
+
+def _note_peak(solver, nao, nvec, nterms, ncalls, nspins, ndens):
+    """Records the most a build was predicted to reach, for memory profiling.
+
+    :param solver:
+        The solver holding the B vectors.
+    :param ndens:
+        The densities of the call.
+
+    The other parameters are those of _max_densities.
+    """
+
+    memory = getattr(solver, '_ri_jk_memory', None)
+
+    if memory is None:
+        return
+
+    _, forming, build, nheld = memory
+
+    peak = solver._ri_jk_response_drv.peak_memory(forming, build, nao, nvec,
+                                                  nterms, ncalls, nspins,
+                                                  ndens, nheld)
+
+    solver._ri_jk_predicted_peak = max(
+        getattr(solver, '_ri_jk_predicted_peak', 0), peak)
+
+
+def _chunks(ndens, count):
+    """The ranges of the densities a batch is cut into.
+
+    :param ndens:
+        The densities of the batch.
+    :param count:
+        The most densities of a chunk, or None for the whole batch at once.
+
+    :return:
+        The (start, end) of each chunk.
+    """
+
+    if count is None or count >= ndens:
+        return [(0, ndens)]
+
+    return [(start, min(start + count, ndens))
+            for start in range(0, ndens, count)]
 
 
 def _spin_factors(dens_factors, spin):
@@ -363,27 +650,47 @@ def fock_matrices_unrestricted(solver,
     if not rights_a:
         return []
 
-    shared = (basis, aux, _packed(left_a), [_packed(r) for r in rights_a],
-              [_packed(r) for r in transposed_a], _packed(left_b),
-              [_packed(r) for r in rights_b], [_packed(r) for r in transposed_b])
+    bq_erf = (solver._ri_jk_drv.get_bq_vectors_erf()
+              if erf_exchange_scaling_factor != 0.0 else None)
 
-    if erf_exchange_scaling_factor != 0.0:
-        bq_erf = solver._ri_jk_drv.get_bq_vectors_erf()
+    # NOTE: the densities are taken in chunks small enough that a call stays
+    # within the budget the B vectors were checked with. The Fock matrix is
+    # linear in the density, so the chunks are independent.
+    nao = basis.get_dimensions_of_basis()
+    nvec = max(left_a.shape[1], left_b.shape[1])
+    nterms = 2 if (transposed_a or transposed_b) else 1
+    ndens = len(rights_a)
 
-        focks_a, focks_b = drv.compute_unrestricted_rs(
-            bq, bq_erf, *shared, exchange_scaling_factor,
-            erf_exchange_scaling_factor)
-    else:
-        focks_a, focks_b = drv.compute_unrestricted(bq, *shared,
-                                                    exchange_scaling_factor)
+    count = _max_densities(solver, nao, nvec, nterms, 1, 2)
 
     # NOTE: alpha and beta of one density side by side, which is what the four
     # centre path appends and what every caller of it unpacks.
     fock_arrays = []
 
-    for fock_a, fock_b in zip(focks_a, focks_b):
-        fock_arrays.append(fock_a.to_numpy())
-        fock_arrays.append(fock_b.to_numpy())
+    for start, end in _chunks(ndens, count):
+        _note_peak(solver, nao, nvec, nterms, 1, 2, end - start)
+
+        shared = (basis, aux, _packed(left_a),
+                  [_packed(r) for r in rights_a[start:end]],
+                  [_packed(r) for r in transposed_a[start:end]],
+                  _packed(left_b), [_packed(r) for r in rights_b[start:end]],
+                  [_packed(r) for r in transposed_b[start:end]])
+
+        if bq_erf is not None:
+            focks_a, focks_b = drv.compute_unrestricted_rs(
+                bq, bq_erf, *shared, exchange_scaling_factor,
+                erf_exchange_scaling_factor)
+        else:
+            focks_a, focks_b = drv.compute_unrestricted(
+                bq, *shared, exchange_scaling_factor)
+
+        for fock_a, fock_b in zip(focks_a, focks_b):
+            fock_arrays.append(fock_a.to_numpy())
+            fock_arrays.append(fock_b.to_numpy())
+
+        # NOTE: freed before the next chunk is formed, which the count was
+        # taken for, rather than when the names are bound again after it.
+        del shared, focks_a, focks_b
 
     return fock_arrays
 
@@ -471,12 +778,22 @@ def share(source, target):
     # which arises -- a driver drives solvers of its own -- and if it ever did, the
     # target's own is_prepared would reject what it was handed and it would form
     # the set it needs.
+    # NOTE: a source which fell back hands that on, so its solvers do not form
+    # the B vectors it could not hold or warn again.
+    if getattr(source, '_ri_jk_fallback', False):
+        target._ri_jk_fallback = True
+        return
+
     if not is_prepared(source):
         return
 
     target._ri_jk_drv = source._ri_jk_drv
     target._ri_jk_response_drv = source._ri_jk_response_drv
     target._ri_jk_aux_basis = source._ri_jk_aux_basis
+    target._ri_jk_memory = getattr(source, '_ri_jk_memory', None)
+    target._ri_jk_predicted_peak = getattr(source, '_ri_jk_predicted_peak', 0)
+    target._ri_rss_at_setup = getattr(source, '_ri_rss_at_setup', None)
+    target._ri_memory_reserve = getattr(source, '_ri_memory_reserve', 0)
 
 
 def slice_factors(dens_factors, start, end):
@@ -559,6 +876,14 @@ def fock_matrices(solver, basis, dens_factors, exchange_scaling_factor,
     # here. A pure functional asks for a scaling of zero and is given twice the
     # Coulomb, where the dense path forms the Coulomb and doubles it.
 
+    # NOTE: the densities are taken in chunks small enough that a call stays
+    # within the budget the B vectors were checked with. The Fock matrix is
+    # linear in the density, so the chunks are independent; each one transforms
+    # the shared left factor again, which is the price of the bound.
+    nao = basis.get_dimensions_of_basis()
+
+    fock_arrays = []
+
     if len(dens_factors) == 4:
         # NOTE: a block diagonal density, taken as the sum of its blocks. The
         # Fock matrix is linear in the density, so two batches added is the Fock
@@ -566,17 +891,31 @@ def fock_matrices(solver, basis, dens_factors, exchange_scaling_factor,
         # already take.
         left_a, rights_a, left_b, rights_b = dens_factors
 
-        first = drv.compute(bq, basis, aux, _packed(left_a),
-                            [_packed(r) for r in rights_a],
-                            exchange_scaling_factor, bq_erf,
-                            erf_exchange_scaling_factor)
+        nvec = max(left_a.shape[1], left_b.shape[1])
 
-        second = drv.compute(bq, basis, aux, _packed(left_b),
-                             [_packed(r) for r in rights_b],
-                             exchange_scaling_factor, bq_erf,
-                             erf_exchange_scaling_factor)
+        count = _max_densities(solver, nao, nvec, 1, 2, 1)
 
-        return [a.to_numpy() + b.to_numpy() for a, b in zip(first, second)]
+        for start, end in _chunks(len(rights_a), count):
+            _note_peak(solver, nao, nvec, 1, 2, 1, end - start)
+
+            first = drv.compute(bq, basis, aux, _packed(left_a),
+                                [_packed(r) for r in rights_a[start:end]],
+                                exchange_scaling_factor, bq_erf,
+                                erf_exchange_scaling_factor)
+
+            second = drv.compute(bq, basis, aux, _packed(left_b),
+                                 [_packed(r) for r in rights_b[start:end]],
+                                 exchange_scaling_factor, bq_erf,
+                                 erf_exchange_scaling_factor)
+
+            fock_arrays += [
+                a.to_numpy() + b.to_numpy() for a, b in zip(first, second)
+            ]
+
+            # NOTE: freed before the next chunk is formed.
+            del first, second
+
+        return fock_arrays
 
     if len(dens_factors) == 2:
         left, rights = dens_factors
@@ -584,12 +923,29 @@ def fock_matrices(solver, basis, dens_factors, exchange_scaling_factor,
     else:
         left, rights, transposed_rights = dens_factors
 
-    args = [bq, basis, aux, _packed(left), [_packed(r) for r in rights]]
+    nvec = left.shape[1]
+    nterms = 1 if transposed_rights is None else 2
 
-    if transposed_rights is not None:
-        args.append([_packed(r) for r in transposed_rights])
+    count = _max_densities(solver, nao, nvec, nterms, 1, 1)
 
-    focks = drv.compute(*args, exchange_scaling_factor, bq_erf,
-                        erf_exchange_scaling_factor)
+    for start, end in _chunks(len(rights), count):
+        _note_peak(solver, nao, nvec, nterms, 1, 1, end - start)
 
-    return [fock.to_numpy() for fock in focks]
+        args = [
+            bq, basis, aux,
+            _packed(left), [_packed(r) for r in rights[start:end]]
+        ]
+
+        if transposed_rights is not None:
+            args.append(
+                [_packed(r) for r in transposed_rights[start:end]])
+
+        focks = drv.compute(*args, exchange_scaling_factor, bq_erf,
+                            erf_exchange_scaling_factor)
+
+        fock_arrays += [fock.to_numpy() for fock in focks]
+
+        # NOTE: freed before the next chunk is formed.
+        del args, focks
+
+    return fock_arrays

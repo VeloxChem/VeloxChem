@@ -38,11 +38,7 @@ import math
 from .veloxchemlib import XCIntegrator, MolecularGrid
 from .veloxchemlib import T4CScreener
 from .veloxchemlib import mpi_master
-from .molecularbasis import MolecularBasis
-from .veloxchemlib import PackedMatrix
-from .veloxchemlib import SimdRIJFockDriver
 from .veloxchemlib import make_matrix, mat_t
-from .veloxchemlib import rimode
 from .matrix import Matrix
 from .aodensitymatrix import AODensityMatrix
 from .griddriver import GridDriver
@@ -53,6 +49,7 @@ from .sanitychecks import dft_and_ri_sanity_check
 from .sanitychecks import nonlinear_response_environment_sanity_check
 from .errorhandler import assert_msg_critical
 from . import rijkresponse
+from . import rijresponse
 from .inputparser import parse_input, print_keywords, print_attributes
 from .dftutils import get_default_grid_level, get_optimal_grid_box_size
 from .batchsize import get_batch_size
@@ -122,6 +119,20 @@ class NonlinearSolver:
         # the four-center integrals for want of memory. It is read from the SCF
         # results, and ri, ri_coulomb and ri_jk are left as they were set.
         self._ri_fallback = False
+
+        # NOTE: the memory the simd RI driver of a rank may hold, in GB, taken as
+        # it is; None takes what is free less the reserves. An attribute and not
+        # an input keyword, as for the gradient's budget.
+        self.ri_memory_budget = None
+
+        # NOTE: whether this response fell back from RI to the four-center
+        # integrals for want of memory of its own, and what the build was
+        # checked with. RI-JK's is decided once with the B vectors and handed on
+        # with them; RI-J's is decided again whenever the integrals are.
+        self._ri_jk_fallback = False
+        self._ri_jk_memory = None
+        self._ri_j_fallback = False
+        self._ri_j_memory = None
 
         # dft
         self._dft = False
@@ -337,8 +348,8 @@ class NonlinearSolver:
 
         self._print_ri_fallback_info(asks_ri_coulomb, asks_ri_jk)
 
-        if asks_ri_coulomb and self._uses_ri_coulomb():
-            self._init_simd_ri_j(molecule, basis)
+        if asks_ri_coulomb and not self._ri_fallback:
+            rijresponse.initialize(self, molecule, basis)
 
         if asks_ri_jk and self._uses_ri_jk():
             rijkresponse.initialize(self, molecule, basis)
@@ -350,26 +361,28 @@ class NonlinearSolver:
     def _uses_ri_jk(self):
         """
         Checks whether the Fock matrices are formed with the SIMD RI-JK driver,
-        which is what ri_jk asks for unless the SCF fell back to the
-        four-center integrals for want of memory.
+        which is what ri_jk asks for unless the SCF or this response fell back
+        to the four-center integrals for want of memory.
 
         :return:
             True if the SIMD RI-JK driver forms the Fock matrices.
         """
 
-        return self.ri_jk and not self._ri_fallback
+        return (self.ri_jk and not self._ri_fallback and
+                not self._ri_jk_fallback)
 
     def _uses_ri_coulomb(self):
         """
         Checks whether the Coulomb matrices are formed with the SIMD RI-J
-        driver, which is what ri_coulomb asks for unless the SCF fell back to
-        the four-center integrals for want of memory.
+        driver, which is what ri_coulomb asks for unless the SCF or this
+        response fell back to the four-center integrals for want of memory.
 
         :return:
             True if the SIMD RI-J driver forms the Coulomb matrices.
         """
 
-        return self.ri_coulomb and not self._ri_fallback
+        return (self.ri_coulomb and not self._ri_fallback and
+                not self._ri_j_fallback)
 
     def _print_ri_fallback_info(self, asks_ri_coulomb, asks_ri_jk):
         """
@@ -394,121 +407,6 @@ class NonlinearSolver:
             'response Fock matrices are formed from the four-center integrals.')
         self.ostream.print_blank()
         self.ostream.flush()
-
-    def _init_simd_ri_j(self, molecule, basis):
-        """
-        Prepares the simd Coulomb only driver this solver builds with.
-
-        :param molecule:
-            The molecule.
-        :param basis:
-            The AO basis set.
-        """
-
-        basis_ri = MolecularBasis.read(molecule,
-                                       self.ri_auxiliary_basis,
-                                       ostream=None,
-                                       auxiliary_basis=True)
-
-        self._ri_drv = SimdRIJFockDriver()
-
-        # NOTE: the metric is inverted once on the master and handed to the ranks,
-        # as the Fock build does it: the inversion picks its own fallback from the
-        # matrix, and two ranks choosing differently would build with metrics which
-        # are not the same.
-        metric = PackedMatrix()
-
-        if self.rank == mpi_master():
-            metric = self._ri_drv.make_metric(molecule, basis_ri,
-                                              self.ri_metric_threshold)
-
-        metric = metric.broadcast(self.comm, root=mpi_master())
-
-        self._ri_drv.prepare(molecule, basis, basis_ri, self.eri_thresh,
-                             self._get_ri_j_memory_budget(),
-                             self.ri_metric_threshold, rimode.automatic, metric,
-                             self.rank, self.nodes)
-
-        if self.rank == mpi_master():
-            self.ostream.print_info(
-                'Using the SIMD resolution of the identity (RI-J) for response.')
-            self.ostream.print_blank()
-            self.ostream.flush()
-
-    def _get_ri_j_memory_budget(self):
-        """
-        Gets the memory the simd Coulomb only driver may hold, per rank.
-
-        :return:
-            The memory budget in bytes.
-        """
-
-        try:
-            import psutil
-            available = psutil.virtual_memory().available
-        except ImportError:
-            available = 8 * 1024**3
-
-        # NOTE: the ranks of one node see the same free memory and would each claim
-        # the whole of it, so the node would be promised several times over.
-        import platform
-        here = platform.node()
-        on_this_node = max(self.comm.allgather(here).count(here), 1)
-
-        return int(max(available - 4 * 1024**3, 0.25 * available) / on_this_node)
-
-    def _comp_simd_ri_j_fock(self, dens):
-        """
-        Computes this rank's share of the Coulomb matrices of a batch of densities.
-
-        :param dens:
-            The densities, as numpy arrays.
-
-        :return:
-            This rank's share of each Coulomb matrix, as numpy arrays.
-        """
-
-        # NOTE: a three-time DFT calculation may hand empty trailing batches.
-        if not dens:
-            return []
-
-        nao = dens[0].shape[0]
-
-        mine = self._ri_drv.owned_parts()
-
-        packed = []
-
-        for density in dens:
-            matrix = PackedMatrix(nao, nao, mat_t.symmetric)
-            matrix.from_numpy(np.ascontiguousarray(0.5 * (density + density.T)))
-            packed.append(matrix)
-
-        # NOTE: the right hand sides of every fitting of the batch, reduced in one
-        # collective rather than one for each density.
-
-        local = np.array(
-            [self._ri_drv.compute_gamma(matrix, mine) for matrix in packed],
-            dtype=np.float64)
-
-        total = np.zeros_like(local)
-        self.comm.Allreduce(local, total, op=MPI.SUM)
-
-        fock_arrays = []
-
-        for idx in range(len(packed)):
-            gamma = self._ri_drv.solve_fitting(list(total[idx]))
-
-            fock = PackedMatrix(nao, nao, mat_t.symmetric)
-            fock.zero()
-
-            self._ri_drv.compute_coulomb(gamma, mine, fock)
-
-            # NOTE: twice, as the loop this path replaces doubles what the
-            # conventional driver of this approximation answers.
-
-            fock_arrays.append(2.0 * fock.to_numpy())
-
-        return fock_arrays
 
     def _init_dft(self, molecule, scf_results):
         """
@@ -1113,7 +1011,8 @@ class NonlinearSolver:
             erf_k_factor = erf_k_coef if need_omega else 0.0
 
             if use_ri_coulomb:
-                fock_arrays = self._comp_simd_ri_j_fock(dts_for_fock)
+                fock_arrays = rijresponse.coulomb_matrices(
+                    self, dts_for_fock, self.comm)
 
             elif use_ri_jk:
                 # NOTE: the factors of this batch and not of the whole set. The

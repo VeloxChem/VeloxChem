@@ -649,6 +649,7 @@ class PolOrbitalResponse(CphfSolver):
 
         profiler.print_timing(self.ostream)
         profiler.print_memory_usage(self.ostream)
+        self._print_ri_memory_check()
         profiler.print_profiling_summary(self.ostream)
 
         if self.rank == mpi_master():
@@ -1129,6 +1130,7 @@ class PolOrbitalResponse(CphfSolver):
 
         profiler.print_timing(self.ostream)
         profiler.print_memory_usage(self.ostream)
+        self._print_ri_memory_check()
         profiler.print_profiling_summary(self.ostream)
 
         if self.rank == mpi_master():
@@ -1456,6 +1458,7 @@ class PolOrbitalResponse(CphfSolver):
 
         profiler.print_timing(self.ostream)
         profiler.print_memory_usage(self.ostream)
+        self._print_ri_memory_check()
         profiler.print_profiling_summary(self.ostream)
 
         if self.rank == mpi_master():
@@ -1782,6 +1785,7 @@ class PolOrbitalResponse(CphfSolver):
 
         profiler.print_timing(self.ostream)
         profiler.print_memory_usage(self.ostream)
+        self._print_ri_memory_check()
         profiler.print_profiling_summary(self.ostream)
 
         if self.rank == mpi_master():
@@ -2865,6 +2869,7 @@ class PolOrbitalResponse(CphfSolver):
 
         profiler.print_timing(self.ostream)
         profiler.print_memory_usage(self.ostream)
+        self._print_ri_memory_check()
         profiler.print_profiling_summary(self.ostream)
 
         if self.rank == mpi_master():
@@ -3140,6 +3145,7 @@ class PolOrbitalResponse(CphfSolver):
 
         profiler.print_timing(self.ostream)
         profiler.print_memory_usage(self.ostream)
+        self._print_ri_memory_check()
         profiler.print_profiling_summary(self.ostream)
 
         if self.rank == mpi_master():
@@ -3489,6 +3495,7 @@ class PolOrbitalResponse(CphfSolver):
 
         profiler.print_timing(self.ostream)
         profiler.print_memory_usage(self.ostream)
+        self._print_ri_memory_check()
         profiler.print_profiling_summary(self.ostream)
 
         if self.rank == mpi_master():
@@ -3824,6 +3831,7 @@ class PolOrbitalResponse(CphfSolver):
 
         profiler.print_timing(self.ostream)
         profiler.print_memory_usage(self.ostream)
+        self._print_ri_memory_check()
         profiler.print_profiling_summary(self.ostream)
 
         if self.rank == mpi_master():

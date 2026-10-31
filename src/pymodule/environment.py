@@ -119,6 +119,54 @@ def get_available_memory():
     return available
 
 
+def get_ri_free_memory(comm, rank_reserve):
+    """
+    Gets the memory free to a rank for a resolution of the identity driver, less
+    a reserve for the node and one for each rank on it, in bytes. Every rank of
+    the communicator must call this.
+
+    :param comm:
+        The communicator, whose ranks sharing a node divide its memory.
+    :param rank_reserve:
+        The memory each rank keeps back for what the calculation allocates after
+        this is measured, in bytes.
+
+    :return:
+        The memory in bytes, zero where the reserves leave nothing.
+    """
+
+    # NOTE: what is free to this process, which is less than what is free on
+    # the node where a batch system confines the job to a share of it. What
+    # the process already holds is not free, so it needs no reserve.
+    available = get_available_memory()
+
+    # NOTE: the ranks of one node see the same free memory and would each claim
+    # the whole of it, so the node would be promised several times over. The
+    # ranks sharing a node are counted by their host name and the memory is
+    # divided between them.
+    import platform
+    here = platform.node()
+    on_this_node = max(comm.allgather(here).count(here), 1)
+
+    # NOTE: two reserves. The node keeps a few gigabytes for itself, and every
+    # rank keeps what the rest of the calculation allocates after this is
+    # measured.
+    #
+    # NOTE: the node's reserve is a guess at what is used outside the
+    # calculation, and what the operating system holds is already not counted
+    # as available, so on a small machine it is kept to a quarter of what is
+    # free rather than a fixed amount which would leave nothing. The ranks'
+    # reserves are what the calculation itself will allocate and are never
+    # cut: where they leave nothing, the budget is zero and the build falls
+    # back to the four-center integrals, rather than RI being handed memory
+    # the rest of the calculation needs.
+    node_reserve = min(4 * 1024**3, available // 4)
+
+    free = available - node_reserve - on_this_node * rank_reserve
+
+    return int(max(free, 0) / on_this_node)
+
+
 def _get_cgroup_available_memory():
     """
     Gets the memory the control groups of this process leave free, in bytes.
