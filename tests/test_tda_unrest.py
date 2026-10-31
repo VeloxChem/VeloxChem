@@ -470,3 +470,31 @@ class TestUnrestrictedTDA:
         with pytest.raises(VeloxChemError,
                            match='restricted_subspace not implemented'):
             lr_drv.compute(mol, bas, scf_results)
+
+    def test_unstable_reference_is_flagged(self):
+
+        # H2 at 2.0 Angstrom: the spin-symmetric UHF solution is a saddle point
+        # with a negative TDA excitation energy; at 0.74 Angstrom it is stable
+
+        found = {}
+
+        for distance in [0.74, 2.0]:
+            mol = Molecule.read_xyz_string(
+                f'2\n\nH 0.0 0.0 0.0\nH 0.0 0.0 {distance}')
+            bas = MolecularBasis.read(mol, 'def2-svp', ostream=None)
+
+            scf_drv = ScfUnrestrictedDriver()
+            scf_drv.ri = False
+            scf_drv.ostream.mute()
+            scf_results = scf_drv.compute(mol, bas)
+
+            tda_drv = TdaUnrestrictedEigenSolver()
+            tda_drv.ostream.mute()
+            tda_drv.nstates = 1
+            tda_drv.compute(mol, bas, scf_results)
+
+            found[distance] = tda_drv._reference_instability
+
+        if MPI.COMM_WORLD.Get_rank() == mpi_master():
+            assert found[0.74] is None
+            assert found[2.0] < -0.05

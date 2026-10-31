@@ -122,6 +122,8 @@ class TdaEigenSolver(TdaEigenSolverBase):
         if self.lindep_thresh is None:
             self.lindep_thresh = self.conv_thresh * 1.0e-2
 
+        self._reference_instability = None
+
         # check molecule
         molecule_sanity_check(molecule, 'restricted', type(self).__name__)
 
@@ -290,6 +292,7 @@ class TdaEigenSolver(TdaEigenSolverBase):
 
             if self.rank == mpi_master():
                 trial_mat = self.solver.compute(diag_mat)
+                self._check_reference_stability()
 
         profiler.check_memory_usage('Initial guess')
 
@@ -329,6 +332,8 @@ class TdaEigenSolver(TdaEigenSolverBase):
                 self.solver.add_iteration_data(sig_mat, trial_mat, self.nstates)
 
                 trial_mat = self.solver.compute(diag_mat)
+
+                self._check_reference_stability()
 
                 self._print_iter_data(i)
 

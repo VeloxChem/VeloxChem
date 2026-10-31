@@ -541,3 +541,38 @@ class TestTDA:
                 VeloxChemError,
                 match="TdaEigenSolver: not implemented for unrestricted case"):
             lr_results_not_used = lr_drv.compute(mol, bas, scf_results)
+
+    def test_unstable_reference_is_flagged(self):
+
+        # H2 with the antibonding orbital doubly occupied, converged with the
+        # maximum overlap method: a saddle point with a negative TDA excitation
+        # energy; the ground state is stable
+
+        mol = Molecule.read_xyz_string('2\n\nH 0.0 0.0 0.0\nH 0.0 0.0 0.74')
+        bas = MolecularBasis.read(mol, 'def2-svp', ostream=None)
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ri = False
+        scf_drv.ostream.mute()
+        ground_results = scf_drv.compute(mol, bas)
+
+        mom_drv = ScfRestrictedDriver()
+        mom_drv.ri = False
+        mom_drv.ostream.mute()
+        mom_drv.maximum_overlap(mol, bas, scf_drv.molecular_orbitals, [1], [1])
+        mom_results = mom_drv.compute(mol, bas)
+
+        found = {}
+
+        for label, scf_results in [('ground', ground_results),
+                                   ('mom', mom_results)]:
+            tda_drv = TdaEigenSolver()
+            tda_drv.ostream.mute()
+            tda_drv.nstates = 1
+            tda_drv.compute(mol, bas, scf_results)
+
+            found[label] = tda_drv._reference_instability
+
+        if MPI.COMM_WORLD.Get_rank() == mpi_master():
+            assert found['ground'] is None
+            assert found['mom'] < -0.5
