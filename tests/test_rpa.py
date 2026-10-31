@@ -766,3 +766,43 @@ class TestRPA:
                                np.arange(1.0, nrows + 1.0).reshape(-1, 1))
             assert np.allclose(full_new_ung,
                                np.arange(101.0, 101.0 + nrows).reshape(-1, 1))
+
+    def test_unstable_reference_is_flagged(self):
+
+        # ethylene twisted by 90 degrees: the RHF solution is unstable towards
+        # complex orbitals; the planar molecule is stable
+
+        found = {}
+
+        for twist, h_xy in [(0, ('0.920851', '0.000000')),
+                            (90, ('0.000000', '0.920851'))]:
+            xyz_string = f"""6
+            xyz
+            C   0.000000   0.000000  -0.665000
+            C   0.000000   0.000000   0.665000
+            H   0.920851   0.000000  -1.229298
+            H  -0.920851   0.000000  -1.229298
+            H   {h_xy[0]}   {h_xy[1]}   1.229298
+            H  -{h_xy[0]}  -{h_xy[1]}   1.229298
+            """
+            mol = Molecule.read_xyz_string(xyz_string)
+            bas = MolecularBasis.read(mol, 'def2-svp', ostream=None)
+
+            scf_drv = ScfRestrictedDriver()
+            scf_drv.ri = False
+            scf_drv.ostream.mute()
+            scf_results = scf_drv.compute(mol, bas)
+
+            lr_drv = LinearResponseEigenSolver()
+            lr_drv.ostream.mute()
+            lr_drv.nstates = 1
+            lr_drv.compute(mol, bas, scf_results)
+
+            found[twist] = lr_drv._reference_instability
+
+        if MPI.COMM_WORLD.Get_rank() == mpi_master():
+            assert found[0] is None
+            assert len(found[90]) == 1
+            rotation, lowest = found[90][0]
+            assert rotation == 'imaginary'
+            assert lowest < -0.003

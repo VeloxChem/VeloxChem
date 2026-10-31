@@ -455,3 +455,34 @@ class TestUnrestrictedRPA:
         with pytest.raises(VeloxChemError,
                            match='restricted_subspace not implemented'):
             restricted_drv.compute(mol, bas, scf_results)
+
+    def test_unstable_reference_is_flagged(self):
+
+        # H2 at 1.5 Angstrom: the spin-symmetric UHF solution is a saddle point
+        # (unstable towards spin polarization); at 0.74 Angstrom it is stable
+
+        found = {}
+
+        for distance in [0.74, 1.5]:
+            mol = Molecule.read_xyz_string(
+                f'2\n\nH 0.0 0.0 0.0\nH 0.0 0.0 {distance}')
+            bas = MolecularBasis.read(mol, 'def2-svp', ostream=None)
+
+            scf_drv = ScfUnrestrictedDriver()
+            scf_drv.ri = False
+            scf_drv.ostream.mute()
+            scf_results = scf_drv.compute(mol, bas)
+
+            lr_drv = LinearResponseUnrestrictedEigenSolver()
+            lr_drv.ostream.mute()
+            lr_drv.nstates = 1
+            lr_drv.compute(mol, bas, scf_results)
+
+            found[distance] = lr_drv._reference_instability
+
+        if MPI.COMM_WORLD.Get_rank() == mpi_master():
+            assert found[0.74] is None
+            assert len(found[1.5]) == 1
+            rotation, lowest = found[1.5][0]
+            assert rotation == 'real'
+            assert lowest < -0.1

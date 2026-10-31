@@ -117,6 +117,8 @@ class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
         self._dist_fock_ger = None
         self._dist_fock_ung = None
 
+        self._reference_instability = None
+
         # check molecule
         molecule_sanity_check(molecule)
 
@@ -978,6 +980,8 @@ class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
         e2gg = self._dist_bger.matmul_AtB(self._dist_e2bger)
         e2uu = self._dist_bung.matmul_AtB(self._dist_e2bung)
         s2ug = self._dist_bung.matmul_AtB(self._dist_bger)
+
+        self._check_reference_stability(e2gg, e2uu, 1.0)
 
         if self.rank == mpi_master():
 

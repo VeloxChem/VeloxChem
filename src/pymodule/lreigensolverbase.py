@@ -57,6 +57,15 @@ class LinearResponseEigenSolverBase(LinearSolver):
     Thin shared scaffold for restricted and unrestricted LR eigensolvers.
     """
 
+    # The reference is reported as unstable when a projected E[2] block has an
+    # eigenvalue below minus this value (in Hartree). Numerical errors in these
+    # eigenvalues are far smaller. For H2, twisted ethylene and the triplet of
+    # noradrenaline with B3LYP/def2-SVP, switching between RI-JK and
+    # four-center integrals, between grid levels 2 and 6, or between SCF
+    # thresholds 1e-4 and 1e-10 moved them by at most 5e-5. Modes that are zero
+    # by symmetry (C, O and B atoms, OH radical) came out within 3e-6 of zero.
+    _reference_instability_thresh = 1.0e-3
+
     def __init__(self, comm=None, ostream=None):
         """
         Initializes linear response eigensolver to default setup.
@@ -98,6 +107,10 @@ class LinearResponseEigenSolverBase(LinearSolver):
         self.collapsed_subspace = False
         self.collapsed_from_dim = None
         self.collapsed_to_dim = None
+
+        # the rotation types and lowest eigenvalues found by
+        # _check_reference_stability, or None
+        self._reference_instability = None
 
         self._input_keywords['response'].update({
             'nstates': ('int', 'number of excited states'),
@@ -239,6 +252,58 @@ class LinearResponseEigenSolverBase(LinearSolver):
         vectors = self._normalize_half_size(vectors)
 
         return vectors
+
+    def _check_reference_stability(self, e2gg, e2uu, factor):
+        """
+        Warns, once per calculation, when the reduced-space E[2] shows that the
+        SCF reference is not a minimum of the energy.
+
+        A gerade trial vector gives an antisymmetric transition density and an
+        ungerade one a symmetric density, so e2gg and e2uu are the electronic
+        Hessian projected on imaginary and on real orbital rotations. With the
+        trial vectors orthogonal, scaling by their norms gives the Rayleigh-Ritz
+        values, and the lowest of them is an upper bound to the lowest
+        eigenvalue of the Hessian. The reduced-space solution leaves negative
+        directions out, so a root that has an imaginary excitation energy is
+        missing from the results, and the other roots may not converge.
+
+        :param e2gg:
+            The projected E[2] of the gerade trial vectors (master rank).
+        :param e2uu:
+            The projected E[2] of the ungerade trial vectors (master rank).
+        :param factor:
+            The factor that e2gg and e2uu were formed with.
+        """
+
+        # collective, so computed on every rank
+        n2_ger = factor * self._dist_bger.squared_norm(axis=0)
+        n2_ung = factor * self._dist_bung.squared_norm(axis=0)
+
+        if self.rank != mpi_master() or self._reference_instability is not None:
+            return
+
+        found = []
+
+        for rotation, e2, n2 in (('real', e2uu, n2_ung),
+                                 ('imaginary', e2gg, n2_ger)):
+            scale = 1.0 / np.sqrt(n2)
+            lowest = np.linalg.eigvalsh(e2 * np.outer(scale, scale))[0]
+            if lowest < -self._reference_instability_thresh:
+                found.append((rotation, lowest))
+
+        if not found:
+            return
+
+        self._reference_instability = found
+
+        for rotation, lowest in found:
+            self.ostream.print_warning(
+                'E[2] has an eigenvalue of at most '
+                f'{lowest:.2e} a.u. for {rotation} orbital rotations.')
+        self.ostream.print_warning(
+            'Check whether the SCF solution is a true minimum.')
+        self.ostream.print_blank()
+        self.ostream.flush()
 
     def _print_iteration(self, relative_residual_norm, ws):
         """
