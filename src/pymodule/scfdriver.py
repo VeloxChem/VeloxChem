@@ -3251,18 +3251,25 @@ class ScfDriver:
         # instead, keeping the eigenvalues _simd_ri_jk_occupied keeps. The guess
         # is a sum of atomic densities, whose rank is about half again the
         # occupied orbitals of the molecule.
-        if self.molecular_orbitals.is_empty():
-            if self.rank == mpi_master():
-                guess = []
-                for density in den_mat[:nspins]:
-                    occupation = np.linalg.eigvalsh(density)
-                    guess.append(
-                        int(
-                            np.sum(occupation > self.ri_guess_thresh *
-                                   max(occupation[-1], 1.0))))
-            else:
-                guess = None
-            guess = self.comm.bcast(guess, root=mpi_master())
+
+        # NOTE: whether there are orbitals is decided on the master. A restart
+        # and set_start_orbitals set them on the master only, and they reach
+        # the other ranks in _prepare_for_ri_fock_build, after this count. Were
+        # each rank to test its own orbitals, the master would skip the
+        # broadcast below and the other ranks would wait in it. guess is None
+        # when the master has orbitals.
+        guess = None
+        if (self.rank == mpi_master() and
+                self.molecular_orbitals.is_empty()):
+            guess = []
+            for density in den_mat[:nspins]:
+                occupation = np.linalg.eigvalsh(density)
+                guess.append(
+                    int(
+                        np.sum(occupation > self.ri_guess_thresh *
+                               max(occupation[-1], 1.0))))
+        guess = self.comm.bcast(guess, root=mpi_master())
+        if guess is not None:
             nocc = [max(n, g) for n, g in zip(nocc, guess)]
 
         return sum(nocc)

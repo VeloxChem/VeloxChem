@@ -159,6 +159,75 @@ class TestScfRiJk:
 
         assert abs(roomy - plain) > 1.0e-6
 
+    @staticmethod
+    def make_driver(**settings):
+
+        driver = ScfRestrictedDriver(ostream=OutputStream(None))
+        driver.conv_thresh = 1.0e-8
+        driver.ri_auxiliary_basis = 'def2-universal-jkfit'
+
+        for key, value in settings.items():
+            setattr(driver, key, value)
+
+        return driver
+
+    @staticmethod
+    def energy_on_all_ranks(driver, results):
+
+        energy = (results['scf_energy']
+                  if driver.rank == mpi_master() else None)
+
+        return driver.comm.bcast(energy, root=mpi_master())
+
+    def test_a_restart_converges_to_the_energy_it_restarts_from(
+            self, molecule, basis, tmp_path):
+        """A restart reads the orbitals from the checkpoint file on the master
+        only, and the other ranks receive them at the first Fock build, after
+        the RI-JK peak memory is predicted. That prediction counts the orbitals
+        through a broadcast, which every rank has to enter. Under mpirun with
+        more than one rank, a rank which skipped it hangs the test."""
+
+        # NOTE: tmp_path differs between the ranks, and the checkpoint file is
+        # written and read on the master.
+        filename = MPI.COMM_WORLD.bcast(str(tmp_path / 'water'),
+                                        root=mpi_master())
+
+        first = self.make_driver(filename=filename)
+        first_energy = self.energy_on_all_ranks(first,
+                                                first.compute(molecule, basis))
+
+        assert not first.restart
+
+        second = self.make_driver(filename=filename)
+        second_energy = self.energy_on_all_ranks(
+            second, second.compute(molecule, basis))
+
+        assert second.restart
+        assert abs(second_energy - first_energy) < 1.0e-9, (
+            f"{second_energy:.12f} against {first_energy:.12f}")
+
+    def test_start_orbitals_converge_to_the_energy_they_come_from(
+            self, molecule, basis):
+        """set_start_orbitals sets the orbitals on the master only, as a
+        restart does, and the other ranks receive them at the first Fock
+        build. Under mpirun with more than one rank, a rank which skipped the
+        broadcast of the RI-JK orbital count hangs the test."""
+
+        first = self.make_driver()
+        first_results = first.compute(molecule, basis)
+        first_energy = self.energy_on_all_ranks(first, first_results)
+
+        orbitals = (first_results['C_alpha']
+                    if first.rank == mpi_master() else None)
+
+        second = self.make_driver()
+        second.set_start_orbitals(molecule, basis, orbitals)
+        second_energy = self.energy_on_all_ranks(
+            second, second.compute(molecule, basis))
+
+        assert abs(second_energy - first_energy) < 1.0e-9, (
+            f"{second_energy:.12f} against {first_energy:.12f}")
+
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason="pytest.raises only valid in serial")
     @pytest.mark.parametrize('xcfun', [None, 'BLYP'])
