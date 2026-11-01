@@ -235,6 +235,11 @@ class ScfDriver:
         self.ri_metric_threshold = 1.0e-12
         self.ri_metric_route = 'cholesky'
         self.ri_dense_threshold = 0.0
+        # NOTE: the memory the SIMD RI driver may hold, per rank, in GB. None
+        # works it out from what is free when the SCF starts, less a reserve for
+        # the node and one for each rank. A value is taken as it is, with no
+        # reserves. It is a Python attribute and not an input keyword, as the
+        # budgets of the gradient and of response are.
         self.ri_memory_budget = None
         # NOTE: the auxiliary atoms this rank holds. An empty list is none of them,
         # and the whole molecule is a list of every atom.
@@ -393,8 +398,6 @@ class ScfDriver:
                 'ri_dense_threshold':
                     ('float', 'density of the B vectors at which the SIMD RI-JK '
                      'exchange expands them; 0 expands always, above 1 never'),
-                'ri_memory_budget':
-                    ('float', 'memory the SIMD RI driver may hold, in GB'),
                 'ri_mode':
                     ('str_lower', 'SIMD RI-JK mode: in_memory or direct'),
                 'dispersion': ('bool', 'use D4 dispersion correction'),
