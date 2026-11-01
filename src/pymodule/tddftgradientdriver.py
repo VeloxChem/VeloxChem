@@ -701,10 +701,6 @@ class TddftGradientDriver(GradientDriver):
                 ri_jk_drv is not None and ri_jk_drv.is_prepared(),
                 'TddftGradientDriver: the RI-JK driver is not prepared')
 
-            assert_msg_critical(
-                'direct' not in str(ri_jk_drv.get_mode()),
-                'TddftGradientDriver: the direct RI-JK mode has no gradient')
-
             if self.rank == mpi_master():
                 basis_ri_jk = MolecularBasis.read(
                     molecule,

@@ -102,26 +102,6 @@ class TestScfRiJk:
         assert driver.ri
         assert driver.ri_memory_budget is None
 
-    @pytest.mark.parametrize('xcfun', [None, 'BLYP'])
-    def test_the_mode_can_be_chosen(self, molecule, basis, xcfun):
-        """The way the Fock matrices are formed is an input setting, and both ways
-        must reach the same energy. A pure functional takes RI-J and the others
-        RI-JK, and each has both ways."""
-
-        settings = {
-            'ri_auxiliary_basis': 'def2-universal-jkfit',
-        }
-
-        if xcfun is not None:
-            settings['xcfun'] = xcfun
-
-        energies = {}
-
-        for mode in ('in_memory', 'direct'):
-            energies[mode] = self.run_scf(molecule, basis, ri_mode=mode, **settings)
-
-        assert abs(energies['in_memory'] - energies['direct']) < 1.0e-10
-
     @pytest.mark.parametrize('unrestricted, xcfun', [
         (False, None),
         (False, 'CAM-B3LYP'),
@@ -181,19 +161,24 @@ class TestScfRiJk:
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason="pytest.raises only valid in serial")
-    @pytest.mark.parametrize('mode', ['sideways', 'automatic'])
-    def test_an_unknown_mode_is_refused(self, molecule, basis, mode):
-        """A name which is not one of the two ways has to be caught, not quietly
-        treated as one of them. The way is no longer chosen from the memory, so
-        automatic is not one of them either."""
+    @pytest.mark.parametrize('xcfun', [None, 'BLYP'])
+    @pytest.mark.parametrize('mode', ['direct', 'sideways', 'automatic'])
+    def test_a_mode_other_than_in_memory_is_refused(self, molecule, basis,
+                                                    mode, xcfun):
+        """The SIMD RI drivers are used only with the three-center integrals or
+        the B vectors held in memory. Any other name, the direct way of the C++
+        drivers among them, has to be caught and not quietly taken for that. A
+        pure functional takes RI-J and the others RI-JK."""
 
         from veloxchem.errorhandler import VeloxChemError
 
+        settings = {'ri_auxiliary_basis': 'def2-universal-jkfit'}
+
+        if xcfun is not None:
+            settings['xcfun'] = xcfun
+
         with pytest.raises(VeloxChemError, match='ri_mode'):
-            self.run_scf(molecule,
-                         basis,
-                         ri_auxiliary_basis='def2-universal-jkfit',
-                         ri_mode=mode)
+            self.run_scf(molecule, basis, ri_mode=mode, **settings)
 
     def test_the_mode_defaults_to_in_memory(self):
 

@@ -134,39 +134,6 @@ class ScfGradientDriver(GradientDriver):
         # D4 dispersion correction
         self.dispersion = scf_drv.dispersion
 
-    def _check_ri_gradient_mode(self, molecule, basis):
-        """
-        Checks that the way the SCF resolves the identity can give a gradient.
-
-        The direct mode holds no B vectors and forms no inverted factor of the
-        metric, which the gradient needs, so it has no gradient. Left to itself
-        that surfaces as an abort after a converged SCF has been paid for, and in
-        a geometry optimization after the first step of many, so it is refused
-        here instead, before any of it is spent.
-
-        :param molecule:
-            The molecule.
-        :param basis:
-            The AO basis set.
-        """
-
-        if not self.scf_driver.ri_jk:
-            return
-
-        xcfun = self.scf_driver.xcfun
-        if (xcfun is not None and not isinstance(xcfun, str) and
-                not xcfun.is_hybrid()):
-            return
-
-        # NOTE: ri_mode is in_memory or direct, and only what it names is taken.
-        # It was once chosen from the memory when left automatic, and this
-        # predicted the choice; an SCF whose B vectors do not fit now falls back
-        # to the four-center integrals instead, and so does its gradient.
-        assert_msg_critical(
-            self.scf_driver.ri_mode != 'direct',
-            f'{type(self).__name__}: the direct RI-JK mode has no gradient. ' +
-            'Set ri_mode to in_memory')
-
     def read_settings(self, checkpoint_file):
         """
         Reads opt settings from checkpoint file.
@@ -213,8 +180,6 @@ class ScfGradientDriver(GradientDriver):
         assert_msg_critical(
             self.scf_driver.electric_field is None,
             f'{type(self).__name__}.compute: electric_field is not supported')
-
-        self._check_ri_gradient_mode(molecule, basis)
 
         scf_results = self.scf_driver.scf_results
         if scf_results is None:
@@ -1714,8 +1679,6 @@ class ScfGradientDriver(GradientDriver):
         :return:
             The energy.
         """
-
-        self._check_ri_gradient_mode(molecule, basis)
 
         if self.numerical:
             # disable restarting scf for numerical calculation

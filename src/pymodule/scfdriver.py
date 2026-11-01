@@ -234,6 +234,11 @@ class ScfDriver:
         self.ri_auxiliary_basis = 'def2-universal-jfit'
         self.ri_metric_threshold = 1.0e-12
         self.ri_metric_route = 'cholesky'
+        # NOTE: the density of the B vectors at which the SIMD RI-JK exchange of
+        # the SCF expands them into squares for a matrix product rather than
+        # walking their values: 0 or below expands always, above 1 never. It is a
+        # Python attribute and not an input keyword. The RI-JK gradient and
+        # response drivers always expand.
         self.ri_dense_threshold = 0.0
         # NOTE: the memory the SIMD RI driver may hold, per rank, in GB. None
         # works it out from what is free when the SCF starts, less a reserve for
@@ -395,11 +400,8 @@ class ScfDriver:
                      'eigenvalues'),
                 'ri_metric_threshold':
                     ('float', 'linear dependence threshold for RI-JK metric'),
-                'ri_dense_threshold':
-                    ('float', 'density of the B vectors at which the SIMD RI-JK '
-                     'exchange expands them; 0 expands always, above 1 never'),
                 'ri_mode':
-                    ('str_lower', 'SIMD RI-JK mode: in_memory or direct'),
+                    ('str_lower', 'SIMD RI mode: in_memory'),
                 'dispersion': ('bool', 'use D4 dispersion correction'),
                 'xcfun': ('str_upper', 'exchange-correlation functional'),
                 'grid_level': ('int', 'accuracy level of DFT grid (1-8)'),
@@ -1890,16 +1892,9 @@ class ScfDriver:
 
             self._ri_drv = SimdRIJFockDriver()
 
-            modes = {
-                'in_memory': rimode.in_memory,
-                'direct': rimode.direct,
-            }
+            self._check_ri_mode()
 
-            assert_msg_critical(
-                self.ri_mode in modes,
-                'SCF driver: ri_mode must be in_memory or direct')
-
-            mode = modes[self.ri_mode]
+            mode = rimode.in_memory
 
             # NOTE: the parts are cut from the budget, and every rank has to cut
             # the same ones or a rank would sweep a part no other rank knows of. The
@@ -1907,21 +1902,18 @@ class ScfDriver:
             budget = min(
                 self.comm.allgather(self._get_ri_memory_budget(ao_basis)))
 
-            # NOTE: as for RI-JK below, the way of building is the one ri_mode
-            # names and is not chosen from the memory. A calculation whose peak in
-            # the way which holds the integrals exceeds the budget falls back to the
+            # NOTE: as for RI-JK below, the integrals are held in memory. A
+            # calculation whose peak exceeds the budget falls back to the
             # four-center integrals, and ri, ri_coulomb and ri_jk are left as they
             # were set.
-            if mode == rimode.in_memory:
-                peak = self._ri_drv.peak_memory(molecule, ao_basis, basis_ri,
-                                                self.eri_thresh, budget,
-                                                self.rank, self.nodes)
-                peaks = self.comm.allgather(peak)
-                self._ri_fallback = (max(peaks) > budget)
-                if not self._ri_fallback:
-                    self._ri_memory_check = (
-                        'RI-J', max(peaks),
-                        self._get_ri_rank_reserve(ao_basis))
+            peak = self._ri_drv.peak_memory(molecule, ao_basis, basis_ri,
+                                            self.eri_thresh, budget,
+                                            self.rank, self.nodes)
+            peaks = self.comm.allgather(peak)
+            self._ri_fallback = (max(peaks) > budget)
+            if not self._ri_fallback:
+                self._ri_memory_check = ('RI-J', max(peaks),
+                                         self._get_ri_rank_reserve(ao_basis))
 
             if self._ri_fallback:
                 where = ('available'
@@ -1966,22 +1958,18 @@ class ScfDriver:
                 # otherwise stay alive through every iteration below.
                 del metric
 
-                taken = ('held in memory'
-                         if self._ri_drv.get_mode() == rimode.in_memory else
-                         'formed again on every Fock build')
-
                 self.ostream.print_info(
                     'Using the SIMD resolution of the identity (RI-J).')
                 self.ostream.print_info(
                     'Dimension of RI auxiliary basis set ' +
                     f'({basis_ri.get_label().upper()}): ' +
                     f'{basis_ri.get_dimensions_of_basis()}')
-                if mode == rimode.in_memory and self.nodes == 1:
+                if self.nodes == 1:
                     self.ostream.print_info(
                         'RI-J needs roughly ' +
                         f'{Profiler.memory_to_string(max(peaks))} of ' +
                         f'{Profiler.memory_to_string(budget)} available.')
-                elif mode == rimode.in_memory:
+                else:
                     self.ostream.print_info(
                         'RI-J needs roughly ' +
                         f'{Profiler.memory_to_string(sum(peaks))} over ' +
@@ -1990,7 +1978,7 @@ class ScfDriver:
                         f'{Profiler.memory_to_string(budget)} on the ' +
                         'largest rank.')
                 self.ostream.print_info(
-                    f'Three-center integrals are {taken}, in ' +
+                    'Three-center integrals are held in memory, in ' +
                     f'{self._ri_drv.number_of_parts()} parts.')
                 self.ostream.print_blank()
                 self.ostream.flush()
@@ -2019,14 +2007,7 @@ class ScfDriver:
 
             omega = self.xcfun.get_rs_omega() if range_separated else 0.0
 
-            modes = {
-                'in_memory': rimode.in_memory,
-                'direct': rimode.direct,
-            }
-
-            assert_msg_critical(
-                self.ri_mode in modes,
-                'SCF driver: ri_mode must be in_memory or direct')
+            self._check_ri_mode()
 
             # NOTE: every term of the Coulomb and of the exchange is a sum over the
             # auxiliary basis, so a rank given a share of its atoms forms a share of
@@ -2072,23 +2053,9 @@ class ScfDriver:
             largest = max(self.comm.allgather(needed))
             budget = min(self.comm.allgather(budget))
 
-            # NOTE: the way of building is the one ri_mode names, and is not
-            # chosen from the memory. The direct way is several times slower than
-            # holding the B vectors, so it is taken only where it is asked for; a
-            # calculation whose B vectors do not fit falls back to the
-            # four-center integrals below instead.
-            mode = modes[self.ri_mode]
-
-            # NOTE: the way which forms the integrals again on every call has one
-            # sweep and one fitting, and two operators do not fit in it. It is
-            # refused here rather than at the first build, so a calculation which
-            # cannot be served says so before it forms anything.
-            if range_separated:
-                assert_msg_critical(
-                    mode == rimode.in_memory,
-                    'SCF driver: a hybrid range-separated functional is ' +
-                    'served only by the way which holds the B vectors, and ' +
-                    'ri_mode asks for the direct way')
+            # NOTE: the B vectors are held in memory. A calculation whose B
+            # vectors do not fit falls back to the four-center integrals below.
+            mode = rimode.in_memory
 
             # NOTE: the metric may be inverted through its Cholesky factor, which
             # is an order of magnitude cheaper, or through its eigenvalues, which
@@ -2105,13 +2072,6 @@ class ScfDriver:
 
             use_inverse_square_root = routes[self.ri_metric_route]
 
-            # NOTE: the direct way is divided over the orbitals and not over the
-            # auxiliary basis, as the triangular solve of its exchange pass reaches
-            # across the whole of it. Every rank therefore holds the whole of the
-            # auxiliary basis, and the division is made in the build.
-            if mode == rimode.direct:
-                self._ri_aux_atoms = all_atoms
-
             # NOTE: the B vectors are not the most the way which holds them
             # reaches. Forming them holds a batch of the integrals beside them, and
             # a Fock build holds the W matrices of a range, which is the whole
@@ -2124,24 +2084,20 @@ class ScfDriver:
             # ri, ri_coulomb and ri_jk are left as they were set: they are what
             # was asked for, and the fallback is what this calculation could
             # serve, which the next one on the same driver may not share.
-            if mode == rimode.in_memory:
-                # NOTE: the orbitals are counted on every rank, including one
-                # which holds nothing, as the count broadcasts from the master
-                # and a rank which skipped it would meet the next collective
-                # out of step.
-                norbitals = self._get_ri_jk_max_orbitals(
-                    molecule, ao_basis, den_mat)
-                peak = self._ri_drv.peak_memory(molecule, ao_basis, basis_ri,
-                                                self.eri_thresh,
-                                                self._ri_aux_atoms,
-                                                range_separated, budget,
-                                                norbitals)
-                peaks = self.comm.allgather(peak)
-                self._ri_fallback = (max(peaks) > budget)
-                if not self._ri_fallback:
-                    self._ri_memory_check = (
-                        'RI-JK', max(peaks),
-                        self._get_ri_rank_reserve(ao_basis))
+            # NOTE: the orbitals are counted on every rank, including one which
+            # holds nothing, as the count broadcasts from the master and a rank
+            # which skipped it would meet the next collective out of step.
+            norbitals = self._get_ri_jk_max_orbitals(molecule, ao_basis,
+                                                     den_mat)
+            peak = self._ri_drv.peak_memory(molecule, ao_basis, basis_ri,
+                                            self.eri_thresh,
+                                            self._ri_aux_atoms,
+                                            range_separated, budget, norbitals)
+            peaks = self.comm.allgather(peak)
+            self._ri_fallback = (max(peaks) > budget)
+            if not self._ri_fallback:
+                self._ri_memory_check = ('RI-JK', max(peaks),
+                                         self._get_ri_rank_reserve(ao_basis))
 
             if self._ri_fallback:
                 where = ('available'
@@ -2158,14 +2114,14 @@ class ScfDriver:
                     'Dimension of RI auxiliary basis set ' +
                     f'({basis_ri.get_label().upper()}): ' +
                     f'{basis_ri.get_dimensions_of_basis()}')
-                if mode == rimode.in_memory and self.nodes == 1:
+                if self.nodes == 1:
                     self.ostream.print_info(
                         'RI-JK needs roughly ' +
                         f'{Profiler.memory_to_string(max(peaks))} of ' +
                         f'{Profiler.memory_to_string(budget)} available ' +
                         '(B vectors ' +
                         f'{Profiler.memory_to_string(largest)}).')
-                elif mode == rimode.in_memory:
+                else:
                     self.ostream.print_info(
                         'RI-JK needs roughly ' +
                         f'{Profiler.memory_to_string(sum(peaks))} over ' +
@@ -2174,19 +2130,6 @@ class ScfDriver:
                         f'{Profiler.memory_to_string(budget)} on the ' +
                         'largest rank (B vectors ' +
                         f'{Profiler.memory_to_string(largest)}).')
-                elif self.nodes == 1:
-                    self.ostream.print_info(
-                        'B vectors need ' +
-                        f'{Profiler.memory_to_string(largest)} of ' +
-                        f'{Profiler.memory_to_string(budget)} available.')
-                else:
-                    total = sum(self.comm.allgather(needed))
-                    self.ostream.print_info(
-                        'B vectors need ' +
-                        f'{Profiler.memory_to_string(total)} over ' +
-                        f'{self.nodes:d} ranks, at most ' +
-                        f'{Profiler.memory_to_string(largest)} of ' +
-                        f'{Profiler.memory_to_string(budget)} on a rank.')
             self.ostream.print_blank()
             self.ostream.flush()
 
@@ -2205,41 +2148,34 @@ class ScfDriver:
             # ranks. The fallbacks are chosen from the matrix itself, and a fitting
             # basis close to linear dependence could have two ranks choose
             # differently and build with metrics which are not the same, so the
-            # choice is taken in one place. The way of building comes back with it,
-            # as a fallback can change it.
+            # choice is taken in one place.
             metric_erf = PackedMatrix()
 
             if self.rank == mpi_master():
                 if range_separated:
                     # NOTE: the two come out of one call, which forms both
-                    # operators over one set of primitive pairs. The way is not
-                    # answered here as make_metric answers it, there being only
-                    # one a range separated build can take.
+                    # operators over one set of primitive pairs.
                     metric, metric_erf = self._ri_drv.make_metric_rs(
                         molecule, basis_ri, self.ri_metric_threshold,
                         use_inverse_square_root, mode, omega)
                 else:
-                    metric, mode = self._ri_drv.make_metric(
+                    # NOTE: make_metric also answers the way of building, which
+                    # is the way it was asked for when that is in_memory.
+                    metric, _ = self._ri_drv.make_metric(
                         molecule, basis_ri, self.ri_metric_threshold,
                         use_inverse_square_root, mode)
             else:
                 metric = PackedMatrix()
 
-            mode = self.comm.bcast(mode, root=mpi_master())
             metric = metric.broadcast(self.comm, root=mpi_master())
 
             if range_separated:
                 metric_erf = metric_erf.broadcast(self.comm, root=mpi_master())
 
-            # NOTE: the direct way sweeps the auxiliary basis in parts, and its
-            # Coulomb pass is divided over them. They are cut to fit the memory of a
-            # build, so a machine with memory to spare gives one part and one rank
-            # sweeps the integrals a second time while the others wait -- a fifth of
-            # a build, measured on two nodes. At least one part per rank is asked for
-            # so there is something for each of them to take.
             # NOTE: an empty share of the auxiliary atoms means this rank was dealt
-            # none of them. The direct way sweeps the whole auxiliary basis on
-            # every rank, so every rank of it is given every atom.
+            # none of them. The number of ranks is the fewest parts the driver's
+            # direct way cuts its Coulomb pass into; the way which holds the B
+            # vectors does not read it.
             self._ri_drv.prepare(molecule, ao_basis, basis_ri, self.eri_thresh,
                                  budget, self.ri_metric_threshold,
                                  use_inverse_square_root, mode,
@@ -2271,11 +2207,7 @@ class ScfDriver:
                 self.ostream.print_info(
                     f'Metric inverted through its {self.ri_metric_route}.')
 
-            taken = ('held in memory'
-                     if self._ri_drv.get_mode() == rimode.in_memory else
-                     'formed again on every Fock build')
-
-            self.ostream.print_info(f'B vectors are {taken}.')
+            self.ostream.print_info('B vectors are held in memory.')
 
             self.ostream.print_info(
                 f'B vectors for RI done in {tm.time() - ri_prep_t0:.2f} sec.')
@@ -3153,19 +3085,9 @@ class ScfDriver:
         packed_density = PackedMatrix(nao, nao, mat_t.symmetric)
         packed_density.from_numpy(np.ascontiguousarray(density))
 
-        if (self.nodes > 1) and (self._ri_drv.get_mode() == rimode.direct):
-            # NOTE: a range-separated build never reaches here, as the direct way
-            # is refused where the driver is prepared. The assertion says so at
-            # the point where it would otherwise be dropped in silence.
-            assert_msg_critical(
-                erf_exchange_scaling_factor == 0.0,
-                'ScfDriver: the direct way does not form the attenuated ' +
-                'exchange of a range-separated functional')
-            fock = self._simd_ri_jk_direct_share(coeffs, exchange_scaling_factor)
-        else:
-            fock = self._ri_drv.compute(packed_density, coeffs,
-                                        exchange_scaling_factor,
-                                        erf_exchange_scaling_factor)
+        fock = self._ri_drv.compute(packed_density, coeffs,
+                                    exchange_scaling_factor,
+                                    erf_exchange_scaling_factor)
 
         # NOTE: the limit is of the Fock matrix being expanded, which is the square
         # of the basis and is modest, and not the budget of the B vectors, which
@@ -3283,11 +3205,6 @@ class ScfDriver:
         packed_density = PackedMatrix(nao, nao, mat_t.symmetric)
         packed_density.from_numpy(np.ascontiguousarray(den_alpha + den_beta))
 
-        assert_msg_critical(
-            self._ri_drv.get_mode() != rimode.direct,
-            'ScfDriver: the open shell RI-JK build is served only by ' +
-            'ri_mode in_memory, and this calculation got direct')
-
         fock_a, fock_b = self._ri_drv.compute(packed_density, coeffs_a,
                                               coeffs_b,
                                               exchange_scaling_factor,
@@ -3301,55 +3218,6 @@ class ScfDriver:
 
         return fock_a.to_numpy(max_memory=limit), fock_b.to_numpy(
             max_memory=limit)
-
-    def _simd_ri_jk_direct_share(self, coeffs, exchange_scaling_factor):
-        """
-        Computes this rank's share of the closed shell Fock matrix of the direct
-        SIMD RI-JK way.
-
-        :param coeffs:
-            The occupied orbital coefficients as a packed matrix.
-        :param exchange_scaling_factor:
-            The fraction of exact exchange.
-
-        :return:
-            This rank's share of the Fock matrix as a packed matrix.
-        """
-
-        # NOTE: the direct way is two sweeps of the integrals with the fitting
-        # between them, and the two sweeps divide over different things. The first
-        # is a sum over the orbitals, so the ranks take a range of them each; the
-        # auxiliary basis is not an index it can be divided over, as its triangular
-        # solve reaches across all of it. The second is a sum over the parts of the
-        # auxiliary basis, so the ranks take some parts each. What couples them is
-        # the fitting, whose right hand side has to be complete before it is
-        # solved, which is the one thing the ranks exchange.
-
-        norbitals = coeffs.number_of_columns()
-
-        ofirst = (norbitals * self.rank) // self.nodes
-        olast = (norbitals * (self.rank + 1)) // self.nodes
-
-        fock, gamma = self._ri_drv.compute_exchange(coeffs,
-                                                    exchange_scaling_factor,
-                                                    ofirst, olast)
-
-        local = np.array(gamma, dtype=np.float64)
-        total = np.zeros_like(local)
-        self.comm.Allreduce(local, total, op=MPI.SUM)
-
-        # NOTE: every rank holds the factor of the metric, so each of them solves
-        # the fitting rather than one solving and sending. It is the square of the
-        # auxiliary basis against one right hand side, which is nothing beside
-        # either sweep.
-
-        gamma = self._ri_drv.solve_fitting(total)
-
-        parts = list(range(self._ri_drv.number_of_parts()))
-
-        self._ri_drv.compute_coulomb(gamma, parts[self.rank::self.nodes], fock)
-
-        return fock
 
     def _get_ri_jk_max_orbitals(self, molecule, ao_basis, den_mat):
         """
@@ -3422,12 +3290,23 @@ class ScfDriver:
         return get_ri_free_memory(self.comm,
                                   self._get_ri_rank_reserve(ao_basis))
 
+    def _check_ri_mode(self):
+        """
+        Checks that ri_mode names the one way the SIMD RI drivers are used in:
+        holding the three-center integrals (RI-J) or the B vectors (RI-JK) in
+        memory. The C++ drivers also have a direct way, which forms them again on
+        every Fock build. It is not offered here, as the gradient and response
+        drivers cannot take it.
+        """
+
+        assert_msg_critical(self.ri_mode == 'in_memory',
+                            'SCF driver: ri_mode must be in_memory')
+
     @staticmethod
     def _check_ri_aux_functions(ri_drv, basis_ri, comm):
         """
         Checks that the ranks of a prepared SIMD RI-JK driver hold the auxiliary
-        basis between them: every function once over the ranks in the way which
-        holds the B vectors, and every function on every rank in the direct way.
+        basis between them, every function once over the ranks.
 
         :param ri_drv:
             The prepared SIMD RI-JK driver.
@@ -3441,13 +3320,8 @@ class ScfDriver:
 
         held = comm.allgather(ri_drv.number_of_aux_functions())
 
-        if ri_drv.get_mode() == rimode.direct:
-            covered = all(nheld == naux for nheld in held)
-        else:
-            covered = (sum(held) == naux)
-
         assert_msg_critical(
-            covered, 'SCF driver: the ranks hold ' +
+            sum(held) == naux, 'SCF driver: the ranks hold ' +
             f'{held} of {naux} auxiliary functions, which is not the ' +
             'auxiliary basis once over the ranks')
 
