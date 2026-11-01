@@ -213,3 +213,41 @@ class TestLRBaseUtilities:
         lr_drv.print_property(rsp_funcs)
 
         assert property_stream.headers == result_stream.headers
+
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='skip pytest.raises for multiple MPI processes')
+    def test_setup_trials_warns_on_zero_right_hand_sides(self):
+
+        lr_drv = LinearResponseSolver()
+        lr_drv.norm_thresh = 1.0e-10
+        lr_drv.lindep_thresh = 1.0e-6
+        lr_drv._ostream = RecordingOutput()
+
+        nrows = 16
+
+        zero_vectors = {
+            ('x', 0.0): DistributedArray(np.zeros((nrows, 2)), lr_drv.comm)
+        }
+        precond = {
+            0.0:
+                DistributedArray(
+                    np.column_stack((np.ones(nrows), np.zeros(nrows))),
+                    lr_drv.comm)
+        }
+
+        # initial guess: no reduced space yet
+        with pytest.raises(VeloxChemError, match='trial vectors are empty'):
+            lr_drv._setup_trials(zero_vectors, precond)
+        assert lr_drv.ostream.warnings == [
+            'All right-hand sides are zero; the response functions vanish.'
+        ]
+
+        # with a reduced space the same error comes without the warning
+        lr_drv._ostream = RecordingOutput()
+        basis = np.zeros((nrows, 1))
+        basis[0, 0] = 1.0 / np.sqrt(2.0)
+        with pytest.raises(VeloxChemError, match='trial vectors are empty'):
+            lr_drv._setup_trials(zero_vectors, precond,
+                                 DistributedArray(basis.copy(), lr_drv.comm),
+                                 DistributedArray(basis.copy(), lr_drv.comm))
+        assert lr_drv.ostream.warnings == []

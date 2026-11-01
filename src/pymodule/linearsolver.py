@@ -3561,9 +3561,18 @@ class LinearSolver:
         dist_new_ger, dist_new_ung = self._precond_trials(vectors, precond)
 
         if self.rank == mpi_master():
-            assert_msg_critical(
-                dist_new_ger.data.size > 0 or dist_new_ung.data.size > 0,
-                'LinearSolver: trial vectors are empty')
+            no_trials = (dist_new_ger.data.size == 0 and
+                         dist_new_ung.data.size == 0)
+            # At the initial guess (no reduced space yet) the vectors are the
+            # right-hand sides, and an empty set means that all of them were
+            # below norm_thresh after preconditioning.
+            if no_trials and dist_bger is None and dist_bung is None:
+                self.ostream.print_warning(
+                    'All right-hand sides are zero; the response functions '
+                    'vanish.')
+                self.ostream.flush()
+            assert_msg_critical(not no_trials,
+                                'LinearSolver: trial vectors are empty')
 
         if dist_new_ger.data.size == 0:
             dist_new_ger.data = np.zeros((dist_new_ung.shape(0), 0))
@@ -3606,8 +3615,9 @@ class LinearSolver:
 
         # The preconditioned vectors can all be removed above when what is
         # left of them after the projection is too small, for example when the
-        # residuals lie inside the reduced space. The callers would then form
-        # no sigma vectors, so stop here.
+        # residuals lie inside the reduced space. The callers cannot continue
+        # without new vectors, and the iteration could not make progress, so
+        # stop here.
         if self.rank == mpi_master():
             assert_msg_critical(
                 dist_new_ger.shape(1) + dist_new_ung.shape(1) > 0,
