@@ -149,33 +149,41 @@ class TestScfGradientDriverMiscellaneous:
                            match='Not implemented for restricted open-shell'):
             grad_drv.compute(molecule, basis)
 
-    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
-                        reason='skip pytest.raises for multiple MPI processes')
-    def test_restricted_ri_gradient_rejects_non_def2_basis(self):
+    @staticmethod
+    def run_ri_j_gradient(scf_type, molecule, basis, numerical):
 
-        molecule, basis = self.get_h2o_molecule_and_basis()
-        scf_drv, scf_results = self.run_restricted_scf(molecule, basis,
-                                                       xcfun='blyp',
-                                                       ri=True)
+        scf_drv = scf_type()
+        scf_drv.ri = True
+        scf_drv.ostream.mute()
+        scf_drv.xcfun = 'blyp'
+        scf_drv.grid_level = 6
+        scf_drv.conv_thresh = 1.0e-10
+        scf_drv.compute(molecule, basis)
 
-        grad_drv = ScfGradientDriver(scf_drv)
-
-        with pytest.raises(VeloxChemError, match='Invalid basis set for RI-J'):
-            grad_drv.compute(molecule, basis, scf_results)
-
-    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
-                        reason='skip pytest.raises for multiple MPI processes')
-    def test_unrestricted_ri_gradient_rejects_non_def2_basis(self):
-
-        molecule, basis = self.get_ch3_molecule_and_basis()
-        scf_drv, scf_results = self.run_unrestricted_scf(molecule, basis,
-                                                         xcfun='blyp',
-                                                         ri=True)
+        assert scf_drv._uses_ri_coulomb()
 
         grad_drv = ScfGradientDriver(scf_drv)
+        grad_drv.ostream.mute()
+        grad_drv.numerical = numerical
+        grad_drv.compute(molecule, basis)
 
-        with pytest.raises(VeloxChemError, match='Invalid basis set for RI-J'):
-            grad_drv.compute(molecule, basis, scf_results)
+        return grad_drv.get_gradient()
+
+    # NOTE: STO-3G is not a def2 basis set. The analytical RI-J gradient is
+    # compared with the numerical gradient of the RI-J energy.
+    @pytest.mark.parametrize('scf_type, label', [
+        (ScfRestrictedDriver, 'h2o'),
+        (ScfUnrestrictedDriver, 'ch3'),
+    ])
+    def test_ri_j_gradient_with_non_def2_basis(self, scf_type, label):
+
+        molecule, basis = getattr(self, f'get_{label}_molecule_and_basis')()
+
+        analytical = self.run_ri_j_gradient(scf_type, molecule, basis, False)
+        numerical = self.run_ri_j_gradient(scf_type, molecule, basis, True)
+
+        if MPI.COMM_WORLD.Get_rank() == mpi_master():
+            assert np.max(np.abs(analytical - numerical)) < 1.0e-5
 
     def test_restricted_ri_jk_gradient(self):
 

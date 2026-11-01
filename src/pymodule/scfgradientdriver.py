@@ -1114,11 +1114,6 @@ class ScfGradientDriver(GradientDriver):
                                             local_atoms)
 
         if ri_label == 'RI-J':
-
-            assert_msg_critical(
-                basis.get_label().lower().startswith('def2-'),
-                'ScfGradientDriver: Invalid basis set for RI-J')
-
             basis_ri_j = MolecularBasis.read(
                 molecule,
                 self.scf_driver.ri_auxiliary_basis,
@@ -1511,11 +1506,6 @@ class ScfGradientDriver(GradientDriver):
             grad_timing['Fock_grad'] += time.time() - t0
 
         elif ri_label == 'RI-J':
-
-            assert_msg_critical(
-                basis.get_label().lower().startswith('def2-'),
-                'ScfGradientDriver: Invalid basis set for RI-J')
-
             basis_ri_j = MolecularBasis.read(
                 molecule,
                 self.scf_driver.ri_auxiliary_basis,

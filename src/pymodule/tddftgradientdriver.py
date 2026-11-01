@@ -623,11 +623,6 @@ class TddftGradientDriver(GradientDriver):
         den_mat_for_fock_gs.set_values(gs_dm)
 
         if self._scf_drv.ri_coulomb and fock_type == 'j':
-
-            assert_msg_critical(
-                basis.get_label().lower().startswith('def2-'),
-                'TddftGradientDriver: Invalid basis set for RI-J')
-
             if self.rank == mpi_master():
                 basis_ri_j = MolecularBasis.read(
                     molecule,
