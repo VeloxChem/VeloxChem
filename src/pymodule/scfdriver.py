@@ -244,7 +244,8 @@ class ScfDriver:
         # works it out from what is free when the SCF starts, less a reserve for
         # the node and one for each rank. A value is taken as it is, with no
         # reserves. It is a Python attribute and not an input keyword, as the
-        # budgets of the gradient and of response are.
+        # budgets of the gradient and of response are. It bounds the SCF's driver
+        # alone; the gradient and response work out their own.
         self.ri_memory_budget = None
         # NOTE: the auxiliary atoms this rank holds. An empty list is none of them,
         # and the whole molecule is a list of every atom.

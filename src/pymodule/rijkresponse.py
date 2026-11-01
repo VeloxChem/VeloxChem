@@ -382,6 +382,12 @@ def initialize(solver, molecule, basis):
         solver.ostream.flush()
         return
 
+    # NOTE: the metric is inverted through its Cholesky factor (the False passed
+    # as use_inverse_square_root here and to prepare) with the solver's own
+    # ri_metric_threshold. The SCF's ri_metric_route and ri_metric_threshold are
+    # not handed to response, so a response after an SCF which inverted its
+    # metric through its eigenvalues still takes the Cholesky route. With the
+    # SCF's defaults (cholesky, 1e-12) the two invert the metric the same way.
     metric_erf = PackedMatrix()
 
     if omega > 0.0:

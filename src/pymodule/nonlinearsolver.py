@@ -122,7 +122,8 @@ class NonlinearSolver:
 
         # NOTE: the memory the simd RI driver of a rank may hold, in GB, taken as
         # it is; None takes what is free less the reserves. An attribute and not
-        # an input keyword, as for the gradient's budget.
+        # an input keyword, as for the gradient's budget. The SCF's
+        # ri_memory_budget is not handed on to response.
         self.ri_memory_budget = None
 
         # NOTE: whether this response fell back from RI to the four-center
