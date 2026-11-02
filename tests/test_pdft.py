@@ -44,7 +44,8 @@ class TestPDFT:
                                          [1.0, 1.0, 1.0])
         assert pfunc == pfunc2
 
-    def test_H(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_H(self, ri):
         """
         Test all functional components for numerical stability for nbeta = 0
         """
@@ -57,11 +58,14 @@ class TestPDFT:
 
         # Optimize ROHF wavefunction
         scfdrv = ScfRestrictedOpenDriver()
-        scfdrv.ri = False
+        scfdrv.ri = ri
         scfdrv.ostream.mute()
         scf_results = scfdrv.compute(molecule, basis)
 
         if scfdrv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
             total_density = scf_results['D_alpha']
         else:
             total_density = None
@@ -83,23 +87,47 @@ class TestPDFT:
         xc_drv = XCIntegrator()
 
         # References
+        # NOTE: the RI and the four-center SCF energies of the hydrogen atom
+        # agree to 1.0e-15, as the Coulomb and exchange terms of one electron
+        # cancel in both. The two SCFs stop at different iterations within the
+        # default convergence threshold, and the energies below, which depend
+        # on the density, differ between them by up to 3.0e-6.
         references = {
-            "tSlater": -0.21286739663259885,
-            "tSlater_erf": -0.0780214343193473,
-            "tVWN_RPA": -0.05792602070111518,
-            "tVWN5": -0.040929846047812316,
-            "tPMGB06": -0.023054878539261928,
-            "tP86": -0.018538415905553742,
-            "tPBE_X": -0.2543064204128253,
-            "tPBEX_erf": -0.09113476160995143,
-            "tPBE_C": -0.014861790644530826,
-            "tPBEC_erf": -0.01496306351838878,
-            "tB88": -0.045962079987423625,
-            "tB88_erf": -0.011016744566851068,
-            "tLYP": -0.013596771624186594,
-            "tLYP_erf": -0.01415140810845559,
-            "HPG20": -0.0139680482003766
-        }
+            False: {
+                "tSlater": -0.21286739663259885,
+                "tSlater_erf": -0.0780214343193473,
+                "tVWN_RPA": -0.05792602070111518,
+                "tVWN5": -0.040929846047812316,
+                "tPMGB06": -0.023054878539261928,
+                "tP86": -0.018538415905553742,
+                "tPBE_X": -0.2543064204128253,
+                "tPBEX_erf": -0.09113476160995143,
+                "tPBE_C": -0.014861790644530826,
+                "tPBEC_erf": -0.01496306351838878,
+                "tB88": -0.045962079987423625,
+                "tB88_erf": -0.011016744566851068,
+                "tLYP": -0.013596771624186594,
+                "tLYP_erf": -0.01415140810845559,
+                "HPG20": -0.0139680482003766
+            },
+            True: {
+                "tSlater": -0.21286869323668636,
+                "tSlater_erf": -0.0780219564508125,
+                "tVWN_RPA": -0.05792539925531115,
+                "tVWN5": -0.04092920755185682,
+                "tPMGB06": -0.023054673280621222,
+                "tP86": -0.018541034490877722,
+                "tPBE_X": -0.2543079335318527,
+                "tPBEX_erf": -0.09113535134780917,
+                "tPBE_C": -0.014861697435833134,
+                "tPBEC_erf": -0.01496290102783369,
+                "tB88": -0.04596197779480555,
+                "tB88_erf": -0.011016795548436271,
+                "tLYP": -0.013596872648710536,
+                "tLYP_erf": -0.014151143681467977,
+                "HPG20": -0.013967414967941363
+            },
+        }[ri]
 
         for func in available_pdft_functionals():
             pdft_vxc, pdft_wxc = xc_drv.integrate_vxc_pdft(
@@ -234,7 +262,7 @@ class TestPDFT:
             assert abs(xc_energy - pdft_xc_energy) < 1.0e-6
             assert np.allclose(grad_ks, grad_pdft)
 
-    def run_RDFT(self, func, pfunc):
+    def run_RDFT(self, func, pfunc, ri):
 
         mol_str = """
         H    0.7493682    0.0000000    0.4424329
@@ -246,9 +274,14 @@ class TestPDFT:
 
         # Optimize ROHF wavefunction
         scfdrv = ScfRestrictedDriver()
-        scfdrv.ri = False
+        scfdrv.ri = ri
         scfdrv.ostream.mute()
         scf_results = scfdrv.compute(molecule, basis)
+
+        if scfdrv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         # Compute DFT correction
         grid_drv = GridDriver()
@@ -295,15 +328,17 @@ class TestPDFT:
 
         return xc_energy, pdft_xc_energy, np_xcmat_a, pdft_np_xcmat_a
 
-    def test_H2O_PBE(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_H2O_PBE(self, ri):
         pfunc = {"name": "tPBE", "components": {"TPBE_X": 1.0, 'TPBE_C': 1.0}}
         xc_energy, pdft_xc_energy, np_xcmat_a, pdft_np_xcmat_a = self.run_RDFT(
-            'pbe', pfunc)
+            'pbe', pfunc, ri)
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
             assert abs(xc_energy - pdft_xc_energy) < 3.0e-6
             assert np.allclose(np_xcmat_a, pdft_np_xcmat_a)
 
-    def test_H2O_BLYP(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_H2O_BLYP(self, ri):
         pfunc = {
             "name": "tBLYP",
             "components": {
@@ -313,12 +348,13 @@ class TestPDFT:
             }
         }
         xc_energy, pdft_xc_energy, np_xcmat_a, pdft_np_xcmat_a = self.run_RDFT(
-            'blyp', pfunc)
+            'blyp', pfunc, ri)
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
             assert abs(xc_energy - pdft_xc_energy) < 1.0e-6
             assert np.allclose(np_xcmat_a, pdft_np_xcmat_a)
 
-    def test_H2O_BP86(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_H2O_BP86(self, ri):
         pfunc = {
             "name": "tBLYP",
             "components": {
@@ -328,7 +364,7 @@ class TestPDFT:
             }
         }
         xc_energy, pdft_xc_energy, np_xcmat_a, pdft_np_xcmat_a = self.run_RDFT(
-            'bp86', pfunc)
+            'bp86', pfunc, ri)
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
             assert abs(xc_energy - pdft_xc_energy) < 1.0e-6
             assert np.allclose(np_xcmat_a, pdft_np_xcmat_a)

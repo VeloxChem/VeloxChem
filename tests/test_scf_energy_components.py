@@ -31,6 +31,7 @@ class TestScfEnergyComponents:
                                   tmp_path,
                                   mol,
                                   bas,
+                                  ri,
                                   solvation_model=None,
                                   potfile=None,
                                   vdwfile=None):
@@ -41,11 +42,11 @@ class TestScfEnergyComponents:
         ostream = OutputStream.create_mpi_ostream(comm, fname)
 
         scf_drv = ScfRestrictedDriver(comm, ostream)
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.solvation_model = solvation_model
         scf_drv.point_charges = potfile
         scf_drv.qm_vdw_params = vdwfile
-        scf_results_not_used = scf_drv.compute(mol, bas)
+        scf_results = scf_drv.compute(mol, bas)
 
         energy_keys = [
             'Total Energy',
@@ -61,6 +62,10 @@ class TestScfEnergyComponents:
         energy_components = {}
 
         if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
+
             with open(fname, 'r') as fh:
                 for line in fh:
                     for key in energy_keys:
@@ -87,7 +92,8 @@ class TestScfEnergyComponents:
                 assert abs(energy_components['SMD Solvation Energy'] -
                            sum_of_smd_components) < 1.0e-9
 
-    def test_scf_with_point_charges_and_vdw(self, tmp_path):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_scf_with_point_charges_and_vdw(self, tmp_path, ri):
 
         mol, bas = self.get_molecule_and_basis()
 
@@ -98,28 +104,33 @@ class TestScfEnergyComponents:
         self.run_scf_energy_components(tmp_path,
                                        mol,
                                        bas,
+                                       ri,
                                        potfile=potfile,
                                        vdwfile=vdwfile)
 
-    def test_scf_with_point_charges(self, tmp_path):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_scf_with_point_charges(self, tmp_path, ri):
 
         mol, bas = self.get_molecule_and_basis()
 
         here = Path(__file__).parent
         potfile = str(here / 'data' / 'pe_water.pot')
 
-        self.run_scf_energy_components(tmp_path, mol, bas, potfile=potfile)
+        self.run_scf_energy_components(tmp_path, mol, bas, ri, potfile=potfile)
 
-    def test_scf_with_cpcm(self, tmp_path):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_scf_with_cpcm(self, tmp_path, ri):
 
         mol, bas = self.get_molecule_and_basis()
 
         self.run_scf_energy_components(tmp_path,
                                        mol,
                                        bas,
+                                       ri,
                                        solvation_model='cpcm')
 
-    def test_scf_with_smd(self, tmp_path):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_scf_with_smd(self, tmp_path, ri):
 
         pytest.importorskip('rdkit')
 
@@ -128,4 +139,5 @@ class TestScfEnergyComponents:
         self.run_scf_energy_components(tmp_path,
                                        mol,
                                        bas,
+                                       ri,
                                        solvation_model='smd')

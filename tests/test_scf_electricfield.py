@@ -9,8 +9,8 @@ from veloxchem.scfrestdriver import ScfRestrictedDriver
 @pytest.mark.solvers
 class TestScfInElectricField:
 
-    def run_scf_electricfield(self, xcfun_label, ref_scf_energy, electric_field,
-                              tol):
+    def run_scf_electricfield(self, xcfun_label, ri, ref_scf_energy,
+                              electric_field, tol):
 
         mol_string = """
         O   0.0   0.0   0.0
@@ -24,15 +24,21 @@ class TestScfInElectricField:
         bas = MolecularBasis.read(mol, basis_label, ostream=None)
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_drv.xcfun = xcfun_label
         scf_drv.electric_field = electric_field
         scf_results = scf_drv.compute(mol, bas)
 
         if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
             assert abs(ref_scf_energy - scf_results['scf_energy']) < tol
 
-    def test_hf(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_hf(self, ri):
 
-        self.run_scf_electricfield('hf', -76.0688447658, [0, 0, 0.03], 1.0e-6)
+        ref_scf_energy = {False: -76.0688447658, True: -76.0688199487}[ri]
+        self.run_scf_electricfield('hf', ri, ref_scf_energy, [0, 0, 0.03],
+                                   1.0e-6)

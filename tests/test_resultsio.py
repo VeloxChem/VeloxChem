@@ -55,17 +55,22 @@ def test_create_hdf5_stores_veloxchem_version(tmp_path):
         assert h5f.attrs['veloxchem_version'] == __version__
 
 
-def _run_water_rsp_roundtrip(tmp_path, solver_cls, save_solutions=True):
+def _run_water_rsp_roundtrip(tmp_path, solver_cls, ri, save_solutions=True):
 
     molecule, basis = _get_water_and_basis()
     base = str(Path(tmp_path) / solver_cls.__name__.lower())
 
     scf_drv = ScfRestrictedDriver()
-    scf_drv.ri = False
+    scf_drv.ri = ri
     scf_drv.ostream.mute()
     base = scf_drv.comm.bcast(base, root=mpi_master())
     scf_drv.filename = base
     scf_results = scf_drv.compute(molecule, basis)
+
+    if scf_drv.rank == mpi_master():
+        if ri:
+            assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+            assert not scf_results['ri_fallback']
 
     rsp_drv = solver_cls()
     rsp_drv.ostream.mute()
@@ -80,7 +85,7 @@ def _run_water_rsp_roundtrip(tmp_path, solver_cls, save_solutions=True):
     return rsp_drv, rsp_results, base + '.h5'
 
 
-def _run_cpp_rsp_roundtrip(tmp_path, solver_cls):
+def _run_cpp_rsp_roundtrip(tmp_path, solver_cls, ri):
 
     xyz_string = """6
     xyz
@@ -97,13 +102,18 @@ def _run_cpp_rsp_roundtrip(tmp_path, solver_cls):
     base = str(Path(tmp_path) / solver_cls.__name__.lower())
 
     scf_drv = ScfRestrictedDriver()
-    scf_drv.ri = False
+    scf_drv.ri = ri
     scf_drv.ostream.mute()
     base = scf_drv.comm.bcast(base, root=mpi_master())
     scf_drv.filename = base
     scf_drv.xcfun = 'hf'
     scf_drv.acc_type = 'l2_diis'
     scf_results = scf_drv.compute(molecule, basis)
+
+    if scf_drv.rank == mpi_master():
+        if ri:
+            assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+            assert not scf_results['ri_fallback']
 
     rsp_drv = solver_cls()
     rsp_drv.ostream.mute()
@@ -160,17 +170,22 @@ def _run_lr_rsp_roundtrip(tmp_path, solver_cls):
     return rsp_drv, rsp_results, base + '.h5'
 
 
-def _run_c6_rsp_roundtrip(tmp_path):
+def _run_c6_rsp_roundtrip(tmp_path, ri):
 
     molecule, basis = _get_water_and_basis()
     base = str(Path(tmp_path) / 'c6driver')
 
     scf_drv = ScfRestrictedDriver()
-    scf_drv.ri = False
+    scf_drv.ri = ri
     scf_drv.ostream.mute()
     base = scf_drv.comm.bcast(base, root=mpi_master())
     scf_drv.filename = base
     scf_results = scf_drv.compute(molecule, basis)
+
+    if scf_drv.rank == mpi_master():
+        if ri:
+            assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+            assert not scf_results['ri_fallback']
 
     rsp_drv = C6Driver()
     rsp_drv.ostream.mute()
@@ -368,10 +383,11 @@ def test_write_rsp_full_solution_requires_numpy_array(tmp_path):
         write_rsp_full_solution_to_hdf5(str(h5file), [1.0, 2.0], 0, 1)
 
 
-def test_tda_rsp_omits_solution_keys_when_saving_is_disabled(tmp_path):
+@pytest.mark.parametrize('ri', [False, True])
+def test_tda_rsp_omits_solution_keys_when_saving_is_disabled(tmp_path, ri):
 
     rsp_drv, rsp_results, h5file = _run_water_rsp_roundtrip(
-        tmp_path, TdaEigenSolver, save_solutions=False)
+        tmp_path, TdaEigenSolver, ri, save_solutions=False)
 
     if rsp_drv.rank == mpi_master():
         assert 'full_solutions_keys' not in rsp_results
@@ -481,11 +497,12 @@ def test_atomic_property_metadata_for_charge_result_datasets(tmp_path):
         assert h5f['resp/resp_charges'].attrs['atomic_property'] == 'RESP Charges'
 
 
+@pytest.mark.parametrize('ri', [False, True])
 def test_read_results_roundtrips_tda_rsp_and_preserves_legacy_solution_vectors(
-        tmp_path):
+        tmp_path, ri):
 
     rsp_drv, rsp_results, h5file = _run_water_rsp_roundtrip(
-        tmp_path, TdaEigenSolver)
+        tmp_path, TdaEigenSolver, ri)
 
     if MPI.COMM_WORLD.Get_rank() == mpi_master():
         assert 'full_solutions_keys' not in rsp_results
@@ -516,11 +533,12 @@ def test_read_results_roundtrips_tda_rsp_and_preserves_legacy_solution_vectors(
 
 @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() != 1,
                     reason='runs only on a single MPI rank')
+@pytest.mark.parametrize('ri', [False, True])
 def test_read_results_roundtrips_rpa_rsp_and_preserves_legacy_solution_vectors(
-        tmp_path):
+        tmp_path, ri):
 
     rsp_drv, rsp_results, h5file = _run_water_rsp_roundtrip(
-        tmp_path, LinearResponseEigenSolver)
+        tmp_path, LinearResponseEigenSolver, ri)
 
     assert 'full_solutions_keys' not in rsp_results
 
@@ -554,12 +572,14 @@ def test_read_results_roundtrips_rpa_rsp_and_preserves_legacy_solution_vectors(
 
 @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() != 1,
                     reason='runs only on a single MPI rank')
+@pytest.mark.parametrize('ri', [False, True])
 @pytest.mark.parametrize('solver_cls',
                          [ComplexResponseSolver, ComplexResponseTdaSolver])
 def test_read_results_roundtrips_cpp_rsp_and_preserves_legacy_solution_vectors(
-        tmp_path, solver_cls):
+        tmp_path, solver_cls, ri):
 
-    rsp_drv, rsp_results, h5file = _run_cpp_rsp_roundtrip(tmp_path, solver_cls)
+    rsp_drv, rsp_results, h5file = _run_cpp_rsp_roundtrip(
+        tmp_path, solver_cls, ri)
 
     assert 'full_solutions_keys' not in rsp_results
 
@@ -651,10 +671,11 @@ def test_read_results_roundtrips_lr_rsp_and_preserves_solution_vectors(
 
 @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() != 1,
                     reason='runs only on a single MPI rank')
+@pytest.mark.parametrize('ri', [False, True])
 def test_read_results_roundtrips_c6_rsp_and_preserves_solution_vectors(
-        tmp_path):
+        tmp_path, ri):
 
-    rsp_drv, rsp_results, h5file = _run_c6_rsp_roundtrip(tmp_path)
+    rsp_drv, rsp_results, h5file = _run_c6_rsp_roundtrip(tmp_path, ri)
 
     recovered = read_results(h5file, 'rsp')
 
@@ -699,7 +720,8 @@ def test_read_results_roundtrips_c6_rsp_and_preserves_solution_vectors(
         np.testing.assert_allclose(recovered[flat_key], full_vec)
 
 
-def test_scf_results_hdf5_roundtrip_with_water_calculation(tmp_path):
+@pytest.mark.parametrize('ri', [False, True])
+def test_scf_results_hdf5_roundtrip_with_water_calculation(tmp_path, ri):
 
     molecule, basis = _get_water_and_basis()
     comm = MPI.COMM_WORLD
@@ -707,12 +729,16 @@ def test_scf_results_hdf5_roundtrip_with_water_calculation(tmp_path):
     filename = comm.bcast(filename, root=mpi_master())
 
     scf_drv = ScfRestrictedDriver()
-    scf_drv.ri = False
+    scf_drv.ri = ri
     scf_drv.ostream.mute()
     scf_drv.filename = filename
     scf_results = scf_drv.compute(molecule, basis)
 
     if scf_drv.rank == mpi_master():
+        if ri:
+            assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+            assert not scf_results['ri_fallback']
+
         h5file = Path(f'{filename}.h5')
 
         recovered = read_results(str(h5file), 'scf')
@@ -759,7 +785,8 @@ def test_read_results_ignores_legacy_untyped_rsp_nto_group(tmp_path):
     np.testing.assert_allclose(recovered['eigenvalues'], np.array([1.2, 1.5]))
 
 
-def test_opt_results_hdf5_roundtrip_with_nh3_optimization(tmp_path):
+@pytest.mark.parametrize('ri', [False, True])
+def test_opt_results_hdf5_roundtrip_with_nh3_optimization(tmp_path, ri):
 
     here = Path(__file__).parent
     inpfile = str(here / 'data' / 'nh3.inp')
@@ -780,10 +807,15 @@ def test_opt_results_hdf5_roundtrip_with_nh3_optimization(tmp_path):
     task.ao_basis = task.mpi_comm.bcast(task.ao_basis, root=mpi_master())
 
     scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
-    scf_drv.ri = False
+    scf_drv.ri = ri
     scf_drv.update_settings(task.input_dict['scf'],
                             task.input_dict['method_settings'])
-    _ = scf_drv.compute(task.molecule, task.ao_basis)
+    scf_results = scf_drv.compute(task.molecule, task.ao_basis)
+
+    if scf_drv.rank == mpi_master():
+        if ri:
+            assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+            assert not scf_results['ri_fallback']
 
     grad_drv = ScfGradientDriver(scf_drv)
     opt_drv = OptimizationDriver(grad_drv)
@@ -801,7 +833,8 @@ def test_opt_results_hdf5_roundtrip_with_nh3_optimization(tmp_path):
         assert 'final_molecule' not in recovered
 
 
-def test_opt_results_hdf5_roundtrip_with_real_scan(tmp_path):
+@pytest.mark.parametrize('ri', [False, True])
+def test_opt_results_hdf5_roundtrip_with_real_scan(tmp_path, ri):
 
     molecule = Molecule.read_xyz_string("""2
     H2
@@ -813,7 +846,7 @@ def test_opt_results_hdf5_roundtrip_with_real_scan(tmp_path):
 
     ostream = OutputStream(None)
     scf_drv = ScfRestrictedDriver(MPI.COMM_WORLD, ostream)
-    scf_drv.ri = False
+    scf_drv.ri = ri
     scf_drv.filename = filename
     grad_drv = ScfGradientDriver(scf_drv)
     opt_drv = OptimizationDriver(grad_drv)
@@ -827,6 +860,11 @@ def test_opt_results_hdf5_roundtrip_with_real_scan(tmp_path):
     opt_results = opt_drv.compute(molecule, basis)
 
     if opt_drv.rank == mpi_master():
+        if ri:
+            scf_results = scf_drv.scf_results
+            assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+            assert not scf_results['ri_fallback']
+
         recovered = read_results(f'{filename}.h5', 'opt')
 
         _assert_opt_results_roundtrip_equal(opt_results, recovered)
@@ -838,7 +876,8 @@ def test_opt_results_hdf5_roundtrip_with_real_scan(tmp_path):
             fpath.unlink()
 
 
-def test_vib_results_hdf5_roundtrip_with_water_calculation(tmp_path):
+@pytest.mark.parametrize('ri', [False, True])
+def test_vib_results_hdf5_roundtrip_with_water_calculation(tmp_path, ri):
 
     here = Path(__file__).parent
     inpfile = str(here / 'data' / 'water_hessian_scf.inp')
@@ -848,10 +887,15 @@ def test_vib_results_hdf5_roundtrip_with_water_calculation(tmp_path):
     filename = task.mpi_comm.bcast(filename, root=mpi_master())
 
     scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
-    scf_drv.ri = False
+    scf_drv.ri = ri
     scf_drv.acc_type = 'l2_diis'
     scf_drv.filename = filename
-    _ = scf_drv.compute(task.molecule, task.ao_basis)
+    scf_results = scf_drv.compute(task.molecule, task.ao_basis)
+
+    if scf_drv.rank == mpi_master():
+        if ri:
+            assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+            assert not scf_results['ri_fallback']
 
     vib_drv = VibrationalAnalysis(scf_drv)
     vib_drv.update_settings({}, {
@@ -871,7 +915,8 @@ def test_vib_results_hdf5_roundtrip_with_water_calculation(tmp_path):
         assert 'nuclear_charges' not in recovered
 
 
-def test_rixs_results_hdf5_roundtrip_with_water_calculation(tmp_path):
+@pytest.mark.parametrize('ri', [False, True])
+def test_rixs_results_hdf5_roundtrip_with_water_calculation(tmp_path, ri):
     here = Path(__file__).parent
     inpfile = str(here / 'data' / 'water_rixs_scf.inp')
 
@@ -880,9 +925,14 @@ def test_rixs_results_hdf5_roundtrip_with_water_calculation(tmp_path):
     filename = task.mpi_comm.bcast(filename, root=mpi_master())
 
     scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
-    scf_drv.ri = False
+    scf_drv.ri = ri
     scf_drv.filename = filename
     scf_results = scf_drv.compute(task.molecule, task.ao_basis)
+
+    if scf_drv.rank == mpi_master():
+        if ri:
+            assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+            assert not scf_results['ri_fallback']
 
     rixs_drv = RixsDriver()
     rixs_drv.update_settings({

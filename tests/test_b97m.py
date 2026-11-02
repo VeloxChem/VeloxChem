@@ -12,7 +12,7 @@ from veloxchem.scfrestdriver import ScfRestrictedDriver
 @pytest.mark.solvers
 class TestB97M:
 
-    def run_scf(self, xcfun_label, ref_scf_energy, tol):
+    def run_scf(self, xcfun_label, ri, ref_scf_energy, tol):
 
         mol_string = """
         N   -3.710    3.019   -0.037
@@ -31,18 +31,25 @@ class TestB97M:
         bas = MolecularBasis.read(mol, basis_label, ostream=None)
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_drv.xcfun = xcfun_label
         scf_results = scf_drv.compute(mol, bas)
 
         if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
             assert abs(ref_scf_energy - scf_results['scf_energy']) < tol
 
-    def test_b97m_d4(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_b97m_d4(self, ri):
 
-        self.run_scf('b97m-d4', -97.0598213335, 1.0e-5)
+        ref_scf_energy = {False: -97.0598213335, True: -97.0600844998}[ri]
+        self.run_scf('b97m-d4', ri, ref_scf_energy, 1.0e-5)
 
-    def test_wb97m_d4(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_wb97m_d4(self, ri):
 
-        self.run_scf('wb97m-d4', -96.9982843462, 1.0e-5)
+        ref_scf_energy = {False: -96.9982843462, True: -96.9983313393}[ri]
+        self.run_scf('wb97m-d4', ri, ref_scf_energy, 1.0e-5)

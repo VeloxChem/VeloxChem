@@ -42,7 +42,7 @@ class TestInputEnergy:
 
         MPI.COMM_WORLD.barrier()
 
-    def get_input_lines(self, xcfun, scf_type):
+    def get_input_lines(self, xcfun, scf_type, ri):
 
         input_lines = """
             @jobs
@@ -70,6 +70,9 @@ class TestInputEnergy:
             @end
         """
 
+        if ri:
+            input_lines = input_lines.replace('ri: false', 'ri: yes')
+
         if xcfun is not None:
             input_lines = input_lines.replace(
                 '@method settings', f'@method settings\nxcfun:{xcfun}')
@@ -85,13 +88,13 @@ class TestInputEnergy:
             return input_lines.replace('task: scf', 'task: roscf').replace(
                 'multiplicity: 1', 'multiplicity: 3')
 
-    def run_input_energy(self, capsys, xcfun, scf_type, ref_data):
+    def run_input_energy(self, capsys, xcfun, scf_type, ri, ref_data):
 
         here = Path(__file__).parent
         random_string = get_random_string_parallel()
         input_file = here / 'data' / f'vlx_scf_{random_string}.inp'
 
-        input_lines = self.get_input_lines(xcfun, scf_type)
+        input_lines = self.get_input_lines(xcfun, scf_type, ri)
         self.create_input_file(input_lines, input_file)
 
         with patch.object(sys, 'argv', ['vlx', str(input_file)]):
@@ -112,6 +115,13 @@ class TestInputEnergy:
                     if 'Debye' in line and 'Total' in line:
                         dipole = float(line.split()[2])
 
+                # NOTE: printed only where the SCF formed its Fock matrices
+                # with RI; one which fell back to the four-center integrals
+                # prints a warning instead.
+                if ri:
+                    assert ('Using the SIMD resolution of the identity'
+                            in captured.out)
+
                 assert wf_model == ref_data['wf_model']
                 assert abs(e_scf - ref_data['e_scf']) < 1.0e-6
                 assert n_iterations == ref_data['n_iterations']
@@ -119,7 +129,8 @@ class TestInputEnergy:
 
             self.remove_input_and_h5_files(input_file)
 
-    def test_input_rhf_energy(self, capsys):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_input_rhf_energy(self, capsys, ri):
 
         # vlxtag: RHF, Energy
 
@@ -127,15 +138,24 @@ class TestInputEnergy:
         xcfun = None
 
         ref_data = {
-            'wf_model': 'Spin-Restricted Hartree-Fock',
-            'e_scf': -75.9612569185,
-            'n_iterations': 8,
-            'dipole': 0.837406,
-        }
+            False: {
+                'wf_model': 'Spin-Restricted Hartree-Fock',
+                'e_scf': -75.9612569185,
+                'n_iterations': 8,
+                'dipole': 0.837406,
+            },
+            True: {
+                'wf_model': 'Spin-Restricted Hartree-Fock',
+                'e_scf': -75.9612009880,
+                'n_iterations': 9,
+                'dipole': 0.837522,
+            },
+        }[ri]
 
-        self.run_input_energy(capsys, xcfun, scf_type, ref_data)
+        self.run_input_energy(capsys, xcfun, scf_type, ri, ref_data)
 
-    def test_input_uhf_energy(self, capsys):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_input_uhf_energy(self, capsys, ri):
 
         # vlxtag: UHF, Energy
 
@@ -143,15 +163,24 @@ class TestInputEnergy:
         xcfun = None
 
         ref_data = {
-            'wf_model': 'Spin-Unrestricted Hartree-Fock',
-            'e_scf': -75.7066294501,
-            'n_iterations': 10,
-            'dipole': 0.291780,
-        }
+            False: {
+                'wf_model': 'Spin-Unrestricted Hartree-Fock',
+                'e_scf': -75.7066294501,
+                'n_iterations': 10,
+                'dipole': 0.291780,
+            },
+            True: {
+                'wf_model': 'Spin-Unrestricted Hartree-Fock',
+                'e_scf': -75.7065778270,
+                'n_iterations': 11,
+                'dipole': 0.291704,
+            },
+        }[ri]
 
-        self.run_input_energy(capsys, xcfun, scf_type, ref_data)
+        self.run_input_energy(capsys, xcfun, scf_type, ri, ref_data)
 
-    def test_input_rohf_energy(self, capsys):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_input_rohf_energy(self, capsys, ri):
 
         # vlxtag: ROHF, Energy
 
@@ -159,15 +188,24 @@ class TestInputEnergy:
         xcfun = None
 
         ref_data = {
-            'wf_model': 'Spin-Restricted Open-Shell Hartree-Fock',
-            'e_scf': -75.7013577367,
-            'n_iterations': 8,
-            'dipole': 0.287662,
-        }
+            False: {
+                'wf_model': 'Spin-Restricted Open-Shell Hartree-Fock',
+                'e_scf': -75.7013577367,
+                'n_iterations': 8,
+                'dipole': 0.287662,
+            },
+            True: {
+                'wf_model': 'Spin-Restricted Open-Shell Hartree-Fock',
+                'e_scf': -75.7013054694,
+                'n_iterations': 9,
+                'dipole': 0.287584,
+            },
+        }[ri]
 
-        self.run_input_energy(capsys, xcfun, scf_type, ref_data)
+        self.run_input_energy(capsys, xcfun, scf_type, ri, ref_data)
 
-    def test_input_rks_energy(self, capsys):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_input_rks_energy(self, capsys, ri):
 
         # vlxtag: RKS, Energy
 
@@ -175,15 +213,24 @@ class TestInputEnergy:
         xcfun = 'b3lyp'
 
         ref_data = {
-            'wf_model': 'Spin-Restricted Kohn-Sham',
-            'e_scf': -76.3571447881,
-            'n_iterations': 7,
-            'dipole': 0.780569,
-        }
+            False: {
+                'wf_model': 'Spin-Restricted Kohn-Sham',
+                'e_scf': -76.3571447881,
+                'n_iterations': 7,
+                'dipole': 0.780569,
+            },
+            True: {
+                'wf_model': 'Spin-Restricted Kohn-Sham',
+                'e_scf': -76.3571551317,
+                'n_iterations': 7,
+                'dipole': 0.780594,
+            },
+        }[ri]
 
-        self.run_input_energy(capsys, xcfun, scf_type, ref_data)
+        self.run_input_energy(capsys, xcfun, scf_type, ri, ref_data)
 
-    def test_input_uks_energy(self, capsys):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_input_uks_energy(self, capsys, ri):
 
         # vlxtag: UKS, Energy
 
@@ -191,15 +238,24 @@ class TestInputEnergy:
         xcfun = 'b3lyp'
 
         ref_data = {
-            'wf_model': 'Spin-Unrestricted Kohn-Sham',
-            'e_scf': -76.0761244587,
-            'n_iterations': 7,
-            'dipole': 0.300483,
-        }
+            False: {
+                'wf_model': 'Spin-Unrestricted Kohn-Sham',
+                'e_scf': -76.0761244587,
+                'n_iterations': 7,
+                'dipole': 0.300483,
+            },
+            True: {
+                'wf_model': 'Spin-Unrestricted Kohn-Sham',
+                'e_scf': -76.0761479026,
+                'n_iterations': 9,
+                'dipole': 0.300513,
+            },
+        }[ri]
 
-        self.run_input_energy(capsys, xcfun, scf_type, ref_data)
+        self.run_input_energy(capsys, xcfun, scf_type, ri, ref_data)
 
-    def test_input_roks_energy(self, capsys):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_input_roks_energy(self, capsys, ri):
 
         # vlxtag: ROKS, Energy
 
@@ -207,10 +263,18 @@ class TestInputEnergy:
         xcfun = 'b3lyp'
 
         ref_data = {
-            'wf_model': 'Spin-Restricted Open-Shell Kohn-Sham',
-            'e_scf': -76.0744670640,
-            'n_iterations': 7,
-            'dipole': 0.298953,
-        }
+            False: {
+                'wf_model': 'Spin-Restricted Open-Shell Kohn-Sham',
+                'e_scf': -76.0744670640,
+                'n_iterations': 7,
+                'dipole': 0.298953,
+            },
+            True: {
+                'wf_model': 'Spin-Restricted Open-Shell Kohn-Sham',
+                'e_scf': -76.0744904543,
+                'n_iterations': 8,
+                'dipole': 0.298983,
+            },
+        }[ri]
 
-        self.run_input_energy(capsys, xcfun, scf_type, ref_data)
+        self.run_input_energy(capsys, xcfun, scf_type, ri, ref_data)

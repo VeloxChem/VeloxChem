@@ -27,15 +27,21 @@ class TestScfSetupHeader:
             H 0.0 -0.7572 -0.4692
             """)
 
-    def run_scf(self, xcfun_label, molecule, basis, grid_level=None):
+    def run_scf(self, xcfun_label, molecule, basis, ri, grid_level=None):
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         if xcfun_label is not None:
             scf_drv.xcfun = xcfun_label
             scf_drv.grid_level = grid_level
-        scf_drv.compute(molecule, basis)
+        scf_results = scf_drv.compute(molecule, basis)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
+
         return scf_drv
 
     def compute_with_capture(self, drv, molecule, basis, tmp_path):
@@ -78,12 +84,13 @@ class TestScfSetupHeader:
                 'Coupled-Perturbed')[0]
         return text
 
-    def test_gradient_header_inherits_dft_from_scf_results(self, tmp_path):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_gradient_header_inherits_dft_from_scf_results(self, tmp_path, ri):
 
         molecule = self.make_molecule()
         basis = MolecularBasis.read(molecule, 'sto-3g')
 
-        scf_drv = self.run_scf('b3lyp', molecule, basis, grid_level=5)
+        scf_drv = self.run_scf('b3lyp', molecule, basis, ri, grid_level=5)
 
         # newly constructed driver without method settings
         grad_drv = ScfGradientDriver(scf_drv)
@@ -104,12 +111,13 @@ class TestScfSetupHeader:
                 lines, 'Exchange-Correlation Functional', 'B3LYP')
             assert self.header_value_lines(lines, 'Molecular Grid Level', 5)
 
-    def test_gradient_header_with_hf_scf_results(self, tmp_path):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_gradient_header_with_hf_scf_results(self, tmp_path, ri):
 
         molecule = self.make_molecule()
         basis = MolecularBasis.read(molecule, 'sto-3g')
 
-        scf_drv = self.run_scf(None, molecule, basis)
+        scf_drv = self.run_scf(None, molecule, basis, ri)
 
         grad_drv = ScfGradientDriver(scf_drv)
         assert grad_drv.xcfun is None
@@ -122,12 +130,13 @@ class TestScfSetupHeader:
         if grad_drv.rank == mpi_master():
             assert self.dft_header_lines(text) == []
 
-    def test_hessian_header_inherits_dft_from_scf_results(self, tmp_path):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_hessian_header_inherits_dft_from_scf_results(self, tmp_path, ri):
 
         molecule = self.make_molecule()
         basis = MolecularBasis.read(molecule, 'sto-3g')
 
-        scf_drv = self.run_scf('b3lyp', molecule, basis, grid_level=5)
+        scf_drv = self.run_scf('b3lyp', molecule, basis, ri, grid_level=5)
 
         # newly constructed driver without method settings
         hess_drv = ScfHessianDriver(scf_drv)
@@ -148,12 +157,13 @@ class TestScfSetupHeader:
                 lines, 'Exchange-Correlation Functional', 'B3LYP')
             assert self.header_value_lines(lines, 'Molecular Grid Level', 5)
 
-    def test_hessian_header_with_hf_scf_results(self, tmp_path):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_hessian_header_with_hf_scf_results(self, tmp_path, ri):
 
         molecule = self.make_molecule()
         basis = MolecularBasis.read(molecule, 'sto-3g')
 
-        scf_drv = self.run_scf(None, molecule, basis)
+        scf_drv = self.run_scf(None, molecule, basis, ri)
 
         hess_drv = ScfHessianDriver(scf_drv)
         assert hess_drv.xcfun is None
@@ -166,16 +176,17 @@ class TestScfSetupHeader:
         if hess_drv.rank == mpi_master():
             assert self.dft_header_lines(self.hessian_driver_section(text)) == []
 
+    @pytest.mark.parametrize('ri', [False, True])
     @pytest.mark.parametrize('driver_cls',
                              [ScfGradientDriver, ScfHessianDriver])
     def test_header_runs_scf_on_demand_before_inheriting_settings(
-            self, driver_cls, tmp_path):
+            self, driver_cls, tmp_path, ri):
 
         molecule = self.make_molecule()
         basis = MolecularBasis.read(molecule, 'sto-3g')
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_drv.xcfun = 'b3lyp'
         scf_drv.grid_level = 5
@@ -190,6 +201,11 @@ class TestScfSetupHeader:
         assert drv.grid_level == 5
 
         if drv.rank == mpi_master():
+            if ri:
+                scf_results = scf_drv.scf_results
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
+
             if isinstance(drv, ScfHessianDriver):
                 text = self.hessian_driver_section(text)
             lines = self.dft_header_lines(text)

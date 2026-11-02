@@ -32,12 +32,12 @@ class TestEFieldRestart:
         return scf_drv.comm.bcast(filename, root=mpi_master())
 
     @staticmethod
-    def run_scf(electric_field, filename):
+    def run_scf(electric_field, filename, ri):
 
         mol, bas = TestEFieldRestart.get_molecule_and_basis()
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_drv.electric_field = electric_field
         scf_drv.filename = filename
@@ -46,12 +46,13 @@ class TestEFieldRestart:
 
         return scf_drv, scf_results
 
-    def test_scf_restart_with_matching_field(self, tmp_path):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_scf_restart_with_matching_field(self, tmp_path, ri):
 
         mol, bas = self.get_molecule_and_basis()
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_drv.electric_field = (0.0, 0.0, 0.001)
         scf_drv.filename = self.get_checkpoint_filename(scf_drv, tmp_path,
@@ -67,15 +68,21 @@ class TestEFieldRestart:
         assert scf_drv.restart is True
 
         if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
+
             assert abs(scf_results['scf_energy'] -
                        scf_results_ref['scf_energy']) < 1.0e-6
 
-    def test_scf_restart_without_field_from_field_checkpoint(self, tmp_path):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_scf_restart_without_field_from_field_checkpoint(
+            self, tmp_path, ri):
 
         mol, bas = self.get_molecule_and_basis()
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_drv.electric_field = (0.0, 0.0, 0.001)
         scf_drv.filename = self.get_checkpoint_filename(scf_drv, tmp_path,
@@ -92,9 +99,13 @@ class TestEFieldRestart:
         # restart is really a restart (the driver accepts the checkpoint)
         assert scf_drv.restart is True
 
-        _, fresh_results = self.run_scf(None, None)
+        _, fresh_results = self.run_scf(None, None, ri)
 
         if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
+
             # the restarted calculation converges to the regular zero-field
             # SCF result ...
             assert abs(scf_results['scf_energy'] -
@@ -105,12 +116,14 @@ class TestEFieldRestart:
             assert abs(scf_results['scf_energy'] -
                        scf_results_ref['scf_energy']) > 1.0e-5
 
-    def test_scf_restart_with_field_from_fieldfree_checkpoint(self, tmp_path):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_scf_restart_with_field_from_fieldfree_checkpoint(
+            self, tmp_path, ri):
 
         mol, bas = self.get_molecule_and_basis()
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_drv.filename = self.get_checkpoint_filename(scf_drv, tmp_path,
                                                         'water_added_field')
@@ -125,9 +138,13 @@ class TestEFieldRestart:
         # really a restart (the driver accepts the checkpoint)
         assert scf_drv.restart is True
 
-        _, fresh_results = self.run_scf((0.0, 0.0, 0.001), None)
+        _, fresh_results = self.run_scf((0.0, 0.0, 0.001), None, ri)
 
         if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
+
             # converges to the field-perturbed result, not to the checkpoint's
             # zero-field state (field effect must exceed the tolerance)
             assert abs(scf_results['scf_energy'] -
@@ -135,12 +152,13 @@ class TestEFieldRestart:
             assert abs(scf_results['scf_energy'] -
                        scf_results_ref['scf_energy']) > 1.0e-5
 
-    def test_scf_restart_with_changed_field(self, tmp_path):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_scf_restart_with_changed_field(self, tmp_path, ri):
 
         mol, bas = self.get_molecule_and_basis()
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_drv.electric_field = (0.0, 0.0, 0.001)
         scf_drv.filename = self.get_checkpoint_filename(scf_drv, tmp_path,
@@ -155,9 +173,13 @@ class TestEFieldRestart:
         # the restart is really a restart: the driver accepts the checkpoint
         assert scf_drv.restart is True
 
-        _, fresh_results = self.run_scf((0.0, 0.0, -0.001), None)
+        _, fresh_results = self.run_scf((0.0, 0.0, -0.001), None, ri)
 
         if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
+
             # converges to the new field's result, not to the checkpoint's
             # old-field state (field effect must exceed the tolerance)
             assert abs(scf_results['scf_energy'] -
@@ -165,13 +187,14 @@ class TestEFieldRestart:
             assert abs(scf_results['scf_energy'] -
                        scf_results_ref['scf_energy']) > 1.0e-5
 
-    def test_scf_restart_without_field_from_fieldfree_checkpoint(self,
-                                                                 tmp_path):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_scf_restart_without_field_from_fieldfree_checkpoint(
+            self, tmp_path, ri):
 
         mol, bas = self.get_molecule_and_basis()
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_drv.filename = self.get_checkpoint_filename(scf_drv, tmp_path,
                                                         'water_fieldfree')
@@ -186,6 +209,10 @@ class TestEFieldRestart:
         assert scf_drv.restart is True
 
         if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
+
             assert abs(scf_results['scf_energy'] -
                        scf_results_ref['scf_energy']) < 1.0e-6
 
