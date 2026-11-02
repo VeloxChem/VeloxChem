@@ -146,7 +146,7 @@ class TestPDFT:
 
             if scfdrv.comm.rank == mpi_master():
                 if func in references:
-                    assert (pdft_xc_energy - references[func]) < 1.0e-8
+                    assert abs(pdft_xc_energy - references[func]) < 1.0e-8
                 else:
                     assert not np.isnan(pdft_xc_energy)
                 assert not np.isnan(pdft_vxc_mat).any()
