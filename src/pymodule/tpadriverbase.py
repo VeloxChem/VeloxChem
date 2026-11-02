@@ -252,14 +252,13 @@ class TpaDriverBase(NonlinearSolver):
         for key in cpp_keywords:
             setattr(Nb_drv, key, getattr(self, key))
 
-        rijkresponse.share(self, Nb_drv)
-
         if self.checkpoint_file is not None:
             fpath = Path(self.checkpoint_file)
             fpath = fpath.with_name(fpath.stem)
             Nb_drv.checkpoint_file = str(fpath) + '_tpa_1.h5'
 
-        Nb_results = Nb_drv.compute(molecule, ao_basis, scf_results, v_grad)
+        with rijkresponse.lend(self, Nb_drv):
+            Nb_results = Nb_drv.compute(molecule, ao_basis, scf_results, v_grad)
 
         self._is_converged = Nb_drv.is_converged
 

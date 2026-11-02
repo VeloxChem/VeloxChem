@@ -396,15 +396,14 @@ class TpaReducedDriver(TpaDriverBase):
         for key in cpp_keywords:
             setattr(N_total_drv, key, getattr(self, key))
 
-        rijkresponse.share(self, N_total_drv)
-
         if self.checkpoint_file is not None:
             fpath = Path(self.checkpoint_file)
             fpath = fpath.with_name(fpath.stem)
             N_total_drv.checkpoint_file = str(fpath) + '_tpa_2_red.h5'
 
-        N_total_results = N_total_drv.compute(molecule, ao_basis, scf_results,
-                                              xy_dict)
+        with rijkresponse.lend(self, N_total_drv):
+            N_total_results = N_total_drv.compute(
+                molecule, ao_basis, scf_results, xy_dict)
 
         self._is_converged = (self._is_converged and N_total_drv.is_converged)
 

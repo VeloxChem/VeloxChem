@@ -71,6 +71,8 @@ shape of factors but two of them, and the caller holds them apart and calls this
 twice rather than this module learning about batches it cannot see.
 """
 
+from contextlib import contextmanager
+
 import numpy as np
 import psutil
 
@@ -266,9 +268,10 @@ def range_separation(solver):
     return xcfun.get_rs_omega()
 
 
-def initialize(solver, molecule, basis):
+def initialize(solver, molecule, basis, reuse=False):
     """
-    Forms the B vectors the response driver contracts, on the solver.
+    Forms the B vectors the response driver contracts, on the solver, or checks
+    that the solver holds the ones it is to use again.
 
     :param solver:
         The solver, which is given the drivers and the auxiliary basis.
@@ -276,15 +279,43 @@ def initialize(solver, molecule, basis):
         The molecule.
     :param basis:
         The AO basis set.
+    :param reuse:
+        True where the solver formed the B vectors, or fell back, earlier in
+        the same calculation with the same molecule and basis, and uses that
+        again: nothing is formed, and an error is raised if there is nothing to
+        use. Callers pass it for the second setup of one calculation, which is
+        a nonlinear driver's after it formed the B vectors to lend them (see
+        lend) and an orbital response's omega after its compute.
     """
 
-    # NOTE: the B vectors are the dearest thing this path forms and they depend on
-    # the molecule, the basis and the fitting set alone. A driver which drives
-    # solvers of its own hands them down with share below, and each of those
-    # solvers initializes itself in turn, so this is reached again with the work
-    # already done. Doing it again would cost what it cost the first time.
-    if is_prepared(solver) or getattr(solver, '_ri_jk_fallback', False):
+    _check_not_lent(solver)
+
+    # NOTE: a solver which borrows the B vectors of the driver that drives it
+    # (see lend) uses them for the call they were lent for and forms none of
+    # its own. The driver formed them for its own functional; every driver
+    # copies its xcfun to a solver among the keywords it sets before lending,
+    # and the check below fails if one ever does not.
+    if solver._ri_jk_borrowing:
+        assert_msg_critical(
+            solver._ri_jk_fallback or
+            solver._ri_jk_drv.get_omega() == range_separation(solver),
+            f'{type(solver).__name__}: the RI-JK B vectors it borrows are ' +
+            'not formed for the range separation of its functional')
         return
+
+    if reuse:
+        assert_msg_critical(
+            solver._ri_jk_fallback or solver._ri_jk_drv is not None,
+            f'{type(solver).__name__}: no RI-JK B vectors were formed ' +
+            'earlier in this calculation')
+        return
+
+    # NOTE: B vectors held from an earlier calculation are let go before new
+    # ones are formed. They belong to the molecule and basis of that
+    # calculation, which may not be this one (a solver computed again at
+    # another geometry), and let go here they are freed before the new ones
+    # are allocated rather than after. The fallback is decided again as well.
+    _release(solver)
 
     mark_setup(solver)
 
@@ -364,7 +395,7 @@ def initialize(solver, molecule, basis):
 
     if max(peaks) > budget:
         # NOTE: the solver falls back to the four-center integrals, and so does
-        # every solver this one hands its B vectors to (see share). ri, ri_jk
+        # every solver this one lends its B vectors to (see lend). ri, ri_jk
         # and ri_coulomb are left as they were set.
         solver._ri_jk_fallback = True
         solver._ri_jk_drv = None
@@ -642,6 +673,8 @@ def fock_matrices_unrestricted(solver,
         the rest, and this picks between them. They are separate there so that a
         plain calculation cannot reach the attenuated code at all.
     """
+    _check_not_lent(solver)
+
     drv = solver._ri_jk_response_drv
     bq = solver._ri_jk_drv.get_bq_vectors()
     aux = solver._ri_jk_aux_basis
@@ -738,68 +771,93 @@ def general_factors(mo, nocc, mo_density):
     return right_a, right_b
 
 
-def is_prepared(solver):
-    """Whether the solver already holds B vectors it can contract.
+def _release(solver):
+    """Lets go of the B vectors the solver holds and of its fallback.
 
     :param solver:
         The solver.
-
-    :return:
-        True where the B vectors are formed and ready.
     """
 
-    drv = getattr(solver, '_ri_jk_drv', None)
-
-    if (drv is None or not drv.is_prepared() or
-            getattr(solver, '_ri_jk_response_drv', None) is None or
-            getattr(solver, '_ri_jk_aux_basis', None) is None):
-        return False
-
-    # NOTE: and prepared for the functional this solver has. A driver handed down
-    # by another one carries the operators that solver needed, which is the same
-    # set in every case that arises today -- a driver drives solvers of its own
-    # functional -- but a plain set answering a range separated build would drop
-    # the long-range term, and one which asks here is told no and forms its own.
-    return drv.get_omega() == range_separation(solver)
+    solver._ri_jk_drv = None
+    solver._ri_jk_response_drv = None
+    solver._ri_jk_aux_basis = None
+    solver._ri_jk_memory = None
+    solver._ri_jk_predicted_peak = 0
+    solver._ri_jk_fallback = False
 
 
-def share(source, target):
-    """Hands the B vectors of one solver to another.
+def _check_not_lent(solver):
+    """Raises an error where the solver's B vectors are lent out (see lend).
+
+    :param solver:
+        The solver.
+    """
+
+    assert_msg_critical(
+        not solver._ri_jk_lent,
+        f'{type(solver).__name__}: its RI-JK B vectors are lent to a solver ' +
+        'it drives and cannot be used or formed again until they are returned')
+
+
+@contextmanager
+def lend(driver, solver):
+    """Lends the B vectors of a driver to a solver it drives, for one call.
 
     A response driver drives linear solvers of its own, and every one of them
     needs the same B vectors of the same molecule in the same basis. Formed once
-    and handed down they cost one transformation of the integrals; left to each
-    solver they cost one for each, which on a molecule of seventy atoms was eight
-    seconds apiece.
+    and lent they cost one transformation of the integrals; formed by each
+    solver they cost one for each.
 
-    :param source:
-        The solver which holds them, or which does not, in which case nothing is
-        handed over and the target forms its own.
-    :param target:
-        The solver which is given them.
+    Used as ``with lend(driver, solver): solver.compute(...)``. Inside the block
+    the solver borrows the driver's B vectors and forms none of its own (see
+    initialize), and the driver, which stays their owner, raises an error if
+    it uses or forms them. On leaving the block, also on an error, the solver
+    holds no reference to them and the driver can use them again.
+
+    A driver which fell back to the four-center integrals lends that, so its
+    solvers do not form the B vectors it could not hold or warn again. A
+    driver which holds neither lends nothing, and the solver sets itself up.
+
+    :param driver:
+        The driver which formed the B vectors.
+    :param solver:
+        The solver the driver is about to compute.
     """
 
-    # NOTE: is_prepared asks whether the source holds vectors for its own
-    # functional. A source and a target of different functionals is not a case
-    # which arises -- a driver drives solvers of its own -- and if it ever did, the
-    # target's own is_prepared would reject what it was handed and it would form
-    # the set it needs.
-    # NOTE: a source which fell back hands that on, so its solvers do not form
-    # the B vectors it could not hold or warn again.
-    if getattr(source, '_ri_jk_fallback', False):
-        target._ri_jk_fallback = True
+    _check_not_lent(driver)
+
+    assert_msg_critical(
+        not driver._ri_jk_borrowing,
+        f'{type(driver).__name__}: it lends only RI-JK B vectors it formed')
+
+    assert_msg_critical(
+        not solver._ri_jk_lent and not solver._ri_jk_borrowing and
+        solver._ri_jk_drv is None and not solver._ri_jk_fallback,
+        f'{type(solver).__name__}: it holds RI-JK B vectors or a fallback of ' +
+        'its own and cannot borrow those of the driver')
+
+    if not driver._ri_jk_fallback and driver._ri_jk_drv is None:
+        yield
         return
 
-    if not is_prepared(source):
-        return
+    solver._ri_jk_fallback = driver._ri_jk_fallback
+    solver._ri_jk_drv = driver._ri_jk_drv
+    solver._ri_jk_response_drv = driver._ri_jk_response_drv
+    solver._ri_jk_aux_basis = driver._ri_jk_aux_basis
+    solver._ri_jk_memory = driver._ri_jk_memory
+    solver._ri_jk_predicted_peak = getattr(driver, '_ri_jk_predicted_peak', 0)
+    solver._ri_rss_at_setup = getattr(driver, '_ri_rss_at_setup', None)
+    solver._ri_memory_reserve = getattr(driver, '_ri_memory_reserve', 0)
 
-    target._ri_jk_drv = source._ri_jk_drv
-    target._ri_jk_response_drv = source._ri_jk_response_drv
-    target._ri_jk_aux_basis = source._ri_jk_aux_basis
-    target._ri_jk_memory = getattr(source, '_ri_jk_memory', None)
-    target._ri_jk_predicted_peak = getattr(source, '_ri_jk_predicted_peak', 0)
-    target._ri_rss_at_setup = getattr(source, '_ri_rss_at_setup', None)
-    target._ri_memory_reserve = getattr(source, '_ri_memory_reserve', 0)
+    solver._ri_jk_borrowing = True
+    driver._ri_jk_lent = True
+
+    try:
+        yield
+    finally:
+        _release(solver)
+        solver._ri_jk_borrowing = False
+        driver._ri_jk_lent = False
 
 
 def slice_factors(dens_factors, start, end):
@@ -866,6 +924,8 @@ def fock_matrices(solver, basis, dens_factors, exchange_scaling_factor,
     :return:
         The Fock matrices as numpy arrays, one for each density.
     """
+
+    _check_not_lent(solver)
 
     drv = solver._ri_jk_response_drv
     bq = solver._ri_jk_drv.get_bq_vectors()

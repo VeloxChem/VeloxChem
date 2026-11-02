@@ -243,10 +243,11 @@ class TpaTransitionDriver(NonlinearSolver):
                     b_grad[ind] *= -1.0
 
         # NOTE: the B vectors are formed before the solvers this driver drives
-        # are made, so that each of them is handed the same ones rather than
-        # forming its own. Forming them again where the integrals are set up
-        # costs nothing, the driver holding them already.
-        if self._uses_ri_jk():
+        # are made and lent to each of them (rijkresponse.lend), rather than
+        # formed by each. The integral setup in compute_quad_components
+        # uses them again. Not gated on _uses_ri_jk(), for the reason given
+        # in _init_eri.
+        if self.ri_jk and not self._ri_fallback:
             rijkresponse.initialize(self, molecule, ao_basis)
 
         rpa_drv = LinearResponseEigenSolver(self.comm, self.ostream)
@@ -264,14 +265,13 @@ class TpaTransitionDriver(NonlinearSolver):
         for key in rpa_keywords:
             setattr(rpa_drv, key, getattr(self, key))
 
-        rijkresponse.share(self, rpa_drv)
-
         if self.checkpoint_file is not None:
             fpath = Path(self.checkpoint_file)
             fpath = fpath.with_name(fpath.stem)
             rpa_drv.checkpoint_file = str(fpath) + '_tpatrans_rpa.h5'
 
-        rpa_results = rpa_drv.compute(molecule, ao_basis, scf_results)
+        with rijkresponse.lend(self, rpa_drv):
+            rpa_results = rpa_drv.compute(molecule, ao_basis, scf_results)
 
         excitation_details = rpa_results['excitation_details']
         oscillator_strengths = rpa_results['oscillator_strengths']
@@ -322,14 +322,13 @@ class TpaTransitionDriver(NonlinearSolver):
         for key in cpp_keywords:
             setattr(N_drv, key, getattr(self, key))
 
-        rijkresponse.share(self, N_drv)
-
         if self.checkpoint_file is not None:
             fpath = Path(self.checkpoint_file)
             fpath = fpath.with_name(fpath.stem)
             N_drv.checkpoint_file = str(fpath) + '_tpatrans_cpp.h5'
 
-        N_results = N_drv.compute(molecule, ao_basis, scf_results, B)
+        with rijkresponse.lend(self, N_drv):
+            N_results = N_drv.compute(molecule, ao_basis, scf_results, B)
 
         self._is_converged = N_drv.is_converged
 
@@ -409,7 +408,7 @@ class TpaTransitionDriver(NonlinearSolver):
 
         nocc = molecule.number_of_alpha_occupied_orbitals(ao_basis)
 
-        eri_dict = self._init_eri(molecule, ao_basis)
+        eri_dict = self._init_eri(molecule, ao_basis, reuse_ri_jk=True)
 
         dft_dict = self._init_dft(molecule, scf_results)
 

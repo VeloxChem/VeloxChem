@@ -2617,8 +2617,9 @@ class PolOrbitalResponse(CphfSolver):
             'memory_tracing': self.memory_tracing,
         })
 
-        # ERI information
-        eri_dict = self._init_eri(molecule, basis)
+        # ERI information. The RI-JK B vectors are the ones compute formed:
+        # callers run compute first, with the same molecule and basis.
+        eri_dict = self._init_eri(molecule, basis, reuse_ri_jk=True)
         # DFT information
         dft_dict = self._init_dft(molecule, scf_tensors, silent=True)
         # PE information
@@ -2903,8 +2904,9 @@ class PolOrbitalResponse(CphfSolver):
             'memory_tracing': self.memory_tracing,
         })
 
-        # ERI information
-        eri_dict = self._init_eri(molecule, basis)
+        # ERI information. The RI-JK B vectors are the ones compute formed:
+        # callers run compute first, with the same molecule and basis.
+        eri_dict = self._init_eri(molecule, basis, reuse_ri_jk=True)
         # DFT information
         dft_dict = self._init_dft(molecule, scf_tensors, silent=True)
         # PE information
@@ -3179,8 +3181,9 @@ class PolOrbitalResponse(CphfSolver):
             'memory_tracing': self.memory_tracing,
         })
 
-        # ERI information
-        eri_dict = self._init_eri(molecule, basis)
+        # ERI information. The RI-JK B vectors are the ones compute formed:
+        # callers run compute first, with the same molecule and basis.
+        eri_dict = self._init_eri(molecule, basis, reuse_ri_jk=True)
         # DFT information
         dft_dict = self._init_dft(molecule, scf_tensors, silent=True)
         # PE information
@@ -3528,8 +3531,9 @@ class PolOrbitalResponse(CphfSolver):
             'memory_tracing': self.memory_tracing,
         })
 
-        # ERI information
-        eri_dict = self._init_eri(molecule, basis)
+        # ERI information. The RI-JK B vectors are the ones compute formed:
+        # callers run compute first, with the same molecule and basis.
+        eri_dict = self._init_eri(molecule, basis, reuse_ri_jk=True)
         # DFT information
         dft_dict = self._init_dft(molecule, scf_tensors, silent=True)
         # PE information

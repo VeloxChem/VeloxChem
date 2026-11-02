@@ -243,6 +243,17 @@ class TddftGradientDriver(GradientDriver):
             self.compute_numerical(molecule, basis, scf_drv, rsp_drv,
                                    rsp_results)
         else:
+            # NOTE: the RI gradient reads the RI driver the SCF formed. A deep
+            # copy of an SCF driver holds none until it runs the SCF itself
+            # (__deepcopy__ of the SCF drivers).
+            assert_msg_critical(
+                not (self._scf_drv._uses_ri_jk() or
+                     self._scf_drv._uses_ri_coulomb()) or
+                self._scf_drv._ri_drv is not None,
+                f'{type(self).__name__}: the SCF driver holds no RI driver ' +
+                '(a copy of one which has not run the SCF); run the SCF ' +
+                'with this driver before the gradient')
+
             self.compute_analytical(molecule, basis, rsp_results)
 
         if self.rank == mpi_master():

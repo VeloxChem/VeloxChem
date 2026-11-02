@@ -126,6 +126,14 @@ class LinearSolver:
         - dist_fock_ung: The distributed ungerade Fock matrices in MO.
     """
 
+    # NOTE: the attributes a deepcopy leaves as the constructor sets them: the
+    # simd RI drivers, which have no copy in Python, what describes the B
+    # vectors of the RI-JK one, and whether they are lent or borrowed (see
+    # rijkresponse.lend). Read by the __deepcopy__ of the eigensolver bases.
+    _ri_not_copied = ('_ri_drv', '_ri_jk_drv', '_ri_jk_response_drv',
+                      '_ri_jk_aux_basis', '_ri_jk_memory', '_ri_jk_lent',
+                      '_ri_jk_borrowing')
+
     def __init__(self, comm, ostream):
         """
         Initializes linear solver to default setup.
@@ -156,12 +164,19 @@ class LinearSolver:
 
         # NOTE: whether this response fell back from RI to the four-center
         # integrals for want of memory of its own, and what the build was
-        # checked with. RI-JK's is decided once with the B vectors and handed on
-        # with them; RI-J's is decided again whenever the integrals are.
+        # checked with. RI-JK's is decided with the B vectors at the start of
+        # each calculation and lent with them (rijkresponse.lend); RI-J's is
+        # decided again whenever the integrals are.
         self._ri_jk_fallback = False
         self._ri_jk_memory = None
         self._ri_j_fallback = False
         self._ri_j_memory = None
+
+        # NOTE: whether this solver's RI-JK B vectors are lent to a solver it
+        # drives, and whether the ones it holds are borrowed from the driver
+        # that drives it, for the duration of one compute (rijkresponse.lend).
+        self._ri_jk_lent = False
+        self._ri_jk_borrowing = False
 
         # NOTE: the resolution of the identity for response needs a fitting basis
         # for the exchange as well as the Coulomb. The default above fits the
@@ -590,7 +605,7 @@ class LinearSolver:
         return (checkpoint_rsp_input == current_rsp_input and
                 checkpoint_method_input == current_method_input)
 
-    def _init_eri(self, molecule, basis):
+    def _init_eri(self, molecule, basis, reuse_ri_jk=False):
         """
         Initializes ERI.
 
@@ -598,6 +613,9 @@ class LinearSolver:
             The molecule.
         :param basis:
             The AO basis set.
+        :param reuse_ri_jk:
+            True where the RI-JK B vectors were formed earlier in the same
+            calculation and are used again (see rijkresponse.initialize).
 
         :return:
             The dictionary of ERI information.
@@ -622,8 +640,12 @@ class LinearSolver:
         if asks_ri_coulomb and not self._ri_fallback:
             rijresponse.initialize(self, molecule, basis)
 
-        if asks_ri_jk and self._uses_ri_jk():
-            self._init_simd_ri_jk(molecule, basis)
+        # NOTE: not gated on _uses_ri_jk(), which reads this response's own
+        # fallback: that is decided again by rijkresponse.initialize at the
+        # start of each calculation, and one left from an earlier calculation
+        # would otherwise keep it from being decided again.
+        if asks_ri_jk and not self._ri_fallback:
+            self._init_simd_ri_jk(molecule, basis, reuse_ri_jk)
 
         return {
             'screening': screening,
@@ -688,7 +710,7 @@ class LinearSolver:
         self.ostream.print_blank()
         self.ostream.flush()
 
-    def _init_simd_ri_jk(self, molecule, basis):
+    def _init_simd_ri_jk(self, molecule, basis, reuse=False):
         """
         Forms the B vectors the simd RI-JK response driver contracts.
 
@@ -696,9 +718,12 @@ class LinearSolver:
             The molecule.
         :param basis:
             The AO basis set.
+        :param reuse:
+            True where they were formed earlier in the same calculation and
+            are used again (see rijkresponse.initialize).
         """
 
-        rijkresponse.initialize(self, molecule, basis)
+        rijkresponse.initialize(self, molecule, basis, reuse)
 
     def _init_dft(self, molecule, scf_results, silent=False):
         """

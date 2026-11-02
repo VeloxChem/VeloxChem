@@ -329,6 +329,13 @@ class ScfUnrestrictedDriver(ScfDriver):
         for key, val in vars(self).items():
             if isinstance(val, (MPI.Intracomm, OutputStream)):
                 continue
+            # NOTE: the RI driver the SCF formed is not copied. The simd RI
+            # drivers have no copy in Python, and the copy forms its own when it
+            # runs the SCF. A gradient of a copy which has not run the SCF stops
+            # with an error before any work (ScfGradientDriver.compute,
+            # TddftGradientDriver.compute).
+            if key == '_ri_drv':
+                continue
             setattr(new_scf_drv, key, deepcopy(val))
 
         return new_scf_drv

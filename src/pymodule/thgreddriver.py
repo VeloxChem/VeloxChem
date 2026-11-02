@@ -238,14 +238,13 @@ class ThgReducedDriver(NonlinearSolver):
         for key in cpp_keywords:
             setattr(Nb_drv, key, getattr(self, key))
 
-        rijkresponse.share(self, Nb_drv)
-
         if self.checkpoint_file is not None:
             fpath = Path(self.checkpoint_file)
             fpath = fpath.with_name(fpath.stem)
             Nb_drv.checkpoint_file = str(fpath) + '_tpa_1.h5'
 
-        Nb_results = Nb_drv.compute(molecule, ao_basis, scf_tensors, v_grad)
+        with rijkresponse.lend(self, Nb_drv):
+            Nb_results = Nb_drv.compute(molecule, ao_basis, scf_tensors, v_grad)
 
         self._is_converged = Nb_drv.is_converged
 
@@ -1000,8 +999,6 @@ class ThgReducedDriver(NonlinearSolver):
         for key in cpp_keywords:
             setattr(N_total_drv, key, getattr(self, key))
 
-        rijkresponse.share(self, N_total_drv)
-
         if self.checkpoint_file is not None:
             fpath = Path(self.checkpoint_file)
             fpath = fpath.with_name(fpath.stem)
@@ -1009,8 +1006,9 @@ class ThgReducedDriver(NonlinearSolver):
 
         # commutpute second-order response vectors
 
-        N_total_results = N_total_drv.compute(molecule, ao_basis, scf_tensors,
-                                              xy_dict)
+        with rijkresponse.lend(self, N_total_drv):
+            N_total_results = N_total_drv.compute(
+                molecule, ao_basis, scf_tensors, xy_dict)
 
         self._is_converged = (self._is_converged and N_total_drv.is_converged)
 

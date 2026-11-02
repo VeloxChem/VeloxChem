@@ -449,6 +449,13 @@ class LinearResponseEigenSolverBase(LinearSolver):
         for key, val in vars(self).items():
             if isinstance(val, (MPI.Intracomm, OutputStream)):
                 continue
+            # NOTE: the RI drivers and B vectors are not copied. The simd RI
+            # drivers have no copy in Python, and every calculation forms its
+            # own at its start (rijkresponse.initialize, rijresponse.initialize).
+            # The copy keeps them unset as constructed, neither lent nor
+            # borrowing.
+            if key in self._ri_not_copied:
+                continue
             setattr(new_rsp_drv, key, deepcopy(val))
 
         return new_rsp_drv
