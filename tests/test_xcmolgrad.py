@@ -13,16 +13,22 @@ from veloxchem.dftutils import get_default_grid_level
 @pytest.mark.solvers
 class TestXCMolGrad:
 
-    def run_xc_mol_grad(self, molecule, basis, xcfun, ref_grad):
+    def run_xc_mol_grad(self, molecule, basis, xcfun, ri, ref_grad):
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
 
         scf_drv.xcfun = xcfun
         scf_drv.conv_thresh = 1.0e-8
 
-        scf_drv.compute(molecule, basis)
+        scf_results = scf_drv.compute(molecule, basis)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
+
         density = scf_drv.density
         density = density.broadcast(scf_drv.comm, root=mpi_master())
 
@@ -41,7 +47,8 @@ class TestXCMolGrad:
         if scf_drv.rank == mpi_master():
             assert np.max(np.abs(mol_grad - ref_grad)) < 1.0e-4
 
-    def test_xc_mol_grad_slater(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_xc_mol_grad_slater(self, ri):
 
         mol_str = """
             O  0.0000000000   0.0000000000  -0.0254395383
@@ -53,15 +60,23 @@ class TestXCMolGrad:
         basis = MolecularBasis.read(molecule, 'def2-svp', ostream=None)
         xcfun = 'slater'
 
-        ref_grad = np.array([
-            [0., 0., -0.4075911],
-            [-0., 0.2540621, 0.2037956],
-            [0., -0.2540621, 0.2037956],
-        ])
+        ref_grad = {
+            False: np.array([
+                [0., 0., -0.4075911],
+                [-0., 0.2540621, 0.2037956],
+                [0., -0.2540621, 0.2037956],
+            ]),
+            True: np.array([
+                [0.0000000, -0.0000000, -0.4076932],
+                [-0.0000000, 0.2540673, 0.2038515],
+                [-0.0000000, -0.2540673, 0.2038515],
+            ]),
+        }[ri]
 
-        self.run_xc_mol_grad(molecule, basis, xcfun, ref_grad)
+        self.run_xc_mol_grad(molecule, basis, xcfun, ri, ref_grad)
 
-    def test_xc_mol_grad_blyp(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_xc_mol_grad_blyp(self, ri):
 
         mol_str = """
             O  0.0000000000   0.0000000000  -0.0254395383
@@ -74,22 +89,37 @@ class TestXCMolGrad:
         xcfun = 'blyp'
 
         basis = MolecularBasis.read(molecule, 'def2-svp', ostream=None)
-        ref_grad = np.array([
-            [-0., 0.0000000, -0.4453751],
-            [0., 0.2801306, 0.2226875],
-            [0., -0.2801306, 0.2226875],
-        ])
-        self.run_xc_mol_grad(molecule, basis, xcfun, ref_grad)
+        ref_grad = {
+            False: np.array([
+                [-0., 0.0000000, -0.4453751],
+                [0., 0.2801306, 0.2226875],
+                [0., -0.2801306, 0.2226875],
+            ]),
+            True: np.array([
+                [0.0000000, -0.0000000, -0.4454790],
+                [0.0000000, 0.2801448, 0.2227503],
+                [0.0000000, -0.2801448, 0.2227503],
+            ]),
+        }[ri]
+        self.run_xc_mol_grad(molecule, basis, xcfun, ri, ref_grad)
 
         basis = MolecularBasis.read(molecule, 'def2-tzvp', ostream=None)
-        ref_grad = np.array([
-            [0., -0.0000000, -0.3754200],
-            [0., 0.2442768, 0.1877100],
-            [0., -0.2442768, 0.1877100],
-        ])
-        self.run_xc_mol_grad(molecule, basis, xcfun, ref_grad)
+        ref_grad = {
+            False: np.array([
+                [0., -0.0000000, -0.3754200],
+                [0., 0.2442768, 0.1877100],
+                [0., -0.2442768, 0.1877100],
+            ]),
+            True: np.array([
+                [0.0000000, -0.0000000, -0.3748129],
+                [-0.0000000, 0.2441086, 0.1874206],
+                [-0.0000000, -0.2441086, 0.1874206],
+            ]),
+        }[ri]
+        self.run_xc_mol_grad(molecule, basis, xcfun, ri, ref_grad)
 
-    def test_xc_mol_grad_tpss(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_xc_mol_grad_tpss(self, ri):
 
         mol_str = """
             O  0.0000000000   0.0000000000  -0.0254395383
@@ -102,9 +132,16 @@ class TestXCMolGrad:
         xcfun = 'tpss'
 
         basis = MolecularBasis.read(molecule, 'def2-svp', ostream=None)
-        ref_grad = np.array([
-            [-0., 0., -0.4584369],
-            [0., 0.2891046, 0.2292038],
-            [0., -0.2891046, 0.2292038],
-        ])
-        self.run_xc_mol_grad(molecule, basis, xcfun, ref_grad)
+        ref_grad = {
+            False: np.array([
+                [-0., 0., -0.4584369],
+                [0., 0.2891046, 0.2292038],
+                [0., -0.2891046, 0.2292038],
+            ]),
+            True: np.array([
+                [-0.0000000, -0.0000000, -0.4585718],
+                [0.0000000, 0.2891194, 0.2292717],
+                [-0.0000000, -0.2891194, 0.2292717],
+            ]),
+        }[ri]
+        self.run_xc_mol_grad(molecule, basis, xcfun, ri, ref_grad)

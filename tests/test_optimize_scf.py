@@ -15,7 +15,7 @@ from veloxchem.optimizationdriver import OptimizationDriver
 @pytest.mark.solvers
 class TestOptimizeSCF:
 
-    def run_opt(self, inpfile, basis_label, ref_coords):
+    def run_opt(self, inpfile, basis_label, ri, ref_coords):
 
         task = MpiTask([inpfile, None])
         task.input_dict['scf']['checkpoint_file'] = None
@@ -30,10 +30,15 @@ class TestOptimizeSCF:
         task.ao_basis = task.mpi_comm.bcast(task.ao_basis, root=mpi_master())
 
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.update_settings(task.input_dict['scf'],
                                 task.input_dict['method_settings'])
-        scf_results_not_used = scf_drv.compute(task.molecule, task.ao_basis)
+        scf_results = scf_drv.compute(task.molecule, task.ao_basis)
+
+        if task.mpi_rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         grad_drv = ScfGradientDriver(scf_drv)
         opt_drv = OptimizationDriver(grad_drv)
@@ -70,18 +75,27 @@ class TestOptimizeSCF:
             except PermissionError:
                 pass
 
-    def test_nh3(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_nh3(self, ri):
 
         here = Path(__file__).parent
         inpfile = str(here / 'data' / 'nh3.inp')
 
         basis_label = 'sto-3g'
 
-        ref_coords = np.array([
-            [-1.941114808233, 1.588257603470, -0.020632249491],
-            [-1.965745778628, 2.619171893222, 0.031449914839],
-            [-2.496768727202, 1.280798298868, 0.793505674044],
-            [-2.536814090843, 1.362016810479, -0.833073376431],
-        ]) / bohr_in_angstrom()
+        ref_coords = {
+            False: np.array([
+                [-1.941114808233, 1.588257603470, -0.020632249491],
+                [-1.965745778628, 2.619171893222, 0.031449914839],
+                [-2.496768727202, 1.280798298868, 0.793505674044],
+                [-2.536814090843, 1.362016810479, -0.833073376431],
+            ]),
+            True: np.array([
+                [-1.941088521496, 1.588249144941, -0.020633542554],
+                [-1.965758561107, 2.619169219202, 0.031451648780],
+                [-2.496774069907, 1.280805581057, 0.793497710784],
+                [-2.536818847199, 1.362026054460, -0.833065817008],
+            ]),
+        }[ri] / bohr_in_angstrom()
 
-        self.run_opt(inpfile, basis_label, ref_coords)
+        self.run_opt(inpfile, basis_label, ri, ref_coords)

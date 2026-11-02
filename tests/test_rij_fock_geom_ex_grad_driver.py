@@ -14,7 +14,8 @@ from veloxchem.veloxchemlib import (PackedMatrix, mat_t, mpi_master, rimode,
 @pytest.mark.solvers
 class TestRIJFockGeomExGradDriver:
 
-    def test_h2o_excited_state_ri_j_gradient(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_h2o_excited_state_ri_j_gradient(self, ri):
 
         h2ostr = """
             O   1.206898105612   1.227024188072  -0.113458607566
@@ -27,9 +28,14 @@ class TestRIJFockGeomExGradDriver:
         aux_bas = MolecularBasis.read(mol, 'def2-universal-jfit')
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         comm = MPI.COMM_WORLD
         rank = comm.Get_rank()

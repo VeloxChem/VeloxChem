@@ -112,7 +112,8 @@ class TestInterpolationSetup:
         assert np.max(np.abs(num_b - b_matrix)) < 1.0e-5
         assert np.max(np.abs(num_b2 - b2_matrix)) < 1.0e-5
 
-    def test_internal_transformation(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_internal_transformation(self, ri):
 
         molecule_xyz = '''7
 
@@ -136,10 +137,12 @@ class TestInterpolationSetup:
         interpolation_datapoint = InterpolationDatapoint(z_matrix)
         interpolation_datapoint.cartesian_coordinates = molecule.get_coordinates_in_bohr()
         qm_driver = ScfRestrictedDriver()
-        qm_driver.ri = False
+        qm_driver.ri = ri
         basis = MolecularBasis.read(molecule, 'def2-svp')
         qm_driver.ostream.mute()
         scf_results = qm_driver.compute(molecule, basis)
+        if ri:
+            assert qm_driver._uses_ri_jk() or qm_driver._uses_ri_coulomb()
         qm_energy = qm_driver.scf_energy
 
         qm_grad_driver = ScfGradientDriver(qm_driver)

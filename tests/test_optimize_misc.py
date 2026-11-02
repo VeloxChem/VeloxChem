@@ -86,6 +86,7 @@ class TestOptimizeMiscellaneous:
     @staticmethod
     def run_unrestricted_opt(molecule,
                              basis,
+                             ri,
                              xcfun='hf',
                              filename=None,
                              constraints=None,
@@ -94,7 +95,7 @@ class TestOptimizeMiscellaneous:
                              hessian_stop=False):
 
         scf_drv = ScfUnrestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_drv.xcfun = xcfun
         scf_drv.filename = filename
@@ -111,14 +112,20 @@ class TestOptimizeMiscellaneous:
             opt_drv.hessian = 'last'
         opt_results = opt_drv.compute(molecule, basis)
 
+        # NOTE: read from the driver, which every rank holds; the results of
+        # the last SCF are held on the master rank only.
+        if ri:
+            assert scf_drv._uses_ri_jk() or scf_drv._uses_ri_coulomb()
+
         return opt_drv, opt_results
 
-    def test_optimization_engine_and_driver_deepcopy(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_optimization_engine_and_driver_deepcopy(self, ri):
 
         molecule, basis = self.get_ch3_molecule_and_basis()
 
         opt_drv, opt_results = self.run_unrestricted_opt(
-            molecule, basis, 'b3lyp')
+            molecule, basis, ri, 'b3lyp')
 
         if opt_drv.rank == mpi_master():
             filename = opt_drv.grad_drv.scf_driver.filename
@@ -141,7 +148,8 @@ class TestOptimizeMiscellaneous:
         assert opt_drv_copy.grad_drv.xcfun == opt_drv.grad_drv.xcfun
         assert opt_drv_copy.grad_drv.ostream is opt_drv.grad_drv.ostream
 
-    def test_read_settings(self, tmp_path):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_read_settings(self, tmp_path, ri):
 
         molecule, basis = self.get_ch3_molecule_and_basis()
 
@@ -153,6 +161,7 @@ class TestOptimizeMiscellaneous:
         opt_drv, opt_results = self.run_unrestricted_opt(
             molecule,
             basis,
+            ri,
             'b3lyp',
             filename=filename,
             constraints=[
@@ -163,7 +172,7 @@ class TestOptimizeMiscellaneous:
         checkpoint_file = f'{filename}_scf.h5'
 
         new_scf_drv = ScfUnrestrictedDriver()
-        new_scf_drv.ri = False
+        new_scf_drv.ri = ri
         new_opt_drv = OptimizationDriver(new_scf_drv)
         new_opt_drv.read_settings(checkpoint_file)
 
@@ -177,7 +186,8 @@ class TestOptimizeMiscellaneous:
         assert new_opt_drv.grad_drv.scf_driver.checkpoint_file is None
         assert new_opt_drv.grad_drv.gradient is None
 
-    def test_opt_with_hessian(self, tmp_path):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_opt_with_hessian(self, tmp_path, ri):
 
         molecule, basis = self.get_ch3_molecule_and_basis()
 
@@ -188,6 +198,7 @@ class TestOptimizeMiscellaneous:
 
         opt_drv, opt_results = self.run_unrestricted_opt(molecule,
                                                          basis,
+                                                         ri,
                                                          'hf',
                                                          filename=filename,
                                                          first_hessian=False,
@@ -200,10 +211,18 @@ class TestOptimizeMiscellaneous:
             assert 'vib' in hf
             assert 'vib_frequencies' in hf['vib']
             assert 'ir_intensities' in hf['vib']
-            ref_vib_freqs = np.array(
-                [584.46, 1690.07, 1690.07, 3552.39, 3827.10, 3827.10])
-            ref_ir_intens = np.array(
-                [16.8701, 0.3816, 0.3816, 0.0144, 0.0357, 0.0357])
+            ref_vib_freqs = {
+                False: np.array(
+                    [584.46, 1690.07, 1690.07, 3552.39, 3827.10, 3827.10]),
+                True: np.array(
+                    [584.81, 1690.10, 1690.10, 3552.36, 3827.06, 3827.06]),
+            }[ri]
+            ref_ir_intens = {
+                False: np.array(
+                    [16.8701, 0.3816, 0.3816, 0.0144, 0.0357, 0.0357]),
+                True: np.array(
+                    [16.8494, 0.3839, 0.3839, 0.0143, 0.0364, 0.0364]),
+            }[ri]
             assert np.max(
                 np.abs(np.array(hf['vib/vib_frequencies']) -
                        ref_vib_freqs)) < 0.1
@@ -267,7 +286,8 @@ class TestOptimizeMiscellaneous:
             with pytest.raises(AssertionError, match='SCF did not converge'):
                 engine.run_worker()
 
-    def test_opt_hessian_exit(self, tmp_path):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_opt_hessian_exit(self, tmp_path, ri):
         """
         geomeTRIC raises HessianExit for hessian='stop': the driver takes the
         hessian_exit branch (no optimization steps, input geometry is the
@@ -284,6 +304,7 @@ class TestOptimizeMiscellaneous:
 
         opt_drv, opt_results = self.run_unrestricted_opt(molecule,
                                                          basis,
+                                                         ri,
                                                          'hf',
                                                          filename=filename,
                                                          hessian_stop=True)
@@ -299,8 +320,9 @@ class TestOptimizeMiscellaneous:
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason='skip pytest.raises for multiple MPI processes')
+    @pytest.mark.parametrize('ri', [False, True])
     def test_opt_preserves_serial_optimizer_exception(self, monkeypatch,
-                                                      tmp_path):
+                                                      tmp_path, ri):
         """A serial optimizer failure retains its type and message."""
 
         class _OptimizerFailure(RuntimeError):
@@ -315,7 +337,7 @@ class TestOptimizeMiscellaneous:
 
         molecule, basis = self.get_ch3_molecule_and_basis()
         scf_drv = ScfUnrestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_drv.filename = str(tmp_path / 'opt_failure')
         opt_drv = OptimizationDriver(scf_drv)

@@ -116,9 +116,9 @@ def _run_construction_once(monkeypatch, workdir: Path) -> ConstructionContext:
     )
 
 
-def _make_setup_only_generator(mute_output=True) -> IMForceFieldGenerator:
+def _make_setup_only_generator(ri, mute_output=True) -> IMForceFieldGenerator:
     qm_driver = ScfRestrictedDriver()
-    qm_driver.ri = False
+    qm_driver.ri = ri
     qm_driver.ostream.mute()
 
     ffg = IMForceFieldGenerator(
@@ -313,14 +313,15 @@ def _assert_nve_total_energy_conserved(ffg: IMForceFieldGenerator):
     )
 
 
-def test_setup_excludes_user_rotatable_bonds(tmp_path, monkeypatch, capsys):
+@pytest.mark.parametrize('ri', [False, True])
+def test_setup_excludes_user_rotatable_bonds(tmp_path, monkeypatch, capsys, ri):
     monkeypatch.chdir(tmp_path)
 
     mol = Molecule.from_xyz_string(get_xyz_structure())
     mol.set_charge(0)
     mol.set_multiplicity(1)
 
-    baseline = _make_setup_only_generator()
+    baseline = _make_setup_only_generator(ri)
     baseline.set_up_the_system(mol)
 
     baseline_bonds = {
@@ -331,7 +332,7 @@ def test_setup_excludes_user_rotatable_bonds(tmp_path, monkeypatch, capsys):
     excluded_bond_zero_based = sorted(next(iter(baseline_bonds)))
     excluded_bond_one_based = [idx + 1 for idx in excluded_bond_zero_based]
 
-    filtered = _make_setup_only_generator()
+    filtered = _make_setup_only_generator(ri)
     filtered.set_up_the_system(
         mol,
         exclude_rot_bonds=[excluded_bond_one_based],
@@ -344,7 +345,7 @@ def test_setup_excludes_user_rotatable_bonds(tmp_path, monkeypatch, capsys):
     assert tuple(excluded_bond_zero_based) not in filtered_bonds
     assert filtered_bonds == baseline_bonds - {tuple(excluded_bond_zero_based)}
 
-    empty_exclude = _make_setup_only_generator()
+    empty_exclude = _make_setup_only_generator(ri)
     empty_exclude.set_up_the_system(mol, exclude_rot_bonds=[])
     empty_exclude_bonds = {
         tuple(sorted(bond)) for bond in empty_exclude.all_rotatable_bonds
@@ -352,7 +353,7 @@ def test_setup_excludes_user_rotatable_bonds(tmp_path, monkeypatch, capsys):
 
     assert empty_exclude_bonds == baseline_bonds
 
-    reversed_exclude = _make_setup_only_generator()
+    reversed_exclude = _make_setup_only_generator(ri)
     reversed_exclude.set_up_the_system(
         mol,
         exclude_rot_bonds=[list(reversed(excluded_bond_one_based))],
@@ -364,7 +365,7 @@ def test_setup_excludes_user_rotatable_bonds(tmp_path, monkeypatch, capsys):
     assert reversed_exclude_bonds == filtered_bonds
 
     missing_bond = [mol.number_of_atoms() + 1, mol.number_of_atoms() + 2]
-    missing_exclude = _make_setup_only_generator(mute_output=False)
+    missing_exclude = _make_setup_only_generator(ri, mute_output=False)
     missing_exclude.set_up_the_system(
         mol,
         exclude_rot_bonds=[missing_bond],

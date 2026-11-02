@@ -1,6 +1,7 @@
 import numpy as np
 import pytest
 
+from veloxchem.veloxchemlib import mpi_master
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfunrestdriver import ScfUnrestrictedDriver
@@ -14,6 +15,7 @@ class TestGradUnrestrictedSCF:
                  molecule,
                  xcfun_label,
                  basis_label,
+                 ri,
                  ref_grad,
                  tol,
                  d4_flag='none'):
@@ -21,11 +23,16 @@ class TestGradUnrestrictedSCF:
         basis = MolecularBasis.read(molecule, basis_label)
 
         scf_drv = ScfUnrestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_drv.xcfun = xcfun_label
         scf_drv.dispersion = (d4_flag.lower() == 'd4')
         scf_results = scf_drv.compute(molecule, basis)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         grad_drv = ScfGradientDriver(scf_drv)
         grad_drv.compute(molecule, basis, scf_results)
@@ -33,7 +40,8 @@ class TestGradUnrestrictedSCF:
 
         assert np.max(np.abs(grad - ref_grad)) < tol
 
-    def test_nh3_tzvp(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_nh3_tzvp(self, ri):
 
         molstr = """
         N         -1.96309        1.59755       -0.01963
@@ -52,30 +60,46 @@ class TestGradUnrestrictedSCF:
             [1.308930992, 0.636201502, 2.029448579],
         ])
 
-        self.run_grad(mol, 'hf', 'def2-tzvp', ref_grad, 1.0e-4)
+        self.run_grad(mol, 'hf', 'def2-tzvp', ri, ref_grad, 1.0e-4)
 
-        ref_grad = np.array([
-            [-2.429691597, 1.027438566, 0.111298759],
-            [-0.10204324, -2.490299784, -0.121855711],
-            [1.216181028, 0.832324072, -2.013620701],
-            [1.315553795, 0.6305372, 2.024177654],
-        ])
+        ref_grad = {
+            False: np.array([
+                [-2.429691597, 1.027438566, 0.111298759],
+                [-0.10204324, -2.490299784, -0.121855711],
+                [1.216181028, 0.832324072, -2.013620701],
+                [1.315553795, 0.6305372, 2.024177654],
+            ]),
+            True: np.array([
+                [-2.430660282, 1.027678267, 0.111143599],
+                [-0.101518180, -2.490143852, -0.121857545],
+                [1.216564615, 0.831938401, -2.013403144],
+                [1.315963058, 0.630344630, 2.024061041],
+            ]),
+        }[ri]
 
-        self.run_grad(mol, 'slda', 'def2-tzvp', ref_grad, 1.0e-3)
+        self.run_grad(mol, 'slda', 'def2-tzvp', ri, ref_grad, 1.0e-3)
 
-        ref_grad = np.array([[-2.407691473, 1.018158314, 0.11031899],
+        ref_grad = {
+            False: np.array([[-2.407691473, 1.018158314, 0.11031899],
                              [-0.107273535, -2.482263778, -0.121327734],
                              [1.207918349, 0.83272141, -2.008731851],
-                             [1.307046644, 0.631384109, 2.019740596]])
+                             [1.307046644, 0.631384109, 2.019740596]]),
+            True: np.array([
+                [-2.408689509, 1.018389812, 0.110138485],
+                [-0.106744235, -2.482135107, -0.121329313],
+                [1.208322408, 0.832340370, -2.008543202],
+                [1.307492350, 0.631209781, 2.019677182],
+            ]),
+        }[ri]
 
-        self.run_grad(mol, 'blyp', 'def2-tzvp', ref_grad, 1.0e-3)
+        self.run_grad(mol, 'blyp', 'def2-tzvp', ri, ref_grad, 1.0e-3)
 
         ref_grad = np.array([[-2.404693831, 1.016859978, 0.110144742],
                              [-0.108078426, -2.481352867, -0.121261112],
                              [1.206827125, 0.832875139, -2.008254371],
                              [1.305945115, 0.631617805, 2.019370742]])
 
-        self.run_grad(mol, 'b3lyp', 'def2-tzvp', ref_grad, 1.0e-3)
+        self.run_grad(mol, 'b3lyp', 'def2-tzvp', ri, ref_grad, 1.0e-3)
 
         ref_grad = np.array([
             [-2.405765356322, 1.017221798072, 0.110096775899],
@@ -84,9 +108,10 @@ class TestGradUnrestrictedSCF:
             [1.307032618595, 0.632923133068, 2.022394084388],
         ])
 
-        self.run_grad(mol, 'tpssh', 'def2-tzvp', ref_grad, 1.0e-3)
+        self.run_grad(mol, 'tpssh', 'def2-tzvp', ri, ref_grad, 1.0e-3)
 
-    def test_c2h4_svp(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_c2h4_svp(self, ri):
 
         xyzstr = """
         6
@@ -102,35 +127,65 @@ class TestGradUnrestrictedSCF:
         mol.set_charge(0)
         mol.set_multiplicity(3)
 
-        ref_grad = np.array([
-            [0.206766526, -0., 0.],
-            [-0.206766526, -0., 0.],
-            [0.001566777, 0.00467968, 0.],
-            [0.001566777, -0.00467968, 0.],
-            [-0.001566777, 0.00467968, 0.],
-            [-0.001566777, -0.00467968, -0.],
-        ])
+        ref_grad = {
+            False: np.array([
+                [0.206766526, -0., 0.],
+                [-0.206766526, -0., 0.],
+                [0.001566777, 0.00467968, 0.],
+                [0.001566777, -0.00467968, 0.],
+                [-0.001566777, 0.00467968, 0.],
+                [-0.001566777, -0.00467968, -0.],
+            ]),
+            True: np.array([
+                [0.206799842, 0.000000000, 0.000000000],
+                [-0.206799842, -0.000000000, 0.000000000],
+                [0.001564346, 0.004693299, -0.000000000],
+                [0.001564346, -0.004693299, -0.000000000],
+                [-0.001564346, 0.004693299, -0.000000000],
+                [-0.001564346, -0.004693299, -0.000000000],
+            ]),
+        }[ri]
 
-        self.run_grad(mol, 'hf', 'def2-svp', ref_grad, 1.0e-5)
+        self.run_grad(mol, 'hf', 'def2-svp', ri, ref_grad, 1.0e-5)
 
-        ref_grad = np.array([
-            [0.173586245, 0., 0.],
-            [-0.173586245, -0., -0.],
-            [0.008790969, -0.006423456, -0.],
-            [0.008790969, 0.006423456, -0.],
-            [-0.008790969, -0.006423456, -0.],
-            [-0.008790969, 0.006423456, 0.],
-        ])
+        ref_grad = {
+            False: np.array([
+                [0.173586245, 0., 0.],
+                [-0.173586245, -0., -0.],
+                [0.008790969, -0.006423456, -0.],
+                [0.008790969, 0.006423456, -0.],
+                [-0.008790969, -0.006423456, -0.],
+                [-0.008790969, 0.006423456, 0.],
+            ]),
+            True: np.array([
+                [0.173527256, -0.000000000, 0.000000000],
+                [-0.173527256, -0.000000000, 0.000000000],
+                [0.008815390, -0.006437135, -0.000000000],
+                [0.008815390, 0.006437135, -0.000000000],
+                [-0.008815390, -0.006437135, -0.000000000],
+                [-0.008815390, 0.006437135, -0.000000000],
+            ]),
+        }[ri]
 
-        self.run_grad(mol, 'slda', 'def2-svp', ref_grad, 1.0e-4)
+        self.run_grad(mol, 'slda', 'def2-svp', ri, ref_grad, 1.0e-4)
 
-        ref_grad = np.array([[0.189529949, 0., 0.], [-0.189529949, -0., 0.],
+        ref_grad = {
+            False: np.array([[0.189529949, 0., 0.], [-0.189529949, -0., 0.],
                              [0.008659375, -0.005825038, -0.],
                              [0.008659375, 0.005825038, -0.],
                              [-0.008659375, -0.005825038, 0.],
-                             [-0.008659375, 0.005825038, -0.]])
+                             [-0.008659375, 0.005825038, -0.]]),
+            True: np.array([
+                [0.189472935, 0.000000000, -0.000000000],
+                [-0.189472935, 0.000000000, 0.000000000],
+                [0.008689390, -0.005839780, -0.000000000],
+                [0.008689390, 0.005839780, 0.000000000],
+                [-0.008689390, -0.005839780, -0.000000000],
+                [-0.008689390, 0.005839780, 0.000000000],
+            ]),
+        }[ri]
 
-        self.run_grad(mol, 'blyp', 'def2-svp', ref_grad, 1.0e-4)
+        self.run_grad(mol, 'blyp', 'def2-svp', ri, ref_grad, 1.0e-4)
 
         ref_grad = np.array([[0.190927027, 0., -0.], [-0.190927026, 0., -0.],
                              [0.00593267, -0.00172427, -0.],
@@ -138,18 +193,28 @@ class TestGradUnrestrictedSCF:
                              [-0.00593267, -0.00172427, -0.],
                              [-0.00593267, 0.00172427, -0.]])
 
-        self.run_grad(mol, 'b3lyp', 'def2-svp', ref_grad, 1.0e-4)
+        self.run_grad(mol, 'b3lyp', 'def2-svp', ri, ref_grad, 1.0e-4)
 
-        ref_grad = np.array([
-            [0.182943548, 0.000000000, -0.000000000],
-            [-0.182943548, 0.000000000, 0.000000000],
-            [0.005993681, -0.000833749, -0.000000000],
-            [0.005993681, 0.000833749, -0.000000000],
-            [-0.005993681, -0.000833749, 0.000000000],
-            [-0.005993681, 0.000833749, 0.000000000],
-        ])
+        ref_grad = {
+            False: np.array([
+                [0.182943548, 0.000000000, -0.000000000],
+                [-0.182943548, 0.000000000, 0.000000000],
+                [0.005993681, -0.000833749, -0.000000000],
+                [0.005993681, 0.000833749, -0.000000000],
+                [-0.005993681, -0.000833749, 0.000000000],
+                [-0.005993681, 0.000833749, 0.000000000],
+            ]),
+            True: np.array([
+                [0.182890915, -0.000000000, -0.000000000],
+                [-0.182890915, -0.000000000, -0.000000000],
+                [0.005999613, -0.000835665, 0.000000000],
+                [0.005999613, 0.000835665, 0.000000000],
+                [-0.005999613, -0.000835665, 0.000000000],
+                [-0.005999613, 0.000835665, 0.000000000],
+            ]),
+        }[ri]
 
-        self.run_grad(mol, 'm06-l', 'def2-svp', ref_grad, 1.0e-4)
+        self.run_grad(mol, 'm06-l', 'def2-svp', ri, ref_grad, 1.0e-4)
 
         ref_grad = np.array([
             [0.190663659, -0.000000000, 0.000000000],
@@ -160,9 +225,10 @@ class TestGradUnrestrictedSCF:
             [-0.005775999, 0.001793691, -0.000000000],
         ])
 
-        self.run_grad(mol, 'lrc-wpbeh', 'def2-svp', ref_grad, 1.0e-4)
+        self.run_grad(mol, 'lrc-wpbeh', 'def2-svp', ri, ref_grad, 1.0e-4)
 
-    def test_auh2_svp(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_auh2_svp(self, ri):
 
         molstr = """
         Au   0.00  0.00  0.00
@@ -173,10 +239,17 @@ class TestGradUnrestrictedSCF:
         mol.set_charge(0)
         mol.set_multiplicity(2)
 
-        ref_grad = np.array([[[
-            [0., 0.008160607, 0.008546413],
-            [0., -0.003138707, -0.040246835],
-            [0., -0.0050219, 0.031700422],
-        ]]])
+        ref_grad = {
+            False: np.array([[[
+                [0., 0.008160607, 0.008546413],
+                [0., -0.003138707, -0.040246835],
+                [0., -0.0050219, 0.031700422],
+            ]]]),
+            True: np.array([
+                [-0.000000000, 0.008161823, 0.008542952],
+                [0.000000000, -0.003139395, -0.040241005],
+                [0.000000000, -0.005022428, 0.031698053],
+            ]),
+        }[ri]
 
-        self.run_grad(mol, 'hf', 'def2-svp', ref_grad, 1.0e-5)
+        self.run_grad(mol, 'hf', 'def2-svp', ri, ref_grad, 1.0e-5)

@@ -13,14 +13,19 @@ from veloxchem.fockdriver import FockDriver
 @pytest.mark.solvers
 class TestNumericalGradient:
 
-    def run_numgrad(self, mol, bas_label):
+    def run_numgrad(self, mol, bas_label, ri):
 
         bas = MolecularBasis.read(mol, bas_label)
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         if scf_drv.rank == mpi_master():
             D = scf_results['D_alpha']
@@ -147,7 +152,8 @@ class TestNumericalGradient:
             if scf_drv.rank == mpi_master():
                 assert np.max(np.abs(anagrad - numgrad)) < 1.0e-7
 
-    def test_nh3_svp(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_nh3_svp(self, ri):
 
         molstr = """
         N         -1.96309        1.59755       -0.01963
@@ -157,4 +163,4 @@ class TestNumericalGradient:
         """
         mol = Molecule.read_molecule_string(molstr, units='bohr')
 
-        self.run_numgrad(mol, 'def2-svp')
+        self.run_numgrad(mol, 'def2-svp', ri)

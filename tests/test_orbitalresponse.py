@@ -1,6 +1,7 @@
 from mpi4py import MPI
 from pathlib import Path
 import numpy as np
+import pytest
 
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.mpitask import MpiTask
@@ -14,7 +15,7 @@ from veloxchem.checkpoint import read_rsp_hdf5
 class TestOrbitalResponse:
 
     def run_orbitalresponse(self, inpfile, potfile, xcfun_label,
-                            orbrsp_ref_file, is_tda):
+                            orbrsp_ref_file, is_tda, ri):
 
         task = MpiTask([inpfile, None], MPI.COMM_WORLD)
         task.input_dict['scf']['checkpoint_file'] = None
@@ -31,10 +32,15 @@ class TestOrbitalResponse:
             task.input_dict['method_settings']['xcfun'] = xcfun_label
 
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.update_settings(task.input_dict['scf'],
                                 task.input_dict['method_settings'])
-        scf_drv.compute(task.molecule, task.ao_basis)
+        scf_results = scf_drv.compute(task.molecule, task.ao_basis)
+
+        if task.mpi_rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         # Our references: lambda and omega in AO basis
 
@@ -121,7 +127,8 @@ class TestOrbitalResponse:
             assert np.max(np.abs(omega_ao[0] -
                                  ref_excited_omega_ao)) < 5.0e-4
 
-    def test_tda_hf(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_tda_hf(self, ri):
 
         here = Path(__file__).parent
         inpfile = str(here / 'data' / 'water_orbrsp.inp')
@@ -132,9 +139,10 @@ class TestOrbitalResponse:
         xcfun_label = None
 
         self.run_orbitalresponse(inpfile, potfile, xcfun_label, orbrsp_ref_file,
-                                 True)
+                                 True, ri)
 
-    def test_rpa_hf(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_rpa_hf(self, ri):
 
         here = Path(__file__).parent
         inpfile = str(here / 'data' / 'water_orbrsp.inp')
@@ -145,4 +153,4 @@ class TestOrbitalResponse:
         xcfun_label = None
 
         self.run_orbitalresponse(inpfile, potfile, xcfun_label, orbrsp_ref_file,
-                                 False)
+                                 False, ri)

@@ -3,6 +3,7 @@ from copy import deepcopy
 
 import h5py
 import numpy as np
+import pytest
 from mpi4py import MPI
 
 from veloxchem.veloxchemlib import bohr_in_angstrom
@@ -29,24 +30,25 @@ class TestOptimizationDriverCoverage:
         return MolecularBasis.read(molecule, basis_label.upper(), ostream=None)
 
     @staticmethod
-    def make_scf_opt_driver(molecule, basis_label="sto-3g", filename=None):
+    def make_scf_opt_driver(molecule, ri, basis_label="sto-3g", filename=None):
         ostream = OutputStream(None)
         scf_drv = ScfRestrictedDriver(MPI.COMM_WORLD, ostream)
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.filename = filename
         grad_drv = ScfGradientDriver(scf_drv)
         opt_drv = OptimizationDriver(grad_drv)
         basis = MolecularBasis.read(molecule, basis_label.upper(), ostream=None)
         return opt_drv, basis
 
-    def test_optimizationdriver_helper_methods(self, tmp_path):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_optimizationdriver_helper_methods(self, tmp_path, ri):
         molecule = self.make_molecule("""3
             water
             O  0.000000  0.000000  0.000000
             H  0.000000  0.000000  0.950000
             H  0.000000  0.750000 -0.250000
         """)
-        opt_drv, basis_not_used = self.make_scf_opt_driver(molecule)
+        opt_drv, basis_not_used = self.make_scf_opt_driver(molecule, ri)
 
         assert opt_drv.is_scf is True
 
@@ -112,13 +114,15 @@ class TestOptimizationDriverCoverage:
         assert opt_copy.grad_drv is not opt_drv.grad_drv
         assert opt_copy.filename == opt_drv.filename
 
-    def test_optimizationdriver_write_final_hdf5_scan_and_opt(self, tmp_path):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_optimizationdriver_write_final_hdf5_scan_and_opt(
+            self, tmp_path, ri):
         molecule = self.make_molecule("""2
             H2
             H 0.0 0.0 0.0
             H 0.0 0.0 0.7
         """)
-        opt_drv, _ = self.make_scf_opt_driver(molecule)
+        opt_drv, _ = self.make_scf_opt_driver(molecule, ri)
 
         opt_h5 = tmp_path / "opt_results.h5"
         with h5py.File(opt_h5, "w"):
@@ -173,8 +177,9 @@ class TestOptimizationDriverCoverage:
         np.testing.assert_allclose(scan_readback["scan_coordinates_au"],
                                    np.array([coords_au, coords_au]))
 
+    @pytest.mark.parametrize('ri', [False, True])
     def test_optimizationdriver_restart_uses_checkpoint_geometry(
-            self, tmp_path):
+            self, tmp_path, ri):
         checkpoint_molecule = self.make_molecule("""2
             H2
             H 0.0 0.0 0.0
@@ -189,9 +194,14 @@ class TestOptimizationDriverCoverage:
 
         filename = str(tmp_path / "opt_restart_real")
         scf_drv = ScfRestrictedDriver(MPI.COMM_WORLD, OutputStream(None))
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.filename = filename
         scf_results = scf_drv.compute(checkpoint_molecule, basis)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         opt_drv = OptimizationDriver(scf_drv)
         opt_drv.ostream.mute()
@@ -215,7 +225,8 @@ class TestOptimizationDriverCoverage:
         assert final_dist != input_dist
         assert abs(final_dist - checkpoint_dist) < abs(final_dist - input_dist)
 
-    def test_optimizationdriver_real_scan(self, tmp_path):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_optimizationdriver_real_scan(self, tmp_path, ri):
         molecule = self.make_molecule("""2
             H2
             H 0.0 0.0 0.0
@@ -223,13 +234,19 @@ class TestOptimizationDriverCoverage:
         """)
         filename = str(tmp_path / "opt_scan_real")
 
-        opt_drv, basis = self.make_scf_opt_driver(molecule, filename=filename)
+        opt_drv, basis = self.make_scf_opt_driver(molecule,
+                                                  ri,
+                                                  filename=filename)
         opt_drv.ostream.mute()
         opt_drv.filename = filename
         opt_drv.constraints = ["scan distance 1 2 0.6 1.0 3"]
         opt_drv.conv_maxiter = True
 
         opt_results = opt_drv.compute(molecule, basis)
+
+        if ri:
+            scf_drv = opt_drv.grad_drv.scf_driver
+            assert scf_drv._uses_ri_jk() or scf_drv._uses_ri_coulomb()
 
         if opt_drv.rank == mpi_master():
             assert "scan_energies" in opt_results
@@ -252,7 +269,8 @@ class TestOptimizationDriverCoverage:
             if fpath.is_file():
                 fpath.unlink()
 
-    def test_optimizationengine_calc_new_and_deepcopy(self, tmp_path):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_optimizationengine_calc_new_and_deepcopy(self, tmp_path, ri):
         molecule = self.make_molecule("""2
             H2
             H 0.0 0.0 0.0
@@ -262,9 +280,14 @@ class TestOptimizationDriverCoverage:
         filename = str(tmp_path / "opt_engine_real")
 
         scf_drv = ScfRestrictedDriver(MPI.COMM_WORLD, OutputStream(None))
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.filename = filename
         scf_results = scf_drv.compute(molecule, basis)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         grad_drv = ScfGradientDriver(scf_drv)
         engine = OptimizationEngine(grad_drv, molecule, basis, scf_results)

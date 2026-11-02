@@ -12,15 +12,20 @@ from veloxchem.scfrestdriver import ScfRestrictedDriver
 @pytest.mark.solvers
 class TestGradientDriver:
 
-    def run_grad_drv(self, molecule, xcfun_label, basis_label):
+    def run_grad_drv(self, molecule, xcfun_label, basis_label, ri):
 
         basis = MolecularBasis.read(molecule, basis_label)
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_drv.xcfun = xcfun_label
         scf_results = scf_drv.compute(molecule, basis)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         if scf_drv.rank == mpi_master():
             D = scf_results['D_alpha']
@@ -75,7 +80,8 @@ class TestGradientDriver:
 
                     assert np.max(np.abs(gmat_sym - gmat_gen)) < 1.0e-10
 
-    def test_nh3_svp(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_nh3_svp(self, ri):
 
         molstr = """
         N         -1.96309        1.59755       -0.01963
@@ -85,6 +91,6 @@ class TestGradientDriver:
         """
         mol = Molecule.read_molecule_string(molstr, units='bohr')
 
-        self.run_grad_drv(mol, 'hf', 'def2-svp')
-        self.run_grad_drv(mol, 'slda', 'def2-svp')
-        self.run_grad_drv(mol, 'b3lyp', 'def2-svp')
+        self.run_grad_drv(mol, 'hf', 'def2-svp', ri)
+        self.run_grad_drv(mol, 'slda', 'def2-svp', ri)
+        self.run_grad_drv(mol, 'b3lyp', 'def2-svp', ri)
