@@ -103,3 +103,42 @@ class TestScfRestrictedDriver:
 
         ref_scf_energy = {False: -2718.2407866974, True: -2718.2407205568}[ri]
         self.run_scf_rest_with_ecp('hf', ri, ref_scf_energy, 1.0e-8)
+
+    # NOTE: def2-SVPD has two s and two p shells on hydrogen, so H2 has as
+    # many p as s shells (4 each). The number of p shells is then also one of
+    # the p orbital indices (4 to 7).
+    def run_scf_h2_def2_svpd(self, xcfun_label, ri, ref_scf_energy, tol):
+
+        xyz_string = """2
+        xyz
+        H    0.000000    0.000000    0.000000
+        H    0.000000    0.000000    0.740000
+        """
+        basis_label = 'def2-svpd'
+
+        mol = Molecule.read_xyz_string(xyz_string)
+        bas = MolecularBasis.read(mol, basis_label, ostream=None)
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ri = ri
+        scf_drv.ostream.mute()
+        scf_drv.xcfun = xcfun_label
+        scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
+            assert abs(ref_scf_energy - scf_results['scf_energy']) < tol
+
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_hf_h2_def2_svpd(self, ri):
+
+        ref_scf_energy = {False: -1.1289033744, True: -1.1289247644}[ri]
+        self.run_scf_h2_def2_svpd('hf', ri, ref_scf_energy, 1.0e-8)
+
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_b3lyp_h2_def2_svpd(self, ri):
+
+        ref_scf_energy = {False: -1.1735831074, True: -1.1736177271}[ri]
+        self.run_scf_h2_def2_svpd('b3lyp', ri, ref_scf_energy, 1.0e-6)

@@ -60,8 +60,18 @@ masked_indices(const std::vector<T>& indices) -> std::vector<T>
     {
         loc_indices.push_back(static_cast<T>(unique_indices.size()));
 
-        for (const auto index : indices)
+        // NOTE: indices[0] is the number of basis functions of this angular
+        // momentum (the stride between its components), not an orbital index,
+        // and callers read loc_indices[k + 1] as the position of
+        // indices[k + 1]. It is therefore left out here as well as from the
+        // set above. Where its value equals one of the orbital indices, a
+        // loop over all of indices pushes one more position and shifts every
+        // one after it (H2 in def2-SVPD: 4 s and 4 p shells, the p orbital
+        // indices run from 4 to 7 with stride 4).
+        for (auto it = std::next(indices.cbegin()); it != indices.cend(); ++it)
         {
+            const auto index = *it;
+
             auto position = T{0};
 
             for (const auto unique_index : unique_indices)

@@ -169,6 +169,45 @@ class TestScfGradientDriverMiscellaneous:
 
         return grad_drv.get_gradient()
 
+    @staticmethod
+    def run_hf_gradient(molecule, basis, ri, numerical):
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ri = ri
+        scf_drv.ostream.mute()
+        scf_drv.conv_thresh = 1.0e-10
+        scf_drv.compute(molecule, basis)
+
+        assert scf_drv._uses_ri_jk() == ri
+
+        grad_drv = ScfGradientDriver(scf_drv)
+        grad_drv.ostream.mute()
+        grad_drv.numerical = numerical
+        grad_drv.compute(molecule, basis)
+
+        return grad_drv.get_gradient()
+
+    # NOTE: def2-SVPD has two s and two p shells on hydrogen, so H2 has as
+    # many p as s shells (4 each). The number of p shells is then also one of
+    # the p orbital indices (4 to 7), which the four-center gradient takes
+    # through the same local indices as the Fock build.
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_hf_gradient_with_as_many_p_as_s_shells(self, ri):
+
+        molecule = Molecule.read_xyz_string("""2
+        h2
+        H    0.000000    0.000000    0.000000
+        H    0.000000    0.000000    0.800000
+        """)
+        basis = MolecularBasis.read(molecule, 'def2-svpd', ostream=None)
+
+        analytical = self.run_hf_gradient(molecule, basis, ri, False)
+        numerical = self.run_hf_gradient(molecule, basis, ri, True)
+
+        if MPI.COMM_WORLD.Get_rank() == mpi_master():
+            assert np.max(np.abs(analytical)) > 1.0e-2
+            assert np.max(np.abs(analytical - numerical)) < 1.0e-6
+
     # NOTE: STO-3G is not a def2 basis set. The analytical RI-J gradient is
     # compared with the numerical gradient of the RI-J energy.
     @pytest.mark.parametrize('scf_type, label', [
