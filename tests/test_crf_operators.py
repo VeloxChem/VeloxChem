@@ -11,8 +11,8 @@ from veloxchem.scfrestdriver import ScfRestrictedDriver
 @pytest.mark.solvers
 class TestCrfOperators:
 
-    def run_crf(self, basis_set_label, freqs, operators, components,
-                ref_result):
+    def run_crf(self, basis_set_label, freqs, operators, components, ref_result,
+                *, ri):
 
         molecule = Molecule.read_xyz_string("""4
             Hydrogen peroxide
@@ -24,9 +24,14 @@ class TestCrfOperators:
         basis = MolecularBasis.read(molecule, basis_set_label, ostream=None)
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_results = scf_drv.compute(molecule, basis)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         crf_drv = CubicResponseDriver()
         crf_drv.ostream.mute()
@@ -73,7 +78,8 @@ class TestCrfOperators:
                     imag_diff_rel = imag_diff
                 assert imag_diff < 0.01 or imag_diff_rel < 0.0075
 
-    def test_svp_crf_general(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_svp_crf_general(self, ri):
 
         wb_wc_wd = (0.0656, 0.0445, 0.0353)
 
@@ -266,5 +272,9 @@ class TestCrfOperators:
                 'A2': rsp_ref_A2_val,
             }
 
-            self.run_crf('def2-svp', wb_wc_wd, operators, 'zzzz',
-                         rsp_ref_result)
+            self.run_crf('def2-svp',
+                         wb_wc_wd,
+                         operators,
+                         'zzzz',
+                         rsp_ref_result,
+                         ri=ri)

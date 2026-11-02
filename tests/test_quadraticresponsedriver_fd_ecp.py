@@ -13,7 +13,7 @@ from veloxchem.quadraticresponsedriver import QuadraticResponseDriver
 @pytest.mark.timeconsuming
 class TestQrfFDECP:
 
-    def run_qrf_fd_with_ecp(self, components, freqs):
+    def run_qrf_fd_with_ecp(self, components, freqs, *, ri):
 
         comm = MPI.COMM_WORLD
         ostream = OutputStream(None)
@@ -38,9 +38,14 @@ class TestQrfFDECP:
         method_settings = {'xcfun': 'hf'}
 
         scfdrv = ScfRestrictedDriver(comm, ostream)
-        scfdrv.ri = False
+        scfdrv.ri = ri
         scfdrv.update_settings(scf_settings, method_settings)
         scf_result = scfdrv.compute(molecule, basis)
+
+        if scfdrv.rank == mpi_master():
+            if ri:
+                assert scf_result['ri_jk'] or scf_result['ri_coulomb']
+                assert not scf_result['ri_fallback']
 
         qrf = QuadraticResponseDriver(comm, ostream)
 
@@ -126,7 +131,7 @@ class TestQrfFDECP:
         method_dict_minus['electric_field'] = efield_minus
 
         scf_drv_plus = ScfRestrictedDriver(comm, ostream)
-        scf_drv_plus.ri = False
+        scf_drv_plus.ri = ri
         scf_drv_plus.update_settings(scf_settings, method_dict_plus)
         scf_result_plus = scf_drv_plus.compute(molecule, basis)
 
@@ -135,7 +140,7 @@ class TestQrfFDECP:
         cpp_result_plus = cpp_plus.compute(molecule, basis, scf_result_plus)
 
         scf_drv_minus = ScfRestrictedDriver(comm, ostream)
-        scf_drv_minus.ri = False
+        scf_drv_minus.ri = ri
         scf_drv_minus.update_settings(scf_settings, method_dict_minus)
         scf_result_minus = scf_drv_minus.compute(molecule, basis)
 
@@ -152,6 +157,7 @@ class TestQrfFDECP:
             beta_0_fd = (alpha_plus.real - alpha_minus.real) / (2.0 * delta_ef)
             assert abs(beta_0 - beta_0_fd) / abs(beta_0_fd) < 1.0e-5
 
-    def test_hf_qrf_fd_with_ecp(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_hf_qrf_fd_with_ecp(self, ri):
 
-        self.run_qrf_fd_with_ecp('yyz', [0.20, -0.11])
+        self.run_qrf_fd_with_ecp('yyz', [0.20, -0.11], ri=ri)

@@ -1,6 +1,7 @@
 from mpi4py import MPI
 import pytest
 
+from veloxchem.veloxchemlib import mpi_master
 from veloxchem.outputstream import OutputStream
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
@@ -12,7 +13,7 @@ from veloxchem.cubicresponsedriver import CubicResponseDriver
 @pytest.mark.timeconsuming
 class TestCrfOperatorsFD:
 
-    def run_crf_op_fd(self, op_comp_pairs, tol):
+    def run_crf_op_fd(self, op_comp_pairs, tol, *, ri):
 
         comm = MPI.COMM_WORLD
         ostream = OutputStream(None)
@@ -34,8 +35,13 @@ class TestCrfOperatorsFD:
         # SCF
 
         scfdrv = ScfRestrictedDriver(comm, ostream)
-        scfdrv.ri = False
+        scfdrv.ri = ri
         scf_result = scfdrv.compute(molecule, basis)
+
+        if scfdrv.rank == mpi_master():
+            if ri:
+                assert scf_result['ri_jk'] or scf_result['ri_coulomb']
+                assert not scf_result['ri_fallback']
 
         # finite difference prep
 
@@ -48,12 +54,12 @@ class TestCrfOperatorsFD:
         efield_minus[fd_index] = -delta_ef
 
         scf_drv_plus = ScfRestrictedDriver(comm, ostream)
-        scf_drv_plus.ri = False
+        scf_drv_plus.ri = ri
         scf_drv_plus.electric_field = efield_plus
         scf_result_plus = scf_drv_plus.compute(molecule, basis)
 
         scf_drv_minus = ScfRestrictedDriver(comm, ostream)
-        scf_drv_minus.ri = False
+        scf_drv_minus.ri = ri
         scf_drv_minus.electric_field = efield_minus
         scf_result_minus = scf_drv_minus.compute(molecule, basis)
 
@@ -285,7 +291,8 @@ class TestCrfOperatorsFD:
                     assert abs(crf_result[('crf', wb, wd, wc)].imag -
                                rsp_func_fd.imag) < tol
 
-    def test_crf_op_fd_lmom_edip(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_crf_op_fd_lmom_edip(self, ri):
 
         op_comp_pairs = [
             ('linear momentum', 'z'),
@@ -294,9 +301,10 @@ class TestCrfOperatorsFD:
 
         tol = 1.0e-3
 
-        self.run_crf_op_fd(op_comp_pairs, tol)
+        self.run_crf_op_fd(op_comp_pairs, tol, ri=ri)
 
-    def test_crf_op_fd_lmom_quad(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_crf_op_fd_lmom_quad(self, ri):
 
         op_comp_pairs = [
             ('linear momentum', 'z'),
@@ -305,4 +313,4 @@ class TestCrfOperatorsFD:
 
         tol = 5.0e-3
 
-        self.run_crf_op_fd(op_comp_pairs, tol)
+        self.run_crf_op_fd(op_comp_pairs, tol, ri=ri)

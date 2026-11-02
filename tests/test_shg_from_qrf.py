@@ -14,7 +14,7 @@ from veloxchem.shgdriver import ShgDriver
 @pytest.mark.timeconsuming
 class TestShgFromQrf:
 
-    def run_shg_from_qrf(self, xcfun_label):
+    def run_shg_from_qrf(self, xcfun_label, *, ri):
 
         molecule_string = """
             O   0.0   0.0   0.0
@@ -30,10 +30,15 @@ class TestShgFromQrf:
         method_settings = {'xcfun': xcfun_label, 'grid_level': 1}
 
         scfdrv = ScfRestrictedDriver()
-        scfdrv.ri = False
+        scfdrv.ri = ri
         scfdrv.ostream.mute()
         scfdrv.update_settings(scf_settings, method_settings)
         scf_results = scfdrv.compute(molecule, basis)
+
+        if scfdrv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         scf_prop = FirstOrderProperties()
         scf_prop.compute_scf_prop(molecule, basis, scf_results)
@@ -128,14 +133,17 @@ class TestShgFromQrf:
             assert abs(abs(calc_beta_bar.real / ref_beta_bar.real) - 1.0) < tol
             assert abs(abs(calc_beta_bar.imag / ref_beta_bar.imag) - 1.0) < tol
 
-    def test_shg_from_qrf_lda(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_shg_from_qrf_lda(self, ri):
 
-        self.run_shg_from_qrf('slda')
+        self.run_shg_from_qrf('slda', ri=ri)
 
-    def test_shg_from_qrf_gga(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_shg_from_qrf_gga(self, ri):
 
-        self.run_shg_from_qrf('pbe0')
+        self.run_shg_from_qrf('pbe0', ri=ri)
 
-    def test_shg_from_qrf_mgga(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_shg_from_qrf_mgga(self, ri):
 
-        self.run_shg_from_qrf('tpssh')
+        self.run_shg_from_qrf('tpssh', ri=ri)

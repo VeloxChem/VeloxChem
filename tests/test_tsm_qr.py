@@ -30,20 +30,26 @@ class TestTransitionDipoleMomentQR:
 
         return mol, bas
 
-    def get_scf_results(self):
+    def get_scf_results(self, *, ri):
 
         mol, bas = self.get_molecule_and_basis()
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_results = scf_drv.compute(mol, bas)
 
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
+
         return mol, bas, scf_results
 
-    def test_tsm_qr(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_tsm_qr(self, ri):
 
-        mol, bas, scf_results = self.get_scf_results()
+        mol, bas, scf_results = self.get_scf_results(ri=ri)
 
         tsm_drv = ExcitedStateMomentDriver()
         tsm_drv.ostream.mute()
@@ -67,13 +73,17 @@ class TestTransitionDipoleMomentQR:
             calc_esm = tsm_results['excited_state_dipole_moment']
             assert abs(calc_esm[0]) < tol
             assert abs(calc_esm[1]) < tol
-            assert abs(calc_esm[2] - 0.053558) < tol
+            assert abs(calc_esm[2] - {
+                False: 0.053558,
+                True: 0.0530138
+            }[ri]) < tol
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason='pytest.raises only valid in serial')
-    def test_tsm_qr_rejects_nonpositive_state_indices(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_tsm_qr_rejects_nonpositive_state_indices(self, ri):
 
-        mol, bas, scf_results = self.get_scf_results()
+        mol, bas, scf_results = self.get_scf_results(ri=ri)
 
         tsm_drv = ExcitedStateMomentDriver()
         tsm_drv.ostream.mute()
@@ -85,9 +95,10 @@ class TestTransitionDipoleMomentQR:
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason='pytest.raises only valid in serial')
-    def test_tsm_qr_rejects_unconverged_complex_response(self, monkeypatch):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_tsm_qr_rejects_unconverged_complex_response(self, monkeypatch, ri):
 
-        mol, bas, scf_results = self.get_scf_results()
+        mol, bas, scf_results = self.get_scf_results(ri=ri)
 
         original_compute = esm_driver_module.ComplexResponseSolver.compute
 

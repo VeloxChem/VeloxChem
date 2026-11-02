@@ -11,7 +11,7 @@ from veloxchem.scfrestdriver import ScfRestrictedDriver
 @pytest.mark.solvers
 class TestCrf:
 
-    def run_scf(self):
+    def run_scf(self, *, ri):
 
         molecule_string = """
             O  0.0           0.0  0.0
@@ -31,16 +31,21 @@ class TestCrf:
         basis = MolecularBasis.read(molecule, basis_set_label, ostream=None)
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_drv.update_settings(scf_settings)
         scf_results = scf_drv.compute(molecule, basis)
 
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
+
         return scf_results, molecule, basis
 
-    def run_crf(self, ref_result):
+    def run_crf(self, ref_result, *, ri):
 
-        scf_results, molecule, ao_basis = self.run_scf()
+        scf_results, molecule, ao_basis = self.run_scf(ri=ri)
 
         wb = -0.1
         wc = 0.3
@@ -70,8 +75,16 @@ class TestCrf:
                 assert abs(crf_result[(key, wb, wc, wd)].imag -
                            ref_result[key].imag) < 1.0e-5
 
-    def test_crf(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_crf(self, ri):
 
-        ref_result = {'crf': 28.34936268562558 + 364.3225598403005j}
+        ref_result = {
+            False: {
+                'crf': 28.34936268562558 + 364.3225598403005j
+            },
+            True: {
+                'crf': 28.42520239 + 364.41477421j
+            }
+        }[ri]
 
-        self.run_crf(ref_result)
+        self.run_crf(ref_result, ri=ri)

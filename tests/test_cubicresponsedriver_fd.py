@@ -14,8 +14,14 @@ from veloxchem.cubicresponsedriver import CubicResponseDriver
 @pytest.mark.timeconsuming
 class TestCrfFD:
 
-    def run_crf_fd(self, xcfun_label, basis_set_label, components, freqs,
-                   point_charges=None):
+    def run_crf_fd(self,
+                   xcfun_label,
+                   basis_set_label,
+                   components,
+                   freqs,
+                   point_charges=None,
+                   *,
+                   ri):
 
         comm = MPI.COMM_WORLD
         ostream = OutputStream(None)
@@ -40,9 +46,14 @@ class TestCrfFD:
         method_settings = {'xcfun': xcfun_label}
 
         scfdrv = ScfRestrictedDriver(comm, ostream)
-        scfdrv.ri = False
+        scfdrv.ri = ri
         scfdrv.update_settings(scf_settings, method_settings)
         scf_result = scfdrv.compute(molecule, basis)
+
+        if scfdrv.rank == mpi_master():
+            if ri:
+                assert scf_result['ri_jk'] or scf_result['ri_coulomb']
+                assert not scf_result['ri_fallback']
 
         if point_charges is not None:
             # rerun the SCF with the point-charge environment; the response
@@ -173,7 +184,7 @@ class TestCrfFD:
         method_dict_minus['electric_field'] = efield_minus
 
         scf_drv_plus = ScfRestrictedDriver(comm, ostream)
-        scf_drv_plus.ri = False
+        scf_drv_plus.ri = ri
         scf_drv_plus.update_settings(scf_settings, method_dict_plus)
         if point_charges is not None:
             scf_drv_plus.point_charges = point_charges
@@ -184,7 +195,7 @@ class TestCrfFD:
         quad_result_plus = qrf_plus.compute(molecule, basis, scf_result_plus)
 
         scf_drv_minus = ScfRestrictedDriver(comm, ostream)
-        scf_drv_minus.ri = False
+        scf_drv_minus.ri = ri
         scf_drv_minus.update_settings(scf_settings, method_dict_minus)
         if point_charges is not None:
             scf_drv_minus.point_charges = point_charges
@@ -203,19 +214,23 @@ class TestCrfFD:
             gamma_0_fd = (beta_plus.real - beta_minus.real) / (2.0 * delta_ef)
             assert abs(gamma_0 - gamma_0_fd) / abs(gamma_0_fd) < 1.0e-5
 
-    def test_hf_crf_fd(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_hf_crf_fd(self, ri):
 
-        self.run_crf_fd('hf', 'def2-tzvp', 'zyyz', [0.11, -0.3, 0.05])
+        self.run_crf_fd('hf', 'def2-tzvp', 'zyyz', [0.11, -0.3, 0.05], ri=ri)
 
-    def test_lda_crf_fd(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_lda_crf_fd(self, ri):
 
-        self.run_crf_fd('slda', 'def2-svp', 'zyyz', [0.11, -0.3, 0.05])
+        self.run_crf_fd('slda', 'def2-svp', 'zyyz', [0.11, -0.3, 0.05], ri=ri)
 
-    def test_gga_hyb_crf_fd(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_gga_hyb_crf_fd(self, ri):
 
-        self.run_crf_fd('b3lyp', 'def2-tzvp', 'zyyz', [0.11, -0.3, 0.05])
+        self.run_crf_fd('b3lyp', 'def2-tzvp', 'zyyz', [0.11, -0.3, 0.05], ri=ri)
 
-    def test_gga_hyb_pc_crf_fd(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_gga_hyb_pc_crf_fd(self, ri):
 
         # point-charge environment (positions in bohr, charges in e); strong
         # enough to clearly change the response vs. vacuum, but weak enough
@@ -228,13 +243,21 @@ class TestCrfFD:
             [2.5, -2.5, 0.0, -0.06, 0.0, 0.0],
         ]).T
 
-        self.run_crf_fd('b3lyp', 'def2-tzvp', 'zyyz', [0.11, -0.3, 0.05],
-                        point_charges)
+        self.run_crf_fd('b3lyp',
+                        'def2-tzvp',
+                        'zyyz', [0.11, -0.3, 0.05],
+                        point_charges,
+                        ri=ri)
 
-    def test_gga_rsh_crf_fd(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_gga_rsh_crf_fd(self, ri):
 
-        self.run_crf_fd('cam-b3lyp', 'def2-svp', 'zyyz', [0.11, -0.3, 0.05])
+        self.run_crf_fd('cam-b3lyp',
+                        'def2-svp',
+                        'zyyz', [0.11, -0.3, 0.05],
+                        ri=ri)
 
-    def test_mgga_crf_fd(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_mgga_crf_fd(self, ri):
 
-        self.run_crf_fd('m06-2x', 'def2-svp', 'zyyz', [0.11, -0.3, 0.05])
+        self.run_crf_fd('m06-2x', 'def2-svp', 'zyyz', [0.11, -0.3, 0.05], ri=ri)

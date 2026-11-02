@@ -12,7 +12,7 @@ from veloxchem.outputstream import OutputStream
 
 class TestthgFromCrf:
 
-    def run_thg_from_crf(self, xcfun_label):
+    def run_thg_from_crf(self, xcfun_label, *, ri):
 
         molecule_string = """
             O   0.0   0.0   0.0
@@ -28,10 +28,15 @@ class TestthgFromCrf:
         method_settings = {'xcfun': xcfun_label, 'grid_level': 1}
 
         scfdrv = ScfRestrictedDriver()
-        scfdrv.ri = False
+        scfdrv.ri = ri
         scfdrv.ostream.mute()
         scfdrv.update_settings(scf_settings, method_settings)
         scf_results = scfdrv.compute(molecule, basis)
+
+        if scfdrv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         w1 = 0.05
         w2 = w1
@@ -121,16 +126,19 @@ class TestthgFromCrf:
                 assert abs(abs(calc_val.real / ref_val.real) - 1.0) < tol
 
     @pytest.mark.timeconsuming
-    def test_thg_from_crf_lda(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_thg_from_crf_lda(self, ri):
 
-        self.run_thg_from_crf('slda')
+        self.run_thg_from_crf('slda', ri=ri)
 
     @pytest.mark.solvers
-    def test_thg_from_crf_gga(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_thg_from_crf_gga(self, ri):
 
-        self.run_thg_from_crf('pbe0')
+        self.run_thg_from_crf('pbe0', ri=ri)
 
     @pytest.mark.timeconsuming
-    def test_thg_from_crf_mgga(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_thg_from_crf_mgga(self, ri):
 
-        self.run_thg_from_crf('m06-2x')
+        self.run_thg_from_crf('m06-2x', ri=ri)

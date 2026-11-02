@@ -14,22 +14,27 @@ from veloxchem.rsptpa import TPA
 @pytest.mark.solvers
 class TestTPA:
 
-    def run_scf(self, task):
+    def run_scf(self, task, *, ri):
         scf_settings = {'conv_thresh': 1.0e-8}
         method_settings = {'xcfun': 'BP86'}
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.update_settings(scf_settings, method_settings)
         scf_results = scf_drv.compute(task.molecule, task.ao_basis)
 
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
+
         return scf_results
 
-    def run_tpa(self, inpfile, tpa_type, w, ref_result):
+    def run_tpa(self, inpfile, tpa_type, w, ref_result, *, ri):
 
         task = MpiTask([inpfile, None])
         task.input_dict['scf']['checkpoint_file'] = None
 
-        scf_results = self.run_scf(task)
+        scf_results = self.run_scf(task, ri=ri)
 
         tpa_prop = TPA(
             {
@@ -60,46 +65,73 @@ class TestTPA:
             assert np.max(np.abs(
                 np.array(calc_sigma) - np.array(ref_sigma))) < 1.0e-8
 
-    def test_tpa_full(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_tpa_full(self, ri):
 
         w = 0.05
 
         ref_result = {
-            'tpa_terms': {
-                't4_dict': -39.81102482 - 0.37943318j,
-                't3_dict': -92.30945471 - 1.15690967j,
-                'NaX3NyNz': -154.11176435 - 1.18509718j,
-                'NaA3NxNy': -51.38898554 - 0.10346488j,
-                'NaX2Nyz': 621.17712859 + 10.77037598j,
-                'NxA2Nyz': 621.79142488 + 2.18017301j,
+            False: {
+                'tpa_terms': {
+                    't4_dict': -39.81102482 - 0.37943318j,
+                    't3_dict': -92.30945471 - 1.15690967j,
+                    'NaX3NyNz': -154.11176435 - 1.18509718j,
+                    'NaA3NxNy': -51.38898554 - 0.10346488j,
+                    'NaX2Nyz': 621.17712859 + 10.77037598j,
+                    'NxA2Nyz': 621.79142488 + 2.18017301j,
+                },
+                'gamma': 905.34732406 + 10.12564409j,
+                'cross_sections': [0.000100942184],
             },
-            'gamma': 905.34732406 + 10.12564409j,
-            'cross_sections': [0.000100942184],
-        }
+            True: {
+                'tpa_terms': {
+                    't4_dict': -39.85127361 - 0.38007378j,
+                    't3_dict': -87.92661739 - 1.09818575j,
+                    'NaX3NyNz': -154.74476373 - 1.19241333j,
+                    'NaA3NxNy': -51.60006659 - 0.10440128j,
+                    'NaX2Nyz': 626.33552990 + 10.85643895j,
+                    'NxA2Nyz': 626.95317251 + 2.20968942j
+                },
+                'gamma': 919.16598108 + 10.29105423j,
+                'cross_sections': [0.000102591151]
+            }
+        }[ri]
 
         here = Path(__file__).parent
         inpfile = str(here / 'data' / 'water_tpa.inp')
 
-        self.run_tpa(inpfile, 'full', w, ref_result)
+        self.run_tpa(inpfile, 'full', w, ref_result, ri=ri)
 
-    def test_tpa_reduced(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_tpa_reduced(self, ri):
 
         w = 0.05
 
         ref_result = {
-            'tpa_terms': {
-                't3_dict': -35.37827126 - 0.92778160j,
-                'NaX2Nyz': 230.17180603 + 7.10669620j,
-                'NxA2Nyz': 230.43358578 + 2.16388980j,
+            False: {
+                'tpa_terms': {
+                    't3_dict': -35.37827126 - 0.92778160j,
+                    'NaX2Nyz': 230.17180603 + 7.10669620j,
+                    'NxA2Nyz': 230.43358578 + 2.16388980j,
+                },
+                'gamma': 425.22712055 + 8.34280441j,
+                'cross_sections': [0.000083169119],
             },
-            'gamma': 425.22712055 + 8.34280441j,
-            'cross_sections': [0.000083169119],
-        }
+            True: {
+                'tpa_terms': {
+                    't3_dict': -33.79801239 - 0.90196264j,
+                    'NaX2Nyz': 232.02804690 + 7.16267693j,
+                    'NxA2Nyz': 232.29138269 + 2.18154022j
+                },
+                'gamma': 430.52141720 + 8.44225450j,
+                'cross_sections': [0.000084160533]
+            }
+        }[ri]
 
         here = Path(__file__).parent
         inpfile = str(here / 'data' / 'water_tpa.inp')
 
-        self.run_tpa(inpfile, 'reduced', w, ref_result)
+        self.run_tpa(inpfile, 'reduced', w, ref_result, ri=ri)
 
     def test_update_settings(self):
 

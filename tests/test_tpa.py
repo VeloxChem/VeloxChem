@@ -21,20 +21,25 @@ from veloxchem.rsptpa import TPA
 @pytest.mark.solvers
 class TestTPA:
 
-    def run_scf(self, task):
+    def run_scf(self, task, *, ri):
 
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.update_settings(task.input_dict['scf'],
                                 task.input_dict['method_settings'])
         scf_results = scf_drv.compute(task.molecule, task.ao_basis)
 
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
+
         return scf_results
 
-    def run_scf_restart(self, task, filename):
+    def run_scf_restart(self, task, filename, *, ri):
 
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.update_settings(task.input_dict['scf'],
                                 task.input_dict['method_settings'])
         scf_drv.filename = filename
@@ -43,16 +48,21 @@ class TestTPA:
         scf_drv.restart = True
         scf_results = scf_drv.compute(task.molecule, task.ao_basis)
 
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
+
         assert scf_drv.restart
 
         return scf_results
 
-    def run_tpa(self, inpfile, tpa_type, w, ref_result):
+    def run_tpa(self, inpfile, tpa_type, w, ref_result, *, ri):
 
         task = MpiTask([inpfile, None])
         task.input_dict['scf']['checkpoint_file'] = None
 
-        scf_results = self.run_scf(task)
+        scf_results = self.run_scf(task, ri=ri)
 
         tpa_prop = TPA({
             'damping': task.input_dict['response']['damping'],
@@ -83,50 +93,77 @@ class TestTPA:
             assert np.max(np.abs(
                 np.array(calc_sigma) - np.array(ref_sigma))) < 1.0e-8
 
-    def test_tpa_full(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_tpa_full(self, ri):
 
         # vlxtag: RHF, TPA, CR
 
         w = 0.05
 
         ref_result = {
-            'tpa_terms': {
-                't4_dict': 11.43071305 + 0.04957732j,
-                't3_dict': -42.19841751 - 0.28695214j,
-                'NaX3NyNz': -81.62345190 - 0.35812832j,
-                'NaA3NxNy': -27.21320341 - 0.03029788j,
-                'NaX2Nyz': 270.69041328 + 2.67837597j,
-                'NxA2Nyz': 270.83461366 + 0.52758094j,
+            False: {
+                'tpa_terms': {
+                    't4_dict': 11.43071305 + 0.04957732j,
+                    't3_dict': -42.19841751 - 0.28695214j,
+                    'NaX3NyNz': -81.62345190 - 0.35812832j,
+                    'NaA3NxNy': -27.21320341 - 0.03029788j,
+                    'NaX2Nyz': 270.69041328 + 2.67837597j,
+                    'NxA2Nyz': 270.83461366 + 0.52758094j,
+                },
+                'gamma': 401.92066716 + 2.58015589j,
+                'cross_sections': [0.000025721482],
             },
-            'gamma': 401.92066716 + 2.58015589j,
-            'cross_sections': [0.000025721482],
-        }
+            True: {
+                'tpa_terms': {
+                    't4_dict': 11.43008301 + 0.04957077j,
+                    't3_dict': -42.19681780 - 0.28698523j,
+                    'NaX3NyNz': -81.63839070 - 0.35821549j,
+                    'NaA3NxNy': -27.21818420 - 0.03030653j,
+                    'NaX2Nyz': 270.78954696 + 2.67948280j,
+                    'NxA2Nyz': 270.93380182 + 0.52785653j
+                },
+                'gamma': 402.10003909 + 2.58140286j,
+                'cross_sections': [0.000025733913]
+            }
+        }[ri]
 
         here = Path(__file__).parent
         inpfile = str(here / 'data' / 'water_tpa.inp')
 
-        self.run_tpa(inpfile, 'full', w, ref_result)
+        self.run_tpa(inpfile, 'full', w, ref_result, ri=ri)
 
-    def test_tpa_reduced(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_tpa_reduced(self, ri):
 
         # vlxtag: RHF, TPA, CR
 
         w = 0.05
 
         ref_result = {
-            'tpa_terms': {
-                't3_dict': -15.12982062 - 0.19793495j,
-                'NaX2Nyz': 96.30910639 + 1.72679037j,
-                'NxA2Nyz': 96.36431088 + 0.51886895j,
+            False: {
+                'tpa_terms': {
+                    't3_dict': -15.12982062 - 0.19793495j,
+                    'NaX2Nyz': 96.30910639 + 1.72679037j,
+                    'NxA2Nyz': 96.36431088 + 0.51886895j,
+                },
+                'gamma': 177.54359664 + 2.04772438j,
+                'cross_sections': [0.000020413691],
             },
-            'gamma': 177.54359664 + 2.04772438j,
-            'cross_sections': [0.000020413691],
-        }
+            True: {
+                'tpa_terms': {
+                    't3_dict': -15.12934666 - 0.19795656j,
+                    'NaX2Nyz': 96.34476580 + 1.72752590j,
+                    'NxA2Nyz': 96.39999199 + 0.51911895j
+                },
+                'gamma': 177.61541113 + 2.04868829j,
+                'cross_sections': [0.000020423300]
+            }
+        }[ri]
 
         here = Path(__file__).parent
         inpfile = str(here / 'data' / 'water_tpa.inp')
 
-        self.run_tpa(inpfile, 'reduced', w, ref_result)
+        self.run_tpa(inpfile, 'reduced', w, ref_result, ri=ri)
 
     def test_update_settings(self):
 
@@ -537,7 +574,8 @@ class TestTPA:
         tpa_drv.ostream.mute()
         tpa_drv._write_final_hdf5(None, rsp_results)
 
-    def test_full_driver_defaults_and_restart(self, tmp_path):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_full_driver_defaults_and_restart(self, tmp_path, ri):
 
         here = Path(__file__).parent
         inpfile = str(here / 'data' / 'water_tpa.inp')
@@ -548,7 +586,7 @@ class TestTPA:
         filename = str(tmp_path / 'tpa_full_restart')
         filename = task.mpi_comm.bcast(filename, root=mpi_master())
 
-        scf_results = self.run_scf_restart(task, filename)
+        scf_results = self.run_scf_restart(task, filename, ri=ri)
 
         rsp_settings = {
             'damping': task.input_dict['response']['damping'],
@@ -610,7 +648,8 @@ class TestTPA:
             ]:
                 assert Path(f'{filename}{suffix}').is_file()
 
-    def test_reduced_driver_defaults_and_restart(self, tmp_path):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_reduced_driver_defaults_and_restart(self, tmp_path, ri):
 
         here = Path(__file__).parent
         inpfile = str(here / 'data' / 'water_tpa.inp')
@@ -621,7 +660,7 @@ class TestTPA:
         filename = str(tmp_path / 'tpa_reduced_restart')
         filename = task.mpi_comm.bcast(filename, root=mpi_master())
 
-        scf_results = self.run_scf_restart(task, filename)
+        scf_results = self.run_scf_restart(task, filename, ri=ri)
 
         rsp_settings = {
             'damping': task.input_dict['response']['damping'],

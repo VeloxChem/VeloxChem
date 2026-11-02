@@ -11,7 +11,7 @@ from veloxchem.scfrestdriver import ScfRestrictedDriver
 @pytest.mark.solvers
 class TestCrf:
 
-    def run_scf(self, xcfun_label, basis_set_label):
+    def run_scf(self, xcfun_label, basis_set_label, *, ri):
 
         molecule_string = """
             O  0.0           0.0  0.0
@@ -26,18 +26,24 @@ class TestCrf:
         basis = MolecularBasis.read(molecule, basis_set_label, ostream=None)
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_drv.conv_thresh = 1.0e-8
         scf_drv.xcfun = xcfun_label
         scf_results = scf_drv.compute(molecule, basis)
 
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
+
         return molecule, basis, scf_results
 
-    def run_crf(self, xcfun_label, basis_set_label, ref_result):
+    def run_crf(self, xcfun_label, basis_set_label, ref_result, *, ri):
 
         molecule, ao_basis, scf_results = self.run_scf(xcfun_label,
-                                                       basis_set_label)
+                                                       basis_set_label,
+                                                       ri=ri)
 
         wb = 0.11
         wc = -0.2
@@ -67,20 +73,44 @@ class TestCrf:
                 assert abs(crf_result[(key, wb, wc, wd)].imag -
                            ref_result[key].imag) < 1.0e-5
 
-    def test_lda_crf(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_lda_crf(self, ri):
 
-        ref_result = {'crf': -219.79050033492334 + 25.111107933316774j}
+        ref_result = {
+            False: {
+                'crf': -219.79050033492334 + 25.111107933316774j
+            },
+            True: {
+                'crf': -220.15188096 + 25.16019395j
+            }
+        }[ri]
 
-        self.run_crf('slda', 'def2-svp', ref_result)
+        self.run_crf('slda', 'def2-svp', ref_result, ri=ri)
 
-    def test_gga_hyb_crf(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_gga_hyb_crf(self, ri):
 
-        ref_result = {'crf': -652.4805189222037 + 60.48380758714163j}
+        ref_result = {
+            False: {
+                'crf': -652.4805189222037 + 60.48380758714163j
+            },
+            True: {
+                'crf': -652.80248712 + 60.50916047j
+            }
+        }[ri]
 
-        self.run_crf('b3lyp', 'def2-svpd', ref_result)
+        self.run_crf('b3lyp', 'def2-svpd', ref_result, ri=ri)
 
-    def test_mgga_hyb_crf(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_mgga_hyb_crf(self, ri):
 
-        ref_result = {'crf': -554.03621714552764 + 44.932696554117825j}
+        ref_result = {
+            False: {
+                'crf': -554.03621714552764 + 44.932696554117825j
+            },
+            True: {
+                'crf': -554.05323640 + 44.93626137j
+            }
+        }[ri]
 
-        self.run_crf('m06-2x', 'def2-svpd', ref_result)
+        self.run_crf('m06-2x', 'def2-svpd', ref_result, ri=ri)
