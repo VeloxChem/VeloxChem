@@ -17,7 +17,9 @@ class TestCPPCpcm:
                      ref_x_data,
                      ref_y_data,
                      tol,
-                     noneq_solv=False):
+                     noneq_solv=False,
+                     *,
+                     ri):
 
         xyz_string = """6
         xyz
@@ -36,10 +38,15 @@ class TestCPPCpcm:
         # Note: vacuum-SCF + CPCM-response for testing purposes only
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_drv.xcfun = xcfun_label
         scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         lr_drv = ComplexResponseSolver()
         lr_drv.ostream.mute()
@@ -52,33 +59,46 @@ class TestCPPCpcm:
 
         if lr_drv.rank == mpi_master():
             lr_spec = lr_drv.get_spectrum(lr_results, 'au')
-            assert np.max(
-                np.abs(np.array(lr_spec['y_data']) -
-                       np.array(ref_y_data))) < tol
+            assert np.max(np.abs(np.array(lr_spec['y_data']) -
+                                 ref_y_data)) < tol
 
-    def test_b3lyp_absorption_cpcm(self):
-
-        # vlxtag: RKS, Absorption, CPP, CPCM
-
-        xcfun_label = 'b3lyp'
-        cpp_property = 'absorption'
-        ref_x_data = [0.39, 0.40, 0.41]
-        ref_y_data = [0.32158440, 0.66111297, 2.15027316]
-
-        self.run_cpp_cpcm(xcfun_label, cpp_property, ref_x_data, ref_y_data, 1.0e-4)
-
-    def test_b3lyp_absorption_cpcm_noneq(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_b3lyp_absorption_cpcm(self, ri):
 
         # vlxtag: RKS, Absorption, CPP, CPCM
 
         xcfun_label = 'b3lyp'
         cpp_property = 'absorption'
         ref_x_data = [0.39, 0.40, 0.41]
-        ref_y_data = [0.23785824, 0.32046951, 1.27698344]
+        ref_y_data = {
+            False: [0.32158440, 0.66111297, 2.15027316],
+            True: [0.32163522, 0.66152443, 2.14998963]
+        }[ri]
 
         self.run_cpp_cpcm(xcfun_label,
                           cpp_property,
                           ref_x_data,
                           ref_y_data,
                           1.0e-4,
-                          noneq_solv=True)
+                          ri=ri)
+
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_b3lyp_absorption_cpcm_noneq(self, ri):
+
+        # vlxtag: RKS, Absorption, CPP, CPCM
+
+        xcfun_label = 'b3lyp'
+        cpp_property = 'absorption'
+        ref_x_data = [0.39, 0.40, 0.41]
+        ref_y_data = {
+            False: [0.23785824, 0.32046951, 1.27698344],
+            True: [0.23789533, 0.32059839, 1.27758983]
+        }[ri]
+
+        self.run_cpp_cpcm(xcfun_label,
+                          cpp_property,
+                          ref_x_data,
+                          ref_y_data,
+                          1.0e-4,
+                          noneq_solv=True,
+                          ri=ri)

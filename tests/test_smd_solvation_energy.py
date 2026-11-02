@@ -10,19 +10,24 @@ from veloxchem.scfrestdriver import ScfRestrictedDriver
 class TestSmdSolvation:
 
     def run_smd_solvation(self, mol, xcfun_label, smd_solvent, ref_epsilon,
-                          ref_solv_energy):
+                          ref_solv_energy, *, ri):
 
         basis_label = 'def2-svp'
         bas = MolecularBasis.read(mol, basis_label, ostream=None)
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.xcfun = xcfun_label
 
         scf_drv.solvation_model = 'smd'
         scf_drv.smd_solvent = smd_solvent
         scf_drv.ostream.mute()
-        scf_drv.compute(mol, bas)
+        scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         if scf_drv.rank == mpi_master():
             assert scf_drv.cpcm_drv.epsilon == ref_epsilon
@@ -30,7 +35,8 @@ class TestSmdSolvation:
             assert abs(ref_solv_energy[1] - scf_drv.smd_cds_energy) < 1.0e-3
             assert abs(sum(ref_solv_energy) - scf_drv.smd_energy) < 1.0e-3
 
-    def test_pbe0(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_pbe0(self, ri):
 
         pytest.importorskip('rdkit')
 
@@ -53,4 +59,5 @@ class TestSmdSolvation:
             xcfun_label='pbe0',
             smd_solvent='water',
             ref_epsilon=78.355,
-            ref_solv_energy=[-0.01208379720722, 0.00383188957126])
+            ref_solv_energy=[-0.01208379720722, 0.00383188957126],
+            ri=ri)

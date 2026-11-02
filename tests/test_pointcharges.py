@@ -34,7 +34,7 @@ class TestPointCharges:
         return mol, bas
 
     def run_scf_with_point_charges(self, xcfun_label, ref_energy, ene_tol,
-                                   ref_grad, grad_tol):
+                                   ref_grad, grad_tol, *, ri):
 
         mol, bas = self.get_molecule_and_basis()
 
@@ -45,12 +45,17 @@ class TestPointCharges:
         for scf_drv in [ScfRestrictedDriver(), ScfUnrestrictedDriver()]:
 
             scf_drv.xcfun = xcfun_label
-            scf_drv.ri = False
+            scf_drv.ri = ri
             scf_drv.point_charges = potfile
             scf_drv.qm_vdw_params = vdwfile
             scf_drv.ostream.mute()
 
             scf_results = scf_drv.compute(mol, bas)
+
+            if scf_drv.rank == mpi_master():
+                if ri:
+                    assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                    assert not scf_results['ri_fallback']
 
             if scf_drv.rank == mpi_master():
                 assert abs(scf_results['scf_energy'] - ref_energy) < ene_tol
@@ -61,40 +66,56 @@ class TestPointCharges:
 
             assert np.max(np.abs(grad - ref_grad)) < grad_tol
 
-    def test_hf_with_point_charges(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_hf_with_point_charges(self, ri):
 
-        ref_energy = -75.9732334209
-        ref_grad = np.array([
-            [-0.012426949439, -0.009449823622, -0.013955922853],
-            [-0.003881905016, -0.002485992070, 0.002890530027],
-            [0.010380233206, 0.003716170298, 0.009359249589],
-        ])
+        ref_energy = {False: -75.9732334209, True: -75.97317946022}[ri]
+        ref_grad = {
+            False: np.array([
+                [-0.012426949439, -0.009449823622, -0.013955922853],
+                [-0.003881905016, -0.002485992070, 0.002890530027],
+                [0.010380233206, 0.003716170298, 0.009359249589],
+            ]),
+            True: np.array([[-0.012425578502, -0.009449095063, -0.013971496604],
+                            [-0.003880647998, -0.002485951088, 0.002898179075],
+                            [0.010378663988, 0.003716100350, 0.009367058123]])
+        }[ri]
 
-        self.run_scf_with_point_charges('hf', ref_energy, 1.0e-9, ref_grad,
-                                        1.0e-6)
+        self.run_scf_with_point_charges('hf',
+                                        ref_energy,
+                                        1.0e-9,
+                                        ref_grad,
+                                        1.0e-6,
+                                        ri=ri)
 
-    def test_b3lyp_with_point_charges(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_b3lyp_with_point_charges(self, ri):
 
-        ref_energy = -76.3690497939
+        ref_energy = {False: -76.3690497939, True: -76.36906046063}[ri]
         ref_grad = np.array([
             [-0.011154306762, -0.008028413518, 0.014921369370],
             [0.010672309330, -0.000331661909, -0.011756057376],
             [-0.006021550334, -0.000313431386, -0.004840032815],
         ])
 
-        self.run_scf_with_point_charges('b3lyp', ref_energy, 1.0e-9, ref_grad,
-                                        1.0e-4)
+        self.run_scf_with_point_charges('b3lyp',
+                                        ref_energy,
+                                        1.0e-9,
+                                        ref_grad,
+                                        1.0e-4,
+                                        ri=ri)
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason='requires standard single-process assertions')
-    def test_invalid_point_charge_line_raises(self, tmp_path):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_invalid_point_charge_line_raises(self, tmp_path, ri):
 
         mol, bas = self.get_molecule_and_basis()
         potfile = tmp_path / 'invalid_point_charges.pot'
         potfile.write_text('1\ninvalid\nQ 0.0 0.0 0.0\n')
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.point_charges = str(potfile)
         scf_drv.ostream.mute()
 
@@ -104,14 +125,15 @@ class TestPointCharges:
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason='requires standard single-process assertions')
-    def test_empty_point_charge_file_raises(self, tmp_path):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_empty_point_charge_file_raises(self, tmp_path, ri):
 
         mol, bas = self.get_molecule_and_basis()
         potfile = tmp_path / 'empty_point_charges.pot'
         potfile.write_text('')
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.point_charges = str(potfile)
         scf_drv.ostream.mute()
 
@@ -121,7 +143,8 @@ class TestPointCharges:
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason='requires standard single-process assertions')
-    def test_invalid_qm_vdw_line_raises(self, tmp_path):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_invalid_qm_vdw_line_raises(self, tmp_path, ri):
 
         mol, bas = self.get_molecule_and_basis()
         potfile = tmp_path / 'valid_point_charges.pot'
@@ -130,7 +153,7 @@ class TestPointCharges:
         vdwfile.write_text('1.0 2.0\n3.0\n')
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.point_charges = str(potfile)
         scf_drv.qm_vdw_params = str(vdwfile)
         scf_drv.ostream.mute()
@@ -139,7 +162,8 @@ class TestPointCharges:
                            match='qm_vdw_params: Invalid data on line 2'):
             scf_drv.compute(mol, bas)
 
-    def test_linear_response_with_point_charges(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_linear_response_with_point_charges(self, ri):
 
         # point_charges only indirectly affect response
 
@@ -148,10 +172,10 @@ class TestPointCharges:
         here = Path(__file__).parent
         potfile = str(here / 'data' / 'pe_water.pot')
 
-        ref_energy_vac = -75.9610148052
-        ref_energy_pc = -75.9798409316
-        ref_alpha_zz_vac = 4.9696841693
-        ref_alpha_zz_pc = 4.7783688210
+        ref_energy_vac = {False: -75.9610148052, True: -75.9609589425}[ri]
+        ref_energy_pc = {False: -75.9798409316, True: -75.9797869709}[ri]
+        ref_alpha_zz_vac = {False: 4.9696841693, True: 4.9695706051}[ri]
+        ref_alpha_zz_pc = {False: 4.7783688210, True: 4.7781993836}[ri]
 
         scf_settings = {'conv_thresh': 1.0e-8}
         rsp_settings = {'conv_thresh': 1.0e-5, 'frequencies': '0'}
@@ -159,17 +183,27 @@ class TestPointCharges:
         method_settings_pc = {'xcfun': 'hf', 'point_charges': potfile}
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.update_settings(scf_settings, method_settings)
         scf_drv.ostream.mute()
         scf_results_vac = scf_drv.compute(mol, bas)
 
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results_vac['ri_jk'] or scf_results_vac['ri_coulomb']
+                assert not scf_results_vac['ri_fallback']
+
         scf_drv_pc = ScfRestrictedDriver()
-        scf_drv_pc.ri = False
+        scf_drv_pc.ri = ri
         scf_drv_pc.update_settings(scf_settings, method_settings)
         scf_drv_pc.point_charges = potfile
         scf_drv_pc.ostream.mute()
         scf_results_pc = scf_drv_pc.compute(mol, bas)
+
+        if scf_drv_pc.rank == mpi_master():
+            if ri:
+                assert scf_results_pc['ri_jk'] or scf_results_pc['ri_coulomb']
+                assert not scf_results_pc['ri_fallback']
 
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
             assert 'point_charges' in scf_results_pc
@@ -208,7 +242,8 @@ class TestPointCharges:
             assert not hasattr(lr_prop_pc.rsp_driver, 'point_charges')
             assert not hasattr(lr_prop_pc_nokey.rsp_driver, 'point_charges')
 
-    def test_linear_response_with_electric_field(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_linear_response_with_electric_field(self, ri):
 
         # electric_field is inherited from SCF results, and only indirectly
         # affect response
@@ -221,11 +256,16 @@ class TestPointCharges:
         field = [0.0, 0.0, 0.001]
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.update_settings(scf_settings, method_settings)
         scf_drv.electric_field = field
         scf_drv.ostream.mute()
         scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
             assert 'electric_field' in scf_results
@@ -238,7 +278,8 @@ class TestPointCharges:
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
             assert lr_prop.rsp_driver.electric_field == field
 
-    def test_response_electric_field_conflict_warns(self, capsys):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_response_electric_field_conflict_warns(self, capsys, ri):
 
         # a different electric field in response settings is overwritten
         # by the SCF value with a warning
@@ -252,11 +293,16 @@ class TestPointCharges:
         other_field = [0.0, 0.001, 0.0]
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.update_settings(scf_settings, method_settings)
         scf_drv.electric_field = field
         scf_drv.ostream.mute()
         scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         ostream = OutputStream(
             sys.stdout if MPI.COMM_WORLD.Get_rank() == mpi_master() else None)

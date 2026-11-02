@@ -47,14 +47,21 @@ class TestNonlinearEnvironmentGap:
         self.molecule = Molecule.read_xyz_string(xyz_string)
         self.basis = MolecularBasis.read(self.molecule, 'sto-3g')
 
-    def run_scf(self, **env_settings):
+    def run_scf(self, *, ri, **env_settings):
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         for key, value in env_settings.items():
             setattr(scf_drv, key, value)
-        return scf_drv.compute(self.molecule, self.basis)
+        scf_results = scf_drv.compute(self.molecule, self.basis)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
+
+        return scf_results
 
     def assert_compute_rejected(self, driver_cls, scf_results, errmsg):
 
@@ -71,10 +78,12 @@ class TestNonlinearEnvironmentGap:
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason='pytest.raises only valid in serial')
-    def test_compute_rejects_inherited_solvation_model(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_compute_rejects_inherited_solvation_model(self, ri):
 
         scf_results = self.run_scf(solvation_model='cpcm',
-                                   cpcm_epsilon=10.0)
+                                   cpcm_epsilon=10.0,
+                                   ri=ri)
 
         errmsg = ("NonlinearSolver: The 'solvation_model' keyword is not "
                   "supported in nonlinear response calculation.")
@@ -83,9 +92,10 @@ class TestNonlinearEnvironmentGap:
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason='pytest.raises only valid in serial')
-    def test_compute_rejects_inherited_pressure(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_compute_rejects_inherited_pressure(self, ri):
 
-        scf_results = self.run_scf(pressure=20000.0)
+        scf_results = self.run_scf(pressure=20000.0, ri=ri)
 
         errmsg = ("NonlinearSolver: The 'pressure' keyword is not "
                   "supported in nonlinear response calculation.")
@@ -129,9 +139,10 @@ class TestNonlinearEnvironmentGap:
                 with pytest.raises(VeloxChemError, match=errmsg):
                     drv.update_settings({}, {})
 
-    def test_electric_field_is_supported(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_electric_field_is_supported(self, ri):
 
-        scf_results = self.run_scf(electric_field=(0.0, 0.0, 1.0e-4))
+        scf_results = self.run_scf(electric_field=(0.0, 0.0, 1.0e-4), ri=ri)
 
         qrf_drv = QuadraticResponseDriver()
         qrf_drv.ostream.mute()

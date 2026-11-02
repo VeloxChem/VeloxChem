@@ -49,14 +49,21 @@ def fika_embedding(pdb_file, damping=None):
     }
 
 
-def run_scf(molecule, basis, embedding):
+def run_scf(molecule, basis, embedding, *, ri):
 
     scf_drv = ScfRestrictedDriver()
-    scf_drv.ri = False
+    scf_drv.ri = ri
     scf_drv.ostream.mute()
     scf_drv.conv_thresh = 1.0e-8
     scf_drv.embedding = embedding
-    return scf_drv, scf_drv.compute(molecule, basis)
+    scf_results = scf_drv.compute(molecule, basis)
+
+    if scf_drv.rank == mpi_master():
+        if ri:
+            assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+            assert not scf_results['ri_fallback']
+
+    return scf_drv, scf_results
 
 
 def run_lrs(molecule, basis, embedding, scf_results):
@@ -80,7 +87,8 @@ def run_lrs(molecule, basis, embedding, scf_results):
 @pytest.mark.solvers
 class TestFikaScf:
 
-    def test_scf_and_response(self, tmp_path):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_scf_and_response(self, tmp_path, ri):
 
         pdb_file = write_droplet(tmp_path)
         reader = FikaPdbReader()
@@ -88,19 +96,27 @@ class TestFikaScf:
         molecule = reader.get_solute(residues)
         basis = MolecularBasis.read(molecule, 'def2-svp', ostream=None)
 
-        ref_file = Path(__file__).parent / 'data' / 'fika_pe_reference.h5'
+        ref_file = Path(__file__).parent / 'data' / {
+            False: 'fika_pe_reference.h5',
+            True: 'fika_pe_reference_ri.h5'
+        }[ri]
         with h5py.File(ref_file, 'r') as hf:
             ref_f_emb = np.array(hf.get('droplet_f_emb'))
             ref_response = np.array(hf.get('droplet_response'))
 
         fika = fika_embedding(pdb_file)
-        fika_drv, fika_results = run_scf(molecule, basis, fika)
+        fika_drv, fika_results = run_scf(molecule, basis, fika, ri=ri)
 
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
             assert fika_results['scf_energy'] == pytest.approx(
-                -190.61770854930165, abs=1.0e-8)
+                {False: -190.61770854930165, True: -190.61756755272114}[ri],
+                abs=1.0e-8)
             assert fika_results['E_emb'] == pytest.approx(
-                -0.0032606747801258718, abs=1.0e-8)
+                {
+                    False: -0.0032606747801258718,
+                    True: -0.0032610353369353527
+                }[ri],
+                abs=1.0e-8)
             assert np.max(np.abs(fika_results['F_emb'] -
                                  ref_f_emb)) < 1.0e-7
 
@@ -119,7 +135,8 @@ class TestFikaScf:
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
             assert np.max(np.abs(fika_prop - ref_response)) < 1.0e-6
 
-    def test_excitations_and_complex_response(self, tmp_path):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_excitations_and_complex_response(self, tmp_path, ri):
 
         from veloxchem.lreigensolver import LinearResponseEigenSolver
         from veloxchem.tdaeigensolver import TdaEigenSolver
@@ -131,7 +148,10 @@ class TestFikaScf:
         molecule = reader.get_solute(residues)
         basis = MolecularBasis.read(molecule, 'def2-svp', ostream=None)
 
-        ref_file = Path(__file__).parent / 'data' / 'fika_pe_reference.h5'
+        ref_file = Path(__file__).parent / 'data' / {
+            False: 'fika_pe_reference.h5',
+            True: 'fika_pe_reference_ri.h5'
+        }[ri]
         with h5py.File(ref_file, 'r') as hf:
             ref_lr_eigenvalues = np.array(hf.get('droplet_lr_eigenvalues'))
             ref_tda_eigenvalues = np.array(hf.get('droplet_tda_eigenvalues'))
@@ -139,7 +159,7 @@ class TestFikaScf:
                 hf.get('droplet_complex_response'))
 
         embedding = fika_embedding(pdb_file)
-        scf_results = run_scf(molecule, basis, embedding)[1]
+        scf_results = run_scf(molecule, basis, embedding, ri=ri)[1]
 
         def solve(solver, **settings):
             solver.ostream.mute()
@@ -173,7 +193,8 @@ class TestFikaScf:
             assert np.max(np.abs(values - ref_complex_response)) < (
                 1.0e-7 * np.max(np.abs(ref_complex_response)))
 
-    def test_response_with_subcommunicators(self, tmp_path):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_response_with_subcommunicators(self, tmp_path, ri):
 
         # With subcommunicators each one embeds its own trial densities.
         from veloxchem.lreigensolver import LinearResponseEigenSolver
@@ -183,7 +204,7 @@ class TestFikaScf:
         molecule = reader.get_solute(reader.read(pdb_file))
         basis = MolecularBasis.read(molecule, 'def2-svp', ostream=None)
         embedding = fika_embedding(pdb_file)
-        _, scf_results = run_scf(molecule, basis, embedding)
+        _, scf_results = run_scf(molecule, basis, embedding, ri=ri)
 
         def excitation_energies(use_subcomms):
             solver = LinearResponseEigenSolver()
@@ -201,7 +222,8 @@ class TestFikaScf:
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
             assert np.max(np.abs(distributed - reference)) < 1.0e-10
 
-    def test_unrestricted(self, tmp_path):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_unrestricted(self, tmp_path, ri):
 
         from veloxchem.scfunrestdriver import ScfUnrestrictedDriver
         from veloxchem.scfrestopendriver import ScfRestrictedOpenDriver
@@ -220,10 +242,17 @@ class TestFikaScf:
         def scf(driver_class, mol):
             driver = driver_class()
             driver.ostream.mute()
-            driver.ri = False
+            driver.ri = ri
             driver.conv_thresh = 1.0e-8
             driver.embedding = embedding
-            return driver.compute(mol, basis)
+            results = driver.compute(mol, basis)
+
+            if driver.rank == mpi_master():
+                if ri:
+                    assert results['ri_jk'] or results['ri_coulomb']
+                    assert not results['ri_fallback']
+
+            return results
 
         def solve(solver, scf_results, mol, **settings):
             solver.ostream.mute()
@@ -244,7 +273,7 @@ class TestFikaScf:
         # A closed shell through the unrestricted path gives the restricted
         # results (TDA: closed-shell unrestricted RPA has a triplet
         # instability).
-        restricted = run_scf(molecule, basis, embedding)[1]
+        restricted = run_scf(molecule, basis, embedding, ri=ri)[1]
         unrestricted = scf(ScfUnrestrictedDriver, molecule)
         frequencies = [0.0, 0.05]
         alpha = solve(LinearResponseSolver(), restricted, molecule,
@@ -292,7 +321,8 @@ class TestFikaScf:
                 for a in 'xyz')
             assert np.all(rpa['eigenvalues'] > 0.0)
 
-    def test_fika_embedding_from_potfile(self, tmp_path):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_fika_embedding_from_potfile(self, tmp_path, ri):
         molecule = Molecule.read_xyz_string("""3
             water
             O  0.000000  0.000000  0.000000
@@ -324,7 +354,7 @@ class TestFikaScf:
 
         # A potfile takes priority over an assigned embedding.
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_drv.embedding = {
             'settings': {
@@ -336,6 +366,11 @@ class TestFikaScf:
         }
         scf_drv.potfile = str(potfile)
         results = scf_drv.compute(molecule, basis)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert results['ri_jk'] or results['ri_coulomb']
+                assert not results['ri_fallback']
 
         assert scf_drv._pe
         assert scf_drv.embedding['settings']['embedding_method'] == 'fika'
@@ -349,7 +384,8 @@ class TestFikaScf:
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
             assert abs(results['E_emb']) > 0.0
 
-    def test_scf_and_linear_response_from_potfile(self, tmp_path):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_scf_and_linear_response_from_potfile(self, tmp_path, ri):
 
         potfile = tmp_path / 'fika_water.pot'
         potfile.write_text("""
@@ -381,11 +417,16 @@ class TestFikaScf:
         basis = MolecularBasis.read(molecule, 'def2-svp', ostream=None)
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_drv.conv_thresh = 1.0e-8
         scf_drv.potfile = str(potfile)
         scf_results = scf_drv.compute(molecule, basis)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         # The response does not receive an embedding: it inherits the SCF
         # potfile and builds the default fika embedding from it.
@@ -399,9 +440,11 @@ class TestFikaScf:
 
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
             assert scf_results['scf_energy'] == pytest.approx(
-                -75.9588041254, abs=1.0e-8)
+                {False: -75.9588041254, True: -75.9587477569}[ri],
+                abs=1.0e-8)
             assert scf_results['E_emb'] == pytest.approx(
-                0.0021369030, abs=1.0e-8)
+                {False: 0.0021369030, True: 0.0021374109}[ri],
+                abs=1.0e-8)
             assert scf_results['embedding_method'] == 'fika'
             assert scf_results['potfile'] == str(potfile)
 
@@ -412,11 +455,18 @@ class TestFikaScf:
             assert lrs_drv.embedding['inputs']['potfile'] == str(potfile)
             assert lrs_drv._embedding_drv.switching is not None
 
-            ref_response = np.array([
-                [-3.0013483959, 0.0, -0.0056242824],
-                [0.0, -6.8387290055, 0.0],
-                [-0.0056242824, 0.0, -5.0077482764],
-            ])
+            ref_response = {
+                False: np.array([
+                    [-3.0013483959, 0.0, -0.0056242824],
+                    [0.0, -6.8387290055, 0.0],
+                    [-0.0056242824, 0.0, -5.0077482764],
+                ]),
+                True: np.array([
+                    [-3.0008403794, 0.0, -0.0056262815],
+                    [0.0, -6.8384659214, 0.0],
+                    [-0.0056262815, 0.0, -5.0076506281],
+                ]),
+            }[ri]
             got_response = np.array([[
                 lrs_results['response_functions'][(a, b, 0.0)]
                 for b in 'xyz'
@@ -424,7 +474,8 @@ class TestFikaScf:
 
             assert np.max(np.abs(got_response - ref_response)) < 1.0e-8
 
-    def test_damping_and_objects(self, tmp_path):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_damping_and_objects(self, tmp_path, ri):
 
         pdb_file = write_droplet(tmp_path)
         reader = FikaPdbReader()
@@ -435,10 +486,10 @@ class TestFikaScf:
         # No damping is the default.
         undamped = fika_embedding(pdb_file)
         del undamped['settings']['damping']
-        _, undamped_results = run_scf(molecule, basis, undamped)
+        _, undamped_results = run_scf(molecule, basis, undamped, ri=ri)
         thole = fika_embedding(pdb_file)
         thole['settings']['damping'] = 'thole'
-        _, thole_results = run_scf(molecule, basis, thole)
+        _, thole_results = run_scf(molecule, basis, thole, ri=ri)
 
         # The same classical system given as an object.
         system, _ = reader.get_classical_system(residues, {'HOH': 'ahlstrom'})
@@ -453,7 +504,7 @@ class TestFikaScf:
                 }
             },
         }
-        _, object_results = run_scf(molecule, basis, objects)
+        _, object_results = run_scf(molecule, basis, objects, ri=ri)
 
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
             assert abs(thole_results['scf_energy'] -
@@ -463,7 +514,8 @@ class TestFikaScf:
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason='input errors abort MPI runs')
-    def test_errors(self, tmp_path):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_errors(self, tmp_path, ri):
 
         pdb_file = write_droplet(tmp_path)
         reader = FikaPdbReader()
@@ -473,7 +525,7 @@ class TestFikaScf:
 
         def fails(embedding, message, molecule=molecule, basis=basis):
             with pytest.raises(VeloxChemError, match=message):
-                run_scf(molecule, basis, embedding)
+                run_scf(molecule, basis, embedding, ri=ri)
 
         # The molecule must be the solute of the PDB file.
         moved = molecule.get_coordinates_in_bohr()
@@ -502,23 +554,29 @@ class TestFikaScf:
 
         # Gradients are not available yet.
         from veloxchem.scfgradientdriver import ScfGradientDriver
-        scf_drv, scf_results = run_scf(molecule, basis,
-                                       fika_embedding(pdb_file))
+        scf_drv, scf_results = run_scf(molecule,
+                                       basis,
+                                       fika_embedding(pdb_file),
+                                       ri=ri)
         grad_drv = ScfGradientDriver(scf_drv)
         grad_drv.ostream.mute()
         with pytest.raises(VeloxChemError,
                            match='gradients with the fika embedding'):
             grad_drv.compute(molecule, basis, scf_results)
 
-    def test_response_on_fika_reference(self, tmp_path):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_response_on_fika_reference(self, tmp_path, ri):
 
         pdb_file = write_droplet(tmp_path)
         reader = FikaPdbReader()
         molecule = reader.get_solute(reader.read(pdb_file))
         basis = MolecularBasis.read(molecule, 'sto-3g', ostream=None)
 
-        _, fika_results = run_scf(molecule, basis, fika_embedding(pdb_file))
-        _, gas_results = run_scf(molecule, basis, None)
+        _, fika_results = run_scf(molecule,
+                                  basis,
+                                  fika_embedding(pdb_file),
+                                  ri=ri)
+        _, gas_results = run_scf(molecule, basis, None, ri=ri)
         # the SCF results are filled on the master rank only
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
             assert fika_results['embedding_method'] == 'fika'
@@ -536,15 +594,19 @@ class TestFikaScf:
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason='skip pytest.raises for multiple MPI processes')
-    def test_response_on_fika_reference_errors(self, tmp_path):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_response_on_fika_reference_errors(self, tmp_path, ri):
 
         pdb_file = write_droplet(tmp_path)
         reader = FikaPdbReader()
         molecule = reader.get_solute(reader.read(pdb_file))
         basis = MolecularBasis.read(molecule, 'sto-3g', ostream=None)
 
-        _, fika_results = run_scf(molecule, basis, fika_embedding(pdb_file))
-        _, gas_results = run_scf(molecule, basis, None)
+        _, fika_results = run_scf(molecule,
+                                  basis,
+                                  fika_embedding(pdb_file),
+                                  ri=ri)
+        _, gas_results = run_scf(molecule, basis, None, ri=ri)
 
         # Linear response on a fika reference needs the fika embedding; a
         # reused driver accepts a gas-phase reference afterwards.

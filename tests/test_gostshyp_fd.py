@@ -42,7 +42,8 @@ class TestGostshypFiniteField:
     """
 
     @pytest.mark.timeconsuming
-    def test_water_def2svpd_at_10_gpa(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_water_def2svpd_at_10_gpa(self, ri):
 
         xyz_string = """3
 
@@ -56,7 +57,7 @@ class TestGostshypFiniteField:
         pressure = 10  # GPa
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_drv.conv_thresh = 1.0e-8
         scf_drv.pressure_units = 'GPa'
@@ -126,6 +127,11 @@ class TestGostshypFiniteField:
         scf_drv.electric_field = [0.0, 0.0, 0.0]
         scf_results = scf_drv.compute(molecule, basis)
 
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
+
         lrf_drv = LinearResponseSolver()
         lrf_drv.ostream.mute()
         lrf_drv.conv_thresh = 1.0e-5
@@ -151,10 +157,11 @@ class TestGostshypFiniteField:
         alpha = comm.bcast(alpha, root=mpi_master())
 
         if rank == mpi_master():
-            # reference values from the GOSTSHYP finite-field verification
-            # (printed to 6 and 5 decimals, respectively)
-            ref_mu = 0.801786
-            ref_alpha = 7.85045
+            # four-center: reference values from the GOSTSHYP finite-field
+            # verification (printed to 6 and 5 decimals, respectively);
+            # RI: values from this test with ri = True
+            ref_mu = {False: 0.801786, True: 0.80180767}[ri]
+            ref_alpha = {False: 7.85045, True: 7.8490791}[ri]
 
             # analytical dipole moment and polarizability at 10 GPa
             assert abs(mu[2] - ref_mu) < 1.0e-6

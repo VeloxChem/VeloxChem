@@ -10,7 +10,7 @@ from veloxchem.scfrestdriver import ScfRestrictedDriver
 class TestCpcmSolvation:
 
     def run_cpcm_solvation(self, xcfun_label, ref_solv_energy,
-                           cpcm_custom_vdw_radii, tol):
+                           cpcm_custom_vdw_radii, tol, *, ri):
 
         xyz_string = """6
         xyz
@@ -27,7 +27,7 @@ class TestCpcmSolvation:
         bas = MolecularBasis.read(mol, basis_label, ostream=None)
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.xcfun = xcfun_label
 
         scf_drv.solvation_model = 'cpcm'
@@ -35,25 +35,49 @@ class TestCpcmSolvation:
         scf_drv.cpcm_custom_vdw_radii = cpcm_custom_vdw_radii
 
         scf_drv.ostream.mute()
-        scf_drv.compute(mol, bas)
+        scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         if scf_drv.rank == mpi_master():
             assert abs(ref_solv_energy - scf_drv.cpcm_drv.cpcm_epol) < tol
 
-    def test_hf(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_hf(self, ri):
 
-        self.run_cpcm_solvation('hf', -0.022994741795899817, None, 1.0e-8)
+        self.run_cpcm_solvation('hf',
+                                {
+                                    False: -0.022994741795899817,
+                                    True: -0.023000082327860622
+                                }[ri],
+                                None,
+                                1.0e-8,
+                                ri=ri)
 
-    def test_b3lyp(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_b3lyp(self, ri):
 
-        self.run_cpcm_solvation('b3lyp', -0.020249892377218158, None, 1.0e-6)
+        self.run_cpcm_solvation('b3lyp',
+                                {
+                                    False: -0.020249892377218158,
+                                    True: -0.020251215480936596
+                                }[ri],
+                                None,
+                                1.0e-6,
+                                ri=ri)
 
-    def test_b3lyp_custom_radii(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_b3lyp_custom_radii(self, ri):
 
-        self.run_cpcm_solvation('b3lyp', -0.00214350811184457, ['O', 3.0],
-                                1.0e-6)
+        self.run_cpcm_solvation('b3lyp',
+                                -0.00214350811184457, ['O', 3.0],
+                                1.0e-6,
+                                ri=ri)
 
-    def run_cpcm_solvation_with_ecp(self, ref_solv_energy, tol):
+    def run_cpcm_solvation_with_ecp(self, ref_solv_energy, tol, *, ri):
 
         xyz_string = """3
         xyz
@@ -67,14 +91,25 @@ class TestCpcmSolvation:
         bas = MolecularBasis.read(mol, basis_label, ostream=None)
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.solvation_model = 'cpcm'
         scf_drv.ostream.mute()
-        scf_drv.compute(mol, bas)
+        scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         if scf_drv.rank == mpi_master():
             assert abs(ref_solv_energy - scf_drv.cpcm_drv.cpcm_epol) < tol
 
-    def test_hf_with_ecp(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_hf_with_ecp(self, ri):
 
-        self.run_cpcm_solvation_with_ecp(-0.0465435704, 1.0e-8)
+        self.run_cpcm_solvation_with_ecp({
+            False: -0.0465435704,
+            True: -0.0465441336
+        }[ri],
+                                         1.0e-8,
+                                         ri=ri)

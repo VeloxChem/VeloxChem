@@ -222,12 +222,13 @@ class TestEnvironmentCompatibility:
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason='skip pytest.raises for multiple MPI processes')
-    def test_compute_rejects_cpcm_with_electric_field(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_compute_rejects_cpcm_with_electric_field(self, ri):
 
         molecule, basis = self.get_water_and_basis()
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_drv.solvation_model = 'cpcm'
         scf_drv.electric_field = [0.0, 0.0, 1.0e-4]
@@ -236,7 +237,8 @@ class TestEnvironmentCompatibility:
                            match='Incompatible environment settings'):
             scf_drv.compute(molecule, basis)
 
-    def test_compute_allows_gostshyp_with_electric_field(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_compute_allows_gostshyp_with_electric_field(self, ri):
 
         # the supported combination pressure + electric field runs to
         # convergence: the field is a static one-electron term added to
@@ -245,12 +247,17 @@ class TestEnvironmentCompatibility:
         molecule, basis = self.get_water_and_basis()
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_drv.pressure = 100.0
         scf_drv.electric_field = [0.0, 0.0, 1.0e-4]
 
         scf_results = scf_drv.compute(molecule, basis)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
             assert scf_results is not None
@@ -261,12 +268,13 @@ class TestEnvironmentCompatibility:
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason='skip pytest.raises for multiple MPI processes')
-    def test_compute_rejects_gostshyp_with_point_charges(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_compute_rejects_gostshyp_with_point_charges(self, ri):
 
         molecule, basis = self.get_water_and_basis()
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_drv.pressure = 100.0
         scf_drv.point_charges = one_point_charge()
@@ -277,14 +285,15 @@ class TestEnvironmentCompatibility:
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason='skip pytest.raises for multiple MPI processes')
-    def test_compute_rejects_pe_with_gostshyp(self, tmp_path):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_compute_rejects_pe_with_gostshyp(self, tmp_path, ri):
 
         molecule, basis = self.get_water_and_basis()
         potfile = tmp_path / 'dummy_pe.pot'
         potfile.write_text('{}')
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_drv.potfile = str(potfile)
         scf_drv.pressure = 100.0
@@ -295,7 +304,8 @@ class TestEnvironmentCompatibility:
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason='skip pytest.raises for multiple MPI processes')
-    def test_compute_rejects_pe_with_electric_field(self, tmp_path):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_compute_rejects_pe_with_electric_field(self, tmp_path, ri):
 
         # the pre-existing rejection only ran in update_settings; compute
         # must also reject the pair when attributes are set directly
@@ -304,7 +314,7 @@ class TestEnvironmentCompatibility:
         potfile.write_text('{}')
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_drv.potfile = str(potfile)
         scf_drv.electric_field = [0.0, 0.0, 1.0e-4]
@@ -315,7 +325,8 @@ class TestEnvironmentCompatibility:
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason='skip pytest.raises for multiple MPI processes')
-    def test_compute_rejects_pe_with_point_charges(self, tmp_path):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_compute_rejects_pe_with_point_charges(self, tmp_path, ri):
 
         # same as above: the pair must be rejected in compute as well
         molecule, basis = self.get_water_and_basis()
@@ -323,7 +334,7 @@ class TestEnvironmentCompatibility:
         potfile.write_text('{}')
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_drv.potfile = str(potfile)
         scf_drv.point_charges = one_point_charge()
@@ -332,10 +343,11 @@ class TestEnvironmentCompatibility:
                            match='Incompatible environment settings'):
             scf_drv.compute(molecule, basis)
 
-    def test_update_settings_allows_gostshyp_with_electric_field(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_update_settings_allows_gostshyp_with_electric_field(self, ri):
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
 
         scf_drv.update_settings(
@@ -345,7 +357,8 @@ class TestEnvironmentCompatibility:
         assert scf_drv.pressure == 100.0
         assert scf_drv.electric_field == (0.0, 0.0, 1.0e-4)
 
-    def test_compute_allows_electric_field_with_point_charges(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_compute_allows_electric_field_with_point_charges(self, ri):
 
         # the only supported combination runs to convergence
         molecule, basis = self.get_water_and_basis()
@@ -355,12 +368,17 @@ class TestEnvironmentCompatibility:
         point_charges[3, 0] = 1.0
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_drv.electric_field = [0.0, 0.0, 1.0e-4]
         scf_drv.point_charges = point_charges
 
         scf_results = scf_drv.compute(molecule, basis)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
             assert scf_results is not None
@@ -408,7 +426,8 @@ class TestEnvironmentCompatibility:
                            match='Incompatible environment settings'):
             lr_drv.compute(molecule, basis, scf_results)
 
-    def test_lr_compute_allows_gostshyp_with_electric_field(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_lr_compute_allows_gostshyp_with_electric_field(self, ri):
 
         # the response driver inherits both the pressure and the electric
         # field from the SCF results; the combined environment is
@@ -416,11 +435,16 @@ class TestEnvironmentCompatibility:
         molecule, basis = self.get_water_and_basis()
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_drv.pressure = 100.0
         scf_drv.electric_field = [0.0, 0.0, 1.0e-4]
         scf_results = scf_drv.compute(molecule, basis)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         lr_drv = LinearResponseEigenSolver()
         lr_drv.ostream.mute()

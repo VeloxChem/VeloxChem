@@ -88,13 +88,18 @@ def get_classical_system(waters):
     return system
 
 
-def get_hf_density(molecule, basis):
+def get_hf_density(molecule, basis, *, ri):
 
     scf_drv = ScfRestrictedDriver()
-    scf_drv.ri = False
+    scf_drv.ri = ri
     scf_drv.conv_thresh = 1.0e-8
     scf_drv.ostream.mute()
     results = scf_drv.compute(molecule, basis)
+
+    if scf_drv.rank == mpi_master():
+        if ri:
+            assert results['ri_jk'] or results['ri_coulomb']
+            assert not results['ri_fallback']
     density = None
     if scf_drv.rank == mpi_master():
         density = results['D_alpha'] + results['D_beta']
@@ -659,17 +664,26 @@ class TestFikaEmbedding:
         return options
 
     @pytest.mark.solvers
-    def test_ground_state(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_ground_state(self, ri):
 
         molecule = get_acrolein()
         basis = MolecularBasis.read(molecule, 'def2-svp', ostream=None)
-        density = get_hf_density(molecule, basis)
+        density = get_hf_density(molecule, basis, ri=ri)
         waters = get_water_shell(molecule, 40)
 
-        ref_file = Path(__file__).parent / 'data' / 'fika_pe_reference.h5'
+        # The permanent Fock matrix does not depend on the density and has
+        # one reference; the induced dipoles and the embedding Fock matrix
+        # depend on the SCF density, four-center or RI.
+        data_dir = Path(__file__).parent / 'data'
+        with h5py.File(data_dir / 'fika_pe_reference.h5', 'r') as hf:
+            ref_f_elec = np.array(hf.get('acrolein_f_elec'))
+        ref_file = data_dir / {
+            False: 'fika_pe_reference.h5',
+            True: 'fika_pe_reference_ri.h5'
+        }[ri]
         with h5py.File(ref_file, 'r') as hf:
             ref_mu = np.array(hf.get('acrolein_mu'))
-            ref_f_elec = np.array(hf.get('acrolein_f_elec'))
             ref_v_emb = np.array(hf.get('acrolein_v_emb'))
 
         result = FikaQmmmEmbeddingDriver(molecule, basis,
@@ -678,13 +692,16 @@ class TestFikaEmbedding:
 
         assert result.induced.converged
         assert result.electron_permanent_energy == pytest.approx(
-            -0.03903501058147324, abs=1.0e-10)
+            {False: -0.03903501058147324, True: -0.03903533431716837}[ri],
+            abs=1.0e-10)
         assert result.nuclear_permanent_energy == pytest.approx(
             0.03590023271653367, abs=1.0e-10)
         assert result.polarization_energy == pytest.approx(
-            -0.006375170012274301, abs=1.0e-9)
-        assert result.energy() == pytest.approx(-0.009509947877213869,
-                                                abs=1.0e-9)
+            {False: -0.006375170012274301, True: -0.006375282462079584}[ri],
+            abs=1.0e-9)
+        assert result.energy() == pytest.approx(
+            {False: -0.009509947877213869, True: -0.009510384062715252}[ri],
+            abs=1.0e-9)
 
         # The reference dipoles use the same sign convention as fika.
         assert np.max(np.abs(result.induced.dipoles - ref_mu)) < 1.0e-8
@@ -718,11 +735,12 @@ class TestFikaEmbedding:
         assert np.max(np.abs(result.induced_fock - ref)) < 1.0e-9
         assert np.max(np.abs(result.fock() - ref)) < 1.0e-9
 
-    def test_warm_start_and_fock_driver(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_warm_start_and_fock_driver(self, ri):
 
         molecule = get_acrolein()
         basis = MolecularBasis.read(molecule, 'def2-svp', ostream=None)
-        density = get_hf_density(molecule, basis)
+        density = get_hf_density(molecule, basis, ri=ri)
         system = get_classical_system(get_water_shell(molecule, 40))
 
         # Converged tightly, so the restart needs no rescaling (s = 1).
