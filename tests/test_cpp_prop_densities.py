@@ -13,8 +13,9 @@ from veloxchem.resultsio import read_results
 @pytest.mark.solvers
 class TestCppPropertyDensities:
 
-    def run_cpp_prop_densities(self, tmp_path, mol, bas, xcfun_label, cpp_property,
-                               cpp_frequencies, freq_prop_tuple, tol):
+    def run_cpp_prop_densities(self, tmp_path, mol, bas, xcfun_label,
+                               cpp_property, cpp_frequencies, freq_prop_tuple,
+                               tol, ri):
 
         comm = MPI.COMM_WORLD
         if comm.Get_rank() == mpi_master():
@@ -26,13 +27,18 @@ class TestCppPropertyDensities:
         # run SCF
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.xcfun = xcfun_label
         scf_drv.acc_type = 'l2_diis'
         scf_drv.conv_thresh = 1.0e-8
         scf_drv.filename = filename
         scf_drv.ostream.mute()
         scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         # run CPP
 
@@ -80,7 +86,8 @@ class TestCppPropertyDensities:
                     assert abs(-np.sum(prop_dens_D * S) + 1.0) < tol
                     assert abs(np.sum(prop_dens_A * S) + 1.0) < tol
 
-    def test_cpp_prop_dens_absorption(self, tmp_path):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_cpp_prop_dens_absorption(self, tmp_path, ri):
 
         molstr = """
         C        0.0000        0.0000       -1.2436
@@ -99,13 +106,15 @@ class TestCppPropertyDensities:
         cpp_property = 'absorption'
         cpp_frequencies = np.round(np.arange(0.7, 0.8, 0.005), 4)
 
-        freq_prop_tuple = (0.735, 7.46130785)
+        freq_prop_tuple = (0.735, {False: 7.46130785, True: 7.47578494}[ri])
         tol = 1e-7
 
-        self.run_cpp_prop_densities(tmp_path, mol, bas, xcfun_label, cpp_property,
-                                    cpp_frequencies, freq_prop_tuple, tol)
+        self.run_cpp_prop_densities(tmp_path, mol, bas, xcfun_label,
+                                    cpp_property, cpp_frequencies,
+                                    freq_prop_tuple, tol, ri)
 
-    def test_cpp_prop_dens_ecd(self, tmp_path):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_cpp_prop_dens_ecd(self, tmp_path, ri):
 
         xyzstr = """4
         xyz
@@ -123,8 +132,9 @@ class TestCppPropertyDensities:
         cpp_property = 'ecd'
         cpp_frequencies = np.round(np.arange(0.3, 0.4, 0.005), 4)
 
-        freq_prop_tuple = (0.380, -33.00282097)
+        freq_prop_tuple = (0.380, {False: -33.00282097, True: -32.96669375}[ri])
         tol = 1e-5
 
-        self.run_cpp_prop_densities(tmp_path, mol, bas, xcfun_label, cpp_property,
-                                    cpp_frequencies, freq_prop_tuple, tol)
+        self.run_cpp_prop_densities(tmp_path, mol, bas, xcfun_label,
+                                    cpp_property, cpp_frequencies,
+                                    freq_prop_tuple, tol, ri)

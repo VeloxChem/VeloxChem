@@ -16,7 +16,7 @@ from veloxchem.resultsio import read_results
 @pytest.mark.solvers
 class TestUnrestrictedLR:
 
-    def run_lr(self, xcfun_label, ref_rsp_func, tol):
+    def run_lr(self, xcfun_label, ri, ref_rsp_func, tol):
 
         xyz_string = """3
         xyz
@@ -31,10 +31,15 @@ class TestUnrestrictedLR:
         bas = MolecularBasis.read(mol, basis_label, ostream=None)
 
         scf_drv = ScfUnrestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_drv.xcfun = xcfun_label
         scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         lr_drv = LinearResponseUnrestrictedSolver()
         lr_drv.ostream.mute()
@@ -48,7 +53,8 @@ class TestUnrestrictedLR:
                 max_diff = max(max_diff, abs(val - ref_val))
             assert max_diff < tol
 
-    def test_camb3lyp(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_camb3lyp(self, ri):
 
         ref_rsp_func = {}
 
@@ -57,21 +63,34 @@ class TestUnrestrictedLR:
                 for op_b in 'xyz':
                     ref_rsp_func[(op_a, op_b, w)] = 0.0
 
-        ref_rsp_func[('x', 'x', 0.0)] = -3.54375468
-        ref_rsp_func[('y', 'y', 0.0)] = -66.53060889
-        ref_rsp_func[('z', 'z', 0.0)] = -4.79288428
+        ref_rsp_func.update({
+            False: {
+                ('x', 'x', 0.0): -3.54375468,
+                ('y', 'y', 0.0): -66.53060889,
+                ('z', 'z', 0.0): -4.79288428,
+                ('x', 'x', 0.01): -3.54934293,
+                ('y', 'y', 0.01): -67.29003967,
+                ('z', 'z', 0.01): -4.79357607,
+                ('x', 'x', 0.05): -3.74295389,
+                ('y', 'y', 0.05): -93.80105016,
+                ('z', 'z', 0.05): -4.81028519,
+            },
+            True: {
+                ('x', 'x', 0.0): -3.54407278,
+                ('y', 'y', 0.0): -66.52446175,
+                ('z', 'z', 0.0): -4.79280260,
+                ('x', 'x', 0.01): -3.54966259,
+                ('y', 'y', 0.01): -67.28323295,
+                ('z', 'z', 0.01): -4.79349438,
+                ('x', 'x', 0.05): -3.74332718,
+                ('y', 'y', 0.05): -93.76223511,
+                ('z', 'z', 0.05): -4.81020320,
+            },
+        }[ri])
 
-        ref_rsp_func[('x', 'x', 0.01)] = -3.54934293
-        ref_rsp_func[('y', 'y', 0.01)] = -67.29003967
-        ref_rsp_func[('z', 'z', 0.01)] = -4.79357607
+        self.run_lr('cam-b3lyp', ri, ref_rsp_func, 1.0e-5)
 
-        ref_rsp_func[('x', 'x', 0.05)] = -3.74295389
-        ref_rsp_func[('y', 'y', 0.05)] = -93.80105016
-        ref_rsp_func[('z', 'z', 0.05)] = -4.81028519
-
-        self.run_lr('cam-b3lyp', ref_rsp_func, 1.0e-5)
-
-    def run_lr_with_ecp(self, ref_rsp_func, tol):
+    def run_lr_with_ecp(self, ref_rsp_func, tol, ri):
 
         xyz_string = """2
         xyz
@@ -86,9 +105,14 @@ class TestUnrestrictedLR:
         bas = MolecularBasis.read(mol, basis_label, ostream=None)
 
         scf_drv = ScfUnrestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         lr_drv = LinearResponseUnrestrictedSolver()
         lr_drv.ostream.mute()
@@ -102,7 +126,8 @@ class TestUnrestrictedLR:
                 max_diff = max(max_diff, abs(val - ref_val))
             assert max_diff < tol
 
-    def test_hf_with_ecp(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_hf_with_ecp(self, ri):
 
         ref_rsp_func = {}
 
@@ -111,13 +136,23 @@ class TestUnrestrictedLR:
                 for op_b in 'xyz':
                     ref_rsp_func[(op_a, op_b, w)] = 0.0
 
-        ref_rsp_func[('x', 'x', 0.05)] = -14.00881203
-        ref_rsp_func[('y', 'y', 0.05)] = -14.00881203
-        ref_rsp_func[('z', 'z', 0.05)] = -24.65918702
+        ref_rsp_func.update({
+            False: {
+                ('x', 'x', 0.05): -14.00881203,
+                ('y', 'y', 0.05): -14.00881203,
+                ('z', 'z', 0.05): -24.65918702,
+            },
+            True: {
+                ('x', 'x', 0.05): -14.00913751,
+                ('y', 'y', 0.05): -14.00913751,
+                ('z', 'z', 0.05): -24.66035765,
+            },
+        }[ri])
 
-        self.run_lr_with_ecp(ref_rsp_func, 1.0e-5)
+        self.run_lr_with_ecp(ref_rsp_func, 1.0e-5, ri)
 
-    def test_checkpoint_restart_and_saved_solutions(self, tmp_path):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_checkpoint_restart_and_saved_solutions(self, tmp_path, ri):
 
         xyz_string = """3
         xyz
@@ -131,7 +166,7 @@ class TestUnrestrictedLR:
         bas = MolecularBasis.read(mol, 'def2-svp', ostream=None)
 
         scf_drv = ScfUnrestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
 
         filename = str(tmp_path / 'lr_unrest_restart')
@@ -141,6 +176,11 @@ class TestUnrestrictedLR:
         scf_drv.compute(mol, bas)
         scf_drv.restart = True
         scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         lr_drv = LinearResponseUnrestrictedSolver()
         lr_drv.filename = filename
@@ -182,7 +222,8 @@ class TestUnrestrictedLR:
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason='skip pytest.raises for multiple MPI processes')
-    def test_compute_rejects_external_rhs(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_compute_rejects_external_rhs(self, ri):
 
         xyz_string = """3
         xyz
@@ -196,9 +237,14 @@ class TestUnrestrictedLR:
         bas = MolecularBasis.read(mol, 'sto-3g', ostream=None)
 
         scf_drv = ScfUnrestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         lr_drv = LinearResponseUnrestrictedSolver()
         lr_drv.ostream.mute()

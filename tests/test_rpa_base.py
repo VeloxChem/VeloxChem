@@ -27,14 +27,21 @@ class TestRPABase:
 
         return mol, bas
 
-    def run_restricted_scf(self, mol, bas, xcfun_label='hf'):
+    def run_restricted_scf(self, mol, bas, xcfun_label='hf', *, ri):
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_drv.xcfun = xcfun_label
 
-        return scf_drv.compute(mol, bas)
+        scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
+
+        return scf_results
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason='skip pytest.raises for multiple MPI processes')
@@ -70,10 +77,11 @@ class TestRPABase:
         full_vector = lr_drv.get_full_solution_vector(solution)
         assert np.allclose(full_vector, np.array([3.0, 7.0, -1.0, -1.0]))
 
-    def test_spectrum_helpers_valence(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_spectrum_helpers_valence(self, ri):
 
         mol, bas = self.get_water_system('sto-3g')
-        scf_results = self.run_restricted_scf(mol, bas)
+        scf_results = self.run_restricted_scf(mol, bas, ri=ri)
 
         lr_drv = LinearResponseEigenSolver()
         lr_drv.ostream.mute()
@@ -96,12 +104,13 @@ class TestRPABase:
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason='skip plot for multiple MPI processes')
-    def test_plot_valence_spectra(self, monkeypatch):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_plot_valence_spectra(self, monkeypatch, ri):
 
         plt = pytest.importorskip('matplotlib.pyplot')
 
         mol, bas = self.get_water_system('sto-3g')
-        scf_results = self.run_restricted_scf(mol, bas)
+        scf_results = self.run_restricted_scf(mol, bas, ri=ri)
 
         lr_drv = LinearResponseEigenSolver()
         lr_drv.ostream.mute()
@@ -125,12 +134,13 @@ class TestRPABase:
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason='skip plot for multiple MPI processes')
-    def test_plot_core_spectra(self, monkeypatch):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_plot_core_spectra(self, monkeypatch, ri):
 
         plt = pytest.importorskip('matplotlib.pyplot')
 
         mol, bas = self.get_water_system('def2-svpd')
-        scf_results = self.run_restricted_scf(mol, bas, 'b3lyp')
+        scf_results = self.run_restricted_scf(mol, bas, 'b3lyp', ri=ri)
 
         lr_drv = LinearResponseEigenSolver()
         lr_drv.ostream.mute()

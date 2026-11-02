@@ -102,7 +102,8 @@ class TestORD:
             rsp_prop.init_driver(ostream=OutputStream(None),
                                  method_type=method_type)
 
-    def test_ord(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_ord(self, ri):
 
         xyz_string = """10
         xyz
@@ -124,15 +125,20 @@ class TestORD:
         cpp_property = 'ord'
 
         ref_x_data = [0.3]
-        ref_y_data = [12.18]
+        ref_y_data = {False: [12.18], True: [12.1886]}[ri]
 
         bas = MolecularBasis.read(mol, basis_label, ostream=None)
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_drv.xcfun = xcfun_label
         scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         lr_drv = ComplexResponseSolver()
         lr_drv.ostream.mute()
@@ -142,6 +148,5 @@ class TestORD:
 
         if lr_drv.rank == mpi_master():
             lr_spec = lr_drv.get_spectrum(lr_results, 'au')
-            assert np.max(
-                np.abs(np.array(lr_spec['y_data']) -
-                       np.array(ref_y_data))) < 0.01
+            assert np.max(np.abs(np.array(lr_spec['y_data']) -
+                                 ref_y_data)) < 0.01

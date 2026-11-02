@@ -10,7 +10,7 @@ from veloxchem.c6driver import C6Driver
 @pytest.mark.solvers
 class TestC6:
 
-    def run_c6(self, xcfun_label, ref_c6, tol):
+    def run_c6(self, xcfun_label, ri, ref_c6, tol):
 
         xyz_string = """3
         xyz
@@ -24,11 +24,16 @@ class TestC6:
         bas = MolecularBasis.read(mol, basis_label, ostream=None)
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_drv.xcfun = xcfun_label
         scf_drv.acc_type = 'l2_diis'
         scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         lr_drv = C6Driver()
         lr_drv.ostream.mute()
@@ -37,20 +42,22 @@ class TestC6:
         if lr_drv.rank == mpi_master():
             assert abs(lr_results['c6'] - ref_c6) < tol
 
-    def test_hf(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_hf(self, ri):
 
         # vlxtag: RHF, C6, LR
 
         xcfun_label = 'hf'
-        ref_c6 = 16.852249
+        ref_c6 = {False: 16.852249, True: 16.8498302}[ri]
 
-        self.run_c6(xcfun_label, ref_c6, 2.0e-5)
+        self.run_c6(xcfun_label, ri, ref_c6, 2.0e-5)
 
-    def test_b3lyp(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_b3lyp(self, ri):
 
         # vlxtag: RKS, C6, LR
 
         xcfun_label = 'b3lyp'
-        ref_c6 = 17.421351
+        ref_c6 = {False: 17.421351, True: 17.422050}[ri]
 
-        self.run_c6(xcfun_label, ref_c6, 1.0e-4)
+        self.run_c6(xcfun_label, ri, ref_c6, 1.0e-4)

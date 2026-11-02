@@ -23,16 +23,23 @@ class TestCPP:
 
         return comm.bcast(path_string, root=mpi_master())
 
-    def run_restarted_scf(self, molecule, basis, filename):
+    def run_restarted_scf(self, molecule, basis, filename, *, ri):
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_drv.filename = filename
         scf_drv.compute(molecule, basis)
         scf_drv.restart = True
 
-        return scf_drv.compute(molecule, basis)
+        scf_results = scf_drv.compute(molecule, basis)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
+
+        return scf_results
 
     def _configure_cpp(self, driver, filename, frequencies):
 
@@ -54,7 +61,9 @@ class TestCPP:
                 ref_y_data,
                 tol,
                 use_subcomms=False,
-                max_subspace_dim=None):
+                max_subspace_dim=None,
+                *,
+                ri):
 
         xyz_string = """6
         xyz
@@ -71,11 +80,16 @@ class TestCPP:
         bas = MolecularBasis.read(mol, basis_label, ostream=None)
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_drv.xcfun = xcfun_label
         scf_drv.acc_type = 'l2_diis'
         scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         lr_drv = ComplexResponseSolver()
         lr_drv.ostream.mute()
@@ -87,9 +101,8 @@ class TestCPP:
 
         if lr_drv.rank == mpi_master():
             lr_spec = lr_drv.get_spectrum(lr_results, 'au')
-            assert np.max(
-                np.abs(np.array(lr_spec['y_data']) -
-                       np.array(ref_y_data))) < tol
+            assert np.max(np.abs(np.array(lr_spec['y_data']) -
+                                 ref_y_data)) < tol
 
     def run_cpp_plot(self,
                      xcfun_label,
@@ -97,7 +110,9 @@ class TestCPP:
                      frequencies,
                      monkeypatch,
                      x_unit='nm',
-                     plot_scatter=True):
+                     plot_scatter=True,
+                     *,
+                     ri):
 
         xyz_string = """6
         xyz
@@ -113,10 +128,15 @@ class TestCPP:
         bas = MolecularBasis.read(mol, '6-31g', ostream=None)
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_drv.xcfun = xcfun_label
         scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         cpp_drv = ComplexResponseSolver()
         cpp_drv.ostream.mute()
@@ -137,81 +157,120 @@ class TestCPP:
             finally:
                 plt.close('all')
 
-    def test_hf_absorption(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_hf_absorption(self, ri):
 
         # vlxtag: RHF, Absorption, CPP
 
         xcfun_label = 'hf'
         cpp_property = 'absorption'
         ref_x_data = [0.39, 0.40, 0.41]
-        ref_y_data = [0.11359517, 0.34554765, 1.41940099]
+        ref_y_data = {
+            False: [0.11359517, 0.34554765, 1.41940099],
+            True: [0.11356387, 0.34532589, 1.41988867]
+        }[ri]
 
         self.run_cpp(xcfun_label,
                      cpp_property,
                      ref_x_data,
                      ref_y_data,
                      1.0e-6,
-                     max_subspace_dim=120)
+                     max_subspace_dim=120,
+                     ri=ri)
 
-    def test_hf_ecd(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_hf_ecd(self, ri):
 
         # vlxtag: RHF, ECD, CPP
 
         xcfun_label = 'hf'
         cpp_property = 'ecd'
         ref_x_data = [0.39, 0.40, 0.41]
-        ref_y_data = [5.74701958, 35.38200618, -15.89867350]
-
-        self.run_cpp(xcfun_label, cpp_property, ref_x_data, ref_y_data, 2.0e-4)
+        ref_y_data = {
+            False: [5.74701958, 35.38200618, -15.89867350],
+            True: [5.74504747, 35.37119980, -15.90451365]
+        }[ri]
 
         self.run_cpp(xcfun_label,
                      cpp_property,
                      ref_x_data,
                      ref_y_data,
                      2.0e-4,
-                     use_subcomms=True)
+                     ri=ri)
 
-    def test_b3lyp_absorption(self):
+        self.run_cpp(xcfun_label,
+                     cpp_property,
+                     ref_x_data,
+                     ref_y_data,
+                     2.0e-4,
+                     use_subcomms=True,
+                     ri=ri)
+
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_b3lyp_absorption(self, ri):
 
         # vlxtag: RKS, Absorption, CPP
 
         xcfun_label = 'b3lyp'
         cpp_property = 'absorption'
         ref_x_data = [0.39, 0.40, 0.41]
-        ref_y_data = [0.20856963, 0.21772352, 0.71434376]
-
-        self.run_cpp(xcfun_label, cpp_property, ref_x_data, ref_y_data, 1.0e-4)
-
-    def test_b3lyp_ecd(self):
-
-        # vlxtag: RKS, ECD, CPP
-
-        xcfun_label = 'b3lyp'
-        cpp_property = 'ecd'
-        ref_x_data = [0.39, 0.40, 0.41]
-        ref_y_data = [0.48472627, -1.18394788, -9.81377126]
-
-        self.run_cpp(xcfun_label, cpp_property, ref_x_data, ref_y_data, 1.0e-4)
+        ref_y_data = {
+            False: [0.20856963, 0.21772352, 0.71434376],
+            True: [0.20861157, 0.21779176, 0.71484211]
+        }[ri]
 
         self.run_cpp(xcfun_label,
                      cpp_property,
                      ref_x_data,
                      ref_y_data,
                      1.0e-4,
-                     use_subcomms=True)
+                     ri=ri)
 
-    def test_plot_absorption(self, monkeypatch):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_b3lyp_ecd(self, ri):
 
-        self.run_cpp_plot('b3lyp', 'absorption', [0.38, 0.39, 0.40, 0.41],
-                          monkeypatch)
+        # vlxtag: RKS, ECD, CPP
 
-    def test_plot_ecd(self, monkeypatch):
+        xcfun_label = 'b3lyp'
+        cpp_property = 'ecd'
+        ref_x_data = [0.39, 0.40, 0.41]
+        ref_y_data = {
+            False: [0.48472627, -1.18394788, -9.81377126],
+            True: [0.48559252, -1.18557309, -9.82950384]
+        }[ri]
+
+        self.run_cpp(xcfun_label,
+                     cpp_property,
+                     ref_x_data,
+                     ref_y_data,
+                     1.0e-4,
+                     ri=ri)
+
+        self.run_cpp(xcfun_label,
+                     cpp_property,
+                     ref_x_data,
+                     ref_y_data,
+                     1.0e-4,
+                     use_subcomms=True,
+                     ri=ri)
+
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_plot_absorption(self, monkeypatch, ri):
+
+        self.run_cpp_plot('b3lyp',
+                          'absorption', [0.38, 0.39, 0.40, 0.41],
+                          monkeypatch,
+                          ri=ri)
+
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_plot_ecd(self, monkeypatch, ri):
 
         self.run_cpp_plot('hf',
                           'ecd', [0.38, 0.39, 0.40, 0.41],
                           monkeypatch,
                           x_unit='ev',
-                          plot_scatter=False)
+                          plot_scatter=False,
+                          ri=ri)
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason='skip pytest.raises for multiple MPI processes')
@@ -240,7 +299,7 @@ class TestCPP:
             lr_results_not_used = lr_drv.compute(mol, bas, scf_results)
 
     def run_cpp_with_ecp(self, xcfun_label, cpp_property, ref_x_data,
-                         ref_y_data, tol):
+                         ref_y_data, tol, *, ri):
 
         xyz_string = """3
         xyz
@@ -255,10 +314,15 @@ class TestCPP:
         bas = MolecularBasis.read(mol, basis_label, ostream=None)
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_drv.xcfun = xcfun_label
         scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         lr_drv = ComplexResponseSolver()
         lr_drv.ostream.mute()
@@ -268,21 +332,29 @@ class TestCPP:
 
         if lr_drv.rank == mpi_master():
             lr_spec = lr_drv.get_spectrum(lr_results, 'au')
-            assert np.max(
-                np.abs(np.array(lr_spec['y_data']) -
-                       np.array(ref_y_data))) < tol
+            assert np.max(np.abs(np.array(lr_spec['y_data']) -
+                                 ref_y_data)) < tol
 
-    def test_hf_absorption_with_ecp(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_hf_absorption_with_ecp(self, ri):
 
         xcfun_label = 'hf'
         cpp_property = 'absorption'
         ref_x_data = [0.20, 0.21]
-        ref_y_data = [0.03486827, 0.04576025]
+        ref_y_data = {
+            False: [0.03486827, 0.04576025],
+            True: [0.03487039, 0.04576617]
+        }[ri]
 
-        self.run_cpp_with_ecp(xcfun_label, cpp_property, ref_x_data, ref_y_data,
-                              1.0e-6)
+        self.run_cpp_with_ecp(xcfun_label,
+                              cpp_property,
+                              ref_x_data,
+                              ref_y_data,
+                              1.0e-6,
+                              ri=ri)
 
-    def test_hf_absorption_nonlinear_rhs(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_hf_absorption_nonlinear_rhs(self, ri):
 
         xyz_string = """3
         xyz
@@ -294,9 +366,14 @@ class TestCPP:
         bas = MolecularBasis.read(mol, 'sto-3g', ostream=None)
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         lr_drv = ComplexResponseSolver()
         lr_drv.ostream.mute()
@@ -318,7 +395,9 @@ class TestCPP:
             assert set(lr_results['solutions'].keys()) == set(v_grad.keys())
             assert set(lr_results['focks'].keys()) == set(v_grad.keys())
 
-    def test_restart_adds_initial_guesses_for_more_frequencies(self, tmp_path):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_restart_adds_initial_guesses_for_more_frequencies(
+            self, tmp_path, ri):
 
         xyz_string = """3
         xyz
@@ -331,7 +410,7 @@ class TestCPP:
 
         filename = self._bcast_path_string(
             MPI.COMM_WORLD, str(tmp_path / 'cpp_restart_extra_freqs'))
-        scf_results = self.run_restarted_scf(mol, bas, filename)
+        scf_results = self.run_restarted_scf(mol, bas, filename, ri=ri)
 
         reference_drv = ComplexResponseSolver()
         self._configure_cpp(reference_drv, filename, (0.10,))
@@ -368,7 +447,8 @@ class TestCPP:
                 assert restarted_results['response_functions'][
                     key] == pytest.approx(value, abs=1.0e-8)
 
-    def test_restart_allows_missing_frequency_dataset(self, tmp_path):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_restart_allows_missing_frequency_dataset(self, tmp_path, ri):
 
         xyz_string = """3
         xyz
@@ -381,7 +461,7 @@ class TestCPP:
 
         filename = self._bcast_path_string(
             MPI.COMM_WORLD, str(tmp_path / 'cpp_restart_missing_freqs'))
-        scf_results = self.run_restarted_scf(mol, bas, filename)
+        scf_results = self.run_restarted_scf(mol, bas, filename, ri=ri)
 
         reference_drv = ComplexResponseSolver()
         self._configure_cpp(reference_drv, filename, (0.10,))

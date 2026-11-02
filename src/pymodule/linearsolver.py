@@ -1275,13 +1275,14 @@ class LinearSolver:
             self.ostream.print_blank()
             self.ostream.flush()
 
-        # NOTE: and for RI-JK, for a reason of its own. The B vectors are divided
-        # over the ranks of this solver's communicator, and a Fock build on a
-        # subcommunicator would sum the shares of that subcommunicator alone --
-        # which is a Fock matrix missing whatever the other ranks hold, and it
-        # would be returned rather than refused. Dividing the B vectors within
-        # each subcommunicator instead is separate work.
-        if self.use_subcomms and self._uses_ri_jk() and self.nodes > 1:
+        # NOTE: and for RI-JK, on any number of ranks. The subcommunicator path
+        # (_e2n_half_size_subcomms) builds no density factors, and
+        # _comp_lr_fock without them forms the Fock matrices from the
+        # four-center integrals, on top of an RI ground state. With more than
+        # one rank there is a further reason: the B vectors are divided over
+        # the ranks of this solver's communicator, and a Fock build on a
+        # subcommunicator would sum the shares of that subcommunicator alone.
+        if self.use_subcomms and self._uses_ri_jk():
             self.use_subcomms = False
             warn_msg = 'Use of subcomms is disabled for RI-JK.'
             self.ostream.print_warning(warn_msg)

@@ -19,6 +19,7 @@ class TestRPA:
     def run_rpa(self,
                 xcfun_label,
                 basis_label,
+                ri,
                 ref_exc_enes,
                 ref_osc_str,
                 tol,
@@ -35,10 +36,15 @@ class TestRPA:
         bas = MolecularBasis.read(mol, basis_label, ostream=None)
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_drv.xcfun = xcfun_label
         scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         lr_drv = LinearResponseEigenSolver()
         lr_drv.ostream.mute()
@@ -79,85 +85,126 @@ class TestRPA:
                 match="LinearResponseEigenSolver: not implemented for unrestricted case"):
             lr_results_not_used = lr_drv.compute(mol, bas, scf_results)
 
-    def test_hf_svp(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_hf_svp(self, ri):
 
         # vlxtag: RHF, Absorption, TDHF
 
-        ref_exc_enes = np.array(
-            [0.33973039, 0.40464346, 0.43325535, 0.49805052, 0.55325390])
+        ref_exc_enes = {
+            False: np.array(
+                [0.33973039, 0.40464346, 0.43325535, 0.49805052, 0.55325390]),
+            True: np.array(
+                [0.33973064, 0.40463219, 0.43324153, 0.49804893, 0.55325612])
+        }[ri]
 
         ref_osc_str = np.array(
             [0.023665, 0.000000, 0.097765, 0.086454, 0.291919])
 
         self.run_rpa('hf',
                      'def2-svp',
+                     ri,
                      ref_exc_enes,
                      ref_osc_str,
                      1.0e-6,
                      max_subspace_dim=50)
 
-    def test_slda_svp(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_slda_svp(self, ri):
 
         # vlxtag: RKS, Absorption, TDDFT
 
-        ref_exc_enes = np.array(
-            [0.27459103, 0.34805152, 0.35179468, 0.43068396, 0.51123472])
+        ref_exc_enes = {
+            False: np.array(
+                [0.27459103, 0.34805152, 0.35179468, 0.43068396, 0.51123472]),
+            True: np.array(
+                [0.27451655, 0.34787592, 0.35172595, 0.43054087, 0.51122210])
+        }[ri]
 
-        ref_osc_str = np.array(
-            [0.018005, 0.000000, 0.075418, 0.059909, 0.258165])
+        ref_osc_str = {
+            False: np.array([0.018005, 0.000000, 0.075418, 0.059909, 0.258165]),
+            True: np.array([0.017964, 0.000000, 0.075335, 0.059940, 0.258031])
+        }[ri]
 
-        self.run_rpa('slda', 'def2-svp', ref_exc_enes, ref_osc_str, 1.0e-5)
+        self.run_rpa('slda', 'def2-svp', ri, ref_exc_enes, ref_osc_str, 1.0e-5)
 
-    def test_b3lyp_svp(self):
-
-        # vlxtag: RKS, Absorption, TDDFT
-
-        ref_exc_enes = np.array(
-            [0.27940792, 0.35031697, 0.36276301, 0.43718376, 0.51430795])
-
-        ref_osc_str = np.array(
-            [0.018243, 0.000000, 0.078326, 0.061329, 0.272933])
-
-        self.run_rpa('b3lyp', 'def2-svp', ref_exc_enes, ref_osc_str, 1.0e-5)
-
-    def test_camb3lyp_svp(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_b3lyp_svp(self, ri):
 
         # vlxtag: RKS, Absorption, TDDFT
 
-        ref_exc_enes = np.array(
-            [0.28249530, 0.35533592, 0.36664012, 0.44312170, 0.51548914])
+        ref_exc_enes = {
+            False: np.array(
+                [0.27940792, 0.35031697, 0.36276301, 0.43718376, 0.51430795]),
+            True: np.array(
+                [0.27940590, 0.35030507, 0.36275840, 0.43717334, 0.51430704])
+        }[ri]
 
-        ref_osc_str = np.array(
-            [0.018219, 0.000000, 0.077391, 0.059649, 0.273690])
+        ref_osc_str = {
+            False: np.array([0.018243, 0.000000, 0.078326, 0.061329, 0.272933]),
+            True: np.array([0.018244, 0.000000, 0.078323, 0.061347, 0.272881])
+        }[ri]
 
-        self.run_rpa('cam-b3lyp', 'def2-svp', ref_exc_enes, ref_osc_str, 1.0e-5)
+        self.run_rpa('b3lyp', 'def2-svp', ri, ref_exc_enes, ref_osc_str, 1.0e-5)
 
-    def test_camb3lyp_tzvp(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_camb3lyp_svp(self, ri):
 
         # vlxtag: RKS, Absorption, TDDFT
 
-        ref_exc_enes = np.array(
-            [0.27984870, 0.35148791, 0.36310452, 0.43770042, 0.50331834])
+        ref_exc_enes = {
+            False: np.array(
+                [0.28249530, 0.35533592, 0.36664012, 0.44312170, 0.51548914]),
+            True: np.array(
+                [0.28249339, 0.35532424, 0.36663576, 0.44311156, 0.51548814])
+        }[ri]
+
+        ref_osc_str = {
+            False: np.array([0.018219, 0.000000, 0.077391, 0.059649, 0.273690]),
+            True: np.array([0.018220, 0.000000, 0.077399, 0.059668, 0.273638])
+        }[ri]
+
+        self.run_rpa('cam-b3lyp', 'def2-svp', ri, ref_exc_enes, ref_osc_str,
+                     1.0e-5)
+
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_camb3lyp_tzvp(self, ri):
+
+        # vlxtag: RKS, Absorption, TDDFT
+
+        ref_exc_enes = {
+            False: np.array(
+                [0.27984870, 0.35148791, 0.36310452, 0.43770042, 0.50331834]),
+            True: np.array(
+                [0.27985380, 0.35148692, 0.36311413, 0.43773206, 0.50333810])
+        }[ri]
 
         ref_osc_str = np.array(
             [0.033878, 0.000000, 0.099329, 0.053065, 0.229533])
 
-        self.run_rpa('cam-b3lyp', 'def2-tzvp', ref_exc_enes, ref_osc_str,
+        self.run_rpa('cam-b3lyp', 'def2-tzvp', ri, ref_exc_enes, ref_osc_str,
                      1.0e-5)
 
-    def test_tpssh_svp(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_tpssh_svp(self, ri):
 
         # vlxtag: RKS, Absorption, TDDFT
 
-        ref_exc_enes = np.array(
-            [0.28898749, 0.36043436, 0.37287451, 0.44801126, 0.52385373])
+        ref_exc_enes = {
+            False: np.array(
+                [0.28898749, 0.36043436, 0.37287451, 0.44801126, 0.52385373]),
+            True: np.array(
+                [0.28898571, 0.36042311, 0.37287141, 0.44799951, 0.52385237])
+        }[ri]
 
-        ref_osc_str = np.array(
-            [0.020158, 0.000000, 0.085796, 0.074117, 0.272050])
+        ref_osc_str = {
+            False: np.array([0.020158, 0.000000, 0.085796, 0.074117, 0.272050]),
+            True: np.array([0.020160, 0.000000, 0.085799, 0.074135, 0.271989])
+        }[ri]
 
-        self.run_rpa('tpssh', 'def2-svp', ref_exc_enes, ref_osc_str, 1.0e-5)
+        self.run_rpa('tpssh', 'def2-svp', ri, ref_exc_enes, ref_osc_str, 1.0e-5)
 
-    def test_detach_attach_charges_water_631g(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_detach_attach_charges_water_631g(self, ri):
 
         xyz_string = """3
         xyz
@@ -169,9 +216,14 @@ class TestRPA:
         bas = MolecularBasis.read(mol, '6-31g', ostream=None)
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         lr_drv = LinearResponseEigenSolver()
         lr_drv.ostream.mute()
@@ -183,23 +235,34 @@ class TestRPA:
         if lr_drv.rank == mpi_master():
             detachment = lr_results['detachment_charges']
             attachment = lr_results['attachment_charges']
-            ref_detachment = np.array([
-                [-1.0029851374, -0.0000948340, -0.0000948341],
-                [-1.0027814588, -0.0002540890, -0.0002540890],
-                [-0.9143468349, -0.0447074693, -0.0447074695],
-            ])
-            ref_attachment = np.array([
-                [0.2897746805, 0.3567000207, 0.3567001044],
-                [0.3056100033, 0.3488398628, 0.3488397706],
-                [0.2784322949, 0.3626647099, 0.3626647689],
-            ])
+            ref_detachment = {
+                False: np.array([
+                    [-1.0029851374, -0.0000948340, -0.0000948341],
+                    [-1.0027814588, -0.0002540890, -0.0002540890],
+                    [-0.9143468349, -0.0447074693, -0.0447074695],
+                ]),
+                True: np.array([[-1.0029853675, -0.0000948707, -0.0000948708],
+                                [-1.0027818697, -0.0002541342, -0.0002541342],
+                                [-0.9143439234, -0.0447087981, -0.0447087983]])
+            }[ri]
+            ref_attachment = {
+                False: np.array([
+                    [0.2897746805, 0.3567000207, 0.3567001044],
+                    [0.3056100033, 0.3488398628, 0.3488397706],
+                    [0.2784322949, 0.3626647099, 0.3626647689],
+                ]),
+                True: np.array([[0.2897635053, 0.3567057600, 0.3567058437],
+                                [0.3055885369, 0.3488508467, 0.3488507544],
+                                [0.2784174710, 0.3626719950, 0.3626720539]])
+            }[ri]
 
             assert detachment.shape == (3, mol.number_of_atoms())
             assert attachment.shape == (3, mol.number_of_atoms())
             assert np.max(np.abs(detachment - ref_detachment)) < 1.0e-6
             assert np.max(np.abs(attachment - ref_attachment)) < 1.0e-6
 
-    def test_detach_attach_density_consistency(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_detach_attach_density_consistency(self, ri):
 
         # detach + attach must reproduce the unrelaxed difference density
 
@@ -213,9 +276,14 @@ class TestRPA:
         bas = MolecularBasis.read(mol, '6-31g', ostream=None)
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         lr_drv = LinearResponseEigenSolver()
         lr_drv.ostream.mute()
@@ -246,7 +314,8 @@ class TestRPA:
             assert np.max(np.linalg.eigvalsh(dens_D_mo)) < 1.0e-12
             assert np.min(np.linalg.eigvalsh(dens_A_mo)) > -1.0e-12
 
-    def test_esa_water_631g(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_esa_water_631g(self, ri):
 
         xyz_string = """3
         xyz
@@ -258,9 +327,14 @@ class TestRPA:
         bas = MolecularBasis.read(mol, '6-31g', ostream=None)
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         lr_drv = LinearResponseEigenSolver()
         lr_drv.ostream.mute()
@@ -272,12 +346,24 @@ class TestRPA:
         if lr_drv.rank == mpi_master():
             esa_results = lr_results['esa_results']
 
-            ref_excitation_energies = np.array([0.0706309931, 0.0887848965])
-            ref_oscillator_strengths = np.array([0.1379630687, 0.0013910509])
-            ref_transition_dipoles = np.array([
-                [-0.0794549688, -0.5971935937, 1.6021820000],
-                [0.1512160878, -0.0251332634, -0.0018690476],
-            ])
+            ref_excitation_energies = {
+                False: np.array([0.0706309931, 0.0887848965]),
+                True: np.array([0.0706208215, 0.0887779539]),
+            }[ri]
+            ref_oscillator_strengths = {
+                False: np.array([0.1379630687, 0.0013910509]),
+                True: np.array([0.1379461067, 0.0013909689]),
+            }[ri]
+            ref_transition_dipoles = {
+                False: np.array([
+                    [-0.0794549688, -0.5971935937, 1.6021820000],
+                    [0.1512160878, -0.0251332634, -0.0018690476],
+                ]),
+                True: np.array([
+                    [-0.0794558058, -0.5971998843, 1.6021988767],
+                    [0.1512175387, -0.0251335045, -0.0018690655],
+                ]),
+            }[ri]
 
             src_states = [item['from_state'] for item in esa_results]
             dest_states = [item['to_state'] for item in esa_results]
@@ -305,7 +391,7 @@ class TestRPA:
             assert np.max(np.abs(transition_dipoles -
                                  ref_transition_dipoles)) < 1.0e-5
 
-    def run_rpa_with_ecp(self, ref_exc_enes, ref_osc_str, tol):
+    def run_rpa_with_ecp(self, ref_exc_enes, ref_osc_str, tol, ri):
 
         xyz_string = """2
         xyz
@@ -317,9 +403,14 @@ class TestRPA:
         bas = MolecularBasis.read(mol, 'def2-svp', ostream=None)
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         lr_drv = LinearResponseEigenSolver()
         lr_drv.ostream.mute()
@@ -333,16 +424,21 @@ class TestRPA:
                 np.abs(ref_osc_str -
                        lr_results['oscillator_strengths'])) < 1.0e-4
 
-    def test_hf_with_ecp(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_hf_with_ecp(self, ri):
 
         # vlxtag: RHF, Absorption, TDHF
 
-        ref_exc_enes = np.array([0.10859702, 0.15291543, 0.16111886])
+        ref_exc_enes = {
+            False: np.array([0.10859702, 0.15291543, 0.16111886]),
+            True: np.array([0.10859685, 0.15290990, 0.16111267])
+        }[ri]
         ref_osc_str = np.array([0.4439, 0.0000, 0.0025])
 
-        self.run_rpa_with_ecp(ref_exc_enes, ref_osc_str, 1.0e-6)
+        self.run_rpa_with_ecp(ref_exc_enes, ref_osc_str, 1.0e-6, ri)
 
-    def test_checkpoint_and_restart(self, tmp_path):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_checkpoint_and_restart(self, tmp_path, ri):
 
         xyz_string = """3
         xyz
@@ -354,7 +450,7 @@ class TestRPA:
         bas = MolecularBasis.read(mol, 'def2-svp', ostream=None)
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
 
         filename = str(tmp_path / "water_restart")
@@ -365,6 +461,11 @@ class TestRPA:
         scf_drv.compute(mol, bas)
         scf_drv.restart = True
         scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         lr_drv = LinearResponseEigenSolver()
         lr_drv.filename = filename
@@ -391,7 +492,8 @@ class TestRPA:
                     np.abs(lr_results_first[key] -
                            lr_results_second[key])) < tol
 
-    def test_restart_allows_missing_nstates(self, tmp_path):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_restart_allows_missing_nstates(self, tmp_path, ri):
 
         xyz_string = """3
         xyz
@@ -403,7 +505,7 @@ class TestRPA:
         bas = MolecularBasis.read(mol, 'sto-3g', ostream=None)
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
 
         filename = str(tmp_path / 'restricted_missing_nstates')
@@ -413,6 +515,11 @@ class TestRPA:
         scf_drv.compute(mol, bas)
         scf_drv.restart = True
         scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
         scf_results['filename'] = filename
 
         reference_drv = LinearResponseEigenSolver()
@@ -452,7 +559,8 @@ class TestRPA:
             assert restarted_results[
                 'number_of_states'] == restarted_drv.nstates
 
-    def test_get_e2_h2o(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_get_e2_h2o(self, ri):
 
         xyz_string = """3
         xyz
@@ -464,9 +572,14 @@ class TestRPA:
         bas = MolecularBasis.read(mol, 'sto-3g', ostream=None)
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         lr_drv = LinearResponseEigenSolver()
         lr_drv.ostream.mute()
@@ -477,7 +590,8 @@ class TestRPA:
             assert np.max(np.abs(e2_matrix - e2_matrix.T)) < 1.0e-10
             assert np.all(np.diag(e2_matrix) > 0.0)
 
-    def test_get_e2_cpcm_matches_rpa(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_get_e2_cpcm_matches_rpa(self, ri):
         """get_e2 must build the same E[2] as the RPA solver when CPCM is on.
 
         Regression test: get_e2 used to skip the solvation sanity checks, so
@@ -500,11 +614,16 @@ class TestRPA:
         n_exc = nocc * (norb - nocc)
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_drv.solvation_model = 'cpcm'
         scf_drv.cpcm_epsilon = 10.0
         scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         # regular RPA over the full excitation space (reference)
         rpa_drv = LinearResponseEigenSolver()
@@ -534,7 +653,8 @@ class TestRPA:
             assert w_pos.shape == w_rpa.shape == (n_exc,)
             assert np.max(np.abs(w_pos - w_rpa)) < 1.0e-6
 
-    def test_get_e2_gostshyp_matches_rpa(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_get_e2_gostshyp_matches_rpa(self, ri):
         """get_e2 must build the same E[2] as the RPA solver when GOSTSHYP is on.
 
         Mirrors test_get_e2_cpcm_matches_rpa for hydrostatic pressure; before
@@ -555,10 +675,15 @@ class TestRPA:
         n_exc = nocc * (norb - nocc)
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_drv.pressure = 20000.0
         scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         rpa_drv = LinearResponseEigenSolver()
         rpa_drv.ostream.mute()
@@ -586,7 +711,8 @@ class TestRPA:
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason='skip pytest.raises for multiple MPI processes')
-    def test_compute_rejects_gostshyp_with_subcomms(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_compute_rejects_gostshyp_with_subcomms(self, ri):
 
         xyz_string = """3
         xyz
@@ -598,10 +724,15 @@ class TestRPA:
         bas = MolecularBasis.read(mol, 'sto-3g', ostream=None)
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_drv.pressure = 20000.0
         scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         lr_drv = LinearResponseEigenSolver()
         lr_drv.ostream.mute()
@@ -767,15 +898,22 @@ class TestRPA:
             assert np.allclose(full_new_ung,
                                np.arange(101.0, 101.0 + nrows).reshape(-1, 1))
 
-    def test_unstable_reference_is_flagged(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_unstable_reference_is_flagged(self, ri):
 
-        # ethylene twisted by 90 degrees: the RHF solution is unstable towards
+        # ethylene twisted by 89.9 degrees: the RHF solution is unstable towards
         # complex orbitals; the planar molecule is stable
+        # NOTE: 89.9 rather than 90 degrees. At 90 degrees the highest occupied
+        # orbital is doubly degenerate, which of the pair the SCF occupies
+        # depends on rounding, and plain DIIS (which RI uses) then converges
+        # to either of two RHF solutions, 31 mEh apart, depending on the number
+        # of threads. At 89.9 degrees the lowest imaginary eigenvalue is
+        # -4.9e-3, with RI and four-center alike.
 
         found = {}
 
         for twist, h_xy in [(0, ('0.920851', '0.000000')),
-                            (90, ('0.000000', '0.920851'))]:
+                            (89.9, ('0.001607', '0.920850'))]:
             xyz_string = f"""6
             xyz
             C   0.000000   0.000000  -0.665000
@@ -789,9 +927,14 @@ class TestRPA:
             bas = MolecularBasis.read(mol, 'def2-svp', ostream=None)
 
             scf_drv = ScfRestrictedDriver()
-            scf_drv.ri = False
+            scf_drv.ri = ri
             scf_drv.ostream.mute()
             scf_results = scf_drv.compute(mol, bas)
+
+            if scf_drv.rank == mpi_master():
+                if ri:
+                    assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                    assert not scf_results['ri_fallback']
 
             lr_drv = LinearResponseEigenSolver()
             lr_drv.ostream.mute()
@@ -802,7 +945,7 @@ class TestRPA:
 
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
             assert found[0] is None
-            assert len(found[90]) == 1
-            rotation, lowest = found[90][0]
+            assert len(found[89.9]) == 1
+            rotation, lowest = found[89.9][0]
             assert rotation == 'imaginary'
             assert lowest < -0.003

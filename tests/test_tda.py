@@ -30,26 +30,46 @@ class TestTDA:
 
         return mol, bas
 
-    def run_restricted_scf(self, mol, bas, xcfun_label='hf'):
+    def run_restricted_scf(self, mol, bas, xcfun_label='hf', *, ri):
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_drv.xcfun = xcfun_label
 
-        return scf_drv.compute(mol, bas)
+        scf_results = scf_drv.compute(mol, bas)
 
-    def run_restarted_restricted_scf(self, mol, bas, filename, xcfun_label='hf'):
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
+
+        return scf_results
+
+    def run_restarted_restricted_scf(self,
+                                     mol,
+                                     bas,
+                                     filename,
+                                     xcfun_label='hf',
+                                     *,
+                                     ri):
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_drv.filename = filename
         scf_drv.xcfun = xcfun_label
         scf_drv.compute(mol, bas)
         scf_drv.restart = True
 
-        return scf_drv.compute(mol, bas)
+        scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
+
+        return scf_results
 
     def configure_tda(self, driver, filename):
 
@@ -72,10 +92,10 @@ class TestTDA:
     def run_tda(self,
                 xcfun_label,
                 basis_label,
+                ri,
                 ref_exc_enes,
                 ref_osc_str,
                 tol,
-                ri_coulomb=False,
                 max_subspace_dim=None):
 
         xyz_string = """3
@@ -91,8 +111,13 @@ class TestTDA:
         scf_drv = ScfRestrictedDriver()
         scf_drv.ostream.mute()
         scf_drv.xcfun = xcfun_label
-        scf_drv.ri = ri_coulomb
+        scf_drv.ri = ri
         scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         lr_drv = TdaEigenSolver()
         lr_drv.ostream.mute()
@@ -107,56 +132,83 @@ class TestTDA:
                 np.abs(ref_osc_str -
                        lr_results['oscillator_strengths'])) < 1.0e-4
 
-    def test_hf_svp(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_hf_svp(self, ri):
 
         # vlxtag: RHF, Absorption, CIS
 
-        ref_exc_enes = np.array(
-            [0.34189725, 0.40717708, 0.43577895, 0.50150019, 0.55485041])
+        ref_exc_enes = {
+            False: np.array(
+                [0.34189725, 0.40717708, 0.43577895, 0.50150019, 0.55485041]),
+            True: np.array(
+                [0.34189759, 0.40716615, 0.43576509, 0.50149749, 0.55485206])
+        }[ri]
 
         ref_osc_str = np.array([0.0229, 0.0000, 0.1039, 0.0975, 0.3060])
 
         self.run_tda('hf',
                      'def2-svp',
+                     ri,
                      ref_exc_enes,
                      ref_osc_str,
                      1.0e-6,
                      max_subspace_dim=30)
 
-    def test_b3lyp_svp(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_b3lyp_svp(self, ri):
 
         # vlxtag: RKS, Absorption, TDA
 
-        ref_exc_enes = np.array(
-            [0.28045483, 0.35053288, 0.36504833, 0.43904962, 0.51570229])
+        ref_exc_enes = {
+            False: np.array(
+                [0.28045483, 0.35053288, 0.36504833, 0.43904962, 0.51570229]),
+            True: np.array(
+                [0.28045263, 0.35052101, 0.36504338, 0.43903883, 0.51570051])
+        }[ri]
 
-        ref_osc_str = np.array([0.0180, 0.0000, 0.0854, 0.0695, 0.3006])
+        ref_osc_str = {
+            False: np.array([0.0180, 0.0000, 0.0854, 0.0695, 0.3006]),
+            True: np.array([0.018025, 0.000000, 0.085372, 0.069569, 0.300492])
+        }[ri]
 
-        self.run_tda('b3lyp', 'def2-svp', ref_exc_enes, ref_osc_str, 1.0e-5)
+        self.run_tda('b3lyp', 'def2-svp', ri, ref_exc_enes, ref_osc_str, 1.0e-5)
 
-    def test_camb3lyp_svp(self):
-
-        # vlxtag: RKS, Absorption, TDA
-
-        ref_exc_enes = np.array(
-            [0.28370223, 0.35557650, 0.36883370, 0.44496286, 0.51683587])
-
-        ref_osc_str = np.array(
-            [0.017966, 0.000000, 0.084011, 0.068027, 0.300331])
-
-        self.run_tda('cam-b3lyp', 'def2-svp', ref_exc_enes, ref_osc_str, 1.0e-5)
-
-    def test_camb3lyp_tzvp(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_camb3lyp_svp(self, ri):
 
         # vlxtag: RKS, Absorption, TDA
 
-        ref_exc_enes = np.array(
-            [0.28085567, 0.35172399, 0.36474654, 0.43912355, 0.50442105])
+        ref_exc_enes = {
+            False: np.array(
+                [0.28370223, 0.35557650, 0.36883370, 0.44496286, 0.51683587]),
+            True: np.array(
+                [0.28370034, 0.35556506, 0.36882914, 0.44495251, 0.51683407])
+        }[ri]
+
+        ref_osc_str = {
+            False: np.array([0.017966, 0.000000, 0.084011, 0.068027, 0.300331]),
+            True: np.array([0.017967, 0.000000, 0.083997, 0.068049, 0.300258])
+        }[ri]
+
+        self.run_tda('cam-b3lyp', 'def2-svp', ri, ref_exc_enes, ref_osc_str,
+                     1.0e-5)
+
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_camb3lyp_tzvp(self, ri):
+
+        # vlxtag: RKS, Absorption, TDA
+
+        ref_exc_enes = {
+            False: np.array(
+                [0.28085567, 0.35172399, 0.36474654, 0.43912355, 0.50442105]),
+            True: np.array(
+                [0.28086060, 0.35172295, 0.36475575, 0.43915513, 0.50444021])
+        }[ri]
 
         ref_osc_str = np.array(
             [0.034572, 0.000000, 0.107302, 0.059653, 0.249276])
 
-        self.run_tda('cam-b3lyp', 'def2-tzvp', ref_exc_enes, ref_osc_str,
+        self.run_tda('cam-b3lyp', 'def2-tzvp', ri, ref_exc_enes, ref_osc_str,
                      1.0e-5)
 
     def test_ri_blyp_svp(self):
@@ -169,14 +221,10 @@ class TestTDA:
         ref_osc_str = np.array(
             [0.016643, 0.000000, 0.081274, 0.066394, 0.293944])
 
-        self.run_tda('blyp',
-                     'def2-svp',
-                     ref_exc_enes,
-                     ref_osc_str,
-                     1.0e-5,
-                     ri_coulomb=True)
+        self.run_tda('blyp', 'def2-svp', True, ref_exc_enes, ref_osc_str,
+                     1.0e-5)
 
-    def run_tda_with_ecp(self, ref_exc_enes, ref_osc_str, tol):
+    def run_tda_with_ecp(self, ref_exc_enes, ref_osc_str, tol, ri):
 
         xyz_string = """2
         xyz
@@ -188,9 +236,14 @@ class TestTDA:
         bas = MolecularBasis.read(mol, 'def2-svp', ostream=None)
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         lr_drv = TdaEigenSolver()
         lr_drv.ostream.mute()
@@ -204,23 +257,31 @@ class TestTDA:
                 np.abs(ref_osc_str -
                        lr_results['oscillator_strengths'])) < 1.0e-4
 
-    def test_hf_with_ecp(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_hf_with_ecp(self, ri):
 
         # vlxtag: RHF, Absorption, CIS
 
-        ref_exc_enes = np.array([0.11555805, 0.15539632, 0.16343183])
+        ref_exc_enes = {
+            False: np.array([0.11555805, 0.15539632, 0.16343183]),
+            True: np.array([0.11555746, 0.15539082, 0.16342562])
+        }[ri]
         ref_osc_str = np.array([0.6238, 0.0000, 0.0027])
 
-        self.run_tda_with_ecp(ref_exc_enes, ref_osc_str, 1.0e-6)
+        self.run_tda_with_ecp(ref_exc_enes, ref_osc_str, 1.0e-6, ri)
 
-    def test_checkpoint_and_restart(self, tmp_path):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_checkpoint_and_restart(self, tmp_path, ri):
 
         mol, bas = self.get_water_system()
 
         filename = str(tmp_path / "water_restart")
         filename = MPI.COMM_WORLD.bcast(filename, root=mpi_master())
 
-        scf_results = self.run_restarted_restricted_scf(mol, bas, filename)
+        scf_results = self.run_restarted_restricted_scf(mol,
+                                                        bas,
+                                                        filename,
+                                                        ri=ri)
 
         lr_drv = TdaEigenSolver()
         lr_drv.filename = filename
@@ -247,10 +308,11 @@ class TestTDA:
                     np.abs(lr_results_first[key] -
                            lr_results_second[key])) < tol
 
-    def test_response_settings_roundtrip(self, tmp_path):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_response_settings_roundtrip(self, tmp_path, ri):
 
         mol, bas = self.get_water_system('sto-3g')
-        scf_results = self.run_restricted_scf(mol, bas)
+        scf_results = self.run_restricted_scf(mol, bas, ri=ri)
 
         driver = TdaEigenSolver()
         driver.ostream.mute()
@@ -392,7 +454,8 @@ class TestTDA:
         assert copied.cube_points == driver.cube_points
         assert copied.cube_points is not driver.cube_points
 
-    def test_restart_allows_missing_nstates_dataset(self, tmp_path):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_restart_allows_missing_nstates_dataset(self, tmp_path, ri):
 
         mol, bas = self.get_water_system('sto-3g')
 
@@ -401,7 +464,10 @@ class TestTDA:
         driver.ostream.mute()
         filename = driver.comm.bcast(filename, root=mpi_master())
 
-        scf_results = self.run_restarted_restricted_scf(mol, bas, filename)
+        scf_results = self.run_restarted_restricted_scf(mol,
+                                                        bas,
+                                                        filename,
+                                                        ri=ri)
         reference_scf_results = dict(scf_results)
         reference_scf_results['filename'] = filename
 
@@ -433,12 +499,13 @@ class TestTDA:
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason='skip plot for multiple MPI processes')
-    def test_plot_valence_spectra(self, monkeypatch):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_plot_valence_spectra(self, monkeypatch, ri):
 
         plt = pytest.importorskip('matplotlib.pyplot')
 
         mol, bas = self.get_water_system('sto-3g')
-        scf_results = self.run_restricted_scf(mol, bas)
+        scf_results = self.run_restricted_scf(mol, bas, ri=ri)
 
         lr_drv = TdaEigenSolver()
         lr_drv.ostream.mute()
@@ -462,12 +529,13 @@ class TestTDA:
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason='skip plot for multiple MPI processes')
-    def test_plot_core_spectra(self, monkeypatch):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_plot_core_spectra(self, monkeypatch, ri):
 
         plt = pytest.importorskip('matplotlib.pyplot')
 
         mol, bas = self.get_water_system('def2-svpd')
-        scf_results = self.run_restricted_scf(mol, bas, 'b3lyp')
+        scf_results = self.run_restricted_scf(mol, bas, 'b3lyp', ri=ri)
 
         lr_drv = TdaEigenSolver()
         lr_drv.ostream.mute()
@@ -542,7 +610,8 @@ class TestTDA:
                 match="TdaEigenSolver: not implemented for unrestricted case"):
             lr_results_not_used = lr_drv.compute(mol, bas, scf_results)
 
-    def test_unstable_reference_is_flagged(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_unstable_reference_is_flagged(self, ri):
 
         # H2 with the antibonding orbital doubly occupied, converged with the
         # maximum overlap method: a saddle point with a negative TDA excitation
@@ -552,15 +621,20 @@ class TestTDA:
         bas = MolecularBasis.read(mol, 'def2-svp', ostream=None)
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         ground_results = scf_drv.compute(mol, bas)
 
         mom_drv = ScfRestrictedDriver()
-        mom_drv.ri = False
+        mom_drv.ri = ri
         mom_drv.ostream.mute()
         mom_drv.maximum_overlap(mol, bas, scf_drv.molecular_orbitals, [1], [1])
         mom_results = mom_drv.compute(mol, bas)
+
+        if mom_drv.rank == mpi_master():
+            if ri:
+                assert mom_results['ri_jk'] or mom_results['ri_coulomb']
+                assert not mom_results['ri_fallback']
 
         found = {}
 

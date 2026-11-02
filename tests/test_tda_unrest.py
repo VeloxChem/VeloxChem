@@ -31,30 +31,46 @@ class TestUnrestrictedTDA:
 
         return mol, bas
 
-    def run_unrestricted_scf(self, mol, bas, xcfun_label='hf'):
+    def run_unrestricted_scf(self, mol, bas, xcfun_label='hf', *, ri):
 
         scf_drv = ScfUnrestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_drv.xcfun = xcfun_label
 
-        return scf_drv.compute(mol, bas)
+        scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
+
+        return scf_results
 
     def run_restarted_unrestricted_scf(self,
                                        mol,
                                        bas,
                                        filename,
-                                       xcfun_label='hf'):
+                                       xcfun_label='hf',
+                                       *,
+                                       ri):
 
         scf_drv = ScfUnrestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_drv.filename = filename
         scf_drv.xcfun = xcfun_label
         scf_drv.compute(mol, bas)
         scf_drv.restart = True
 
-        return scf_drv.compute(mol, bas)
+        scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
+
+        return scf_results
 
     def configure_tda(self, driver, filename):
 
@@ -77,6 +93,7 @@ class TestUnrestrictedTDA:
     def run_tda(self,
                 xcfun_label,
                 basis_label,
+                ri,
                 ref_exc_enes,
                 ref_osc_str,
                 tol,
@@ -94,10 +111,15 @@ class TestUnrestrictedTDA:
         bas = MolecularBasis.read(mol, basis_label, ostream=None)
 
         scf_drv = ScfUnrestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_drv.xcfun = xcfun_label
         scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         lr_drv = TdaUnrestrictedEigenSolver()
         lr_drv.ostream.mute()
@@ -112,28 +134,42 @@ class TestUnrestrictedTDA:
                 np.abs(ref_osc_str -
                        lr_results['oscillator_strengths'])) < 1.0e-4
 
-    def test_camb3lyp_svp(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_camb3lyp_svp(self, ri):
 
         # vlxtag: UKS, Absorption, TDA
 
-        ref_exc_enes = np.array([
-            0.09065604, 0.09500459, 0.21881146, 0.47239371, 0.48842790,
-            0.51728556, 0.52413401, 0.55026290, 0.55530527, 0.59463209
-        ])
+        ref_exc_enes = {
+            False: np.array([
+                0.09065604, 0.09500459, 0.21881146, 0.47239371, 0.48842790,
+                0.51728556, 0.52413401, 0.55026290, 0.55530527, 0.59463209
+            ]),
+            True: np.array([
+                0.09065668, 0.09503608, 0.21882417, 0.47236813, 0.48843590,
+                0.51732121, 0.52416390, 0.55018253, 0.55533804, 0.59461800
+            ])
+        }[ri]
 
-        ref_osc_str = np.array([
-            0.0013, 0.2065, 0.0000, 0.0325, 0.1953, 0.0015, 0.0000, 0.0256,
-            0.0701, 0.1727
-        ])
+        ref_osc_str = {
+            False: np.array([
+                0.0013, 0.2065, 0.0000, 0.0325, 0.1953, 0.0015, 0.0000, 0.0256,
+                0.0701, 0.1727
+            ]),
+            True: np.array([
+                0.001253, 0.206584, 0.000000, 0.032477, 0.195288, 0.001530,
+                0.000000, 0.025578, 0.070141, 0.172743
+            ])
+        }[ri]
 
         self.run_tda('cam-b3lyp',
                      'def2-svp',
+                     ri,
                      ref_exc_enes,
                      ref_osc_str,
                      1.0e-5,
                      max_subspace_dim=80)
 
-    def run_tda_with_ecp(self, ref_exc_enes, ref_osc_str, tol):
+    def run_tda_with_ecp(self, ref_exc_enes, ref_osc_str, tol, ri):
 
         xyz_string = """2
         xyz
@@ -147,9 +183,14 @@ class TestUnrestrictedTDA:
         bas = MolecularBasis.read(mol, 'def2-svp', ostream=None)
 
         scf_drv = ScfUnrestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         lr_drv = TdaUnrestrictedEigenSolver()
         lr_drv.ostream.mute()
@@ -163,24 +204,33 @@ class TestUnrestrictedTDA:
                 np.abs(ref_osc_str -
                        lr_results['oscillator_strengths'])) < 1.0e-4
 
-    def test_hf_with_ecp(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_hf_with_ecp(self, ri):
 
         # vlxtag: UHF, Absorption, TDA
 
-        ref_exc_enes = np.array(
-            [0.08351815, 0.08351815, 0.10137196, 0.10137196, 0.15068886])
+        ref_exc_enes = {
+            False: np.array(
+                [0.08351815, 0.08351815, 0.10137196, 0.10137196, 0.15068886]),
+            True: np.array(
+                [0.08351248, 0.08351248, 0.10136619, 0.10136619, 0.15069013])
+        }[ri]
         ref_osc_str = np.array([0.0000, 0.0000, 0.0002, 0.0002, 0.0089])
 
-        self.run_tda_with_ecp(ref_exc_enes, ref_osc_str, 1.0e-6)
+        self.run_tda_with_ecp(ref_exc_enes, ref_osc_str, 1.0e-6, ri)
 
-    def test_checkpoint_and_restart(self, tmp_path):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_checkpoint_and_restart(self, tmp_path, ri):
 
         mol, bas = self.get_water_cation_system()
 
         filename = str(tmp_path / "water_restart")
         filename = MPI.COMM_WORLD.bcast(filename, root=mpi_master())
 
-        scf_results = self.run_restarted_unrestricted_scf(mol, bas, filename)
+        scf_results = self.run_restarted_unrestricted_scf(mol,
+                                                          bas,
+                                                          filename,
+                                                          ri=ri)
 
         lr_drv = TdaUnrestrictedEigenSolver()
         lr_drv.filename = filename
@@ -207,10 +257,11 @@ class TestUnrestrictedTDA:
                     np.abs(lr_results_first[key] -
                            lr_results_second[key])) < tol
 
-    def test_response_settings_roundtrip(self, tmp_path):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_response_settings_roundtrip(self, tmp_path, ri):
 
         mol, bas = self.get_water_cation_system('sto-3g')
-        scf_results = self.run_unrestricted_scf(mol, bas)
+        scf_results = self.run_unrestricted_scf(mol, bas, ri=ri)
 
         driver = TdaUnrestrictedEigenSolver()
         driver.ostream.mute()
@@ -306,7 +357,8 @@ class TestUnrestrictedTDA:
                 np.abs(copied_results['eigenvalues'] -
                        reference_results['eigenvalues'])) < 1.0e-8
 
-    def test_restart_allows_missing_nstates_dataset(self, tmp_path):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_restart_allows_missing_nstates_dataset(self, tmp_path, ri):
 
         mol, bas = self.get_water_cation_system('sto-3g')
 
@@ -315,7 +367,10 @@ class TestUnrestrictedTDA:
         driver.ostream.mute()
         filename = driver.comm.bcast(filename, root=mpi_master())
 
-        scf_results = self.run_restarted_unrestricted_scf(mol, bas, filename)
+        scf_results = self.run_restarted_unrestricted_scf(mol,
+                                                          bas,
+                                                          filename,
+                                                          ri=ri)
         reference_scf_results = dict(scf_results)
         reference_scf_results['filename'] = filename
 
@@ -348,10 +403,11 @@ class TestUnrestrictedTDA:
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 4,
                         reason='limit MPI size for this test case')
-    def test_core_excitation_water_cation_sto3g(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_core_excitation_water_cation_sto3g(self, ri):
 
         mol, bas = self.get_water_cation_system('sto-3g')
-        scf_results = self.run_unrestricted_scf(mol, bas)
+        scf_results = self.run_unrestricted_scf(mol, bas, ri=ri)
 
         lr_drv = TdaUnrestrictedEigenSolver()
         lr_drv.ostream.mute()
@@ -361,7 +417,10 @@ class TestUnrestrictedTDA:
         lr_results = lr_drv.compute(mol, bas, scf_results)
 
         if lr_drv.rank == mpi_master():
-            ref_exc_enes = np.array([19.686416716, 20.394059829, 20.435127623])
+            ref_exc_enes = {
+                False: np.array([19.686416716, 20.394059829, 20.435127623]),
+                True: np.array([19.686628345, 20.394300168, 20.435374083])
+            }[ri]
             ref_osc_str = np.array([0.051629296, 0.002793567, 0.013583490])
 
             assert np.max(np.abs(lr_results['eigenvalues'] -
@@ -370,10 +429,11 @@ class TestUnrestrictedTDA:
                 np.abs(lr_results['oscillator_strengths'] -
                        ref_osc_str)) < 1.0e-5
 
-    def test_nto_and_detach_attach_water_cation_sto3g(self, tmp_path):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_nto_and_detach_attach_water_cation_sto3g(self, tmp_path, ri):
 
         mol, bas = self.get_water_cation_system('sto-3g')
-        scf_results = self.run_unrestricted_scf(mol, bas)
+        scf_results = self.run_unrestricted_scf(mol, bas, ri=ri)
         filename = str(tmp_path / 'tda_unrest_nto')
 
         lr_drv = TdaUnrestrictedEigenSolver()
@@ -425,10 +485,11 @@ class TestUnrestrictedTDA:
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason='skip pytest.raises for multiple MPI processes')
-    def test_compute_rejects_missing_num_core_orbitals(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_compute_rejects_missing_num_core_orbitals(self, ri):
 
         mol, bas = self.get_water_cation_system()
-        scf_results = self.run_unrestricted_scf(mol, bas, 'cam-b3lyp')
+        scf_results = self.run_unrestricted_scf(mol, bas, 'cam-b3lyp', ri=ri)
 
         lr_drv = TdaUnrestrictedEigenSolver()
         lr_drv.ostream.mute()
@@ -441,10 +502,11 @@ class TestUnrestrictedTDA:
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason='skip pytest.raises for multiple MPI processes')
-    def test_compute_rejects_too_large_num_core_orbitals(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_compute_rejects_too_large_num_core_orbitals(self, ri):
 
         mol, bas = self.get_water_cation_system()
-        scf_results = self.run_unrestricted_scf(mol, bas, 'cam-b3lyp')
+        scf_results = self.run_unrestricted_scf(mol, bas, 'cam-b3lyp', ri=ri)
 
         lr_drv = TdaUnrestrictedEigenSolver()
         lr_drv.ostream.mute()
@@ -457,10 +519,11 @@ class TestUnrestrictedTDA:
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason='skip pytest.raises for multiple MPI processes')
-    def test_compute_rejects_restricted_subspace(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_compute_rejects_restricted_subspace(self, ri):
 
         mol, bas = self.get_water_cation_system()
-        scf_results = self.run_unrestricted_scf(mol, bas)
+        scf_results = self.run_unrestricted_scf(mol, bas, ri=ri)
 
         lr_drv = TdaUnrestrictedEigenSolver()
         lr_drv.ostream.mute()
@@ -471,7 +534,8 @@ class TestUnrestrictedTDA:
                            match='restricted_subspace not implemented'):
             lr_drv.compute(mol, bas, scf_results)
 
-    def test_unstable_reference_is_flagged(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_unstable_reference_is_flagged(self, ri):
 
         # H2 at 2.0 Angstrom: the spin-symmetric UHF solution is a saddle point
         # with a negative TDA excitation energy; at 0.74 Angstrom it is stable
@@ -484,9 +548,14 @@ class TestUnrestrictedTDA:
             bas = MolecularBasis.read(mol, 'def2-svp', ostream=None)
 
             scf_drv = ScfUnrestrictedDriver()
-            scf_drv.ri = False
+            scf_drv.ri = ri
             scf_drv.ostream.mute()
             scf_results = scf_drv.compute(mol, bas)
+
+            if scf_drv.rank == mpi_master():
+                if ri:
+                    assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                    assert not scf_results['ri_fallback']
 
             tda_drv = TdaUnrestrictedEigenSolver()
             tda_drv.ostream.mute()
