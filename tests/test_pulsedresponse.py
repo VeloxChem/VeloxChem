@@ -58,18 +58,40 @@ xx = np.array([
     2.19004003 + 0.66663608j, 3.07350937 + 0.51583667j, 3.7778817 + 0.41984064j,
     4.36546063 + 0.35690017j, 4.87587013 + 0.3157651j
 ])
+
+# xx with the resolution of the identity in the SCF and the response
+xx_ri = np.array([
+    0. + 0.j, 0. + 0.j, 0. + 0.j, 0. + 0.j, 0. + 0.j, 0. + 0.j, 0. + 0.j,
+    0. + 0.j, 0. + 0.j, 0. + 0.j, 0. + 0.j, 0. + 0.j, 0. + 0.j, 0. + 0.j,
+    0. + 0.j, 0. + 0.j, 0. + 0.j, 0. + 0.j, 0. + 0.j, 0. + 0.j, 0. + 0.j,
+    0. + 0.j, 0. + 0.j, 0. + 0.j, 0. + 0.j, 0. + 0.j, 0. + 0.j, 0. + 0.j,
+    0. + 0.j, 0. + 0.j, 0. + 0.j, 0. + 0.j, 0. + 0.j, 9.38549689 + 0.15499103j,
+    9.64066110 + 0.17975815j, 9.93829721 + 0.21130035j,
+    10.29055754 + 0.25244849j, 10.71489550 + 0.30768813j,
+    11.23730191 + 0.38447061j, 11.89821802 + 0.49591372j,
+    12.76407624 + 0.66686108j, 13.95172256 + 0.94904512j,
+    15.68550264 + 1.46492149j, 18.44708261 + 2.56245009j,
+    23.39831111 + 5.54775479j, 32.37488408 + 17.91874023j,
+    0.46076797 + 52.31896992j, -16.06587920 + 14.11154130j,
+    -7.66234840 + 4.76996598j, -3.20005874 + 2.31854302j,
+    -0.63857412 + 1.37296513j, 1.01733591 + 0.91790402j,
+    2.18727440 + 0.66709088j, 3.07132065 + 0.51616567j,
+    3.77612939 + 0.42009779j, 4.36406369 + 0.35711725j, 4.87478608 + 0.31596444j
+])
 # ---------------------------------------------------------------------------
 
 
 class TestComplexResponse:
+
+    ri = False
+    h5fname = 'pulsed'
+    ref_xx = xx
 
     @classmethod
     def setup_class(cls):
         """ setUpClass - initiates the Test object making a single calculcation for all
             subsequent tests
         """
-
-        cls.h5fname = 'pulsed'
 
         here = Path(__file__).parent
         inpfile = here / 'data' / 'pulsed_water.inp'
@@ -80,6 +102,7 @@ class TestComplexResponse:
         # scf
         pulse_input = task.input_dict['pulses']
         pulse_input['h5'] = cls.h5fname
+        pulse_input['ascii'] = cls.h5fname
 
         # Fix the test parameters to match the test comparison results
         pulse_input['field_max'] = 1.0e-5
@@ -95,8 +118,13 @@ class TestComplexResponse:
 
         # Setup the Task parameters
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
-        scf_drv.ri = False
+        scf_drv.ri = cls.ri
         scf_results = scf_drv.compute(task.molecule, task.ao_basis)
+
+        if scf_drv.rank == mpi_master():
+            if cls.ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         # Run the pulsed response computation
         pulsed_response = PulsedResponse(task.mpi_comm, task.ostream)
@@ -184,7 +212,7 @@ class TestComplexResponse:
             # Verify that the results stored are the same as expected
             assert np.allclose(hf.get('amplitudes')[()], amplitudes)
             assert np.allclose(hf.get('frequencies')[()], frequencies)
-            assert np.allclose(hf.get('xx')[()], xx)
+            assert np.allclose(hf.get('xx')[()], self.ref_xx)
 
             hf.close()
 
@@ -208,3 +236,14 @@ class TestComplexResponse:
                                trunc_amplitudes)
             assert np.allclose(self.results['pulse_settings']['frequencies'],
                                trunc_frequencies)
+
+
+class TestComplexResponseRI(TestComplexResponse):
+    """
+    The tests above, with the resolution of the identity: the SCF runs once
+    for the class, so the RI case is a subclass rather than a parameter.
+    """
+
+    ri = True
+    h5fname = 'pulsed_ri'
+    ref_xx = xx_ri

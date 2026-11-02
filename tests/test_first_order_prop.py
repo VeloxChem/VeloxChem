@@ -17,17 +17,22 @@ from veloxchem.errorhandler import VeloxChemError
 @pytest.mark.solvers
 class TestFirstOrderPropertyDriver:
 
-    def run_scf(self, mol, bas, xcfun_label, ref_dipole):
+    def run_scf(self, mol, bas, xcfun_label, ref_dipole, ri):
 
         if mol.get_multiplicity() == 1:
             scf_drv = ScfRestrictedDriver()
-            scf_drv.ri = False
+            scf_drv.ri = ri
         else:
             scf_drv = ScfUnrestrictedDriver()
-            scf_drv.ri = False
+            scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_drv.xcfun = xcfun_label
         scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         prop_drv = FirstOrderPropertyDriver()
         prop_drv.property = 'electric dipole moment'
@@ -40,7 +45,8 @@ class TestFirstOrderPropertyDriver:
 
         return scf_results, dipole_dict
 
-    def test_prop_rest(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_prop_rest(self, ri):
 
         xyz_string = """3
         xyz
@@ -53,11 +59,15 @@ class TestFirstOrderPropertyDriver:
         mol = Molecule.read_xyz_string(xyz_string)
         bas = MolecularBasis.read(mol, basis_label, ostream=None)
 
-        ref_dipole = np.array([0.13230065, 0.77405262, 0.29507959])
+        ref_dipole = {
+            False: np.array([0.13230065, 0.77405262, 0.29507959]),
+            True: np.array([0.13231836, 0.77415628, 0.29511911])
+        }[ri]
 
-        self.run_scf(mol, bas, 'hf', ref_dipole)
+        self.run_scf(mol, bas, 'hf', ref_dipole, ri)
 
-    def test_prop_unrest(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_prop_unrest(self, ri):
 
         xyz_string = """3
         xyz
@@ -71,11 +81,15 @@ class TestFirstOrderPropertyDriver:
         mol.set_multiplicity(3)
         bas = MolecularBasis.read(mol, basis_label, ostream=None)
 
-        ref_dipole = np.array([-0.0441419, -0.25826667, -0.09845354])
+        ref_dipole = {
+            False: np.array([-0.0441419, -0.25826667, -0.09845354]),
+            True: np.array([-0.04414621, -0.25829195, -0.09846315])
+        }[ri]
 
-        self.run_scf(mol, bas, 'b3lyp', ref_dipole)
+        self.run_scf(mol, bas, 'b3lyp', ref_dipole, ri)
 
-    def test_prop_rest_with_ecp(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_prop_rest_with_ecp(self, ri):
 
         xyz_string = """2
         xyz
@@ -87,11 +101,15 @@ class TestFirstOrderPropertyDriver:
         mol = Molecule.read_xyz_string(xyz_string)
         bas = MolecularBasis.read(mol, basis_label, ostream=None)
 
-        ref_dipole = np.array([0.0, 0.0, -1.32557130])
+        ref_dipole = {
+            False: np.array([0.0, 0.0, -1.32557130]),
+            True: np.array([-6.371326e-14, 8.300236e-13, -1.32553660])
+        }[ri]
 
-        self.run_scf(mol, bas, 'b3lyp', ref_dipole)
+        self.run_scf(mol, bas, 'b3lyp', ref_dipole, ri)
 
-    def test_prop_unrest_with_ecp(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_prop_unrest_with_ecp(self, ri):
 
         xyz_string = """2
         xyz
@@ -105,11 +123,15 @@ class TestFirstOrderPropertyDriver:
         mol.set_multiplicity(2)
         bas = MolecularBasis.read(mol, basis_label, ostream=None)
 
-        ref_dipole = np.array([0.0, 0.0, -0.315138231])
+        ref_dipole = {
+            False: np.array([0.0, 0.0, -0.315138231]),
+            True: np.array([3.811076e-13, -1.495299e-12, -0.315155816])
+        }[ri]
 
-        self.run_scf(mol, bas, 'hf', ref_dipole)
+        self.run_scf(mol, bas, 'hf', ref_dipole, ri)
 
-    def test_prop_with_underscore_alias_and_multistate_density(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_prop_with_underscore_alias_and_multistate_density(self, ri):
 
         xyz_string = """3
         xyz
@@ -123,7 +145,10 @@ class TestFirstOrderPropertyDriver:
         bas = MolecularBasis.read(mol, basis_label, ostream=None)
 
         scf_results, ref_dipole = self.run_scf(
-            mol, bas, 'hf', np.array([0.13230065, 0.77405262, 0.29507959]))
+            mol, bas, 'hf', {
+                False: np.array([0.13230065, 0.77405262, 0.29507959]),
+                True: np.array([0.13231836, 0.77415628, 0.29511911])
+            }[ri], ri)
 
         prop_drv = FirstOrderPropertyDriver()
         prop_drv.property = 'electric dipole moment'
@@ -171,7 +196,9 @@ class TestFirstOrderPropertyDriver:
                 match='Property quadrupole moment not yet supported'):
             prop_drv.compute(None, None, None)
 
-    def test_first_order_properties_compute_print_and_deepcopy(self, tmp_path):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_first_order_properties_compute_print_and_deepcopy(
+            self, tmp_path, ri):
 
         xyz_string = """3
         xyz
@@ -185,10 +212,15 @@ class TestFirstOrderPropertyDriver:
         bas = MolecularBasis.read(mol, basis_label, ostream=None)
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_drv.xcfun = 'hf'
         scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         ostream = OutputStream(tmp_path / 'first_order_prop.out')
         scf_prop = FirstOrderProperties(ostream=ostream)
@@ -233,7 +265,8 @@ class TestFirstOrderPropertyDriver:
         assert scf_prop_copy.comm is scf_prop.comm
         assert scf_prop_copy.ostream is scf_prop.ostream
 
-    def test_first_order_property_driver_print_property(self, tmp_path):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_first_order_property_driver_print_property(self, tmp_path, ri):
 
         xyz_string = """3
         xyz
@@ -247,10 +280,15 @@ class TestFirstOrderPropertyDriver:
         bas = MolecularBasis.read(mol, basis_label, ostream=None)
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_drv.xcfun = 'hf'
         scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         ostream = OutputStream(tmp_path / 'prop_drv_print.out')
         prop_drv = FirstOrderPropertyDriver(ostream=ostream)

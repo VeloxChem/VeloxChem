@@ -18,7 +18,8 @@ from veloxchem.molecularbasis import MolecularBasis
 @pytest.mark.solvers
 class TestNTO2:
 
-    def run_nto(self, mol, basis, flag, core_excitation, restricted_subspace):
+    def run_nto(self, mol, basis, flag, core_excitation, restricted_subspace,
+                ri):
 
         fname = '_vlx_test_nto_2_'
 
@@ -26,10 +27,10 @@ class TestNTO2:
 
         if mol.get_multiplicity() == 1:
             scf_drv = ScfRestrictedDriver()
-            scf_drv.ri = False
+            scf_drv.ri = ri
         else:
             scf_drv = ScfUnrestrictedDriver()
-            scf_drv.ri = False
+            scf_drv.ri = ri
 
         scf_drv.restart = False
 
@@ -37,6 +38,11 @@ class TestNTO2:
         scf_drv.ostream.mute()
 
         scf_results = scf_drv.compute(mol, basis)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         # run TDA/RPA
 
@@ -136,8 +142,9 @@ class TestNTO2:
     @pytest.mark.parametrize('flag', ['rpa', 'tda'])
     @pytest.mark.parametrize('core_excitation_str', ['no_cvs', 'cvs'])
     @pytest.mark.parametrize('restricted_subspace_str', ['no_rsa', 'rsa'])
+    @pytest.mark.parametrize('ri', [False, True])
     def test_nto(self, multiplicity, flag, core_excitation_str,
-                 restricted_subspace_str):
+                 restricted_subspace_str, ri):
 
         core_excitation = (core_excitation_str == 'cvs')
         restricted_subspace = (restricted_subspace_str == 'rsa')
@@ -162,4 +169,4 @@ class TestNTO2:
 
         basis = MolecularBasis.read(mol, 'def2-svp')
 
-        self.run_nto(mol, basis, flag, core_excitation, restricted_subspace)
+        self.run_nto(mol, basis, flag, core_excitation, restricted_subspace, ri)

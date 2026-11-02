@@ -11,8 +11,19 @@ from veloxchem.rixsdriver import RixsDriver
 @pytest.mark.solvers
 class TestRIXS:
 
-    def run_rixs(self, xcfun_label, basis_label, ref_xsection, ncore, nstates,
-                 ncorestates=None, nvir=None, nvalence=None, tda=False, cutoff_ene=None):
+    def run_rixs(self,
+                 xcfun_label,
+                 basis_label,
+                 ref_xsection,
+                 ncore,
+                 nstates,
+                 ncorestates=None,
+                 nvir=None,
+                 nvalence=None,
+                 tda=False,
+                 cutoff_ene=None,
+                 *,
+                 ri):
 
         xyz_string = """3
         xyz
@@ -25,11 +36,16 @@ class TestRIXS:
         bas = MolecularBasis.read(mol, basis_label, ostream=None)
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_drv.xcfun = xcfun_label
         scf_drv.conv_thresh = 1e-8
         scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         rixs_drv = RixsDriver()
         rixs_drv.ostream.mute()
@@ -57,7 +73,8 @@ class TestRIXS:
             assert np.allclose(ref_xsection, rixs_res['cross_sections'][:,0],
                                rtol=1e-5, atol=1e-8)
 
-    def test_hf_svp_rpa_rsa(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_hf_svp_rpa_rsa(self, ri):
 
         ref_xsection = np.array([
             17811.632987086, 1229.758519817, 48.681891774, 733.254590340,
@@ -66,9 +83,19 @@ class TestRIXS:
             3.890917736, 75.817596511, 3.899221697, 4.796194695
         ])
 
-        self.run_rixs('hf', 'def2-svp', ref_xsection, 1, 20, ncorestates=2, nvir=16, nvalence=1, tda=False)
+        self.run_rixs('hf',
+                      'def2-svp',
+                      ref_xsection,
+                      1,
+                      20,
+                      ncorestates=2,
+                      nvir=16,
+                      nvalence=1,
+                      tda=False,
+                      ri=ri)
 
-    def test_hf_svp_tda_rsa(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_hf_svp_tda_rsa(self, ri):
 
         ref_xsection = np.array([
             18466.533352055, 1272.812377437, 50.42744885, 768.626586751,
@@ -77,9 +104,19 @@ class TestRIXS:
             4.254749669, 5.275604059
         ])
 
-        self.run_rixs('hf', 'def2-svp', ref_xsection, 1, 20, ncorestates=2, nvir=16, nvalence=1, tda=True)
+        self.run_rixs('hf',
+                      'def2-svp',
+                      ref_xsection,
+                      1,
+                      20,
+                      ncorestates=2,
+                      nvir=16,
+                      nvalence=1,
+                      tda=True,
+                      ri=ri)
 
-    def test_b3lyp_svp_rpa_rsa(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_b3lyp_svp_rpa_rsa(self, ri):
 
         ref_xsection = np.array([
             5558.473364257, 29.490542895, 0.486049704, 4.629266414, 0.363044685,
@@ -88,9 +125,19 @@ class TestRIXS:
             2.465981090
         ])
 
-        self.run_rixs('b3lyp', 'def2-svp', ref_xsection, 1, 20, ncorestates=2, nvir=16, nvalence=1, tda=False)
+        self.run_rixs('b3lyp',
+                      'def2-svp',
+                      ref_xsection,
+                      1,
+                      20,
+                      ncorestates=2,
+                      nvir=16,
+                      nvalence=1,
+                      tda=False,
+                      ri=ri)
 
-    def test_b3lyp_svp_tda_rsa(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_b3lyp_svp_tda_rsa(self, ri):
 
         ref_xsection = np.array([
             5792.840577899, 30.579097754, 0.502282504, 5.272993513, 0.47202898,
@@ -99,9 +146,19 @@ class TestRIXS:
             2.702091265
         ])
 
-        self.run_rixs('b3lyp', 'def2-svp', ref_xsection, 1, 20, ncorestates=2, nvir=16, nvalence=1, tda=True)
+        self.run_rixs('b3lyp',
+                      'def2-svp',
+                      ref_xsection,
+                      1,
+                      20,
+                      ncorestates=2,
+                      nvir=16,
+                      nvalence=1,
+                      tda=True,
+                      ri=ri)
 
-    def test_hf_svp_rpa_2s(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_hf_svp_rpa_2s(self, ri):
 
         ref_xsection = np.array([
             18244.555308374, 1293.746642124, 6818.769734878, 1027.656605437,
@@ -111,9 +168,17 @@ class TestRIXS:
             51.308249625, 43.198426438, 58.966168215, 83.452659794
         ])
 
-        self.run_rixs('hf', 'def2-svp', ref_xsection, 1, 20, ncorestates=4, tda=False)
+        self.run_rixs('hf',
+                      'def2-svp',
+                      ref_xsection,
+                      1,
+                      20,
+                      ncorestates=4,
+                      tda=False,
+                      ri=ri)
 
-    def test_hf_svp_tda_2s(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_hf_svp_tda_2s(self, ri):
 
         ref_xsection = np.array([
             18282.708141936, 1296.440100667, 6785.96485048, 1018.264720384,
@@ -123,9 +188,17 @@ class TestRIXS:
             59.501431469, 44.226334207, 62.956362303, 83.197727132
         ])
 
-        self.run_rixs('hf', 'def2-svp', ref_xsection, 1, 20, ncorestates=4, tda=True)
+        self.run_rixs('hf',
+                      'def2-svp',
+                      ref_xsection,
+                      1,
+                      20,
+                      ncorestates=4,
+                      tda=True,
+                      ri=ri)
 
-    def test_b3lyp_svp_rpa_2s(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_b3lyp_svp_rpa_2s(self, ri):
 
         ref_xsection = np.array([
             5419.408540219, 29.654485681, 2022.737567512, 50.138868853,
@@ -135,9 +208,17 @@ class TestRIXS:
             0.003525553
         ])
 
-        self.run_rixs('b3lyp', 'def2-svp', ref_xsection, 1, 20, ncorestates=4, tda=False)
+        self.run_rixs('b3lyp',
+                      'def2-svp',
+                      ref_xsection,
+                      1,
+                      20,
+                      ncorestates=4,
+                      tda=False,
+                      ri=ri)
 
-    def test_b3lyp_svp_tda_2s(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_b3lyp_svp_tda_2s(self, ri):
 
         ref_xsection = np.array([
             5451.525464935, 29.795911911, 2015.46273501, 55.197006007,
@@ -147,14 +228,38 @@ class TestRIXS:
             0.004104707
         ])
 
-        self.run_rixs('b3lyp', 'def2-svp', ref_xsection, 1, 20, ncorestates=4, tda=True)
+        self.run_rixs('b3lyp',
+                      'def2-svp',
+                      ref_xsection,
+                      1,
+                      20,
+                      ncorestates=4,
+                      tda=True,
+                      ri=ri)
 
-    def test_hf_svp_rpa_fulldiag(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_hf_svp_rpa_fulldiag(self, ri):
 
-        ref_xsection = np.array([
-            23060.546141723, 872.799710229, 8798.472214577, 921.838965056,
-            14909.152754469, 278.367031877, 6.099015095, 858.837996761,
-            106.762584488
-        ])
+        ref_xsection = {
+            False: np.array([
+                23060.546141723, 872.799710229, 8798.472214577, 921.838965056,
+                14909.152754469, 278.367031877, 6.099015095, 858.837996761,
+                106.762584488
+            ]),
+            True: np.array([
+                23056.445238880, 872.333231374, 8797.069750012, 921.316561542,
+                14907.194703067, 278.236649711, 6.099264658, 858.639676859,
+                106.775162706
+            ])
+        }[ri]
 
-        self.run_rixs('hf', '6-31G*', ref_xsection, 1, 57, nvir=13, nvalence=4, tda=False, cutoff_ene=31.5 / hartree_in_ev())
+        self.run_rixs('hf',
+                      '6-31G*',
+                      ref_xsection,
+                      1,
+                      57,
+                      nvir=13,
+                      nvalence=4,
+                      tda=False,
+                      cutoff_ene=31.5 / hartree_in_ev(),
+                      ri=ri)

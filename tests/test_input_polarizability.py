@@ -44,7 +44,7 @@ class TestInputPolarizability:
 
         MPI.COMM_WORLD.barrier()
 
-    def get_input_lines(self, xcfun):
+    def get_input_lines(self, xcfun, ri):
 
         input_lines = """
             @jobs
@@ -78,6 +78,9 @@ class TestInputPolarizability:
             @end
         """
 
+        if ri:
+            input_lines = input_lines.replace('ri: false', 'ri: yes')
+
         input_lines = input_lines.replace('==batch_size==',
                                           str(choice([1, 10, 100])))
 
@@ -87,13 +90,13 @@ class TestInputPolarizability:
 
         return input_lines
 
-    def run_input_polarizability(self, capsys, xcfun, ref_data):
+    def run_input_polarizability(self, capsys, xcfun, ri, ref_data):
 
         here = Path(__file__).parent
         random_string = get_random_string_parallel()
         input_file = here / 'data' / f'vlx_polarizability_{random_string}.inp'
 
-        input_lines = self.get_input_lines(xcfun)
+        input_lines = self.get_input_lines(xcfun, ri)
         self.create_input_file(input_lines, input_file)
 
         with patch.object(sys, 'argv', ['vlx', str(input_file)]):
@@ -101,6 +104,13 @@ class TestInputPolarizability:
             captured = capsys.readouterr()
 
             if MPI.COMM_WORLD.Get_rank() == mpi_master():
+                # NOTE: printed only where the SCF formed its Fock matrices
+                # with RI; one which fell back to the four-center integrals
+                # prints a warning instead.
+                if ri:
+                    assert ('Using the SIMD resolution of the identity'
+                            in captured.out)
+
                 polarizability = []
                 polar_flag = False
 
@@ -136,40 +146,68 @@ class TestInputPolarizability:
 
             self.remove_input_and_h5_files(input_file)
 
-    def test_input_rhf_lr_polarizability(self, capsys):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_input_rhf_lr_polarizability(self, capsys, ri):
 
         # vlxtag: RHF, Polarizability, LR
 
         xcfun = None
 
         ref_data = {
-            'wf_model': 'Spin-Restricted Hartree-Fock',
-            'n_rsp_iterations': 7,
-            'polarizability': np.array([
-                7.251835, 0, 0, 0, 8.724516, 0, 0, 0, 7.880586, 7.311119, 0, 0,
-                0, 8.770615, 0, 0, 0, 7.930012, 7.502485, 0, 0, 0, 8.912738, 0,
-                0, 0, 8.084815
-            ])
-        }
+            False: {
+                'wf_model': 'Spin-Restricted Hartree-Fock',
+                'n_rsp_iterations': 7,
+                'polarizability': np.array([
+                    7.251835, 0, 0, 0, 8.724516, 0, 0, 0, 7.880586, 7.311119, 0,
+                    0, 0, 8.770615, 0, 0, 0, 7.930012, 7.502485, 0, 0, 0,
+                    8.912738, 0, 0, 0, 8.084815
+                ])
+            },
+            True: {
+                'wf_model': 'Spin-Restricted Hartree-Fock',
+                'n_rsp_iterations': 7,
+                'polarizability': np.array([
+                    7.2523665, 0.0000000, 0.0000000, 0.0000000, 8.7237237,
+                    0.0000000, 0.0000000, 0.0000000, 7.8795769, 7.3116631,
+                    0.0000000, 0.0000000, 0.0000000, 8.7698176, 0.0000000,
+                    0.0000000, 0.0000000, 7.9289998, 7.5030715, 0.0000000,
+                    0.0000000, 0.0000000, 8.9119239, 0.0000000, 0.0000000,
+                    0.0000000, 8.0837946
+                ])
+            }
+        }[ri]
 
-        self.run_input_polarizability(capsys, xcfun, ref_data)
+        self.run_input_polarizability(capsys, xcfun, ri, ref_data)
 
-    def test_input_rks_lr_polarizability(self, capsys):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_input_rks_lr_polarizability(self, capsys, ri):
 
         # vlxtag: RKS, Polarizability, LR
 
         xcfun = 'b3lyp'
 
         ref_data = {
-            'wf_model': 'Spin-Restricted Kohn-Sham',
-            'e_scf': -76.4435484737,
-            'n_scf_iterations': 7,
-            'n_rsp_iterations': 5,
-            'polarizability': np.array([
-                8.769167, 0, 0, 0, 9.696169, 0, 0, 0, 9.066348, 8.893297, 0, 0,
-                0, 9.757652, 0, 0, 0, 9.147367, 9.318413, 0, 0, 0, 9.948375, 0,
-                0, 0, 9.407198
-            ])
-        }
+            False: {
+                'wf_model': 'Spin-Restricted Kohn-Sham',
+                'e_scf': -76.4435484737,
+                'n_scf_iterations': 7,
+                'n_rsp_iterations': 5,
+                'polarizability': np.array([
+                    8.769167, 0, 0, 0, 9.696169, 0, 0, 0, 9.066348, 8.893297, 0,
+                    0, 0, 9.757652, 0, 0, 0, 9.147367, 9.318413, 0, 0, 0,
+                    9.948375, 0, 0, 0, 9.407198
+                ])
+            },
+            True: {
+                'wf_model': 'Spin-Restricted Kohn-Sham',
+                'n_rsp_iterations': 5,
+                'polarizability': np.array([
+                    8.7699726, 0.0, 0.0, 0.0, 9.6958026, 0.0, 0.0, 0.0,
+                    9.0664655, 8.8941251, 0.0, 0.0, 0.0, 9.7572813, 0.0, 0.0,
+                    0.0, 9.1474919, 9.3193195, 0.0, 0.0, 0.0, 9.9479893, 0.0,
+                    0.0, 0.0, 9.4073440
+                ])
+            }
+        }[ri]
 
-        self.run_input_polarizability(capsys, xcfun, ref_data)
+        self.run_input_polarizability(capsys, xcfun, ri, ref_data)

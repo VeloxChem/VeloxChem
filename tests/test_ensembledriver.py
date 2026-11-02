@@ -12,7 +12,8 @@ pytest.importorskip("MDAnalysis")
 @pytest.mark.timeconsuming
 class TestEnsembleDriver:
 
-    def test_compute_with_scf_and_property_options(self, tmp_path):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_compute_with_scf_and_property_options(self, tmp_path, ri):
         """
         Regression test for notebook-style ensemble API:
         - compute(..., scf_options=..., property_options=...)
@@ -51,7 +52,7 @@ class TestEnsembleDriver:
             "max_iter": 150,
             "xcfun": "CAM-B3LYP",
             "grid_level": 4,
-            "ri": False,
+            "ri": ri,
         }
 
         property_options = {
@@ -74,12 +75,21 @@ class TestEnsembleDriver:
         assert len(results["scf_all"]) == 2
         assert len(results["rsp_all"]) == 2
 
+        if ens_drv.rank == mpi_master():
+            if ri:
+                for _, scf_res in results["scf_all"]:
+                    assert scf_res['ri_jk'] or scf_res['ri_coulomb']
+                    assert not scf_res['ri_fallback']
+
         # Reference values from validated output (frames 0 and 100)
         ref_frames = [0, 100]
-        ref_scf = np.array([
-            -193.06034955,
-            -193.07240911,
-        ])
+        ref_scf = {
+            False: np.array([
+                -193.06034955,
+                -193.07240911,
+            ]),
+            True: np.array([-193.06040165, -193.07246246]),
+        }[ri]
         ref_eigs = {
             0: np.array([0.16050853, 0.30432000, 0.32229297,
                          0.32426471, 0.34648957, 0.35888439]),
@@ -145,7 +155,8 @@ class TestEnsembleDriver:
                 assert ax is not None
                 assert generated_csv.is_file()
 
-                ref_csv = data_dir / "averaged_spectra.csv"
+                ref_csv = data_dir / ("averaged_spectra_ri.csv"
+                                      if ri else "averaged_spectra.csv")
                 assert ref_csv.is_file(), f"Missing reference CSV: {ref_csv}"
 
                 got = np.loadtxt(generated_csv, delimiter=",", skiprows=1)
@@ -157,7 +168,8 @@ class TestEnsembleDriver:
             except ImportError:
                 pass
 
-    def test_compute_with_provided_potfiles(self, tmp_path):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_compute_with_provided_potfiles(self, tmp_path, ri):
         """
         Reads user-provided potfiles with the fika switched embedding
         (r_on/r_off of 1.0/1.9 angstrom, damping off).
@@ -198,7 +210,7 @@ class TestEnsembleDriver:
             "max_iter": 150,
             "xcfun": "CAM-B3LYP",
             "grid_level": 4,
-            "ri": False,
+            "ri": ri,
         }
 
         property_options = {
@@ -231,6 +243,12 @@ class TestEnsembleDriver:
         assert len(results["scf_all"]) == 2
         assert len(results["rsp_all"]) == 2
 
+        if ens_drv.rank == mpi_master():
+            if ri:
+                for _, scf_res in results["scf_all"]:
+                    assert scf_res['ri_jk'] or scf_res['ri_coulomb']
+                    assert not scf_res['ri_fallback']
+
         ref_frames = [0, 100]
 
         # CP3 reference (same values as the potfile regression test)
@@ -244,7 +262,10 @@ class TestEnsembleDriver:
         }
 
         # fika switched embedding regression values
-        fika_scf = np.array([-193.06034955, -193.07240911])
+        fika_scf = {
+            False: np.array([-193.06034955, -193.07240911]),
+            True: np.array([-193.06040165, -193.07246246]),
+        }[ri]
         fika_eigs = {
             0: np.array([0.16050853, 0.30432000, 0.32229297,
                          0.32426471, 0.34648957, 0.35888439]),

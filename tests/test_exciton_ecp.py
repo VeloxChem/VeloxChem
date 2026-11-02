@@ -35,13 +35,19 @@ class TestExcitonECP:
         return molecule, basis
 
     @staticmethod
-    def get_reference_data():
+    def get_reference_data(ri):
 
         return {
-            'exciton_energies': np.array([
-                0.18067744, 0.24082588, 0.24689075, 0.32415115, 0.34479102,
-                0.48593087
-            ]),
+            'exciton_energies': {
+                False: np.array([
+                    0.18067744, 0.24082588, 0.24689075, 0.32415115, 0.34479102,
+                    0.48593087
+                ]),
+                True: np.array([
+                    0.18066828, 0.24083044, 0.24690654, 0.32413869, 0.34479247,
+                    0.48594512
+                ]),
+            }[ri],
             'exciton_osc': np.array(
                 [0.0000, 0.0025, 0.0089, 0.0055, 0.0034, 0.0003]),
             'hamiltonian': np.array([
@@ -72,7 +78,7 @@ class TestExcitonECP:
             ]),
         }
 
-    def run_exciton_ecp(self):
+    def run_exciton_ecp(self, ri):
 
         comm = MPI.COMM_WORLD
         ostream = OutputStream(None)
@@ -86,18 +92,38 @@ class TestExcitonECP:
         exciton_drv.nstates = 2
         exciton_drv.ct_nocc = 1
         exciton_drv.ct_nvir = 1
-        exciton_drv.ri = False
+        exciton_drv.ri = ri
         exciton_drv.scf_conv_thresh = 1.0e-7
         exciton_drv.tda_conv_thresh = 1.0e-5
         exciton_drv.restart = False
 
+        # NOTE: the exciton model driver keeps no SCF results; those of the
+        # monomers are recorded here so that the RI case can check them.
+        monomer_scf_results = []
+        monomer_scf = exciton_drv.monomer_scf
+
+        def recording_monomer_scf(*args, **kwargs):
+            scf_results = monomer_scf(*args, **kwargs)
+            monomer_scf_results.append(scf_results)
+            return scf_results
+
+        exciton_drv.monomer_scf = recording_monomer_scf
+
         exciton_results = exciton_drv.compute(molecule, basis)
+
+        if comm.Get_rank() == mpi_master():
+            if ri:
+                assert monomer_scf_results
+                for scf_results in monomer_scf_results:
+                    assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                    assert not scf_results['ri_fallback']
 
         return comm, exciton_results
 
-    def test_exciton_ecp_h2te_h2o(self):
-        comm, exciton_results = self.run_exciton_ecp()
-        ref_data = self.get_reference_data()
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_exciton_ecp_h2te_h2o(self, ri):
+        comm, exciton_results = self.run_exciton_ecp(ri)
+        ref_data = self.get_reference_data(ri)
 
         if comm.Get_rank() == mpi_master():
             exciton_energies = exciton_results['adiabatic_eigenvalues']

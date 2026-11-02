@@ -12,7 +12,7 @@ from veloxchem.scfrestdriver import ScfRestrictedDriver
 class TestLrfOperators:
 
     def run_lrf(self, basis_set_label, freq, operators, components, prefac,
-                ref_val):
+                ref_val, ri):
 
         molecule = Molecule.read_xyz_string("""1
             xyz
@@ -21,9 +21,14 @@ class TestLrfOperators:
         basis = MolecularBasis.read(molecule, basis_set_label, ostream=None)
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_results = scf_drv.compute(molecule, basis)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         lrf_drv = ComplexResponseSolver()
         lrf_drv.ostream.mute()
@@ -48,42 +53,51 @@ class TestLrfOperators:
             assert abs(calc_val.real - ref_val) < 1.0e-3
             assert abs(calc_val.imag) < 1.0e-3
 
-    def test_lrf_diplen(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_lrf_diplen(self, ri):
 
         freq = 0.0656
-        ref_val = 2.362
+        ref_val = {False: 2.362, True: 2.35906}[ri]
 
         operators = ['electric dipole', 'electric dipole']
         prefac = -1.0
 
-        self.run_lrf('daug-cc-pvdz', freq, operators, 'zz', prefac, ref_val)
+        self.run_lrf('daug-cc-pvdz', freq, operators, 'zz', prefac, ref_val, ri)
 
-    def test_lrf_dipvel(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_lrf_dipvel(self, ri):
 
         freq = 0.0656
-        ref_val = 2.378
+        ref_val = {False: 2.378, True: 2.37444}[ri]
 
         operators = ['linear momentum', 'electric dipole']
         prefac = (-1j * (-1.0) / freq)
 
-        self.run_lrf('daug-cc-pvdz', freq, operators, 'zz', prefac, ref_val)
+        self.run_lrf('daug-cc-pvdz', freq, operators, 'zz', prefac, ref_val, ri)
 
-    def test_lrf_dipvel_flipped(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_lrf_dipvel_flipped(self, ri):
 
         freq = 0.0656
-        ref_val = 2.378
+        ref_val = {False: 2.378, True: 2.37445}[ri]
 
         operators = ['electric dipole', 'linear momentum']
         prefac = -1.0 * (-1j * (-1.0) / freq)
 
-        self.run_lrf('daug-cc-pvdz', freq, operators, 'zz', prefac, ref_val)
+        self.run_lrf('daug-cc-pvdz', freq, operators, 'zz', prefac, ref_val, ri)
 
-    def test_lrf_quadrupole(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_lrf_quadrupole(self, ri):
 
         freq = 0.0656
 
         operators = ['quadrupole', 'quadrupole']
 
-        self.run_lrf('daug-cc-pvdz', freq, operators, ['xx', 'zz'], -1.0, 1.527)
-        self.run_lrf('daug-cc-pvdz', freq, operators, ['xy', 'xy'], -1.0, 1.031)
-        self.run_lrf('daug-cc-pvdz', freq, operators, ['zz', 'zz'], -1.0, 3.590)
+        self.run_lrf('daug-cc-pvdz', freq, operators, ['xx', 'zz'], -1.0, {
+            False: 1.527,
+            True: 1.52752
+        }[ri], ri)
+        self.run_lrf('daug-cc-pvdz', freq, operators, ['xy', 'xy'], -1.0, 1.031,
+                     ri)
+        self.run_lrf('daug-cc-pvdz', freq, operators, ['zz', 'zz'], -1.0, 3.590,
+                     ri)

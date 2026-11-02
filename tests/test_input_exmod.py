@@ -55,7 +55,7 @@ class TestInputExcitonModel:
 
         MPI.COMM_WORLD.barrier()
 
-    def get_input_lines(self, xcfun):
+    def get_input_lines(self, xcfun, ri):
 
         input_lines = """
             @jobs
@@ -94,19 +94,22 @@ class TestInputExcitonModel:
             @end
         """
 
+        if ri:
+            input_lines = input_lines.replace('ri: false', 'ri: yes')
+
         if xcfun is not None:
             input_lines = input_lines.replace(
                 '@method settings', f'@method settings\nxcfun:{xcfun}')
 
         return input_lines
 
-    def run_input_exmod(self, capsys, xcfun, ref_data):
+    def run_input_exmod(self, capsys, xcfun, ri, ref_data):
 
         here = Path(__file__).parent
         random_string = get_random_string_parallel()
         input_file = here / 'data' / f'vlx_exmod_{random_string}.inp'
 
-        input_lines = self.get_input_lines(xcfun)
+        input_lines = self.get_input_lines(xcfun, ri)
         self.create_input_file(input_lines, input_file)
 
         with patch.object(sys, 'argv', ['vlx', str(input_file)]):
@@ -114,6 +117,13 @@ class TestInputExcitonModel:
             captured = capsys.readouterr()
 
             if MPI.COMM_WORLD.Get_rank() == mpi_master():
+                # NOTE: printed only where the SCF formed its Fock matrices
+                # with RI; one which fell back to the four-center integrals
+                # prints a warning instead.
+                if ri:
+                    assert ('Using the SIMD resolution of the identity'
+                            in captured.out)
+
                 exc_ene = []
                 osc_str = []
                 rot_str = []
@@ -144,24 +154,45 @@ class TestInputExcitonModel:
 
             self.remove_input_and_h5_files(input_file)
 
-    def test_input_rhf_exmod(self, capsys):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_input_rhf_exmod(self, capsys, ri):
 
         xcfun = None
 
         ref_data = {
-            'exc_ene': np.array([
-                0.28932589, 0.31669640, 0.34117880, 0.34154634, 0.34448158,
-                0.34474205, 0.35545359, 0.35550180, 0.37509079, 0.37587732,
-                0.40570065, 0.41752625
-            ]),
-            'osc_str': np.array([
-                0.031064, 1.241580, 0.000108, 0.013926, 0.000704, 0.000126,
-                0.000001, 0.000025, 0.000134, 0.001633, 0.024283, 0.005320
-            ]),
-            'rot_str': np.array([
-                0.149686, -0.157138, -0.000080, 0.000033, 0.021327, -0.001754,
-                -0.000358, -0.002835, -0.010791, -0.007212, 0.001252, 0.016260
-            ]),
-        }
+            False: {
+                'exc_ene': np.array([
+                    0.28932589, 0.31669640, 0.34117880, 0.34154634, 0.34448158,
+                    0.34474205, 0.35545359, 0.35550180, 0.37509079, 0.37587732,
+                    0.40570065, 0.41752625
+                ]),
+                'osc_str': np.array([
+                    0.031064, 1.241580, 0.000108, 0.013926, 0.000704, 0.000126,
+                    0.000001, 0.000025, 0.000134, 0.001633, 0.024283, 0.005320
+                ]),
+                'rot_str': np.array([
+                    0.149686, -0.157138, -0.000080, 0.000033, 0.021327,
+                    -0.001754, -0.000358, -0.002835, -0.010791, -0.007212,
+                    0.001252, 0.016260
+                ]),
+            },
+            True: {
+                'exc_ene': np.array([
+                    0.28934303, 0.31671347, 0.34118154, 0.34154941, 0.34449241,
+                    0.34475279, 0.35546895, 0.35551709, 0.37511313, 0.37589993,
+                    0.40570240, 0.41752876
+                ]),
+                'osc_str': np.array([
+                    0.0311000, 1.2416000, 0.0001000, 0.0139000, 0.0007000,
+                    0.0001000, 0.0000000, 0.0000000, 0.0001000, 0.0016000,
+                    0.0243000, 0.0053000
+                ]),
+                'rot_str': np.array([
+                    0.1496250, -0.1570830, -8.000000e-05, 3.300000e-05,
+                    0.0213310, -0.0017560, -0.0003580, -0.0028380, -0.0107960,
+                    -0.0072060, 0.0012530, 0.0162620
+                ])
+            }
+        }[ri]
 
-        self.run_input_exmod(capsys, xcfun, ref_data)
+        self.run_input_exmod(capsys, xcfun, ri, ref_data)

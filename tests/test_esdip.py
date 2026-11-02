@@ -15,7 +15,8 @@ from veloxchem.tpatransitiondriver import TpaTransitionDriver
 @pytest.mark.solvers
 class TestExcitedStateDipole:
 
-    def test_excited_state_dipole(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_excited_state_dipole(self, ri):
 
         xyzstr = """3
         xyz
@@ -31,10 +32,15 @@ class TestExcitedStateDipole:
         nstates = 5
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_drv.xcfun = xcfun_label
         scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         tddft_drv = LinearResponseEigenSolver()
         tddft_drv.ostream.mute()
@@ -108,29 +114,50 @@ class TestExcitedStateDipole:
         tpatrans_es_dipoles = scf_drv.comm.bcast(tpatrans_es_dipoles,
                                                  root=mpi_master())
 
-        ref_unrelaxed_es_dipoles = np.array([
-            [0.0, 0.0, -0.623834],
-            [0.0, 0.0, -0.427791],
-            [0.0, 0.0, -0.837253],
-            [0.0, 0.0, -0.646247],
-            [0.0, 0.0, -0.265976],
-        ])
+        ref_unrelaxed_es_dipoles = {
+            False: np.array([
+                [0.0, 0.0, -0.623834],
+                [0.0, 0.0, -0.427791],
+                [0.0, 0.0, -0.837253],
+                [0.0, 0.0, -0.646247],
+                [0.0, 0.0, -0.265976],
+            ]),
+            True: np.array([[-2.586805e-16, 7.489148e-14, -0.623855],
+                            [-1.089661e-15, -7.209858e-14, -0.427832],
+                            [-1.693677e-17, 4.900594e-14, -0.837282],
+                            [7.270078e-16, -4.624079e-14, -0.646300],
+                            [-9.813489e-18, 3.677614e-14, -0.265937]])
+        }[ri]
 
-        ref_relaxed_es_dipoles = np.array([
-            [0.0, 0.0, -0.327991],
-            [0.0, 0.0, -0.181910],
-            [0.0, 0.0, -0.406894],
-            [0.0, 0.0, -0.329932],
-            [0.0, 0.0, -0.117703],
-        ])
+        ref_relaxed_es_dipoles = {
+            False: np.array([
+                [0.0, 0.0, -0.327991],
+                [0.0, 0.0, -0.181910],
+                [0.0, 0.0, -0.406894],
+                [0.0, 0.0, -0.329932],
+                [0.0, 0.0, -0.117703],
+            ]),
+            True: np.array([[-4.196194e-16, 6.320985e-14, -0.327954],
+                            [-9.762954e-16, -6.729339e-14, -0.181995],
+                            [-2.278166e-16, 3.943200e-14, -0.406853],
+                            [4.056495e-16, -4.399779e-14, -0.330008],
+                            [-1.317888e-16, 2.970887e-14, -0.117636]])
+        }[ri]
 
-        ref_qrf_es_dipoles = np.array([
-            [0.0, 0.0, -0.327997589],
-            [0.0, 0.0, -0.181916586],
-            [0.0, 0.0, -0.406908758],
-            [0.0, 0.0, -0.329942339],
-            [0.0, 0.0, -0.117702195],
-        ])
+        ref_qrf_es_dipoles = {
+            False: np.array([
+                [0.0, 0.0, -0.327997589],
+                [0.0, 0.0, -0.181916586],
+                [0.0, 0.0, -0.406908758],
+                [0.0, 0.0, -0.329942339],
+                [0.0, 0.0, -0.117702195],
+            ]),
+            True: np.array([[0.000000000, 0.000000000, -0.327950557],
+                            [0.000000000, 0.000000000, -0.181994739],
+                            [0.000000000, 0.000000000, -0.406854337],
+                            [0.000000000, 0.000000000, -0.330013930],
+                            [0.000000000, 0.000000000, -0.117636084]])
+        }[ri]
 
         assert np.max(np.abs(ref_unrelaxed_es_dipoles -
                              unrelaxed_es_dipoles)) < 1.0e-4

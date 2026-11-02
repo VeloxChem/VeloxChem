@@ -14,7 +14,7 @@ from veloxchem.lreigensolver import LinearResponseEigenSolver
 class TestNTO:
 
     def run_nto(self, inpfile, xcfun_label, ref_eig_vals, ref_nto_lambdas,
-                ref_nto_cube_vals, ref_dens_cube_vals, flag):
+                ref_nto_cube_vals, ref_dens_cube_vals, flag, ri):
 
         task = MpiTask([str(inpfile), None])
         task.input_dict['scf']['checkpoint_file'] = None
@@ -25,10 +25,15 @@ class TestNTO:
         # run SCF
 
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.update_settings(task.input_dict['scf'],
                                 task.input_dict['method_settings'])
         scf_results = scf_drv.compute(task.molecule, task.ao_basis)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         # run TDA/RPA
 
@@ -119,7 +124,8 @@ class TestNTO:
 
         task.mpi_comm.barrier()
 
-    def test_nto_tda(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_nto_tda(self, ri):
 
         here = Path(__file__).parent
         inpfile = here / 'data' / 'c2h4.inp'
@@ -230,10 +236,21 @@ class TestNTO:
         dens_cube_vals = np.array([float(x) for x in raw_vals.split()])
         dens_cube_vals = dens_cube_vals.reshape(nstates * 2, -1)
 
-        self.run_nto(inpfile, xcfun_label, eig_vals, nto_lambdas, nto_cube_vals,
-                     dens_cube_vals, 'tda')
+        eig_vals = {
+            False: eig_vals,
+            True: np.array(
+                [0.31645072, 0.34675141, 0.34866307, 0.35832620, 0.38625852])
+        }[ri]
+        nto_lambdas = {
+            False: nto_lambdas,
+            True: np.array([0.939996, 0.657976, 0.998597, 0.660069, 0.611129])
+        }[ri]
 
-    def test_nto_rpa(self):
+        self.run_nto(inpfile, xcfun_label, eig_vals, nto_lambdas, nto_cube_vals,
+                     dens_cube_vals, 'tda', ri)
+
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_nto_rpa(self, ri):
 
         here = Path(__file__).parent
         inpfile = here / 'data' / 'c2h4.inp'
@@ -344,5 +361,11 @@ class TestNTO:
         dens_cube_vals = np.array([float(x) for x in raw_vals.split()])
         dens_cube_vals = dens_cube_vals.reshape(nstates * 2, -1)
 
+        eig_vals = {
+            False: eig_vals,
+            True: np.array(
+                [0.30466279, 0.30538645, 0.31769222, 0.33178816, 0.35266409])
+        }[ri]
+
         self.run_nto(inpfile, xcfun_label, eig_vals, nto_lambdas, nto_cube_vals,
-                     dens_cube_vals, 'rpa')
+                     dens_cube_vals, 'rpa', ri)

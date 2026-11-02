@@ -43,7 +43,7 @@ class TestInputCppECD:
 
         MPI.COMM_WORLD.barrier()
 
-    def get_input_lines(self, xcfun):
+    def get_input_lines(self, xcfun, ri):
 
         input_lines = """
             @jobs
@@ -83,19 +83,22 @@ class TestInputCppECD:
             @end
         """
 
+        if ri:
+            input_lines = input_lines.replace('ri: false', 'ri: yes')
+
         if xcfun is not None:
             input_lines = input_lines.replace(
                 '@method settings', f'@method settings\nxcfun:{xcfun}')
 
         return input_lines
 
-    def run_input_cpp_ecd(self, capsys, xcfun, ref_data):
+    def run_input_cpp_ecd(self, capsys, xcfun, ri, ref_data):
 
         here = Path(__file__).parent
         random_string = get_random_string_parallel()
         input_file = here / 'data' / f'vlx_cpp_ecd_{random_string}.inp'
 
-        input_lines = self.get_input_lines(xcfun)
+        input_lines = self.get_input_lines(xcfun, ri)
         self.create_input_file(input_lines, input_file)
 
         with patch.object(sys, 'argv', ['vlx', str(input_file)]):
@@ -103,6 +106,13 @@ class TestInputCppECD:
             captured = capsys.readouterr()
 
             if MPI.COMM_WORLD.Get_rank() == mpi_master():
+                # NOTE: printed only where the SCF formed its Fock matrices
+                # with RI; one which fell back to the four-center integrals
+                # prints a warning instead.
+                if ri:
+                    assert ('Using the SIMD resolution of the identity'
+                            in captured.out)
+
                 cpp_line_number = None
                 output_lines = captured.out.splitlines()
 
@@ -156,50 +166,92 @@ class TestInputCppECD:
 
             self.remove_input_and_h5_files(input_file)
 
-    def test_input_rhf_cpp_ecd(self, capsys):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_input_rhf_cpp_ecd(self, capsys, ri):
 
         xcfun = None
 
         ref_data = {
-            'wf_model': 'Spin-Restricted Hartree-Fock',
-            'e_scf': -225.9526840315,
-            'n_scf_iterations': 5,
-            'dipole': 0.923876,
-            'nfreqs': 11,
-            'n_cpp_iterations': 10,
-            'cpp_energies': np.array([
-                0.4500, 0.4600, 0.4700, 0.4800, 0.4900, 0.5000, 0.5100, 0.5200,
-                0.5300, 0.5400, 0.5500
-            ]),
-            'cpp_ecd_values': np.array([
-                -1.29153530, 1.80271442, 0.24229833, 0.01949196, -0.14441290,
-                -0.77377515, -5.55622119, 5.44284829, 0.55350044, -0.46225168,
-                -1.87160197
-            ]),
-        }
+            False: {
+                'wf_model': 'Spin-Restricted Hartree-Fock',
+                'e_scf': -225.9526840315,
+                'n_scf_iterations': 5,
+                'dipole': 0.923876,
+                'nfreqs': 11,
+                'n_cpp_iterations': 10,
+                'cpp_energies': np.array([
+                    0.4500, 0.4600, 0.4700, 0.4800, 0.4900, 0.5000, 0.5100,
+                    0.5200, 0.5300, 0.5400, 0.5500
+                ]),
+                'cpp_ecd_values': np.array([
+                    -1.29153530, 1.80271442, 0.24229833, 0.01949196,
+                    -0.14441290, -0.77377515, -5.55622119, 5.44284829,
+                    0.55350044, -0.46225168, -1.87160197
+                ]),
+            },
+            True: {
+                'wf_model': 'Spin-Restricted Hartree-Fock',
+                'e_scf': -225.953068460,
+                'n_scf_iterations': 10,
+                'dipole': 0.92367500,
+                'nfreqs': 11,
+                'n_cpp_iterations': 10,
+                'cpp_energies': np.array([
+                    0.45000000, 0.46000000, 0.47000000, 0.48000000, 0.49000000,
+                    0.50000000, 0.51000000, 0.52000000, 0.53000000, 0.54000000,
+                    0.55000000
+                ]),
+                'cpp_ecd_values': np.array([
+                    -1.298146, 1.804446, 0.242494, 0.019651, -0.143948,
+                    -0.771104, -5.556031, 5.441055, 0.556770, -0.460831,
+                    -1.867030
+                ])
+            }
+        }[ri]
 
-        self.run_input_cpp_ecd(capsys, xcfun, ref_data)
+        self.run_input_cpp_ecd(capsys, xcfun, ri, ref_data)
 
-    def test_input_rks_cpp_ecd(self, capsys):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_input_rks_cpp_ecd(self, capsys, ri):
 
         xcfun = 'b3lyp'
 
         ref_data = {
-            'wf_model': 'Spin-Restricted Kohn-Sham',
-            'e_scf': -227.1612519218,
-            'n_scf_iterations': 4,
-            'dipole': 0.859299,
-            'nfreqs': 11,
-            'n_cpp_iterations': 5,
-            'cpp_energies': np.array([
-                0.4500, 0.4600, 0.4700, 0.4800, 0.4900, 0.5000, 0.5100, 0.5200,
-                0.5300, 0.5400, 0.5500
-            ]),
-            'cpp_ecd_values': np.array([
-                -1.5111483, -11.89993278, -26.60109317, 3.54769273, 4.04898144,
-                20.54478343, 3.95404303, -0.75578452, 8.35512241, -9.02677093,
-                21.08438121
-            ]),
-        }
+            False: {
+                'wf_model': 'Spin-Restricted Kohn-Sham',
+                'e_scf': -227.1612519218,
+                'n_scf_iterations': 4,
+                'dipole': 0.859299,
+                'nfreqs': 11,
+                'n_cpp_iterations': 5,
+                'cpp_energies': np.array([
+                    0.4500, 0.4600, 0.4700, 0.4800, 0.4900, 0.5000, 0.5100,
+                    0.5200, 0.5300, 0.5400, 0.5500
+                ]),
+                'cpp_ecd_values': np.array([
+                    -1.5111483, -11.89993278, -26.60109317, 3.54769273,
+                    4.04898144, 20.54478343, 3.95404303, -0.75578452,
+                    8.35512241, -9.02677093, 21.08438121
+                ]),
+            },
+            True: {
+                'wf_model': 'Spin-Restricted Kohn-Sham',
+                'e_scf': -227.162522904,
+                'n_scf_iterations': 10,
+                'dipole': 0.85913600,
+                'nfreqs': 11,
+                'n_cpp_iterations': 5,
+                'cpp_energies': np.array([
+                    0.45000000, 0.46000000, 0.47000000, 0.48000000, 0.49000000,
+                    0.50000000, 0.51000000, 0.52000000, 0.53000000, 0.54000000,
+                    0.55000000
+                ]),
+                'cpp_ecd_values': np.array([
+                    -1.511244, -11.897798, -26.613345, 3.551325, 4.051567,
+                    20.556230, 3.924176, -0.763393, 8.349649, -9.064271,
+                    21.107977
+                ])
+            }
+        }[ri]
 
-        self.run_input_cpp_ecd(capsys, xcfun, ref_data)
+        self.run_input_cpp_ecd(capsys, xcfun, ri, ref_data)

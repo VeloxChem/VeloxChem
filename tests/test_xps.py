@@ -27,15 +27,21 @@ class TestXpsDriver:
 
         return molecule, basis
 
-    def test_water_oxygen_core_ionization_energy(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_water_oxygen_core_ionization_energy(self, ri):
 
         molecule, basis = self.get_water_and_basis()
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.xcfun = 'pbe0'
         scf_drv.ostream.mute()
-        scf_drv.compute(molecule, basis)
+        scf_results = scf_drv.compute(molecule, basis)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         xps_drv = XPSDriver()
         xps_drv.ostream.mute()
@@ -49,7 +55,8 @@ class TestXpsDriver:
 
             assert record['mo_index'] == 0
             assert record['atom_index'] == 0
-            assert record['contribution'] == pytest.approx(0.6004496392,
+            ref_contribution = {False: 0.6004496392, True: 0.6004473135}[ri]
+            assert record['contribution'] == pytest.approx(ref_contribution,
                                                            abs=1.0e-6)
             assert record['ionization_energy_ev'] == pytest.approx(539.249,
                                                                    abs=1.0e-2)
@@ -72,14 +79,20 @@ class TestXpsDriver:
 
         return molecule, basis
 
-    def test_methanol_carbon_oxygen_core_ionization_energy(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_methanol_carbon_oxygen_core_ionization_energy(self, ri):
 
         molecule, basis = self.get_methanol_and_basis()
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
-        scf_drv.compute(molecule, basis)
+        scf_results = scf_drv.compute(molecule, basis)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         xps_drv = XPSDriver()
         xps_drv.ostream.mute()

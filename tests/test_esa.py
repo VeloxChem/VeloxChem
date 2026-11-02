@@ -43,12 +43,17 @@ class TestExcitedStateAbsorption:
 
         return mol, bas
 
-    def _get_esa_transition_dipoles(self, mol, bas, nstates, esafrom=None):
+    def _get_esa_transition_dipoles(self, mol, bas, nstates, ri, esafrom=None):
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         lr_drv = LinearResponseEigenSolver()
         lr_drv.ostream.mute()
@@ -79,12 +84,17 @@ class TestExcitedStateAbsorption:
 
         return mol, bas
 
-    def _get_unrest_esa_results(self, mol, bas, nstates, esafrom=None):
+    def _get_unrest_esa_results(self, mol, bas, nstates, ri, esafrom=None):
 
         scf_drv = ScfUnrestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         lr_drv = LinearResponseUnrestrictedEigenSolver()
         lr_drv.ostream.mute()
@@ -107,16 +117,22 @@ class TestExcitedStateAbsorption:
 
         return dipoles
 
-    def test_esa_transition_density_of_identical_states(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_esa_transition_density_of_identical_states(self, ri):
 
         # For identical states the ESA transition density must reduce to the unrelaxed density.
 
         mol, bas = self._get_water_and_basis()
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         lr_drv = LinearResponseEigenSolver()
         lr_drv.ostream.mute()
@@ -153,59 +169,78 @@ class TestExcitedStateAbsorption:
                 assert np.max(np.abs(esa_trans_dens -
                                      unrelaxed_densities[s])) < 1.0e-12
 
-    def test_esa_transition_dipoles_water(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_esa_transition_dipoles_water(self, ri):
 
         # regression test for the sign of the de-excitation (Y) terms
 
         mol, bas = self._get_water_and_basis()
 
-        dipoles = self._get_esa_transition_dipoles(mol, bas, 3, esafrom=1)
+        dipoles = self._get_esa_transition_dipoles(mol, bas, 3, ri, esafrom=1)
 
         if dipoles is not None:
-            ref_dipoles = np.array([
-                [-0.0794549688, -0.5971935937, 1.6021820000],
-                [0.1512160878, -0.0251332634, -0.0018690476],
-            ])
+            ref_dipoles = {
+                False: np.array([
+                    [-0.0794549688, -0.5971935937, 1.6021820000],
+                    [0.1512160878, -0.0251332634, -0.0018690476],
+                ]),
+                True: np.array([[-0.0794558058, -0.5971998843, 1.6021988767],
+                                [0.1512175387, -0.0251335045, -0.0018690655]])
+            }[ri]
 
             dipoles = self._match_signs(dipoles, ref_dipoles)
 
             assert dipoles.shape[0] == 2
             assert np.max(np.abs(dipoles - ref_dipoles)) < 1.0e-8
 
-    def test_esa_transition_dipoles_formaldehyde(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_esa_transition_dipoles_formaldehyde(self, ri):
 
         # formaldehyde has larger de-excitation amplitudes than water
 
         mol, bas = self._get_formaldehyde_and_basis()
 
-        dipoles = self._get_esa_transition_dipoles(mol, bas, 4, esafrom=1)
+        dipoles = self._get_esa_transition_dipoles(mol, bas, 4, ri, esafrom=1)
 
         if dipoles is not None:
-            ref_dipoles = np.array([
-                [0.0000000000, -0.0599013291, 0.0000000000],
-                [0.0000000000, 0.0000000000, 0.0000000000],
-                [-0.0477763616, 0.0000000000, 0.0000000000],
-            ])
+            ref_dipoles = {
+                False: np.array([
+                    [0.0000000000, -0.0599013291, 0.0000000000],
+                    [0.0000000000, 0.0000000000, 0.0000000000],
+                    [-0.0477763616, 0.0000000000, 0.0000000000],
+                ]),
+                True: np.array([[-1.420978e-16, -0.0598711512, 9.908095e-15],
+                                [-6.816208e-15, 4.895671e-15, 6.292357e-15],
+                                [-0.0477826662, 3.479722e-16, 6.539451e-13]])
+            }[ri]
 
             dipoles = self._match_signs(dipoles, ref_dipoles)
 
             assert dipoles.shape[0] == 3
             assert np.max(np.abs(dipoles - ref_dipoles)) < 1.0e-6
 
-    def test_esa_unrest_transition_dipoles_singlet_water(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_esa_unrest_transition_dipoles_singlet_water(self, ri):
 
         # compare with restricted ESA transition dipoles
 
         mol, bas = self._get_water_and_basis()
 
-        esa_results = self._get_unrest_esa_results(mol, bas, 6)
+        esa_results = self._get_unrest_esa_results(mol, bas, 6, ri)
 
         if esa_results is not None:
-            ref_excitation_energies = np.array([0.0706309931, 0.0887848965])
-            ref_dipoles = np.array([
-                [-0.0794549688, -0.5971935937, 1.6021820000],
-                [0.1512160878, -0.0251332634, -0.0018690476],
-            ])
+            ref_excitation_energies = {
+                False: np.array([0.0706309931, 0.0887848965]),
+                True: np.array([0.0706208215, 0.0887779539]),
+            }[ri]
+            ref_dipoles = {
+                False: np.array([
+                    [-0.0794549688, -0.5971935937, 1.6021820000],
+                    [0.1512160878, -0.0251332634, -0.0018690476],
+                ]),
+                True: np.array([[-0.0794557550, -0.5971995025, 1.6021978523],
+                                [0.1512152429, -0.0251331230, -0.0018690371]])
+            }[ri]
 
             dipoles = []
             for ref_ene in ref_excitation_energies:
@@ -219,24 +254,31 @@ class TestExcitedStateAbsorption:
 
             assert np.max(np.abs(dipoles - ref_dipoles)) < 1.0e-5
 
-    def test_esa_unrest_transition_dipoles_triplet_water(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_esa_unrest_transition_dipoles_triplet_water(self, ri):
 
         mol, bas = self._get_triplet_water_and_basis()
 
-        esa_results = self._get_unrest_esa_results(mol, bas, 4, esafrom=1)
+        esa_results = self._get_unrest_esa_results(mol, bas, 4, ri, esafrom=1)
 
         if esa_results is not None:
-            ref_excitation_energies = np.array([
-                0.0087253354, 0.1579950135, 0.4590985513
-            ])
+            ref_excitation_energies = {
+                False: np.array([0.0087253354, 0.1579950135, 0.4590985513]),
+                True: np.array([0.0087296060, 0.1580046522, 0.4591048888])
+            }[ri]
             ref_oscillator_strengths = np.array([
                 1.1027020148e-33, 3.5691078533e-06, 1.6953562026e-03
             ])
-            ref_transition_dipoles = np.array([
-                [0.0000000000, 0.0000000000, 0.0000000000],
-                [-0.0058210828, 0.0000000000, 0.0000000000],
-                [0.0000000000, 0.0744257377, 0.0000000000],
-            ])
+            ref_transition_dipoles = {
+                False: np.array([
+                    [0.0000000000, 0.0000000000, 0.0000000000],
+                    [-0.0058210828, 0.0000000000, 0.0000000000],
+                    [0.0000000000, 0.0744257377, 0.0000000000],
+                ]),
+                True: np.array([[4.163336e-16, -9.276800e-16, -9.058017e-17],
+                                [-0.0058219937, -8.831394e-16, 2.373785e-17],
+                                [-1.886478e-17, 0.0743403956, 2.866839e-13]])
+            }[ri]
 
             src_states = [item['from_state'] for item in esa_results]
             dest_states = [item['to_state'] for item in esa_results]

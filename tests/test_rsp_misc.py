@@ -48,34 +48,55 @@ def _get_unrestricted_water_cation():
     return molecule, basis
 
 
-def _run_restricted_scf(molecule, basis):
+def _run_restricted_scf(molecule, basis, *, ri):
 
     scf_drv = ScfRestrictedDriver()
-    scf_drv.ri = False
+    scf_drv.ri = ri
     scf_drv.ostream.mute()
 
-    return scf_drv.compute(molecule, basis)
+    scf_results = scf_drv.compute(molecule, basis)
+
+    if scf_drv.rank == mpi_master():
+        if ri:
+            assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+            assert not scf_results['ri_fallback']
+
+    return scf_results
 
 
-def _run_unrestricted_scf(molecule, basis):
+def _run_unrestricted_scf(molecule, basis, *, ri):
 
     scf_drv = ScfUnrestrictedDriver()
-    scf_drv.ri = False
+    scf_drv.ri = ri
     scf_drv.ostream.mute()
 
-    return scf_drv.compute(molecule, basis)
+    scf_results = scf_drv.compute(molecule, basis)
+
+    if scf_drv.rank == mpi_master():
+        if ri:
+            assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+            assert not scf_results['ri_fallback']
+
+    return scf_results
 
 
-def _run_restarted_restricted_scf(molecule, basis, filename):
+def _run_restarted_restricted_scf(molecule, basis, filename, *, ri):
 
     scf_drv = ScfRestrictedDriver()
-    scf_drv.ri = False
+    scf_drv.ri = ri
     scf_drv.ostream.mute()
     scf_drv.filename = filename
     scf_drv.compute(molecule, basis)
     scf_drv.restart = True
 
-    return scf_drv.compute(molecule, basis)
+    scf_results = scf_drv.compute(molecule, basis)
+
+    if scf_drv.rank == mpi_master():
+        if ri:
+            assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+            assert not scf_results['ri_fallback']
+
+    return scf_results
 
 
 def _configure_lr(driver, filename):
@@ -203,12 +224,13 @@ def _bcast_path_string(comm, path_string):
         (TdaEigenSolver, _configure_tda, _compare_eigen_results),
     ],
 )
+@pytest.mark.parametrize('ri', [False, True])
 def test_restricted_response_settings_roundtrip(tmp_path, solver_cls,
                                                 configure_solver,
-                                                compare_results):
+                                                compare_results, ri):
 
     molecule, basis = _get_restricted_water()
-    scf_results = _run_restricted_scf(molecule, basis)
+    scf_results = _run_restricted_scf(molecule, basis, ri=ri)
 
     driver = solver_cls()
     driver.ostream.mute()
@@ -304,10 +326,11 @@ def test_restricted_response_settings_roundtrip(tmp_path, solver_cls,
 
 
 @pytest.mark.solvers
-def test_unrestricted_response_settings_roundtrip(tmp_path):
+@pytest.mark.parametrize('ri', [False, True])
+def test_unrestricted_response_settings_roundtrip(tmp_path, ri):
 
     molecule, basis = _get_unrestricted_water_cation()
-    scf_results = _run_unrestricted_scf(molecule, basis)
+    scf_results = _run_unrestricted_scf(molecule, basis, ri=ri)
 
     driver = LinearResponseUnrestrictedSolver()
     driver.ostream.mute()
@@ -403,7 +426,8 @@ def test_unrestricted_response_settings_roundtrip(tmp_path):
 
 
 @pytest.mark.solvers
-def test_match_settings_rejects_restart_with_mismatched_settings(tmp_path):
+@pytest.mark.parametrize('ri', [False, True])
+def test_match_settings_rejects_restart_with_mismatched_settings(tmp_path, ri):
 
     molecule, basis = _get_restricted_water()
 
@@ -412,7 +436,10 @@ def test_match_settings_rejects_restart_with_mismatched_settings(tmp_path):
 
     filename = _bcast_path_string(reference_drv.comm,
                                   str(tmp_path / 'lr_match_settings'))
-    scf_results = _run_restarted_restricted_scf(molecule, basis, filename)
+    scf_results = _run_restarted_restricted_scf(molecule,
+                                                basis,
+                                                filename,
+                                                ri=ri)
     reference_scf_results = dict(scf_results)
     reference_scf_results['filename'] = filename
 
@@ -439,7 +466,8 @@ def test_match_settings_rejects_restart_with_mismatched_settings(tmp_path):
 
 
 @pytest.mark.solvers
-def test_match_settings_allows_restart_without_settings_groups(tmp_path):
+@pytest.mark.parametrize('ri', [False, True])
+def test_match_settings_allows_restart_without_settings_groups(tmp_path, ri):
 
     molecule, basis = _get_restricted_water()
 
@@ -448,7 +476,10 @@ def test_match_settings_allows_restart_without_settings_groups(tmp_path):
 
     filename = _bcast_path_string(reference_drv.comm,
                                   str(tmp_path / 'lr_backward_compatible'))
-    scf_results = _run_restarted_restricted_scf(molecule, basis, filename)
+    scf_results = _run_restarted_restricted_scf(molecule,
+                                                basis,
+                                                filename,
+                                                ri=ri)
     reference_scf_results = dict(scf_results)
     reference_scf_results['filename'] = filename
 
