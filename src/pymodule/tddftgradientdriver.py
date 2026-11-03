@@ -121,6 +121,9 @@ class TddftGradientDriver(GradientDriver):
         self.do_first_order_prop = False
         self.relaxed_dipole_moment = None
         self.unrelaxed_dipole_moment = None
+        # the origin of the dipole moments in bohr; None takes the center of
+        # nuclear charge (see FirstOrderProperties)
+        self.dipole_moment_origin = None
 
         # option dictionaries from input
         # TODO: cleanup
@@ -1210,7 +1213,8 @@ class TddftGradientDriver(GradientDriver):
 
         """
 
-        first_order_prop = FirstOrderProperties(self.comm, self.ostream)
+        first_order_prop = FirstOrderProperties(
+            self.comm, self.ostream, origin=self.dipole_moment_origin)
         first_order_prop.compute(molecule, basis, density)
 
         if self.rank == mpi_master():

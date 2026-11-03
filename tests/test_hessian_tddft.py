@@ -145,3 +145,43 @@ class TestTddftHessianDriver:
         tamm_dancoff = False
         ref_label = "rpa_camb3lyp"
         self.run_tddft_hessian(xcfun_label, tamm_dancoff, ref_label, ri=ri)
+
+    @pytest.mark.solvers
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_dipole_gradient_of_charged_molecule(self, ri):
+
+        molecule = Molecule.read_xyz_string("""2
+        hydroxide
+        O    0.000000    0.000000    0.000000
+        H    0.000000    0.000000    0.970000
+        """)
+        molecule.set_charge(-1)
+        basis = MolecularBasis.read(molecule, 'sto-3g', ostream=None)
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ri = ri
+        scf_drv.ostream.mute()
+        scf_results = scf_drv.compute(molecule, basis)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
+
+        rsp_drv = TdaEigenSolver()
+        rsp_drv.nstates = 1
+        rsp_drv.ostream.mute()
+        rsp_drv.compute(molecule, basis, scf_results)
+
+        hessian_drv = TddftHessianDriver(scf_drv, rsp_drv=rsp_drv)
+        hessian_drv.do_dipole_gradient = True
+        hessian_drv.ostream.mute()
+        hessian_drv.compute(molecule, basis)
+
+        # Moving the whole molecule by t changes the dipole moment of a
+        # molecule with charge q by q t when the origin is fixed, so the
+        # dipole gradient summed over the atoms is q times the unit matrix.
+        if MPI.COMM_WORLD.Get_rank() == mpi_master():
+            dipole_gradient = hessian_drv.dipole_gradient.reshape(3, -1, 3)
+            assert np.max(np.abs(dipole_gradient.sum(axis=1) +
+                                 np.eye(3))) < 1.0e-8

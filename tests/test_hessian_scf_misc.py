@@ -342,3 +342,29 @@ class TestScfHessianDriverMiscellaneous:
 
         assert hess_drv._determine_xc_hessian_grid_level(
             au2_molecule, au2_basis, default_grid_level) == 6
+
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_numerical_dipole_gradient_of_charged_molecule(self, ri):
+
+        molecule = Molecule.read_xyz_string("""2
+        hydroxide
+        O    0.000000    0.000000    0.000000
+        H    0.000000    0.000000    0.970000
+        """)
+        molecule.set_charge(-1)
+        basis = MolecularBasis.read(molecule, 'sto-3g', ostream=None)
+        scf_drv = self.run_restricted_scf(molecule, basis, ri=ri)
+
+        hess_drv = ScfHessianDriver(scf_drv)
+        hess_drv.ostream.mute()
+        hess_drv.numerical = True
+        hess_drv.do_dipole_gradient = True
+        hess_drv.compute(molecule, basis)
+
+        # Moving the whole molecule by t changes the dipole moment of a
+        # molecule with charge q by q t when the origin is fixed, so the
+        # dipole gradient summed over the atoms is q times the unit matrix.
+        if scf_drv.rank == mpi_master():
+            dipole_gradient = hess_drv.dipole_gradient.reshape(3, -1, 3)
+            assert np.max(np.abs(dipole_gradient.sum(axis=1) +
+                                 np.eye(3))) < 1.0e-8

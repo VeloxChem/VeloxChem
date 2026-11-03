@@ -2061,7 +2061,15 @@ class ScfHessianDriver(HessianDriver):
 
         scf_results = self.scf_driver.scf_results
 
-        prop = FirstOrderProperties(self.comm, self.ostream)
+        # NOTE: a fixed origin, the one of the analytical dipole gradient
+        # (compute_dipole_gradient_restricted and _unrestricted). The default
+        # origin of FirstOrderProperties, the center of nuclear charge, moves
+        # with the atoms; for a charged molecule the finite differences of
+        # compute_numerical would then add -q Z_A / sum(Z) to the derivative
+        # with respect to atom A.
+        prop = FirstOrderProperties(self.comm,
+                                    self.ostream,
+                                    origin=[0.0, 0.0, 0.0])
         prop.compute_scf_prop(molecule, basis, scf_results)
 
         if self.rank == mpi_master():

@@ -246,6 +246,10 @@ class TddftHessianDriver(HessianDriver):
         # Calculate excited-state relaxed dipole moment
         if self.do_dipole_gradient:
             tddft_gradient_driver.do_first_order_prop = True
+            # NOTE: a fixed origin for the finite differences of
+            # compute_numerical, as in
+            # ScfHessianDriver.compute_electric_dipole_moment.
+            tddft_gradient_driver.dipole_moment_origin = [0.0, 0.0, 0.0]
 
         tddft_gradient_driver.ostream.mute()
         tddft_gradient_driver.compute(
