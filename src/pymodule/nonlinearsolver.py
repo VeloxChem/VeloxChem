@@ -561,6 +561,32 @@ class NonlinearSolver:
         else:
             return None
 
+    def _note_ri_batch_memory(self, density_memory, ndens):
+        """
+        Records, for memory profiling, the most the solver held on the master
+        rank for the densities of one batch of an RI build.
+
+        :param density_memory:
+            The memory of one density, as get_ri_batch_size took it; None away
+            from the master rank, where nothing is recorded.
+        :param ndens:
+            The densities of the batch.
+        """
+
+        if density_memory is not None:
+            self._ri_batch_memory = max(getattr(self, '_ri_batch_memory', 0),
+                                        density_memory * ndens)
+
+    def _print_ri_memory_check(self):
+        """
+        Prints, with memory profiling, the most the simd RI driver was
+        predicted to reach and the solver held for a batch, against the growth
+        of each rank's peak after the driver was set up. Every rank must call
+        this.
+        """
+
+        rijkresponse.print_memory_check(self)
+
     def _ri_density_memory(self, molecule, ao_basis, dft_dict, n_ao, mode,
                            mode_is_cubic):
         """
@@ -803,13 +829,13 @@ class NonlinearSolver:
         elif mode_is_quadratic:
             n_total = second_order_dens.shape(1)
 
+        density_memory = None
+
         if self._uses_ri_jk() or self._uses_ri_coulomb():
             # NOTE: without factors from the caller, use_ri_jk below is false
             # and the build takes the four-center integrals. It passes no
             # memory, which gives get_batch_size's count, as every
             # four-center build takes.
-            density_memory = None
-
             if self.rank == mpi_master() and (self._uses_ri_coulomb() or
                                               dens_factors is not None):
                 density_memory = self._ri_density_memory(
@@ -874,6 +900,17 @@ class NonlinearSolver:
             if mode_is_cubic:
                 batch_size_second_order = self.comm.bcast(
                     batch_size_second_order, root=mpi_master())
+
+        # NOTE: the densities whose Fock matrices a batch builds, once a batch
+        # with a functional is rounded to whole groups: the second- and
+        # third-order ones of a cubic mode, the others of a quadratic mode.
+        if density_memory is not None:
+            if self._dft and mode_is_cubic:
+                fock_densities = batch_size + batch_size_second_order
+            else:
+                fock_densities = batch_size
+            self._note_ri_batch_memory(density_memory,
+                                       min(fock_densities, n_total))
 
         # NOTE: **the factors are broadcast as the densities are.** They are built
         # on the master rank alone, and the response driver sweeps only the share

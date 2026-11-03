@@ -324,6 +324,10 @@ class ThreePATransitionDriver(NonlinearSolver):
 
         profiler.end(self.ostream)
 
+        # NOTE: the RI memory check of this driver's own Fock builds; the
+        # solvers it drives print their own.
+        self._print_ri_memory_check()
+
         if self.rank == mpi_master():
             ret_dict.update({
                 'oscillator_strengths': oscillator_strengths,

@@ -312,6 +312,10 @@ class ShgDriver(NonlinearSolver):
 
         profiler.end(self.ostream)
 
+        # NOTE: the RI memory check of this driver's own Fock builds; the
+        # solvers it drives print their own.
+        self._print_ri_memory_check()
+
         # Compute dipole vector
         scf_prop = FirstOrderProperties(self.comm, self.ostream)
         scf_prop.compute_scf_prop(molecule, ao_basis, scf_results)

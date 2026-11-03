@@ -301,6 +301,10 @@ class TpaDriverBase(NonlinearSolver):
 
         profiler.end(self.ostream)
 
+        # NOTE: the RI memory check of this driver's own Fock builds; the
+        # solvers it drives print their own.
+        self._print_ri_memory_check()
+
         if self.rank == mpi_master() and self.filename is not None:
             self._write_final_hdf5(self.filename, tpa_dict)
 

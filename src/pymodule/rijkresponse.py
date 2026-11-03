@@ -230,7 +230,11 @@ def print_memory_check(solver):
 
     # NOTE: the growth of the peak and not the peak itself, as in the SCF: what
     # a rank held before the setup was not free when the budget was taken.
-    grown = Profiler.get_peak_memory() - solver._ri_rss_at_setup
+    #
+    # NOTE: at least zero. The start is the resident memory read at the setup
+    # and the end the kernel's high-water mark, and the two counters can differ
+    # by a few hundred kB, which turns a growth near zero negative.
+    grown = max(Profiler.get_peak_memory() - solver._ri_rss_at_setup, 0)
     grown_all = solver.comm.allgather(grown)
     largest = max(grown_all)
 

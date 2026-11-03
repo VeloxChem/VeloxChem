@@ -364,3 +364,33 @@ class TestResponseRiMemory:
             assert solver._ri_batch_memory >= 7 * nao * nao * 8
         else:
             assert solver._ri_batch_memory == 0
+
+    @pytest.mark.parametrize('xcfun', ['b3lyp', 'blyp'])
+    def test_memory_profiling_of_a_nonlinear_driver(self, xcfun):
+
+        molecule, basis = self.get_water()
+        scf_results = self.run_scf(molecule, basis, xcfun)
+
+        drv = QuadraticResponseDriver()
+        drv.ostream.mute()
+        drv.update_settings({
+            'conv_thresh': 1.0e-6,
+            'b_frequencies': [0.2],
+            'c_frequencies': [0.2],
+            'damping': 0.1,
+            'a_component': 'z',
+            'b_component': 'z',
+            'c_component': 'x',
+            'memory_profiling': 'yes',
+        })
+        drv.compute(molecule, basis, scf_results)
+
+        assert drv._ri_rss_at_setup is not None
+
+        # NOTE: recorded by the driver's own Fock builds, on the master rank
+        # only; at least one density of the 3 matrices of n_ao by n_ao.
+        if drv.rank == mpi_master():
+            nao = basis.get_dimensions_of_basis()
+            assert drv._ri_batch_memory >= 3 * nao * nao * 8
+        else:
+            assert drv._ri_batch_memory == 0
