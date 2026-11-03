@@ -574,7 +574,12 @@ class Profiler:
             The amount of available memory as text string.
         """
 
-        return self.memory_to_string(psutil.virtual_memory().available)
+        # NOTE: the memory this process may still take: the node's free
+        # memory, or less where a control group the process is in (a Slurm
+        # allocation on a shared node) leaves less of its limit free.
+        from .environment import get_available_memory
+
+        return self.memory_to_string(get_available_memory())
 
     @staticmethod
     def memory_to_string(memsize):
