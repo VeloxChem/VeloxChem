@@ -385,7 +385,9 @@ class TestFikaScf:
             assert abs(results['E_emb']) > 0.0
 
     @pytest.mark.parametrize('ri', [False, True])
-    def test_scf_and_linear_response_from_potfile(self, tmp_path, ri):
+    @pytest.mark.parametrize('potfile_storage', ['file', 'string'])
+    def test_scf_and_linear_response_from_potfile(self, tmp_path, ri,
+                                                  potfile_storage):
 
         potfile = tmp_path / 'fika_water.pot'
         potfile.write_text("""
@@ -420,7 +422,20 @@ class TestFikaScf:
         scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_drv.conv_thresh = 1.0e-8
-        scf_drv.potfile = str(potfile)
+        if potfile_storage == 'file':
+            scf_drv.potfile = str(potfile)
+        else:
+            scf_drv.embedding = {
+                'settings': {
+                    'embedding_method': 'fika'
+                },
+                'inputs': {
+                    'potfile': {
+                        'source': 'string',
+                        'text': potfile.read_text(),
+                    },
+                },
+            }
         scf_results = scf_drv.compute(molecule, basis)
 
         if scf_drv.rank == mpi_master():
@@ -446,13 +461,21 @@ class TestFikaScf:
                 {False: 0.0021369030, True: 0.0021374109}[ri],
                 abs=1.0e-8)
             assert scf_results['embedding_method'] == 'fika'
-            assert scf_results['potfile'] == str(potfile)
+            expected_potfile = (str(potfile)
+                                if potfile_storage == 'file' else None)
+            assert scf_results['potfile'] == expected_potfile
 
             assert lrs_drv._pe
             assert lrs_drv.embedding['settings'] == {
                 'embedding_method': 'fika'
             }
-            assert lrs_drv.embedding['inputs']['potfile'] == str(potfile)
+            if potfile_storage == 'file':
+                assert lrs_drv.embedding['inputs']['potfile'] == str(potfile)
+            else:
+                assert lrs_drv.embedding['inputs']['potfile'] == {
+                    'source': 'string',
+                    'text': potfile.read_text(),
+                }
             assert lrs_drv._embedding_drv.switching is not None
 
             ref_response = {

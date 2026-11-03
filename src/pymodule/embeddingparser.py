@@ -37,7 +37,7 @@ import numpy as np
 from .trajectoryparserbase import TrajectoryParserBase
 from .embeddingpotfilewriter import EmbeddingPotfileWriter
 from .fikaembedding import fika_embedding_sanity_check
-from .inputparser import InputParser
+from .fikapotfilereader import FikaPotfileReader
 from .molecule import Molecule
 from .veloxchemlib import bohr_in_angstrom
 
@@ -136,7 +136,7 @@ class EmbeddingParser(TrajectoryParserBase):
     def read_pdb(self,
                  pdb_file,
                  *,
-                 potfile,
+                 output_potfile=None,
                  qm_region="",
                  qm_charge=0,
                  qm_multiplicity=1,
@@ -146,12 +146,16 @@ class EmbeddingParser(TrajectoryParserBase):
                  pe_model=("CP3", "SEP"),
                  npe_model=("ff19sb", "tip3p"),
                  embedding_settings=None):
-        """Read a single-frame PDB and prepare a potfile-backed embedding.
+        """Read a single-frame PDB and create its QM molecule and embedding.
 
         :param pdb_file:
             Input PDB file containing the QM subsystem and environment.
-        :param potfile:
-            Path of the potential file to create.
+        :param output_potfile:
+            Optional output path for the generated potential file. When it is
+            omitted, the potfile text is stored directly in the returned
+            embedding dictionary and no potfile is created. When supplied,
+            an existing file is overwritten and the embedding contains an
+            explicit file source referencing this path.
         :param qm_region:
             MDAnalysis selection for the QM subsystem. When omitted, the
             parser selects atoms with residue name ``MOL``.
@@ -214,36 +218,45 @@ class EmbeddingParser(TrajectoryParserBase):
         if method != "fika":
             raise ValueError("embedding_method must be 'fika'.")
         settings["embedding_method"] = "fika"
+        writer = EmbeddingPotfileWriter(self.comm, self.ostream)
+        writer.set_env_models(pe_model=pe_model, npe_model=npe_model)
+        potfile_text = writer.render_potfile(snapshot)
+        if potfile_text is None:
+            raise ValueError(
+                "The selected PDB environment is empty; no potfile content "
+                "was created.")
+
+        if output_potfile is None:
+            potfile = {
+                "source": "string",
+                "text": potfile_text,
+            }
+        else:
+            potfile_path = writer.write_pot_file(snapshot, output_potfile)
+            if not potfile_path.is_file():
+                raise OSError(f"Failed to create potfile {potfile_path}")
+            potfile = {
+                "source": "file",
+                "path": str(potfile_path),
+            }
+
         embedding = {
             "settings": settings,
             "inputs": {
-                "potfile": str(potfile),
+                "potfile": potfile,
             },
         }
         fika_embedding_sanity_check(embedding)
-
-        potfile_path = self.write_pot_file(
-            snapshot,
-            potfile,
-            pe_model=pe_model,
-            npe_model=npe_model,
-        )
-        if potfile_path is None or not potfile_path.is_file():
-            raise ValueError(
-                "The selected PDB environment is empty; no potfile was "
-                "created.")
-
-        embedding["inputs"]["potfile"] = str(potfile_path)
         return molecule, embedding
 
     @staticmethod
     def _environment_xyz_from_potfile(potfile):
         """Build an XYZ string from a potfile ``@environment`` section."""
-        data = InputParser(potfile).input_dict
+        data, source = FikaPotfileReader().read_data(potfile)
         environment = data.get("environment")
         if not isinstance(environment, dict) or "xyz" not in environment:
             raise ValueError(
-                f"{potfile}: missing @environment section with xyz")
+                f"{source}: missing @environment section with xyz")
 
         units = str(environment.get("units", "angstrom")).lower()
         if len(units) >= 3 and units == "angstrom"[:len(units)]:
@@ -251,7 +264,7 @@ class EmbeddingParser(TrajectoryParserBase):
         elif units in ("au", "bohr"):
             scale = bohr_in_angstrom()
         else:
-            raise ValueError(f"{potfile}: unknown units {units}")
+            raise ValueError(f"{source}: unknown units {units}")
 
         xyz_lines = environment["xyz"]
         if isinstance(xyz_lines, str):
@@ -262,16 +275,16 @@ class EmbeddingParser(TrajectoryParserBase):
             fields = line.split()
             if len(fields) not in (6, 7):
                 raise ValueError(
-                    f"{potfile}: xyz line {line_number}: needs element, "
+                    f"{source}: xyz line {line_number}: needs element, "
                     "three coordinates, residue, resid and atom name")
             try:
                 coordinates = [float(value) * scale for value in fields[1:4]]
             except ValueError:
                 raise ValueError(
-                    f"{potfile}: xyz line {line_number}: invalid coordinates")
+                    f"{source}: xyz line {line_number}: invalid coordinates")
             if not all(np.isfinite(coordinates)):
                 raise ValueError(
-                    f"{potfile}: xyz line {line_number}: invalid coordinates")
+                    f"{source}: xyz line {line_number}: invalid coordinates")
             atoms.append((fields[0], coordinates))
 
         output = [str(len(atoms)), "embedding environment"]
@@ -295,7 +308,8 @@ class EmbeddingParser(TrajectoryParserBase):
         :param molecule:
             QM molecule to display.
         :param potfile:
-            Potential file containing an ``@environment`` section.
+            Potential-file source containing an ``@environment`` section.
+            This may be a legacy path or an explicit file/string source.
         :param embedding:
             Fika embedding dictionary containing ``inputs.potfile``.
         :param width:

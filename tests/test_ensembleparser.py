@@ -7,6 +7,8 @@ from veloxchem.embeddingparser import EmbeddingParser
 from veloxchem.embeddingpotfilewriter import EmbeddingPotfileWriter
 from veloxchem.ensembleparser import EnsembleParser
 from veloxchem.fikaembedding import fika_embedding_sanity_check
+from veloxchem.fikapotfilereader import FikaPotfileReader
+from veloxchem.inputparser import InputParser
 
 pytest.importorskip("MDAnalysis")
 
@@ -208,7 +210,7 @@ class TestEnsembleParser:
 
         molecule, embedding = parser.read_pdb(
             simple_tip3_pdb,
-            potfile=potfile,
+            output_potfile=potfile,
             qm_region="resname LIG",
             qm_charge=0,
             qm_multiplicity=1,
@@ -226,12 +228,43 @@ class TestEnsembleParser:
                 "switching": None,
             },
             "inputs": {
-                "potfile": str(potfile),
+                "potfile": {
+                    "source": "file",
+                    "path": str(potfile),
+                },
             },
         }
         fika_embedding_sanity_check(embedding)
         if parser.rank == trajectoryparserbase_module.mpi_master():
             assert potfile.is_file()
+            source = InputParser(potfile).input_dict["source"]
+            assert source["pdb_file"] == str(simple_tip3_pdb)
+            assert source["qm_region"] == "resname LIG"
+            assert source["pe_cutoff_angstrom"] == "3.0"
+            assert source["pe_models"] == "CP3, SEP"
+
+    def test_embedding_parser_reads_pdb_with_inline_embedding(self, tmp_path):
+        simple_tip3_pdb = make_simple_tip3_pdb(tmp_path)
+        parser = EmbeddingParser()
+        parser.ostream.mute()
+
+        molecule, embedding = parser.read_pdb(
+            simple_tip3_pdb,
+            qm_region="resname LIG",
+            pe_cutoff=3.0,
+        )
+
+        assert molecule.number_of_atoms() == 1
+        potfile = embedding["inputs"]["potfile"]
+        assert potfile["source"] == "string"
+        assert "@environment\n" in potfile["text"]
+        source = InputParser.from_string(potfile["text"]).input_dict["source"]
+        assert source["pdb_file"] == str(simple_tip3_pdb)
+        assert source["frame"] == "0"
+        assert source["qm_charge"] == "0"
+        classical_system = FikaPotfileReader().read(potfile)
+        assert classical_system.number_of_residues(True) == 1
+        fika_embedding_sanity_check(embedding)
 
     def test_embedding_parser_read_pdb_rejects_other_extensions(self,
                                                                 tmp_path):
@@ -241,7 +274,7 @@ class TestEnsembleParser:
                 match=r"EmbeddingParser\.read_pdb requires a \.pdb file"):
             parser.read_pdb(
                 tmp_path / "structure.xyz",
-                potfile=tmp_path / "embedding.pot",
+                output_potfile=tmp_path / "embedding.pot",
                 pe_cutoff=3.0,
             )
 
@@ -252,7 +285,6 @@ class TestEnsembleParser:
         parser.ostream.mute()
         molecule, embedding = parser.read_pdb(
             simple_tip3_pdb,
-            potfile=tmp_path / "embedding.pot",
             qm_region="resname LIG",
             pe_cutoff=3.0,
         )

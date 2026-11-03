@@ -40,6 +40,8 @@ from .veloxchemlib import (mpi_master, bohr_in_angstroms,
                            FikaQmmmEmbeddingOptions, FikaQmmmSources,
                            FikaTholeDamping)
 from .errorhandler import assert_msg_critical
+from .fikapotfilesource import (normalize_potfile_source,
+                                potfile_source_description)
 
 # Default inner switching function of the fika embedding (angstrom).
 default_fika_switching = {'r_on': 1.0, 'r_off': 1.9}
@@ -100,7 +102,10 @@ def fika_embedding_sanity_check(embedding):
             - pdb_file, solvent, and optionally radius or shells, unit
               ('angstrom' or 'bohr') and solute (residue name, 'MOL'): the QM
               molecule is the solute of the PDB file;
-            - potfile: a potential file with the classical environment;
+            - potfile: a potential-file source with the classical
+              environment. A string is a legacy file path; an explicit
+              source is ``{'source': 'file', 'path': ...}`` or
+              ``{'source': 'string', 'text': ...}``;
             - objects: {'classical_system': FikaClassicalSystem}.
 
     :param embedding:
@@ -182,6 +187,10 @@ def fika_embedding_sanity_check(embedding):
         }
     elif has_potfile:
         unknown = set(inputs) - {'potfile'}
+        try:
+            normalize_potfile_source(inputs['potfile'])
+        except (TypeError, ValueError) as exc:
+            assert_msg_critical(False, f'fika embedding: {exc}')
     else:
         assert_msg_critical(
             isinstance(inputs['objects'], dict) and isinstance(
@@ -372,7 +381,8 @@ class FikaEmbedding:
                                  inputs.get('unit', 'angstrom'))
         elif 'potfile' in self.options['inputs']:
             inputs = self.options['inputs']
-            lines.append(f"- potfile         : {inputs['potfile']}")
+            source = potfile_source_description(inputs['potfile'])
+            lines.append(f"- potfile         : {source}")
         lines.append('- residues        : ' +
                      f'{system.number_of_residues(True)} polarizable, ' +
                      f'{system.number_of_residues(False)} nonpolarizable')

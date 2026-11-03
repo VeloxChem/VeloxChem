@@ -575,7 +575,59 @@ class EmbeddingPotfileWriter:
         """Ensure that PE and NPE regions do not split a residue."""
         self._ensure_no_split_residues_between_pe_and_npe(snapshot)
 
-    def _potfile_text(self, snapshot: dict) -> str | None:
+    @staticmethod
+    def _source_value(value):
+        if isinstance(value, (list, tuple)):
+            value = ", ".join(str(item) for item in value)
+        value = str(value)
+        if "\n" in value or "\r" in value:
+            raise ValueError("potfile source values must be single-line")
+        return value
+
+    def _write_source(self, output, snapshot, source):
+        provenance = dict(snapshot.get("provenance", {}))
+        if source is not None:
+            if not isinstance(source, dict):
+                raise TypeError(
+                    "potfile source provenance must be a dictionary")
+            provenance.update(source)
+
+        provenance.setdefault("schema_version", 1)
+        provenance.setdefault("generator", "VeloxChem EmbeddingPotfileWriter")
+        provenance.setdefault("frame", snapshot.get("frame"))
+        provenance.setdefault("trajectory_time_ps",
+                              snapshot.get("trajectory_time"))
+        provenance.setdefault("qm_charge", snapshot.get("qm_charge"))
+        provenance.setdefault("qm_multiplicity",
+                              snapshot.get("qm_multiplicity"))
+        if self.pe_model is not None:
+            provenance["pe_models"] = self.pe_model["model_names"]
+        if self.npe_model is not None:
+            provenance["npe_models"] = self.npe_model["model_names"]
+
+        preferred_order = (
+            "schema_version", "generator", "pdb_file", "topology_file",
+            "trajectory_file", "frame", "trajectory_time_ps", "qm_region",
+            "qm_charge", "qm_multiplicity", "environment_region",
+            "pe_cutoff_angstrom", "npe_cutoff_angstrom", "pe_models",
+            "npe_models",
+        )
+        keys = [key for key in preferred_order if key in provenance]
+        keys.extend(sorted(set(provenance) - set(keys)))
+
+        output.write("@source\n")
+        for key in keys:
+            value = provenance[key]
+            if value is None or (isinstance(value, str) and not value):
+                continue
+            if isinstance(value, (list, tuple)) and not value:
+                continue
+            output.write(f"{key}: {self._source_value(value)}\n")
+        output.write("@end\n\n")
+
+    def render_potfile(self, snapshot: dict, source=None) -> str | None:
+        """Render a snapshot as potfile text, including provenance."""
+
         arrays = self.validate_snapshot(snapshot)
         pe = arrays["pe"]
         npe = arrays["npe"]
@@ -592,6 +644,7 @@ class EmbeddingPotfileWriter:
                     unique_resnames[region].append(name)
 
         output = StringIO()
+        self._write_source(output, snapshot, source)
         output.write("@environment\nunits: angstrom\nxyz:\n")
         for region, data in (("pe", pe), ("npe", npe)):
             for coords, element, resname, resid, atom_name in zip(
@@ -657,9 +710,17 @@ class EmbeddingPotfileWriter:
             output.write("@end\n")
         return output.getvalue()
 
-    def write_pot_file(self, snapshot: dict, filename: str | Path):
+    def _potfile_text(self, snapshot: dict) -> str | None:
+        """Backward-compatible alias for :meth:`render_potfile`."""
+
+        return self.render_potfile(snapshot)
+
+    def write_pot_file(self,
+                       snapshot: dict,
+                       filename: str | Path,
+                       source=None):
         """Write one snapshot to an explicitly named potential file."""
-        text = self._potfile_text(snapshot)
+        text = self.render_potfile(snapshot, source=source)
         path = Path(filename)
         if text is not None and self.rank == mpi_master():
             path.parent.mkdir(parents=True, exist_ok=True)

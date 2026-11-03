@@ -30,13 +30,12 @@
 #  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 from mpi4py import MPI
-from pathlib import Path
 import numpy as np
 
 from .veloxchemlib import (mpi_master, bohr_in_angstrom,
                            chemical_element_identifier, FikaClassicalSystem,
                            FikaForceField, FikaResidue)
-from .inputparser import InputParser
+from .fikapotfilesource import parse_potfile_source
 
 
 class FikaPotfileReader:
@@ -76,28 +75,43 @@ class FikaPotfileReader:
         self.comm = comm
         self.rank = comm.Get_rank()
 
-    def read(self, path):
+    def read_data(self, potfile):
+        """Read and broadcast parsed data from a file or inline source."""
+
+        data = None
+        source = None
+        error = None
+        if self.rank == mpi_master():
+            try:
+                data, source = parse_potfile_source(potfile)
+            except Exception as exc:
+                error = (type(exc).__name__, str(exc))
+        data, source, error = self.comm.bcast(
+            (data, source, error), root=mpi_master())
+        if error is not None:
+            error_type, message = error
+            if error_type == 'FileNotFoundError':
+                raise FileNotFoundError(message)
+            if error_type == 'TypeError':
+                raise TypeError(message)
+            raise ValueError(message)
+        return data, source
+
+    def read(self, potfile):
         """
         Reads a potential file.
 
-        :param path:
-            The path of the file.
+        :param potfile:
+            A legacy file path or a potfile source dictionary. Explicit
+            sources have ``source`` equal to ``file`` (with ``path``) or
+            ``string`` (with inline ``text``).
 
         :return:
             The FikaClassicalSystem of the environment.
         """
 
-        path = Path(path)
-        data = None
-        if self.rank == mpi_master():
-            try:
-                data = InputParser(path).input_dict
-            except OSError:
-                data = None
-        data = self.comm.bcast(data, root=mpi_master())
-        if data is None:
-            raise FileNotFoundError(f'cannot open potential file {path}')
-        return self._build(data, str(path))
+        data, source = self.read_data(potfile)
+        return self._build(data, source)
 
     def _build(self, data, source):
 
