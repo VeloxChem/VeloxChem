@@ -1425,6 +1425,19 @@ class LinearSolver:
                 'LinearSolver._e2n_half_size: '
                 'inconsistent shape of trial vectors')
 
+            # NOTE: the build is written for arrays of real numbers on every
+            # path. Every solver which reaches here stores its trial vectors so
+            # (the damped response stores a complex vector as its real and
+            # imaginary parts). An array of complex numbers would lose its
+            # imaginary part in the four-center build without an error, so it
+            # is refused here.
+            assert_msg_critical(
+                not np.iscomplexobj(vecs_ger.data) and
+                not np.iscomplexobj(vecs_ung.data),
+                'LinearSolver: the trial vectors have to be arrays of real ' +
+                'numbers (complex ones as their real and imaginary parts), ' +
+                'not arrays of complex numbers')
+
             mo = scf_results['C_alpha']
             fa = scf_results['F_alpha']
 
@@ -1928,6 +1941,19 @@ class LinearSolver:
                 'LinearSolver._e2n_half_size: '
                 'inconsistent shape of trial vectors')
 
+            # NOTE: the build is written for arrays of real numbers on every
+            # path. Every solver which reaches here stores its trial vectors so
+            # (the damped response stores a complex vector as its real and
+            # imaginary parts). An array of complex numbers would lose its
+            # imaginary part in the four-center build without an error, so it
+            # is refused here.
+            assert_msg_critical(
+                not np.iscomplexobj(vecs_ger.data) and
+                not np.iscomplexobj(vecs_ung.data),
+                'LinearSolver: the trial vectors have to be arrays of real ' +
+                'numbers (complex ones as their real and imaginary parts), ' +
+                'not arrays of complex numbers')
+
             mo = scf_results['C_alpha']
             fa = scf_results['F_alpha']
 
@@ -2019,19 +2045,12 @@ class LinearSolver:
             # this way of building cannot be taken, and then nothing looks for them.
             #
             # The two modes which restrict the orbital space carry a different set
-            # of orbitals and are left out for that reason. The test for a complex
-            # trial vector is not about anything this code does today: every solver
-            # which reaches here works in real arithmetic, the complex vectors of
-            # the damped response being carried as real blocks, so the test always
-            # passes. It is here so that the day the complex path is developed
-            # these solvers fall back to the dense route rather than hand complex
-            # data to a driver which takes doubles.
+            # of orbitals and are left out for that reason.
             ri_jk_factors = None
 
             if (self.rank == mpi_master() and self._uses_ri_jk() and
                     not getattr(self, 'core_excitation', False) and
-                    not getattr(self, 'restricted_subspace', False) and
-                    not np.iscomplexobj(vecs_ger.data)):
+                    not getattr(self, 'restricted_subspace', False)):
                 ri_jk_factors = (mo[:, :nocc], [], [])
 
             prep_t0 = tm.time()
@@ -2899,6 +2918,19 @@ class LinearSolver:
                 vecs_ger.shape(0) == vecs_ung.shape(0),
                 'LinearSolver._e2n_half_size: '
                 'inconsistent shape of trial vectors')
+
+            # NOTE: the build is written for arrays of real numbers on every
+            # path. Every solver which reaches here stores its trial vectors so
+            # (the damped response stores a complex vector as its real and
+            # imaginary parts). An array of complex numbers would lose its
+            # imaginary part in the four-center build without an error, so it
+            # is refused here.
+            assert_msg_critical(
+                not np.iscomplexobj(vecs_ger.data) and
+                not np.iscomplexobj(vecs_ung.data),
+                'LinearSolver: the trial vectors have to be arrays of real ' +
+                'numbers (complex ones as their real and imaginary parts), ' +
+                'not arrays of complex numbers')
 
             mo_a = scf_results['C_alpha']
             mo_b = scf_results['C_beta']
