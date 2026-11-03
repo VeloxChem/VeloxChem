@@ -1,4 +1,6 @@
+from collections import namedtuple
 from pathlib import Path
+from types import SimpleNamespace
 import numpy as np
 import pytest
 
@@ -8,6 +10,7 @@ from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.dispersionmodel import DispersionModel
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.scfhessiandriver import ScfHessianDriver
+import veloxchem.batchsize as batchsize
 
 
 class TestHessianAtomPair:
@@ -140,3 +143,57 @@ class TestHessianAtomPair:
                                                    0.0,
                                                    rtol=1.0e-7,
                                                    atol=1.0e-9)
+
+    @pytest.mark.solvers
+    def test_batches_of_the_atoms_in_pairs(self, monkeypatch):
+        """The exchange-correlation part over the atoms in pairs takes every
+        one of them, also where they do not fill the last batch: four atoms,
+        three of them in pairs, two to a batch."""
+
+        mol = Molecule.read_xyz_string("""4
+
+        N     0.000000000     0.000000000     0.000000000
+        H    -0.653401663     0.309213352     0.817609879
+        H     0.695693936     0.071283622    -0.702632331
+        H    -0.468651181    -0.844282500    -0.433152944""")
+
+        basis = MolecularBasis.read(mol, 'sto-3g', ostream=None)
+        nao = basis.get_dimensions_of_basis()
+
+        atom_pairs = [(0, 1), (1, 2)]
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.xcfun = 'b3lyp'
+        scf_drv.ostream.mute()
+        scf_drv.compute(mol, basis)
+
+        def run():
+            hess_drv = ScfHessianDriver(scf_drv)
+            hess_drv.atom_pairs = atom_pairs
+            hess_drv.update_settings({}, cphf_dict={'conv_thresh': 1.0e-8})
+            hess_drv.compute(mol, basis)
+            return hess_drv.hessian
+
+        whole = run()
+
+        # NOTE: get_batch_size gives 6 Fock matrices for the 9 of the three
+        # atoms in pairs (an estimate of nao^2 doubles a thread for each, with
+        # four threads, and 6.5 of them free to the one rank on the node), so
+        # two atoms to a batch. Only the name psutil in batchsize is replaced,
+        # so the RI memory budgets, which read the free memory elsewhere, are
+        # not touched.
+        memory = namedtuple('memory', ['total', 'available'])
+        available = int(6.5 * nao * nao * 8 * 4)
+        monkeypatch.setattr(
+            batchsize, 'psutil',
+            SimpleNamespace(
+                virtual_memory=lambda: memory(64 * 1024**3, available)))
+        monkeypatch.setenv('OMP_NUM_THREADS', '4')
+        monkeypatch.setenv('SLURM_NTASKS_PER_NODE', '1')
+
+        assert batchsize.get_batch_size(None, 9, nao, scf_drv.comm) == 6
+
+        batched = run()
+
+        if scf_drv.rank == mpi_master():
+            assert np.max(np.abs(whole - batched)) < 1.0e-8

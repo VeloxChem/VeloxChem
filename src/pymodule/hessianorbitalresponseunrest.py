@@ -316,7 +316,7 @@ class UnrestrictedHessianOrbitalResponse(CphfSolver):
                 batch_size = max(batch_size // 3, 1)
 
                 num_batches = natm_in_pairs // batch_size
-                if natm % batch_size != 0:
+                if natm_in_pairs % batch_size != 0:
                     num_batches += 1
 
             for batch_ind in range(num_batches):
