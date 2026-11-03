@@ -725,6 +725,37 @@ class LinearSolver:
             self.ostream.print_blank()
             self.ostream.flush()
 
+    def _get_excitation_orbital_indices(self, nocc, norb):
+        """
+        Gets the orbitals the trial vectors excite between, in the order
+        lrvec2mat lays them out.
+
+        :param nocc:
+            The number of occupied orbitals (of one spin).
+        :param norb:
+            The number of orbitals.
+
+        :return:
+            The indices of the occupied orbitals the trial vectors excite from
+            and of the virtual orbitals they excite to: the core orbitals and
+            every virtual one for core excitation; the core and the highest
+            valence orbitals and the lowest virtual ones for a restricted
+            subspace; every occupied and every virtual orbital otherwise.
+        """
+
+        if getattr(self, 'core_excitation', False):
+            occ_inds = list(range(self.num_core_orbitals))
+            vir_inds = list(range(nocc, norb))
+        elif getattr(self, 'restricted_subspace', False):
+            occ_inds = (list(range(self.num_core_orbitals)) +
+                        list(range(nocc - self.num_valence_orbitals, nocc)))
+            vir_inds = list(range(nocc, nocc + self.num_virtual_orbitals))
+        else:
+            occ_inds = list(range(nocc))
+            vir_inds = list(range(nocc, norb))
+
+        return occ_inds, vir_inds
+
     def _ri_density_memory(self, molecule, basis, dft_dict, n_ao, n_matrices,
                            n_factor_columns, n_sliced):
         """
@@ -2000,9 +2031,9 @@ class LinearSolver:
 
         if self._uses_ri_jk() or self._uses_ri_coulomb():
             # NOTE: an RI-JK build also holds the two right factors of each
-            # density (ri_jk_factors below), n_ao by nocc. The two modes which
-            # restrict the orbital space form no factors and are built from the
-            # four-center integrals; they are given the same memory.
+            # density (ri_jk_factors below), n_ao by the occupied orbitals the
+            # trial vectors excite from: nocc, or fewer for core excitation or
+            # a restricted subspace, which nocc bounds.
             density_memory = None
 
             if self.rank == mpi_master():
@@ -2061,15 +2092,16 @@ class LinearSolver:
                 dks = None
             # NOTE: the factors of the densities, collected beside them. None where
             # this way of building cannot be taken, and then nothing looks for them.
-            #
-            # The two modes which restrict the orbital space carry a different set
-            # of orbitals and are left out for that reason.
+            # The left factor is the occupied orbitals the trial vectors excite
+            # from, which are fewer than all of them where core excitation or a
+            # restricted subspace is asked for.
             ri_jk_factors = None
 
-            if (self.rank == mpi_master() and self._uses_ri_jk() and
-                    not getattr(self, 'core_excitation', False) and
-                    not getattr(self, 'restricted_subspace', False)):
-                ri_jk_factors = (mo[:, :nocc], [], [])
+            if self.rank == mpi_master() and self._uses_ri_jk():
+                occ_inds, vir_inds = self._get_excitation_orbital_indices(
+                    nocc, norb)
+                mo_vir_exc = mo[:, vir_inds]
+                ri_jk_factors = (mo[:, occ_inds], [], [])
 
             prep_t0 = tm.time()
 
@@ -2142,21 +2174,25 @@ class LinearSolver:
                         dak = self.commut_mo_density(kn, nocc)
                         dak = np.linalg.multi_dot([mo, dak, mo.T])
 
-                        # NOTE: the same density as the factors it is made of,
-                        # which the resolution of the identity wants and the dense
-                        # path does not. The commutator leaves the occupied
-                        # orbitals on the left of the excitation part and on the
-                        # right of the de-excitation part, so the density is
-                        # C(occupied) times the first factor transposed plus the
-                        # second factor times C(occupied) transposed, and one
-                        # transformation of the occupied orbitals serves both.
-                        if ri_jk_factors is not None:
-                            n_ov = nocc * (norb - nocc)
-                            mo_vir = mo[:, nocc:]
-                            zmat = vec[:n_ov].reshape(nocc, norb - nocc)
-                            ymat = vec[n_ov:].reshape(nocc, norb - nocc)
-                            ri_jk_factors[1].append(-np.matmul(mo_vir, zmat.T))
-                            ri_jk_factors[2].append(np.matmul(mo_vir, ymat.T))
+                    # NOTE: the same density as the factors it is made of,
+                    # which the resolution of the identity wants and the dense
+                    # path does not. lrvec2mat lays the excitation part out
+                    # between the occupied orbitals the trial vectors excite
+                    # from and the virtual ones they excite to, in each mode,
+                    # and the commutator leaves those occupied orbitals on the
+                    # left of the excitation part and on the right of the
+                    # de-excitation part. So the density is C(occupied) times
+                    # the first factor transposed plus the second factor times
+                    # C(occupied) transposed, and one transformation of the
+                    # occupied orbitals serves both.
+                    if ri_jk_factors is not None:
+                        n_occ_exc = len(occ_inds)
+                        n_vir_exc = len(vir_inds)
+                        n_ov = n_occ_exc * n_vir_exc
+                        zmat = vec[:n_ov].reshape(n_occ_exc, n_vir_exc)
+                        ymat = vec[n_ov:].reshape(n_occ_exc, n_vir_exc)
+                        ri_jk_factors[1].append(-np.matmul(mo_vir_exc, zmat.T))
+                        ri_jk_factors[2].append(np.matmul(mo_vir_exc, ymat.T))
 
                     dks.append(dak)
                     kns.append(kn)
@@ -2990,8 +3026,8 @@ class LinearSolver:
 
         if self._uses_ri_jk() or self._uses_ri_coulomb():
             # NOTE: as in _e2n_half_size_single_comm, for both spins: n_ao by
-            # nocc_a and n_ao by nocc_b for each RI-JK right factor, and the
-            # same memory for the core excitation case.
+            # nocc_a and n_ao by nocc_b for each RI-JK right factor, which bound
+            # the core excitation case.
             density_memory = None
 
             if self.rank == mpi_master():
@@ -3056,17 +3092,23 @@ class LinearSolver:
                 kns_b = None
 
             # NOTE: the factors of each spin, gathered beside its densities. The
-            # left factor of a spin is its own occupied orbitals, so the two spins
-            # carry a set each rather than sharing one. Formed only where the
-            # resolution of the identity will use them, and only outside the core
-            # excitation case, whose orbitals are a subset the factors below do not
-            # describe.
+            # left factor of a spin is the occupied orbitals of that spin the
+            # trial vectors excite from (the core ones for core excitation), so
+            # the two spins carry a set each rather than sharing one. Formed
+            # only where the resolution of the identity will use them.
             ri_jk_factors = None
 
-            if (self.rank == mpi_master() and self._uses_ri_jk() and
-                    not getattr(self, 'core_excitation', False)):
-                ri_jk_factors = ((mo_a[:, :nocc_a], [], []),
-                                 (mo_b[:, :nocc_b], [], []))
+            if self.rank == mpi_master() and self._uses_ri_jk():
+                occ_inds_a, vir_inds_a = self._get_excitation_orbital_indices(
+                    nocc_a, norb)
+                occ_inds_b, vir_inds_b = self._get_excitation_orbital_indices(
+                    nocc_b, norb)
+                ri_jk_factors = ((mo_a[:, occ_inds_a], [], []),
+                                 (mo_b[:, occ_inds_b], [], []))
+                ri_jk_spins = ((ri_jk_factors[0], mo_a[:, vir_inds_a],
+                                len(occ_inds_a), len(vir_inds_a)),
+                               (ri_jk_factors[1], mo_b[:, vir_inds_b],
+                                len(occ_inds_b), len(vir_inds_b)))
 
             prep_t0 = tm.time()
 
@@ -3153,23 +3195,23 @@ class LinearSolver:
                         dak = np.linalg.multi_dot([mo_a, dak, mo_a.T])
                         dbk = np.linalg.multi_dot([mo_b, dbk, mo_b.T])
 
-                        # NOTE: the same densities as the factors they are made of,
-                        # spin by spin. The commutator leaves that spin's occupied
-                        # orbitals on the left of the excitation part and on the
-                        # right of the de-excitation part, exactly as in the
-                        # restricted case, so each density is C(occupied) times the
-                        # first factor transposed plus the second factor times
-                        # C(occupied) transposed.
-                        if ri_jk_factors is not None:
-                            for factors, vec, mo, nocc in (
-                                    (ri_jk_factors[0], vec_a, mo_a, nocc_a),
-                                    (ri_jk_factors[1], vec_b, mo_b, nocc_b)):
-                                n_ov = nocc * (norb - nocc)
-                                mo_vir = mo[:, nocc:]
-                                zmat = vec[:n_ov].reshape(nocc, norb - nocc)
-                                ymat = vec[n_ov:].reshape(nocc, norb - nocc)
-                                factors[1].append(-np.matmul(mo_vir, zmat.T))
-                                factors[2].append(np.matmul(mo_vir, ymat.T))
+                    # NOTE: the same densities as the factors they are made of,
+                    # spin by spin. The commutator leaves the occupied orbitals
+                    # of that spin which the trial vectors excite from on the
+                    # left of the excitation part and on the right of the
+                    # de-excitation part, exactly as in the restricted case, so
+                    # each density is C(occupied) times the first factor
+                    # transposed plus the second factor times C(occupied)
+                    # transposed.
+                    if ri_jk_factors is not None:
+                        for (factors, mo_vir_exc, n_occ_exc,
+                             n_vir_exc), vec_spin in zip(ri_jk_spins,
+                                                         (vec_a, vec_b)):
+                            n_ov = n_occ_exc * n_vir_exc
+                            zmat = vec_spin[:n_ov].reshape(n_occ_exc, n_vir_exc)
+                            ymat = vec_spin[n_ov:].reshape(n_occ_exc, n_vir_exc)
+                            factors[1].append(-np.matmul(mo_vir_exc, zmat.T))
+                            factors[2].append(np.matmul(mo_vir_exc, ymat.T))
 
                     dks_a.append(dak)
                     dks_b.append(dbk)

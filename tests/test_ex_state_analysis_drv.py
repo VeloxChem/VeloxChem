@@ -263,11 +263,11 @@ class TestCTNumbers:
         avg_hole_position = np.array([-2.06430183, 0.17889688, 2.35290839])
         avg_particle_position = {
             False: np.array([-1.45474337, 0.02338098, 1.75900387]),
-            True: np.array([-1.45473892, 0.02338250, 1.75900196])
+            True: np.array([-1.45474161, 0.02338293, 1.75900451])
         }[ri]
         avg_difference_vec = {
             False: np.array([0.60955845, -0.1555159, -0.59390452]),
-            True: np.array([0.60956306, -0.15551441, -0.59390657])
+            True: np.array([0.60956037, -0.15551398, -0.59390402])
         }[ri]
 
         # Molecule and basis

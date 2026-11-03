@@ -209,11 +209,11 @@ class TestUnrestrictedRPA:
         if lr_drv.rank == mpi_master():
             ref_exc_enes = {
                 False: np.array([19.686416638, 20.394042142, 20.435119894]),
-                True: np.array([19.686644224, 20.394282351, 20.435369958])
+                True: np.array([19.686629210, 20.394282949, 20.435366772])
             }[ri]
             ref_osc_str = {
                 False: np.array([0.051629296, 0.002790081, 0.013572433]),
-                True: np.array([0.051628316, 0.002787279, 0.013566293])
+                True: np.array([0.051628277, 0.002788722, 0.013575975])
             }[ri]
 
             assert np.max(np.abs(lr_results['eigenvalues'] -
