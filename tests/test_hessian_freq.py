@@ -11,7 +11,7 @@ from veloxchem.vibrationalanalysis import VibrationalAnalysis
 
 class TestHessianFrequencies:
 
-    def run_hessian_freq(self, dispersion, ref_vib_freqs):
+    def run_hessian_freq(self, dispersion, ref_vib_freqs, *, ri):
 
         mol = Molecule.read_xyz_string("""14
         xyz
@@ -33,10 +33,15 @@ class TestHessianFrequencies:
         bas = MolecularBasis.read(mol, 'sto-3g')
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_drv.dispersion = dispersion
-        scf_drv.compute(mol, bas)
+        scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         vibanalysis_drv = VibrationalAnalysis(scf_drv)
         vibanalysis_drv.ostream.mute()
@@ -51,20 +56,29 @@ class TestHessianFrequencies:
     @pytest.mark.solvers
     @pytest.mark.skipif(not DispersionModel.is_available(),
                         reason='dftd4-python not available')
-    def test_hessian_freq_d4(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_hessian_freq_d4(self, ri):
 
         dispersion = True
-        ref_vib_freqs = np.array([52.91, 57.97, 154.55, 199.55, 275.43])
-        self.run_hessian_freq(dispersion, ref_vib_freqs)
+        ref_vib_freqs = {
+            False: np.array([52.91, 57.97, 154.55, 199.55, 275.43]),
+            True: np.array([52.686, 57.825, 154.524, 199.488, 275.417])
+        }[ri]
+        self.run_hessian_freq(dispersion, ref_vib_freqs, ri=ri)
 
     @pytest.mark.timeconsuming
-    def test_hessian_freq(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_hessian_freq(self, ri):
 
         dispersion = False
-        ref_vib_freqs = np.array([37.77, 42.84, 149.97, 195.25, 274.24])
-        self.run_hessian_freq(dispersion, ref_vib_freqs)
+        ref_vib_freqs = {
+            False: np.array([37.77, 42.84, 149.97, 195.25, 274.24]),
+            True: np.array([37.420, 42.683, 149.940, 195.187, 274.225])
+        }[ri]
+        self.run_hessian_freq(dispersion, ref_vib_freqs, ri=ri)
 
-    def run_hessian_freq_with_isotopes(self, isotopes_input, ref_vib_freqs):
+    def run_hessian_freq_with_isotopes(self, isotopes_input, ref_vib_freqs, *,
+                                       ri):
 
         mol = Molecule.read_xyz_string("""3
         xyz
@@ -75,9 +89,14 @@ class TestHessianFrequencies:
         bas = MolecularBasis.read(mol, 'def2-svp')
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
-        scf_drv.compute(mol, bas)
+        scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         vibanalysis_drv = VibrationalAnalysis(scf_drv)
         vibanalysis_drv.ostream.mute()
@@ -91,13 +110,16 @@ class TestHessianFrequencies:
                                  ref_vib_freqs)) < 0.1
 
     @pytest.mark.solvers
-    def test_hessian_freq_with_isotopes(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_hessian_freq_with_isotopes(self, ri):
 
         ref_vib_freqs = np.array([1349.11, 2556.18, 2662.01])
         isotopes_input = 'H (2.01410177812)'
-        self.run_hessian_freq_with_isotopes(isotopes_input, ref_vib_freqs)
+        self.run_hessian_freq_with_isotopes(isotopes_input,
+                                            ref_vib_freqs,
+                                            ri=ri)
 
-    def run_hessian_freq_with_ecp(self, ref_vib_freqs, ref_ir_intens):
+    def run_hessian_freq_with_ecp(self, ref_vib_freqs, ref_ir_intens, *, ri):
 
         mol = Molecule.read_xyz_string("""2
         xyz
@@ -107,9 +129,14 @@ class TestHessianFrequencies:
         bas = MolecularBasis.read(mol, 'def2-svp')
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
-        scf_drv.compute(mol, bas)
+        scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         vib_drv = VibrationalAnalysis(scf_drv)
         vib_drv.ostream.mute()
@@ -122,8 +149,9 @@ class TestHessianFrequencies:
                                  ref_ir_intens)) < 0.1
 
     @pytest.mark.solvers
-    def test_hessian_freq_with_ecp(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_hessian_freq_with_ecp(self, ri):
 
         ref_vib_freqs = np.array([108.96])
         ref_ir_intens = np.array([37.4141])
-        self.run_hessian_freq_with_ecp(ref_vib_freqs, ref_ir_intens)
+        self.run_hessian_freq_with_ecp(ref_vib_freqs, ref_ir_intens, ri=ri)

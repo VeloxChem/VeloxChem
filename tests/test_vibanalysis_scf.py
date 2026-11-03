@@ -138,18 +138,31 @@ class TestScfVibrationalAnalysisDriver:
         return vib_drv
 
     @pytest.mark.timeconsuming
-    def test_scf_vibrational_analysis_driver_numerical(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_scf_vibrational_analysis_driver_numerical(self, ri):
 
         here = Path(__file__).parent
         inpfile = str(here / 'data' / 'water_hessian_scf.inp')
-        h5file = str(here / 'data' / 'water_vib_scf.h5')
+        # With RI the numerical Hessian differentiates the RI gradient,
+        # while the analytical one uses four-center derivative integrals;
+        # the two differ by more than the tolerances below, so the RI
+        # numerical results have their own reference file.
+        h5file = str(here / 'data' / {
+            False: 'water_vib_scf.h5',
+            True: 'water_vib_scf_numerical_ri.h5'
+        }[ri])
 
         task = MpiTask([inpfile, None])
 
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.acc_type = 'diis'
-        scf_drv.compute(task.molecule, task.ao_basis)
+        scf_results = scf_drv.compute(task.molecule, task.ao_basis)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         vib_settings = {
             'do_ir': 'yes',
@@ -190,17 +203,30 @@ class TestScfVibrationalAnalysisDriver:
         task.finish()
 
     @pytest.mark.timeconsuming
-    def test_scf_resonance_raman_numerical(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_scf_resonance_raman_numerical(self, ri):
 
         here = Path(__file__).parent
         inpfile = str(here / 'data' / 'water_hessian_scf.inp')
-        h5file = str(here / 'data' / 'water_vib_scf.h5')
+        # With RI the numerical Hessian differentiates the RI gradient,
+        # while the analytical one uses four-center derivative integrals;
+        # the two differ by more than the tolerances below, so the RI
+        # numerical results have their own reference file.
+        h5file = str(here / 'data' / {
+            False: 'water_vib_scf.h5',
+            True: 'water_vib_scf_numerical_ri.h5'
+        }[ri])
 
         task = MpiTask([inpfile, None])
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
-        scf_drv.ri = False
+        scf_drv.ri = ri
 
-        scf_drv.compute(task.molecule, task.ao_basis)
+        scf_results = scf_drv.compute(task.molecule, task.ao_basis)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         vib_settings = {
             'do_ir': 'no',
@@ -498,17 +524,26 @@ class TestScfVibrationalAnalysisDriver:
                 plot_type='unsupported')
 
     @pytest.mark.solvers
-    def test_scf_vibrational_analysis_ir(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_scf_vibrational_analysis_ir(self, ri):
 
         here = Path(__file__).parent
         inpfile = str(here / 'data' / 'water_hessian_scf.inp')
-        h5file = str(here / 'data' / 'water_vib_scf.h5')
+        h5file = str(here / 'data' / {
+            False: 'water_vib_scf.h5',
+            True: 'water_vib_scf_ri.h5'
+        }[ri])
 
         task = MpiTask([inpfile, None])
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
-        scf_drv.ri = False
+        scf_drv.ri = ri
 
-        scf_drv.compute(task.molecule, task.ao_basis)
+        scf_results = scf_drv.compute(task.molecule, task.ao_basis)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         vib_settings = {
             'do_ir': 'yes',
@@ -543,17 +578,26 @@ class TestScfVibrationalAnalysisDriver:
 
         task.finish()
 
-    def test_scf_vibrational_analysis_raman(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_scf_vibrational_analysis_raman(self, ri):
 
         here = Path(__file__).parent
         inpfile = str(here / 'data' / 'water_hessian_scf.inp')
-        h5file = str(here / 'data' / 'water_vib_scf.h5')
+        h5file = str(here / 'data' / {
+            False: 'water_vib_scf.h5',
+            True: 'water_vib_scf_ri.h5'
+        }[ri])
 
         task = MpiTask([inpfile, None])
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
-        scf_drv.ri = False
+        scf_drv.ri = ri
 
-        scf_drv.compute(task.molecule, task.ao_basis)
+        scf_results = scf_drv.compute(task.molecule, task.ao_basis)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         vib_settings = {
             'do_ir': 'yes',
@@ -593,17 +637,26 @@ class TestScfVibrationalAnalysisDriver:
 
         task.finish()
 
-    def test_scf_resonance_raman_analytical(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_scf_resonance_raman_analytical(self, ri):
 
         here = Path(__file__).parent
         inpfile = str(here / 'data' / 'water_hessian_scf.inp')
-        h5file = str(here / 'data' / 'water_vib_scf.h5')
+        h5file = str(here / 'data' / {
+            False: 'water_vib_scf.h5',
+            True: 'water_vib_scf_ri.h5'
+        }[ri])
 
         task = MpiTask([inpfile, None])
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
-        scf_drv.ri = False
+        scf_drv.ri = ri
 
-        scf_drv.compute(task.molecule, task.ao_basis)
+        scf_results = scf_drv.compute(task.molecule, task.ao_basis)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         vib_settings = {
             'do_ir': 'no',

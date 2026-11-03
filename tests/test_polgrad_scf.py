@@ -15,11 +15,16 @@ from veloxchem.polarizabilitygradient import PolarizabilityGradient
 @pytest.mark.solvers
 class TestPolgrad:
 
-    def run_polgrad_real(self, molecule, basis, xcfun=None, label=None):
+    def run_polgrad_real(self, molecule, basis, xcfun=None, label=None, *, ri):
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_results = scf_drv.compute(molecule, basis)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         # linear response
         rsp_settings = {'conv_thresh': 1.0e-5, 'frequencies': (0.0, 0.4)}
@@ -44,7 +49,11 @@ class TestPolgrad:
             polgrad_dynamic = polgrad_results[0.4].reshape(3, 3, 3, 3)
             np.set_printoptions(suppress=True, precision=10)
             here = Path(__file__).parent
-            hf_file_name = str(here / 'data' / 'polarizabilitygradients.h5')
+            hf_file_name = str(
+                here / 'data' / {
+                    False: 'polarizabilitygradients.h5',
+                    True: 'polarizabilitygradients_ri.h5'
+                }[ri])
             hf = h5py.File(hf_file_name, 'r')
             an_label = 'an_' + label
             polgrad_reference = np.array(hf.get(an_label))
@@ -69,7 +78,11 @@ class TestPolgrad:
             polgrad_dynamic = polgrad_results[0.4].reshape(3, 3, 3, 3)
             np.set_printoptions(suppress=True, precision=10)
             here = Path(__file__).parent
-            hf_file_name = str(here / 'data' / 'polarizabilitygradients.h5')
+            hf_file_name = str(
+                here / 'data' / {
+                    False: 'polarizabilitygradients.h5',
+                    True: 'polarizabilitygradients_ri.h5'
+                }[ri])
             hf = h5py.File(hf_file_name, 'r')
             num_label = 'num_' + label
             polgrad_reference = np.array(hf.get(num_label))
@@ -79,11 +92,22 @@ class TestPolgrad:
 
             assert np.max(np.abs(polgrad_dynamic) - np.abs(polgrad_dynamic_reference)) < 1.0e-6
 
-    def run_polgrad_complex(self, molecule, basis, xcfun=None, label=None):
+    def run_polgrad_complex(self,
+                            molecule,
+                            basis,
+                            xcfun=None,
+                            label=None,
+                            *,
+                            ri):
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_results = scf_drv.compute(molecule, basis)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         # linear response
         rsp_settings = {'conv_thresh': 1.0e-5, 'frequencies': (0.0, 0.4),
@@ -110,7 +134,11 @@ class TestPolgrad:
             polgrad_dynamic = polgrad_results[0.4].reshape(3, 3, 3, 3)
             np.set_printoptions(suppress=True, precision=10)
             here = Path(__file__).parent
-            hf_file_name = str(here / 'data' / 'polarizabilitygradients.h5')
+            hf_file_name = str(
+                here / 'data' / {
+                    False: 'polarizabilitygradients.h5',
+                    True: 'polarizabilitygradients_ri.h5'
+                }[ri])
             hf = h5py.File(hf_file_name, 'r')
             an_label = 'an_' + label
             polgrad_reference = np.array(hf.get(an_label))
@@ -135,7 +163,11 @@ class TestPolgrad:
             polgrad_dynamic = polgrad_results[0.4].reshape(3, 3, 3, 3)
             np.set_printoptions(suppress=True, precision=10)
             here = Path(__file__).parent
-            hf_file_name = str(here / 'data' / 'polarizabilitygradients.h5')
+            hf_file_name = str(
+                here / 'data' / {
+                    False: 'polarizabilitygradients.h5',
+                    True: 'polarizabilitygradients_ri.h5'
+                }[ri])
             hf = h5py.File(hf_file_name, 'r')
             num_label = 'num_' + label
             polgrad_reference = np.array(hf.get(num_label))
@@ -146,7 +178,8 @@ class TestPolgrad:
             assert np.max(np.abs(polgrad_static) - np.abs(polgrad_static_reference)) < 1.0e-6
             assert np.max(np.abs(polgrad_dynamic) - np.abs(polgrad_dynamic_reference)) < 1.0e-6
 
-    def test_hf_polarizabilitygradient_real(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_hf_polarizabilitygradient_real(self, ri):
         h2o_xyz = """3
 
         O     0.000000    0.000000    0.000000
@@ -158,9 +191,14 @@ class TestPolgrad:
         molecule = Molecule.from_xyz_string(h2o_xyz)
         basis = MolecularBasis.read(molecule, basis_set_label)
 
-        self.run_polgrad_real(molecule, basis, None, "polarizabilitygradient_hf_real")
+        self.run_polgrad_real(molecule,
+                              basis,
+                              None,
+                              "polarizabilitygradient_hf_real",
+                              ri=ri)
 
-    def test_hf_polarizabilitygradient_complex(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_hf_polarizabilitygradient_complex(self, ri):
         h2o_xyz = """3
 
         O     0.000000    0.000000    0.000000
@@ -171,4 +209,8 @@ class TestPolgrad:
         molecule = Molecule.from_xyz_string(h2o_xyz)
         basis = MolecularBasis.read(molecule, basis_set_label)
 
-        self.run_polgrad_complex(molecule, basis, None, "polarizabilitygradient_hf_complex")
+        self.run_polgrad_complex(molecule,
+                                 basis,
+                                 None,
+                                 "polarizabilitygradient_hf_complex",
+                                 ri=ri)

@@ -22,7 +22,8 @@ class TestInputOptVib:
 
         MPI.COMM_WORLD.barrier()
 
-    def test_input_opt_vib(self, capsys, tmp_path):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_input_opt_vib(self, capsys, tmp_path, ri):
 
         # Note: bad geometry for testing purposes
         # `task: optimize` with `hessian: last` triggers optimization
@@ -52,6 +53,9 @@ class TestInputOptVib:
             H   0.0  -1.1   1.1
             @end
         """
+
+        if ri:
+            input_lines = input_lines.replace('ri: false', 'ri: yes')
 
         input_file = tmp_path / 'vlx_opt_vib.inp'
         input_file = Path(MPI.COMM_WORLD.bcast(str(input_file), root=mpi_master()))
@@ -89,10 +93,24 @@ class TestInputOptVib:
                 force_consts = np.array(force_consts)
                 ir_ints = np.array(ir_ints)
 
-                ref_freqs = np.array([1750.50, 4148.93, 4245.10])
+
+                # NOTE: printed only where the SCF formed its Fock matrices
+                # with RI; one which fell back to the four-center integrals
+                # prints a warning instead.
+                if ri:
+                    assert ('Using the SIMD resolution of the identity'
+                            in captured.out)
+
+                ref_freqs = {
+                    False: np.array([1750.50, 4148.93, 4245.10]),
+                    True: np.array([1750.36, 4148.95, 4245.18])
+                }[ri]
                 ref_masses = np.array([1.0816, 1.0461, 1.0825])
                 ref_force_consts = np.array([1.9528, 10.6100, 11.4934])
-                ref_ir_ints = np.array([82.7062, 26.8087, 74.4989])
+                ref_ir_ints = {
+                    False: np.array([82.7062, 26.8087, 74.4989]),
+                    True: np.array([82.7258, 26.7705, 74.4477])
+                }[ri]
 
                 np.testing.assert_allclose(freqs, ref_freqs, atol=0.05)
                 np.testing.assert_allclose(red_masses, ref_masses, atol=0.05)

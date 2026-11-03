@@ -19,18 +19,25 @@ class TestXCMolHess:
                         basis,
                         xcfun_label,
                         ref_exc_deriv_2,
-                        ref_vxc_deriv_1=None):
+                        ref_vxc_deriv_1=None,
+                        *,
+                        ri):
 
         grid_level = 6
         scf_conv_thresh = 1.0e-8
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.xcfun = xcfun_label
         scf_drv.grid_level = grid_level
         scf_drv.conv_thresh = scf_conv_thresh
         scf_drv.ostream.mute()
         scf_results = scf_drv.compute(molecule, basis)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         if scf_drv.rank == mpi_master():
             gs_dm = scf_results['D_alpha']
@@ -60,7 +67,8 @@ class TestXCMolHess:
             assert np.max(np.abs(ref_exc_deriv_2 - exc_deriv_2)) < 1.0e-4
             assert np.max(np.abs(ref_vxc_deriv_1 - vxc_deriv_1)) < 1.0e-4
 
-    def test_xc_mol_hess_lda(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_xc_mol_hess_lda(self, ri):
 
         molecule_string = """
         O   0.0   0.0   0.0
@@ -79,16 +87,24 @@ class TestXCMolHess:
         basis = MolecularBasis.read(molecule, basis_set_label, ostream=None)
 
         here = Path(__file__).parent
-        h5file = str(here / 'data' / 'hessian_lda_data.h5')
+        h5file = str(here / 'data' / {
+            False: 'hessian_lda_data.h5',
+            True: 'hessian_lda_data_ri.h5'
+        }[ri])
         hf = h5py.File(h5file, 'r')
         ref_exc_deriv_2 = np.array(hf.get('exc_geom_deriv_2'))
         ref_vxc_deriv_1 = np.array(hf.get('vxc_geom_deriv_1'))
         hf.close()
 
-        self.run_xc_mol_hess(molecule, basis, xcfun_label, ref_exc_deriv_2,
-                             ref_vxc_deriv_1)
+        self.run_xc_mol_hess(molecule,
+                             basis,
+                             xcfun_label,
+                             ref_exc_deriv_2,
+                             ref_vxc_deriv_1,
+                             ri=ri)
 
-    def test_xc_mol_hess_gga(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_xc_mol_hess_gga(self, ri):
 
         molecule_string = """
         O   0.0   0.0   0.0
@@ -107,16 +123,24 @@ class TestXCMolHess:
         basis = MolecularBasis.read(molecule, basis_set_label, ostream=None)
 
         here = Path(__file__).parent
-        h5file = str(here / 'data' / 'hessian_gga_data.h5')
+        h5file = str(here / 'data' / {
+            False: 'hessian_gga_data.h5',
+            True: 'hessian_gga_data_ri.h5'
+        }[ri])
         hf = h5py.File(h5file, 'r')
         ref_exc_deriv_2 = np.array(hf.get('exc_geom_deriv_2'))
         ref_vxc_deriv_1 = np.array(hf.get('vxc_geom_deriv_1'))
         hf.close()
 
-        self.run_xc_mol_hess(molecule, basis, xcfun_label, ref_exc_deriv_2,
-                             ref_vxc_deriv_1)
+        self.run_xc_mol_hess(molecule,
+                             basis,
+                             xcfun_label,
+                             ref_exc_deriv_2,
+                             ref_vxc_deriv_1,
+                             ri=ri)
 
-    def test_xc_mol_hess_mgga(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_xc_mol_hess_mgga(self, ri):
 
         molecule_string = """
         O   0.0   0.0   0.0
@@ -135,11 +159,18 @@ class TestXCMolHess:
         basis = MolecularBasis.read(molecule, basis_set_label, ostream=None)
 
         here = Path(__file__).parent
-        h5file = str(here / 'data' / 'hessian_mgga_data.h5')
+        h5file = str(here / 'data' / {
+            False: 'hessian_mgga_data.h5',
+            True: 'hessian_mgga_data_ri.h5'
+        }[ri])
         hf = h5py.File(h5file, 'r')
         ref_exc_deriv_2 = np.array(hf.get('exc_geom_deriv_2'))
         ref_vxc_deriv_1 = np.array(hf.get('vxc_geom_deriv_1'))
         hf.close()
 
-        self.run_xc_mol_hess(molecule, basis, xcfun_label, ref_exc_deriv_2,
-                             ref_vxc_deriv_1)
+        self.run_xc_mol_hess(molecule,
+                             basis,
+                             xcfun_label,
+                             ref_exc_deriv_2,
+                             ref_vxc_deriv_1,
+                             ri=ri)

@@ -24,7 +24,7 @@ class TestScfUnrestrictedHessian:
         bas = MolecularBasis.read(mol, 'def2-svp', ostream=None)
         return mol, bas
 
-    def run_hessian_unrest(self, xcfun_label, ref_vib_freqs):
+    def run_hessian_unrest(self, xcfun_label, ref_vib_freqs, *, ri):
 
         mol = Molecule.read_xyz_string("""4
         xyz
@@ -38,10 +38,15 @@ class TestScfUnrestrictedHessian:
         bas = MolecularBasis.read(mol, 'def2-svp')
 
         scf_drv = ScfUnrestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_drv.xcfun = xcfun_label
-        scf_drv.compute(mol, bas)
+        scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         vibanalysis_drv = VibrationalAnalysis(scf_drv)
         vibanalysis_drv.ostream.mute()
@@ -79,26 +84,36 @@ class TestScfUnrestrictedHessian:
                 assert diff_bb < 1e-8
 
     @pytest.mark.solvers
-    def test_hessian_unrest_pbe(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_hessian_unrest_pbe(self, ri):
 
         xcfun_label = 'pbe'
 
-        ref_vib_freqs = np.array(
-            [393.84, 1309.27, 1309.32, 3105.28, 3311.26, 3311.30])
+        ref_vib_freqs = {
+            False: np.array(
+                [393.84, 1309.27, 1309.32, 3105.28, 3311.26, 3311.30]),
+            True: np.array(
+                [394.308, 1309.352, 1309.396, 3105.029, 3311.058, 3311.090])
+        }[ri]
 
-        self.run_hessian_unrest(xcfun_label, ref_vib_freqs)
+        self.run_hessian_unrest(xcfun_label, ref_vib_freqs, ri=ri)
 
     @pytest.mark.solvers
-    def test_hessian_unrest_b3lyp(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_hessian_unrest_b3lyp(self, ri):
 
         xcfun_label = 'b3lyp'
 
-        ref_vib_freqs = np.array(
-            [470.01, 1373.86, 1373.90, 3096.68, 3296.69, 3296.72])
+        ref_vib_freqs = {
+            False: np.array(
+                [470.01, 1373.86, 1373.90, 3096.68, 3296.69, 3296.72]),
+            True: np.array(
+                [469.882, 1373.769, 1373.812, 3096.635, 3296.655, 3296.688])
+        }[ri]
 
-        self.run_hessian_unrest(xcfun_label, ref_vib_freqs)
+        self.run_hessian_unrest(xcfun_label, ref_vib_freqs, ri=ri)
 
-    def run_hessian_unrest_with_ecp(self, ref_vib_freqs, ref_ir_intens):
+    def run_hessian_unrest_with_ecp(self, ref_vib_freqs, ref_ir_intens, *, ri):
 
         mol = Molecule.read_xyz_string("""2
         xyz
@@ -111,9 +126,14 @@ class TestScfUnrestrictedHessian:
         bas = MolecularBasis.read(mol, 'def2-svp')
 
         scf_drv = ScfUnrestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
-        scf_drv.compute(mol, bas)
+        scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         vib_drv = VibrationalAnalysis(scf_drv)
         vib_drv.ostream.mute()
@@ -126,30 +146,46 @@ class TestScfUnrestrictedHessian:
                                  ref_ir_intens)) < 0.1
 
     @pytest.mark.solvers
-    def test_hessian_unrest_with_ecp(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_hessian_unrest_with_ecp(self, ri):
 
-        ref_vib_freqs = np.array([1949.51])
-        ref_ir_intens = np.array([278.8583])
-        self.run_hessian_unrest_with_ecp(ref_vib_freqs, ref_ir_intens)
+        ref_vib_freqs = {
+            False: np.array([1949.51]),
+            True: np.array([1949.657])
+        }[ri]
+        ref_ir_intens = {
+            False: np.array([278.8583]),
+            True: np.array([278.7320])
+        }[ri]
+        self.run_hessian_unrest_with_ecp(ref_vib_freqs, ref_ir_intens, ri=ri)
 
     @pytest.mark.solvers
-    def test_hessian_unrest_with_point_charges_and_vdw(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_hessian_unrest_with_point_charges_and_vdw(self, ri):
 
         mol, bas = self.get_embedded_water_molecule_and_basis()
 
         here = Path(__file__).parent
         potfile = str(here / 'data' / 'pe_water.pot')
         vdwfile = str(here / 'data' / 'pe_water.qm_vdw_params.txt')
-        reffile = str(here / 'data' /
-                      'water_analytical_hessian_pointcharges_unrest_b3lyp.txt')
+        reffile = str(
+            here / 'data' / {
+                False: 'water_analytical_hessian_pointcharges_unrest_b3lyp.txt',
+                True: 'water_analytical_hessian_pointcharges_unrest_b3lyp_ri.txt'
+            }[ri])
 
         scf_drv = ScfUnrestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_drv.xcfun = 'b3lyp'
         scf_drv.point_charges = potfile
         scf_drv.qm_vdw_params = vdwfile
-        scf_drv.compute(mol, bas)
+        scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         hess_drv = ScfHessianDriver(scf_drv)
         hess_drv.ostream.mute()
@@ -163,7 +199,8 @@ class TestScfUnrestrictedHessian:
                                        atol=5.0e-7)
 
     @pytest.mark.solvers
-    def test_hessian_unrest_camb3lyp(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_hessian_unrest_camb3lyp(self, ri):
         mol = Molecule.read_xyz_string("""4
         xyz
         C       -0.8246083505   -2.6364102075   -0.0255277471
@@ -176,10 +213,15 @@ class TestScfUnrestrictedHessian:
         bas = MolecularBasis.read(mol, 'def2-svp')
 
         scf_drv = ScfUnrestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_drv.xcfun = 'cam-b3lyp'
-        scf_drv.compute(mol, bas)
+        scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         hess_drv = ScfHessianDriver(scf_drv)
         hess_drv.ostream.mute()
@@ -188,8 +230,11 @@ class TestScfUnrestrictedHessian:
 
         if scf_drv.rank == mpi_master():
             here = Path(__file__).parent
-            reffile = str(here / 'data' /
-                          'methyl_analytical_hessian_unrest_camb3lyp.txt')
+            reffile = str(
+                here / 'data' / {
+                    False: 'methyl_analytical_hessian_unrest_camb3lyp.txt',
+                    True: 'methyl_analytical_hessian_unrest_camb3lyp_ri.txt'
+                }[ri])
             ref_hessian = np.loadtxt(reffile)
             np.testing.assert_allclose(hess_drv.hessian,
                                        ref_hessian,

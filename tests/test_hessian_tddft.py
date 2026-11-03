@@ -15,7 +15,7 @@ from veloxchem.tddfthessiandriver import TddftHessianDriver
 
 class TestTddftHessianDriver:
 
-    def run_tddft_hessian(self, xcfun_label, tamm_dancoff, ref_label):
+    def run_tddft_hessian(self, xcfun_label, tamm_dancoff, ref_label, *, ri):
 
         molecule_xyz_string = """
             3
@@ -29,15 +29,23 @@ class TestTddftHessianDriver:
         basis = MolecularBasis.read(molecule, basis_set_label)
 
         here = Path(__file__).parent
-        h5file = str(here / 'data' / 'tddft_hessian.h5')
+        h5file = str(here / 'data' / {
+            False: 'tddft_hessian.h5',
+            True: 'tddft_hessian_ri.h5'
+        }[ri])
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.xcfun = xcfun_label
         scf_drv.grid_level = 6
         scf_drv.conv_thresh = 1e-10
         scf_drv.ostream.mute()
         scf_results = scf_drv.compute(molecule, basis)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         if tamm_dancoff:
             rsp_drv = TdaEigenSolver()
@@ -75,57 +83,65 @@ class TestTddftHessianDriver:
             assert diff_dipole_grad < 1.0e-5
 
     @pytest.mark.solvers
-    def test_tda(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_tda(self, ri):
         xcfun_label = "hf"
         tamm_dancoff = True
         ref_label = "tda_hf"
-        self.run_tddft_hessian(xcfun_label, tamm_dancoff, ref_label)
+        self.run_tddft_hessian(xcfun_label, tamm_dancoff, ref_label, ri=ri)
 
     @pytest.mark.timeconsuming
-    def test_tda_pbe(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_tda_pbe(self, ri):
         xcfun_label = "pbe"
         tamm_dancoff = True
         ref_label = "tda_pbe"
-        self.run_tddft_hessian(xcfun_label, tamm_dancoff, ref_label)
+        self.run_tddft_hessian(xcfun_label, tamm_dancoff, ref_label, ri=ri)
 
     @pytest.mark.timeconsuming
-    def test_tda_pbe0(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_tda_pbe0(self, ri):
         xcfun_label = "pbe0"
         tamm_dancoff = True
         ref_label = "tda_pbe0"
-        self.run_tddft_hessian(xcfun_label, tamm_dancoff, ref_label)
+        self.run_tddft_hessian(xcfun_label, tamm_dancoff, ref_label, ri=ri)
 
     @pytest.mark.timeconsuming
-    def test_tda_camb3lyp(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_tda_camb3lyp(self, ri):
         xcfun_label = "cam-b3lyp"
         tamm_dancoff = True
         ref_label = "tda_camb3lyp"
-        self.run_tddft_hessian(xcfun_label, tamm_dancoff, ref_label)
+        self.run_tddft_hessian(xcfun_label, tamm_dancoff, ref_label, ri=ri)
 
     @pytest.mark.solvers
-    def test_rpa(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_rpa(self, ri):
         xcfun_label = "hf"
         tamm_dancoff = False
         ref_label = "rpa_hf"
-        self.run_tddft_hessian(xcfun_label, tamm_dancoff, ref_label)
+        self.run_tddft_hessian(xcfun_label, tamm_dancoff, ref_label, ri=ri)
 
     @pytest.mark.timeconsuming
-    def test_tddft_pbe(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_tddft_pbe(self, ri):
         xcfun_label = "pbe"
         tamm_dancoff = False
         ref_label = "rpa_pbe"
-        self.run_tddft_hessian(xcfun_label, tamm_dancoff, ref_label)
+        self.run_tddft_hessian(xcfun_label, tamm_dancoff, ref_label, ri=ri)
 
     @pytest.mark.timeconsuming
-    def test_tddft_pbe0(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_tddft_pbe0(self, ri):
         xcfun_label = "pbe0"
         tamm_dancoff = False
         ref_label = "rpa_pbe0"
-        self.run_tddft_hessian(xcfun_label, tamm_dancoff, ref_label)
+        self.run_tddft_hessian(xcfun_label, tamm_dancoff, ref_label, ri=ri)
 
     @pytest.mark.timeconsuming
-    def test_tddft_camb3lyp(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_tddft_camb3lyp(self, ri):
         xcfun_label = "cam-b3lyp"
         tamm_dancoff = False
         ref_label = "rpa_camb3lyp"
-        self.run_tddft_hessian(xcfun_label, tamm_dancoff, ref_label)
+        self.run_tddft_hessian(xcfun_label, tamm_dancoff, ref_label, ri=ri)

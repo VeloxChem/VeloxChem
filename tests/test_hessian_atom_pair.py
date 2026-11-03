@@ -13,7 +13,8 @@ from veloxchem.scfhessiandriver import ScfHessianDriver
 class TestHessianAtomPair:
 
     @pytest.mark.solvers
-    def test_hessian_atom_pair(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_hessian_atom_pair(self, ri):
 
         mol = Molecule.read_xyz_string("""15
 
@@ -38,10 +39,15 @@ class TestHessianAtomPair:
         atom_pairs = [(9, 6), (0, 3)]
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_drv.acc_type = 'l2_diis'
-        scf_drv.compute(mol, basis)
+        scf_results = scf_drv.compute(mol, basis)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         hess_drv = ScfHessianDriver(scf_drv)
         hess_drv.atom_pairs = atom_pairs
@@ -52,7 +58,11 @@ class TestHessianAtomPair:
 
         if scf_drv.rank == mpi_master():
             cwd = Path(__file__).parent
-            path = str(cwd / 'data' / 'water_hessian_pair_1-4_7-10.txt')
+            path = str(
+                cwd / 'data' / {
+                    False: 'water_hessian_pair_1-4_7-10.txt',
+                    True: 'water_hessian_pair_1-4_7-10_ri.txt'
+                }[ri])
             reference_hess = np.loadtxt(path)
             np.testing.assert_allclose(pair_hess,
                                        reference_hess,
@@ -62,7 +72,8 @@ class TestHessianAtomPair:
     @pytest.mark.solvers
     @pytest.mark.skipif(not DispersionModel.is_available(),
                         reason='dftd4-python not available')
-    def test_hessian_atom_pair_with_d4_matches_full_hessian(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_hessian_atom_pair_with_d4_matches_full_hessian(self, ri):
 
         mol = Molecule.read_xyz_string("""15
 
@@ -88,10 +99,15 @@ class TestHessianAtomPair:
         def run_hessian_with_dispersion(atom_pairs_input=None):
 
             scf_drv = ScfRestrictedDriver()
-            scf_drv.ri = False
+            scf_drv.ri = ri
             scf_drv.ostream.mute()
             scf_drv.dispersion = True
-            scf_drv.compute(mol, basis)
+            scf_results = scf_drv.compute(mol, basis)
+
+            if scf_drv.rank == mpi_master():
+                if ri:
+                    assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                    assert not scf_results['ri_fallback']
 
             hess_drv = ScfHessianDriver(scf_drv)
             hess_drv.ostream.mute()

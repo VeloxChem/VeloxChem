@@ -108,31 +108,39 @@ class TestScfHessianDriverMiscellaneous:
         return FakeMolecule(), FakeBasis()
 
     @staticmethod
-    def run_restricted_scf(molecule, basis, xcfun='hf'):
+    def run_restricted_scf(molecule, basis, xcfun='hf', *, ri):
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_drv.xcfun = xcfun
-        scf_drv.compute(molecule, basis)
+        scf_results = scf_drv.compute(molecule, basis)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
+
         return scf_drv
 
-    def test_update_settings_defaults_cphf_dict(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_update_settings_defaults_cphf_dict(self, ri):
 
         molecule, basis = self.get_h2_molecule_and_basis()
-        scf_drv = self.run_restricted_scf(molecule, basis)
+        scf_drv = self.run_restricted_scf(molecule, basis, ri=ri)
 
         hess_drv = ScfHessianDriver(scf_drv)
         hess_drv.update_settings({'xcfun': 'hf'}, hess_dict={'numerical': 'no'})
 
         assert hess_drv.cphf_dict == {}
 
-    def test_compute_runs_internal_scf_when_results_missing(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_compute_runs_internal_scf_when_results_missing(self, ri):
 
         molecule, basis = self.get_h2o_molecule_and_basis()
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
 
         hess_drv = ScfHessianDriver(scf_drv)
@@ -145,10 +153,11 @@ class TestScfHessianDriverMiscellaneous:
             assert hess_drv.hessian.shape == (9, 9)
             assert np.max(np.abs(hess_drv.hessian)) > 0.0
 
-    def test_compute_energy_gradient_and_dipole_helpers(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_compute_energy_gradient_and_dipole_helpers(self, ri):
 
         molecule, basis = self.get_h2o_molecule_and_basis()
-        scf_drv = self.run_restricted_scf(molecule, basis)
+        scf_drv = self.run_restricted_scf(molecule, basis, ri=ri)
         hess_drv = ScfHessianDriver(scf_drv)
 
         original_compute = scf_drv.compute
@@ -192,12 +201,14 @@ class TestScfHessianDriverMiscellaneous:
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason='skip pytest.raises for multiple MPI processes')
-    def test_analytical_hessian_rejects_atom_pairs_with_dipole_gradient(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_analytical_hessian_rejects_atom_pairs_with_dipole_gradient(
+            self, ri):
 
         molecule, basis = self.get_h2o_molecule_and_basis()
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
 
         hess_drv = ScfHessianDriver(scf_drv)
@@ -216,21 +227,30 @@ class TestScfHessianDriverMiscellaneous:
         if scf_drv.rank == mpi_master():
             assert hess_drv.dipole_gradient.shape == (3, 9)
 
-    def test_analytical_hessian_with_point_charges_and_vdw(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_analytical_hessian_with_point_charges_and_vdw(self, ri):
 
         molecule, basis = self.get_embedded_water_molecule_and_basis()
         here = Path(__file__).parent
         potfile = str(here / 'data' / 'pe_water.pot')
         vdwfile = str(here / 'data' / 'pe_water.qm_vdw_params.txt')
-        reffile = str(here / 'data' /
-                      'water_analytical_hessian_pointcharges_scf.txt')
+        reffile = str(
+            here / 'data' / {
+                False: 'water_analytical_hessian_pointcharges_scf.txt',
+                True: 'water_analytical_hessian_pointcharges_scf_ri.txt'
+            }[ri])
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_drv.point_charges = potfile
         scf_drv.qm_vdw_params = vdwfile
-        scf_drv.compute(molecule, basis)
+        scf_results = scf_drv.compute(molecule, basis)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         hess_drv = ScfHessianDriver(scf_drv)
         hess_drv.ostream.mute()
@@ -243,10 +263,11 @@ class TestScfHessianDriverMiscellaneous:
                                        rtol=1.0e-8,
                                        atol=1.0e-10)
 
-    def test_determine_xc_hessian_grid_level_promotes_supported_cases(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_determine_xc_hessian_grid_level_promotes_supported_cases(self, ri):
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         hess_drv = ScfHessianDriver(scf_drv)
 
@@ -283,12 +304,13 @@ class TestScfHessianDriverMiscellaneous:
          ('M06', 'get_fake_molecule_and_basis_19', 5,
           r'Hessian calculation with M06 functional and max element id 19 '
           r'is not supported')])
+    @pytest.mark.parametrize('ri', [False, True])
     def test_determine_xc_hessian_grid_level_rejects_unsupported_cases(
             self, xcfun_label, molecule_basis_getter, grid_level,
-            expected_message):
+            expected_message, ri):
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_drv.xcfun = parse_xc_func(xcfun_label)
         hess_drv = ScfHessianDriver(scf_drv)
@@ -304,12 +326,13 @@ class TestScfHessianDriverMiscellaneous:
             hess_drv._determine_xc_hessian_grid_level(molecule, basis,
                                                       grid_level)
 
-    def test_determine_xc_hessian_grid_level_with_all_ecp_case(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_determine_xc_hessian_grid_level_with_all_ecp_case(self, ri):
 
         au2_molecule, au2_basis = self.get_au2_molecule_and_basis()
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_drv.xcfun = parse_xc_func('PBE')
 

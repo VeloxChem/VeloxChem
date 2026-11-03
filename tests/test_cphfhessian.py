@@ -18,13 +18,20 @@ class TestCphfSolver:
                        basis,
                        xcfun=None,
                        label=None,
-                       use_subcomms=False):
+                       use_subcomms=False,
+                       *,
+                       ri):
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.xcfun = xcfun
 
         scf_drv.ostream.mute()
         scf_results = scf_drv.compute(molecule, basis)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         hess_orbrsp_drv = HessianOrbitalResponse()
         orbrsp_settings = {'conv_thresh': 2e-7}
@@ -47,7 +54,10 @@ class TestCphfSolver:
 
         if scf_drv.rank == mpi_master():
             here = Path(__file__).parent
-            hf_file_name = str(here / 'data' / 'cphf_coefficients.h5')
+            hf_file_name = str(here / 'data' / {
+                False: 'cphf_coefficients.h5',
+                True: 'cphf_coefficients_ri.h5'
+            }[ri])
             hf = h5py.File(hf_file_name, 'r')
             cphf_reference = np.array(hf.get(label))
             hf.close()
@@ -60,7 +70,8 @@ class TestCphfSolver:
             assert np.max(np.abs(cphf_coefficients) -
                           np.abs(cphf_reference)) < 1.0e-6
 
-    def test_cphf_coefficients(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_cphf_coefficients(self, ri):
         nh3_xyz = """4
 
         N     0.000000000     0.000000000     0.000000000
@@ -73,15 +84,17 @@ class TestCphfSolver:
         molecule = Molecule.from_xyz_string(nh3_xyz)
         basis = MolecularBasis.read(molecule, basis_set_label)
 
-        self.run_cphfsolver(molecule, basis, "hf", "cphf_coefficients")
+        self.run_cphfsolver(molecule, basis, "hf", "cphf_coefficients", ri=ri)
 
         self.run_cphfsolver(molecule,
                             basis,
                             "hf",
                             "cphf_coefficients",
-                            use_subcomms=True)
+                            use_subcomms=True,
+                            ri=ri)
 
-    def test_cpks_coefficients(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_cpks_coefficients(self, ri):
         nh3_xyz = """4
 
         N     0.000000000     0.000000000     0.000000000
@@ -94,15 +107,21 @@ class TestCphfSolver:
         molecule = Molecule.from_xyz_string(nh3_xyz)
         basis = MolecularBasis.read(molecule, basis_set_label)
 
-        self.run_cphfsolver(molecule, basis, "b3lyp", "cpks_coefficients_b3lyp")
+        self.run_cphfsolver(molecule,
+                            basis,
+                            "b3lyp",
+                            "cpks_coefficients_b3lyp",
+                            ri=ri)
 
         self.run_cphfsolver(molecule,
                             basis,
                             "b3lyp",
                             "cpks_coefficients_b3lyp",
-                            use_subcomms=True)
+                            use_subcomms=True,
+                            ri=ri)
 
-    def test_cphf_trial_orthogonality(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_cphf_trial_orthogonality(self, ri):
         nh3_xyz = """4
 
         N     0.000000000     0.000000000     0.000000000
@@ -116,9 +135,14 @@ class TestCphfSolver:
         basis = MolecularBasis.read(molecule, basis_set_label)
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_results = scf_drv.compute(molecule, basis)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         cphf = HessianOrbitalResponse()
         cphf.update_settings({'conv_thresh': 1.0e-6})

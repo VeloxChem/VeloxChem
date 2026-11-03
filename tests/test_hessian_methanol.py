@@ -10,7 +10,7 @@ from veloxchem.vibrationalanalysis import VibrationalAnalysis
 
 class TestHessianMethanol:
 
-    def run_hessian_methanol(self, numerical_hessian):
+    def run_hessian_methanol(self, numerical_hessian, *, ri):
 
         mol = Molecule.read_xyz_string("""6
         methanol
@@ -24,10 +24,15 @@ class TestHessianMethanol:
         bas = MolecularBasis.read(mol, 'def2-svp')
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.xcfun = 'pbe0'
         scf_drv.ostream.mute()
-        scf_drv.compute(mol, bas)
+        scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         vibanalysis_drv = VibrationalAnalysis(scf_drv)
         vibanalysis_drv.numerical_hessian = numerical_hessian
@@ -56,11 +61,13 @@ class TestHessianMethanol:
             assert max_rel_diff_ir_intens < 0.02
 
     @pytest.mark.timeconsuming
-    def test_numerical_hessian_methanol(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_numerical_hessian_methanol(self, ri):
 
-        self.run_hessian_methanol(numerical_hessian=True)
+        self.run_hessian_methanol(numerical_hessian=True, ri=ri)
 
     @pytest.mark.solvers
-    def test_analytical_hessian_methanol(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_analytical_hessian_methanol(self, ri):
 
-        self.run_hessian_methanol(numerical_hessian=False)
+        self.run_hessian_methanol(numerical_hessian=False, ri=ri)
