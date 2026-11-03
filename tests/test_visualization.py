@@ -75,7 +75,7 @@ class TestVisualization:
 
             homo_diff = np.abs(homo_values) - np.abs(homo_ref)
             homo_diff_rel = homo_diff / np.abs(homo_ref)
-            assert np.max(homo_diff_rel) < 1.0e-5
+            assert np.max(np.abs(homo_diff_rel)) < 1.0e-5
 
             mo_val = np.array(mo_val).reshape(2, 3, 3)
             assert np.max(np.abs(np.abs(homo_values) - np.abs(mo_val))) < 1.0e-8
@@ -108,7 +108,7 @@ class TestVisualization:
 
             dens_diff = dens_total - dens_ref
             dens_diff_rel = dens_diff / np.abs(dens_ref)
-            assert np.max(dens_diff_rel) < 1.0e-5
+            assert np.max(np.abs(dens_diff_rel)) < 1.0e-5
 
             den_val = np.array(den_val).reshape(2, 3, 3)
             assert np.max(np.abs(dens_alpha - den_val)) < 1.0e-8
