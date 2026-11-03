@@ -804,10 +804,10 @@ class NonlinearSolver:
             n_total = second_order_dens.shape(1)
 
         if self._uses_ri_jk() or self._uses_ri_coulomb():
-            # NOTE: the RI-JK build takes the factors of the densities, and a
-            # caller which hands none is built from the four-center integrals
-            # (use_ri_jk below). A build which is not RI passes no memory,
-            # which gives get_batch_size's count.
+            # NOTE: without factors from the caller, use_ri_jk below is false
+            # and the build takes the four-center integrals. It passes no
+            # memory, which gives get_batch_size's count, as every
+            # four-center build takes.
             density_memory = None
 
             if self.rank == mpi_master() and (self._uses_ri_coulomb() or
