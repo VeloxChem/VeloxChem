@@ -63,6 +63,19 @@ def get_batch_size(input_batch_size, n_total, n_ao, comm):
     total_mem = psutil.virtual_memory().total
     total_mem_list = comm.gather(total_mem, root=mpi_master())
 
+    # NOTE: the ranks on one node share its free memory. SLURM_NTASKS_PER_NODE
+    # says how many there are; where it is not set, each rank counts the ranks
+    # with its own host name, and the master's count is used below. The
+    # allgather is a collective, and it relies on every rank of a job seeing
+    # the same environment: either every rank finds SLURM_NTASKS_PER_NODE set
+    # and none gathers, or every rank gathers.
+    if 'SLURM_NTASKS_PER_NODE' in environ:
+        ntasks_per_node = int(environ['SLURM_NTASKS_PER_NODE'])
+    else:
+        import platform
+        host = platform.node()
+        ntasks_per_node = comm.allgather(host).count(host)
+
     if comm.Get_rank() == mpi_master():
 
         # check if master node has larger memory
@@ -72,8 +85,7 @@ def get_batch_size(input_batch_size, n_total, n_ao, comm):
 
         # computes maximum batch size from available memory
         avail_mem = psutil.virtual_memory().available - mem_adjust
-        if 'SLURM_NTASKS_PER_NODE' in environ:
-            avail_mem //= int(environ['SLURM_NTASKS_PER_NODE'])
+        avail_mem //= ntasks_per_node
         mem_per_mat = n_ao**2 * ctypes.sizeof(ctypes.c_double)
         nthreads = int(environ['OMP_NUM_THREADS'])
         # TODO: double check the estimation of max_batch_size
