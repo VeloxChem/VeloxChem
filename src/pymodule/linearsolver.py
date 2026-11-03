@@ -68,12 +68,25 @@ from .inputparser import (parse_input, print_keywords, print_attributes,
                           write_unparsed_input_to_hdf5,
                           read_unparsed_input_from_hdf5)
 from .dftutils import (get_default_grid_level, get_optimal_grid_box_size,
-                       print_xc_reference)
+                       print_xc_reference, get_response_fock_xc_density_memory)
 from .checkpoint import write_rsp_hdf5
 from .batchsize import get_batch_size
+from .batchsize import get_ri_batch_size
+from .batchsize import get_ri_density_memory
 from .batchsize import get_number_of_batches
 from .cpcmdriver import CpcmDriver
 from .gostshypdriver import GostshypDriver
+
+# NOTE: the matrices of n_ao by n_ao which _e2n_half_size_single_comm holds on
+# the master for each density of a batch while it splits the Fock matrices:
+# the density (dks), the matrix of the trial vector (kns), the Fock matrix the
+# build returns, and for a general trial vector the gerade and ungerade parts
+# of the Fock matrix (raw_fock_ger, raw_fock_ung) and of the trial vector
+# matrix (raw_kns_ger, raw_kns_ung). A gerade or an ungerade trial vector holds
+# one of each pair. _e2n_half_size_single_comm_unrestricted holds these for
+# each spin.
+_RI_BATCH_MATRICES = 7
+_RI_BATCH_MATRICES_UNRESTRICTED = 14
 
 
 class LinearSolver:
@@ -711,6 +724,33 @@ class LinearSolver:
             self.ostream.print_warning(warn_msg)
             self.ostream.print_blank()
             self.ostream.flush()
+
+    def _ri_density_memory(self, molecule, basis, dft_dict, n_ao, n_matrices,
+                           n_factor_columns, n_sliced):
+        """
+        Gets the memory the solver holds on the master rank for each density
+        of an RI Fock build, as get_ri_batch_size takes it. Called on the
+        master only.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param dft_dict:
+            The dictionary of DFT information.
+
+        The other parameters are those of batchsize.get_ri_density_memory.
+
+        :return:
+            The memory in bytes.
+        """
+
+        xc_density_memory = get_response_fock_xc_density_memory(
+            molecule, basis, dft_dict, self.xcfun if self._dft else None,
+            self.xc_screening_threshold)
+
+        return get_ri_density_memory(n_ao, n_matrices, n_factor_columns,
+                                     n_sliced, xc_density_memory)
 
     def _print_ri_memory_check(self):
         """
@@ -1916,7 +1956,23 @@ class LinearSolver:
 
         n_total = n_general + n_extra_ger + n_extra_ung
 
-        batch_size = get_batch_size(self.batch_size, n_total, n_ao, self.comm)
+        if self._uses_ri_jk() or self._uses_ri_coulomb():
+            # NOTE: an RI-JK build also holds the two right factors of each
+            # density (ri_jk_factors below), n_ao by nocc. The two modes which
+            # restrict the orbital space form no factors and are built from the
+            # four-center integrals; they are given the same memory.
+            density_memory = None
+
+            if self.rank == mpi_master():
+                density_memory = self._ri_density_memory(
+                    molecule, basis, dft_dict, n_ao, _RI_BATCH_MATRICES,
+                    2 * nocc if self._uses_ri_jk() else 0, 1)
+
+            batch_size = get_ri_batch_size(self.batch_size, n_total, n_ao,
+                                           density_memory, self.comm)
+        else:
+            batch_size = get_batch_size(self.batch_size, n_total, n_ao,
+                                        self.comm)
         num_batches = get_number_of_batches(n_total, batch_size, self.comm)
 
         if profiler is not None:
@@ -2882,7 +2938,23 @@ class LinearSolver:
 
         n_total = n_general + n_extra_ger + n_extra_ung
 
-        batch_size = get_batch_size(self.batch_size, n_total, n_ao, self.comm)
+        if self._uses_ri_jk() or self._uses_ri_coulomb():
+            # NOTE: as in _e2n_half_size_single_comm, for both spins: n_ao by
+            # nocc_a and n_ao by nocc_b for each RI-JK right factor, and the
+            # same memory for the core excitation case.
+            density_memory = None
+
+            if self.rank == mpi_master():
+                density_memory = self._ri_density_memory(
+                    molecule, basis, dft_dict, n_ao,
+                    _RI_BATCH_MATRICES_UNRESTRICTED,
+                    2 * (nocc_a + nocc_b) if self._uses_ri_jk() else 0, 2)
+
+            batch_size = get_ri_batch_size(self.batch_size, n_total, n_ao,
+                                           density_memory, self.comm)
+        else:
+            batch_size = get_batch_size(self.batch_size, n_total, n_ao,
+                                        self.comm)
         num_batches = get_number_of_batches(n_total, batch_size, self.comm)
 
         if profiler is not None:

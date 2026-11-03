@@ -52,8 +52,20 @@ from . import rijkresponse
 from . import rijresponse
 from .inputparser import parse_input, print_keywords, print_attributes
 from .dftutils import get_default_grid_level, get_optimal_grid_box_size
+from .dftutils import get_response_fock_xc_density_memory
 from .batchsize import get_batch_size
+from .batchsize import get_ri_batch_size
+from .batchsize import get_ri_density_memory
 from .batchsize import get_number_of_batches
+
+
+# NOTE: the matrices of n_ao by n_ao which _comp_two_el_int holds on the master
+# for each density it builds the Fock matrix of: the density (in dts2 or dts3),
+# the Fock matrix the build returns, and its column of fock_mo. A cubic mode
+# with a functional also copies fock_mo into fock_mo_2 and fock_mo_3. The
+# first-order densities a functional needs are counted by _ri_density_memory.
+_RI_BATCH_MATRICES = 3
+_RI_BATCH_MATRICES_CUBIC_DFT = 4
 
 
 class NonlinearSolver:
@@ -549,6 +561,167 @@ class NonlinearSolver:
         else:
             return None
 
+    def _ri_density_memory(self, molecule, ao_basis, dft_dict, n_ao, mode,
+                           mode_is_cubic):
+        """
+        Gets the memory _comp_two_el_int holds on the master rank for each
+        density it builds the Fock matrix of, as get_ri_batch_size takes it.
+        Called on the master only.
+
+        :param molecule:
+            The molecule.
+        :param ao_basis:
+            The AO basis set.
+        :param dft_dict:
+            The dictionary of DFT information.
+        :param n_ao:
+            The number of atomic orbitals.
+        :param mode:
+            The mode for densities in quadratic/cubic response.
+        :param mode_is_cubic:
+            True for a cubic mode.
+
+        :return:
+            The memory in bytes.
+        """
+
+        n_matrices = _RI_BATCH_MATRICES
+        n_sliced = 0
+
+        if self._dft:
+            # NOTE: with a functional a batch is made of groups. Each group
+            # holds its first-order densities beside the densities whose Fock
+            # matrices are built (the second-order ones of a quadratic mode,
+            # the second- and third-order ones of a cubic mode), and the
+            # exchange-correlation integration slices all of them.
+            size_1, size_2, size_3 = self._get_dft_group_sizes(mode)
+
+            n_fock = size_2 + (size_3 if mode_is_cubic else 0)
+
+            if mode_is_cubic:
+                n_matrices = _RI_BATCH_MATRICES_CUBIC_DFT
+
+            n_matrices += size_1 / n_fock
+            n_sliced = (size_1 + n_fock) / n_fock
+
+        xc_density_memory = get_response_fock_xc_density_memory(
+            molecule, ao_basis, dft_dict, self.xcfun if self._dft else None,
+            self.xc_screening_threshold)
+
+        return get_ri_density_memory(n_ao, n_matrices, 0, n_sliced,
+                                     xc_density_memory)
+
+    def _get_dft_group_sizes(self, mode):
+        """
+        Gets the sizes of a group of densities a nonlinear Fock build with a
+        functional takes together, which its batches are made of.
+
+        :param mode:
+            The mode for densities in quadratic/cubic response.
+
+        :return:
+            The first-order, second-order and third-order densities of a group;
+            None for the third-order ones of a quadratic mode.
+        """
+
+        size_3 = None
+
+        if mode.lower() == 'crf':
+            # 6 first-order densities per frequency
+            # 6 second-order densities per frequency
+            # 2 third-order densities per frequency
+            size_1, size_2, size_3 = 6, 6, 2
+
+        elif mode.lower() == 'tpa':
+            # 12 first-order densities per frequency
+            # 24 second-order densities per frequency
+            # 6 third-order densities per frequency
+            size_1, size_2, size_3 = 12, 24, 6
+
+        elif mode.lower() == 'thg':
+            # 12 first-order densities per frequency
+            # 24 second-order densities per frequency
+            # 6 third-order densities per frequency
+            size_1, size_2, size_3 = 6, 12, 6
+
+        elif mode.lower() == 'thgred':
+            # 12 first-order densities per frequency
+            # 24 second-order densities per frequency
+            # 6 third-order densities per frequency
+            size_1, size_2, size_3 = 3, 6, 3
+
+        elif mode.lower() == '3pa':
+            # 4 first-order densities per frequency
+            # 9 second-order densities per frequency
+            # 6 third-order densities per frequency
+            size_1, size_2, size_3 = 4, 9, 6
+
+        elif mode.lower() == 'crf_ii':
+            # 12 first-order densities per frequency
+            # 6 second-order densities per frequency
+            size_1, size_2 = 12, 2
+
+        elif mode.lower() == '3pa_ii':
+            # 13 first-order densities per frequency
+            # 6 second-order densities per frequency
+            size_1, size_2 = 13, 6
+
+        elif mode.lower() == 'tpa_ii':
+            # 36 first-order densities per frequency
+            # 6 second-order densities per frequency
+            size_1, size_2 = 36, 6
+
+        elif mode.lower() == 'thg_ii':
+            # 36 first-order densities per frequency
+            # 6 second-order densities per frequency
+            size_1, size_2 = 18, 6
+
+        elif mode.lower() == 'thgred_ii':
+            # 36 first-order densities per frequency
+            # 6 second-order densities per frequency
+            size_1, size_2 = 9, 3
+
+        elif mode.lower() == 'redtpa_i':
+            # 6 first-order densities per frequency
+            # 6 second-order densities per frequency
+            size_1, size_2 = 6, 6
+
+        elif mode.lower() == 'redtpa_ii':
+            # 18 first-order densities per frequency
+            # 6 second-order densities per frequency
+            size_1, size_2 = 18, 6
+
+        elif mode.lower() == 'qrf':
+            # 4 first-order densities per frequency
+            # 2 second-order densities per frequency
+            # see get_densities in quadraticresponsedriver
+            size_1, size_2 = 4, 2
+
+        elif mode.lower() == 'shg':
+            # 6 first-order densities per frequency
+            # 12 second-order densities per frequency
+            # see get_densities in shgdriver
+            size_1, size_2 = 6, 12
+
+        elif mode.lower() == 'shg_red':
+            # 6 first-order densities
+            # 6 second-order densities
+            # see get_densities in shgdriver
+            size_1, size_2 = 6, 6
+
+        elif mode.lower() == 'tpa_quad':
+            # 5 first-order densities
+            # 4 second-order densities
+            # see get_densities in shgdriver
+            size_1, size_2 = 5, 4
+
+        else:
+            assert_msg_critical(
+                False, 'NonlinearSolver: Cannot get sizes for mode ' +
+                mode.lower())
+
+        return size_1, size_2, size_3
+
     def _comp_two_el_int(self,
                          mo,
                          molecule,
@@ -630,7 +803,23 @@ class NonlinearSolver:
         elif mode_is_quadratic:
             n_total = second_order_dens.shape(1)
 
-        batch_size = get_batch_size(self.batch_size, n_total, n_ao, self.comm)
+        if self._uses_ri_jk() or self._uses_ri_coulomb():
+            # NOTE: the RI-JK build takes the factors of the densities, and a
+            # caller which hands none is built from the four-center integrals
+            # (use_ri_jk below). A build which is not RI passes no memory,
+            # which gives get_batch_size's count.
+            density_memory = None
+
+            if self.rank == mpi_master() and (self._uses_ri_coulomb() or
+                                              dens_factors is not None):
+                density_memory = self._ri_density_memory(
+                    molecule, ao_basis, dft_dict, n_ao, mode, mode_is_cubic)
+
+            batch_size = get_ri_batch_size(self.batch_size, n_total, n_ao,
+                                           density_memory, self.comm)
+        else:
+            batch_size = get_batch_size(self.batch_size, n_total, n_ao,
+                                        self.comm)
         num_batches = get_number_of_batches(n_total, batch_size, self.comm)
 
         # double-check batch size for DFT
@@ -639,99 +828,7 @@ class NonlinearSolver:
 
             if self.rank == mpi_master():
 
-                if mode.lower() == 'crf':
-                    # 6 first-order densities per frequency
-                    # 6 second-order densities per frequency
-                    # 2 third-order densities per frequency
-                    size_1, size_2, size_3 = 6, 6, 2
-
-                elif mode.lower() == 'tpa':
-                    # 12 first-order densities per frequency
-                    # 24 second-order densities per frequency
-                    # 6 third-order densities per frequency
-                    size_1, size_2, size_3 = 12, 24, 6
-
-                elif mode.lower() == 'thg':
-                    # 12 first-order densities per frequency
-                    # 24 second-order densities per frequency
-                    # 6 third-order densities per frequency
-                    size_1, size_2, size_3 = 6, 12, 6
-
-                elif mode.lower() == 'thgred':
-                    # 12 first-order densities per frequency
-                    # 24 second-order densities per frequency
-                    # 6 third-order densities per frequency
-                    size_1, size_2, size_3 = 3, 6, 3
-
-                elif mode.lower() == '3pa':
-                    # 4 first-order densities per frequency
-                    # 9 second-order densities per frequency
-                    # 6 third-order densities per frequency
-                    size_1, size_2, size_3 = 4, 9, 6
-
-                elif mode.lower() == 'crf_ii':
-                    # 12 first-order densities per frequency
-                    # 6 second-order densities per frequency
-                    size_1, size_2 = 12, 2
-
-                elif mode.lower() == '3pa_ii':
-                    # 13 first-order densities per frequency
-                    # 6 second-order densities per frequency
-                    size_1, size_2 = 13, 6
-
-                elif mode.lower() == 'tpa_ii':
-                    # 36 first-order densities per frequency
-                    # 6 second-order densities per frequency
-                    size_1, size_2 = 36, 6
-
-                elif mode.lower() == 'thg_ii':
-                    # 36 first-order densities per frequency
-                    # 6 second-order densities per frequency
-                    size_1, size_2 = 18, 6
-
-                elif mode.lower() == 'thgred_ii':
-                    # 36 first-order densities per frequency
-                    # 6 second-order densities per frequency
-                    size_1, size_2 = 9, 3
-
-                elif mode.lower() == 'redtpa_i':
-                    # 6 first-order densities per frequency
-                    # 6 second-order densities per frequency
-                    size_1, size_2 = 6, 6
-
-                elif mode.lower() == 'redtpa_ii':
-                    # 18 first-order densities per frequency
-                    # 6 second-order densities per frequency
-                    size_1, size_2 = 18, 6
-
-                elif mode.lower() == 'qrf':
-                    # 4 first-order densities per frequency
-                    # 2 second-order densities per frequency
-                    # see get_densities in quadraticresponsedriver
-                    size_1, size_2 = 4, 2
-
-                elif mode.lower() == 'shg':
-                    # 6 first-order densities per frequency
-                    # 12 second-order densities per frequency
-                    # see get_densities in shgdriver
-                    size_1, size_2 = 6, 12
-
-                elif mode.lower() == 'shg_red':
-                    # 6 first-order densities
-                    # 6 second-order densities
-                    # see get_densities in shgdriver
-                    size_1, size_2 = 6, 6
-
-                elif mode.lower() == 'tpa_quad':
-                    # 5 first-order densities
-                    # 4 second-order densities
-                    # see get_densities in shgdriver
-                    size_1, size_2 = 5, 4
-
-                else:
-                    assert_msg_critical(
-                        False, 'NonlinearSolver: Cannot get sizes for mode ' +
-                        mode.lower())
+                size_1, size_2, size_3 = self._get_dft_group_sizes(mode)
 
                 if mode_is_cubic:
                     batch_size = max((batch_size // (size_2 + size_3)) * size_3,

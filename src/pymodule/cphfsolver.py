@@ -50,7 +50,15 @@ from .mathutils import safe_solve
 from .inputparser import parse_input
 from .checkpoint import write_rsp_hdf5, check_rsp_hdf5
 from .batchsize import get_batch_size
+from .batchsize import get_ri_batch_size
 from .batchsize import get_number_of_batches
+
+# NOTE: the matrices of nao by nao which build_sigmas_single_comm holds on the
+# master for each density of a batch: the density (vec_list) and the Fock
+# matrix the build returns. build_sigmas_single_comm_unrestricted holds these
+# for each spin.
+_RI_BATCH_MATRICES = 2
+_RI_BATCH_MATRICES_UNRESTRICTED = 4
 
 
 class CphfSolver(LinearSolver):
@@ -1032,7 +1040,21 @@ class CphfSolver(LinearSolver):
 
         num_vecs = dist_trials.shape(1)
 
-        batch_size = get_batch_size(self.batch_size, num_vecs, nao, self.comm)
+        if self._uses_ri_jk() or self._uses_ri_coulomb():
+            # NOTE: an RI-JK build also holds the right factor of each density
+            # (ri_jk_factors below), nao by nocc.
+            density_memory = None
+
+            if self.rank == mpi_master():
+                density_memory = self._ri_density_memory(
+                    molecule, basis, dft_dict, nao, _RI_BATCH_MATRICES,
+                    nocc if self._uses_ri_jk() else 0, 1)
+
+            batch_size = get_ri_batch_size(self.batch_size, num_vecs, nao,
+                                           density_memory, self.comm)
+        else:
+            batch_size = get_batch_size(self.batch_size, num_vecs, nao,
+                                        self.comm)
         num_batches = get_number_of_batches(num_vecs, batch_size, self.comm)
 
         if profiler is not None:
@@ -1198,7 +1220,22 @@ class CphfSolver(LinearSolver):
 
         num_vecs = dist_trials.shape(1)
 
-        batch_size = get_batch_size(self.batch_size, num_vecs, nao, self.comm)
+        if self._uses_ri_jk() or self._uses_ri_coulomb():
+            # NOTE: an RI-JK build also holds the right factor of each spin's
+            # density (ri_jk_factors below), nao by nocc_a and nao by nocc_b.
+            density_memory = None
+
+            if self.rank == mpi_master():
+                density_memory = self._ri_density_memory(
+                    molecule, basis, dft_dict, nao,
+                    _RI_BATCH_MATRICES_UNRESTRICTED,
+                    (nocc_a + nocc_b) if self._uses_ri_jk() else 0, 2)
+
+            batch_size = get_ri_batch_size(self.batch_size, num_vecs, nao,
+                                           density_memory, self.comm)
+        else:
+            batch_size = get_batch_size(self.batch_size, num_vecs, nao,
+                                        self.comm)
         num_batches = get_number_of_batches(num_vecs, batch_size, self.comm)
 
         if profiler is not None:

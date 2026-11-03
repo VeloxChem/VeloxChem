@@ -151,6 +151,35 @@ def _batch_size_from_memory(input_batch_size, n_total, n_ao, density_memory,
     return batch_size
 
 
+def get_ri_density_memory(n_ao, n_matrices, n_factor_columns, n_sliced,
+                          xc_density_memory):
+    """
+    Gets the memory the solver holds on the master rank for each density of a
+    Fock build with the resolution of the identity, in bytes, as
+    get_ri_batch_size takes it.
+
+    :param n_ao:
+        The number of atomic orbitals.
+    :param n_matrices:
+        The matrices of n_ao by n_ao the solver holds for each density.
+    :param n_factor_columns:
+        The columns of n_ao rows the solver holds for each density: the right
+        factors of an RI-JK build.
+    :param n_sliced:
+        The densities the exchange-correlation integration slices for each
+        density.
+    :param xc_density_memory:
+        The memory one sliced density takes, from
+        dftutils.get_response_fock_xc_density_memory.
+
+    :return:
+        The memory in bytes.
+    """
+
+    return int(8 * (n_matrices * n_ao * n_ao + n_factor_columns * n_ao) +
+               n_sliced * xc_density_memory)
+
+
 def get_number_of_batches(n_total, batch_size, comm):
     """
     Gets number of batches for Fock matrix computation.
