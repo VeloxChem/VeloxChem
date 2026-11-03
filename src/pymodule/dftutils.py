@@ -33,6 +33,8 @@
 from .veloxchemlib import xcfun as xcfun_enum
 from .veloxchemlib import parse_xc_func
 from .veloxchemlib import XCFunctional
+from .veloxchemlib import XCIntegrator
+from .veloxchemlib import get_number_of_threads
 from .errorhandler import assert_msg_critical
 
 
@@ -130,6 +132,65 @@ def get_optimal_grid_box_size(nbf):
         return 512
     else:
         return 1024
+
+
+def get_response_fock_xc_density_memory(molecule,
+                                      basis,
+                                      dft_dict,
+                                      xcfun,
+                                      xc_screening_threshold=None):
+    """
+    Gets the memory the exchange-correlation part of a response Fock build
+    (integrate_fxc_fock, integrate_kxc_fock, integrate_kxclxc_fock) holds on
+    this rank for each density it slices, in bytes. Ground-state Fock builds
+    and the gradients and Hessians are not what this counts. The first call
+    for a dft_dict keeps the answer in it as 'response_fock_xc_density_memory',
+    and later calls with the same dft_dict return it.
+
+    :param molecule:
+        The molecule.
+    :param basis:
+        The AO basis set.
+    :param dft_dict:
+        The dictionary of DFT information a solver's _init_dft returns, whose
+        'molgrid' the integration takes.
+    :param xcfun:
+        The exchange-correlation functional, or None without one.
+    :param xc_screening_threshold:
+        The screening threshold the solver sets on its XCIntegrator, or None
+        where it sets none.
+
+    :return:
+        The memory in bytes, 0 without a functional.
+
+    .. note::
+        integrate_fxc_fock, integrate_kxc_fock and integrate_kxclxc_fock give
+        each grid box to one thread, and a thread copies every density of the
+        call into a matrix over the basis functions the box keeps. With
+        get_number_of_threads() threads, as many boxes are held at once, so the
+        most this takes for one density is the sum of aocount^2 over that many
+        of the largest boxes. A caller multiplies this by the densities a build
+        slices: two for each density of an open shell (alpha and beta), and
+        for the nonlinear builds the first-order densities as well.
+    """
+
+    if xcfun is None:
+        return 0
+
+    if 'response_fock_xc_density_memory' not in dft_dict:
+        xc_drv = XCIntegrator()
+
+        if xc_screening_threshold is not None:
+            xc_drv.set_screening_threshold(xc_screening_threshold)
+
+        counts = xc_drv.get_largest_box_ao_counts_for_response_fock_xc(
+            molecule, basis, dft_dict['molgrid'], xcfun,
+            get_number_of_threads())
+
+        dft_dict['response_fock_xc_density_memory'] = 8 * sum(
+            c * c for c in counts)
+
+    return dft_dict['response_fock_xc_density_memory']
 
 
 def print_xc_reference(xcfun, ostream):

@@ -57,7 +57,7 @@ def get_batch_size(input_batch_size, n_total, n_ao, comm):
     return _batch_size_from_memory(input_batch_size, n_total, n_ao, None, comm)
 
 
-def get_ri_batch_size(input_batch_size, n_total, n_ao, density_cost, comm):
+def get_ri_batch_size(input_batch_size, n_total, n_ao, density_memory, comm):
     """
     Gets the batch size of a Fock build with the resolution of the identity:
     as get_batch_size, but with the memory of a density no less than what the
@@ -70,7 +70,7 @@ def get_ri_batch_size(input_batch_size, n_total, n_ao, density_cost, comm):
         The total number of Fock matrices.
     :param n_ao:
         The number of atomic orbitals in one Fock matrix.
-    :param density_cost:
+    :param density_memory:
         The memory the solver holds on the master rank for each density of a
         batch, in bytes. Only the master's value is read.
     :param comm:
@@ -80,21 +80,21 @@ def get_ri_batch_size(input_batch_size, n_total, n_ao, density_cost, comm):
         The batch size, which is never more than get_batch_size gives.
 
     .. note::
-        The RI build's own matrices are not part of density_cost: the build
+        The RI build's own matrices are not part of density_memory: the build
         cuts its densities into chunks that fit the RI driver's budget (see
         rijkresponse._max_densities and rijresponse._max_densities).
     """
 
     return _batch_size_from_memory(input_batch_size, n_total, n_ao,
-                                   density_cost, comm)
+                                   density_memory, comm)
 
 
-def _batch_size_from_memory(input_batch_size, n_total, n_ao, density_cost,
+def _batch_size_from_memory(input_batch_size, n_total, n_ao, density_memory,
                             comm):
     """
     Gets the batch size for get_batch_size and get_ri_batch_size.
 
-    :param density_cost:
+    :param density_memory:
         The memory the solver holds on the master rank for each density, in
         bytes, or None for the estimate of get_batch_size alone.
 
@@ -133,11 +133,11 @@ def _batch_size_from_memory(input_batch_size, n_total, n_ao, density_cost,
         mem_per_mat = n_ao**2 * ctypes.sizeof(ctypes.c_double)
         nthreads = int(environ['OMP_NUM_THREADS'])
         mem_per_density = mem_per_mat * nthreads
-        # NOTE: the larger of this estimate and the caller's cost, so that a
-        # cost from the caller can make a batch smaller than get_batch_size
+        # NOTE: the larger of this estimate and the caller's density_memory,
+        # so that density_memory can make a batch smaller than get_batch_size
         # gives and never larger.
-        if density_cost is not None:
-            mem_per_density = max(mem_per_density, density_cost)
+        if density_memory is not None:
+            mem_per_density = max(mem_per_density, density_memory)
         # TODO: double check the estimation of max_batch_size
         max_batch_size = int(avail_mem / mem_per_density)
         max_batch_size = max(1, max_batch_size)

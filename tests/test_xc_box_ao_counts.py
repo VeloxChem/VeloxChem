@@ -3,6 +3,8 @@ import pytest
 
 from veloxchem.veloxchemlib import XCIntegrator
 from veloxchem.veloxchemlib import parse_xc_func
+from veloxchem.veloxchemlib import get_number_of_threads
+from veloxchem.dftutils import get_response_fock_xc_density_memory
 from veloxchem.griddriver import GridDriver
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
@@ -122,3 +124,42 @@ class TestXCBoxAOCounts:
             reverse=True)
 
         assert gathered == whole
+
+    def test_the_xc_memory_of_a_density(self):
+
+        molecule = self.water_chain(4, 4.0)
+        basis = MolecularBasis.read(molecule, 'def2-svp', ostream=None)
+        grid = self.grid(molecule, MPI.COMM_WORLD)
+        xcfun = parse_xc_func('b3lyp')
+
+        nthreads = get_number_of_threads()
+
+        xc_drv = XCIntegrator()
+
+        largest = xc_drv.get_largest_box_ao_counts_for_response_fock_xc(
+            molecule, basis, grid, xcfun, nthreads)
+
+        dft_dict = {'molgrid': grid}
+
+        memory = get_response_fock_xc_density_memory(molecule, basis, dft_dict,
+                                                 xcfun)
+
+        assert memory == 8 * sum(c * c for c in largest)
+        assert dft_dict['response_fock_xc_density_memory'] == memory
+
+        # NOTE: kept in the dictionary, so a second call does not count
+        # again; a value put there is what comes back.
+        dft_dict['response_fock_xc_density_memory'] = 1
+        assert get_response_fock_xc_density_memory(molecule, basis, dft_dict,
+                                                 xcfun) == 1
+
+        # NOTE: a looser screening keeps no more functions in any box.
+        loose = get_response_fock_xc_density_memory(molecule, basis,
+                                                  {'molgrid': grid}, xcfun,
+                                                  1.0e-4)
+        assert loose <= memory
+
+        none_dict = {'molgrid': grid}
+        assert get_response_fock_xc_density_memory(molecule, basis, none_dict,
+                                                 None) == 0
+        assert 'response_fock_xc_density_memory' not in none_dict
