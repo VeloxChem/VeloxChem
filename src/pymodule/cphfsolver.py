@@ -884,25 +884,18 @@ class CphfSolver(LinearSolver):
                     vec = vec.reshape(nocc, nvir)
                     vec_ao = np.linalg.multi_dot([mo_occ, vec, mo_vir.T])
                     dens = [vec_ao]
-                    # NOTE: the factors of the trial density for the resolution
-                    # of the identity, as in build_sigmas_single_comm.  The
-                    # local master of this subcommunicator holds them and the
-                    # broadcast in _comp_lr_fock sends them to its ranks.
-                    ri_jk_factors = (
-                        (mo_occ, [np.matmul(mo_vir, vec.T)])
-                        if self._uses_ri_jk() else None)
                 else:
                     dens = None
-                    ri_jk_factors = None
 
                 if profiler is not None:
                     profiler.add_timing_info('PreProc', tm.time() - prep_t0)
 
                 # create Fock matrices and contract with two-electron integrals
+                # NOTE: not with RI: build_sigmas turns subcomms off for RI-J
+                # and RI-JK (_disable_subcomms_for_ri).
                 fock = self._comp_lr_fock(dens, molecule, basis, eri_dict,
                                           dft_dict, pe_dict, profiler,
-                                          local_comm,
-                                          dens_factors=ri_jk_factors)
+                                          local_comm)
 
                 if profiler is not None:
                     # only increment FockCount on local master
