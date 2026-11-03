@@ -132,7 +132,6 @@ class TestPolgrad:
 
         if scf_drv.rank == mpi_master():
             # polgrad_results = an_polgrad_drv.polgradient
-            # polgrad_static = polgrad_results[0.0].reshape(3, 3, 3, 3)
             polgrad_dynamic = polgrad_results[0.4].reshape(3, 3, 3, 3)
             np.set_printoptions(suppress=True, precision=10)
             here = Path(__file__).parent
@@ -143,12 +142,10 @@ class TestPolgrad:
                 }[ri])
             hf = h5py.File(hf_file_name, 'r')
             an_label = 'an_' + label
-            polgrad_reference = np.array(hf.get(an_label))
-            polgrad_static_reference = polgrad_reference[0]
-            polgrad_dynamic_reference = polgrad_reference[1]
+            # no zero frequency: polorbrsp_sanity_check_1 drops it for complex
+            polgrad_dynamic_reference = np.array(hf.get(an_label))
             hf.close()
 
-            # assert np.max(np.abs(polgrad_static) - np.abs(polgrad_static_reference)) < 1.0e-6
             assert np.max(np.abs(polgrad_dynamic) - np.abs(polgrad_dynamic_reference)) < 1.0e-6
 
         # test complex numerical gradient

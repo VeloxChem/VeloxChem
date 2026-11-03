@@ -187,8 +187,9 @@ class TestCphfPolgrad:
                     True: 'cphfpolgrad_coefficients_ri.h5'
                 }[ri])
             hf = h5py.File(hf_file_name, 'r')
-            cphfpolgrad_reference = np.array(hf.get(label1))[12:]
-            cphfpolgrad_omega_reference = np.array(hf.get(label2))[12:]
+            # no zero frequency: polorbrsp_sanity_check_1 drops it for complex
+            cphfpolgrad_reference = np.array(hf.get(label1))
+            cphfpolgrad_omega_reference = np.array(hf.get(label2))
             hf.close()
 
             cphfpolgrad_coefficients = np.array(cphfpolgrad_coefficients)
