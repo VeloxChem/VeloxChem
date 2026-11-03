@@ -2045,10 +2045,11 @@ class ScfHessianDriver(HessianDriver):
 
         return gradient_driver.gradient.copy()
 
-    def compute_electric_dipole_moment(self, molecule, basis):
+    def _compute_electric_dipole_moment(self, molecule, basis):
         """
-        Computes the electric dipole moment calculated in
-        compute_gradient.
+        Computes the electric dipole moment of the SCF density calculated in
+        compute_gradient, about the fixed origin (0,0,0), for the dipole
+        gradient of compute_numerical.
 
         :param molecule:
             The molecule.

@@ -406,7 +406,7 @@ class HessianDriver:
                 grad_plus = self.compute_gradient(new_mol, *args)
 
                 if self.do_dipole_gradient:
-                    dipmom_plus = (self.compute_electric_dipole_moment(
+                    dipmom_plus = (self._compute_electric_dipole_moment(
                         new_mol, *args))
 
                 coords[i, d] -= 2.0 * self.delta_h
@@ -417,7 +417,7 @@ class HessianDriver:
                 grad_minus = self.compute_gradient(new_mol, *args)
 
                 if self.do_dipole_gradient:
-                    dipmom_minus = (self.compute_electric_dipole_moment(
+                    dipmom_minus = (self._compute_electric_dipole_moment(
                         new_mol, *args))
 
                 if self.do_four_point:
@@ -429,7 +429,7 @@ class HessianDriver:
                     grad_minus2 = self.compute_gradient(new_mol, *args)
 
                     if self.do_dipole_gradient:
-                        dipmom_minus2 = (self.compute_electric_dipole_moment(
+                        dipmom_minus2 = (self._compute_electric_dipole_moment(
                             new_mol, *args))
 
                     coords[i, d] += 4.0 * self.delta_h
@@ -440,7 +440,7 @@ class HessianDriver:
                     grad_plus2 = self.compute_gradient(new_mol, *args)
 
                     if self.do_dipole_gradient:
-                        dipmom_plus2 = (self.compute_electric_dipole_moment(
+                        dipmom_plus2 = (self._compute_electric_dipole_moment(
                             new_mol, *args))
 
                     coords[i, d] -= 2.0 * self.delta_h
@@ -505,9 +505,10 @@ class HessianDriver:
 
         return
 
-    def compute_electric_dipole_moment(self, molecule, *args):
+    def _compute_electric_dipole_moment(self, molecule, *args):
         """
-        Computes the electric dipole moment at current geometry.
+        Computes the electric dipole moment at current geometry, about the
+        fixed origin (0,0,0), for the dipole gradient of compute_numerical.
 
         :param molecule:
             The molecule.

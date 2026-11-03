@@ -248,7 +248,7 @@ class TddftHessianDriver(HessianDriver):
             tddft_gradient_driver.do_first_order_prop = True
             # NOTE: a fixed origin for the finite differences of
             # compute_numerical, as in
-            # ScfHessianDriver.compute_electric_dipole_moment.
+            # ScfHessianDriver._compute_electric_dipole_moment.
             tddft_gradient_driver.dipole_moment_origin = [0.0, 0.0, 0.0]
 
         tddft_gradient_driver.ostream.mute()
@@ -268,10 +268,11 @@ class TddftHessianDriver(HessianDriver):
     # The relaxed dipole moment is calculated at the same time as
     # the gradient so, to avoid re-calculating everything, here the value
     # is simply returned. Used by compute_numerical in HessianDriver.
-    def compute_electric_dipole_moment(self, molecule, basis):
+    def _compute_electric_dipole_moment(self, molecule, basis):
         """
-        Returns the electric dipole moment calculated with the
-        TDDFT gradient in compute_gradient.
+        Returns the relaxed electric dipole moment calculated with the
+        TDDFT gradient in compute_gradient, about the fixed origin (0,0,0),
+        for the dipole gradient of compute_numerical.
 
         :param molecule:
             The molecule.

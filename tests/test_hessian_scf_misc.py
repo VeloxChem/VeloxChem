@@ -179,7 +179,8 @@ class TestScfHessianDriverMiscellaneous:
 
         prop = FirstOrderProperties(hess_drv.comm, hess_drv.ostream)
         prop.compute_scf_prop(molecule, basis, scf_drv.scf_results)
-        dipole_moment = hess_drv.compute_electric_dipole_moment(molecule, basis)
+        dipole_moment = hess_drv._compute_electric_dipole_moment(
+            molecule, basis)
 
         hess_drv.numerical = True
         numerical_energy = hess_drv.compute_energy(molecule, basis)
