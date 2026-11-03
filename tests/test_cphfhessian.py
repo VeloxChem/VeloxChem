@@ -1,4 +1,6 @@
+from collections import namedtuple
 from pathlib import Path
+from types import SimpleNamespace
 import numpy as np
 import h5py
 import pytest
@@ -7,7 +9,11 @@ from veloxchem.veloxchemlib import mpi_master
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
+from veloxchem.scfunrestdriver import ScfUnrestrictedDriver
 from veloxchem.hessianorbitalresponse import HessianOrbitalResponse
+from veloxchem.hessianorbitalresponseunrest import (
+    UnrestrictedHessianOrbitalResponse)
+import veloxchem.batchsize as batchsize
 
 
 @pytest.mark.solvers
@@ -158,3 +164,50 @@ class TestCphfSolver:
         if cphf.rank == mpi_master():
             assert gram.shape[0] > 0
             assert np.max(np.abs(gram - np.eye(gram.shape[0]))) < 1.0e-10
+
+    @pytest.mark.parametrize('unrestricted', [False, True])
+    def test_little_free_memory(self, monkeypatch, unrestricted):
+        """With so little free memory that get_batch_size gives one Fock
+        matrix, the exchange-correlation part still takes one atom a batch
+        and gives what it gives with the machine's memory."""
+
+        molecule = Molecule.read_molecule_string(
+            """
+            O  0.0           0.0  0.0
+            H   .7586020000  0.0  -.5042840000
+            H   .7586020000  0.0   .5042840000
+            """,
+            units='angstrom')
+        basis = MolecularBasis.read(molecule, 'def2-svp', ostream=None)
+
+        scf_drv = (ScfUnrestrictedDriver()
+                   if unrestricted else ScfRestrictedDriver())
+        scf_drv.xcfun = 'b3lyp'
+        scf_drv.ostream.mute()
+        scf_results = scf_drv.compute(molecule, basis)
+
+        def run():
+            cphf = (UnrestrictedHessianOrbitalResponse()
+                    if unrestricted else HessianOrbitalResponse())
+            cphf.update_settings({'conv_thresh': 1.0e-7})
+            cphf.ostream.mute()
+            cphf.compute(molecule, basis, scf_results)
+            coefficients = cphf.cphf_results['dist_cphf_ov']
+            vectors = [c.get_full_vector(0) for c in coefficients]
+            return (np.array(vectors)
+                    if cphf.rank == mpi_master() else None)
+
+        whole = run()
+
+        # NOTE: only the name psutil in batchsize is replaced, so the RI
+        # memory budgets, which read the free memory elsewhere, are not
+        # touched.
+        memory = namedtuple('memory', ['total', 'available'])
+        monkeypatch.setattr(
+            batchsize, 'psutil',
+            SimpleNamespace(virtual_memory=lambda: memory(64 * 1024**3, 1)))
+
+        little = run()
+
+        if scf_drv.rank == mpi_master():
+            assert np.max(np.abs(whole - little)) < 1.0e-10

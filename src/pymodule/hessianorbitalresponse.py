@@ -273,7 +273,9 @@ class HessianOrbitalResponse(CphfSolver):
 
             if atom_pairs is None:
                 batch_size = get_batch_size(None, natm * 3, naos, self.comm)
-                batch_size = batch_size // 3
+                # NOTE: three Fock matrices for each atom, and at least one
+                # atom: get_batch_size gives 1 or 2 where little memory is free.
+                batch_size = max(batch_size // 3, 1)
 
                 num_batches = natm // batch_size
                 if natm % batch_size != 0:
@@ -281,7 +283,7 @@ class HessianOrbitalResponse(CphfSolver):
             else:
                 batch_size = get_batch_size(None, natm_in_pairs * 3, naos,
                                             self.comm)
-                batch_size = batch_size // 3
+                batch_size = max(batch_size // 3, 1)
 
                 num_batches = natm_in_pairs // batch_size
                 if natm % batch_size != 0:
