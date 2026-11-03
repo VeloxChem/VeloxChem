@@ -112,8 +112,8 @@ class TestCphfPolgrad:
 
             # Here we are comparing the CPHF coefficients in MO basis, so
             # there might be sign differences; we compare absolute values instead.
-            assert np.max(np.abs(cphfpolgrad_coefficients) - np.abs(cphfpolgrad_reference)) < 1.0e-6
-            assert np.max(np.abs(cphfpolgrad_omega_coefficients) - np.abs(cphfpolgrad_omega_reference)) < 1.0e-6
+            assert np.max(np.abs(np.abs(cphfpolgrad_coefficients) - np.abs(cphfpolgrad_reference))) < 1.0e-6
+            assert np.max(np.abs(np.abs(cphfpolgrad_omega_coefficients) - np.abs(cphfpolgrad_omega_reference))) < 1.0e-6
 
     def run_cphfpolgrad_complex(self,
                                 molecule,
@@ -197,8 +197,8 @@ class TestCphfPolgrad:
 
             # Here we ar comparing the CPHF coefficients in MO basis, so
             # there might be sign differences; we compare absolute values instead.
-            assert np.max(np.abs(cphfpolgrad_coefficients) - np.abs(cphfpolgrad_reference)) < 1.0e-6
-            assert np.max(np.abs(cphfpolgrad_omega_coefficients) - np.abs(cphfpolgrad_omega_reference)) < 1.0e-6
+            assert np.max(np.abs(np.abs(cphfpolgrad_coefficients) - np.abs(cphfpolgrad_reference))) < 1.0e-6
+            assert np.max(np.abs(np.abs(cphfpolgrad_omega_coefficients) - np.abs(cphfpolgrad_omega_reference))) < 1.0e-6
 
     @pytest.mark.parametrize(
         'solver_cls',

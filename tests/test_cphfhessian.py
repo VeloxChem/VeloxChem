@@ -67,8 +67,9 @@ class TestCphfSolver:
 
             # Here we are comparing the CPHF coefficients in MO basis, so
             # there might be sign differences; we compare absolute values instead.
-            assert np.max(np.abs(cphf_coefficients) -
-                          np.abs(cphf_reference)) < 1.0e-6
+            assert np.max(
+                np.abs(np.abs(cphf_coefficients) -
+                       np.abs(cphf_reference))) < 1.0e-6
 
     @pytest.mark.parametrize('ri', [False, True])
     def test_cphf_coefficients(self, ri):
