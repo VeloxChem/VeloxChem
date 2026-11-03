@@ -657,7 +657,11 @@ class ScfGradientDriver(GradientDriver):
 
         if self._ri_memory_check is not None:
             check = self._ri_memory_check
-            check[4] = Profiler.get_peak_memory() - check[3]
+            # NOTE: at least zero. The start is the resident memory read
+            # before the RI term and the end the kernel's high-water mark, and
+            # the two counters can differ by a few hundred kB, which turns a
+            # growth near zero negative.
+            check[4] = max(Profiler.get_peak_memory() - check[3], 0)
 
     def _print_ri_memory_check(self):
         """
