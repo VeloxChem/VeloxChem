@@ -280,6 +280,23 @@ class CXCIntegrator
                           const CXCPairDensityFunctional&     fvxc,
                           const double                        rs_omega) const -> void;
 
+    /// @brief Gets the numbers of basis functions the largest boxes of this rank's
+    /// share of the grid keep in the exchange-correlation part of response Fock
+    /// matrices (integrateFxcFock, integrateKxcFock, integrateKxcLxcFock).
+    /// @param molecule The molecule.
+    /// @param basis The molecular basis.
+    /// @param molecularGrid The molecular grid, with this rank's boxes.
+    /// @param fvxc The exchange-correlation functional, LDA, GGA or meta-GGA.
+    /// @param count The number of boxes to report.
+    /// @return The counts of the count boxes that keep the most functions, largest
+    /// first; fewer where this rank has fewer boxes, none where the grid is not
+    /// partitioned into boxes.
+    auto getLargestBoxAOCountsForResponseFockXC(const CMolecule&       molecule,
+                                                const CMolecularBasis& basis,
+                                                const CMolecularGrid&  molecularGrid,
+                                                const CXCFunctional&   fvxc,
+                                                const int              count) const -> std::vector<int>;
+
     /**
      Computes GTOs values on grid points.
 

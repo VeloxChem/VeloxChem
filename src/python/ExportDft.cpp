@@ -754,6 +754,16 @@ export_dft(py::module& m)
             },
             "Integrates 4th-order exchange-correlation contribution.")
         .def("integrate_vxc_pdft", &CXCIntegrator_integrate_vxc_pdft)
+        .def("get_largest_box_ao_counts_for_response_fock_xc",
+             &CXCIntegrator::getLargestBoxAOCountsForResponseFockXC,
+             "Gets the numbers of basis functions the largest boxes of this rank's share of the grid keep in the "
+             "exchange-correlation part of response Fock matrices (integrate_fxc_fock, integrate_kxc_fock, "
+             "integrate_kxclxc_fock), largest first.",
+             "molecule"_a,
+             "basis"_a,
+             "molecular_grid"_a,
+             "xc_functional"_a,
+             "count"_a)
         .def(
             "compute_gto_values",
             [](CXCIntegrator& self, const CMolecule& molecule, const CMolecularBasis& basis, const CMolecularGrid& molecularGrid)
