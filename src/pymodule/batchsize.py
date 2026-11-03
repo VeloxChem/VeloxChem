@@ -30,11 +30,14 @@
 #  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+from mpi4py import MPI
 from os import environ
 import psutil
 import ctypes
 
 from .veloxchemlib import mpi_master
+from .environment import get_ri_free_memory
+from .errorhandler import assert_msg_critical
 
 
 def get_batch_size(input_batch_size, n_total, n_ao, comm):
@@ -84,6 +87,57 @@ def get_batch_size(input_batch_size, n_total, n_ao, comm):
     batch_size = comm.bcast(batch_size, root=mpi_master())
 
     return batch_size
+
+
+def get_ri_batch_size(input_batch_size, n_total, item_cost, fixed_cost, comm):
+    """
+    Gets the batch size of a Fock build with the resolution of the identity,
+    from the memory free to each rank when the build starts. Every rank must
+    call this. Builds without the resolution of the identity take
+    get_batch_size.
+
+    :param input_batch_size:
+        The batch size from input, or None.
+    :param n_total:
+        The number of items to build: densities, or groups of densities which
+        the caller does not split.
+    :param item_cost:
+        The memory each item takes on this rank during the build, in bytes.
+    :param fixed_cost:
+        The memory the build takes on this rank whatever the number of items,
+        beyond what the rank already holds, in bytes.
+    :param comm:
+        The communicator.
+
+    :return:
+        The batch size, the same on every rank: the input batch size where one
+        is given, and otherwise the most items every rank has room for, at
+        least one and at most n_total (zero where n_total is zero).
+    """
+
+    if input_batch_size is not None:
+        return comm.bcast(input_batch_size, root=mpi_master())
+
+    assert_msg_critical(item_cost > 0,
+                        'get_ri_batch_size: an item has to cost memory')
+
+    # NOTE: read when the build starts, so what the RI driver and the solver
+    # already hold is not counted as free. get_ri_free_memory keeps back the
+    # node's reserve and divides the rest among the ranks on the node.
+    room = get_ri_free_memory(comm, 0) - fixed_cost
+
+    # NOTE: the costs differ between the ranks (the master holds more for each
+    # density than the others), and every rank builds the same batch, so each
+    # rank works out how many items it has room for and the smallest count is
+    # taken.
+    count = comm.allreduce(max(room, 0) // item_cost, op=MPI.MIN)
+
+    batch_size = None
+
+    if comm.Get_rank() == mpi_master():
+        batch_size = min(max(count, 1), n_total)
+
+    return comm.bcast(batch_size, root=mpi_master())
 
 
 def get_number_of_batches(n_total, batch_size, comm):
