@@ -831,13 +831,20 @@ class NonlinearSolver:
 
         density_memory = None
 
-        if self._uses_ri_jk() or self._uses_ri_coulomb():
-            # NOTE: without factors from the caller, use_ri_jk below is false
-            # and the build takes the four-center integrals. It passes no
-            # memory, which gives get_batch_size's count, as every
-            # four-center build takes.
-            if self.rank == mpi_master() and (self._uses_ri_coulomb() or
-                                              dens_factors is not None):
+        # NOTE: without factors from the caller, use_ri_jk below is false and
+        # the build takes the four-center integrals, and get_batch_size as
+        # every four-center build. The factors are handed on the master rank
+        # alone, so the master decides.
+        ri_build = None
+
+        if self.rank == mpi_master():
+            ri_build = (self._uses_ri_coulomb() or
+                        (self._uses_ri_jk() and dens_factors is not None))
+
+        ri_build = self.comm.bcast(ri_build, root=mpi_master())
+
+        if ri_build:
+            if self.rank == mpi_master():
                 density_memory = self._ri_density_memory(
                     molecule, ao_basis, dft_dict, n_ao, mode, mode_is_cubic)
 

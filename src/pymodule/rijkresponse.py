@@ -870,6 +870,15 @@ def lend(driver, solver):
     try:
         yield
     finally:
+        # NOTE: the driver's memory check measures from its own setup, which
+        # comes before the solver's builds, so it takes the largest RI build
+        # the solver was predicted to reach and the largest batch it held.
+        driver._ri_jk_predicted_peak = max(
+            getattr(driver, '_ri_jk_predicted_peak', 0),
+            getattr(solver, '_ri_jk_predicted_peak', 0))
+        driver._ri_batch_memory = max(getattr(driver, '_ri_batch_memory', 0),
+                                      getattr(solver, '_ri_batch_memory', 0))
+
         _release(solver)
         solver._ri_jk_borrowing = False
         driver._ri_jk_lent = False

@@ -1,5 +1,3 @@
-from collections import namedtuple
-from types import SimpleNamespace
 from mpi4py import MPI
 import numpy as np
 import pytest
@@ -74,8 +72,9 @@ class TestResponseRiBatch:
     def spy(monkeypatch, module, little_memory=False):
         """Records each call of get_ri_batch_size from a module.
 
-        With little_memory, get_ri_batch_size sees one byte free, which
-        leaves room for one density in each batch.
+        With little_memory, get_ri_batch_size sees one byte free (through
+        get_available_memory, the name batchsize holds), which leaves room
+        for one density in each batch.
 
         NOTE: the free memory is changed only while get_ri_batch_size runs.
         The other readers of it (get_batch_size in the drivers which call it
@@ -85,14 +84,11 @@ class TestResponseRiBatch:
         calls = []
         real = module.get_ri_batch_size
 
-        memory = namedtuple('memory', ['total', 'available'])
-        fake = SimpleNamespace(
-            virtual_memory=lambda: memory(64 * 1024**3, 1))
-
         def recorded(input_batch_size, n_total, n_ao, density_memory, comm):
             if little_memory:
                 with monkeypatch.context() as patch:
-                    patch.setattr(batchsize, 'psutil', fake)
+                    patch.setattr(batchsize, 'get_available_memory',
+                                  lambda: 1)
                     size = real(input_batch_size, n_total, n_ao,
                                 density_memory, comm)
             else:

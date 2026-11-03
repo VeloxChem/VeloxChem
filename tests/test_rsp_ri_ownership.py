@@ -200,6 +200,30 @@ class TestResponseRiOwnership:
         assert not solver._ri_jk_borrowing
         assert solver._ri_jk_drv is None
 
+    def test_lending_hands_back_the_memory_of_the_builds(self):
+        """The driver's memory check takes the largest RI build and batch of
+        the solver it lent its B vectors to."""
+
+        molecule, basis = self.get_water(1)
+        _, scf_results = self.run_scf(ScfRestrictedDriver, molecule, basis,
+                                      'b3lyp')
+
+        driver = self.run_tda(molecule, basis, scf_results)
+        driver._ri_jk_predicted_peak = 100
+        driver._ri_batch_memory = 10
+
+        for solver_peak, solver_batch, peak, batch in [(50, 5, 100, 10),
+                                                       (300, 30, 300, 30)]:
+            solver = self.make_eigensolver(TdaEigenSolver)
+
+            with rijkresponse.lend(driver, solver):
+                # NOTE: what the solver's builds record while it borrows.
+                solver._ri_jk_predicted_peak = solver_peak
+                solver._ri_batch_memory = solver_batch
+
+            assert driver._ri_jk_predicted_peak == peak
+            assert driver._ri_batch_memory == batch
+
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason='skip pytest.raises for multiple MPI processes')
     def test_reuse_without_b_vectors_is_refused(self):

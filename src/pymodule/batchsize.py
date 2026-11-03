@@ -35,6 +35,9 @@ import psutil
 import ctypes
 
 from .veloxchemlib import mpi_master
+from .veloxchemlib import get_number_of_threads
+from .environment import get_available_memory
+from .errorhandler import assert_msg_critical
 
 
 def get_batch_size(input_batch_size, n_total, n_ao, comm):
@@ -52,53 +55,6 @@ def get_batch_size(input_batch_size, n_total, n_ao, comm):
 
     :return:
         The batch size for Fock matrix computation..
-    """
-
-    return _batch_size_from_memory(input_batch_size, n_total, n_ao, None, comm)
-
-
-def get_ri_batch_size(input_batch_size, n_total, n_ao, density_memory, comm):
-    """
-    Gets the batch size of a Fock build with the resolution of the identity:
-    as get_batch_size, but with the memory of a density no less than what the
-    caller says the solver holds for it. Builds without the resolution of the
-    identity take get_batch_size.
-
-    :param input_batch_size:
-        The batch size from input, or None.
-    :param n_total:
-        The total number of Fock matrices.
-    :param n_ao:
-        The number of atomic orbitals in one Fock matrix.
-    :param density_memory:
-        The memory the solver holds on the master rank for each density of a
-        batch, in bytes. Only the master's value is read.
-    :param comm:
-        The communicator.
-
-    :return:
-        The batch size, which is never more than get_batch_size gives.
-
-    .. note::
-        The RI build's own matrices are not part of density_memory: the build
-        cuts its densities into chunks that fit the RI driver's budget (see
-        rijkresponse._max_densities and rijresponse._max_densities).
-    """
-
-    return _batch_size_from_memory(input_batch_size, n_total, n_ao,
-                                   density_memory, comm)
-
-
-def _batch_size_from_memory(input_batch_size, n_total, n_ao, density_memory,
-                            comm):
-    """
-    Gets the batch size for get_batch_size and get_ri_batch_size.
-
-    :param density_memory:
-        The memory the solver holds on the master rank for each density, in
-        bytes, or None for the estimate of get_batch_size alone.
-
-    The other parameters are those of get_ri_batch_size.
     """
 
     batch_size = input_batch_size
@@ -132,14 +88,8 @@ def _batch_size_from_memory(input_batch_size, n_total, n_ao, density_memory,
         avail_mem //= ntasks_per_node
         mem_per_mat = n_ao**2 * ctypes.sizeof(ctypes.c_double)
         nthreads = int(environ['OMP_NUM_THREADS'])
-        mem_per_density = mem_per_mat * nthreads
-        # NOTE: the larger of this estimate and the caller's density_memory,
-        # so that density_memory can make a batch smaller than get_batch_size
-        # gives and never larger.
-        if density_memory is not None:
-            mem_per_density = max(mem_per_density, density_memory)
         # TODO: double check the estimation of max_batch_size
-        max_batch_size = int(avail_mem / mem_per_density)
+        max_batch_size = int(avail_mem / (mem_per_mat * nthreads))
         max_batch_size = max(1, max_batch_size)
 
         # note: batch_size will be zero if n_total is zero
@@ -149,6 +99,72 @@ def _batch_size_from_memory(input_batch_size, n_total, n_ao, density_memory,
     batch_size = comm.bcast(batch_size, root=mpi_master())
 
     return batch_size
+
+
+def get_ri_batch_size(input_batch_size, n_total, n_ao, density_memory, comm):
+    """
+    Gets the batch size of a Fock build with the resolution of the identity,
+    from the memory free to each rank (the smaller of the node's and what its
+    control groups leave, see environment.get_available_memory). Every rank
+    must call this. Builds from the four-center integrals take
+    get_batch_size.
+
+    :param input_batch_size:
+        The batch size from input, or None.
+    :param n_total:
+        The total number of Fock matrices.
+    :param n_ao:
+        The number of atomic orbitals in one Fock matrix; read on the master
+        rank only.
+    :param density_memory:
+        The memory the solver holds on the master rank for each density of a
+        batch, in bytes; read on the master rank only.
+    :param comm:
+        The communicator.
+
+    :return:
+        The batch size, the same on every rank: the input batch size where one
+        is given, and otherwise as many densities as the smallest room of a
+        rank holds, at least one and at most n_total (zero where n_total is
+        zero).
+
+    .. note::
+        The RI build's own matrices are not part of density_memory: the build
+        cuts its densities into chunks that fit the RI driver's budget (see
+        rijkresponse._max_densities and rijresponse._max_densities).
+    """
+
+    if input_batch_size is not None:
+        return comm.bcast(input_batch_size, root=mpi_master())
+
+    # NOTE: the ranks on one node share its free memory, and are counted by
+    # their host name, as get_ri_free_memory counts them for the RI budgets.
+    # Each rank's room is its node's free memory over the ranks on it, and the
+    # smallest room of any rank is taken.
+    import platform
+    hosts_and_memory = comm.allgather((platform.node(), get_available_memory()))
+    hosts = [host for host, _ in hosts_and_memory]
+    room = min(available // hosts.count(host)
+               for host, available in hosts_and_memory)
+
+    batch_size = None
+
+    if comm.Get_rank() == mpi_master():
+        assert_msg_critical(density_memory is not None,
+                            'get_ri_batch_size: no memory of a density given')
+
+        # NOTE: the memory of a density is no less than 8 bytes of n_ao^2
+        # for each thread, as get_batch_size takes it. With many threads this
+        # is above density_memory, and what lies between the two is room for
+        # what neither counts, such as the matrices the RI build allocates
+        # beside its densities.
+        estimate = n_ao * n_ao * 8 * get_number_of_threads()
+        per_density = max(estimate, density_memory)
+
+        # NOTE: batch_size is zero where n_total is zero.
+        batch_size = min(n_total, max(room // per_density, 1))
+
+    return comm.bcast(batch_size, root=mpi_master())
 
 
 def get_ri_density_memory(n_ao, n_matrices, n_factor_columns, n_sliced,
