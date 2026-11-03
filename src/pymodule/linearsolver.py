@@ -677,6 +677,41 @@ class LinearSolver:
         return (self.ri_coulomb and not self._ri_fallback and
                 not self._ri_j_fallback)
 
+    def _disable_subcomms_for_ri(self):
+        """
+        Turns use_subcomms off, with a warning, when the Fock matrices of the
+        response are formed with RI-J or RI-JK. Called by the sigma builds of
+        this class (_e2n_half_size) and of CphfSolver (build_sigmas) before
+        they choose between the single communicator and the subcommunicators.
+        """
+
+        # NOTE: each rank holds a share of the auxiliary basis, set up on this
+        # solver's communicator: RI-J fits the parts of owned_parts(), RI-JK
+        # uses its share of the B vectors. _comp_lr_fock sums the shares over
+        # the communicator it is given, so a Fock build on a subcommunicator
+        # sums the shares of that subcommunicator alone, which with more than
+        # one rank is not the whole auxiliary basis. The subcommunicator path
+        # of this class (_e2n_half_size_subcomms) also builds no density
+        # factors, and _comp_lr_fock without them forms the RI-JK Fock
+        # matrices from the four-center integrals, on top of an RI ground
+        # state, on any number of ranks. The subcommunicators are turned off
+        # on one rank as well, so the setting behaves the same on any number
+        # of ranks.
+        # TODO: enable subcomms for RI-J and RI-JK
+        if self.use_subcomms and self._uses_ri_coulomb():
+            self.use_subcomms = False
+            warn_msg = 'Use of subcomms is disabled for RI-J.'
+            self.ostream.print_warning(warn_msg)
+            self.ostream.print_blank()
+            self.ostream.flush()
+
+        if self.use_subcomms and self._uses_ri_jk():
+            self.use_subcomms = False
+            warn_msg = 'Use of subcomms is disabled for RI-JK.'
+            self.ostream.print_warning(warn_msg)
+            self.ostream.print_blank()
+            self.ostream.flush()
+
     def _print_ri_memory_check(self):
         """
         Prints, with memory profiling, the most the simd RI driver was
@@ -1268,28 +1303,7 @@ class LinearSolver:
             not (self.use_subcomms and self._gostshyp),
             'LinearSolver: Cannot use subcomms with GOSTSHYP')
 
-        if self.use_subcomms and self._uses_ri_coulomb():
-            self.use_subcomms = False
-            warn_msg = 'Use of subcomms is disabled for RI-J.'
-            self.ostream.print_warning(warn_msg)
-            self.ostream.print_blank()
-            self.ostream.flush()
-
-        # NOTE: and for RI-JK, on any number of ranks. The subcommunicator path
-        # (_e2n_half_size_subcomms) builds no density factors, and
-        # _comp_lr_fock without them forms the Fock matrices from the
-        # four-center integrals, on top of an RI ground state. With more than
-        # one rank there is a further reason: the B vectors are divided over
-        # the ranks of this solver's communicator, and a Fock build on a
-        # subcommunicator would sum the shares of that subcommunicator alone.
-        if self.use_subcomms and self._uses_ri_jk():
-            self.use_subcomms = False
-            warn_msg = 'Use of subcomms is disabled for RI-JK.'
-            self.ostream.print_warning(warn_msg)
-            self.ostream.print_blank()
-            self.ostream.flush()
-
-        # TODO: enable subcomms for RI-J and RI-JK
+        self._disable_subcomms_for_ri()
 
         if self.use_subcomms:
             if method_type == 'restricted':

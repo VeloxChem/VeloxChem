@@ -657,6 +657,8 @@ class CphfSolver(LinearSolver):
             The method type (restricted, unrestricted).
         """
 
+        self._disable_subcomms_for_ri()
+
         if self.use_subcomms:
             if method_type == 'restricted':
                 self.build_sigmas_subcomms(molecule, basis, scf_results,
