@@ -30,14 +30,11 @@
 #  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-from mpi4py import MPI
 from os import environ
 import psutil
 import ctypes
 
 from .veloxchemlib import mpi_master
-from .environment import get_ri_free_memory
-from .errorhandler import assert_msg_critical
 
 
 def get_batch_size(input_batch_size, n_total, n_ao, comm):
@@ -55,6 +52,53 @@ def get_batch_size(input_batch_size, n_total, n_ao, comm):
 
     :return:
         The batch size for Fock matrix computation..
+    """
+
+    return _batch_size_from_memory(input_batch_size, n_total, n_ao, None, comm)
+
+
+def get_ri_batch_size(input_batch_size, n_total, n_ao, density_cost, comm):
+    """
+    Gets the batch size of a Fock build with the resolution of the identity:
+    as get_batch_size, but with the memory of a density no less than what the
+    caller says the solver holds for it. Builds without the resolution of the
+    identity take get_batch_size.
+
+    :param input_batch_size:
+        The batch size from input, or None.
+    :param n_total:
+        The total number of Fock matrices.
+    :param n_ao:
+        The number of atomic orbitals in one Fock matrix.
+    :param density_cost:
+        The memory the solver holds on the master rank for each density of a
+        batch, in bytes. Only the master's value is read.
+    :param comm:
+        The communicator.
+
+    :return:
+        The batch size, which is never more than get_batch_size gives.
+
+    .. note::
+        The RI build's own matrices are not part of density_cost: the build
+        cuts its densities into chunks that fit the RI driver's budget (see
+        rijkresponse._max_densities and rijresponse._max_densities).
+    """
+
+    return _batch_size_from_memory(input_batch_size, n_total, n_ao,
+                                   density_cost, comm)
+
+
+def _batch_size_from_memory(input_batch_size, n_total, n_ao, density_cost,
+                            comm):
+    """
+    Gets the batch size for get_batch_size and get_ri_batch_size.
+
+    :param density_cost:
+        The memory the solver holds on the master rank for each density, in
+        bytes, or None for the estimate of get_batch_size alone.
+
+    The other parameters are those of get_ri_batch_size.
     """
 
     batch_size = input_batch_size
@@ -88,8 +132,14 @@ def get_batch_size(input_batch_size, n_total, n_ao, comm):
         avail_mem //= ntasks_per_node
         mem_per_mat = n_ao**2 * ctypes.sizeof(ctypes.c_double)
         nthreads = int(environ['OMP_NUM_THREADS'])
+        mem_per_density = mem_per_mat * nthreads
+        # NOTE: the larger of this estimate and the caller's cost, so that a
+        # cost from the caller can make a batch smaller than get_batch_size
+        # gives and never larger.
+        if density_cost is not None:
+            mem_per_density = max(mem_per_density, density_cost)
         # TODO: double check the estimation of max_batch_size
-        max_batch_size = int(avail_mem / (mem_per_mat * nthreads))
+        max_batch_size = int(avail_mem / mem_per_density)
         max_batch_size = max(1, max_batch_size)
 
         # note: batch_size will be zero if n_total is zero
@@ -99,57 +149,6 @@ def get_batch_size(input_batch_size, n_total, n_ao, comm):
     batch_size = comm.bcast(batch_size, root=mpi_master())
 
     return batch_size
-
-
-def get_ri_batch_size(input_batch_size, n_total, item_cost, fixed_cost, comm):
-    """
-    Gets the batch size of a Fock build with the resolution of the identity,
-    from the memory free to each rank when the build starts. Every rank must
-    call this. Builds without the resolution of the identity take
-    get_batch_size.
-
-    :param input_batch_size:
-        The batch size from input, or None.
-    :param n_total:
-        The number of items to build: densities, or groups of densities which
-        the caller does not split.
-    :param item_cost:
-        The memory each item takes on this rank during the build, in bytes.
-    :param fixed_cost:
-        The memory the build takes on this rank whatever the number of items,
-        beyond what the rank already holds, in bytes.
-    :param comm:
-        The communicator.
-
-    :return:
-        The batch size, the same on every rank: the input batch size where one
-        is given, and otherwise the most items every rank has room for, at
-        least one and at most n_total (zero where n_total is zero).
-    """
-
-    if input_batch_size is not None:
-        return comm.bcast(input_batch_size, root=mpi_master())
-
-    assert_msg_critical(item_cost > 0,
-                        'get_ri_batch_size: an item has to cost memory')
-
-    # NOTE: read when the build starts, so what the RI driver and the solver
-    # already hold is not counted as free. get_ri_free_memory keeps back the
-    # node's reserve and divides the rest among the ranks on the node.
-    room = get_ri_free_memory(comm, 0) - fixed_cost
-
-    # NOTE: the costs differ between the ranks (the master holds more for each
-    # density than the others), and every rank builds the same batch, so each
-    # rank works out how many items it has room for and the smallest count is
-    # taken.
-    count = comm.allreduce(max(room, 0) // item_cost, op=MPI.MIN)
-
-    batch_size = None
-
-    if comm.Get_rank() == mpi_master():
-        batch_size = min(max(count, 1), n_total)
-
-    return comm.bcast(batch_size, root=mpi_master())
 
 
 def get_number_of_batches(n_total, batch_size, comm):
