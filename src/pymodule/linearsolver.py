@@ -752,6 +752,22 @@ class LinearSolver:
         return get_ri_density_memory(n_ao, n_matrices, n_factor_columns,
                                      n_sliced, xc_density_memory)
 
+    def _note_ri_batch_memory(self, density_memory, ndens):
+        """
+        Records, for memory profiling, the most the solver held on the master
+        rank for the densities of one batch of an RI build.
+
+        :param density_memory:
+            The memory of one density, as get_ri_batch_size took it; None away
+            from the master rank, where nothing is recorded.
+        :param ndens:
+            The densities of the batch.
+        """
+
+        if density_memory is not None:
+            self._ri_batch_memory = max(getattr(self, '_ri_batch_memory', 0),
+                                        density_memory * ndens)
+
     def _print_ri_memory_check(self):
         """
         Prints, with memory profiling, the most the simd RI driver was
@@ -1996,6 +2012,8 @@ class LinearSolver:
 
             batch_size = get_ri_batch_size(self.batch_size, n_total, n_ao,
                                            density_memory, self.comm)
+            self._note_ri_batch_memory(density_memory,
+                                       min(batch_size, n_total))
         else:
             batch_size = get_batch_size(self.batch_size, n_total, n_ao,
                                         self.comm)
@@ -2984,6 +3002,8 @@ class LinearSolver:
 
             batch_size = get_ri_batch_size(self.batch_size, n_total, n_ao,
                                            density_memory, self.comm)
+            self._note_ri_batch_memory(density_memory,
+                                       min(batch_size, n_total))
         else:
             batch_size = get_batch_size(self.batch_size, n_total, n_ao,
                                         self.comm)

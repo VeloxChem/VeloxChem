@@ -186,6 +186,10 @@ def mark_setup(solver):
         The solver.
     """
 
+    # NOTE: what the solver holds for the densities of a batch, recorded by
+    # the builds after this setup (LinearSolver._note_ri_batch_memory).
+    solver._ri_batch_memory = 0
+
     if not getattr(solver, 'memory_profiling', False):
         return
 
@@ -219,6 +223,11 @@ def print_memory_check(solver):
 
     predicted = max(solver.comm.allgather(predicted))
 
+    # NOTE: recorded on the master rank only, which holds the most for each
+    # density of a batch.
+    batch_memory = max(
+        solver.comm.allgather(getattr(solver, '_ri_batch_memory', 0)))
+
     # NOTE: the growth of the peak and not the peak itself, as in the SCF: what
     # a rank held before the setup was not free when the budget was taken.
     grown = Profiler.get_peak_memory() - solver._ri_rss_at_setup
@@ -231,7 +240,9 @@ def print_memory_check(solver):
 
     solver.ostream.print_info(
         f'{label} was predicted to need roughly ' +
-        f'{Profiler.memory_to_string(predicted)} at its largest build, with ' +
+        f'{Profiler.memory_to_string(predicted)} at its largest build, and ' +
+        f'the solver {Profiler.memory_to_string(batch_memory)} for the ' +
+        'densities of its largest batch, with ' +
         f'{Profiler.memory_to_string(solver._ri_memory_reserve)} reserved ' +
         'for the rest of the response.')
     solver.ostream.print_info('Peak memory grew by ' +

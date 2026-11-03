@@ -1052,6 +1052,8 @@ class CphfSolver(LinearSolver):
 
             batch_size = get_ri_batch_size(self.batch_size, num_vecs, nao,
                                            density_memory, self.comm)
+            self._note_ri_batch_memory(density_memory,
+                                       min(batch_size, num_vecs))
         else:
             batch_size = get_batch_size(self.batch_size, num_vecs, nao,
                                         self.comm)
@@ -1233,6 +1235,8 @@ class CphfSolver(LinearSolver):
 
             batch_size = get_ri_batch_size(self.batch_size, num_vecs, nao,
                                            density_memory, self.comm)
+            self._note_ri_batch_memory(density_memory,
+                                       min(batch_size, num_vecs))
         else:
             batch_size = get_batch_size(self.batch_size, num_vecs, nao,
                                         self.comm)

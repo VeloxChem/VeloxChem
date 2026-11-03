@@ -356,3 +356,11 @@ class TestResponseRiMemory:
             assert solver._ri_jk_predicted_peak > 0
         else:
             assert solver._ri_j_memory is not None
+
+        # NOTE: recorded on the master rank only, where the batch size is
+        # decided; at least one density of the 7 matrices of n_ao by n_ao.
+        if solver.rank == mpi_master():
+            nao = basis.get_dimensions_of_basis()
+            assert solver._ri_batch_memory >= 7 * nao * nao * 8
+        else:
+            assert solver._ri_batch_memory == 0
