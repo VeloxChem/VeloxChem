@@ -157,8 +157,12 @@ class XtbDriver:
         identifiers = np.array(molecule.get_identifiers())
         coords_in_au = molecule.get_coordinates_in_bohr()
 
-        self._xtb_calc = XtbCalculator(
-            self.xtb_method.upper() + '-xTB', identifiers, coords_in_au)
+        # uhf is tblite's number of unpaired electrons
+        self._xtb_calc = XtbCalculator(self.xtb_method.upper() + '-xTB',
+                                       identifiers,
+                                       coords_in_au,
+                                       charge=float(molecule.get_charge()),
+                                       uhf=molecule.get_multiplicity() - 1)
 
         if self.rank == mpi_master():
 
