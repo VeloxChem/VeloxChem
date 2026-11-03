@@ -11,7 +11,8 @@ from veloxchem.localizationdriver import LocalizationDriver
 @pytest.mark.solvers
 class TestLocalization:
 
-    def test_run_localization(self, tol=1e-6):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_run_localization(self, ri, tol=1e-6):
 
         xyz_string = """12
         D6h
@@ -32,9 +33,14 @@ class TestLocalization:
         bas = MolecularBasis.read(mol, 'def2-svp', ostream=None)
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_res = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_res['ri_jk'] or scf_res['ri_coulomb']
+                assert not scf_res['ri_fallback']
 
         if scf_drv.rank == mpi_master():
             mo_coefs = scf_res['C_alpha']

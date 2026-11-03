@@ -1,5 +1,6 @@
 from pathlib import Path
 import numpy as np
+import pytest
 import h5py
 
 from veloxchem.veloxchemlib import mpi_master
@@ -12,17 +13,26 @@ from veloxchem.densityviewer import DensityViewer
 
 class TestDensityViewer:
 
-    def test_density_viewer(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_density_viewer(self, ri):
 
         here = Path(__file__).parent
         inpfile = str(here / 'data' / 'h2se.inp')
-        h5file = str(here / 'data' / 'h2se.denv.h5')
+        h5file = str(here / 'data' / {
+            False: 'h2se.denv.h5',
+            True: 'h2se.denv_ri.h5'
+        }[ri])
 
         task = MpiTask([inpfile, None])
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
-        scf_drv.ri = False
+        scf_drv.ri = ri
 
         scf_results = scf_drv.compute(task.molecule, task.ao_basis)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         density_viewer = DensityViewer()
         density_viewer.initialize(task.molecule, task.ao_basis)
@@ -44,7 +54,8 @@ class TestDensityViewer:
 
         task.finish()
 
-    def test_density_viewer_relative_difference(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_density_viewer_relative_difference(self, ri):
 
         molstr = """
             O   0.0   0.0   0.0
@@ -55,9 +66,14 @@ class TestDensityViewer:
         bas = MolecularBasis.read(mol, 'aug-cc-pvdz', ostream=None)
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         if scf_drv.rank == mpi_master():
             density_matrix_a = scf_results['D_alpha']

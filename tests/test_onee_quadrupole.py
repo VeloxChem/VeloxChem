@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 from veloxchem.veloxchemlib import compute_quadrupole_integrals
 from veloxchem.veloxchemlib import mpi_master
@@ -24,14 +25,20 @@ class TestOneElecIntsQuadrupole:
 
         return mol, bas
 
-    def test_quadrupole_integrals(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_quadrupole_integrals(self, ri):
 
         mol, bas = self.get_molecule_and_basis()
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         if scf_drv.rank == mpi_master():
             total_density = scf_results['D_alpha'] + scf_results['D_beta']
@@ -77,8 +84,14 @@ class TestOneElecIntsQuadrupole:
 
         ref_Q_nuc = np.array(
             [0.479107, 0.357448, 0.038664, 1.173405, -0.016335, 1.322784])
-        ref_Q_elec = np.array(
-            [-5.613973, 0.055904, 0.006044, -5.505387, -0.002561, -5.482035])
+        ref_Q_elec = {
+            False: np.array([
+                -5.613973, 0.055904, 0.006044, -5.505387, -0.002561, -5.482035
+            ]),
+            True: np.array([
+                -5.614223, 0.056016, 0.006057, -5.505418, -0.002566, -5.482019
+            ]),
+        }[ri]
         ref_Q_tot = ref_Q_nuc + ref_Q_elec
 
         assert np.max(np.abs(nuclear_quadrupole - ref_Q_nuc)) < 1.0e-5

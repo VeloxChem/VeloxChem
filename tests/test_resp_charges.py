@@ -18,17 +18,24 @@ class TestRespCharges:
                  ref_charges,
                  inp_chg_dict,
                  chg_type,
-                 custom_mk_radii=None):
+                 custom_mk_radii=None,
+                 *,
+                 ri):
 
         task = MpiTask([inpfile, None])
         task.input_dict['scf']['checkpoint_file'] = None
 
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.filename = task.input_dict['filename']
         scf_drv.update_settings(task.input_dict['scf'],
                                 task.input_dict['method_settings'])
         scf_results = scf_drv.compute(task.molecule, task.ao_basis)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         chg_dict = {'filename': task.input_dict['filename']}
         chg_dict.update(inp_chg_dict)
@@ -56,35 +63,53 @@ class TestRespCharges:
             scf_h5_file = Path(chg_drv.filename + '_scf.h5')
             scf_h5_file.unlink(missing_ok=True)
 
-    def test_resp_methanol(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_resp_methanol(self, ri):
 
         # vlxtag: RHF, RESP_charges
 
         here = Path(__file__).parent
         inpfile = str(here / 'data' / 'methanol.inp')
 
-        ref_resp_charges = np.array(
-            [0.041310, 0.021227, 0.041310, 0.041310, -0.454284, 0.309127])
+        ref_resp_charges = {
+            False: np.array(
+                [0.041310, 0.021227, 0.041310, 0.041310, -0.454284, 0.309127]),
+            True: np.array([
+                0.0412889, 0.0212605, 0.0412889, 0.0412889, -0.4542080,
+                0.3090809
+            ])
+        }[ri]
 
         chg_dict = {'number_layers': 1}
 
-        self.run_resp(inpfile, ref_resp_charges, chg_dict, 'resp')
+        self.run_resp(inpfile, ref_resp_charges, chg_dict, 'resp', ri=ri)
 
-    def test_resp_methanol_custom_radii(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_resp_methanol_custom_radii(self, ri):
 
         # vlxtag: RHF, RESP_charges
 
         here = Path(__file__).parent
         inpfile = str(here / 'data' / 'methanol.inp')
 
-        ref_resp_charges = np.array([
-            0.04858359, -0.00613574, 0.04858359, 0.04858359, -0.43473053,
-            0.29511548
-        ])
+        ref_resp_charges = {
+            False: np.array([
+                0.04858359, -0.00613574, 0.04858359, 0.04858359, -0.43473053,
+                0.29511548
+            ]),
+            True: np.array([
+                0.04857019, -0.00613411, 0.04857019, 0.04857019, -0.43464770,
+                0.29507124
+            ])
+        }[ri]
 
         chg_dict = {'number_layers': 1}
 
-        self.run_resp(inpfile, ref_resp_charges, chg_dict, 'resp', ['C', 3.0])
+        self.run_resp(inpfile,
+                      ref_resp_charges,
+                      chg_dict,
+                      'resp', ['C', 3.0],
+                      ri=ri)
 
     def test_resp_writes_h5_without_input_scf_results(self):
 

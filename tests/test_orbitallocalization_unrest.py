@@ -3,6 +3,7 @@ import numpy as np
 import pytest
 from mpi4py import MPI
 
+from veloxchem.veloxchemlib import mpi_master
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.orbitallocalization import OrbitalLocalizationDriver
@@ -13,7 +14,7 @@ from veloxchem.errorhandler import VeloxChemError
 class TestOrbitalLocalizationUnrestricted:
 
     @staticmethod
-    def _build_system():
+    def _build_system(*, ri):
         h2o_xyz = """3
         xyz
         O   0    0     0
@@ -24,9 +25,14 @@ class TestOrbitalLocalizationUnrestricted:
         molecule.set_multiplicity(3)
         basis = MolecularBasis.read(molecule, "def2-svp")
         scf_drv = ScfUnrestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_res = scf_drv.compute(molecule, basis)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_res['ri_jk'] or scf_res['ri_coulomb']
+                assert not scf_res['ri_fallback']
 
         n_occ_a = molecule.number_of_alpha_occupied_orbitals(basis)
         n_occ_b = molecule.number_of_beta_occupied_orbitals(basis)
@@ -61,8 +67,9 @@ class TestOrbitalLocalizationUnrestricted:
             ("pm", "lowdin", "orbloc_pm_lowdin_C_unrest"),
         ],
     )
-    def test_localization(self, method, pm_projector, ref_name):
-        molecule, basis, scf_res, n_occ_a, n_occ_b = self._build_system()
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_localization(self, method, pm_projector, ref_name, ri):
+        molecule, basis, scf_res, n_occ_a, n_occ_b = self._build_system(ri=ri)
 
         loc = OrbitalLocalizationDriver()
         loc.method = method
@@ -76,8 +83,14 @@ class TestOrbitalLocalizationUnrestricted:
             C_loc_b = C_loc["loc_orbs"].beta_to_numpy()
 
             # Load reference
-            ref_path_a = Path(__file__).parent / "data" / f"{ref_name}_alpha.npy"
-            ref_path_b = Path(__file__).parent / "data" / f"{ref_name}_beta.npy"
+            ref_path_a = Path(__file__).parent / "data" / {
+                False: f"{ref_name}_alpha.npy",
+                True: f"{ref_name}_alpha_ri.npy"
+            }[ri]
+            ref_path_b = Path(__file__).parent / "data" / {
+                False: f"{ref_name}_beta.npy",
+                True: f"{ref_name}_beta_ri.npy"
+            }[ri]
             C_ref_occ_a = np.load(ref_path_a)
             C_ref_occ_b = np.load(ref_path_b)
             C_ref_a = np.zeros(C_loc_a.shape)
@@ -95,8 +108,9 @@ class TestOrbitalLocalizationUnrestricted:
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason="pytest.raises only valid in serial")
-    def test_mo_range_requires_uniform_occupations(self):
-        molecule, basis, scf_res, n_occ_a, n_occ_b = self._build_system()
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_mo_range_requires_uniform_occupations(self, ri):
+        molecule, basis, scf_res, n_occ_a, n_occ_b = self._build_system(ri=ri)
 
         loc = OrbitalLocalizationDriver()
         loc.ostream.mute()

@@ -64,13 +64,15 @@ class TestInputMp2:
 
         return input_lines
 
-    def run_input_mp2(self, capsys, ref_data):
+    def run_input_mp2(self, capsys, ref_data, *, ri):
 
         here = Path(__file__).parent
         random_string = get_random_string_parallel()
         input_file = here / 'data' / f'vlx_mp2_{random_string}.inp'
 
         input_lines = self.get_input_lines()
+        if ri:
+            input_lines = input_lines.replace('ri: false', 'ri: yes')
         self.create_input_file(input_lines, input_file)
 
         with patch.object(sys, 'argv', ['vlx', str(input_file)]):
@@ -85,15 +87,28 @@ class TestInputMp2:
                         content = line.split()
                         mp2_energy = float(content[4])
 
+                # NOTE: printed only where the SCF formed its Fock matrices
+                # with RI; one which fell back to the four-center integrals
+                # prints a warning instead.
+                if ri:
+                    assert ('Using the SIMD resolution of the identity'
+                            in captured.out)
+
                 assert np.max(np.abs(mp2_energy -
                                      ref_data['mp2_energy'])) < 1.0e-8
 
             self.remove_input_and_h5_files(input_file)
 
-    def test_input_rhf_mp2(self, capsys):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_input_rhf_mp2(self, capsys, ri):
 
         ref_data = {
-            'mp2_energy': -0.28529088,
-        }
+            False: {
+                'mp2_energy': -0.28529088,
+            },
+            True: {
+                'mp2_energy': -0.28527849048
+            }
+        }[ri]
 
-        self.run_input_mp2(capsys, ref_data)
+        self.run_input_mp2(capsys, ref_data, ri=ri)

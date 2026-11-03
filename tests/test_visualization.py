@@ -14,16 +14,23 @@ from veloxchem.inputparser import get_random_string_parallel
 @pytest.mark.solvers
 class TestVisualization:
 
-    def test_visualization_driver(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_visualization_driver(self, ri):
 
         here = Path(__file__).parent
         inpfile = str(here / 'data' / 'h2se.inp')
 
         task = MpiTask([inpfile, None])
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
-        scf_drv.ri = False
+        scf_drv.ri = ri
 
         scf_results_not_used = scf_drv.compute(task.molecule, task.ao_basis)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results_not_used['ri_jk'] or scf_results_not_used[
+                    'ri_coulomb']
+                assert not scf_results_not_used['ri_fallback']
 
         mol_orbs = scf_drv.molecular_orbitals
         density = scf_drv.density
@@ -49,12 +56,22 @@ class TestVisualization:
         if task.mpi_rank == mpi_master():
             homo_values = grid.values_to_numpy()
 
-            homo_ref = np.array([
-                5.09744e-02, 2.82845e-02, 1.20927e-02, 3.22233e-02, 1.53738e-02,
-                6.37159e-03, 1.33161e-02, 6.65229e-03, 3.03229e-03, 1.59826e-01,
-                7.64720e-02, 3.17590e-02, 8.77249e-02, 4.56304e-02, 1.99448e-02,
-                3.70652e-02, 2.14514e-02, 1.03838e-02
-            ]).reshape(2, 3, 3)
+            homo_ref = {
+                False: np.array([
+                    5.09744e-02, 2.82845e-02, 1.20927e-02, 3.22233e-02,
+                    1.53738e-02, 6.37159e-03, 1.33161e-02, 6.65229e-03,
+                    3.03229e-03, 1.59826e-01, 7.64720e-02, 3.17590e-02,
+                    8.77249e-02, 4.56304e-02, 1.99448e-02, 3.70652e-02,
+                    2.14514e-02, 1.03838e-02
+                ]),
+                True: np.array([
+                    5.097382e-02, 2.828262e-02, 1.209039e-02, 3.222183e-02,
+                    1.537297e-02, 6.371107e-03, 1.331432e-02, 6.651982e-03,
+                    3.032254e-03, 1.598231e-01, 7.646861e-02, 3.175601e-02,
+                    8.772180e-02, 4.562884e-02, 1.994413e-02, 3.706268e-02,
+                    2.145085e-02, 1.038370e-02
+                ]),
+            }[ri].reshape(2, 3, 3)
 
             homo_diff = np.abs(homo_values) - np.abs(homo_ref)
             homo_diff_rel = homo_diff / np.abs(homo_ref)
@@ -72,12 +89,22 @@ class TestVisualization:
             dens_alpha = grid.values_to_numpy()
             dens_total = dens_alpha * 2.0
 
-            dens_ref = np.array([
-                3.26043e-01, 1.18974e-01, 1.00508e-01, 9.37167e-02, 3.30301e-02,
-                1.66540e-02, 7.19205e-02, 1.21828e-02, 3.05223e-03, 1.01686e-01,
-                4.68902e-02, 2.50173e-02, 4.55977e-02, 1.69215e-02, 7.68553e-03,
-                2.35932e-02, 6.38199e-03, 1.90608e-03
-            ]).reshape(2, 3, 3)
+            dens_ref = {
+                False: np.array([
+                    3.26043e-01, 1.18974e-01, 1.00508e-01, 9.37167e-02,
+                    3.30301e-02, 1.66540e-02, 7.19205e-02, 1.21828e-02,
+                    3.05223e-03, 1.01686e-01, 4.68902e-02, 2.50173e-02,
+                    4.55977e-02, 1.69215e-02, 7.68553e-03, 2.35932e-02,
+                    6.38199e-03, 1.90608e-03
+                ]),
+                True: np.array([
+                    3.260425e-01, 1.189715e-01, 1.005031e-01, 9.371577e-02,
+                    3.303057e-02, 1.665415e-02, 7.191749e-02, 1.218323e-02,
+                    3.052549e-03, 1.016836e-01, 4.688980e-02, 2.501706e-02,
+                    4.559725e-02, 1.692190e-02, 7.685860e-03, 2.359320e-02,
+                    6.382399e-03, 1.906290e-03
+                ]),
+            }[ri].reshape(2, 3, 3)
 
             dens_diff = dens_total - dens_ref
             dens_diff_rel = dens_diff / np.abs(dens_ref)
@@ -134,16 +161,23 @@ class TestVisualization:
         grid = vis_drv.gen_cubic_grid(mol, num_points)
         assert num_points == grid.get_num_points()
 
-    def test_gen_cubes(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_gen_cubes(self, ri):
 
         here = Path(__file__).parent
         inpfile = str(here / 'data' / 'water.inp')
 
         task = MpiTask([inpfile, None])
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
-        scf_drv.ri = False
+        scf_drv.ri = ri
 
         scf_results_not_used = scf_drv.compute(task.molecule, task.ao_basis)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results_not_used['ri_jk'] or scf_results_not_used[
+                    'ri_coulomb']
+                assert not scf_results_not_used['ri_fallback']
 
         mol_orbs = scf_drv.molecular_orbitals
         density = scf_drv.density

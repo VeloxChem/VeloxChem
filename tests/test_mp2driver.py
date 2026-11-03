@@ -13,15 +13,20 @@ from veloxchem.errorhandler import VeloxChemError
 
 class TestMp2Driver:
 
-    def run_mp2(self, task, scf_type, e_ref, mp2_type, tol):
+    def run_mp2(self, task, scf_type, e_ref, mp2_type, tol, *, ri):
 
         if scf_type.lower() == 'restricted':
             scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
-            scf_drv.ri = False
+            scf_drv.ri = ri
         else:
             scf_drv = ScfUnrestrictedDriver(task.mpi_comm, task.ostream)
-            scf_drv.ri = False
+            scf_drv.ri = ri
         scf_results = scf_drv.compute(task.molecule, task.ao_basis)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         mp2_drv = Mp2Driver(task.mpi_comm, task.ostream)
         if mp2_type.lower() == 'conventional':
@@ -34,31 +39,34 @@ class TestMp2Driver:
             assert abs(e_ref - mp2_result['mp2_energy']) < tol
 
     @pytest.mark.solvers
-    def test_mp2_conventional(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_mp2_conventional(self, ri):
 
         here = Path(__file__).parent
         inpfile = str(here / 'data' / 'h2se.inp')
 
         task = MpiTask([inpfile, None])
 
-        e_ref = -0.28529088
+        e_ref = {False: -0.28529088, True: -0.2852784905}[ri]
 
-        self.run_mp2(task, 'restricted', e_ref, 'conventional', 1.0e-8)
+        self.run_mp2(task, 'restricted', e_ref, 'conventional', 1.0e-8, ri=ri)
 
     @pytest.mark.solvers
-    def test_mp2_fockdriven(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_mp2_fockdriven(self, ri):
 
         here = Path(__file__).parent
         inpfile = str(here / 'data' / 'h2se.inp')
 
         task = MpiTask([inpfile, None])
 
-        e_ref = -0.28529088
+        e_ref = {False: -0.28529088, True: -0.2852784905}[ri]
 
-        self.run_mp2(task, 'restricted', e_ref, 'fockdriven', 1.0e-8)
+        self.run_mp2(task, 'restricted', e_ref, 'fockdriven', 1.0e-8, ri=ri)
 
     @pytest.mark.solvers
-    def test_ump2_conventional(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_ump2_conventional(self, ri):
 
         here = Path(__file__).parent
         inpfile = str(here / 'data' / 'h2se.inp')
@@ -66,12 +74,13 @@ class TestMp2Driver:
         task = MpiTask([inpfile, None])
         task.molecule.set_multiplicity(3)
 
-        e_ref = -0.26775296
+        e_ref = {False: -0.26775296, True: -0.267739184}[ri]
 
-        self.run_mp2(task, 'unrestricted', e_ref, 'conventional', 1.0e-7)
+        self.run_mp2(task, 'unrestricted', e_ref, 'conventional', 1.0e-7, ri=ri)
 
     @pytest.mark.timeconsuming
-    def test_ump2_fockdriven(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_ump2_fockdriven(self, ri):
 
         here = Path(__file__).parent
         inpfile = str(here / 'data' / 'h2se.inp')
@@ -79,9 +88,9 @@ class TestMp2Driver:
         task = MpiTask([inpfile, None])
         task.molecule.set_multiplicity(3)
 
-        e_ref = -0.26775296
+        e_ref = {False: -0.26775296, True: -0.267739184}[ri]
 
-        self.run_mp2(task, 'unrestricted', e_ref, 'fockdriven', 1.0e-7)
+        self.run_mp2(task, 'unrestricted', e_ref, 'fockdriven', 1.0e-7, ri=ri)
 
     @pytest.mark.solvers
     def test_mp2_update_settings(self):
@@ -104,14 +113,15 @@ class TestMp2Driver:
     @pytest.mark.skipif(
         MPI.COMM_WORLD.Get_size() > 1,
         reason='pytest.raises assertions require a single MPI rank')
-    def test_mp2_rejects_non_aufbau_occupations(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_mp2_rejects_non_aufbau_occupations(self, ri):
 
         here = Path(__file__).parent
         inpfile = str(here / 'data' / 'h2se.inp')
 
         task = MpiTask([inpfile, None])
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_results = scf_drv.compute(task.molecule, task.ao_basis)
 
         occ_alpha = task.molecule.get_aufbau_alpha_occupation(

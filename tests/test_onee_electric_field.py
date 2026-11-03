@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
@@ -570,16 +571,22 @@ class TestOneElecIntsElectricField:
 
         assert np.max(np.abs(ef_vals - ref_ef_vals)) < 1.0e-7
 
-    def test_electric_field_def2tzvp(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_electric_field_def2tzvp(self, ri):
 
         mol, bas = self.get_molecule_and_basis('def2-tzvp')
         dipole_coords = self.get_dipole_coords()
         dipole_moments = self.get_dipole_moments()
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         if scf_drv.rank == mpi_master():
             D = scf_results['D_alpha'] + scf_results['D_beta']
@@ -591,18 +598,30 @@ class TestOneElecIntsElectricField:
         ef_pot_grad = compute_electric_field_potential_gradient(
             mol, bas, dipole_coords, dipole_moments, D)
 
-        ref_ef_vals = np.array(
-            [[0.309715361824, 0.141906715269, -0.170625297598],
-             [0.159337681902, 0.095001729925, -0.109176125518],
-             [0.319808147807, 0.224736469898, -0.058824195945],
-             [0.189067708934, 0.262044221637, 0.154275681358],
-             [0.325555449146, 0.568481863897, 0.404328413465],
-             [0.135943326227, 0.144452502538, 0.164480253099]])
+        ref_ef_vals = {
+            False: np.array([[0.309715361824, 0.141906715269, -0.170625297598],
+                             [0.159337681902, 0.095001729925, -0.109176125518],
+                             [0.319808147807, 0.224736469898, -0.058824195945],
+                             [0.189067708934, 0.262044221637, 0.154275681358],
+                             [0.325555449146, 0.568481863897, 0.404328413465],
+                             [0.135943326227, 0.144452502538, 0.164480253099]]),
+            True: np.array([[0.309714123786, 0.141905905239, -0.170625140639],
+                            [0.159337294602, 0.095001385433, -0.109176082888],
+                            [0.319807573422, 0.224735576874, -0.058824865515],
+                            [0.189068490637, 0.262044693130, 0.154275381592],
+                            [0.325558165351, 0.568483681230, 0.404328270079],
+                            [0.135943859146, 0.144452853186, 0.164480320051]])
+        }[ri]
 
-        ref_ef_pot_grad = np.array(
-            [[-0.012094417841, 0.027485947892, 0.052250181684],
-             [-0.003129538137, -0.00060841351, 0.003160702822],
-             [-0.000657150687, 0.000458545183, 0.001496181131]])
+        ref_ef_pot_grad = {
+            False: np.array([[-0.012094417841, 0.027485947892, 0.052250181684],
+                             [-0.003129538137, -0.00060841351, 0.003160702822],
+                             [-0.000657150687, 0.000458545183,
+                              0.001496181131]]),
+            True: np.array([[-0.012094544966, 0.027486231781, 0.052250840730],
+                            [-0.003129178230, -0.000608371067, 0.003160275195],
+                            [-0.000656983787, 0.000458520229, 0.001496004410]])
+        }[ri]
 
         assert np.max(np.abs(ef_vals - ref_ef_vals)) < 1.0e-8
         assert np.max(np.abs(ef_pot_grad - ref_ef_pot_grad)) < 1.0e-8

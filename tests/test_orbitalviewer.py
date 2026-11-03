@@ -17,17 +17,26 @@ from veloxchem.errorhandler import VeloxChemError
 
 class TestOrbitalViewer:
 
-    def test_orbital_viewer(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_orbital_viewer(self, ri):
 
         here = Path(__file__).parent
         inpfile = str(here / 'data' / 'h2se.inp')
-        h5file = str(here / 'data' / 'h2se.orbv.h5')
+        h5file = str(here / 'data' / {
+            False: 'h2se.orbv.h5',
+            True: 'h2se.orbv_ri.h5'
+        }[ri])
 
         task = MpiTask([inpfile, None])
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
-        scf_drv.ri = False
+        scf_drv.ri = ri
 
-        scf_drv.compute(task.molecule, task.ao_basis)
+        scf_results = scf_drv.compute(task.molecule, task.ao_basis)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         if scf_drv.rank == mpi_master():
             mo_coefs = scf_drv.molecular_orbitals.alpha_to_numpy()
@@ -49,7 +58,8 @@ class TestOrbitalViewer:
 
         task.finish()
 
-    def test_orbital_viewer_interpolate(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_orbital_viewer_interpolate(self, ri):
 
         molstr = """
             O   0.0   0.0   0.0
@@ -60,9 +70,15 @@ class TestOrbitalViewer:
         bas = MolecularBasis.read(mol, 'aug-cc-pvdz', ostream=None)
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_results_not_used = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results_not_used['ri_jk'] or scf_results_not_used[
+                    'ri_coulomb']
+                assert not scf_results_not_used['ri_fallback']
 
         mol_orbs = scf_drv.molecular_orbitals
         mol_orbs = mol_orbs.broadcast(scf_drv.comm, root=mpi_master())
@@ -149,7 +165,8 @@ class TestOrbitalViewer:
         assert interp_values[0, 0, 0] == pytest.approx(2.0 * 0.7**3)
         assert np.count_nonzero(interp_values) == 1
 
-    def test_get_orbital_cube_str(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_get_orbital_cube_str(self, ri):
 
         mol = Molecule.read_molecule_string("""
             H  0.0  0.0  -0.7
@@ -159,9 +176,14 @@ class TestOrbitalViewer:
         bas = MolecularBasis.read(mol, 'sto-3g', ostream=None)
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
-        scf_drv.compute(mol, bas)
+        scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         mol_orbs = scf_drv.molecular_orbitals.broadcast(scf_drv.comm,
                                                         root=mpi_master())

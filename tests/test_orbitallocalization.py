@@ -3,6 +3,7 @@ import numpy as np
 import pytest
 from mpi4py import MPI
 
+from veloxchem.veloxchemlib import mpi_master
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.orbitallocalization import OrbitalLocalizationDriver
@@ -14,7 +15,7 @@ from veloxchem.errorhandler import VeloxChemError
 class TestOrbitalLocalization:
 
     @staticmethod
-    def _build_system():
+    def _build_system(*, ri):
         h2o_xyz = """3
         xyz
         O   0    0     0
@@ -24,9 +25,14 @@ class TestOrbitalLocalization:
         molecule = Molecule.from_xyz_string(h2o_xyz)
         basis = MolecularBasis.read(molecule, "def2-svp")
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ri = False
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_res = scf_drv.compute(molecule, basis)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_res['ri_jk'] or scf_res['ri_coulomb']
+                assert not scf_res['ri_fallback']
 
         n_occ = molecule.number_of_alpha_occupied_orbitals(basis)
 
@@ -60,8 +66,9 @@ class TestOrbitalLocalization:
             ("pm", "lowdin", "orbloc_pm_lowdin_C"),
         ],
     )
-    def test_localization(self, method, pm_projector, ref_name):
-        molecule, basis, scf_res, n_occ = self._build_system()
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_localization(self, method, pm_projector, ref_name, ri):
+        molecule, basis, scf_res, n_occ = self._build_system(ri=ri)
 
         loc = OrbitalLocalizationDriver()
         loc.method = method
@@ -74,7 +81,10 @@ class TestOrbitalLocalization:
             C_loc = C_loc["loc_orbs"].alpha_to_numpy()
 
             # Load reference
-            ref_path = Path(__file__).parent / "data" / f"{ref_name}.npy"
+            ref_path = Path(__file__).parent / "data" / {
+                False: f"{ref_name}.npy",
+                True: f"{ref_name}_ri.npy"
+            }[ri]
             C_ref_occ = np.load(ref_path)
             C_ref = np.zeros(C_loc.shape)
             C_ref[:, :n_occ] = C_ref_occ[:, :]
@@ -86,8 +96,9 @@ class TestOrbitalLocalization:
             np.testing.assert_allclose(C_loc, C_ref, atol=1e-6)
 
     @pytest.mark.parametrize("method", ["boys", "pm"])
-    def test_compute_does_not_mutate_scf_orbitals(self, method):
-        molecule, basis, scf_res, n_occ = self._build_system()
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_compute_does_not_mutate_scf_orbitals(self, method, ri):
+        molecule, basis, scf_res, n_occ = self._build_system(ri=ri)
         C_alpha = scf_res["C_alpha"].copy()
 
         loc = OrbitalLocalizationDriver()
@@ -99,8 +110,9 @@ class TestOrbitalLocalization:
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason="pytest.raises only valid in serial")
-    def test_mo_range_requires_uniform_occupations(self):
-        molecule, basis, scf_res, n_occ = self._build_system()
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_mo_range_requires_uniform_occupations(self, ri):
+        molecule, basis, scf_res, n_occ = self._build_system(ri=ri)
 
         loc = OrbitalLocalizationDriver()
         loc.ostream.mute()
@@ -110,8 +122,9 @@ class TestOrbitalLocalization:
                         mo_range=(n_occ, n_occ + 1))
 
     @pytest.mark.parametrize("method", ["boys", "pm"])
-    def test_compute_uses_configured_ostream(self, method, capsys):
-        molecule, basis, scf_res, n_occ = self._build_system()
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_compute_uses_configured_ostream(self, method, capsys, ri):
+        molecule, basis, scf_res, n_occ = self._build_system(ri=ri)
 
         loc = OrbitalLocalizationDriver(OutputStream(None))
         loc.method = method

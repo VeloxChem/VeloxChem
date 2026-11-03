@@ -5,6 +5,7 @@ import pytest
 from mpi4py import MPI
 
 import veloxchem.valetanalyzer as valet_module
+from veloxchem.veloxchemlib import mpi_master
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
@@ -20,7 +21,7 @@ skip_multi_rank = pytest.mark.skipif(
 @pytest.mark.solvers
 class TestValetAnalyzer:
 
-    _water_lr_case = None
+    _water_lr_cases = {}
 
     def _get_h2_molecule_and_basis(self):
 
@@ -39,9 +40,9 @@ class TestValetAnalyzer:
             analyzer.initialize(molecule, basis, subgroups)
 
     @classmethod
-    def _get_water_lr_case(cls):
+    def _get_water_lr_case(cls, *, ri):
 
-        if cls._water_lr_case is None:
+        if ri not in cls._water_lr_cases:
             xyz_string = """3
             xyz
             O   -0.1858140  -1.1749469   0.7662596
@@ -52,9 +53,14 @@ class TestValetAnalyzer:
             basis = MolecularBasis.read(molecule, '6-31g', ostream=None)
 
             scf_drv = ScfRestrictedDriver()
-            scf_drv.ri = False
+            scf_drv.ri = ri
             scf_drv.ostream.mute()
             scf_results = scf_drv.compute(molecule, basis)
+
+            if scf_drv.rank == mpi_master():
+                if ri:
+                    assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                    assert not scf_results['ri_fallback']
 
             lr_drv = LinearResponseEigenSolver()
             lr_drv.ostream.mute()
@@ -63,7 +69,7 @@ class TestValetAnalyzer:
             lr_drv.detach_attach_charges = True
             rsp_results = lr_drv.compute(molecule, basis, scf_results)
 
-            cls._water_lr_case = (
+            cls._water_lr_cases[ri] = (
                 molecule,
                 basis,
                 scf_results,
@@ -71,7 +77,7 @@ class TestValetAnalyzer:
                 lr_drv,
             )
 
-        return cls._water_lr_case
+        return cls._water_lr_cases[ri]
 
     def test_initialize_set_subgroups(self, capsys):
 
@@ -129,9 +135,11 @@ class TestValetAnalyzer:
                                                      state_index=2)
 
     @skip_multi_rank
-    def test_real_detach_attach_density_and_charge_paths(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_real_detach_attach_density_and_charge_paths(self, ri):
 
-        molecule, basis, scf_results, rsp_results, _ = self._get_water_lr_case()
+        molecule, basis, scf_results, rsp_results, _ = self._get_water_lr_case(
+            ri=ri)
         analyzer = ValetAnalyzer()
         self._initialize_silently(analyzer, molecule, basis)
 
@@ -148,16 +156,30 @@ class TestValetAnalyzer:
         charges = analyzer.compute_atom_charges(scf_results,
                                                 rsp_results,
                                                 state_index=1)
-        ref_detachment = np.array([
-            0.9998357388039689,
-            0.00008213057844294671,
-            0.00008213061758819769,
-        ])
-        ref_attachment = np.array([
-            0.28456175730239014,
-            0.35771907934092895,
-            0.35771916335668086,
-        ])
+        ref_detachment = {
+            False: np.array([
+                0.9998357388039689,
+                0.00008213057844294671,
+                0.00008213061758819769,
+            ]),
+            True: np.array([
+                0.9998355666150519,
+                0.00008221667287605658,
+                0.00008221671207203143,
+            ]),
+        }[ri]
+        ref_attachment = {
+            False: np.array([
+                0.28456175730239014,
+                0.35771907934092895,
+                0.35771916335668086,
+            ]),
+            True: np.array([
+                0.2845518005350951,
+                0.3577240577247713,
+                0.35772414174013356,
+            ]),
+        }[ri]
 
         assert np.allclose(charges['detachment_charges'], ref_detachment)
         assert np.allclose(charges['attachment_charges'], ref_attachment)
@@ -165,9 +187,11 @@ class TestValetAnalyzer:
         assert np.isclose(np.sum(charges['attachment_charges']), 1.0)
 
     @skip_multi_rank
-    def test_real_transition_data_uses_grouped_atomic_charges(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_real_transition_data_uses_grouped_atomic_charges(self, ri):
 
-        molecule, basis, scf_results, rsp_results, _ = self._get_water_lr_case()
+        molecule, basis, scf_results, rsp_results, _ = self._get_water_lr_case(
+            ri=ri)
         analyzer = ValetAnalyzer()
         self._initialize_silently(analyzer, molecule, basis)
 
@@ -205,9 +229,11 @@ class TestValetAnalyzer:
                                                     expected_attachment))
 
     @skip_multi_rank
-    def test_compute_transition_data_validates_subgroup_atom_indices(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_compute_transition_data_validates_subgroup_atom_indices(self, ri):
 
-        molecule, basis, scf_results, rsp_results, _ = self._get_water_lr_case()
+        molecule, basis, scf_results, rsp_results, _ = self._get_water_lr_case(
+            ri=ri)
         analyzer = ValetAnalyzer()
         self._initialize_silently(analyzer, molecule, basis)
 
