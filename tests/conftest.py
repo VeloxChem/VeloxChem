@@ -7,6 +7,13 @@ else:
     matplotlib.use('Agg')
 
 
+def pytest_make_parametrize_id(config, val, argname):
+    if argname == 'ri' and isinstance(val, bool):
+        return 'RI' if val else '4C'
+
+    return None
+
+
 def pytest_configure(config):
     config.addinivalue_line(
         "markers",
