@@ -1500,16 +1500,23 @@ class PolarizabilityGradient:
         # set linear response driver
         lr_drv = self.set_lr_driver()
 
-        # mute the outputstreams
-        scf_drv.ostream.mute()
-        lr_drv.ostream.mute()
+        # NOTE: the SCF at every displaced geometry, and the response formed on
+        # it, takes the choice between RI and the four-center integrals that
+        # the SCF made at the reference geometry; see
+        # ScfDriver._ri_kept_for_displacements.
+        with scf_drv._ri_kept_for_displacements():
 
-        # construct polarizability gradient
-        num_polgradient = self.construct_numerical_gradient(molecule, ao_basis, scf_drv, lr_drv)
+            # mute the outputstreams
+            scf_drv.ostream.mute()
+            lr_drv.ostream.mute()
 
-        # unmute the output streams
-        scf_drv.ostream.unmute()
-        lr_drv.ostream.unmute()
+            # construct polarizability gradient
+            num_polgradient = self.construct_numerical_gradient(
+                molecule, ao_basis, scf_drv, lr_drv)
+
+            # unmute the output streams
+            scf_drv.ostream.unmute()
+            lr_drv.ostream.unmute()
 
         return num_polgradient
 

@@ -31,6 +31,7 @@
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from mpi4py import MPI
+from contextlib import nullcontext
 import numpy as np
 import sys
 
@@ -359,6 +360,32 @@ class HessianDriver:
     def compute_numerical(self, molecule, *args):
         """
         Computes the numerical Hessian based on the analytical gradient.
+
+        :param molecule:
+            The molecule.
+        :param args:
+            The same arguments as the compute function.
+        """
+
+        # NOTE: the SCF at every displaced geometry, and what is formed on it,
+        # takes the choice between RI and the four-center integrals that the
+        # SCF made at the reference geometry; see
+        # ScfDriver._ri_kept_for_displacements. A driver with no SCF driver
+        # has no such choice.
+        scf_drv = getattr(self, 'scf_driver', None)
+
+        if scf_drv is not None:
+            ri_kept = scf_drv._ri_kept_for_displacements()
+        else:
+            ri_kept = nullcontext()
+
+        with ri_kept:
+            self._compute_numerical_hessian(molecule, *args)
+
+    def _compute_numerical_hessian(self, molecule, *args):
+        """
+        Computes the numerical Hessian from the analytical gradients at
+        displaced geometries.
 
         :param molecule:
             The molecule.

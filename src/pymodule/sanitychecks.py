@@ -168,6 +168,11 @@ def scf_results_sanity_check(obj, scf_results):
         # a stale value, and ri, ri_coulomb and ri_jk stay what was asked for
         updated_scf_info['_ri_fallback'] = bool(
             scf_results.get('ri_fallback', False))
+        # whether the SCF was asked to use RI whatever memory it needs
+        # (force_ri), which the response follows; always updated, for the
+        # same reason
+        updated_scf_info['_force_ri'] = bool(
+            scf_results.get('force_ri', False))
 
         if scf_results.get('restart', None) is not None:
             # do not restart if scf is not restarted from checkpoint

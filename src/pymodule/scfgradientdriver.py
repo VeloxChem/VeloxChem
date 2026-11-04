@@ -601,9 +601,21 @@ class ScfGradientDriver(GradientDriver):
         # smallest budget.
         peaks = self.comm.allgather(peak)
 
-        self._ri_fallback = (max(peaks) > budget)
+        # NOTE: an SCF asked for force_ri covers its gradient as well.
+        force_ri = self.scf_driver.force_ri
+
+        self._ri_fallback = (max(peaks) > budget) and not force_ri
 
         where = ('available' if self.nodes == 1 else 'on the largest rank')
+
+        if (max(peaks) > budget) and force_ri:
+            self.ostream.print_warning(
+                f'{label} gradient would need roughly ' +
+                f'{Profiler.memory_to_string(max(peaks))} of ' +
+                f'{Profiler.memory_to_string(budget)} {where}; force_ri is ' +
+                f'set on the SCF, so the {label} gradient is used.')
+            self.ostream.print_blank()
+            self.ostream.flush()
 
         if self._ri_fallback:
             self.ostream.print_warning(

@@ -1138,7 +1138,19 @@ class TddftGradientDriver(GradientDriver):
 
         where = ('available' if self.nodes == 1 else 'on the largest rank')
 
-        if max(peaks) > budget:
+        # NOTE: an SCF asked for force_ri covers this gradient as well.
+        force_ri = self._scf_drv.force_ri
+
+        if (max(peaks) > budget) and force_ri:
+            self.ostream.print_warning(
+                f'{label} gradient would need roughly ' +
+                f'{Profiler.memory_to_string(max(peaks))} of ' +
+                f'{Profiler.memory_to_string(budget)} {where}; force_ri is ' +
+                f'set on the SCF, so the {label} gradient is used.')
+            self.ostream.print_blank()
+            self.ostream.flush()
+
+        elif max(peaks) > budget:
             self.ostream.print_warning(
                 f'{label} gradient would need roughly ' +
                 f'{Profiler.memory_to_string(max(peaks))} of ' +
@@ -1547,6 +1559,26 @@ class TddftGradientDriver(GradientDriver):
             return dipole_moment
         else:
             return None
+
+    def _get_displaced_scf_driver(self, basis, scf_drv, rsp_drv, rsp_results):
+        """
+        Gets the SCF driver which compute_energy runs at displaced geometries,
+        which is the one handed to compute.
+
+        :param basis:
+            The basis set.
+        :param scf_drv:
+            The SCF driver.
+        :param rsp_drv:
+            The linear response driver.
+        :param rsp_results:
+            The dictionary containing response results.
+
+        :return:
+            The SCF driver.
+        """
+
+        return scf_drv
 
     def compute_energy(self, molecule, basis, scf_drv, rsp_drv, rsp_results):
         """

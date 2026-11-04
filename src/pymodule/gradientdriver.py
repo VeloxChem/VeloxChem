@@ -31,6 +31,7 @@
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from mpi4py import MPI
+from contextlib import nullcontext
 import numpy as np
 import sys
 
@@ -182,6 +183,45 @@ class GradientDriver:
     def compute_numerical(self, molecule, *args):
         """
         Performs calculation of numerical gradient.
+
+        :param molecule:
+            The molecule.
+        :param args:
+            The same arguments as the "compute" function.
+        """
+
+        # NOTE: the SCF at every displaced geometry, and what is formed on it,
+        # takes the choice between RI and the four-center integrals that the
+        # SCF made at the reference geometry; see
+        # ScfDriver._ri_kept_for_displacements. A driver with no SCF driver
+        # has no such choice.
+        scf_drv = self._get_displaced_scf_driver(*args)
+
+        if scf_drv is not None:
+            ri_kept = scf_drv._ri_kept_for_displacements()
+        else:
+            ri_kept = nullcontext()
+
+        with ri_kept:
+            self._compute_numerical_gradient(molecule, *args)
+
+    def _get_displaced_scf_driver(self, *args):
+        """
+        Gets the SCF driver which compute_energy runs at displaced geometries.
+
+        :param args:
+            The same arguments as the "compute" function.
+
+        :return:
+            The SCF driver, or None for a driver with no SCF.
+        """
+
+        return getattr(self, 'scf_driver', None)
+
+    def _compute_numerical_gradient(self, molecule, *args):
+        """
+        Computes the numerical gradient from the energies at displaced
+        geometries.
 
         :param molecule:
             The molecule.

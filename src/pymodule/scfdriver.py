@@ -32,6 +32,7 @@
 
 from pathlib import Path
 from datetime import datetime
+from contextlib import contextmanager
 from copy import deepcopy
 import time as tm
 import math
@@ -247,6 +248,13 @@ class ScfDriver:
         # budgets of the gradient and of response are. It bounds the SCF's driver
         # alone; the gradient and response work out their own.
         self.ri_memory_budget = None
+        # NOTE: whether RI is used whatever memory it is predicted to need. The
+        # prediction is still made and printed, with a warning where it exceeds
+        # the budget, and nothing falls back to the four-center integrals. It
+        # covers what is formed on this SCF as well: the gradient drivers read
+        # it from the SCF driver, and the response solvers from the SCF results
+        # ('force_ri').
+        self.force_ri = False
         # NOTE: the auxiliary atoms this rank holds. An empty list is none of them,
         # and the whole molecule is a list of every atom.
         self._ri_aux_atoms = []
@@ -395,6 +403,8 @@ class ScfDriver:
                 'ri': ('bool', 'use RI approximation'),
                 'ri_coulomb': ('bool', 'use RI-J approximation'),
                 'ri_jk': ('bool', 'use RI-JK approximation'),
+                'force_ri': ('bool', 'use RI whatever memory it needs, '
+                             'without falling back to four-center integrals'),
                 'ri_auxiliary_basis': ('str', 'RI auxiliary basis set'),
                 'ri_metric_route':
                     ('str', 'how the RI-JK metric is inverted, cholesky or '
@@ -1911,14 +1921,23 @@ class ScfDriver:
                                             self.eri_thresh, budget,
                                             self.rank, self.nodes)
             peaks = self.comm.allgather(peak)
-            self._ri_fallback = (max(peaks) > budget)
+            self._ri_fallback = (max(peaks) > budget) and not self.force_ri
             if not self._ri_fallback:
                 self._ri_memory_check = ('RI-J', max(peaks),
                                          self._get_ri_rank_reserve(ao_basis))
 
+            where = ('available' if self.nodes == 1 else 'on the largest rank')
+
+            if (max(peaks) > budget) and self.force_ri:
+                self.ostream.print_warning(
+                    'RI-J would need roughly ' +
+                    f'{Profiler.memory_to_string(max(peaks))} of ' +
+                    f'{Profiler.memory_to_string(budget)} {where}; force_ri ' +
+                    'is set, so RI-J is used.')
+                self.ostream.print_blank()
+                self.ostream.flush()
+
             if self._ri_fallback:
-                where = ('available'
-                         if self.nodes == 1 else 'on the largest rank')
                 self.ostream.print_warning(
                     'RI-J would need roughly ' +
                     f'{Profiler.memory_to_string(max(peaks))} of ' +
@@ -2095,14 +2114,21 @@ class ScfDriver:
                                             self._ri_aux_atoms,
                                             range_separated, budget, norbitals)
             peaks = self.comm.allgather(peak)
-            self._ri_fallback = (max(peaks) > budget)
+            self._ri_fallback = (max(peaks) > budget) and not self.force_ri
             if not self._ri_fallback:
                 self._ri_memory_check = ('RI-JK', max(peaks),
                                          self._get_ri_rank_reserve(ao_basis))
 
+            where = ('available' if self.nodes == 1 else 'on the largest rank')
+
+            if (max(peaks) > budget) and self.force_ri:
+                self.ostream.print_warning(
+                    'RI-JK would need roughly ' +
+                    f'{Profiler.memory_to_string(max(peaks))} of ' +
+                    f'{Profiler.memory_to_string(budget)} {where}; force_ri ' +
+                    'is set, so RI-JK is used.')
+
             if self._ri_fallback:
-                where = ('available'
-                         if self.nodes == 1 else 'on the largest rank')
                 self.ostream.print_warning(
                     'RI-JK would need roughly ' +
                     f'{Profiler.memory_to_string(max(peaks))} of ' +
@@ -2546,6 +2572,10 @@ class ScfDriver:
                     # them, so that a calculation which takes these results
                     # (response) follows the ground state it was handed.
                     self._scf_results['ri_fallback'] = bool(self._ri_fallback)
+                    # NOTE: whether the drivers formed on these results use RI
+                    # whatever memory they are predicted to need, as this SCF
+                    # did (force_ri).
+                    self._scf_results['force_ri'] = bool(self.force_ri)
 
                 if self._dft:
                     # dft info
@@ -3437,6 +3467,48 @@ class ScfDriver:
         """
 
         return self.ri_coulomb and not self._ri_fallback
+
+    @contextmanager
+    def _ri_kept_for_displacements(self):
+        """
+        Keeps the choice between RI and the four-center integrals which this
+        SCF made at its last calculation, for the calculations a finite
+        difference makes on it at displaced geometries. force_ri and
+        ri_memory_budget are restored afterwards.
+        """
+
+        force_ri = self.force_ri
+        ri_memory_budget = self.ri_memory_budget
+
+        # NOTE: the choice is made again at every geometry, against the memory
+        # free there. Where it differs between the geometries of a finite
+        # difference, the difference of RI and four-center results, divided by
+        # the step, enters the derivative. The SCF, and through force_ri and
+        # its fallback what is formed on it, takes the choice made at the
+        # reference geometry: force_ri where it used RI, and a budget of zero,
+        # which every RI driver exceeds, where it fell back.
+        if self._uses_ri_jk() or self._uses_ri_coulomb():
+            self.force_ri = True
+            self.ostream.print_info(
+                'The calculations at displaced geometries use RI, as the SCF ' +
+                'at the reference geometry did, whatever memory they are ' +
+                'predicted to need.')
+            self.ostream.print_blank()
+            self.ostream.flush()
+        elif self._ri_fallback:
+            self.ri_memory_budget = 0.0
+            self.ostream.print_info(
+                'The calculations at displaced geometries are formed from ' +
+                'the four-center integrals, as the SCF at the reference ' +
+                'geometry fell back to them.')
+            self.ostream.print_blank()
+            self.ostream.flush()
+
+        try:
+            yield
+        finally:
+            self.force_ri = force_ri
+            self.ri_memory_budget = ri_memory_budget
 
     def _prepare_for_ri_fock_build(self, fock_type):
         """

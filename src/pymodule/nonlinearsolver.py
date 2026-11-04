@@ -132,6 +132,12 @@ class NonlinearSolver:
         # results, and ri, ri_coulomb and ri_jk are left as they were set.
         self._ri_fallback = False
 
+        # NOTE: whether the SCF this response is formed on was asked to use RI
+        # whatever memory it needs (ScfDriver.force_ri). It is read from the
+        # SCF results, and the response then uses RI whatever memory it is
+        # predicted to need as well.
+        self._force_ri = False
+
         # NOTE: the memory the simd RI driver of a rank may hold, in GB, taken as
         # it is; None takes what is free less the reserves. An attribute and not
         # an input keyword, as for the gradient's budget. The SCF's

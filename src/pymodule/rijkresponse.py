@@ -408,7 +408,19 @@ def initialize(solver, molecule, basis, reuse=False):
 
     peaks = solver.comm.allgather(peak)
 
-    if max(peaks) > budget:
+    where = ('available' if solver.nodes == 1 else 'on the largest rank')
+
+    # NOTE: an SCF asked for force_ri hands it on through its results.
+    if (max(peaks) > budget) and getattr(solver, '_force_ri', False):
+        solver.ostream.print_warning(
+            'RI-JK would need roughly ' +
+            f'{Profiler.memory_to_string(max(peaks))} of ' +
+            f'{Profiler.memory_to_string(budget)} {where}; force_ri is set ' +
+            'on the SCF, so the response uses RI-JK.')
+        solver.ostream.print_blank()
+        solver.ostream.flush()
+
+    elif max(peaks) > budget:
         # NOTE: the solver falls back to the four-center integrals, and so does
         # every solver this one lends its B vectors to (see lend). ri, ri_jk
         # and ri_coulomb are left as they were set.
@@ -418,7 +430,6 @@ def initialize(solver, molecule, basis, reuse=False):
         solver._ri_jk_aux_basis = None
         solver._ri_jk_memory = None
 
-        where = ('available' if solver.nodes == 1 else 'on the largest rank')
         solver.ostream.print_warning(
             'RI-JK would need roughly ' +
             f'{Profiler.memory_to_string(max(peaks))} of ' +

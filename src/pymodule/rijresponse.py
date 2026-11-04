@@ -101,7 +101,17 @@ def initialize(solver, molecule, basis):
 
     where = ('available' if solver.nodes == 1 else 'on the largest rank')
 
-    if max(peaks) > budget:
+    # NOTE: an SCF asked for force_ri hands it on through its results.
+    if (max(peaks) > budget) and getattr(solver, '_force_ri', False):
+        solver.ostream.print_warning(
+            'RI-J would need roughly ' +
+            f'{Profiler.memory_to_string(max(peaks))} of ' +
+            f'{Profiler.memory_to_string(budget)} {where}; force_ri is set ' +
+            'on the SCF, so the response uses RI-J.')
+        solver.ostream.print_blank()
+        solver.ostream.flush()
+
+    elif max(peaks) > budget:
         solver._ri_j_fallback = True
 
         solver.ostream.print_warning(
