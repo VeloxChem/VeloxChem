@@ -14,6 +14,7 @@ from veloxchem.hessianorbitalresponse import HessianOrbitalResponse
 from veloxchem.hessianorbitalresponseunrest import (
     UnrestrictedHessianOrbitalResponse)
 import veloxchem.batchsize as batchsize
+from veloxchem.linearsolver import LinearSolver
 
 
 @pytest.mark.solvers
@@ -211,3 +212,115 @@ class TestCphfSolver:
 
         if scf_drv.rank == mpi_master():
             assert np.max(np.abs(whole - little)) < 1.0e-10
+
+    @staticmethod
+    def rebuilt(factors):
+        """The densities the factors give: a left factor and the right
+        factors of the densities, or two of them for densities block diagonal
+        in the occupied and the virtual orbitals."""
+
+        if len(factors) == 2:
+            left, rights = factors
+            return [np.matmul(left, r.T) for r in rights]
+
+        left, rights, left_vir, rights_vir = factors
+        return [
+            np.matmul(left, r.T) + np.matmul(left_vir, rv.T)
+            for r, rv in zip(rights, rights_vir)
+        ]
+
+    @pytest.mark.parametrize('unrestricted', [False, True])
+    def test_ri_jk_builds_take_factors(self, monkeypatch, unrestricted):
+        """With RI-JK every Fock build of the Hessian orbital response, those
+        of uij on the right-hand side included, takes the factors of its
+        densities, the factors give the densities, and the build agrees with
+        a four-center build of them to the accuracy of the fitting."""
+
+        molecule = Molecule.read_molecule_string(
+            """
+            O  0.0           0.0  0.0
+            H   .7586020000  0.0  -.5042840000
+            H   .7586020000  0.0   .5042840000
+            """,
+            units='angstrom')
+        basis = MolecularBasis.read(molecule, 'def2-svp', ostream=None)
+
+        scf_drv = (ScfUnrestrictedDriver()
+                   if unrestricted else ScfRestrictedDriver())
+        scf_drv.xcfun = 'b3lyp'
+        scf_drv.ostream.mute()
+        scf_results = scf_drv.compute(molecule, basis)
+
+        name = ('_comp_lr_fock_unrestricted'
+                if unrestricted else '_comp_lr_fock')
+        real_build = getattr(LinearSolver, name)
+
+        calls = []
+
+        def recorded(self, dens, *args, dens_factors=None, **kwargs):
+            # NOTE: a copy of the lists, which some callers empty after the
+            # build.
+            # NOTE: the unrestricted build takes a pair of lists on every
+            # rank, of None on all but the master rank.
+            if self.rank == mpi_master():
+                copied = ([list(d) for d in dens]
+                          if unrestricted else list(dens))
+            else:
+                copied = (None, None) if unrestricted else None
+
+            fock = real_build(self, dens, *args, dens_factors=dens_factors,
+                              **kwargs)
+
+            # NOTE: the same densities built again from the four-center
+            # integrals, which a build without factors is. Every rank takes
+            # part, so this is decided by _uses_ri_jk, which every rank
+            # answers alike, and not by the factors, which only the master
+            # rank holds.
+            if self._uses_ri_jk():
+                four_center = real_build(self, copied, *args,
+                                         dens_factors=None, **kwargs)
+            else:
+                four_center = None
+
+            if self.rank == mpi_master():
+                calls.append((self._uses_ri_jk(), copied, dens_factors, fock,
+                              four_center))
+
+            return fock
+
+        monkeypatch.setattr(LinearSolver, name, recorded)
+
+        cphf = (UnrestrictedHessianOrbitalResponse()
+                if unrestricted else HessianOrbitalResponse())
+        cphf.update_settings({'conv_thresh': 1.0e-7})
+        cphf.ostream.mute()
+        cphf.compute(molecule, basis, scf_results)
+
+        if scf_drv.rank == mpi_master():
+            assert calls
+
+            for uses_ri_jk, dens, factors, fock, four_center in calls:
+                assert uses_ri_jk
+                assert factors is not None
+
+                if unrestricted:
+                    spins = list(zip(dens, factors))
+                else:
+                    spins = [(dens, factors)]
+
+                for spin_dens, spin_factors in spins:
+                    from_factors = self.rebuilt(spin_factors)
+                    assert len(from_factors) == len(spin_dens)
+                    for density, rebuilt in zip(spin_dens, from_factors):
+                        assert np.max(np.abs(density - rebuilt)) < 1.0e-12
+
+                # NOTE: the RI-JK build against the four-center build of the
+                # same densities, relative to the largest Fock element. Here
+                # the uij builds differ by 7e-5 to 1.1e-4 and those of the
+                # iterations by up to 3.8e-3; a build which read the factors
+                # of an occupied-by-virtual pair as L R^T + R L^T differed by
+                # 1.0.
+                fock = np.array(fock)
+                four_center = np.array(four_center)
+                largest = np.max(np.abs(four_center))
+                assert np.max(np.abs(fock - four_center)) < 5.0e-2 * largest
