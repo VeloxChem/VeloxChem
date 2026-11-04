@@ -32,6 +32,7 @@
 
 from mpi4py import MPI
 import numpy as np
+import psutil
 import time
 import math
 
@@ -42,7 +43,7 @@ from .veloxchemlib import SimdRIJGradientDriver
 from .veloxchemlib import SimdRIJKGradientDriver
 from .veloxchemlib import T4CScreener
 from .veloxchemlib import XCMolecularGradient
-from .veloxchemlib import mpi_master, mat_t
+from .veloxchemlib import mpi_master, mat_t, release_free_memory
 from .veloxchemlib import make_matrix
 from .veloxchemlib import PackedMatrix
 from .matrices import Matrices
@@ -53,7 +54,9 @@ from .gradientdriver import GradientDriver
 from .scfgradientdriver import ScfGradientDriver
 from .oneeints import compute_point_charge_gradient
 from .firstorderprop import FirstOrderProperties
+from .environment import get_ri_free_memory
 from .errorhandler import assert_msg_critical
+from .profiler import Profiler
 from .inputparser import parse_input
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            dft_and_ri_sanity_check)
@@ -108,6 +111,21 @@ class TddftGradientDriver(GradientDriver):
         self.xc_screening_threshold = scf_drv.xc_screening_threshold
 
         self.timing = scf_drv.timing
+        self.memory_profiling = scf_drv.memory_profiling
+
+        # NOTE: the memory the RI-J or RI-JK term of the excited-state gradient
+        # may hold beside what the SCF's RI driver already holds, per rank, in
+        # GB. None works it out from what is free when the term starts, less a
+        # reserve for the node and one for each rank. A value is taken as it
+        # is, with no reserves, as ScfGradientDriver.ri_gradient_memory_budget
+        # is. The ground-state gradient is formed by a ScfGradientDriver of its
+        # own, which takes its own budget and does not read this one.
+        self.ri_gradient_memory_budget = None
+
+        # NOTE: what was predicted for the RI term where it was formed, for
+        # memory profiling to hold the peak against.
+        self._ri_memory_check = None
+        self._peak_was_reset = False
 
         self.flag = 'RPA Gradient Driver'
 
@@ -493,6 +511,18 @@ class TddftGradientDriver(GradientDriver):
         gs_grad_drv.compute(molecule, basis, scf_tensors)
         gs_grad_drv.ostream.unmute()
 
+        # NOTE: the ground-state gradient runs muted, so the warning
+        # ScfGradientDriver._choose_ri_gradient prints when its RI term does
+        # not fit in memory is not shown. It is printed here instead.
+        if gs_grad_drv._ri_fallback:
+            gs_label = 'RI-JK' if self._scf_drv._uses_ri_jk() else 'RI-J'
+            self.ostream.print_warning(
+                'The ground-state gradient was formed from the four-center ' +
+                f'integrals, as its {gs_label} gradient did not fit in the ' +
+                'memory available.')
+            self.ostream.print_blank()
+            self.ostream.flush()
+
         gs_grad = gs_grad_drv.get_gradient()
 
         grad_timing['Ground_state_grad'] += time.time() - t0
@@ -636,28 +666,18 @@ class TddftGradientDriver(GradientDriver):
         den_mat_for_fock_gs = make_matrix(basis, mat_t.symmetric)
         den_mat_for_fock_gs.set_values(gs_dm)
 
-        # NOTE: the gradient follows the ground state, as the SCF gradient
-        # does (ScfGradientDriver._choose_ri_gradient). An SCF which fell back
-        # to the four-center integrals holds no RI driver to differentiate,
-        # and the RI gradient of its energy would be the gradient of a
-        # different one, so the term is formed from the four-center integrals.
-        if fock_type == 'j':
-            ri_label = 'RI-J'
-            ri_asked = self._scf_drv.ri_coulomb
-            ri_used = self._scf_drv._uses_ri_coulomb()
+        # NOTE: the panel budget of the RI-JK term, which sets its batches and
+        # panels and which its prediction is sized from.
+        if (fock_type != 'j') and self._scf_drv._uses_ri_jk():
+            ri_panel_budget = gs_grad_drv._get_ri_gradient_budget()
         else:
-            ri_label = 'RI-JK'
-            ri_asked = self._scf_drv.ri_jk
-            ri_used = self._scf_drv._uses_ri_jk()
+            ri_panel_budget = 0
 
-        if ri_asked and not ri_used:
-            self.ostream.print_info(
-                f'The SCF formed its Fock matrices without {ri_label}, so ' +
-                'the gradient is formed from the four-center integrals.')
-            self.ostream.print_blank()
-            self.ostream.flush()
+        ri_label = self._choose_ri_gradient(molecule, basis, fock_type,
+                                            need_omega, local_atoms,
+                                            ri_panel_budget)
 
-        if ri_used and fock_type == 'j':
+        if ri_label == 'RI-J':
             if self.rank == mpi_master():
                 basis_ri_j = MolecularBasis.read(
                     molecule,
@@ -715,7 +735,7 @@ class TddftGradientDriver(GradientDriver):
                     (grad_plus.to_numpy() - grad_minus.to_numpy()) / 4.0 +
                     grad_xmy.to_numpy())
 
-        elif ri_used and fock_type != 'j':
+        elif ri_label == 'RI-JK':
 
             assert_msg_critical(
                 fock_type != 'j',
@@ -750,7 +770,7 @@ class TddftGradientDriver(GradientDriver):
             else:
                 aux_atoms = list(self._scf_drv._ri_aux_atoms)
 
-            budget = gs_grad_drv._get_ri_gradient_budget()
+            budget = ri_panel_budget
 
             for idx in range(dof):
 
@@ -867,6 +887,18 @@ class TddftGradientDriver(GradientDriver):
                         self.gradient[
                             idx, iatom, :] -= 0.5 * np.array(atomgrad_xmy_rs)
 
+        self._mark_ri_memory_peak()
+        self._print_ri_memory_check()
+
+        # NOTE: the RI term frees its per-thread buffers, the derivative blocks
+        # of each auxiliary atom, the panels and the fitted densities in pieces
+        # the allocator keeps rather than returns. Kept, they stay resident
+        # after the gradient, and in an optimization the next SCF reads them as
+        # memory in use and takes a smaller RI budget. They are returned here,
+        # after the RI term only, as ScfGradientDriver does after its own.
+        if ri_label is not None:
+            release_free_memory()
+
         grad_timing['Fock_grad'] += time.time() - t0
 
         # TODO: enable multiple DMs for DFT to avoid for-loops.
@@ -955,6 +987,256 @@ class TddftGradientDriver(GradientDriver):
             for key, val in grad_timing.items():
                 self.ostream.print_info(f'    {key:<25s}:  {val:.2f} sec')
             self.ostream.print_blank()
+
+    def _get_ri_gradient_memory_budget(self, basis):
+        """
+        Gets the memory the RI-J or RI-JK term of the excited-state gradient of
+        a rank may hold beside what the SCF's RI driver holds, in bytes. Every
+        rank must call this.
+
+        :param basis:
+            The AO basis set.
+
+        :return:
+            The memory budget in bytes.
+        """
+
+        if self.ri_gradient_memory_budget is not None:
+            return int(self.ri_gradient_memory_budget * 1.0e9)
+
+        return get_ri_free_memory(self.comm,
+                                  self._get_ri_gradient_rank_reserve(basis))
+
+    def _get_ri_gradient_rank_reserve(self, basis):
+        """
+        Gets the memory a rank keeps back from the RI term of the excited-state
+        gradient for what the caller of the RI driver holds beside it, in bytes.
+
+        :param basis:
+            The AO basis set.
+
+        :return:
+            The reserve in bytes, or zero where ri_gradient_memory_budget is set,
+            which is then the budget as it stands.
+        """
+
+        if self.ri_gradient_memory_budget is not None:
+            return 0
+
+        # NOTE: what the RI-JK term holds beside the RI driver goes as the
+        # square of the basis. For each state it forms four densities, and the
+        # master rank factorises each of them (_factorize_rijk_density): for a
+        # density of 3000 basis functions and full rank, the peak grew by 7.5
+        # squares of the basis over the singular value decomposition of a skew
+        # one and by 5 over the eigenvalue decomposition of a symmetric one.
+        # Every rank then holds the two factors as arrays and packed, four
+        # squares at full rank, and the symmetric part of the density with its
+        # packed copy, one and a half. That is under thirteen squares at any
+        # one time; sixteen are reserved, with the floor of half a gibibyte
+        # the SCF gradient keeps. The RI-J term holds fewer: the densities of a
+        # state and their packed copies. The exchange-correlation term runs
+        # after the RI term has freed what it held, so it is not reserved for.
+        nao = basis.get_dimensions_of_basis()
+
+        return max(16 * nao * nao * 8, 512 * 1024**2)
+
+    def _choose_ri_gradient(self, molecule, basis, fock_type, need_omega,
+                            local_atoms, panel_budget):
+        """
+        Chooses how the two-electron term of the excited-state gradient is
+        formed: with the SIMD RI-J or RI-JK gradient driver where the SCF used
+        one and its peak fits in the budget, and from the four-center integrals
+        otherwise. Every rank must call this.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param fock_type:
+            The type of the Fock matrix, 'j' for a functional with no exact
+            exchange.
+        :param need_omega:
+            Whether the functional is range separated.
+        :param local_atoms:
+            The atoms of the auxiliary basis this rank sweeps for RI-J.
+        :param panel_budget:
+            The budget the RI-JK term hands to the gradient driver for its
+            batches and panels.
+
+        :return:
+            'RI-J', 'RI-JK', or None for the four-center integrals.
+        """
+
+        self._ri_memory_check = None
+
+        if fock_type == 'j':
+            label = 'RI-J'
+            asked = self._scf_drv.ri_coulomb
+            used = self._scf_drv._uses_ri_coulomb()
+        else:
+            label = 'RI-JK'
+            asked = self._scf_drv.ri_jk
+            used = self._scf_drv._uses_ri_jk()
+
+        # NOTE: the gradient follows the ground state, as the SCF gradient
+        # does (ScfGradientDriver._choose_ri_gradient). An SCF which fell back
+        # to the four-center integrals holds no RI driver to differentiate,
+        # and the RI gradient of its energy would be the gradient of a
+        # different one, so the term is formed from the four-center integrals.
+        if asked and not used:
+            self.ostream.print_info(
+                f'The SCF formed its Fock matrices without {label}, so ' +
+                'the gradient is formed from the four-center integrals.')
+            self.ostream.print_blank()
+            self.ostream.flush()
+
+        if not used:
+            return None
+
+        aux_basis = MolecularBasis.read(molecule,
+                                        self._scf_drv.ri_auxiliary_basis,
+                                        ostream=None,
+                                        auxiliary_basis=True)
+
+        budget = min(
+            self.comm.allgather(self._get_ri_gradient_memory_budget(basis)))
+
+        # NOTE: the peak of each rank, as the term will take it. A rank of RI-J
+        # sweeps the atoms of local_atoms, and a rank of RI-JK those whose B
+        # vectors it holds; only the master rank forms the two-center term.
+        #
+        # NOTE: the RI-JK term factorises each density as D = L R transposed
+        # and holds a full fitted density of the rank of the factorisation for
+        # every auxiliary function a rank owns. What is predicted for is an
+        # upper bound of that rank, from how the densities are built: the
+        # columns of each lie in the occupied orbitals and in the virtual
+        # orbitals reached from them by X + Y, X - Y (the unrelaxed density
+        # of TddftOrbitalResponse) and the orbital response, nocc directions
+        # each. For TDA, X + Y and X - Y are both X. The bound is then 4 nocc,
+        # or 3 nocc for TDA, and at most the basis dimension.
+        if label == 'RI-J':
+            peak = SimdRIJGradientDriver(self._scf_drv.eri_thresh).peak_memory(
+                molecule, basis, aux_basis, list(local_atoms),
+                self.rank == mpi_master())
+        else:
+            if self.nodes == 1:
+                aux_atoms = list(range(molecule.number_of_atoms()))
+            else:
+                aux_atoms = list(self._scf_drv._ri_aux_atoms)
+            nocc = molecule.number_of_alpha_occupied_orbitals(basis)
+            norbs = min(basis.get_dimensions_of_basis(),
+                        (3 if self.tamm_dancoff else 4) * nocc)
+            peak = SimdRIJKGradientDriver(
+                self._scf_drv.eri_thresh).peak_memory_general(
+                    molecule, basis, aux_basis, aux_atoms, norbs, need_omega,
+                    panel_budget, self.rank == mpi_master())
+
+        # NOTE: the decision has to be the same on every rank, as the ranks add
+        # shares of one gradient, so it is taken from the largest peak against
+        # the smallest budget.
+        peaks = self.comm.allgather(peak)
+
+        where = ('available' if self.nodes == 1 else 'on the largest rank')
+
+        if max(peaks) > budget:
+            self.ostream.print_warning(
+                f'{label} gradient would need roughly ' +
+                f'{Profiler.memory_to_string(max(peaks))} of ' +
+                f'{Profiler.memory_to_string(budget)} {where}, so the ' +
+                'gradient is formed from the four-center integrals.')
+            self.ostream.print_blank()
+            self.ostream.flush()
+            return None
+
+        self.ostream.print_info(
+            f'Using the SIMD resolution of the identity ({label}) gradient.')
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+        if self.nodes == 1:
+            needs = (f'{label} gradient needs roughly ' +
+                     f'{Profiler.memory_to_string(max(peaks))} of ' +
+                     f'{Profiler.memory_to_string(budget)} available.')
+        else:
+            needs = (f'{label} gradient needs roughly ' +
+                     f'{Profiler.memory_to_string(sum(peaks))} over ' +
+                     f'{self.nodes:d} ranks, ' +
+                     f'{Profiler.memory_to_string(max(peaks))} of ' +
+                     f'{Profiler.memory_to_string(budget)} on the largest ' +
+                     'rank.')
+
+        self.ostream.print_info(needs)
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+        # NOTE: the peak is reset here, so that the profile reads the peak of
+        # the RI term rather than that of the response or the ground-state
+        # gradient before it. What this rank holds before the RI term is what
+        # its peak is held against after it.
+        if self.memory_profiling:
+            self._peak_was_reset = Profiler.reset_peak_memory()
+            self._ri_memory_check = [
+                label,
+                max(peaks),
+                self._get_ri_gradient_rank_reserve(basis),
+                psutil.Process().memory_info().rss,
+                None,
+            ]
+
+        return label
+
+    def _mark_ri_memory_peak(self):
+        """
+        Records, with memory profiling, what the peak of this rank grew by over
+        the RI term of the gradient, which has just finished.
+        """
+
+        if self._ri_memory_check is not None:
+            check = self._ri_memory_check
+            # NOTE: at least zero. The start is the resident memory read
+            # before the RI term and the end the kernel's high-water mark, and
+            # the two counters can differ by a few hundred kB, which turns a
+            # growth near zero negative.
+            check[4] = max(Profiler.get_peak_memory() - check[3], 0)
+
+    def _print_ri_memory_check(self):
+        """
+        Prints, with memory profiling, the memory the RI term was predicted to
+        need against what each rank's peak grew by over it. Every rank must
+        call this.
+        """
+
+        if (not self.memory_profiling) or (self._ri_memory_check is None):
+            return
+
+        # NOTE: a peak which could not be reset is that of everything before
+        # the RI term as well, and what it grew by says nothing of the term.
+        if not self._peak_was_reset:
+            return
+
+        label, predicted, reserve, rss_before, grown = self._ri_memory_check
+
+        # NOTE: the growth over the RI term and not the peak itself. What a rank
+        # held before it was not free when the budget was taken, so it is not
+        # what the prediction and the reserve were held against.
+        grown_all = self.comm.allgather(grown)
+        largest = max(grown_all)
+
+        where = ('' if self.nodes == 1 else
+                 f' on rank {grown_all.index(largest):d}, the largest of ' +
+                 f'{self.nodes:d}')
+
+        self.ostream.print_info(
+            f'{label} gradient was predicted to need roughly ' +
+            f'{Profiler.memory_to_string(predicted)}, with ' +
+            f'{Profiler.memory_to_string(reserve)} reserved for the rest of ' +
+            'the gradient.')
+        self.ostream.print_info(
+            'Peak memory grew by ' +
+            f'{Profiler.memory_to_string(largest)} over the {label} ' +
+            f'gradient{where}.')
+        self.ostream.print_blank()
+        self.ostream.flush()
 
     @staticmethod
     def _pack_symmetric_density(density):
@@ -1214,7 +1496,21 @@ class TddftGradientDriver(GradientDriver):
                 left, right, omega_plain, exchange_scaling_factor, all_atoms,
                 aux_atoms)
 
-        return gradient.to_numpy()
+        share = gradient.to_numpy()
+
+        # NOTE: the fitted densities of this density are freed here, and the
+        # allocator keeps what they held rather than returning it. The next
+        # density's fitted densities did not reuse all of it: for the TDA
+        # gradient of noradrenaline (C8H11NO3) in def2-SVP with
+        # def2-universal-jkfit, on one rank of twelve threads, the peak grew by
+        # 709 MB over the first density and 873 MB over the first two. What is
+        # kept is returned after each density, so the term peaks at the most
+        # one density reaches.
+        fit = None
+        fit_erf = None
+        release_free_memory()
+
+        return share
 
     def compute_dipole_moment(self,
                               molecule,

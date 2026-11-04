@@ -2476,6 +2476,211 @@ CSimdRIJKGradientDriver::peak_memory(const CMolecule           &molecule,
 }
 
 auto
+CSimdRIJKGradientDriver::peak_memory_general(const CMolecule        &molecule,
+                                             const CMolecularBasis  &basis,
+                                             const CMolecularBasis  &aux_basis,
+                                             const std::vector<int> &aux_atoms,
+                                             const size_t            norbs,
+                                             const bool              range_separated,
+                                             const size_t            panel_budget,
+                                             const bool              with_metric) const -> size_t
+{
+    constexpr auto dsize = sizeof(double);
+
+    const auto nthreads = static_cast<size_t>(omp::get_number_of_threads());
+
+    const auto nao = basis.dimensions_of_basis();
+
+    const auto naux = aux_basis.dimensions_of_basis();
+
+    const auto natoms = static_cast<size_t>(molecule.number_of_atoms());
+
+    const size_t nops = range_separated ? 2 : 1;
+
+    const auto nheld = simdri::aux_functions_of(aux_basis, aux_atoms).size();
+
+    const auto budget = panel_budget;
+
+    const auto square = naux * naux * dsize;
+
+    // NOTE: the squares of the half transformation, one of the basis a thread,
+    // which the driver of the B vectors keeps from the first transformation to the
+    // end of this driver, as peak_memory counts them.
+
+    size_t held = nthreads * nao * nao * dsize;
+
+    size_t peak = held;
+
+    std::map<std::string, size_t> phases;
+
+    const auto reach = [&](const char *phase, const size_t extra) {
+        peak = std::max(peak, held + extra);
+
+        phases[phase] = std::max(phases[phase], held + extra);
+    };
+
+    // NOTE: the index the transformation forms over the B vectors, as peak_memory
+    // counts it.
+
+    const auto index = (nheld == 0) ? size_t{0}
+                                    : _drv.bq_vectors_memory(molecule, basis, aux_basis, _threshold, aux_atoms, 1).index +
+                                          nheld * sizeof(std::vector<int>) + naux * sizeof(long);
+
+    // NOTE: one half transformed vector, B(q) L, and one fitted density, a full
+    // norbs by norbs matrix.
+
+    const auto per_function = nao * norbs * dsize;
+
+    const auto nelements = norbs * norbs;
+
+    const auto fitted = nheld * nelements * dsize;
+
+    for (size_t iop = 0; iop < nops; iop++)
+    {
+        // NOTE: only the plain operator carries a Coulomb term. Its right hand side
+        // is summed in a row of the auxiliary basis a thread and then held.
+
+        const auto coulomb = (iop == 0);
+
+        if (coulomb)
+        {
+            reach("fitting", (nthreads + 1) * naux * dsize);
+
+            held += naux * dsize;
+        }
+
+        // NOTE: the functions this rank owns, its rows of the Gram, and a vector of
+        // the whole auxiliary basis for the fitted densities, with only the owned
+        // entries allocated.
+
+        held += nheld * sizeof(size_t) + nheld * naux * dsize + naux * sizeof(CPackedMatrix);
+
+        if ((norbs > 0) && (nheld > 0))
+        {
+            // NOTE: _local_densities_for_general holds the transposed right factor and
+            // compute_w_vectors a copy of the left one, a batch of half transformed
+            // vectors, a copy of the last batch where it is shorter than the others,
+            // and for each thread the half transformed vector it closes as a dense
+            // array. The closed matrix is the fitted density itself.
+
+            const auto nbatch = std::min(nheld, std::max(_min_batch, std::max(size_t{1}, budget / per_function)));
+
+            const auto half = nbatch * (per_function + sizeof(CPackedMatrix));
+
+            const auto rest = nheld % nbatch;
+
+            const auto tail = ((nheld > nbatch) && (rest > 0)) ? rest * (per_function + sizeof(CPackedMatrix)) : 0;
+
+            const auto factors = 2 * per_function;
+
+            const auto close = nthreads * per_function;
+
+            reach("transform", fitted + factors + half + tail + index + close + nthreads * _thread_allowance);
+        }
+
+        held += fitted;
+
+        // NOTE: the caller adds the right hand sides of the ranks, and the factor
+        // is applied to the sum.
+
+        if (coulomb) reach("fitting", square + 3 * naux * dsize);
+
+        if (norbs > 0)
+        {
+            const auto npanel = std::min(nelements, std::max(_min_batch, _panel_elements(naux, budget)));
+
+            const auto npanels = (nelements + npanel - 1) / npanel;
+
+            const auto panel = naux * npanel * dsize;
+
+            const auto owned = nheld * npanel * dsize;
+
+            const auto columns = nheld * naux * dsize;
+
+            const auto scratch = panel;
+
+            // NOTE: the panels of the factor applied to the fitted densities.
+            // mpi_panel_partial_general holds the partial and the owned elements
+            // of the panel gathered from the fitted densities; the first panel cuts
+            // the columns of the factor this rank owns from the whole factor, a
+            // square, and keeps them. The gathered elements are freed when it
+            // returns, and the binding then copies the partial for the caller to
+            // reduce. The reduction in place takes scratch of the panel's size,
+            // which peak_memory counts for as long as panels are reduced.
+            // mpi_panel_absorb_general copies the reduced panel into the fitted
+            // densities and holds nothing of its own.
+
+            reach("panel partial", std::max(panel + owned + columns + square, 2 * panel + columns));
+
+            held += columns;
+
+            if (npanels > 1) reach("panel partial", std::max(panel + owned, 2 * panel) + scratch);
+
+            reach("panel reduce", panel + scratch);
+
+            // NOTE: the Gram is taken in a second pass over the panels. A partial is
+            // the transposed elements of the owned fitted densities, which the caller
+            // copies and reduces; mpi_gram_panel_absorb_general gathers the owned
+            // elements of the panel and adds their product with the reduced panel to
+            // this rank's rows of the Gram.
+
+            reach("gram panel", 2 * panel + scratch);
+
+            reach("gram panel", panel + owned + scratch);
+        }
+
+        // NOTE: the caller gathers the Gram as a square, from a copy of the rows,
+        // and reduces it in place, which takes scratch of the square's size. The
+        // rank which forms the two-index fitted density forms it beside the square,
+        // and the caller holds it to the end.
+
+        const auto omega = with_metric ? naux * (naux + 1) / 2 * dsize : size_t{0};
+
+        reach("gram", 2 * square + nheld * naux * dsize + omega);
+
+        held += omega;
+    }
+
+    // NOTE: the three-center term, as peak_memory counts it with the factors in
+    // place of the orbitals: the Coulomb density as a square, the left factor and
+    // the transposed right one for each operator, the right factor as it is
+    // transposed, and the most one auxiliary atom holds, which is its derivative
+    // and, for each of its functions, the exchange of every operator back
+    // transformed into a square of the basis, formed from a fitted density and a
+    // half transformed one.
+
+    const auto factors = nops * 2 * per_function;
+
+    const auto exchange = nops * nao * nao * dsize;
+
+    const auto per_atom = _drv.derivative_memory(molecule, basis, aux_basis, _threshold, aux_atoms, nops, exchange);
+
+    if (!aux_atoms.empty())
+    {
+        reach("three-center", nao * nao * dsize + factors + per_function + per_atom + nelements * dsize + per_function);
+    }
+
+    // the two-center term, of the rank which forms the two-index fitted density
+
+    if (with_metric) reach("two-center", _drv.metric_derivative_memory(aux_basis, natoms, nops));
+
+    if (std::getenv("VLX_RIJK_PROFILE") != nullptr)
+    {
+        const auto gb = [](const size_t n) { return static_cast<double>(n) / 1.0e9; };
+
+        std::printf("RIJK general gradient memory: held %.3f GB, one auxiliary atom %.3f GB, peak %.3f GB with the margin\n",
+                    gb(held), gb(per_atom), gb(peak + peak / _peak_margin_divisor));
+
+        for (const auto &[phase, memory] : phases)
+        {
+            std::printf("RIJK general gradient memory: %s %.3f GB\n", phase.c_str(), gb(memory));
+        }
+    }
+
+    return peak + peak / _peak_margin_divisor;
+}
+
+auto
 CSimdRIJKGradientDriver::compute(const CMolecule        &molecule,
                                  const CMolecularBasis  &basis,
                                  const CMolecularBasis  &aux_basis,

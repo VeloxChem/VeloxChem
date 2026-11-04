@@ -298,6 +298,39 @@ class CSimdRIJKGradientDriver
                      const size_t               panel_budget,
                      const bool                 with_metric) const -> size_t;
 
+    /// @brief Gets the most memory the gradient of one general density reaches
+    /// beside the B vectors, the metrics, the factors and the density it is
+    /// handed, through mpi_local_densities_general and the calls that follow it.
+    /// @param molecule The molecule.
+    /// @param basis The molecular basis.
+    /// @param aux_basis The auxiliary molecular basis.
+    /// @param aux_atoms The atoms of the auxiliary basis this rank holds the B
+    /// vectors of, as for mpi_local_densities_general.
+    /// @param norbs The rank of the factorisation D = L R transposed, the number of
+    /// columns of each factor.
+    /// @param range_separated True for a hybrid range separated functional, which
+    /// forms a second set of fitted densities from the attenuated B vectors.
+    /// @param panel_budget The budget handed to mpi_local_densities_general, which
+    /// sets its batches and panels.
+    /// @param with_metric Whether this rank forms the two-index fitted density and
+    /// adds the two-center term.
+    /// @return The memory in bytes, for the number of threads of the caller.
+    /// @note The phases are those peak_memory follows for the distributed
+    /// gradient, with a full norbs by norbs fitted density for each auxiliary
+    /// function in place of a packed triangle, one set of factors in place of the
+    /// orbitals of each spin, and the Gram rows formed in a second pass over the
+    /// panels. The Coulomb term is counted for the plain operator, which is the
+    /// larger case: a density handed with no Coulomb term forms no fitting.
+    /// @note A margin of a tenth is added to what is counted, as peak_memory adds.
+    auto peak_memory_general(const CMolecule        &molecule,
+                             const CMolecularBasis  &basis,
+                             const CMolecularBasis  &aux_basis,
+                             const std::vector<int> &aux_atoms,
+                             const size_t            norbs,
+                             const bool              range_separated,
+                             const size_t            panel_budget,
+                             const bool              with_metric) const -> size_t;
+
     /// @brief Computes the Coulomb and exchange contributions to the gradient of
     /// the atoms it is asked for.
     /// @param molecule The molecule.

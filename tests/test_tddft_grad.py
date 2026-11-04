@@ -11,6 +11,7 @@ from veloxchem.errorhandler import VeloxChemError
 from veloxchem.tdaeigensolver import TdaEigenSolver
 from veloxchem.lreigensolver import LinearResponseEigenSolver
 from veloxchem.tddftgradientdriver import TddftGradientDriver
+from veloxchem.scfgradientdriver import ScfGradientDriver
 
 
 @pytest.mark.solvers
@@ -327,3 +328,128 @@ class TestGrad:
             assert np.max(
                 np.abs(fallen.get_gradient()[0] -
                        plain.get_gradient()[0])) < 1.0e-6
+
+    @pytest.mark.parametrize('xcfun_label, ri_label, tolerance',
+                             [('b3lyp', 'RI-JK', 1.0e-4),
+                              ('blyp', 'RI-J', 1.0e-3)])
+    def test_gradient_after_term_fallback(self, monkeypatch, xcfun_label,
+                                          ri_label, tolerance):
+        """With a budget the RI term does not fit in, the excited-state
+        gradient of an RI SCF forms its two-electron term from the four-center
+        integrals, which differs from the RI term by the fitting error: 2.6e-5
+        for RI-JK and 2.6e-4 for RI-J in the first state here."""
+
+        molecule = Molecule.read_str(
+            """
+            O 0.0000000000    0.0000000000   -0.0254395383
+            H 0.0000000000    0.7695699584    0.5948147012
+            H 0.0000000000   -0.7695699584    0.5948147012
+            """,
+            units='angstrom')
+        basis = MolecularBasis.read(molecule, 'def2-svp', ostream=None)
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ri = True
+        scf_drv.xcfun = xcfun_label
+        scf_drv.conv_thresh = 1.0e-8
+        scf_drv.ostream.mute()
+        scf_drv.compute(molecule, basis)
+
+        rsp_solver = TdaEigenSolver()
+        rsp_solver.xcfun = xcfun_label
+        rsp_solver.conv_thresh = 1.0e-5
+        rsp_solver.nstates = 3
+        rsp_solver.ostream.mute()
+        rsp_results = rsp_solver.compute(molecule, basis, scf_drv.scf_results)
+
+        chosen = []
+        real_choose = TddftGradientDriver._choose_ri_gradient
+
+        def recorded(self, *args, **kwargs):
+            label = real_choose(self, *args, **kwargs)
+            chosen.append(label)
+            return label
+
+        monkeypatch.setattr(TddftGradientDriver, '_choose_ri_gradient',
+                            recorded)
+
+        def run(ri_gradient_memory_budget):
+            tddft_grad = TddftGradientDriver(scf_drv)
+            tddft_grad.update_settings({}, {'tamm_dancoff': 'yes'},
+                                       {'conv_thresh': 1.0e-7},
+                                       {'xcfun': xcfun_label})
+            tddft_grad.ri_gradient_memory_budget = ri_gradient_memory_budget
+            tddft_grad.ostream.mute()
+            tddft_grad.compute(molecule, basis, scf_drv, rsp_solver,
+                               rsp_results)
+            return tddft_grad
+
+        with_ri = run(None)
+
+        # NOTE: a budget of 1 kB, which no RI term fits in.
+        fallen = run(1.0e-6)
+
+        assert chosen == [ri_label, None]
+
+        if MPI.COMM_WORLD.Get_rank() == mpi_master():
+            assert np.max(
+                np.abs(fallen.get_gradient()[0] -
+                       with_ri.get_gradient()[0])) < tolerance
+
+    @pytest.mark.parametrize('xcfun_label, ri_label', [('b3lyp', 'RI-JK'),
+                                                       ('blyp', 'RI-J')])
+    def test_ground_state_fallback_warning(self, monkeypatch, xcfun_label,
+                                           ri_label):
+        """When the ground-state gradient, which runs muted, falls back to the
+        four-center integrals, the excited-state gradient prints the
+        warning."""
+
+        molecule = Molecule.read_str(
+            """
+            O 0.0000000000    0.0000000000   -0.0254395383
+            H 0.0000000000    0.7695699584    0.5948147012
+            H 0.0000000000   -0.7695699584    0.5948147012
+            """,
+            units='angstrom')
+        basis = MolecularBasis.read(molecule, 'def2-svp', ostream=None)
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ri = True
+        scf_drv.xcfun = xcfun_label
+        scf_drv.conv_thresh = 1.0e-8
+        scf_drv.ostream.mute()
+        scf_drv.compute(molecule, basis)
+
+        rsp_solver = TdaEigenSolver()
+        rsp_solver.xcfun = xcfun_label
+        rsp_solver.conv_thresh = 1.0e-5
+        rsp_solver.nstates = 3
+        rsp_solver.ostream.mute()
+        rsp_results = rsp_solver.compute(molecule, basis, scf_drv.scf_results)
+
+        # NOTE: a budget of 1 kB for the ground-state gradient alone, which
+        # its RI term does not fit in; the excited-state term takes its own.
+        monkeypatch.setattr(ScfGradientDriver,
+                            '_get_ri_gradient_memory_budget',
+                            lambda self, basis, nspins: 1000)
+
+        tddft_grad = TddftGradientDriver(scf_drv)
+        tddft_grad.update_settings({}, {'tamm_dancoff': 'yes'},
+                                   {'conv_thresh': 1.0e-7},
+                                   {'xcfun': xcfun_label})
+        tddft_grad.ostream.mute()
+
+        warnings = []
+        real_warning = tddft_grad.ostream.print_warning
+
+        def recorded(line):
+            warnings.append(line)
+            real_warning(line)
+
+        monkeypatch.setattr(tddft_grad.ostream, 'print_warning', recorded)
+
+        tddft_grad.compute(molecule, basis, scf_drv, rsp_solver, rsp_results)
+
+        assert ('The ground-state gradient was formed from the four-center ' +
+                f'integrals, as its {ri_label} gradient did not fit in the ' +
+                'memory available.') in warnings

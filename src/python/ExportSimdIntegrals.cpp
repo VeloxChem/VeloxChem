@@ -803,6 +803,19 @@ export_simdintegrals(py::module &m) -> void
              py::arg("distributed"),
              py::arg("panel_budget"),
              py::arg("with_metric"))
+        .def("peak_memory_general", &CSimdRIJKGradientDriver::peak_memory_general,
+             "Gets the most memory the gradient of one general density D = L R transposed reaches through "
+             "mpi_local_densities_general and the calls that follow it, beside the B vectors, the metrics, "
+             "the factors and the density it is handed, in bytes, for the number of threads of the caller "
+             "and with a margin of a tenth. norbs is the number of columns of each factor.",
+             py::arg("molecule"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("aux_atoms"),
+             py::arg("norbs"),
+             py::arg("range_separated"),
+             py::arg("panel_budget"),
+             py::arg("with_metric"))
         .def("mpi_local_densities", &CSimdRIJKGradientDriver::mpi_local_densities,
              "Forms this rank's share of the fitted densities, with no metric applied and nothing "
              "communicated. The `fitting` of what comes back is this rank's partial sum of the right "
