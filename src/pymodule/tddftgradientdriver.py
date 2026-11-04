@@ -636,7 +636,28 @@ class TddftGradientDriver(GradientDriver):
         den_mat_for_fock_gs = make_matrix(basis, mat_t.symmetric)
         den_mat_for_fock_gs.set_values(gs_dm)
 
-        if self._scf_drv.ri_coulomb and fock_type == 'j':
+        # NOTE: the gradient follows the ground state, as the SCF gradient
+        # does (ScfGradientDriver._choose_ri_gradient). An SCF which fell back
+        # to the four-center integrals holds no RI driver to differentiate,
+        # and the RI gradient of its energy would be the gradient of a
+        # different one, so the term is formed from the four-center integrals.
+        if fock_type == 'j':
+            ri_label = 'RI-J'
+            ri_asked = self._scf_drv.ri_coulomb
+            ri_used = self._scf_drv._uses_ri_coulomb()
+        else:
+            ri_label = 'RI-JK'
+            ri_asked = self._scf_drv.ri_jk
+            ri_used = self._scf_drv._uses_ri_jk()
+
+        if ri_asked and not ri_used:
+            self.ostream.print_info(
+                f'The SCF formed its Fock matrices without {ri_label}, so ' +
+                'the gradient is formed from the four-center integrals.')
+            self.ostream.print_blank()
+            self.ostream.flush()
+
+        if ri_used and fock_type == 'j':
             if self.rank == mpi_master():
                 basis_ri_j = MolecularBasis.read(
                     molecule,
@@ -694,7 +715,7 @@ class TddftGradientDriver(GradientDriver):
                     (grad_plus.to_numpy() - grad_minus.to_numpy()) / 4.0 +
                     grad_xmy.to_numpy())
 
-        elif self._scf_drv.ri_jk and fock_type != 'j':
+        elif ri_used and fock_type != 'j':
 
             assert_msg_critical(
                 fock_type != 'j',

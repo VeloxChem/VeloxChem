@@ -273,3 +273,57 @@ class TestGrad:
             }[ri]
             for s in range(2):
                 assert np.max(np.abs(grads[s] - ref_grads[s])) < 1.0e-5
+
+    @pytest.mark.parametrize('xcfun_label', ['b3lyp', 'blyp'])
+    def test_gradient_after_scf_fallback(self, xcfun_label):
+        """After an RI SCF which fell back to the four-center integrals, the
+        gradient follows it and equals a four-center TDDFT gradient."""
+
+        molecule = Molecule.read_str(
+            """
+            O 0.0000000000    0.0000000000   -0.0254395383
+            H 0.0000000000    0.7695699584    0.5948147012
+            H 0.0000000000   -0.7695699584    0.5948147012
+            """,
+            units='angstrom')
+        basis = MolecularBasis.read(molecule, 'def2-svp', ostream=None)
+
+        def run(ri, ri_memory_budget=None):
+            scf_drv = ScfRestrictedDriver()
+            scf_drv.ri = ri
+            scf_drv.ri_memory_budget = ri_memory_budget
+            scf_drv.xcfun = xcfun_label
+            scf_drv.conv_thresh = 1.0e-8
+            scf_drv.ostream.mute()
+            scf_drv.compute(molecule, basis)
+
+            rsp_solver = TdaEigenSolver()
+            rsp_solver.xcfun = xcfun_label
+            rsp_solver.conv_thresh = 1.0e-5
+            rsp_solver.nstates = 3
+            rsp_solver.ostream.mute()
+            rsp_results = rsp_solver.compute(molecule, basis,
+                                             scf_drv.scf_results)
+
+            tddft_grad = TddftGradientDriver(scf_drv)
+            tddft_grad.update_settings({}, {'tamm_dancoff': 'yes'},
+                                       {'conv_thresh': 1.0e-7},
+                                       {'xcfun': xcfun_label})
+            tddft_grad.ostream.mute()
+            tddft_grad.compute(molecule, basis, scf_drv, rsp_solver,
+                               rsp_results)
+
+            return scf_drv, tddft_grad
+
+        # NOTE: a budget of 1 kB makes the SCF fall back to the four-center
+        # integrals while ri stays set.
+        fallen_scf, fallen = run(True, 1.0e-6)
+        _, plain = run(False)
+
+        assert fallen_scf._ri_fallback
+        assert not (fallen_scf._uses_ri_jk() or fallen_scf._uses_ri_coulomb())
+
+        if MPI.COMM_WORLD.Get_rank() == mpi_master():
+            assert np.max(
+                np.abs(fallen.get_gradient()[0] -
+                       plain.get_gradient()[0])) < 1.0e-6
