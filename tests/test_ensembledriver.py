@@ -117,6 +117,22 @@ class TestEnsembleDriver:
                 assert reference_path.is_file(), f"Missing reference file: {reference_path}"
 
                 generated_lines = expected_path.read_text().splitlines()
+                assert generated_lines[0] == "@source"
+                source_end = generated_lines.index("@end")
+                source = dict(
+                    line.split(": ", maxsplit=1)
+                    for line in generated_lines[1:source_end]
+                )
+                assert source["schema_version"] == "1"
+                assert source["topology_file"] == top
+                assert source["trajectory_file"] == traj
+                assert int(source["frame"]) == int(frame)
+                assert source["pe_models"] == "CP3, SEP"
+                assert source["npe_models"] == "ff19sb, tip3p"
+
+                generated_lines = generated_lines[source_end + 1:]
+                if generated_lines and generated_lines[0] == "":
+                    generated_lines = generated_lines[1:]
                 reference_lines = reference_path.read_text().splitlines()
                 assert generated_lines == reference_lines, (
                     f"PE+NPE pot mismatch for frame {frame}: {expected_name}"
