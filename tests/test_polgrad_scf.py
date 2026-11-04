@@ -61,8 +61,10 @@ class TestPolgrad:
             polgrad_dynamic_reference = polgrad_reference[1]
             hf.close()
 
-            assert np.max(np.abs(np.abs(polgrad_static) - np.abs(polgrad_static_reference))) < 1.0e-6
-            assert np.max(np.abs(np.abs(polgrad_dynamic) - np.abs(polgrad_dynamic_reference))) < 1.0e-6
+            # NOTE: compared with their signs. The polarizability gradient does
+            # not depend on the phases of the molecular orbitals.
+            assert np.max(np.abs(polgrad_static - polgrad_static_reference)) < 1.0e-6
+            assert np.max(np.abs(polgrad_dynamic - polgrad_dynamic_reference)) < 1.0e-6
 
         # test real numerical gradient
         num_polgrad_drv = PolarizabilityGradient(scf_drv)
@@ -90,7 +92,9 @@ class TestPolgrad:
             polgrad_dynamic_reference = polgrad_reference[1]
             hf.close()
 
-            assert np.max(np.abs(np.abs(polgrad_dynamic) - np.abs(polgrad_dynamic_reference))) < 1.0e-6
+            # NOTE: compared with their signs. The polarizability gradient does
+            # not depend on the phases of the molecular orbitals.
+            assert np.max(np.abs(polgrad_dynamic - polgrad_dynamic_reference)) < 1.0e-6
 
     def run_polgrad_complex(self,
                             molecule,
@@ -144,7 +148,9 @@ class TestPolgrad:
             polgrad_dynamic_reference = np.array(hf.get(an_label))
             hf.close()
 
-            assert np.max(np.abs(np.abs(polgrad_dynamic) - np.abs(polgrad_dynamic_reference))) < 1.0e-6
+            # NOTE: compared with their signs. The polarizability gradient does
+            # not depend on the phases of the molecular orbitals.
+            assert np.max(np.abs(polgrad_dynamic - polgrad_dynamic_reference)) < 1.0e-6
 
         # test complex numerical gradient
         num_polgrad_drv = PolarizabilityGradient(scf_drv)
@@ -172,8 +178,10 @@ class TestPolgrad:
             polgrad_dynamic_reference = polgrad_reference[1]
             hf.close()
 
-            assert np.max(np.abs(np.abs(polgrad_static) - np.abs(polgrad_static_reference))) < 1.0e-6
-            assert np.max(np.abs(np.abs(polgrad_dynamic) - np.abs(polgrad_dynamic_reference))) < 1.0e-6
+            # NOTE: compared with their signs. The polarizability gradient does
+            # not depend on the phases of the molecular orbitals.
+            assert np.max(np.abs(polgrad_static - polgrad_static_reference)) < 1.0e-6
+            assert np.max(np.abs(polgrad_dynamic - polgrad_dynamic_reference)) < 1.0e-6
 
     @pytest.mark.parametrize('ri', [False, True])
     def test_hf_polarizabilitygradient_real(self, ri):

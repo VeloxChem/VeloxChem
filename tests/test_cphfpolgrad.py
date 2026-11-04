@@ -114,7 +114,10 @@ class TestCphfPolgrad:
             # Here we are comparing the CPHF coefficients in MO basis, so
             # there might be sign differences; we compare absolute values instead.
             assert np.max(np.abs(np.abs(cphfpolgrad_coefficients) - np.abs(cphfpolgrad_reference))) < 1.0e-6
-            assert np.max(np.abs(np.abs(cphfpolgrad_omega_coefficients) - np.abs(cphfpolgrad_omega_reference))) < 1.0e-6
+            # NOTE: omega is in the AO basis and does not depend on the phases
+            # of the molecular orbitals, so it is compared with its signs.
+            assert np.max(np.abs(np.array(cphfpolgrad_omega_coefficients) -
+                                 cphfpolgrad_omega_reference)) < 1.0e-6
 
     def run_cphfpolgrad_complex(self,
                                 molecule,
@@ -199,7 +202,10 @@ class TestCphfPolgrad:
             # Here we ar comparing the CPHF coefficients in MO basis, so
             # there might be sign differences; we compare absolute values instead.
             assert np.max(np.abs(np.abs(cphfpolgrad_coefficients) - np.abs(cphfpolgrad_reference))) < 1.0e-6
-            assert np.max(np.abs(np.abs(cphfpolgrad_omega_coefficients) - np.abs(cphfpolgrad_omega_reference))) < 1.0e-6
+            # NOTE: omega is in the AO basis and does not depend on the phases
+            # of the molecular orbitals, so it is compared with its signs.
+            assert np.max(np.abs(np.array(cphfpolgrad_omega_coefficients) -
+                                 cphfpolgrad_omega_reference)) < 1.0e-6
 
     @pytest.mark.parametrize(
         'solver_cls',
@@ -313,7 +319,8 @@ class TestCphfPolgrad:
                                        is_complex):
         """With RI-JK every Fock build of the orbital response, those of the
         right-hand side and of omega included, takes the factors of its
-        densities, and the factors give the densities."""
+        densities, the factors give the densities, and the build agrees with
+        a four-center build of them to the accuracy of the fitting."""
 
         molecule = Molecule.from_xyz_string("""3
 
@@ -344,10 +351,27 @@ class TestCphfPolgrad:
         def recorded(self, dens, *args, dens_factors=None, **kwargs):
             # NOTE: a copy of the list, which some callers empty after the
             # build.
-            if self.rank == mpi_master():
-                calls.append((self._uses_ri_jk(), list(dens), dens_factors))
-            return real_build(self, dens, *args, dens_factors=dens_factors,
+            copied = list(dens) if self.rank == mpi_master() else None
+
+            fock = real_build(self, dens, *args, dens_factors=dens_factors,
                               **kwargs)
+
+            # NOTE: the same densities built again from the four-center
+            # integrals, which a build without factors is. Every rank takes
+            # part, so this is decided by _uses_ri_jk, which every rank
+            # answers alike, and not by the factors, which only the master
+            # rank holds.
+            if self._uses_ri_jk():
+                four_center = real_build(self, copied, *args,
+                                         dens_factors=None, **kwargs)
+            else:
+                four_center = None
+
+            if self.rank == mpi_master():
+                calls.append((self._uses_ri_jk(), copied, dens_factors, fock,
+                              four_center))
+
+            return fock
 
         monkeypatch.setattr(LinearSolver, '_comp_lr_fock', recorded)
 
@@ -363,9 +387,19 @@ class TestCphfPolgrad:
         if scf_drv.rank == mpi_master():
             assert calls
 
-            for uses_ri_jk, dens, factors in calls:
+            for uses_ri_jk, dens, factors, fock, four_center in calls:
                 assert uses_ri_jk
                 assert factors is not None
+
+                # NOTE: the RI-JK build against the four-center build of the
+                # same densities. Here they differ by 7e-5 to 1.3e-4 of the
+                # largest Fock element; factors in a form the build reads
+                # differently give a difference of the size of the Fock
+                # matrices.
+                largest = max(np.max(np.abs(f)) for f in four_center)
+                difference = max(
+                    np.max(np.abs(f - g)) for f, g in zip(fock, four_center))
+                assert difference < 1.0e-2 * largest
 
                 # NOTE: a left factor and the right factors of the densities,
                 # or two of them for densities block diagonal in the
