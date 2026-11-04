@@ -3,6 +3,7 @@ import pytest
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
+from veloxchem.veloxchemlib import mpi_master
 
 pytest.importorskip('py3Dmol')
 
