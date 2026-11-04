@@ -175,6 +175,114 @@ class PolOrbitalResponse(CphfSolver):
             return self.compute_rhs_real_red_dim(molecule, basis, scf_tensors, eri_dict,
                                                  dft_dict, pe_dict, lr_results)
 
+    @staticmethod
+    def _ri_jk_unrel_factors(mo_occ, mo_vir, dm_oo, dm_vv, pairs, part=None):
+        """
+        Gets the unrelaxed one-particle densities as the factors the RI-JK
+        build of _comp_lr_fock takes.
+
+        :param mo_occ:
+            The occupied orbitals.
+        :param mo_vir:
+            The virtual orbitals.
+        :param dm_oo:
+            The occupied blocks in MO basis, as calculate_1pdm returns them.
+        :param dm_vv:
+            The virtual blocks in MO basis, as calculate_1pdm returns them.
+        :param pairs:
+            The operator components (x, y) of the densities, in the order of
+            the list of densities.
+        :param part:
+            np.real or np.imag for the part of complex blocks a list of
+            densities is made of, or None for real blocks.
+
+        :return:
+            The factors (left, rights, left, rights) of densities which are
+            block diagonal in the orbitals: C_occ dm_oo C_occ^T on the
+            occupied orbitals and C_vir dm_vv C_vir^T on the virtual ones.
+        """
+
+        if part is None:
+            part = np.asarray
+
+        return (
+            mo_occ,
+            [np.matmul(mo_occ, part(dm_oo[x, y]).T) for x, y in pairs],
+            mo_vir,
+            [np.matmul(mo_vir, part(dm_vv[x, y]).T) for x, y in pairs],
+        )
+
+    @staticmethod
+    def _ri_jk_transition_rights(mo_vir, vectors, part=None):
+        """
+        Gets the right factors of densities C_occ V C_vir^T, whose left factor
+        is the occupied orbitals, for the RI-JK build of _comp_lr_fock.
+
+        :param mo_vir:
+            The virtual orbitals.
+        :param vectors:
+            The matrices V, occupied by virtual orbitals.
+        :param part:
+            np.real or np.imag for the part of complex matrices a list of
+            densities is made of, or None for real matrices.
+
+        :return:
+            The right factors C_vir V^T, one for each matrix.
+        """
+
+        if part is None:
+            part = np.asarray
+
+        return [np.matmul(mo_vir, part(v).T) for v in vectors]
+
+    def _comp_rhs_fock(self, dens, nunrel, factors, molecule, basis, eri_dict,
+                       dft_dict, pe_dict, profiler):
+        """
+        Computes the Fock matrices of the densities of the RHS: the unrelaxed
+        one-particle densities followed by the X+Y and X-Y transition
+        densities.
+
+        :param dens:
+            The densities.
+        :param nunrel:
+            The number of unrelaxed densities at the start of the list.
+        :param factors:
+            The factors of the unrelaxed densities and those of the transition
+            densities, on the master rank where the solver uses RI-JK, and
+            None otherwise.
+
+        :return:
+            The Fock matrices in the order of the densities, on the master
+            rank.
+        """
+
+        if not self._uses_ri_jk():
+            return self._comp_lr_fock(dens, molecule, basis, eri_dict,
+                                      dft_dict, pe_dict, profiler)
+
+        # NOTE: the two kinds of density have factors of different shapes,
+        # block diagonal in the orbitals and occupied by virtual, so they are
+        # built in two calls, as TddftOrbitalResponse builds its own.
+        if self.rank == mpi_master():
+            unrel_factors, transition_factors = factors
+            unrel, transition = dens[:nunrel], dens[nunrel:]
+        else:
+            unrel_factors, transition_factors = None, None
+            unrel, transition = None, None
+
+        fock_unrel = self._comp_lr_fock(unrel, molecule, basis, eri_dict,
+                                        dft_dict, pe_dict, profiler,
+                                        dens_factors=unrel_factors)
+        fock_transition = self._comp_lr_fock(transition, molecule, basis,
+                                             eri_dict, dft_dict, pe_dict,
+                                             profiler,
+                                             dens_factors=transition_factors)
+
+        if self.rank == mpi_master():
+            return fock_unrel + fock_transition
+        else:
+            return None
+
     def compute_rhs_complex(self, molecule, basis, scf_tensors, eri_dict, dft_dict, pe_dict, lr_results):
         """
         Computes the complex right-hand side (RHS) of the polarizability
@@ -322,6 +430,32 @@ class PolOrbitalResponse(CphfSolver):
                 dm_ao_rhs_real_list = dm_ao_list_real + xpmy_ao_list_real
                 dm_ao_rhs_imag_list = dm_ao_list_imag + xpmy_ao_list_imag
 
+                # NOTE: the same densities as the factors they are made of,
+                # for the RI-JK build (_comp_rhs_fock). The unrelaxed
+                # densities are block diagonal in the orbitals, from the
+                # blocks calculate_unrel_dm transforms.
+                # The real and the imaginary parts are built apart, each from
+                # the same part of the blocks and of the vectors.
+                if self._uses_ri_jk():
+                    dm_oo, dm_vv = self.calculate_1pdm(molecule, basis,
+                                                       scf_tensors, x_plus_y,
+                                                       x_minus_y)
+                    ri_jk_factors_real, ri_jk_factors_imag = [
+                        (self._ri_jk_unrel_factors(mo_occ, mo_vir, dm_oo,
+                                                   dm_vv, [(x, y) for x in range(dof) for y in range(dof)],
+                                                   part),
+                         (mo_occ,
+                          self._ri_jk_transition_rights(
+                              mo_vir, x_plus_y, part) +
+                          self._ri_jk_transition_rights(
+                              mo_vir, x_minus_y, part)))
+                        for part in [np.real, np.imag]
+                    ]
+                    del dm_oo, dm_vv
+                else:
+                    ri_jk_factors_real = None
+                    ri_jk_factors_imag = None
+
                 if self._dft:
                     # construct density matrices for E[3] term
                     perturbed_dm_ao_list_rere = []
@@ -361,6 +495,8 @@ class PolOrbitalResponse(CphfSolver):
             else:
                 dm_ao_rhs_real_list = None
                 dm_ao_rhs_imag_list = None
+                ri_jk_factors_real = None
+                ri_jk_factors_imag = None
 
                 if self._dft:
                     perturbed_dm_ao_list_rere = None
@@ -441,12 +577,16 @@ class PolOrbitalResponse(CphfSolver):
                 fock_gxc_ao_reim = None
                 fock_gxc_ao_imre = None
 
-            fock_ao_rhs_real = self._comp_lr_fock(dm_ao_rhs_real_list, molecule,
-                                                  basis, eri_dict, dft_dict, pe_dict,
-                                                  profiler)
-            fock_ao_rhs_imag = self._comp_lr_fock(dm_ao_rhs_imag_list, molecule,
-                                                  basis, eri_dict, dft_dict, pe_dict,
-                                                  profiler)
+            fock_ao_rhs_real = self._comp_rhs_fock(dm_ao_rhs_real_list,
+                                                   dof**2,
+                                                   ri_jk_factors_real,
+                                                   molecule, basis, eri_dict,
+                                                   dft_dict, pe_dict, profiler)
+            fock_ao_rhs_imag = self._comp_rhs_fock(dm_ao_rhs_imag_list,
+                                                   dof**2,
+                                                   ri_jk_factors_imag,
+                                                   molecule, basis, eri_dict,
+                                                   dft_dict, pe_dict, profiler)
 
             # calculate the RHS
             if self.rank == mpi_master():
@@ -811,6 +951,32 @@ class PolOrbitalResponse(CphfSolver):
                 dm_ao_rhs_real_list = dm_ao_list_real + xpmy_ao_list_real
                 dm_ao_rhs_imag_list = dm_ao_list_imag + xpmy_ao_list_imag
 
+                # NOTE: the same densities as the factors they are made of,
+                # for the RI-JK build (_comp_rhs_fock). The unrelaxed
+                # densities are block diagonal in the orbitals, from the
+                # blocks calculate_unrel_dm_red_dim transforms.
+                # The real and the imaginary parts are built apart, each from
+                # the same part of the blocks and of the vectors.
+                if self._uses_ri_jk():
+                    dm_oo, dm_vv = self.calculate_1pdm(molecule, basis,
+                                                       scf_tensors, x_plus_y,
+                                                       x_minus_y)
+                    ri_jk_factors_real, ri_jk_factors_imag = [
+                        (self._ri_jk_unrel_factors(mo_occ, mo_vir, dm_oo,
+                                                   dm_vv, xy_pairs,
+                                                   part),
+                         (mo_occ,
+                          self._ri_jk_transition_rights(
+                              mo_vir, x_plus_y, part) +
+                          self._ri_jk_transition_rights(
+                              mo_vir, x_minus_y, part)))
+                        for part in [np.real, np.imag]
+                    ]
+                    del dm_oo, dm_vv
+                else:
+                    ri_jk_factors_real = None
+                    ri_jk_factors_imag = None
+
                 if self._dft:
                     # construct density matrices for E[3] term
                     perturbed_dm_ao_list_rere = []
@@ -850,6 +1016,8 @@ class PolOrbitalResponse(CphfSolver):
             else:
                 dm_ao_rhs_real_list = None
                 dm_ao_rhs_imag_list = None
+                ri_jk_factors_real = None
+                ri_jk_factors_imag = None
 
                 if self._dft:
                     perturbed_dm_ao_list_rere = None
@@ -929,12 +1097,16 @@ class PolOrbitalResponse(CphfSolver):
                 fock_gxc_ao_reim = None
                 fock_gxc_ao_imre = None
 
-            fock_ao_rhs_real = self._comp_lr_fock(dm_ao_rhs_real_list, molecule,
-                                                  basis, eri_dict, dft_dict, pe_dict,
-                                                  profiler)
-            fock_ao_rhs_imag = self._comp_lr_fock(dm_ao_rhs_imag_list, molecule,
-                                                  basis, eri_dict, dft_dict, pe_dict,
-                                                  profiler)
+            fock_ao_rhs_real = self._comp_rhs_fock(dm_ao_rhs_real_list,
+                                                   dof_red,
+                                                   ri_jk_factors_real,
+                                                   molecule, basis, eri_dict,
+                                                   dft_dict, pe_dict, profiler)
+            fock_ao_rhs_imag = self._comp_rhs_fock(dm_ao_rhs_imag_list,
+                                                   dof_red,
+                                                   ri_jk_factors_imag,
+                                                   molecule, basis, eri_dict,
+                                                   dft_dict, pe_dict, profiler)
 
             # calculate the RHS
             if self.rank == mpi_master():
@@ -1282,6 +1454,25 @@ class PolOrbitalResponse(CphfSolver):
                 # density matrix for RHS
                 dm_ao_rhs_list = dm_ao_list + xpmy_ao_list
 
+                # NOTE: the same densities as the factors they are made of,
+                # for the RI-JK build (_comp_rhs_fock). The unrelaxed
+                # densities are block diagonal in the orbitals, from the
+                # blocks calculate_unrel_dm transforms.
+                if self._uses_ri_jk():
+                    dm_oo, dm_vv = self.calculate_1pdm(molecule, basis,
+                                                       scf_tensors, x_plus_y,
+                                                       x_minus_y)
+                    ri_jk_factors = (
+                        self._ri_jk_unrel_factors(
+                            mo_occ, mo_vir, dm_oo, dm_vv,
+                            [(x, y) for x in range(dof) for y in range(dof)]),
+                        (mo_occ,
+                         self._ri_jk_transition_rights(mo_vir, x_plus_y) +
+                         self._ri_jk_transition_rights(mo_vir, x_minus_y)))
+                    del dm_oo, dm_vv
+                else:
+                    ri_jk_factors = None
+
                 if self._dft:
                     # construct density matrices for E[3] term:
                     perturbed_dm_ao_list = []
@@ -1298,6 +1489,7 @@ class PolOrbitalResponse(CphfSolver):
 
             else:
                 dm_ao_rhs_list = None
+                ri_jk_factors = None
 
                 if self._dft:
                     perturbed_dm_ao_list = None
@@ -1335,8 +1527,10 @@ class PolOrbitalResponse(CphfSolver):
             # vector-related components to general Fock matrix
             # (not 1PDM part)
 
-            fock_ao_rhs = self._comp_lr_fock(dm_ao_rhs_list, molecule, basis,
-                                             eri_dict, dft_dict, pe_dict, profiler)
+            fock_ao_rhs = self._comp_rhs_fock(dm_ao_rhs_list, dof**2,
+                                              ri_jk_factors, molecule, basis,
+                                              eri_dict, dft_dict, pe_dict,
+                                              profiler)
 
             # calculate the RHS
             if self.rank == mpi_master():
@@ -1617,6 +1811,24 @@ class PolOrbitalResponse(CphfSolver):
                 # density matrix for RHS
                 dm_ao_rhs_list = dm_ao_list + xpmy_ao_list
 
+                # NOTE: the same densities as the factors they are made of,
+                # for the RI-JK build (_comp_rhs_fock). The unrelaxed
+                # densities are block diagonal in the orbitals, from the
+                # blocks calculate_unrel_dm_red_dim transforms.
+                if self._uses_ri_jk():
+                    dm_oo, dm_vv = self.calculate_1pdm(molecule, basis,
+                                                       scf_tensors, x_plus_y,
+                                                       x_minus_y)
+                    ri_jk_factors = (
+                        self._ri_jk_unrel_factors(mo_occ, mo_vir, dm_oo,
+                                                  dm_vv, xy_pairs),
+                        (mo_occ,
+                         self._ri_jk_transition_rights(mo_vir, x_plus_y) +
+                         self._ri_jk_transition_rights(mo_vir, x_minus_y)))
+                    del dm_oo, dm_vv
+                else:
+                    ri_jk_factors = None
+
                 if self._dft:
                     # construct density matrices for E[3] term:
                     perturbed_dm_ao_list = []
@@ -1633,6 +1845,7 @@ class PolOrbitalResponse(CphfSolver):
 
             else:
                 dm_ao_rhs_list = None
+                ri_jk_factors = None
 
                 if self._dft:
                     perturbed_dm_ao_list = None
@@ -1669,8 +1882,10 @@ class PolOrbitalResponse(CphfSolver):
 
             # vector-related components to general Fock matrix
             # (not 1PDM part)
-            fock_ao_rhs = self._comp_lr_fock(dm_ao_rhs_list, molecule, basis,
-                                             eri_dict, dft_dict, pe_dict, profiler)
+            fock_ao_rhs = self._comp_rhs_fock(dm_ao_rhs_list, dof_red,
+                                              ri_jk_factors, molecule, basis,
+                                              eri_dict, dft_dict, pe_dict,
+                                              profiler)
 
             # calculate the RHS
             if self.rank == mpi_master():
@@ -2754,13 +2969,24 @@ class PolOrbitalResponse(CphfSolver):
 
                 cphf_ao_list = [cphf_ao[x] for x in range(dof**2)]
 
+                # NOTE: the same densities as the factors they are made of,
+                # the occupied orbitals on the left, for the RI-JK build.
+                if self._uses_ri_jk():
+                    cphf_factors = (mo_occ,
+                                    self._ri_jk_transition_rights(
+                                        mo_vir, cphf_ov[:dof**2]))
+                else:
+                    cphf_factors = None
+
                 del x_plus_y_mo, x_minus_y_mo, cphf_ao
             else:
                 cphf_ao_list = None
+                cphf_factors = None
 
             fock_cphf = self._comp_lr_fock(cphf_ao_list, molecule, basis,
                                            eri_dict, dft_dict, pe_dict,
-                                           profiler)
+                                           profiler,
+                                           dens_factors=cphf_factors)
 
             # get Fock matrices from distributed arrays
             # Notes: fock_ao_rhs is a list with dof**2 matrices corresponding to
@@ -3039,13 +3265,24 @@ class PolOrbitalResponse(CphfSolver):
 
                 cphf_ao_list = [cphf_ao[x] for x in range(dof_red)]
 
+                # NOTE: the same densities as the factors they are made of,
+                # the occupied orbitals on the left, for the RI-JK build.
+                if self._uses_ri_jk():
+                    cphf_factors = (mo_occ,
+                                    self._ri_jk_transition_rights(
+                                        mo_vir, cphf_ov[:dof_red]))
+                else:
+                    cphf_factors = None
+
                 del x_plus_y_mo, x_minus_y_mo, cphf_ao
             else:
                 cphf_ao_list = None
+                cphf_factors = None
 
             fock_cphf = self._comp_lr_fock(cphf_ao_list, molecule, basis,
                                            eri_dict, dft_dict, pe_dict,
-                                           profiler)
+                                           profiler,
+                                           dens_factors=cphf_factors)
 
             # get Fock matrices from distributed arrays
             # Notes: fock_ao_rhs is a list with dof**2 matrices corresponding to
@@ -3330,17 +3567,35 @@ class PolOrbitalResponse(CphfSolver):
                 cphf_ao_list_imag = list(
                     np.array([cphf_ao[x].imag for x in range(dof**2)]))
 
+                # NOTE: the same densities as the factors they are made of,
+                # the occupied orbitals on the left, for the RI-JK build.
+                # The real and the imaginary parts are built apart.
+                if self._uses_ri_jk():
+                    cphf_factors_real, cphf_factors_imag = [
+                        (mo_occ,
+                         self._ri_jk_transition_rights(
+                             mo_vir, cphf_ov[:dof**2], part))
+                        for part in [np.real, np.imag]
+                    ]
+                else:
+                    cphf_factors_real = None
+                    cphf_factors_imag = None
+
                 del x_plus_y_mo, x_minus_y_mo, cphf_ao
             else:
                 cphf_ao_list_real = None
                 cphf_ao_list_imag = None
+                cphf_factors_real = None
+                cphf_factors_imag = None
 
             fock_cphf_real = self._comp_lr_fock(cphf_ao_list_real, molecule, basis,
                                                 eri_dict, dft_dict, pe_dict,
-                                                profiler)
+                                                profiler,
+                                                dens_factors=cphf_factors_real)
             fock_cphf_imag = self._comp_lr_fock(cphf_ao_list_imag, molecule, basis,
                                                 eri_dict, dft_dict, pe_dict,
-                                                profiler)
+                                                profiler,
+                                                dens_factors=cphf_factors_imag)
 
             # get Fock matrix intermediates from distributed arrays
             # Notes: fock_ao_rhs is a list with dof**2 matrices corresponding to
@@ -3676,17 +3931,35 @@ class PolOrbitalResponse(CphfSolver):
                 cphf_ao_list_imag = list(
                     np.array([cphf_ao[x].imag for x in range(dof_red)]))
 
+                # NOTE: the same densities as the factors they are made of,
+                # the occupied orbitals on the left, for the RI-JK build.
+                # The real and the imaginary parts are built apart.
+                if self._uses_ri_jk():
+                    cphf_factors_real, cphf_factors_imag = [
+                        (mo_occ,
+                         self._ri_jk_transition_rights(
+                             mo_vir, cphf_ov[:dof_red], part))
+                        for part in [np.real, np.imag]
+                    ]
+                else:
+                    cphf_factors_real = None
+                    cphf_factors_imag = None
+
                 del x_plus_y_mo, x_minus_y_mo, cphf_ao
             else:
                 cphf_ao_list_real = None
                 cphf_ao_list_imag = None
+                cphf_factors_real = None
+                cphf_factors_imag = None
 
             fock_cphf_real = self._comp_lr_fock(cphf_ao_list_real, molecule, basis,
                                                 eri_dict, dft_dict, pe_dict,
-                                                profiler)
+                                                profiler,
+                                                dens_factors=cphf_factors_real)
             fock_cphf_imag = self._comp_lr_fock(cphf_ao_list_imag, molecule, basis,
                                                 eri_dict, dft_dict, pe_dict,
-                                                profiler)
+                                                profiler,
+                                                dens_factors=cphf_factors_imag)
 
             # get Fock matrix intermediates from distributed arrays
             # Notes: fock_ao_rhs is a list with dof**2 matrices corresponding to

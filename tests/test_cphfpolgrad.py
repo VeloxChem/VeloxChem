@@ -10,6 +10,7 @@ from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.lrsolver import LinearResponseSolver
 from veloxchem.cppsolver import ComplexResponseSolver
 from veloxchem.polorbitalresponse import PolOrbitalResponse
+from veloxchem.linearsolver import LinearSolver
 
 
 class FullDimensionPolOrbitalResponse(PolOrbitalResponse):
@@ -302,3 +303,83 @@ class TestCphfPolgrad:
             "cpkspolgrad_omega_coefficients_red_b3lyp_complex",
             solver_cls,
             ri=ri)
+
+    @pytest.mark.parametrize(
+        'solver_cls',
+        [PolOrbitalResponse, FullDimensionPolOrbitalResponse],
+        ids=['reduced', 'full'])
+    @pytest.mark.parametrize('is_complex', [False, True])
+    def test_ri_jk_builds_take_factors(self, monkeypatch, solver_cls,
+                                       is_complex):
+        """With RI-JK every Fock build of the orbital response, those of the
+        right-hand side and of omega included, takes the factors of its
+        densities, and the factors give the densities."""
+
+        molecule = Molecule.from_xyz_string("""3
+
+        O     0.000000    0.000000    0.000000
+        H     0.000000    0.504284    0.758602
+        H     0.000000   -0.504284    0.758602
+        """)
+        basis = MolecularBasis.read(molecule, 'sto-3g', ostream=None)
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.xcfun = 'b3lyp'
+        scf_drv.ostream.mute()
+        scf_results = scf_drv.compute(molecule, basis)
+
+        settings = {'conv_thresh': 1.0e-5, 'frequencies': (0.0, 0.4)}
+        if is_complex:
+            settings['damping'] = 0.5
+            lr_drv = ComplexResponseSolver()
+        else:
+            lr_drv = LinearResponseSolver()
+        lr_drv.update_settings(settings)
+        lr_drv.ostream.mute()
+        lr_results = lr_drv.compute(molecule, basis, scf_results)
+
+        calls = []
+        real_build = LinearSolver._comp_lr_fock
+
+        def recorded(self, dens, *args, dens_factors=None, **kwargs):
+            # NOTE: a copy of the list, which some callers empty after the
+            # build.
+            if self.rank == mpi_master():
+                calls.append((self._uses_ri_jk(), list(dens), dens_factors))
+            return real_build(self, dens, *args, dens_factors=dens_factors,
+                              **kwargs)
+
+        monkeypatch.setattr(LinearSolver, '_comp_lr_fock', recorded)
+
+        solver = solver_cls()
+        settings = {'conv_thresh': 2e-7, 'frequencies': (0.0, 0.4)}
+        if is_complex:
+            settings.update({'is_complex': 'yes', 'damping': 0.5})
+        solver.update_settings(settings)
+        solver.ostream.mute()
+        solver.compute(molecule, basis, scf_results, lr_results)
+        solver.compute_omega(molecule, basis, scf_results, lr_results)
+
+        if scf_drv.rank == mpi_master():
+            assert calls
+
+            for uses_ri_jk, dens, factors in calls:
+                assert uses_ri_jk
+                assert factors is not None
+
+                # NOTE: a left factor and the right factors of the densities,
+                # or two of them for densities block diagonal in the
+                # occupied and the virtual orbitals.
+                if len(factors) == 2:
+                    left, rights = factors
+                    rebuilt = [np.matmul(left, r.T) for r in rights]
+                else:
+                    left, rights, left_vir, rights_vir = factors
+                    rebuilt = [
+                        np.matmul(left, r.T) + np.matmul(left_vir, rv.T)
+                        for r, rv in zip(rights, rights_vir)
+                    ]
+
+                assert len(rebuilt) == len(dens)
+                for density, from_factors in zip(dens, rebuilt):
+                    assert np.max(np.abs(density - from_factors)) < 1.0e-12
