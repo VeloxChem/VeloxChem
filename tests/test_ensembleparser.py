@@ -1,8 +1,14 @@
 import pytest
 import numpy as np
+import sys
 
 import veloxchem.trajectoryparserbase as trajectoryparserbase_module
+from veloxchem.embeddingparser import EmbeddingParser
+from veloxchem.embeddingpotfilewriter import EmbeddingPotfileWriter
 from veloxchem.ensembleparser import EnsembleParser
+from veloxchem.fikaembedding import fika_embedding_sanity_check
+from veloxchem.fikapotfilereader import FikaPotfileReader
+from veloxchem.inputparser import InputParser
 
 pytest.importorskip("MDAnalysis")
 
@@ -90,7 +96,6 @@ class TestEnsembleParser:
 
     def test_pdb_file_and_tip3_pe_pot_files(self, tmp_path):
         from veloxchem.veloxchemlib import mpi_master
-        from veloxchem.ensembledriver import EnsembleDriver
 
         simple_tip3_pdb = make_simple_tip3_pdb(tmp_path)
         ens_parser = EnsembleParser()
@@ -111,15 +116,15 @@ class TestEnsembleParser:
         tip3p_snapshot["frame"] = 1
         tip3p_snapshot["pe_resnames"] = np.array(["TIP3P"] * 3, dtype=object)
 
-        ens_drv = EnsembleDriver()
-        ens_drv.ostream.mute()
-        ens_drv.set_env_models(pe_model="SEP")
-        ens_drv.write_pot_files(
+        writer = EmbeddingPotfileWriter()
+        writer.ostream.mute()
+        writer.set_env_models(pe_model="SEP")
+        writer.write_pot_files(
             [snapshots[0], tip3p_snapshot],
             outdir=tmp_path,
         )
 
-        if ens_drv.rank == mpi_master():
+        if writer.rank == mpi_master():
             for frame, resname in ((0, "TIP3"), (1, "TIP3P")):
                 pot_text = (
                     tmp_path / f"pe_frame_{frame:06d}.pot"
@@ -137,7 +142,6 @@ class TestEnsembleParser:
 
     def test_tip3_npe_only_pot_files(self, tmp_path):
         from veloxchem.veloxchemlib import mpi_master
-        from veloxchem.ensembledriver import EnsembleDriver
 
         simple_tip3_pdb = make_simple_tip3_pdb(tmp_path)
         ens_parser = EnsembleParser()
@@ -153,15 +157,15 @@ class TestEnsembleParser:
         tip3p_snapshot["frame"] = 1
         tip3p_snapshot["npe_resnames"] = np.array(["TIP3P"] * 3, dtype=object)
 
-        ens_drv = EnsembleDriver()
-        ens_drv.ostream.mute()
-        ens_drv.set_env_models(pe_model="SEP", npe_model="tip3p")
-        ens_drv.write_pot_files(
+        writer = EmbeddingPotfileWriter()
+        writer.ostream.mute()
+        writer.set_env_models(pe_model="SEP", npe_model="tip3p")
+        writer.write_pot_files(
             [snapshots[0], tip3p_snapshot],
             outdir=tmp_path,
         )
 
-        if ens_drv.rank == mpi_master():
+        if writer.rank == mpi_master():
             for frame, resname in ((0, "TIP3"), (1, "TIP3P")):
                 pot_text = (
                     tmp_path / f"pe_frame_{frame:06d}.pot"
@@ -176,6 +180,169 @@ class TestEnsembleParser:
                     ["H", "0.41700000", f"{resname}_npe"],
                 ]
                 assert "@polarizabilities\n" not in pot_text
+
+    def test_embedding_parser_writes_explicit_potfile(self, tmp_path):
+        simple_tip3_pdb = make_simple_tip3_pdb(tmp_path)
+        parser = EmbeddingParser()
+        parser.ostream.mute()
+
+        snapshot = parser.parse(
+            pdb_file=simple_tip3_pdb,
+            qm_region="resname LIG",
+            pe_cutoff=3.0,
+        )
+        potfile = parser.write_pot_file(
+            snapshot,
+            tmp_path / "embedding.pot",
+            pe_model="SEP",
+        )
+
+        if parser.rank == trajectoryparserbase_module.mpi_master():
+            assert potfile == tmp_path / "embedding.pot"
+            assert potfile.is_file()
+            assert "@polarizabilities\n" in potfile.read_text()
+
+    def test_embedding_parser_reads_pdb_with_embedding(self, tmp_path):
+        simple_tip3_pdb = make_simple_tip3_pdb(tmp_path)
+        potfile = tmp_path / "embedding.pot"
+        parser = EmbeddingParser()
+        parser.ostream.mute()
+
+        molecule, embedding = parser.read_pdb(
+            simple_tip3_pdb,
+            output_potfile=potfile,
+            qm_region="resname LIG",
+            qm_charge=0,
+            qm_multiplicity=1,
+            pe_cutoff=3.0,
+            embedding_settings={"switching": None},
+        )
+
+        assert molecule.number_of_atoms() == 1
+        assert molecule.get_labels() == ["C"]
+        assert molecule.get_charge() == 0
+        assert molecule.get_multiplicity() == 1
+        assert embedding == {
+            "settings": {
+                "embedding_method": "fika",
+                "switching": None,
+            },
+            "inputs": {
+                "potfile": {
+                    "source": "file",
+                    "path": str(potfile),
+                },
+            },
+        }
+        fika_embedding_sanity_check(embedding)
+        if parser.rank == trajectoryparserbase_module.mpi_master():
+            assert potfile.is_file()
+            source = InputParser(potfile).input_dict["source"]
+            assert source["pdb_file"] == str(simple_tip3_pdb)
+            assert source["qm_region"] == "resname LIG"
+            assert source["pe_cutoff_angstrom"] == "3.0"
+            assert source["pe_models"] == "CP3, SEP"
+
+    def test_embedding_parser_reads_pdb_with_inline_embedding(self, tmp_path):
+        simple_tip3_pdb = make_simple_tip3_pdb(tmp_path)
+        parser = EmbeddingParser()
+        parser.ostream.mute()
+
+        molecule, embedding = parser.read_pdb(
+            simple_tip3_pdb,
+            qm_region="resname LIG",
+            pe_cutoff=3.0,
+        )
+
+        assert molecule.number_of_atoms() == 1
+        potfile = embedding["inputs"]["potfile"]
+        assert potfile["source"] == "string"
+        assert "@environment\n" in potfile["text"]
+        source = InputParser.from_string(potfile["text"]).input_dict["source"]
+        assert source["pdb_file"] == str(simple_tip3_pdb)
+        assert source["frame"] == "0"
+        assert source["qm_charge"] == "0"
+        classical_system = FikaPotfileReader().read(potfile)
+        assert classical_system.number_of_residues(True) == 1
+        fika_embedding_sanity_check(embedding)
+
+    def test_embedding_parser_read_pdb_rejects_other_extensions(self,
+                                                                tmp_path):
+        parser = EmbeddingParser()
+        with pytest.raises(
+                ValueError,
+                match=r"EmbeddingParser\.read_pdb requires a \.pdb file"):
+            parser.read_pdb(
+                tmp_path / "structure.xyz",
+                output_potfile=tmp_path / "embedding.pot",
+                pe_cutoff=3.0,
+            )
+
+    def test_embedding_parser_shows_potfile_environment(self, tmp_path,
+                                                        monkeypatch):
+        simple_tip3_pdb = make_simple_tip3_pdb(tmp_path)
+        parser = EmbeddingParser()
+        parser.ostream.mute()
+        molecule, embedding = parser.read_pdb(
+            simple_tip3_pdb,
+            qm_region="resname LIG",
+            pe_cutoff=3.0,
+        )
+
+        class FakeViewer:
+
+            def __init__(self, width, height):
+                self.width = width
+                self.height = height
+                self.models = []
+                self.styles = []
+                self.shown = False
+
+            def setViewStyle(self, style):
+                self.view_style = style
+
+            def addModel(self, model):
+                self.models.append(model)
+
+            def setStyle(self, selector, style):
+                self.styles.append((selector, style))
+
+            def zoomTo(self):
+                self.zoomed = True
+
+            def show(self):
+                self.shown = True
+
+        class FakePy3Dmol:
+
+            viewer = None
+
+            @staticmethod
+            def view(width, height):
+                FakePy3Dmol.viewer = FakeViewer(width, height)
+                return FakePy3Dmol.viewer
+
+        monkeypatch.setitem(sys.modules, "py3Dmol", FakePy3Dmol)
+        result = parser.show_embedding(
+            molecule,
+            embedding=embedding,
+            width=320,
+            height=240,
+            mm_opacity=0.5,
+        )
+
+        viewer = FakePy3Dmol.viewer
+        assert result is None
+        assert viewer.width == 320
+        assert viewer.height == 240
+        assert viewer.shown
+        assert len(viewer.models) == 2
+        environment_lines = viewer.models[1].splitlines()
+        assert environment_lines[0] == "3"
+        assert environment_lines[2].split() == [
+            "O", "2.0000000000", "0.0000000000", "0.0000000000"
+        ]
+        assert viewer.styles[1][1]["sphere"]["opacity"] == 0.5
 
     # _histidine_resname_from_atoms (static method)
 

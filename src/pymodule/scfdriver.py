@@ -59,6 +59,8 @@ from .matrix import Matrix
 from .aodensitymatrix import AODensityMatrix
 from .fikaembedding import (FikaEmbeddingSCF, fika_embedding_text,
                             is_fika_embedding)
+from .fikapotfilesource import (potfile_source_description,
+                                potfile_source_path)
 from .veloxchemlib import SimdRIJFockDriver
 from .veloxchemlib import SimdRIJKFockDriver
 from .veloxchemlib import rimode
@@ -935,7 +937,7 @@ class ScfDriver:
             inputs = self.embedding.get('inputs', {})
             if 'potfile' in inputs:
                 pot_info = 'Reading polarizable embedding: {}'.format(
-                    inputs['potfile'])
+                    potfile_source_description(inputs['potfile']))
                 self.ostream.print_info(pot_info)
                 self.ostream.print_blank()
 
@@ -2589,6 +2591,9 @@ class ScfDriver:
                 if self._pe:
                     # pe info, energy and potential matrix
                     self._scf_results['potfile'] = self._get_pe_potfile()
+                    if 'potfile' in self.embedding.get('inputs', {}):
+                        self._scf_results['embedding'] = deepcopy(
+                            self.embedding)
                     self._scf_results['E_emb'] = e_emb
                     self._scf_results['F_emb'] = V_emb
                     # marks the reference for the response sanity checks
@@ -2785,7 +2790,10 @@ class ScfDriver:
         """Returns the fika potfile of the embedding, if any."""
 
         if self._pe:
-            return self.embedding.get('inputs', {}).get('potfile')
+            potfile = self.embedding.get('inputs', {}).get('potfile')
+            if potfile is not None:
+                return potfile_source_path(potfile)
+            return None
 
         return self.potfile
 

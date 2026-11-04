@@ -193,7 +193,17 @@ def scf_results_sanity_check(obj, scf_results):
             updated_scf_info['xc_screening_threshold'] = scf_results[
                 'xc_screening_threshold']
 
-        if scf_results.get('potfile', None) is not None:
+        if scf_results.get('embedding', None) is not None:
+            _warn_if_environment_overwritten(obj, 'embedding',
+                                             scf_results['embedding'])
+            updated_scf_info['embedding'] = scf_results['embedding']
+            # The complete embedding supersedes the legacy file-only
+            # shortcut. Clear a response potfile so pe_sanity_check does not
+            # replace the inherited settings with a default embedding.
+            if getattr(obj, 'potfile', None) is not None:
+                _warn_if_environment_overwritten(obj, 'potfile', None)
+            updated_scf_info['potfile'] = None
+        elif scf_results.get('potfile', None) is not None:
             _warn_if_environment_overwritten(obj, 'potfile',
                                              scf_results['potfile'])
             updated_scf_info['potfile'] = scf_results['potfile']

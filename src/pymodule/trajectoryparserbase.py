@@ -625,6 +625,9 @@ class TrajectoryParserBase:
         """
         Parses structures and returns a list of snapshot dictionaries.
         """
+        input_pdb_file = pdb_file
+        input_trajectory_file = trajectory_file
+        input_topology_file = topology_file
         mda_universe, trajectory_file = self._load_universe(
             trajectory_file=trajectory_file,
             topology_file=topology_file,
@@ -688,6 +691,21 @@ class TrajectoryParserBase:
                 env_region_sel = "all"
         else:
             env_region_sel = str(env_region)
+
+        provenance = {
+            "pdb_file": (str(input_pdb_file)
+                         if input_pdb_file is not None else None),
+            "topology_file": (str(input_topology_file)
+                              if input_topology_file is not None else None),
+            "trajectory_file": (str(input_trajectory_file)
+                                if input_trajectory_file is not None else None),
+            "qm_region": (qm_region if qm_region else
+                          ("external molecule" if external_qm is not None else
+                           "resname MOL")),
+            "environment_region": env_region_sel,
+            "pe_cutoff_angstrom": pe_cutoff,
+            "npe_cutoff_angstrom": npe_cutoff,
+        }
 
         self._seek_trajectory_frame(mda_universe, int(frame_indices[0]))
         env_atoms = mda_universe.select_atoms(env_region_sel)
@@ -873,6 +891,7 @@ class TrajectoryParserBase:
             snapshot = {
                 "frame": int(mda_universe.trajectory.frame),
                 "trajectory_time": float(ts.time),
+                "provenance": dict(provenance),
 
                 "qm_coords": qm_coords,
                 "qm_atom_names": qm_atom_names,

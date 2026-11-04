@@ -235,6 +235,7 @@ from .smddriver import SmdDriver
 from .atombdedriver import AtomBdeDriver
 from .orbitallocalization import OrbitalLocalizationDriver
 from .embeddingparser import EmbeddingParser
+from .embeddingpotfilewriter import EmbeddingPotfileWriter
 from .ensembleparser import EnsembleParser
 from .ensembledriver import EnsembleDriver
 from .spectrumaverager import SpectrumAverager

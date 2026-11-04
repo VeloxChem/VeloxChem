@@ -50,12 +50,6 @@ class EnsembleParser(TrajectoryParserBase):
         The output stream.
     """
 
-    def __init__(self, comm=None, ostream=None):
-        """
-        Initialize the EnsembleParser.
-        """
-        super().__init__(comm=comm, ostream=ostream)
-
     def structures(self,
                    trajectory_file: str | None = None,
                    num_snapshots: int | None = None,
