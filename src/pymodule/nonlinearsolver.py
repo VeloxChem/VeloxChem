@@ -659,92 +659,120 @@ class NonlinearSolver:
         size_3 = None
 
         if mode.lower() == 'crf':
-            # 6 first-order densities per frequency
-            # 6 second-order densities per frequency
-            # 2 third-order densities per frequency
+            # 6 first-order densities per frequency triple
+            # 6 second-order densities per frequency triple
+            # 2 third-order densities per frequency triple
+            # the real and the imaginary parts of each complex density count
+            # as two; see get_densities in cubicresponsedriver
             size_1, size_2, size_3 = 6, 6, 2
 
         elif mode.lower() == 'tpa':
             # 12 first-order densities per frequency
             # 24 second-order densities per frequency
             # 6 third-order densities per frequency
+            # the real and the imaginary parts of each complex density count
+            # as two; see get_densities in tpafulldriver
             size_1, size_2, size_3 = 12, 24, 6
 
         elif mode.lower() == 'thg':
-            # 12 first-order densities per frequency
-            # 24 second-order densities per frequency
+            # 6 first-order densities per frequency
+            # 12 second-order densities per frequency
             # 6 third-order densities per frequency
+            # the real and the imaginary parts of each complex density count
+            # as two; see get_densities in thgdriver
             size_1, size_2, size_3 = 6, 12, 6
 
         elif mode.lower() == 'thgred':
-            # 12 first-order densities per frequency
-            # 24 second-order densities per frequency
-            # 6 third-order densities per frequency
+            # 3 first-order densities per frequency
+            # 6 second-order densities per frequency
+            # 3 third-order densities per frequency
+            # see get_densities in thgreddriver
             size_1, size_2, size_3 = 3, 6, 3
 
         elif mode.lower() == '3pa':
             # 4 first-order densities per frequency
             # 9 second-order densities per frequency
             # 6 third-order densities per frequency
+            # see get_densities in threepatransitiondriver
             size_1, size_2, size_3 = 4, 9, 6
 
         elif mode.lower() == 'crf_ii':
-            # 12 first-order densities per frequency
-            # 6 second-order densities per frequency
+            # 12 first-order densities per frequency triple
+            # 2 second-order densities per frequency triple
+            # the real and the imaginary parts of each complex density count
+            # as two; see get_densities_II in cubicresponsedriver
             size_1, size_2 = 12, 2
 
         elif mode.lower() == '3pa_ii':
             # 13 first-order densities per frequency
             # 6 second-order densities per frequency
+            # see get_densities_II in threepatransitiondriver
             size_1, size_2 = 13, 6
 
         elif mode.lower() == 'tpa_ii':
             # 36 first-order densities per frequency
             # 6 second-order densities per frequency
+            # the real and the imaginary parts of each complex density count
+            # as two; see get_densities_II in tpafulldriver
             size_1, size_2 = 36, 6
 
         elif mode.lower() == 'thg_ii':
-            # 36 first-order densities per frequency
+            # 18 first-order densities per frequency
             # 6 second-order densities per frequency
+            # the real and the imaginary parts of each complex density count
+            # as two; see get_densities_II in thgdriver
             size_1, size_2 = 18, 6
 
         elif mode.lower() == 'thgred_ii':
-            # 36 first-order densities per frequency
-            # 6 second-order densities per frequency
+            # 9 first-order densities per frequency
+            # 3 second-order densities per frequency
+            # see get_densities_II in thgreddriver
             size_1, size_2 = 9, 3
 
         elif mode.lower() == 'redtpa_i':
             # 6 first-order densities per frequency
             # 6 second-order densities per frequency
+            # the real and the imaginary parts of each complex first-order
+            # density count as two, and the second-order densities are real;
+            # see get_densities in tpareddriver
             size_1, size_2 = 6, 6
 
         elif mode.lower() == 'redtpa_ii':
             # 18 first-order densities per frequency
             # 6 second-order densities per frequency
+            # the real and the imaginary parts of each complex density count
+            # as two; see get_densities_II in tpareddriver
             size_1, size_2 = 18, 6
 
         elif mode.lower() == 'qrf':
-            # 4 first-order densities per frequency
-            # 2 second-order densities per frequency
-            # see get_densities in quadraticresponsedriver
+            # 4 first-order densities per frequency pair, or per frequency
+            # in excitedstatemomentdriver
+            # 2 second-order densities per frequency pair, or per frequency
+            # in excitedstatemomentdriver
+            # the real and the imaginary parts of each complex density count
+            # as two; see get_densities in quadraticresponsedriver
+            # and in excitedstatemomentdriver
             size_1, size_2 = 4, 2
 
         elif mode.lower() == 'shg':
             # 6 first-order densities per frequency
             # 12 second-order densities per frequency
-            # see get_densities in shgdriver
+            # the real and the imaginary parts of each complex density count
+            # as two; see get_densities in shgdriver
             size_1, size_2 = 6, 12
 
         elif mode.lower() == 'shg_red':
-            # 6 first-order densities
-            # 6 second-order densities
+            # 6 first-order densities per frequency
+            # 6 second-order densities per frequency
+            # the real and the imaginary parts of each complex first-order
+            # density count as two, and the second-order densities are real;
             # see get_densities in shgdriver
             size_1, size_2 = 6, 6
 
         elif mode.lower() == 'tpa_quad':
-            # 5 first-order densities
-            # 4 second-order densities
-            # see get_densities in shgdriver
+            # 5 first-order densities per frequency
+            # 4 second-order densities per frequency
+            # see get_densities in tpatransitiondriver
             size_1, size_2 = 5, 4
 
         else:
