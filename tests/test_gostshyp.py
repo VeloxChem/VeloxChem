@@ -3,12 +3,12 @@ import pytest
 from mpi4py import MPI
 
 from veloxchem.veloxchemlib import mpi_master
+from veloxchem import GostshypCavityDriver
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.scfgradientdriver import ScfGradientDriver
 from veloxchem.lreigensolver import LinearResponseEigenSolver
-from veloxchem.tessellation import TessellationDriver
 from veloxchem.outputstream import OutputStream
 from veloxchem.errorhandler import VeloxChemError
 
@@ -16,7 +16,7 @@ from veloxchem.errorhandler import VeloxChemError
 def test_write_grid_to_file(tmp_path):
     """Checks that the grid writer uses its mandatory XYZ filename."""
 
-    tessellation_drv = TessellationDriver()
+    tessellation_drv = GostshypCavityDriver()
     vdw_surface = np.zeros((15, 2))
     vdw_surface[:3, 0] = [1.0, 2.0, 3.0]
     vdw_surface[:3, 1] = [4.0, 5.0, 6.0]

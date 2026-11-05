@@ -1,19 +1,18 @@
 import numpy as np
 import pytest
 
-from veloxchem import ElectricDipoleIntegralsDriver
+from veloxchem import ElectricDipoleIntegralsDriver, GostshypCavityDriver
 from veloxchem.lrsolver import LinearResponseSolver
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.molecule import Molecule
 from veloxchem.scfrestdriver import ScfRestrictedDriver
-from veloxchem.tessellation import TessellationDriver
 from veloxchem.veloxchemlib import mpi_master
 
 
 def test_iswig_switching_function_derivative():
     """Checks the analytical ISWIG derivative by finite differences."""
 
-    tessellation_drv = TessellationDriver()
+    tessellation_drv = GostshypCavityDriver()
 
     x = 1.0
     zeta = 0.7

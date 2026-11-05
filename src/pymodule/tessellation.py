@@ -48,7 +48,7 @@ from .inputparser import parse_input, print_keywords
 from .errorhandler import assert_msg_critical
 
 
-class TessellationDriver:
+class GostshypCavityDriver:
     """
     Implements the discretization of the van der Waals surface
     into a grid with octahedral symmetry including grid point areas geometric derivatives
@@ -703,7 +703,7 @@ class TessellationDriver:
             raise ImportError('Unable to import py3Dmol.')
 
         assert_msg_critical(grid.shape[1] == 15,
-                            'TessellationDriver.visualize_grid: Invalid grid size')
+                            'GostshypCavityDriver.visualize_grid: Invalid grid size')
 
         num_points = grid.shape[0]
 
