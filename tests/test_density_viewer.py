@@ -55,6 +55,7 @@ class TestDensityViewer:
         task.finish()
 
     @pytest.mark.parametrize('ri', [False, True])
+    @pytest.mark.timeconsuming
     def test_density_viewer_relative_difference(self, ri):
 
         molstr = """

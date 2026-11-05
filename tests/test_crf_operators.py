@@ -79,6 +79,7 @@ class TestCrfOperators:
                 assert imag_diff < 0.01 or imag_diff_rel < 0.0075
 
     @pytest.mark.parametrize('ri', [False, True])
+    @pytest.mark.timeconsuming
     def test_svp_crf_general(self, ri):
 
         wb_wc_wd = (0.0656, 0.0445, 0.0353)

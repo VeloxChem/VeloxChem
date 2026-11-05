@@ -460,8 +460,10 @@ class TestGrad:
 
         self.run_grad(mol, 'tpssh', 'def2-svp', ri, ref_grad, 1.0e-4, 'd4')
 
-    @pytest.mark.timeconsuming
-    @pytest.mark.parametrize('ri', [False, True])
+    @pytest.mark.parametrize('ri', [
+        pytest.param(False, marks=pytest.mark.timeconsuming),
+        True,
+    ])
     def test_dimer_def2tzvp(self, ri):
 
         molstr_au = """

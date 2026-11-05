@@ -11,7 +11,6 @@ from veloxchem.quadraticresponsedriver import QuadraticResponseDriver
 from veloxchem.shgdriver import ShgDriver
 
 
-@pytest.mark.timeconsuming
 class TestShgFromQrf:
 
     def run_shg_from_qrf(self, xcfun_label, *, ri):

@@ -11,7 +11,6 @@ from veloxchem.quadraticresponsedriver import QuadraticResponseDriver
 from veloxchem.cubicresponsedriver import CubicResponseDriver
 
 
-@pytest.mark.timeconsuming
 class TestCrfFD:
 
     def run_crf_fd(self,
@@ -214,7 +213,10 @@ class TestCrfFD:
             gamma_0_fd = (beta_plus.real - beta_minus.real) / (2.0 * delta_ef)
             assert abs(gamma_0 - gamma_0_fd) / abs(gamma_0_fd) < 1.0e-5
 
-    @pytest.mark.parametrize('ri', [False, True])
+    @pytest.mark.parametrize('ri', [
+        pytest.param(False, marks=pytest.mark.timeconsuming),
+        True,
+    ])
     def test_hf_crf_fd(self, ri):
 
         self.run_crf_fd('hf', 'def2-tzvp', 'zyyz', [0.11, -0.3, 0.05], ri=ri)
@@ -225,11 +227,13 @@ class TestCrfFD:
         self.run_crf_fd('slda', 'def2-svp', 'zyyz', [0.11, -0.3, 0.05], ri=ri)
 
     @pytest.mark.parametrize('ri', [False, True])
+    @pytest.mark.timeconsuming
     def test_gga_hyb_crf_fd(self, ri):
 
         self.run_crf_fd('b3lyp', 'def2-tzvp', 'zyyz', [0.11, -0.3, 0.05], ri=ri)
 
     @pytest.mark.parametrize('ri', [False, True])
+    @pytest.mark.timeconsuming
     def test_gga_hyb_pc_crf_fd(self, ri):
 
         # point-charge environment (positions in bohr, charges in e); strong
@@ -250,6 +254,7 @@ class TestCrfFD:
                         ri=ri)
 
     @pytest.mark.parametrize('ri', [False, True])
+    @pytest.mark.timeconsuming
     def test_gga_rsh_crf_fd(self, ri):
 
         self.run_crf_fd('cam-b3lyp',
@@ -258,6 +263,7 @@ class TestCrfFD:
                         ri=ri)
 
     @pytest.mark.parametrize('ri', [False, True])
+    @pytest.mark.timeconsuming
     def test_mgga_crf_fd(self, ri):
 
         self.run_crf_fd('m06-2x', 'def2-svp', 'zyyz', [0.11, -0.3, 0.05], ri=ri)

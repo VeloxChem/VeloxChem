@@ -186,6 +186,7 @@ class TestPolgrad:
             assert np.max(np.abs(polgrad_dynamic - polgrad_dynamic_reference)) < 2.0e-5
 
     @pytest.mark.parametrize('ri', [False, True])
+    @pytest.mark.timeconsuming
     def test_b3lyp_polarizabilitygradient_real(self, ri):
         h2o_xyz = """3
 
@@ -205,6 +206,7 @@ class TestPolgrad:
                               ri=ri)
 
     @pytest.mark.parametrize('ri', [False, True])
+    @pytest.mark.timeconsuming
     def test_b3lyp_polarizabilitygradient_complex(self, ri):
         h2o_xyz = """3
 
@@ -224,6 +226,7 @@ class TestPolgrad:
                                  ri=ri)
 
     @pytest.mark.parametrize('ri', [False, True])
+    @pytest.mark.timeconsuming
     def test_camb3lyp_polarizabilitygradient_real(self, ri):
         h2o_xyz = """3
 
@@ -243,6 +246,7 @@ class TestPolgrad:
                               ri=ri)
 
     @pytest.mark.parametrize('ri', [False, True])
+    @pytest.mark.timeconsuming
     def test_camb3lyp_polarizabilitygradient_complex(self, ri):
         h2o_xyz = """3
 

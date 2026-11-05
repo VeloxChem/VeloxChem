@@ -57,6 +57,7 @@ class TestHessianFrequencies:
     @pytest.mark.skipif(not DispersionModel.is_available(),
                         reason='dftd4-python not available')
     @pytest.mark.parametrize('ri', [False, True])
+    @pytest.mark.timeconsuming
     def test_hessian_freq_d4(self, ri):
 
         dispersion = True
@@ -150,6 +151,7 @@ class TestHessianFrequencies:
 
     @pytest.mark.solvers
     @pytest.mark.parametrize('ri', [False, True])
+    @pytest.mark.timeconsuming
     def test_hessian_freq_with_ecp(self, ri):
 
         ref_vib_freqs = np.array([108.96])

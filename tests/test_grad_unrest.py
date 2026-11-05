@@ -40,7 +40,10 @@ class TestGradUnrestrictedSCF:
 
         assert np.max(np.abs(grad - ref_grad)) < tol
 
-    @pytest.mark.parametrize('ri', [False, True])
+    @pytest.mark.parametrize('ri', [
+        pytest.param(False, marks=pytest.mark.timeconsuming),
+        True,
+    ])
     def test_nh3_tzvp(self, ri):
 
         molstr = """
@@ -110,7 +113,10 @@ class TestGradUnrestrictedSCF:
 
         self.run_grad(mol, 'tpssh', 'def2-tzvp', ri, ref_grad, 1.0e-3)
 
-    @pytest.mark.parametrize('ri', [False, True])
+    @pytest.mark.parametrize('ri', [
+        pytest.param(False, marks=pytest.mark.timeconsuming),
+        True,
+    ])
     def test_c2h4_svp(self, ri):
 
         xyzstr = """

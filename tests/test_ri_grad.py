@@ -33,6 +33,7 @@ class TestScfGradientDriverWithRI:
             assert abs(ref_scf_energy - scf_results['scf_energy']) < tol_energy
             assert np.max(np.abs(ref_scf_grad - grad)) < tol_grad
 
+    @pytest.mark.timeconsuming
     def test_ri_blyp(self):
 
         mol_xyz = """24

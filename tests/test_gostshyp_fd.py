@@ -40,7 +40,6 @@ class TestGostshypFiniteField:
     agree with each other and with the reference values.
     """
 
-    @pytest.mark.timeconsuming
     @pytest.mark.parametrize('ri', [False, True])
     def test_water_def2svpd_at_10_gpa(self, ri):
 

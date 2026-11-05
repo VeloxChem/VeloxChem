@@ -226,7 +226,10 @@ class TestCPP:
                      1.0e-4,
                      ri=ri)
 
-    @pytest.mark.parametrize('ri', [False, True])
+    @pytest.mark.parametrize('ri', [
+        pytest.param(False, marks=pytest.mark.timeconsuming),
+        True,
+    ])
     def test_b3lyp_ecd(self, ri):
 
         # vlxtag: RKS, ECD, CPP

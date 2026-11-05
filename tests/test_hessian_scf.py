@@ -14,8 +14,10 @@ from veloxchem.vibrationalanalysis import VibrationalAnalysis
 
 class TestScfHessianDriver:
 
-    @pytest.mark.timeconsuming
-    @pytest.mark.parametrize('ri', [False, True])
+    @pytest.mark.parametrize('ri', [
+        False,
+        pytest.param(True, marks=pytest.mark.timeconsuming),
+    ])
     def test_scf_hessian_driver(self, ri):
 
         here = Path(__file__).parent
@@ -75,8 +77,10 @@ class TestScfHessianDriver:
 
         task.finish()
 
-    @pytest.mark.timeconsuming
-    @pytest.mark.parametrize('ri', [False, True])
+    @pytest.mark.parametrize('ri', [
+        False,
+        pytest.param(True, marks=pytest.mark.timeconsuming),
+    ])
     def test_numerical_vib_resets_final_h5_geometry(self, tmp_path, ri):
 
         here = Path(__file__).parent
@@ -119,8 +123,10 @@ class TestScfHessianDriver:
 
         task.finish()
 
-    @pytest.mark.timeconsuming
-    @pytest.mark.parametrize('ri', [False, True])
+    @pytest.mark.parametrize('ri', [
+        False,
+        pytest.param(True, marks=pytest.mark.timeconsuming),
+    ])
     def test_numerical_vib_results_include_legacy_vib_domain_fields(
             self, tmp_path, ri):
 
@@ -329,7 +335,6 @@ class TestScfHessianDriver:
             diff_hessian = np.max(np.abs(hessian_drv.hessian - ref_hessian))
             assert diff_hessian < 1e-6
 
-    @pytest.mark.timeconsuming
     def test_restricted_ri_jk_hessian(self):
         """The RI-JK analytical Hessian must run and stay within the RI-JK
         approximation error of the no-RI Hessian.  This exercises the RI-JK

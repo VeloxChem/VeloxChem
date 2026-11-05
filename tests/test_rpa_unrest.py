@@ -158,7 +158,10 @@ class TestUnrestrictedRPA:
                 np.abs(ref_osc_str -
                        lr_results['oscillator_strengths'])) < 1.0e-4
 
-    @pytest.mark.parametrize('ri', [False, True])
+    @pytest.mark.parametrize('ri', [
+        pytest.param(False, marks=pytest.mark.timeconsuming),
+        True,
+    ])
     def test_hf_with_ecp(self, ri):
 
         # vlxtag: UHF, Absorption, TDHF

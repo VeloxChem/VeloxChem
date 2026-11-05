@@ -10,7 +10,6 @@ from veloxchem.excitondriver import ExcitonModelDriver
 
 
 @pytest.mark.solvers
-@pytest.mark.timeconsuming
 class TestExcitonECP:
 
     @staticmethod

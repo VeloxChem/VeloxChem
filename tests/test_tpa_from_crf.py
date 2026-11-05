@@ -9,7 +9,6 @@ from veloxchem.cubicresponsedriver import CubicResponseDriver
 from veloxchem.tpafulldriver import TpaFullDriver
 
 
-@pytest.mark.timeconsuming
 class TestTpaFromCrf:
 
     def run_tpa_from_crf(self, xcfun_label, *, ri):
@@ -130,11 +129,13 @@ class TestTpaFromCrf:
         self.run_tpa_from_crf('slda', ri=ri)
 
     @pytest.mark.parametrize('ri', [False, True])
+    @pytest.mark.timeconsuming
     def test_tpa_from_crf_gga(self, ri):
 
         self.run_tpa_from_crf('pbe0', ri=ri)
 
     @pytest.mark.parametrize('ri', [False, True])
+    @pytest.mark.timeconsuming
     def test_tpa_from_crf_mgga(self, ri):
 
         self.run_tpa_from_crf('m06-2x', ri=ri)

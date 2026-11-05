@@ -10,7 +10,6 @@ from veloxchem.cppsolver import ComplexResponseSolver
 from veloxchem.quadraticresponsedriver import QuadraticResponseDriver
 
 
-@pytest.mark.timeconsuming
 class TestQrfFDECP:
 
     def run_qrf_fd_with_ecp(self, components, freqs, *, ri):
@@ -157,7 +156,10 @@ class TestQrfFDECP:
             beta_0_fd = (alpha_plus.real - alpha_minus.real) / (2.0 * delta_ef)
             assert abs(beta_0 - beta_0_fd) / abs(beta_0_fd) < 1.0e-5
 
-    @pytest.mark.parametrize('ri', [False, True])
+    @pytest.mark.parametrize('ri', [
+        pytest.param(False, marks=pytest.mark.timeconsuming),
+        True,
+    ])
     def test_hf_qrf_fd_with_ecp(self, ri):
 
         self.run_qrf_fd_with_ecp('yyz', [0.20, -0.11], ri=ri)

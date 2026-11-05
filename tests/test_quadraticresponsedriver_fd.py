@@ -10,7 +10,6 @@ from veloxchem.cppsolver import ComplexResponseSolver
 from veloxchem.quadraticresponsedriver import QuadraticResponseDriver
 
 
-@pytest.mark.timeconsuming
 class TestQrfFD:
 
     def run_qrf_fd(self, xcfun_label, basis_set_label, components, freqs, *,
@@ -166,7 +165,10 @@ class TestQrfFD:
             beta_0_fd = (alpha_plus.real - alpha_minus.real) / (2.0 * delta_ef)
             assert abs(beta_0 - beta_0_fd) / abs(beta_0_fd) < 1.0e-5
 
-    @pytest.mark.parametrize('ri', [False, True])
+    @pytest.mark.parametrize('ri', [
+        pytest.param(False, marks=pytest.mark.timeconsuming),
+        True,
+    ])
     def test_hf_qrf_fd(self, ri):
 
         self.run_qrf_fd('hf', 'def2-tzvp', 'yyz', [0.3, -0.11], ri=ri)
@@ -186,12 +188,16 @@ class TestQrfFD:
 
         self.run_qrf_fd('b3lyp', 'def2-svp', 'yyz', [0.3, -0.11], ri=ri)
 
-    @pytest.mark.parametrize('ri', [False, True])
+    @pytest.mark.parametrize('ri', [
+        pytest.param(False, marks=pytest.mark.timeconsuming),
+        True,
+    ])
     def test_gga_rsh_qrf_fd(self, ri):
 
         self.run_qrf_fd('cam-b3lyp', 'def2-tzvp', 'yyz', [0.3, -0.11], ri=ri)
 
     @pytest.mark.parametrize('ri', [False, True])
+    @pytest.mark.timeconsuming
     def test_mgga_qrf_fd(self, ri):
 
         self.run_qrf_fd('tpssh', 'def2-svp', 'yyz', [0.3, -0.11], ri=ri)

@@ -286,7 +286,10 @@ class TestOptimizeMiscellaneous:
             with pytest.raises(AssertionError, match='SCF did not converge'):
                 engine.run_worker()
 
-    @pytest.mark.parametrize('ri', [False, True])
+    @pytest.mark.parametrize('ri', [
+        False,
+        pytest.param(True, marks=pytest.mark.timeconsuming),
+    ])
     def test_opt_hessian_exit(self, tmp_path, ri):
         """
         geomeTRIC raises HessianExit for hessian='stop': the driver takes the

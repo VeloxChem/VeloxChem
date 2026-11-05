@@ -453,6 +453,7 @@ class TestSimdRIFockDriver:
 
         return float(np.max(np.abs(computed - reference))) / scale, visited
 
+    @pytest.mark.timeconsuming
     def test_fock_matrix_symmetric_density(self, molecule):
         """The Coulomb matrix against the resolution of the identity written out."""
 
@@ -474,6 +475,7 @@ class TestSimdRIFockDriver:
         # longer reached.
         assert total > 150000
 
+    @pytest.mark.timeconsuming
     def test_fock_matrix_general_density(self, molecule):
         """A response density, which is not symmetric, still gives a symmetric matrix."""
 

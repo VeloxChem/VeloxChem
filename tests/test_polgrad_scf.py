@@ -183,7 +183,10 @@ class TestPolgrad:
             assert np.max(np.abs(polgrad_static - polgrad_static_reference)) < 1.0e-6
             assert np.max(np.abs(polgrad_dynamic - polgrad_dynamic_reference)) < 1.0e-6
 
-    @pytest.mark.parametrize('ri', [False, True])
+    @pytest.mark.parametrize('ri', [
+        False,
+        pytest.param(True, marks=pytest.mark.timeconsuming),
+    ])
     def test_hf_polarizabilitygradient_real(self, ri):
         h2o_xyz = """3
 
@@ -202,7 +205,10 @@ class TestPolgrad:
                               "polarizabilitygradient_hf_real",
                               ri=ri)
 
-    @pytest.mark.parametrize('ri', [False, True])
+    @pytest.mark.parametrize('ri', [
+        False,
+        pytest.param(True, marks=pytest.mark.timeconsuming),
+    ])
     def test_hf_polarizabilitygradient_complex(self, ri):
         h2o_xyz = """3
 

@@ -13,6 +13,7 @@ from veloxchem.scfhessiandriver import ScfHessianDriver
 
 class TestInterpolationSetup:
 
+    @pytest.mark.timeconsuming
     def test_b_b2_matrix(self):
 
         def compute_numerical_b2_matrix(structure, z_matrix, delta=1e-4):
@@ -113,6 +114,7 @@ class TestInterpolationSetup:
         assert np.max(np.abs(num_b2 - b2_matrix)) < 1.0e-5
 
     @pytest.mark.parametrize('ri', [False, True])
+    @pytest.mark.timeconsuming
     def test_internal_transformation(self, ri):
 
         molecule_xyz = '''7

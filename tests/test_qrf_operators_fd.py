@@ -10,7 +10,6 @@ from veloxchem.cppsolver import ComplexResponseSolver
 from veloxchem.quadraticresponsedriver import QuadraticResponseDriver
 
 
-@pytest.mark.timeconsuming
 class TestQrfOperatorsFD:
 
     def run_qrf_op_fd(self, op_comp_pairs, tol, *, ri):

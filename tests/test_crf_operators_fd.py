@@ -10,7 +10,6 @@ from veloxchem.quadraticresponsedriver import QuadraticResponseDriver
 from veloxchem.cubicresponsedriver import CubicResponseDriver
 
 
-@pytest.mark.timeconsuming
 class TestCrfOperatorsFD:
 
     def run_crf_op_fd(self, op_comp_pairs, tol, *, ri):
@@ -292,6 +291,7 @@ class TestCrfOperatorsFD:
                                rsp_func_fd.imag) < tol
 
     @pytest.mark.parametrize('ri', [False, True])
+    @pytest.mark.timeconsuming
     def test_crf_op_fd_lmom_edip(self, ri):
 
         op_comp_pairs = [
@@ -304,6 +304,7 @@ class TestCrfOperatorsFD:
         self.run_crf_op_fd(op_comp_pairs, tol, ri=ri)
 
     @pytest.mark.parametrize('ri', [False, True])
+    @pytest.mark.timeconsuming
     def test_crf_op_fd_lmom_quad(self, ri):
 
         op_comp_pairs = [

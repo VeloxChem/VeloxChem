@@ -231,6 +231,7 @@ class TestScfGradientDriverMiscellaneous:
         (ScfRestrictedDriver, 'h2o'),
         (ScfUnrestrictedDriver, 'ch3'),
     ])
+    @pytest.mark.timeconsuming
     def test_ri_j_gradient_with_non_def2_basis(self, scf_type, label):
 
         molecule, basis = getattr(self, f'get_{label}_molecule_and_basis')()

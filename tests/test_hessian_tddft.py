@@ -83,7 +83,10 @@ class TestTddftHessianDriver:
             assert diff_dipole_grad < 1.0e-5
 
     @pytest.mark.solvers
-    @pytest.mark.parametrize('ri', [False, True])
+    @pytest.mark.parametrize('ri', [
+        False,
+        pytest.param(True, marks=pytest.mark.timeconsuming),
+    ])
     def test_tda(self, ri):
         xcfun_label = "hf"
         tamm_dancoff = True
@@ -115,7 +118,10 @@ class TestTddftHessianDriver:
         self.run_tddft_hessian(xcfun_label, tamm_dancoff, ref_label, ri=ri)
 
     @pytest.mark.solvers
-    @pytest.mark.parametrize('ri', [False, True])
+    @pytest.mark.parametrize('ri', [
+        False,
+        pytest.param(True, marks=pytest.mark.timeconsuming),
+    ])
     def test_rpa(self, ri):
         xcfun_label = "hf"
         tamm_dancoff = False
@@ -147,7 +153,10 @@ class TestTddftHessianDriver:
         self.run_tddft_hessian(xcfun_label, tamm_dancoff, ref_label, ri=ri)
 
     @pytest.mark.solvers
-    @pytest.mark.parametrize('ri', [False, True])
+    @pytest.mark.parametrize('ri', [
+        False,
+        pytest.param(True, marks=pytest.mark.timeconsuming),
+    ])
     def test_dipole_gradient_of_charged_molecule(self, ri):
 
         molecule = Molecule.read_xyz_string("""2

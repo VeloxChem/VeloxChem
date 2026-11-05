@@ -9,10 +9,10 @@ from veloxchem.ensembledriver import EnsembleDriver
 pytest.importorskip("MDAnalysis")
 
 
-@pytest.mark.timeconsuming
 class TestEnsembleDriver:
 
     @pytest.mark.parametrize('ri', [False, True])
+    @pytest.mark.timeconsuming
     def test_compute_with_scf_and_property_options(self, tmp_path, ri):
         """
         Regression test for notebook-style ensemble API:
@@ -185,6 +185,7 @@ class TestEnsembleDriver:
                 pass
 
     @pytest.mark.parametrize('ri', [False, True])
+    @pytest.mark.timeconsuming
     def test_compute_with_provided_potfiles(self, tmp_path, ri):
         """
         Reads user-provided potfiles with the fika switched embedding

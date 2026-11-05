@@ -137,8 +137,10 @@ class TestScfVibrationalAnalysisDriver:
 
         return vib_drv
 
-    @pytest.mark.timeconsuming
-    @pytest.mark.parametrize('ri', [False, True])
+    @pytest.mark.parametrize('ri', [
+        False,
+        pytest.param(True, marks=pytest.mark.timeconsuming),
+    ])
     def test_scf_vibrational_analysis_driver_numerical(self, ri):
 
         here = Path(__file__).parent
@@ -202,8 +204,10 @@ class TestScfVibrationalAnalysisDriver:
 
         task.finish()
 
-    @pytest.mark.timeconsuming
-    @pytest.mark.parametrize('ri', [False, True])
+    @pytest.mark.parametrize('ri', [
+        False,
+        pytest.param(True, marks=pytest.mark.timeconsuming),
+    ])
     def test_scf_resonance_raman_numerical(self, ri):
 
         here = Path(__file__).parent

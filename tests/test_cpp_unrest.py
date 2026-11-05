@@ -105,7 +105,10 @@ class TestCppUnrestricted:
             assert np.max(np.abs(np.array(lr_spec['y_data']) -
                                  ref_y_data)) < tol
 
-    @pytest.mark.parametrize('ri', [False, True])
+    @pytest.mark.parametrize('ri', [
+        pytest.param(False, marks=pytest.mark.timeconsuming),
+        True,
+    ])
     def test_hf_absorption(self, ri):
 
         # vlxtag: UHF, Absorption, CPP
@@ -184,7 +187,10 @@ class TestCppUnrestricted:
             assert np.max(np.abs(np.array(lr_spec['y_data']) -
                                  ref_y_data)) < tol
 
-    @pytest.mark.parametrize('ri', [False, True])
+    @pytest.mark.parametrize('ri', [
+        pytest.param(False, marks=pytest.mark.timeconsuming),
+        True,
+    ])
     def test_hf_absorption_with_ecp(self, ri):
 
         xcfun_label = 'hf'

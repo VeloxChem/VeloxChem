@@ -102,6 +102,7 @@ class TestCrf:
         self.run_crf('b3lyp', 'def2-svpd', ref_result, ri=ri)
 
     @pytest.mark.parametrize('ri', [False, True])
+    @pytest.mark.timeconsuming
     def test_mgga_hyb_crf(self, ri):
 
         ref_result = {

@@ -8,7 +8,6 @@ from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.threepatransitiondriver import ThreePATransitionDriver
 
 
-@pytest.mark.timeconsuming
 class Test3PA:
 
     def run_scf(self, xcfun_label, basis_set_label, *, ri):
@@ -122,7 +121,10 @@ class Test3PA:
                 ) < 1.0e-4
 
 
-    @pytest.mark.parametrize('ri', [False, True])
+    @pytest.mark.parametrize('ri', [
+        pytest.param(False, marks=pytest.mark.timeconsuming),
+        True,
+    ])
     def test_hf_3pa(self, ri):
 
         ref_result = {
@@ -243,6 +245,7 @@ class Test3PA:
         self.run_3pa('hf', '6-31G', ref_result, ri=ri)
 
     @pytest.mark.parametrize('ri', [False, True])
+    @pytest.mark.timeconsuming
     def test_gga_hyb_3pa(self, ri):
 
         ref_result = {
@@ -362,6 +365,7 @@ class Test3PA:
         self.run_3pa('b3lyp', '6-31G', ref_result, ri=ri)
 
     @pytest.mark.parametrize('ri', [False, True])
+    @pytest.mark.timeconsuming
     def test_mgga_3pa(self, ri):
 
         ref_result = {

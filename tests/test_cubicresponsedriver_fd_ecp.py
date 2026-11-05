@@ -10,7 +10,6 @@ from veloxchem.quadraticresponsedriver import QuadraticResponseDriver
 from veloxchem.cubicresponsedriver import CubicResponseDriver
 
 
-@pytest.mark.timeconsuming
 class TestCrfFDECP:
 
     def run_crf_fd_with_ecp(self, components, freqs, *, ri):
@@ -170,6 +169,7 @@ class TestCrfFDECP:
             assert abs(gamma_0 - gamma_0_fd) / abs(gamma_0_fd) < 1.0e-5
 
     @pytest.mark.parametrize('ri', [False, True])
+    @pytest.mark.timeconsuming
     def test_hf_crf_fd_with_ecp(self, ri):
 
         self.run_crf_fd_with_ecp('zyyz', [0.11, -0.20, 0.05], ri=ri)

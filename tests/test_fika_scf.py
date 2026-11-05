@@ -87,7 +87,10 @@ def run_lrs(molecule, basis, embedding, scf_results):
 @pytest.mark.solvers
 class TestFikaScf:
 
-    @pytest.mark.parametrize('ri', [False, True])
+    @pytest.mark.parametrize('ri', [
+        pytest.param(False, marks=pytest.mark.timeconsuming),
+        True,
+    ])
     def test_scf_and_response(self, tmp_path, ri):
 
         pdb_file = write_droplet(tmp_path)
@@ -135,7 +138,10 @@ class TestFikaScf:
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
             assert np.max(np.abs(fika_prop - ref_response)) < 1.0e-6
 
-    @pytest.mark.parametrize('ri', [False, True])
+    @pytest.mark.parametrize('ri', [
+        pytest.param(False, marks=pytest.mark.timeconsuming),
+        True,
+    ])
     def test_excitations_and_complex_response(self, tmp_path, ri):
 
         from veloxchem.lreigensolver import LinearResponseEigenSolver
@@ -193,7 +199,10 @@ class TestFikaScf:
             assert np.max(np.abs(values - ref_complex_response)) < (
                 1.0e-7 * np.max(np.abs(ref_complex_response)))
 
-    @pytest.mark.parametrize('ri', [False, True])
+    @pytest.mark.parametrize('ri', [
+        pytest.param(False, marks=pytest.mark.timeconsuming),
+        True,
+    ])
     def test_response_with_subcommunicators(self, tmp_path, ri):
 
         # With subcommunicators each one embeds its own trial densities.
@@ -223,6 +232,7 @@ class TestFikaScf:
             assert np.max(np.abs(distributed - reference)) < 1.0e-10
 
     @pytest.mark.parametrize('ri', [False, True])
+    @pytest.mark.timeconsuming
     def test_unrestricted(self, tmp_path, ri):
 
         from veloxchem.scfunrestdriver import ScfUnrestrictedDriver

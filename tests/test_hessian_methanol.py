@@ -68,6 +68,7 @@ class TestHessianMethanol:
 
     @pytest.mark.solvers
     @pytest.mark.parametrize('ri', [False, True])
+    @pytest.mark.timeconsuming
     def test_analytical_hessian_methanol(self, ri):
 
         self.run_hessian_methanol(numerical_hessian=False, ri=ri)

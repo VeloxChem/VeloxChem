@@ -136,6 +136,7 @@ class TestForceRi:
 
         return grad_drv.get_gradient()
 
+    @pytest.mark.timeconsuming
     def test_numerical_gradient_keeps_the_choice_of_the_reference(
             self, monkeypatch):
 

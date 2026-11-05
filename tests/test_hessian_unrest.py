@@ -100,6 +100,7 @@ class TestScfUnrestrictedHessian:
 
     @pytest.mark.solvers
     @pytest.mark.parametrize('ri', [False, True])
+    @pytest.mark.timeconsuming
     def test_hessian_unrest_b3lyp(self, ri):
 
         xcfun_label = 'b3lyp'
@@ -147,6 +148,7 @@ class TestScfUnrestrictedHessian:
 
     @pytest.mark.solvers
     @pytest.mark.parametrize('ri', [False, True])
+    @pytest.mark.timeconsuming
     def test_hessian_unrest_with_ecp(self, ri):
 
         ref_vib_freqs = {
@@ -241,7 +243,6 @@ class TestScfUnrestrictedHessian:
                                        rtol=1.0e-8,
                                        atol=5.0e-7)
 
-    @pytest.mark.timeconsuming
     def test_unrestricted_ri_jk_hessian(self):
         """The unrestricted RI-JK analytical Hessian must run and stay within
         the RI-JK approximation error of the no-RI Hessian.  This exercises the

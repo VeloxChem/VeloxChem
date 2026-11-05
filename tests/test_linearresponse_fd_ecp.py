@@ -10,7 +10,6 @@ from veloxchem.rsppolarizability import Polarizability
 from veloxchem.firstorderprop import FirstOrderProperties
 
 
-@pytest.mark.timeconsuming
 class TestLrfFDECP:
 
     def run_lrf_fd_with_ecp(self, ri):
@@ -86,7 +85,10 @@ class TestLrfFDECP:
             rel_diff = abs(alpha_zz - alpha_zz_fd) / abs(alpha_zz_fd)
             assert rel_diff < 1.0e-6
 
-    @pytest.mark.parametrize('ri', [False, True])
+    @pytest.mark.parametrize('ri', [
+        pytest.param(False, marks=pytest.mark.timeconsuming),
+        True,
+    ])
     def test_hf_lrf_fd_with_ecp(self, ri):
 
         self.run_lrf_fd_with_ecp(ri)

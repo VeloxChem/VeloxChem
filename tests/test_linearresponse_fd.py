@@ -10,7 +10,6 @@ from veloxchem.rsppolarizability import Polarizability
 from veloxchem.firstorderprop import FirstOrderProperties
 
 
-@pytest.mark.timeconsuming
 class TestLrfFD:
 
     def run_lrf_fd(self, xcfun_label, ri):
@@ -104,7 +103,10 @@ class TestLrfFD:
 
         self.run_lrf_fd('pbe0', ri)
 
-    @pytest.mark.parametrize('ri', [False, True])
+    @pytest.mark.parametrize('ri', [
+        pytest.param(False, marks=pytest.mark.timeconsuming),
+        True,
+    ])
     def test_mgga_lrf_fd(self, ri):
 
         self.run_lrf_fd('scan', ri)

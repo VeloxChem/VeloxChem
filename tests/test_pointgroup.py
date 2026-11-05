@@ -300,6 +300,7 @@ class TestPointGroup:
             sym_res = sym_analyzer.identify_pointgroup(mol)
             assert sym_res['point_group'] == pg
 
+    @pytest.mark.timeconsuming
     def test_symmetrize_pointgroup(self):
 
         pg_mol = {

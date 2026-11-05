@@ -75,7 +75,10 @@ class TestHessianAtomPair:
     @pytest.mark.solvers
     @pytest.mark.skipif(not DispersionModel.is_available(),
                         reason='dftd4-python not available')
-    @pytest.mark.parametrize('ri', [False, True])
+    @pytest.mark.parametrize('ri', [
+        pytest.param(False, marks=pytest.mark.timeconsuming),
+        True,
+    ])
     def test_hessian_atom_pair_with_d4_matches_full_hessian(self, ri):
 
         mol = Molecule.read_xyz_string("""15

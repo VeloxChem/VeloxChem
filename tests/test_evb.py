@@ -20,7 +20,6 @@ except ImportError:
 @pytest.mark.skipif(('openmm' not in sys.modules)
                     or (not XtbDriver.is_available()),
                     reason='openmm or tblite-python not available')
-@pytest.mark.timeconsuming
 class TestEvb:
 
     def test_forcefield_builder(self):

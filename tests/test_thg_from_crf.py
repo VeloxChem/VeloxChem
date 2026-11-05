@@ -125,7 +125,6 @@ class TestthgFromCrf:
                 calc_val = thg_results['THG'][(w1, w2, w3)]
                 assert abs(abs(calc_val.real / ref_val.real) - 1.0) < tol
 
-    @pytest.mark.timeconsuming
     @pytest.mark.parametrize('ri', [False, True])
     def test_thg_from_crf_lda(self, ri):
 
@@ -133,6 +132,7 @@ class TestthgFromCrf:
 
     @pytest.mark.solvers
     @pytest.mark.parametrize('ri', [False, True])
+    @pytest.mark.timeconsuming
     def test_thg_from_crf_gga(self, ri):
 
         self.run_thg_from_crf('pbe0', ri=ri)
