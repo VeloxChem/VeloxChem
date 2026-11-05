@@ -33,7 +33,6 @@
 from pathlib import Path
 import numpy as np
 import math
-import os
 
 from .veloxchemlib import Molecule
 from .veloxchemlib import bohr_in_angstrom, mpi_master
@@ -109,13 +108,13 @@ def _Molecule_smiles_to_xyz(smiles_str,
                 reordering = []
                 for atom in mol_full.GetAtoms():
                     # add non-hydrogen atom
-                    if (atom.GetAtomicNum() != 1
-                            and atom.GetIdx() not in reordering):
+                    if (atom.GetAtomicNum() != 1 and
+                            atom.GetIdx() not in reordering):
                         reordering.append(atom.GetIdx())
                         for nbr in atom.GetNeighbors():
                             # add neighboring hydrogen atoms
-                            if (nbr.GetAtomicNum() == 1
-                                    and nbr.GetIdx() not in reordering):
+                            if (nbr.GetAtomicNum() == 1 and
+                                    nbr.GetIdx() not in reordering):
                                 reordering.append(nbr.GetIdx())
                 for atom in mol_full.GetAtoms():
                     # For completeness, add remaining atoms
@@ -130,7 +129,7 @@ def _Molecule_smiles_to_xyz(smiles_str,
                 mol_full = mol_full_reordered
             return Chem.MolToXYZBlock(mol_full)
         else:
-            return Chem.RemoveHs(mol_full)
+            return Chem.MolToXYZBlock(Chem.RemoveHs(mol_full))
 
     except ImportError:
         raise ImportError('Unable to import rdkit.')
@@ -667,8 +666,8 @@ def _Molecule_find_connected_atoms(self, atom_idx, connectivity_matrix=None):
         more_connected_atoms = set()
         for a in connected_atoms:
             for b in range(connectivity_matrix.shape[0]):
-                if (b not in connected_atoms
-                        and connectivity_matrix[a, b] == 1):
+                if (b not in connected_atoms and
+                        connectivity_matrix[a, b] == 1):
                     more_connected_atoms.add(b)
         if more_connected_atoms:
             connected_atoms.update(more_connected_atoms)
@@ -998,8 +997,7 @@ def _Molecule_set_angle(self,
     atoms_connected_to_j = self.find_connected_atoms(j, connectivity_matrix)
 
     assert_msg_critical(
-        i not in atoms_connected_to_j,
-        'Molecule.set_angle: Cannot rotate angle ' +
+        i not in atoms_connected_to_j, 'Molecule.set_angle: Cannot set angle ' +
         '(Maybe it is part of a ring?)')
 
     # rotate whole molecule around normal vector of i-j-k
@@ -1175,7 +1173,7 @@ def _Molecule_set_dihedral(self,
 
     assert_msg_critical(
         i not in atoms_connected_to_j,
-        'Molecule.set_dihedral: Cannot rotate dihedral ' +
+        'Molecule.set_dihedral: Cannot set dihedral ' +
         '(Maybe it is part of a ring?)')
 
     # rotate whole molecule around vector i->j
@@ -1484,6 +1482,7 @@ def _Molecule_show(self,
     :param label_font_size:
         The font size for atom labels and indices.
     """
+
     try:
         import py3Dmol
     except ImportError:
@@ -1674,14 +1673,13 @@ def _Molecule_draw_2d(smiles_str, width=400, height=300):
 
     try:
         from rdkit import Chem
+        from rdkit.Chem import Draw
         from IPython.display import SVG
         from IPython.display import display
 
-        mol_no_hydrogen = Molecule.smiles_to_xyz(smiles_str,
-                                                 optimize=True,
-                                                 hydrogen=False)
+        mol_no_hydrogen = Chem.RemoveHs(Chem.MolFromSmiles(smiles_str))
 
-        drawer = Chem.Draw.rdMolDraw2D.MolDraw2DSVG(width, height)
+        drawer = Draw.rdMolDraw2D.MolDraw2DSVG(width, height)
         drawer.DrawMolecule(mol_no_hydrogen)
         drawer.FinishDrawing()
 
@@ -2000,8 +1998,10 @@ def _Molecule_is_water_molecule(self):
     conn = self.get_connectivity_matrix()
 
     bond_labels = [
-        sorted([labels[i], labels[j]]) for i in range(natoms)
-        for j in range(i, natoms) if conn[i, j] == 1
+        sorted([labels[i], labels[j]])
+        for i in range(natoms)
+        for j in range(i, natoms)
+        if conn[i, j] == 1
     ]
 
     if bond_labels != [['H', 'O'], ['H', 'O']]:

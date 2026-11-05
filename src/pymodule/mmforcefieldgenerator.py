@@ -415,8 +415,9 @@ class MMForceFieldGenerator:
                 dihedral_types.append(dihedral['comment'])
 
         # Transform the dihedral indices to 1-indexed for printing
-        dihedral_indices_one_based = [[i + 1, j + 1, k + 1, l + 1]
-                                      for i, j, k, l in dihedral_indices]
+        dihedral_indices_one_based = [
+            [i + 1, j + 1, k + 1, l + 1] for i, j, k, l in dihedral_indices
+        ]
 
         assert_msg_critical(
             len(dihedral_indices) > 0,
@@ -534,8 +535,8 @@ class MMForceFieldGenerator:
             error_msg = 'Scipy is required for reparameterize_dihedrals.'
             assert_msg_critical(False, error_msg)
 
-        valid_input = ((scan_results is None and scan_file is not None)
-                       or (scan_results is not None and scan_file is None))
+        valid_input = ((scan_results is None and scan_file is not None) or
+                       (scan_results is not None and scan_file is None))
         assert_msg_critical(
             valid_input, 'MMForceFieldGenerator.reparameterize_dihedrals: ' +
             'Please provide either scan_results or scan_file')
@@ -581,8 +582,9 @@ class MMForceFieldGenerator:
                 dihedral_types.append(dihedral['comment'])
 
         # Transform the dihedral indices to 1-indexed for printing
-        dihedral_indices_one_based = [[i + 1, j + 1, k + 1, l + 1]
-                                      for i, j, k, l in dihedral_indices]
+        dihedral_indices_one_based = [
+            [i + 1, j + 1, k + 1, l + 1] for i, j, k, l in dihedral_indices
+        ]
 
         assert_msg_critical(
             len(dihedral_indices) > 0,
@@ -669,8 +671,7 @@ class MMForceFieldGenerator:
         phases_array = np.array(phases, dtype=float)
         periodicities_array = np.array(periodicities, dtype=float)
         phases_array_rad = np.deg2rad(phases_array)
-        dihedral_angles_rad = np.deg2rad(
-            self.scan_dih_angles[target_scan_index])
+        dihedral_angles_rad = np.deg2rad(self.scan_dih_angles[target_scan_index])
 
         # Set the dihedral barriers to zero for the scan
         for i, j, k, l in dihedral_indices:
@@ -785,8 +786,7 @@ class MMForceFieldGenerator:
                 'qm_scan_kJpermol': np.copy(qm_energies) - np.min(qm_energies),
             }
 
-            self.print_validation_summary(fitted_dihedral_results,
-                                          verbose=verbose)
+            self.print_validation_summary(fitted_dihedral_results, verbose=verbose)
 
             if visualize:
                 self.visualize(fitted_dihedral_results, show_diff=show_diff)
@@ -805,9 +805,9 @@ class MMForceFieldGenerator:
         # Extract maxima for QM and MM energies
         if fit_extrema:
             qm_maxima_indices = extract_maxima(barriers, qm_energies)
-            args = (qm_maxima_indices, )
+            args = (qm_maxima_indices,)
         else:
-            args = (None, )
+            args = (None,)
 
         # Set as bound that the barriers should be positive
         bounds = (0, np.inf)
@@ -917,16 +917,14 @@ class MMForceFieldGenerator:
         self.ostream.flush()
 
         return {
-            'dihedral_angles':
-            np.array(fitted_dihedral_results['dihedral_angles']),
-            'qm_scan_kJpermol':
-            np.array(fitted_dihedral_results['qm_scan_kJpermol']),
-            'mm_scan_kJpermol':
-            np.array(fitted_dihedral_results['mm_scan_kJpermol']),
-            'maximum_difference':
-            self.fitting_summary['maximum_difference'],
-            'standard_deviation':
-            self.fitting_summary['standard_deviation'],
+            'dihedral_angles': np.array(
+                fitted_dihedral_results['dihedral_angles']),
+            'qm_scan_kJpermol': np.array(
+                fitted_dihedral_results['qm_scan_kJpermol']),
+            'mm_scan_kJpermol': np.array(
+                fitted_dihedral_results['mm_scan_kJpermol']),
+            'maximum_difference': self.fitting_summary['maximum_difference'],
+            'standard_deviation': self.fitting_summary['standard_deviation'],
         }
 
     def _get_target_scan_index(self, rotatable_bond):
@@ -1664,8 +1662,12 @@ class MMForceFieldGenerator:
 
         contains_water = molecule.contains_water_molecule()
         is_water = molecule.is_water_molecule()
-        use_water_model = ((water_model is not None)
-                           and (is_water or contains_water))
+        use_water_model = ((water_model is not None) and
+                           (is_water or contains_water))
+        assert_msg_critical(
+            (not is_water) or (water_model is not None),
+            'MMForceFieldGenerator: explicit water_model is required for isolated water molecules.'
+        )
         skip_resp = (not resp) or ((water_model is not None) and is_water)
 
         if skip_resp:
@@ -1974,12 +1976,8 @@ class MMForceFieldGenerator:
         Checks if ow/hw atom types exist in the system.
         """
 
-        hydrogen_indices = [
-            idx for idx, atom in self.atoms.items() if atom['type'] == 'hw'
-        ]
-        oxygen_indices = [
-            idx for idx, atom in self.atoms.items() if atom['type'] == 'ow'
-        ]
+        hydrogen_indices = [idx for idx, atom in self.atoms.items() if atom['type'] == 'hw']
+        oxygen_indices = [idx for idx, atom in self.atoms.items() if atom['type'] == 'ow']
 
         # We have updated the ow/hw sigma/epsilon parameters in database/gaff-2.11.xml.
         # By default, if no water model is used, the ow/hw sigma/epsilon parameters
@@ -1992,18 +1990,16 @@ class MMForceFieldGenerator:
         cspce_hw_epsilon = self.water_parameters['cspce']['hw']['epsilon']
 
         for idx in oxygen_indices:
-            assert_msg_critical((
-                self.atoms[idx]['sigma'] == cspce_ow_sigma
-                and self.atoms[idx]['epsilon'] == cspce_ow_epsilon
-            ), "MMForceFieldGenerator: Incorrect 'ow' sigma/epsilon parameters."
-                                )
+            assert_msg_critical(
+                (self.atoms[idx]['sigma'] == cspce_ow_sigma and
+                    self.atoms[idx]['epsilon'] == cspce_ow_epsilon),
+                "MMForceFieldGenerator: Incorrect 'ow' sigma/epsilon parameters.")
 
         for idx in hydrogen_indices:
-            assert_msg_critical((
-                self.atoms[idx]['sigma'] == cspce_hw_sigma
-                and self.atoms[idx]['epsilon'] == cspce_hw_epsilon
-            ), "MMForceFieldGenerator: Incorrect 'hw' sigma/epsilon parameters."
-                                )
+            assert_msg_critical(
+                (self.atoms[idx]['sigma'] == cspce_hw_sigma and
+                    self.atoms[idx]['epsilon'] == cspce_hw_epsilon),
+                "MMForceFieldGenerator: Incorrect 'hw' sigma/epsilon parameters.")
 
         if hydrogen_indices or oxygen_indices:
             warnmsg = 'MMForceFieldGenerator: ow/hw atom types identified. '
@@ -3253,7 +3249,7 @@ class MMForceFieldGenerator:
             ('nt', 'ns'): 'n ',
             ('nu', 'nv'): 'nh',
             ('n7', 'n8', 'n5', 'n6'): 'n3',
-            ('cs', ): 'c ',
+            ('cs',): 'c ',
         }
         new_at_2, new_at_3 = at_2, at_3
         for key, val in atom_types_mapping.items():
@@ -3606,8 +3602,7 @@ class MMForceFieldGenerator:
                 continue
 
             # Check if any side atom of the bond is involved in a triple bond
-            if (bond[0] in ['c1', 'n1', 'cg', 'ch'
-                            ]) or (bond[1] in ['c1', 'n1', 'cg', 'ch']):
+            if (bond[0] in ['c1', 'n1', 'cg', 'ch']) or (bond[1] in ['c1', 'n1', 'cg', 'ch']):
                 bonds_to_delete.append((i, j))
                 continue
 
@@ -4272,12 +4267,11 @@ class MMForceFieldGenerator:
                 # Multiple sets of periodicity, phase, k
                 for i in range(len(dihedral_data['periodicity'])):
                     attributes.update({
-                        f"periodicity{i+1}":
-                        str(abs(dihedral_data['periodicity'][i])),
-                        f"phase{i+1}":
-                        str(dihedral_data['phase'][i] * np.pi / 180),
-                        f"k{i+1}":
-                        str(dihedral_data['barrier'][i])
+                        f"periodicity{i+1}": str(
+                            abs(dihedral_data['periodicity'][i])),
+                        f"phase{i+1}": str(dihedral_data['phase'][i] * np.pi /
+                                           180),
+                        f"k{i+1}": str(dihedral_data['barrier'][i])
                     })
 
                 ET.SubElement(Dihedrals, "Proper", **attributes)
@@ -4632,18 +4626,16 @@ class MMForceFieldGenerator:
 
         if verbose:
             self.ostream.print_info(
-                '      Dihedral      MM energy(rel)      QM energy(rel)       diff'
-            )
+                '      Dihedral      MM energy(rel)      QM energy(rel)       diff')
             self.ostream.print_info(
-                '  ---------------------------------------------------------------'
-            )
+                '  ---------------------------------------------------------------')
             for angle, e_mm, e_qm in zip(
                     fitted_dihedral_results['dihedral_angles'],
                     fitted_dihedral_results['mm_scan_kJpermol'],
                     fitted_dihedral_results['qm_scan_kJpermol']):
                 self.ostream.print_info(
-                    f'  {angle:8.1f} deg {e_mm:12.3f} kJ/mol {e_qm:12.3f} kJ/mol '
-                    + f'{(e_mm - e_qm):10.3f}')
+                    f'  {angle:8.1f} deg {e_mm:12.3f} kJ/mol {e_qm:12.3f} kJ/mol ' +
+                    f'{(e_mm - e_qm):10.3f}')
             self.ostream.print_blank()
 
         self.ostream.print_info('Summary of validation')
@@ -4890,16 +4882,13 @@ class MMForceFieldGenerator:
             str: The JSON string representation of the forcefield data.
         """
         ff_data = {
-            "atoms":
-            forcefield.atoms,
-            "bonds":
-            MMForceFieldGenerator._tuple_to_str_key(forcefield.bonds),
-            "angles":
-            MMForceFieldGenerator._tuple_to_str_key(forcefield.angles),
-            "dihedrals":
-            MMForceFieldGenerator._tuple_to_str_key(forcefield.dihedrals),
-            "impropers":
-            MMForceFieldGenerator._tuple_to_str_key(forcefield.impropers),
+            "atoms": forcefield.atoms,
+            "bonds": MMForceFieldGenerator._tuple_to_str_key(forcefield.bonds),
+            "angles": MMForceFieldGenerator._tuple_to_str_key(forcefield.angles),
+            "dihedrals": MMForceFieldGenerator._tuple_to_str_key(
+                forcefield.dihedrals),
+            "impropers": MMForceFieldGenerator._tuple_to_str_key(
+                forcefield.impropers),
         }
         return json.dumps(ff_data, indent=4)
 
