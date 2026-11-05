@@ -288,7 +288,8 @@ class SolvationBuilder:
         box_volume_nm3 = self.box[0] * self.box[1] * self.box[2] * 1e-3
         self.ostream.print_info(
             'The density of the system after packing is: ' +
-            f'{self._compute_density(box_volume_nm3)} kg/m^3')
+            f'{self._compute_density(box_volume_nm3)} kg/m^3'
+        )
         self.ostream.print_blank()
         self.ostream.flush()
 
@@ -306,8 +307,7 @@ class SolvationBuilder:
             self.ostream.flush()
             start = time.time()
             try:
-                self.perform_equilibration(steps=equilibration_steps,
-                                           write_log=write_log)
+                self.perform_equilibration(steps=equilibration_steps, write_log=write_log)
             except ValueError:
                 # ValueError: Could not locate #include file: amber03.ff/forcefield.itp
                 self.ostream.print_info(
@@ -425,7 +425,8 @@ class SolvationBuilder:
         self._pack_solvent_mixture(cKDTree, tree)
         self.ostream.print_info(
             'The density of the system after packing is: ' +
-            f'{self._compute_density(box_volume_nm3)} kg/m^3')
+            f'{self._compute_density(box_volume_nm3)} kg/m^3'
+        )
         self.ostream.print_blank()
         self.ostream.flush()
 
@@ -590,8 +591,8 @@ class SolvationBuilder:
                 max_failures = self.failures_factor * quantity
             else:
                 batch_size = 1
-                max_failures = max(
-                    1, int(np.ceil(self.failures_factor * quantity)))
+                max_failures = max(1, int(np.ceil(self.failures_factor *
+                                                  quantity)))
 
             while added_count < quantity:
                 attempts = min(batch_size, quantity - added_count)
@@ -640,8 +641,7 @@ class SolvationBuilder:
             for quantity in self.quantities
         ]
         active_indices = {
-            idx
-            for idx, quantity in enumerate(self.quantities) if quantity > 0
+            idx for idx, quantity in enumerate(self.quantities) if quantity > 0
         }
 
         stop_reason = None
@@ -676,8 +676,7 @@ class SolvationBuilder:
                         "requested composition as the box became saturated")
                     stop_failure_idx = idx
                     for active_idx in active_indices:
-                        if added_counts[active_idx] < self.quantities[
-                                active_idx]:
+                        if added_counts[active_idx] < self.quantities[active_idx]:
                             partial_fill[active_idx] = True
                     active_indices.clear()
 
@@ -688,8 +687,8 @@ class SolvationBuilder:
         for idx, (added_count,
                   quantity) in enumerate(zip(added_counts, self.quantities)):
             if partial_fill[idx]:
-                failure_count = (failure_counts[idx]
-                                 if idx == stop_failure_idx else None)
+                failure_count = (
+                    failure_counts[idx] if idx == stop_failure_idx else None)
                 self._report_partial_fill(quantity,
                                           added_count,
                                           failure_count=failure_count,
@@ -713,12 +712,15 @@ class SolvationBuilder:
                 inserted_counterions += 1
 
         if inserted_counterions != self.added_counterions:
-            self._report_partial_fill(
-                self.added_counterions, inserted_counterions,
-                self.added_counterions - inserted_counterions)
+            self._report_partial_fill(self.added_counterions,
+                                      inserted_counterions,
+                                      self.added_counterions -
+                                      inserted_counterions)
             self.added_counterions = inserted_counterions
 
-    def write_gromacs_files(self, solute_ff=None, solvent_ffs=None):
+    def write_gromacs_files(self,
+                            solute_ff=None,
+                            solvent_ffs=None):
         """
         Write the GROMACS topology and coordinate files for the system.
 
@@ -767,9 +769,7 @@ class SolvationBuilder:
             for line in lines:
                 if line.startswith('; Compound '):
                     f.write(line)
-                    f.write(
-                        f'MOL               {self.added_solvent_counts[0] + 1}\n'
-                    )
+                    f.write(f'MOL               {self.added_solvent_counts[0] + 1}\n')
                     break
                 f.write(line)
 
@@ -867,7 +867,8 @@ class SolvationBuilder:
                 f.write(f'#include "solvent_{i+1}.itp"\n')
             if self.counterion:
                 f.write(
-                    f'#include "{self.parent_forcefield}.ff/forcefield.itp"\n')
+                    f'#include "{self.parent_forcefield}.ff/forcefield.itp"\n'
+                )
                 f.write(f'#include "{self.parent_forcefield}.ff/ions.itp"\n')
             f.write('\n[ system ]\n')
             f.write('System\n\n')
@@ -913,8 +914,8 @@ class SolvationBuilder:
                 self.ostream.flush()
 
             for i, solvent_ff in enumerate(self.solvent_ffs):
-                solvent_ff.generate_residue_xml(
-                    str(self._path(f'solvent_{i+1}.xml')), f'S{i+1:02d}')
+                solvent_ff.generate_residue_xml(str(self._path(f'solvent_{i+1}.xml')),
+                                                f'S{i+1:02d}')
                 self.ostream.print_info(f"solvent_{i+1}.xml file written")
                 self.ostream.flush()
 
@@ -931,10 +932,7 @@ class SolvationBuilder:
         self.ostream.print_info(f"{filename} file written")
         self.ostream.flush()
 
-    def perform_equilibration(self,
-                              water_model=None,
-                              steps=None,
-                              write_log=False):
+    def perform_equilibration(self, water_model=None, steps=None, write_log=False):
         """
         Performs an equilibration using OpenMM.
 
@@ -1260,8 +1258,8 @@ class SolvationBuilder:
             translated_solvent_coords = rotated_coords + position
 
             # Check if the solvent molecule is within the box
-            if not np.all((translated_solvent_coords >= 0)
-                          & (translated_solvent_coords <= self.box)):
+            if not np.all((translated_solvent_coords >= 0) &
+                          (translated_solvent_coords <= self.box)):
                 continue
 
             # Check for overlap using KD-Tree
@@ -1502,9 +1500,8 @@ class SolvationBuilder:
             solute_mass = sum(self.solute.get_masses()) * 1e-3
             total_mass += solute_mass * solute_count / 6.022e23
 
-        for molecule, number_of_molecules in zip(
-                self.solvents[solvent_start:],
-                self.added_solvent_counts[solvent_start:]):
+        for molecule, number_of_molecules in zip(self.solvents[solvent_start:],
+                                                 self.added_solvent_counts[solvent_start:]):
             mass = sum(molecule.get_masses()) * 1e-3
             moles = number_of_molecules / 6.022e23
             total_mass += mass * moles
@@ -1540,7 +1537,10 @@ class SolvationBuilder:
 
         return mols_per_nm3
 
-    def _generate_forcefields(self, solute_ff, solvent_ffs, resp=True):
+    def _generate_forcefields(self,
+                              solute_ff,
+                              solvent_ffs,
+                              resp=True):
         """
         Generate the force fields for the solute and solvent molecules.
         The forcefields get stored in the solute_ff and solvent_ffs attributes (lists).
@@ -1555,7 +1555,8 @@ class SolvationBuilder:
         if not solute_ff:
             self.solute_ff = MMForceFieldGenerator()
             self.solute_ff.ostream.mute()
-            self.ostream.print_info('Generating the ForceField for the solute')
+            self.ostream.print_info(
+                'Generating the ForceField for the solute')
             self.ostream.flush()
             self.solute_ff.create_topology(self.solute, resp=resp)
 
@@ -1615,8 +1616,7 @@ class SolvationBuilder:
                     f, coords_in_nm)
                 res_id_counter, atom_id_counter = self._write_solvent_gro_atoms(
                     f, coords_in_nm, res_id_counter, atom_id_counter)
-                self._write_counterion_gro_atoms(f, coords_in_nm,
-                                                 res_id_counter,
+                self._write_counterion_gro_atoms(f, coords_in_nm, res_id_counter,
                                                  atom_id_counter)
 
             self._write_gro_box(f)
@@ -1656,8 +1656,7 @@ class SolvationBuilder:
                 residue_counter, coordinate_counter)
             self._write_counterion_pdb_atoms(f, coordinates, chain_ids,
                                              pdb_atom_numbers, atom_counter,
-                                             residue_counter,
-                                             coordinate_counter)
+                                             residue_counter, coordinate_counter)
             self._write_pdb_connect_records(f, pdb_atom_numbers)
 
             # Write END line
@@ -1771,8 +1770,8 @@ class SolvationBuilder:
             stream.write(
                 "{:6s}{:5d} {:^4s}{:1s}{:3s} {:1s}{:4d}{:1s}   {:8.3f}{:8.3f}{:8.3f}{:6.2f}{:6.2f}          {:>2s}\n"
                 .format('HETATM', atom_counter, atom_name, '', residue_name,
-                        chain_ids[0], residue_counter, '', x, y, z, 1.00, 0.00,
-                        element))
+                        chain_ids[0], residue_counter, '', x, y, z, 1.00,
+                        0.00, element))
             pdb_atom_numbers[('solute', i)] = atom_counter
             atom_counter += 1
 
