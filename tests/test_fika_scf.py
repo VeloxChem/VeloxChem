@@ -431,7 +431,7 @@ class TestFikaScf:
                 },
                 'inputs': {
                     'potfile': {
-                        'source': 'string',
+                        'type': 'string',
                         'text': potfile.read_text(),
                     },
                 },
@@ -473,7 +473,7 @@ class TestFikaScf:
                 assert lrs_drv.embedding['inputs']['potfile'] == str(potfile)
             else:
                 assert lrs_drv.embedding['inputs']['potfile'] == {
-                    'source': 'string',
+                    'type': 'string',
                     'text': potfile.read_text(),
                 }
             assert lrs_drv._embedding_drv.switching is not None

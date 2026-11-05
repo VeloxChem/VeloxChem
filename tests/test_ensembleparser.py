@@ -229,7 +229,7 @@ class TestEnsembleParser:
             },
             "inputs": {
                 "potfile": {
-                    "source": "file",
+                    "type": "file",
                     "path": str(potfile),
                 },
             },
@@ -256,7 +256,7 @@ class TestEnsembleParser:
 
         assert molecule.number_of_atoms() == 1
         potfile = embedding["inputs"]["potfile"]
-        assert potfile["source"] == "string"
+        assert potfile["type"] == "string"
         assert "@environment\n" in potfile["text"]
         source = InputParser.from_string(potfile["text"]).input_dict["source"]
         assert source["pdb_file"] == str(simple_tip3_pdb)

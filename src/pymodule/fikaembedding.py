@@ -102,10 +102,10 @@ def fika_embedding_sanity_check(embedding):
             - pdb_file, solvent, and optionally radius or shells, unit
               ('angstrom' or 'bohr') and solute (residue name, 'MOL'): the QM
               molecule is the solute of the PDB file;
-            - potfile: a potential-file source with the classical
+            - potfile: a potential-file descriptor with the classical
               environment. A string is a legacy file path; an explicit
-              source is ``{'source': 'file', 'path': ...}`` or
-              ``{'source': 'string', 'text': ...}``;
+              descriptor is ``{'type': 'file', 'path': ...}`` or
+              ``{'type': 'string', 'text': ...}``;
             - objects: {'classical_system': FikaClassicalSystem}.
 
     :param embedding:

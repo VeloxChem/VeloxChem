@@ -102,8 +102,8 @@ class FikaPotfileReader:
         Reads a potential file.
 
         :param potfile:
-            A legacy file path or a potfile source dictionary. Explicit
-            sources have ``source`` equal to ``file`` (with ``path``) or
+            A legacy file path or a potfile descriptor dictionary. Explicit
+            descriptors have ``type`` equal to ``file`` (with ``path``) or
             ``string`` (with inline ``text``).
 
         :return:

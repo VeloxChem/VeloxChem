@@ -228,7 +228,7 @@ class EmbeddingParser(TrajectoryParserBase):
 
         if output_potfile is None:
             potfile = {
-                "source": "string",
+                "type": "string",
                 "text": potfile_text,
             }
         else:
@@ -236,7 +236,7 @@ class EmbeddingParser(TrajectoryParserBase):
             if not potfile_path.is_file():
                 raise OSError(f"Failed to create potfile {potfile_path}")
             potfile = {
-                "source": "file",
+                "type": "file",
                 "path": str(potfile_path),
             }
 
@@ -308,8 +308,8 @@ class EmbeddingParser(TrajectoryParserBase):
         :param molecule:
             QM molecule to display.
         :param potfile:
-            Potential-file source containing an ``@environment`` section.
-            This may be a legacy path or an explicit file/string source.
+            Potential-file descriptor containing an ``@environment`` section.
+            This may be a legacy path or an explicit file/string descriptor.
         :param embedding:
             Fika embedding dictionary containing ``inputs.potfile``.
         :param width:

@@ -36,58 +36,60 @@ from .inputparser import InputParser
 
 
 def normalize_potfile_source(potfile):
-    """Return a validated, explicit potfile source dictionary.
+    """Return a validated, explicit potfile descriptor.
 
-    A string or path is the legacy spelling for a file source. Explicit
-    sources use ``{"source": "file", "path": ...}`` or
-    ``{"source": "string", "text": ...}``.
+    A string or path is the legacy spelling for a file descriptor. Explicit
+    descriptors use ``{"type": "file", "path": ...}`` or
+    ``{"type": "string", "text": ...}``.
     """
 
     if isinstance(potfile, (str, Path)):
         path = str(potfile)
         if not path:
             raise ValueError("potfile path must not be empty")
-        return {"source": "file", "path": path}
+        return {"type": "file", "path": path}
 
     if not isinstance(potfile, dict):
-        raise TypeError("potfile must be a path or a source dictionary")
+        raise TypeError("potfile must be a path or a descriptor dictionary")
 
-    source = potfile.get("source")
-    if source == "file":
-        unknown = set(potfile) - {"source", "path"}
+    source_type = potfile.get("type")
+    if source_type == "file":
+        unknown = set(potfile) - {"type", "path"}
         if unknown:
             raise ValueError(
-                f"file potfile source has unknown entries {sorted(unknown)}")
+                f"file potfile descriptor has unknown entries {sorted(unknown)}"
+            )
         path = potfile.get("path")
         if not isinstance(path, (str, Path)) or not str(path):
-            raise ValueError("file potfile source needs a non-empty path")
-        return {"source": "file", "path": str(path)}
+            raise ValueError("file potfile descriptor needs a non-empty path")
+        return {"type": "file", "path": str(path)}
 
-    if source == "string":
-        unknown = set(potfile) - {"source", "text"}
+    if source_type == "string":
+        unknown = set(potfile) - {"type", "text"}
         if unknown:
             raise ValueError(
-                f"string potfile source has unknown entries {sorted(unknown)}")
+                "string potfile descriptor has unknown entries "
+                f"{sorted(unknown)}")
         text = potfile.get("text")
         if not isinstance(text, str) or not text.strip():
-            raise ValueError("string potfile source needs non-empty text")
-        return {"source": "string", "text": text}
+            raise ValueError("string potfile descriptor needs non-empty text")
+        return {"type": "string", "text": text}
 
-    raise ValueError("potfile source must be 'file' or 'string'")
+    raise ValueError("potfile type must be 'file' or 'string'")
 
 
 def potfile_source_path(potfile):
     """Return the file path of a potfile source, or ``None`` if inline."""
 
     source = normalize_potfile_source(potfile)
-    return source.get("path") if source["source"] == "file" else None
+    return source["path"] if source["type"] == "file" else None
 
 
 def potfile_source_description(potfile):
     """Return a concise description suitable for output messages."""
 
     source = normalize_potfile_source(potfile)
-    if source["source"] == "file":
+    if source["type"] == "file":
         return source["path"]
     return "inline string"
 
@@ -96,7 +98,7 @@ def parse_potfile_source(potfile):
     """Parse a file or inline potfile source and return data and its label."""
 
     source = normalize_potfile_source(potfile)
-    if source["source"] == "file":
+    if source["type"] == "file":
         label = source["path"]
         data = InputParser(label).input_dict
     else:
