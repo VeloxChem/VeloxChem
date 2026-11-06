@@ -43,7 +43,7 @@ from .tdaeigensolverunrest import TdaUnrestrictedEigenSolver
 from .orbitallocalization import OrbitalLocalizationDriver
 from .molecularorbitals import MolecularOrbitals, molorb
 from .errorhandler import assert_msg_critical
-from .inputparser import parse_seq_fixed
+from .inputparser import parse_seq_fixed, parse_input
 from .resultsio import write_results_to_hdf5
 from .spectrumplot import plot_xps_spectrum
 from .sanitychecks import scf_results_sanity_check
@@ -118,9 +118,8 @@ class XPSDriver:
         self.shake_ups = False
         # Only enabled w/ TDA, for stability over RPA
         self.tamm_dancoff = True
-        # Number of TOTAL states to compute per core ionization (if shake_ups is True)
         # TODO: add the emission energies as separate result entries since these are computed anyway
-        # i.e., the ones that we skip in the XPS
+        # Number of shake-up states per core ionization (if shake_ups is true)
         self.nstates = 5
 
     def update_settings(self, xps_dict, method_dict=None):
@@ -137,12 +136,15 @@ class XPSDriver:
             method_dict = {}
 
         xps_keywords = {
-            'filename': str,
+            'filename': 'str',
+            'shake_ups': 'bool',
+            'nstates': 'int',
+            'tamm_dancoff': 'bool',
+            'density_damping': 'bool',
+            'localization_threshold': 'float',
         }
 
-        for key in xps_dict:
-            if key in xps_keywords:
-                setattr(self, key, xps_dict[key])
+        parse_input(self, xps_keywords, xps_dict)
 
     @staticmethod
     def _normalize_element_input(element):
@@ -298,7 +300,7 @@ class XPSDriver:
 
         return ao_to_atom
 
-    def _assign_orbital_to_atom(self, mo_index, mo_coefficients, molecule, basis, element, S):
+    def _assign_orbital_to_atom(self, mo_index, mo_coefficients, molecule, basis, element):
         """
         Assigns a core molecular orbital to a specific atom based on MO coefficient analysis.
 
@@ -315,8 +317,6 @@ class XPSDriver:
             The molecular basis set.
         :param element:
             Element symbol (e.g., 'C', 'O', 'N').
-        :param S:
-            The overlap matrix.
 
         :return:
             Tuple of (atom_index, contribution) where atom_index is the 0-based index
@@ -325,7 +325,6 @@ class XPSDriver:
 
         # Get MO coefficients for this orbital
         mo_coeff = mo_coefficients[:, mo_index]
-        SC_coeff = S @ mo_coeff
 
         # Get atom labels
         atom_labels = molecule.get_labels()
@@ -339,10 +338,8 @@ class XPSDriver:
 
         for ao_idx, atom_idx in enumerate(ao_to_atom_map):
             # Sum of squared coefficients for this atom
-            #atom_contributions[atom_idx] += mo_coeff[ao_idx]**2
-            # inner product: <C|C> = C^T S C
-            # atom-contribution = sum_{mu in atom} C_mu * (S C)_mu
-            atom_contributions[atom_idx] += mo_coeff[ao_idx] * SC_coeff[ao_idx]
+            # TODO: should make the localization identification more robust
+            atom_contributions[atom_idx] += mo_coeff[ao_idx]**2
 
         # Find atoms of the target element
         target_atom_indices = [i for i, label in enumerate(atom_labels)
@@ -461,7 +458,7 @@ class XPSDriver:
         assignments = []
         for mo_idx in indices:
             atom_idx, contribution = self._assign_orbital_to_atom(
-                mo_idx, mo_coefficients, molecule, basis, element_symbol, scf_results['S'])
+                mo_idx, mo_coefficients, molecule, basis, element_symbol)
             assignments.append((mo_idx, atom_idx, contribution))
 
         return assignments
@@ -470,19 +467,17 @@ class XPSDriver:
         """
         Computes the intensity of the mainline peak in the sudden approximation.
 
-        :param molecule:
-            The molecule object.
-        :param basis:
-            The molecular basis set.
+        :param scf_results:
+            The ground state SCF results dictionary.
         :param scf_ion_results:
             The ion SCF results dictionary.
-        :param core_idx:
-            The index of the core orbital for which to compute the intensity.
+        :param O_Rb:
+            The unrelaxed (sudden-approx.) beta-spin occupied MO coefficients.
         :param nalpha:
             The number of alpha-spin occupied molecular orbitals.
 
         :return:
-            Mainline intensity (float) (0-1).
+            Mainline intensity.
         """
         S = scf_results['S']
         # For the ionized system
@@ -490,15 +485,13 @@ class XPSDriver:
 
         C_alpha_occ_unrel = scf_results['C_alpha'][:, :nalpha]
         # Ionized (sudden-approx.) GS determinant (beta-spin) for mainline intensity calculation
-        C_beta_occ_unrel = O_Rb #self._get_unrelaxed_fchgs_det(scf_results, core_idx, nbeta)
+        C_beta_occ_unrel = O_Rb
 
         C_beta_occ_rel = scf_ion_results['C_beta'][:, :nbeta]
         C_alpha_occ_rel = scf_ion_results['C_alpha'][:, :nalpha]
 
         amp_beta = np.linalg.det(C_beta_occ_rel.T @ S @ C_beta_occ_unrel)
         amp_alpha = np.linalg.det(C_alpha_occ_rel.T @ S @ C_alpha_occ_unrel)
-        #amp_beta = np.linalg.det(np.linalg.matmul(np.linalg.matmul(C_occ_beta_rel.T, S), C_occ_beta_unrel))
-        #amp_alpha = np.linalg.det(np.linalg.matmul(np.linalg.matmul(C_occ_alpha_rel.T, S), C_occ_alpha_unrel))
         
         return (amp_alpha * amp_beta)**2
 
@@ -514,8 +507,8 @@ class XPSDriver:
             The number of beta-spin occupied molecular orbitals.
 
         :return:
-            Tuple of (O_Ra, O_Rb) where each is a matrix of occupied MO coefficients
-            for alpha and beta spins in the unrelaxed determinant.
+            The beta-spin occupied MO coefficients of the unrelaxed ion determinant,
+            i.e. the GS beta orbitals with core_idx removed.
         """
         return np.hstack((scf_results['C_beta'][:, :core_idx], scf_results['C_beta'][:, core_idx+1:1+nbeta]))
     
@@ -530,8 +523,6 @@ class XPSDriver:
             The ion SCF results dictionary.
         :param rsp_results:
             The response results dictionary.
-        :param state_idx:
-            The index of the excited state for which to compute the intensity.
         :param unrel_occ_b:
             The unrelaxed (sudden-approx.) beta-spin occupied molecular orbital coefficients.
         :param nalpha:
@@ -540,11 +531,10 @@ class XPSDriver:
             Whether to use the TDA approximation.
 
         :return:
-            The shake-up intensity (float).
+            Array of intensities, one per computed TDA state. (includes emnission states!)
         """
 
-        assert_msg_critical(tda,
-                        'Only enabled in the TDA approximation.')
+        assert_msg_critical(tda, 'Only enabled in the TDA approximation.')
         
         S = gs_scf_results['S']
         norb = gs_scf_results['C_alpha'].shape[1]
@@ -571,20 +561,12 @@ class XPSDriver:
         s0_a = np.linalg.det(M_a)
         s0_b = np.linalg.det(M_b)
 
-        # ampliteude
-        # A_a, A_b = 0, 0
-        # A_a_ia = X_ia * s_ia = X_ia * s0_a*(WM^-1)_ai = X_ia * s0_a * G_ai
-        # A_a = sum_ia A_a_ia = s0_a * sum_ia X_ia * G_ai
-
         G_a = np.linalg.solve(M_a.T, W_a.T)
         G_b = np.linalg.solve(M_b.T, W_b.T)
 
         n_ov_a = nalpha * (norb - nalpha)
         eigvecs = rsp_results['eigenvectors']
 
-        #A_a = s0_a * np.sum(X_a * G_a)
-        #A_a = s0_a * np.sum(G_a.reshape(-1)[:, None] * eigvecs[:n_ov_a, :], axis=0)
-        #A_b = s0_b * np.sum(G_b.reshape(-1)[:, None] * eigvecs[n_ov_a:, :], axis=0)
         A_a = s0_a * (G_a.ravel() @ eigvecs[:n_ov_a, :])
         A_b = s0_b * (G_b.ravel() @ eigvecs[n_ov_a:, :])
 
@@ -694,7 +676,6 @@ class XPSDriver:
                         warning = f' The molecule contains {n_deloc} delocalized core orbitals.'
                         self.ostream.print_blank()
                         self.ostream.print_warning(warning)
-                        #warning = ' For correct XPS spectra, localize these orbitals first: '
                         info = ' For correct XPS spectra, the following orbitals are localized: '
                         for mo_idx in delocalized:
                             info += f' MO {mo_idx} '
@@ -782,10 +763,8 @@ class XPSDriver:
                     mainline_intensity = self._compute_mainline_intensity(scf_results, scf_ion_results, O_Rb, nalpha)
 
                     # Calculate core ionization energy (in eV)
-                    # why do we return in eV?
                     ie = (fch_energy - gs_energy) * hartree_in_ev()
 
-                    #ionization_energies.append((mo_index, atom_index, ie, contribution, mainline_intensity))
                     ionization_energies.append({'mo_index': mo_index,
                                                 'atom_index': atom_index,
                                                 'state': 'mainline',
@@ -799,7 +778,6 @@ class XPSDriver:
                 if self.shake_ups:
                     if self.rank == mpi_master():
                         self.ostream.print_blank()
-                        # TODO: should not print the number of shake-up states since these include emission
                         self.ostream.print_info(
                             f'Computing {self.nstates} shake-up states for {elem} of orbital {mo_index} '
                             f'(Atom {atom_index+1})...')
@@ -811,10 +789,8 @@ class XPSDriver:
                     else:
                         assert_msg_critical(False, 'Only enabled in the TDA approximation.')
 
-                    rsp_drv.update_settings({'nstates': self.nstates})
-
-                    # add nbeta = nalpha-1 to cover the emission states
                     nbeta = nalpha - 1
+                    # to compute shake-up states, we need to compute the first nstates + nbeta states
                     rsp_drv.nstates = self.nstates + nbeta
                     rsp_results = rsp_drv.compute(molecular_ion, basis, scf_ion_results)
 

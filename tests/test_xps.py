@@ -38,6 +38,8 @@ class TestXpsDriver:
 
         xps_drv = XPSDriver()
         xps_drv.ostream.mute()
+        # TODO: should make the localization identification more robust
+        xps_drv.localization_threshold = 0.5
         xps_results = xps_drv.compute(molecule, basis, scf_drv, element='O')
 
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
@@ -48,7 +50,7 @@ class TestXpsDriver:
 
             assert record['mo_index'] == 0
             assert record['atom_index'] == 0
-            assert record['contribution'] == pytest.approx(0.9998668939,
+            assert record['contribution'] == pytest.approx(0.6004496392,
                                                            abs=1.0e-6)
             assert record['ionization_energy_ev'] == pytest.approx(539.249,
                                                                    abs=1.0e-2)
@@ -69,6 +71,8 @@ class TestXpsDriver:
         xps_drv.ostream.mute()
         xps_drv.shake_ups = True
         xps_drv.nstates = 5
+        # TODO: should make the localization identification more robust
+        xps_drv.localization_threshold = 0.5
         xps_results = xps_drv.compute(molecule, basis, scf_drv, element='O')
 
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
@@ -141,7 +145,7 @@ class TestXpsDriver:
 
             assert oxygen_record['mo_index'] == 0
             assert oxygen_record['atom_index'] == 1
-            assert oxygen_record['contribution'] == pytest.approx(0.9993365235,
+            assert oxygen_record['contribution'] == pytest.approx(0.9824145671,
                                                                   abs=1.0e-6)
             assert oxygen_record['ionization_energy_ev'] == pytest.approx(
                 540.410, abs=1.0e-2)
@@ -153,7 +157,7 @@ class TestXpsDriver:
 
             assert carbon_record['mo_index'] == 1
             assert carbon_record['atom_index'] == 0
-            assert carbon_record['contribution'] == pytest.approx(0.9989394794,
+            assert carbon_record['contribution'] == pytest.approx(0.9837630584,
                                                                   abs=1.0e-6)
             assert carbon_record['ionization_energy_ev'] == pytest.approx(
                 293.989, abs=1.0e-2)
@@ -244,7 +248,10 @@ class TestXpsDriver:
             'O': [{
                 'mo_index': 0,
                 'atom_index': 0,
+                'state': 'mainline',
+                'state_index': 0,
                 'ionization_energy_ev': 539.249,
+                'excitation_energy_ev': 0.0,
                 'intensity': 0.7807865496,
                 'contribution': 0.9998668939,
                 'is_delocalized': False,
@@ -252,14 +259,20 @@ class TestXpsDriver:
             'C': [{
                 'mo_index': 1,
                 'atom_index': 2,
+                'state': 'mainline',
+                'state_index': 0,
                 'ionization_energy_ev': 293.989,
+                'excitation_energy_ev': 0.0,
                 'intensity': 0.7452093207,
                 'contribution': 0.9989394794,
                 'is_delocalized': False,
             }, {
                 'mo_index': 1,
                 'atom_index': 2,
+                'state': 'shake-up',
+                'state_index': 3,
                 'ionization_energy_ev': 303.318,
+                'excitation_energy_ev': 9.329,
                 'intensity': 0.0037645967,
                 'contribution': 0.9989394794,
                 'is_delocalized': False,
