@@ -68,7 +68,7 @@ from .packedmatrix import PackedMatrix
 from .fockdriver import FockDriver
 from .profiler import Profiler
 from .griddriver import GridDriver
-from .molecularbasis import MolecularBasis
+from .molecularbasis import MolecularBasis, get_basis_set_category
 from .molecularorbitals import MolecularOrbitals, molorb
 from .sadguessdriver import SadGuessDriver
 from .firstorderprop import FirstOrderProperties
@@ -91,6 +91,19 @@ from .mathutils import screened_eigh
 from .environment import get_ri_free_memory
 from .checkpoint import write_cpcm_charges, read_cpcm_charges
 from .resultsio import create_hdf5, write_scf_results_to_hdf5
+
+# NOTE: RI-JK falls back to the four-center integrals from these numbers of
+# atoms on, whatever memory it would need: in a basis set of at most double-zeta
+# valence without diffuse functions, in a triple-zeta one without diffuse
+# functions, and in any basis set (see ScfDriver._get_ri_jk_atom_limit).
+#
+# NOTE: the limits are an empirical default set for speed, not memory: the
+# sizes from which RI-JK is taken to have no advantage in time over the
+# four-center integrals, which depends on the machine. force_ri bypasses them,
+# and the memory fallback is decided apart from them.
+_RI_JK_FALLBACK_ATOMS_DOUBLE_ZETA = 128
+_RI_JK_FALLBACK_ATOMS_TRIPLE_ZETA = 256
+_RI_JK_FALLBACK_ATOMS = 512
 
 
 class ScfDriver:
@@ -250,12 +263,13 @@ class ScfDriver:
         # budgets of the gradient and of response are. It bounds the SCF's driver
         # alone; the gradient and response work out their own.
         self.ri_memory_budget = None
-        # NOTE: whether RI is used whatever memory it is predicted to need. The
+        # NOTE: whether RI is used whatever memory it is predicted to need, and
+        # RI-JK whatever the number of atoms (_ri_jk_exceeds_atom_limit). The
         # prediction is still made and printed, with a warning where it exceeds
-        # the budget, and nothing falls back to the four-center integrals. It
-        # covers what is formed on this SCF as well: the gradient drivers read
-        # it from the SCF driver, and the response solvers from the SCF results
-        # ('force_ri').
+        # the budget or the atoms reach the limit, and nothing falls back to
+        # the four-center integrals. It covers what is formed on this SCF as
+        # well: the gradient drivers read it from the SCF driver, and the
+        # response solvers from the SCF results ('force_ri').
         self.force_ri = False
         # NOTE: the auxiliary atoms this rank holds. An empty list is none of them,
         # and the whole molecule is a list of every atom.
@@ -405,8 +419,9 @@ class ScfDriver:
                 'ri': ('bool', 'use RI approximation'),
                 'ri_coulomb': ('bool', 'use RI-J approximation'),
                 'ri_jk': ('bool', 'use RI-JK approximation'),
-                'force_ri': ('bool', 'use RI whatever memory it needs, '
-                             'without falling back to four-center integrals'),
+                'force_ri': ('bool', 'use RI whatever memory it needs, and '
+                             'RI-JK whatever the number of atoms, without '
+                             'falling back to four-center integrals'),
                 'ri_auxiliary_basis': ('str', 'RI auxiliary basis set'),
                 'ri_metric_route':
                     ('str', 'how the RI-JK metric is inverted, cholesky or '
@@ -1898,6 +1913,17 @@ class ScfDriver:
         use_ri_coulomb = self.ri_coulomb and fock_type == 'j'
         use_ri_jk = self.ri_jk and fock_type != 'j'
 
+        # NOTE: the number of atoms is checked before the auxiliary basis is
+        # read and the memory is predicted, and a molecule whose atoms reach
+        # the limit falls back without either. It is the same on every rank, as the
+        # molecule and the basis set are.
+        if use_ri_jk:
+            self._ri_fallback = self._ri_jk_exceeds_atom_limit(
+                molecule, ao_basis)
+            if self._ri_fallback:
+                self._ri_drv = None
+                self._ri_aux_atoms = []
+
         if use_ri_coulomb:
             basis_ri = MolecularBasis.read(molecule,
                                            self.ri_auxiliary_basis,
@@ -2005,7 +2031,7 @@ class ScfDriver:
                 self.ostream.print_blank()
                 self.ostream.flush()
 
-        elif use_ri_jk:
+        elif use_ri_jk and not self._ri_fallback:
             basis_ri = MolecularBasis.read(molecule,
                                            self.ri_auxiliary_basis,
                                            auxiliary_basis=True)
@@ -2570,9 +2596,10 @@ class ScfDriver:
                         'ri_auxiliary_basis'] = self.ri_auxiliary_basis
                     # NOTE: ri_coulomb and ri_jk above are what was asked for.
                     # Whether the Fock matrices were in fact formed from the
-                    # four-center integrals for want of memory is kept beside
-                    # them, so that a calculation which takes these results
-                    # (response) follows the ground state it was handed.
+                    # four-center integrals, for want of memory or (RI-JK) for
+                    # the number of atoms, is kept beside them, so that a
+                    # calculation which takes these results (response) follows
+                    # the ground state it was handed.
                     self._scf_results['ri_fallback'] = bool(self._ri_fallback)
                     # NOTE: whether the drivers formed on these results use RI
                     # whatever memory they are predicted to need, as this SCF
@@ -3452,11 +3479,87 @@ class ScfDriver:
         self.ostream.print_blank()
         self.ostream.flush()
 
+    def _get_ri_jk_atom_limit(self, ao_basis):
+        """
+        Gets the number of atoms from which RI-JK falls back to the
+        four-center integrals in a basis set.
+
+        :param ao_basis:
+            The AO basis set, whose category is that of its main basis set (the
+            one on the most atoms).
+
+        :return:
+            The number of atoms, and a description of the basis set it applies
+            to, or None where it applies to any basis set.
+        """
+
+        # NOTE: a basis set not in molecularbasis._known_basis_set_categories
+        # (one read from the user's own file under another name) is given the
+        # limit of any basis set.
+        label = ao_basis.get_main_basis_label()
+        category = get_basis_set_category(label)
+
+        if category is not None:
+            zeta, diffuse = category
+            if zeta <= 2 and not diffuse:
+                return (_RI_JK_FALLBACK_ATOMS_DOUBLE_ZETA,
+                        f'{label}, a basis set of at most double-zeta ' +
+                        'valence without diffuse functions')
+            if zeta == 3 and not diffuse:
+                return (_RI_JK_FALLBACK_ATOMS_TRIPLE_ZETA,
+                        f'{label}, a triple-zeta basis set without diffuse ' +
+                        'functions')
+
+        return _RI_JK_FALLBACK_ATOMS, None
+
+    def _ri_jk_exceeds_atom_limit(self, molecule, ao_basis):
+        """
+        Checks whether RI-JK falls back to the four-center integrals for the
+        number of atoms of the molecule, an empirical default set for speed
+        (see _RI_JK_FALLBACK_ATOMS), and prints a warning where the limit is
+        reached. force_ri keeps RI-JK.
+
+        :param molecule:
+            The molecule, whose atoms (ghost atoms included) are counted.
+        :param ao_basis:
+            The AO basis set.
+
+        :return:
+            True if RI-JK falls back.
+        """
+
+        natoms = molecule.number_of_atoms()
+        limit, basis_text = self._get_ri_jk_atom_limit(ao_basis)
+
+        if natoms < limit:
+            return False
+
+        where = ('' if basis_text is None else f' in {basis_text}')
+
+        limit_text = (f'The molecule has {natoms} atoms, and by default RI-JK ' +
+                      f'is not used from {limit} atoms on{where}')
+
+        if self.force_ri:
+            self.ostream.print_warning(
+                f'{limit_text}; force_ri is set, so RI-JK is used.')
+            self.ostream.print_blank()
+            self.ostream.flush()
+            return False
+
+        self.ostream.print_warning(
+            f'{limit_text}, so the Fock matrices are formed from the ' +
+            'four-center integrals (force_ri keeps RI-JK).')
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+        return True
+
     def _uses_ri_jk(self):
         """
         Checks whether the Fock matrices are formed with the SIMD RI-JK driver,
         which is what ri_jk asks for unless the calculation fell back to the
-        four-center integrals for want of memory.
+        four-center integrals, for want of memory or for the number of atoms
+        (_ri_jk_exceeds_atom_limit).
 
         :return:
             True if the SIMD RI-JK driver forms the Fock matrices.

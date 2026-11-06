@@ -128,8 +128,9 @@ class NonlinearSolver:
         self._ri_drv = None
 
         # NOTE: whether the SCF this response is formed on fell back from RI to
-        # the four-center integrals for want of memory. It is read from the SCF
-        # results, and ri, ri_coulomb and ri_jk are left as they were set.
+        # the four-center integrals, for want of memory or, with RI-JK, for the
+        # number of atoms. It is read from the SCF results, and ri, ri_coulomb
+        # and ri_jk are left as they were set.
         self._ri_fallback = False
 
         # NOTE: whether the SCF this response is formed on was asked to use RI
@@ -394,8 +395,9 @@ class NonlinearSolver:
     def _uses_ri_jk(self):
         """
         Checks whether the Fock matrices are formed with the SIMD RI-JK driver,
-        which is what ri_jk asks for unless the SCF or this response fell back
-        to the four-center integrals for want of memory.
+        which is what ri_jk asks for unless the SCF fell back to the
+        four-center integrals, for want of memory or for the number of atoms,
+        or this response did, for want of memory.
 
         :return:
             True if the SIMD RI-JK driver forms the Fock matrices.
