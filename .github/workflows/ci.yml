@@ -92,8 +92,8 @@ jobs:
           echo "=== VeloxChem test ==="
           python -c "import veloxchem; print(veloxchem.__version__)"
           OMP_NUM_THREADS=2 mpiexec.openmpi --bind-to none -n 2 python -m pytest --capture=no --log-cli-level=INFO \
-            -m "solvers" --durations=10
+            -m "solvers" --durations=100
           OMP_NUM_THREADS=4 python -m pytest --cov=veloxchem --capture=no --log-cli-level=INFO \
-            -m "not timeconsuming" --durations=10
+            -m "not timeconsuming" --durations=100
           git clone https://github.com/VeloxChem/vlx-extra-tests.git
           OMP_NUM_THREADS=4 python -m pytest --capture=no --log-cli-level=INFO vlx-extra-tests/tests

@@ -90,8 +90,7 @@ pip_install:
   script:
     - CC=gcc MPICC=mpicc.openmpi python -m pip install --no-cache-dir mpi4py --no-binary=mpi4py
     - mpiexec.openmpi --bind-to none -n 2 python -c "from mpi4py import MPI; size = MPI.COMM_WORLD.Get_size(); assert size == 2, size"
-    - CC=gcc CXX=g++ python -m pip install
-        MDAnalysis
+    - python -m pip install MDAnalysis dftd4 openmm rdkit pymbar
     # retry with backoff, cloning into a fresh directory each attempt and renaming on success
     - for i in 1 2 3 4 5; do
         git clone --depth 1 -b 3.4.0 https://gitlab.com/libeigen/eigen.git eigen-$i && mv eigen-$i eigen && break;
@@ -129,9 +128,10 @@ python_tests:
         -n "$VLX_CI_MPI_RANKS" python -c "from mpi4py import MPI; size = MPI.COMM_WORLD.Get_size(); assert size == 2, size"
     - OMP_NUM_THREADS="$VLX_MPI_THREADS" mpiexec.openmpi --bind-to none
         -n "$VLX_CI_MPI_RANKS" python -m pytest --capture=no --log-cli-level=INFO
-        -m "solvers" --durations=10
+        -m "solvers" --durations=100
+    # local runner: run the full suite, including tests marked as timeconsuming
     - python -m pytest --cov=veloxchem --capture=no --log-cli-level=INFO
-        -m "not timeconsuming" --durations=10
+        --durations=100
     - git clone https://github.com/VeloxChem/vlx-extra-tests.git
     - python -m pytest --capture=no --log-cli-level=INFO vlx-extra-tests/tests
   timeout: 2h
