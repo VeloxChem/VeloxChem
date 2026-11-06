@@ -538,7 +538,7 @@ def plot_xps_spectrum(xps_results,
     _plot_single_element_xps(ax, element, energies, intensities,
                              broadening_type, broadening_value,
                              elem_color, atom_indices, show_atom_labels,
-                             color_by_atom)
+                             color_by_atom, label_mask)
 
     return ax
 
