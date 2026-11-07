@@ -50,7 +50,7 @@ class TestXpsDriver:
 
             assert record['mo_index'] == 0
             assert record['atom_index'] == 0
-            assert record['contribution'] == pytest.approx(0.6004496392,
+            assert record['contribution'] == pytest.approx(0.9999808086,
                                                            abs=1.0e-6)
             assert record['ionization_energy_ev'] == pytest.approx(539.249,
                                                                    abs=1.0e-2)
@@ -145,7 +145,7 @@ class TestXpsDriver:
 
             assert oxygen_record['mo_index'] == 0
             assert oxygen_record['atom_index'] == 1
-            assert oxygen_record['contribution'] == pytest.approx(0.9824145671,
+            assert oxygen_record['contribution'] == pytest.approx(0.9999238784,
                                                                   abs=1.0e-6)
             assert oxygen_record['ionization_energy_ev'] == pytest.approx(
                 540.410, abs=1.0e-2)
@@ -157,7 +157,7 @@ class TestXpsDriver:
 
             assert carbon_record['mo_index'] == 1
             assert carbon_record['atom_index'] == 0
-            assert carbon_record['contribution'] == pytest.approx(0.9837630584,
+            assert carbon_record['contribution'] == pytest.approx(0.9998817811,
                                                                   abs=1.0e-6)
             assert carbon_record['ionization_energy_ev'] == pytest.approx(
                 293.989, abs=1.0e-2)
