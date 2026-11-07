@@ -338,8 +338,9 @@ class XPSDriver:
 
         for ao_idx, atom_idx in enumerate(ao_to_atom_map):
             # Sum of squared coefficients for this atom
-            # TODO: should make the localization identification more robust
             atom_contributions[atom_idx] += mo_coeff[ao_idx]**2
+
+        atom_contributions /= np.sum(atom_contributions)
 
         # Find atoms of the target element
         target_atom_indices = [i for i, label in enumerate(atom_labels)
@@ -463,9 +464,9 @@ class XPSDriver:
 
         return assignments
     
-    def _compute_mainline_intensity(self, scf_results, scf_ion_results, O_Rb, nalpha):
+    def _compute_main_line_intensity(self, scf_results, scf_ion_results, O_Rb, nalpha):
         """
-        Computes the intensity of the mainline peak in the sudden approximation.
+        Computes the intensity of the main line peak in the sudden approximation.
 
         :param scf_results:
             The ground state SCF results dictionary.
@@ -477,14 +478,14 @@ class XPSDriver:
             The number of alpha-spin occupied molecular orbitals.
 
         :return:
-            Mainline intensity.
+            Main line intensity.
         """
         S = scf_results['S']
         # For the ionized system
         nbeta = nalpha - 1 
 
         C_alpha_occ_unrel = scf_results['C_alpha'][:, :nalpha]
-        # Ionized (sudden-approx.) GS determinant (beta-spin) for mainline intensity calculation
+        # Ionized (sudden-approx.) GS determinant (beta-spin) for main line intensity calculation
         C_beta_occ_unrel = O_Rb
 
         C_beta_occ_rel = scf_ion_results['C_beta'][:, :nbeta]
@@ -756,22 +757,22 @@ class XPSDriver:
                 scf_ion_results = scf_ion.compute(molecular_ion, basis)
                 fch_energy = scf_ion.get_scf_energy()
 
-                # Calculate mainline intensity
+                # Calculate main line intensity
                 O_Rb = None
                 if self.rank == mpi_master():
                     O_Rb = self._get_unrelaxed_fchgs_det(scf_results, mo_index, nalpha-1)
-                    mainline_intensity = self._compute_mainline_intensity(scf_results, scf_ion_results, O_Rb, nalpha)
+                    main_line_intensity = self._compute_main_line_intensity(scf_results, scf_ion_results, O_Rb, nalpha)
 
                     # Calculate core ionization energy (in eV)
                     ie = (fch_energy - gs_energy) * hartree_in_ev()
 
                     ionization_energies.append({'mo_index': mo_index,
                                                 'atom_index': atom_index,
-                                                'state': 'mainline',
+                                                'state': 'main_line',
                                                 'state_index': 0,
                                                 'ionization_energy_ev': ie,
                                                 'excitation_energy_ev': 0.0,
-                                                'intensity': mainline_intensity,
+                                                'intensity': main_line_intensity,
                                                 'contribution': contribution,
                                                 'is_delocalized': bool(contribution < self.localization_threshold),})
                 
@@ -812,7 +813,7 @@ class XPSDriver:
 
                         for k, n in enumerate(range(first_shakeup, first_shakeup + self.nstates), start=1):
                             energy = eigvals[n] * hartree_in_ev()
-                            # Approximate shake-up IE as mainline IE + excitation energy
+                            # Approximate shake-up IE as main_line IE + excitation energy
                             shakeup_energy = ie + energy  
 
                             ionization_energies.append({
@@ -885,13 +886,13 @@ class XPSDriver:
                 ie = record['ionization_energy_ev']
                 contribution = record['contribution']
                 intensity = record['intensity']
-                if state == 'mainline':
-                    mainline_intensity = intensity
+                if state == 'main_line':
+                    main_line_intensity = intensity
                     line = (f'{atom_idx+1:<6} {mo_idx:<4} {state:<11} {ie:>9.2f} '
                             f'{"":>8} {intensity:>10.4f} {1.0:>9.3f} {contribution:>13.1%}')
                 else:
                     line = (f'{"":<6} {"":<4} {state + " " + str(state_idx):<11} {ie:>9.2f} '
-                            f'{exc:>8.2f} {intensity:>10.2e} {intensity / mainline_intensity:>9.2e} {"":>13}')
+                            f'{exc:>8.2f} {intensity:>10.2e} {intensity / main_line_intensity:>9.2e} {"":>13}')
                 self.ostream.print_header(line.ljust(width))
 
             self.ostream.print_blank()

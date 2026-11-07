@@ -38,7 +38,7 @@ class TestXpsDriver:
 
         xps_drv = XPSDriver()
         xps_drv.ostream.mute()
-        # TODO: should make the localization identification more robust
+        # TODO: should use a more reliable way to determine whether localization is needed
         xps_drv.localization_threshold = 0.5
         xps_results = xps_drv.compute(molecule, basis, scf_drv, element='O')
 
@@ -77,16 +77,16 @@ class TestXpsDriver:
 
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
             assert list(xps_results.keys()) == ['O']
-            # mainline followed by the shake-up states in increasing energy
+            # main line followed by the shake-up states in increasing energy
             assert len(xps_results['O']) == 6
 
-            mainline = xps_results['O'][0]
+            main_line = xps_results['O'][0]
 
-            assert mainline['mo_index'] == 0
-            assert mainline['atom_index'] == 0
-            assert mainline['ionization_energy_ev'] == pytest.approx(539.249,
+            assert main_line['mo_index'] == 0
+            assert main_line['atom_index'] == 0
+            assert main_line['ionization_energy_ev'] == pytest.approx(539.249,
                                                                      abs=1.0e-2)
-            assert mainline['intensity'] == pytest.approx(0.7807865496,
+            assert main_line['intensity'] == pytest.approx(0.7807865496,
                                                           abs=1.0e-4)
 
             ref_shakeups = [
@@ -181,17 +181,17 @@ class TestXpsDriver:
 
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
             assert list(xps_results.keys()) == ['O', 'C']
-            # mainline followed by the shake-up states in increasing energy
+            # main line followed by the shake-up states in increasing energy
             assert len(xps_results['O']) == 4
             assert len(xps_results['C']) == 4
 
-            oxygen_mainline = xps_results['O'][0]
+            oxygen_main_line = xps_results['O'][0]
 
-            assert oxygen_mainline['mo_index'] == 0
-            assert oxygen_mainline['atom_index'] == 1
-            assert oxygen_mainline['ionization_energy_ev'] == pytest.approx(
+            assert oxygen_main_line['mo_index'] == 0
+            assert oxygen_main_line['atom_index'] == 1
+            assert oxygen_main_line['ionization_energy_ev'] == pytest.approx(
                 540.410, abs=1.0e-2)
-            assert oxygen_mainline['intensity'] == pytest.approx(0.7396281620,
+            assert oxygen_main_line['intensity'] == pytest.approx(0.7396281620,
                                                                  abs=1.0e-4)
 
             ref_oxygen_shakeups = [
@@ -210,13 +210,13 @@ class TestXpsDriver:
                                                             abs=2.0e-5)
                 assert record['is_delocalized'] is False
 
-            carbon_mainline = xps_results['C'][0]
+            carbon_main_line = xps_results['C'][0]
 
-            assert carbon_mainline['mo_index'] == 1
-            assert carbon_mainline['atom_index'] == 0
-            assert carbon_mainline['ionization_energy_ev'] == pytest.approx(
+            assert carbon_main_line['mo_index'] == 1
+            assert carbon_main_line['atom_index'] == 0
+            assert carbon_main_line['ionization_energy_ev'] == pytest.approx(
                 293.989, abs=1.0e-2)
-            assert carbon_mainline['intensity'] == pytest.approx(0.7452093207,
+            assert carbon_main_line['intensity'] == pytest.approx(0.7452093207,
                                                                  abs=1.0e-4)
 
             ref_carbon_shakeups = [
@@ -248,7 +248,7 @@ class TestXpsDriver:
             'O': [{
                 'mo_index': 0,
                 'atom_index': 0,
-                'state': 'mainline',
+                'state': 'main_line',
                 'state_index': 0,
                 'ionization_energy_ev': 539.249,
                 'excitation_energy_ev': 0.0,
@@ -259,7 +259,7 @@ class TestXpsDriver:
             'C': [{
                 'mo_index': 1,
                 'atom_index': 2,
-                'state': 'mainline',
+                'state': 'main_line',
                 'state_index': 0,
                 'ionization_energy_ev': 293.989,
                 'excitation_energy_ev': 0.0,

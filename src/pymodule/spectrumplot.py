@@ -528,7 +528,7 @@ def plot_xps_spectrum(xps_results,
     intensities = np.array([record['intensity'] for record in ionization_data])
     # label only mainlines
     label_mask = np.array(
-        [record.get('state', 'mainline') == 'mainline' for record in ionization_data])
+        [record.get('state', 'main_line') == 'main_line' for record in ionization_data])
 
     # Create or use provided axis
     if ax is None:
