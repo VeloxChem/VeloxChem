@@ -38,8 +38,6 @@ class TestXpsDriver:
 
         xps_drv = XPSDriver()
         xps_drv.ostream.mute()
-        # TODO: should use a more reliable way to determine whether localization is needed
-        xps_drv.localization_threshold = 0.5
         xps_results = xps_drv.compute(molecule, basis, scf_drv, element='O')
 
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
@@ -71,8 +69,6 @@ class TestXpsDriver:
         xps_drv.ostream.mute()
         xps_drv.shake_ups = True
         xps_drv.nstates = 5
-        # TODO: should make the localization identification more robust
-        xps_drv.localization_threshold = 0.5
         xps_results = xps_drv.compute(molecule, basis, scf_drv, element='O')
 
         if MPI.COMM_WORLD.Get_rank() == mpi_master():

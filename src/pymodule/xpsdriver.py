@@ -886,12 +886,13 @@ class XPSDriver:
                 ie = record['ionization_energy_ev']
                 contribution = record['contribution']
                 intensity = record['intensity']
+                label = state.replace('_', ' ').capitalize()
                 if state == 'main_line':
                     main_line_intensity = intensity
-                    line = (f'{atom_idx+1:<6} {mo_idx:<4} {state:<11} {ie:>9.2f} '
+                    line = (f'{atom_idx+1:<6} {mo_idx:<4} {label:<11} {ie:>9.2f} '
                             f'{"":>8} {intensity:>10.4f} {1.0:>9.3f} {contribution:>13.1%}')
                 else:
-                    line = (f'{"":<6} {"":<4} {state + " " + str(state_idx):<11} {ie:>9.2f} '
+                    line = (f'{"":<6} {"":<4} {label + " " + str(state_idx):<11} {ie:>9.2f} '
                             f'{exc:>8.2f} {intensity:>10.2e} {intensity / main_line_intensity:>9.2e} {"":>13}')
                 self.ostream.print_header(line.ljust(width))
 
