@@ -39,8 +39,11 @@ import sys
 from .veloxchemlib import hartree_in_ev, mpi_master
 from .outputstream import OutputStream
 from .scfunrestdriver import ScfUnrestrictedDriver
+from .tdaeigensolverunrest import TdaUnrestrictedEigenSolver
+from .orbitallocalization import OrbitalLocalizationDriver
+from .molecularorbitals import MolecularOrbitals, molorb
 from .errorhandler import assert_msg_critical
-from .inputparser import parse_seq_fixed
+from .inputparser import parse_seq_fixed, parse_input
 from .resultsio import write_results_to_hdf5
 from .spectrumplot import plot_xps_spectrum
 from .sanitychecks import scf_results_sanity_check
@@ -61,6 +64,8 @@ class XPSDriver:
 
     Instance variables
         - energy_ranges: Dictionary of core orbital energy ranges for different elements (in Hartree).
+        - shake_ups: Whether to compute shake-up satellites (bool).
+        - density_damping: Whether to use density damping in FCH-SCF (bool).
     """
 
     def __init__(self, comm=None, ostream=None):
@@ -93,6 +98,7 @@ class XPSDriver:
         }
 
         # Based on typical DFT (B3LYP/PBE) calculations
+        # separate ranges for GGA vs hybrid?
         self.energy_ranges_dft = {
             'C': (-10.5, -9.2),
             'N': (-14.6, -13.8),
@@ -105,6 +111,16 @@ class XPSDriver:
         self.energy_ranges = self.energy_ranges_dft
         self.localization_threshold = 0.75
         self.filename = None
+
+        # only for the FCH-SCF calculations, not for the GS-SCF
+        self.density_damping = True
+
+        self.shake_ups = False
+        # Only enabled w/ TDA, for stability over RPA
+        self.tamm_dancoff = True
+        # TODO: add the emission energies as separate result entries since these are computed anyway
+        # Number of shake-up states per core ionization (if shake_ups is true)
+        self.nstates = 5
 
     def update_settings(self, xps_dict, method_dict=None):
         """
@@ -120,12 +136,15 @@ class XPSDriver:
             method_dict = {}
 
         xps_keywords = {
-            'filename': str,
+            'filename': 'str',
+            'shake_ups': 'bool',
+            'nstates': 'int',
+            'tamm_dancoff': 'bool',
+            'density_damping': 'bool',
+            'localization_threshold': 'float',
         }
 
-        for key in xps_dict:
-            if key in xps_keywords:
-                setattr(self, key, xps_dict[key])
+        parse_input(self, xps_keywords, xps_dict)
 
     @staticmethod
     def _normalize_element_input(element):
@@ -321,6 +340,8 @@ class XPSDriver:
             # Sum of squared coefficients for this atom
             atom_contributions[atom_idx] += mo_coeff[ao_idx]**2
 
+        atom_contributions /= np.sum(atom_contributions)
+
         # Find atoms of the target element
         target_atom_indices = [i for i, label in enumerate(atom_labels)
                                if label == element]
@@ -442,6 +463,117 @@ class XPSDriver:
             assignments.append((mo_idx, atom_idx, contribution))
 
         return assignments
+    
+    def _compute_main_line_intensity(self, scf_results, scf_ion_results, O_Rb, nalpha):
+        """
+        Computes the intensity of the main line peak in the sudden approximation.
+
+        :param scf_results:
+            The ground state SCF results dictionary.
+        :param scf_ion_results:
+            The ion SCF results dictionary.
+        :param O_Rb:
+            The unrelaxed (sudden-approx.) beta-spin occupied MO coefficients.
+        :param nalpha:
+            The number of alpha-spin occupied molecular orbitals.
+
+        :return:
+            Main line intensity.
+        """
+        S = scf_results['S']
+        # For the ionized system
+        nbeta = nalpha - 1 
+
+        C_alpha_occ_unrel = scf_results['C_alpha'][:, :nalpha]
+        # Ionized (sudden-approx.) GS determinant (beta-spin) for main line intensity calculation
+        C_beta_occ_unrel = O_Rb
+
+        C_beta_occ_rel = scf_ion_results['C_beta'][:, :nbeta]
+        C_alpha_occ_rel = scf_ion_results['C_alpha'][:, :nalpha]
+
+        amp_beta = np.linalg.det(C_beta_occ_rel.T @ S @ C_beta_occ_unrel)
+        amp_alpha = np.linalg.det(C_alpha_occ_rel.T @ S @ C_alpha_occ_unrel)
+        
+        return (amp_alpha * amp_beta)**2
+
+    def _get_unrelaxed_fchgs_det(self, scf_results, core_idx, nbeta):
+        """
+        Constructs the unrelaxed ground state (beta-spin) determinant for the ionized system.
+
+        :param scf_results:
+            The GS SCF results dictionary.
+        :param core_idx:
+            The index of the core orbital for which to construct the determinant.
+        :param nbeta:
+            The number of beta-spin occupied molecular orbitals.
+
+        :return:
+            The beta-spin occupied MO coefficients of the unrelaxed ion determinant,
+            i.e. the GS beta orbitals with core_idx removed.
+        """
+        return np.hstack((scf_results['C_beta'][:, :core_idx], scf_results['C_beta'][:, core_idx+1:1+nbeta]))
+    
+    def _compute_shakeup_intensities(self, gs_scf_results, ion_scf_results, 
+                                     rsp_results, unrel_occ_b, nalpha, tda=True):
+        """
+        Computes the intensity of shake-up satellites in the sudden approximation.
+
+        :param gs_scf_results:
+            The ground state SCF results dictionary.
+        :param ion_ scf_results:
+            The ion SCF results dictionary.
+        :param rsp_results:
+            The response results dictionary.
+        :param unrel_occ_b:
+            The unrelaxed (sudden-approx.) beta-spin occupied molecular orbital coefficients.
+        :param nalpha:
+            The number of alpha-spin occupied molecular orbitals.
+        :param tda:
+            Whether to use the TDA approximation.
+
+        :return:
+            Array of intensities, one per computed TDA state. (includes emnission states!)
+        """
+
+        assert_msg_critical(tda, 'Only enabled in the TDA approximation.')
+        
+        S = gs_scf_results['S']
+        norb = gs_scf_results['C_alpha'].shape[1]
+        nbeta = nalpha - 1
+
+        # Get the occupied- and virtual MOs of the ionized system, alpha and beta
+        R_a = ion_scf_results['C_alpha'][:, :nalpha]
+        V_a = ion_scf_results['C_alpha'][:, nalpha:]
+        R_b = ion_scf_results['C_beta'][:, :nbeta]
+        V_b = ion_scf_results['C_beta'][:, nbeta:]
+            
+        # Unrelaxed (sudden-approximation) reference (beta hole)
+        U_a = gs_scf_results['C_alpha'][:, :nalpha]
+        U_b = unrel_occ_b
+
+        SU_a = S @ U_a
+        SU_b = S @ U_b
+
+        M_a = R_a.conj().T @ SU_a
+        M_b = R_b.conj().T @ SU_b
+        W_a = V_a.conj().T @ SU_a
+        W_b = V_b.conj().T @ SU_b
+
+        s0_a = np.linalg.det(M_a)
+        s0_b = np.linalg.det(M_b)
+
+        G_a = np.linalg.solve(M_a.T, W_a.T)
+        G_b = np.linalg.solve(M_b.T, W_b.T)
+
+        n_ov_a = nalpha * (norb - nalpha)
+        eigvecs = rsp_results['eigenvectors']
+
+        A_a = s0_a * (G_a.ravel() @ eigvecs[:n_ov_a, :])
+        A_b = s0_b * (G_b.ravel() @ eigvecs[n_ov_a:, :])
+
+        amplitude = A_a * s0_b + A_b * s0_a
+        intensity = abs(amplitude)**2
+        return intensity
 
     def compute(self, molecule, basis, scf_driver, element=None):
         """
@@ -540,16 +672,43 @@ class XPSDriver:
                         if contrib < self.localization_threshold:
                             delocalized.append(mo_idx)
                     if delocalized:
-                        # TODO: Localize orbitals. If multiple edges, core orbitals must be
-                        # localized separately for each edge.
                         n_deloc = len(delocalized)
+
                         warning = f' The molecule contains {n_deloc} delocalized core orbitals.'
                         self.ostream.print_blank()
                         self.ostream.print_warning(warning)
-                        warning = ' For correct XPS spectra, localize these orbitals first: '
+                        info = ' For correct XPS spectra, the following orbitals are localized: '
                         for mo_idx in delocalized:
-                            warning += f' MO {mo_idx} '
-                        self.ostream.print_warning(warning)
+                            info += f' MO {mo_idx} '
+                        self.ostream.print_info(info)
+
+                        min_moind, max_moind = min(delocalized), max(delocalized) + 1
+
+                        orb_drv = OrbitalLocalizationDriver(self.ostream)
+                        orb_drv.method = 'boys'
+                        # restricted reference
+                        loc_orbs = orb_drv.compute(molecule, basis, scf_results, (min_moind+1, max_moind))['loc_orbs'].alpha_to_numpy()
+
+                        C_loc = scf_results['C_alpha'].copy()
+                        C_loc[:, min_moind:max_moind] = loc_orbs[:, min_moind:max_moind]
+
+                        scf_results = dict(scf_results)
+                        scf_results['C_alpha'] = C_loc
+                        scf_results['C_beta'] = C_loc.copy()
+
+                        orbs = MolecularOrbitals([C_loc], [scf_results['E_alpha']], 
+                                                 [scf_results['occ_alpha']], molorb.rest)
+
+                        core_orbital_assignments = self._find_core_orbital_indices(molecule, 
+                                                                                   basis, scf_results, elem, method_type)
+                        assert_msg_critical(
+                            all(c >= 0.75 for _,_, c in core_orbital_assignments),
+                            'XPSDriver: orbital localization failed.')
+
+                        for mo_idx, atom_idx, contrib in core_orbital_assignments:
+                            self.ostream.print_info(
+                                f'  (Post localization) MO {mo_idx} -> Atom {atom_idx+1} ({elem}) with {contrib:.1%} contribution')
+
                 self.ostream.print_blank()
                 self.ostream.flush()
             else:
@@ -586,23 +745,88 @@ class XPSDriver:
                 # Maximum number of iterations (not included in scf_results)
                 scf_ion.max_iter = scf_driver.max_iter
 
+                # use density-damping as default for FCH calculations
+                if self.density_damping:
+                    scf_ion.density_damping = True
+
                 # Apply maximum overlap method to maintain core hole
                 scf_ion.maximum_overlap(molecular_ion, basis, orbs, occa, occb)
 
                 # Compute FCH state
-                fch_results_not_used = scf_ion.compute(molecular_ion, basis)
+                #fch_results_not_used = scf_ion.compute(molecular_ion, basis)
+                scf_ion_results = scf_ion.compute(molecular_ion, basis)
                 fch_energy = scf_ion.get_scf_energy()
 
-                # Calculate core ionization energy (in eV)
-                ie = (fch_energy - gs_energy) * hartree_in_ev()
+                # Calculate main line intensity
+                O_Rb = None
+                if self.rank == mpi_master():
+                    O_Rb = self._get_unrelaxed_fchgs_det(scf_results, mo_index, nalpha-1)
+                    main_line_intensity = self._compute_main_line_intensity(scf_results, scf_ion_results, O_Rb, nalpha)
 
-                ionization_energies.append({
-                    'mo_index': mo_index,
-                    'atom_index': atom_index,
-                    'ionization_energy_ev': ie,
-                    'contribution': contribution,
-                    'is_delocalized': bool(contribution < self.localization_threshold),
-                })
+                    # Calculate core ionization energy (in eV)
+                    ie = (fch_energy - gs_energy) * hartree_in_ev()
+
+                    ionization_energies.append({'mo_index': mo_index,
+                                                'atom_index': atom_index,
+                                                'state': 'main_line',
+                                                'state_index': 0,
+                                                'ionization_energy_ev': ie,
+                                                'excitation_energy_ev': 0.0,
+                                                'intensity': main_line_intensity,
+                                                'contribution': contribution,
+                                                'is_delocalized': bool(contribution < self.localization_threshold),})
+                
+                if self.shake_ups:
+                    if self.rank == mpi_master():
+                        self.ostream.print_blank()
+                        self.ostream.print_info(
+                            f'Computing {self.nstates} shake-up states for {elem} of orbital {mo_index} '
+                            f'(Atom {atom_index+1})...')
+                        self.ostream.print_blank()
+                        self.ostream.flush()
+
+                    if self.tamm_dancoff:
+                        rsp_drv = TdaUnrestrictedEigenSolver(self.comm, self.ostream)
+                    else:
+                        assert_msg_critical(False, 'Only enabled in the TDA approximation.')
+
+                    nbeta = nalpha - 1
+                    # to compute shake-up states, we need to compute the first nstates + nbeta states
+                    rsp_drv.nstates = self.nstates + nbeta
+                    rsp_results = rsp_drv.compute(molecular_ion, basis, scf_ion_results)
+
+                    if self.rank == mpi_master():
+                        eigvals = rsp_results["eigenvalues"]
+                        # shake-up states are the first positive eigenvalues after the emission states
+                        positive_indices = np.where(eigvals > 0.0)[0]
+                        assert_msg_critical(positive_indices.size > 0,
+                            'XPSDriver: increase nstates.')
+                        first_shakeup = positive_indices[0]
+
+                        n_emission_states = np.sum(scf_ion_results['E_beta'][:nbeta] > scf_ion_results['E_beta'][nbeta])
+                        assert_msg_critical(first_shakeup == n_emission_states,
+                                            f'XPSDriver: expected {n_emission_states} emission states, but found {first_shakeup} positive eigenvalues.')
+
+                        shakeup_intensities = self._compute_shakeup_intensities(
+                            scf_results, scf_ion_results, rsp_results, O_Rb,
+                            nalpha, tda=self.tamm_dancoff)
+
+                        for k, n in enumerate(range(first_shakeup, first_shakeup + self.nstates), start=1):
+                            energy = eigvals[n] * hartree_in_ev()
+                            # Approximate shake-up IE as main_line IE + excitation energy
+                            shakeup_energy = ie + energy  
+
+                            ionization_energies.append({
+                                'mo_index': mo_index,
+                                'atom_index': atom_index,
+                                'state': 'shake-up',
+                                'state_index': k,
+                                'ionization_energy_ev': shakeup_energy,
+                                'excitation_energy_ev': energy,
+                                'intensity': shakeup_intensities[n],
+                                'contribution': contribution,
+                                'is_delocalized': bool(contribution < self.localization_threshold),
+                            })
 
                 if self.rank == mpi_master():
                     self.ostream.print_info(
@@ -610,7 +834,8 @@ class XPSDriver:
                     self.ostream.print_blank()
                     self.ostream.flush()
 
-            results[elem] = ionization_energies
+            #results[elem] = ionization_energies
+            results[elem] = self.comm.bcast(ionization_energies, root=mpi_master())
 
         if self.rank == mpi_master():
             self.ostream.print_blank()
@@ -643,21 +868,32 @@ class XPSDriver:
         for element, ionization_data in results.items():
             self.ostream.print_header(f'Element: {element}'.ljust(width))
             self.ostream.print_header(('-' * width).ljust(width))
-            header = (f'{"Atom":<8} {"MO Index":<12} '
-                      f'{"IE (eV)":<15} {"Localization":<15}')
+            header = (f'{"Atom":<6} {"MO":<4} {"State":<11} {"IE (eV)":>9} '
+                      f'{"dE (eV)":>8} {"Intensity":>10} {"I/I_main":>9} {"Localization":>13}')
             self.ostream.print_header(header.ljust(width))
             self.ostream.print_header(('-' * width).ljust(width))
 
             # Sort by atom index for better readability
-            sorted_data = sorted(ionization_data, key=lambda x: x['atom_index'])
+            sorted_data = sorted(ionization_data,
+                                 key=lambda x: (x['atom_index'], x['ionization_energy_ev']))
 
             for record in sorted_data:
                 mo_idx = record['mo_index']
                 atom_idx = record['atom_index']
+                state = record['state']
+                state_idx = record['state_index']
+                exc = record['excitation_energy_ev']
                 ie = record['ionization_energy_ev']
                 contribution = record['contribution']
-                line = (f'{atom_idx+1:<8} {mo_idx:<12} '
-                        f'{ie:>12.2f}   {contribution:>13.1%}')
+                intensity = record['intensity']
+                label = state.replace('_', ' ').capitalize()
+                if state == 'main_line':
+                    main_line_intensity = intensity
+                    line = (f'{atom_idx+1:<6} {mo_idx:<4} {label:<11} {ie:>9.2f} '
+                            f'{"":>8} {intensity:>10.4f} {1.0:>9.3f} {contribution:>13.1%}')
+                else:
+                    line = (f'{"":<6} {"":<4} {label + " " + str(state_idx):<11} {ie:>9.2f} '
+                            f'{exc:>8.2f} {intensity:>10.2e} {intensity / main_line_intensity:>9.2e} {"":>13}')
                 self.ostream.print_header(line.ljust(width))
 
             self.ostream.print_blank()

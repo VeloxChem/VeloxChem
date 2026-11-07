@@ -440,7 +440,11 @@ def plot_xps_spectrum(xps_results,
         Format: {element: [{
             'mo_index': int,
             'atom_index': int,
+            'state': str,
+            'state_index': int,
             'ionization_energy_ev': float,
+            'excitation_energy_ev': float,
+            'intensity': float,
             'contribution': float,
             'is_delocalized': bool,
         }, ...]}
@@ -520,7 +524,11 @@ def plot_xps_spectrum(xps_results,
     energies = np.array(
         [record['ionization_energy_ev'] for record in ionization_data])
     atom_indices = np.array([record['atom_index'] for record in ionization_data])
-    intensities = np.ones(len(energies))
+
+    intensities = np.array([record['intensity'] for record in ionization_data])
+    # label only mainlines
+    label_mask = np.array(
+        [record.get('state', 'main_line') == 'main_line' for record in ionization_data])
 
     # Create or use provided axis
     if ax is None:
@@ -530,7 +538,7 @@ def plot_xps_spectrum(xps_results,
     _plot_single_element_xps(ax, element, energies, intensities,
                              broadening_type, broadening_value,
                              elem_color, atom_indices, show_atom_labels,
-                             color_by_atom)
+                             color_by_atom, label_mask)
 
     return ax
 
@@ -1165,7 +1173,7 @@ def plot_tpa_spectrum(spectrum, ax=None, interpolate=True, show_points=True):
 def _plot_single_element_xps(ax, element, energies, intensities,
                              broadening_type, broadening_value, color,
                              atom_indices=None, show_atom_labels=True,
-                             color_by_atom=False):
+                             color_by_atom=False, label_mask=None):
     """
     Helper function to plot XPS spectrum for a single element.
 
@@ -1222,7 +1230,7 @@ def _plot_single_element_xps(ax, element, energies, intensities,
         )
 
         # Add atom labels above peaks (1-based indexing)
-        if show_atom_labels and atom_indices is not None:
+        if (show_atom_labels and atom_indices is not None and (label_mask is None or label_mask[i])):
             ax2.text(energies[i], intensities[i] * 1.05,
                      f'{element}{atom_indices[i] + 1}',
                      ha='center', va='bottom', fontsize=9,
