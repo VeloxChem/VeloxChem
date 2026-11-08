@@ -97,6 +97,12 @@ class SolvationFepDriver:
         - stage: The current stage.
         - final_free_energy: The final free energy.
         - delta_f: The free energy calculations for each stage.
+        - skip_vacuum: If True, skip the vacuum stages 3 and 4 and count them as
+          zero. Only valid for a solute without intramolecular nonbonded
+          interactions (e.g. a rigid cluster bonded only by 1-2/1-3 terms).
+        - coulomb_global_parameters: Names of global parameters of custom forces
+          that are decoupled with the charges: set to lambda in stages 1 and 3
+          and to 1.0 (fully decoupled) in stages 2 and 4.
     """
 
     def __init__(self, comm=None, ostream=None):
@@ -165,6 +171,10 @@ class SolvationFepDriver:
         self.lambdas_stage3 = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]
         # Fixed lambda vector for stage 4 with 3 lambdas
         self.lambdas_stage4 = [1.0, 0.5, 0.0]
+
+        # Optional alchemical controls
+        self.skip_vacuum = False
+        self.coulomb_global_parameters = []
 
         # Storage for potential energies across stages
         self.u_kn_matrices = []
@@ -372,6 +382,10 @@ class SolvationFepDriver:
         self.ostream.print_line(f"Lambdas in Stage 2: {self.lambdas_stage2}")
         self.ostream.print_line(f"Lambdas in Stage 3: {self.lambdas_stage3}")
         self.ostream.print_line(f"Lambdas in Stage 4: {self.lambdas_stage4}")
+        if self.coulomb_global_parameters:
+            self.ostream.print_line(f"Global parameters scaled with charges: {list(self.coulomb_global_parameters)}")
+        if self.skip_vacuum:
+            self.ostream.print_line("Vacuum stages: skipped (counted as 0.0 kJ/mol)")
         self.ostream.print_blank()
 
         # Run the simulations
@@ -383,12 +397,18 @@ class SolvationFepDriver:
         delta_f_2, free_en_s2 = self._run_lambda_simulations(stage=2)
         self.ostream.flush()
 
-        self.ostream.print_info("Starting vacuum simulation (Stage 3)...\n")
-        delta_f_3, free_en_s3 = self._run_lambda_simulations(stage=3, vacuum=True)
-        self.ostream.flush()
+        if self.skip_vacuum:
+            self.ostream.print_info("Skipping vacuum stages 3 and 4 (dG = 0.0 kJ/mol)...\n")
+            delta_f_3 = {'Delta_f': np.zeros((2, 2)), 'dDelta_f': np.zeros((2, 2))}
+            delta_f_4 = {'Delta_f': np.zeros((2, 2)), 'dDelta_f': np.zeros((2, 2))}
+            free_en_s3, free_en_s4 = 0.0, 0.0
+        else:
+            self.ostream.print_info("Starting vacuum simulation (Stage 3)...\n")
+            delta_f_3, free_en_s3 = self._run_lambda_simulations(stage=3, vacuum=True)
+            self.ostream.flush()
 
-        self.ostream.print_info("Removing GSC potential in vacuum (Stage 4)...\n")
-        delta_f_4, free_en_s4 = self._run_lambda_simulations(stage=4, vacuum=True)
+            self.ostream.print_info("Removing GSC potential in vacuum (Stage 4)...\n")
+            delta_f_4, free_en_s4 = self._run_lambda_simulations(stage=4, vacuum=True)
         self.ostream.flush()
 
         # Calculate the final free energy
@@ -580,6 +600,7 @@ class SolvationFepDriver:
             gsc_force.addInteractionGroup(alchemical_region, chemical_region)
             gsc_force.addInteractionGroup(alchemical_region, alchemical_region)  # To avoid self-collapse in flexible molecules
             solvated_system.addForce(gsc_force)
+            self._scale_coulomb_global_parameters(solvated_system, lambda_val)
             solvated_systems.append(solvated_system)
 
         return solvated_systems, topology, positions
@@ -642,9 +663,29 @@ class SolvationFepDriver:
                             force.setExceptionParameters(i, p1, p2, 0, si, 0)
 
             vacuum_system.addForce(gsc_force)
+            self._scale_coulomb_global_parameters(vacuum_system, lambda_val)
             vacuum_systems.append(vacuum_system)
 
         return vacuum_systems, topology, positions
+
+    def _scale_coulomb_global_parameters(self, system, lambda_val):
+        """
+        Sets the global parameters in coulomb_global_parameters of all forces
+        in the system: lambda in the charge stages (1 and 3), 1.0 otherwise.
+
+        :param system:
+            The OpenMM system.
+        :param lambda_val:
+            The lambda value of the system.
+        """
+
+        value = lambda_val if self.stage in (1, 3) else 1.0
+        for force in system.getForces():
+            if not hasattr(force, 'getNumGlobalParameters'):
+                continue
+            for i in range(force.getNumGlobalParameters()):
+                if force.getGlobalParameterName(i) in self.coulomb_global_parameters:
+                    force.setGlobalParameterDefaultValue(i, value)
 
     def _get_gaussian_softcore_force(self, lambda_val):
         """
