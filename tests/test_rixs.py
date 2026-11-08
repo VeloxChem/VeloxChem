@@ -157,3 +157,4 @@ class TestRIXS:
         ])
 
         self.run_rixs('hf', '6-31G*', ref_xsection, 1, 57, nvir=13, nvalence=4, tda=False, cutoff_ene=31.5 / hartree_in_ev())
+
