@@ -114,8 +114,6 @@ class RixsDriver(LinearSolver):
         # Restricted subspace
         self.restricted_subspace = False
 
-        self.compute_in_mo = False
-
         self.num_core_orbitals = 0
         self.num_virtual_orbitals = 0
         self.num_valence_orbitals = 0
@@ -406,9 +404,6 @@ class RixsDriver(LinearSolver):
             valence_eigvals = None
             core_osc_strengths = None
 
-        #mo_occ = self.comm.bcast(mo_occ, root=mpi_master())
-        #mo_vir = self.comm.bcast(mo_vir, root=mpi_master())
-
         core_eigvals = self.comm.bcast(core_eigvals, root=mpi_master())
         valence_eigvals = self.comm.bcast(valence_eigvals, root=mpi_master())
         core_osc_strengths = self.comm.bcast(core_osc_strengths, root=mpi_master())
@@ -421,22 +416,23 @@ class RixsDriver(LinearSolver):
 
         if self.rank == mpi_master():
             dipole_integrals_ao = compute_electric_dipole_integrals(molecule, basis, [0.0,0.0,0.0])
-            # perhaps this should be parallelized
             #dipole_integrals_mo = np.array([mo.T @ dipole_integrals_ao[i] @ mo for i in range(3)])
-            d_ov = np.array([mo_occ.T @ dipole_integrals_ao[i] @ mo_vir for i in range(3)])
             d_oo = np.array([mo_occ.T @ dipole_integrals_ao[i] @ mo_occ for i in range(3)])
+            d_ov = np.array([mo_occ.T @ dipole_integrals_ao[i] @ mo_vir for i in range(3)])
             d_vv = np.array([mo_vir.T @ dipole_integrals_ao[i] @ mo_vir for i in range(3)])
         else:
             #dipole_integrals_ao = None
             #dipole_integrals_mo = None
-            d_ov = None
             d_oo = None
+            d_ov = None
             d_vv = None
+        
         #dipole_integrals_ao = self.comm.bcast(dipole_integrals_ao, root=mpi_master())
         #dipole_integrals_mo = self.comm.bcast(dipole_integrals_mo, root=mpi_master())
-        d_ov = self.comm.bcast(d_ov, root=mpi_master())
         d_oo = self.comm.bcast(d_oo, root=mpi_master())
+        d_ov = self.comm.bcast(d_ov, root=mpi_master())
         d_vv = self.comm.bcast(d_vv, root=mpi_master())
+        dipole_integrals = (d_oo, d_ov, d_vv)
 
         # Store state and orbital information used in computation
         self._orb_and_state_dict = {
@@ -530,17 +526,14 @@ class RixsDriver(LinearSolver):
                                                  num_vir_orbitals, self.tamm_dancoff)
                 for n in range(num_intermediate_states):
                     z_core, y_core = core_mats[n]
-                    #if self.compute_in_mo:
                     gs2core, core2val = self.get_tdms_mo(z_val, y_val, z_core, y_core)
-                    #else:
-                    #    gs2core, core2val = self.get_tdms(mo_occ, mo_vir, z_val, y_val, z_core, y_core)
 
                     F_inelastic += self.scattering_amplitude_tensor(
-                        omega, core_eigvals[n], valence_eigvals[f], gs2core, core2val, d_ov, d_oo, d_vv
+                        omega, core_eigvals[n], valence_eigvals[f], gs2core, core2val, dipole_integrals
                     )
                     if f == 0:
                         F_elastic_local += self.scattering_amplitude_tensor(
-                            omega, core_eigvals[n], None, gs2core, None, d_ov, d_oo, d_vv
+                            omega, core_eigvals[n], None, gs2core, None, dipole_integrals
                         )
 
                 emission_energy = omega - valence_eigvals[f]
@@ -700,7 +693,7 @@ class RixsDriver(LinearSolver):
         return val_states.astype(int)
 
     def scattering_amplitude_tensor(self, omega, core_eigenvalue, val_eigenvalue,
-                                    intermediate_tdens, final_tdens, d_ov, d_oo, d_vv):
+                                    intermediate_tdens, final_tdens, dipole_integrals):
         """
         The RIXS scattering amplitude.
 
@@ -724,6 +717,7 @@ class RixsDriver(LinearSolver):
             The scattering amplitude tensor: shape = (3,3)
 
         """
+        d_oo, d_ov, d_vv = dipole_integrals
         gamma_hwhm = self.gamma / 2.0
         e_n = 1.0 / (omega - (core_eigenvalue + 1j * gamma_hwhm))
         
@@ -741,8 +735,6 @@ class RixsDriver(LinearSolver):
             # Inelastic line
             omega_product = (core_eigenvalue - val_eigenvalue) * core_eigenvalue
             tdens_oo, tdens_vv = final_tdens
-            #gs_exc_tdipole = np.array([np.sum(intermediate_tdens * dipole_integrals[i])
-            #                           for i in range(3)])
             exc_exc_tdipole = np.array([np.sum(tdens_oo * d_oo[i]) + np.sum(tdens_vv * d_vv[i])
                                         for i in range(3)])
             outer_product = np.matmul(exc_exc_tdipole[:, np.newaxis], gs_exc_tdipole[np.newaxis, :])
