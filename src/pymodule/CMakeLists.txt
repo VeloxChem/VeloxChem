@@ -15,6 +15,21 @@ install(
   PATTERN "*.egg-info" EXCLUDE
   )
 
+# The pattern above also drops subpackage __init__.py files (e.g. autocdam/),
+# which must be installed for the subpackage to be a regular package. Only the
+# top-level __init__.py is handled separately below.
+file(GLOB_RECURSE _subpackage_inits CONFIGURE_DEPENDS
+  RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}
+  ${CMAKE_CURRENT_SOURCE_DIR}/*/__init__.py
+  )
+foreach(_init IN LISTS _subpackage_inits)
+  get_filename_component(_subdir ${_init} DIRECTORY)
+  install(
+    FILES ${CMAKE_CURRENT_SOURCE_DIR}/${_init}
+    DESTINATION ${PYMOD_INSTALL_FULLDIR}/${_subdir}
+    )
+endforeach()
+
 # process commit hash
 set(_vlx_commit "unknown")
 
