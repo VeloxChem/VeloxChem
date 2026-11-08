@@ -62,8 +62,8 @@ class RixsDriver(LinearSolver):
 
     Instance variables:
         - photon_energy: Incoming photon energies (a.u.).
-        - core_resonances: Number of core-excited resonances used as
-          incoming photon energies (alternative to photon_energy).
+        - num_resonant_energies: Number of lowest core resonances whose 
+          energies are used as incoming photon energies (alternative to photon_energy).
         - theta: Angle between incident polarization
           and outgoing propagation vectors (rad.).
         - gamma: Life-time broadening (FWHM) (a.u.).
@@ -102,7 +102,7 @@ class RixsDriver(LinearSolver):
 
         # method settings
         self.photon_energy = None
-        self.core_resonances = None
+        self.num_resonant_energies = None
         self.theta = 0
         # a.u., FWHM
         # 1000.0 / hartree_in_wavenumber()
@@ -141,7 +141,7 @@ class RixsDriver(LinearSolver):
                 ('int', 'number of involved valence orbitals'),
             'num_virtual_orbitals':
                 ('int', 'number of involved virtual orbitals'),
-            'core_resonances':
+            'num_resonant_energies':
                 ('int', 'number of core resonances to take as '
                 'incoming photon energies'),
         })
@@ -171,9 +171,9 @@ class RixsDriver(LinearSolver):
             method_dict = {}
 
         assert_msg_critical(not ('photon_energy' in rsp_dict and
-                                  'core_resonances' in rsp_dict),
+                                  'num_resonant_energies' in rsp_dict),
             'RixsDriver.update_settings: give either photon_energy or '
-            'core_resonances, not both.')
+            'num_resonant_energies, not both.')
 
         super().update_settings(rsp_dict, method_dict)
 
@@ -440,13 +440,22 @@ class RixsDriver(LinearSolver):
             'valence_states': val_states,
         }
 
-        if self.core_resonances is not None:
+        if self.num_resonant_energies is not None:
             assert_msg_critical(
                 self.photon_energy is None,
                 'RixsDriver.compute: give either photon_energy or '
-                'core_resonances, not both.')
+                'num_resonant_energies, not both.')
+            assert_msg_critical(
+                0 < self.num_resonant_energies <= num_intermediate_states,
+                'RixsDriver.compute: num_resonant_energies exceeds the number of '
+                'available core-excited states.')
+            if num_intermediate_states - self.num_resonant_energies < 2:
+                self.ostream.print_warning(
+                    'RixsDriver.compute: num_resonant_energies is close to the number '
+                    'of available core-excited states. Consider increasing the '
+                    'computed number of core-excited states.')
             # incoming photon energies at the first n core resonances
-            self.photon_energy = core_eigvals[:self.core_resonances].tolist()
+            self.photon_energy = core_eigvals[:self.num_resonant_energies].tolist()
             init_photon_set = False
         # If incoming photon energy is not set, set it to match the
         # first core-excited state with osc_strength > 1e-3
@@ -715,7 +724,7 @@ class RixsDriver(LinearSolver):
         d_oo, d_ov, d_vv = dipole_integrals
         gamma_hwhm = self.gamma / 2.0
         e_n = 1.0 / (omega - (core_eigenvalue + 1j * gamma_hwhm))
-        
+
         gs_exc_tdipole = np.array([np.sum(intermediate_tdens * d_ov[i])
                                     for i in range(3)])
 
@@ -922,10 +931,6 @@ class RixsDriver(LinearSolver):
         to excited state, and between two excited states (here between)
         core-excited and valence-excited states.
 
-        :param mo_occ:
-            The occupied molecular orbitals.
-        :param mo_vir:
-            The unoccupied/virtual molecular orbitals.
         :param z_val:
             The excitation matrix (valence-excited state).
         :param y_val:
