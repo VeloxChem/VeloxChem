@@ -1,0 +1,15 @@
+{
+  "structure": "al_node_fragment.xyz",
+  "molecular_charge": -1,
+  "source": "illustrative hand-assigned model charges for fast tests and --quick examples; not RESP, not validated",
+  "atom_order": "same as the xyz file",
+  "charges_e": [
+    1.7,
+    -1.0, 0.4,
+    -1.0, 0.4,
+    -0.7, 0.6, -0.7, 0.05,
+    -0.7, 0.6, -0.7, 0.05,
+    -0.8, 0.4, 0.4,
+    -0.8, 0.4, 0.4
+  ]
+}
