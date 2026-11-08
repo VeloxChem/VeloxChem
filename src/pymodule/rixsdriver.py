@@ -449,7 +449,7 @@ class RixsDriver(LinearSolver):
                 0 < self.num_resonant_energies <= num_intermediate_states,
                 'RixsDriver.compute: num_resonant_energies exceeds the number of '
                 'available core-excited states.')
-            if num_intermediate_states - self.num_resonant_energies < 2:
+            if num_intermediate_states - self.num_resonant_energies <= 2:
                 self.ostream.print_warning(
                     'RixsDriver.compute: num_resonant_energies is close to the number '
                     'of available core-excited states. Consider increasing the '
