@@ -416,19 +416,14 @@ class RixsDriver(LinearSolver):
 
         if self.rank == mpi_master():
             dipole_integrals_ao = compute_electric_dipole_integrals(molecule, basis, [0.0,0.0,0.0])
-            #dipole_integrals_mo = np.array([mo.T @ dipole_integrals_ao[i] @ mo for i in range(3)])
             d_oo = np.array([mo_occ.T @ dipole_integrals_ao[i] @ mo_occ for i in range(3)])
             d_ov = np.array([mo_occ.T @ dipole_integrals_ao[i] @ mo_vir for i in range(3)])
             d_vv = np.array([mo_vir.T @ dipole_integrals_ao[i] @ mo_vir for i in range(3)])
         else:
-            #dipole_integrals_ao = None
-            #dipole_integrals_mo = None
             d_oo = None
             d_ov = None
             d_vv = None
-        
-        #dipole_integrals_ao = self.comm.bcast(dipole_integrals_ao, root=mpi_master())
-        #dipole_integrals_mo = self.comm.bcast(dipole_integrals_mo, root=mpi_master())
+
         d_oo = self.comm.bcast(d_oo, root=mpi_master())
         d_ov = self.comm.bcast(d_ov, root=mpi_master())
         d_vv = self.comm.bcast(d_vv, root=mpi_master())
@@ -526,7 +521,7 @@ class RixsDriver(LinearSolver):
                                                  num_vir_orbitals, self.tamm_dancoff)
                 for n in range(num_intermediate_states):
                     z_core, y_core = core_mats[n]
-                    gs2core, core2val = self.get_tdms_mo(z_val, y_val, z_core, y_core)
+                    gs2core, core2val = self.get_tdms(z_val, y_val, z_core, y_core)
 
                     F_inelastic += self.scattering_amplitude_tensor(
                         omega, core_eigvals[n], valence_eigvals[f], gs2core, core2val, dipole_integrals
@@ -706,12 +701,12 @@ class RixsDriver(LinearSolver):
             the elastic line is computed.
         :param intermediate_tdens:
             Transition density from ground to
-            intermediate (core) excited state (AO).
+            intermediate (core) excited state (MO).
         :param final_tdens:
             Transition density matrix from
-            intermediate to final excited state (AO).
+            intermediate to final excited state (MO).
         :param dipole_integrals:
-            Electric dipole integrals (length gauge) in AO-basis.
+            Electric dipole integrals (length gauge) in MO-basis.
 
         :return:
             The scattering amplitude tensor: shape = (3,3)
@@ -724,7 +719,7 @@ class RixsDriver(LinearSolver):
         gs_exc_tdipole = np.array([np.sum(intermediate_tdens * d_ov[i])
                                     for i in range(3)])
 
-        if val_eigenvalue is None or intermediate_tdens is None:
+        if val_eigenvalue is None or final_tdens is None:
             # Elastic line, note that the term prop. to A^2 is not included
             # Phys. Rep. 324, 1–105 (2000), DOI: 10.1016/S0370-1573(99)00003-4
             core_eigvals2 = core_eigenvalue**2
@@ -921,7 +916,7 @@ class RixsDriver(LinearSolver):
 
         return pp_core_eigvecs
 
-    def get_tdms(self, mo_occ, mo_vir, z_val, y_val, z_core, y_core):
+    def get_tdms(self, z_val, y_val, z_core, y_core):
         """
         Get the transition density matrices, both from ground-state
         to excited state, and between two excited states (here between)
@@ -944,43 +939,8 @@ class RixsDriver(LinearSolver):
             The ground-to-core and core-to-valence transition densities.
         """
 
-        gs_to_core = np.linalg.multi_dot([mo_occ, z_core - y_core, mo_vir.T])
-        gs_to_core *= np.sqrt(2.0)
-
-        core_to_val = self._get_esa_transition_density(
-            z_core, y_core, z_val, y_val, mo_occ, mo_vir)
-
-        return gs_to_core, core_to_val
-
-    def get_tdms_mo(self, z_val, y_val, z_core, y_core):
-        """
-        Get the transition density matrices, both from ground-state
-        to excited state, and between two excited states (here between)
-        core-excited and valence-excited states.
-
-        :param mo_occ:
-            The occupied molecular orbitals.
-        :param mo_vir:
-            The unoccupied/virtual molecular orbitals.
-        :param z_val:
-            The excitation matrix (valence-excited state).
-        :param y_val:
-            The dexcitation matrix (valence-excited state).
-        :param z_core:
-            The excitation matrix (core-excited state).
-        :param y_core:
-            The dexcitation matrix (core-excited state).
-
-        :return:
-            The ground-to-core and core-to-valence transition densities.
-        """
-
-        #gs_to_core = np.zeros((nmo, nmo))
         gs_to_core = np.sqrt(2.0) * (z_core - y_core)
 
-        #core_to_val = self._get_esa_transition_density(
-        #    z_core, y_core, z_val, y_val, mo_occ, mo_vir)
-        #core_to_val = np.zeros((nmo, nmo))
         core_to_val_oo = -(z_core @ z_val.T + y_core @ y_val.T)
         core_to_val_vv = z_core.T @ z_val + y_core.T @ y_val
 

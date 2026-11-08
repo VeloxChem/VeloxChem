@@ -12,8 +12,7 @@ from veloxchem.rixsdriver import RixsDriver
 class TestRIXS:
 
     def run_rixs(self, xcfun_label, basis_label, ref_xsection, ncore, nstates,
-                 ncorestates=None, nvir=None, nvalence=None, tda=False, cutoff_ene=None,
-                 compute_in_mo=False):
+                 ncorestates=None, nvir=None, nvalence=None, tda=False, cutoff_ene=None):
 
         xyz_string = """3
         xyz
@@ -39,7 +38,6 @@ class TestRIXS:
         rixs_drv.conv_thresh = 1e-6
         rixs_drv.tamm_dancoff = tda
         rixs_drv.nstates = nstates
-        rixs_drv.compute_in_mo = compute_in_mo
 
         if nvir is not None:
             rixs_drv.restricted_subspace = True
@@ -160,26 +158,3 @@ class TestRIXS:
 
         self.run_rixs('hf', '6-31G*', ref_xsection, 1, 57, nvir=13, nvalence=4, tda=False, cutoff_ene=31.5 / hartree_in_ev())
 
-    def test_b3lyp_svp_rpa_2s_mo(self):
-    
-            ref_xsection = np.array([
-                5419.408540219, 29.654485681, 2022.737567512, 50.138868853,
-                3601.703649966, 15.488104351, 0.513719573, 4.381978513, 1.945222941,
-                3.365520699, 134.695043955, 0.540695855, 2.625666460, 0.008474128,
-                7.481248883, 4.981706022, 0.690424900, 0.003741214, 0.428471086,
-                0.003525553
-            ])
-    
-            self.run_rixs('b3lyp', 'def2-svp', ref_xsection, 1, 20, ncorestates=4, tda=False, compute_in_mo=True)
-
-    def test_b3lyp_svp_rpa_rsa_mo(self):
-    
-            ref_xsection = np.array([
-                5558.473364257, 29.490542895, 0.486049704, 4.629266414, 0.363044685,
-                0.004777157, 0.051060100, 0.440354664, 0.051898838, 0.106438494,
-                0.133616609, 0.000000149, 0.000335247, 3.649828944, 1.915088149,
-                2.465981090
-            ])
-    
-            self.run_rixs('b3lyp', 'def2-svp', ref_xsection, 1, 20, ncorestates=2, nvir=16, nvalence=1, tda=False, compute_in_mo=True)
-    
