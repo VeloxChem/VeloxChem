@@ -62,6 +62,8 @@ class RixsDriver(LinearSolver):
 
     Instance variables:
         - photon_energy: Incoming photon energies (a.u.).
+        - core_resonances: Number of core-excited resonances used as
+          incoming photon energies (alternative to photon_energy).
         - theta: Angle between incident polarization
           and outgoing propagation vectors (rad.).
         - gamma: Life-time broadening (FWHM) (a.u.).
@@ -100,6 +102,7 @@ class RixsDriver(LinearSolver):
 
         # method settings
         self.photon_energy = None
+        self.core_resonances = None
         self.theta = 0
         # a.u., FWHM
         # 1000.0 / hartree_in_wavenumber()
@@ -140,6 +143,9 @@ class RixsDriver(LinearSolver):
                 ('int', 'number of involved valence orbitals'),
             'num_virtual_orbitals':
                 ('int', 'number of involved virtual orbitals'),
+            'core_resonances':
+                ('int', 'number of core resonances to take as '
+                'incoming photon energies'),
         })
 
     @property
@@ -165,6 +171,11 @@ class RixsDriver(LinearSolver):
 
         if method_dict is None:
             method_dict = {}
+
+        assert_msg_critical(not ('photon_energy' in rsp_dict and
+                                  'core_resonances' in rsp_dict),
+            'RixsDriver.update_settings: give either photon_energy or '
+            'core_resonances, not both.')
 
         super().update_settings(rsp_dict, method_dict)
 
@@ -383,7 +394,6 @@ class RixsDriver(LinearSolver):
         if self.rank == mpi_master():
             mo_occ = scf_results['C_alpha'][:, mo_core_indices + mo_val_indices].copy()
             mo_vir = scf_results['C_alpha'][:, mo_vir_indices].copy()
-            mo = np.hstack((mo_occ, mo_vir))
 
             core_eigvals = core_rsp_results['eigenvalues'][core_states].copy()
             valence_eigvals = rsp_results['eigenvalues'][val_states].copy()
@@ -396,8 +406,8 @@ class RixsDriver(LinearSolver):
             valence_eigvals = None
             core_osc_strengths = None
 
-        mo_occ = self.comm.bcast(mo_occ, root=mpi_master())
-        mo_vir = self.comm.bcast(mo_vir, root=mpi_master())
+        #mo_occ = self.comm.bcast(mo_occ, root=mpi_master())
+        #mo_vir = self.comm.bcast(mo_vir, root=mpi_master())
 
         core_eigvals = self.comm.bcast(core_eigvals, root=mpi_master())
         valence_eigvals = self.comm.bcast(valence_eigvals, root=mpi_master())
@@ -412,21 +422,21 @@ class RixsDriver(LinearSolver):
         if self.rank == mpi_master():
             dipole_integrals_ao = compute_electric_dipole_integrals(molecule, basis, [0.0,0.0,0.0])
             # perhaps this should be parallelized
-            dipole_integrals_mo = np.array([mo.T @ dipole_integrals_ao[i] @ mo for i in range(3)])
+            #dipole_integrals_mo = np.array([mo.T @ dipole_integrals_ao[i] @ mo for i in range(3)])
             d_ov = np.array([mo_occ.T @ dipole_integrals_ao[i] @ mo_vir for i in range(3)])
             d_oo = np.array([mo_occ.T @ dipole_integrals_ao[i] @ mo_occ for i in range(3)])
             d_vv = np.array([mo_vir.T @ dipole_integrals_ao[i] @ mo_vir for i in range(3)])
         else:
-            dipole_integrals_ao = None
-            dipole_integrals_mo = None
+            #dipole_integrals_ao = None
+            #dipole_integrals_mo = None
             d_ov = None
             d_oo = None
             d_vv = None
-        dipole_integrals_ao = self.comm.bcast(dipole_integrals_ao, root=mpi_master())
-        dipole_integrals_mo = self.comm.bcast(dipole_integrals_mo, root=mpi_master())
-        # d_ov = self.comm.bcast(d_ov, root=mpi_master())
-        # d_oo = self.comm.bcast(d_oo, root=mpi_master())
-        # d_vv = self.comm.bcast(d_vv, root=mpi_master())
+        #dipole_integrals_ao = self.comm.bcast(dipole_integrals_ao, root=mpi_master())
+        #dipole_integrals_mo = self.comm.bcast(dipole_integrals_mo, root=mpi_master())
+        d_ov = self.comm.bcast(d_ov, root=mpi_master())
+        d_oo = self.comm.bcast(d_oo, root=mpi_master())
+        d_vv = self.comm.bcast(d_vv, root=mpi_master())
 
         # Store state and orbital information used in computation
         self._orb_and_state_dict = {
@@ -439,6 +449,14 @@ class RixsDriver(LinearSolver):
             'valence_states': val_states,
         }
 
+        if self.core_resonances is not None:
+            assert_msg_critical(
+                self.photon_energy is None,
+                'RixsDriver.compute: give either photon_energy or '
+                'core_resonances, not both.')
+            # incoming photon energies at the first n core resonances
+            self.photon_energy = core_eigvals[:self.core_resonances].tolist()
+            init_photon_set = False
         # If incoming photon energy is not set, set it to match the
         # first core-excited state with osc_strength > 1e-3
         if self.photon_energy is None:
@@ -512,17 +530,17 @@ class RixsDriver(LinearSolver):
                                                  num_vir_orbitals, self.tamm_dancoff)
                 for n in range(num_intermediate_states):
                     z_core, y_core = core_mats[n]
-                    if self.compute_in_mo:
-                        gs2core, core2val = self.get_tdms_mo(z_val, y_val, z_core, y_core)
-                    else:
-                        gs2core, core2val = self.get_tdms(mo_occ, mo_vir, z_val, y_val, z_core, y_core)
+                    #if self.compute_in_mo:
+                    gs2core, core2val = self.get_tdms_mo(z_val, y_val, z_core, y_core)
+                    #else:
+                    #    gs2core, core2val = self.get_tdms(mo_occ, mo_vir, z_val, y_val, z_core, y_core)
 
                     F_inelastic += self.scattering_amplitude_tensor(
-                        omega, core_eigvals[n], valence_eigvals[f], gs2core, core2val, dipole_integrals_mo if self.compute_in_mo else dipole_integrals_ao
+                        omega, core_eigvals[n], valence_eigvals[f], gs2core, core2val, d_ov, d_oo, d_vv
                     )
                     if f == 0:
                         F_elastic_local += self.scattering_amplitude_tensor(
-                            omega, core_eigvals[n], None, gs2core, None, dipole_integrals_mo if self.compute_in_mo else dipole_integrals_ao
+                            omega, core_eigvals[n], None, gs2core, None, d_ov, d_oo, d_vv
                         )
 
                 emission_energy = omega - valence_eigvals[f]
@@ -682,7 +700,7 @@ class RixsDriver(LinearSolver):
         return val_states.astype(int)
 
     def scattering_amplitude_tensor(self, omega, core_eigenvalue, val_eigenvalue,
-                                    intermediate_tdens, final_tdens, dipole_integrals):
+                                    intermediate_tdens, final_tdens, d_ov, d_oo, d_vv):
         """
         The RIXS scattering amplitude.
 
@@ -708,22 +726,24 @@ class RixsDriver(LinearSolver):
         """
         gamma_hwhm = self.gamma / 2.0
         e_n = 1.0 / (omega - (core_eigenvalue + 1j * gamma_hwhm))
+        
+        gs_exc_tdipole = np.array([np.sum(intermediate_tdens * d_ov[i])
+                                    for i in range(3)])
 
         if val_eigenvalue is None or intermediate_tdens is None:
             # Elastic line, note that the term prop. to A^2 is not included
             # Phys. Rep. 324, 1–105 (2000), DOI: 10.1016/S0370-1573(99)00003-4
             core_eigvals2 = core_eigenvalue**2
-            gs_exc_tdipole = np.array([np.sum(intermediate_tdens * dipole_integrals[i])
-                                       for i in range(3)])
             outer_product = np.matmul(gs_exc_tdipole[:, np.newaxis], gs_exc_tdipole[np.newaxis, :])
             scatt_amp = e_n * core_eigvals2 * outer_product
 
         else:
             # Inelastic line
             omega_product = (core_eigenvalue - val_eigenvalue) * core_eigenvalue
-            gs_exc_tdipole = np.array([np.sum(intermediate_tdens * dipole_integrals[i])
-                                       for i in range(3)])
-            exc_exc_tdipole = np.array([np.sum(final_tdens * dipole_integrals[i])
+            tdens_oo, tdens_vv = final_tdens
+            #gs_exc_tdipole = np.array([np.sum(intermediate_tdens * dipole_integrals[i])
+            #                           for i in range(3)])
+            exc_exc_tdipole = np.array([np.sum(tdens_oo * d_oo[i]) + np.sum(tdens_vv * d_vv[i])
                                         for i in range(3)])
             outer_product = np.matmul(exc_exc_tdipole[:, np.newaxis], gs_exc_tdipole[np.newaxis, :])
             scatt_amp = e_n * omega_product * outer_product
@@ -962,19 +982,17 @@ class RixsDriver(LinearSolver):
         :return:
             The ground-to-core and core-to-valence transition densities.
         """
-        nocc, nvir = z_core.shape
-        nmo = nocc + nvir
 
-        gs_to_core = np.zeros((nmo, nmo))
-        gs_to_core[:nocc, nocc:] = np.sqrt(2.0) * (z_core - y_core)
+        #gs_to_core = np.zeros((nmo, nmo))
+        gs_to_core = np.sqrt(2.0) * (z_core - y_core)
 
         #core_to_val = self._get_esa_transition_density(
         #    z_core, y_core, z_val, y_val, mo_occ, mo_vir)
-        core_to_val = np.zeros((nmo, nmo))
-        core_to_val[nocc:, nocc:] = z_core.T @ z_val + y_core.T @ y_val
-        core_to_val[:nocc, :nocc] = -(z_core @ z_val.T + y_core @ y_val.T)
+        #core_to_val = np.zeros((nmo, nmo))
+        core_to_val_oo = -(z_core @ z_val.T + y_core @ y_val.T)
+        core_to_val_vv = z_core.T @ z_val + y_core.T @ y_val
 
-        return gs_to_core, core_to_val
+        return gs_to_core, (core_to_val_oo, core_to_val_vv)
 
     def _print_header(self, molecule, basis):
         """
