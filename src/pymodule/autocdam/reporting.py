@@ -130,7 +130,7 @@ def bound_warnings(specs: Sequence[ParameterSpec], parameters: dict[str, float],
                 "times; check identifiability" if spec.expandable else
                 "widen the bounds or check identifiability")
             warnings.append(
-                f"WARNING: fitted {spec.name} = {value:.4g} lies at its {side} bound "
+                f"Fitted {spec.name} = {value:.4g} lies at its {side} bound "
                 f"[{lower:.4g}, {upper:.4g}]; {advice}")
     return warnings
 

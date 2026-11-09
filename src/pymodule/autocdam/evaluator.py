@@ -169,7 +169,7 @@ class Evaluator:
 
     def _failure(self, reason: str, warnings: list[str]) -> EvaluationResult:
         """Report one consistent penalty while preserving calculator diagnostics."""
-        warning = f"WARNING: Evaluation failed: {reason} A finite penalty was assigned."
+        warning = f"Evaluation failed: {reason} A finite penalty was assigned."
         self.ostream.print_warning(warning)
         self.ostream.flush()
         return EvaluationResult(

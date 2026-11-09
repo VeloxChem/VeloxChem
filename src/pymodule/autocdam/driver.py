@@ -460,7 +460,7 @@ class AutoCDAM:
                 self.parameter_specs))
             ineffective = names if ineffective is None else ineffective & names
         warnings = [
-            f"WARNING: parameter {name!r} cannot affect any fitted system; it is "
+            f"Parameter {name!r} cannot affect any fitted system; it is "
             "unidentifiable and should be fixed"
             for name in sorted(ineffective or ())
         ]
