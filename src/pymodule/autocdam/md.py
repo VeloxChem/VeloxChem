@@ -344,7 +344,7 @@ DRIVER_OPTIONS = ("num_steps", "num_snapshots", "num_equil_steps",
 # Finite-size correction constants (OpenMM units: nm, e, kJ/mol).
 # 1/(4 pi eps0) in kJ/mol nm/e^2, from VeloxChem atomic-unit conversions.
 COULOMB_CONSTANT = hartree_in_kjpermol() * bohr_in_angstrom() * ANGSTROM_TO_NM
-WATER_DIELECTRIC = 78.4
+WATER_DIELECTRIC = 78.39  # as used throughout VeloxChem (e.g. OpenMMDynamics)
 WIGNER_LATTICE_SUM = -2.837297
 # Quadrupole-moment trace of each water model, e nm^2 (TIP3P if unknown).
 WATER_QUADRUPOLE_TRACE = {

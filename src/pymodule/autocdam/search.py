@@ -60,13 +60,17 @@ import time
 from pathlib import Path
 
 import importlib.util
+
 import numpy as np
+from mpi4py import MPI
 
 from ..errorhandler import assert_msg_critical
+from ..veloxchemlib import mpi_master
 from .evaluator import within_tolerance
 from .models import (CalculationResult, EvaluationResult, FitTarget,
                      GeneratedBatch, ParameterSet, ParameterSpec, all_finite,
-                     FitResult, write_atomic, format_value, print_settings)
+                     FitResult, format_value, h5_filename, print_settings,
+                     read_h5_group, write_h5_groups)
 
 # ==========================================================================
 # sampling
@@ -309,6 +313,7 @@ def _learned_noise(model) -> float:
 # ==========================================================================
 
 CHECKPOINT_VERSION = 1
+CHECKPOINT_GROUP = "autocdam/checkpoint"
 
 
 def _json_value(value):
@@ -345,7 +350,9 @@ class SearchDriver:
                                          QualityStatus] = default_quality_check,
                  noise: bool = False,
                  study_metadata: dict[str, Any] | None = None,
-                 checkpoint_path: str | Path | None = None,
+                 checkpoint_file: str | Path | None = None,
+                 checkpoint_group: str = CHECKPOINT_GROUP,
+                 comm=None,
                  ostream=None):
         """Validate the parameters and targets and create an empty observation table.
 
@@ -378,8 +385,12 @@ class SearchDriver:
         self.surrogate = SklearnGaussianProcessSurrogate(noise=noise)
         self.table = ParameterPropertyTable(
             study_metadata=dict(study_metadata or {}))
-        self.checkpoint_path = Path(
-            checkpoint_path) if checkpoint_path else None
+        self.checkpoint_file = (h5_filename(checkpoint_file)
+                                if checkpoint_file else None)
+        self.checkpoint_group = checkpoint_group
+        # only the MPI master rank writes the checkpoint
+        self.comm = comm if comm is not None else MPI.COMM_WORLD
+        self.rank = self.comm.Get_rank()
         self.ostream = ostream
         self.history: list[dict[str, Any]] = []
 
@@ -505,9 +516,15 @@ class SearchDriver:
         """Search-specific checkpoint entries besides signature, history and samples."""
         return {}
 
+    def _checkpoint_label(self) -> str | None:
+        """The checkpoint location for printing: ``file.h5:group``, or None."""
+        if self.checkpoint_file is None:
+            return None
+        return f"{self.checkpoint_file}:{self.checkpoint_group}"
+
     def _save(self) -> None:
         """Replace the checkpoint only after writing the complete next version."""
-        if self.checkpoint_path is None:
+        if self.checkpoint_file is None or self.rank != mpi_master():
             return
         data = {
             "version": CHECKPOINT_VERSION,
@@ -515,14 +532,17 @@ class SearchDriver:
             **self._checkpoint_state(), "history": self.history,
             "samples": [asdict(r) for r in self.table.samples]
         }
-        write_atomic(self.checkpoint_path,
-                     json.dumps(data, indent=2, default=_json_value) + "\n")
+        # Plain values (as JSON would store them), then one HDF5 group.
+        data = json.loads(json.dumps(data, default=_json_value))
+        write_h5_groups(self.checkpoint_file, {self.checkpoint_group: data})
 
     def _load_checkpoint(self, differ_message: str) -> dict[str, Any]:
         """Check a saved study matches this one, restore its samples, return the data."""
-        if self.checkpoint_path is None or not self.checkpoint_path.exists():
-            raise ValueError("resume requires an existing checkpoint_path")
-        data = json.loads(self.checkpoint_path.read_text(encoding="utf-8"))
+        data = (read_h5_group(self.checkpoint_file, self.checkpoint_group)
+                if self.checkpoint_file is not None else None)
+        if data is None:
+            raise ValueError("restart requires an existing checkpoint in the "
+                             "run file")
         signature = json.loads(
             json.dumps(self._signature(), default=_json_value))
         if (data.get("version") != CHECKPOINT_VERSION or
@@ -584,7 +604,10 @@ class SearchDriver:
                 "pilot": any(item.get("pilot") for item in metadata),
                 "scientifically_validated": False,
             },
-            checkpoint=self.checkpoint_path,
+            checkpoint=(str(self.checkpoint_file)
+                        if self.checkpoint_file is not None else None),
+            checkpoint_group=(self.checkpoint_group
+                              if self.checkpoint_file is not None else None),
         )
 
 
@@ -833,7 +856,7 @@ class FittingDriver(SearchDriver):
              "all targets within tolerance"),
             ("Quality Check", quality_check),
             ("Random Seed", self.seed),
-            ("Checkpoint", self.checkpoint_path),
+            ("Checkpoint", self._checkpoint_label()),
             ("Resumed Stages",
              f"{len(self.history)} stages, {len(self.table.samples)} samples"
              if resume else None),

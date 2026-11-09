@@ -37,6 +37,7 @@ import pytest
 import veloxchem as vlx
 
 from veloxchem.autocdam import AutoCDAM, CalculationResult, CDAMCandidate, FitResult, FrameworkSystem, plot_fit
+from veloxchem.autocdam.models import RESULT_GROUP, read_h5_group
 
 STRUCTURES = Path(__file__).parent / "data"
 CHARGES = json.loads(
@@ -167,11 +168,16 @@ class TestAutoCdamResultsDiagnostics:
         fit()
         assert list(tmp_path.iterdir()) == []
 
-    def test_result_json_round_trip_and_plot_from_file(self, tmp_path):
+    def test_result_h5_round_trip_and_plot_from_file(self, tmp_path):
         _, result = fit()
-        path = result.save(tmp_path / "result.json")
-        data = json.loads(path.read_text())
+        path = result.save(tmp_path / "run")
+        assert path == tmp_path / "run.h5"
+        data = read_h5_group(path, RESULT_GROUP)
         assert data["diagnostics"]["evaluations"] and data["converged"]
+        assert data == result.to_dict()
+        loaded = FitResult.load(path)
+        assert loaded.to_dict() == result.to_dict()
+        assert loaded.parameters.to_dict() == result.parameters.to_dict()
         figure = plot_fit(path, output_path=tmp_path / "from_file.png")
         assert len(figure.axes) == 4 and (tmp_path / "from_file.png").exists()
 

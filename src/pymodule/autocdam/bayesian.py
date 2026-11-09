@@ -764,5 +764,5 @@ class BayesianFittingDriver(SearchDriver):
             f"{format_value(t.tolerance)}, {t.kind}, weight {format_value(t.weight)}"
         ) for t in self.targets]
         rows += [(f"Search {key}", value) for key, value in self.search.items()]
-        rows.append(("Checkpoint", self.checkpoint_path))
+        rows.append(("Checkpoint", self._checkpoint_label()))
         print_settings(self.ostream, "CDAM Bayesian Fitting Setup", rows)

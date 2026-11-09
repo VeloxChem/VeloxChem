@@ -139,6 +139,9 @@ def print_settings(ostream: OutputStream | None, title: str, rows) -> None:
 # ==========================================================================
 
 
+RESULT_GROUP = "autocdam/result"
+
+
 def h5_filename(filename) -> Path:
     """
     Gets the HDF5 file of a run (``.h5`` added when missing).
@@ -692,7 +695,8 @@ class FitResult:
     ``parameters`` and ``metrics`` describe the selected best candidate;
     ``history`` holds one record per evaluated step and ``diagnostics`` the
     target results, parameter definitions, cost and stop reason read by
-    ``summary``. ``checkpoint`` is the checkpoint file, if one was written.
+    ``summary``. ``checkpoint`` is the run file and ``checkpoint_group`` the
+    group of the search checkpoint in it, if one was written.
     """
 
     parameters: ParameterSet
@@ -704,7 +708,8 @@ class FitResult:
     history: list[dict[str, Any]] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     diagnostics: dict[str, Any] = field(default_factory=dict)
-    checkpoint: Path | None = None
+    checkpoint: str | None = None
+    checkpoint_group: str | None = None
 
     def plot(self, **kwargs):
         """Delegate CDAM or metal-complex plotting to the standalone module."""
@@ -716,6 +721,7 @@ class FitResult:
         import json
         objective = self.objective if math.isfinite(self.objective) else None
         checkpoint = str(self.checkpoint) if self.checkpoint else None
+        group = self.checkpoint_group if checkpoint else None
         data = {
             "parameters": self.parameters.to_dict(),
             "metrics": self.metrics,
@@ -727,6 +733,7 @@ class FitResult:
             "warnings": self.warnings,
             "diagnostics": self.diagnostics,
             "checkpoint": checkpoint,
+            "checkpoint_group": group,
         }
         return json.loads(json.dumps(data, default=_json_default))
 
@@ -735,14 +742,62 @@ class FitResult:
         from .reporting import samples_table
         return samples_table(self)
 
-    def save(self, path) -> Path:
-        """Write the result as JSON (only when requested); returns the path."""
-        import json
-        path = Path(path)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(self.to_dict(), indent=2) + "\n",
-                        encoding="utf-8")
-        return path
+    def save(self, filename) -> Path:
+        """
+        Writes the result to the ``autocdam/result`` group of a run file.
+
+        :param filename:
+            The run file (``.h5`` added when missing).
+
+        :return:
+            The path of the HDF5 file.
+        """
+
+        return write_h5_groups(filename, {RESULT_GROUP: self.to_dict()})
+
+    @classmethod
+    def load(cls, filename) -> "FitResult":
+        """
+        Reads a result saved with ``save``.
+
+        :param filename:
+            The run file (``.h5`` added when missing).
+
+        :return:
+            The fit result.
+        """
+
+        data = read_h5_group(filename, RESULT_GROUP)
+        if data is None:
+            raise FileNotFoundError(
+                f"no AutoCDAM result in {h5_filename(filename)}")
+        return cls.from_dict(data)
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> "FitResult":
+        """
+        Rebuilds a result from ``to_dict`` output.
+
+        :param data:
+            The dictionary of a saved result.
+
+        :return:
+            The fit result.
+        """
+
+        data = dict(data)
+        objective = data.get("objective")
+        return cls(parameters=ParameterSet(dict(data["parameters"])),
+                   metrics=dict(data.get("metrics") or {}),
+                   objective=math.inf if objective is None else objective,
+                   status=data.get("status", "failed"),
+                   converged=bool(data.get("converged", False)),
+                   iterations=int(data.get("iterations", 0)),
+                   history=list(data.get("history") or []),
+                   warnings=list(data.get("warnings") or []),
+                   diagnostics=dict(data.get("diagnostics") or {}),
+                   checkpoint=data.get("checkpoint"),
+                   checkpoint_group=data.get("checkpoint_group"))
 
     def summary(self) -> str:
         """Plain-text report: parameters, targets, constraints, cost, and status."""

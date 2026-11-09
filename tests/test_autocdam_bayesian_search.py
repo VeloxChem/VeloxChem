@@ -35,7 +35,9 @@ import math
 import numpy as np
 import pytest
 
-from veloxchem.autocdam import AutoCDAM, CalculationResult, CDAMCandidate
+from veloxchem.autocdam import (AutoCDAM, CalculationResult, CDAMCandidate,
+                                samples_table)
+from veloxchem.autocdam.models import read_h5_group
 from veloxchem.errorhandler import VeloxChemError
 
 PARAMETERS = {
@@ -286,14 +288,16 @@ class TestAutoCdamBayesianSearch:
             }
         }
         full = fit({**search, "max_evaluations": 12}, targets)[2].points
-        checkpoint = tmp_path / "bo.json"
-        first = fit(search, targets, checkpoint_file=str(checkpoint))[2].points
+        filename = str(tmp_path / "bo")
+        first = fit(search, targets, filename=filename,
+                    cache=False)[2].points
         assert first == full[:9]
         resumed_calc = Surface()
         longer_search = {**search, "max_evaluations": 12}
         driver = bayesian_driver(longer_search,
                                  resumed_calc,
-                                 checkpoint_file=str(checkpoint),
+                                 filename=filename,
+                                 cache=False,
                                  restart=True)
         with pytest.raises(
                 ValueError,
@@ -301,7 +305,8 @@ class TestAutoCdamBayesianSearch:
             driver.fit(CDAMCandidate("Al", 3), targets, parameters=PARAMETERS)
         driver = bayesian_driver(search,
                                  resumed_calc,
-                                 checkpoint_file=str(checkpoint),
+                                 filename=filename,
+                                 cache=False,
                                  restart=True)
         result = driver.fit(CDAMCandidate("Al", 3),
                             targets,
@@ -361,7 +366,7 @@ class TestAutoCdamBayesianSearch:
         assert result.diagnostics["stop_reason"] == "acquisition_exhausted"
         assert not result.converged and len(calculator.points) == 6
 
-    def test_discrete_geometries_are_searched_separately(self):
+    def test_discrete_geometries_are_searched_separately(self, tmp_path):
 
         class GeometrySurface(Surface):
 
@@ -378,12 +383,22 @@ class TestAutoCdamBayesianSearch:
                 "seed": 12,
                 "geometries": ["tetrahedral", "octahedral"]
             },
-            calculator=GeometrySurface())
+            calculator=GeometrySurface(),
+            filename=str(tmp_path / "run"))
         assert result.diagnostics["geometry"] == "octahedral"
         assert set(result.diagnostics["geometry_results"]) == {
             "tetrahedral", "octahedral"
         }
         assert driver.candidate.geometry == "octahedral"
+        # One checkpoint group per geometry in the same run file.
+        assert result.checkpoint_group == "autocdam/checkpoint_octahedral"
+        for geometry in ("tetrahedral", "octahedral"):
+            assert read_h5_group(tmp_path / "run",
+                                 f"autocdam/checkpoint_{geometry}")["samples"]
+        assert read_h5_group(tmp_path / "run", "autocdam/checkpoint") is None
+        rows = samples_table(tmp_path / "run.h5")
+        assert rows == samples_table(result)
+        assert len(rows) == len(driver.fitting_driver.table.samples)
 
     @pytest.mark.parametrize("search, message", [
         ({

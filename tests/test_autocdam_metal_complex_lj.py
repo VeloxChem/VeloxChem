@@ -31,13 +31,13 @@
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """Nonbonded curve mechanics; synthetic recovery is not physical validation."""
 from copy import deepcopy
-import json
 
 import numpy as np
 import pytest
 import veloxchem as vlx
 
 from veloxchem.autocdam import Calculator, MetalComplexLJDriver, QMScanDataset
+from veloxchem.autocdam.models import read_h5_group, write_h5_groups
 
 
 @pytest.fixture
@@ -91,7 +91,7 @@ def make_driver(baseline, tmp_path, **overrides):
                     sigma_bounds_angstrom=[1.0, 4.0],
                     epsilon_bounds_kjmol=[0.01, 5.0],
                     energy_tolerance_kjmol=1e-5,
-                    workdir=str(tmp_path))
+                    filename=str(tmp_path / "run"))
     for key, value in overrides.items():
         (study if key in study else settings)[key] = value
     driver = MetalComplexLJDriver(
@@ -166,16 +166,17 @@ class TestAutoCdamMetalComplexLj:
         engine = vlx.MMDriver(ostream=driver.ostream)
         engine.load_force_field(fitted)
         assert engine.force_field["atoms"][0]["sigma"] == pytest.approx(0.26)
-        path = driver.export_fitted_model()
+        path = driver.export_fitted_model(tmp_path / "fitted_complex.xml")
         import xml.etree.ElementTree as ET
         root = ET.parse(path).getroot()
         atoms = root.findall("NonbondedForce/Atom")
         assert float(atoms[0].attrib["sigma"]) == pytest.approx(0.26)
         assert float(atoms[1].attrib["sigma"]) == original[1]["sigma"]
         assert path.with_suffix(".fit.json").exists()
-        assert (tmp_path / "fit_curves.csv").exists()
-        assert json.loads((tmp_path / "fit_result.json").read_text(
-        ))["diagnostics"]["scientific_validation"] == "not performed"
+        saved = read_h5_group(tmp_path / "run", "metal_complex_lj/result")
+        assert saved["diagnostics"]["scientific_validation"] == "not performed"
+        assert len(saved["diagnostics"]["qm_interaction_kjmol"]) == len(
+            saved["diagnostics"]["mm_interaction_kjmol"])
 
     def test_mm_matches_independent_pair_sum_and_qm_stays_fixed(
             self, baseline, tmp_path):
@@ -218,8 +219,8 @@ class TestAutoCdamMetalComplexLj:
         synthesize_qm(driver, fail_one=True)
         assert not driver.dataset.records[0].usable
         assert "SCF did not converge" in driver.dataset.records[0].reject_reason
-        dataset_path = driver.save_dataset(tmp_path / "portable.json")
-        saved_json = json.loads(dataset_path.read_text())
+        dataset_path = driver.save_dataset(tmp_path / "portable")
+        saved_json = read_h5_group(dataset_path, "metal_complex_lj/qm_scan")
         assert "fingerprint" not in saved_json
         weights = {driver.dataset.records[1].record_id: 3.0}
 
@@ -246,7 +247,7 @@ class TestAutoCdamMetalComplexLj:
             dataset_path).records == driver.dataset.records
         # Metadata is advisory; callers own correctness.
         saved_json["metadata"] = {}
-        dataset_path.write_text(json.dumps(saved_json))
+        write_h5_groups(dataset_path, {"metal_complex_lj/qm_scan": saved_json})
         loaded = QMScanDataset.load(dataset_path)
         assert loaded.records == driver.dataset.records
         assert loaded.metadata == {}
@@ -393,7 +394,7 @@ class TestAutoCdamMetalComplexLj:
             "scan_distances_angstrom": [5],
             "scan_directions": [[0, 0, 1]],
             "qm_settings": {"basis": "STO-3G"},
-            "workdir": str(tmp_path / probe)
+            "filename": str(tmp_path / probe)
         })
         dataset = qm_driver.compute_qm_dataset(helium, 0)
         assert dataset.records[0].usable
@@ -407,9 +408,9 @@ class TestAutoCdamMetalComplexLj:
         original = make_driver(baseline, tmp_path)
         synthesize_qm(original)
         original.prepare_baseline()
-        saved = original.save_dataset(tmp_path / "with_baseline.json")
-        assert "fingerprint" not in json.loads(
-            saved.read_text())["metadata"]["baseline"]
+        saved = original.save_dataset(tmp_path / "with_baseline")
+        assert "fingerprint" not in read_h5_group(
+            saved, "metal_complex_lj/qm_scan")["metadata"]["baseline"]
         modified = deepcopy(baseline.atoms)
         modified[1]["epsilon"] *= 2
         other_ff = deepcopy(baseline.atoms)
@@ -418,8 +419,8 @@ class TestAutoCdamMetalComplexLj:
         other.prepare_baseline()
         assert other.load_dataset(saved).records == original.dataset.records
         other.save_dataset(saved)
-        assert "fingerprint" not in json.loads(
-            saved.read_text())["metadata"]["baseline"]
+        assert "fingerprint" not in read_h5_group(
+            saved, "metal_complex_lj/qm_scan")["metadata"]["baseline"]
         baseline.atoms = other_ff
 
     def test_qm_reference_failure_is_saved(self, baseline, tmp_path):
@@ -433,7 +434,7 @@ class TestAutoCdamMetalComplexLj:
         driver.calculator = BrokenQM()
         with pytest.raises(RuntimeError, match="dataset saved"):
             driver.compute_qm_dataset()
-        data = QMScanDataset.load(tmp_path / "qm_scan_dataset.json")
+        data = QMScanDataset.load(tmp_path / "run")
         assert data.metadata["reference_failure"] == "reference failed"
         assert not any(row.usable for row in data.records)
 

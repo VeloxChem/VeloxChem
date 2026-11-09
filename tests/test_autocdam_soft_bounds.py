@@ -30,12 +30,11 @@
 #  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """UFF-referenced soft bounds and their widening during the Bayesian search."""
-import json
-
 import pytest
 
 from veloxchem.autocdam import AutoCDAM, CalculationResult, CDAMCandidate, ParameterSpec
-from veloxchem.autocdam.models import HARD_LIMITS, reference_bounds, uff_lj
+from veloxchem.autocdam.models import (HARD_LIMITS, read_h5_group,
+                                       reference_bounds, uff_lj)
 
 
 class Surface:
@@ -177,15 +176,15 @@ class TestAutoCdamSoftBounds:
                              2.0, (1.4, 2.6),
                              expandable=True,
                              hard_bounds=(0.5, 8.0))
-        checkpoint = tmp_path / "bo.json"
+        filename = str(tmp_path / "bo")
         _, first = fit({"sigma": soft},
                        iod=1.40,
-                       checkpoint_file=str(checkpoint))
-        saved = json.loads(checkpoint.read_text())
+                       filename=filename)
+        saved = read_h5_group(filename, "autocdam/checkpoint")
         assert saved["history"][-1]["bounds"]["metal_lj_sigma"][0] < 1.4
         _, resumed = fit({"sigma": soft},
                          iod=1.40,
-                         checkpoint_file=str(checkpoint),
+                         filename=filename,
                          restart=True)
         assert resumed.parameters.to_dict() == first.parameters.to_dict()
         assert resumed.diagnostics["final_bounds"] == first.diagnostics[

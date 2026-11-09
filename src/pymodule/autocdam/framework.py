@@ -56,6 +56,7 @@ from copy import copy, deepcopy
 from dataclasses import dataclass, field
 import xml.etree.ElementTree as ET
 import hashlib
+import inspect
 import io
 from pathlib import Path
 import tempfile
@@ -209,8 +210,12 @@ def check_no_bond_crosses_cell(molecule, box_nm, bonds, metals):
     """VeloxChem connectivity is not periodic; refuse covalent bonds it would miss.
 
     Uses the bond rule of ``Molecule.get_connectivity_matrix`` (covalent radii
-    times 1.3, or 1.8 for H-H) on minimum-image distances.
+    times its default ``factor``, or ``H2_factor`` for H-H) on minimum-image
+    distances.
     """
+    defaults = inspect.signature(Molecule.get_connectivity_matrix).parameters
+    factor = defaults["factor"].default
+    h2_factor = defaults["H2_factor"].default
     positions = molecule.get_coordinates_in_bohr()
     box_bohr = np.asarray(box_nm) * 10.0 / bohr_in_angstrom()
     radii = molecule.covalent_radii_to_numpy()
@@ -223,8 +228,8 @@ def check_no_bond_crosses_cell(molecule, box_nm, bonds, metals):
         delta = positions[j] - positions[i]
         direct = np.linalg.norm(delta, axis=1)
         image = np.linalg.norm(minimum_image(delta, box_bohr), axis=1)
-        limit = (radii[i] + radii[j]) * np.where(hydrogen[i] & hydrogen[j], 1.8,
-                                                 1.3)
+        limit = (radii[i] + radii[j]) * np.where(hydrogen[i] & hydrogen[j],
+                                                 h2_factor, factor)
         for k in np.flatnonzero((image <= limit) & (direct > limit)):
             if int(j[k]) not in metal_set and (i, int(j[k])) not in known:
                 raise ValueError(

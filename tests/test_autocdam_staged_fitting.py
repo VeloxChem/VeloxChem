@@ -37,7 +37,9 @@ import pytest
 from veloxchem.autocdam import (AutoCDAM, CalculationResult, CDAMCandidate,
                                 CoordinateGenerator, Evaluator, FitTarget,
                                 ParameterSet, ParameterSpec)
-from veloxchem.autocdam.search import CalculationInput, FittingDriver
+from veloxchem.autocdam.models import RESULT_GROUP, read_h5_group
+from veloxchem.autocdam.search import (CHECKPOINT_GROUP, CalculationInput,
+                                       FittingDriver)
 
 
 def candidate():
@@ -61,7 +63,11 @@ class SyntheticCalculator:
         return CalculationResult(values={"IOD": sigma, "CN": 2 * sigma})
 
 
-def make_driver(*, max_iterations=3, checkpoint_path=None, tolerance=1e-12):
+def make_driver(*,
+                max_iterations=3,
+                checkpoint_file=None,
+                tolerance=1e-12,
+                **options):
     generator = CoordinateGenerator()
     calculator = SyntheticCalculator()
     specs = [ParameterSpec("metal_lj_sigma", 1.0, (0.5, 4.0))]
@@ -84,7 +90,8 @@ def make_driver(*, max_iterations=3, checkpoint_path=None, tolerance=1e-12):
                          max_iterations=max_iterations,
                          samples_per_stage=8,
                          seed=42,
-                         checkpoint_path=checkpoint_path), calculator
+                         checkpoint_file=checkpoint_file,
+                         **options), calculator
 
 
 class TestAutoCdamStagedFitting:
@@ -119,11 +126,11 @@ class TestAutoCdamStagedFitting:
         assert result.diagnostics["stop_reason"] == "threshold"
 
     def test_resume_keeps_samples_and_replays_same_next_stage(self, tmp_path):
-        path = tmp_path / "fit.json"
-        first, _ = make_driver(max_iterations=1, checkpoint_path=path)
+        path = tmp_path / "fit"
+        first, _ = make_driver(max_iterations=1, checkpoint_file=path)
         first.fit()
         resumed, calculator = make_driver(max_iterations=3,
-                                          checkpoint_path=path)
+                                          checkpoint_file=path)
         result = resumed.fit(resume=True)
         uninterrupted, _ = make_driver(max_iterations=3)
         expected = uninterrupted.fit()
@@ -131,10 +138,39 @@ class TestAutoCdamStagedFitting:
         assert result.history == expected.history
         assert len(calculator.batches) == 16
         incompatible, _ = make_driver(max_iterations=4,
-                                      checkpoint_path=path,
+                                      checkpoint_file=path,
                                       tolerance=2)
         with pytest.raises(ValueError, match="settings differ"):
             incompatible.fit(resume=True)
+
+    def test_resume_without_a_checkpoint_is_an_error(self, tmp_path):
+        missing, _ = make_driver(checkpoint_file=tmp_path / "absent")
+        with pytest.raises(ValueError,
+                           match="restart requires an existing checkpoint"):
+            missing.fit(resume=True)
+
+    def test_checkpoint_groups_share_one_run_file(self, tmp_path):
+        path = tmp_path / "run"
+        group = "autocdam/checkpoint_a"
+        first, _ = make_driver(max_iterations=1,
+                               checkpoint_file=path,
+                               checkpoint_group=group)
+        result = first.fit()
+        assert result.checkpoint == str(tmp_path / "run.h5")
+        assert result.checkpoint_group == group
+        assert read_h5_group(path,
+                             group)["history"] == result.to_dict()["history"]
+        assert read_h5_group(path, CHECKPOINT_GROUP) is None
+        assert read_h5_group(path, RESULT_GROUP) is None  # driver-level save
+        other, _ = make_driver(max_iterations=1, checkpoint_file=path)
+        with pytest.raises(ValueError,
+                           match="restart requires an existing checkpoint"):
+            other.fit(resume=True)
+        resumed, calculator = make_driver(max_iterations=1,
+                                          checkpoint_file=path,
+                                          checkpoint_group=group)
+        assert resumed.fit(resume=True).iterations == 1
+        assert calculator.batches == []
 
     def test_failed_and_unreviewed_results_never_win_or_train(self):
 

@@ -32,12 +32,11 @@
 """Post-fit diagnostics, flat result tables, and fitted-model export.
 
 Diagnostics functions return plain dictionaries or lists for
-``FitResult.diagnostics``, so results stay JSON-serializable.
+``FitResult.diagnostics``, so results stay plain, storable values.
 
 ``samples_table`` accepts a ``FitResult``, a search driver, a
-``ParameterPropertyTable``, or a saved run (``checkpoint.json``,
-``result.json`` or the output directory holding them) and returns one row
-per candidate::
+``ParameterPropertyTable``, or a run file (``<filename>.h5``, with the search
+checkpoint and the result) and returns one row per candidate::
 
     sample_id, step, parameter.<name>..., property.<name>...,
     uncertainty.<name>... (e.g. HFE), spread.<name>... (e.g. IOD, CN),
@@ -63,7 +62,8 @@ try:
 except ImportError:
     pass
 
-from .models import FitResult, FitTarget, ParameterSpec
+from .models import (RESULT_GROUP, FitResult, FitTarget, ParameterSpec,
+                     h5_filename, read_h5_group)
 
 # ==========================================================================
 # reporting
@@ -326,12 +326,11 @@ def _from_objects(samples) -> list[dict[str, Any]]:
     return [_flatten(asdict(s)) for s in samples]
 
 
-def _from_checkpoint(path: Path) -> list[dict[str, Any]]:
-    """Plain sample dictionaries read from a ``checkpoint.json`` file."""
-    return [
-        _flatten(s)
-        for s in json.loads(path.read_text(encoding="utf-8"))["samples"]
-    ]
+def _from_checkpoint(filename, group=None) -> list[dict[str, Any]]:
+    """Plain sample dictionaries read from the checkpoint group of a run file."""
+    from .search import CHECKPOINT_GROUP
+    data = read_h5_group(filename, group or CHECKPOINT_GROUP)
+    return [_flatten(s) for s in (data or {}).get("samples", [])]
 
 
 def _from_evaluations(
@@ -362,9 +361,10 @@ def _scores(evaluations) -> dict[str, dict]:
 def _load(source) -> tuple[list[dict[str, Any]], dict[str, dict]]:
     """Samples and scores from any accepted source.
 
-    A checkpoint is preferred over saved evaluations because it also carries
-    per-property metadata. Raises FileNotFoundError for a directory holding
-    neither file and ValueError for an unrecognized JSON file.
+    ``source`` is a FitResult, a search table or driver, or a run file. A
+    checkpoint is preferred over saved evaluations because it also carries
+    per-property metadata. Raises FileNotFoundError for a missing run file and
+    ValueError for a run file without samples or result.
     """
     from .models import FitResult
     from .search import ParameterPropertyTable
@@ -376,29 +376,25 @@ def _load(source) -> tuple[list[dict[str, Any]], dict[str, dict]]:
         return _from_objects(source.table.samples), {}
     if isinstance(source, FitResult):
         evaluations = source.diagnostics.get("evaluations", [])
-        checkpoint = Path(source.checkpoint) if source.checkpoint else None
-        if checkpoint is not None and checkpoint.exists():
-            return _from_checkpoint(checkpoint), _scores(evaluations)
+        if source.checkpoint and h5_filename(source.checkpoint).exists():
+            samples = _from_checkpoint(source.checkpoint,
+                                       source.checkpoint_group)
+            if samples:
+                return samples, _scores(evaluations)
         return _from_evaluations(evaluations)
 
-    path = Path(source)
-    if path.is_dir():
-        checkpoint, result = path / "checkpoint.json", path / "result.json"
-        evaluations = []
-        if result.exists():
-            data = json.loads(result.read_text(encoding="utf-8"))
-            evaluations = data["diagnostics"].get("evaluations", [])
-        if checkpoint.exists():
-            return _from_checkpoint(checkpoint), _scores(evaluations)
-        if evaluations:
-            return _from_evaluations(evaluations)
-        raise FileNotFoundError(f"no checkpoint.json or result.json in {path}")
-    data = json.loads(path.read_text(encoding="utf-8"))
-    if "samples" in data:
-        return _from_checkpoint(path), {}
-    if "diagnostics" in data:
-        return _from_evaluations(data["diagnostics"].get("evaluations", []))
-    raise ValueError(f"{path} is neither a checkpoint nor a saved FitResult")
+    # a run file: the checkpoint carries per-property metadata, so prefer it
+    path = h5_filename(source)
+    if not path.exists():
+        raise FileNotFoundError(f"no AutoCDAM run file {path}")
+    result = read_h5_group(path, RESULT_GROUP)
+    evaluations = (result or {}).get("diagnostics", {}).get("evaluations", [])
+    samples = _from_checkpoint(path, (result or {}).get("checkpoint_group"))
+    if samples:
+        return samples, _scores(evaluations)
+    if evaluations:
+        return _from_evaluations(evaluations)
+    raise ValueError(f"no AutoCDAM samples or result in {path}")
 
 
 # ==========================================================================

@@ -30,15 +30,15 @@
 #  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """Step 7: property caching, cost tracking, screening, and failure visibility."""
-import re
-
 import h5py
 import numpy as np
 import pytest
 
 from veloxchem.autocdam import (AutoCDAM, CalculationResult, CDAMCandidate,
-                                FitTarget, ParameterSet, ParameterSpec)
-from veloxchem.autocdam.cache import CachedCalculator, load_cache, saved_caches
+                                FitResult, FitTarget, ParameterSet,
+                                ParameterSpec)
+from veloxchem.autocdam.cache import CACHE_GROUP, CachedCalculator, load_cache
+from veloxchem.autocdam.models import RESULT_GROUP, read_h5_group
 from veloxchem.autocdam.bayesian import BayesianFittingDriver
 from veloxchem.autocdam.search import ParameterPropertySample
 
@@ -175,33 +175,44 @@ class TestAutoCdamCostAndCache:
         assert len(
             inner.calls) == 2 and cached.stats["failed_calculations"] == 2
 
-    def test_persistent_cache_is_time_stamped_h5_and_survives_a_new_process(
+    def test_persistent_cache_lives_in_the_run_file_and_survives_a_new_process(
             self, tmp_path):
-        path = tmp_path / "cache.json"
+        path = tmp_path / "run"
         first = CachedCalculator(Counting(), path)
         first.calculate(batch(), ParameterSet(), [IOD, CN])
-        assert re.fullmatch(r"cache_\d{8}-\d{6}\.h5", first.path.name)
-        assert h5py.is_hdf5(first.path) and saved_caches(
-            tmp_path / "cache") == [first.path]
-        first.path.rename(tmp_path / "cache_20000101-000000.h5")  # an older run
+        assert first.path == tmp_path / "run.h5"
+        with h5py.File(first.path, "r") as h5f:
+            assert CACHE_GROUP in h5f
+        assert len(load_cache(path)) == 2
         inner = Counting()
         second = CachedCalculator(inner, path)
         result = second.calculate(batch(), ParameterSet(), [IOD, CN])
         assert inner.calls == [] and result.values["IOD"] == pytest.approx(1.9)
         second.calculate(batch(sigma=2.1), ParameterSet(), [IOD])
-        assert len(load_cache(second.path)) == 3  # old entries + the new one
-        assert len(load_cache(tmp_path / "cache_20000101-000000.h5")) == 2
+        assert len(load_cache(path)) == 3  # old entries + the new one
+
+    def test_failed_calculations_are_not_written_to_the_run_file(self, tmp_path):
+        path = tmp_path / "run"
+        cached = CachedCalculator(Counting(fail=True), path)
+        assert cached.calculate(batch(), ParameterSet(), [IOD]).failed
+        assert load_cache(path) == {}
+        assert CachedCalculator(Counting(), path).entries == {}
+
+    def test_missing_run_file_gives_an_empty_cache(self, tmp_path):
+        assert load_cache(tmp_path / "absent") == {}
 
     def test_new_weights_reuse_earlier_calculations_through_a_persistent_cache(
             self, tmp_path):
-        cache = tmp_path / "properties.json"
+        filename = str(tmp_path / "properties")
         search = {"max_evaluations": 8, "initial_samples": 6, "seed": 3}
         first = Counting()
-        run(search, first, cache=str(cache))
+        run(search, first, cache=True, filename=filename)
+        assert len(load_cache(filename)) == 2 * len(first.calls)
         reweighted = Counting()
         _, result = run(search,
                         reweighted,
-                        cache=str(cache),
+                        cache=True,
+                        filename=filename,
                         targets={
                             "IOD": {
                                 "value": 2.055,
@@ -234,12 +245,14 @@ class TestAutoCdamCostAndCache:
             self, tmp_path):
         search = {"max_evaluations": 10, "initial_samples": 5, "seed": 5}
         _, reference = run(search, Counting())
-        checkpoint, cache = tmp_path / "bo.json", tmp_path / "cache.json"
+        filename = str(tmp_path / "run")
         with pytest.raises(KeyboardInterrupt):
             run(search,
                 Counting(interrupt_at=8),
-                checkpoint_file=str(checkpoint),
-                cache=str(cache))
+                filename=filename,
+                cache=True)
+        assert len(load_cache(filename)) == 2 * 7  # the finished calculations
+        assert read_h5_group(filename, RESULT_GROUP) is None
         resumed = Counting()
         targets = {
             "IOD": {
@@ -256,14 +269,16 @@ class TestAutoCdamCostAndCache:
         fit.update_settings({
             "search_method": "bayesian",
             **search,
-            "checkpoint_file": str(checkpoint),
-            "cache": str(cache),
+            "filename": filename,
+            "cache": True,
             "restart": True,
         })
         result = fit.fit(CDAMCandidate("Al", 3), targets, parameters=PARAMETERS)
         assert result.diagnostics["n_evaluations"] == 10
         assert result.parameters.to_dict() == reference.parameters.to_dict()
         assert len(resumed.calls) <= 3  # only the unfinished steps
+        assert FitResult.load(filename).parameters.to_dict(
+        ) == result.parameters.to_dict()
 
     def test_failures_are_listed_with_reasons_in_history_and_result(self):
 

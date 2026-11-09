@@ -52,7 +52,6 @@ from __future__ import annotations
 from collections.abc import Mapping
 from copy import deepcopy
 from dataclasses import asdict
-from pathlib import Path
 from typing import Any
 
 import sys
@@ -63,6 +62,7 @@ from . import reporting
 from ..errorhandler import assert_msg_critical
 from ..inputparser import parse_input, print_keywords, print_attributes
 from ..outputstream import OutputStream
+from ..profiler import Profiler
 from ..veloxchemlib import mpi_master
 from .bayesian import SEARCH_DEFAULTS, BayesianFittingDriver
 from .cache import CachedCalculator
@@ -74,11 +74,12 @@ from .candidate import CDAMCandidate
 from .generator import CoordinateGenerator
 from .md import md_settings
 from .models import (CalculationResult, EvaluationResult, FitResult, FitTarget,
-                     GeneratedBatch, OpenMMSystems, ParameterSet, ParameterSpec,
+                     GeneratedBatch, ParameterSet, ParameterSpec,
                      coerce_parameter_specs, coerce_targets, parse_parameters,
-                     reference_bounds)
+                     read_h5_group, reference_bounds)
 from .multisystem import MultiSystemCalculator, build_systems
-from .search import CalculationInput, default_quality_check, FittingDriver
+from .search import (CHECKPOINT_GROUP, CalculationInput, FittingDriver,
+                     default_quality_check)
 
 # Default parameters: metal LJ sigma/epsilon with wide UFF-scaled soft bounds.
 DEFAULT_PARAMETERS = {"metal_lj_sigma": "uff", "metal_lj_epsilon": "uff"}
@@ -156,8 +157,12 @@ class AutoCDAM:
         self.fep_options = None
         self.qm_options = None
 
+        # timing and profiling
+        self.timing = False
+        self.profiling = False
+
         # files
-        self.checkpoint_file = None
+        self.filename = None
         self.cache = True
         self.restart = False
 
@@ -208,9 +213,12 @@ class AutoCDAM:
                 'md_options': ('raw', 'MD protocol settings'),
                 'fep_options': ('raw', 'solvation FEP settings'),
                 'qm_options': ('raw', 'QM single-point settings'),
-                'checkpoint_file': ('str', 'checkpoint file of the search'),
-                'cache': ('raw', 'property cache: True, False or a file'),
-                'restart': ('bool', 'resume from the checkpoint file'),
+                'timing': ('bool', 'print timing of the fit stages'),
+                'profiling': ('bool', 'print profiling information'),
+                'filename':
+                    ('str', 'run file <filename>.h5: checkpoint, cache, result'),
+                'cache': ('bool', 'reuse calculated properties'),
+                'restart': ('bool', 'resume from the checkpoint in the run file'),
             },
         }
 
@@ -243,6 +251,38 @@ class AutoCDAM:
         assert_msg_critical(
             not unknown, f'AutoCDAM: unknown settings {unknown}')
         parse_input(self, keywords, settings)
+
+    def get_references(self):
+        """
+        Gets the references of the methods used by this study.
+
+        :return:
+            The list of reference strings.
+        """
+
+        references = [
+            # cationic dummy atom model
+            'Y.-P. Pang, J. Mol. Model. 1999, 5, 196',
+        ]
+        candidate = getattr(self, 'candidate', None)
+        if candidate is not None and candidate.potential_form == 'lj12_6_4':
+            references.append('P. Li and K. M. Merz, J. Chem. Theory Comput. '
+                              '2014, 10, 289')
+        # Gaussian-process surrogates of both searches (scikit-learn)
+        references.append('F. Pedregosa et al., J. Mach. Learn. Res. '
+                          '2011, 12, 2825')
+        return references
+
+    def print_references(self):
+        """
+        Prints the references of the methods used by this study.
+        """
+
+        self.ostream.print_blank()
+        for reference in self.get_references():
+            self.ostream.print_reference('Reference: ' + reference)
+        self.ostream.print_blank()
+        self.ostream.flush()
 
     def _search_settings(self):
         """
@@ -317,7 +357,7 @@ class AutoCDAM:
         self.fitting_options = {
             "objective_threshold": self.objective_threshold,
             "quality_check": self.quality_check,
-            "checkpoint_path": self.checkpoint_file,
+            "checkpoint_file": self.filename,
             **self._search_settings()
         }
         self.search = self.fitting_options.get('search')
@@ -354,12 +394,15 @@ class AutoCDAM:
             self._base_calculator = self.calculator
         self.calculator = (self._base_calculator
                            if self._base_calculator is not None else
-                           Calculator(ostream=ostream))
+                           Calculator(comm=self.comm, ostream=ostream))
         self.systems = self._build_systems(systems, ostream)
         self.parameter_warnings = self._ineffective_parameter_warnings()
-        if self.cache is not False and self.cache is not None:
-            self.calculator = CachedCalculator(
-                self.calculator, None if self.cache is True else self.cache)
+        if self.cache:
+            # Calculated properties are kept in the run file, so a later run
+            # with the same filename reuses them.
+            self.calculator = CachedCalculator(self.calculator,
+                                               self.filename,
+                                               write=self.rank == mpi_master())
         self._resolve_md_protocol()
         if self.evaluator is None:
             self.evaluator = Evaluator(ostream=ostream)
@@ -534,8 +577,20 @@ class AutoCDAM:
             hasattr(self, 'candidate'),
             'AutoCDAM: give candidate and fit_targets to fit() or setup()')
         resume = bool(self.restart)
+        self.print_references()
+
+        profiler = Profiler({
+            'timing': self.timing,
+            'profiling': self.profiling,
+        })
+        profiler.set_timing_key('AutoCDAM fit')
+
+        profiler.start_timer('Template')
         self._prepare_template()
         study_metadata = self._study_metadata()
+        profiler.stop_timer('Template')
+
+        profiler.start_timer('Search')
         if self.geometries:
             result = self._fit_geometries(study_metadata, resume)
         else:
@@ -544,13 +599,24 @@ class AutoCDAM:
             if self.fitting_driver.table.samples:
                 self.last_calculation = self.fitting_driver.table.samples[
                     -1].calculation
+        profiler.stop_timer('Search')
+
         result.warnings.extend(self.parameter_warnings)
         if self.systems is not None:
             result.diagnostics["systems"] = reporting.system_report(
                 self.systems, self._samples(), self.candidate.water_model)
         if self.geometries:
             self.openmm_template = None
-        return self._finalize(self._add_monitors(result))
+
+        profiler.start_timer('Monitors')
+        result = self._finalize(self._add_monitors(result))
+        profiler.stop_timer('Monitors')
+
+        if self.filename is not None and self.rank == mpi_master():
+            result.save(self.filename)
+
+        profiler.end(self.ostream)
+        return result
 
     def _study_metadata(self) -> dict[str, Any]:
         """What defines this study; checkpoints only resume when it matches."""
@@ -582,11 +648,11 @@ class AutoCDAM:
             except Exception as exc:
                 yield exc
 
-    def _make_fitting_driver(self, study_metadata, checkpoint_path=None):
+    def _make_fitting_driver(self, study_metadata, checkpoint_group=None):
         """The Bayesian or the staged driver, as ``search`` selected."""
         options = dict(self.fitting_options)
-        if checkpoint_path is not None:
-            options["checkpoint_path"] = checkpoint_path
+        if checkpoint_group is not None:
+            options["checkpoint_group"] = checkpoint_group
         if self.search is not None:
             options["search"] = self.search
         driver = FittingDriver if self.search is None else BayesianFittingDriver
@@ -596,17 +662,17 @@ class AutoCDAM:
                       self.evaluator,
                       self._make_stage_inputs,
                       study_metadata=study_metadata,
+                      comm=self.comm,
                       ostream=self.ostream,
                       **options)
 
     def _fit_geometries(self, study_metadata, resume) -> FitResult:
         """One full search per dummy geometry; keep the best (feasible first, then objective).
 
-        Each geometry gets its own solvent template and checkpoint
-        (``<stem>_<geometry><suffix>``).
+        Each geometry gets its own solvent template and checkpoint group
+        (``autocdam/checkpoint_<geometry>`` in the run file).
         """
-        base_candidate, base_checkpoint = self.candidate, self.fitting_options[
-            "checkpoint_path"]
+        base_candidate = self.candidate
         results, drivers = {}, {}
         for geometry in self.geometries:
             self.candidate = base_candidate.with_geometry(geometry)
@@ -614,15 +680,11 @@ class AutoCDAM:
             self._prepare_template()
             metadata = deepcopy(study_metadata)
             metadata.update(self.candidate.metadata())
-            checkpoint = None
-            if base_checkpoint is not None:
-                path = Path(base_checkpoint)
-                checkpoint = path.with_name(
-                    f"{path.stem}_{geometry}{path.suffix}")
-            driver = self._make_fitting_driver(metadata, checkpoint)
-            results[geometry] = driver.fit(
-                resume=resume and checkpoint is not None and
-                checkpoint.exists())
+            group = f"{CHECKPOINT_GROUP}_{geometry}"
+            driver = self._make_fitting_driver(metadata, group)
+            saved = (self.filename is not None and
+                     read_h5_group(self.filename, group) is not None)
+            results[geometry] = driver.fit(resume=resume and saved)
             drivers[geometry] = driver
         best = min(results,
                    key=lambda g: (not results[g].diagnostics.get(
@@ -698,7 +760,10 @@ class AutoCDAM:
             raise ValueError("fit() before exporting a fitted model")
         if path is None:
             raise ValueError("give an output directory for the fitted model")
-        return export_cdam_model(path, self.candidate, self._best_parameters(),
+        parameters = self._best_parameters()
+        if self.rank != mpi_master():
+            return []
+        return export_cdam_model(path, self.candidate, parameters,
                                  self.systems)
 
     def _best_parameters(self) -> dict[str, float]:

@@ -31,8 +31,6 @@
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """Plot source alignment and public API checks; synthetic inputs are fixtures."""
 from copy import deepcopy
-from dataclasses import asdict
-import json
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -103,10 +101,14 @@ class TestAutoCdamPlotting:
         assert result.history == original
         assert (tmp_path / "cdam.png").read_bytes().startswith(b"\x89PNG")
         plt.close(figure)
-        source = tmp_path / "summary.json"
-        source.write_text(json.dumps({"result": asdict(result)}))
-        figure = plot_fit(source)
+        # Batch example summaries wrap the result dictionary under "result".
+        figure = plot_fit({"result": result.to_dict()})
         assert len(figure.axes) == 2
+        plt.close(figure)
+        figure = plot_fit(result.save(tmp_path / "run"))
+        assert len(figure.axes) == 2
+        np.testing.assert_allclose(figure.axes[0].lines[0].get_ydata(),
+                                   [4.0, np.nan, 0.25])
         plt.close(figure)
 
     def test_metal_plot_matches_ids_and_keeps_directions_separate(
@@ -157,9 +159,7 @@ class TestAutoCdamPlotting:
     def test_saved_result_file_plots_with_its_probe(self, tmp_path):
         result = metal_result()
         result.diagnostics["probe"] = "He"
-        source = tmp_path / "fit_result.json"
-        source.write_text(json.dumps(asdict(result)))
-        figure = plot_fit(source)
+        figure = plot_fit(result.save(tmp_path / "run"))
         np.testing.assert_allclose(figure.axes[0].lines[0].get_xdata(),
                                    [2.5, 3.5])
         assert len(figure.axes) == 1

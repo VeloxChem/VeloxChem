@@ -29,27 +29,26 @@
 #  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
 #  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-"""Persistent per-property cache in front of any calculator, with cost accounting.
+"""Per-property cache in front of any calculator, with cost accounting.
 
-A persistent cache ``<dir>/<name>`` is saved as ``<dir>/<name>_<YYYYmmdd-HHMMSS>.h5``,
-stamped with the time the cache was opened. Opening it again loads the newest
-stamped file and writes a new one, so every run leaves its own complete copy.
+With a run file, the cache is the ``autocdam/cache`` group of
+``<filename>.h5``: it is loaded when the file exists and rewritten after each
+new calculation, so a later run with the same file reuses the properties.
 """
 
 from __future__ import annotations
 
 import json
-import re
 import time
 from pathlib import Path
 from typing import Any
 
-import h5py
 import numpy as np
 
-from .models import CalculationResult, FitTarget, GeneratedBatch, all_finite
+from .models import (CalculationResult, FitTarget, GeneratedBatch, all_finite,
+                     h5_filename, read_h5_group, write_h5_groups)
 
-TIME_FORMAT = "%Y%m%d-%H%M%S"
+CACHE_GROUP = "autocdam/cache"
 
 
 def _canonical(value):
@@ -82,25 +81,24 @@ class CachedCalculator:
     the same study. Only
     missing properties are recalculated. Failed or nonfinite results are never
     cached, so they stay visible as failures. ``path`` makes the cache
-    persistent (time-stamped HDF5, see the module docstring). Wall time and
+    persistent (the run file, see the module docstring). Wall time and
     calculation counts are tracked per system.
     """
 
-    def __init__(self, calculator, path: str | Path | None = None):
-        """Wrap ``calculator``; load the newest saved cache for ``path``, if any.
+    def __init__(self,
+                 calculator,
+                 filename: str | Path | None = None,
+                 write: bool = True):
+        """Wrap ``calculator``; load the cache of the run file ``filename``, if any.
 
-        New entries go to ``<path without suffix>_<now>.h5``.
+        ``write=False`` (MPI ranks other than the master) never writes the file.
         """
         self.inner = calculator
+        self.write = write
         self.entries: dict[str, dict[str, Any]] = {}
-        self.path = None
-        if path is not None:
-            base = Path(path).with_suffix("")
-            saved = saved_caches(base)
-            if saved:
-                self.entries = load_cache(saved[-1])
-            self.path = base.with_name(
-                f"{base.name}_{time.strftime(TIME_FORMAT)}.h5")
+        self.path = h5_filename(filename) if filename is not None else None
+        if self.path is not None:
+            self.entries = load_cache(self.path)
         self.stats = {
             "requests": 0,
             "target_requests": 0,
@@ -207,25 +205,18 @@ class CachedCalculator:
             entry["wall_time_s"] += float(seconds)
 
     def _save(self) -> None:
-        """Rewrite this run's cache file through a temporary file; no-op without ``path``."""
-        if self.path is None:
+        """Rewrite the cache group of the run file; no-op without a run file."""
+        if self.path is None or not self.write:
             return
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        temporary = self.path.with_suffix(".h5.tmp")
-        strings = h5py.string_dtype()
-        with h5py.File(temporary, "w") as handle:
-            handle.attrs["created"] = self.path.stem.rsplit("_", 1)[-1]
-            handle.create_dataset("keys",
-                                  data=list(self.entries),
-                                  dtype=strings)
-            for field in ("value", "metadata"):
-                handle.create_dataset(field,
-                                      dtype=strings,
-                                      data=[
-                                          json.dumps(entry[field])
-                                          for entry in self.entries.values()
-                                      ])
-        temporary.replace(self.path)
+        write_h5_groups(
+            self.path, {
+                CACHE_GROUP: {
+                    "keys": list(self.entries),
+                    "values": [entry["value"] for entry in self.entries.values()],
+                    "metadata":
+                        [entry["metadata"] for entry in self.entries.values()],
+                }
+            })
 
     def cost_report(self) -> dict[str, Any]:
         """Copy of the request/hit/calculation counters and wall times, plus cache size and path."""
@@ -235,22 +226,24 @@ class CachedCalculator:
         return report
 
 
-def saved_caches(base: Path) -> list[Path]:
-    """Time-stamped cache files ``<base>_<YYYYmmdd-HHMMSS>.h5``, oldest first."""
-    pattern = re.compile(re.escape(base.name) + r"_\d{8}-\d{6}\.h5")
-    if not base.parent.is_dir():
-        return []
-    return sorted(p for p in base.parent.iterdir() if pattern.fullmatch(p.name))
+def load_cache(filename) -> dict[str, dict[str, Any]]:
+    """
+    Gets the cached properties of a run file.
 
+    :param filename:
+        The run file (``.h5`` added when missing).
 
-def load_cache(path: Path) -> dict[str, dict[str, Any]]:
-    """Entries ``{key: {"value", "metadata"}}`` of one saved HDF5 cache file."""
-    with h5py.File(path, "r") as handle:
-        keys, values, metadata = (
-            handle[name].asstr()[()] for name in ("keys", "value", "metadata"))
+    :return:
+        The entries ``{key: {"value", "metadata"}}``; empty without a cache.
+    """
+
+    data = read_h5_group(filename, CACHE_GROUP)
+    if not data:
+        return {}
     return {
         key: {
-            "value": json.loads(value),
-            "metadata": json.loads(meta)
-        } for key, value, meta in zip(keys, values, metadata)
+            "value": value,
+            "metadata": metadata
+        } for key, value, metadata in zip(data["keys"], data["values"],
+                                          data["metadata"])
     }

@@ -66,9 +66,12 @@ def _plt():
 
 
 def _result(result) -> dict:
-    """Normalize a FitResult, dict or JSON path to a result dictionary."""
+    """Normalize a FitResult, dict or run file to a result dictionary."""
     if isinstance(result, (str, Path)):
-        result = json.loads(Path(result).read_text())
+        from .models import RESULT_GROUP, read_h5_group
+        result = read_h5_group(result, RESULT_GROUP)
+        assert_msg_critical(result is not None,
+                            "AutoCDAM plotting: no result in the run file")
     if isinstance(result, Mapping):
         # Batch example summaries wrap the shared FitResult under 'result'.
         return result.get("result", result)

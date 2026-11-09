@@ -64,7 +64,7 @@ def fit(tmp_path):
         "search_method": "bayesian",
         "max_evaluations": 6,
         "seed": 1,
-        "checkpoint_file": str(tmp_path / "checkpoint.json"),
+        "filename": str(tmp_path / "run"),
     })
     return driver, driver.fit(CDAMCandidate("Al", 3),
                               targets,
@@ -75,11 +75,10 @@ class TestAutoCdamTables:
 
     def test_rows_from_result_driver_and_saved_run_agree(self, tmp_path):
         driver, result = fit(tmp_path)
-        result.save(tmp_path / "result.json")
         from_result = samples_table(result)
-        from_dir = samples_table(tmp_path)
+        from_file = samples_table(tmp_path / "run.h5")
         assert len(from_result) == len(driver.fitting_driver.table.samples) == 6
-        assert from_result == from_dir
+        assert from_result == from_file
         row = from_result[0]
         assert row["step"] == 1 and "parameter.metal_lj_sigma" in row
         assert row[
@@ -94,7 +93,8 @@ class TestAutoCdamTables:
 
     def test_saved_result_alone_and_csv(self, tmp_path):
         _, result = fit(tmp_path)
-        path = result.save(tmp_path / "only" / "result.json")
+        path = result.save(tmp_path / "only" / "result")
+        assert path.name == "result.h5"
         rows = samples_table(path)
         assert len(rows) == 6 and rows[0]["objective"] is not None
         with save_table(rows, tmp_path / "samples.csv").open() as handle:

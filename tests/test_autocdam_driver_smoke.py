@@ -39,6 +39,8 @@ class TestAutoCdamDriverSmoke:
         import math
         import random
         from veloxchem import OutputStream
+        from veloxchem.autocdam import FitResult
+        from veloxchem.autocdam.models import read_h5_group
 
         random.seed(42)
         ostream = OutputStream(str(tmp_path / "fit.log"))
@@ -50,7 +52,7 @@ class TestAutoCdamDriverSmoke:
                 "samples_per_stage": 2,
                 "pilot": True,
                 "work_dir": str(tmp_path),
-                "checkpoint_file": str(tmp_path / "checkpoint.json"),
+                "filename": str(tmp_path / "run"),
             })
             result = cdam.fit(CDAMCandidate("Zn", 2), {
                 "IOD": {
@@ -78,7 +80,10 @@ class TestAutoCdamDriverSmoke:
             assert best.calculation.metadata["IOD"]["md_options"][
                 "timestep_fs"] == 0.25
             assert best.calculation.metadata["IOD"]["pilot"] is True
-            assert (tmp_path / "checkpoint.json").exists()
+            assert read_h5_group(tmp_path / "run.h5",
+                                 "autocdam/checkpoint") is not None
+            assert FitResult.load(tmp_path / "run").parameters.to_dict(
+            ) == result.parameters.to_dict()
         finally:
             ostream.close()
 

@@ -51,8 +51,10 @@ import re
 
 import numpy as np
 
+from ..mathutils import safe_arccos
 from ..mmforcefieldgenerator import MMForceFieldGenerator
 from ..outputstream import OutputStream
+from ..superimpose import svd_superimpose
 from .models import ANGSTROM_TO_NM, GEOMETRY_RMSD_PROPERTIES
 
 # ==========================================================================
@@ -90,33 +92,23 @@ def box_widths(box_nm: np.ndarray) -> np.ndarray:
 # --------------------------------------------------------------- superposition
 
 
-def kabsch_rotation(mobile_centered: np.ndarray,
-                    reference_centered: np.ndarray) -> np.ndarray:
-    """Proper rotation R minimizing |mobile @ R.T - reference| for centred point sets."""
-    u, _, vt = np.linalg.svd(mobile_centered.T @ reference_centered)
-    d = np.sign(np.linalg.det(vt.T @ u.T))
-    return vt.T @ np.diag([1.0, 1.0, d]) @ u.T
-
-
 def kabsch_rmsd(P: np.ndarray, Q: np.ndarray) -> float:
     """Minimum RMSD between matched point sets P and Q over rigid rotation.
 
-    Both sets are centred first, so the result ignores translation and
-    rotation but keeps the chirality/torsion that distances and angles miss.
+    Both sets are centred first (VeloxChem's ``svd_superimpose``), so the
+    result ignores translation and rotation but keeps the chirality/torsion
+    that distances and angles miss.
     """
-    Pc = np.asarray(P, float) - np.mean(P, axis=0)
-    Qc = np.asarray(Q, float) - np.mean(Q, axis=0)
-    R = kabsch_rotation(Pc, Qc)
-    return float(np.sqrt(np.mean(np.sum((Pc @ R.T - Qc)**2, axis=1))))
+    rmsd, _, _ = svd_superimpose(np.asarray(P, float), np.asarray(Q, float))
+    return float(rmsd)
 
 
 def superpose_all(points: np.ndarray, mobile: np.ndarray,
                   reference: np.ndarray) -> np.ndarray:
-    """Apply the Kabsch transform taking ``mobile`` onto ``reference`` to ``points``."""
-    center = mobile.mean(axis=0)
-    rotation = kabsch_rotation(mobile - center,
-                               reference - reference.mean(axis=0))
-    return (points - center) @ rotation.T + reference.mean(axis=0)
+    """Apply the transform taking ``mobile`` onto ``reference`` to ``points``."""
+    _, rotation, translation = svd_superimpose(np.asarray(mobile, float),
+                                               np.asarray(reference, float))
+    return np.asarray(points, float) @ rotation + translation
 
 
 def element_matched_rmsd(local, elements, reference, ref_elements) -> float:
@@ -192,9 +184,7 @@ def align_template(template: np.ndarray, observed: np.ndarray) -> np.ndarray:
 def pairwise_angles_deg(unit_dirs: np.ndarray) -> np.ndarray:
     """All C(n,2) angles (degrees) between unit direction vectors."""
     return np.asarray([
-        math.degrees(
-            math.acos(
-                float(np.clip(np.dot(unit_dirs[i], unit_dirs[j]), -1.0, 1.0))))
+        math.degrees(safe_arccos(float(np.dot(unit_dirs[i], unit_dirs[j]))))
         for i, j in itertools.combinations(range(len(unit_dirs)), 2)
     ])
 
@@ -275,7 +265,7 @@ def angle_degrees(xyz_nm, atoms, box_nm) -> float:
     left = minimum_image(xyz_nm[atoms[0]] - xyz_nm[atoms[1]], box_nm)
     right = minimum_image(xyz_nm[atoms[2]] - xyz_nm[atoms[1]], box_nm)
     cosine = left @ right / (np.linalg.norm(left) * np.linalg.norm(right))
-    return float(np.degrees(np.arccos(np.clip(cosine, -1.0, 1.0))))
+    return math.degrees(safe_arccos(float(cosine)))
 
 
 def count_within(xyz_nm, center: int, partners, cutoff_nm: float,

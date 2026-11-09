@@ -37,6 +37,7 @@ from veloxchem.molecule import Molecule
 from veloxchem.mmforcefieldgenerator import MMForceFieldGenerator
 from veloxchem.veloxchemlib import hartree_in_kjpermol
 from veloxchem.autocdam import (AutoCDAM, CalculationResult, CDAMCandidate,
+                                FitResult,
                                 MetalComplexLJDriver,
                                 format_table, plot_fit, samples_table,
                                 save_table)
@@ -104,11 +105,9 @@ def toy_fit(search, output):
     fit.update_settings({
         **options,
         "cache": False,
-        "checkpoint_file": str(output / "checkpoint.json"),
+        "filename": str(output / "run"),
     })
-    result = fit.fit(CDAMCandidate("Al", 3), targets, parameters=parameters)
-    result.save(output / "result.json")
-    return result
+    return fit.fit(CDAMCandidate("Al", 3), targets, parameters=parameters)
 
 
 def zn_complex_and_baseline():
@@ -177,16 +176,16 @@ class TestAutoCdamToyFits:
         result = toy_fit(search, tmp_path)
         assert result.converged
         assert abs(result.diagnostics["best_properties"]["IOD"] - 1.90) <= 0.01
-        assert (tmp_path / "result.json").exists()
+        assert FitResult.load(tmp_path / "run").converged
 
     def test_toy_fit_results_read_back(self, tmp_path):
         toy_fit("bayesian", tmp_path)
-        rows = samples_table(tmp_path)
+        rows = samples_table(tmp_path / "run.h5")
         assert rows and "objective" in rows[0]
         assert save_table(rows, tmp_path / "samples.csv").exists()
         assert "objective" in format_table(rows[:2], ["sample_id", "objective"])
         pytest.importorskip("matplotlib")
-        plot_fit(tmp_path / "result.json").savefig(tmp_path / "fit_plot.png")
+        plot_fit(tmp_path / "run.h5").savefig(tmp_path / "fit_plot.png")
         assert (tmp_path / "fit_plot.png").exists()
 
     def test_metal_complex_fit_recovers_the_encoded_parameters(self, tmp_path):
@@ -201,7 +200,7 @@ class TestAutoCdamToyFits:
             "sigma_bounds_angstrom": [1.0, 4.0],
             "epsilon_bounds_kjmol": [0.01, 5.0],
             "energy_tolerance_kjmol": 0.05,
-            "workdir": str(tmp_path)
+            "filename": str(tmp_path / "complex")
         })
         driver.setup(molecule, 0, baseline_force_field=baseline)
         driver.compute_qm_dataset()
@@ -210,4 +209,4 @@ class TestAutoCdamToyFits:
                                                                     abs=1e-3)
         assert result.parameters["metal_lj_epsilon"] == pytest.approx(
             TRUE_EPSILON, abs=1e-3)
-        assert driver.export_fitted_model()
+        assert driver.export_fitted_model(tmp_path / "fitted_complex.xml")

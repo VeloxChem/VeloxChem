@@ -61,6 +61,8 @@ try:
 except ImportError:
     pass
 
+from mpi4py import MPI
+
 from ..errorhandler import assert_msg_critical
 from ..molecularbasis import MolecularBasis
 from ..molecule import Molecule
@@ -129,8 +131,9 @@ def print_setup(ostream, molecule: Molecule, settings: dict[str, Any]) -> None:
 class SinglePointCalculator:
     """Converged SCF energies (Hartree), restricted for singlets, unrestricted otherwise."""
 
-    def __init__(self, ostream):
-        """Store the output stream and start an empty in-memory energy cache."""
+    def __init__(self, comm=None, ostream=None):
+        """Store the communicator and output stream; start an empty energy cache."""
+        self.comm = comm if comm is not None else MPI.COMM_WORLD
         self.ostream = ostream
         self.cache: dict[tuple, float] = {}
 
@@ -158,7 +161,7 @@ class SinglePointCalculator:
             return self.cache[key]
 
         driver = (ScfRestrictedDriver if multiplicity == 1 else
-                  ScfUnrestrictedDriver)(ostream=self.ostream)
+                  ScfUnrestrictedDriver)(comm=self.comm, ostream=self.ostream)
         for name, value in settings.items():
             if name != "basis":
                 setattr(driver, name, value)
@@ -237,12 +240,13 @@ class Calculator:
 
     requires_openmm_systems = True
 
-    def __init__(self, ostream: OutputStream | None = None) -> None:
+    def __init__(self, comm=None, ostream: OutputStream | None = None) -> None:
         """Create the calculator with an output stream and an empty QM single-point cache."""
         assert_msg_critical("openmm" in sys.modules,
                             f"{type(self).__name__}: OpenMM is required")
-        self.ostream = default_ostream(ostream)
-        self.qm = SinglePointCalculator(self.ostream)
+        self.comm = comm if comm is not None else MPI.COMM_WORLD
+        self.ostream = default_ostream(ostream, self.comm)
+        self.qm = SinglePointCalculator(self.comm, self.ostream)
 
     # ------------------------------------------------------------ public API
 

@@ -52,7 +52,7 @@ from dataclasses import asdict, dataclass, field
 import json
 from pathlib import Path
 from typing import Any
-import csv
+import tempfile
 
 import sys
 
@@ -72,7 +72,8 @@ from .calculator import DEFAULT_BASIS, SINGLE_POINT_SETTINGS, Calculator
 from .evaluator import Evaluator
 from .framework import check_force_field_atoms, copy_force_field
 from .models import (CalculationResult, FitResult, FitTarget, ParameterSet,
-                     ParameterSpec, print_settings,
+                     ParameterSpec, h5_filename, print_settings, read_h5_group,
+                     write_h5_groups,
                      ANGSTROM_TO_NM)
 
 # ==========================================================================
@@ -96,6 +97,7 @@ FIT_SETTING_NAMES = frozenset({
     "xtol",
     "gtol",
 })
+DATASET_GROUP = "metal_complex_lj/qm_scan"
 # A supplied baseline matches the study molecule when coordinates agree this closely.
 COORDINATE_ATOL_ANGSTROM = 1e-6
 
@@ -180,7 +182,6 @@ class MetalComplexLJStudy:
     fit_settings: dict[str, Any] = field(default_factory=dict)
     probe_parameters: dict[str, Any] | None = None
     baseline_force_field: Any = None
-    workdir: str | Path = "outputs/metal_complex_lj"
 
     def __post_init__(self):
         """Copy the molecule and settings, normalize the probe name, and validate every input.
@@ -218,7 +219,6 @@ class MetalComplexLJStudy:
                 f"unsupported fit settings: {sorted(set(self.fit_settings) - FIT_SETTING_NAMES)}"
             )
         self.probe_parameters = deepcopy(self.probe_parameters)
-        self.workdir = Path(self.workdir)
 
     def _check_target(self, sig):
         """Validate the target index and require real atoms with finite coordinates."""
@@ -310,22 +310,44 @@ class QMScanDataset:
     metadata: dict[str, Any]
     records: list[LJScanRecord]
 
-    def save(self, path):
-        """Write the dataset as versioned JSON, creating parent directories; return the path."""
-        path = Path(path)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        write_json(
-            path, {
-                "version": 1,
-                "metadata": self.metadata,
-                "records": [asdict(record) for record in self.records]
-            })
-        return path
+    def save(self, filename, group=DATASET_GROUP):
+        """
+        Writes the dataset to a group of a run file.
+
+        :param filename:
+            The run file (``.h5`` added when missing).
+        :param group:
+            The group of the dataset.
+
+        :return:
+            The path of the HDF5 file.
+        """
+
+        payload = {
+            "version": 1,
+            "metadata": self.metadata,
+            "records": [asdict(record) for record in self.records]
+        }
+        return write_h5_groups(filename, {group: json.loads(to_json(payload))})
 
     @classmethod
-    def load(cls, path):
-        """Read caller-supplied JSON directly, trusting its contents."""
-        payload = json.loads(Path(path).read_text())
+    def load(cls, filename, group=DATASET_GROUP):
+        """
+        Reads a dataset from a run file, trusting its contents.
+
+        :param filename:
+            The run file (``.h5`` added when missing).
+        :param group:
+            The group of the dataset.
+
+        :return:
+            The QM scan dataset.
+        """
+
+        payload = read_h5_group(filename, group)
+        if payload is None:
+            raise FileNotFoundError(
+                f"no QM scan dataset in {h5_filename(filename)}")
         return cls(payload.get("metadata", {}),
                    [LJScanRecord(**row) for row in payload["records"]])
 
@@ -352,6 +374,7 @@ STRATEGIES = ("least_squares", "differential_evolution+least_squares")
 AUTO_DIRECTION_SAMPLES = 128  # Fibonacci-sphere directions tried for the "auto" scan
 ILL_CONDITIONED = 1e8  # scaled Jacobian condition number that triggers a warning
 MM_ENERGY_NAME = "MM_INTERACTION_ENERGY"
+FIT_RESULT_GROUP = "metal_complex_lj/result"
 
 
 class MetalComplexLJDriver:
@@ -409,7 +432,7 @@ class MetalComplexLJDriver:
             setattr(self, name, None)
 
         # files
-        self.workdir = 'outputs/metal_complex_lj'
+        self.filename = None
 
         # collaborators
         self.calculator = None
@@ -453,7 +476,8 @@ class MetalComplexLJDriver:
                 'ftol': ('float', 'least-squares ftol'),
                 'xtol': ('float', 'least-squares xtol'),
                 'gtol': ('float', 'least-squares gtol'),
-                'workdir': ('str', 'directory of the output files'),
+                'filename':
+                    ('str', 'run file <filename>.h5: QM dataset and result'),
             },
         }
 
@@ -486,6 +510,28 @@ class MetalComplexLJDriver:
         assert_msg_critical(
             not unknown, f'MetalComplexLJDriver: unknown settings {unknown}')
         parse_input(self, keywords, settings)
+
+    def get_references(self):
+        """
+        Gets the references of the methods used by the fit.
+
+        :return:
+            The list of reference strings.
+        """
+
+        # least-squares and differential-evolution optimizers (SciPy)
+        return ['P. Virtanen et al., Nat. Methods 2020, 17, 261']
+
+    def print_references(self):
+        """
+        Prints the references of the methods used by the fit.
+        """
+
+        self.ostream.print_blank()
+        for reference in self.get_references():
+            self.ostream.print_reference('Reference: ' + reference)
+        self.ostream.print_blank()
+        self.ostream.flush()
 
     def _fit_settings(self):
         """
@@ -527,10 +573,9 @@ class MetalComplexLJDriver:
             qm_settings=self.qm_settings,
             fit_settings=self._fit_settings(),
             probe_parameters=self.probe_parameters,
-            baseline_force_field=baseline_force_field,
-            workdir=self.workdir)
+            baseline_force_field=baseline_force_field)
         if self.calculator is None:
-            self.calculator = Calculator(ostream=self.ostream)
+            self.calculator = Calculator(comm=self.comm, ostream=self.ostream)
         if self.evaluator is None:
             self.evaluator = Evaluator(ostream=self.ostream)
         if self.force_field_factory is None:
@@ -626,9 +671,11 @@ class MetalComplexLJDriver:
         """A copy of the supplied baseline, or the generator's defaults for the complex."""
         if supplied is None:
             ff = self.force_field_factory()
-            self.study.workdir.mkdir(parents=True, exist_ok=True)
-            ff.molecule_name = str(self.study.workdir / "baseline")
-            ff.create_topology(self.study.molecule)
+            # RESP/SCF scratch files of the generator go to a temporary directory.
+            with tempfile.TemporaryDirectory() as directory:
+                ff.molecule_name = str(Path(directory) / "baseline")
+                ff.create_topology(self.study.molecule)
+            ff.molecule_name = "baseline"
             return ff
         if not same_molecule(molecule_signature(supplied.molecule),
                              self._study_signature["molecule"]):
@@ -657,9 +704,10 @@ class MetalComplexLJDriver:
         override = self.study.probe_parameters
         if override is None:
             probe_ff = self.force_field_factory()
-            probe_ff.molecule_name = str(self.study.workdir / "probe")
             try:
-                probe_ff.create_topology(self._probe_molecule(), resp=False)
+                with tempfile.TemporaryDirectory() as directory:
+                    probe_ff.molecule_name = str(Path(directory) / "probe")
+                    probe_ff.create_topology(self._probe_molecule(), resp=False)
             except Exception as exc:
                 raise ValueError(
                     f"no generator defaults for {self.study.probe}; "
@@ -881,28 +929,46 @@ class MetalComplexLJDriver:
             *((f"QM {name.replace('_', ' ').title()}", value)
               for name, value in sorted(study.qm_settings.items())),
             ("Energy Reference", self.dataset.metadata["energy_reference"]),
-            ("Working Directory", study.workdir),
+            ("Run File", h5_filename(self.filename) if self.filename else None),
         ])
 
-    def save_dataset(self, path=None):
-        """Write the scan dataset JSON and return its path.
+    def save_dataset(self, filename=None):
+        """
+        Writes the scan dataset to a run file.
 
-        The default path is ``workdir/qm_scan_dataset.json``. Baseline metadata
-        is attached when the baseline has been prepared. Raises RuntimeError if
-        no scans have been generated or loaded.
+        Baseline metadata is attached when the baseline has been prepared.
+        Raises RuntimeError if no scans have been generated or loaded.
+
+        :param filename:
+            The run file (default: the ``filename`` setting; nothing is
+            written without either).
+
+        :return:
+            The path of the HDF5 file, or None.
         """
         self._check_study()
         if self.dataset is None:
             raise RuntimeError("generate or load scans before saving a dataset")
         if self.baseline_force_field is not None:
             self.dataset.metadata["baseline"] = deepcopy(self.baseline_metadata)
-        return self.dataset.save(path or
-                                 self.study.workdir / "qm_scan_dataset.json")
+        filename = filename or self.filename
+        if filename is None or self.rank != mpi_master():
+            return h5_filename(filename) if filename is not None else None
+        return self.dataset.save(filename)
 
-    def load_dataset(self, path):
-        """Use the supplied reference JSON as-is; the caller ensures correctness."""
+    def load_dataset(self, filename):
+        """
+        Uses the dataset of a run file as-is; the caller ensures correctness.
+
+        :param filename:
+            The run file.
+
+        :return:
+            The QM scan dataset.
+        """
+
         self._check_study()
-        dataset = QMScanDataset.load(path)
+        dataset = QMScanDataset.load(filename)
         self.dataset = dataset
         self.result = None
         return dataset
@@ -997,10 +1063,11 @@ class MetalComplexLJDriver:
 
     def _targets(self):
         """One FitTarget per usable record (QM interaction, kJ/mol); sets point weights."""
+        settings = self._fit_settings()
         tolerance = float(
-            self._fit_settings().get("energy_tolerance_kjmol",
-                                        DEFAULT_ENERGY_TOLERANCE_KJMOL))
-        weights = self._fit_settings().get("point_weights", {})
+            settings.get("energy_tolerance_kjmol",
+                         DEFAULT_ENERGY_TOLERANCE_KJMOL))
+        weights = settings.get("point_weights", {})
         if not isinstance(weights, dict):
             raise ValueError(
                 "point_weights must map record IDs to nonnegative weights")
@@ -1077,6 +1144,7 @@ class MetalComplexLJDriver:
         targets = self._targets()
         settings = {**OPTIMIZER_DEFAULTS, **self._fit_settings()}
         strategy = settings["strategy"]
+        self.print_references()
         if strategy not in STRATEGIES:
             raise ValueError("unknown fitting strategy")
         reference = np.array([target.reference for target in targets])
@@ -1273,9 +1341,13 @@ class MetalComplexLJDriver:
         writer assigns per-atom classes, preventing other same-type atoms from
         inheriting the target metal's fitted LJ parameters.
         """
+        if path is None:
+            raise ValueError("give an output file for the fitted model")
         ff = self.fitted_force_field()
-        path = Path(path or self.study.workdir / "fitted_complex.xml")
+        path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
+        if self.rank != mpi_master():
+            return path
         ff.generate_residue_xml(path, mol_name="COMPLEX")
         write_json(
             path.with_suffix(".fit.json"), {
@@ -1286,25 +1358,15 @@ class MetalComplexLJDriver:
         return path
 
     def _save_fit_outputs(self):
-        """Write ``fit_result.json`` and the QM/MM curves (kJ/mol) ``fit_curves.csv`` to the workdir."""
-        self.study.workdir.mkdir(parents=True, exist_ok=True)
-        write_json(self.study.workdir / "fit_result.json", asdict(self.result))
-        diag = self.result.diagnostics
-        with (self.study.workdir / "fit_curves.csv").open("w",
-                                                          newline="") as handle:
-            writer = csv.writer(handle)
-            writer.writerow([
-                "record_id", "distance_angstrom", "direction_x", "direction_y",
-                "direction_z", "qm_interaction_kjmol", "mm_interaction_kjmol",
-                "error_kjmol"
-            ])
-            for row, qm, mm in zip(self._usable_records(),
-                                   diag["qm_interaction_kjmol"],
-                                   diag["mm_interaction_kjmol"]):
-                writer.writerow([
-                    row.record_id, row.distance_angstrom, *row.direction, qm,
-                    mm, mm - qm
-                ])
+        """
+        Writes the fit result (with the QM/MM curves in its diagnostics) to
+        the run file; no-op without a ``filename`` setting.
+        """
+
+        if self.filename is None or self.rank != mpi_master():
+            return
+        write_h5_groups(self.filename,
+                        {FIT_RESULT_GROUP: json.loads(to_json(asdict(self.result)))})
 
 
 def _fibonacci_sphere(n: int) -> np.ndarray:
