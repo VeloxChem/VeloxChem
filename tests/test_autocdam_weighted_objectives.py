@@ -36,6 +36,7 @@ import pytest
 
 from veloxchem.autocdam import AutoCDAM, CalculationResult, CDAMCandidate, Evaluator, FitTarget
 from veloxchem.autocdam.evaluator import within_tolerance
+from veloxchem.errorhandler import VeloxChemError
 
 
 class SurfaceCalculator:
@@ -149,7 +150,7 @@ class TestAutoCdamWeightedObjectives:
         }, "unsupported keys"),
     ])
     def test_invalid_target_inputs_are_rejected(self, bad, message):
-        with pytest.raises(ValueError, match=message):
+        with pytest.raises(VeloxChemError, match=message):
             FitTarget.from_mapping("T", {"value": 1.0, "tolerance": 0.1, **bad})
 
     def test_target_selection_keys_are_kept_in_metadata(self):
@@ -181,7 +182,7 @@ class TestAutoCdamWeightedObjectives:
         }, "more than once"),
     ])
     def test_invalid_parameter_inputs_are_rejected(self, parameters, message):
-        with pytest.raises(ValueError, match=message):
+        with pytest.raises(VeloxChemError, match=message):
             AutoCDAM().setup(CDAMCandidate("Al", 3),
                              {"IOD": {
                                  "value": 1.9,
@@ -190,7 +191,7 @@ class TestAutoCdamWeightedObjectives:
                              parameters=parameters)
 
     def test_parameters_and_fit_parameters_are_exclusive(self):
-        with pytest.raises(ValueError, match="either"):
+        with pytest.raises(VeloxChemError, match="either"):
             AutoCDAM().setup(CDAMCandidate("Al", 3),
                              {"IOD": {
                                  "value": 1.9,
@@ -198,10 +199,7 @@ class TestAutoCdamWeightedObjectives:
                              }},
                              parameters={"sigma": (1.4, 2.6)},
                              fit_parameters={
-                                 "metal_lj_sigma": {
-                                     "bounds": [1.0, 3.0]
-                                 }
-                             })
+                                 "metal_lj_sigma": {"bounds": [1.0, 3.0]}})
 
     def test_bounded_start_uses_template_value_or_midpoint(self):
         targets = {"IOD": {"value": 1.9, "tolerance": 0.03}}
@@ -262,7 +260,7 @@ class TestAutoCdamWeightedObjectives:
         assert all(call[1] == ["IOD", "SHELL"] for call in calculator.calls)
 
     def test_only_monitors_cannot_be_fitted(self):
-        with pytest.raises(ValueError, match="required or weighted"):
+        with pytest.raises(VeloxChemError, match="required or weighted"):
             fit_with(
                 {"SHELL": {
                     "value": 0.0,

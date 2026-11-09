@@ -203,11 +203,19 @@ def angle_rmsd_deg(unit_dirs: np.ndarray,
 
 
 def atom_labels(molecule) -> list[str]:
-    """VeloxChem force-field atom names of ``molecule`` (Al, O1, O2, ...).
+    """
+    Gets the VeloxChem force-field atom names of a molecule (Al, O1, O2, ...).
 
     The names are those of ``MMForceFieldGenerator.get_atom_names``: element
     label plus ordinal, or the bare label for an element that occurs once.
+
+    :param molecule:
+        The molecule.
+
+    :return:
+        The atom names.
     """
+
     ff = MMForceFieldGenerator(ostream=OutputStream(None))
     ff.molecule = molecule
     return ff.get_atom_names()

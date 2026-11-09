@@ -41,6 +41,7 @@ from veloxchem.autocdam import AutoCDAM, CalculationResult, CDAMCandidate, FitTa
 from veloxchem.autocdam.calculator import Calculator
 from veloxchem.autocdam.multisystem import MultiSystemCalculator
 from veloxchem.autocdam.framework import compare_to_baseline
+from veloxchem.errorhandler import VeloxChemError
 
 STRUCTURES = Path(__file__).parent / "data"
 CHARGES = json.loads(
@@ -316,7 +317,7 @@ class TestAutoCdamMultisystemProperties:
                 "tolerance": 0.1
             }
         }
-        with pytest.raises(ValueError, match="aqueous systems support"):
+        with pytest.raises(VeloxChemError, match="aqueous systems support"):
             AutoCDAM().setup(CDAMCandidate("Al", 3),
                              aqueous_distance,
                              parameters={"sigma": (1.4, 2.6)},

@@ -191,7 +191,14 @@ SPREAD_DEFINITIONS = {
 
 @dataclass
 class CalculationPlan:
-    """Requested properties grouped by the job that computes them."""
+    """
+    Requested properties grouped by the job that computes them.
+
+    :param jobs:
+        The target names by job (md, fep, qm).
+    :param methods:
+        The method label by target name.
+    """
 
     jobs: dict[str, list[str]] = field(default_factory=dict)
     methods: dict[str, str] = field(default_factory=dict)
@@ -231,17 +238,27 @@ class _Results:
 
 
 class Calculator:
-    """Run the physical property calculations for one generated parameter point.
+    """
+    Runs the physical property calculations for one generated parameter point.
 
     Keyword options of ``calculate``: ``md_options``, ``fep_options``,
     ``qm_options`` and ``work_dir``. In-memory systems are copied first, so the
     caller's batch is never modified.
+
+    :param comm:
+        The MPI communicator.
+    :param ostream:
+        The output stream.
     """
 
     requires_openmm_systems = True
 
     def __init__(self, comm=None, ostream: OutputStream | None = None) -> None:
-        """Create the calculator with an output stream and an empty QM single-point cache."""
+        """
+        Creates the calculator with an output stream and an empty QM single-point
+        cache; OpenMM is required.
+        """
+
         assert_msg_critical("openmm" in sys.modules,
                             f"{type(self).__name__}: OpenMM is required")
         self.comm = comm if comm is not None else MPI.COMM_WORLD
@@ -251,10 +268,18 @@ class Calculator:
     # ------------------------------------------------------------ public API
 
     def plan(self, targets: Iterable[FitTarget]) -> CalculationPlan:
-        """Group ``targets`` by job (md/fep/qm), print the plan and return it.
+        """
+        Groups targets by job (md/fep/qm) and prints the plan.
 
         Raises ``ValueError`` for a target name with no registered aqueous property.
+
+        :param targets:
+            The targets.
+
+        :return:
+            The calculation plan.
         """
+
         plan = CalculationPlan()
         for target in targets:
             prop = aqueous_property(target.name)
@@ -265,20 +290,48 @@ class Calculator:
         return plan
 
     def single_point(self, molecule, *, settings=None, metadata=None) -> float:
-        """Converged SCF energy (Hartree) of a real molecule (cached single point)."""
+        """
+        Calculates the converged SCF energy of a real molecule (cached single point).
+
+        :param molecule:
+            The molecule.
+        :param settings:
+            The single-point settings (see ``SINGLE_POINT_SETTINGS``).
+        :param metadata:
+            A dictionary that receives ``cache_hit`` and ``scf_converged``.
+
+        :return:
+            The SCF energy in hartree.
+        """
+
         return self.qm.energy(molecule, settings, metadata)
 
     def calculate(self, batch: GeneratedBatch, parameters: ParameterSet,
                   targets: Iterable[FitTarget],
                   **kwargs: Any) -> CalculationResult:
-        """Compute every target for ``parameters`` and return a ``CalculationResult``.
+        """
+        Computes every target for one parameter set.
 
         QM-only plans return before any OpenMM work. MD runs when MD properties are
         requested or to equilibrate the box before FEP (``equilibrate_first``). An MD
         or trajectory-analysis failure returns a failed result with NaN values.
         Raises ``ValueError`` if ``parameters`` differ from the batch's own parameters,
         and ``check_fep_backend`` errors if HFE is requested without a usable backend.
+
+        :param batch:
+            The generated batch.
+        :param parameters:
+            The parameter set of the batch.
+        :param targets:
+            The targets.
+        :param kwargs:
+            The options ``md_options``, ``fep_options``, ``qm_options`` and
+            ``work_dir``.
+
+        :return:
+            The calculation result.
         """
+
         targets = list(targets)
         plan = self.plan(targets)
         if "fep" in plan.jobs:

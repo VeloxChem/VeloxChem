@@ -41,6 +41,7 @@ from pathlib import Path
 import pytest
 
 from veloxchem.autocdam import AutoCDAM, CDAMCandidate, CalculationResult, Evaluator, FitTarget
+from veloxchem.errorhandler import VeloxChemError
 
 STRUCTURES = Path(__file__).parent / "data"
 
@@ -74,10 +75,11 @@ class TestAutoCdamFlexibleInterface:
             "metal_dummy_distance": 0.9
         }
         fit = AutoCDAM()
-        fit.setup(CDAMCandidate("Al", 3), {"IOD": {
-            "value": 1.9,
-            "tolerance": 0.03
-        }},
+        fit.setup(CDAMCandidate("Al", 3),
+                  {"IOD": {
+                      "value": 1.9,
+                      "tolerance": 0.03
+                  }},
                   parameters=parameters)
         specs = {spec.name: spec for spec in fit.parameter_specs}
         assert specs["metal_lj_sigma"].bounds == (
@@ -88,7 +90,7 @@ class TestAutoCdamFlexibleInterface:
 
     @step2
     def test_unknown_parameter_is_rejected_before_calculation(self):
-        with pytest.raises(ValueError, match="unsupported"):
+        with pytest.raises(VeloxChemError, match="unsupported"):
             AutoCDAM().setup(CDAMCandidate("Al", 3),
                              {"IOD": {
                                  "value": 1.9,

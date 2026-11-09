@@ -52,7 +52,8 @@ from .models import CalculationResult, EvaluationResult, FitTarget, _is_sequence
 
 
 class Evaluator:
-    """Convert calculator values into a normalized scalar objective.
+    """
+    Converts calculator values into a normalized scalar objective.
 
     The ``CalculationResult -> EvaluationResult`` handoff compares scalar and
     array targets, applies the target tolerance and weight, and assigns a large
@@ -62,6 +63,11 @@ class Evaluator:
     ``ostream`` uses the same output contract as the surrounding VeloxChem
     package, so warnings have the familiar VeloxChem formatting and are still
     retained in ``EvaluationResult.warnings`` for programmatic inspection.
+
+    :param failure_penalty:
+        The objective of a failed proposal (positive and finite).
+    :param ostream:
+        The output stream.
     """
 
     def __init__(
@@ -69,7 +75,8 @@ class Evaluator:
         failure_penalty: float = 1.0e6,
         ostream: OutputStream | None = None,
     ) -> None:
-        """Initialize objective normalization and warning output.
+        """
+        Initializes objective normalization and warning output.
 
         ``failure_penalty`` must be finite so an optimizer can continue after
         an unstable proposal while still recording the failure in its history.
@@ -87,7 +94,17 @@ class Evaluator:
         calculation: CalculationResult,
         targets: Iterable[FitTarget],
     ) -> EvaluationResult:
-        """Compare scalar and array targets using one shared objective formula."""
+        """
+        Compares scalar and array targets using one shared objective formula.
+
+        :param calculation:
+            The calculation result.
+        :param targets:
+            The targets.
+
+        :return:
+            The evaluation result.
+        """
 
         targets = list(targets)
         if calculation.failed:
@@ -165,23 +182,43 @@ class Evaluator:
 
     def evaluate_predictions(self, values: dict,
                              targets: Iterable[FitTarget]) -> EvaluationResult:
-        """Score surrogate means for choosing where to calculate next.
+        """
+        Scores surrogate means for choosing where to calculate next.
 
         This score cannot stop the fit. Custom evaluators that require raw
         trajectories can provide their own prediction-scoring method.
+
+        :param values:
+            The predicted values by target name.
+        :param targets:
+            The targets.
+
+        :return:
+            The evaluation result.
         """
+
         return self.evaluate(CalculationResult(values=values), targets)
 
     @staticmethod
     def score_draws(
             draws: np.ndarray,
             targets: Sequence[FitTarget]) -> tuple[np.ndarray, np.ndarray]:
-        """Vectorized ``evaluate`` for scalar targets, for many predicted draws at once.
-
-        ``draws`` has shape (..., len(targets)), one column per target. Returns
-        the squared normalized errors (the loss terms) and whether each raw error
-        is within tolerance, using the same scalar metrics as ``_error``.
         """
+        Vectorized ``evaluate`` for scalar targets, for many predicted draws at once.
+
+        ``draws`` has shape (..., len(targets)), one column per target. Uses the
+        same scalar metrics as ``_error``.
+
+        :param draws:
+            The predicted draws.
+        :param targets:
+            The scalar targets.
+
+        :return:
+            The squared normalized errors (the loss terms) and whether each raw
+            error is within tolerance.
+        """
+
         reference = np.array([float(t.reference) for t in targets])
         scale = np.array([t.normalization_scale for t in targets])
         tolerance = np.array([t.tolerance for t in targets])

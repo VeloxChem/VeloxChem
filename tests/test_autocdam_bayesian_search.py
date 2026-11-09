@@ -416,11 +416,11 @@ class TestAutoCdamBayesianSearch:
         }, "geometry"),
     ])
     def test_invalid_search_settings_are_rejected(self, search, message):
-        with pytest.raises(ValueError, match=message):
+        with pytest.raises(VeloxChemError, match=message):
             fit(search)
 
     def test_constrained_mode_needs_a_required_target(self):
-        with pytest.raises(ValueError, match="required"):
+        with pytest.raises(VeloxChemError, match="required"):
             fit({"mode": "constrained"},
                 {"IOD": {
                     "value": 2.0,
@@ -438,7 +438,7 @@ class TestAutoCdamBayesianSearch:
             driver.fit(CDAMCandidate("Al", 3), TARGETS, parameters=PARAMETERS)
 
     def test_vector_targets_are_left_to_the_staged_search(self):
-        with pytest.raises(ValueError, match="scalar"):
+        with pytest.raises(VeloxChemError, match="scalar"):
             fit({"max_evaluations": 6},
                 {"IOD": {
                     "value": [2.0, 2.1],

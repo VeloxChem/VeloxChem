@@ -520,9 +520,9 @@ def _plot_metal_complex_fit(data,
         raise ValueError("plotting requires finite, nonempty scan data")
     if zoom_range is not None:
         lo, hi = zoom_range
-        if not np.isfinite([lo, hi]).all() or lo >= hi:
-            raise ValueError(
-                "zoom_range must be finite increasing distances in angstrom")
+        assert_msg_critical(
+            bool(np.isfinite([lo, hi]).all()) and lo < hi,
+            "zoom_range must be finite increasing distances in angstrom")
 
     width = 10 if zoom_range is not None else 6.5
     figure = _plt().figure(figsize=(width, 6.4 if show_residuals else 4.5))
@@ -577,7 +577,8 @@ def _plot_metal_complex_fit(data,
         mask = (distances >= lo) & (distances <= hi)
         if not mask.any():
             _plt().close(figure)
-            raise ValueError("zoom_range contains no sampled distances")
+            assert_msg_critical(False,
+                                "zoom_range contains no sampled distances")
         energy = np.r_[qm[mask], mm[mask], 0]
         padding = max(float(np.ptp(energy)) * 0.12, 0.01)
         expanded.set_xlim(lo, hi)
@@ -635,12 +636,24 @@ def _plot_metal_complex_fit(data,
 
 
 def plot_fit(result, *, dataset=None, **kwargs):
-    """Plot a FitResult, result dict or saved JSON; returns the Matplotlib Figure.
+    """
+    Plots a FitResult, result dict or saved JSON.
 
     Keyword options: ``output_path``, ``title``, ``dpi``, ``details``; for a
     metal-complex fit also ``dataset``, ``zoom_range``, ``show_residuals`` and
     ``show_rejected``.
+
+    :param result:
+        The fit result, result dictionary or saved JSON.
+    :param dataset:
+        The QM scan dataset of a metal-complex fit.
+    :param kwargs:
+        The keyword options listed above.
+
+    :return:
+        The Matplotlib figure.
     """
+
     data = _result(result)
     if "qm_interaction_kjmol" in data.get("diagnostics", {}):
         return _plot_metal_complex_fit(data, dataset=dataset, **kwargs)

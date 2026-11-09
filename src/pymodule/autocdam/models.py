@@ -60,6 +60,7 @@ from typing import Any, Iterable, Literal, Mapping, Sequence
 
 from mpi4py import MPI
 
+from ..errorhandler import assert_msg_critical
 from ..outputstream import OutputStream
 from ..veloxchemlib import hartree_in_kcalpermol, hartree_in_kjpermol, mpi_master
 
@@ -303,8 +304,8 @@ def uff_lj(element: str) -> tuple[float, float]:
     from ..uffparameters import get_uff_parameters
 
     table = get_uff_parameters()
-    if element not in table:
-        raise ValueError(f"no UFF parameters for element {element!r}")
+    assert_msg_critical(element in table,
+                        f"no UFF parameters for element {element!r}")
     values = table[element]
     return 10.0 * values["sigma"], values["epsilon"] / KCAL_TO_KJ
 
@@ -337,11 +338,29 @@ FitStatus = Literal["success", "warning", "failed"]
 
 @dataclass
 class SystemData:
-    """Topology and basic force-field data used by a generated batch.
+    """
+    Topology and basic force-field data used by a generated batch.
 
     The containers are deliberately permissive because topology may originate
     from an external ForceFieldGenerator.  A generator may create a safely
     copied, augmented instance when dummy or probe atoms are required.
+
+    :param atoms:
+        The atoms.
+    :param residues:
+        The residues.
+    :param bonds:
+        The bonds.
+    :param atom_types:
+        The atom types (same length as ``atoms`` when given).
+    :param charges:
+        The charges (same length as ``atoms`` when given).
+    :param bonded_parameters:
+        The bonded force-field parameters.
+    :param nonbonded_parameters:
+        The nonbonded force-field parameters.
+    :param metadata:
+        The metadata.
     """
 
     atoms: list[Any] = field(default_factory=list)
@@ -365,10 +384,26 @@ class SystemData:
 
 @dataclass
 class OpenMMSystems:
-    """Candidate-owned OpenMM systems and starting positions (in nm).
+    """
+    Candidate-owned OpenMM systems and starting positions (in nm).
 
     Topologies can be shared read-only. Systems and positions must be copied
     before updating a proposal; live Context objects are never shared.
+
+    :param vacuum_system:
+        The vacuum OpenMM system.
+    :param vacuum_topology:
+        The vacuum topology.
+    :param vacuum_positions:
+        The vacuum positions.
+    :param solvated_system:
+        The solvated OpenMM system.
+    :param solvated_topology:
+        The solvated topology.
+    :param solvated_positions:
+        The solvated positions.
+    :param model_metadata:
+        The model metadata.
     """
 
     vacuum_system: Any
@@ -382,10 +417,22 @@ class OpenMMSystems:
 
 @dataclass
 class GeneratedBatch:
-    """One shared topology plus coordinate frames for multiple configurations.
+    """
+    One shared topology plus coordinate frames for multiple configurations.
 
     Every frame must use identical atom ordering and the same topology.  A
     frame is represented as ``n_atoms`` rows of ``[x, y, z]`` coordinates.
+
+    :param system:
+        The shared topology.
+    :param configurations:
+        The coordinate frames.
+    :param metadata:
+        The metadata.
+    :param parameters:
+        The parameter set the batch was generated for.
+    :param openmm_systems:
+        The candidate-owned OpenMM systems.
     """
 
     system: SystemData
@@ -424,20 +471,43 @@ class GeneratedBatch:
 
     @property
     def n_configurations(self) -> int:
-        """Number of coordinate frames in the batch."""
+        """
+        Gets the number of coordinate frames in the batch.
+
+        :return:
+            The number of frames.
+        """
 
         return len(self.configurations)
 
 
 @dataclass(frozen=True)
 class ParameterSpec:
-    """Definition of one search parameter and its optional optimization bound.
+    """
+    Definition of one search parameter and its optional optimization bound.
 
     ``initial`` is the starting value and ``bounds`` the ``(lower, upper)``
     search interval, both in the parameter's own ``unit`` (CDAM parameters use
     angstrom and kcal/mol). A spec with ``optimizable=False`` is held fixed at
     ``initial``. ``expandable`` bounds are soft and may be widened up to
     ``hard_bounds``.
+
+    :param name:
+        The parameter name.
+    :param initial:
+        The starting value.
+    :param bounds:
+        The ``(lower, upper)`` search interval.
+    :param unit:
+        The unit.
+    :param optimizable:
+        Whether the parameter is adjusted.
+    :param metadata:
+        The metadata.
+    :param expandable:
+        Whether the bounds are soft.
+    :param hard_bounds:
+        The limits soft bounds are never widened past.
     """
 
     name: str
@@ -451,31 +521,41 @@ class ParameterSpec:
     hard_bounds: tuple[float, float] | None = None
 
     def __post_init__(self) -> None:
-        """Validate name, finite initial value and bounds nesting; raise ValueError."""
-        if not self.name:
-            raise ValueError("parameter name cannot be empty")
-        if not math.isfinite(self.initial):
-            raise ValueError("initial parameter value must be finite")
+        """Validate name, finite initial value and bounds nesting (critical error)."""
+        assert_msg_critical(bool(self.name), "parameter name cannot be empty")
+        assert_msg_critical(math.isfinite(self.initial),
+                            "initial parameter value must be finite")
         if self.bounds is not None:
             lower, upper = self.bounds
-            if not math.isfinite(lower) or not math.isfinite(upper):
-                raise ValueError("parameter bounds must be finite")
-            if not lower < upper:
-                raise ValueError("parameter bounds must satisfy lower < upper")
-            if not lower <= self.initial <= upper:
-                raise ValueError(
-                    "initial parameter value must be inside bounds")
+            assert_msg_critical(
+                math.isfinite(lower) and math.isfinite(upper),
+                "parameter bounds must be finite")
+            assert_msg_critical(lower < upper,
+                                "parameter bounds must satisfy lower < upper")
+            assert_msg_critical(lower <= self.initial <= upper,
+                                "initial parameter value must be inside bounds")
         if self.hard_bounds is not None:
-            if self.bounds is None:
-                raise ValueError("hard_bounds need bounds")
-            if not self.hard_bounds[0] <= self.bounds[0] < self.bounds[
-                    1] <= self.hard_bounds[1]:
-                raise ValueError("bounds must lie inside hard_bounds")
+            assert_msg_critical(self.bounds is not None,
+                                "hard_bounds need bounds")
+            assert_msg_critical(
+                self.hard_bounds[0] <= self.bounds[0] < self.bounds[1] <=
+                self.hard_bounds[1], "bounds must lie inside hard_bounds")
 
     @classmethod
     def from_mapping(cls, name: str, values: Mapping[str,
                                                      Any]) -> "ParameterSpec":
-        """Create a spec from the compact user-facing configuration mapping."""
+        """
+        Creates a spec from the compact user-facing configuration mapping.
+
+        :param name:
+            The parameter name.
+        :param values:
+            The mapping with ``ParameterSpec`` keys (``value`` is an alias of
+            ``initial``).
+
+        :return:
+            The parameter specification.
+        """
 
         raw_bounds = values.get("bounds")
         bounds = tuple(
@@ -499,7 +579,12 @@ class ParameterSpec:
 
 @dataclass
 class ParameterSet:
-    """Current parameter values passed to one calculation."""
+    """
+    Current parameter values passed to one calculation.
+
+    :param values:
+        The parameter values by name.
+    """
 
     values: dict[str, float] = field(default_factory=dict)
 
@@ -522,11 +607,23 @@ class ParameterSet:
         return len(self.values)
 
     def items(self):
-        """(name, value) pairs, as for a dict."""
+        """
+        Gets the (name, value) pairs, as for a dict.
+
+        :return:
+            The (name, value) pairs.
+        """
+
         return self.values.items()
 
     def to_dict(self) -> dict[str, float]:
-        """Plain ``{name: value}`` copy of the values."""
+        """
+        Gets a plain copy of the values.
+
+        :return:
+            The ``{name: value}`` dictionary.
+        """
+
         return dict(self.values)
 
 
@@ -541,7 +638,8 @@ TARGET_SELECTION_KEYS = ("system", "property", "atoms", "selection",
 
 @dataclass
 class FitTarget:
-    """Reference data and objective settings for one named target.
+    """
+    Reference data and objective settings for one named target.
 
     ``reference`` may be a scalar or a sequence.  Names such as HFE, IOD, CN,
     and QM_ENERGY are target labels, not architectural special cases.
@@ -550,6 +648,25 @@ class FitTarget:
     loss), ``weighted`` (loss only) or ``monitor`` (reported, never optimized).
     The legacy names ``objective`` and ``analysis`` mean weighted and monitor.
     ``scale`` normalizes the error; it defaults to the tolerance.
+
+    :param name:
+        The target name.
+    :param reference:
+        The reference value (scalar or sequence).
+    :param tolerance:
+        The tolerance (positive).
+    :param weight:
+        The weight in the loss (nonnegative).
+    :param metric:
+        The error metric.
+    :param unit:
+        The unit of the reference.
+    :param role:
+        The role (required, weighted or monitor).
+    :param metadata:
+        The selection keys (system, property, atoms, ...) and other metadata.
+    :param scale:
+        The normalization scale of the error.
     """
 
     name: str
@@ -563,73 +680,130 @@ class FitTarget:
     scale: float | None = None
 
     def __post_init__(self) -> None:
-        """Validate name, positive tolerance/scale, non-negative weight and role; raise ValueError."""
-        if not self.name:
-            raise ValueError("target name cannot be empty")
-        if not math.isfinite(self.tolerance) or self.tolerance <= 0:
-            raise ValueError("target tolerance must be positive")
-        if not math.isfinite(self.weight) or self.weight < 0:
-            raise ValueError("target weight cannot be negative")
-        if self.role not in TARGET_ROLES and self.role not in LEGACY_ROLES:
-            raise ValueError(
-                f"target role must be one of {TARGET_ROLES}, got {self.role!r}")
-        if self.scale is not None and (not math.isfinite(self.scale) or
-                                       self.scale <= 0):
-            raise ValueError("target scale must be positive")
+        """Validate name, positive tolerance/scale, non-negative weight and role (critical error)."""
+        assert_msg_critical(bool(self.name), "target name cannot be empty")
+        assert_msg_critical(
+            math.isfinite(self.tolerance) and self.tolerance > 0,
+            "target tolerance must be positive")
+        assert_msg_critical(
+            math.isfinite(self.weight) and self.weight >= 0,
+            "target weight cannot be negative")
+        assert_msg_critical(
+            self.role in TARGET_ROLES or self.role in LEGACY_ROLES,
+            f"target role must be one of {TARGET_ROLES}, got {self.role!r}")
+        assert_msg_critical(
+            self.scale is None or
+            (math.isfinite(self.scale) and self.scale > 0),
+            "target scale must be positive")
 
     @property
     def kind(self) -> str:
-        """The role with legacy names mapped to required/weighted/monitor."""
+        """
+        Gets the role with legacy names mapped to required/weighted/monitor.
+
+        :return:
+            The kind of the target.
+        """
+
         return LEGACY_ROLES.get(self.role, self.role)
 
     @property
     def is_objective(self) -> bool:
-        """True when this target contributes to the weighted loss."""
+        """
+        Checks whether this target contributes to the weighted loss.
+
+        :return:
+            True unless the target is a monitor.
+        """
+
         return self.kind != "monitor"
 
     @property
     def is_required(self) -> bool:
-        """True for a hard tolerance constraint."""
+        """
+        Checks whether this target is a hard tolerance constraint.
+
+        :return:
+            True for a required target.
+        """
+
         return self.kind == "required"
 
     @property
     def is_monitor(self) -> bool:
-        """True when the target is only reported, never optimized."""
+        """
+        Checks whether the target is only reported, never optimized.
+
+        :return:
+            True for a monitor target.
+        """
+
         return self.kind == "monitor"
 
     @property
     def normalization_scale(self) -> float:
-        """Divisor for the error: ``scale`` if set, otherwise ``tolerance``."""
+        """
+        Gets the divisor for the error.
+
+        :return:
+            ``scale`` if set, otherwise ``tolerance``.
+        """
+
         return self.scale if self.scale is not None else self.tolerance
 
     @property
     def system(self) -> str | None:
-        """Name of the system the target is calculated on, if one was selected."""
+        """
+        Gets the name of the system the target is calculated on.
+
+        :return:
+            The system name, or None if no system was selected.
+        """
+
         return self.metadata.get("system")
 
     @property
     def property_name(self) -> str:
-        """The calculated property; defaults to the target name (IOD, CN, ...)."""
+        """
+        Gets the calculated property.
+
+        :return:
+            The property name; defaults to the target name (IOD, CN, ...).
+        """
+
         return self.metadata.get("property", self.name)
 
     @classmethod
     def from_mapping(cls, name: str, values: Mapping[str, Any]) -> "FitTarget":
-        """Create a target from the intended user-facing dictionary syntax."""
+        """
+        Creates a target from the intended user-facing dictionary syntax.
+
+        :param name:
+            The target name.
+        :param values:
+            The target settings: ``reference`` (or ``value``), ``tolerance``,
+            ``weight``, ``metric``, ``unit``, ``role``, ``metadata``, ``scale`` and
+            the selection keys.
+
+        :return:
+            The fit target.
+        """
 
         if "reference" in values:
             reference = values["reference"]
         elif "value" in values:
             reference = values["value"]
         else:
-            raise ValueError(f"target {name!r} needs a 'reference' or 'value'")
+            assert_msg_critical(
+                False, f"target {name!r} needs a 'reference' or 'value'")
         known = {
             "reference", "value", "tolerance", "weight", "metric", "unit",
             "role", "metadata", "scale", *TARGET_SELECTION_KEYS
         }
         unknown = set(values) - known
-        if unknown:
-            raise ValueError(
-                f"target {name!r} has unsupported keys {sorted(unknown)}")
+        assert_msg_critical(
+            not unknown,
+            f"target {name!r} has unsupported keys {sorted(unknown)}")
         default_metric = "rmse" if _is_sequence(reference) else "absolute"
         metadata = dict(values.get("metadata", {}))
         metadata.update(
@@ -650,11 +824,25 @@ class FitTarget:
 
 @dataclass
 class CalculationResult:
-    """Values produced by a calculator, independent of how they were obtained.
+    """
+    Values produced by a calculator, independent of how they were obtained.
 
     ``values`` maps target names to calculated scalars or arrays; ``raw_data``
     holds calculator-specific intermediates. ``failed`` with
     ``failure_reason`` marks a calculation the evaluator must penalize.
+
+    :param values:
+        The calculated values by target name.
+    :param metadata:
+        The per-target metadata.
+    :param raw_data:
+        The calculator-specific intermediates.
+    :param warnings:
+        The warnings.
+    :param failed:
+        Whether the calculation failed.
+    :param failure_reason:
+        Why the calculation failed.
     """
 
     values: dict[str, Any] = field(default_factory=dict)
@@ -667,7 +855,8 @@ class CalculationResult:
 
 @dataclass
 class EvaluationResult:
-    """Normalized objective and target-level diagnostics for one proposal.
+    """
+    Normalized objective and target-level diagnostics for one proposal.
 
     ``objective`` is the normalized weighted loss (or the failure penalty).
     ``metrics`` holds each target's raw error in the target's unit, ``errors``
@@ -675,6 +864,25 @@ class EvaluationResult:
     per-target row with prediction, reference and tolerance status.
     ``constraint_violations`` maps each required target outside tolerance to
     raw error / tolerance; ``feasible`` is False when any exist.
+
+    :param objective:
+        The normalized weighted loss.
+    :param metrics:
+        The raw errors.
+    :param errors:
+        The normalized errors.
+    :param target_results:
+        The per-target rows.
+    :param failed:
+        Whether the evaluation failed.
+    :param failure_reason:
+        Why the evaluation failed.
+    :param warnings:
+        The warnings.
+    :param feasible:
+        Whether all required targets are within tolerance.
+    :param constraint_violations:
+        The violated required targets.
     """
 
     objective: float
@@ -690,13 +898,37 @@ class EvaluationResult:
 
 @dataclass
 class FitResult:
-    """Final optimizer output, including history and diagnostic information.
+    """
+    Final optimizer output, including history and diagnostic information.
 
     ``parameters`` and ``metrics`` describe the selected best candidate;
     ``history`` holds one record per evaluated step and ``diagnostics`` the
     target results, parameter definitions, cost and stop reason read by
     ``summary``. ``checkpoint`` is the run file and ``checkpoint_group`` the
     group of the search checkpoint in it, if one was written.
+
+    :param parameters:
+        The best parameters.
+    :param metrics:
+        The metrics of the best candidate.
+    :param objective:
+        The objective of the best candidate.
+    :param status:
+        The status (success, warning or failed).
+    :param converged:
+        Whether the optimization converged.
+    :param iterations:
+        The number of iterations.
+    :param history:
+        The per-step records.
+    :param warnings:
+        The warnings.
+    :param diagnostics:
+        The diagnostics.
+    :param checkpoint:
+        The run file.
+    :param checkpoint_group:
+        The group of the search checkpoint.
     """
 
     parameters: ParameterSet
@@ -712,12 +944,27 @@ class FitResult:
     checkpoint_group: str | None = None
 
     def plot(self, **kwargs):
-        """Delegate CDAM or metal-complex plotting to the standalone module."""
+        """
+        Delegates CDAM or metal-complex plotting to the standalone module.
+
+        :param kwargs:
+            The keyword options of ``plot_fit``.
+
+        :return:
+            The Matplotlib figure.
+        """
+
         from .plotting import plot_fit
         return plot_fit(self, **kwargs)
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-ready dictionary of the complete result."""
+        """
+        Converts the complete result to a JSON-ready dictionary.
+
+        :return:
+            The dictionary.
+        """
+
         import json
         objective = self.objective if math.isfinite(self.objective) else None
         checkpoint = str(self.checkpoint) if self.checkpoint else None
@@ -738,7 +985,15 @@ class FitResult:
         return json.loads(json.dumps(data, default=_json_default))
 
     def samples_table(self) -> list[dict[str, Any]]:
-        """One flat row per calculated candidate; see ``veloxchem.autocdam.reporting``."""
+        """
+        Creates one flat row per calculated candidate.
+
+        See ``veloxchem.autocdam.reporting``.
+
+        :return:
+            The list of rows.
+        """
+
         from .reporting import samples_table
         return samples_table(self)
 
@@ -800,7 +1055,15 @@ class FitResult:
                    checkpoint_group=data.get("checkpoint_group"))
 
     def summary(self) -> str:
-        """Plain-text report: parameters, targets, constraints, cost, and status."""
+        """
+        Creates a plain-text report.
+
+        The report lists parameters, targets, constraints, cost, and status.
+
+        :return:
+            The report text.
+        """
+
         d = self.diagnostics
         lines = [
             f"Status: {self.status} | optimization converged: {self.converged} | "
@@ -930,22 +1193,22 @@ def parse_parameters(
     specs: list[ParameterSpec] = []
     for raw_name, value in parameters.items():
         name = aliases.get(raw_name, raw_name)
-        if name not in allowed:
-            raise ValueError(
-                f"unsupported parameter {raw_name!r}; adjustable parameters are "
-                f"{sorted(allowed)} (aliases {sorted(aliases)})")
-        if any(spec.name == name for spec in specs):
-            raise ValueError(f"parameter {name!r} is given more than once")
+        assert_msg_critical(
+            name in allowed,
+            f"unsupported parameter {raw_name!r}; adjustable parameters are "
+            f"{sorted(allowed)} (aliases {sorted(aliases)})")
+        assert_msg_critical(
+            all(spec.name != name for spec in specs),
+            f"parameter {name!r} is given more than once")
         if isinstance(value, str):
-            if value.lower() not in REFERENCE_KEYWORDS:
-                raise ValueError(
-                    f"unknown bound keyword {value!r} for {raw_name!r}; use "
-                    f"(lower, upper), a fixed value, or one of {REFERENCE_KEYWORDS}"
-                )
-            if name not in references:
-                raise ValueError(
-                    f"no reference bounds for {raw_name!r}; give (lower, upper) "
-                    f"(references exist for {sorted(references)})")
+            assert_msg_critical(
+                value.lower() in REFERENCE_KEYWORDS,
+                f"unknown bound keyword {value!r} for {raw_name!r}; use "
+                f"(lower, upper), a fixed value, or one of {REFERENCE_KEYWORDS}")
+            assert_msg_critical(
+                name in references,
+                f"no reference bounds for {raw_name!r}; give (lower, upper) "
+                f"(references exist for {sorted(references)})")
             reference = references[name]
             lower, upper = reference["bounds"]
             specs.append(
@@ -960,9 +1223,9 @@ def parse_parameters(
         elif isinstance(value, Mapping):
             specs.append(ParameterSpec.from_mapping(name, value))
         elif _is_sequence(value):
-            if len(value) != 2:
-                raise ValueError(
-                    f"bounds for {raw_name!r} must be (lower, upper)")
+            assert_msg_critical(
+                len(value) == 2,
+                f"bounds for {raw_name!r} must be (lower, upper)")
             lower, upper = float(value[0]), float(value[1])
             specs.append(
                 ParameterSpec(name,
@@ -971,9 +1234,9 @@ def parse_parameters(
         else:
             specs.append(
                 ParameterSpec(name, initial=float(value), optimizable=False))
-    if not any(spec.optimizable for spec in specs):
-        raise ValueError(
-            "at least one parameter needs (lower, upper) bounds to be fitted")
+    assert_msg_critical(
+        any(spec.optimizable for spec in specs),
+        "at least one parameter needs (lower, upper) bounds to be fitted")
     return specs
 
 

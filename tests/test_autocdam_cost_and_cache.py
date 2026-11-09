@@ -41,6 +41,7 @@ from veloxchem.autocdam.cache import CACHE_GROUP, CachedCalculator, load_cache
 from veloxchem.autocdam.models import RESULT_GROUP, read_h5_group
 from veloxchem.autocdam.bayesian import BayesianFittingDriver
 from veloxchem.autocdam.search import ParameterPropertySample
+from veloxchem.errorhandler import VeloxChemError
 
 PARAMETERS = {"sigma": (1.4, 2.6), "dummy_charge": (0.2, 0.7)}
 
@@ -352,7 +353,7 @@ class TestAutoCdamCostAndCache:
         }, "unsupported"),
     ])
     def test_invalid_screening_settings(self, screening, message):
-        with pytest.raises(ValueError, match=message):
+        with pytest.raises(VeloxChemError, match=message):
             run({"max_evaluations": 6, "screening": screening}, Counting())
 
     def test_cost_model_predicts_expensive_regions(self):

@@ -373,14 +373,14 @@ class AutoCDAM:
         self.monitor_targets = [
             t for t in self.targets if t not in self.search_targets
         ]
-        if not self.search_targets:
-            raise ValueError(
-                "at least one required or weighted target is needed to fit")
+        assert_msg_critical(
+            bool(self.search_targets),
+            "at least one required or weighted target is needed to fit")
 
         for geometry in self.geometries:
-            if geometry not in CDAMCandidate.geometries:
-                raise ValueError(
-                    f"unsupported geometry {geometry!r} in geometries")
+            assert_msg_critical(
+                geometry in CDAMCandidate.geometries,
+                f"unsupported geometry {geometry!r} in geometries")
 
         self.parameter_specs = self._resolve_parameters(parameters,
                                                         fit_parameters)
@@ -417,15 +417,14 @@ class AutoCDAM:
                             fit_parameters) -> list[ParameterSpec]:
         """Parameter specs from ``parameters`` (compact form) or ``fit_parameters``."""
         candidate = self.candidate
-        if parameters is not None and fit_parameters is not None:
-            raise ValueError(
-                "use either parameters or fit_parameters, not both")
+        assert_msg_critical(
+            parameters is None or fit_parameters is None,
+            "use either parameters or fit_parameters, not both")
         if fit_parameters is not None:
             specs = coerce_parameter_specs(fit_parameters)
             unknown = {spec.name for spec in specs} - candidate.parameter_names
-            if unknown:
-                raise ValueError(
-                    f"unsupported CDAM parameters: {sorted(unknown)}")
+            assert_msg_critical(
+                not unknown, f"unsupported CDAM parameters: {sorted(unknown)}")
             return specs
         current = {
             name: getattr(candidate, name) for name in candidate.parameter_names
@@ -440,9 +439,9 @@ class AutoCDAM:
     def _build_systems(self, systems, ostream) -> MultiSystemCalculator | None:
         """Route targets to named systems; None keeps the single aqueous calculator."""
         if systems is None:
-            if any(t.system is not None for t in self.targets):
-                raise ValueError(
-                    "targets name a system but no systems were defined")
+            assert_msg_critical(
+                all(t.system is None for t in self.targets),
+                "targets name a system but no systems were defined")
             return None
         router = build_systems(systems, self.targets, self.calculator, ostream)
         self.calculator = router
@@ -512,7 +511,18 @@ class AutoCDAM:
 
     def generate(self,
                  parameters: ParameterSet | Mapping[str, float] | None = None):
-        """Generate the CDAM batch for ``parameters`` (default: the initial study point)."""
+        """
+        Generates the CDAM batch of one parameter set.
+
+        The batch is also kept as ``generated_batch``.
+
+        :param parameters:
+            The parameter values (default: the initial study point).
+
+        :return:
+            The generated batch.
+        """
+
         self.generated_batch = self.generator.generate_parameter_batch(
             self.candidate, [self._parameter_set(parameters)],
             openmm_template=self.openmm_template)[0]
@@ -522,7 +532,22 @@ class AutoCDAM:
                   parameters: ParameterSet | Mapping[str, float] | None = None,
                   *,
                   batch: GeneratedBatch | None = None) -> CalculationResult:
-        """Calculate the CDAM properties of ``parameters`` (or of a generated ``batch``)."""
+        """
+        Calculates the CDAM properties of one parameter set.
+
+        Without ``batch`` the batch is generated from ``parameters``; with only
+        ``batch`` its own parameters are used. The result is also kept as
+        ``last_calculation``.
+
+        :param parameters:
+            The parameter values (default: the initial study point).
+        :param batch:
+            A previously generated batch.
+
+        :return:
+            The calculation result.
+        """
+
         if parameters is None and batch is not None and batch.parameters is not None:
             parameter_set = batch.parameters
         else:
@@ -537,7 +562,17 @@ class AutoCDAM:
     def evaluate(
             self,
             calculation: CalculationResult | None = None) -> EvaluationResult:
-        """Compare an explicit result or the latest calculation against the targets."""
+        """
+        Compares a calculation result against the targets.
+
+        :param calculation:
+            The calculation result (default: the latest calculation, or a new
+            calculation at the initial study point).
+
+        :return:
+            The evaluation result.
+        """
+
         result = calculation if calculation is not None else self.last_calculation
         if result is None:
             result = self.calculate()
@@ -755,11 +790,20 @@ class AutoCDAM:
         return result
 
     def export_fitted_model(self, path=None):
-        """Write the fitted model: a directory with PDB/XML, systems and provenance."""
-        if self.fitting_driver is None:
-            raise ValueError("fit() before exporting a fitted model")
-        if path is None:
-            raise ValueError("give an output directory for the fitted model")
+        """
+        Writes the fitted model: a directory with PDB/XML, systems and provenance.
+
+        :param path:
+            The output directory.
+
+        :return:
+            The paths of the written files (an empty list on non-master ranks).
+        """
+
+        assert_msg_critical(self.fitting_driver is not None,
+                            "fit() before exporting a fitted model")
+        assert_msg_critical(path is not None,
+                            "give an output directory for the fitted model")
         parameters = self._best_parameters()
         if self.rank != mpi_master():
             return []

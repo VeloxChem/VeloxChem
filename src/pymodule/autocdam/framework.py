@@ -67,6 +67,7 @@ import numpy as np
 
 from ..atomtypeidentifier import AtomTypeIdentifier
 from ..mmforcefieldgenerator import MMForceFieldGenerator
+from ..errorhandler import assert_msg_critical
 from ..molecule import Molecule
 from ..outputstream import OutputStream
 from ..veloxchemlib import bohr_in_angstrom
@@ -96,10 +97,34 @@ _FORCE_FIELD_DATA = ("atoms", "bonds", "angles", "dihedrals", "impropers",
 
 @dataclass(frozen=True)
 class FrameworkBaseline:
-    """Immutable baseline snapshot; every candidate deserializes a fresh copy.
+    """
+    Immutable baseline snapshot; every candidate deserializes a fresh copy.
 
     Charges are in e. ``bonds`` is the covalent graph after metal-ligand bonds
     were removed.
+
+    :param system_xml:
+        The serialized OpenMM system.
+    :param positions_nm:
+        The read-only positions in nm.
+    :param elements:
+        The element labels.
+    :param target_index:
+        The index of the target metal.
+    :param metal_indices:
+        The indices of all metals.
+    :param charges:
+        The particle charges in e.
+    :param bonds:
+        The covalent bonds without metal-ligand bonds.
+    :param removed_metal_terms:
+        The number of removed metal terms by kind.
+    :param box_vectors_nm:
+        The periodic box vectors in nm, or None.
+    :param source:
+        The description of the force-field source.
+    :param fingerprint:
+        The fingerprint of system, positions and box.
     """
 
     system_xml: str
@@ -116,16 +141,34 @@ class FrameworkBaseline:
 
     @property
     def periodic(self) -> bool:
-        """True when the baseline has a periodic cell."""
+        """
+        Checks whether the baseline has a periodic cell.
+
+        :return:
+            True for a periodic baseline.
+        """
+
         return self.box_vectors_nm is not None
 
     @property
     def total_charge(self) -> float:
-        """Sum of the baseline particle charges in e."""
+        """
+        Gets the sum of the baseline particle charges.
+
+        :return:
+            The total charge in e.
+        """
+
         return float(sum(self.charges))
 
     def new_system(self):
-        """Return an independent OpenMM System; the snapshot itself never changes."""
+        """
+        Creates an independent OpenMM System; the snapshot itself never changes.
+
+        :return:
+            The OpenMM System.
+        """
+
         import openmm as mm
         return mm.XmlSerializer.deserialize(self.system_xml)
 
@@ -356,7 +399,8 @@ _ATOMS_NEEDED = {"distance": 2, "angle": 3}
 
 @dataclass
 class FrameworkSystem:
-    """A target metal site inside a cluster or periodic framework.
+    """
+    A target metal site inside a cluster or periodic framework.
 
     ``charges`` selects the baseline charges: ``"resp"`` (VeloxChem RESP, runs
     an SCF), an explicit per-atom sequence in e, or ``"zero"``. It is required
@@ -374,6 +418,35 @@ class FrameworkSystem:
     candidate's bond force constant). D-M-D harmonic angles hold the geometry,
     as in the aqueous CDAM model. ``c4_partners`` selects the oxygens that feel
     the 12-6-4 C4 term: ``"water"`` (O with exactly two H) or ``"oxygen"``.
+
+    :param structure:
+        The structure: a Molecule, an xyz file, or xyz text.
+    :param target_metal:
+        The target metal (index or atom label).
+    :param charges:
+        The baseline charges: "resp", "zero", or a per-atom sequence in e.
+    :param charge:
+        The molecular charge (required for an xyz structure).
+    :param multiplicity:
+        The spin multiplicity.
+    :param representation:
+        The representation of the target, "atom" or "cdam".
+    :param baseline_force_field:
+        An already generated force field of the same structure.
+    :param box_vectors:
+        The 3x3 periodic box vectors in angstrom.
+    :param protocol:
+        The protocol settings (see ``DEFAULT_PROTOCOL``).
+    :param metal_site_charge:
+        The total charge of the CDAM site.
+    :param metal_dummy_bond:
+        The metal-dummy bond, "constraint" or "harmonic".
+    :param c4_partners:
+        The oxygens that feel the C4 term, "water" or "oxygen".
+    :param name:
+        The system name.
+    :param ostream:
+        The output stream.
     """
 
     structure: Any
@@ -394,8 +467,8 @@ class FrameworkSystem:
     def __post_init__(self):
         """Validate options, read the structure and resolve the target metal.
 
-        Raises ValueError if the target is not a metal, no baseline charge
-        source is chosen, or ``box_vectors`` (angstrom) is not a finite,
+        It is a critical error if the target is not a metal, no baseline
+        charge source is chosen, or ``box_vectors`` (angstrom) is not a finite,
         nonsingular 3x3 matrix. The VeloxChem baseline itself is built lazily
         by ``prepare_baseline``.
         """
@@ -404,22 +477,21 @@ class FrameworkSystem:
         self.elements = tuple(self.molecule.get_labels())
         self.labels = tuple(atom_labels(self.molecule))
         self.target_index = resolve_atom(self.target_metal, self.labels)
-        if self.target_index not in metal_indices(self.molecule):
-            raise ValueError(
-                f"target {self.target_metal!r} is {self.elements[self.target_index]}, "
-                "not a metal")
-        if self.charges is None and self.baseline_force_field is None:
-            raise ValueError(
-                "choose baseline charges: charges='resp' (VeloxChem RESP), an "
-                "explicit per-atom list, or 'zero'; VeloxChem would otherwise "
-                "assign zero charges without RESP")
+        assert_msg_critical(
+            self.target_index in metal_indices(self.molecule),
+            f"target {self.target_metal!r} is {self.elements[self.target_index]}, "
+            "not a metal")
+        assert_msg_critical(
+            self.charges is not None or self.baseline_force_field is not None,
+            "choose baseline charges: charges='resp' (VeloxChem RESP), an "
+            "explicit per-atom list, or 'zero'; VeloxChem would otherwise "
+            "assign zero charges without RESP")
         if self.box_vectors is not None:
             box = np.asarray(self.box_vectors, dtype=float)
-            if box.shape != (3, 3) or not np.isfinite(box).all() or abs(
-                    np.linalg.det(box)) < 1e-6:
-                raise ValueError(
-                    "box_vectors must be a finite, nonsingular 3x3 matrix in angstrom"
-                )
+            assert_msg_critical(
+                box.shape == (3, 3) and bool(np.isfinite(box).all()) and
+                abs(np.linalg.det(box)) >= 1e-6,
+                "box_vectors must be a finite, nonsingular 3x3 matrix in angstrom")
             self.box_vectors = box
         self.protocol = dict(self.protocol)
         self.ostream = default_ostream(self.ostream)
@@ -427,14 +499,14 @@ class FrameworkSystem:
         self._baseline: FrameworkBaseline | None = None
 
     def _check_options(self):
-        """Raise ValueError for any option value outside the supported set."""
-        if self.representation not in ("atom", "cdam"):
-            raise ValueError("representation must be 'atom' or 'cdam'")
-        if self.metal_dummy_bond not in ("constraint", "harmonic"):
-            raise ValueError(
-                "metal_dummy_bond must be 'constraint' or 'harmonic'")
-        if self.c4_partners not in ("water", "oxygen"):
-            raise ValueError("c4_partners must be 'water' or 'oxygen'")
+        """Critical error for any option value outside the supported set."""
+        assert_msg_critical(self.representation in ("atom", "cdam"),
+                            "representation must be 'atom' or 'cdam'")
+        assert_msg_critical(
+            self.metal_dummy_bond in ("constraint", "harmonic"),
+            "metal_dummy_bond must be 'constraint' or 'harmonic'")
+        assert_msg_critical(self.c4_partners in ("water", "oxygen"),
+                            "c4_partners must be 'water' or 'oxygen'")
 
     def _read_structure(self):
         """A VeloxChem Molecule from the given object, xyz file, or xyz text."""
@@ -444,9 +516,9 @@ class FrameworkSystem:
             text = Path(molecule).read_text() if Path(
                 str(molecule)).suffix == ".xyz" else str(molecule)
             molecule = Molecule.read_xyz_string(text)
-            if self.charge is None:
-                raise ValueError(
-                    "give the molecular charge for an xyz structure")
+            assert_msg_critical(
+                self.charge is not None,
+                "give the molecular charge for an xyz structure")
         if self.charge is not None:
             molecule.set_charge(self.charge)
         molecule.set_multiplicity(self.multiplicity)
@@ -454,7 +526,13 @@ class FrameworkSystem:
 
     # ================================================================ baseline
     def prepare_baseline(self) -> FrameworkBaseline:
-        """Generate the VeloxChem baseline once and keep an immutable snapshot."""
+        """
+        Generates the VeloxChem baseline once and keeps an immutable snapshot.
+
+        :return:
+            The baseline snapshot.
+        """
+
         if self._baseline is None:
             self._baseline = self._build_baseline()
             self.baseline_builds += 1
@@ -616,14 +694,22 @@ class FrameworkSystem:
 
     # ============================================================== candidates
     def build(self, candidate):
-        """Return a fresh (system, positions_nm, site) for one CDAM candidate.
+        """
+        Builds a fresh system for one CDAM candidate.
 
         ``candidate`` is a ``CDAMCandidate`` point. In the atom representation
         only its metal sigma/epsilon (and C4) are used; the metal charge stays
         at its baseline value. In the CDAM representation dummies are added
         around the target. Every other particle, exception, and bonded term is
         the baseline's; a fresh System per candidate lets constraints change.
+
+        :param candidate:
+            The CDAM candidate.
+
+        :return:
+            The tuple (system, positions_nm, site).
         """
+
         baseline = self.prepare_baseline()
         system = baseline.new_system()
         positions = np.array(baseline.positions_nm, dtype=float)
@@ -660,19 +746,36 @@ class FrameworkSystem:
         return float(self.metal_site_charge)
 
     def first_shell(self, size: int) -> list[int]:
-        """The ``size`` nearest non-hydrogen, non-metal atoms to the target."""
+        """
+        Finds the nearest non-hydrogen, non-metal atoms to the target.
+
+        :param size:
+            The number of atoms.
+
+        :return:
+            The atom indices.
+        """
+
         baseline = self.prepare_baseline()
         return nearest_heavy_atoms(baseline.positions_nm, baseline.target_index,
                                    self.elements, baseline.metal_indices,
                                    baseline.box_vectors_nm, size)
 
     def dummy_directions(self, candidate) -> np.ndarray:
-        """Template dummy directions rotated onto the first coordination shell.
+        """
+        Rotates the template dummy directions onto the first coordination shell.
 
         The rotation minimizing the RMSD between template directions and the
         observed metal-ligand unit vectors (with the best atom assignment) is
         used, so dummies point at the coordinating atoms of the input structure.
+
+        :param candidate:
+            The CDAM candidate (its geometry gives the template).
+
+        :return:
+            The rotated unit directions.
         """
+
         template = np.asarray(candidate.geometries[candidate.geometry],
                               dtype=float)
         baseline = self.prepare_baseline()
@@ -764,7 +867,14 @@ class FrameworkSystem:
                      c4)
 
     def c4_oxygens(self) -> set[int]:
-        """Oxygens that feel the C4 term: water O (two H neighbours) or every O."""
+        """
+        Finds the oxygens that feel the C4 term: water O (two H neighbours) or
+        every O.
+
+        :return:
+            The oxygen indices.
+        """
+
         baseline = self.prepare_baseline()
         neighbours = {i: [] for i in range(len(self.elements))}
         for left, right in baseline.bonds:
@@ -781,7 +891,16 @@ class FrameworkSystem:
         return oxygens
 
     def ineffective_parameters(self, specs) -> list[str]:
-        """Adjustable parameters that cannot change this system's interactions."""
+        """
+        Finds adjustable parameters that cannot change this system's interactions.
+
+        :param specs:
+            The parameter specifications.
+
+        :return:
+            The names of the ineffective optimizable parameters.
+        """
+
         unused = set()
         if self.representation == "atom":
             unused |= {
@@ -798,7 +917,16 @@ class FrameworkSystem:
 
     # ============================================================== properties
     def check_targets(self, targets) -> None:
-        """Validate property names and atom selections before any calculation."""
+        """
+        Validates property names and atom selections before any calculation.
+
+        Raises ValueError for an unsupported property, a wrong number of atoms,
+        or an unknown method.
+
+        :param targets:
+            The targets of this system.
+        """
+
         for target in targets:
             prop = target.property_name
             if prop not in FRAMEWORK_PROPERTIES:
@@ -820,12 +948,24 @@ class FrameworkSystem:
                 )
 
     def calculate(self, candidate, targets, protocol=None) -> CalculationResult:
-        """Build the candidate system, relax or sample it, and measure targets.
+        """
+        Builds the candidate system, relaxes or samples it, and measures targets.
 
         Targets may ask for ``method`` "minimize" or "md"; each requested
         method runs once. ``protocol`` temporarily overrides protocol settings
         (used for cheap screening). Failures return a failed result.
+
+        :param candidate:
+            The CDAM candidate.
+        :param targets:
+            The targets of this system.
+        :param protocol:
+            The temporary protocol overrides.
+
+        :return:
+            The calculation result.
         """
+
         targets = list(targets)
         started = time.monotonic()
         try:
@@ -928,7 +1068,20 @@ class FrameworkSystem:
         return frames
 
     def measure(self, target, xyz_nm: np.ndarray, site) -> float:
-        """One property value (angstrom, degree, or count) for one geometry."""
+        """
+        Measures one property value for one geometry.
+
+        :param target:
+            The target (its property and atom selection).
+        :param xyz_nm:
+            The coordinates in nm.
+        :param site:
+            The site returned by ``build``.
+
+        :return:
+            The value in angstrom, degree, or count.
+        """
+
         baseline = self.prepare_baseline()
         box = baseline.box_vectors_nm
         prop = target.property_name

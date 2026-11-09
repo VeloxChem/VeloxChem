@@ -38,6 +38,7 @@ import pytest
 from veloxchem.autocdam import Evaluator, FitTarget, CalculationResult
 from veloxchem.autocdam.geometry import angle_rmsd_deg, assign_to_reference, kabsch_rmsd, pairwise_angles_deg
 from veloxchem.autocdam.models import AQUEOUS_PROPERTIES, GEOMETRY_RMSD_PROPERTIES
+from veloxchem.errorhandler import VeloxChemError
 
 OCTAHEDRON = np.array([
     [1.0, 0.0, 0.0],
@@ -119,5 +120,5 @@ class TestAutoCdamGeometryRmsd:
 
     def test_default_role_is_objective_and_bad_role_rejected(self):
         assert FitTarget("IOD", 1.9, 0.05).is_objective is True
-        with pytest.raises(ValueError):
+        with pytest.raises(VeloxChemError):
             FitTarget("IOD", 1.9, 0.05, role="diagnostic")

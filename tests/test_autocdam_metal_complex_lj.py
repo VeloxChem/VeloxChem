@@ -38,6 +38,7 @@ import veloxchem as vlx
 
 from veloxchem.autocdam import Calculator, MetalComplexLJDriver, QMScanDataset
 from veloxchem.autocdam.models import read_h5_group, write_h5_groups
+from veloxchem.errorhandler import VeloxChemError
 
 
 @pytest.fixture
@@ -326,7 +327,7 @@ class TestAutoCdamMetalComplexLj:
         },
     ])
     def test_invalid_study_inputs(self, baseline, tmp_path, overrides):
-        with pytest.raises(ValueError):
+        with pytest.raises(VeloxChemError):
             make_driver(baseline, tmp_path, **overrides)
 
     def test_zero_weights_missing_data_and_study_mutation(
@@ -338,10 +339,10 @@ class TestAutoCdamMetalComplexLj:
         driver.point_weights = {
             row.record_id: 0 for row in driver.dataset.records
         }
-        with pytest.raises(ValueError, match="positive weight"):
+        with pytest.raises(VeloxChemError, match="positive weight"):
             driver.fit()
         driver.qm_settings = {"basis": "STO-3G"}
-        with pytest.raises(ValueError, match="changed"):
+        with pytest.raises(VeloxChemError, match="changed"):
             driver.generate_scans()
 
     def test_real_single_point_settings_cache(self, tmp_path):
@@ -476,6 +477,6 @@ class TestAutoCdamMetalComplexLj:
             assert driver.baseline_force_field.atoms[0][
                 "sigma"] == pytest.approx(0.22)
         else:
-            with pytest.raises(ValueError,
+            with pytest.raises(VeloxChemError,
                                match="does not match the exact input molecule"):
                 driver.prepare_baseline()

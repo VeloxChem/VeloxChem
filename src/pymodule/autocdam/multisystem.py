@@ -37,6 +37,7 @@ import time
 from dataclasses import replace
 from typing import Iterable
 
+from ..errorhandler import assert_msg_critical
 from ..outputstream import OutputStream
 from .calculator import Calculator
 from .framework import FrameworkSystem
@@ -46,7 +47,8 @@ from .models import (CalculationResult, FitTarget, GeneratedBatch, ParameterSet,
 
 
 class MultiSystemCalculator:
-    """Calculate one parameter set in several systems and merge the results.
+    """
+    Calculates one parameter set in several systems and merges the results.
 
     Each target names its system (``FitTarget.system``) and property
     (``FitTarget.property_name``). Aqueous targets go to the CDAM
@@ -55,6 +57,15 @@ class MultiSystemCalculator:
     Values are keyed by target name, so several targets may share a property
     in different systems. A failure in any system fails the whole proposal
     and its reason names the system.
+
+    :param systems:
+        The systems by name (``None`` marks the aqueous one).
+    :param aqueous:
+        The aqueous ``Calculator``.
+    :param default_system:
+        The system of targets that name none.
+    :param ostream:
+        The output stream.
     """
 
     def __init__(self,
@@ -63,7 +74,10 @@ class MultiSystemCalculator:
                  *,
                  default_system: str | None = None,
                  ostream: OutputStream | None = None):
-        """Store the systems (``None`` marks the aqueous one) and the aqueous ``Calculator``."""
+        """
+        Stores the systems and the aqueous ``Calculator``.
+        """
+
         self.systems = dict(systems)
         self.aqueous = aqueous
         self.default_system = default_system
@@ -74,7 +88,18 @@ class MultiSystemCalculator:
         self.requires_openmm_systems = False
 
     def system_of(self, target: FitTarget) -> str:
-        """Name of the system a target belongs to; raises ``ValueError`` if missing or unknown."""
+        """
+        Gets the name of the system a target belongs to.
+
+        Raises ``ValueError`` if the system is missing or unknown.
+
+        :param target:
+            The target.
+
+        :return:
+            The system name.
+        """
+
         name = target.system or self.default_system
         if name is None:
             raise ValueError(f"target {target.name!r} must name its system "
@@ -85,16 +110,22 @@ class MultiSystemCalculator:
         return name
 
     def check_targets(self, targets) -> None:
-        """Validate routing and properties before any calculation starts."""
+        """
+        Validates routing and properties before any calculation starts.
+
+        :param targets:
+            The targets.
+        """
+
         targets = list(targets)
         for name, system in self.systems.items():
             group = [t for t in targets if self.system_of(t) == name]
             if system is None:
                 for target in group:
-                    if target.property_name not in AQUEOUS_PROPERTIES:
-                        raise ValueError(
-                            f"target {target.name!r}: aqueous systems support "
-                            f"{sorted(AQUEOUS_PROPERTIES)}")
+                    assert_msg_critical(
+                        target.property_name in AQUEOUS_PROPERTIES,
+                        f"target {target.name!r}: aqueous systems support "
+                        f"{sorted(AQUEOUS_PROPERTIES)}")
             elif group:
                 system.check_targets(group)
         self.requires_openmm_systems = any(
@@ -103,14 +134,29 @@ class MultiSystemCalculator:
 
     def calculate(self, batch: GeneratedBatch, parameters: ParameterSet,
                   targets: Iterable[FitTarget], **kwargs) -> CalculationResult:
-        """Calculate every system that has targets and merge the results under target names.
+        """
+        Calculates every system that has targets and merges the results under
+        target names.
 
         Aqueous targets are deduplicated by property so one aqueous calculation serves
         several targets; it runs in the canonical unit and each target's value is then
         converted to that target's own unit. ``framework_protocol`` is forwarded only to framework systems.
         Per-system raw data records ``runtime_seconds``. Any system failure marks the
         merged result failed, with reasons prefixed by the system name.
+
+        :param batch:
+            The generated batch.
+        :param parameters:
+            The parameter set.
+        :param targets:
+            The targets.
+        :param kwargs:
+            The calculator options (and ``framework_protocol``).
+
+        :return:
+            The merged calculation result.
         """
+
         targets = list(targets)
         merged = CalculationResult()
         failures = []
@@ -182,24 +228,24 @@ def build_systems(systems, targets, calculator,
         spec = dict(spec)
         kind = spec.pop("type", "framework")
         if kind == "aqueous":
-            if spec:
-                raise ValueError(
-                    f"aqueous system {name!r} takes no options; use "
-                    "calculator_options and the candidate's water_model")
+            assert_msg_critical(
+                not spec, f"aqueous system {name!r} takes no options; use "
+                "calculator_options and the candidate's water_model")
             built[name] = None
         elif kind in ("framework", "cluster", "molecular"):
             built[name] = FrameworkSystem(name=name, ostream=ostream, **spec)
         else:
-            raise ValueError(
+            assert_msg_critical(
+                False,
                 f"system {name!r}: type must be 'aqueous' or 'framework'")
     aqueous = [name for name, system in built.items() if system is None]
-    if len(aqueous) > 1:
-        raise ValueError("define at most one aqueous system")
+    assert_msg_critical(
+        len(aqueous) <= 1, "define at most one aqueous system")
     default = next(
         iter(built)) if len(built) == 1 else (aqueous[0] if aqueous else None)
-    if aqueous and not isinstance(calculator, Calculator):
-        raise ValueError(
-            "an injected calculator cannot be combined with an aqueous system")
+    assert_msg_critical(
+        not aqueous or isinstance(calculator, Calculator),
+        "an injected calculator cannot be combined with an aqueous system")
     router = MultiSystemCalculator(built,
                                    calculator if aqueous else None,
                                    default_system=default,

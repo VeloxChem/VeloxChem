@@ -186,8 +186,8 @@ class MetalComplexLJStudy:
     def __post_init__(self):
         """Copy the molecule and settings, normalize the probe name, and validate every input.
 
-        Raises ValueError on an invalid target index, probe, scan, clash scale, or
-        unsupported QM/fit setting.
+        An invalid target index, probe, scan, clash scale, or unsupported
+        QM/fit setting is a critical error.
         """
         sig = molecule_signature(self.molecule)
         self.molecule = make_molecule(sig["labels"],
@@ -196,67 +196,70 @@ class MetalComplexLJStudy:
                                       sig["basis_labels"])
         self._check_target(sig)
         self.probe = self.probe.capitalize()
-        if self.probe not in PROBES:
-            raise ValueError("probe must be He or Ne")
+        assert_msg_critical(self.probe in PROBES, "probe must be He or Ne")
         self.scan_distances_angstrom = self._checked_distances()
-        if not np.isfinite(
-                self.clash_cutoff_scale) or self.clash_cutoff_scale < 0:
-            raise ValueError(
-                "clash_cutoff_scale must be nonnegative and finite")
+        assert_msg_critical(
+            np.isfinite(self.clash_cutoff_scale) and
+            self.clash_cutoff_scale >= 0,
+            "clash_cutoff_scale must be nonnegative and finite")
         if not isinstance(self.scan_directions, str):
             self.scan_directions = self._checked_directions()
-        elif self.scan_directions != "auto":
-            raise ValueError(
+        else:
+            assert_msg_critical(
+                self.scan_directions == "auto",
                 "scan_directions must be 'auto' or a sequence of vectors")
         self.qm_settings = deepcopy(self.qm_settings)
         self.qm_settings.setdefault("basis", DEFAULT_BASIS)
-        if set(self.qm_settings) - SINGLE_POINT_SETTINGS:
-            raise ValueError(
-                "unsupported QM settings; see Calculator.single_point")
+        assert_msg_critical(
+            not set(self.qm_settings) - SINGLE_POINT_SETTINGS,
+            "unsupported QM settings; see Calculator.single_point")
         self.fit_settings = deepcopy(self.fit_settings)
-        if set(self.fit_settings) - FIT_SETTING_NAMES:
-            raise ValueError(
-                f"unsupported fit settings: {sorted(set(self.fit_settings) - FIT_SETTING_NAMES)}"
-            )
+        unknown = sorted(set(self.fit_settings) - FIT_SETTING_NAMES)
+        assert_msg_critical(not unknown,
+                            f"unsupported fit settings: {unknown}")
         self.probe_parameters = deepcopy(self.probe_parameters)
 
     def _check_target(self, sig):
         """Validate the target index and require real atoms with finite coordinates."""
-        if (isinstance(self.target_atom_index, bool) or
-                int(self.target_atom_index) != self.target_atom_index):
-            raise ValueError("target_atom_index must be an integer")
+        assert_msg_critical(
+            not isinstance(self.target_atom_index, bool) and
+            int(self.target_atom_index) == self.target_atom_index,
+            "target_atom_index must be an integer")
         self.target_atom_index = int(self.target_atom_index)
-        if not 0 <= self.target_atom_index < len(sig["labels"]):
-            raise ValueError("target_atom_index is outside the input molecule")
-        if any(chemical_element_identifier(label.upper()) <= 0
-               for label in sig["labels"]):
-            raise ValueError(
-                "metal-complex fitting requires real atoms, without dummy sites"
-            )
-        if not np.isfinite(sig["coordinates_angstrom"]).all():
-            raise ValueError("complex coordinates must be finite")
+        assert_msg_critical(
+            0 <= self.target_atom_index < len(sig["labels"]),
+            "target_atom_index is outside the input molecule")
+        assert_msg_critical(
+            all(chemical_element_identifier(label.upper()) > 0
+                for label in sig["labels"]),
+            "metal-complex fitting requires real atoms, without dummy sites")
+        assert_msg_critical(
+            bool(np.isfinite(sig["coordinates_angstrom"]).all()),
+            "complex coordinates must be finite")
 
     def _checked_distances(self) -> list[float]:
         """Scan distances (angstrom) as a list; must be unique, positive and finite."""
         distances = np.asarray(self.scan_distances_angstrom, dtype=float)
-        if (distances.ndim != 1 or not distances.size or
-                not np.isfinite(distances).all() or np.any(distances <= 0)):
-            raise ValueError(
-                "scan distances must be a nonempty sequence of positive finite values"
-            )
-        if len(set(distances)) != len(distances):
-            raise ValueError("scan distances must be unique")
+        assert_msg_critical(
+            distances.ndim == 1 and bool(distances.size) and
+            bool(np.isfinite(distances).all()) and
+            not np.any(distances <= 0),
+            "scan distances must be a nonempty sequence of positive finite values")
+        assert_msg_critical(
+            len(set(distances)) == len(distances),
+            "scan distances must be unique")
         return distances.tolist()
 
     def _checked_directions(self) -> list[list[float]]:
         """User scan directions as unit vectors; must be finite, nonzero, shape (n, 3)."""
         directions = np.asarray(self.scan_directions, dtype=float)
-        if directions.ndim != 2 or directions.shape[1] != 3 or not len(
-                directions):
-            raise ValueError("scan directions must have shape (n, 3)")
+        assert_msg_critical(
+            directions.ndim == 2 and directions.shape[1] == 3 and
+            bool(len(directions)), "scan directions must have shape (n, 3)")
         norms = np.linalg.norm(directions, axis=1)
-        if not np.isfinite(directions).all() or np.any(norms == 0):
-            raise ValueError("scan directions must be finite nonzero vectors")
+        assert_msg_critical(
+            bool(np.isfinite(directions).all()) and not np.any(norms == 0),
+            "scan directions must be finite nonzero vectors")
         return (directions / norms[:, None]).tolist()
 
     def signature(self):
@@ -277,7 +280,38 @@ class MetalComplexLJStudy:
 
 @dataclass
 class LJScanRecord:
-    """One rigid probe position: complex + probe coordinates and QM energies (hartree)."""
+    """
+    One rigid probe position: complex + probe coordinates and QM energies.
+
+    Energies are in hartree; a rejected point keeps its ``reject_reason``.
+
+    :param record_id:
+        The record identifier.
+    :param target_atom_index:
+        The 0-based index of the target metal atom.
+    :param probe:
+        The probe element (He or Ne).
+    :param distance_angstrom:
+        The target-probe distance in angstrom.
+    :param direction:
+        The unit scan direction.
+    :param coordinates_angstrom:
+        The complex + probe coordinates in angstrom.
+    :param accepted:
+        Whether the point passed the clash check (and QM).
+    :param reject_reason:
+        Why the point was rejected.
+    :param qm_converged:
+        Whether the combined QM calculation converged.
+    :param qm_host_energy_hartree:
+        The isolated complex energy.
+    :param qm_probe_energy_hartree:
+        The isolated probe energy.
+    :param qm_combined_energy_hartree:
+        The complex + probe energy.
+    :param qm_interaction_energy_hartree:
+        The interaction energy (combined - complex - probe).
+    """
 
     record_id: str
     target_atom_index: int
@@ -295,7 +329,14 @@ class LJScanRecord:
 
     @property
     def usable(self):
-        """True when the point was accepted, QM converged, and all energies are finite."""
+        """
+        Checks whether the point can be fitted.
+
+        :return:
+            True when the point was accepted, QM converged, and all energies are
+            finite.
+        """
+
         energies = (self.qm_host_energy_hartree, self.qm_probe_energy_hartree,
                     self.qm_combined_energy_hartree,
                     self.qm_interaction_energy_hartree)
@@ -305,7 +346,14 @@ class LJScanRecord:
 
 @dataclass
 class QMScanDataset:
-    """Portable embedded geometries and raw energies, independent of fit weights."""
+    """
+    Portable embedded geometries and raw energies, independent of fit weights.
+
+    :param metadata:
+        The study signature, units, energy reference and version.
+    :param records:
+        The scan records.
+    """
 
     metadata: dict[str, Any]
     records: list[LJScanRecord]
@@ -621,15 +669,14 @@ class MetalComplexLJDriver:
             'MetalComplexLJDriver: give the molecule and target atom index')
 
     def _check_study(self):
-        """Raise ValueError if the study or scan/QM settings changed since ``setup``."""
-        if (to_json(self.study.signature()) != to_json(self._study_signature)
-                or self._settings() != self._settings_snapshot):
-            raise ValueError(
-                "molecule or scan/QM settings changed; create a new study driver"
-            )
-        if self.study.probe_parameters != self._probe_override:
-            raise ValueError(
-                "probe parameters changed; create a new study driver")
+        """Critical error if the study or scan/QM settings changed since ``setup``."""
+        assert_msg_critical(
+            to_json(self.study.signature()) == to_json(self._study_signature)
+            and self._settings() == self._settings_snapshot,
+            "molecule or scan/QM settings changed; create a new study driver")
+        assert_msg_critical(
+            self.study.probe_parameters == self._probe_override,
+            "probe parameters changed; create a new study driver")
 
     def _probe_molecule(self):
         """A neutral singlet He/Ne atom at the origin."""
@@ -645,7 +692,16 @@ class MetalComplexLJDriver:
 
     # ================================================================ baseline
     def prepare_baseline(self):
-        """Generate/copy default host FF once, preserving its charges and topology."""
+        """
+        Generates or copies the default host force field once.
+
+        The charges and topology of the baseline are preserved; the probe atom
+        and the MM engines are set up with it.
+
+        :return:
+            A copy of the baseline force field.
+        """
+
         self._check_study()
         if self.baseline_force_field is not None:
             return copy_force_field(self.baseline_force_field)
@@ -677,27 +733,28 @@ class MetalComplexLJDriver:
                 ff.create_topology(self.study.molecule)
             ff.molecule_name = "baseline"
             return ff
-        if not same_molecule(molecule_signature(supplied.molecule),
-                             self._study_signature["molecule"]):
-            raise ValueError(
-                "supplied baseline does not match the exact input molecule")
+        assert_msg_critical(
+            same_molecule(molecule_signature(supplied.molecule),
+                          self._study_signature["molecule"]),
+            "supplied baseline does not match the exact input molecule")
         return copy_force_field(supplied)
 
     def _check_host_force_field(self, ff):
         """Validate the baseline: atom count/order, finite nonnegative LJ, LB mixing, total charge.
 
-        Raises ValueError on the first problem found.
+        Stops at the first problem found (atom count/order and total charge
+        are critical errors; ``check_force_field_atoms`` raises ValueError).
         """
         natoms = self.study.molecule.number_of_atoms()
-        if set(ff.atoms) != set(range(natoms)):
-            raise ValueError(
-                "baseline atom ordering/count does not match the complex")
+        assert_msg_critical(
+            set(ff.atoms) == set(range(natoms)),
+            "baseline atom ordering/count does not match the complex")
         check_force_field_atoms(ff)
-        if not np.isclose(sum(atom["charge"] for atom in ff.atoms.values()),
-                          self.study.molecule.get_charge(),
-                          atol=1e-5):
-            raise ValueError(
-                "baseline partial charges do not sum to the molecular charge")
+        assert_msg_critical(
+            bool(np.isclose(sum(atom["charge"] for atom in ff.atoms.values()),
+                            self.study.molecule.get_charge(),
+                            atol=1e-5)),
+            "baseline partial charges do not sum to the molecular charge")
 
     def _probe_atom(self) -> dict:
         """The neutral probe's force-field atom (nm, kJ/mol): generator default or override."""
@@ -713,11 +770,11 @@ class MetalComplexLJDriver:
                     f"no generator defaults for {self.study.probe}; "
                     "supply probe_parameters") from exc
             probe_atom = deepcopy(probe_ff.atoms[0])
-            if not np.isclose(probe_atom["charge"], 0):
-                raise ValueError("He/Ne probe must have zero charge")
+            assert_msg_critical(bool(np.isclose(probe_atom["charge"], 0)),
+                                "He/Ne probe must have zero charge")
         else:
-            if not override.get("source"):
-                raise ValueError("explicit probe_parameters require a source")
+            assert_msg_critical(bool(override.get("source")),
+                                "explicit probe_parameters require a source")
             probe_atom = {
                 "type": self.study.probe,
                 "name": self.study.probe,
@@ -727,11 +784,12 @@ class MetalComplexLJDriver:
                 "epsilon": float(override["epsilon_kjmol"]),
                 "comment": override["source"]
             }
-        if not all(
+        assert_msg_critical(
+            all(
                 np.isfinite(probe_atom[k]) and probe_atom[k] > 0
-                for k in ("sigma", "epsilon")):
-            raise ValueError("probe sigma/epsilon must be finite and positive; "
-                             "provide supported parameters")
+                for k in ("sigma", "epsilon")),
+            "probe sigma/epsilon must be finite and positive; "
+            "provide supported parameters")
         return probe_atom
 
     def _build_mm_engines(self, probe_atom):
@@ -796,7 +854,15 @@ class MetalComplexLJDriver:
         return [directions[indices[np.argmax(clearance[indices])]].tolist()]
 
     def generate_scans(self):
-        """Probe positions along each direction; clashing points are kept but rejected."""
+        """
+        Generates the probe positions along each scan direction.
+
+        Clashing points are kept but rejected. An existing dataset is reused.
+
+        :return:
+            The scan records.
+        """
+
         self._check_study()
         if self.dataset is not None:
             return self.dataset.records
@@ -988,7 +1054,7 @@ class MetalComplexLJDriver:
     def _parameter_specs(self):
         """Sigma (angstrom) and epsilon (kJ/mol) specs; initial values default to the baseline atom.
 
-        Raises ValueError if a lower search bound is not positive.
+        A lower search bound that is not positive is a critical error.
         """
         atom = self.baseline_force_field.atoms[self.study.target_atom_index]
         settings = self._fit_settings()
@@ -1006,12 +1072,23 @@ class MetalComplexLJDriver:
                     settings.get("epsilon_bounds_kjmol",
                                  DEFAULT_EPSILON_BOUNDS_KJMOL)), "kJ/mol")
         ]
-        if any(spec.bounds[0] <= 0 for spec in specs):
-            raise ValueError("sigma and epsilon search bounds must be positive")
+        assert_msg_critical(
+            all(spec.bounds[0] > 0 for spec in specs),
+            "sigma and epsilon search bounds must be positive")
         return specs
 
     def evaluate_mm(self, parameters=None):
-        """MM host-probe interaction energies (kJ/mol) for every usable record."""
+        """
+        Calculates the MM host-probe interaction energies of every usable record.
+
+        :param parameters:
+            The metal_lj_sigma (angstrom) and metal_lj_epsilon (kJ/mol) values
+            (default: the initial values of the fit).
+
+        :return:
+            The calculation result with the energies in kJ/mol.
+        """
+
         rows = self._usable_records()
         self.prepare_baseline()
         if parameters is None:
@@ -1068,22 +1145,23 @@ class MetalComplexLJDriver:
             settings.get("energy_tolerance_kjmol",
                          DEFAULT_ENERGY_TOLERANCE_KJMOL))
         weights = settings.get("point_weights", {})
-        if not isinstance(weights, dict):
-            raise ValueError(
-                "point_weights must map record IDs to nonnegative weights")
+        assert_msg_critical(
+            isinstance(weights, dict),
+            "point_weights must map record IDs to nonnegative weights")
         ids = {row.record_id for row in self.dataset.records}
-        if set(weights) - ids:
-            raise ValueError("point_weights contain unknown record IDs")
-        if not all(
+        assert_msg_critical(not set(weights) - ids,
+                            "point_weights contain unknown record IDs")
+        assert_msg_critical(
+            all(
                 np.isfinite(weight) and weight >= 0
-                for weight in weights.values()):
-            raise ValueError("point weights must be finite and nonnegative")
+                for weight in weights.values()),
+            "point weights must be finite and nonnegative")
         rows = self._usable_records()
         self._point_weights = np.array(
             [weights.get(row.record_id, 1.0) for row in rows])
-        if not np.any(self._point_weights > 0):
-            raise ValueError(
-                "at least one usable point must have positive weight")
+        assert_msg_critical(
+            bool(np.any(self._point_weights > 0)),
+            "at least one usable point must have positive weight")
         return [
             FitTarget(row.record_id,
                       row.qm_interaction_energy_hartree * hartree_in_kjpermol(),
@@ -1094,12 +1172,19 @@ class MetalComplexLJDriver:
         ]
 
     def evaluate(self, calculation=None):
-        """Score MM predictions against the QM interaction energies with the Evaluator.
-
-        Uses ``calculation``, else the last MM calculation, else a fresh one at the
-        initial parameters. Caches and returns the EvaluationResult; raises
-        ValueError if the predictions do not match the usable records.
         """
+        Scores MM predictions against the QM interaction energies with the Evaluator.
+
+        Raises ValueError if the predictions do not match the usable records.
+
+        :param calculation:
+            The MM calculation (default: the last MM calculation, else a fresh one
+            at the initial parameters).
+
+        :return:
+            The evaluation result.
+        """
+
         calculation = calculation if calculation is not None else self.last_calculation
         if calculation is None:
             calculation = self.evaluate_mm()
@@ -1145,8 +1230,7 @@ class MetalComplexLJDriver:
         settings = {**OPTIMIZER_DEFAULTS, **self._fit_settings()}
         strategy = settings["strategy"]
         self.print_references()
-        if strategy not in STRATEGIES:
-            raise ValueError("unknown fitting strategy")
+        assert_msg_critical(strategy in STRATEGIES, "unknown fitting strategy")
         reference = np.array([target.reference for target in targets])
         tolerance = targets[0].tolerance
         self._print_fit_setup(strategy, specs, rows, tolerance, settings)
@@ -1316,7 +1400,18 @@ class MetalComplexLJDriver:
 
     # ================================================================= outputs
     def fitted_force_field(self, parameters=None):
-        """Return a copied generator with only the selected atom's LJ changed."""
+        """
+        Creates a copy of the baseline force field with only the target atom's LJ
+        changed.
+
+        :param parameters:
+            The metal_lj_sigma (angstrom) and metal_lj_epsilon (kJ/mol) values
+            (default: the fitted parameters).
+
+        :return:
+            The copied force-field generator.
+        """
+
         self.prepare_baseline()
         if parameters is None:
             if self.result is None:
@@ -1324,10 +1419,10 @@ class MetalComplexLJDriver:
             parameters = self.result.parameters
         if not isinstance(parameters, ParameterSet):
             parameters = ParameterSet(parameters)
-        if set(parameters) != FITTED_PARAMETERS or not all(
-                np.isfinite(v) and v > 0 for v in parameters.values.values()):
-            raise ValueError(
-                "supply positive finite metal_lj_sigma/metal_lj_epsilon only")
+        assert_msg_critical(
+            set(parameters) == FITTED_PARAMETERS and all(
+                np.isfinite(v) and v > 0 for v in parameters.values.values()),
+            "supply positive finite metal_lj_sigma/metal_lj_epsilon only")
         ff = copy_force_field(self.baseline_force_field)
         atom = ff.atoms[self.study.target_atom_index]
         atom["sigma"] = parameters["metal_lj_sigma"] * ANGSTROM_TO_NM
@@ -1335,14 +1430,24 @@ class MetalComplexLJDriver:
         return ff
 
     def export_fitted_model(self, path=None):
-        """Write a per-atom force-field XML using the generator's existing writer.
-
-        The returned generator can also be loaded directly into MMDriver. The
-        writer assigns per-atom classes, preventing other same-type atoms from
-        inheriting the target metal's fitted LJ parameters.
         """
-        if path is None:
-            raise ValueError("give an output file for the fitted model")
+        Writes a per-atom force-field XML using the generator's existing writer.
+
+        The fitted generator (see ``fitted_force_field``) can also be loaded
+        directly into MMDriver. The writer assigns per-atom classes, preventing
+        other same-type atoms from inheriting the target metal's fitted LJ
+        parameters. A JSON file with the study, parameters and diagnostics is
+        written next to it.
+
+        :param path:
+            The output XML file.
+
+        :return:
+            The path of the XML file.
+        """
+
+        assert_msg_critical(path is not None,
+                            "give an output file for the fitted model")
         ff = self.fitted_force_field()
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)

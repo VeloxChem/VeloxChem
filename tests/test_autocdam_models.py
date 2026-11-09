@@ -33,6 +33,7 @@
 import pytest
 
 from veloxchem.autocdam import GeneratedBatch, ParameterSpec, SystemData
+from veloxchem.errorhandler import VeloxChemError
 
 
 class TestAutoCdamModels:
@@ -59,5 +60,5 @@ class TestAutoCdamModels:
             GeneratedBatch(system, [[[0, 0, 0], [1, 0, 0]], [[0, 0, 0]]])
 
     def test_parameter_spec_rejects_initial_outside_bounds(self) -> None:
-        with pytest.raises(ValueError, match="inside bounds"):
+        with pytest.raises(VeloxChemError, match="inside bounds"):
             ParameterSpec("sigma", initial=5.0, bounds=(0.5, 4.0))

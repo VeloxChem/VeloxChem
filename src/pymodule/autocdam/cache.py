@@ -72,7 +72,8 @@ def _canonical(value):
 
 
 class CachedCalculator:
-    """Reuse property results for candidates that were already calculated.
+    """
+    Reuses property results for candidates that were already calculated.
 
     Each target is cached under its name and unit, the calculator options,
     and the candidate model (metal, geometry, water model, charges, every CDAM
@@ -83,16 +84,26 @@ class CachedCalculator:
     cached, so they stay visible as failures. ``path`` makes the cache
     persistent (the run file, see the module docstring). Wall time and
     calculation counts are tracked per system.
+
+    :param calculator:
+        The wrapped calculator.
+    :param filename:
+        The run file of the persistent cache.
+    :param write:
+        Whether the run file is written (False on MPI ranks other than the
+        master).
     """
 
     def __init__(self,
                  calculator,
                  filename: str | Path | None = None,
                  write: bool = True):
-        """Wrap ``calculator``; load the cache of the run file ``filename``, if any.
+        """
+        Wraps the calculator and loads the cache of the run file, if any.
 
         ``write=False`` (MPI ranks other than the master) never writes the file.
         """
+
         self.inner = calculator
         self.write = write
         self.entries: dict[str, dict[str, Any]] = {}
@@ -116,13 +127,26 @@ class CachedCalculator:
     @staticmethod
     def key(batch: GeneratedBatch, target: FitTarget,
             options: dict[str, Any]) -> str:
-        """Readable cache key: target name and unit, calculator options, candidate model.
+        """
+        Creates the readable cache key: target name and unit, calculator options,
+        candidate model.
 
         Values are stored in the target's unit, and options such as a cheaper
         screening protocol change the values, so both are part of the key.
         References, tolerances, weights, roles and ``work_dir`` are left out, so
         re-weighting reuses results.
+
+        :param batch:
+            The generated batch.
+        :param target:
+            The target.
+        :param options:
+            The calculator options.
+
+        :return:
+            The cache key.
         """
+
         model = {k: v for k, v in batch.metadata.items() if k != "sample_id"}
         model.update(batch.system.nonbonded_parameters)
         model.update(batch.system.bonded_parameters)
@@ -133,12 +157,27 @@ class CachedCalculator:
 
     def calculate(self, batch, parameters, targets,
                   **kwargs) -> CalculationResult:
-        """Return cached values where available and calculate only the missing targets.
+        """
+        Returns cached values where available and calculates only the missing
+        targets.
 
         All missing targets go to the inner calculator in one call. Finite fresh values
         are stored and the cache file is rewritten; a failed inner result is returned
         unchanged. Reused entries carry ``cached: True`` in their metadata.
+
+        :param batch:
+            The generated batch.
+        :param parameters:
+            The parameter set.
+        :param targets:
+            The targets.
+        :param kwargs:
+            The calculator options.
+
+        :return:
+            The calculation result.
         """
+
         targets = list(targets)
         self.stats["requests"] += 1
         self.stats["target_requests"] += len(targets)
@@ -219,7 +258,14 @@ class CachedCalculator:
             })
 
     def cost_report(self) -> dict[str, Any]:
-        """Copy of the request/hit/calculation counters and wall times, plus cache size and path."""
+        """
+        Gets the request/hit/calculation counters and wall times, plus cache size
+        and path.
+
+        :return:
+            A copy of the cost counters.
+        """
+
         report = json.loads(json.dumps(self.stats))
         report["cached_properties"] = len(self.entries)
         report["cache_path"] = str(self.path) if self.path else None

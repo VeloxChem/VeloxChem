@@ -73,6 +73,7 @@ from typing import Any
 
 import numpy as np
 
+from ..errorhandler import assert_msg_critical
 from .evaluator import Evaluator
 from .models import FitResult, ParameterSet, _is_sequence, format_value, print_settings
 from .search import SearchDriver
@@ -108,52 +109,55 @@ PARETO_RHO = 0.05  # augmentation weight of the Chebyshev scalarization
 def resolve_search_settings(search, specs, targets) -> dict[str, Any]:
     """Defaults plus ``search``, validated against the parameters and targets."""
     unknown = set(search or {}) - set(SEARCH_DEFAULTS)
-    if unknown:
-        raise ValueError(f"unsupported search settings: {sorted(unknown)}")
+    assert_msg_critical(not unknown,
+                        f"unsupported search settings: {sorted(unknown)}")
     settings = {**SEARCH_DEFAULTS, **(search or {})}
     if settings["initial_samples"] is None:
         settings["initial_samples"] = max(
             5, 2 * sum(spec.optimizable for spec in specs) + 1)
-    if settings["mode"] not in ("weighted", "constrained", "pareto"):
-        raise ValueError(
-            "search mode must be 'weighted', 'constrained', or 'pareto'")
-    if settings["initial_design"] not in ("sobol", "lhs"):
-        raise ValueError("initial_design must be 'sobol' or 'lhs'")
+    assert_msg_critical(
+        settings["mode"] in ("weighted", "constrained", "pareto"),
+        "search mode must be 'weighted', 'constrained', or 'pareto'")
+    assert_msg_critical(settings["initial_design"] in ("sobol", "lhs"),
+                        "initial_design must be 'sobol' or 'lhs'")
     for key in ("max_evaluations", "initial_samples", "batch_size", "pool_size",
                 "n_mc", "patience"):
-        if int(settings[key]) < 1:
-            raise ValueError(f"search setting {key} must be a positive integer")
-    if int(settings["max_bound_expansions"]) < 0 or int(
-            settings["bound_expansion_evaluations"]) < 0:
-        raise ValueError("bound expansion counts must be nonnegative")
-    if not float(settings["bound_expansion_factor"]) > 0:
-        raise ValueError("bound_expansion_factor must be positive")
-    if settings["initial_samples"] < 2:
-        raise ValueError(
-            "initial_samples must be at least 2 to fit a surrogate")
-    if settings["initial_samples"] > settings["max_evaluations"]:
-        raise ValueError("initial_samples cannot exceed max_evaluations")
-    if settings["mode"] == "constrained" and not any(t.is_required
-                                                     for t in targets):
-        raise ValueError(
-            "constrained mode needs at least one target with role='required'")
-    if settings["mode"] == "pareto" and sum(
-            t.is_objective for t in targets) < 2:
-        raise ValueError(
-            "pareto mode needs at least two required or weighted targets")
+        assert_msg_critical(
+            int(settings[key]) >= 1,
+            f"search setting {key} must be a positive integer")
+    assert_msg_critical(
+        int(settings["max_bound_expansions"]) >= 0 and
+        int(settings["bound_expansion_evaluations"]) >= 0,
+        "bound expansion counts must be nonnegative")
+    assert_msg_critical(
+        float(settings["bound_expansion_factor"]) > 0,
+        "bound_expansion_factor must be positive")
+    assert_msg_critical(
+        settings["initial_samples"] >= 2,
+        "initial_samples must be at least 2 to fit a surrogate")
+    assert_msg_critical(
+        settings["initial_samples"] <= settings["max_evaluations"],
+        "initial_samples cannot exceed max_evaluations")
+    assert_msg_critical(
+        settings["mode"] != "constrained" or
+        any(t.is_required for t in targets),
+        "constrained mode needs at least one target with role='required'")
+    assert_msg_critical(
+        settings["mode"] != "pareto" or
+        sum(t.is_objective for t in targets) >= 2,
+        "pareto mode needs at least two required or weighted targets")
     screening = settings["screening"]
     if screening is not None:
         unknown = set(screening) - SCREENING_KEYS
-        if unknown:
-            raise ValueError(
-                f"unsupported screening settings: {sorted(unknown)}")
-        if int(screening.get("oversample", 4)) < 2:
-            raise ValueError("screening oversample must be at least 2")
-        if not screening.get("calculator_options") and not screening.get(
-                "framework_protocol"):
-            raise ValueError(
-                "screening needs cheaper calculator_options or framework_protocol"
-            )
+        assert_msg_critical(
+            not unknown, f"unsupported screening settings: {sorted(unknown)}")
+        assert_msg_critical(
+            int(screening.get("oversample", 4)) >= 2,
+            "screening oversample must be at least 2")
+        assert_msg_critical(
+            bool(screening.get("calculator_options") or
+                 screening.get("framework_protocol")),
+            "screening needs cheaper calculator_options or framework_protocol")
     return settings
 
 
@@ -167,7 +171,26 @@ def _quasi_random(d: int, n: int, seed: int):
 
 
 class BayesianFittingDriver(SearchDriver):
-    """Bayesian search; see the module docstring for modes, bounds and screening."""
+    """
+    Bayesian search; see the module docstring for modes, bounds and screening.
+
+    :param specs:
+        The parameter specifications.
+    :param targets:
+        The fitted targets.
+    :param calculator:
+        The property calculator.
+    :param evaluator:
+        The evaluator.
+    :param make_inputs:
+        The function ``make_inputs(proposals, sample_ids)`` that yields one
+        generated input (or an exception) per proposal.
+    :param search:
+        The search settings (see ``SEARCH_DEFAULTS``).
+    :param options:
+        The shared search options (objective_threshold, quality_check,
+        study_metadata, checkpoint settings, comm, ostream).
+    """
 
     def __init__(self,
                  specs,
@@ -178,11 +201,13 @@ class BayesianFittingDriver(SearchDriver):
                  *,
                  search: dict[str, Any] | None = None,
                  **options):
-        """Resolve and validate ``search`` (see ``SEARCH_DEFAULTS``) and set up the driver.
+        """
+        Resolves and validates ``search`` and sets up the driver.
 
         One GP per property learns observation noise when ``search["noise"]`` is
-        true. Raises ``ValueError`` for unknown or inconsistent search settings.
+        true. Unknown or inconsistent search settings are a critical error.
         """
+
         settings = resolve_search_settings(search, specs, targets)
         super().__init__(specs,
                          targets,
@@ -201,15 +226,25 @@ class BayesianFittingDriver(SearchDriver):
     # ------------------------------------------------------------------ fit
 
     def fit(self, *, resume: bool = False) -> FitResult:
-        """Design, then acquisition steps, until tolerance, budget, or stagnation."""
+        """
+        Runs the design, then acquisition steps, until tolerance, budget, or
+        stagnation.
+
+        :param resume:
+            Whether to resume from the checkpoint.
+
+        :return:
+            The fit result.
+        """
+
         if resume:
             self._resume()
         self._print_setup()
         for target in self.objective_targets:
-            if _is_sequence(target.reference):
-                raise ValueError(
-                    f"Bayesian search supports scalar targets; {target.name} is a "
-                    "vector (use the staged search)")
+            assert_msg_critical(
+                not _is_sequence(target.reference),
+                f"Bayesian search supports scalar targets; {target.name} is a "
+                "vector (use the staged search)")
         best, evaluation = self._observed_best()
         converged = self._meets_threshold(evaluation)
         stop_reason = "threshold" if converged else "max_evaluations"
@@ -320,7 +355,13 @@ class BayesianFittingDriver(SearchDriver):
         self.free = [spec for spec in self.specs if spec.optimizable]
 
     def current_bounds(self) -> dict[str, tuple[float, float]]:
-        """Current (possibly widened) bounds of the optimizable parameters, by name."""
+        """
+        Gets the current (possibly widened) bounds of the optimizable parameters.
+
+        :return:
+            The bounds by parameter name.
+        """
+
         return {s.name: tuple(s.bounds) for s in self.free}
 
     def _n_widenings(self) -> int:
@@ -629,7 +670,14 @@ class BayesianFittingDriver(SearchDriver):
         return records
 
     def screening_agreement(self) -> dict[str, Any] | None:
-        """Correlation between screening and full values for doubly calculated points."""
+        """
+        Gets the correlation between screening and full values for doubly
+        calculated points.
+
+        :return:
+            The agreement per target, or None without screening.
+        """
+
         if self.search["screening"] is None:
             return None
         full = {
@@ -671,7 +719,16 @@ class BayesianFittingDriver(SearchDriver):
     # ----------------------------------------------------------------- result
 
     def pareto_front(self) -> list[dict[str, Any]]:
-        """Non-dominated usable observations in per-target normalized squared error."""
+        """
+        Finds the non-dominated usable observations in per-target normalized
+        squared error.
+
+        Feasible observations are preferred when any exist.
+
+        :return:
+            The front, one dictionary per observation.
+        """
+
         scores = self.table.rescore(self.evaluator, self.targets)
         rows = [(r, scores[r.sample_id])
                 for r in self.table.samples

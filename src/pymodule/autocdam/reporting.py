@@ -222,7 +222,18 @@ def add_validation_status(result: FitResult) -> None:
 
 
 def samples_table(source) -> list[dict[str, Any]]:
-    """Rows for every calculated candidate of ``source`` (see the module docstring)."""
+    """
+    Creates rows for every calculated candidate of a source.
+
+    See the module docstring for the columns.
+
+    :param source:
+        A FitResult, a search driver, a ParameterPropertyTable, or a run file.
+
+    :return:
+        The list of rows.
+    """
+
     samples, scores = _load(source)
     return [_row(s, scores.get(s["sample_id"])) for s in samples]
 
@@ -251,7 +262,18 @@ def _row(sample: dict[str, Any], score: dict | None) -> dict[str, Any]:
 
 
 def save_table(rows: Iterable[dict[str, Any]], path) -> Path:
-    """Write rows as CSV (columns in first-seen order); returns the path."""
+    """
+    Writes rows as CSV (columns in first-seen order).
+
+    :param rows:
+        The rows.
+    :param path:
+        The CSV file.
+
+    :return:
+        The path of the CSV file.
+    """
+
     rows = list(rows)
     columns = list(dict.fromkeys(key for row in rows for key in row))
     path = Path(path)
@@ -266,10 +288,22 @@ def save_table(rows: Iterable[dict[str, Any]], path) -> Path:
 def format_table(rows: Iterable[dict[str, Any]],
                  columns=None,
                  digits: int = 4) -> str:
-    """Rows as an aligned plain-text table; ``columns`` selects and orders them.
+    """
+    Formats rows as an aligned plain-text table.
 
     Floats are shown with ``digits`` significant figures, missing cells are blank.
+
+    :param rows:
+        The rows.
+    :param columns:
+        The selected columns, in order (default: all).
+    :param digits:
+        The number of significant figures.
+
+    :return:
+        The table text.
     """
+
     rows = list(rows)
     if columns is None:
         columns = list(dict.fromkeys(key for row in rows for key in row))

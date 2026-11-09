@@ -38,6 +38,7 @@ import veloxchem as vlx
 
 from veloxchem.autocdam import AutoCDAM, CalculationResult, CDAMCandidate, FitResult, FrameworkSystem, plot_fit
 from veloxchem.autocdam.models import RESULT_GROUP, read_h5_group
+from veloxchem.errorhandler import VeloxChemError
 
 STRUCTURES = Path(__file__).parent / "data"
 CHARGES = json.loads(
@@ -276,10 +277,11 @@ class TestAutoCdamResultsDiagnostics:
     def test_export_requires_a_fit(self):
         driver = AutoCDAM()
         driver.calculator = Surface()
-        driver.setup(CDAMCandidate("Al", 3), {"IOD": {
-            "value": 2.0,
-            "tolerance": 0.01
-        }},
+        driver.setup(CDAMCandidate("Al", 3),
+                     {"IOD": {
+                         "value": 2.0,
+                         "tolerance": 0.01
+                     }},
                      parameters={"sigma": (1.4, 2.6)})
-        with pytest.raises(ValueError, match="fit"):
+        with pytest.raises(VeloxChemError, match="fit"):
             driver.export_fitted_model("unused")

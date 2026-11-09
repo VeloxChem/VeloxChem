@@ -276,13 +276,46 @@ PARAMETER_ALIASES = {
 
 
 class CDAMCandidate:
-    """One CDAM parameter point: geometry, charges, and potential settings.
+    """
+    One CDAM parameter point: geometry, charges, and potential settings.
 
     Dummy sites carry charge only. The central charge compensates their total
     charge so the complete ion retains ``formal_charge``. Positive dummy
     charges have no hard-coded upper limit; fitting bounds belong to the study.
     TIP3P, sigma 2 Å and epsilon 0.2 kcal/mol are convenient starting
     defaults, not fitted or transferable literature parameters.
+
+    :param metal:
+        The metal element symbol, such as 'Zn'.
+    :param formal_charge:
+        The formal charge of the ion (positive integer).
+    :param geometry:
+        The dummy geometry.
+    :param coordination_number:
+        The number of dummy sites (default: the number of directions of
+        ``geometry``).
+    :param dummy_charge:
+        The charge of each dummy site in e.
+    :param metal_dummy_distance:
+        The metal-dummy distance in angstrom.
+    :param potential_form:
+        The potential form, 'lj12_6' or 'lj12_6_4'.
+    :param metal_lj_sigma:
+        The metal LJ sigma in angstrom.
+    :param metal_lj_epsilon:
+        The metal LJ epsilon in kcal/mol.
+    :param c4_metal_water:
+        The metal-water C4 coefficient in kcal/mol*angstrom^4.
+    :param water_model:
+        The water model.
+    :param metal_mass:
+        The mass of the whole ion in amu (default: the VeloxChem element mass).
+    :param dummy_mass:
+        The mass of each dummy site in amu.
+    :param bond_force_constant:
+        The metal-dummy bond force constant in kcal/mol/angstrom^2.
+    :param angle_force_constant:
+        The dummy angle force constant in kcal/mol/rad^2.
     """
 
     geometries = GEOMETRIES
@@ -307,7 +340,8 @@ class CDAMCandidate:
             bond_force_constant=800.0,  # TODO: check against VeloxChem defaults
             angle_force_constant=250.0,  # TODO: check against VeloxChem defaults
     ):
-        """Store the template settings and validate them.
+        """
+        Stores the template settings and validates them.
 
         Distances and sigma are in angstrom, epsilon in kcal/mol, C4 in
         kcal/mol*angstrom^4, charges in e and masses in amu. The bond force
@@ -319,6 +353,7 @@ class CDAMCandidate:
         ``metal_lj_epsilon`` may be None until forces are built. Raises
         ValueError for an invalid combination (see ``_validate``).
         """
+
         self.metal = self._normalise_metal(metal)
         self.formal_charge = formal_charge
         self.geometry = normalize_geometry_name(geometry)
@@ -342,30 +377,63 @@ class CDAMCandidate:
     # ------------------------------------------------------------ derived values
     @property
     def coordination_number(self):
-        """Number of dummy sites."""
+        """
+        Gets the number of dummy sites.
+
+        :return:
+            The coordination number.
+        """
+
         return self._coordination_number
 
     @property
     def central_charge(self):
-        """Charge on the central metal site in e, so the ion totals ``formal_charge``."""
+        """
+        Gets the charge on the central metal site, so the ion totals
+        ``formal_charge``.
+
+        :return:
+            The central charge in e.
+        """
+
         return float(
             self.formal_charge) - self.coordination_number * self.dummy_charge
 
     @property
     def central_mass(self):
-        """Mass of the central site in amu: the ion mass minus all dummy masses."""
+        """
+        Gets the mass of the central site: the ion mass minus all dummy masses.
+
+        :return:
+            The central mass in amu.
+        """
+
         return self.metal_mass - self.coordination_number * self.dummy_mass
 
     @property
     def candidate_id(self):
-        """Readable identifier built from metal, charge, geometry, q, r and potential form."""
+        """
+        Gets a readable identifier built from metal, charge, geometry, q, r and
+        potential form.
+
+        :return:
+            The identifier.
+        """
+
         return (
             f"{self.metal}{self.formal_charge}_{self.geometry}_"
             f"q{self.dummy_charge:.3f}_r{self.metal_dummy_distance:.3f}_{self.potential_form}"
         )
 
     def openmm_parameters(self) -> dict[str, float]:
-        """Metal LJ, C4, metal-dummy distance and force constants in OpenMM units."""
+        """
+        Gets the metal LJ, C4, metal-dummy distance and force constants in OpenMM
+        units.
+
+        :return:
+            The parameters by name.
+        """
+
         return site_parameters_openmm(sigma=self.metal_lj_sigma,
                                       epsilon=self.metal_lj_epsilon,
                                       c4=self.c4_metal_water,
@@ -374,7 +442,13 @@ class CDAMCandidate:
                                       angle_k=self.angle_force_constant)
 
     def coordinates(self):
-        """Return metal and dummy coordinates in angstrom."""
+        """
+        Gets the metal and dummy coordinates.
+
+        :return:
+            The coordinates in angstrom, metal first.
+        """
+
         coordinates = [[0.0, 0.0, 0.0]]
         for direction in self.geometries[self.geometry]:
             coordinates.append(
@@ -382,11 +456,23 @@ class CDAMCandidate:
         return coordinates
 
     def dummy_names(self):
-        """Return the dummy atom names ``D1`` ... ``Dn``."""
+        """
+        Gets the dummy atom names.
+
+        :return:
+            The names ``D1`` ... ``Dn``.
+        """
+
         return [f"D{index}" for index in range(1, self.coordination_number + 1)]
 
     def dummy_types(self):
-        """Return the force-field atom types of all dummy sites, in site order."""
+        """
+        Gets the force-field atom types of all dummy sites.
+
+        :return:
+            The atom types, in site order.
+        """
+
         return [
             self.dummy_type(index)
             for index in range(1, self.coordination_number + 1)
@@ -394,21 +480,44 @@ class CDAMCandidate:
 
     @staticmethod
     def dummy_type(index):
-        """Return the atom type of the 1-based dummy site ``index``."""
+        """
+        Gets the atom type of one dummy site.
+
+        :param index:
+            The 1-based dummy site index.
+
+        :return:
+            The atom type.
+        """
+
         return f"CDAM_D{index}"
 
     def metal_type(self):
-        """Return the force-field atom type of the central metal."""
+        """
+        Gets the force-field atom type of the central metal.
+
+        :return:
+            The atom type.
+        """
+
         return f"CDAM_{self.metal}"
 
     # ------------------------------------------------------------------- copies
     def with_parameters(self, parameters):
-        """Copy this template and apply named physical parameters.
+        """
+        Copies this template and applies named physical parameters.
 
         LJ sigma and M--D distance are in angstrom; epsilon and C4 are in
         kcal/mol and kcal/mol*angstrom^4. Charge is in elementary charges.
         Unknown names are rejected so a scan cannot silently be ineffective.
+
+        :param parameters:
+            The parameter values (a ParameterSet or a mapping).
+
+        :return:
+            The new candidate.
         """
+
         values = parameters.values if isinstance(parameters,
                                                  ParameterSet) else parameters
         unknown = set(values) - self.parameter_names
@@ -422,7 +531,19 @@ class CDAMCandidate:
         return candidate
 
     def with_geometry(self, geometry, metal_dummy_distance=None):
-        """Copy this template with another dummy geometry (and its coordination number)."""
+        """
+        Copies this template with another dummy geometry (and its coordination
+        number).
+
+        :param geometry:
+            The dummy geometry.
+        :param metal_dummy_distance:
+            The metal-dummy distance in angstrom (default: unchanged).
+
+        :return:
+            The new candidate.
+        """
+
         return type(self)(metal=self.metal,
                           formal_charge=self.formal_charge,
                           geometry=geometry,
@@ -443,7 +564,16 @@ class CDAMCandidate:
     # ------------------------------------------------------- batch round trip
     @classmethod
     def from_generated_batch(cls, batch):
-        """Recover a CDAM template from authoritative Python-side batch data."""
+        """
+        Recovers a CDAM template from authoritative Python-side batch data.
+
+        :param batch:
+            The generated batch of a candidate.
+
+        :return:
+            The candidate.
+        """
+
         data, meta = batch.system, batch.metadata
         nb, bonded = data.nonbonded_parameters, data.bonded_parameters
         return cls(metal=meta["metal"],
@@ -464,7 +594,13 @@ class CDAMCandidate:
                        "angle_force_constant_kcal_per_mol_rad2"])
 
     def to_generated_batch(self):
-        """Return this candidate as a one-frame generated batch."""
+        """
+        Converts this candidate to a one-frame generated batch.
+
+        :return:
+            The generated batch.
+        """
+
         metal_atom = {
             "name": self.metal,
             "element": self.metal,
@@ -512,7 +648,13 @@ class CDAMCandidate:
                               metadata=self.metadata())
 
     def metadata(self):
-        """Return a JSON-friendly summary of the candidate (units in the key names)."""
+        """
+        Gets a JSON-friendly summary of the candidate (units in the key names).
+
+        :return:
+            The summary dictionary.
+        """
+
         return {
             "mode": "cdam_candidate",
             "candidate_id": self.candidate_id,
@@ -529,7 +671,18 @@ class CDAMCandidate:
 
     # ------------------------------------------------------------------- files
     def write_files(self, directory, stem=None):
-        """Write matching PDB and OpenMM XML files."""
+        """
+        Writes matching PDB and OpenMM XML files.
+
+        :param directory:
+            The output directory.
+        :param stem:
+            The file name stem (default: the candidate identifier).
+
+        :return:
+            The paths of the PDB and XML files.
+        """
+
         self.require_lj_parameters()
         output_directory = Path(directory)
         output_directory.mkdir(parents=True, exist_ok=True)
@@ -541,11 +694,23 @@ class CDAMCandidate:
         return pdb_path, xml_path
 
     def to_pdb(self):  # TODO: align with VeloxChem PDB output
-        """Return the PDB geometry."""
+        """
+        Creates the PDB geometry.
+
+        :return:
+            The PDB text.
+        """
+
         return candidate_pdb(self)
 
     def to_openmm_xml(self):  # TODO: align with VeloxChem XML output
-        """Return an OpenMM ForceField XML file as plain text."""
+        """
+        Creates an OpenMM ForceField XML file as plain text.
+
+        :return:
+            The XML text.
+        """
+
         self.require_lj_parameters()
         return candidate_forcefield_xml(self)
 
@@ -585,7 +750,12 @@ class CDAMCandidate:
             raise ValueError("lj12_6 requires c4_metal_water=0.0")
 
     def require_lj_parameters(self):
-        """Refuse to build forces without a positive sigma and nonnegative epsilon."""
+        """
+        Refuses to build forces without a positive sigma and nonnegative epsilon.
+
+        Raises ValueError otherwise.
+        """
+
         if self.metal_lj_sigma is None or self.metal_lj_epsilon is None:
             raise ValueError(
                 "writing OpenMM XML requires metal_lj_sigma and metal_lj_epsilon"

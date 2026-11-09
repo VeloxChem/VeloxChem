@@ -35,6 +35,7 @@ import pytest
 from veloxchem.autocdam import AutoCDAM, CalculationResult, CDAMCandidate, ParameterSpec
 from veloxchem.autocdam.models import (HARD_LIMITS, read_h5_group,
                                        reference_bounds, uff_lj)
+from veloxchem.errorhandler import VeloxChemError
 
 
 class Surface:
@@ -84,8 +85,7 @@ class TestAutoCdamSoftBounds:
         driver.calculator = Surface()
         driver.setup(CDAMCandidate("Al", 3), {"IOD": {
             "value": 2.0
-        }},
-                     parameters=parameters)
+        }}, parameters=parameters)
         specs = {s.name: s for s in driver.parameter_specs}
         assert specs["metal_lj_sigma"].expandable and specs[
             "metal_lj_sigma"].hard_bounds
@@ -105,14 +105,13 @@ class TestAutoCdamSoftBounds:
                               ("uff", "no reference bounds")])
     def test_bad_reference_requests(self, value, message):
         parameters = {"sigma": (1.4, 2.6), "dummy_charge": value}
-        with pytest.raises(ValueError, match=message):
+        with pytest.raises(VeloxChemError, match=message):
             AutoCDAM().setup(CDAMCandidate("Al", 3), {"IOD": {
                 "value": 2.0
-            }},
-                             parameters=parameters)
+            }}, parameters=parameters)
 
     def test_hard_bounds_must_contain_bounds(self):
-        with pytest.raises(ValueError, match="inside hard_bounds"):
+        with pytest.raises(VeloxChemError, match="inside hard_bounds"):
             ParameterSpec("metal_lj_sigma",
                           2.0, (1.0, 3.0),
                           hard_bounds=(1.5, 3.0))

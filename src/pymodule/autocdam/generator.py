@@ -66,14 +66,21 @@ MODEL_METADATA_KEYS = ("metal", "formal_charge", "geometry", "potential_form",
 
 
 class CoordinateGenerator:
-    """Create candidate coordinate batches and update their OpenMM systems.
+    """
+    Creates candidate coordinate batches and updates their OpenMM systems.
 
     Batch generation updates candidate coordinates and cloned OpenMM systems
     from a common template. File export remains an optional candidate utility.
+
+    :param ostream:
+        The output stream for progress messages (the package default when None).
     """
 
     def __init__(self, ostream=None):
-        """Use ``ostream`` for progress messages (the package default when None)."""
+        """
+        Initializes the generator; OpenMM is required.
+        """
+
         assert_msg_critical("openmm" in sys.modules,
                             f"{type(self).__name__}: OpenMM is required")
         self.ostream = default_ostream(ostream)
@@ -84,12 +91,27 @@ class CoordinateGenerator:
                                  *,
                                  openmm_template=None,
                                  sample_ids=None):
-        """Generate one independent coordinate/system batch per parameter set.
+        """
+        Generates one independent coordinate/system batch per parameter set.
 
         This does not write PDB/XML. A fixed solvent box can be reused: its
         coordinates are copied, solute coordinates and forces are updated, and
         the calculator minimizes each candidate before collecting properties.
+
+        :param candidate:
+            The CDAM candidate template.
+        :param proposals:
+            The parameter sets.
+        :param openmm_template:
+            The shared OpenMM template (see ``create_openmm_template``).
+        :param sample_ids:
+            The sample identifiers, one per proposal (default: ``sample-000000``,
+            ...).
+
+        :return:
+            The list of generated batches.
         """
+
         proposals = list(proposals)
         ids = (list(sample_ids) if sample_ids is not None else
                [f"sample-{i:06d}" for i in range(len(proposals))])
@@ -109,12 +131,22 @@ class CoordinateGenerator:
         return batches
 
     def create_openmm_template(self, candidate, *, padding_nm=1.2):
-        """Build vacuum and solvated OpenMM objects once, entirely in memory.
+        """
+        Builds vacuum and solvated OpenMM objects once, entirely in memory.
 
         OpenMM's ForceField reads the candidate XML from StringIO; no candidate
         files are generated. Supported water models use OpenMM's bundled XML.
         More complex solvent/framework systems can be supplied as OpenMMSystems.
+
+        :param candidate:
+            The CDAM candidate.
+        :param padding_nm:
+            The solvent padding in nm (must exceed the 1.0 nm nonbonded cutoff).
+
+        :return:
+            The OpenMM systems of the candidate.
         """
+
         candidate.require_lj_parameters()
         if candidate.water_model is None or candidate.water_model.lower(
         ) not in WATER_MODELS:
@@ -156,12 +188,22 @@ class CoordinateGenerator:
 
     @staticmethod
     def update_openmm_systems(template, batch):
-        """Clone and update both systems from a generated candidate's data.
+        """
+        Clones and updates both systems from a generated candidate's data.
 
         Updates occur before creating a Context. Changing constraints/geometry
         requires a fresh Context, rather than updateParametersInContext alone.
         The caller's template and every other proposal remain untouched.
+
+        :param template:
+            The OpenMM systems template.
+        :param batch:
+            The generated batch of a CDAM candidate.
+
+        :return:
+            The updated copies of the OpenMM systems.
         """
+
         if batch.metadata.get("mode") != "cdam_candidate":
             raise ValueError(
                 "OpenMM updates require a generated CDAM candidate")

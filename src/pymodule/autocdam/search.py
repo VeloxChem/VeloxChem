@@ -94,20 +94,46 @@ class ParameterPropertySample:
 
 @dataclass
 class ParameterPropertyTable:
-    """Accumulated observations, including failed attempts, independent of scoring."""
+    """
+    Accumulated observations, including failed attempts, independent of scoring.
+
+    :param samples:
+        The samples.
+    :param study_metadata:
+        The metadata that defines the study.
+    """
 
     samples: list[ParameterPropertySample] = field(default_factory=list)
     study_metadata: dict[str, Any] = field(default_factory=dict)
 
     def add(self, sample: ParameterPropertySample) -> None:
-        """Append a sample; raises ``ValueError`` if its ``sample_id`` already exists."""
+        """
+        Appends a sample.
+
+        Raises ``ValueError`` if its ``sample_id`` already exists.
+
+        :param sample:
+            The sample.
+        """
+
         if any(row.sample_id == sample.sample_id for row in self.samples):
             raise ValueError(f"duplicate sample_id: {sample.sample_id}")
         self.samples.append(sample)
 
     def rescore(self, evaluator,
                 targets: Iterable[FitTarget]) -> dict[str, EvaluationResult]:
-        """Evaluate every usable sample against ``targets``; returns evaluations by sample id."""
+        """
+        Evaluates every usable sample against the targets.
+
+        :param evaluator:
+            The evaluator.
+        :param targets:
+            The targets.
+
+        :return:
+            The evaluations by sample id.
+        """
+
         targets = list(targets)
         return {
             row.sample_id: evaluator.evaluate(row.calculation, targets)
@@ -180,19 +206,26 @@ class PropertyPrediction:
 
 
 class SklearnGaussianProcessSurrogate:
-    """Learn one Gaussian process per property from usable observations.
+    """
+    Learns one Gaussian process per property from usable observations.
 
     Inputs and outputs are standardized, and kernel parameters are learned from
     the data. Vector properties keep the same component order in every sample.
     Predicted uncertainty describes the model, rather than MD/FEP convergence.
+
+    :param noise:
+        Whether a learned white-noise term is added for noisy MD properties.
     """
 
     def __init__(self, noise: bool = False):
-        """``noise=True`` adds a learned white-noise term for noisy MD properties.
-
-        Predicted standard deviations then describe the latent property, not a
-        new noisy observation, which is what expected improvement needs.
         """
+        Initializes the surrogate; scikit-learn is required.
+
+        With ``noise=True`` predicted standard deviations describe the latent
+        property, not a new noisy observation, which is what expected improvement
+        needs.
+        """
+
         assert_msg_critical(
             importlib.util.find_spec("sklearn") is not None,
             "SklearnGaussianProcessSurrogate: scikit-learn is required")
@@ -202,12 +235,19 @@ class SklearnGaussianProcessSurrogate:
 
     def fit(self, table: ParameterPropertyTable,
             property_names: Sequence[str]) -> None:
-        """Fit one GP per property from usable, finite observations.
+        """
+        Fits one GP per property from usable, finite observations.
 
         Properties with fewer than two such observations are skipped (and absent
         from ``predict``). Raises ``ValueError`` for properties that are neither
         scalars nor fixed-length vectors.
+
+        :param table:
+            The observation table.
+        :param property_names:
+            The properties to fit.
         """
+
         from sklearn.gaussian_process import GaussianProcessRegressor
         from sklearn.gaussian_process.kernels import Matern, WhiteKernel
         from sklearn.preprocessing import StandardScaler
@@ -264,11 +304,19 @@ class SklearnGaussianProcessSurrogate:
     def predict(
         self, parameters: Sequence[ParameterSet]
     ) -> dict[str, list[PropertyPrediction]]:
-        """Predict each fitted property in its original units.
+        """
+        Predicts each fitted property in its original units.
 
         Standard deviations exclude the learned white noise, so they describe the
         latent property rather than a new noisy observation.
+
+        :param parameters:
+            The parameter points.
+
+        :return:
+            The predictions (mean and standard deviation) per point, by property.
         """
+
         if not parameters:
             return {name: [] for name in self.models}
         parameter_values = np.array(
@@ -356,26 +404,27 @@ class SearchDriver:
                  ostream=None):
         """Validate the parameters and targets and create an empty observation table.
 
-        Raises ``ValueError`` if parameters or targets are missing or duplicated,
-        an optimizable parameter has no bounds, or ``objective_threshold`` is
-        negative or not finite. ``noise`` lets the property GPs learn observation noise.
+        It is a critical error if parameters or targets are missing or
+        duplicated, an optimizable parameter has no bounds, or
+        ``objective_threshold`` is negative or not finite. ``noise`` lets the property GPs learn observation noise.
         """
         self.specs = list(specs)
         self.targets = list(targets)
-        if not self.specs or not self.targets:
-            raise ValueError("fitting requires parameters and targets")
-        if (len({s.name for s in self.specs}) != len(self.specs) or
-                len({t.name for t in self.targets}) != len(self.targets)):
-            raise ValueError("parameter and target names must be unique")
-        if objective_threshold is not None and (
-                not math.isfinite(objective_threshold) or
-                objective_threshold < 0):
-            raise ValueError(
-                "objective_threshold must be finite and nonnegative")
+        assert_msg_critical(
+            bool(self.specs) and bool(self.targets),
+            "fitting requires parameters and targets")
+        assert_msg_critical(
+            len({s.name for s in self.specs}) == len(self.specs) and
+            len({t.name for t in self.targets}) == len(self.targets),
+            "parameter and target names must be unique")
+        assert_msg_critical(
+            objective_threshold is None or
+            (math.isfinite(objective_threshold) and objective_threshold >= 0),
+            "objective_threshold must be finite and nonnegative")
         for spec in self.specs:
-            if spec.optimizable and spec.bounds is None:
-                raise ValueError(
-                    f"bounded sampling requires bounds for {spec.name}")
+            assert_msg_critical(
+                not spec.optimizable or spec.bounds is not None,
+                f"bounded sampling requires bounds for {spec.name}")
         self.calculator = calculator
         self.evaluator = evaluator
         self.make_inputs = make_inputs
@@ -620,7 +669,30 @@ EXPLORATION_FRACTION = 0.2  # share of each later stage sampled from the origina
 
 
 class FittingDriver(SearchDriver):
-    """Generate, calculate, refit, and refine stages until tolerance or budget."""
+    """
+    Generates, calculates, refits, and refines stages until tolerance or budget.
+
+    :param specs:
+        The parameter specifications.
+    :param targets:
+        The fitted targets.
+    :param calculator:
+        The property calculator.
+    :param evaluator:
+        The evaluator.
+    :param make_inputs:
+        The function ``make_inputs(proposals, sample_ids)`` that yields one
+        generated input (or an exception) per proposal.
+    :param max_iterations:
+        The number of stages.
+    :param samples_per_stage:
+        The number of candidates per stage.
+    :param shrink_fraction:
+        The width kept per refinement, in (0, 1).
+    :param options:
+        The shared search options (seed, objective_threshold, quality_check,
+        noise, study_metadata, checkpoint settings, comm, ostream).
+    """
 
     def __init__(self,
                  specs,
@@ -633,18 +705,20 @@ class FittingDriver(SearchDriver):
                  samples_per_stage: int = 10,
                  shrink_fraction: float = 0.5,
                  **options):
-        """Set the stage budget; the region starts at the full bounds.
-
-        ``shrink_fraction`` is the width kept per refinement. Raises
-        ``ValueError`` for out-of-range sizes or fractions.
         """
+        Sets the stage budget; the region starts at the full bounds.
+
+        ``shrink_fraction`` is the width kept per refinement. Out-of-range
+        sizes or fractions are a critical error.
+        """
+
         super().__init__(specs, targets, calculator, evaluator, make_inputs,
                          **options)
-        if max_iterations < 1 or samples_per_stage < 2:
-            raise ValueError(
-                "max_iterations >= 1 and samples_per_stage >= 2 are required")
-        if not 0 < shrink_fraction < 1:
-            raise ValueError("shrink_fraction must lie in (0, 1)")
+        assert_msg_critical(
+            max_iterations >= 1 and samples_per_stage >= 2,
+            "max_iterations >= 1 and samples_per_stage >= 2 are required")
+        assert_msg_critical(0 < shrink_fraction < 1,
+                            "shrink_fraction must lie in (0, 1)")
         self.max_iterations = max_iterations
         self.samples_per_stage = samples_per_stage
         self.shrink_fraction = shrink_fraction
@@ -653,7 +727,16 @@ class FittingDriver(SearchDriver):
     # ------------------------------------------------------------------ fit
 
     def fit(self, *, resume: bool = False) -> FitResult:
-        """Calculate complete stages until a measured solution or the budget limit."""
+        """
+        Calculates complete stages until a measured solution or the budget limit.
+
+        :param resume:
+            Whether to resume from the checkpoint.
+
+        :return:
+            The fit result.
+        """
+
         if resume:
             self._resume()
         self._print_setup(resume)

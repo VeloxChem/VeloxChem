@@ -40,6 +40,7 @@ import veloxchem as vlx
 from veloxchem.autocdam import CDAMCandidate, FrameworkSystem, ParameterSpec
 from veloxchem.autocdam.framework import compare_to_baseline
 from veloxchem.autocdam.geometry import atom_labels, minimum_image
+from veloxchem.errorhandler import VeloxChemError
 
 STRUCTURES = Path(__file__).parent / "data"
 CHARGES = json.loads(
@@ -193,28 +194,29 @@ class TestAutoCdamFrameworkBaseline:
         ]
         assert node_system().ineffective_parameters(specs) == ["dummy_charge"]
 
-    @pytest.mark.parametrize("kwargs, message", [
+    @pytest.mark.parametrize("kwargs, error, message", [
         ({
             "charges": None
-        }, "choose baseline charges"),
+        }, VeloxChemError, "choose baseline charges"),
         ({
             "target_metal": "O1"
-        }, "not a metal"),
+        }, VeloxChemError, "not a metal"),
         ({
             "target_metal": "AL9"
-        }, "unknown atom label"),
+        }, ValueError, "unknown atom label"),
         ({
             "charges": [0.0] * 19
-        }, "sum to"),
+        }, ValueError, "sum to"),
         ({
             "charges": [0.1] * 3
-        }, "19 finite values"),
+        }, ValueError, "19 finite values"),
         ({
             "representation": "united"
-        }, "representation"),
+        }, VeloxChemError, "representation"),
     ])
-    def test_invalid_framework_inputs_fail_clearly(self, kwargs, message):
-        with pytest.raises(ValueError, match=message):
+    def test_invalid_framework_inputs_fail_clearly(self, kwargs, error,
+                                                   message):
+        with pytest.raises(error, match=message):
             node_system(**kwargs).prepare_baseline()
 
     def test_periodic_cell_uses_pme_and_minimum_image(self):
