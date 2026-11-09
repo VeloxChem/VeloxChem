@@ -48,7 +48,7 @@ kJ/mol, QM energies are hartree.
 from __future__ import annotations
 
 from copy import deepcopy
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 import json
 from pathlib import Path
 from typing import Any
@@ -71,9 +71,10 @@ from ..veloxchemlib import (bohr_in_angstrom, chemical_element_identifier,
 from .calculator import DEFAULT_BASIS, SINGLE_POINT_SETTINGS, Calculator
 from .evaluator import Evaluator
 from .framework import check_force_field_atoms, copy_force_field
+from . import reporting
 from .models import (CalculationResult, FitResult, FitTarget, ParameterSet,
                      ParameterSpec, h5_filename, print_settings, read_h5_group,
-                     write_h5_groups,
+                     widen_soft_bounds, write_h5_groups,
                      ANGSTROM_TO_NM)
 
 # ==========================================================================
@@ -86,6 +87,10 @@ FIT_SETTING_NAMES = frozenset({
     "epsilon0_kjmol",
     "sigma_bounds_angstrom",
     "epsilon_bounds_kjmol",
+    "sigma_hard_bounds_angstrom",
+    "epsilon_hard_bounds_kjmol",
+    "max_bound_expansions",
+    "bound_expansion_factor",
     "energy_tolerance_kjmol",
     "point_weights",
     "strategy",
@@ -416,7 +421,9 @@ OPTIMIZER_DEFAULTS = {
     "max_nfev": 2000,
     "ftol": 1e-8,
     "xtol": 1e-8,
-    "gtol": 1e-8
+    "gtol": 1e-8,
+    "max_bound_expansions": 3,  # refits after widening a soft bound
+    "bound_expansion_factor": 1.0,  # a widened side moves by this fraction of the width
 }
 STRATEGIES = ("least_squares", "differential_evolution+least_squares")
 AUTO_DIRECTION_SAMPLES = 128  # Fibonacci-sphere directions tried for the "auto" scan
@@ -512,6 +519,14 @@ class MetalComplexLJDriver:
                 'epsilon0_kjmol': ('float', 'initial epsilon'),
                 'sigma_bounds_angstrom': ('seq_fixed', 'sigma bounds'),
                 'epsilon_bounds_kjmol': ('seq_fixed', 'epsilon bounds'),
+                'sigma_hard_bounds_angstrom':
+                    ('seq_fixed', 'limits of soft sigma bounds'),
+                'epsilon_hard_bounds_kjmol':
+                    ('seq_fixed', 'limits of soft epsilon bounds'),
+                'max_bound_expansions':
+                    ('int', 'widenings of soft bounds (refits)'),
+                'bound_expansion_factor':
+                    ('float', 'widening fraction of the width'),
                 'energy_tolerance_kjmol':
                     ('float', 'tolerance of the interaction energies'),
                 'point_weights': ('raw', 'weights of scan points'),
@@ -1054,26 +1069,40 @@ class MetalComplexLJDriver:
     def _parameter_specs(self):
         """Sigma (angstrom) and epsilon (kJ/mol) specs; initial values default to the baseline atom.
 
-        A lower search bound that is not positive is a critical error.
+        Bounds given together with hard bounds are soft: ``fit`` widens a side
+        the fitted value reaches, up to the hard bound (as in the Bayesian
+        CDAM search). A lower search bound that is not positive is a critical
+        error.
         """
         atom = self.baseline_force_field.atoms[self.study.target_atom_index]
         settings = self._fit_settings()
+
+        def spec(name, initial, bounds, hard_bounds, unit):
+            hard = settings.get(hard_bounds)
+            return ParameterSpec(
+                name,
+                initial,
+                tuple(float(v) for v in bounds),
+                unit,
+                expandable=hard is not None,
+                hard_bounds=(tuple(float(v) for v in hard)
+                             if hard is not None else None))
+
         specs = [
-            ParameterSpec(
-                "metal_lj_sigma",
-                settings.get("sigma0_angstrom", atom["sigma"] / ANGSTROM_TO_NM),
-                tuple(
-                    settings.get("sigma_bounds_angstrom",
-                                 DEFAULT_SIGMA_BOUNDS_ANGSTROM)), "angstrom"),
-            ParameterSpec(
-                "metal_lj_epsilon",
-                settings.get("epsilon0_kjmol", atom["epsilon"]),
-                tuple(
-                    settings.get("epsilon_bounds_kjmol",
-                                 DEFAULT_EPSILON_BOUNDS_KJMOL)), "kJ/mol")
+            spec("metal_lj_sigma",
+                 settings.get("sigma0_angstrom", atom["sigma"] / ANGSTROM_TO_NM),
+                 settings.get("sigma_bounds_angstrom",
+                              DEFAULT_SIGMA_BOUNDS_ANGSTROM),
+                 "sigma_hard_bounds_angstrom", "angstrom"),
+            spec("metal_lj_epsilon",
+                 settings.get("epsilon0_kjmol", atom["epsilon"]),
+                 settings.get("epsilon_bounds_kjmol",
+                              DEFAULT_EPSILON_BOUNDS_KJMOL),
+                 "epsilon_hard_bounds_kjmol", "kJ/mol"),
         ]
         assert_msg_critical(
-            all(spec.bounds[0] > 0 for spec in specs),
+            all(s.bounds[0] > 0 and (s.hard_bounds is None or
+                                     s.hard_bounds[0] > 0) for s in specs),
             "sigma and epsilon search bounds must be positive")
         return specs
 
@@ -1234,16 +1263,40 @@ class MetalComplexLJDriver:
         reference = np.array([target.reference for target in targets])
         tolerance = targets[0].tolerance
         self._print_fit_setup(strategy, specs, rows, tolerance, settings)
-        optimized, global_result, history = self._optimize(
-            strategy, specs, reference, tolerance, settings)
-        parameters = ParameterSet(
-            dict(zip((spec.name for spec in specs), optimized.x)))
+        initial_specs, history, expansions, nfev = specs, [], [], 0
+        while True:
+            optimized, global_result, trials = self._optimize(
+                strategy, specs, reference, tolerance, settings)
+            history.extend(trials)
+            nfev += int(optimized.nfev)
+            fitted = dict(zip((spec.name for spec in specs), optimized.x))
+            if len({c["step"] for c in expansions}) >= int(
+                    settings["max_bound_expansions"]):
+                break
+            specs, changes = widen_soft_bounds(
+                specs, fitted, float(settings["bound_expansion_factor"]),
+                len({c["step"] for c in expansions}) + 1)
+            if not changes:
+                break
+            expansions.extend(changes)
+            for c in changes:
+                self.ostream.print_info(
+                    f"Fitted {c['parameter']} = {c['value']:.4g} reached its "
+                    f"{c['side']} bound; widened [{c['old'][0]:.4g}, "
+                    f"{c['old'][1]:.4g}] -> [{c['new'][0]:.4g}, "
+                    f"{c['new'][1]:.4g}] and refitting")
+            self.ostream.flush()
+            # Restart from the fitted point, inside the widened bounds.
+            specs = [replace(s, initial=fitted[s.name]) for s in specs]
+        for i, trial in enumerate(history, 1):
+            trial["iteration"] = i
+        parameters = ParameterSet(fitted)
         calculation = self.evaluate_mm(parameters)
         evaluation = self.evaluate(calculation)
         self.result = self._fit_result(parameters, calculation, evaluation,
                                        optimized, global_result, history,
-                                       strategy, specs, rows, reference,
-                                       tolerance)
+                                       strategy, initial_specs, specs, rows,
+                                       reference, tolerance, expansions, nfev)
         self.save_dataset()
         self._save_fit_outputs()
         return self.result
@@ -1295,10 +1348,16 @@ class MetalComplexLJDriver:
         return optimized, global_result, history
 
     def _fit_result(self, parameters, calculation, evaluation, optimized,
-                    global_result, history, strategy, specs, rows, reference,
-                    tolerance) -> FitResult:
-        """Convergence, conditioning and bound warnings, and the full diagnostics."""
+                    global_result, history, strategy, initial_specs, specs,
+                    rows, reference, tolerance, expansions,
+                    nfev) -> FitResult:
+        """Convergence, conditioning and bound warnings, and the full diagnostics.
+
+        ``initial_specs`` hold the bounds as given, ``specs`` the final
+        (possibly widened) bounds.
+        """
         bounds = np.array([spec.bounds for spec in specs])
+        final_bounds = {spec.name: list(spec.bounds) for spec in specs}
         mm_values = calculation.values[MM_ENERGY_NAME]
         differences = np.array(mm_values) - reference
         meets_tolerance = bool(
@@ -1314,9 +1373,10 @@ class MetalComplexLJDriver:
             warnings.append(
                 "scan Jacobian poorly constrains sigma/epsilon; inspect parameter sensitivity"
             )
-        if np.any(np.isclose(optimized.x, bounds[:, 0])) or np.any(
-                np.isclose(optimized.x, bounds[:, 1])):
-            warnings.append("fitted parameter lies near a search bound")
+        bound_warnings = reporting.bound_warnings(initial_specs,
+                                                  parameters.values,
+                                                  final_bounds)
+        warnings.extend(bound_warnings)
         baseline = self.baseline_force_field.atoms[self.study.target_atom_index]
         if converged:
             stop_reason = "target_tolerance"
@@ -1337,6 +1397,10 @@ class MetalComplexLJDriver:
             "n_usable": len(rows),
             "n_rejected": len(self.dataset.records) - len(rows),
             "bounds": bounds.tolist(),
+            "parameter_definitions": reporting.parameter_definitions(
+                initial_specs, final_bounds),
+            "bound_expansions": expansions,
+            "bound_warnings": bound_warnings,
             "parameter_units": {
                 spec.name: spec.unit for spec in specs
             },
@@ -1366,7 +1430,7 @@ class MetalComplexLJDriver:
             status="failed" if evaluation.failed else
             ("success" if converged else "warning"),
             converged=converged,
-            iterations=int(optimized.nfev),
+            iterations=nfev,
             history=history,
             warnings=warnings,
             diagnostics=diagnostics)

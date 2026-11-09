@@ -54,7 +54,7 @@ from __future__ import annotations
 import math
 import sys
 import textwrap
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, Iterable, Literal, Mapping, Sequence
 
@@ -575,6 +575,62 @@ class ParameterSpec:
             hard_bounds=(tuple(float(v) for v in values["hard_bounds"])
                          if values.get("hard_bounds") is not None else None),
         )
+
+
+BOUND_MARGIN = 0.02  # "at a bound" = within this fraction of the width
+
+
+def widen_soft_bounds(specs: Sequence[ParameterSpec],
+                      values: Mapping[str, float], factor: float,
+                      step: int) -> tuple[list[ParameterSpec], list[dict]]:
+    """
+    Widens the soft bounds that the given parameter values have reached.
+
+    A value within ``BOUND_MARGIN`` of the width from a side of an expandable
+    spec moves that side out by ``factor`` times the width, never past
+    ``hard_bounds``. Fixed and non-expandable specs are returned unchanged.
+
+    :param specs:
+        The parameter specifications.
+    :param values:
+        The parameter values (the current best point) by name.
+    :param factor:
+        The widening as a fraction of the current width.
+    :param step:
+        The search step recorded with each change.
+
+    :return:
+        The specs with widened bounds, and one record per widened side.
+    """
+
+    widened, changes = [], []
+    for spec in specs:
+        if not (spec.optimizable and spec.expandable):
+            widened.append(spec)
+            continue
+        lower, upper = spec.bounds
+        hard_lower, hard_upper = spec.hard_bounds or (-math.inf, math.inf)
+        width, value = upper - lower, values[spec.name]
+        margin = BOUND_MARGIN * width
+        if value - lower <= margin and lower > hard_lower:
+            side, new = "lower", (max(hard_lower,
+                                      lower - factor * width), upper)
+        elif upper - value <= margin and upper < hard_upper:
+            side, new = "upper", (lower,
+                                  min(hard_upper, upper + factor * width))
+        else:
+            widened.append(spec)
+            continue
+        widened.append(replace(spec, bounds=new))
+        changes.append({
+            "step": step,
+            "parameter": spec.name,
+            "side": side,
+            "value": value,
+            "old": [lower, upper],
+            "new": list(new)
+        })
+    return widened, changes
 
 
 @dataclass

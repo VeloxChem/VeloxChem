@@ -454,6 +454,50 @@ class TestAutoCdamMetalComplexLj:
         assert result.diagnostics["optimizer_success"] is True
         assert result.converged
 
+    def test_soft_bounds_widen_up_to_hard_bounds(self, baseline, tmp_path):
+        # True sigma is 2.6: a soft [2.0, 2.4] bound widens once to [2.0, 2.8].
+        driver = make_driver(baseline, tmp_path,
+                             sigma0_angstrom=2.2,
+                             sigma_bounds_angstrom=[2.0, 2.4],
+                             sigma_hard_bounds_angstrom=[0.5, 6.0])
+        synthesize_qm(driver)
+        result = driver.fit()
+        assert result.converged
+        assert result.parameters["metal_lj_sigma"] == pytest.approx(2.6,
+                                                                    abs=1e-5)
+        changes = result.diagnostics["bound_expansions"]
+        assert [(c["parameter"], c["side"], c["new"]) for c in changes] == [
+            ("metal_lj_sigma", "upper", [2.0, pytest.approx(2.8)])
+        ]
+        definition = result.diagnostics["parameter_definitions"][0]
+        assert definition["initial_bounds"] == [2.0, 2.4]
+        assert definition["bounds"] == [2.0, pytest.approx(2.8)]
+        assert definition["hard_bounds"] == [0.5, 6.0]
+        assert "bound widened at step 1" in result.summary()
+        assert not result.warnings
+
+        # A hard limit below the true value stops the widening there.
+        (tmp_path / "hard").mkdir()
+        driver = make_driver(baseline, tmp_path / "hard",
+                             sigma0_angstrom=2.2,
+                             sigma_bounds_angstrom=[2.0, 2.4],
+                             sigma_hard_bounds_angstrom=[2.0, 2.5])
+        synthesize_qm(driver)
+        result = driver.fit()
+        assert result.parameters["metal_lj_sigma"] == pytest.approx(2.5)
+        assert result.diagnostics["bounds"][0] == [2.0, 2.5]
+        assert any("upper bound" in w for w in result.warnings)
+
+        # Without hard bounds the bounds stay fixed, as before.
+        (tmp_path / "fixed").mkdir()
+        driver = make_driver(baseline, tmp_path / "fixed",
+                             sigma0_angstrom=2.2,
+                             sigma_bounds_angstrom=[2.0, 2.4])
+        synthesize_qm(driver)
+        result = driver.fit()
+        assert result.diagnostics["bound_expansions"] == []
+        assert result.parameters["metal_lj_sigma"] == pytest.approx(2.4)
+
     @pytest.mark.parametrize(
         "xyz, accepted",
         [

@@ -62,14 +62,13 @@ try:
 except ImportError:
     pass
 
-from .models import (RESULT_GROUP, FitResult, FitTarget, ParameterSpec,
-                     h5_filename, read_h5_group)
+from .models import (BOUND_MARGIN, RESULT_GROUP, FitResult, FitTarget,
+                     ParameterSpec, h5_filename, read_h5_group)
 
 # ==========================================================================
 # reporting
 # ==========================================================================
 
-BOUND_FRACTION = 0.02  # a fitted value within this fraction of the width is "at the bound"
 PHYSICAL_VALIDATION_NOTE = (
     "not performed: meeting the targets shows the optimizer converged, not that the "
     "force field is transferable or physically validated")
@@ -122,7 +121,7 @@ def bound_warnings(specs: Sequence[ParameterSpec], parameters: dict[str, float],
         if not spec.optimizable or spec.name not in parameters:
             continue
         lower, upper = final_bounds.get(spec.name, spec.bounds)
-        margin = BOUND_FRACTION * (upper - lower)
+        margin = BOUND_MARGIN * (upper - lower)
         value = parameters[spec.name]
         if value - lower <= margin or upper - value <= margin:
             side = "lower" if value - lower <= margin else "upper"

@@ -66,7 +66,6 @@ never train the surrogate; their agreement with full results is reported.
 """
 from __future__ import annotations
 
-import math
 import warnings
 from dataclasses import asdict, replace
 from typing import Any
@@ -75,7 +74,8 @@ import numpy as np
 
 from ..errorhandler import assert_msg_critical
 from .evaluator import Evaluator
-from .models import FitResult, ParameterSet, _is_sequence, format_value, print_settings
+from .models import (FitResult, ParameterSet, _is_sequence, format_value,
+                     print_settings, widen_soft_bounds)
 from .search import SearchDriver
 
 SEARCH_DEFAULTS = {
@@ -100,7 +100,6 @@ SEARCH_DEFAULTS = {
     "bound_expansion_evaluations": 3,  # extra budget granted per widening
 }
 SCREENING_KEYS = {"calculator_options", "framework_protocol", "oversample"}
-BOUND_MARGIN = 0.02  # "at a bound" = within this fraction of the width
 LOCAL_POOL_SPREAD = 0.08  # unit-cube spread of extra pool points around the best
 PENALTY_RADIUS = 0.10  # local penalization radius between batch members
 PARETO_RHO = 0.05  # augmentation weight of the Chebyshev scalarization
@@ -378,32 +377,10 @@ class BayesianFittingDriver(SearchDriver):
         if best is None or self._n_widenings() >= int(
                 self.search["max_bound_expansions"]):
             return []
-        factor = float(self.search["bound_expansion_factor"])
-        bounds, changes = self.current_bounds(), []
-        for spec in self.free:
-            if not spec.expandable:
-                continue
-            lower, upper = spec.bounds
-            hard_lower, hard_upper = spec.hard_bounds or (-math.inf, math.inf)
-            width, value = upper - lower, best.parameters[spec.name]
-            margin = BOUND_MARGIN * width
-            if value - lower <= margin and lower > hard_lower:
-                side, new = "lower", (max(hard_lower,
-                                          lower - factor * width), upper)
-            elif upper - value <= margin and upper < hard_upper:
-                side, new = "upper", (lower,
-                                      min(hard_upper, upper + factor * width))
-            else:
-                continue
-            bounds[spec.name] = new
-            changes.append({
-                "step": step,
-                "parameter": spec.name,
-                "side": side,
-                "value": value,
-                "old": [lower, upper],
-                "new": list(new)
-            })
+        _, changes = widen_soft_bounds(self.free, best.parameters,
+                                       float(self.search["bound_expansion_factor"]),
+                                       step)
+        bounds = {c["parameter"]: tuple(c["new"]) for c in changes}
         if changes:
             self._set_bounds(bounds)
             self.bound_expansions.extend(changes)
