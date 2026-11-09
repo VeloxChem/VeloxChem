@@ -34,8 +34,8 @@
 Minimum-image displacements (box vectors as rows; one cell or a cell per
 frame), Kabsch superposition and RMSD, direction assignment, angle sets, and
 framework atom selection and measurements. Atoms are selected by 0-based
-index or by ``<element><ordinal>`` labels such as ``AL1`` (first Al) or ``O3``
-(third O), counted in input order. Positions are in nm.
+index or by VeloxChem atom names (case-insensitive) such as ``O3`` (third O)
+or ``Al`` (an element that occurs once). Positions are in nm.
 
 The analysis section's ``analyze_trajectory`` turns aqueous production frames
 into IOD, CN and the geometry RMSD properties; IOD and distance/shape RMSDs
@@ -51,6 +51,8 @@ import re
 
 import numpy as np
 
+from ..mmforcefieldgenerator import MMForceFieldGenerator
+from ..outputstream import OutputStream
 from .models import ANGSTROM_TO_NM, GEOMETRY_RMSD_PROPERTIES
 
 # ==========================================================================
@@ -210,15 +212,15 @@ def angle_rmsd_deg(unit_dirs: np.ndarray,
 # ---------------------------------------------------------------- selection
 
 
-def atom_labels(elements: Sequence[str]) -> list[str]:
-    """Return ``<ELEMENT><ordinal>`` labels in input order (AL1, O1, O2, ...)."""
-    counts: dict[str, int] = {}
-    labels = []
-    for element in elements:
-        key = element.upper()
-        counts[key] = counts.get(key, 0) + 1
-        labels.append(f"{key}{counts[key]}")
-    return labels
+def atom_labels(molecule) -> list[str]:
+    """VeloxChem force-field atom names of ``molecule`` (Al, O1, O2, ...).
+
+    The names are those of ``MMForceFieldGenerator.get_atom_names``: element
+    label plus ordinal, or the bare label for an element that occurs once.
+    """
+    ff = MMForceFieldGenerator(ostream=OutputStream(None))
+    ff.molecule = molecule
+    return ff.get_atom_names()
 
 
 def resolve_atom(selector: int | str, labels: Sequence[str]) -> int:
@@ -232,10 +234,11 @@ def resolve_atom(selector: int | str, labels: Sequence[str]) -> int:
         return int(selector)
     if isinstance(selector, str):
         key = selector.strip().upper()
-        if key in labels:
-            return list(labels).index(key)
+        upper = [label.upper() for label in labels]
+        if key in upper:
+            return upper.index(key)
         raise ValueError(
-            f"unknown atom label {selector!r}; labels are element + ordinal, "
+            f"unknown atom label {selector!r}; labels are VeloxChem atom names, "
             f"e.g. {', '.join(labels[:4])}")
     raise ValueError(
         f"atom selector must be an index or a label, got {selector!r}")

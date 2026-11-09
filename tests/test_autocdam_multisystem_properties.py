@@ -59,7 +59,7 @@ def node(**kwargs):
     kwargs.setdefault("representation", "cdam")
     return FrameworkSystem(structure=molecule(),
                            charges=CHARGES,
-                           target_metal="AL1",
+                           target_metal="Al",
                            **kwargs)
 
 
@@ -81,9 +81,9 @@ def point(sigma=2.0, epsilon=0.2, q=0.5):
 
 
 STRUCTURAL = [
-    target("al_o_carboxylate", "distance", atoms=["AL1", "O3"]),
-    target("al_o_hydroxide", "distance", atoms=["AL1", "O1"]),
-    target("o_al_o", "angle", atoms=["O1", "AL1", "O2"]),
+    target("al_o_carboxylate", "distance", atoms=["Al", "O3"]),
+    target("al_o_hydroxide", "distance", atoms=["Al", "O1"]),
+    target("o_al_o", "angle", atoms=["O1", "Al", "O2"]),
     target("cn", "coordination_number", cutoff_angstrom=2.5),
     target("shell_rmsd", "coordination_rmsd", selection="first_shell"),
 ]
@@ -156,8 +156,8 @@ class TestAutoCdamMultisystemProperties:
                 "timestep_fs": 0.5
             })
         result = system.calculate(point(), [
-            target("d_md", "distance", atoms=["AL1", "O3"], method="md"),
-            target("d_min", "distance", atoms=["AL1", "O3"]),
+            target("d_md", "distance", atoms=["Al", "O3"], method="md"),
+            target("d_min", "distance", atoms=["Al", "O3"]),
         ])
         assert not result.failed, result.failure_reason
         assert result.metadata["d_md"]["geometry"] == "md_average"
@@ -197,8 +197,8 @@ class TestAutoCdamMultisystemProperties:
             system.measure(wrong, baseline.positions_nm, site=None)
 
     @pytest.mark.parametrize("bad, message", [
-        (target("d", "distance", atoms=["AL1"]), "needs 2 atoms"),
-        (target("a", "angle", atoms=["O1", "AL1", "Q9"]), "unknown atom label"),
+        (target("d", "distance", atoms=["Al"]), "needs 2 atoms"),
+        (target("a", "angle", atoms=["O1", "Al", "Q9"]), "unknown atom label"),
         (target("x", "dihedral", atoms=[0, 1, 2, 3]), "supports"),
         (target("m", "distance", atoms=[0, 1], method="anneal"), "method"),
     ])
@@ -229,7 +229,7 @@ class TestAutoCdamMultisystemProperties:
                 "al_o", {
                     "system": "mof",
                     "property": "distance",
-                    "atoms": ["AL1", "O3"],
+                    "atoms": ["Al", "O3"],
                     "value": 1.9,
                     "tolerance": 0.05
                 })
@@ -249,7 +249,7 @@ class TestAutoCdamMultisystemProperties:
             "bad", {
                 "system": "mof",
                 "property": "distance",
-                "atoms": ["AL1", "O3"],
+                "atoms": ["Al", "O3"],
                 "value": 1.9,
                 "tolerance": 0.05
             })
@@ -329,7 +329,7 @@ class TestAutoCdamMultisystemProperties:
         targets = {
             "d": {
                 "property": "distance",
-                "atoms": ["AL1", "O3"],
+                "atoms": ["Al", "O3"],
                 "value": 1.93,
                 "tolerance": 0.05
             }
@@ -344,7 +344,7 @@ class TestAutoCdamMultisystemProperties:
     def test_one_parameter_set_is_fitted_against_water_and_mof_together(self):
         mof = SpyFramework(structure=molecule(),
                            charges=CHARGES,
-                           target_metal="AL1",
+                           target_metal="Al",
                            representation="cdam",
                            name="mof")
         aqueous = FakeAqueous()
@@ -371,7 +371,7 @@ class TestAutoCdamMultisystemProperties:
             "al_o": {
                 "system": "mof",
                 "property": "distance",
-                "atoms": ["AL1", "O3"],
+                "atoms": ["Al", "O3"],
                 "value": 1.93,
                 "tolerance": 0.05,
                 "weight": 2.0
@@ -432,7 +432,7 @@ class TestAutoCdamMultisystemProperties:
             "al_o": {
                 "system": "mof",
                 "property": "distance",
-                "atoms": ["AL1", "O3"],
+                "atoms": ["Al", "O3"],
                 "value": 1.93,
                 "tolerance": 0.05
             }

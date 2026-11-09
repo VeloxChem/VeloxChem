@@ -230,14 +230,14 @@ class TestAutoCdamResultsDiagnostics:
         mol.set_charge(-1)
         mof = FrameworkSystem(structure=mol,
                               charges=CHARGES,
-                              target_metal="AL1",
+                              target_metal="Al",
                               representation="cdam",
                               name="mof")
         parameters = {"sigma": (1.5, 2.5), "dummy_charge": (0.3, 0.7)}
         targets = {
             "al_o": {
                 "property": "distance",
-                "atoms": ["AL1", "O3"],
+                "atoms": ["Al", "O3"],
                 "value": 1.93,
                 "tolerance": 0.05
             }

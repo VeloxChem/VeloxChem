@@ -397,7 +397,7 @@ class FrameworkSystem:
         self._check_options()
         self.molecule = self._read_structure()
         self.elements = tuple(self.molecule.get_labels())
-        self.labels = tuple(atom_labels(self.elements))
+        self.labels = tuple(atom_labels(self.molecule))
         self.target_index = resolve_atom(self.target_metal, self.labels)
         if self.target_index not in metal_indices(self.molecule):
             raise ValueError(

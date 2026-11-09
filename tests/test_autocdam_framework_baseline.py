@@ -64,7 +64,7 @@ def node_molecule(copies=1, shift=9.0):
 
 def node_system(**kwargs):
     kwargs.setdefault("charges", CHARGES)
-    kwargs.setdefault("target_metal", "AL1")
+    kwargs.setdefault("target_metal", "Al")
     return FrameworkSystem(structure=node_molecule(), **kwargs)
 
 
@@ -88,9 +88,9 @@ def point(sigma=2.2, epsilon=0.1):
 
 class TestAutoCdamFrameworkBaseline:
 
-    def test_labels_count_each_element_in_input_order(self):
-        assert atom_labels(["Al", "O", "H", "O",
-                            "Al"]) == ["AL1", "O1", "H1", "O2", "AL2"]
+    def test_labels_are_veloxchem_atom_names(self):
+        molecule = vlx.Molecule.read_str("Al 0 0 0\nO 2 0 0\nH 3 0 0\nO 0 2 0")
+        assert atom_labels(molecule) == ["Al", "O1", "H", "O2"]
 
     def test_veloxchem_baseline_keeps_charges_and_removes_metal_bonded_terms(
             self):
@@ -140,7 +140,7 @@ class TestAutoCdamFrameworkBaseline:
         charges = CHARGES * 2
         system = FrameworkSystem(structure=node_molecule(copies=2),
                                  charges=charges,
-                                 target_metal="AL2")
+                                 target_metal="Al2")
         baseline = system.prepare_baseline()
         assert system.target_index == 19 and baseline.metal_indices == (0, 19)
         omm, _, _ = system.build(point(1.7, 0.3))
@@ -240,7 +240,7 @@ class TestAutoCdamFrameworkBaseline:
         with pytest.raises(ValueError, match="periodic boundary"):
             FrameworkSystem(structure=moved,
                             charges=CHARGES,
-                            target_metal="AL1",
+                            target_metal="Al",
                             box_vectors=np.eye(3) * 8.0).prepare_baseline()
 
     @pytest.mark.timeconsuming

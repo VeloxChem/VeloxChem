@@ -61,9 +61,10 @@ except ImportError:
     pass
 
 from ..solvationfepdriver import SolvationFepDriver
+from ..veloxchemlib import bohr_in_angstrom, hartree_in_kjpermol
 from .candidate import CDAMCandidate
 from .generator import C4_FORCE_NAME
-from .models import default_ostream, print_settings
+from .models import ANGSTROM_TO_NM, default_ostream, print_settings
 
 # ==========================================================================
 # md
@@ -322,7 +323,7 @@ def run_md(system: mm.System,
         return Trajectory(simulation.context.getState(getPositions=True),
                           np.array(reporter.frames), np.array(reporter.boxes))
     except mm.OpenMMException as error:
-        ostream.print_line(f"MD Simulation crashed: {error}")
+        ostream.print_warning(f"MD simulation crashed: {error}")
         return None
 
 
@@ -341,7 +342,8 @@ DRIVER_OPTIONS = ("num_steps", "num_snapshots", "num_equil_steps",
                   "num_em_steps", "platform")
 
 # Finite-size correction constants (OpenMM units: nm, e, kJ/mol).
-COULOMB_CONSTANT = 138.935456
+# 1/(4 pi eps0) in kJ/mol nm/e^2, from VeloxChem atomic-unit conversions.
+COULOMB_CONSTANT = hartree_in_kjpermol() * bohr_in_angstrom() * ANGSTROM_TO_NM
 WATER_DIELECTRIC = 78.4
 WIGNER_LATTICE_SUM = -2.837297
 # Quadrupole-moment trace of each water model, e nm^2 (TIP3P if unknown).
@@ -421,7 +423,7 @@ def run_fep(systems, final_state: mm.State | None, work_dir: Path,
     ``RuntimeError`` unless the CDAM cluster is rigid (purely 1-2/1-3 bonded),
     because only then are the vacuum legs zero and skipped.
     """
-    ostream.print_line("Handing CDAM system to SolvationFepDriver...")
+    ostream.print_info("Handing CDAM system to SolvationFepDriver...")
     ostream.flush()
     system = systems.solvated_system
     driver = _make_driver(fep_options, ostream)
@@ -435,7 +437,7 @@ def run_fep(systems, final_state: mm.State | None, work_dir: Path,
     if not is_rigid_cluster(systems.vacuum_topology):
         raise RuntimeError(
             "file-based FEP needs a rigid (1-2/1-3 bonded) CDAM cluster")
-    ostream.print_line("* Info * CDAM cluster is purely 1-2/1-3 bonded. "
+    ostream.print_info("CDAM cluster is purely 1-2/1-3 bonded. "
                        "Bypassing vacuum stages (dG = 0.0 kJ/mol).")
     driver.skip_vacuum = True
 

@@ -141,7 +141,7 @@ class TestAutoCdamFlexibleInterface:
              "autocdam_al_node_fragment_charges.json").read_text())["charges_e"]
         system = FrameworkSystem(structure=molecule,
                                  charges=charges,
-                                 target_metal="AL1")
+                                 target_metal="Al")
         baseline = system.prepare_baseline()
         assert baseline is system.prepare_baseline()  # prepared once and reused
         assert system.target_index == 0

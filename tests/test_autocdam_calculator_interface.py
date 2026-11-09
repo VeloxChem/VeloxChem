@@ -54,7 +54,7 @@ class TestAutoCdamCalculatorInterface:
             Calculator(ostream=ostream).plan(
                 [FitTarget("IOD", reference=2.0, tolerance=0.1)])
             text = path.read_text()
-            assert "AutoCDAM calculation plan" in text
+            assert "AutoCDAM Calculation Plan" in text
             assert "OpenMM MD trajectory analysis" in text
         finally:
             ostream.close()

@@ -60,8 +60,9 @@ from .._version import __version__
 from ..mmdriver import MMDriver
 from ..mmforcefieldgenerator import MMForceFieldGenerator
 from ..molecule import Molecule
-from ..veloxchemlib import bohr_in_angstrom, hartree_in_kjpermol
-from .calculator import DEFAULT_BASIS, DUMMY_ELEMENTS, SINGLE_POINT_SETTINGS, Calculator
+from ..veloxchemlib import (bohr_in_angstrom, chemical_element_identifier,
+                            hartree_in_kjpermol)
+from .calculator import DEFAULT_BASIS, SINGLE_POINT_SETTINGS, Calculator
 from .evaluator import Evaluator
 from .framework import check_force_field_atoms, copy_force_field
 from .models import (CalculationResult, FitResult, FitTarget, ParameterSet,
@@ -221,7 +222,8 @@ class MetalComplexLJStudy:
         self.target_atom_index = int(self.target_atom_index)
         if not 0 <= self.target_atom_index < len(sig["labels"]):
             raise ValueError("target_atom_index is outside the input molecule")
-        if any(label.upper() in DUMMY_ELEMENTS for label in sig["labels"]):
+        if any(chemical_element_identifier(label.upper()) <= 0
+               for label in sig["labels"]):
             raise ValueError(
                 "metal-complex fitting requires real atoms, without dummy sites"
             )

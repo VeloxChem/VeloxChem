@@ -67,6 +67,7 @@ from ..molecule import Molecule
 from ..outputstream import OutputStream
 from ..scfrestdriver import ScfRestrictedDriver
 from ..scfunrestdriver import ScfUnrestrictedDriver
+from ..veloxchemlib import chemical_element_identifier
 from .candidate import CDAMCandidate
 from .generator import CoordinateGenerator
 from .geometry import analyze_trajectory, count_waters
@@ -91,7 +92,6 @@ SINGLE_POINT_SETTINGS = frozenset({
     "ri_coulomb",
     "solvation_model",
 })
-DUMMY_ELEMENTS = frozenset({"EP", "D", "X", "DUMMY", "BQ"})
 
 
 def real_atom_molecule(batch, charge: float, multiplicity: int) -> Molecule:
@@ -100,7 +100,7 @@ def real_atom_molecule(batch, charge: float, multiplicity: int) -> Molecule:
                                 for v in xyz])
              for atom, xyz in zip(batch.system.atoms, batch.configurations[0])
              if atom.get("role") != "dummy" and
-             atom["element"].upper() not in DUMMY_ELEMENTS]
+             chemical_element_identifier(atom["element"].upper()) > 0]
     if not atoms:
         raise ValueError(
             "QM single-point calculation requires at least one real atom")
@@ -154,7 +154,7 @@ class SinglePointCalculator:
                json.dumps(settings, sort_keys=True, allow_nan=False))
         metadata["cache_hit"] = metadata["scf_converged"] = key in self.cache
         if key in self.cache:
-            self.ostream.print_line("Using cached QM single-point energy.")
+            self.ostream.print_info("Using cached QM single-point energy.")
             return self.cache[key]
 
         driver = (ScfRestrictedDriver if multiplicity == 1 else
@@ -192,15 +192,6 @@ class CalculationPlan:
 
     jobs: dict[str, list[str]] = field(default_factory=dict)
     methods: dict[str, str] = field(default_factory=dict)
-
-    def report(self) -> str:
-        """Text table mapping each target to the method that computes it."""
-        lines = ["AutoCDAM calculation plan", "-------------------------"]
-        lines += [
-            f"{target:<9} -> {method}"
-            for target, method in self.methods.items()
-        ]
-        return "\n".join(lines)
 
 
 @dataclass
@@ -265,9 +256,8 @@ class Calculator:
             prop = aqueous_property(target.name)
             plan.jobs.setdefault(prop.job, []).append(target.name)
             plan.methods[target.name] = prop.method
-        for line in plan.report().splitlines():
-            self.ostream.print_line(line)
-        self.ostream.flush()
+        print_settings(self.ostream, "AutoCDAM Calculation Plan",
+                       list(plan.methods.items()))
         return plan
 
     def single_point(self, molecule, *, settings=None, metadata=None) -> float:
@@ -335,7 +325,7 @@ class Calculator:
     def _initialize_platform(self) -> None:
         """First OpenMM work of a calculation: report the default platform."""
         platform, _ = default_platform()
-        self.ostream.print_line(f"OpenMM platform: {platform.getName()}")
+        self.ostream.print_info(f"OpenMM platform: {platform.getName()}")
 
     def _print_header(self, batch, parameters, targets, kwargs) -> None:
         """Print the sample, candidate, parameters, targets and paths of this calculation."""
@@ -420,7 +410,7 @@ class Calculator:
             md_targets,
             options=None) -> tuple[mm.State | None, dict[str, Any]]:
         """Run MD of the solvated box and analyse ``md_targets``; (None, {}) if either fails."""
-        self.ostream.print_line("Starting NPT MD...")
+        self.ostream.print_info("Starting NPT MD...")
         started = time.time()
         topology, positions = systems.solvated_topology, systems.solvated_positions
         trajectory = run_md(systems.solvated_system,
@@ -437,7 +427,7 @@ class Calculator:
             md_results = analyze_trajectory(trajectory.frames, trajectory.boxes,
                                             topology, md_targets, reference)
         except Exception as error:
-            self.ostream.print_line(f"Trajectory analysis failed: {error}")
+            self.ostream.print_warning(f"Trajectory analysis failed: {error}")
             return None, {}
         self.ostream.print_info(
             f"MD block completed in {time.time() - started:.1f} s")
@@ -521,7 +511,7 @@ class Calculator:
     def _generate_failed_result(self, targets: list[FitTarget],
                                 parameters: ParameterSet) -> CalculationResult:
         """NaN-valued, ``failed=True`` result used when MD or its analysis crashed."""
-        self.ostream.print_line(
+        self.ostream.print_warning(
             "Short-circuiting calculation due to MD crash. Returning NaN.")
         return CalculationResult(
             values={t.name: float("nan") for t in targets},

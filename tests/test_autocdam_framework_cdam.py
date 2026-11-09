@@ -67,7 +67,7 @@ def node(request):
     box = np.eye(3) * 25.0 if request.param == "periodic" else None
     return FrameworkSystem(structure=molecule(),
                            charges=CHARGES,
-                           target_metal="AL1",
+                           target_metal="Al",
                            representation="cdam",
                            box_vectors=box)
 
@@ -276,7 +276,7 @@ class TestAutoCdamFrameworkCdam:
     def test_harmonic_metal_dummy_bond_is_explicit_and_flexible(self):
         node = FrameworkSystem(structure=molecule(),
                                charges=CHARGES,
-                               target_metal="AL1",
+                               target_metal="Al",
                                representation="cdam",
                                metal_dummy_bond="harmonic")
         system, _, site = node.build(point())
@@ -288,7 +288,7 @@ class TestAutoCdamFrameworkCdam:
     def test_c4_acts_only_between_metal_and_water_oxygens(self):
         node = FrameworkSystem(structure=molecule(),
                                charges=CHARGES,
-                               target_metal="AL1",
+                               target_metal="Al",
                                representation="cdam")
         assert node.c4_oxygens() == {13, 16}
         candidate = point(c4_metal_water=10.0, potential_form="lj12_6_4")

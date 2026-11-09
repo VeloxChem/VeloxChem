@@ -126,7 +126,7 @@ class CoordinateGenerator:
                 "padding_nm must exceed the 1.0 nm nonbonded cutoff")
         topology = app.Topology()
         residue = topology.addResidue("CDM", topology.addChain("A"))
-        metal = topology.addAtom(candidate.metal.upper(),
+        metal = topology.addAtom(candidate.metal,
                                  app.element.get_by_symbol(candidate.metal),
                                  residue)
         for name in candidate.dummy_names():

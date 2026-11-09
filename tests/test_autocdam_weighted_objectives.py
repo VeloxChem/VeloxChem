@@ -156,12 +156,12 @@ class TestAutoCdamWeightedObjectives:
             "metal_oxygen", {
                 "system": "mof",
                 "property": "distance",
-                "atoms": ["AL1", "O3"],
+                "atoms": ["Al", "O3"],
                 "value": 1.93,
                 "tolerance": 0.05
             })
         assert target.system == "mof" and target.property_name == "distance"
-        assert target.metadata["atoms"] == ["AL1", "O3"]
+        assert target.metadata["atoms"] == ["Al", "O3"]
         assert FitTarget("IOD", 1.9, 0.03).property_name == "IOD"
 
     @pytest.mark.parametrize("parameters, message", [

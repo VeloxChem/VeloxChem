@@ -54,7 +54,7 @@ def setup(ostream):
     # Small deterministic solute + water system: no stochastic solvent packing.
     topology = app.Topology()
     residue = topology.addResidue("CDM", topology.addChain())
-    metal = topology.addAtom("AL", app.element.aluminum, residue)
+    metal = topology.addAtom("Al", app.element.aluminum, residue)
     for i in range(6):
         dummy = topology.addAtom(f"D{i+1}", None, residue)
         topology.addBond(metal, dummy)
@@ -266,7 +266,7 @@ class TestAutoCdamOpenmmBatch:
         """Run actual OpenMM to check the zero-stage path and saved production frames."""
         topology = app.Topology()
         residue = topology.addResidue("CDM", topology.addChain())
-        topology.addAtom("AL", app.element.aluminum, residue)
+        topology.addAtom("Al", app.element.aluminum, residue)
         system = mm.System()
         system.addParticle(27)
         system.setDefaultPeriodicBoxVectors(mm.Vec3(2, 0, 0), mm.Vec3(0, 2, 0),

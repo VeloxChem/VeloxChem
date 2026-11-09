@@ -49,6 +49,8 @@ import math
 from copy import deepcopy
 from pathlib import Path
 
+from ..veloxchemlib import (chemical_element_identifier, chemical_element_label,
+                            chemical_element_mass)
 from .models import GeneratedBatch, ParameterSet, SystemData, site_parameters_openmm
 
 # ==========================================================================
@@ -157,7 +159,7 @@ WATER_MODELS = {
 
 def candidate_pdb(candidate):
     """Return the PDB geometry (angstrom)."""
-    names = [candidate.metal.upper(), *candidate.dummy_names()]
+    names = [candidate.metal, *candidate.dummy_names()]
     elements = [candidate.metal, *("EP" for _ in candidate.dummy_names())]
     lines = [f"REMARK   1 AutoCDAM candidate {candidate.candidate_id}"]
     for serial, (name, element,
@@ -197,12 +199,12 @@ def candidate_forcefield_xml(c):
     # One CDM residue with metal-dummy bonds.
     lines += [
         "  <Residues>", '    <Residue name="CDM">',
-        f'      <Atom name="{c.metal.upper()}" type="{metal}"/>'
+        f'      <Atom name="{c.metal}" type="{metal}"/>'
     ]
     for name, atom_type in zip(c.dummy_names(), dummies):
         lines.append(f'      <Atom name="{name}" type="{atom_type}"/>')
         lines.append(
-            f'      <Bond atomName1="{c.metal.upper()}" atomName2="{name}"/>')
+            f'      <Bond atomName1="{c.metal}" atomName2="{name}"/>')
     lines += ["    </Residue>", "  </Residues>"]
 
     lines.append("  <HarmonicBondForce>")
@@ -271,19 +273,6 @@ PARAMETER_ALIASES = {
     "epsilon": "metal_lj_epsilon",
     "c4": "c4_metal_water",
 }
-# TODO: use the VeloxChem element library for metal masses instead of this table.
-METAL_MASSES = {
-    "Al": 26.9815385,
-    "Ca": 40.078,
-    "Co": 58.933194,
-    "Cr": 51.9961,
-    "Fe": 55.845,
-    "Mg": 24.305,
-    "Mn": 54.938044,
-    "Ni": 58.6934,
-    "Zr": 91.224,
-    "Zn": 65.38,
-}
 
 
 class CDAMCandidate:
@@ -299,7 +288,6 @@ class CDAMCandidate:
     geometries = GEOMETRIES
     parameter_names = PARAMETER_NAMES
     parameter_aliases = PARAMETER_ALIASES
-    metal_masses = METAL_MASSES
 
     def __init__(
             self,
@@ -325,8 +313,8 @@ class CDAMCandidate:
         kcal/mol*angstrom^4, charges in e and masses in amu. The bond force
         constant is in kcal/mol/angstrom^2 and the angle constant in
         kcal/mol/rad^2. ``coordination_number`` defaults to the number of
-        directions of ``geometry``; ``metal_mass`` defaults to the
-        ``METAL_MASSES`` table and is the mass of the whole ion (dummy masses
+        directions of ``geometry``; ``metal_mass`` defaults to the VeloxChem
+        element mass (``chemical_element_mass``) and is the mass of the whole ion (dummy masses
         are subtracted from the central site). ``metal_lj_sigma`` and
         ``metal_lj_epsilon`` may be None until forces are built. Raises
         ValueError for an invalid combination (see ``_validate``).
@@ -343,8 +331,9 @@ class CDAMCandidate:
         self.metal_lj_epsilon = metal_lj_epsilon
         self.c4_metal_water = c4_metal_water
         self.water_model = water_model
-        self.metal_mass = metal_mass if metal_mass is not None else self.metal_masses.get(
-            self.metal)
+        self.metal_mass = (metal_mass if metal_mass is not None else
+                           chemical_element_mass(
+                               chemical_element_identifier(self.metal)))
         self.dummy_mass = dummy_mass
         self.bond_force_constant = bond_force_constant
         self.angle_force_constant = angle_force_constant
@@ -477,7 +466,7 @@ class CDAMCandidate:
     def to_generated_batch(self):
         """Return this candidate as a one-frame generated batch."""
         metal_atom = {
-            "name": self.metal.upper(),
+            "name": self.metal,
             "element": self.metal,
             "role": "metal",
             "mass_amu": self.central_mass
@@ -590,9 +579,6 @@ class CDAMCandidate:
                 self.angle_force_constant < 0 or self.c4_metal_water < 0):
             raise ValueError(
                 "masses must be positive and force coefficients nonnegative")
-        if self.metal_mass is None:
-            raise ValueError(
-                f"provide metal_mass for unsupported metal {self.metal}")
         if self.metal_mass <= self.coordination_number * self.dummy_mass:
             raise ValueError("metal mass must exceed total dummy mass")
         if self.potential_form == "lj12_6" and self.c4_metal_water != 0.0:
@@ -613,8 +599,8 @@ class CDAMCandidate:
 
     @staticmethod
     def _normalise_metal(metal):
-        """Return the element symbol capitalised (``zn`` -> ``Zn``); raise ValueError if not alphabetic."""
-        metal = metal.strip()
-        if not metal or not metal.isalpha():
+        """Return the VeloxChem element label (``zn`` -> ``Zn``); raise ValueError if not an element."""
+        elem_id = chemical_element_identifier(str(metal).strip().upper())
+        if elem_id <= 0:
             raise ValueError("metal must be an element symbol, such as 'Zn'")
-        return metal[0].upper() + metal[1:].lower()
+        return chemical_element_label(elem_id)
