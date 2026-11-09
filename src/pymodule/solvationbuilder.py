@@ -57,7 +57,7 @@ class SolvationBuilder:
         - threshold: The threshold for overlap between molecules in angstrom.
         - acceleration_threshold: The threshold of number of molecules to increase the batch size to speed up the process.
         - number_of_attempts: The number of attempts to insert a molecule.
-        - random_rotation: Boolean flag to indicate if the solvent molecules will be randomly rotated. False for linear molecules.
+        - random_rotation: Boolean flag to indicate if the solvent molecules will be randomly rotated.
         - solute: The VeloxChem molecule object of the solute.
         - solute_labels: The list of atom labels of the solute.
         - solute_ff: The ForceField object of the solute.
@@ -156,9 +156,35 @@ class SolvationBuilder:
 
         return Path(self.workdir) / filename
 
+    def _solvent_residue_name(self, index):
+        """
+        Residue name of a solvent in the PDB and XML files (HOH for water, so
+        that OpenMM keeps it rigid).
+
+        :param index:
+            The index of the solvent component.
+        """
+
+        if self.solvents[index].is_water_molecule():
+            return 'HOH'
+        return f'S{index+1:02d}'
+
+    def _solvent_molecule_name(self, index):
+        """
+        Molecule name of a solvent in the GROMACS files (HOH for water, so that
+        OpenMM keeps it rigid).
+
+        :param index:
+            The index of the solvent component.
+        """
+
+        if self.solvents[index].is_water_molecule():
+            return 'HOH'
+        return f'SOL{index+1}'
+
     def solvate(self,
                 solute,
-                solvent='cspce',
+                solvent='spce',
                 solvent_molecule=None,
                 padding=1.0,
                 target_density=None,
@@ -173,8 +199,8 @@ class SolvationBuilder:
         :param solute:
             The VeloxChem molecule object of the solute.
         :param solvent:
-            The name of the solvent molecule. The default is 'water'.
-            Available options: 'cspce', 'ctip3p', 'spce', 'tip3p', 'ethanol', 'methanol', 'acetone',
+            The name of the solvent molecule. The default is 'spce' water.
+            Available options: 'cspce', 'ctip3p', 'spc', 'spce', 'tip3p', 'tip4pew', 'ethanol', 'methanol', 'acetone',
             'chloroform', 'hexane', 'toluene', 'dcm', 'benzene', 'dmso', 'thf',
             'acetonitrile', 'dmf', 'other' or 'itself'.
                 * 'other': The solvent molecule must be provided.
@@ -261,12 +287,6 @@ class SolvationBuilder:
             solvent_molecule = solute
         else:
             solvent_molecule = solvent_molecule
-
-        if self._molecule_linearity(solvent_molecule):
-            self.ostream.print_info(
-                "The solvent molecule is linear, random rotation is disabled")
-            self.ostream.flush()
-            self.random_rotation = False
 
         # Solvate the solute with the solvent molecules
         start = time.time()
@@ -795,7 +815,7 @@ class SolvationBuilder:
         if self.solvent_ffs:
             for i, solvent_ff in enumerate(self.solvent_ffs):
                 solvent_ff.write_itp(str(self._path(f'solvent_{i+1}.itp')),
-                                     f'SOL{i+1}')
+                                     self._solvent_molecule_name(i))
                 self.ostream.print_info(f"solvent_{i+1}.itp file written")
                 self.ostream.flush()
 
@@ -875,7 +895,7 @@ class SolvationBuilder:
             f.write('[ molecules ]\n')
             f.write('MOL 1\n')
             for i, count in enumerate(self.added_solvent_counts):
-                f.write(f'SOL{i+1} {count}\n')
+                f.write(f'{self._solvent_molecule_name(i)} {count}\n')
             if self.counterion:
                 residue_name = self.ion_name.upper()
                 f.write(f'{residue_name} {abs(self.added_counterions)}\n')
@@ -915,7 +935,7 @@ class SolvationBuilder:
 
             for i, solvent_ff in enumerate(self.solvent_ffs):
                 solvent_ff.generate_residue_xml(str(self._path(f'solvent_{i+1}.xml')),
-                                                f'S{i+1:02d}')
+                                                self._solvent_residue_name(i))
                 self.ostream.print_info(f"solvent_{i+1}.xml file written")
                 self.ostream.flush()
 
@@ -1071,10 +1091,12 @@ class SolvationBuilder:
         with open(self._path('equilibrated_system.pdb'), 'w') as f:
             app.PDBFile.writeFile(simulation.topology, positions, f)
 
-        # Update the system molecule
-        labels = [atom.element.symbol for atom in topology.atoms()]
-        xyz = f"{len(labels)}\n\n"
-        for label, coord in zip(labels, positions):
+        # Update the system molecule, without the virtual sites
+        atoms = [(atom.element.symbol, coord)
+                 for atom, coord in zip(topology.atoms(), positions)
+                 if atom.element is not None]
+        xyz = f"{len(atoms)}\n\n"
+        for label, coord in atoms:
             xyz += f"{label} {coord.x * 10} {coord.y * 10} {coord.z * 10}\n"
         self.system_molecule = Molecule.read_xyz_string(xyz)
 
@@ -1604,10 +1626,10 @@ class SolvationBuilder:
         """
 
         filename = self._path(filename)
-        coords_in_nm = self.system_molecule.get_coordinates_in_angstrom() * 0.1
+        coords_in_nm = self._coordinates_with_virtual_sites() * 0.1
 
         with open(filename, 'w') as f:
-            self._write_gro_header(f)
+            self._write_gro_header(f, len(coords_in_nm))
 
             if self.solvent_name == 'itself':
                 self._write_self_solvent_gro_atoms(f, coords_in_nm)
@@ -1641,10 +1663,10 @@ class SolvationBuilder:
             residue_counter = 1
             chain_ids = ['A', 'B', 'C']
             pdb_atom_numbers = {}
-            coordinates = self.system_molecule.get_coordinates_in_angstrom()
+            coordinates = self._coordinates_with_virtual_sites()
 
             assert_msg_critical(
-                self.system_molecule.number_of_atoms() <= 99999,
+                len(coordinates) <= 99999,
                 "The total number of atoms exceeds 99999. " +
                 "The PDB format does not support more than 99999 atoms.")
 
@@ -1662,13 +1684,42 @@ class SolvationBuilder:
             # Write END line
             f.write("END\n")
 
-    def _write_gro_header(self, stream):
+    def _coordinates_with_virtual_sites(self):
+        """
+        Returns the system coordinates (angstrom) with the virtual sites of
+        each solvent molecule inserted after its atoms.
+        """
+
+        assert_msg_critical(
+            not self.solute_ff.virtual_sites,
+            'SolvationBuilder: virtual sites are only supported in solvent molecules')
+
+        coords = self.system_molecule.get_coordinates_in_angstrom()
+
+        if self.solvent_name == 'itself' or not self.solvent_ffs:
+            return coords
+
+        blocks = [coords[:len(self.solute_ff.atoms)]]
+        pos = len(self.solute_ff.atoms)
+        for solvent_ff, count in zip(self.solvent_ffs,
+                                     self.added_solvent_counts):
+            n_atoms = len(solvent_ff.atoms)
+            for _ in range(count):
+                blocks.append(coords[pos:pos + n_atoms])
+                blocks.append(
+                    solvent_ff.get_virtual_site_coordinates(blocks[-1]))
+                pos += n_atoms
+        blocks.append(coords[pos:])
+
+        return np.vstack(blocks)
+
+    def _write_gro_header(self, stream, number_of_atoms):
         """
         Write the standard GRO file header.
         """
 
         stream.write('Generated by VeloxChem\n')
-        stream.write(f'{self.system_molecule.number_of_atoms()}\n')
+        stream.write(f'{number_of_atoms}\n')
 
     def _write_self_solvent_gro_atoms(self, stream, coords_in_nm):
         """
@@ -1712,12 +1763,13 @@ class SolvationBuilder:
         """
 
         for i, solvent in enumerate(self.solvent_ffs):
+            residue_name = self._solvent_molecule_name(i)
             for _ in range(self.added_solvent_counts[i]):
                 resid_k = (res_id_counter + 1) % 100000
-                for atom in solvent.atoms.values():
+                for atom in list(solvent.atoms.values()) + solvent.virtual_sites:
                     atom_name = atom['name']
                     atomid_j = (atom_id_counter + 1) % 100000
-                    line_str = f'{resid_k:>5d}{f"SOL{i+1}":<5s}{atom_name:>5s}{atomid_j:>5d}'
+                    line_str = f'{resid_k:>5d}{residue_name:<5s}{atom_name:>5s}{atomid_j:>5d}'
                     for d in range(3):
                         line_str += f'{coords_in_nm[atom_id_counter][d]:8.3f}'
                     line_str += '\n'
@@ -1805,11 +1857,16 @@ class SolvationBuilder:
                 residue_counter += 1
         else:
             for i, solvent_ff in enumerate(self.solvent_ffs):
-                elements = self.solvents[i].get_labels()
+                elements = self.solvents[i].get_labels() + ['EP'] * len(
+                    solvent_ff.virtual_sites)
+                atom_names = [
+                    atom['name'] for atom in list(solvent_ff.atoms.values()) +
+                    solvent_ff.virtual_sites
+                ]
+                residue_name = self._solvent_residue_name(i)
                 for j in range(self.added_solvent_counts[i]):
                     for k in range(len(elements)):
-                        residue_name = f'S{i+1:02d}'
-                        atom_name = solvent_ff.atoms[k]['name']
+                        atom_name = atom_names[k]
                         element = elements[k]
                         x, y, z = coordinates[coordinate_counter]
                         stream.write(

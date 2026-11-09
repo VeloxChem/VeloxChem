@@ -762,24 +762,8 @@ class AtomTypeIdentifier:
 
         if info.get('CyclicStructure') == 'none':
             if info['NumConnectedAtoms'] == 4:
-                if num_hydrogens == 4:
-                    nitrogen_type = {'opls': 'opls_XXX', 'gaff': 'n+'}
-
-                elif num_hydrogens == 3:
-                    # Sp3 N with three hydrogen atoms
-                    nitrogen_type = {'opls': 'opls_XXX', 'gaff': 'nz'}
-
-                elif num_hydrogens == 2:
-                    # Sp3 N with two hydrogen atoms
-                    nitrogen_type = {'opls': 'opls_XXX', 'gaff': 'ny'}
-
-                elif num_hydrogens == 1:
-                    # Sp3 N with one hydrogen atom
-                    nitrogen_type = {'opls': 'opls_XXX', 'gaff': 'nx'}
-
-                else:
-                    # Sp3 N with four connected atoms, but no hydrogens
-                    nitrogen_type = {'opls': 'opls_XXX', 'gaff': 'n4'}
+                nitrogen_type = self.assign_ammonium_nitrogen_type(
+                    num_hydrogens)
 
             elif info['NumConnectedAtoms'] == 3:
                 # This case is highly dependent on the environment of
@@ -1135,7 +1119,43 @@ class AtomTypeIdentifier:
                 else:
                     nitrogen_type = {'opls': 'opls_XXX', 'gaff': 'n2'}
 
+            elif info['NumConnectedAtoms'] == 4:
+                # Sp3 N+ in a ring (e.g. piperidinium, morpholinium)
+                nitrogen_type = self.assign_ammonium_nitrogen_type(
+                    num_hydrogens)
+
         return nitrogen_type
+
+    @staticmethod
+    def assign_ammonium_nitrogen_type(num_hydrogens):
+        """
+        Assigns the type of a four-coordinate (ammonium) nitrogen from the
+        number of attached hydrogens.
+
+        :param num_hydrogens:
+            The number of hydrogens bonded to the nitrogen.
+
+        :return:
+            The nitrogen type.
+        """
+
+        if num_hydrogens == 4:
+            return {'opls': 'opls_XXX', 'gaff': 'n+'}
+
+        elif num_hydrogens == 3:
+            # Sp3 N with three hydrogen atoms
+            return {'opls': 'opls_XXX', 'gaff': 'nz'}
+
+        elif num_hydrogens == 2:
+            # Sp3 N with two hydrogen atoms
+            return {'opls': 'opls_XXX', 'gaff': 'ny'}
+
+        elif num_hydrogens == 1:
+            # Sp3 N with one hydrogen atom
+            return {'opls': 'opls_XXX', 'gaff': 'nx'}
+
+        # Sp3 N with four connected atoms, but no hydrogens
+        return {'opls': 'opls_XXX', 'gaff': 'n4'}
 
     def assign_carbon_type(self, atom_info_dict, using_gaff_220, info,
                            connected_symbols):
@@ -1529,6 +1549,10 @@ class AtomTypeIdentifier:
 
                 oxygen_type = {'opls': 'opls_XXX', 'gaff': 'os'}
 
+            elif info['NumConnectedAtoms'] == 3:
+
+                oxygen_type = self.assign_oxonium_oxygen_type(connected_symbols)
+
             elif info['NumConnectedAtoms'] == 1:
 
                 # If necessary we could check if the carbon connected
@@ -1561,6 +1585,10 @@ class AtomTypeIdentifier:
 
                 oxygen_type = {'opls': 'opls_XXX', 'gaff': 'os'}
 
+            elif info['NumConnectedAtoms'] == 3:
+
+                oxygen_type = self.assign_oxonium_oxygen_type(connected_symbols)
+
             elif info['NumConnectedAtoms'] == 1:
 
                 # If necessary we could check if the carbon connected
@@ -1578,6 +1606,23 @@ class AtomTypeIdentifier:
                 oxygen_type = {'opls': 'opls_XXX', 'gaff': 'o'}
 
         return oxygen_type
+
+    @staticmethod
+    def assign_oxonium_oxygen_type(connected_symbols):
+        """
+        Assigns the type of a three-coordinate (oxonium) oxygen: oh if a
+        hydrogen is attached, otherwise os (GAFF has no oxonium types).
+
+        :param connected_symbols:
+            The set of element symbols bonded to the oxygen.
+
+        :return:
+            The oxygen type.
+        """
+
+        if 'H' in connected_symbols:
+            return {'opls': 'opls_154', 'gaff': 'oh'}
+        return {'opls': 'opls_XXX', 'gaff': 'os'}
 
     def extract_gaff_atom_types(self, atom_types_dict):
         """

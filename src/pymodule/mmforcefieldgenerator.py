@@ -170,6 +170,12 @@ class MMForceFieldGenerator:
         # Water parameters
         self.water_parameters = get_water_parameters()
 
+        # Massless virtual sites (e.g. the TIP4P M-site), not part of the molecule
+        self.virtual_sites = []
+
+        # SETTLE geometry of a rigid water molecule
+        self.water_settles = None
+
         # Summary of fitting
         self.fitting_summary = None
 
@@ -1229,6 +1235,8 @@ class MMForceFieldGenerator:
         self.equivalent_atoms = atomtypeidentifier.equivalent_atoms
         self.equivalent_charges = atomtypeidentifier.equivalent_charges
 
+        self._assign_polar_hydrogen_fallback_types()
+
         contains_water = molecule.contains_water_molecule()
         is_water = molecule.is_water_molecule()
         use_water_model = ((water_model is not None) and
@@ -1375,6 +1383,9 @@ class MMForceFieldGenerator:
             angle_indices,
         )
 
+        self.virtual_sites = []
+        self.water_settles = None
+
         # Process water model if requested
         if use_water_model:
             self.apply_water_model(water_model)
@@ -1474,23 +1485,30 @@ class MMForceFieldGenerator:
         hydrogen_indices = [idx for idx, atom in atoms.items() if atom['type'] == 'hw']
         oxygen_indices = [idx for idx, atom in atoms.items() if atom['type'] == 'ow']
 
+        is_water = self.molecule.is_water_molecule()
+        assert_msg_critical(
+            is_water or 'mw' not in water_params,
+            f"MMForceFieldGenerator: '{water_model}' requires an isolated water molecule.")
+
         water_bonds = [idx for idx, bond in self.bonds.items() if (idx[0] in oxygen_indices or idx[1] in oxygen_indices)]
         water_angles = [idx for idx, angle in self.angles.items() if (idx[1] in oxygen_indices)]
 
-        for hydrogen_idx in hydrogen_indices:
+        for i, hydrogen_idx in enumerate(hydrogen_indices):
             self.atoms[hydrogen_idx]['sigma'] = water_params['hw']['sigma']
             self.atoms[hydrogen_idx]['epsilon'] = water_params['hw']['epsilon']
 
             # Do not overwrite partial charges if the molecule is part of a larger system
             # This can cause the total charge to become a non-integer
-            if self.molecule.is_water_molecule():
+            if is_water:
+                self.atoms[hydrogen_idx]['name'] = f'H{i + 1}'
                 self.atoms[hydrogen_idx]['charge'] = water_params['hw']['charge']
 
         for oxygen_idx in oxygen_indices:
             self.atoms[oxygen_idx]['sigma'] = water_params['ow']['sigma']
             self.atoms[oxygen_idx]['epsilon'] = water_params['ow']['epsilon']
 
-            if self.molecule.is_water_molecule():
+            if is_water:
+                self.atoms[oxygen_idx]['name'] = 'O'
                 self.atoms[oxygen_idx]['charge'] = water_params['ow']['charge']
 
         for bond_idx in water_bonds:
@@ -1498,6 +1516,77 @@ class MMForceFieldGenerator:
 
         for angle_idx in water_angles:
             self.angles[angle_idx].update(water_params['angles'])
+
+        if 'mw' in water_params:
+            site = dict(water_params['mw'])
+            site['parents'] = (oxygen_indices[0], hydrogen_indices[0],
+                               hydrogen_indices[1])
+            self.virtual_sites = [site]
+
+        # GROMACS SETTLE requires the atom order O, H, H
+        if is_water:
+            o_idx = oxygen_indices[0]
+            if hydrogen_indices == [o_idx + 1, o_idx + 2]:
+                r_oh = water_params['bonds']['equilibrium']
+                theta = np.radians(water_params['angles']['equilibrium'])
+                self.water_settles = {
+                    'oxygen': o_idx,
+                    'doh': r_oh,
+                    'dhh': 2.0 * r_oh * np.sin(0.5 * theta),
+                }
+            else:
+                warnmsg = 'MMForceFieldGenerator: water atoms are not ordered '
+                warnmsg += 'O, H, H. The GROMACS topology will contain flexible '
+                warnmsg += 'water (no [ settles ]).'
+                self.ostream.print_warning(warnmsg)
+
+    def get_virtual_site_coordinates(self, coords):
+        """
+        Computes the virtual site positions from the atom positions.
+
+        :param coords:
+            The atom coordinates (any unit), shape (number of atoms, 3).
+
+        :return:
+            The virtual site coordinates in the same unit.
+        """
+
+        coords = np.array(coords)
+        return np.array([
+            np.dot(site['weights'], coords[list(site['parents'])])
+            for site in self.virtual_sites
+        ]).reshape(-1, 3)
+
+    def _assign_polar_hydrogen_fallback_types(self):
+        """
+        Assigns GAFF polar hydrogen types (ho, hn, hs) to untyped hydrogens on
+        O, N or S, which would otherwise get non-polar UFF parameters.
+        """
+
+        polar_hydrogen_types = {'O': 'ho', 'N': 'hn', 'S': 'hs'}
+
+        labels = self.molecule.get_labels()
+        type_keys = list(self.atom_types_dict.keys())
+
+        for i, label in enumerate(labels):
+            if label != 'H' or not self.atom_types[i].endswith('_unknown'):
+                continue
+
+            neighbors = [
+                labels[j] for j in range(len(labels))
+                if self.connectivity_matrix[i, j] == 1
+            ]
+            if len(neighbors) != 1 or neighbors[0] not in polar_hydrogen_types:
+                continue
+
+            gaff_type = polar_hydrogen_types[neighbors[0]]
+            self.atom_types[i] = gaff_type
+            self.atom_types_dict[type_keys[i]]['gaff'] = gaff_type
+
+            warnmsg = f'MMForceFieldGenerator: hydrogen {i + 1} bonded to '
+            warnmsg += f'{neighbors[0]} has no GAFF type. Using the polar '
+            warnmsg += f'hydrogen type {gaff_type} instead of UFF parameters.'
+            self.ostream.print_warning(warnmsg)
 
     def _check_ow_hw_atoms(self):
         """
@@ -3105,6 +3194,14 @@ class MMForceFieldGenerator:
                         f_itp.write(line_str)
                         break
 
+            # Virtual sites are dummy particles (ptype D)
+            for site in self.virtual_sites:
+                line_str = '{:>3}{:>9}{:17.5f}{:9.5f}{:>4}'.format(
+                    site['type'], site['type'], 0., 0., 'D')
+                line_str += '{:16.5e}{:14.5e}\n'.format(
+                    site['sigma'], site['epsilon'])
+                f_itp.write(line_str)
+
             # Molecule type
             f_itp.write('\n[ moleculetype ]\n')
             f_itp.write(';name            nrexcl\n')
@@ -3117,7 +3214,8 @@ class MMForceFieldGenerator:
             f_itp.write(line_str)
 
             total_charge = 0.0
-            for i, atom in self.atoms.items():
+            for i, atom in enumerate(
+                    list(self.atoms.values()) + self.virtual_sites):
                 total_charge += atom['charge']
                 line_str = '{:6} {:>5} {:6} {:>6} {:>6}'.format(
                     i + 1, atom['type'], 1, res_name, atom['name'])
@@ -3126,6 +3224,16 @@ class MMForceFieldGenerator:
                 line_str += ' ; qtot{:7.3f}  equiv. {}\n'.format(
                     total_charge, atom['equivalent_atom'])
                 f_itp.write(line_str)
+
+            # Rigid water unless FLEXIBLE is defined, as in GROMACS
+            settles = self.water_settles
+            if settles is not None:
+                f_itp.write('\n#ifndef FLEXIBLE\n')
+                f_itp.write('\n[ settles ]\n')
+                f_itp.write(';   ow  funct           doh           dhh\n')
+                f_itp.write('{:6}{:7}{:14.9f}{:14.9f}\n'.format(
+                    settles['oxygen'] + 1, 1, settles['doh'], settles['dhh']))
+                f_itp.write('\n#else\n')
 
             # Bonds
             if self.bonds:
@@ -3157,6 +3265,9 @@ class MMForceFieldGenerator:
                     i + 1, j + 1, k + 1, 1, angle['equilibrium'],
                     angle['force_constant'], angle['comment'])
                 f_itp.write(line_str)
+
+            if settles is not None:
+                f_itp.write('\n#endif\n')
 
             # Proper dihedrals
             if self.dihedrals:
@@ -3208,6 +3319,33 @@ class MMForceFieldGenerator:
                     dih['comment'])
                 f_itp.write(line_str)
 
+            # Virtual sites as weighted averages of three atoms (funct 1)
+            n_atoms = len(self.atoms)
+            if self.virtual_sites:
+                f_itp.write('\n[ virtual_sites3 ]\n')
+                f_itp.write(';  site   ai     aj     ak  funct            a             b\n')
+                for k, site in enumerate(self.virtual_sites):
+                    ai, aj, ak = [i + 1 for i in site['parents']]
+                    f_itp.write('{:6}{:7}{:7}{:7}{:7}{:14.9f}{:14.9f}\n'.format(
+                        n_atoms + k + 1, ai, aj, ak, 1, site['weights'][1],
+                        site['weights'][2]))
+
+            # Rigid water and virtual sites have no bonds to generate exclusions
+            water_atoms = set()
+            if self.water_settles is not None:
+                o_idx = self.water_settles['oxygen']
+                water_atoms.update([o_idx, o_idx + 1, o_idx + 2])
+            for k, site in enumerate(self.virtual_sites):
+                water_atoms.update(site['parents'])
+                water_atoms.add(n_atoms + k)
+
+            if water_atoms:
+                indices = [i + 1 for i in sorted(water_atoms)]
+                f_itp.write('\n[ exclusions ]\n')
+                for i in indices:
+                    others = ''.join(f'{j:7}' for j in indices if j != i)
+                    f_itp.write(f'{i:6}{others}\n')
+
     def generate_residue_xml(self, xml_file, mol_name='MOL'):
         """
         Generates an XML force field file for a single residue.
@@ -3245,6 +3383,16 @@ class MMForceFieldGenerator:
             }
             ET.SubElement(AtomTypes, "Type", **attributes)
 
+        # Virtual sites have no element
+        n_atoms = len(self.atoms)
+        for k, site in enumerate(self.virtual_sites):
+            attributes = {
+                "name": site['name'] + f'_{mol_name}',
+                "class": str(n_atoms + k + 1) + f'_{mol_name}',
+                "mass": str(site['mass'])
+            }
+            ET.SubElement(AtomTypes, "Type", **attributes)
+
         # Residues section
         Residues = ET.SubElement(ForceField, "Residues")
         Residue = ET.SubElement(Residues, "Residue", name=mol_name)
@@ -3254,11 +3402,29 @@ class MMForceFieldGenerator:
                           name=atom_data['name'],
                           type=atom_data['name'] + f'_{mol_name}',
                           charge=str(atom_data['charge']))
+        for site in self.virtual_sites:
+            ET.SubElement(Residue,
+                          "Atom",
+                          name=site['name'],
+                          type=site['name'] + f'_{mol_name}',
+                          charge=str(site['charge']))
         for bond_id, bond_data in self.bonds.items():
             ET.SubElement(Residue,
                           "Bond",
                           atomName1=self.atoms[bond_id[0]]['name'],
                           atomName2=self.atoms[bond_id[1]]['name'])
+        for site in self.virtual_sites:
+            parents = [self.atoms[i]['name'] for i in site['parents']]
+            ET.SubElement(Residue,
+                          "VirtualSite",
+                          type="average3",
+                          siteName=site['name'],
+                          atomName1=parents[0],
+                          atomName2=parents[1],
+                          atomName3=parents[2],
+                          weight1=str(site['weights'][0]),
+                          weight2=str(site['weights'][1]),
+                          weight3=str(site['weights'][2]))
 
         # Bonds section
         Bonds = ET.SubElement(ForceField, "HarmonicBondForce")
@@ -3342,7 +3508,7 @@ class MMForceFieldGenerator:
                                        "NonbondedForce",
                                        coulomb14scale=str(self.fudgeQQ),
                                        lj14scale=str(self.fudgeLJ))
-        for atom_id, atom_data in self.atoms.items():
+        for atom_data in list(self.atoms.values()) + self.virtual_sites:
             attributes = {
                 "type": atom_data['name'] + f'_{mol_name}',
                 "charge": str(atom_data['charge']),
@@ -3379,16 +3545,19 @@ class MMForceFieldGenerator:
         res_name = mol_name
 
         coords_in_nm = self.molecule.get_coordinates_in_angstrom() * 0.1
+        coords_in_nm = np.vstack(
+            (coords_in_nm, self.get_virtual_site_coordinates(coords_in_nm)))
 
         with open(gro_filename, 'w') as f_gro:
             # Header
             f_gro.write(f'GRO file of {mol_name}, generated by VeloxChem\n')
-            f_gro.write(f'{len(self.atoms):>5d}\n')
+            f_gro.write(f'{len(coords_in_nm):>5d}\n')
 
             ndec = gro_precision
 
             # Atoms
-            for i, atom in self.atoms.items():
+            for i, atom in enumerate(
+                    list(self.atoms.values()) + self.virtual_sites):
                 atom_name = atom['name']
                 line_str = f'{1:>5d}{res_name:<5s}{atom_name:>5s}{i + 1:>5d}'
                 for d in range(3):
@@ -3439,6 +3608,12 @@ class MMForceFieldGenerator:
         coords_in_angstrom = self.molecule.get_coordinates_in_angstrom()
         molecule_elements = self.molecule.get_labels()
 
+        # Virtual sites are written as extra points (EP), as read by OpenMM
+        coords_in_angstrom = np.vstack(
+            (coords_in_angstrom,
+             self.get_virtual_site_coordinates(coords_in_angstrom)))
+        molecule_elements = molecule_elements + ['EP'] * len(self.virtual_sites)
+
         with open(pdb_filename, 'w') as f_pdb:
             # Header
             f_pdb.write(
@@ -3447,7 +3622,8 @@ class MMForceFieldGenerator:
 
             # Atoms
             for i, (atom, element) in enumerate(
-                    zip(self.atoms.values(), molecule_elements), 1):
+                    zip(list(self.atoms.values()) + self.virtual_sites,
+                        molecule_elements), 1):
                 atom_name = atom['name']
                 occupancy = 1.00
                 temp_factor = 0.00
