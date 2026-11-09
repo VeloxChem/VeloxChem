@@ -431,12 +431,20 @@ def run_fep(systems, final_state: mm.State | None, work_dir: Path,
     c4_active = any(
         force.getName() == C4_FORCE_NAME for force in system.getForces())
     if c4_active:
-        # the explicit C4 term is decoupled with the charges
+        # The 12-6-4 C4 term is a separate CustomNonbondedForce,
+        # -(1-c4_lambda)*C4_i*C4_j/r^4, unknown to SolvationFepDriver. It is
+        # an induced-dipole (charge-driven) attraction, so it is switched off
+        # with the charges: c4_lambda follows lambda in stage 1 and stays 1.0
+        # (off) in stage 2. Without this the decoupled ion keeps an
+        # unopposed -C4/r^4 pull on water, giving a wrong HFE or a crash.
         driver.coulomb_global_parameters = ["c4_lambda"]
 
     if not is_rigid_cluster(systems.vacuum_topology):
         raise RuntimeError(
             "file-based FEP needs a rigid (1-2/1-3 bonded) CDAM cluster")
+    # Every metal-dummy and dummy-dummy pair is a 1-2/1-3 exclusion and C4
+    # acts only on water oxygens, so the vacuum legs (stages 3 and 4) have
+    # nothing to decouple and are exactly 0.0 kJ/mol; skip them to save time.
     ostream.print_info("CDAM cluster is purely 1-2/1-3 bonded. "
                        "Bypassing vacuum stages (dG = 0.0 kJ/mol).")
     driver.skip_vacuum = True

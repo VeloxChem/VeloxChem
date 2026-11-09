@@ -172,8 +172,28 @@ class SolvationFepDriver:
         # Fixed lambda vector for stage 4 with 3 lambdas
         self.lambdas_stage4 = [1.0, 0.5, 0.0]
 
-        # Optional alchemical controls
+        # Optional alchemical controls. Both default to the standard
+        # four-stage protocol and change nothing unless set by the caller.
+        #
+        # skip_vacuum: if True, stages 3 and 4 (the vacuum legs) are not run
+        # and contribute 0.0 kJ/mol. This is exact only when the solute has no
+        # intramolecular nonbonded interactions to decouple, i.e. every atom
+        # pair is excluded (1-2/1-3 bonded) and no custom force acts within
+        # the solute. Used by AutoCDAM for the rigid metal + dummy-site (CDAM)
+        # ion, where the vacuum legs are identically zero and only cost time.
         self.skip_vacuum = False
+        #
+        # coulomb_global_parameters: names of global parameters of custom
+        # forces in the input system that must be switched off together with
+        # the charges. The driver itself only decouples NonbondedForce
+        # charges/LJ (and its own GSC term); any extra solute-solvent force
+        # would otherwise stay fully on in all stages. Each named parameter is
+        # set to lambda in the charge stages (1 and 3) and to 1.0 (fully
+        # decoupled) in stages 2 and 4, so the force must be written to be
+        # on at 0.0 and off at 1.0. Used by AutoCDAM for the 12-6-4 C4
+        # ion-induced-dipole term, -(1-c4_lambda)*C4_i*C4_j/r^4, which is
+        # attractive only; leaving it on would pull water onto the
+        # decoupled ion and give a wrong (or crashing) free energy.
         self.coulomb_global_parameters = []
 
         # Storage for potential energies across stages
@@ -398,6 +418,9 @@ class SolvationFepDriver:
         self.ostream.flush()
 
         if self.skip_vacuum:
+            # Vacuum legs are identically zero for a solute without
+            # intramolecular nonbonded interactions (see skip_vacuum in
+            # __init__); zero 2x2 matrices keep the result format unchanged.
             self.ostream.print_info("Skipping vacuum stages 3 and 4 (dG = 0.0 kJ/mol)...\n")
             delta_f_3 = {'Delta_f': np.zeros((2, 2)), 'dDelta_f': np.zeros((2, 2))}
             delta_f_4 = {'Delta_f': np.zeros((2, 2)), 'dDelta_f': np.zeros((2, 2))}
@@ -679,6 +702,10 @@ class SolvationFepDriver:
             The lambda value of the system.
         """
 
+        # Stage 1/3 switch off the charges as lambda goes 0 -> 1, so the
+        # coupled custom terms follow lambda; in stage 2/4 the charges are
+        # already off, so these terms stay fully decoupled (1.0). With the
+        # default empty list this loop changes nothing.
         value = lambda_val if self.stage in (1, 3) else 1.0
         for force in system.getForces():
             if not hasattr(force, 'getNumGlobalParameters'):
