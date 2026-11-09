@@ -55,9 +55,16 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
+import sys
+
+from mpi4py import MPI
+
 from . import reporting
+from ..errorhandler import assert_msg_critical
+from ..inputparser import parse_input, print_keywords, print_attributes
 from ..outputstream import OutputStream
-from .bayesian import BayesianFittingDriver
+from ..veloxchemlib import mpi_master
+from .bayesian import SEARCH_DEFAULTS, BayesianFittingDriver
 from .cache import CachedCalculator
 from .calculator import Calculator
 from .evaluator import Evaluator
@@ -69,7 +76,7 @@ from .md import md_settings
 from .models import (CalculationResult, EvaluationResult, FitResult, FitTarget,
                      GeneratedBatch, OpenMMSystems, ParameterSet, ParameterSpec,
                      coerce_parameter_specs, coerce_targets, parse_parameters,
-                     default_ostream, reference_bounds)
+                     reference_bounds)
 from .multisystem import MultiSystemCalculator, build_systems
 from .search import CalculationInput, default_quality_check, FittingDriver
 
@@ -86,61 +93,235 @@ SEARCH_METHODS = ("staged", "bayesian")
 
 
 class AutoCDAM:
-    """Fit a CDAM candidate.
+    """
+    Fits the parameters of a cationic dummy-atom model (CDAM) of a metal ion.
 
-    Collaborators (generator, calculator, evaluator) can be injected with the
-    same result contracts. One VeloxChem ``ostream`` (stdout by default) is
-    shared by the default collaborators and the search. ``pilot=True`` selects
-    the short MD workflow test. ``cache`` is True (in memory), a JSON path
-    (persistent), or False.
+    Settings are attributes (see ``_input_keywords`` and ``update_settings``);
+    the study itself (candidate, targets, parameters, systems) is given to
+    ``setup`` or directly to ``fit``. ``search_method`` selects the staged
+    (default) or the Bayesian search; ``geometries`` repeats the search per
+    dummy geometry and keeps the best.
 
-    ``search`` holds every search setting. Without it the staged search runs
-    with ``STAGED_DEFAULTS``; ``{"method": "staged", "max_iterations": ...}``
-    overrides those; any other mapping is the Bayesian search (keys in
-    ``bayesian.SEARCH_DEFAULTS``). ``"geometries": [...]`` repeats either search
-    per dummy geometry. Unknown keys raise ValueError.
+    Collaborators (``generator``, ``calculator``, ``evaluator``) can be replaced
+    by objects with the same result contracts before ``setup``.
+
+    :param comm:
+        The MPI communicator.
+    :param ostream:
+        The output stream.
     """
 
-    def __init__(
-        self,
-        *,
-        candidate: CDAMCandidate,
-        fit_targets: Mapping[str, FitTarget | Mapping[str, Any]] |
-        list[FitTarget],
-        fit_parameters: Mapping[str, Mapping[str, Any]] | list[ParameterSpec] |
-        None = None,
-        parameters: Mapping[str, Any] | None = None,
-        systems: Mapping[str, Mapping[str, Any] | FrameworkSystem] |
-        None = None,
-        search: Mapping[str, Any] | None = None,
-        cache: bool | str | Any = True,
-        openmm_template: OpenMMSystems | None = None,
-        pilot: bool = False,
-        objective_threshold: float | None = None,
-        calculator_options: dict[str, Any] | None = None,
-        quality_check=default_quality_check,
-        checkpoint_path=None,
-        generator: CoordinateGenerator | None = None,
-        calculator: Calculator | None = None,
-        evaluator: Evaluator | None = None,
-        ostream: OutputStream | None = None,
-    ) -> None:
-        """Store the study settings without starting calculations."""
-        ostream = default_ostream(ostream)
-        self.candidate = candidate
-        self.openmm_template = openmm_template
+    def __init__(self, comm=None, ostream=None):
+        """
+        Initializes the AutoCDAM driver with default settings.
+        """
+
+        if comm is None:
+            comm = MPI.COMM_WORLD
+
+        if ostream is None:
+            if comm.Get_rank() == mpi_master():
+                ostream = OutputStream(sys.stdout)
+            else:
+                ostream = OutputStream(None)
+
+        # MPI information
+        self.comm = comm
+        self.rank = self.comm.Get_rank()
+        self.nodes = self.comm.Get_size()
+
+        # output stream
         self.ostream = ostream
-        self.calculator_options = dict(calculator_options or {})
-        if pilot:
-            self.calculator_options["md_options"] = {
-                "pilot": True,
-                **self.calculator_options.get("md_options", {})
-            }
-        self.fitting_options = {
-            "objective_threshold": objective_threshold,
-            "quality_check": quality_check,
-            "checkpoint_path": checkpoint_path
+
+        # search
+        self.search_method = 'staged'
+        self.geometries = []
+        self.seed = 42
+        self.objective_threshold = None
+
+        # staged search
+        self.max_iterations = STAGED_DEFAULTS['max_iterations']
+        self.samples_per_stage = STAGED_DEFAULTS['samples_per_stage']
+        self.shrink_fraction = STAGED_DEFAULTS['shrink_fraction']
+
+        # Bayesian search
+        for key, value in SEARCH_DEFAULTS.items():
+            if key != 'seed':
+                setattr(self, key, deepcopy(value))
+
+        # calculations
+        self.pilot = False
+        self.work_dir = None
+        self.md_options = None
+        self.fep_options = None
+        self.qm_options = None
+
+        # files
+        self.checkpoint_file = None
+        self.cache = True
+        self.restart = False
+
+        # collaborators and hooks
+        self.generator = None
+        self.calculator = None
+        self.evaluator = None
+        self.quality_check = default_quality_check
+        self.openmm_template = None
+
+        self._input_keywords = {
+            'autocdam': {
+                'search_method': ('str_lower', 'staged or bayesian search'),
+                'geometries': ('raw', 'dummy geometries searched one by one'),
+                'seed': ('int', 'random seed of the search'),
+                'objective_threshold':
+                    ('float', 'objective that counts as converged'),
+                'max_iterations': ('int', 'staged: number of stages'),
+                'samples_per_stage': ('int', 'staged: candidates per stage'),
+                'shrink_fraction':
+                    ('float', 'staged: width kept per refinement'),
+                'mode': ('str_lower', 'Bayesian: weighted, constrained, pareto'),
+                'max_evaluations': ('int', 'Bayesian: calculated candidates'),
+                'initial_samples': ('int', 'Bayesian: space-filling design size'),
+                'initial_design': ('str_lower', 'Bayesian: sobol or lhs'),
+                'batch_size': ('int', 'Bayesian: candidates per step'),
+                'pool_size': ('int', 'Bayesian: acquisition pool size'),
+                'n_mc': ('int', 'Bayesian: Monte Carlo draws'),
+                'noise': ('bool', 'Bayesian: learn observation noise'),
+                'local_refinement':
+                    ('bool', 'Bayesian: polish the best pool point'),
+                'duplicate_tolerance':
+                    ('float', 'Bayesian: minimum unit-cube distance'),
+                'acquisition_tolerance':
+                    ('float', 'Bayesian: stagnation threshold'),
+                'patience': ('int', 'Bayesian: quiet steps before stopping'),
+                'cost_aware': ('bool', 'Bayesian: improvement per second'),
+                'cost_exponent': ('float', 'Bayesian: cost exponent'),
+                'screening': ('raw', 'Bayesian: cheap pre-ranking settings'),
+                'max_bound_expansions':
+                    ('int', 'Bayesian: widenings of soft bounds'),
+                'bound_expansion_factor':
+                    ('float', 'Bayesian: widening fraction of the width'),
+                'bound_expansion_evaluations':
+                    ('int', 'Bayesian: extra budget per widening'),
+                'pilot': ('bool', 'short MD workflow test'),
+                'work_dir': ('str', 'working directory of the calculations'),
+                'md_options': ('raw', 'MD protocol settings'),
+                'fep_options': ('raw', 'solvation FEP settings'),
+                'qm_options': ('raw', 'QM single-point settings'),
+                'checkpoint_file': ('str', 'checkpoint file of the search'),
+                'cache': ('raw', 'property cache: True, False or a file'),
+                'restart': ('bool', 'resume from the checkpoint file'),
+            },
         }
+
+    def print_keywords(self):
+        """
+        Prints the input keywords of the AutoCDAM driver.
+        """
+
+        print_keywords(self._input_keywords, self.ostream)
+
+    def print_attributes(self):
+        """
+        Prints the attributes of the AutoCDAM driver.
+        """
+
+        print_attributes(self._input_keywords, self.ostream)
+
+    def update_settings(self, settings):
+        """
+        Updates the settings of the AutoCDAM driver.
+
+        :param settings:
+            The dictionary of settings; unknown keys are an error.
+        """
+
+        keywords = {
+            key: val[0] for key, val in self._input_keywords['autocdam'].items()
+        }
+        unknown = sorted(set(settings) - set(keywords))
+        assert_msg_critical(
+            not unknown, f'AutoCDAM: unknown settings {unknown}')
+        parse_input(self, keywords, settings)
+
+    def _search_settings(self):
+        """
+        Gets the settings of the selected search.
+
+        :return:
+            The keyword arguments of the search driver.
+        """
+
+        assert_msg_critical(
+            self.search_method in SEARCH_METHODS,
+            f'AutoCDAM: search_method must be one of {SEARCH_METHODS}')
+        if self.search_method == 'staged':
+            return {
+                'max_iterations': int(self.max_iterations),
+                'samples_per_stage': int(self.samples_per_stage),
+                'shrink_fraction': float(self.shrink_fraction),
+                'seed': int(self.seed),
+            }
+        return {
+            'search': {key: getattr(self, key) for key in SEARCH_DEFAULTS}
+        }
+
+    def _calculator_options(self):
+        """
+        Gets the options passed to every property calculation.
+
+        :return:
+            The calculator options (only the settings that are given).
+        """
+
+        options = {
+            name: deepcopy(getattr(self, name))
+            for name in ('work_dir', 'md_options', 'fep_options', 'qm_options')
+            if getattr(self, name) is not None
+        }
+        if self.pilot:
+            options['md_options'] = {
+                'pilot': True,
+                **options.get('md_options', {})
+            }
+        return options
+
+    def setup(self,
+              candidate: CDAMCandidate,
+              fit_targets: Mapping[str, FitTarget | Mapping[str, Any]] |
+              list[FitTarget],
+              parameters: Mapping[str, Any] | None = None,
+              systems: Mapping[str, Mapping[str, Any] | FrameworkSystem] |
+              None = None,
+              fit_parameters: Mapping[str, Mapping[str, Any]] |
+              list[ParameterSpec] | None = None) -> None:
+        """
+        Sets up the study without starting calculations.
+
+        :param candidate:
+            The CDAM candidate (ion model) to fit.
+        :param fit_targets:
+            The fit targets (mapping of name to target settings, or a list).
+        :param parameters:
+            The adjustable parameters in compact form (default: metal LJ
+            sigma and epsilon with UFF-based bounds).
+        :param systems:
+            The named systems (aqueous ion, frameworks) the targets refer to.
+        :param fit_parameters:
+            Explicit parameter specifications instead of ``parameters``.
+        """
+
+        ostream = self.ostream
+        self.candidate = candidate
+        self.calculator_options = self._calculator_options()
+        self.fitting_options = {
+            "objective_threshold": self.objective_threshold,
+            "quality_check": self.quality_check,
+            "checkpoint_path": self.checkpoint_file,
+            **self._search_settings()
+        }
+        self.search = self.fitting_options.get('search')
+        self.geometries = list(self.geometries or [])
 
         # Targets. Monitors are reported, never optimized: they are calculated
         # once for the final result unless metadata asks for evaluate="always".
@@ -156,46 +337,32 @@ class AutoCDAM:
             raise ValueError(
                 "at least one required or weighted target is needed to fit")
 
-        # Search: staged (default) or Bayesian, with all settings in one mapping.
-        settings = dict(search or {})
-        self.geometries = list(settings.pop("geometries", []))
-        method = settings.pop("method",
-                              "staged" if search is None else "bayesian")
-        if method not in SEARCH_METHODS:
-            raise ValueError(
-                f"search method must be one of {SEARCH_METHODS}, got {method!r}"
-            )
-        if method == "staged":
-            unknown = set(settings) - set(STAGED_DEFAULTS)
-            if unknown:
-                raise ValueError(
-                    f"unsupported staged search settings: {sorted(unknown)}")
-            self.fitting_options.update({**STAGED_DEFAULTS, **settings})
-            self.search = None
-        else:
-            self.search = settings
         for geometry in self.geometries:
             if geometry not in CDAMCandidate.geometries:
                 raise ValueError(
-                    f"unsupported geometry {geometry!r} in search['geometries']"
-                )
+                    f"unsupported geometry {geometry!r} in geometries")
 
         self.parameter_specs = self._resolve_parameters(parameters,
                                                         fit_parameters)
 
         # Collaborators: generator -> (system router) -> (cache) calculator -> evaluator.
-        self.generator = generator if generator is not None else CoordinateGenerator(
-            ostream=ostream)
-        self.calculator = calculator if calculator is not None else Calculator(
-            ostream=ostream)
+        if self.generator is None:
+            self.generator = CoordinateGenerator(ostream=ostream)
+        # Keep the user's calculator so a repeated setup does not wrap the
+        # router or cache of an earlier one.
+        if not hasattr(self, '_base_calculator'):
+            self._base_calculator = self.calculator
+        self.calculator = (self._base_calculator
+                           if self._base_calculator is not None else
+                           Calculator(ostream=ostream))
         self.systems = self._build_systems(systems, ostream)
         self.parameter_warnings = self._ineffective_parameter_warnings()
-        if cache is not False and cache is not None:
-            self.calculator = CachedCalculator(self.calculator,
-                                               None if cache is True else cache)
+        if self.cache is not False and self.cache is not None:
+            self.calculator = CachedCalculator(
+                self.calculator, None if self.cache is True else self.cache)
         self._resolve_md_protocol()
-        self.evaluator = evaluator if evaluator is not None else Evaluator(
-            ostream=ostream)
+        if self.evaluator is None:
+            self.evaluator = Evaluator(ostream=ostream)
 
         self.fitting_driver: FittingDriver | BayesianFittingDriver | None = None
         self.generated_batch: GeneratedBatch | None = None
@@ -335,8 +502,38 @@ class AutoCDAM:
 
     # ------------------------------------------------------------------- fit
 
-    def fit(self, *, resume: bool = False) -> FitResult:
-        """Run the configured search and return the finalized result."""
+    def fit(self,
+            candidate: CDAMCandidate | None = None,
+            fit_targets=None,
+            parameters=None,
+            systems=None,
+            fit_parameters=None) -> FitResult:
+        """
+        Runs the configured search and returns the finalized result.
+
+        :param candidate:
+            The CDAM candidate; with ``fit_targets`` it sets up the study
+            (see ``setup``). Omit both after an explicit ``setup``.
+        :param fit_targets:
+            The fit targets.
+        :param parameters:
+            The adjustable parameters in compact form.
+        :param systems:
+            The named systems the targets refer to.
+        :param fit_parameters:
+            Explicit parameter specifications instead of ``parameters``.
+
+        :return:
+            The fit result.
+        """
+
+        if candidate is not None or fit_targets is not None:
+            self.setup(candidate, fit_targets, parameters, systems,
+                       fit_parameters)
+        assert_msg_critical(
+            hasattr(self, 'candidate'),
+            'AutoCDAM: give candidate and fit_targets to fit() or setup()')
+        resume = bool(self.restart)
         self._prepare_template()
         study_metadata = self._study_metadata()
         if self.geometries:

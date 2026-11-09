@@ -54,19 +54,25 @@ from pathlib import Path
 from typing import Any
 import csv
 
+import sys
+
 import numpy as np
+from mpi4py import MPI
 
 from .._version import __version__
+from ..errorhandler import assert_msg_critical
+from ..inputparser import parse_input, print_keywords, print_attributes
 from ..mmdriver import MMDriver
 from ..mmforcefieldgenerator import MMForceFieldGenerator
 from ..molecule import Molecule
+from ..outputstream import OutputStream
 from ..veloxchemlib import (bohr_in_angstrom, chemical_element_identifier,
-                            hartree_in_kjpermol)
+                            hartree_in_kjpermol, mpi_master)
 from .calculator import DEFAULT_BASIS, SINGLE_POINT_SETTINGS, Calculator
 from .evaluator import Evaluator
 from .framework import check_force_field_atoms, copy_force_field
 from .models import (CalculationResult, FitResult, FitTarget, ParameterSet,
-                     ParameterSpec, default_ostream, print_settings,
+                     ParameterSpec, print_settings,
                      ANGSTROM_TO_NM)
 
 # ==========================================================================
@@ -349,37 +355,68 @@ MM_ENERGY_NAME = "MM_INTERACTION_ENERGY"
 
 
 class MetalComplexLJDriver:
-    """Two-stage QM reference generation and direct MM curve fitting.
+    """
+    Fits the LJ parameters of a metal in a real-atom complex to QM probe scans.
+
+    Two stages: QM reference energies of a He/Ne probe scanned around the
+    target atom (``compute_qm_dataset``), then a direct fit of the MM
+    interaction curves (``fit``). Settings are attributes (see
+    ``_input_keywords`` and ``update_settings``); the molecule and target atom
+    are given to ``setup`` or directly to ``compute_qm_dataset``/``fit``.
 
     ``calculator`` may implement ``single_point`` for a different QM backend.
     ``force_field_factory`` is an adapter/testing hook; the default calls the
     native generator with its unchanged host defaults.
+
+    :param comm:
+        The MPI communicator.
+    :param ostream:
+        The output stream.
     """
 
-    def __init__(self,
-                 study: MetalComplexLJStudy,
-                 *,
-                 calculator=None,
-                 evaluator=None,
-                 ostream=None,
-                 force_field_factory=None):
-        """Bind the driver to one study and snapshot its signature.
-
-        Nothing is computed here; the baseline force field, scan dataset, MM
-        engines and fit result are filled in lazily by the public methods. Later
-        changes to the study's molecule, scan/QM settings or probe parameters are
-        rejected (see ``_check_study``).
+    def __init__(self, comm=None, ostream=None):
         """
-        self.study = study
-        self.ostream = default_ostream(ostream)
-        self.calculator = calculator if calculator is not None else Calculator(
-            ostream=self.ostream)
-        self.evaluator = evaluator if evaluator is not None else Evaluator(
-            ostream=self.ostream)
-        self.force_field_factory = force_field_factory or (
-            lambda: MMForceFieldGenerator(ostream=self.ostream))
-        self._study_signature = deepcopy(study.signature())
-        self._probe_override = deepcopy(study.probe_parameters)
+        Initializes the metal-complex LJ driver with default settings.
+        """
+
+        if comm is None:
+            comm = MPI.COMM_WORLD
+
+        if ostream is None:
+            if comm.Get_rank() == mpi_master():
+                ostream = OutputStream(sys.stdout)
+            else:
+                ostream = OutputStream(None)
+
+        # MPI information
+        self.comm = comm
+        self.rank = self.comm.Get_rank()
+        self.nodes = self.comm.Get_size()
+
+        # output stream
+        self.ostream = ostream
+
+        # probe scan
+        self.probe = 'He'
+        self.scan_distances_angstrom = np.linspace(2.0, 5.0, 13).tolist()
+        self.scan_directions = 'auto'
+        self.clash_cutoff_scale = 0.85
+        self.probe_parameters = None
+        self.qm_settings = {}
+
+        # fit (None: the built-in default)
+        for name in sorted(FIT_SETTING_NAMES):
+            setattr(self, name, None)
+
+        # files
+        self.workdir = 'outputs/metal_complex_lj'
+
+        # collaborators
+        self.calculator = None
+        self.evaluator = None
+        self.force_field_factory = None
+
+        self.study = None
         self.dataset = None
         self.baseline_force_field = None
         self.probe_atom = None
@@ -389,9 +426,159 @@ class MetalComplexLJDriver:
         self.result = None
         self.last_calculation = None
 
+        self._input_keywords = {
+            'metal_complex_lj': {
+                'probe': ('str', 'probe atom: He or Ne'),
+                'scan_distances_angstrom':
+                    ('raw', 'probe distances from the target atom'),
+                'scan_directions': ('raw', "'auto' or scan direction vectors"),
+                'clash_cutoff_scale':
+                    ('float', 'scale of the clash distance check'),
+                'probe_parameters':
+                    ('raw', 'explicit probe sigma/epsilon/source'),
+                'qm_settings': ('raw', 'QM single-point settings'),
+                'sigma0_angstrom': ('float', 'initial sigma'),
+                'epsilon0_kjmol': ('float', 'initial epsilon'),
+                'sigma_bounds_angstrom': ('seq_fixed', 'sigma bounds'),
+                'epsilon_bounds_kjmol': ('seq_fixed', 'epsilon bounds'),
+                'energy_tolerance_kjmol':
+                    ('float', 'tolerance of the interaction energies'),
+                'point_weights': ('raw', 'weights of scan points'),
+                'strategy': ('str', 'least_squares or '
+                             'differential_evolution+least_squares'),
+                'de_maxiter': ('int', 'differential evolution iterations'),
+                'de_popsize': ('int', 'differential evolution population'),
+                'seed': ('int', 'random seed of the global search'),
+                'max_nfev': ('int', 'least-squares function evaluations'),
+                'ftol': ('float', 'least-squares ftol'),
+                'xtol': ('float', 'least-squares xtol'),
+                'gtol': ('float', 'least-squares gtol'),
+                'workdir': ('str', 'directory of the output files'),
+            },
+        }
+
+    def print_keywords(self):
+        """
+        Prints the input keywords of the metal-complex LJ driver.
+        """
+
+        print_keywords(self._input_keywords, self.ostream)
+
+    def print_attributes(self):
+        """
+        Prints the attributes of the metal-complex LJ driver.
+        """
+
+        print_attributes(self._input_keywords, self.ostream)
+
+    def update_settings(self, settings):
+        """
+        Updates the settings of the metal-complex LJ driver.
+
+        :param settings:
+            The dictionary of settings; unknown keys are an error.
+        """
+
+        keywords = {
+            key: val[0] for key, val in self._input_keywords['metal_complex_lj'].items()
+        }
+        unknown = sorted(set(settings) - set(keywords))
+        assert_msg_critical(
+            not unknown, f'MetalComplexLJDriver: unknown settings {unknown}')
+        parse_input(self, keywords, settings)
+
+    def _fit_settings(self):
+        """
+        Gets the fit settings that differ from the built-in defaults.
+
+        :return:
+            The fit settings that are set (not None).
+        """
+
+        return {
+            name: deepcopy(getattr(self, name))
+            for name in sorted(FIT_SETTING_NAMES)
+            if getattr(self, name) is not None
+        }
+
+    def setup(self, molecule, target_atom_index, baseline_force_field=None):
+        """
+        Sets up the study of one molecule and target atom.
+
+        The molecule and settings are copied and validated; later changes to
+        the scan, QM or probe settings are rejected (see ``_check_study``).
+
+        :param molecule:
+            The metal complex (real atoms only).
+        :param target_atom_index:
+            The 0-based index of the metal atom whose LJ parameters are fitted.
+        :param baseline_force_field:
+            A previously generated force field of the exact molecule (copied,
+            never modified); generated when omitted.
+        """
+
+        self.study = MetalComplexLJStudy(
+            molecule=molecule,
+            target_atom_index=target_atom_index,
+            probe=self.probe,
+            scan_distances_angstrom=self.scan_distances_angstrom,
+            scan_directions=self.scan_directions,
+            clash_cutoff_scale=self.clash_cutoff_scale,
+            qm_settings=self.qm_settings,
+            fit_settings=self._fit_settings(),
+            probe_parameters=self.probe_parameters,
+            baseline_force_field=baseline_force_field,
+            workdir=self.workdir)
+        if self.calculator is None:
+            self.calculator = Calculator(ostream=self.ostream)
+        if self.evaluator is None:
+            self.evaluator = Evaluator(ostream=self.ostream)
+        if self.force_field_factory is None:
+            self.force_field_factory = (
+                lambda: MMForceFieldGenerator(ostream=self.ostream))
+        self._study_signature = deepcopy(self.study.signature())
+        self._probe_override = deepcopy(self.study.probe_parameters)
+        self._settings_snapshot = self._settings()
+        self.dataset = None
+        self.baseline_force_field = None
+        self.probe_atom = None
+        self._host_mm = None
+        self._combined_mm = None
+        self._interaction_mm = None
+        self.result = None
+        self.last_calculation = None
+
+    def _settings(self):
+        """
+        Gets the current settings, to detect changes after ``setup``.
+
+        :return:
+            The JSON text of the settings.
+        """
+
+        # Fit settings may change between fits; they are read at fit time.
+        return to_json({
+            key: getattr(self, key)
+            for key in self._input_keywords['metal_complex_lj']
+            if key not in FIT_SETTING_NAMES
+        })
+
+    def _setup_if_given(self, molecule, target_atom_index,
+                        baseline_force_field):
+        """
+        Sets up the study when a molecule is given; requires a study otherwise.
+        """
+
+        if molecule is not None:
+            self.setup(molecule, target_atom_index, baseline_force_field)
+        assert_msg_critical(
+            self.study is not None,
+            'MetalComplexLJDriver: give the molecule and target atom index')
+
     def _check_study(self):
-        """Raise ValueError if the study changed since this driver was created."""
-        if to_json(self.study.signature()) != to_json(self._study_signature):
+        """Raise ValueError if the study or scan/QM settings changed since ``setup``."""
+        if (to_json(self.study.signature()) != to_json(self._study_signature)
+                or self._settings() != self._settings_snapshot):
             raise ValueError(
                 "molecule or scan/QM settings changed; create a new study driver"
             )
@@ -591,8 +778,27 @@ class MetalComplexLJDriver:
         return records
 
     # ============================================================ QM reference
-    def compute_qm_dataset(self):
-        """Calculate missing references/accepted points; retain failure reasons."""
+    def compute_qm_dataset(self,
+                           molecule=None,
+                           target_atom_index=None,
+                           baseline_force_field=None):
+        """
+        Calculates missing references and accepted scan points.
+
+        Failure reasons of rejected points are kept.
+
+        :param molecule:
+            The metal complex; sets up a new study (see ``setup``).
+        :param target_atom_index:
+            The 0-based index of the target metal atom.
+        :param baseline_force_field:
+            An optional force field of the exact molecule.
+
+        :return:
+            The QM scan dataset.
+        """
+
+        self._setup_if_given(molecule, target_atom_index, baseline_force_field)
         self.generate_scans()
         self._print_qm_setup()
         references = self._compute_references()
@@ -719,7 +925,7 @@ class MetalComplexLJDriver:
         Raises ValueError if a lower search bound is not positive.
         """
         atom = self.baseline_force_field.atoms[self.study.target_atom_index]
-        settings = self.study.fit_settings
+        settings = self._fit_settings()
         specs = [
             ParameterSpec(
                 "metal_lj_sigma",
@@ -792,9 +998,9 @@ class MetalComplexLJDriver:
     def _targets(self):
         """One FitTarget per usable record (QM interaction, kJ/mol); sets point weights."""
         tolerance = float(
-            self.study.fit_settings.get("energy_tolerance_kjmol",
+            self._fit_settings().get("energy_tolerance_kjmol",
                                         DEFAULT_ENERGY_TOLERANCE_KJMOL))
-        weights = self.study.fit_settings.get("point_weights", {})
+        weights = self._fit_settings().get("point_weights", {})
         if not isinstance(weights, dict):
             raise ValueError(
                 "point_weights must map record IDs to nonnegative weights")
@@ -844,16 +1050,33 @@ class MetalComplexLJDriver:
         return self.evaluator.evaluate(mapped, targets)
 
     # ===================================================================== fit
-    def fit(self, *, strategy=None):
-        """Fit fixed references; optimizer termination and target satisfaction differ."""
+    def fit(self, molecule=None, target_atom_index=None,
+            baseline_force_field=None):
+        """
+        Fits sigma and epsilon of the target atom to the QM references.
+
+        Optimizer termination and target satisfaction are reported separately.
+
+        :param molecule:
+            The metal complex; sets up a new study (see ``setup``).
+        :param target_atom_index:
+            The 0-based index of the target metal atom.
+        :param baseline_force_field:
+            An optional force field of the exact molecule.
+
+        :return:
+            The fit result.
+        """
+
+        self._setup_if_given(molecule, target_atom_index, baseline_force_field)
         if self.dataset is None:
             self.compute_qm_dataset()
         rows = self._usable_records()
         self.prepare_baseline()
         specs = self._parameter_specs()
         targets = self._targets()
-        settings = {**OPTIMIZER_DEFAULTS, **self.study.fit_settings}
-        strategy = strategy or settings["strategy"]
+        settings = {**OPTIMIZER_DEFAULTS, **self._fit_settings()}
+        strategy = settings["strategy"]
         if strategy not in STRATEGIES:
             raise ValueError("unknown fitting strategy")
         reference = np.array([target.reference for target in targets])
@@ -978,7 +1201,7 @@ class MetalComplexLJDriver:
             "probe": self.study.probe,
             "qm_interaction_kjmol": reference.tolist(),
             "mm_interaction_kjmol": mm_values,
-            "fit_settings": deepcopy(self.study.fit_settings),
+            "fit_settings": deepcopy(self._fit_settings()),
             "scientific_validation": "not performed",
         }
         return FitResult(

@@ -37,7 +37,7 @@ import numpy as np
 import pytest
 import veloxchem as vlx
 
-from veloxchem.autocdam import Calculator, MetalComplexLJStudy, MetalComplexLJDriver, QMScanDataset
+from veloxchem.autocdam import Calculator, MetalComplexLJDriver, QMScanDataset
 
 
 @pytest.fixture
@@ -76,10 +76,10 @@ def baseline(tmp_path):
 
 
 def make_driver(baseline, tmp_path, **overrides):
-    settings = dict(molecule=baseline.molecule,
-                    target_atom_index=0,
-                    baseline_force_field=baseline,
-                    probe="He",
+    study = dict(molecule=baseline.molecule,
+                 target_atom_index=0,
+                 baseline_force_field=baseline)
+    settings = dict(probe="He",
                     probe_parameters={
                         "sigma_angstrom": 2.0,
                         "epsilon_kjmol": 0.3,
@@ -88,16 +88,17 @@ def make_driver(baseline, tmp_path, **overrides):
                     scan_distances_angstrom=np.linspace(2.0, 5.0, 14),
                     scan_directions=[[0, 0, 1], [0, 1, 0]],
                     clash_cutoff_scale=0,
-                    fit_settings={
-                        "sigma_bounds_angstrom": [1.0, 4.0],
-                        "epsilon_bounds_kjmol": [0.01, 5.0],
-                        "energy_tolerance_kjmol": 1e-5
-                    },
-                    workdir=tmp_path)
-    settings.update(overrides)
-    return MetalComplexLJDriver(MetalComplexLJStudy(**settings),
-                                ostream=vlx.OutputStream(
-                                    str(tmp_path / "driver.log")))
+                    sigma_bounds_angstrom=[1.0, 4.0],
+                    epsilon_bounds_kjmol=[0.01, 5.0],
+                    energy_tolerance_kjmol=1e-5,
+                    workdir=str(tmp_path))
+    for key, value in overrides.items():
+        (study if key in study else settings)[key] = value
+    driver = MetalComplexLJDriver(
+        ostream=vlx.OutputStream(str(tmp_path / "driver.log")))
+    driver.update_settings(settings)
+    driver.setup(**study)
+    return driver
 
 
 def analytical_interaction(driver, coordinates, sigma=2.6, epsilon=1.4):
@@ -220,19 +221,15 @@ class TestAutoCdamMetalComplexLj:
         dataset_path = driver.save_dataset(tmp_path / "portable.json")
         saved_json = json.loads(dataset_path.read_text())
         assert "fingerprint" not in saved_json
-        study = driver.study
-        study.fit_settings["point_weights"] = {
-            driver.dataset.records[1].record_id: 3.0
-        }
+        weights = {driver.dataset.records[1].record_id: 3.0}
 
         class NoQM:
 
             def single_point(self, *args, **kwargs):
                 raise AssertionError("loaded references must not rerun QM")
 
-        main = MetalComplexLJDriver(study,
-                                    calculator=NoQM(),
-                                    ostream=driver.ostream)
+        main = make_driver(baseline, tmp_path, point_weights=weights)
+        main.calculator = NoQM()
         main.load_dataset(dataset_path)
         result = main.fit()
         assert result.diagnostics["n_rejected"] == 1
@@ -337,12 +334,12 @@ class TestAutoCdamMetalComplexLj:
         with pytest.raises(RuntimeError, match="no accepted"):
             driver.evaluate_mm()
         synthesize_qm(driver)
-        driver.study.fit_settings["point_weights"] = {
+        driver.point_weights = {
             row.record_id: 0 for row in driver.dataset.records
         }
         with pytest.raises(ValueError, match="positive weight"):
             driver.fit()
-        driver.study.qm_settings["basis"] = "STO-3G"
+        driver.qm_settings = {"basis": "STO-3G"}
         with pytest.raises(ValueError, match="changed"):
             driver.generate_scans()
 
@@ -390,15 +387,15 @@ class TestAutoCdamMetalComplexLj:
         # Use the generated host's exact input geometry/state but skip a metal SCF
         # here: a one-He host suffices to verify construction of the probe basis.
         helium = vlx.Molecule.read_xyz_string("1\n\nHe 0 0 0\n")
-        study = MetalComplexLJStudy(helium,
-                                    0,
-                                    probe=probe,
-                                    scan_distances_angstrom=[5],
-                                    scan_directions=[[0, 0, 1]],
-                                    qm_settings={"basis": "STO-3G"},
-                                    workdir=tmp_path / probe)
-        qm_driver = MetalComplexLJDriver(study, ostream=driver.ostream)
-        dataset = qm_driver.compute_qm_dataset()
+        qm_driver = MetalComplexLJDriver(ostream=driver.ostream)
+        qm_driver.update_settings({
+            "probe": probe,
+            "scan_distances_angstrom": [5],
+            "scan_directions": [[0, 0, 1]],
+            "qm_settings": {"basis": "STO-3G"},
+            "workdir": str(tmp_path / probe)
+        })
+        dataset = qm_driver.compute_qm_dataset(helium, 0)
         assert dataset.records[0].usable
         driver.prepare_baseline()
         assert driver.probe_atom["charge"] == 0
@@ -443,7 +440,7 @@ class TestAutoCdamMetalComplexLj:
     def test_de_fit_reports_both_optimizer_stages(self, baseline, tmp_path):
         driver = make_driver(baseline, tmp_path)
         synthesize_qm(driver)
-        driver.study.fit_settings.update({
+        driver.update_settings({
             "strategy": "differential_evolution+least_squares",
             "de_maxiter": 2,
             "de_popsize": 4

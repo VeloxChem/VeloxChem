@@ -58,14 +58,17 @@ def fit(tmp_path):
             "weight": 0.1
         }
     }
-    search = {"max_evaluations": 6, "seed": 1}
-    driver = AutoCDAM(candidate=CDAMCandidate("Al", 3),
-                      calculator=Surface(),
-                      parameters={"sigma": (1.4, 2.6)},
-                      fit_targets=targets,
-                      search=search,
-                      checkpoint_path=tmp_path / "checkpoint.json")
-    return driver, driver.fit()
+    driver = AutoCDAM()
+    driver.calculator = Surface()
+    driver.update_settings({
+        "search_method": "bayesian",
+        "max_evaluations": 6,
+        "seed": 1,
+        "checkpoint_file": str(tmp_path / "checkpoint.json"),
+    })
+    return driver, driver.fit(CDAMCandidate("Al", 3),
+                              targets,
+                              parameters={"sigma": (1.4, 2.6)})
 
 
 class TestAutoCdamTables:

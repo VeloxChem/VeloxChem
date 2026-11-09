@@ -85,12 +85,10 @@ class TestAutoCdamQmSinglePoint:
         monkeypatch.setattr(module.ScfRestrictedDriver, "compute", compute)
         ostream = OutputStream(str(tmp_path / "al3_qm.log"))
         try:
-            cdam = AutoCDAM(
-                candidate=CDAMCandidate("Al",
-                                        3,
-                                        metal_lj_sigma=2,
-                                        metal_lj_epsilon=0.2),
-                fit_targets={"QM_ENERGY": {
+            cdam = AutoCDAM(ostream=ostream)
+            cdam.setup(
+                CDAMCandidate("Al", 3, metal_lj_sigma=2, metal_lj_epsilon=0.2),
+                {"QM_ENERGY": {
                     "value": 0,
                     "tolerance": 1
                 }},
@@ -99,9 +97,7 @@ class TestAutoCdamQmSinglePoint:
                         "initial": 2,
                         "bounds": [1, 3]
                     }
-                },
-                ostream=ostream,
-            )
+                })
             result = cdam.calculate()
             energy = result.values["QM_ENERGY"]
             assert math.isfinite(energy) and energy < 0

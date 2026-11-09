@@ -56,20 +56,21 @@ class SurfaceCalculator:
             values={t.name: values[t.name] for t in targets})
 
 
-def fit_with(targets, parameters=None, **kwargs):
+def fit_with(targets, parameters=None):
     calculator = SurfaceCalculator()
     parameters = parameters or {
         "sigma": (1.4, 2.6),
         "dummy_charge": (0.2, 0.7),
         "metal_dummy_distance": 0.9
     }
-    search = {"method": "staged", "max_iterations": 2, "samples_per_stage": 6}
-    fit = AutoCDAM(candidate=CDAMCandidate("Al", 3),
-                   parameters=parameters,
-                   fit_targets=targets,
-                   calculator=calculator,
-                   search=search,
-                   **kwargs)
+    fit = AutoCDAM()
+    fit.calculator = calculator
+    fit.update_settings({
+        "search_method": "staged",
+        "max_iterations": 2,
+        "samples_per_stage": 6
+    })
+    fit.setup(CDAMCandidate("Al", 3), targets, parameters=parameters)
     return fit, calculator
 
 
@@ -181,24 +182,26 @@ class TestAutoCdamWeightedObjectives:
     ])
     def test_invalid_parameter_inputs_are_rejected(self, parameters, message):
         with pytest.raises(ValueError, match=message):
-            AutoCDAM(candidate=CDAMCandidate("Al", 3),
-                     parameters=parameters,
-                     fit_targets={"IOD": {
-                         "value": 1.9,
-                         "tolerance": 0.03
-                     }})
+            AutoCDAM().setup(CDAMCandidate("Al", 3),
+                             {"IOD": {
+                                 "value": 1.9,
+                                 "tolerance": 0.03
+                             }},
+                             parameters=parameters)
 
     def test_parameters_and_fit_parameters_are_exclusive(self):
         with pytest.raises(ValueError, match="either"):
-            AutoCDAM(candidate=CDAMCandidate("Al", 3),
-                     parameters={"sigma": (1.4, 2.6)},
-                     fit_parameters={"metal_lj_sigma": {
-                         "bounds": [1.0, 3.0]
-                     }},
-                     fit_targets={"IOD": {
-                         "value": 1.9,
-                         "tolerance": 0.03
-                     }})
+            AutoCDAM().setup(CDAMCandidate("Al", 3),
+                             {"IOD": {
+                                 "value": 1.9,
+                                 "tolerance": 0.03
+                             }},
+                             parameters={"sigma": (1.4, 2.6)},
+                             fit_parameters={
+                                 "metal_lj_sigma": {
+                                     "bounds": [1.0, 3.0]
+                                 }
+                             })
 
     def test_bounded_start_uses_template_value_or_midpoint(self):
         targets = {"IOD": {"value": 1.9, "tolerance": 0.03}}

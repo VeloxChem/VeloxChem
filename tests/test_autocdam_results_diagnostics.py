@@ -61,7 +61,7 @@ class Surface:
             values={t.name: values[t.name] for t in targets})
 
 
-def fit(targets=None, search=None, parameters=None, **kwargs):
+def fit(targets=None, search=None, parameters=None):
     parameters = parameters or {
         "sigma": (1.4, 2.6),
         "dummy_charge": (0.2, 0.7),
@@ -85,13 +85,12 @@ def fit(targets=None, search=None, parameters=None, **kwargs):
         }
     }
     search = search or {"max_evaluations": 14, "seed": 1}
-    driver = AutoCDAM(candidate=CDAMCandidate("Al", 3),
-                      parameters=parameters,
-                      fit_targets=targets,
-                      calculator=Surface(),
-                      search=search,
-                      **kwargs)
-    return driver, driver.fit()
+    driver = AutoCDAM()
+    driver.calculator = Surface()
+    driver.update_settings({"search_method": "bayesian", **search})
+    return driver, driver.fit(CDAMCandidate("Al", 3),
+                              targets,
+                              parameters=parameters)
 
 
 def result_parameters():
@@ -243,12 +242,12 @@ class TestAutoCdamResultsDiagnostics:
             }
         }
         search = {"max_evaluations": 6, "initial_samples": 5, "seed": 5}
-        driver = AutoCDAM(candidate=CDAMCandidate("Al", 3),
-                          systems={"mof": mof},
-                          parameters=parameters,
-                          fit_targets=targets,
-                          search=search)
-        result = driver.fit()
+        driver = AutoCDAM()
+        driver.update_settings({"search_method": "bayesian", **search})
+        result = driver.fit(CDAMCandidate("Al", 3),
+                            targets,
+                            parameters=parameters,
+                            systems={"mof": mof})
         report = result.diagnostics["systems"]["mof"]
         assert report["non_target_preserved"] and "VeloxChem" in report[
             "baseline_source"]
@@ -269,13 +268,12 @@ class TestAutoCdamResultsDiagnostics:
             "non_target_parameters"] == "baseline values, unchanged"
 
     def test_export_requires_a_fit(self):
-        driver = AutoCDAM(
-            candidate=CDAMCandidate("Al", 3),
-            parameters={"sigma": (1.4, 2.6)},
-            calculator=Surface(),
-            fit_targets={"IOD": {
-                "value": 2.0,
-                "tolerance": 0.01
-            }})
+        driver = AutoCDAM()
+        driver.calculator = Surface()
+        driver.setup(CDAMCandidate("Al", 3), {"IOD": {
+            "value": 2.0,
+            "tolerance": 0.01
+        }},
+                     parameters={"sigma": (1.4, 2.6)})
         with pytest.raises(ValueError, match="fit"):
             driver.export_fitted_model("unused")

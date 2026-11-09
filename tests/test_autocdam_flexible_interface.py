@@ -73,12 +73,12 @@ class TestAutoCdamFlexibleInterface:
             "epsilon": (0.02, 0.5),
             "metal_dummy_distance": 0.9
         }
-        fit = AutoCDAM(candidate=CDAMCandidate("Al", 3),
-                       parameters=parameters,
-                       fit_targets={"IOD": {
-                           "value": 1.9,
-                           "tolerance": 0.03
-                       }})
+        fit = AutoCDAM()
+        fit.setup(CDAMCandidate("Al", 3), {"IOD": {
+            "value": 1.9,
+            "tolerance": 0.03
+        }},
+                  parameters=parameters)
         specs = {spec.name: spec for spec in fit.parameter_specs}
         assert specs["metal_lj_sigma"].bounds == (
             1.4, 2.6) and specs["metal_lj_sigma"].optimizable
@@ -89,12 +89,12 @@ class TestAutoCdamFlexibleInterface:
     @step2
     def test_unknown_parameter_is_rejected_before_calculation(self):
         with pytest.raises(ValueError, match="unsupported"):
-            AutoCDAM(candidate=CDAMCandidate("Al", 3),
-                     parameters={"neighbor_charge": (0.0, 1.0)},
-                     fit_targets={"IOD": {
-                         "value": 1.9,
-                         "tolerance": 0.03
-                     }})
+            AutoCDAM().setup(CDAMCandidate("Al", 3),
+                             {"IOD": {
+                                 "value": 1.9,
+                                 "tolerance": 0.03
+                             }},
+                             parameters={"neighbor_charge": (0.0, 1.0)})
 
     @step2
     def test_target_roles_and_normalized_weighted_loss(self):

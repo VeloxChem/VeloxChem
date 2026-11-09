@@ -47,7 +47,7 @@ from .framework import FrameworkSystem, FrameworkBaseline
 from .geometry import atom_labels
 from .bayesian import BayesianFittingDriver
 from .search import ParameterPropertyTable, FittingDriver, SklearnGaussianProcessSurrogate
-from .metal_complex import LJScanRecord, MetalComplexLJStudy, QMScanDataset, MetalComplexLJDriver
+from .metal_complex import LJScanRecord, QMScanDataset, MetalComplexLJDriver
 from .plotting import plot_fit
 from .reporting import format_table, samples_table, save_table
 from .models import (

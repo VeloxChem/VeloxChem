@@ -135,6 +135,122 @@ def print_settings(ostream: OutputStream | None, title: str, rows) -> None:
 
 
 # ==========================================================================
+# files
+# ==========================================================================
+
+
+def h5_filename(filename) -> Path:
+    """
+    Gets the HDF5 file of a run (``.h5`` added when missing).
+
+    :param filename:
+        The file name, with or without the ``.h5`` suffix.
+
+    :return:
+        The path of the HDF5 file.
+    """
+
+    path = Path(filename)
+    return path if path.suffix == '.h5' else path.with_name(path.name + '.h5')
+
+
+def _check_h5_keys(value, where='value') -> None:
+    """
+    Checks that dictionary keys can be HDF5 names (no '/' and not '.').
+
+    :param value:
+        The value to be written.
+    :param where:
+        The location used in the error message.
+    """
+
+    if isinstance(value, Mapping):
+        for key, item in value.items():
+            if isinstance(key, str) and ('/' in key or key in ('', '.')):
+                raise ValueError(
+                    f"key {key!r} in {where} cannot be stored in HDF5")
+            _check_h5_keys(item, f"{where}[{key!r}]")
+    elif isinstance(value, (list, tuple)):
+        for item in value:
+            _check_h5_keys(item, where)
+
+
+def write_h5_groups(filename, groups: Mapping[str, Any]) -> Path:
+    """
+    Writes (or replaces) named groups of a run file through a temporary copy.
+
+    Values are written with VeloxChem's results serializer and keep their
+    dictionary order; other groups of the file are left unchanged. The file
+    is replaced only after the complete new version is written.
+
+    :param filename:
+        The run file (``.h5`` added when missing).
+    :param groups:
+        The values by group path, such as ``{'autocdam/result': {...}}``.
+
+    :return:
+        The path of the HDF5 file.
+    """
+
+    import shutil
+
+    import h5py
+
+    from ..resultsio import _write_value_to_hdf5
+
+    for name, value in groups.items():
+        _check_h5_keys(value, name)
+    path = h5_filename(filename)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(path.name + '.tmp')
+    if path.exists():
+        shutil.copyfile(path, temporary)
+    config = h5py.get_config()
+    track_order = config.track_order
+    config.track_order = True
+    try:
+        with h5py.File(temporary, 'a') as handle:
+            for name, value in groups.items():
+                if name in handle:
+                    del handle[name]
+                parent, _, key = name.rpartition('/')
+                group = handle.require_group(parent) if parent else handle
+                _write_value_to_hdf5(group, key, value, 'AutoCDAM value')
+    finally:
+        config.track_order = track_order
+    temporary.replace(path)
+    return path
+
+
+def read_h5_group(filename, name: str, default: Any = None) -> Any:
+    """
+    Reads one named group of a run file.
+
+    :param filename:
+        The run file (``.h5`` added when missing).
+    :param name:
+        The group path, such as ``'autocdam/result'``.
+    :param default:
+        The value returned when the file or group does not exist.
+
+    :return:
+        The stored value, or ``default``.
+    """
+
+    import h5py
+
+    from ..resultsio import _read_value_from_hdf5
+
+    path = h5_filename(filename)
+    if not path.exists():
+        return default
+    with h5py.File(path, 'r') as handle:
+        if name not in handle:
+            return default
+        return _read_value_from_hdf5(handle[name], 'AutoCDAM value')
+
+
+# ==========================================================================
 # units
 # ==========================================================================
 

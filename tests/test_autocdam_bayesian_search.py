@@ -36,6 +36,7 @@ import numpy as np
 import pytest
 
 from veloxchem.autocdam import AutoCDAM, CalculationResult, CDAMCandidate
+from veloxchem.errorhandler import VeloxChemError
 
 PARAMETERS = {
     "sigma": (1.4, 2.6),
@@ -81,15 +82,24 @@ TARGETS = {
 }
 
 
-def fit(search, targets=TARGETS, calculator=None, **kwargs):
+def bayesian_driver(search, calculator, **settings):
+    driver = AutoCDAM()
+    driver.calculator = calculator
+    driver.update_settings({"search_method": "bayesian", **search, **settings})
+    return driver
+
+
+def fit(search,
+        targets=TARGETS,
+        calculator=None,
+        parameters=PARAMETERS,
+        **settings):
     calculator = calculator or Surface()
-    driver = AutoCDAM(candidate=CDAMCandidate("Al", 3),
-                      parameters=kwargs.pop("parameters", PARAMETERS),
-                      fit_targets=targets,
-                      calculator=calculator,
-                      search=search,
-                      **kwargs)
-    return driver, driver.fit(), calculator
+    driver = bayesian_driver(search, calculator, **settings)
+    result = driver.fit(CDAMCandidate("Al", 3),
+                        targets,
+                        parameters=parameters)
+    return driver, result, calculator
 
 
 def _coupled_surface(sigma, q):
@@ -130,24 +140,25 @@ def run(strategy, seed, budget):
     }
     if strategy == "bayesian":
         search = {
+            "search_method": "bayesian",
             "mode": "constrained",
             "max_evaluations": budget,
             "seed": seed
         }
     else:
         search = {
-            "method": "staged",
             "max_iterations": budget // 5,
             "samples_per_stage": 5,
             "seed": seed
         }
     parameters = {"sigma": (1.4, 2.6), "dummy_charge": (0.2, 0.7)}
     calculator = _SyntheticCalculator()
-    result = AutoCDAM(candidate=CDAMCandidate("Al", 3),
-                      parameters=parameters,
-                      fit_targets=targets,
-                      calculator=calculator,
-                      search=search).fit()
+    driver = AutoCDAM()
+    driver.calculator = calculator
+    driver.update_settings(search)
+    result = driver.fit(CDAMCandidate("Al", 3),
+                        targets,
+                        parameters=parameters)
     return {"solved": bool(result.converged), "evaluations": calculator.calls}
 
 
@@ -276,27 +287,25 @@ class TestAutoCdamBayesianSearch:
         }
         full = fit({**search, "max_evaluations": 12}, targets)[2].points
         checkpoint = tmp_path / "bo.json"
-        first = fit(search, targets, checkpoint_path=checkpoint)[2].points
+        first = fit(search, targets, checkpoint_file=str(checkpoint))[2].points
         assert first == full[:9]
         resumed_calc = Surface()
         longer_search = {**search, "max_evaluations": 12}
-        driver = AutoCDAM(candidate=CDAMCandidate("Al", 3),
-                          parameters=PARAMETERS,
-                          fit_targets=targets,
-                          calculator=resumed_calc,
-                          search=longer_search,
-                          checkpoint_path=checkpoint)
+        driver = bayesian_driver(longer_search,
+                                 resumed_calc,
+                                 checkpoint_file=str(checkpoint),
+                                 restart=True)
         with pytest.raises(
                 ValueError,
                 match="differ"):  # changed budget is a different study
-            driver.fit(resume=True)
-        driver = AutoCDAM(candidate=CDAMCandidate("Al", 3),
-                          parameters=PARAMETERS,
-                          fit_targets=targets,
-                          calculator=resumed_calc,
-                          search=search,
-                          checkpoint_path=checkpoint)
-        result = driver.fit(resume=True)
+            driver.fit(CDAMCandidate("Al", 3), targets, parameters=PARAMETERS)
+        driver = bayesian_driver(search,
+                                 resumed_calc,
+                                 checkpoint_file=str(checkpoint),
+                                 restart=True)
+        result = driver.fit(CDAMCandidate("Al", 3),
+                            targets,
+                            parameters=PARAMETERS)
         assert resumed_calc.points == [] and result.diagnostics[
             "n_evaluations"] == 9
 
@@ -378,9 +387,6 @@ class TestAutoCdamBayesianSearch:
 
     @pytest.mark.parametrize("search, message", [
         ({
-            "acquisition": "ucb"
-        }, "unsupported search"),
-        ({
             "mode": "greedy"
         }, "mode"),
         ({
@@ -406,24 +412,15 @@ class TestAutoCdamBayesianSearch:
                     "tolerance": 0.01
                 }})
 
-    @pytest.mark.parametrize("search, message", [
-        ({
-            "method": "matrix"
-        }, "search method"),
-        ({
-            "method": "staged",
-            "mode": "constrained"
-        }, "staged search settings"),
-        ({
-            "max_iterations": 3
-        }, "unsupported search settings"),
-    ])
-    def test_search_settings_are_validated_per_method(self, search, message):
-        with pytest.raises(ValueError, match=message):
-            AutoCDAM(candidate=CDAMCandidate("Al", 3),
-                     parameters=PARAMETERS,
-                     fit_targets=TARGETS,
-                     search=search).fit()
+    def test_unknown_search_settings_are_rejected(self):
+        with pytest.raises(VeloxChemError, match="unknown settings"):
+            AutoCDAM().update_settings({"acquisition": "ucb"})
+
+    def test_unknown_search_method_is_rejected(self):
+        driver = AutoCDAM()
+        driver.update_settings({"search_method": "matrix"})
+        with pytest.raises(VeloxChemError, match="search_method"):
+            driver.fit(CDAMCandidate("Al", 3), TARGETS, parameters=PARAMETERS)
 
     def test_vector_targets_are_left_to_the_staged_search(self):
         with pytest.raises(ValueError, match="scalar"):

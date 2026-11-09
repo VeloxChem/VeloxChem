@@ -84,24 +84,24 @@ IOD = FitTarget("IOD", 1.9, 0.03)
 CN = FitTarget("CN", 6.0, 0.2)
 
 
-def run(search, calculator, **kwargs):
-    fit = AutoCDAM(candidate=CDAMCandidate("Al", 3),
-                   parameters=PARAMETERS,
-                   fit_targets=kwargs.pop(
-                       "targets", {
-                           "IOD": {
-                               "value": 2.055,
-                               "tolerance": 1e-4
-                           },
-                           "CN": {
-                               "value": 5.16,
-                               "tolerance": 1e-4
-                           }
-                       }),
-                   calculator=calculator,
-                   search=search,
-                   **kwargs)
-    return fit, fit.fit()
+def run(search, calculator, targets=None, **settings):
+    fit = AutoCDAM()
+    fit.calculator = calculator
+    fit.update_settings({"search_method": "bayesian", **search, **settings})
+    if targets is None:
+        targets = {
+            "IOD": {
+                "value": 2.055,
+                "tolerance": 1e-4
+            },
+            "CN": {
+                "value": 5.16,
+                "tolerance": 1e-4
+            }
+        }
+    return fit, fit.fit(CDAMCandidate("Al", 3),
+                        targets,
+                        parameters=PARAMETERS)
 
 
 class TestAutoCdamCostAndCache:
@@ -238,7 +238,7 @@ class TestAutoCdamCostAndCache:
         with pytest.raises(KeyboardInterrupt):
             run(search,
                 Counting(interrupt_at=8),
-                checkpoint_path=checkpoint,
+                checkpoint_file=str(checkpoint),
                 cache=str(cache))
         resumed = Counting()
         targets = {
@@ -251,14 +251,16 @@ class TestAutoCdamCostAndCache:
                 "tolerance": 1e-4
             }
         }
-        fit = AutoCDAM(candidate=CDAMCandidate("Al", 3),
-                       parameters=PARAMETERS,
-                       fit_targets=targets,
-                       calculator=resumed,
-                       search=search,
-                       checkpoint_path=checkpoint,
-                       cache=str(cache))
-        result = fit.fit(resume=True)
+        fit = AutoCDAM()
+        fit.calculator = resumed
+        fit.update_settings({
+            "search_method": "bayesian",
+            **search,
+            "checkpoint_file": str(checkpoint),
+            "cache": str(cache),
+            "restart": True,
+        })
+        result = fit.fit(CDAMCandidate("Al", 3), targets, parameters=PARAMETERS)
         assert result.diagnostics["n_evaluations"] == 10
         assert result.parameters.to_dict() == reference.parameters.to_dict()
         assert len(resumed.calls) <= 3  # only the unfinished steps
@@ -368,12 +370,13 @@ class TestAutoCdamCostAndCache:
     def test_cached_default_calculator_still_records_the_md_protocol(self):
         from veloxchem.autocdam.calculator import Calculator
         from veloxchem.autocdam.md import md_settings
-        fit = AutoCDAM(candidate=CDAMCandidate("Al", 3),
-                       parameters=PARAMETERS,
-                       fit_targets={"IOD": {
-                           "value": 2.055,
-                           "tolerance": 0.01
-                       }},
-                       calculator=Calculator())
+        fit = AutoCDAM()
+        fit.calculator = Calculator()
+        fit.setup(CDAMCandidate("Al", 3),
+                  {"IOD": {
+                      "value": 2.055,
+                      "tolerance": 0.01
+                  }},
+                  parameters=PARAMETERS)
         assert isinstance(fit.calculator, CachedCalculator)
         assert fit.calculator_options["md_options"] == md_settings(None)

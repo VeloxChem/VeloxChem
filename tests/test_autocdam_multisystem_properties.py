@@ -303,12 +303,12 @@ class TestAutoCdamMultisystemProperties:
             }
         }
         with pytest.raises(ValueError, match="unknown system"):
-            AutoCDAM(candidate=CDAMCandidate("Al", 3),
-                     systems={"water": {
-                         "type": "aqueous"
-                     }},
-                     parameters={"sigma": (1.4, 2.6)},
-                     fit_targets=unknown_system)
+            AutoCDAM().setup(CDAMCandidate("Al", 3),
+                             unknown_system,
+                             parameters={"sigma": (1.4, 2.6)},
+                             systems={"water": {
+                                 "type": "aqueous"
+                             }})
         aqueous_distance = {
             "d": {
                 "property": "distance",
@@ -317,12 +317,12 @@ class TestAutoCdamMultisystemProperties:
             }
         }
         with pytest.raises(ValueError, match="aqueous systems support"):
-            AutoCDAM(candidate=CDAMCandidate("Al", 3),
-                     systems={"water": {
-                         "type": "aqueous"
-                     }},
-                     parameters={"sigma": (1.4, 2.6)},
-                     fit_targets=aqueous_distance)
+            AutoCDAM().setup(CDAMCandidate("Al", 3),
+                             aqueous_distance,
+                             parameters={"sigma": (1.4, 2.6)},
+                             systems={"water": {
+                                 "type": "aqueous"
+                             }})
 
     def test_atom_representation_flags_unidentifiable_dummy_charge(self):
         parameters = {"sigma": (1.4, 2.6), "dummy_charge": (0.2, 0.7)}
@@ -334,10 +334,11 @@ class TestAutoCdamMultisystemProperties:
                 "tolerance": 0.05
             }
         }
-        fit = AutoCDAM(candidate=CDAMCandidate("Al", 3),
-                       systems={"mof": node(representation="atom")},
-                       parameters=parameters,
-                       fit_targets=targets)
+        fit = AutoCDAM()
+        fit.setup(CDAMCandidate("Al", 3),
+                  targets,
+                  parameters=parameters,
+                  systems={"mof": node(representation="atom")})
         assert any(
             "dummy_charge" in warning for warning in fit.parameter_warnings)
 
@@ -384,17 +385,17 @@ class TestAutoCdamMultisystemProperties:
                 "role": "monitor"
             },
         }
-        search = {
-            "method": "staged",
+        fit = AutoCDAM()
+        fit.calculator = aqueous
+        fit.update_settings({
+            "search_method": "staged",
             "max_iterations": 1,
             "samples_per_stage": 4
-        }
-        fit = AutoCDAM(candidate=CDAMCandidate("Al", 3),
-                       systems=systems,
-                       parameters=parameters,
-                       fit_targets=targets,
-                       calculator=aqueous,
-                       search=search)
+        })
+        fit.setup(CDAMCandidate("Al", 3),
+                  targets,
+                  parameters=parameters,
+                  systems=systems)
         baseline_xml = mof.prepare_baseline().system_xml
         result = fit.fit()
         samples = fit.fitting_driver.table.samples
@@ -437,12 +438,12 @@ class TestAutoCdamMultisystemProperties:
                 "tolerance": 0.05
             }
         }
-        fit = AutoCDAM(candidate=CDAMCandidate("Al", 3),
-                       pilot=True,
-                       systems=systems,
-                       parameters={"sigma": (1.5, 2.5)},
-                       fit_targets=targets,
-                       calculator_options={"work_dir": str(tmp_path)})
+        fit = AutoCDAM()
+        fit.update_settings({"pilot": True, "work_dir": str(tmp_path)})
+        fit.setup(CDAMCandidate("Al", 3),
+                  targets,
+                  parameters={"sigma": (1.5, 2.5)},
+                  systems=systems)
         calculation = fit.calculate({"metal_lj_sigma": 2.0})
         assert not calculation.failed, calculation.failure_reason
         assert {"IOD", "al_o"} <= set(calculation.values)

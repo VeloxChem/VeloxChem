@@ -171,17 +171,14 @@ class TestAutoCdamStagedFitting:
         calculator = SyntheticCalculator()
         targets = {"IOD": {"value": 2.0, "tolerance": 100}}
         parameters = {"metal_lj_sigma": {"initial": 1.0, "bounds": [-2, 4]}}
-        search = {
-            "method": "staged",
+        cdam = AutoCDAM()
+        cdam.calculator = calculator
+        cdam.update_settings({
+            "search_method": "staged",
             "max_iterations": 1,
             "samples_per_stage": 12
-        }
-        cdam = AutoCDAM(candidate=candidate(),
-                        calculator=calculator,
-                        fit_targets=targets,
-                        fit_parameters=parameters,
-                        search=search)
-        result = cdam.fit()
+        })
+        result = cdam.fit(candidate(), targets, fit_parameters=parameters)
         assert result.converged
         assert result.diagnostics["quality_counts"]["rejected"] > 0
         assert result.diagnostics["quality_counts"]["usable"] > 0

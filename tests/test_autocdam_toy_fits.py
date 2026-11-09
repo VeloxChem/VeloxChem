@@ -37,7 +37,7 @@ from veloxchem.molecule import Molecule
 from veloxchem.mmforcefieldgenerator import MMForceFieldGenerator
 from veloxchem.veloxchemlib import hartree_in_kjpermol
 from veloxchem.autocdam import (AutoCDAM, CalculationResult, CDAMCandidate,
-                                MetalComplexLJDriver, MetalComplexLJStudy,
+                                MetalComplexLJDriver,
                                 format_table, plot_fit, samples_table,
                                 save_table)
 
@@ -75,12 +75,13 @@ def toy_fit(search, output):
     }
     if search == "staged":
         options = {
-            "method": "staged",
+            "search_method": "staged",
             "max_iterations": 4,
             "samples_per_stage": 8
         }
     else:
         options = {
+            "search_method": "bayesian",
             "mode": "constrained",
             "max_evaluations": 30,
             "initial_samples": 8,
@@ -98,14 +99,14 @@ def toy_fit(search, output):
             "tolerance": 0.1
         }
     }
-    fit = AutoCDAM(candidate=CDAMCandidate("Al", 3),
-                   parameters=parameters,
-                   fit_targets=targets,
-                   calculator=ToyCalculator(),
-                   cache=False,
-                   checkpoint_path=output / "checkpoint.json",
-                   search=options)
-    result = fit.fit()
+    fit = AutoCDAM()
+    fit.calculator = ToyCalculator()
+    fit.update_settings({
+        **options,
+        "cache": False,
+        "checkpoint_file": str(output / "checkpoint.json"),
+    })
+    result = fit.fit(CDAMCandidate("Al", 3), targets, parameters=parameters)
     result.save(output / "result.json")
     return result
 
@@ -190,21 +191,19 @@ class TestAutoCdamToyFits:
 
     def test_metal_complex_fit_recovers_the_encoded_parameters(self, tmp_path):
         molecule, baseline = zn_complex_and_baseline()
-        study = MetalComplexLJStudy(molecule=molecule,
-                                    target_atom_index=0,
-                                    probe="He",
-                                    baseline_force_field=baseline,
-                                    probe_parameters=PROBE,
-                                    scan_distances_angstrom=np.linspace(
-                                        2.4, 5.0, 10),
-                                    scan_directions=[[0, 0, 1], [0, 1, 0]],
-                                    fit_settings={
-                                        "sigma_bounds_angstrom": [1.0, 4.0],
-                                        "epsilon_bounds_kjmol": [0.01, 5.0],
-                                        "energy_tolerance_kjmol": 0.05
-                                    },
-                                    workdir=tmp_path)
-        driver = MetalComplexLJDriver(study, calculator=SyntheticQM(baseline))
+        driver = MetalComplexLJDriver()
+        driver.calculator = SyntheticQM(baseline)
+        driver.update_settings({
+            "probe": "He",
+            "probe_parameters": PROBE,
+            "scan_distances_angstrom": np.linspace(2.4, 5.0, 10),
+            "scan_directions": [[0, 0, 1], [0, 1, 0]],
+            "sigma_bounds_angstrom": [1.0, 4.0],
+            "epsilon_bounds_kjmol": [0.01, 5.0],
+            "energy_tolerance_kjmol": 0.05,
+            "workdir": str(tmp_path)
+        })
+        driver.setup(molecule, 0, baseline_force_field=baseline)
         driver.compute_qm_dataset()
         result = driver.fit()
         assert result.parameters["metal_lj_sigma"] == pytest.approx(TRUE_SIGMA,

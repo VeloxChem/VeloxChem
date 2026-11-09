@@ -43,29 +43,25 @@ class TestAutoCdamDriverSmoke:
         random.seed(42)
         ostream = OutputStream(str(tmp_path / "fit.log"))
         try:
-            cdam = AutoCDAM(
-                candidate=CDAMCandidate("Zn", 2),
-                fit_targets={
-                    "IOD": {
-                        "value": 2.09,
-                        "tolerance": 0.03
-                    },
-                    "CN": {
-                        "value": 6.0,
-                        "tolerance": 0.25
-                    }
+            cdam = AutoCDAM(ostream=ostream)
+            cdam.update_settings({
+                "search_method": "staged",
+                "max_iterations": 1,
+                "samples_per_stage": 2,
+                "pilot": True,
+                "work_dir": str(tmp_path),
+                "checkpoint_file": str(tmp_path / "checkpoint.json"),
+            })
+            result = cdam.fit(CDAMCandidate("Zn", 2), {
+                "IOD": {
+                    "value": 2.09,
+                    "tolerance": 0.03
                 },
-                search={
-                    "method": "staged",
-                    "max_iterations": 1,
-                    "samples_per_stage": 2
-                },
-                pilot=True,
-                calculator_options={"work_dir": str(tmp_path)},
-                checkpoint_path=tmp_path / "checkpoint.json",
-                ostream=ostream,
-            )
-            result = cdam.fit()
+                "CN": {
+                    "value": 6.0,
+                    "tolerance": 0.25
+                }
+            })
             assert result.iterations == 1
             assert result.diagnostics["n_calculations"] == 2
             assert math.isfinite(result.objective)
@@ -112,25 +108,20 @@ class TestAutoCdamDriverSmoke:
                 return EvaluationResult(objective=7.0,
                                         metrics={"custom_loss": 7.0})
 
-        result = AutoCDAM(
-            candidate=CDAMCandidate("Zn",
-                                    2,
-                                    metal_lj_sigma=2.0,
-                                    metal_lj_epsilon=0.2),
-            fit_targets={
-                "IOD": {
-                    "reference": 2.0,
-                    "tolerance": 0.1
-                }
-            },
+        cdam = AutoCDAM()
+        cdam.calculator = SuppliedCalculator()
+        cdam.evaluator = SuppliedEvaluator()
+        result = cdam.fit(
+            CDAMCandidate("Zn", 2, metal_lj_sigma=2.0, metal_lj_epsilon=0.2),
+            {"IOD": {
+                "reference": 2.0,
+                "tolerance": 0.1
+            }},
             fit_parameters={
                 "dummy_charge": {
                     "initial": 0.5,
                     "bounds": [0.0, 1.0]
                 }
-            },
-            calculator=SuppliedCalculator(),
-            evaluator=SuppliedEvaluator(),
-        ).fit()
+            })
         assert result.objective == 7.0
         assert result.metrics == {"custom_loss": 7.0}

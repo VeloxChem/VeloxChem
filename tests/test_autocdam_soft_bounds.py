@@ -49,16 +49,20 @@ class Surface:
             values={t.name: values[t.name] for t in targets})
 
 
-def fit(parameters, iod, search=None, **kwargs):
+def fit(parameters, iod, search=None, **settings):
     targets = {"IOD": {"value": iod, "tolerance": 0.002}}
-    search = {"max_evaluations": 10, "seed": 1, **(search or {})}
-    driver = AutoCDAM(candidate=CDAMCandidate("Al", 3),
-                      parameters=parameters,
-                      calculator=Surface(),
-                      fit_targets=targets,
-                      search=search,
-                      **kwargs)
-    return driver, driver.fit()
+    driver = AutoCDAM()
+    driver.calculator = Surface()
+    driver.update_settings({
+        "search_method": "bayesian",
+        "max_evaluations": 10,
+        "seed": 1,
+        **(search or {}),
+        **settings
+    })
+    return driver, driver.fit(CDAMCandidate("Al", 3),
+                              targets,
+                              parameters=parameters)
 
 
 class TestAutoCdamSoftBounds:
@@ -77,12 +81,12 @@ class TestAutoCdamSoftBounds:
 
     def test_uff_keyword_gives_soft_bounds_and_explicit_bounds_stay_hard(self):
         parameters = {"sigma": "uff", "dummy_charge": (0.2, 0.7)}
-        driver = AutoCDAM(candidate=CDAMCandidate("Al", 3),
-                          parameters=parameters,
-                          calculator=Surface(),
-                          fit_targets={"IOD": {
-                              "value": 2.0
-                          }})
+        driver = AutoCDAM()
+        driver.calculator = Surface()
+        driver.setup(CDAMCandidate("Al", 3), {"IOD": {
+            "value": 2.0
+        }},
+                     parameters=parameters)
         specs = {s.name: s for s in driver.parameter_specs}
         assert specs["metal_lj_sigma"].expandable and specs[
             "metal_lj_sigma"].hard_bounds
@@ -90,11 +94,9 @@ class TestAutoCdamSoftBounds:
         assert not specs["dummy_charge"].expandable
 
     def test_default_parameters_use_uff_soft_bounds(self):
-        driver = AutoCDAM(candidate=CDAMCandidate("Al", 3),
-                          calculator=Surface(),
-                          fit_targets={"IOD": {
-                              "value": 2.0
-                          }})
+        driver = AutoCDAM()
+        driver.calculator = Surface()
+        driver.setup(CDAMCandidate("Al", 3), {"IOD": {"value": 2.0}})
         names = {s.name for s in driver.parameter_specs}
         assert names == {"metal_lj_sigma", "metal_lj_epsilon"}
         assert all(s.expandable for s in driver.parameter_specs)
@@ -105,12 +107,10 @@ class TestAutoCdamSoftBounds:
     def test_bad_reference_requests(self, value, message):
         parameters = {"sigma": (1.4, 2.6), "dummy_charge": value}
         with pytest.raises(ValueError, match=message):
-            AutoCDAM(candidate=CDAMCandidate("Al", 3),
-                     calculator=Surface(),
-                     parameters=parameters,
-                     fit_targets={"IOD": {
-                         "value": 2.0
-                     }})
+            AutoCDAM().setup(CDAMCandidate("Al", 3), {"IOD": {
+                "value": 2.0
+            }},
+                             parameters=parameters)
 
     def test_hard_bounds_must_contain_bounds(self):
         with pytest.raises(ValueError, match="inside hard_bounds"):
@@ -178,23 +178,15 @@ class TestAutoCdamSoftBounds:
                              expandable=True,
                              hard_bounds=(0.5, 8.0))
         checkpoint = tmp_path / "bo.json"
-        _, first = fit({"sigma": soft}, iod=1.40, checkpoint_path=checkpoint)
+        _, first = fit({"sigma": soft},
+                       iod=1.40,
+                       checkpoint_file=str(checkpoint))
         saved = json.loads(checkpoint.read_text())
         assert saved["history"][-1]["bounds"]["metal_lj_sigma"][0] < 1.4
-        driver = AutoCDAM(
-            candidate=CDAMCandidate("Al", 3),
-            parameters={"sigma": soft},
-            calculator=Surface(),
-            fit_targets={"IOD": {
-                "value": 1.40,
-                "tolerance": 0.002
-            }},
-            search={
-                "max_evaluations": 10,
-                "seed": 1
-            },
-            checkpoint_path=checkpoint)
-        resumed = driver.fit(resume=True)
+        _, resumed = fit({"sigma": soft},
+                         iod=1.40,
+                         checkpoint_file=str(checkpoint),
+                         restart=True)
         assert resumed.parameters.to_dict() == first.parameters.to_dict()
         assert resumed.diagnostics["final_bounds"] == first.diagnostics[
             "final_bounds"]
