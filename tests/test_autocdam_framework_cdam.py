@@ -53,6 +53,7 @@ CHARGES = json.loads(
     (STRUCTURES /
      "autocdam_al_node_fragment_charges.json").read_text())["charges_e"]
 HYDROXIDE_O, CARBOXYLATE_O = 1, 5
+FIRST_SHELL_O = [1, 3, 5, 9, 13, 16]  # hydroxide, carboxylate, water O on Al
 
 
 def molecule():
@@ -253,6 +254,10 @@ class TestAutoCdamFrameworkCdam:
                                axis=1), -1, 1)))
             ideal = np.array([90.0 if a < 135 else 180.0 for a in angles])
             angle_errors.append(np.sqrt(np.mean((angles - ideal)**2)))
+            ligand_o = minimum_image(xyz[FIRST_SHELL_O] - xyz[0],
+                                     baseline.box_vectors_nm)
+            # the nonbonded first shell stays on the metal
+            assert np.linalg.norm(ligand_o, axis=1).max() < 0.25
             for left, right in baseline.bonds:  # every covalent bond survives
                 length = np.linalg.norm(
                     minimum_image(xyz[right] - xyz[left],
