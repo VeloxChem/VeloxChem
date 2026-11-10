@@ -1,14 +1,14 @@
 {
   "structure": "al_node_fragment.xyz",
   "molecular_charge": -1,
-  "source": "per-group charges for a CDAM site: Al formal +3; each OH- and HCOO- (total -1) from RESP of the isolated ion at its fragment geometry (HF/6-31G*, VeloxChem RespChargesDriver); water SPC/E",
+  "source": "FrameworkSystem charges='groups': Al formal +3; each OH- and HCOO- (net -1) by RESP of the isolated ion at its fragment geometry (VeloxChem MMForceFieldGenerator, HF/6-31G*); water SPC/E",
   "atom_order": "same as the xyz file",
   "charges_e": [
     3.0,
     -1.2122, 0.2122,
-    -1.2123, 0.2123,
-    -0.8246, 0.7777, -0.8071, -0.1459,
-    -0.8233, 0.7751, -0.8067, -0.1452,
+    -1.21232, 0.21232,
+    -0.81637, 0.77883, -0.81637, -0.14609,
+    -0.81575, 0.77694, -0.81575, -0.14544,
     -0.8476, 0.4238, 0.4238,
     -0.8476, 0.4238, 0.4238
   ]

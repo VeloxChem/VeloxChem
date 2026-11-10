@@ -38,7 +38,7 @@ import pytest
 import veloxchem as vlx
 
 from veloxchem.autocdam import CDAMCandidate, FrameworkSystem, ParameterSpec
-from veloxchem.autocdam.framework import compare_to_baseline
+from veloxchem.autocdam.framework import compare_to_baseline, covalent_groups
 from veloxchem.autocdam.geometry import atom_labels, minimum_image
 from veloxchem.errorhandler import VeloxChemError
 
@@ -46,6 +46,8 @@ STRUCTURES = Path(__file__).parent / "data"
 CHARGES = json.loads(
     (STRUCTURES /
      "autocdam_al_node_fragment_charges.json").read_text())["charges_e"]
+# hydroxides (O1, O2) and formates (O3, O5) are -1; the waters are neutral
+GROUP_CHARGES = {"O1": -1, "O2": -1, "O3": -1, "O5": -1}
 
 
 def node_molecule(copies=1, shift=9.0):
@@ -213,11 +215,60 @@ class TestAutoCdamFrameworkBaseline:
         ({
             "representation": "united"
         }, VeloxChemError, "representation"),
+        ({
+            "charges": "groups"
+        }, VeloxChemError, "needs metal_charges"),
+        ({
+            "charges": "groups",
+            "metal_charges": {"O1": 3}
+        }, ValueError, "not a metal"),
+        ({
+            "charges": "groups",
+            "metal_charges": {"Al": 3}
+        }, ValueError, "odd number of electrons"),
+        ({
+            "charges": "groups",
+            "metal_charges": {"Al": 2},
+            "group_charges": GROUP_CHARGES
+        }, ValueError, "sum to"),
+        ({
+            "charges": "groups",
+            "metal_charges": {"Al": 3},
+            "group_charges": {"O1": -1, "H1": 0}
+        }, ValueError, "two charges"),
+        ({
+            "water_model": "tip4pew"
+        }, VeloxChemError, "water_model"),
     ])
     def test_invalid_framework_inputs_fail_clearly(self, kwargs, error,
                                                    message):
         with pytest.raises(error, match=message):
             node_system(**kwargs).prepare_baseline()
+
+    def test_group_charge_scheme_gives_formal_metal_and_integer_groups(self):
+        node = node_system(charges="groups",
+                           metal_charges={"Al": 3},
+                           group_charges=GROUP_CHARGES)
+        assert covalent_groups(node.molecule) == [[1, 2], [3, 4],
+                                                  [5, 6, 7, 8],
+                                                  [9, 10, 11, 12],
+                                                  [13, 14, 15],
+                                                  [16, 17, 18]]
+        charges = np.array(node.prepare_baseline().charges)
+        assert charges[0] == pytest.approx(3.0)
+        for group, total in (([1, 2], -1), ([3, 4], -1), ([5, 6, 7, 8], -1),
+                             ([9, 10, 11, 12], -1), ([13, 14, 15], 0),
+                             ([16, 17, 18], 0)):
+            assert charges[group].sum() == pytest.approx(total, abs=1e-6)
+        assert charges[[13, 14, 15]] == pytest.approx([-0.8476, 0.4238, 0.4238])
+        # the test data are this scheme's output
+        assert charges == pytest.approx(CHARGES, abs=1e-4)
+        same = node_system(charges="groups",
+                           metal_charges={0: 3},
+                           group_charges=GROUP_CHARGES,
+                           water_model="tip3p").prepare_baseline().charges
+        assert same[13:16] == pytest.approx((-0.834, 0.417, 0.417))
+        assert same[:13] == pytest.approx(tuple(charges[:13]))
 
     def test_periodic_cell_uses_pme_and_minimum_image(self):
         import openmm as mm

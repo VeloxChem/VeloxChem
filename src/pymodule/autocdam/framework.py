@@ -90,6 +90,36 @@ def metal_indices(molecule) -> tuple[int, ...]:
                  if identifier.element_id_is_metal(elem_id))
 
 
+WATER_MODELS_FOR_GROUPS = ("spc", "spce", "tip3p")
+
+
+def covalent_groups(molecule) -> list[list[int]]:
+    """Covalent fragments once metal-ligand bonds are removed.
+
+    Uses VeloxChem's connectivity. Metals are left out; every other atom is in
+    exactly one group (a ligand, a water, a counter-ion, ...), sorted by its
+    first atom.
+    """
+    connectivity = np.asarray(molecule.get_connectivity_matrix(), dtype=bool)
+    metals = set(metal_indices(molecule))
+    unassigned = [i for i in range(molecule.number_of_atoms()) if i not in metals]
+    seen, groups = set(), []
+    for start in unassigned:
+        if start in seen:
+            continue
+        group, stack = [], [start]
+        seen.add(start)
+        while stack:
+            atom = stack.pop()
+            group.append(atom)
+            for other in np.flatnonzero(connectivity[atom]):
+                if int(other) not in metals and int(other) not in seen:
+                    seen.add(int(other))
+                    stack.append(int(other))
+        groups.append(sorted(group))
+    return groups
+
+
 _FORCE_FIELD_DATA = ("atoms", "bonds", "angles", "dihedrals", "impropers",
                      "pairs", "partial_charges", "atom_types",
                      "unique_atom_types", "connectivity_matrix")
@@ -402,9 +432,23 @@ class FrameworkSystem:
     """
     A target metal site inside a cluster or periodic framework.
 
-    ``charges`` selects the baseline charges: ``"resp"`` (VeloxChem RESP, runs
-    an SCF), an explicit per-atom sequence in e, or ``"zero"``. It is required
-    because VeloxChem otherwise assigns zero charges silently.
+    ``charges`` selects the baseline charges: ``"resp"`` (VeloxChem RESP of the
+    whole structure, runs an SCF), ``"groups"``, an explicit per-atom sequence
+    in e, or ``"zero"``. It is required because VeloxChem otherwise assigns
+    zero charges silently.
+
+    ``"groups"`` is the scheme for a nonbonded metal model: each metal carries
+    its formal charge (``metal_charges``, e.g. ``{"Al": 3}``, by element, atom
+    label or index), and the structure is split into the covalent groups left
+    when metal-ligand bonds are removed. Each water group (O with two H, no
+    charge given) takes the charges of ``water_model`` (``"spc"``, ``"spce"``
+    or ``"tip3p"``). Every other group is fitted by RESP as an isolated species
+    at its geometry (``MMForceFieldGenerator``, HF/6-31G*), with the integer
+    net charge from ``group_charges`` (keyed by any atom label or index in the
+    group, e.g. ``{"O1": -1}`` for a hydroxide); unlisted groups are neutral.
+    Charge transfer to the metal is then left to the fitted CDAM parameters
+    instead of being counted in the charges. The metal and group charges must
+    add up to the structure's charge.
     ``baseline_force_field`` accepts an already generated
     ``MMForceFieldGenerator`` for the same structure; it is copied, never changed.
     ``box_vectors`` (3x3, angstrom) makes the system periodic with PME.
@@ -424,7 +468,7 @@ class FrameworkSystem:
     :param target_metal:
         The target metal (index or atom label).
     :param charges:
-        The baseline charges: "resp", "zero", or a per-atom sequence in e.
+        The baseline charges: "resp", "groups", "zero", or a per-atom sequence in e.
     :param charge:
         The molecular charge (required for an xyz structure).
     :param multiplicity:
@@ -443,6 +487,12 @@ class FrameworkSystem:
         The metal-dummy bond, "constraint" or "harmonic".
     :param c4_partners:
         The oxygens that feel the C4 term, "water" or "oxygen".
+    :param metal_charges:
+        The formal metal charges for charges="groups", by element, label or index.
+    :param group_charges:
+        The net ligand-group charges for charges="groups", by a member atom.
+    :param water_model:
+        The water model whose charges water groups take for charges="groups".
     :param name:
         The system name.
     :param ostream:
@@ -461,6 +511,9 @@ class FrameworkSystem:
     metal_site_charge: float | None = None
     metal_dummy_bond: str = "constraint"
     c4_partners: str = "water"
+    metal_charges: dict[Any, float] | None = None
+    group_charges: dict[Any, int] | None = None
+    water_model: str = "spce"
     name: str = "framework"
     ostream: Any = None
 
@@ -483,7 +536,8 @@ class FrameworkSystem:
             "not a metal")
         assert_msg_critical(
             self.charges is not None or self.baseline_force_field is not None,
-            "choose baseline charges: charges='resp' (VeloxChem RESP), an "
+            "choose baseline charges: charges='resp' (VeloxChem RESP), "
+            "'groups' (formal metal charges with per-group ligand RESP), an "
             "explicit per-atom list, or 'zero'; VeloxChem would otherwise "
             "assign zero charges without RESP")
         if self.box_vectors is not None:
@@ -507,6 +561,14 @@ class FrameworkSystem:
             "metal_dummy_bond must be 'constraint' or 'harmonic'")
         assert_msg_critical(self.c4_partners in ("water", "oxygen"),
                             "c4_partners must be 'water' or 'oxygen'")
+        assert_msg_critical(
+            self.water_model in WATER_MODELS_FOR_GROUPS,
+            "water_model must be one of " + ", ".join(WATER_MODELS_FOR_GROUPS) +
+            " (a 4-site model needs a virtual site the framework cannot add)")
+        if isinstance(self.charges, str) and self.charges == "groups":
+            assert_msg_critical(
+                bool(self.metal_charges),
+                "charges='groups' needs metal_charges, e.g. {'Al': 3}")
 
     def _read_structure(self):
         """A VeloxChem Molecule from the given object, xyz file, or xyz text."""
@@ -590,19 +652,22 @@ class FrameworkSystem:
                     "baseline_force_field does not match the structure's atom count"
                 )
             return ff, "supplied VeloxChem force field"
+        charges = self.charges
+        if isinstance(charges, str) and charges == "groups":
+            charges = self._group_scheme_charges()
         ff = MMForceFieldGenerator()
         ff.ostream.mute()
-        if isinstance(self.charges, str):
-            if self.charges not in ("resp", "zero"):
-                raise ValueError(
-                    "charges must be 'resp', 'zero', or a per-atom sequence")
-            resp = self.charges == "resp"
+        if isinstance(charges, str):
+            if charges not in ("resp", "zero"):
+                raise ValueError("charges must be 'resp', 'groups', 'zero', "
+                                 "or a per-atom sequence")
+            resp = charges == "resp"
             source = (
                 "VeloxChem MMForceFieldGenerator, RESP charges" if resp else
                 "VeloxChem MMForceFieldGenerator, zero charges (explicitly requested)"
             )
         else:
-            values = np.asarray(self.charges, dtype=float)
+            values = np.asarray(charges, dtype=float)
             if values.shape != (n_atoms,) or not np.isfinite(values).all():
                 raise ValueError(
                     f"charges must be {n_atoms} finite values in e")
@@ -613,7 +678,10 @@ class FrameworkSystem:
                     f"charge is {self.molecule.get_charge()}")
             ff.partial_charges = values.copy()
             resp = True  # preset charges are kept; VeloxChem skips its own RESP
-            source = "VeloxChem MMForceFieldGenerator, user-supplied charges"
+            source = ("VeloxChem MMForceFieldGenerator, formal metal charges "
+                      f"with per-group RESP ligands and {self.water_model} water"
+                      if isinstance(self.charges, str) else
+                      "VeloxChem MMForceFieldGenerator, user-supplied charges")
         try:
             # RESP writes SCF files named after molecule_name; keep them out
             # of the working directory.
@@ -628,11 +696,107 @@ class FrameworkSystem:
             raise ValueError(
                 f"VeloxChem could not parameterize the {self.name} structure: "
                 f"{type(exc).__name__}: {exc}") from exc
-        if not isinstance(self.charges, str):
+        if not isinstance(charges, str):
             kept = np.array([ff.atoms[i]["charge"] for i in range(n_atoms)])
-            if not np.allclose(kept, np.round(self.charges, 6), atol=1e-5):
+            if not np.allclose(kept, np.round(charges, 6), atol=1e-5):
                 raise ValueError("VeloxChem changed the supplied charges")
         return ff, source
+
+    def _group_scheme_charges(self) -> list[float]:
+        """Per-atom charges of the ``"groups"`` scheme (see the class docstring)."""
+        from ..waterparameters import get_water_parameters
+
+        n_atoms = len(self.elements)
+        metals = metal_indices(self.molecule)
+        groups = covalent_groups(self.molecule)
+        group_of = {atom: g for g, atoms in enumerate(groups) for atom in atoms}
+        charges = np.zeros(n_atoms)
+
+        # formal metal charges: by element first, then by label or index
+        metal_set, assigned = set(metals), {}
+        for key, value in self.metal_charges.items():
+            if isinstance(key, str) and any(
+                    self.elements[m].upper() == key.strip().upper() for m in metals):
+                targets = [m for m in metals
+                           if self.elements[m].upper() == key.strip().upper()]
+            else:
+                targets = [resolve_atom(key, self.labels)]
+                if targets[0] not in metal_set:
+                    raise ValueError(f"metal_charges key {key!r} is not a metal")
+            for m in targets:
+                assigned[m] = float(value)
+        missing = [self.labels[m] for m in metals if m not in assigned]
+        if missing:
+            raise ValueError("metal_charges has no formal charge for "
+                             + ", ".join(missing))
+        for m, value in assigned.items():
+            charges[m] = value
+
+        # integer net charge of each ligand group, named by any member atom
+        totals = {}
+        for key, value in (self.group_charges or {}).items():
+            atom = resolve_atom(key, self.labels)
+            if atom in metal_set:
+                raise ValueError(f"group_charges key {key!r} is a metal; "
+                                 "use metal_charges")
+            if float(value) != int(value):
+                raise ValueError(f"group charge {value!r} of {key!r} is not an integer")
+            group = group_of[atom]
+            if group in totals and totals[group] != int(value):
+                raise ValueError(f"group_charges gives two charges to the group of {key!r}")
+            totals[group] = int(value)
+
+        water = get_water_parameters()[self.water_model]
+        coordinates = self.molecule.get_coordinates_in_angstrom()
+        for g, atoms in enumerate(groups):
+            elements = [self.elements[i] for i in atoms]
+            total = totals.get(g, 0)
+            names = " ".join(self.labels[i] for i in atoms)
+            if sorted(elements) == ["H", "H", "O"] and g not in totals:
+                for i in atoms:
+                    charges[i] = water["ow" if self.elements[i] == "O" else "hw"]["charge"]
+                how = f"{self.water_model} water"
+            elif len(atoms) == 1:
+                charges[atoms[0]] = float(total)
+                how = "single atom"
+            else:
+                charges[atoms] = self._isolated_group_resp(elements,
+                                                           coordinates[atoms],
+                                                           total, names)
+                how = "RESP of the isolated group"
+            self.ostream.print_info(f"Charge group {names}: net {total:+d}, {how}")
+
+        target = self.molecule.get_charge()
+        if not np.isclose(charges.sum(), target, atol=1e-4):
+            raise ValueError(
+                f"metal and group charges sum to {charges.sum():.4f} e but the "
+                f"structure's charge is {target}; set group_charges for the "
+                "charged ligands")
+        self.ostream.flush()
+        return charges.tolist()
+
+    @staticmethod
+    def _isolated_group_resp(elements, coordinates, total, names) -> np.ndarray:
+        """RESP charges of one ligand group as an isolated closed-shell species."""
+        group = Molecule(list(elements), np.asarray(coordinates), "angstrom")
+        group.set_charge(total)
+        electrons = sum(group.get_element_ids()) - total
+        if electrons % 2:
+            raise ValueError(
+                f"group {names} with net charge {total:+d} has an odd number of "
+                "electrons; give its closed-shell charge in group_charges")
+        group.set_multiplicity(1)
+        ff = MMForceFieldGenerator()
+        ff.ostream.mute()
+        with tempfile.TemporaryDirectory() as directory:
+            ff.molecule_name = str(Path(directory) / "group")
+            try:
+                ff.create_topology(group, resp=True)
+            except Exception as exc:
+                raise ValueError(
+                    f"RESP failed for the group {names}: "
+                    f"{type(exc).__name__}: {exc}") from exc
+        return np.array([ff.atoms[i]["charge"] for i in range(len(elements))])
 
     @staticmethod
     def _openmm_xml(ff) -> str:
