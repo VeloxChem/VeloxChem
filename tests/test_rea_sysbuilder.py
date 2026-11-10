@@ -214,8 +214,11 @@ class TestPdbInput:
                     'residue': 208
                 },
                 {
+                    # HD1 of His208 moves to Asp177; its two oxygens are
+                    # equivalent to the graph match, so name the acceptor.
                     'chain': 'A',
-                    'residue': 177
+                    'residue': 177,
+                    'reacting_atoms': ['OD2']
                 },
                 {
                     'chain': 'A',

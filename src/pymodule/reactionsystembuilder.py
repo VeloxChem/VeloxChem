@@ -227,6 +227,24 @@ class ReactionSystemBuilder():
         self._boundary_nb_exception_keys: list = []
         self._boundary_atom_nb_params: dict = {}
         self._boundary_exception_index: dict = {}
+
+        # Residue cuts: pdb_active_res entries with a 'cut' put only the side
+        # chain beyond the cut bond into the reacting fragment (see
+        # _resolve_residue_cut). Populated by _system_from_pdb, empty (and
+        # inert) for whole-residue entries.
+        # One dict per cut: residue, cut, host, evb_cut, evb_atoms,
+        # rest_atoms, cap, shift.
+        self._cuts: list = []
+        # vlx id of each cut's H cap -> the openmm Atom it stands for (the
+        # host). The host carries the cap's charge.
+        self._cut_caps: dict = {}
+        # NonbondedForce exceptions of the 1-4 pairs (PDB topology) that
+        # involve an atom whose charge the builder sets, as (exception
+        # index, particle 1, particle 2), with the AMBER 1-4 scale factors.
+        self._pdb_14_exceptions: list = []
+        self._pdb_14_pairs: set = set()
+        self._pdb_coul14: float = 1.0 / 1.2
+        self._pdb_lj14: float = 0.5
         self._boundary_summary: list = []
         self._boundary_crossings: list = []
         self._atom_boundary: dict = {}
@@ -478,6 +496,12 @@ class ReactionSystemBuilder():
         if constraints is not None:
             self.constraints = constraints
 
+        # Per-build PDB bookkeeping; must not leak into a later build.
+        self._cuts = []
+        self._cut_caps = {}
+        self._pdb_14_exceptions = []
+        self._pdb_14_pairs = set()
+
         if self.pdb is None:
             system = mm.System()
             topology = mmapp.Topology()
@@ -611,6 +635,11 @@ class ReactionSystemBuilder():
             'epsilon': 0.0,
             'sigma': 1.0,
         })
+        # The 1-4 scale factors of the protein force field, used for the 1-4
+        # exceptions between atoms whose charges the builder sets and the
+        # protein (see _collect_pdb_14_exceptions).
+        self._pdb_coul14 = float(nbforce.coulomb14scale)
+        self._pdb_lj14 = float(nbforce.lj14scale)
 
         system = forcefield.createSystem(
             topology,
@@ -619,11 +648,26 @@ class ReactionSystemBuilder():
 
         self.positions = system_mol.get_coordinates_in_angstrom()
 
+        self._cuts = []
+        self._cut_caps = {}
+        self._pdb_14_exceptions = []
+        self._pdb_14_pairs = set()
+
         reaction_atoms = {}
         if self.no_reactant:
             return system, topology, system_mol, reaction_atoms
 
+        unmatched_residues = {residue.index for residue in residues}
+
         residues = []
+        # The atoms that go into the reacting fragment: whole residues, or the
+        # side of a cut residue beyond its cut bond.
+        res_atoms = []
+        # Per entry, which PDB atoms react ('reacting_atoms'; see
+        # _select_mapping): entry label -> None, 'closest' or a set of atom
+        # indices; and the entry label of every matched PDB atom.
+        reacting_spec = {}
+        entry_of_atom = {}
         for res_dict in self.pdb_active_res:
             # all atoms already exist in the topology, pdb: top, matching chain id with removed_chain
             # the pdb residue should be checked against the reactant, and an index mapping should be found out #todo
@@ -634,14 +678,31 @@ class ReactionSystemBuilder():
                 r for r in chain.residues() if int(r.id) == res_dict['residue']
             ][0]
             residues.append(residue)
+            if res_dict.get('cut') is None:
+                entry_atoms = list(residue.atoms())
+            else:
+                assert_msg_critical(
+                    residue.index not in unmatched_residues,
+                    f"ReactionSystemBuilder: residue {residue.name}"
+                    f"{residue.id} (chain {residue.chain.id}) matches no "
+                    "amber14 template, so it cannot be cut: the rest of the "
+                    "residue would have no force field parameters.")
+                cut = self._resolve_residue_cut(residue, res_dict['cut'])
+                self._cuts.append(cut)
+                entry_atoms = cut['evb_atoms']
+            res_atoms.extend(entry_atoms)
 
-        #test
+            label = (f"{residue.name}{residue.id} "
+                     f"(chain {residue.chain.id})")
+            for atom in entry_atoms:
+                entry_of_atom[atom.index] = label
+            reacting_spec[label] = self._parse_reacting_atoms(
+                res_dict.get('reacting_atoms'), entry_atoms, label)
 
-        iterator = self._get_mapped_atom_ids_from_residues(residues)
+        iterator = self._get_mapped_atom_ids_from_atoms(res_atoms)
 
-        mapping = next(iterator)
-
-        res_atoms = [atom for residue in residues for atom in residue.atoms()]
+        mapping = self._select_mapping(iterator, res_atoms, entry_of_atom,
+                                       reacting_spec)
 
         for id in mapping.keys():
             self.reactant.atoms[id]['pdb'] = 'sys'
@@ -679,6 +740,13 @@ class ReactionSystemBuilder():
             # 'boundary' on state 0; mirror that too.
             self._mirror_pdb_tags()
 
+        if self._cuts:
+            self._resolve_cut_caps(mapping)
+            self._shift_cut_rest_charges(system)
+            self._warn_cut_reacting_atoms(reaction_atoms)
+
+        self._collect_pdb_14_exceptions(system, topology, reaction_atoms)
+
         return system, topology, system_mol, reaction_atoms
 
     def _mirror_pdb_tags(self):
@@ -702,7 +770,143 @@ class ReactionSystemBuilder():
                 else:
                     state.atoms[atom_id]['pdb'] = tag
 
-    def _get_mapped_atom_ids_from_residues(self, residues):
+    def _parse_reacting_atoms(self, value, entry_atoms, label):
+        """Check the 'reacting_atoms' entry of a pdb_active_res dict: None,
+        'closest', or a list of names of the entry's PDB atoms (the reacting
+        side of a cut residue). Returns None, 'closest' or a set of atom
+        indices."""
+
+        if value is None:
+            return None
+        if isinstance(value, str):
+            assert_msg_critical(
+                value == 'closest',
+                f"ReactionSystemBuilder: 'reacting_atoms' of {label} must be "
+                f"'closest' or a list of atom names, got {value!r}.")
+            return 'closest'
+        assert_msg_critical(
+            isinstance(value, (list, tuple)) and len(value) > 0 and
+            all(isinstance(name, str) for name in value),
+            f"ReactionSystemBuilder: 'reacting_atoms' of {label} must be "
+            f"'closest' or a list of atom names, got {value!r}.")
+        by_name = {atom.name: atom for atom in entry_atoms}
+        for name in value:
+            assert_msg_critical(
+                name in by_name,
+                f"ReactionSystemBuilder: 'reacting_atoms' of {label}: no atom "
+                f"named {name} in the part of the residue that goes into the "
+                "reacting fragment.")
+        return {by_name[name].index for name in value}
+
+    def _select_mapping(self,
+                        mappings,
+                        atoms,
+                        entry_of_atom,
+                        reacting_spec,
+                        max_mappings=100000):
+        """Pick one embedding of the PDB atoms into the reactant fragment.
+
+        The graph match goes by elements and bonds only, so it cannot tell
+        symmetry-equivalent atoms apart (the two oxygens of a carboxylate).
+        That is harmless for atoms that do not react, but decides the reaction
+        for the atoms of a forming or breaking bond. Embeddings are therefore
+        grouped by where they put the reacting fragment atoms:
+
+        - one placement only: the first embedding is taken (no input needed);
+        - several: every pdb_active_res entry involved must say which of its
+          atoms react, through 'reacting_atoms': a list of PDB atom names
+          (only embeddings that put these atoms on reacting fragment atoms are
+          kept), or 'closest' (the placement with the smallest sum of PDB
+          distances over the reactive pairs). Otherwise the build stops.
+
+        :param mappings: iterator of embeddings (fragment id -> atom index).
+        :param atoms: the matched PDB atoms (openmm Atoms), for messages.
+        :param entry_of_atom: atom index -> label of its pdb_active_res entry.
+        :param reacting_spec: entry label -> None, 'closest' or a set of atom
+            indices (see _parse_reacting_atoms).
+        """
+
+        pairs = sorted(self.reactive_bonds or ())
+        reacting = sorted({i for pair in pairs for i in pair})
+        required = set()
+        for spec in reacting_spec.values():
+            if isinstance(spec, set):
+                required |= spec
+
+        # placement of the reacting atoms -> first embedding with it
+        placements = {}
+        count = 0
+        for mapping in mappings:
+            count += 1
+            placement = tuple((i, mapping[i]) for i in reacting if i in mapping)
+            if required <= {atom for _, atom in placement}:
+                placements.setdefault(placement, mapping)
+            if count >= max_mappings:
+                self.ostream.print_warning(
+                    f"Stopped after {count} embeddings of the PDB atoms into "
+                    "the reactant fragment; a symmetry-equivalent placement "
+                    "of the reacting atoms may have been missed.")
+                self.ostream.flush()
+                break
+
+        atom_label = {atom.index: self._atom_label(atom) for atom in atoms}
+
+        def names(indices):
+            return ", ".join(atom_label.get(i, str(i)) for i in sorted(indices))
+
+        assert_msg_critical(
+            len(placements) > 0,
+            "ReactionSystemBuilder: no embedding of the PDB atoms into the "
+            f"reactant fragment puts the 'reacting_atoms' ({names(required)}) "
+            "on atoms of a forming or breaking bond.")
+
+        if len(placements) == 1:
+            return next(iter(placements.values()))
+
+        # Which reacting fragment atoms can sit on more than one PDB atom, and
+        # which entries does that involve?
+        options = {}
+        for placement in placements:
+            for i, atom in placement:
+                options.setdefault(i, set()).add(atom)
+        ambiguous = {i: atoms for i, atoms in options.items() if len(atoms) > 1}
+        involved = {entry_of_atom[a] for atoms in ambiguous.values() for a in atoms}
+        unresolved = sorted(e for e in involved if reacting_spec.get(e) != 'closest')
+        details = "; ".join(f"fragment atom {i} on {names(atoms)}"
+                            for i, atoms in sorted(ambiguous.items()))
+        assert_msg_critical(
+            not unresolved,
+            "ReactionSystemBuilder: the reacting atoms of "
+            f"{', '.join(unresolved)} can be placed on symmetry-equivalent "
+            f"PDB atoms ({details}). Say which atoms react with "
+            "'reacting_atoms' in that pdb_active_res entry: a list of PDB "
+            "atom names, or 'closest' for the placement with the shortest "
+            "reacting distances.")
+
+        positions = np.array(self.positions)
+
+        def score(placement):
+            where = dict(placement)
+            return sum(
+                float(np.linalg.norm(positions[where[i]] - positions[where[j]]))
+                for i, j in pairs
+                if i in where and j in where)
+
+        best = None
+        for placement in placements:
+            if best is None or score(placement) < score(best) - 1e-6:
+                best = placement
+        self.ostream.print_info(
+            f"Reacting atoms of {', '.join(sorted(involved))} placed by "
+            f"'closest': {details}; taken: "
+            f"{names(atom for i, atom in best if i in ambiguous)}.")
+        self.ostream.flush()
+        return placements[best]
+
+    def _get_mapped_atom_ids_from_atoms(self, atoms):
+        """Iterator over the mappings (reactant atom id -> topology atom index)
+        that embed the given PDB atoms (whole residues, or the side chains of
+        cut residues) into the reactant fragment."""
         # create a graph of the residue
         # if the bonds are not available, create them based on proximity from the positions
 
@@ -710,13 +914,8 @@ class ReactionSystemBuilder():
         vlx_elements = self.reactant.molecule.get_element_ids()
         vlx_ids = list(self.reactant.atoms.keys())
         vlx_bonds = list(self.reactant.bonds.keys())
-        residue_elements = [
-            atom.element.atomic_number for residue in residues
-            for atom in residue.atoms()
-        ]
-        residue_ids = [
-            atom.index for residue in residues for atom in residue.atoms()
-        ]
+        residue_elements = [atom.element.atomic_number for atom in atoms]
+        residue_ids = [atom.index for atom in atoms]
 
         # Depending on how the residue is stored in the PDB, the bonds might not be available.
         # In that case, the bonds are derived from the connectivity-matrix of a newly created molecule
@@ -805,6 +1004,387 @@ class ReactionSystemBuilder():
             "vlx.Molecule.read_xyz_file('reactant.xyz').show(bonds=np.loadtxt('reactant_bonds.txt'))\n"
             "vlx.Molecule.read_xyz_file('residue.xyz').show(bonds=np.loadtxt('residue_bonds.txt'))"
         )
+
+    def _resolve_residue_cut(self, residue, cut):
+        """Split a standard amino acid at its cut bond.
+
+        The cut is a pair of atom names, e.g. ('CB', 'CG'), or a shorthand:
+        'alpha' (CA-CB), 'beta' (CB-gamma) or 'gamma' (gamma-delta), where the
+        gamma (delta) atom is the only heavy neighbor of CB (gamma) other than
+        CA (CB). The reacting fragment takes the side of the bond that does not
+        hold CA. Its H cap stands in for the host, the cut atom on the CA side.
+
+        :param residue: the openmm Residue (with topology bonds).
+        :param cut: the 'cut' entry of a pdb_active_res dict.
+
+        :return: a dict with the residue, its label, the cut atom names, the
+            host and evb_cut atoms, the evb_atoms and the rest_atoms (residue
+            atoms outside the fragment, without the host), in residue order.
+        """
+
+        label = f"{residue.name}{residue.id} (chain {residue.chain.id})"
+        atoms = list(residue.atoms())
+        by_name = {atom.name: atom for atom in atoms}
+        by_index = {atom.index: atom for atom in atoms}
+        adjacency = {atom.index: set() for atom in atoms}
+        for bond in residue.chain.topology.bonds():
+            a, b = bond[0].index, bond[1].index
+            if a in adjacency and b in adjacency:
+                adjacency[a].add(b)
+                adjacency[b].add(a)
+
+        assert_msg_critical(
+            'CA' in by_name,
+            f"ReactionSystemBuilder: residue {label} has no CA atom; a cut is "
+            "only supported for amino acids.")
+
+        def is_heavy(atom):
+            return (atom.element is not None and
+                    atom.element.atomic_number != 1)
+
+        def next_heavy(atom, previous, position):
+            candidates = [
+                by_index[i]
+                for i in sorted(adjacency[atom.index])
+                if is_heavy(by_index[i]) and by_index[i].name != previous
+            ]
+            assert_msg_critical(
+                len(candidates) == 1,
+                f"ReactionSystemBuilder: cut '{position}' is not defined for "
+                f"residue {label}: {atom.name} has {len(candidates)} heavy "
+                f"neighbors other than {previous}. Give the cut bond "
+                "explicitly, for example 'cut': ('CB', 'CG').")
+            return candidates[0]
+
+        if isinstance(cut, str):
+            position = cut.lower()
+            assert_msg_critical(
+                position in ('alpha', 'beta', 'gamma'),
+                f"ReactionSystemBuilder: unknown cut '{cut}' for residue "
+                f"{label}; use 'alpha', 'beta', 'gamma' or a pair of atom "
+                "names.")
+            assert_msg_critical(
+                'CB' in by_name,
+                f"ReactionSystemBuilder: residue {label} has no CB atom, so "
+                f"it has no '{position}' cut.")
+            if position == 'alpha':
+                names = ('CA', 'CB')
+            else:
+                gamma = next_heavy(by_name['CB'], 'CA', position)
+                if position == 'beta':
+                    names = ('CB', gamma.name)
+                else:
+                    names = (gamma.name, next_heavy(gamma, 'CB',
+                                                    position).name)
+        else:
+            assert_msg_critical(
+                isinstance(cut, (list, tuple)) and len(cut) == 2 and
+                all(isinstance(name, str) for name in cut),
+                f"ReactionSystemBuilder: the cut of residue {label} must be "
+                "'alpha', 'beta', 'gamma' or a pair of atom names, got "
+                f"{cut!r}.")
+            names = tuple(cut)
+            for name in names:
+                assert_msg_critical(
+                    name in by_name,
+                    f"ReactionSystemBuilder: residue {label} has no atom "
+                    f"named {name} (cut {names}).")
+            assert_msg_critical(
+                by_name[names[1]].index in adjacency[by_name[names[0]].index],
+                f"ReactionSystemBuilder: {names[0]} and {names[1]} of "
+                f"residue {label} are not bonded, so they cannot be cut.")
+
+        first, second = by_name[names[0]], by_name[names[1]]
+        cut_pair = {first.index, second.index}
+
+        def component(start):
+            # Atoms reachable from start without crossing the cut bond.
+            seen = {start}
+            stack = [start]
+            while stack:
+                i = stack.pop()
+                for j in adjacency[i]:
+                    if j in seen or {i, j} == cut_pair:
+                        continue
+                    seen.add(j)
+                    stack.append(j)
+            return seen
+
+        side_first = component(first.index)
+        assert_msg_critical(
+            second.index not in side_first,
+            f"ReactionSystemBuilder: the bond {names[0]}-{names[1]} of "
+            f"residue {label} is in a ring; cutting it does not split the "
+            "residue.")
+        side_second = component(second.index)
+        ca_index = by_name['CA'].index
+        assert_msg_critical(
+            ca_index in side_first or ca_index in side_second,
+            f"ReactionSystemBuilder: CA of residue {label} is on neither side "
+            f"of the cut {names}; check the residue's bonds.")
+        if ca_index in side_first:
+            host, evb_cut, evb_side = first, second, side_second
+        else:
+            host, evb_cut, evb_side = second, first, side_first
+
+        evb_atoms = [atom for atom in atoms if atom.index in evb_side]
+        rest_atoms = [
+            atom for atom in atoms
+            if atom.index not in evb_side and atom.index != host.index
+        ]
+
+        for atom in (host, evb_cut):
+            if atom.element != mmapp.element.carbon:
+                self.ostream.print_warning(
+                    f"Residue cut {label}: cut atom {atom.name} is not a "
+                    "carbon; the H cap replaces a polar bond.")
+
+        self.ostream.print_info(
+            f"Residue cut {label}: bond {host.name}-{evb_cut.name}, reacting "
+            f"side {' '.join(atom.name for atom in evb_atoms)}")
+        self.ostream.flush()
+
+        return {
+            'residue': residue,
+            'label': label,
+            'cut': (host.name, evb_cut.name),
+            'host': host,
+            'evb_cut': evb_cut,
+            'evb_atoms': evb_atoms,
+            'rest_atoms': rest_atoms,
+            'cap': None,
+            'shift': 0.0,
+        }
+
+    def _resolve_cut_caps(self, mapping):
+        """Find the H cap of each cut: the one unmapped fragment atom bonded
+        to the fragment atom at the cut. The cap is never a particle; its
+        charge is carried by the host (see _set_cut_host_charges)."""
+
+        real_to_vlx = {real: vlx for vlx, real in mapping.items()}
+        labels = self.reactant.molecule.get_labels()
+        states = self.states if self.states else [self.reactant, self.product]
+
+        for cut in self._cuts:
+            label = cut['label']
+            host_name, cut_name = cut['cut']
+            evb_cut = real_to_vlx.get(cut['evb_cut'].index)
+            assert_msg_critical(
+                evb_cut is not None,
+                f"ReactionSystemBuilder: residue cut {label}: {cut_name} is "
+                "not mapped onto the reactant fragment.")
+
+            neighbors = set()
+            for i, j in self.reactant.bonds:
+                if i == evb_cut:
+                    neighbors.add(j)
+                elif j == evb_cut:
+                    neighbors.add(i)
+            caps = [
+                n for n in sorted(neighbors)
+                if self.reactant.atoms[n].get('pdb') == 'unmapped'
+            ]
+            assert_msg_critical(
+                len(caps) == 1 and labels[caps[0]] == 'H',
+                f"ReactionSystemBuilder: residue cut {label}: the reacting "
+                f"fragment needs exactly one H cap on {cut_name} in place of "
+                f"{host_name}; found unmapped neighbor(s) "
+                f"{[(n, labels[n]) for n in caps]}.")
+            cap = caps[0]
+            assert_msg_critical(
+                cap not in self._cut_caps,
+                f"ReactionSystemBuilder: residue cut {label}: fragment atom "
+                f"{cap} is already the cap of another cut.")
+
+            pair = (min(cap, evb_cut), max(cap, evb_cut))
+            for index, state in enumerate(states):
+                n_bonds = sum(1 for bond in state.bonds if cap in bond)
+                assert_msg_critical(
+                    n_bonds == 1 and pair in state.bonds,
+                    f"ReactionSystemBuilder: residue cut {label}: the H cap "
+                    f"(fragment atom {cap}) must be bonded to {cut_name} "
+                    f"only, in every state; state {index + 1} differs.")
+
+            cut['cap'] = cap
+            self._cut_caps[cap] = cut['host']
+            cap_charges = ", ".join(
+                f"{state.atoms[cap]['charge']:.4f}" for state in states)
+            self.ostream.print_info(
+                f"Residue cut {label}: H cap (fragment atom {cap}) stands for "
+                f"{host_name}, which carries its charge ({cap_charges} by "
+                "state).")
+        self.ostream.flush()
+
+    def _shift_cut_rest_charges(self, system):
+        """Shift the AMBER charges of the rest of each cut residue (outside
+        the fragment, host excluded) uniformly, so that they sum to the
+        nearest integer. The fragment atoms carry their fragment charges and
+        the host the cap's, so the active site keeps the charges it has in
+        any other environment, and the protein stays integer."""
+
+        nb_force = next(f for f in system.getForces()
+                        if isinstance(f, mm.NonbondedForce))
+        for cut in self._cuts:
+            rest = cut['rest_atoms']
+            if not rest:
+                cut['shift'] = 0.0
+                continue
+            charges = [
+                nb_force.getParticleParameters(atom.index)[0].value_in_unit(
+                    mmunit.elementary_charge) for atom in rest
+            ]
+            total = sum(charges)
+            target = round(total)
+            assert_msg_critical(
+                abs(total - target) < 0.3,
+                f"ReactionSystemBuilder: residue cut {cut['label']}: the "
+                f"rest of the residue carries {total:.4f} e, too far from an "
+                "integer to shift.")
+            shift = (target - total) / len(rest)
+            for atom, charge in zip(rest, charges):
+                _, sigma, epsilon = nb_force.getParticleParameters(atom.index)
+                nb_force.setParticleParameters(atom.index, charge + shift,
+                                               sigma, epsilon)
+            cut['shift'] = shift
+            self.ostream.print_info(
+                f"Residue cut {cut['label']}: rest of the residue "
+                f"({len(rest)} atoms, AMBER charge {total:.4f}) shifted by "
+                f"{shift:+.4f} each to {target:d}.")
+        self.ostream.flush()
+
+    def _warn_cut_reacting_atoms(self, reaction_atoms):
+        """Warn when a reacting atom lies within 2 bonds of a cut's host. The
+        bonded terms and 1-4 pairs that span the cut come from AMBER and do not
+        follow the reaction, so the ones such an atom would need are
+        missing."""
+
+        reacting = {i for pair in (self.reactive_bonds or ()) for i in pair}
+        if not reacting:
+            return
+        states = self.states if self.states else [self.reactant, self.product]
+
+        for cut in self._cuts:
+            cap = cut['cap']
+            near = set()
+            for state in states:
+                adjacency = {}
+                for i, j in state.bonds:
+                    adjacency.setdefault(i, set()).add(j)
+                    adjacency.setdefault(j, set()).add(i)
+                shell = {cap}
+                within = set()
+                for _ in range(2):
+                    shell = {
+                        n for a in shell for n in adjacency.get(a, ())
+                    } - within - {cap}
+                    within |= shell
+                near |= within & reacting
+            if near:
+                names = ", ".join(
+                    self._atom_label(reaction_atoms[i]) if i in
+                    reaction_atoms else f"fragment atom {i}"
+                    for i in sorted(near))
+                self.ostream.print_warning(
+                    f"Residue cut {cut['label']}: reacting atom(s) {names} "
+                    f"lie within 2 bonds of the host {cut['cut'][0]}. Terms "
+                    "spanning the cut are kept from AMBER and do not follow "
+                    "the reaction, so those these atoms would need across "
+                    "the cut are missing where their bonding changes.")
+        self.ostream.flush()
+
+    def _collect_pdb_14_exceptions(self, system, topology, reaction_atoms):
+        """Index the NonbondedForce exceptions of the 1-4 pairs (by the PDB
+        topology) that involve an atom whose charge the builder sets (the
+        fragment atoms, cut hosts and shifted cut residues), except pairs
+        inside the fragment, which are handled by the reaction forces.
+        createSystem baked the AMBER charges into them; they are reset from
+        the current charges by _fix_pdb_14_exceptions."""
+
+        nb_force = next(f for f in system.getForces()
+                        if isinstance(f, mm.NonbondedForce))
+        fragment = {atom.index for atom in reaction_atoms.values()}
+        changed = set(fragment)
+        for cut in self._cuts:
+            changed.add(cut['host'].index)
+            changed.update(atom.index for atom in cut['rest_atoms'])
+
+        adjacency = {}
+        for bond in topology.bonds():
+            a, b = bond[0].index, bond[1].index
+            adjacency.setdefault(a, set()).add(b)
+            adjacency.setdefault(b, set()).add(a)
+
+        distance_cache = {}
+
+        def distances_from(start):
+            # Bond distances up to 3 from start.
+            if start not in distance_cache:
+                dist = {start: 0}
+                shell = [start]
+                for depth in (1, 2, 3):
+                    shell = [
+                        n for a in shell for n in adjacency.get(a, ())
+                        if n not in dist
+                    ]
+                    for n in shell:
+                        dist.setdefault(n, depth)
+                distance_cache[start] = dist
+            return distance_cache[start]
+
+        self._pdb_14_exceptions = []
+        self._pdb_14_pairs = set()
+        for index in range(nb_force.getNumExceptions()):
+            p1, p2, _, _, _ = nb_force.getExceptionParameters(index)
+            if p1 not in changed and p2 not in changed:
+                continue
+            if p1 in fragment and p2 in fragment:
+                continue
+            if distances_from(p1).get(p2) != 3:
+                continue
+            self._pdb_14_exceptions.append((index, p1, p2))
+            self._pdb_14_pairs.add((min(p1, p2), max(p1, p2)))
+
+        if self._pdb_14_exceptions:
+            self.ostream.print_info(
+                f"{len(self._pdb_14_exceptions)} 1-4 exceptions between the "
+                "reacting fragment (or cut residues) and the protein are set "
+                "from the current charges (Coulomb x "
+                f"{self._pdb_coul14:.4f}, LJ x {self._pdb_lj14:.4f}).")
+            self.ostream.flush()
+
+    def _fix_pdb_14_exceptions(self, nb_force):
+        """Reset the 1-4 exceptions indexed by _collect_pdb_14_exceptions from
+        the current particle parameters of the shared NonbondedForce."""
+
+        for index, p1, p2 in self._pdb_14_exceptions:
+            q1, s1, e1 = nb_force.getParticleParameters(p1)
+            q2, s2, e2 = nb_force.getParticleParameters(p2)
+            q1 = q1.value_in_unit(mmunit.elementary_charge)
+            q2 = q2.value_in_unit(mmunit.elementary_charge)
+            s1 = s1.value_in_unit(mmunit.nanometer)
+            s2 = s2.value_in_unit(mmunit.nanometer)
+            e1 = e1.value_in_unit(mmunit.kilojoule_per_mole)
+            e2 = e2.value_in_unit(mmunit.kilojoule_per_mole)
+            nb_force.setExceptionParameters(index, p1, p2,
+                                            self._pdb_coul14 * q1 * q2,
+                                            0.5 * (s1 + s2),
+                                            self._pdb_lj14 * math.sqrt(e1 * e2))
+
+    def _set_cut_host_charges(self, nb_force, gb_force, charge_of_cap):
+        """Give each cut host the charge of its H cap, charge_of_cap(cap),
+        in the NonbondedForce and the GB force. Returns the charge added."""
+
+        total = 0.0
+        for cap, host in self._cut_caps.items():
+            charge = charge_of_cap(cap)
+            total += charge
+            _, sigma, epsilon = nb_force.getParticleParameters(host.index)
+            nb_force.setParticleParameters(host.index, charge, sigma, epsilon)
+            if gb_force is not None:
+                gb_params = list(gb_force.getParticleParameters(host.index))
+                gb_params[0] = charge
+                gb_force.setParticleParameters(host.index, gb_params)
+        return total
 
     def _match_boundary_atoms(self, residues, mapping, system, res_atoms,
                               reaction_atoms):
@@ -1317,6 +1897,11 @@ class ReactionSystemBuilder():
         for other_id, bnd_id in self._boundary_nb_exception_keys:
             idx_other = self.reaction_atoms[other_id].index
             idx_bnd = self.boundary_atoms[bnd_id].index
+            # A pair that is 1-4 in the PDB topology is set by
+            # _fix_pdb_14_exceptions; each pair gets exactly one rule.
+            if (min(idx_other, idx_bnd),
+                    max(idx_other, idx_bnd)) in self._pdb_14_pairs:
+                continue
 
             q_o, s_o, e_o = nb_force.getParticleParameters(idx_other)
             charge_o = q_o.value_in_unit(mmunit.elementary_charge)
@@ -2348,56 +2933,10 @@ class ReactionSystemBuilder():
         rather than to steps and are built by _build_state_pes_systems.
         """
         systems = {}
-        rea_charge = [atom['charge'] for atom in self.reactant.atoms.values()]
-        rea_pdb_charge = [
-            atom['charge'] for atom in self.reactant.atoms.values()
-            if atom.get('pdb') not in ('unmapped', 'boundary')
-        ]
-
-        if round(sum(rea_charge), 5).is_integer() and len(rea_pdb_charge) > 0:
-            rea_formal_charge = int(round(sum(rea_charge)))
-            rea_offset = rea_formal_charge - sum(rea_pdb_charge)
-            rea_offset_per_atom = rea_offset / len(rea_pdb_charge)
-            if abs(rea_offset) > 0.01:
-                self.ostream.print_info(
-                    f"Total reactant charge is {rea_formal_charge} but charge sum of the pdb atoms is {sum(rea_pdb_charge)}"
-                )
-                self.ostream.print_info(
-                    f"Applying an offset of {rea_offset_per_atom:.4f} to {len(rea_pdb_charge)} reactant pdb atoms"
-                )
-        elif len(rea_pdb_charge) == 0:
-            rea_offset_per_atom = 0
-        else:
-            rea_offset_per_atom = 0
-            self.ostream.print_warning(
-                f"Total reactant charge is {sum(rea_charge)} and is not sufficiently close to a whole number, skipping charge offset"
-            )
-
-        pro_charge = [atom['charge'] for atom in self.product.atoms.values()]
-        pro_pdb_charge = [
-            pro_atom['charge'] for rea_atom, pro_atom in zip(
-                self.reactant.atoms.values(), self.product.atoms.values())
-            if rea_atom.get('pdb') not in ('unmapped', 'boundary')
-        ]
-
-        if round(sum(pro_charge), 5).is_integer() and len(pro_pdb_charge) > 0:
-            pro_formal_charge = int(round(sum(pro_charge)))
-            pro_offset = pro_formal_charge - sum(pro_pdb_charge)
-            pro_offset_per_atom = pro_offset / len(pro_pdb_charge)
-            if abs(pro_offset) > 0.01:
-                self.ostream.print_info(
-                    f"Total product charge is {pro_formal_charge} but charge sum of the pdb atoms is {sum(pro_pdb_charge)}"
-                )
-                self.ostream.print_info(
-                    f"Applying an offset of {pro_offset_per_atom:.4f} to {len(pro_pdb_charge)} product pdb atoms"
-                )
-        elif len(pro_pdb_charge) == 0:
-            pro_offset_per_atom = 0
-        else:
-            pro_offset_per_atom = 0
-            self.ostream.print_warning(
-                f"Total product charge is {sum(pro_charge)} and is not sufficiently close to a whole number, skipping charge offset"
-            )
+        rea_offset_per_atom = self._charge_offset_per_atom(
+            self.reactant, "the reactant")
+        pro_offset_per_atom = self._charge_offset_per_atom(
+            self.product, "the product")
 
         # Locate the GB force once so we can keep its per-particle charges in
         # sync with the interpolated NB charges before each deepcopy.
@@ -2451,12 +2990,19 @@ class ReactionSystemBuilder():
                         gb_params[0] = charge
                         gb_force.setParticleParameters(atom_index, gb_params)
 
+                # Each cut host carries the interpolated charge of its H cap.
+                total_charge += self._set_cut_host_charges(
+                    nb_force, gb_force,
+                    lambda cap: ((1 - lam) * self.reactant.atoms[cap]['charge']
+                                 + lam * self.product.atoms[cap]['charge']))
+
             # Fix the 1-4 nonbonded exceptions across the reacting-fragment /
             # PDB boundary. Must run on the shared nb_force after the reacting
             # atoms' charges have been set for this lambda and before the
             # deepcopy below, so the corrected values are captured.
             if not self.no_reactant:
                 self._fix_boundary_nonbonded_exceptions(nb_force, lam)
+                self._fix_pdb_14_exceptions(nb_force)
 
             # Add the interpolated charge to the E_field for both the system and environment
             for i in range(system.getNumParticles()):
@@ -2554,7 +3100,11 @@ class ReactionSystemBuilder():
                             gb_force.setParticleParameters(
                                 atom_index, gb_params)
 
+                    self._set_cut_host_charges(
+                        nb_force, gb_force,
+                        lambda cap: state.atoms[cap]['charge'])
                     self._fix_boundary_nonbonded_exceptions(nb_force, 0)
+                    self._fix_pdb_14_exceptions(nb_force)
 
                 for i in range(system.getNumParticles()):
                     charge = nb_force.getParticleParameters(i)[0]
@@ -2573,8 +3123,10 @@ class ReactionSystemBuilder():
         """Per-atom charge offset that spreads the difference between a state's
         formal charge and the charge its PDB-mapped atoms carry.
 
-        Factored out of _interpolate_system so a single state can be treated on
-        its own; the arithmetic is unchanged.
+        The H caps of residue cuts are not dropped: their charge sits on the
+        cut hosts, so it counts as carried. A fragment whose only dropped
+        atoms are cut caps therefore gets a zero offset, and its atoms keep
+        exactly the charges they have in any other environment.
         """
 
         charges = [atom['charge'] for atom in state.atoms.values()]
@@ -2594,6 +3146,8 @@ class ReactionSystemBuilder():
 
         formal_charge = int(round(sum(charges)))
         offset = formal_charge - sum(pdb_charges)
+        if self._cut_caps:
+            offset -= sum(state.atoms[cap]['charge'] for cap in self._cut_caps)
         offset_per_atom = offset / len(pdb_charges)
         if abs(offset) > 0.01:
             self.ostream.print_info(

@@ -1,0 +1,479 @@
+{
+    "atoms": {
+        "0": {
+            "type": "o",
+            "name": "O11",
+            "mass": 15.994915,
+            "charge": -0.36818300000000004,
+            "sigma": 0.3048120874245357,
+            "epsilon": 0.6121192000000001,
+            "equivalent_atom": "o_00",
+            "comment": "GAFF"
+        },
+        "1": {
+            "type": "c",
+            "name": "C11",
+            "mass": 12.0,
+            "charge": 0.192368,
+            "sigma": 0.3315212309943831,
+            "epsilon": 0.4133792,
+            "equivalent_atom": "c_00",
+            "comment": "GAFF"
+        },
+        "2": {
+            "type": "os",
+            "name": "O21",
+            "mass": 15.994915,
+            "charge": -0.291345,
+            "sigma": 0.3156097798883966,
+            "epsilon": 0.3037584,
+            "equivalent_atom": "os_00",
+            "comment": "GAFF"
+        },
+        "3": {
+            "type": "h5",
+            "name": "H11",
+            "mass": 1.007825,
+            "charge": 0.141045,
+            "sigma": 0.24472987787315117,
+            "epsilon": 0.0673624,
+            "equivalent_atom": "h5_00",
+            "comment": "GAFF"
+        },
+        "4": {
+            "type": "cl",
+            "name": "Cl1",
+            "mass": 34.968853,
+            "charge": -0.086853,
+            "sigma": 0.3465952373053176,
+            "epsilon": 1.1037392,
+            "equivalent_atom": "cl_00",
+            "comment": "GAFF"
+        },
+        "5": {
+            "type": "c3",
+            "name": "C31",
+            "mass": 12.0,
+            "charge": -0.093807,
+            "sigma": 0.3397709531243626,
+            "epsilon": 0.4510352,
+            "equivalent_atom": "c3_01",
+            "comment": "GAFF"
+        },
+        "6": {
+            "type": "c3",
+            "name": "C21",
+            "mass": 12.0,
+            "charge": -0.003623,
+            "sigma": 0.3397709531243626,
+            "epsilon": 0.4510352,
+            "equivalent_atom": "c3_00",
+            "comment": "GAFF"
+        },
+        "7": {
+            "type": "cl",
+            "name": "Cl2",
+            "mass": 34.968853,
+            "charge": -1.0,
+            "sigma": 0.3465952373053176,
+            "epsilon": 1.1037392,
+            "equivalent_atom": "cl_00",
+            "comment": "GAFF"
+        },
+        "8": {
+            "type": "h1",
+            "name": "H51",
+            "mass": 1.007825,
+            "charge": 0.121075,
+            "sigma": 0.24219972551363267,
+            "epsilon": 0.0870272,
+            "equivalent_atom": "h1_01",
+            "comment": "GAFF"
+        },
+        "9": {
+            "type": "h1",
+            "name": "H41",
+            "mass": 1.007825,
+            "charge": 0.121075,
+            "sigma": 0.24219972551363267,
+            "epsilon": 0.0870272,
+            "equivalent_atom": "h1_01",
+            "comment": "GAFF"
+        },
+        "10": {
+            "type": "h1",
+            "name": "H21",
+            "mass": 1.007825,
+            "charge": 0.134124,
+            "sigma": 0.24219972551363267,
+            "epsilon": 0.0870272,
+            "equivalent_atom": "h1_00",
+            "comment": "GAFF"
+        },
+        "11": {
+            "type": "h1",
+            "name": "H31",
+            "mass": 1.007825,
+            "charge": 0.134124,
+            "sigma": 0.24219972551363267,
+            "epsilon": 0.0870272,
+            "equivalent_atom": "h1_00",
+            "comment": "GAFF"
+        }
+    },
+    "bonds": {
+        "(0, 1)": {
+            "type": "harmonic",
+            "force_constant": 546095.6799999999,
+            "equilibrium": 0.1218,
+            "comment": "c-o"
+        },
+        "(1, 2)": {
+            "type": "harmonic",
+            "force_constant": 312042.7199999999,
+            "equilibrium": 0.1358,
+            "comment": "c-os"
+        },
+        "(1, 3)": {
+            "type": "harmonic",
+            "force_constant": 302754.23999999993,
+            "equilibrium": 0.1105,
+            "comment": "c-h5"
+        },
+        "(2, 6)": {
+            "type": "harmonic",
+            "force_constant": 238320.63999999996,
+            "equilibrium": 0.1432,
+            "comment": "c3-os, formed in reaction"
+        },
+        "(4, 5)": {
+            "type": "harmonic",
+            "force_constant": 130122.39999999998,
+            "equilibrium": 0.1804,
+            "comment": "c3-cl"
+        },
+        "(5, 6)": {
+            "type": "harmonic",
+            "force_constant": 194555.99999999997,
+            "equilibrium": 0.15380000000000002,
+            "comment": "c3-c3"
+        },
+        "(5, 8)": {
+            "type": "harmonic",
+            "force_constant": 314553.11999999994,
+            "equilibrium": 0.1097,
+            "comment": "c3-h1"
+        },
+        "(5, 9)": {
+            "type": "harmonic",
+            "force_constant": 314553.11999999994,
+            "equilibrium": 0.1097,
+            "comment": "c3-h1"
+        },
+        "(6, 10)": {
+            "type": "harmonic",
+            "force_constant": 314553.11999999994,
+            "equilibrium": 0.1097,
+            "comment": "c3-h1"
+        },
+        "(6, 11)": {
+            "type": "harmonic",
+            "force_constant": 314553.11999999994,
+            "equilibrium": 0.1097,
+            "comment": "c3-h1"
+        }
+    },
+    "angles": {
+        "(0, 1, 2)": {
+            "type": "harmonic",
+            "force_constant": 960.6464,
+            "equilibrium": 123.25,
+            "comment": "o-c-os"
+        },
+        "(0, 1, 3)": {
+            "type": "harmonic",
+            "force_constant": 551.4512000000001,
+            "equilibrium": 123.65000000000002,
+            "comment": "h5-c-o"
+        },
+        "(1, 2, 6)": {
+            "type": "harmonic",
+            "force_constant": 559.8192,
+            "equilibrium": 115.98000000000002,
+            "comment": "c-os-c3"
+        },
+        "(2, 1, 3)": {
+            "type": "harmonic",
+            "force_constant": 535.552,
+            "equilibrium": 113.09,
+            "comment": "h5-c-os"
+        },
+        "(2, 6, 5)": {
+            "type": "harmonic",
+            "force_constant": 713.7904,
+            "equilibrium": 107.97,
+            "comment": "c3-c3-os"
+        },
+        "(2, 6, 10)": {
+            "type": "harmonic",
+            "force_constant": 522.1632,
+            "equilibrium": 109.78,
+            "comment": "h1-c3-os"
+        },
+        "(2, 6, 11)": {
+            "type": "harmonic",
+            "force_constant": 522.1632,
+            "equilibrium": 109.78,
+            "comment": "h1-c3-os"
+        },
+        "(4, 5, 6)": {
+            "type": "harmonic",
+            "force_constant": 598.312,
+            "equilibrium": 110.41,
+            "comment": "c3-c3-cl"
+        },
+        "(4, 5, 8)": {
+            "type": "harmonic",
+            "force_constant": 409.1952,
+            "equilibrium": 106.78,
+            "comment": "cl-c3-h1"
+        },
+        "(4, 5, 9)": {
+            "type": "harmonic",
+            "force_constant": 409.1952,
+            "equilibrium": 106.78,
+            "comment": "cl-c3-h1"
+        },
+        "(5, 6, 10)": {
+            "type": "harmonic",
+            "force_constant": 392.4592,
+            "equilibrium": 109.56,
+            "comment": "c3-c3-h1"
+        },
+        "(5, 6, 11)": {
+            "type": "harmonic",
+            "force_constant": 392.4592,
+            "equilibrium": 109.56,
+            "comment": "c3-c3-h1"
+        },
+        "(6, 5, 8)": {
+            "type": "harmonic",
+            "force_constant": 392.4592,
+            "equilibrium": 109.56,
+            "comment": "c3-c3-h1"
+        },
+        "(6, 5, 9)": {
+            "type": "harmonic",
+            "force_constant": 392.4592,
+            "equilibrium": 109.56,
+            "comment": "c3-c3-h1"
+        },
+        "(8, 5, 9)": {
+            "type": "harmonic",
+            "force_constant": 324.6784,
+            "equilibrium": 108.46,
+            "comment": "h1-c3-h1"
+        },
+        "(10, 6, 11)": {
+            "type": "harmonic",
+            "force_constant": 324.6784,
+            "equilibrium": 108.46,
+            "comment": "h1-c3-h1"
+        }
+    },
+    "dihedrals": {
+        "(0, 1, 2, 6)": {
+            "type": "Fourier",
+            "multiple": true,
+            "barrier": [
+                11.296800000000001,
+                5.8576
+            ],
+            "phase": [
+                180.0,
+                180.0
+            ],
+            "periodicity": [
+                2,
+                1
+            ],
+            "comment": [
+                "o-c-os-c3",
+                "o-c-os-c3"
+            ]
+        },
+        "(1, 2, 6, 5)": {
+            "type": "Fourier",
+            "multiple": true,
+            "barrier": [
+                1.6024720000000001,
+                3.3472000000000004
+            ],
+            "phase": [
+                0.0,
+                180.0
+            ],
+            "periodicity": [
+                3,
+                1
+            ],
+            "comment": [
+                "c3-c3-os-c",
+                "c3-c3-os-c"
+            ]
+        },
+        "(1, 2, 6, 10)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 1.6038666666666666,
+            "phase": 0.0,
+            "periodicity": 3,
+            "comment": "X-c3-os-X"
+        },
+        "(1, 2, 6, 11)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 1.6038666666666666,
+            "phase": 0.0,
+            "periodicity": 3,
+            "comment": "X-c3-os-X"
+        },
+        "(2, 6, 5, 4)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.6508444444444444,
+            "phase": 0.0,
+            "periodicity": 3,
+            "comment": "X-c3-c3-X"
+        },
+        "(2, 6, 5, 8)": {
+            "type": "Fourier",
+            "multiple": true,
+            "barrier": [
+                0.0,
+                1.046
+            ],
+            "phase": [
+                0.0,
+                0.0
+            ],
+            "periodicity": [
+                3,
+                1
+            ],
+            "comment": [
+                "h1-c3-c3-os",
+                "h1-c3-c3-os"
+            ]
+        },
+        "(2, 6, 5, 9)": {
+            "type": "Fourier",
+            "multiple": true,
+            "barrier": [
+                0.0,
+                1.046
+            ],
+            "phase": [
+                0.0,
+                0.0
+            ],
+            "periodicity": [
+                3,
+                1
+            ],
+            "comment": [
+                "h1-c3-c3-os",
+                "h1-c3-c3-os"
+            ]
+        },
+        "(3, 1, 2, 6)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 11.296800000000001,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "X-c-os-X"
+        },
+        "(4, 5, 6, 10)": {
+            "type": "Fourier",
+            "multiple": true,
+            "barrier": [
+                0.0,
+                1.046
+            ],
+            "phase": [
+                0.0,
+                0.0
+            ],
+            "periodicity": [
+                3,
+                1
+            ],
+            "comment": [
+                "h1-c3-c3-cl",
+                "h1-c3-c3-cl"
+            ]
+        },
+        "(4, 5, 6, 11)": {
+            "type": "Fourier",
+            "multiple": true,
+            "barrier": [
+                0.0,
+                1.046
+            ],
+            "phase": [
+                0.0,
+                0.0
+            ],
+            "periodicity": [
+                3,
+                1
+            ],
+            "comment": [
+                "h1-c3-c3-cl",
+                "h1-c3-c3-cl"
+            ]
+        },
+        "(8, 5, 6, 10)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.6508444444444444,
+            "phase": 0.0,
+            "periodicity": 3,
+            "comment": "X-c3-c3-X"
+        },
+        "(8, 5, 6, 11)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.6508444444444444,
+            "phase": 0.0,
+            "periodicity": 3,
+            "comment": "X-c3-c3-X"
+        },
+        "(9, 5, 6, 10)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.6508444444444444,
+            "phase": 0.0,
+            "periodicity": 3,
+            "comment": "X-c3-c3-X"
+        },
+        "(9, 5, 6, 11)": {
+            "type": "Fourier",
+            "multiple": false,
+            "barrier": 0.6508444444444444,
+            "phase": 0.0,
+            "periodicity": 3,
+            "comment": "X-c3-c3-X"
+        }
+    },
+    "impropers": {
+        "(0, 3, 2, 1)": {
+            "type": "Fourier",
+            "barrier": 43.932,
+            "phase": 180.0,
+            "periodicity": 2,
+            "comment": "c-X-X-o"
+        }
+    }
+}
