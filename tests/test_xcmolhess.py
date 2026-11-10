@@ -48,6 +48,17 @@ class TestXCMolHess:
         grid_drv = GridDriver()
         grid_drv.set_level(grid_level)
 
+        # integrate_exc_hessian and integrate_vxc_fock_gradient differentiate
+        # the basis functions on mol_grid, and the grid stays where it is: the
+        # derivatives of the grid points and weights are not included. The
+        # references hold these fixed-grid terms. ScfHessianDriver replaces
+        # the same-atom blocks of the XC energy term after
+        # integrate_exc_hessian, using translational invariance
+        # (_rebuild_xc_hessian_same_atom_blocks). This test calls the C++
+        # functions directly and does not cover that step;
+        # test_hessian_scf.py::test_analytical_mgga_hessian_translational_invariance
+        # does. For M06-L, the 3x3 blocks of each O row of the fixed-grid
+        # term in hessian_mgga_data.h5 sum to about -5e-3, not zero.
         xc_mol_hess = XCMolecularHessian()
         mol_grid = grid_drv.generate(molecule)
 

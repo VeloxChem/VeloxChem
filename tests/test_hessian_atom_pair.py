@@ -9,6 +9,7 @@ from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.dispersionmodel import DispersionModel
 from veloxchem.scfrestdriver import ScfRestrictedDriver
+from veloxchem.scfunrestdriver import ScfUnrestrictedDriver
 from veloxchem.scfhessiandriver import ScfHessianDriver
 import veloxchem.batchsize as batchsize
 
@@ -138,6 +139,74 @@ class TestHessianAtomPair:
                     if ((i, j) in requested_pairs or (j, i) in requested_pairs):
                         np.testing.assert_allclose(
                             pair_hessian[i * 3:(i + 1) * 3, j * 3:(j + 1) * 3],
+                            full_hessian[i * 3:(i + 1) * 3, j * 3:(j + 1) * 3],
+                            rtol=1.0e-7,
+                            atol=1.0e-9)
+                    else:
+                        np.testing.assert_allclose(block,
+                                                   0.0,
+                                                   rtol=1.0e-7,
+                                                   atol=1.0e-9)
+
+    @pytest.mark.solvers
+    @pytest.mark.parametrize('unrestricted', [False, True])
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_hessian_atom_pair_dft_matches_full_hessian(self, ri, unrestricted):
+        """With DFT, the blocks kept for atom_pairs equal those of the full
+        Hessian and the other blocks are zero. The kept blocks include the
+        same-atom blocks of the atoms in pairs, which the XC energy term
+        rebuilds from all other blocks of their row, also those outside
+        atom_pairs."""
+
+        mol = Molecule.read_xyz_string("""4
+
+        N     0.000000000     0.000000000     0.000000000
+        H    -0.653401663     0.309213352     0.817609879
+        H     0.695693936     0.071283622    -0.702632331
+        H    -0.468651181    -0.844282500    -0.433152944""")
+
+        if unrestricted:
+            mol.set_charge(1)
+            mol.set_multiplicity(2)
+            scf_drv = ScfUnrestrictedDriver()
+        else:
+            scf_drv = ScfRestrictedDriver()
+
+        basis = MolecularBasis.read(mol, 'sto-3g', ostream=None)
+
+        atom_pairs = [(0, 1), (1, 2)]
+
+        scf_drv.ri = ri
+        scf_drv.xcfun = 'b3lyp'
+        scf_drv.ostream.mute()
+        scf_results = scf_drv.compute(mol, basis)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
+
+        def run(atom_pairs_input):
+            hess_drv = ScfHessianDriver(scf_drv)
+            hess_drv.ostream.mute()
+            hess_drv.atom_pairs = atom_pairs_input
+            hess_drv.update_settings({}, cphf_dict={'conv_thresh': 1.0e-8})
+            hess_drv.compute(mol, basis)
+            return hess_drv.hessian
+
+        full_hessian = run(None)
+        pair_hessian = run(atom_pairs)
+
+        if scf_drv.rank == mpi_master():
+            kept_pairs = set(atom_pairs)
+            kept_pairs.update((i, i) for pair in atom_pairs for i in pair)
+
+            for i in range(mol.number_of_atoms()):
+                for j in range(mol.number_of_atoms()):
+                    block = pair_hessian[i * 3:(i + 1) * 3, j * 3:(j + 1) * 3]
+                    if (i, j) in kept_pairs or (j, i) in kept_pairs:
+                        np.testing.assert_allclose(
+                            block,
                             full_hessian[i * 3:(i + 1) * 3, j * 3:(j + 1) * 3],
                             rtol=1.0e-7,
                             atol=1.0e-9)

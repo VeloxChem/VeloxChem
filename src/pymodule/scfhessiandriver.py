@@ -778,6 +778,13 @@ class ScfHessianDriver(HessianDriver):
                 self.scf_driver.xcfun.get_func_label())
             hessian_dft_xc = self.comm.reduce(hessian_dft_xc, root=mpi_master())
 
+            # only the XC energy term is rebuilt: with point charges the full
+            # Hessian has nonzero row sums. The rebuild reads every block of a
+            # row, and the blocks outside atom_pairs are zeroed after it.
+            if self.rank == mpi_master():
+                hessian_dft_xc = self._rebuild_xc_hessian_same_atom_blocks(
+                    hessian_dft_xc)
+
         # dft-d4 contribution
         if self.scf_driver.dispersion or (
                 self.scf_driver._dft and
@@ -990,6 +997,38 @@ class ScfHessianDriver(HessianDriver):
             assert_msg_critical(False, errmsg)
 
         return grid_level
+
+    @staticmethod
+    def _rebuild_xc_hessian_same_atom_blocks(hessian_xc):
+        """
+        Rebuilds the same-atom blocks of the XC energy Hessian term from
+        translational invariance.
+
+        :param hessian_xc:
+            The XC energy Hessian term, shape (3 * natoms, 3 * natoms).
+
+        :return:
+            The XC energy Hessian term with rebuilt same-atom blocks.
+        """
+
+        # integrate_exc_hessian differentiates the basis functions on a grid
+        # that is held fixed. The grid of a calculation moves with the atoms,
+        # and the derivatives of its points and weights are not included.
+        # Without these terms the 3x3 blocks of a row of the computed matrix
+        # do not sum to zero, and the deviation lies in the same-atom blocks.
+        # The XC energy does not change under a rigid translation of the
+        # molecule, so the exact blocks of each row sum to zero. Each
+        # same-atom block H[A,A] is set to -sum_{B!=A} H[A,B], symmetrized;
+        # the off-diagonal blocks are kept as computed.
+
+        natoms = hessian_xc.shape[0] // 3
+        hess = hessian_xc.reshape(natoms, 3, natoms, 3).copy()
+
+        for a in range(natoms):
+            block = -(hess[a].sum(axis=1) - hess[a, :, a, :])
+            hess[a, :, a, :] = 0.5 * (block + block.T)
+
+        return hess.reshape(natoms * 3, natoms * 3)
 
     def compute_analytical_unrestricted(self,
                                         molecule,
@@ -1615,6 +1654,13 @@ class ScfHessianDriver(HessianDriver):
                 molecule, ao_basis, [density_a, density_b], mol_grid,
                 self.scf_driver.xcfun.get_func_label())
             hessian_dft_xc = self.comm.reduce(hessian_dft_xc, root=mpi_master())
+
+            # only the XC energy term is rebuilt: with point charges the full
+            # Hessian has nonzero row sums. The rebuild reads every block of a
+            # row, and the blocks outside atom_pairs are zeroed after it.
+            if self.rank == mpi_master():
+                hessian_dft_xc = self._rebuild_xc_hessian_same_atom_blocks(
+                    hessian_dft_xc)
 
         # dft-d4 contribution
         if self.scf_driver.dispersion or (

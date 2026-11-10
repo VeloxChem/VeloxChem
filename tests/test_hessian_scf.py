@@ -335,6 +335,45 @@ class TestScfHessianDriver:
             diff_hessian = np.max(np.abs(hessian_drv.hessian - ref_hessian))
             assert diff_hessian < 1e-6
 
+    @pytest.mark.solvers
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_analytical_mgga_hessian_translational_invariance(self, ri):
+        """For each atom, the 3x3 blocks of its row of the M06-L Hessian sum
+        to zero within 1e-4, with the default grid levels (level 6 for the
+        SCF and the XC Hessian here). This needs the same-atom blocks of the
+        XC energy term to be rebuilt in ScfHessianDriver. Water/def2-SVP, one
+        rank and 12 threads, with and without RI: the largest row sum is
+        9.3e-6 with the rebuild and 4.5e-3 (on O) without it."""
+
+        mol = Molecule.read_xyz_string("""3
+
+        O          -0.047424118711       -0.000000000360       -0.033716003849
+        H           0.034041961427        0.000000000693        0.952334284820
+        H           0.909380965625       -0.000000000444       -0.285619983969""")
+        basis = MolecularBasis.read(mol, 'def2-svp', ostream=None)
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ri = ri
+        scf_drv.xcfun = 'm06-l'
+        scf_drv.ostream.mute()
+        scf_results = scf_drv.compute(mol, basis)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
+
+        hessian_drv = ScfHessianDriver(scf_drv)
+        hessian_drv.ostream.mute()
+        hessian_drv.update_settings({}, cphf_dict={'conv_thresh': 1e-8})
+        hessian_drv.compute(mol, basis)
+
+        if scf_drv.rank == mpi_master():
+            natoms = mol.number_of_atoms()
+            row_sums = hessian_drv.hessian.reshape(natoms, 3, natoms,
+                                                   3).sum(axis=2)
+            assert np.max(np.abs(row_sums)) < 1e-4
+
     def test_restricted_ri_jk_hessian(self):
         """The RI-JK analytical Hessian must run and stay within the RI-JK
         approximation error of the no-RI Hessian.  This exercises the RI-JK
