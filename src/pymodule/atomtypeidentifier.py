@@ -1529,6 +1529,21 @@ class AtomTypeIdentifier:
 
                 oxygen_type = {'opls': 'opls_XXX', 'gaff': 'os'}
 
+            # NOTE (AutoCDAM, for the SolvationFEP merge): commit cb7a9bfe5
+            # on SolvationFEP adds a three-coordinate oxygen case here (oh
+            # with H attached, else os) and gives untyped H on O the ho type.
+            # This retypes water coordinated to a metal (O bonded to the metal
+            # and two H), e.g. in the Al-MOF fragment used by
+            # test_autocdam_framework_cdam.py. With that commit the O-H bond
+            # force constant goes from 250000 to 471536.8 kJ/mol/nm^2, O LJ
+            # from (0.3118 nm, 0.251 kJ/mol) to (0.3243, 0.3891), and H LJ
+            # from (0.2571, 0.1841) to (0.0538, 0.0197). In the periodic MD
+            # test the hydroxide O-H bonds then collapse to 0.070 nm and
+            # test_md_keeps_distances_geometry_and_covalent_bonds[periodic]
+            # fails. cdamfit therefore merges SolvationFEP only up to
+            # cee73dd08. Please check how coordinated water should be typed
+            # before merging cb7a9bfe5.
+
             elif info['NumConnectedAtoms'] == 1:
 
                 # If necessary we could check if the carbon connected
