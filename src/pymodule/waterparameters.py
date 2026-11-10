@@ -41,6 +41,42 @@ def get_water_parameters():
 
     water_parameters = {}
 
+    water_parameters['spc'] = {
+        'bonds': {
+            'type': 'harmonic',
+            'force_constant': 345000,
+            'equilibrium': 0.1,
+            'comment': 'SPC water'
+        },
+        'angles': {
+            'type': 'harmonic',
+            'force_constant': 383,
+            'equilibrium': 109.47,
+            'comment': 'SPC water'
+        },
+        'ow': {
+            'type': 'ow',
+            'name': 'O',
+            'mass': 15.994915,
+            'charge': -0.820,
+            'sigma': 3.1658e-01,
+            'epsilon': 6.49775e-01,
+            'equivalent_atom': 'ow_00',
+            'comment': 'SPC water'
+        },
+        'hw': {
+            'type': 'hw',
+            'name': 'H',
+            'mass': 1.007825,
+            'charge': 0.410,
+            'sigma': 0.1,
+            'epsilon': 0.0,
+            'equivalent_atom': 'hw_00',
+            'comment': 'SPC water'
+        },
+        'ref': 'Berendsen HJC, Postma JPM, van Gunsteren WF, Hermans J. In: Pullman B, editor. Intermolecular Forces. Dordrecht: Reidel; 1981. p. 331–342.'
+    }
+
     water_parameters['spce'] = {
         'bonds': {
             'type': 'harmonic',
@@ -183,6 +219,54 @@ def get_water_parameters():
             'comment': 'cTIP3P water'
         },
         'ref': 'T. Luchko, S. Gusarov, D. R. Roe, C. Simmerling, D. A. Case, J. Tuszynski, A. Kovalenko. J. Chem. Theory Comput. 2010 6 (3), 607-624.'
+    }
+
+    water_parameters['tip4pew'] = {
+        'bonds': {
+            'type': 'harmonic',
+            'force_constant': 462750.4,
+            'equilibrium': 0.09572,
+            'comment': 'TIP4P-Ew water'
+        },
+        'angles': {
+            'type': 'harmonic',
+            'force_constant': 836.8,
+            'equilibrium': 104.52,
+            'comment': 'TIP4P-Ew water'
+        },
+        'ow': {
+            'type': 'ow',
+            'name': 'O',
+            'mass': 15.994915,
+            'charge': 0.0,
+            'sigma': 3.16435e-01,
+            'epsilon': 0.680946,
+            'equivalent_atom': 'ow_00',
+            'comment': 'TIP4P-Ew'
+        },
+        'hw': {
+            'type': 'hw',
+            'name': 'H',
+            'mass': 1.007825,
+            'charge': 0.52422,
+            'sigma': 0.1,
+            'epsilon': 0.0,
+            'equivalent_atom': 'hw_00',
+            'comment': 'TIP4P-Ew'
+        },
+        'mw': {
+            'type': 'mw',
+            'name': 'M',
+            'mass': 0.0,
+            'charge': -1.04844,
+            'sigma': 0.1,
+            'epsilon': 0.0,
+            'equivalent_atom': 'mw_00',
+            'comment': 'TIP4P-Ew',
+            # Virtual site: weighted average of the O, H and H positions
+            'weights': [0.786646558, 0.106676721, 0.106676721]
+        },
+        'ref': 'Horn HW, Swope WC, Pitera JW, Madura JD, Dick TJ, Hura GL, Head-Gordon T. J Chem Phys. 2004;120:9665–9678.'
     }
 
     return water_parameters

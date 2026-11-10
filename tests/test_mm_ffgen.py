@@ -1,5 +1,6 @@
 from mpi4py import MPI
 from pathlib import Path
+import numpy as np
 import pytest
 
 from veloxchem.veloxchemlib import mpi_master
@@ -67,6 +68,325 @@ class TestMMForceFieldGenerator:
             assert self.match_xml(f'{fname}.xml', xmlfile_ref, 1e-10)
 
             self.clean_up_xml_and_pdb(fname)
+
+    @staticmethod
+    def _water():
+
+        return Molecule.read_molecule_string(
+            """O   0.00000  0.00000  0.00000
+               H   0.75695  0.58588  0.00000
+               H  -0.75695  0.58588  0.00000""")
+
+    def test_ffgen_four_site_water(self, tmp_path):
+
+        ff_gen = MMForceFieldGenerator()
+        ff_gen.ostream.mute()
+        ff_gen.create_topology(self._water(), water_model='tip4pew')
+
+        atoms = list(ff_gen.atoms.values())
+        assert [atom['type'] for atom in atoms] == ['ow', 'hw', 'hw']
+        assert [atom['name'] for atom in atoms] == ['O', 'H1', 'H2']
+        assert sorted(ff_gen.bonds) == [(0, 1), (0, 2)]
+
+        assert len(ff_gen.virtual_sites) == 1
+        site = ff_gen.virtual_sites[0]
+        assert site['name'] == 'M'
+        assert site['mass'] == 0.0
+        assert site['parents'] == (0, 1, 2)
+        total_charge = sum(atom['charge'] for atom in atoms) + site['charge']
+        assert abs(total_charge) < 1e-10
+
+        m_xyz = ff_gen.get_virtual_site_coordinates(
+            self._water().get_coordinates_in_angstrom())
+        assert m_xyz.shape == (1, 3)
+        assert np.linalg.norm(m_xyz[0]) == pytest.approx(0.125, abs=1e-5)
+
+        if MPI.COMM_WORLD.Get_rank() == mpi_master():
+
+            fname = str(tmp_path / 'water4')
+            ff_gen.write_openmm_files(fname, 'HOH')
+            ff_gen.write_gromacs_files(fname, 'HOH')
+
+            xml = (tmp_path / 'water4.xml').read_text()
+            assert ('<VirtualSite type="average3" siteName="M" atomName1="O" '
+                    'atomName2="H1" atomName3="H2"') in xml
+
+            pdb_lines = (tmp_path / 'water4.pdb').read_text().splitlines()
+            elements = [
+                line[76:78].strip()
+                for line in pdb_lines
+                if line.startswith('HETATM')
+            ]
+            assert elements == ['O', 'H', 'H', 'EP']
+
+            itp = (tmp_path / 'water4.itp').read_text()
+            assert '[ virtual_sites3 ]' in itp
+            assert '[ exclusions ]' in itp
+
+    def test_ffgen_four_site_water_openmm_virtual_site(self, tmp_path):
+
+        mm = pytest.importorskip('openmm')
+        app = pytest.importorskip('openmm.app')
+
+        ff_gen = MMForceFieldGenerator()
+        ff_gen.ostream.mute()
+        ff_gen.create_topology(self._water(), water_model='tip4pew')
+
+        if MPI.COMM_WORLD.Get_rank() == mpi_master():
+
+            fname = str(tmp_path / 'water4')
+            ff_gen.write_openmm_files(fname, 'HOH')
+
+            pdb = app.PDBFile(f'{fname}.pdb')
+            system = app.ForceField(f'{fname}.xml').createSystem(pdb.topology)
+            assert [system.isVirtualSite(i) for i in range(4)
+                   ] == [False, False, False, True]
+
+            context = mm.Context(system, mm.VerletIntegrator(0.001))
+            context.setPositions(pdb.positions)
+            context.computeVirtualSites()
+            positions = np.array(
+                context.getState(getPositions=True).getPositions(
+                    asNumpy=True)._value)
+            assert np.linalg.norm(positions[3] - positions[0]) == pytest.approx(
+                0.0125, abs=1e-5)
+
+    @staticmethod
+    def _water_forcefield(water_model):
+
+        water = TestMMForceFieldGenerator._water()
+
+        ff_gen = MMForceFieldGenerator()
+        ff_gen.ostream.mute()
+        ff_gen.create_topology(water, water_model=water_model)
+
+        return ff_gen
+
+    @pytest.mark.parametrize('water_model, doh, dhh', [
+        ('spce', 0.1, 0.16330),
+        ('cspce', 0.1, 0.16330),
+        ('tip3p', 0.09572, 0.15139),
+        ('tip4pew', 0.09572, 0.15139),
+    ])
+    def test_ffgen_water_itp_uses_settles(self, tmp_path, water_model, doh,
+                                          dhh):
+
+        ff_gen = self._water_forcefield(water_model)
+
+        if MPI.COMM_WORLD.Get_rank() == mpi_master():
+
+            ff_gen.write_itp(tmp_path / 'water.itp', 'HOH')
+            lines = (tmp_path / 'water.itp').read_text().splitlines()
+
+            ifndef = lines.index('#ifndef FLEXIBLE')
+            settles = lines.index('[ settles ]')
+            else_ = lines.index('#else')
+            endif = lines.index('#endif')
+            assert ifndef < settles < else_ < lines.index('[ bonds ]') < endif
+            assert else_ < lines.index('[ angles ]') < endif
+
+            fields = lines[settles + 2].split()
+            assert fields[:2] == ['1', '1']
+            assert float(fields[2]) == pytest.approx(doh, abs=1e-8)
+            assert float(fields[3]) == pytest.approx(dhh, abs=1e-5)
+
+            exclusions = lines[lines.index('[ exclusions ]') + 1:]
+            n_sites = 4 if water_model == 'tip4pew' else 3
+            for i in range(n_sites):
+                assert sorted(int(x) for x in exclusions[i].split()[1:]) == [
+                    j + 1 for j in range(n_sites) if j != i
+                ]
+
+    @pytest.mark.parametrize('water_model', ['cspce', 'tip4pew'])
+    def test_ffgen_water_gromacs_files_in_openmm(self, tmp_path, monkeypatch,
+                                                 water_model):
+
+        app = pytest.importorskip('openmm.app')
+        mm = pytest.importorskip('openmm')
+
+        ff_gen = self._water_forcefield(water_model)
+
+        if MPI.COMM_WORLD.Get_rank() == mpi_master():
+
+            ff_gen.write_gromacs_files(tmp_path / 'water', 'HOH')
+            monkeypatch.chdir(tmp_path)
+
+            def angle_count(system):
+                return sum(
+                    f.getNumAngles()
+                    for f in system.getForces()
+                    if isinstance(f, mm.HarmonicAngleForce))
+
+            # OpenMM defines FLEXIBLE and keeps residues named HOH rigid
+            top = app.GromacsTopFile('water.top')
+            system = top.createSystem()
+            pairs = {
+                frozenset(system.getConstraintParameters(i)[:2])
+                for i in range(system.getNumConstraints())
+            }
+            assert pairs == {frozenset((0, 1)), frozenset((0, 2)),
+                             frozenset((1, 2))}
+            assert angle_count(system) == 0
+
+            system = top.createSystem(rigidWater=False)
+            assert system.getNumConstraints() == 0
+            assert angle_count(system) == 1
+
+    def test_ffgen_water_without_oxygen_first_stays_flexible(self, tmp_path):
+
+        water = Molecule.read_molecule_string(
+            """H   0.75695  0.58588  0.00000
+               O   0.00000  0.00000  0.00000
+               H  -0.75695  0.58588  0.00000""")
+
+        ff_gen = MMForceFieldGenerator()
+        ff_gen.ostream.mute()
+        ff_gen.create_topology(water, water_model='tip3p')
+
+        assert ff_gen.water_settles is None
+
+        if MPI.COMM_WORLD.Get_rank() == mpi_master():
+
+            ff_gen.write_itp(tmp_path / 'water.itp', 'HOH')
+            itp = (tmp_path / 'water.itp').read_text()
+
+            assert '[ settles ]' not in itp
+            assert 'FLEXIBLE' not in itp
+            assert '[ angles ]' in itp
+
+    def test_ffgen_oxonium_uses_gaff_hydroxyl_parameters(self):
+
+        methyloxonium = Molecule.read_xyz_string("""7
+            methyloxonium
+            C   -0.585893   0.118685   1.492375
+            O    0.092736   0.917762   2.424465
+            H   -1.682901   0.242642   1.620218
+            H   -0.335220  -0.950668   1.662028
+            H   -0.308352   0.395584   0.449314
+            H   -0.117214   1.857115   2.183205
+            H    1.058354   0.816201   2.219678
+            """)
+        methyloxonium.set_charge(1)
+
+        methanol = Molecule.read_xyz_string("""6
+            methanol
+            C   -0.046800   0.662400   0.000000
+            O   -0.046800  -0.755400   0.000000
+            H   -1.086800   0.975400   0.000000
+            H    0.437200   1.071400   0.889000
+            H    0.437200   1.071400  -0.889000
+            H    0.856200  -1.067400   0.000000
+            """)
+
+        ff_gens = []
+        for molecule in [methyloxonium, methanol]:
+            ff_gen = MMForceFieldGenerator()
+            ff_gen.ostream.mute()
+            ff_gen.create_topology(molecule, resp=False)
+            ff_gens.append(ff_gen)
+        ion_atoms, ref_atoms = ff_gens[0].atoms, ff_gens[1].atoms
+
+        # GAFF hydroxyl parameters instead of the UFF fallback
+        assert [ion_atoms[i]['type'] for i in range(7)] == [
+            'c3', 'oh', 'h1', 'h1', 'h1', 'ho', 'ho'
+        ]
+        assert all(atom['comment'] == 'GAFF' for atom in ion_atoms.values())
+        for i in [1, 5, 6]:
+            j = 1 if i == 1 else 5
+            assert ion_atoms[i]['sigma'] == ref_atoms[j]['sigma']
+            assert ion_atoms[i]['epsilon'] == ref_atoms[j]['epsilon']
+        assert not any(bond['comment'] == 'Guessed'
+                       for bond in ff_gens[0].bonds.values())
+
+    def test_ffgen_ring_ammonium_uses_gaff_parameters(self):
+
+        piperidinium = Molecule.read_xyz_string("""18
+            piperidinium
+            C -0.180732 0.666441 0.989560
+            C 1.251952 0.636488 0.454813
+            C 1.437816 -0.470218 -0.607817
+            N 0.175884 -0.868822 -1.265659
+            C -0.719801 0.276056 -1.484748
+            C -1.193052 0.882538 -0.148119
+            H -0.395486 -0.297408 1.501702
+            H -0.283870 1.478497 1.741375
+            H 1.961154 0.474026 1.295114
+            H 1.486496 1.625877 0.003451
+            H 1.890043 -1.364248 -0.123444
+            H 2.165022 -0.114543 -1.371881
+            H 0.400293 -1.303277 -2.191186
+            H -0.314809 -1.589607 -0.685160
+            H -1.605800 -0.048079 -2.074252
+            H -0.192588 1.053924 -2.082645
+            H -2.162924 0.425125 0.145519
+            H -1.366353 1.971668 -0.289612
+            """)
+        piperidinium.set_charge(1)
+
+        ff_gen = MMForceFieldGenerator()
+        ff_gen.ostream.mute()
+        ff_gen.create_topology(piperidinium, resp=False)
+
+        assert ff_gen.atoms[3]['type'] == 'ny'
+        assert [ff_gen.atoms[i]['type'] for i in (12, 13)] == ['hn', 'hn']
+        assert all(atom['comment'] == 'GAFF' for atom in ff_gen.atoms.values())
+
+    def test_ffgen_untyped_polar_hydrogen_falls_back_to_gaff(self, tmp_path):
+
+        from veloxchem.outputstream import OutputStream
+
+        methylsulfonium = Molecule.read_xyz_string("""7
+            methylsulfonium
+            C   -1.023266  -1.198516   1.326472
+            S   -0.534878   0.453881   0.892710
+            H   -0.909483  -1.861294   0.444165
+            H   -2.083314  -1.197129   1.653728
+            H   -0.381765  -1.568874   2.152305
+            H   -0.675344   1.272639   1.982572
+            H   -1.327236   0.911424  -0.127447
+            """)
+        methylsulfonium.set_charge(1)
+
+        ostream = OutputStream(tmp_path / 'ffgen.out')
+        ff_gen = MMForceFieldGenerator(ostream=ostream)
+        ff_gen.create_topology(methylsulfonium, resp=False)
+        ostream.flush()
+
+        sulfur_hydrogens = [ff_gen.atoms[i] for i in (5, 6)]
+        assert [atom['type'] for atom in sulfur_hydrogens] == ['hs', 'hs']
+        assert all(atom['comment'] == 'GAFF' for atom in sulfur_hydrogens)
+        assert not any(t.endswith('_unknown') for t in ff_gen.atom_types)
+
+        if MPI.COMM_WORLD.Get_rank() == mpi_master():
+
+            output = (tmp_path / 'ffgen.out').read_text()
+            assert 'hydrogen 6 bonded to S has no GAFF type' in output
+            assert 'polar hydrogen type hs' in output
+
+            ff_gen.write_itp(tmp_path / 'ion.itp', 'MOL')
+            itp_lines = (tmp_path / 'ion.itp').read_text().splitlines()
+            atomtypes = itp_lines[itp_lines.index('[ atomtypes ]') + 2:
+                                  itp_lines.index('[ moleculetype ]') - 1]
+            assert 'hs' in [line.split()[0] for line in atomtypes]
+
+    @skip_multi_rank_raises
+    def test_ffgen_four_site_water_requires_isolated_water(self):
+
+        water_dimer = Molecule.read_molecule_string(
+            """O   0.00000  0.00000  0.00000
+               H   0.75695  0.58588  0.00000
+               H  -0.75695  0.58588  0.00000
+               O   0.00000  0.00000  3.00000
+               H   0.75695  0.58588  3.00000
+               H  -0.75695  0.58588  3.00000""")
+
+        ff_gen = MMForceFieldGenerator()
+        ff_gen.ostream.mute()
+
+        with pytest.raises(VeloxChemError,
+                           match='requires an isolated water molecule'):
+            ff_gen.create_topology(water_dimer, resp=False,
+                                   water_model='tip4pew')
 
     def test_ffgen_transition_metal(self):
 

@@ -37,7 +37,6 @@ import sys
 from .veloxchemlib import mpi_master, bohr_in_angstrom
 from .outputstream import OutputStream
 from .smdsolventproperties import get_smd_solvent_properties, get_sigma_properties, get_rzz_parameters
-from .atomtypeidentifier import AtomTypeIdentifier
 from .errorhandler import assert_msg_critical
 
 
@@ -177,10 +176,6 @@ class SmdDriver:
         atoms = self.solute.get_labels()
         num_atoms = len(atoms)
 
-        atomtypeidentifier = AtomTypeIdentifier(self.comm)
-        atomtypeidentifier.ostream.mute()
-        atom_types = atomtypeidentifier.generate_gaff_atomtypes(self.solute)
-
         halogens = ['F', 'Si', 'S', 'Cl', 'Br']  # if Zk in halogens, sigma_k = sigma_tilde_Z_k
         all_smd_atoms = ['H', 'C', 'N', 'O'] + halogens  # if Z_k not in all_smd, sigma_k = 0
 
@@ -223,75 +218,81 @@ class SmdDriver:
                         sigma += sigma_params[key] * tanh
 
             elif Zk == 'C':
-                tanh_sum = 0.0
+                # sigma_C = s_C + s_CC * sum_C T(R_CC) + s_CN * (sum_N T(R_CN))**2
+                cn_sum = 0.0
                 for k2 in range(num_atoms):
                     if k == k2:
                         continue
                     Zk2 = atoms[k2]
-                    key = (Zk, Zk2)
-                    if key not in r_ZZ_param or key not in sigma_params:
+                    if Zk2 not in ['C', 'N']:
                         continue
+                    key = (Zk, Zk2)
                     R = distance_matrix[k, k2]
                     r_zz, dr_zz = r_ZZ_param[key]
                     if R < r_zz + dr_zz:
                         tanh = np.exp(dr_zz / (R - dr_zz - r_zz))
                         if Zk2 == 'C':
-                            sigma += sigma_params[key] * tanh
+                            sigma += sigma_params.get(key, 0.0) * tanh
                         else:
-                            tanh_sum += tanh
+                            cn_sum += tanh
 
-                sigma += sigma_params.get(('C','N'), 0.0) * (tanh_sum ** 2)
+                sigma += sigma_params.get(('C', 'N'), 0.0) * (cn_sum ** 2)
 
             elif Zk == 'N':
+                # sigma_N = s_N
+                #   + s_NC * (sum_C T(R_NC) * (sum_k'' T(R_Ck''))**2)**1.3
+                #   + s_NC(3) * sum_C T3(R_NC)
+                # Every carbon neighbour enters both terms. The NC(3) term
+                # (C-N triple bond, nonzero in water only) is selected by its
+                # short switching distance alone, without atom typing.
 
                 nested_cn_sum = 0.0
                 nc3_sum = 0.0
+
+                r_nc, dr_nc = r_ZZ_param[('N', 'C')]
+                r_nc3, dr_nc3 = r_ZZ_param[('N', 'C(3)')]
 
                 for k_prime in range(num_atoms):
                     if k_prime == k:
                         continue
 
                     Zk_prime = atoms[k_prime]
-                    atom_type = atom_types[k_prime]
+                    if Zk_prime != 'C':
+                        continue
 
-                    # NC(3) term - only in water
-                    if atom_type == 'c3' and ('N', 'c3') in sigma_params:
-                        R = distance_matrix[k, k_prime]
-                        r_zz, dr_zz = r_ZZ_param[('N', 'c3')]
-                        if R < r_zz + dr_zz:
-                            tanh_k_kp = np.exp(dr_zz / (R - dr_zz - r_zz))
-                            nc3_sum += tanh_k_kp
+                    R = distance_matrix[k, k_prime]
+
+                    # NC(3) term
+                    if R < r_nc3 + dr_nc3:
+                        nc3_sum += np.exp(dr_nc3 / (R - dr_nc3 - r_nc3))
 
                     # NC + C-X nested sum
-                    elif Zk_prime == 'C' and atom_type != 'c3':
-                        R = distance_matrix[k,k_prime]
-                        r_nc, dr_nc = r_ZZ_param[('N', 'C')]
-                        if R >= r_nc + dr_nc:
+                    if R >= r_nc + dr_nc:
+                        continue
+
+                    tanh_k_kp = np.exp(dr_nc / (R - dr_nc - r_nc))
+
+                    # inner sum over k'k"
+                    inner_sum = 0.0
+                    for k_pp in range(num_atoms):
+                        if k_pp in (k, k_prime):
+                            continue
+                        Zk_pp = atoms[k_pp]
+                        key_kp_kpp = (Zk_prime, Zk_pp)
+                        if key_kp_kpp not in r_ZZ_param:
                             continue
 
-                        tanh_k_kp = np.exp(dr_nc / (R - dr_nc - r_nc))
+                        R = distance_matrix[k_prime, k_pp]
+                        r_ckpp, dr_ckpp = r_ZZ_param[key_kp_kpp]
+                        if R < r_ckpp + dr_ckpp:
+                            tanh_kp_kpp = np.exp(dr_ckpp / (R - dr_ckpp - r_ckpp))
+                            inner_sum += tanh_kp_kpp
 
-                        # inner sum over k'k"
-                        inner_sum = 0.0
-                        for k_pp in range(num_atoms):
-                            if k_pp in (k, k_prime):
-                                continue
-                            Zk_pp = atoms[k_pp]
-                            key_kp_kpp = (Zk_prime, Zk_pp)
-                            if key_kp_kpp not in r_ZZ_param:
-                                continue
-
-                            R = distance_matrix[k_prime, k_pp]
-                            r_ckpp, dr_ckpp = r_ZZ_param[key_kp_kpp]
-                            if R < r_ckpp + dr_ckpp:
-                                tanh_kp_kpp = np.exp(dr_ckpp / (R - dr_ckpp - r_ckpp))
-                                inner_sum += tanh_kp_kpp
-
-                        nested_cn_sum += tanh_k_kp * (inner_sum ** 2)
+                    nested_cn_sum += tanh_k_kp * (inner_sum ** 2)
 
                 # Final sigma_k for nitrogen
                 sigma += sigma_params.get(('N', 'C'), 0.0) * (nested_cn_sum ** 1.3)
-                sigma += sigma_params.get(('N', 'c3'), 0.0) * nc3_sum
+                sigma += sigma_params.get(('N', 'C(3)'), 0.0) * nc3_sum
 
             elif Zk == 'O':
                 for k2 in range(num_atoms):
