@@ -132,7 +132,7 @@ class SolvationFepDriver:
         self.ostream = ostream
 
         # Create directory for storing all generated data
-        self.output_folder = "solvation_fep_output"
+        self.output_folder = Path("solvation_fep_output")
 
         # Options for the SolvationBuilder
         self.padding = 1.0
@@ -605,19 +605,10 @@ class SolvationFepDriver:
                             elif self.stage == 2:
                                 force.setParticleParameters(i, 0, 0, 0)
 
-                    # Handle exceptions (interaction exclusions and 1-4 scaling)
+                    # Handle exceptions (interaction exclusions)
                     for i in range(force.getNumExceptions()):
                         p1, p2, ch, si, ep = force.getExceptionParameters(i)
                         gsc_force.addExclusion(p1, p2)
-                        
-                        # Scale the base NonbondedForce exception if it involves the alchemical region
-                        if p1 in alchemical_region or p2 in alchemical_region:
-                            if self.stage == 1:
-                                # Scale down the charge product and epsilon linearly
-                                force.setExceptionParameters(i, p1, p2, ch * (1 - lambda_val), si, ep * (1 - lambda_val))
-                            elif self.stage == 2:
-                                # Remove the nonbonded interaction entirely
-                                force.setExceptionParameters(i, p1, p2, 0, si, 0)
 
             # Add interaction group for GSC potential
             gsc_force.addInteractionGroup(alchemical_region, chemical_region)
@@ -673,17 +664,10 @@ class SolvationFepDriver:
                         elif self.stage == 4:
                             force.setParticleParameters(i, 0, 0, 0)
 
-                    # Handle exceptions (interaction exclusions and 1-4 scaling)
+                    # Handle exceptions (interaction exclusions)
                     for i in range(force.getNumExceptions()):
                         p1, p2, ch, si, ep = force.getExceptionParameters(i)
                         gsc_force.addExclusion(p1, p2)
-                        # Scale the base NonbondedForce exception for the vacuum stages
-                        if self.stage == 3:
-                            # Scale down the charge product and epsilon linearly
-                            force.setExceptionParameters(i, p1, p2, ch * (1 - lambda_val), si, ep * (1 - lambda_val))
-                        elif self.stage == 4:
-                            # Remove the nonbonded interaction entirely
-                            force.setExceptionParameters(i, p1, p2, 0, si, 0)
 
             vacuum_system.addForce(gsc_force)
             self._scale_coulomb_global_parameters(vacuum_system, lambda_val)
@@ -791,7 +775,8 @@ class SolvationFepDriver:
             state = simulation.context.getState(getPositions=True, getEnergy=True)
             positions = state.getPositions(asNumpy=True)
             energy = state.getPotentialEnergy() / self.kT  # Reduced potential energy
-            conformations.append(positions)
+            # Keep the box of each frame: it changes under the barostat
+            conformations.append((positions, state.getPeriodicBoxVectors()))
             energies.append(energy)
 
         time_end = time.time()
@@ -818,8 +803,9 @@ class SolvationFepDriver:
             integrator = mm.VerletIntegrator(0.0 * unit.femtoseconds)
             simulation = app.Simulation(topology, forcefield, integrator, platform=self._create_platform())
 
-            for n, snapshot in enumerate(snapshots):
-                simulation.context.setPositions(snapshot)
+            for n, (positions, box_vectors) in enumerate(snapshots):
+                simulation.context.setPeriodicBoxVectors(*box_vectors)
+                simulation.context.setPositions(positions)
                 state = simulation.context.getState(getEnergy=True)
                 u_kn[k, n] = state.getPotentialEnergy() / self.kT
 

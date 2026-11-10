@@ -38,6 +38,7 @@ import xml.etree.ElementTree as ET
 import numpy as np
 from itertools import combinations, accumulate
 import string
+import copy
 import sys
 
 from .veloxchemlib import mpi_master
@@ -781,7 +782,8 @@ class OpenMMDynamics:
                                          save_pdb=False,
                                          k=1000,
                                          r0=0.5,
-                                         water_model='tip3p'):
+                                         water_model='tip3p',
+                                         restraint_type='flat_bottom'):
         """
         Runs high-temperature conformational sampling for multiple residues in the system.
 
@@ -808,16 +810,23 @@ class OpenMMDynamics:
         :param save_pdb:
             If true, a PDB file of the lowest energy conformers is written. Default is False.
         :param k:
-            Force constant of the Centroid bond force. Default is 1000.
+            Force constant of the Centroid bond force in kJ/mol/nm^2.
+            Default is 1000.
         :param r0:
             Equilibrium distance of the Centroid bond force. Default i 0.5 nm.
         :param water_model:
             The water model to be used if water molecules are present.
+        :param restraint_type:
+            The centroid restraint during the MD, 'flat_bottom' (no force
+            below r0) or 'harmonic'. It is not included in the returned
+            energies. Default is 'flat_bottom'.
 
         :return:
             conformers_dict: Dictionary with lists of potential energies of the conformations, the minimized molecule objects,
             and their corresponding coordinates in XYZ format.
         """
+        # Fail early on an unknown restraint type
+        self._get_centroid_restraint_expression(restraint_type)
         if molecules:
             self.ostream.print_info("Generating system...")
             self.ostream.flush()
@@ -909,7 +918,8 @@ class OpenMMDynamics:
             self.system = forcefield.createSystem(modeller.topology, **system_arguments)
 
         # prepare system for simulation
-        real_system = self.system  # used for recalculation
+        # Unrestrained copy for the energy recalculation
+        real_system = copy.deepcopy(self.system)
         self.ensemble = 'NVT'
         self.temperature = temperature * unit.kelvin
         self.timestep = timestep * unit.femtosecond
@@ -921,7 +931,8 @@ class OpenMMDynamics:
             self.labels = [atom.element.symbol for atom in self.topology.atoms()]
 
         # add customcentroidbondforce to the system
-        self._get_centroid_bond_force(k, r0, use_chain, position_restraint)
+        self._get_centroid_bond_force(k, r0, use_chain, position_restraint,
+                                      restraint_type)
 
         self.simulation = app.Simulation(self.topology, self.system, self.integrator, platform=self._create_platform())
         self.simulation.context.setPositions(self.positions)
@@ -2643,6 +2654,11 @@ class OpenMMDynamics:
         if write_pdb:
             chain_id_list = list(string.ascii_uppercase + string.ascii_lowercase + string.digits)
             atom_names = [atom_info['name'] for mol in self.atom_dict.values() for atom_info in mol.values()]
+            # OpenMM keeps only residues named HOH rigid
+            resnames = [
+                'HOH' if mol.is_water_molecule() else f"M{mol_id+1:02d}"
+                for mol_id, mol in enumerate(molecules)
+            ]
             # Determine box size
             min_coords = np.min(all_coords, axis=0)
             max_coords = np.max(all_coords, axis=0)
@@ -2658,7 +2674,7 @@ class OpenMMDynamics:
                 f.write(f"CRYST1{box_size:9.3f}{box_size:9.3f}{box_size:9.3f}  90.00  90.00  90.00 P 1           1\n")
 
                 for i, (coord, label, mol_id) in enumerate(zip(all_coords, all_labels, atom_mol_ids), 1):
-                    resname = f"M{mol_id+1:02d}"
+                    resname = resnames[mol_id]
                     chain_id = chain_id_list[mol_id % len(chain_id_list)]
                     resseq = mol_id + 1
                     atom_name = atom_names[i - 1][:4]  # Ensure name is max 4 chars
@@ -2680,20 +2696,39 @@ class OpenMMDynamics:
 
                 f.write("END\n")
 
-    def _get_centroid_bond_force(self, k, r0, use_chain=False, position_restraint=None):
+    @staticmethod
+    def _get_centroid_restraint_expression(restraint_type):
+        """
+        Returns the restraint type and its energy expression.
+        """
+        expressions = {
+            'harmonic': '0.5*k*(d-r0)^2; d=distance(g1,g2)',
+            'flat_bottom': 'step(d-r0)*0.5*k*(d-r0)^2; d=distance(g1,g2)',
+        }
+        restraint_key = str(restraint_type).lower().replace('-', '_')
+        assert_msg_critical(
+            restraint_key in expressions,
+            f"Unknown restraint_type '{restraint_type}'. Options are 'harmonic' and 'flat_bottom'.")
+
+        return restraint_key, expressions[restraint_key]
+
+    def _get_centroid_bond_force(self, k, r0, use_chain=False, position_restraint=None,
+                                 restraint_type='flat_bottom'):
         """
         Creates a CustomCentroidBondForce to restrain the molecules to eachother during conformational sampling
         of more than one molecule.
         """
-        self.ostream.print_info("Applying centroid bond force to the system...")
+        restraint_key, expression = self._get_centroid_restraint_expression(restraint_type)
+        self.ostream.print_info(f"Applying {restraint_key.replace('_', '-')} centroid bond force to the system...")
         self.ostream.flush()
 
         residues = list(self.topology.chains()) if use_chain else list(self.topology.residues())
         if len(residues) < 2:
             raise ValueError("Expected at least two residues in the PDB file")
 
-        restraint = mm.CustomCentroidBondForce(2, "0.5*k*(distance(g1,g2)-r0)^2")
-        restraint.setUsesPeriodicBoundaryConditions(True)
+        restraint = mm.CustomCentroidBondForce(2, expression)
+        # Periodic distances only for periodic systems
+        restraint.setUsesPeriodicBoundaryConditions(self.system.usesPeriodicBoundaryConditions())
         restraint.addGlobalParameter('r0', r0 * unit.nanometer)
         restraint.addGlobalParameter('k',k)
 
