@@ -217,7 +217,7 @@ class TestAutoCdamFrameworkBaseline:
         }, VeloxChemError, "representation"),
         ({
             "charges": "groups"
-        }, VeloxChemError, "needs metal_charges"),
+        }, VeloxChemError, "needs the formal metal charges"),
         ({
             "charges": "groups",
             "metal_charges": {"O1": 3}
@@ -246,9 +246,11 @@ class TestAutoCdamFrameworkBaseline:
             node_system(**kwargs).prepare_baseline()
 
     def test_group_charge_scheme_gives_formal_metal_and_integer_groups(self):
-        node = node_system(charges="groups",
-                           metal_charges={"Al": 3},
-                           group_charges=GROUP_CHARGES)
+        node = FrameworkSystem(structure=node_molecule(),  # default charges
+                               target_metal="Al",
+                               metal_charges={"Al": 3},
+                               group_charges=GROUP_CHARGES)
+        assert node.charges == "groups"
         assert covalent_groups(node.molecule) == [[1, 2], [3, 4],
                                                   [5, 6, 7, 8],
                                                   [9, 10, 11, 12],

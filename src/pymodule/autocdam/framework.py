@@ -432,10 +432,10 @@ class FrameworkSystem:
     """
     A target metal site inside a cluster or periodic framework.
 
-    ``charges`` selects the baseline charges: ``"resp"`` (VeloxChem RESP of the
-    whole structure, runs an SCF), ``"groups"``, an explicit per-atom sequence
-    in e, or ``"zero"``. It is required because VeloxChem otherwise assigns
-    zero charges silently.
+    ``charges`` selects the baseline charges: ``"groups"`` (default),
+    ``"resp"`` (VeloxChem RESP of the whole structure, runs an SCF), an
+    explicit per-atom sequence in e, or ``"zero"``. ``None`` is refused because
+    VeloxChem would otherwise assign zero charges silently.
 
     ``"groups"`` is the scheme for a nonbonded metal model: each metal carries
     its formal charge (``metal_charges``, e.g. ``{"Al": 3}``, by element, atom
@@ -468,7 +468,8 @@ class FrameworkSystem:
     :param target_metal:
         The target metal (index or atom label).
     :param charges:
-        The baseline charges: "resp", "groups", "zero", or a per-atom sequence in e.
+        The baseline charges: "groups" (default), "resp", "zero", or a
+        per-atom sequence in e.
     :param charge:
         The molecular charge (required for an xyz structure).
     :param multiplicity:
@@ -501,7 +502,7 @@ class FrameworkSystem:
 
     structure: Any
     target_metal: int | str
-    charges: Any = None
+    charges: Any = "groups"
     charge: int | None = None
     multiplicity: int = 1
     representation: str = "atom"
@@ -565,10 +566,12 @@ class FrameworkSystem:
             self.water_model in WATER_MODELS_FOR_GROUPS,
             "water_model must be one of " + ", ".join(WATER_MODELS_FOR_GROUPS) +
             " (a 4-site model needs a virtual site the framework cannot add)")
-        if isinstance(self.charges, str) and self.charges == "groups":
+        if (isinstance(self.charges, str) and self.charges == "groups" and
+                self.baseline_force_field is None):
             assert_msg_critical(
                 bool(self.metal_charges),
-                "charges='groups' needs metal_charges, e.g. {'Al': 3}")
+                "charges='groups' (the default) needs the formal metal "
+                "charges, e.g. metal_charges={'Al': 3}")
 
     def _read_structure(self):
         """A VeloxChem Molecule from the given object, xyz file, or xyz text."""
