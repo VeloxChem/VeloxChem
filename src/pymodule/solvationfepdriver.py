@@ -93,6 +93,9 @@ class SolvationFepDriver:
         - lambdas_stage2: The lambdas for stage 2.
         - lambdas_stage3: The lambdas for stage 3.
         - lambdas_stage4: The lambdas for stage 4.
+        - overlap_threshold: Neighbor overlap below which a warning is issued.
+        - save_overlap_txt: If True, save the MBAR overlap matrix of each stage in txt format.
+        - overlap_diagnostics: Per stage: lambdas, overlap matrix, neighbor overlaps, weak pairs and effective sample sizes.
         - u_kln: The potential energies across stages.
         - stage: The current stage.
         - final_free_energy: The final free energy.
@@ -165,6 +168,11 @@ class SolvationFepDriver:
         self.lambdas_stage3 = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]
         # Fixed lambda vector for stage 4 with 3 lambdas
         self.lambdas_stage4 = [1.0, 0.5, 0.0]
+
+        # Overlap diagnostics
+        self.overlap_threshold = 0.03
+        self.save_overlap_txt = False
+        self.overlap_diagnostics = []
 
         # Storage for potential energies across stages
         self.u_kn_matrices = []
@@ -374,6 +382,8 @@ class SolvationFepDriver:
         self.ostream.print_line(f"Lambdas in Stage 4: {self.lambdas_stage4}")
         self.ostream.print_blank()
 
+        self.overlap_diagnostics = []
+
         # Run the simulations
         self.ostream.print_info("Starting solvated simulation (Stage 1)...\n")
         delta_f_1, free_en_s1 = self._run_lambda_simulations(stage=1)
@@ -398,8 +408,11 @@ class SolvationFepDriver:
 
         self.delta_f = [delta_f_1, delta_f_2, delta_f_3, delta_f_4]
 
+        self._print_overlap_summary()
+
         delta_f = {f"Stage {i+1}": {'Delta_f': (self.delta_f[i]['Delta_f'][-1, 0] * self.kT).value_in_unit(unit.kilojoule_per_mole),
-                                    'Uncertainty': (self.delta_f[i]['dDelta_f'][-1, 0] * self.kT).value_in_unit(unit.kilojoule_per_mole)}
+                                    'Uncertainty': (self.delta_f[i]['dDelta_f'][-1, 0] * self.kT).value_in_unit(unit.kilojoule_per_mole),
+                                    'Minimum adjacent overlap': self.overlap_diagnostics[i]['min_neighbor_overlap']}
                    for i in range(4)}
 
         delta_f['free_energy'] = final_free_energy
@@ -484,6 +497,8 @@ class SolvationFepDriver:
 
         self.ostream.print_line(f"Free energy for stage {stage}: {free_energy:.4f} +/- {(delta_f['dDelta_f'][-1, 0] * self.kT).value_in_unit(unit.kilojoule_per_mole):.4f} kJ/mol")
         self.ostream.flush()
+
+        self._analyze_overlap(delta_f, stage, lambdas)
 
         return delta_f, free_energy
 
@@ -778,7 +793,127 @@ class SolvationFepDriver:
         mbar = MBAR(u_kn, N_k=self.N_k, n_bootstraps=50, solver_protocol='robust')
         delta_f = mbar.compute_free_energy_differences(uncertainty_method='bootstrap')
 
+        # Overlap matrix and effective sample sizes for the overlap diagnostics
+        delta_f['overlap_matrix'] = np.asarray(mbar.compute_overlap()['matrix'], dtype=float)
+        delta_f['effective_sample_sizes'] = np.asarray(mbar.compute_effective_sample_number(), dtype=float)
+
         return delta_f
+
+    def _analyze_overlap(self, delta_f, stage, lambdas):
+        """
+        Records the overlap between neighboring lambda windows of a stage and warns if it is low.
+
+        :param delta_f:
+            The MBAR result of the stage, including the overlap matrix.
+        :param stage:
+            The stage number.
+        :param lambdas:
+            The lambda values of the stage.
+        """
+
+        matrix = delta_f['overlap_matrix']
+        lambdas = list(lambdas)
+
+        neighbor_overlaps = [float(min(matrix[k, k + 1], matrix[k + 1, k])) for k in range(len(lambdas) - 1)]
+        weak_pairs = [(lambdas[k], lambdas[k + 1], overlap) for k, overlap in enumerate(neighbor_overlaps)
+                      if overlap < self.overlap_threshold]
+
+        self.overlap_diagnostics.append({
+            'stage': stage,
+            'lambdas': lambdas,
+            'overlap_matrix': matrix,
+            'neighbor_overlaps': neighbor_overlaps,
+            'min_neighbor_overlap': min(neighbor_overlaps) if neighbor_overlaps else float('nan'),
+            'weak_pairs': weak_pairs,
+            'effective_sample_sizes': delta_f['effective_sample_sizes'],
+        })
+
+        self.ostream.print_info(f"Overlap between neighboring windows for stage {stage}: "
+                                + ", ".join(f"{overlap:.3f}" for overlap in neighbor_overlaps))
+        for lambda_a, lambda_b, overlap in weak_pairs:
+            self.ostream.print_warning(f"Stage {stage}: overlap between lambda = {lambda_a} and lambda = {lambda_b} "
+                                       f"is {overlap:.2g}, below {self.overlap_threshold}. Insert intermediate "
+                                       "lambda windows or increase num_steps.")
+
+        if self.save_overlap_txt:
+            output_folder = Path(self.output_folder)
+            output_folder.mkdir(parents=True, exist_ok=True)
+            np.savetxt(output_folder / f'overlap_stage{stage}.txt', matrix, fmt='%.6f',
+                       header=f'MBAR overlap matrix, stage {stage}, lambdas: ' + ' '.join(f'{lam:g}' for lam in lambdas))
+
+        self.ostream.flush()
+
+    def _print_overlap_summary(self):
+        """
+        Prints the smallest neighbor overlap of each stage.
+        """
+
+        self.ostream.print_blank()
+        self.ostream.print_line("Minimum overlap between neighboring windows:")
+        for diag in self.overlap_diagnostics:
+            flag = f"  (below {self.overlap_threshold})" if diag['weak_pairs'] else ""
+            self.ostream.print_line(f"  Stage {diag['stage']}: {diag['min_neighbor_overlap']:.3f}{flag}")
+        if any(diag['weak_pairs'] for diag in self.overlap_diagnostics):
+            self.ostream.print_warning("Low overlap between neighboring lambda windows; see the warnings above.")
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+    def plot_overlap_matrix(self, stage=None, filename=None, annotate=True):
+        """
+        Plots the MBAR overlap matrices of a finished calculation.
+
+        :param stage:
+            The stage (1-4) to plot. If None, all stages are plotted.
+        :param filename:
+            If given, the figure is saved to this file.
+        :param annotate:
+            If True, the matrix elements are written into the cells.
+
+        :return:
+            The matplotlib figure.
+        """
+
+        import matplotlib.pyplot as plt
+
+        assert_msg_critical(len(self.overlap_diagnostics) > 0,
+                            'SolvationFepDriver.plot_overlap_matrix: run a calculation first')
+
+        if stage is None:
+            panels = list(self.overlap_diagnostics)
+        else:
+            panels = [diag for diag in self.overlap_diagnostics if diag['stage'] == stage]
+            assert_msg_critical(len(panels) > 0,
+                                'SolvationFepDriver.plot_overlap_matrix: stage must be 1, 2, 3 or 4')
+
+        fig, axes = plt.subplots(1, len(panels), figsize=(4.0 * len(panels) + 1.0, 4.0), squeeze=False,
+                                 constrained_layout=True)
+
+        for ax, diag in zip(axes[0], panels):
+            matrix = diag['overlap_matrix']
+            n_states = matrix.shape[0]
+            image = ax.imshow(matrix, cmap='Blues', vmin=0.0, vmax=1.0)
+            if annotate:
+                for i in range(n_states):
+                    for j in range(n_states):
+                        if matrix[i, j] >= 0.005:
+                            color = 'white' if matrix[i, j] > 0.6 else 'black'
+                            ax.text(j, i, f'{matrix[i, j]:.2f}'.lstrip('0'), ha='center', va='center',
+                                    fontsize=7, color=color)
+            labels = [f'{lam:g}' for lam in diag['lambdas']]
+            ax.set_xticks(range(n_states))
+            ax.set_yticks(range(n_states))
+            ax.set_xticklabels(labels, rotation=90, fontsize=7)
+            ax.set_yticklabels(labels, fontsize=7)
+            ax.set_xlabel(r'$\lambda$')
+            ax.set_ylabel(r'$\lambda$')
+            ax.set_title(f"Stage {diag['stage']} (min. neighbor {diag['min_neighbor_overlap']:.2f})", fontsize=9)
+
+        fig.colorbar(image, ax=list(axes[0]), shrink=0.8, label='Overlap')
+
+        if filename is not None:
+            fig.savefig(filename, dpi=300, bbox_inches='tight')
+
+        return fig
 
     def _get_alchemical_region(self, topology):
         """
