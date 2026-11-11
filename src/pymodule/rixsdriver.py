@@ -171,8 +171,6 @@ class RixsDriver(LinearSolver):
                 ('int', 'number of involved valence orbitals'),
             'num_virtual_orbitals':
                 ('int', 'number of involved virtual orbitals'),
-            'compute_in_mo':
-                ('bool', 'evaluate transition moments in the MO basis'),
             'cpp':
                 ('bool', 'use the complex polarization propagator routes'),
             'components':
@@ -1032,15 +1030,32 @@ class RixsDriver(LinearSolver):
             valence_eigvals = None
             dipole_integrals_ao = None
         C = self.comm.bcast(C, root=mpi_master())
+        mo_occ = C[:, :nocc].copy()
+        mo_vir = C[:, nocc:].copy()
         valence_eigvals = self.comm.bcast(valence_eigvals, root=mpi_master())
         dipole_integrals_ao = self.comm.bcast(dipole_integrals_ao, root=mpi_master())
+
+        if self.rank == mpi_master():
+            dipole_integrals_ao = compute_electric_dipole_integrals(molecule, basis, [0.0,0.0,0.0])
+            d_oo = np.array([mo_occ.T @ dipole_integrals_ao[i] @ mo_occ for i in range(3)])
+            d_ov = np.array([mo_occ.T @ dipole_integrals_ao[i] @ mo_vir for i in range(3)])
+            d_vv = np.array([mo_vir.T @ dipole_integrals_ao[i] @ mo_vir for i in range(3)])
+        else:
+            d_oo = None
+            d_ov = None
+            d_vv = None
+
+        d_oo = self.comm.bcast(d_oo, root=mpi_master())
+        d_ov = self.comm.bcast(d_ov, root=mpi_master())
+        d_vv = self.comm.bcast(d_vv, root=mpi_master())
+        dipole_integrals = (d_oo, d_ov, d_vv)
+        dipole_integrals_mo = np.array([C.T @ dipole_integrals_ao[i] @ C for i in range(3)])
+
 
         norb = C.shape[1]
         nvir = norb - nocc
 
-        mo_occ = C[:, :nocc].copy()
-        mo_vir = C[:, nocc:].copy()
-        dipole_integrals_mo = np.array([C.T @ dipole_integrals_ao[i] @ C for i in range(3)])
+        #dipole_integrals_mo = np.array([C.T @ dipole_integrals_ao[i] @ C for i in range(3)])
 
         components = self.components
 
@@ -1076,16 +1091,23 @@ class RixsDriver(LinearSolver):
                 # on the transition density matches the SOS amplitude convention
                 F = np.zeros((3, 3), dtype=complex)
                 for comp, (z_core, y_core) in zip(components, core_vecs):
-                    if self.compute_in_mo:
-                        core_to_val = self.get_tdms_mo(z_val, y_val, z_core, y_core)[1]
-                        dipole_integrals = dipole_integrals_mo
-                    else:
-                        core_to_val = self._get_esa_transition_density(z_core, y_core, z_val, y_val, mo_occ, mo_vir)
-                        dipole_integrals = dipole_integrals_ao
+                    #core_to_val = self.get_tdms(z_val, y_val, z_core, y_core)[1]
+                    dipole_integrals = dipole_integrals_mo
 
                     A = dipole_integrals.reshape(dipole_integrals.shape[0], -1)
-                    B = (-core_to_val).reshape(-1)
+                    core_to_val_oo = -(z_core @ z_val.T + y_core @ y_val.T)
+                    core_to_val_vv = z_core.T @ z_val + y_core.T @ y_val
+                    core_to_val = np.zeros((norb, norb), dtype=complex)
+                    core_to_val[:nocc, :nocc] = core_to_val_oo
+                    core_to_val[nocc:, nocc:] = core_to_val_vv
+                    B = np.array(-core_to_val).reshape(-1)
+                    #gs2core, core2val = self.get_tdms(z_val, y_val, z_core, y_core)
                     F[:, 'xyz'.index(comp)] = omega_product * np.matmul(A, B)
+                    
+                #F[:, :] = self.scattering_amplitude_tensor(
+                #    w_ex, w_ex, w, gs2core, core2val, dipole_integrals
+                #)
+                    
                 self.scattering_amplitudes[f_ind, n_ind] = F
 
                 omegaprim = (w_ex - w) / w_ex
