@@ -448,7 +448,10 @@ class FrameworkSystem:
     group, e.g. ``{"O1": -1}`` for a hydroxide); unlisted groups are neutral.
     Charge transfer to the metal is then left to the fitted CDAM parameters
     instead of being counted in the charges. The metal and group charges must
-    add up to the structure's charge.
+    add up to the structure's charge. A precomputed result of this scheme can
+    be given as the charge list together with ``metal_charges`` and
+    ``group_charges``: it is then used as is (no RESP) after checking that it
+    matches the scheme.
     ``baseline_force_field`` accepts an already generated
     ``MMForceFieldGenerator`` for the same structure; it is copied, never changed.
     ``box_vectors`` (3x3, angstrom) makes the system periodic with PME.
@@ -679,11 +682,17 @@ class FrameworkSystem:
                 raise ValueError(
                     f"charges sum to {values.sum():.4f} e but the structure's "
                     f"charge is {self.molecule.get_charge()}")
+            checked = not isinstance(self.charges, str) and bool(
+                self.metal_charges or self.group_charges)
+            if checked:
+                self._check_against_groups(values)
             ff.partial_charges = values.copy()
             resp = True  # preset charges are kept; VeloxChem skips its own RESP
             source = ("VeloxChem MMForceFieldGenerator, formal metal charges "
                       f"with per-group RESP ligands and {self.water_model} water"
                       if isinstance(self.charges, str) else
+                      "VeloxChem MMForceFieldGenerator, precomputed group-scheme "
+                      "charges (checked)" if checked else
                       "VeloxChem MMForceFieldGenerator, user-supplied charges")
         try:
             # RESP writes SCF files named after molecule_name; keep them out
@@ -705,19 +714,18 @@ class FrameworkSystem:
                 raise ValueError("VeloxChem changed the supplied charges")
         return ff, source
 
-    def _group_scheme_charges(self) -> list[float]:
-        """Per-atom charges of the ``"groups"`` scheme (see the class docstring)."""
+    def _group_plan(self):
+        """(formal metal charges, groups, group totals, water groups) of the
+        ``"groups"`` scheme, without any RESP."""
         from ..waterparameters import get_water_parameters
 
-        n_atoms = len(self.elements)
         metals = metal_indices(self.molecule)
         groups = covalent_groups(self.molecule)
         group_of = {atom: g for g, atoms in enumerate(groups) for atom in atoms}
-        charges = np.zeros(n_atoms)
 
         # formal metal charges: by element first, then by label or index
         metal_set, assigned = set(metals), {}
-        for key, value in self.metal_charges.items():
+        for key, value in (self.metal_charges or {}).items():
             if isinstance(key, str) and any(
                     self.elements[m].upper() == key.strip().upper() for m in metals):
                 targets = [m for m in metals
@@ -732,8 +740,6 @@ class FrameworkSystem:
         if missing:
             raise ValueError("metal_charges has no formal charge for "
                              + ", ".join(missing))
-        for m, value in assigned.items():
-            charges[m] = value
 
         # integer net charge of each ligand group, named by any member atom
         totals = {}
@@ -750,14 +756,29 @@ class FrameworkSystem:
             totals[group] = int(value)
 
         water = get_water_parameters()[self.water_model]
+        waters = {}
+        for g, atoms in enumerate(groups):
+            if (sorted(self.elements[i] for i in atoms) == ["H", "H", "O"] and
+                    g not in totals):
+                waters[g] = [
+                    water["ow" if self.elements[i] == "O" else "hw"]["charge"]
+                    for i in atoms
+                ]
+        return assigned, groups, totals, waters
+
+    def _group_scheme_charges(self) -> list[float]:
+        """Per-atom charges of the ``"groups"`` scheme (see the class docstring)."""
+        assigned, groups, totals, waters = self._group_plan()
+        charges = np.zeros(len(self.elements))
+        for m, value in assigned.items():
+            charges[m] = value
         coordinates = self.molecule.get_coordinates_in_angstrom()
         for g, atoms in enumerate(groups):
             elements = [self.elements[i] for i in atoms]
             total = totals.get(g, 0)
             names = " ".join(self.labels[i] for i in atoms)
-            if sorted(elements) == ["H", "H", "O"] and g not in totals:
-                for i in atoms:
-                    charges[i] = water["ow" if self.elements[i] == "O" else "hw"]["charge"]
+            if g in waters:
+                charges[atoms] = waters[g]
                 how = f"{self.water_model} water"
             elif len(atoms) == 1:
                 charges[atoms[0]] = float(total)
@@ -777,6 +798,38 @@ class FrameworkSystem:
                 "charged ligands")
         self.ostream.flush()
         return charges.tolist()
+
+    def _check_against_groups(self, values) -> None:
+        """Check precomputed per-atom charges against the ``"groups"`` scheme.
+
+        Used when an explicit charge list comes with ``metal_charges`` or
+        ``group_charges``: no RESP is run, but each metal must carry its formal
+        charge, each group its integer total and each water the water-model
+        charges.
+        """
+        assigned, groups, totals, waters = self._group_plan()
+        problems = []
+        for m, value in assigned.items():
+            if abs(values[m] - value) > 1e-4:
+                problems.append(f"{self.labels[m]} is {values[m]:+.4f}, "
+                                f"not its formal {value:+g}")
+        for g, atoms in enumerate(groups):
+            names = " ".join(self.labels[i] for i in atoms)
+            total = totals.get(g, 0)
+            if abs(values[atoms].sum() - total) > 1e-3:
+                problems.append(f"group {names} sums to "
+                                f"{values[atoms].sum():+.4f}, not {total:+d}")
+            elif g in waters and not np.allclose(values[atoms], waters[g],
+                                                 atol=1e-4):
+                problems.append(f"water {names} does not have the "
+                                f"{self.water_model} charges")
+        if problems:
+            raise ValueError("the charge list does not match the group "
+                             "scheme: " + "; ".join(problems))
+        self.ostream.print_info(
+            "Precomputed charges match the group scheme (formal metal "
+            f"charges, integer groups, {self.water_model} water); no RESP run")
+        self.ostream.flush()
 
     @staticmethod
     def _isolated_group_resp(elements, coordinates, total, names) -> np.ndarray:

@@ -272,6 +272,26 @@ class TestAutoCdamFrameworkBaseline:
         assert same[13:16] == pytest.approx((-0.834, 0.417, 0.417))
         assert same[:13] == pytest.approx(tuple(charges[:13]))
 
+    def test_precomputed_group_charges_are_checked_not_recomputed(
+            self, monkeypatch):
+
+        def no_resp(*args, **kwargs):
+            raise AssertionError("RESP must not run for precomputed charges")
+
+        monkeypatch.setattr(FrameworkSystem, "_isolated_group_resp",
+                            staticmethod(no_resp))
+        node = node_system(charges=CHARGES,
+                           metal_charges={"Al": 3},
+                           group_charges=GROUP_CHARGES)
+        assert node.prepare_baseline().charges == pytest.approx(tuple(CHARGES))
+        # the old illustrative charges (Al +1.7, OH- -0.6) are not this scheme
+        illustrative = [1.7, -1.0, 0.4, -1.0, 0.4, -0.7, 0.6, -0.7, 0.05,
+                        -0.7, 0.6, -0.7, 0.05, -0.8, 0.4, 0.4, -0.8, 0.4, 0.4]
+        with pytest.raises(ValueError, match="does not match the group scheme"):
+            node_system(charges=illustrative,
+                        metal_charges={"Al": 3},
+                        group_charges=GROUP_CHARGES).prepare_baseline()
+
     def test_periodic_cell_uses_pme_and_minimum_image(self):
         import openmm as mm
 
