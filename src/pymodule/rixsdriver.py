@@ -727,7 +727,8 @@ class RixsDriver(LinearSolver):
         assert_msg_critical(not self.dynamic_relaxation,
                             'Only static relaxation is enabled for now.')
 
-        self.photon_energy = [float(w) for w in self.photon_energy]
+        #self.photon_energy = [float(w) for w in self.photon_energy]
+        self.photon_energy = np.atleast_1d(np.asarray(self.photon_energy, dtype=float)).tolist()
 
         self._is_converged = False
         solver_convergence = []

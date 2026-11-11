@@ -12,7 +12,8 @@ from veloxchem.rixsdriver import RixsDriver
 class TestRIXS:
 
     def run_rixs(self, xcfun_label, basis_label, ref_xsection, ncore, nstates,
-                 ncorestates=None, nvir=None, nvalence=None, tda=False, cutoff_ene=None):
+                 ncorestates=None, nvir=None, nvalence=None, tda=False, cutoff_ene=None,
+                 no_fine_structure_constant=False, final_state_fwhm_ev=None, photon_energy=None):
 
         xyz_string = """3
         xyz
@@ -49,12 +50,24 @@ class TestRIXS:
             rixs_drv.num_core_orbitals = ncore
             rixs_drv.num_core_states = ncorestates
 
+        if final_state_fwhm_ev:
+            rixs_drv.conv_thresh = 1e-4
+            rixs_drv.cpp = True
+            rixs_drv.theta = 0
+            rixs_drv.final_state_gamma = final_state_fwhm_ev / hartree_in_ev()
+            rixs_drv.photon_energy = photon_energy
+            rixs_drv.energyloss_frequencies = np.linspace(7.5 / hartree_in_ev(), 18.5 / hartree_in_ev(), 10)
+
         rixs_res = rixs_drv.compute(mol, bas, scf_results)
 
         if scf_drv.rank == mpi_master():
-            ref_xsection = np.array(ref_xsection) * fine_structure_constant()**4
-            assert np.allclose(ref_xsection, rixs_res['cross_sections'][:,0],
-                               rtol=1e-5, atol=1e-8)
+            if no_fine_structure_constant:
+                assert np.allclose(ref_xsection, rixs_res['cross_sections'][:,0],
+                                   rtol=1e-5, atol=1e-8)
+            else:
+                ref_xsection = np.array(ref_xsection) * fine_structure_constant()**4
+                assert np.allclose(ref_xsection, rixs_res['cross_sections'][:,0],
+                                rtol=1e-5, atol=1e-8)
 
     def test_hf_svp_rpa_rsa(self):
 
@@ -158,3 +171,11 @@ class TestRIXS:
 
         self.run_rixs('hf', '6-31G*', ref_xsection, 1, 57, nvir=13, nvalence=4, tda=False, cutoff_ene=31.5 / hartree_in_ev())
 
+    def test_hf_svp_2xcpp(self):
+
+        ref_xsection = np.array([2.26265819e-05, 1.52676005e-04, 2.30291219e-04, 2.79086321e-04, 
+                                1.65416370e-04, 9.39747755e-05, 2.03358196e-04, 7.89547322e-05,
+                                1.46603566e-05, 3.92198735e-05])
+
+        self.run_rixs('hf', 'def2-svp', ref_xsection, 1, 20, ncorestates=4, tda=False, 
+                      no_fine_structure_constant=True, final_state_fwhm_ev=0.3, photon_energy=20.264221647434987)
